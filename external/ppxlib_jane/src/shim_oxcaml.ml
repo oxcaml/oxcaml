@@ -112,6 +112,7 @@ module Label_declaration = struct
 
   let create ~loc ~name ~mutable_ ~modalities ~type_ =
     { pld_loc = loc
+    ; pld_inherit = Not_inherited
     ; pld_modalities = modalities
     ; pld_name = name
     ; pld_type = type_
@@ -413,6 +414,7 @@ type nonrec jkind_annotation_desc = jkind_annotation_desc =
   | Pjk_with of jkind_annotation * core_type * Modality.t loc list
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
+  | Pjk_inherit of jkind_annotation
 
 type nonrec jkind_annotation = jkind_annotation =
   { pjka_loc : Location.t

@@ -128,6 +128,10 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
+  val is_unfilled_var_flat : Sort.Flat.t t -> bool
+
+  val strip_head_addressable_flat : Sort.Flat.t t -> Sort.Flat.t t
+
   val implied_externality : Sort.t t -> Jkind_axis.Externality.t
 
   module Debug_printers : sig
@@ -368,12 +372,14 @@ module Builtin : sig
   val immediate_or_null :
     why:History.immediate_or_null_creation_reason -> 'd Types.jkind
 
-  (** Build a jkind of unboxed products, given only an arity. This jkind will
-      not mode-cross (and has kind [Not_best] accordingly), even though unboxed
-      products generally should. This is useful when creating an initial jkind
-      in Typedecl. *)
+  (** Build a jkind of unboxed products of [any], given only operators applied
+      to each component. This jkind will not mode-cross (and has kind [Not_best]
+      accordingly), even though unboxed products generally should. This is
+      useful when creating an initial jkind in Typedecl. *)
   val product_of_any :
-    why:History.product_creation_reason -> int -> Types.jkind_l
+    why:History.product_creation_reason ->
+    Jkind_types.Kind_operator.t list ->
+    Types.jkind_l
 end
 
 (** Forcibly change the mod- and with-bounds of a [t] based on the mod- and
@@ -489,7 +495,7 @@ module Unboxed_field_transformation : sig
   (** The kind of an unboxed container is built from the kinds of its unboxed
       contents (which get stored inline), transformed based on the modalities
       and [mutable] labels on its fields (to strengthen or weaken mode crossing,
-      respectively).
+      respectively), and made addressable where the container does so.
 
       An [Unboxed_field_transformation.t] represents such a kind transformation
       as data. *)
@@ -505,7 +511,14 @@ module Unboxed_field_transformation : sig
         type r = #{ <<mutability>> x : t @@ <<modality>> }
       ]} *)
   val of_field :
-    mutability:Types.mutability -> modality:Mode.Modality.Const.t -> t
+    mutability:Types.mutability ->
+    modality:Mode.Modality.Const.t ->
+    operator:Jkind_types.Kind_operator.t ->
+    t
+
+  (** The transformation for a component of an unboxed tuple, which is made
+      addressable. *)
+  val of_tuple_component : t
 
   (** Constructs the transformation for an immutable field declared with the
       given modality. *)
@@ -524,12 +537,19 @@ module Unboxed_field_transformation : sig
 
   (** Executes [t]'s transformation on an expectation for an unboxed container
       to turn it into an expectation on its unboxed contents, checking if the
-      transformation result is satisfiable and failing if it is not. *)
-  val apply_r : t -> ('l * allowed) Types.jkind -> (Types.jkind_r, unit) result
+      transformation result is satisfiable and failing if it is not. Also
+      returns the kind operator the container applies to the contents, which is
+      not undone here: [Ctype.constrain_type_jkind] applies it to the kind of
+      the contents instead. *)
+  val apply_r_except_op :
+    t ->
+    ('l * allowed) Types.jkind ->
+    (Jkind_types.Kind_operator.t * Types.jkind_r, unit) result
 
   (** Translates a violation from checking some unboxed contents against
-      [apply_r t jk] into a violation of their unboxed container against [jk].
-      Returns [None] if the violation is not a [Not_a_subjkind]. *)
+      [apply_r_except_op t jk] into a violation of their unboxed container
+      against [jk]. Returns [None] if the violation is not a [Not_a_subjkind].
+  *)
   val unapply_violation :
     context:jkind_context ->
     Env.t ->
@@ -753,6 +773,28 @@ val apply_modality_l :
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
+(** Given the kind [k] of a type, the kind of that type made addressable (or
+    left as is, for [Id]). *)
+val apply_operator_l :
+  Jkind_types.Kind_operator.t -> ('l * 'r) Types.jkind -> ('l * 'r) Types.jkind
+
+(** Constrain a kind to be addressable, filling sort variables as needed:
+    [k < k addressable]. Fails when it is not. *)
+val constrain_below_addressable : Env.t -> 'd Types.jkind -> (unit, unit) result
+
+(** Constrain a kind to have an addressable kind below it, filling sort
+    variables as needed: [k addressable < k]. Fails when it has none. *)
+val constrain_above_addressable : Env.t -> 'd Types.jkind -> (unit, unit) result
+
+(** Try to apply the right adjoint of [addressable]. I.e.:
+
+    Given some kind [k], try to produce some kind [k'] such that constraints
+    like [l addressable < k] can be reduced to [l < k'] (where the latter
+    implies the former). *)
+val apply_addressable_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
+
+val is_surely_addressable : Env.t -> 'd Types.jkind -> bool
+
 (** Given a kind [k], returns the kind of [(_ : k) or_null]. Fails if [or_null]
     cannot be applied to types of kind [k]. *)
 val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
@@ -764,16 +806,23 @@ val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
     Fails if no [or_null] type could have kind [k]. *)
 val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
-(** Given a jkind [k], produce a list of jkinds [ks] such that [k] is equivalent
-    to [Product ks]. In practice, [k] is the kind of, or required kind of, a
-    tuple/record being inspected in [Ctype.constrain_type_jkind].
+type 'd decomposed_product =
+  { components : 'd Types.jkind list;
+    outer_addressable : bool
+  }
+
+(** Given a jkind [k], produce its components [ks] and [outer_addressable] such
+    that [k] is equivalent to [Product ks], or to [Addressable (Product ks)]
+    when [outer_addressable] is set. In practice, [k] is the kind of, or
+    required kind of, a tuple/record being inspected in
+    [Ctype.constrain_type_jkind].
 
     Because there are no product jkinds, the resulting jkinds are higher in the
     jkind lattice than they might need to be. (This decomposes the layout but
     just reuses the non-layout parts of the original jkind.)
 
     Never does any mutation. *)
-val decompose_product : Env.t -> 'd Types.jkind -> 'd Types.jkind list option
+val decompose_product : Env.t -> 'd Types.jkind -> 'd decomposed_product option
 
 (** Get an annotation (that a user might write) for this [t]. *)
 val get_annotation : 'd Types.jkind -> Parsetree.jkind_annotation option
@@ -1015,7 +1064,7 @@ val mod_bounds_are_obviously_max : 'd Types.jkind -> bool
 val fully_expand_aliases : Env.t -> 'd Types.jkind -> 'd Types.jkind
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)
-val has_layout_any : Env.t -> ('l * allowed) Types.jkind -> bool
+val has_layout_any : Env.t -> 'd Types.jkind -> bool
 
 (** Checks whether a jkind is [value]. This really should require a [jkind_lr],
     but it works on any [jkind], because it's used in printing and is somewhat

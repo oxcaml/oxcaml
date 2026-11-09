@@ -561,7 +561,10 @@ and print_typargs ppf =
       pp_close_box ppf ();
       pp_print_space ppf ()
 and print_out_label ppf
-    { olab_name; olab_mut; olab_type; olab_modalities } =
+    { olab_name; olab_inherit; olab_mut; olab_type; olab_modalities } =
+  let inherit_ =
+    match olab_inherit with Not_inherited -> "" | Inherited -> "inherit "
+  in
   (* See the notes [NON-LEGACY MODES] *)
   let mut, atomic =
     match olab_mut with
@@ -573,7 +576,8 @@ and print_out_label ppf
     | Nonatomic -> ()
     | Atomic -> fprintf ppf " [@@atomic]"
   in
-  fprintf ppf "@[<2>%s%a :@ %a%a%a@];"
+  fprintf ppf "@[<2>%s%s%a :@ %a%a%a@];"
+    inherit_
     mut
     print_lident olab_name
     print_out_type olab_type
@@ -581,6 +585,9 @@ and print_out_label ppf
     print_atomic atomic
 
 and print_out_jkind_const ppf ojkind =
+  print_out_jkind_const_gen ~nested:false ppf ojkind
+
+and print_out_jkind_const_gen ~nested ppf ojkind =
   let rec pp_element ~nested ppf (ojkind : Outcometree.out_jkind_const) =
     (* HACK: we strip off the [Ojkind_const_with]s and convert them to a [string
        list list] so we can sort them lexicographically, because otherwise the
@@ -656,7 +663,7 @@ and print_out_jkind_const ppf ojkind =
         ppf
         withs;
   in
-  fprintf ppf "@[<hv 2>%a@]" (pp_element ~nested:false) ojkind
+  fprintf ppf "@[<hv 2>%a@]" (pp_element ~nested) ojkind
 
 and print_out_jkind ppf ojkind =
   let rec pp_element ~nested ppf ojkind =
@@ -667,11 +674,17 @@ and print_out_jkind ppf ojkind =
     | Ojkind_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
-    | Ojkind_addressable t ->
-      fprintf ppf "%a addressable" (pp_element ~nested:true) t
+    | Ojkind_addressable t -> fprintf ppf "%a addressable" pp_operand t
+    | Ojkind_inherit t -> fprintf ppf "%a inherit" pp_operand t
     | Ojkind_box (t, axes) ->
-      fprintf ppf "%a %s" (pp_element ~nested:true) t
-        (String.concat " " ("box" :: axes))
+      fprintf ppf "%a %s" pp_operand t (String.concat " " ("box" :: axes))
+  (* The operand of a postfix operator is parenthesized when it is a product or
+     has [mod] bounds *)
+  and pp_operand ppf = function
+    | Ojkind_const jkind -> print_out_jkind_const_gen ~nested:true ppf jkind
+    | (Ojkind_var _ | Ojkind_product _ | Ojkind_addressable _ | Ojkind_inherit _
+      | Ojkind_box _) as t ->
+      pp_element ~nested:true ppf t
   in
   pp_element ~nested:false ppf ojkind
 

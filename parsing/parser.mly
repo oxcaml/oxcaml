@@ -1210,6 +1210,7 @@ The precedences must be listed from low to high.
 %left     PERCENT INFIXOP3 MOD STAR     /* expr (e OP e OP e) */
 %right    INFIXOP4                      /* expr (e OP e OP e) */
 %nonassoc prec_unboxed_product_kind
+%nonassoc INHERIT  /* jkind (k1 & k2 inherit): [inherit] binds to [k2] */
 %nonassoc prec_unary_minus prec_unary_plus /* unary - */
 %nonassoc prec_constant_constructor     /* cf. simple_expr (C versus C x) */
 %nonassoc prec_constr_appl              /* above AS BAR COLONCOLON COMMA */
@@ -4164,6 +4165,14 @@ jkind_desc_gen(self):
   | reverse_product_jkind_gen(self) %prec below_AMPERSAND {
       Pjk_product (List.rev $1)
     }
+  | inner = jkind_annotation_gen(self) INHERIT axes = mkrhs(LIDENT)* {
+      match axes with
+      | [] -> Pjk_inherit inner
+      | _ :: _ ->
+        Pjk_operator
+          ({ pjka_loc = make_loc ($startpos, $endpos($2));
+             pjka_desc = Pjk_inherit inner }, axes)
+    }
   | LPAREN inner = self RPAREN axes = mkrhs(LIDENT)* {
       match axes with
       | [] -> inner
@@ -4398,23 +4407,27 @@ label_declarations:
   | label_declaration_semi label_declarations   { $1 :: $2 }
 ;
 label_declaration:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs=attributes
+    inherit_=inherit_flag mutable_or_global_flag mkrhs(label) COLON
+    poly_type_no_attr m1=optional_atat_modalities_expr attrs=attributes
       { let info = symbol_info $endpos in
-        let mut, m0 = $1 in
+        let mut, m0 = $2 in
         let modalities = m0 @ m1 in
-        Type.field $2 $4 ~mut ~modalities ~attrs ~loc:(make_loc $sloc) ~info}
+        Type.field $3 $5 ~inherit_ ~mut ~modalities ~attrs ~loc:(make_loc $sloc)
+          ~info }
 ;
 label_declaration_semi:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs0=attributes
+    inherit_=inherit_flag mutable_or_global_flag mkrhs(label) COLON
+    poly_type_no_attr m1=optional_atat_modalities_expr attrs0=attributes
       SEMI attrs1=attributes
       { let info =
           match rhs_info $endpos(attrs0) with
           | Some _ as info_before_semi -> info_before_semi
           | None -> symbol_info $endpos
        in
-       let mut, m0 = $1 in
+       let mut, m0 = $2 in
        let modalities = m0 @ m1 in
-       Type.field $2 $4 ~mut ~modalities ~attrs:(attrs0 @ attrs1) ~loc:(make_loc $sloc) ~info}
+       Type.field $3 $5 ~inherit_ ~mut ~modalities ~attrs:(attrs0 @ attrs1)
+         ~loc:(make_loc $sloc) ~info }
 ;
 
 /* Type Extensions */
@@ -5446,6 +5459,10 @@ mutable_flag:
 poly_flag:
     /* empty */                                 { false }
   | POLY                                        { true }
+;
+%inline inherit_flag:
+    /* empty */                                 { Not_inherited }
+  | INHERIT                                     { Inherited }
 ;
 mutable_or_global_flag:
     /* empty */

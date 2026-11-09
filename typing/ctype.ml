@@ -3000,7 +3000,7 @@ let unbox_once env ty =
         apply env (extra_params @ decl.type_params) ty2 (extra_args @ args)
       in
       begin match find_unboxed_type decl with
-      | Some (ty2, modality, mutability) ->
+      | Some (ty2, modality, mutability, operator) ->
         let extra_substs =
           match Env.find_type_descrs p env with
           | Type_variant ([ ({ cstr_generalized = true } as cstr) ], _, _) ->
@@ -3024,7 +3024,8 @@ let unbox_once env ty =
         Stepped
           { ty = apply ty2 ~extra_substs;
             wrapping =
-              Jkind.Unboxed_field_transformation.of_field ~mutability ~modality;
+              Jkind.Unboxed_field_transformation.of_field ~mutability ~modality
+                ~operator;
             or_null = None }
       | None -> begin match decl.type_kind with
         | Type_record_unboxed_product ([_], _, _) ->
@@ -3249,7 +3250,9 @@ let apply_jkind_wrapping_l ~env ~level
 
 (* Given some unwrapped type [t] and kind [k], try to produce some [t'] and
    [k'] such that the constraint [t : k] can be reduced to [t' : k'] (where the
-   latter implies the former).
+   latter implies the former), together with the kind operator the unwrapping
+   applied to [t'], which the caller applies to the kind of [t'] (see
+   [constrain_type_jkind]).
 
    Fails if no [t] could have kind [k]. *)
 let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty; wrapping; or_null } jkind =
@@ -3264,8 +3267,8 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty; wrapping; or_null } jkind =
       Ok jkind
   in
   Result.bind jkind (fun jkind ->
-    Jkind.Unboxed_field_transformation.apply_r wrapping jkind
-    |> Result.map (fun jkind -> ty, jkind))
+    Jkind.Unboxed_field_transformation.apply_r_except_op wrapping jkind
+    |> Result.map (fun (operator, jkind) -> ty, operator, jkind))
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3303,9 +3306,11 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
-      let tys = List.map snd ltys in
+      let component =
+        Jkind.Unboxed_field_transformation.of_tuple_component
+      in
       estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds env
-        (List.map (fun ty -> ty, Jkind.Unboxed_field_transformation.id) tys)
+        (List.map (fun (_, ty) -> ty, component) ltys)
         ~why:Jkind_intf.History.Unboxed_tuple
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
@@ -3507,10 +3512,14 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
      are accommodated by changing [jkind], the expected jkind of the type.
      Trying to apply the modality to the jkind extracted from [ty] would be
      wrong, as it would incorrectly change the jkind on a [Tvar] to mode-cross
-     more than necessary.  *)
-  let rec loop ~fuel ~expanded env ty ty's_jkind jkind =
+     more than necessary.
+
+     [operator] is applied to the kind of [ty] before comparing it with
+     [jkind]: a component of an unboxed tuple or record is made addressable. *)
+  let rec loop ~fuel ~expanded ~operator env ty ty's_jkind jkind =
     let type_equal = !type_equal' env in
     let context = mk_jkind_context_check_principal env in
+    let ty's_jkind = Jkind.apply_operator_l operator ty's_jkind in
     (* Just succeed if we're comparing against [any] *)
     if Jkind.is_obviously_max jkind then Ok () else
     if fuel < 0 then
@@ -3519,10 +3528,10 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           Not_a_subjkind (ty's_jkind, jkind, [Constrain_ran_out_of_fuel])))
     else
     match get_desc ty with
-    (* The [ty's_jkind] we get here is an **r** jkind, necessary for
+    (* The [var_jkind] we get here is an **r** jkind, necessary for
        the call to [intersection_or_error]. And even if [ty] has unbound
-       variables, [ty's_jkind] can't have any variables in it, so we're OK. *)
-    | Tvar { jkind = ty's_jkind } when allow_mutation ->
+       variables, [var_jkind] can't have any variables in it, so we're OK. *)
+    | Tvar { jkind = var_jkind } when allow_mutation ->
        (* Mutable tyvars are special in at least two ways:
 
           1) Suppose we're processing [type 'a t = 'a list]. The ['a] on the
@@ -3544,16 +3553,35 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           it first.
         *)
         let open Misc.Stdlib.Monad.Result.Syntax in
+        let operator : Jkind_types.Kind_operator.t =
+          (* Improve precision in this case, as [apply_addressable_r] is
+             incomplete *)
+          match (operator : Jkind_types.Kind_operator.t) with
+          | Addressable when Jkind.is_surely_addressable env var_jkind -> Id
+          | _ -> operator
+        in
+        let* jkind =
+          match operator with
+          | Id -> Ok jkind
+          | Addressable ->
+            match Jkind.apply_addressable_r env jkind with
+            | Ok jkind -> Ok jkind
+            | Error () ->
+              Error (Jkind.Violation.of_ ~context env
+                       (Not_a_subjkind
+                          (Jkind.apply_operator_l operator var_jkind, jkind,
+                           [Layout_disagreement Incompatible])))
+        in
         let* ty's_new_jkind =
           Jkind.intersection_or_error ~type_equal ~context
             ~reason:Tyvar_refinement_intersection env
-            ty's_jkind jkind
+            var_jkind jkind
         in
         let+ () =
           Jkind.update_level (get_level ty) ty's_new_jkind
           |> Result.map_error (fun error ->
             Jkind.Violation.of_ ~context env (
-              Not_a_subjkind (ty's_jkind, jkind,
+              Not_a_subjkind (var_jkind, jkind,
               [Layout_disagreement (Level error)])))
         in
         set_var_jkind ty ty's_new_jkind
@@ -3568,17 +3596,17 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
 
          But if we ever choose to substitute min mod-bounds for [Tunivar]s, we
          must do so here. Internal ticket 5746. *)
-      loop ~fuel ~expanded:false env t ty's_jkind jkind
+      loop ~fuel ~expanded:false ~operator env t ty's_jkind jkind
 
     (* CR metaprogramming jbachurski: These should update the stage, which
        means this function should pass the context explicitly. *)
     (* CR quoted-kinds jbachurski: These quote/splice [ty's_jkind]. *)
     | Tquote ty ->
-      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+      loop ~fuel ~expanded ~operator (incr_stage env) ty ty's_jkind jkind
     | Tsplice ty ->
-      loop ~fuel ~expanded (decr_stage env) ty ty's_jkind jkind
+      loop ~fuel ~expanded ~operator (decr_stage env) ty ty's_jkind jkind
     | Tquote_eval ty ->
-      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+      loop ~fuel ~expanded ~operator (incr_stage env) ty ty's_jkind jkind
 
     | _ ->
        if !Clflags.ikinds_debug
@@ -3673,9 +3701,12 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           (Jkind.Violation.of_ ~context env
                              (Not_a_subjkind
                                 (ty's_jkind, jkind, sub_failure_reasons)))
-                      | Ok (ty, jkind) ->
-                      match Jkind.extract_layout env ty's_jkind with
-                      | Ok (Any _) ->
+                      | Ok (ty, step_operator, jkind) ->
+                      let operator =
+                        Jkind_types.Kind_operator.compose operator step_operator
+                      in
+                      if Jkind.has_layout_any env ty's_jkind
+                      then
                         (* We re-estimate in this case rather than reuse the
                            components of [ty's_jkind] because an unboxed record
                            with an [any] field has a product-of-[any]s kind on
@@ -3685,15 +3716,16 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
                            layout_of instead. *)
-                        estimate_jkind_and_loop ~fuel ~expanded:false env ty
-                          jkind
-                      | _ ->
+                        estimate_jkind_and_loop ~fuel ~expanded:false ~operator
+                          env ty jkind
+                      else
                         (* In this case, there's nothing to gain by
                            re-estimating: either it's already a product and we
                            will successfully recurse into it, or it's not a
                            product and (because it's not [any]) re-estimating
                            won't change that. *)
-                        loop ~fuel ~expanded:false env ty ty's_jkind jkind)
+                        loop ~fuel ~expanded:false ~operator env ty ty's_jkind
+                          jkind)
                    unwrapped_tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
@@ -3743,11 +3775,34 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
              in
              begin match Jkind.decompose_product env ty's_jkind,
                          Jkind.decompose_product env jkind with
-             | Some ty's_jkinds, Some jkinds
+             | Some { components = ty's_jkinds;
+                      outer_addressable = ty's_outer_addressable },
+               Some { components = jkinds; outer_addressable }
                   when List.length ty's_jkinds = num_components
                        && List.length jkinds = num_components ->
+               (* As in [Layout.sub], to compare a product with [addressable]
+                  on the outside against one without, first constrain the
+                  latter's components: below [_ addressable] on the left, above
+                  it on the right. Then compare the components. *)
+               let open Misc.Stdlib.Monad.Result.Syntax in
+               let* () =
+                 (match ty's_outer_addressable, outer_addressable with
+                  | true, false ->
+                    Misc.Stdlib.List.fold_left_result
+                      (fun () -> Jkind.constrain_above_addressable env)
+                      () jkinds
+                  | false, true ->
+                    Misc.Stdlib.List.fold_left_result
+                      (fun () -> Jkind.constrain_below_addressable env)
+                      () ty's_jkinds
+                  | true, true | false, false -> Ok ())
+                 |> Result.map_error (fun () ->
+                      Jkind.Violation.of_ ~context env
+                        (Not_a_subjkind
+                           (ty's_jkind, jkind, sub_failure_reasons)))
+               in
                recur ty's_jkinds jkinds
-             | Some ty's_jkinds, None
+             | Some { components = ty's_jkinds; outer_addressable = _ }, None
                   when Jkind.has_layout_any env jkind
                     && List.length ty's_jkinds = num_components ->
                (* Even though [jkind] has layout any, it still might have
@@ -3762,19 +3817,26 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                   (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              end
           in
-          let or_null ~fuel ty wrapping =
+          let or_null ~fuel ~operator ty wrapping =
             let error () =
               Error (Jkind.Violation.of_ ~context env
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
             in
             match
               Result.bind
-                (Jkind.Unboxed_field_transformation.apply_r wrapping jkind)
-                (Jkind.apply_or_null_r env)
+                (Jkind.Unboxed_field_transformation.apply_r_except_op wrapping
+                   jkind)
+                (fun (step_operator, jkind) ->
+                   Jkind.apply_or_null_r env jkind
+                   |> Result.map (fun jkind -> step_operator, jkind))
             with
-            | Ok jkind ->
+            | Ok (step_operator, jkind) ->
+              let operator =
+                Jkind_types.Kind_operator.compose operator step_operator
+              in
               (match
-                estimate_jkind_and_loop ~fuel ~expanded:false env ty jkind
+                estimate_jkind_and_loop ~fuel ~expanded:false ~operator env ty
+                  jkind
               with
               | Ok () -> Ok ()
               | Error _ ->
@@ -3799,14 +3861,16 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
             List.fold_left
               (fun result (tvar, mod_bounds) ->
                  Result.bind result (fun () ->
-                   loop ~fuel ~expanded:false env tvar ty's_jkind
+                   loop ~fuel ~expanded:false
+                     ~operator:Jkind_types.Kind_operator.Id env tvar ty's_jkind
                      (Jkind.of_mod_bounds ~history:jkind.history mod_bounds)))
               (Ok ()) requirements
           | Error error, Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
-               estimate_jkind_and_loop ~fuel ~expanded:true env ty jkind
+               estimate_jkind_and_loop ~fuel ~expanded:true ~operator env ty
+                 jkind
              else
                begin match unbox_once env (mk_unwrapped_type_expr ty) with
                | Missing path ->
@@ -3817,12 +3881,16 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                  Error error
                | Stepped { ty; wrapping; or_null = None } ->
                  begin match
-                   Jkind.Unboxed_field_transformation.apply_r wrapping jkind
+                   Jkind.Unboxed_field_transformation.apply_r_except_op wrapping
+                     jkind
                  with
-                 | Ok inner_jkind ->
+                 | Ok (step_operator, inner_jkind) ->
+                   let operator =
+                     Jkind_types.Kind_operator.compose operator step_operator
+                   in
                    begin match
                      estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false
-                       env ty inner_jkind
+                       ~operator env ty inner_jkind
                    with
                    | Ok () -> Ok ()
                    | Error inner_error ->
@@ -3849,7 +3917,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                          jkind, sub_failure_reasons)))
                  end
                | Stepped { ty; wrapping; or_null = Some _ } ->
-                 or_null ~fuel:(fuel - 1) ty wrapping
+                 or_null ~fuel:(fuel - 1) ~operator ty wrapping
                | Stepped_record_unboxed_product unwrapped_tys ->
                  product ~fuel:(fuel - 1) unwrapped_tys
                end
@@ -3858,10 +3926,16 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                Fuel counts expansions, and its purpose is to guard against
                infinitely expanding a recursive type. In a wide tuple, we many
                need to expand many types shallowly, and that's fine. *)
-            product ~fuel (List.map (fun (_, ty) ->
-              mk_unwrapped_type_expr ty) ltys)
+            product ~fuel
+              (List.map
+                 (fun (_, ty) ->
+                    { (mk_unwrapped_type_expr ty) with
+                      wrapping =
+                        Jkind.Unboxed_field_transformation.of_tuple_component })
+                 ltys)
           | Error error, _ -> Error error
-  and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
+  and estimate_jkind_and_loop ~fuel ~expanded ~operator env ty jkind
+    : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
        constrain layouts. So we still continue, but we avoid performing any
@@ -3871,9 +3945,10 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
     let jkind = Jkind.fully_expand_aliases env jkind in
     let ignore_mod_bounds = Jkind.mod_bounds_are_obviously_max jkind in
     let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
-    loop ~fuel ~expanded env ty ty's_jkind jkind
+    loop ~fuel ~expanded ~operator env ty ty's_jkind jkind
   in
-  estimate_jkind_and_loop ~fuel:100 ~expanded:false env ty
+  estimate_jkind_and_loop ~fuel:100 ~expanded:false
+    ~operator:Jkind_types.Kind_operator.Id env ty
     (Jkind.disallow_left jkind)
 
 let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
@@ -4977,6 +5052,7 @@ and mcomp_record_description type_pairs env =
     | l1 :: xs, l2 :: ys ->
         mcomp type_pairs env l1.ld_type l2.ld_type;
         if Ident.name l1.ld_id = Ident.name l2.ld_id &&
+           l1.ld_inherit = l2.ld_inherit &&
            l1.ld_mutable = l2.ld_mutable &&
            l1.ld_modalities = l2.ld_modalities
         then iter xs ys
@@ -9122,27 +9198,20 @@ let check_decl_jkind env decl jkind =
     | Type_abstract _, Some inner_ty ->
       Jkind.for_abbreviation ~type_jkind_purely
         Jkind.Unboxed_field_transformation.id inner_ty
-    (* These next cases are more properly rule TK_UNBOXED from kind-inference.md
-       (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but
-       they should be fine here. This will all get fixed up later with the
-       above CRs. *)
-    | Type_record (
-        [{ ld_type = inner_ty; ld_modalities = modality }],
-        Record_unboxed, None), _
-    | Type_variant (
-        [{ cd_args =
-             (Cstr_tuple [{ ca_type = inner_ty;
-                            ca_modalities = modality }] |
-              Cstr_record [{ ld_type = inner_ty;
-                             ld_modalities = modality }]) }],
-        Variant_unboxed, None), _ ->
-      Jkind.for_abbreviation ~type_jkind_purely
-        (Jkind.Unboxed_field_transformation.of_modality modality)
-        inner_ty
-    (* Unboxed records may additionally have [mutable] labels *)
-    | Type_record_unboxed_product ([lbl], _, None), _ ->
-      Jkind.for_abbreviation ~type_jkind_purely
-        (Jkind.Unboxed_field_transformation.of_label lbl) lbl.ld_type
+    | ( Type_record (_, _, None) | Type_record_unboxed_product (_, _, None)
+      | Type_variant (_, _, None) ), _ -> begin
+        (* This case is more properly rule TK_UNBOXED from kind-inference.md
+           (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]),
+           but it should be fine here. This will all get fixed up later with
+           the above CRs. *)
+        match find_unboxed_type decl with
+        | Some (inner_ty, modality, mutability, operator) ->
+          Jkind.for_abbreviation ~type_jkind_purely
+            (Jkind.Unboxed_field_transformation.of_field ~mutability ~modality
+               ~operator)
+            inner_ty
+        | None -> decl.type_jkind
+      end
     | _ -> decl.type_jkind
   in
   match

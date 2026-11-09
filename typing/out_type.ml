@@ -2406,11 +2406,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
      [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
      better for atomic layouts. *)
   | Layout (Product lays) ->
-    Ojkind_product
-      (List.map
-         (fun layout ->
-            out_jkind_of_desc env { desc with base = Layout layout })
-         lays)
+    Ojkind_product (List.map (out_jkind_of_ampersand_component env desc) lays)
   | Layout (Addressable lay) when Option.is_none (Jkind.Desc.get_const desc) ->
     if Jkind.Layout.is_surely_addressable_flat lay then
       out_jkind_of_desc env { desc with base = Layout lay }
@@ -2425,6 +2421,18 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
+
+and out_jkind_of_ampersand_component env (desc : 'd Jkind.Desc.t)
+      (layout : Jkind.Sort.Flat.t Jkind.Layout.t) =
+  let out_jkind_of_desc layout =
+    out_jkind_of_desc env { desc with base = Layout layout }
+  in
+  if
+    Jkind_types.ampersand_component_written_inherit
+      ~is_var:(Jkind.Layout.is_unfilled_var_flat layout)
+      ~is_surely_addressable:(Jkind.Layout.is_surely_addressable_flat layout)
+  then Ojkind_inherit (out_jkind_of_desc layout)
+  else out_jkind_of_desc (Jkind.Layout.strip_head_addressable_flat layout)
 
 let out_jkind_of_jkind env jkind = out_jkind_of_desc env (Jkind.get jkind)
 
@@ -3020,6 +3028,7 @@ let tree_of_label l =
   let ld_modalities = tree_of_modalities l.ld_mutable l.ld_modalities in
   {
     olab_name = Ident.name l.ld_id;
+    olab_inherit = l.ld_inherit;
     olab_mut = mut;
     olab_type = tree_of_typexp ~base:With_locality.Const.legacy Type l.ld_type;
     olab_modalities = ld_modalities;

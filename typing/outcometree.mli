@@ -110,6 +110,8 @@ and out_jkind =
   (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
   | Ojkind_addressable of out_jkind
+  | Ojkind_inherit of out_jkind
+  (** A component of [Ojkind_product] that is not made addressable *)
   | Ojkind_box of out_jkind * string list
   (** The [string list] represents the non-redundant scannable axes applied
       atop the box *)
@@ -161,6 +163,7 @@ and out_type =
 
 and out_label = {
   olab_name: string;
+  olab_inherit: Asttypes.inherit_flag;
   olab_mut: out_mutability;
   olab_type: out_type;
   olab_modalities: out_modality list;
