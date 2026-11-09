@@ -1947,6 +1947,34 @@ val cell_p : '_weak3 id option ref = {contents = None}
 module G_p :
   functor (X : sig end) ->
     sig kind_ k = value mod portable val c : '_weak4 id option ref end
+Line 7, characters 19-50:
+7 | let () = cell_p := (None : (int -> int) id option)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "(int -> int) id option"
+       but an expression was expected of type "'weak4 id id option"
+       Type "(int -> int) id" = "int -> int" is not compatible with type
+         "'weak4 id id" = "'weak4"
+       The kind of int -> int is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of int -> int must be a subkind of value mod portable
+         because of the annotation on the wildcard _ at line 5, characters 20-27.
+|}, Principal{|
+type ('a : any) id = 'a
+val cell_p : '_weak3 id option ref = {contents = None}
+module G_p :
+  functor (X : sig end) ->
+    sig kind_ k = value mod portable val c : '_weak4 id option ref end
+Line 7, characters 19-50:
+7 | let () = cell_p := (None : (int -> int) id option)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "(int -> int) id option"
+       but an expression was expected of type "'weak4 id id id option"
+       Type "(int -> int) id" = "int -> int" is not compatible with type
+         "'weak4 id id id" = "'weak4"
+       The kind of int -> int is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of int -> int must be a subkind of value mod portable
+         because of the annotation on the wildcard _ at line 5, characters 20-27.
 |}]
 
 (************************************************************************)

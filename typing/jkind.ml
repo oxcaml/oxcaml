@@ -3142,21 +3142,20 @@ let generalize ~current_level t =
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
 
-let rec update_level_base env level base =
-  match base with
+let rec update_level_base_and_axes env level jkind =
+  match jkind.base with
   | Kconstr (path, _, _) when level < Path.scope path -> (
-    match Base.expand_once env base with
-    | Some base' -> Base.of_const base' |> update_level_base env level
-    | None -> Error (Layout.Escape path))
-  | Kconstr _ -> Ok base
-  | Layout l -> Layout.update_level level l |> Result.map (fun () -> base)
+    match Base_and_axes.expand_base_once_const env jkind with
+    | Expanded jkind' ->
+      Base_and_axes.jkind_desc_of_const jkind'
+      |> update_level_base_and_axes env level
+    | Not_expanded | Missing_cmi _ -> Error (Layout.Escape path))
+  | Kconstr _ -> Ok jkind
+  | Layout l -> Layout.update_level level l |> Result.map (fun () -> jkind)
 
 let update_level env level t =
-  update_level_base env level t.jkind.base
-  |> Result.map (fun base ->
-      if base == t.jkind.base
-      then t
-      else { t with jkind = { t.jkind with base } })
+  update_level_base_and_axes env level t.jkind
+  |> Result.map (fun jkind -> if jkind == t.jkind then t else { t with jkind })
 
 let get t = Jkind_desc.get t.jkind
 
