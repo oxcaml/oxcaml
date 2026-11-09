@@ -16,7 +16,8 @@ let code loopify(never) size(9) stub
 in
 let code inline(never) loopify(never) size(3) newer_version_of(consume_1)
       consume_1_2
-        (np pair_field_0 : imm tagged, np pair_field_1 : imm tagged)
+        (needed_by_phantom_let pair_field_0 : imm tagged,
+         needed_by_phantom_let pair_field_1 : imm tagged)
         my_unboxed_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -26,11 +27,13 @@ let code inline(never) loopify(never) size(3) newer_version_of(consume_1)
   let int_add = %int_barith.add (pair_field_0, pair_field_1) in
   cont k (int_add)
 in
-let $camlNp_fun_param__consume_1 =
+let $camlPhantom_needed_fun_param__consume_1 =
   closure consume_1_1 @consume &toplevel
-and $camlNp_fun_param__consume_unboxed_2 =
+and $camlPhantom_needed_fun_param__consume_unboxed_2 =
   closure consume_1_2 @consume_unboxed &toplevel
 in
-let phantom consume = $camlNp_fun_param__consume_1 in
-let $camlNp_fun_param = Block 0 ($camlNp_fun_param__consume_1) in
-cont done ($camlNp_fun_param)
+let phantom consume = $camlPhantom_needed_fun_param__consume_1 in
+let $camlPhantom_needed_fun_param =
+  Block 0 ($camlPhantom_needed_fun_param__consume_1)
+in
+cont done ($camlPhantom_needed_fun_param)

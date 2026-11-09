@@ -14,8 +14,8 @@ let code loopify(never) size(34) newer_version_of(test_0)
        let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
        (cont k3 (1L, 1)
           where rec k3
-                      (np for_counter_naked : int64,
-                       np acc_unboxed0 : imm tagged) =
+                      (needed_by_phantom_let for_counter_naked : int64,
+                       needed_by_phantom_let acc_unboxed0 : imm tagged) =
             let phantom prim_2 =
               %num_conv.[`int64`].[`imm`] (for_counter_naked)
             in
@@ -40,7 +40,7 @@ let code loopify(never) size(34) newer_version_of(test_0)
       let `unit` = %end_region (`region`) in
       cont k (acc_unboxed0)
 in
-let $camlNp_loop__test_1 = closure test_0_1 @test &toplevel in
-let phantom test = $camlNp_loop__test_1 in
-let $camlNp_loop = Block 0 ($camlNp_loop__test_1) in
-cont done ($camlNp_loop)
+let $camlPhantom_needed_loop__test_1 = closure test_0_1 @test &toplevel in
+let phantom test = $camlPhantom_needed_loop__test_1 in
+let $camlPhantom_needed_loop = Block 0 ($camlPhantom_needed_loop__test_1) in
+cont done ($camlPhantom_needed_loop)

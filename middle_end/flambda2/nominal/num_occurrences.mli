@@ -32,6 +32,9 @@ module By_name_mode : sig
       phantom : num_occurrences
     }
 
+  (** No occurrences at any name mode. *)
+  val zero : t
+
   val print : Format.formatter -> t -> unit
 
   (** Whether a variable with the given occurrence counts within its scope is
@@ -40,9 +43,4 @@ module By_name_mode : sig
       lets can evaluate (so variables of kind [Region] or [Rec_info] are never
       needed). Such a variable must remain locatable by the debugger. *)
   val needed_by_phantom_let : t -> Variable.t -> bool
-
-  (** As for [needed_by_phantom_let], but looking up the occurrence counts in
-      the given map (e.g. as provided by [Flambda.Let.pattern_match']); [false]
-      if the variable is absent from the map. *)
-  val needed_by_phantom_let_in_map : t Variable.Map.t -> Variable.t -> bool
 end

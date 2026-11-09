@@ -33,6 +33,8 @@ module By_name_mode = struct
       phantom : num_occurrences
     }
 
+  let zero = { normal = Zero; phantom = Zero }
+
   let print ppf { normal; phantom } =
     match phantom with
     | Zero -> Format.fprintf ppf "#%a" print normal
@@ -46,9 +48,4 @@ module By_name_mode = struct
       match Variable.kind var with
       | Region | Rec_info -> false
       | Value | Naked_number _ -> true)
-
-  let needed_by_phantom_let_in_map num_occurrences var =
-    match Variable.Map.find var num_occurrences with
-    | exception Not_found -> false
-    | num_occurrences -> needed_by_phantom_let num_occurrences var
 end

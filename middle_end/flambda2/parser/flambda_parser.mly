@@ -161,11 +161,11 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_MASK [@symbol "mask"]
 %token KWD_MUTABLE [@symbol "mutable"]
 %token KWD_NATIVEINT [@symbol "nativeint"]
+%token KWD_NEEDED_BY_PHANTOM_LET [@symbol "needed_by_phantom_let"]
 %token KWD_NEVER  [@symbol "never"]
 %token KWD_NEWER_VERSION_OF [@symbol "newer_version_of"]
 %token KWD_NOALLOC [@symbol "noalloc"]
 %token KWD_NOTRACE [@symbol "notrace"]
-%token KWD_NP [@symbol "np"]
 %token KWD_NULL [@symbol "null"]
 %token KWD_OF     [@symbol "of"]
 %token KWD_PHANTOM [@symbol "phantom"]
@@ -604,7 +604,7 @@ let_(body):
 ;
 
 let_binding:
-  | needed_by_phantom_let = boption(KWD_NP);
+  | needed_by_phantom_let = boption(KWD_NEEDED_BY_PHANTOM_LET);
     var = variable EQUAL defining_expr = named
     { { var; defining_expr; needed_by_phantom_let } }
 ;
@@ -916,7 +916,7 @@ field_of_block:
 ;
 
 kinded_variable:
-  | needed_by_phantom_let = boption(KWD_NP);
+  | needed_by_phantom_let = boption(KWD_NEEDED_BY_PHANTOM_LET);
     param = variable; kind = kind_with_subkind_opt
     { { param; kind; needed_by_phantom_let } }
 ;

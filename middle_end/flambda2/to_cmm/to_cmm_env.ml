@@ -379,7 +379,7 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env (~var:v, ~debug_uid, ~needed_by_phantom_let) =
+let create_bound_parameter env (v, debug_uid, ~needed_by_phantom_let) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"
@@ -816,8 +816,11 @@ let bind_variable ?extra env res var ~defining_expr ~free_vars_of_defining_expr
       ~effects_and_coeffects_of_defining_expr ~num_occurrences_of_bound_vars
   in
   let needed_by_phantom_let =
-    Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
-      num_occurrences_of_bound_vars (Bound_var.var var)
+    let var = Bound_var.var var in
+    Num_occurrences.By_name_mode.needed_by_phantom_let
+      (Option.value ~default:Num_occurrences.By_name_mode.zero
+         (Variable.Map.find_opt var num_occurrences_of_bound_vars))
+      var
   in
   match inline with
   | Drop_defining_expr -> env, res
@@ -1081,18 +1084,16 @@ let split_binding_and_rebind ~num_occurrences_of_var ~needed_by_phantom_let env
 
 let add_alias env res ~var ~alias_of ~num_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
-  let num_occurrences_of_var : Num_occurrences.t =
+  let (num_occurrences_of_var : Num_occurrences.t), needed_by_phantom_let =
     let var = Bound_var.var var in
     match Variable.Map.find var num_occurrences_of_bound_vars with
     | exception Not_found ->
       Misc.fatal_errorf
         "Missing occurrence in to_cmm for variable %a aliased to %a"
         Variable.print var Variable.print alias_of
-    | { Num_occurrences.By_name_mode.normal; phantom = _ } -> normal
-  in
-  let needed_by_phantom_let =
-    Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
-      num_occurrences_of_bound_vars (Bound_var.var var)
+    | { Num_occurrences.By_name_mode.normal; phantom = _ } as num_occurrences ->
+      ( normal,
+        Num_occurrences.By_name_mode.needed_by_phantom_let num_occurrences var )
   in
   match Variable.Map.find alias_of env.bindings with
   | Binding ({ inline = Must_inline_once; _ } as b) -> (

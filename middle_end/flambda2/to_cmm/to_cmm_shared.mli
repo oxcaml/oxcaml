@@ -98,9 +98,6 @@ val simple_list :
   * To_cmm_result.t
   * Effects_and_coeffects.t
 
-(** The occurrence counts (resp. free names) are those of the scope of the
-    parameters; they determine which of the parameters' Cmm binders carry
-    provenance (see [Num_occurrences.By_name_mode.needed_by_phantom_let]). *)
 val continuation_bound_parameters :
   To_cmm_env.t ->
   Bound_parameters.t ->

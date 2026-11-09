@@ -206,9 +206,9 @@ type kinded_parameter =
             [Num_occurrences.By_name_mode.needed_by_phantom_let]): it is
             referenced by the defining expression of at least one phantom let
             within the scope of its binder, and is of a kind whose values such
-            expressions can evaluate. Printed as "np". This is derived from the
-            occurrence counts recorded in Flambda terms, so it is ignored when
-            converting to Flambda. *)
+            expressions can evaluate. Printed as "needed_by_phantom_let". This
+            is derived from the occurrence counts recorded in Flambda terms, so
+            it is ignored when converting to Flambda. *)
   }
 
 type name =

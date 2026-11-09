@@ -514,7 +514,7 @@ let prim ppf ((op, args) : prim) =
     args
 
 let parameter ppf { param; kind = k; needed_by_phantom_let } =
-  if needed_by_phantom_let then Format.fprintf ppf "np ";
+  if needed_by_phantom_let then Format.fprintf ppf "needed_by_phantom_let ";
   kinded_variable ppf (param, k)
 
 let kinded_parameters ~space ppf = function
@@ -786,7 +786,7 @@ and switch_case ppf (v, c) =
 and let_expr scope ppf : let_ -> unit = function
   | { bindings = first :: rest; body; value_slots = ces; is_phantom } ->
     let binding_var ppf ({ var; needed_by_phantom_let; _ } : let_binding) =
-      if needed_by_phantom_let then Format.fprintf ppf "np ";
+      if needed_by_phantom_let then Format.fprintf ppf "needed_by_phantom_let ";
       variable ppf var
     in
     Format.fprintf ppf "@[<v>@[<hv>@[<hv2>%tlet%s%t %a =@ %a@]"

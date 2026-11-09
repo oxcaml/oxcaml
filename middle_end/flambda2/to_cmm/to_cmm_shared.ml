@@ -361,7 +361,7 @@ let bound_parameters_aux ~f ~needed_by_phantom_let env l =
     List.map
       (fun bp ->
         let var, debug_uid = Bound_parameter.var_and_uid bp in
-        ~var, ~debug_uid, ~needed_by_phantom_let:(needed_by_phantom_let var))
+        var, debug_uid, ~needed_by_phantom_let:(needed_by_phantom_let var))
       (Bound_parameters.to_list l)
   in
   let env, cmm_vars = To_cmm_env.create_bound_parameters env flambda_vars in
@@ -371,11 +371,14 @@ let bound_parameters_aux ~f ~needed_by_phantom_let env l =
   env, vars
 
 let continuation_bound_parameters env l ~num_occurrences_of_params =
+  let needed_by_phantom_let var =
+    Num_occurrences.By_name_mode.needed_by_phantom_let
+      (Option.value ~default:Num_occurrences.By_name_mode.zero
+         (Variable.Map.find_opt var num_occurrences_of_params))
+      var
+  in
   bound_parameters_aux ~f:param_machtype_of_kinded_parameter
-    ~needed_by_phantom_let:
-      (Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
-         num_occurrences_of_params)
-    env l
+    ~needed_by_phantom_let env l
 
 let function_bound_parameters env l ~free_names_of_body =
   let needed_by_phantom_let var =

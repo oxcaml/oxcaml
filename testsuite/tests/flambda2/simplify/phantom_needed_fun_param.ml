@@ -1,0 +1,18 @@
+(* TEST
+   compile_only = "true";
+   flambda2;
+   ocamlopt_flags += " -O3 -g -gno-upstream-dwarf";
+   ocamlopt_flags += " -flambda2-expert-phantom-lets";
+   setup-ocamlopt.opt-build-env;
+   ocamlopt.opt with dump-simplify;
+   check-fexpr-dump;
+ *)
+
+(* The unboxed calling convention splits [pair] into two function parameters
+   of the main code that are not user visible; the main code rebinds the
+   boxed [pair] from them. Once [pair]'s projections have been simplified
+   away, that binding becomes a phantom let referencing the two parameters,
+   which must therefore be marked "needed_by_phantom_let". *)
+
+let[@inline never] [@local never] consume (pair [@unboxable] : int * int) =
+  fst pair + snd pair

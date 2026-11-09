@@ -579,8 +579,11 @@ and let_prim env res ~num_occurrences_of_bound_vars v p dbg body =
       ~effects_and_coeffects_of_defining_expr:effects_and_coeffects_of_prim
   in
   let needed_by_phantom_let =
-    Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
-      num_occurrences_of_bound_vars (Bound_var.var v)
+    let var = Bound_var.var v in
+    Num_occurrences.By_name_mode.needed_by_phantom_let
+      (Option.value ~default:Num_occurrences.By_name_mode.zero
+         (Variable.Map.find_opt var num_occurrences_of_bound_vars))
+      var
   in
   let simple_case (inline : Env.simple Env.inline) =
     let defining_expr, extra, env, res, args_effs =
@@ -1013,10 +1016,12 @@ and apply_expr env res apply =
                (fun bp ->
                  let var, debug_uid = Bound_parameter.var_and_uid bp in
                  let needed_by_phantom_let =
-                   Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
-                     handler_params_occurrences var
+                   Num_occurrences.By_name_mode.needed_by_phantom_let
+                     (Option.value ~default:Num_occurrences.By_name_mode.zero
+                        (Variable.Map.find_opt var handler_params_occurrences))
+                     var
                  in
-                 ~var, ~debug_uid, ~needed_by_phantom_let)
+                 var, debug_uid, ~needed_by_phantom_let)
                params)
         in
         let label = Lambda.next_raise_count () in

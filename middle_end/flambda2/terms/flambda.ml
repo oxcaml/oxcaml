@@ -267,25 +267,18 @@ and apply_renaming_continuations_handlers_t0
     ({ num_occurrences_of_invariant_params; continuation_handlers } as t)
     renaming =
   let continuation_handlers' =
-    if
-      Continuation.Lmap.exists
-        (fun k _ ->
-          not (Continuation.equal k (Renaming.apply_continuation renaming k)))
-        continuation_handlers
-    then
-      Continuation.Lmap.of_list
-      @@ List.map
-           (fun (k, handler) ->
-             let k = Renaming.apply_continuation renaming k in
-             let handler =
-               apply_renaming_continuation_handler handler renaming
-             in
-             k, handler)
-           (Continuation.Lmap.bindings continuation_handlers)
-    else
-      Continuation.Lmap.map_sharing
-        (fun handler -> apply_renaming_continuation_handler handler renaming)
-        continuation_handlers
+    (* [Lmap.bindings] and [Lmap.of_list] preserve sharing. *)
+    Continuation.Lmap.of_list
+      (Misc.Stdlib.List.map_sharing
+         (fun ((k, handler) as binding) ->
+           let k' = Renaming.apply_continuation renaming k in
+           let handler' =
+             apply_renaming_continuation_handler handler renaming
+           in
+           if Continuation.equal k k' && handler == handler'
+           then binding
+           else k', handler')
+         (Continuation.Lmap.bindings continuation_handlers))
   in
   let num_occurrences_of_invariant_params' =
     apply_renaming_num_occurrences num_occurrences_of_invariant_params renaming
@@ -860,8 +853,7 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
       fprintf ppf "%t %a%t" Flambda_colours.elide
         Num_occurrences.By_name_mode.print
         (try Variable.Map.find (Bound_var.var bound_var) num_occurrences
-         with Not_found ->
-           { Num_occurrences.By_name_mode.normal = Zero; phantom = Zero })
+         with Not_found -> Num_occurrences.By_name_mode.zero)
         Flambda_colours.pop
   in
   let rec let_body (expr : expr) =

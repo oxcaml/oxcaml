@@ -272,7 +272,7 @@ end = struct
 
   let count_by_name_mode t name : Num_occurrences.By_name_mode.t =
     match N.Map.find name t with
-    | exception Not_found -> { normal = Zero; phantom = Zero }
+    | exception Not_found -> Num_occurrences.By_name_mode.zero
     | for_one_name ->
       let num_occurrences n : Num_occurrences.t =
         assert (n >= 0);
