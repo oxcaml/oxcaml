@@ -1275,21 +1275,17 @@ and open_description = (Path.t * Longident.t loc) open_infos
 
 and open_declaration = module_expr open_infos
 
-and include_kind =
+and 'repr include_kind =
   | Tincl_structure
   | Tincl_functor of
       { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
+      ; input_repr : 'repr
       ; yielding : Mode.Yielding.l
       }
       (* S1 -> S2 *)
-      (* Since [Types.module_representation = Jkind.sort array], this could've
-         been [of { inputs : (Ident.t * module_coercion * Jkind.sort) list }],
-         but the way [input_coercion] and [input_repr] are used makes keeping
-         them separate more natural. *)
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
+      ; input_repr : 'repr
       ; yielding : Mode.Yielding.l
       }
       (* S1 -> () -> S2 *)
@@ -1300,19 +1296,20 @@ and include_kind =
          (and no runtime application), so the field is a conservative
          [Yielding.max]. *)
 
-and 'a include_infos =
+and ('a, 'repr) include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
-     incl_repr: Types.module_representation;
+     incl_repr: 'repr;
      incl_loc: Location.t;
-     incl_kind: include_kind;
+     incl_kind: 'repr include_kind;
      incl_attributes: attribute list;
     }
 
-and include_description = module_type include_infos
+and include_description = (module_type, unit) include_infos
 
-and include_declaration = module_expr include_infos
+and include_declaration =
+  (module_expr, Types.module_representation) include_infos
 
 and with_constraint =
     Twith_type of type_declaration

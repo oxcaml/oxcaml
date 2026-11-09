@@ -755,8 +755,12 @@ module Vars  : Map.S with type key = string
 
 (* Value descriptions *)
 
+type sort_or_unrepresentable =
+  | Representable of Jkind_types.Sort.t
+  | Unrepresentable
+
 type value_kind =
-    Val_reg of Jkind_types.Sort.t       (* Regular value *)
+    Val_reg of sort_or_unrepresentable  (* Regular value *)
   | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -1294,9 +1298,18 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  (* Returns [None] for items that have no runtime representation (see
-     [Includemod.is_runtime_component]). *)
-  val sort_of_signature_item : signature_item -> Jkind_types.Sort.t option
+  type signature_item_sort =
+    | Fixed of Jkind_types.Sort.t
+    | Unknown of Ident.t * value_description
+    | Absent_at_runtime
+        (** See [Includemod.is_runtime_component]. *)
+
+  val sort_of_signature_item : signature_item -> signature_item_sort
+
+  (** Sorts of the runtime items of a signature. Items with [Unknown] sort
+      are fatal errors. *)
+  val expect_fixed_representation :
+    signature_item list -> Jkind_types.Sort.t array
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t
@@ -1375,10 +1388,6 @@ val mixed_block_element_of_const_sort :
     correspond to a run-time value: values, extensions, modules, classes.
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
-
-(** Like [bound_value_identifiers], but also return sorts *)
-val bound_value_identifiers_and_sorts :
-  signature -> (Ident.t * Jkind_types.Sort.t) list
 
 val signature_item_id : signature_item -> Ident.t
 
