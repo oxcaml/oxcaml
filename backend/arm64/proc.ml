@@ -194,7 +194,7 @@ let external_calling_conventions
   List.iteri (fun i (ty_arg : Cmm.exttype) ->
     let (ty : Cmm.machtype_component), registers, divisor, size =
       match ty_arg with
-      | XInt | XInt64 -> Int, int_registers, 1, size_int
+      | XInt | XInt64 | XMask -> Int, int_registers, 1, size_int
       | XInt32 -> Int, int_registers, 2, size_int
       | XInt16 -> Int, int_registers, 4, size_int
       | XInt8 -> Int, int_registers, 8, size_int
@@ -221,7 +221,7 @@ let external_calling_conventions
          Misc.fatal_error
            "Fat-pointer external arguments passed on the stack are not \
             supported (too many integer arguments)"
-       | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+       | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat | XFloat32
        | XVec128 | XVec256 | XVec512 | XDummy_int | XDummy_float -> ());
       let size = if macosx then size / divisor else size in
       ofs := Misc.align !ofs size;
@@ -246,8 +246,8 @@ let external_calling_conventions
           slot
       in
       loc.(i) <- [| loc.(i).(0); offset_loc |]
-    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32 | XVec128
-    | XVec256 | XVec512 | XDummy_int | XDummy_float -> ())
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat | XFloat32
+    | XVec128 | XVec256 | XVec512 | XDummy_int | XDummy_float -> ())
     ty_args;
   (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
 

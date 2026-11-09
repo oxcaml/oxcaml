@@ -5419,7 +5419,7 @@ let indirect_full_call ~dbg ~returns ty pos f ~callees args_type args =
       | [] -> Misc.fatal_error "indirect_full_call: args_type was empty"
       | _ :: _ :: _ -> 2
     in
-    load ~dbg Word_int Asttypes.Mutable
+    load ~dbg Word_code_pointer Asttypes.Mutable
       ~addr:(field_address (Cvar v) offset dbg)
   in
   letin v' ~defining_expr:f

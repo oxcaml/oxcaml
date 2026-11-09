@@ -292,8 +292,8 @@ let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     | XInt8 -> Rewritten (Op (Specific Imove8), src, dst)
     | XInt16 -> Rewritten (Op (Specific Imove16), src, dst)
     | XInt32 -> Rewritten (Op (Specific Imove32), src, dst)
-    | XInt | XInt64 | XFloat32 | XFloat | XVec128 | XDummy_int | XDummy_float
-    | XFat_pointer ->
+    | XInt | XInt64 | XMask | XFloat32 | XFloat | XVec128 | XDummy_int
+    | XDummy_float | XFat_pointer ->
       Use_default
     | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
