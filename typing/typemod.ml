@@ -447,8 +447,9 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let process_open_arg env (arg : Clflags.open_arg) =
     match arg with
     | Open m -> open_module env m
-    | Open_cmi cmi ->
-        let _, env = Env.open_pers_signature_cmi cmi env in
+    | Open_cmi { path; cmx_guaranteed } ->
+        let cmx_presence = Load_path.cmx_presence_of_bool cmx_guaranteed in
+        let _, env = Env.open_pers_signature_cmi ~cmx_presence path env in
         env
   in
   let add_units env units =

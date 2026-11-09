@@ -4554,9 +4554,9 @@ let open_pers_signature name env =
   in
   path, env
 
-let open_pers_signature_cmi filename env =
+let open_pers_signature_cmi ~cmx_presence filename env =
   let global_name, _sign =
-    Persistent_env.read_cmi_file !persistent_env filename
+    Persistent_env.read_cmi_file !persistent_env ~cmx_presence filename
   in
   let mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false

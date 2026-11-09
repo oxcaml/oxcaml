@@ -359,10 +359,13 @@ let read_one_param ppf position name v =
       let names = String.split_on_char ',' v in
       open_args :=
         List.rev_append (List.map (fun n -> Open n) names) !open_args
-  | "open-cmi" ->
+  | "open-cmi" | "open-cmi-x" ->
+      let cmx_guaranteed = String.equal name "open-cmi-x" in
       let names = String.split_on_char ',' v in
       open_args :=
-        List.rev_append (List.map (fun n -> Open_cmi n) names) !open_args
+        List.rev_append
+          (List.map (fun path -> Open_cmi { path; cmx_guaranteed }) names)
+          !open_args
   | "cc" -> c_compiler := Some v
 
   | "clambda-checks" -> set "clambda-checks" [ clambda_checks ] v
@@ -508,7 +511,7 @@ let read_one_param ppf position name v =
 
   | "I" | "Ix" ->
     let cmx_guaranteed = String.equal name "Ix" in
-    let entry : Clflags.visible_include = { path = v; cmx_guaranteed } in
+    let entry : Clflags.include_dir = { path = v; cmx_guaranteed } in
     begin match position with
     | Before_args -> first_include_dirs := entry :: !first_include_dirs
     | Before_link | Before_compile _ ->

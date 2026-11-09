@@ -458,21 +458,17 @@ let get_path_list () =
   Misc.rev_map_end Dir.path !visible_dirs (List.rev_map Dir.path !hidden_dirs)
 
 type paths =
-  { visible : Clflags.visible_include list;
-    hidden : string list }
+  { visible : Clflags.include_dir list;
+    hidden : Clflags.include_dir list }
 
 let get_paths () =
-  let visible_dir_to_include dir : Clflags.visible_include =
-    let cmx_guaranteed =
-      match Dir.include_flags dir with
-      | { visibility = Hidden; _ } -> Misc.fatal_error "Load_path.get_paths"
-      | { visibility = Visible; cmx_presence } ->
-        bool_of_cmx_presence cmx_presence
-    in
-    { path = Dir.path dir; cmx_guaranteed }
+  let dir_to_include dir : Clflags.include_dir =
+    { path = Dir.path dir;
+      cmx_guaranteed =
+        bool_of_cmx_presence (Dir.include_flags dir).cmx_presence }
   in
-  { visible = List.rev_map visible_dir_to_include !visible_dirs;
-    hidden = List.rev_map Dir.path !hidden_dirs }
+  { visible = List.rev_map dir_to_include !visible_dirs;
+    hidden = List.rev_map dir_to_include !hidden_dirs }
 
 let init_manifests () =
   let init_manifest f manifest_path =
@@ -563,18 +559,16 @@ let find_uncap_loading_manifests fn_uncap =
    redone each time. *)
 let init ~auto_include ~visible ~hidden =
   reset ();
-  visible_dirs :=
+  let create_dirs visibility includes =
     List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
+      (fun ({ path; cmx_guaranteed } : Clflags.include_dir) ->
         Dir.create
-          { visibility = Visible;
-            cmx_presence = cmx_presence_of_bool cmx_guaranteed }
+          { visibility; cmx_presence = cmx_presence_of_bool cmx_guaranteed }
           path)
-      visible;
-  hidden_dirs :=
-    List.rev_map
-      (Dir.create { visibility = Hidden; cmx_presence = Cmx_not_guaranteed })
-      hidden;
+      includes
+  in
+  visible_dirs := create_dirs Visible visible;
+  hidden_dirs := create_dirs Hidden hidden;
   Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
     List.iter Path_cache.prepend_add !hidden_dirs);
   Profile.record_call ~accumulate:true "load_hidden_files" (fun () ->

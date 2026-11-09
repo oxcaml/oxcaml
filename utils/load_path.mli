@@ -33,6 +33,8 @@ type include_flags =
   { visibility : visibility;
     cmx_presence : cmx_presence }
 
+val cmx_presence_of_bool : bool -> cmx_presence
+
 val add_dir : include_flags -> string -> unit
 (** Add a directory to the end of the load path (i.e. at lowest priority.) *)
 
@@ -63,8 +65,8 @@ val no_auto_include : auto_include_callback
 
 val init :
   auto_include:auto_include_callback ->
-  visible:Clflags.visible_include list ->
-  hidden:string list -> unit
+  visible:Clflags.include_dir list ->
+  hidden:Clflags.include_dir list -> unit
 (** [init ~visible ~hidden] is the same as
     [reset ();
      List.iter add_dir (List.rev hidden);
@@ -80,8 +82,8 @@ val get_path_list : unit -> string list
 (** Return the list of directories passed to [add_dir] so far. *)
 
 type paths =
-  { visible : Clflags.visible_include list;
-    hidden : string list }
+  { visible : Clflags.include_dir list;
+    hidden : Clflags.include_dir list }
 
 val get_paths : unit -> paths
 (** Return the directories passed to [add_dir] so far. *)
