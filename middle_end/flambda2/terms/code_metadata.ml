@@ -404,7 +404,7 @@ let [@ocamlformat "disable"] print ppf
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
     Flambda_colours.pop
-    Fdo_annotation.print fdo_entry_annotation
+    Fdo_annotation.With_body_hash.print fdo_entry_annotation
     (if is_tupled
     then Flambda_colours.none
     else Flambda_colours.elide)
