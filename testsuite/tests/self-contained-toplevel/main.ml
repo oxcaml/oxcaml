@@ -50,7 +50,8 @@ let () =
       Some { Persistent_signature.
              filename   = Sys.executable_name
            ; cmi        = cmi
-           ; visibility = Visible { cmx_guaranteed = false }
+           ; include_flags =
+               { visibility = Visible; cmx_presence = Cmx_not_guaranteed }
            }
     | _ -> old_loader ~allow_hidden ~unit_name);
   Toploop.add_hook (function
