@@ -31,10 +31,13 @@
 
     Counters are numbered by visiting the Lambda body: the index of a call or
     switch is its position in the order of the translation, which only depends
-    on the body (whose body hash guards it), not on how the translation compiles
-    it. Calls and switches that the translation introduces (e.g. bounds checks,
-    or the dispatch on whether a variant is an immediate) are not in the source
-    and get no counters of their own. *)
+    on the body (whose body hash guards it).
+
+    Calls and switches that the translation introduces when going to Flambda
+    (e.g. bounds checks, or the dispatch on whether a variant is an immediate)
+    get no counters of their own, while those it first creates in Lambda (e.g.
+    the tests of a string switch, or the loops of [Array.blit]) are numbered
+    like the source's (see [Fdo_body_hash]). *)
 
 type t
 
