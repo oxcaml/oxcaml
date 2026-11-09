@@ -3,131 +3,71 @@
  expect;
 *)
 
-(* CR-soon mode-polymorphism-printing: these tests go through [module type of struct ... end] to print
-   the generalized type of each definition. Rewrite them as plain definitions
-   when the parser is done. *)
-
-module type Const2 = module type of struct
-  let const2 x y = 0
-end
+let const2 x y = 0
 [%%expect{|
-module type Const2 =
-  sig val const2 : 'a @ [< global] -> 'b @ 'n -> int @ 'm @@ stateless end
+val const2 : 'a @ [< global] -> 'b @ 'n -> int @ 'm = <fun>
 |}]
 
-module type Fst2 = module type of struct
-  let fst2 x y = x
-end
+let fst2 x y = x
 [%%expect{|
-module type Fst2 =
-  sig
-    val fst2 : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
-  end
+val fst2 : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
 |}]
 
-module type Three = module type of struct
-  let three x y z = (x, z)
-end
+let three x y z = (x, z)
 [%%expect{|
-module type Three =
-  sig
-    val three :
-      'a @ [< 'n & global] ->
-      'b @ [< global] -> 'c @ [< 'm & global] -> 'a * 'c @ [> 'm | 'n] @@
-      stateless
-  end
+val three :
+  'a @ [< 'n & global] ->
+  'b @ [< global] -> 'c @ [< 'm & global] -> 'a * 'c @ [> 'm | 'n] = <fun>
 |}]
 
-module type Pair = module type of struct
-  let pair x y = (x, y)
-end
+let pair x y = (x, y)
 [%%expect{|
-module type Pair =
-  sig
-    val pair :
-      'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n]
-      @@ stateless
-  end
+val pair :
+  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
+  <fun>
 |}]
 
-module type Apply = module type of struct
-  let apply f x = f x
-end
+let apply f x = f x
 [%%expect{|
-module type Apply =
-  sig
-    val apply :
-      ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-      'a @ [< 'n] -> 'b @ [> 'm | dynamic] @@ stateless
-  end
+val apply :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
+  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
-module type Compose = module type of struct
-  let compose f g x = f (g x)
-end
+let compose f g x = f (g x)
 [%%expect{|
-module type Compose =
-  sig
-    val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
-  end
+val compose :
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
+  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
+  'c @ [< 'o] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
-module type Flip = module type of struct
-  let flip f x y = f y x
-end
+let flip f x y = f y x
 [%%expect{|
-module type Flip =
-  sig
-    val flip :
-      ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-      'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] @@
-      stateless
-  end
+val flip :
+  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
+  'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
 |}]
 
-external ( + ) : int -> int -> int @@ stateless = "%addint"
+let add a b = a + b
 [%%expect{|
-external ( + ) : int -> int -> int = "%addint"
-|}]
-
-module type Add = module type of struct
-  let add a b = a + b
-end
-[%%expect{|
-module type Add =
-  sig val add : int @ 'n -> int @ 'm -> int @ [> dynamic] @@ stateless end
+val add : int @ 'n -> int @ 'm -> int @ [> dynamic] = <fun>
 |}, Principal{|
-module type Add =
-  sig
-    val add : int @ [< global] -> int @ 'm -> int @ [> dynamic] @@ stateless
-  end
+val add : int @ [< global] -> int @ 'm -> int @ [> dynamic] = <fun>
 |}]
 
-module type Once_closure = module type of struct
-  let once_closure (x @ once) = fun y -> (x, y)
-end
+let once_closure (x @ once) = fun y -> (x, y)
 [%%expect{|
-module type Once_closure =
-  sig
-    val once_closure :
-      'a @ [< 'n & global > once] ->
-      'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n | once] @@ stateless
-  end
+val once_closure :
+  'a @ [< 'n & global > once] ->
+  'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n | once] = <fun>
 |}]
 
-module type Portable_closure = module type of struct
-  let portable_closure (x @ portable contended) y = (x, y)
-end
+let portable_closure (x @ portable contended) y = (x, y)
 [%%expect{|
-module type Portable_closure =
-  sig
-    val portable_closure :
-      'a @ [< 'n & global portable > contended] ->
-      'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n | contended] @@ stateless
-  end
+val portable_closure :
+  'a @ [< 'n & global portable > contended] ->
+  'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n | contended] = <fun>
 |}]
 
 type ('a, 'b) pair_record = { a : 'a; b : 'b }
@@ -135,69 +75,45 @@ type ('a, 'b) pair_record = { a : 'a; b : 'b }
 type ('a, 'b) pair_record = { a : 'a; b : 'b; }
 |}]
 
-module type Mk_record = module type of struct
-  let mk_record a b = { a; b }
-end
+let mk_record a b = { a; b }
 [%%expect{|
-module type Mk_record =
-  sig
-    val mk_record :
-      'a @ [< 'n & global] ->
-      'b @ [< 'm & global] -> ('a, 'b) pair_record @ [> 'm | 'n] @@ stateless
-  end
+val mk_record :
+  'a @ [< 'n & global] ->
+  'b @ [< 'm & global] -> ('a, 'b) pair_record @ [> 'm | 'n] = <fun>
 |}]
 
-module type Local_closure = module type of struct
-  let local_closure x = exclave_ (fun y -> (x, y))
-end
+let local_closure x = exclave_ (fun y -> (x, y))
 [%%expect{|
-module type Local_closure =
-  sig
-    val local_closure :
-      'a @ [< 'm & global] ->
-      ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m) | local]
-      @@ stateless
-  end
+val local_closure :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m) | local] =
+  <fun>
 |}]
 
-module type Use_and_return = module type of struct
-  let use_and_return g x = ignore (g x); g
-end
+let use_and_return g x = ignore (g x); g
 [%%expect{|
-module type Use_and_return =
-  sig
-    val use_and_return :
-      ('a @ [> 'm] ->
-       'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n mod aliased contended immutable & global many] ->
-      'a @ [< 'm] ->
-      ('a @ [> 'm] ->
-       'b @ [< global many uncontended forkable unyielding read_write]) @ [> 'n | aliased]
-      @@ portable
-  end
+val use_and_return :
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n mod aliased contended immutable & global many] ->
+  'a @ [< 'm] ->
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [> 'n | aliased] =
+  <fun>
 |}, Principal{|
-module type Use_and_return =
-  sig
-    val use_and_return :
-      ('a @ [> 'm] ->
-       'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n & global many] ->
-      'a @ [< 'm] ->
-      ('a @ [> 'm] ->
-       'b @ [< global many uncontended forkable unyielding read_write]) @ [> 'n | aliased]
-      @@ portable
-  end
+val use_and_return :
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n & global many] ->
+  'a @ [< 'm] ->
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [> 'n | aliased] =
+  <fun>
 |}]
 
-module type Both_branches = module type of struct
-  let both_branches g x = if x then g else (fun y -> y)
-end
+let both_branches g x = if x then g else (fun y -> y)
 [%%expect{|
-module type Both_branches =
-  sig
-    val both_branches :
-      ('a @ [< 'm] -> 'a @ [> 'm]) @ [< 'n & global] ->
-      bool @ 'o -> ('a @ [< 'm] -> 'a @ [> 'm]) @ [> 'n | dynamic] @@
-      stateless
-  end
+val both_branches :
+  ('a @ [< 'm] -> 'a @ [> 'm]) @ [< 'n & global] ->
+  bool @ 'o -> ('a @ [< 'm] -> 'a @ [> 'm]) @ [> 'n | dynamic] = <fun>
 |}]
 
 type 'a cell = { mutable v : 'a }
@@ -205,78 +121,50 @@ type 'a cell = { mutable v : 'a }
 type 'a cell = { mutable v : 'a; }
 |}]
 
-module type Store_and_call = module type of struct
-  let store_and_call c g x = c.v <- g; c.v x
-end
+let store_and_call c g x = c.v <- g; c.v x
 [%%expect{|
-module type Store_and_call =
-  sig
-    val store_and_call :
-      ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global uncontended read_write] ->
-      ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many uncontended forkable unyielding read_write] ->
-      'a @ [< 'n] -> 'b @ [> 'm | dynamic] @@ stateless
-  end
+val store_and_call :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global uncontended read_write] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many uncontended forkable unyielding read_write] ->
+  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
-module type Unique_fst = module type of struct
-  let use_unique (x @ unique) = ()
-  let unique_fst (x @ unique) y = use_unique x
-end
+let unique_fst (x @ unique) y = x
 [%%expect{|
-module type Unique_fst =
-  sig
-    val use_unique : 'a @ [< unique] -> unit @ 'm @@ stateless
-    val unique_fst : 'a @ [< global unique] -> 'b @ 'm -> unit @ [> dynamic]
-      @@ stateless
-  end
+val unique_fst : 'a @ [< 'm & global unique] -> 'b @ 'n -> 'a @ [> 'm] =
+  <fun>
 |}]
 
-module type Unique_closure = module type of struct
-  let use_unique (x @ unique) = ()
-  let unique_closure (x @ unique) = fun y -> use_unique x
-end
+let unique_closure (x @ unique) = fun y -> x
 [%%expect{|
-module type Unique_closure =
-  sig
-    val use_unique : 'a @ [< unique] -> unit @ 'm @@ stateless
-    val unique_closure :
-      'a @ [< global unique] -> 'b @ 'm -> unit @ [> dynamic] @@ stateless
-  end
+val unique_closure : 'a @ [< 'm & global unique] -> 'b @ 'n -> 'a @ [> 'm] =
+  <fun>
 |}]
 
-module type Unique_cell = module type of struct
-  let use_unique (x @ unique) = ()
-  let unique_cell (c @ unique) x = c.v <- x; use_unique c
-end
+let unique_cell (c @ unique) x = c.v <- x; c
 [%%expect{|
-module type Unique_cell =
-  sig
-    val use_unique : 'a @ [< unique] -> unit @ 'm @@ stateless
-    val unique_cell :
-      'a cell @ [< global unique corrupted write] ->
-      'a @ [< global many uncontended forkable unyielding read_write] ->
-      unit @ [> dynamic] @@ stateless
-  end
+val unique_cell :
+  'a cell @ [< 'm & global unique corrupted write] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  'a cell @ [> 'm mod many forkable unyielding] = <fun>
+|}, Principal{|
+val unique_cell :
+  'a cell @ [< 'm & global unique corrupted write] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  'a cell @ [> 'm] = <fun>
 |}]
 
-module type Stack_args = module type of struct
-  let stack_args g = g (stack_ (1, 2)) (stack_ (3, 4)); ()
-end
+let stack_args g = g (stack_ (1, 2)) (stack_ (3, 4)); ()
 [%%expect{|
-module type Stack_args =
-  sig
-    val stack_args :
-      (int * int @ [> local] -> int * int @ [> local] -> 'a @ 'm) @ 'o ->
-      unit @ 'n @@ stateless
-  end
+val stack_args :
+  (int * int @ [> local] -> int * int @ [> local] -> 'a @ 'm) @ 'o ->
+  unit @ 'n = <fun>
 |}]
 
 (* CR-soon mode-polymorphism-printing: printing crashes because a curry mode is
    hidden in front of an arrow that is printed as an alias. Fix once aliased
    types are handled properly. *)
-module type Aliased_return = module type of struct
-  let aliased_return (o : < m : 't > as 'o) : 't = fun a b -> ignore (a, b); o
-end
+let aliased_return (o : < m : 't > as 'o) : 't = fun a b -> ignore (a, b); o
 [%%expect{|
 >> Fatal error: Out_type.name_of_modes: printing an elided curry mode
 Uncaught exception: Misc.Fatal_error
