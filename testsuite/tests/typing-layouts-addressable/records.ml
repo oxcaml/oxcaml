@@ -261,10 +261,5 @@ type t : float64 addressable = #{ f : float# }
 external f : (t [@unboxed]) -> (float [@unboxed]) = "foo" "bar"
 [%%expect{|
 type t = #{ f : float#; }
-Line 2, characters 14-15:
-2 | external f : (t [@unboxed]) -> (float [@unboxed]) = "foo" "bar"
-                  ^
-Error: Don't know how to unbox this type.
-       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
-       the corresponding unboxed types can be marked unboxed.
+external f : t -> (float [@unboxed]) = "foo" "bar"
 |}]
