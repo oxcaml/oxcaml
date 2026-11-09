@@ -1273,3 +1273,17 @@ Error: The value "x" has type "int port ref_hash"
          statefulness: mod stateless with int ≰ mod stateless
          visibility: mod read_write ≰ mod immutable
 |}]
+
+(* A mutable label contributes to the kind of an unboxed record declaration,
+   so it can violate the declaration's kind annotation *)
+type t : immutable_data = #{ mutable x : int }
+[%%expect {|
+Line 1, characters 0-46:
+1 | type t : immutable_data = #{ mutable x : int }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is an unboxed record.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
