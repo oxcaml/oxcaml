@@ -1212,26 +1212,64 @@ Error: This value is "local" to the parent region but is expected to be "global"
 |}]
 
 (* Single-label unboxed records are looked through when checking a kind, which
-   can refine the declared layout. But no contents could make [mut1] cross
+   can refine the declared layout. But no contents could make [ref_hash] cross
    contention, so a requirement to cross contention fails without checking the
    contents. *)
-type 'a mut1 = #{ mutable v : 'a }
-let f (x : int mut1) : (_ : value non_pointer) = x
+type 'a ref_hash = #{ mutable contents : 'a }
+let f (x : int ref_hash) : (_ : value non_pointer) = x
 [%%expect {|
-type 'a mut1 = #{ mutable v : 'a; }
-val f : int mut1 -> int mut1 = <fun>
+type 'a ref_hash = #{ mutable contents : 'a; }
+val f : int ref_hash -> int ref_hash = <fun>
 |}]
 
-let f (x : int mut1) : (_ : immediate) = x
+let f (x : int ref_hash) : (_ : immediate) = x
 [%%expect {|
-Line 1, characters 41-42:
-1 | let f (x : int mut1) : (_ : immediate) = x
-                                             ^
-Error: The value "x" has type "int mut1" but an expression was expected of type
-         "('a : immediate)"
-       The kind of int mut1 is
+Line 1, characters 45-46:
+1 | let f (x : int ref_hash) : (_ : immediate) = x
+                                                 ^
+Error: The value "x" has type "int ref_hash"
+       but an expression was expected of type "('a : immediate)"
+       The kind of int ref_hash is
            mutable_data non_pointer mod global dynamic unforkable yielding
-         because of the definition of mut1 at line 1, characters 0-34.
-       But the kind of int mut1 must be a subkind of immediate
-         because of the annotation on the wildcard _ at line 1, characters 23-38.
+         because of the definition of ref_hash at line 1, characters 0-45.
+       But the kind of int ref_hash must be a subkind of immediate
+         because of the annotation on the wildcard _ at line 1, characters 27-42.
+|}]
+
+(* The kind reported here is recomputed from the contents, so the failure
+   reasons must be too. Under -principal, the per-axis explanation must not
+   list portability, which [int port] crosses. *)
+type 'a port = { x : 'a @@ portable }
+let f (x : int port ref_hash) : (_ : immutable_data) = x
+[%%expect {|
+type 'a port = { x : 'a @@ portable; }
+Line 2, characters 55-56:
+2 | let f (x : int port ref_hash) : (_ : immutable_data) = x
+                                                           ^
+Error: The value "x" has type "int port ref_hash"
+       but an expression was expected of type "('a : immutable_data)"
+       The kind of int port ref_hash is
+           mutable_data mod global dynamic unforkable yielding
+         because of the definition of ref_hash at line 1, characters 0-45.
+       But the kind of int port ref_hash must be a subkind of immutable_data
+         because of the annotation on the wildcard _ at line 2, characters 32-52.
+|}, Principal{|
+type 'a port = { x : 'a @@ portable; }
+Line 2, characters 55-56:
+2 | let f (x : int port ref_hash) : (_ : immutable_data) = x
+                                                           ^
+Error: The value "x" has type "int port ref_hash"
+       but an expression was expected of type "('a : immutable_data)"
+       The kind of int port ref_hash is
+           mutable_data
+             mod global dynamic unforkable yielding
+             with int @@ global many portable dynamic
+         because of the definition of ref_hash at line 1, characters 0-45.
+       But the kind of int port ref_hash must be a subkind of immutable_data
+         because of the annotation on the wildcard _ at line 2, characters 32-52.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+         statefulness: mod stateless with int ≰ mod stateless
+         visibility: mod read_write ≰ mod immutable
 |}]

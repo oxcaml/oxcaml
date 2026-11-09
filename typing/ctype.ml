@@ -3661,6 +3661,21 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                jkind.jkind.with_bounds;
            end;
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
+           (* Reports [ty] failing [jkind] using the more precise
+              [ty's_best_jkind], re-running the check to get precise reasons *)
+           let report_best_jkind ty's_best_jkind =
+             let ty's_best_jkind =
+               { ty's_best_jkind with history = ty's_jkind.history }
+             in
+             match
+               Ikind.sub_or_error ~type_equal ~context env ty's_best_jkind jkind
+             with
+             | Error violation -> Error violation (* better failure reasons *)
+             | Ok () ->
+               Error (Jkind.Violation.of_ ~context env
+                        (Not_a_subjkind (ty's_jkind, jkind,
+                                         sub_failure_reasons)))
+           in
            let product ~fuel unwrapped_tys =
              let num_components = List.length unwrapped_tys in
              let recur ty's_jkinds jkinds =
@@ -3724,22 +3739,16 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                    in
                    match layouts with
                    | Some layouts ->
-                     (* This [why] might be wrong but we're about to correct
-                        it *)
-                     let jkind =
-                       Jkind.product_of_fields ~why:Unboxed_record fields
-                         layouts
-                     in
-                     (* This is a bit gross but we don't want to lose history *)
-                     { jkind with history = ty's_jkind.history }
+                     (* This [why] might be wrong, but [report_best_jkind]
+                        fixes it. *)
+                     Jkind.product_of_fields ~why:Unboxed_record fields
+                       layouts
                    | None ->
                      (* We failed to refine. This is just for error reporting
                         anyway. *)
                      ty's_jkind
                  in
-                 Error (Jkind.Violation.of_ ~context env
-                      (Not_a_subjkind (ty's_best_jkind, jkind,
-                                       sub_failure_reasons)))
+                 report_best_jkind ty's_best_jkind
              in
              begin match Jkind.decompose_product env ty's_jkind,
                          Jkind.decompose_product env jkind with
@@ -3839,14 +3848,9 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                       against [jkind], so it may report a mismatch that looking
                       through would resolve. We recompute to report the most
                       accurate error in this case (e.g. some bad crossing) *)
-                   let ty's_best_jkind =
-                     type_jkind_purely env ty
-                     |> Jkind.Unboxed_field_transformation.apply_l wrapping
-                   in
-                   Error (Jkind.Violation.of_ ~context env
-                     (Not_a_subjkind
-                        ({ ty's_best_jkind with history = ty's_jkind.history },
-                         jkind, sub_failure_reasons)))
+                   type_jkind_purely env ty
+                   |> Jkind.Unboxed_field_transformation.apply_l wrapping
+                   |> report_best_jkind
                  end
                | Stepped { ty; wrapping; or_null = Some _ } ->
                  or_null ~fuel:(fuel - 1) ty wrapping
