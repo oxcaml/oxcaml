@@ -95,6 +95,8 @@ let call t loc =
         ~index:(fresh_index t)
     | Some path ->
       (* Multiple calls can have the same binder, e.g. [module M = F (G (X))] *)
+      (* CR-someday yusumez: No body hash guards these indices, so e.g. swapping
+         [F] and [G] above swaps their counters. *)
       let index =
         Option.value (String.Tbl.find_opt t.module_call_indices path) ~default:0
       in

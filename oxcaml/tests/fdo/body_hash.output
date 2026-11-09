@@ -54,3 +54,16 @@ only in body_hash.edited.raw.fl:
   "Body_hash.change_array_kind":0 body_hash:f61c4060
   "Body_hash.change_arm":0 body_hash:a5ac2d06
   "Body_hash.change_raise":0 body_hash:b9895603
+same body hash, same counters:
+  "Body_hash.apply":0:fd055d10
+  "Body_hash.apply2":0:e39bf38d
+  "Body_hash.is_pos":0:00000000
+  "Body_hash.next":0:00000000
+  "Body_hash.keep_constants":0:d320c83b
+  "Body_hash.keep_names":0:3a53ce1f
+  "Body_hash.keep_attributes":0:fd055d10
+  "Body_hash.keep_closure_body":0:fd055d10
+  "Body_hash.keep_arguments":0:fd055d10
+  "Body_hash.keep_and":0:2622e65a
+  "Body_hash.keep_raise":0:60209345
+same body hash, different counters:

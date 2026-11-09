@@ -2,12 +2,19 @@
    -dfexpr-annot-after raw]), so that tests can check the counters without
    depending on the rest of the dump.
 
-   - [list <dump>] prints every annotation of the dump, in order. -
-   [compare-entries <dump a> <dump b>] prints each dump's function entry
-   annotations, then those in only one of them. *)
+   - [list <dump>] prints every annotation of the dump, in order.
+
+   - [compare-entries <dump a> <dump b>] prints each dump's function entry
+   annotations, then those in only one of them.
+
+   - [compare-counters <dump a> <dump b>] checks that the functions with the
+   same body hash in both dumps have the same interior counters, in order. *)
 
 (* CR yusumez: This is done to not dump the entire fexpr. I still find this a
    bit sad. *)
+(* CR yusumez: The string-wrangling here can be turned into proper parsers in
+   their respective modules. Alternatively, we can use an easier-to-parse
+   representation (like a sexp) *)
 
 module Kind = struct
   type t =
@@ -118,10 +125,104 @@ let compare_entries a b =
   print_lines ("only in " ^ a ^ ":") (only_in la lb);
   print_lines ("only in " ^ b ^ ":") (only_in lb la)
 
+let suffix s i = String.sub s i (String.length s - i)
+
+(* The index just after the function an annotation starts with (see
+   [Fdo_counter_identity.Function.to_string]): its name, discriminator and
+   specializations. *)
+let end_of_function contents =
+  let rec digits i =
+    match contents.[i] with '0' .. '9' -> digits (i + 1) | _ -> i
+  in
+  let rec specializations i =
+    if String.starts_with ~prefix:"@(" (suffix contents i)
+    then specializations (closing_paren contents (i + 2) + 1)
+    else i
+  in
+  let name_end = end_of_string contents 0 in
+  specializations (digits (name_end + 1))
+
+(* The interior counters of the functions of a dump, by function and body hash,
+   in order. Module-level calls aren't guarded by body hashes (see
+   [Fdo_counter_identity]), so they are left out. *)
+module Interior_counters = struct
+  type t =
+    { function_ : string;
+      positions : string list
+    }
+
+  (* The function and body hash of an annotation, and the position of its
+     counter in the body if it is an interior counter. *)
+  let of_annotation ({ kind; contents } : Annotation.t) =
+    let function_end = end_of_function contents in
+    let function_ = String.sub contents 0 function_end in
+    let rest = suffix contents function_end in
+    match kind with
+    | Entry ->
+      let prefix = " body_hash:" in
+      if String.starts_with ~prefix rest
+      then Some (function_ ^ ":" ^ suffix rest (String.length prefix), None)
+      else None
+    | Callsite | Branch ->
+      let edge = suffix rest 1 in
+      if String.starts_with ~prefix:"module(" edge
+      then None
+      else
+        let hash_end = String.index edge ':' in
+        Some
+          ( function_ ^ ":" ^ String.sub edge 0 hash_end,
+            Some (suffix edge (hash_end + 1)) )
+
+  let of_dump file =
+    let annotations = annotations file |> List.filter_map of_annotation in
+    let positions function_ =
+      List.filter_map
+        (fun (f, position) ->
+          if String.equal f function_ then position else None)
+        annotations
+    in
+    annotations |> List.map fst
+    |> List.fold_left
+         (fun functions f ->
+           if List.mem f functions then functions else f :: functions)
+         []
+    |> List.rev_map (fun function_ ->
+        { function_; positions = positions function_ })
+end
+
+let compare_counters a b =
+  let counters_b = Interior_counters.of_dump b in
+  let find (counters : Interior_counters.t) =
+    List.find_opt
+      (fun (c : Interior_counters.t) ->
+        String.equal c.function_ counters.function_)
+      counters_b
+    |> Option.map (fun c -> counters, c)
+  in
+  let same, different =
+    Interior_counters.of_dump a
+    |> List.filter_map find
+    |> List.partition
+         (fun ((ca : Interior_counters.t), (cb : Interior_counters.t)) ->
+           List.equal String.equal ca.positions cb.positions)
+  in
+  let positions file (c : Interior_counters.t) =
+    "  " ^ file ^ ": " ^ String.concat " " c.positions
+  in
+  print_lines "same body hash, same counters:"
+    (List.map (fun ((ca : Interior_counters.t), _) -> ca.function_) same);
+  print_lines "same body hash, different counters:"
+    (List.concat_map
+       (fun ((ca : Interior_counters.t), cb) ->
+         [ca.function_; positions a ca; positions b cb])
+       different)
+
 let () =
   match Sys.argv with
   | [| _; "list"; file |] -> list file
   | [| _; "compare-entries"; a; b |] -> compare_entries a b
+  | [| _; "compare-counters"; a; b |] -> compare_counters a b
   | _ ->
     failwith
-      "usage: fdo_annotations (list <dump> | compare-entries <dump a> <dump b>)"
+      "usage: fdo_annotations (list <dump> | (compare-entries | \
+       compare-counters) <dump a> <dump b>)"
