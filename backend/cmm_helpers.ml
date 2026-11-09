@@ -5359,7 +5359,28 @@ let eq ~dbg x y =
     binary (Ccmpi Ceq) ~dbg c (Cconst_int (m - n, dbg))
   | _, _ -> cmp_int Ceq ~dbg x y
 
-let neq = cmp_int Cne
+let neq ~dbg x y =
+  match x, y with
+  | ( Cconst_int (1, _),
+      Cop
+        ( (Caddi | Cor),
+          [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+          _ ) )
+  | ( Cop
+        ( (Caddi | Cor),
+          [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+          _ ),
+      Cconst_int (1, _) )
+    when max_signed_bit_length c + 1 < arch_bits -> (
+    (* [2c + 1 <> 1] <=> [c <> 0], under the same condition as in [eq]. This is
+       a tagged integer being tested against zero, for example to turn the
+       result of a bitwise operation on booleans back into a boolean. *)
+    match c with
+    | Cop ((Ccmpi _ | Ccmpf _), _, _) ->
+      (* A comparison is already 0 or 1. *)
+      c
+    | _ -> binary (Ccmpi Cne) ~dbg c (Cconst_int (0, dbg)))
+  | _, _ -> cmp_int Cne ~dbg x y
 
 let lt = cmp_int Clt
 
