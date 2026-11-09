@@ -950,7 +950,14 @@ let transl_class_rebind ~scopes cl vf =
 
 let const_path local = function
     Lvar id -> not (List.mem id local)
-  | Lconst _ -> true
+  | Lconst c ->
+      (* The builtins store their arguments in a block of values. *)
+      begin match structured_constant_layout c with
+      | Pvalue _ -> true
+      | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_mask | Pvoid | Punboxed_product _
+      | Pbottom | Psplicevar _ -> false
+      end
   | Lfunction {kind = Curried _; body} ->
       let fv = free_variables body in
       List.for_all (fun x -> not (Ident.Set.mem x fv)) local
