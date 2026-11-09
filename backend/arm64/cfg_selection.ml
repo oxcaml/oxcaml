@@ -116,7 +116,7 @@ let validated_offset chunk n =
 let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match[@ocaml.warning "-fragile-match"] expr with
-  | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
+  | Cop ((Caddv | Cadda), [Cconst_symbol (s, _, _); Cconst_int (n, _)], _)
     when use_direct_addressing s && is_symbol_offset chunk n ->
     Ibased (asm_symbol_of_cmm s, n), Ctuple []
   | Cop ((Caddv | Cadda), [arg; Cconst_int (n, _)], _) when is_offset chunk n ->
@@ -127,7 +127,7 @@ let select_addressing' chunk (expr : Cmm.expression) :
         dbg )
     when is_offset chunk n ->
     validated_offset chunk n, Cop (op, [arg1; arg2], dbg)
-  | Cconst_symbol (s, _) when use_direct_addressing s ->
+  | Cconst_symbol (s, _, _) when use_direct_addressing s ->
     Ibased (asm_symbol_of_cmm s, 0), Ctuple []
   | arg -> validated_offset chunk 0, arg
 

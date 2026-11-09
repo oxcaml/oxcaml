@@ -392,7 +392,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (if returns then Call { op; label_after } else Call_no_return op)
       in
       match[@ocaml.warning "-fragile-match"] args with
-      | Cconst_symbol (func, _dbg) :: rem -> make_call (Direct func), rem
+      | Cconst_symbol (func, _, _dbg) :: rem -> make_call (Direct func), rem
       | _ -> make_call (Indirect callees), args)
     | Cextcall
         { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
@@ -882,15 +882,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_mask (bits, _dbg) ->
       let r = Reg.createv Cmm.typ_mask in
       Ok (insert_op env sub_cfg (Operation.Const_mask bits) [||] r)
-    | Cconst_symbol (n, _dbg) ->
-      (* Cconst_symbol _ evaluates to a statically-allocated address, so its
-         value fits in a typ_int register and is never changed by the GC.
-
-         Some Cconst_symbols point to statically-allocated blocks, some of which
-         may point to heap values. However, any such blocks will be registered
-         in the compilation unit's global roots structure, so adding this
-         register to the frame table would be redundant *)
-      let r = Reg.createv Cmm.typ_int in
+    | Cconst_symbol (n, ty, _dbg) ->
+      let r = Reg.createv ty in
       Ok (insert_op env sub_cfg (SU.make_const_symbol n) [||] r)
     | Cvar v -> (
       try Ok (SU.env_find v env)
@@ -1029,7 +1022,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       emit_return env sub_cfg exp (SU.pop_all_traps env)
 
   and emit_invalid env sub_cfg message symbol =
-    let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
+    let arg_expr = Cmm.Cconst_symbol (symbol, Cmm.typ_int, Debuginfo.none) in
     let* loc_arg, stack_ofs, stack_align =
       (* Set up the argument for the call to caml_flambda2_invalid *)
       emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none

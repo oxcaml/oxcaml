@@ -196,7 +196,7 @@ let name0 ?consider_inlining_effectful_expressions env res name =
         { env;
           res;
           expr =
-            { cmm = symbol ~dbg:Debuginfo.none sym;
+            { cmm = symbol ~dbg:Debuginfo.none ~ty:Cmm.typ_int sym;
               free_vars = Backend_var.Set.empty;
               effs = Ece.pure_can_be_duplicated
             }

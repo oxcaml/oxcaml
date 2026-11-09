@@ -838,7 +838,7 @@ val unit : dbg:Debuginfo.t -> Cmm.expression
 val var : Backend_var.t -> Cmm.expression
 
 (** Create an expression that gives the value of an object file symbol. *)
-val symbol : dbg:Debuginfo.t -> Cmm.symbol -> Cmm.expression
+val symbol : dbg:Debuginfo.t -> ty:machtype -> Cmm.symbol -> Cmm.expression
 
 (** Create a constant float expression. *)
 val float : dbg:Debuginfo.t -> float -> expression

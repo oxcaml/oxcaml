@@ -216,7 +216,8 @@ end = struct
             in
             let env, res, updates =
               C.make_update env res dbg update_kind
-                ~symbol:(C.symbol ~dbg closure_symbol_for_updates)
+                ~symbol:
+                  (C.symbol ~dbg ~ty:Cmm.typ_int closure_symbol_for_updates)
                 v
                 ~index:(slot_offset - function_slot_offset_for_updates)
                 ~prev_updates:updates
@@ -413,7 +414,7 @@ module Dynamic = Make_layout_filler (struct
   let infix_header ~dbg ~function_slot_offset =
     C.alloc_infix_header function_slot_offset dbg
 
-  let term_of_symbol ~dbg sym = C.symbol ~dbg sym
+  let term_of_symbol ~dbg sym = C.symbol ~dbg ~ty:Cmm.typ_int sym
 
   let define_symbol _ = assert false
 end)
@@ -775,7 +776,7 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
     List.fold_left2
       (fun (env, res) cid v ->
         let sym =
-          C.symbol ~dbg
+          C.symbol ~dbg ~ty:Cmm.typ_int
             (R.symbol res (Function_slot.Map.find cid closure_symbols))
         in
         Env.bind_variable env res v ~defining_expr:sym
