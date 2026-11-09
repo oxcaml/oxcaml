@@ -39,7 +39,7 @@ mutual
     /- Lfunction -/
     | function (function : Function)
     /- Llet -/
-    | bind (bound : Expr) (body : Ident → Expr)
+    | letBinding (bound : Expr) (body : Ident → Expr)
     /- TODO: Lmutlet -/
     /- TODO: Lletrec -/
     /- Lprim -/

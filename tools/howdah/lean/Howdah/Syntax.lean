@@ -70,7 +70,7 @@ inductive Lambda : Type where
   /- Lfunction -/
   | function (function : Function Lambda)
   /- Llet -/
-  | bind (id : Ident) (bound : Lambda) (body : Lambda)
+  | letBinding (id : Ident) (bound : Lambda) (body : Lambda)
   /- TODO: Lmutlet -/
   /- TODO: Lletrec -/
   /- Lprim -/
@@ -97,7 +97,7 @@ def Lambda.size : Lambda → Nat
   | .var _ | .const _ => 1
   | .function f => f.body.size.succ
   | .apply func args => func.size + (args.map size).sum |>.succ
-  | .bind _ bound body => bound.size + body.size |>.succ
+  | .letBinding _ bound body => bound.size + body.size |>.succ
   | .prim _ args => args.map size |>.sum |>.succ
 decreasing_by
   all_goals first
@@ -151,11 +151,11 @@ def Lambda.induct' {V} {motive : Lambda V → Prop}
       ∀ headParam tailParam body,
       motive body →
       motive (.function headParam tailParam body))
-    (bind :
+    (letBinding :
       ∀ id bound body,
       motive bound →
       motive body →
-      motive (.bind id bound body))
+      motive (.letBinding id bound body))
     (prim : ∀ prim args, List.forAll motive args → motive (.prim prim args))
     (value : ∀ value, motive (.value value))
     : ∀ l, motive l
@@ -166,7 +166,7 @@ def Lambda.induct' {V} {motive : Lambda V → Prop}
     (var := var)
     (const := const)
     (function := function)
-    (bind := bind)
+    (letBinding := letBinding)
     (prim := prim)
     (value := value)
     (nil := .Nil)

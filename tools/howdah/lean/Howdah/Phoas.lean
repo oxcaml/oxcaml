@@ -47,13 +47,13 @@ private def Syntax.Lambda.quote
   | .const c => do
     let value ← c.quote identType
     return mkApp2 (mkConst ``_root_.Expr.value) identType value
-  | .bind id bound body => do
+  | .letBinding id bound body => do
     let boundExpr ← bound.quote identType env
     let bodyExpr ← withLocalDeclD (Name.mkSimple id.name) identType fun x => do
       let env' := fun other => if other = id then some x else env other
       let bodyExpr ← body.quote identType env'
       mkLambdaFVars #[x] bodyExpr
-    return mkApp3 (mkConst ``_root_.Expr.bind) identType boundExpr bodyExpr
+    return mkApp3 (mkConst ``_root_.Expr.letBinding) identType boundExpr bodyExpr
   | .apply _ _ | .function _ | .prim _ _ =>
     throwError s!"not yet supported"
 
@@ -64,8 +64,8 @@ def Syntax.Lambda.toPhoas? (source : Syntax.Lambda) : TermElabM Lean.Expr :=
 
 namespace IdentityFunctionExample
   @[simp] def x : Syntax.Ident := { name := "x", stamp := .stamped 42 }
-  @[simp] def f : Syntax.Lambda := .bind x (.const (.base (.int 42))) (.var x)
+  @[simp] def f : Syntax.Lambda := .letBinding x (.const (.base (.int 42))) (.var x)
   @[simp] def v {I} : @Expr I := .value (.immediate ⟨42⟩)
-  theorem asExpected I : (by_elab f.toPhoas?) I = .bind v .var := by
+  theorem asExpected I : (by_elab f.toPhoas?) I = .letBinding v .var := by
     simp
 end IdentityFunctionExample

@@ -106,7 +106,7 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
         ("bound", serialize_lambda value);
         ("body", serialize_lambda body);
       ]
-    |> tag "bind"
+    |> tag "letBinding"
   | Lprim (prim, args, _) ->
     Json.Object
       [ ("prim", serialize_primitive prim);

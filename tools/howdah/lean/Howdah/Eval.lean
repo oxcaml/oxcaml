@@ -56,7 +56,7 @@ def Lambda.substitute {V} (idToReplace : Ident) (value : V) :
   | .apply func args =>
     .apply (substitute idToReplace value func) <|
       args.attach.map (fun ⟨arg, _⟩ ↦ arg.substitute idToReplace value)
-  | .bind id bound body =>
+  | .letBinding id bound body =>
     let substSubstituted := substitute idToReplace value bound
     let bodySubstituted :=
       if id = idToReplace then
@@ -64,7 +64,7 @@ def Lambda.substitute {V} (idToReplace : Ident) (value : V) :
         body
       else
         substitute idToReplace value body
-    .bind id substSubstituted bodySubstituted
+    .letBinding id substSubstituted bodySubstituted
   | .prim p args =>
     .prim p <| args.attach.map (fun ⟨arg, _⟩ ↦ arg.substitute idToReplace value)
   | .value v => .value v
@@ -82,7 +82,7 @@ theorem Lambda.size_substitute {V} (lambda : Lambda V) idToReplace value :
   | apply func args ihFunc ihArgs =>
     simp [ihFunc]
     (induction ihArgs with simp_all)
-  | bind id bound body ihBound ihBody => split <;> simp_all
+  | letBinding id bound body ihBound ihBody => split <;> simp_all
   | prim _ args ih => induction ih with simp_all
 
 @[simp]
@@ -131,7 +131,7 @@ def Lambda.pureEval : Expr → PureEvalResult Value
     .halted <| .indirection <|
     .immutable { tag := 247, contents := .closure .nonrecursive f }
   | .apply _ _ => .maybeNonterminating
-  | .bind id bound body => do
+  | .letBinding id bound body => do
     let value : Value ← bound.pureEval
     body.substitute id value |>.pureEval
   | .prim p args => do
@@ -184,12 +184,12 @@ mutual
             }
     | bindBody
         {id v} {body : Expr}
-        : (Lambda.bind id (.value v) body).stepsTo (body.substitute id v)
+        : (Lambda.letBinding id (.value v) body).stepsTo (body.substitute id v)
     | bindBound
         {bound bound' : Expr}
         (step : bound.stepsTo bound')
         {id body}
-        : (Lambda.bind id bound body).stepsTo (Lambda.bind id bound' body)
+        : (Lambda.letBinding id bound body).stepsTo (Lambda.letBinding id bound' body)
     | primWithArgumentsReady
         {args : List Expr} {values : List Value}
         (argsReady : args.allValues values)
