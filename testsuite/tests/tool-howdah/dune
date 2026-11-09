@@ -11,12 +11,15 @@
    %{deps})))
 
 (rule
- (with-stdout-to
-  record.json
-  (run
-   %{exe:../../../tools/howdah/howdah.exe}
-   %{dep:record.cmi}
-   %{dep:record.cmt})))
+ (targets record.json)
+ (mode (promote (until-clean)))
+ (action
+  (with-stdout-to
+   record.json
+   (run
+    %{exe:../../../tools/howdah/howdah.exe}
+    %{dep:record.cmi}
+    %{dep:record.cmt}))))
 
 (rule
  (alias record)

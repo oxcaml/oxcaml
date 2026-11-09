@@ -56,8 +56,8 @@ def Lambda.substitute {V} (idToReplace : Ident) (value : V) :
   | .apply func args =>
     .apply (substitute idToReplace value func) <|
       args.attach.map (fun ⟨arg, _⟩ ↦ arg.substitute idToReplace value)
-  | .bind id subst body =>
-    let substSubstituted := substitute idToReplace value subst
+  | .bind id bound body =>
+    let substSubstituted := substitute idToReplace value bound
     let bodySubstituted :=
       if id = idToReplace then
         dbgTrace s!"Unique identifiers like `{id}` should not be shadowed!" fun () ↦
@@ -82,28 +82,32 @@ theorem Lambda.size_substitute {V} (lambda : Lambda V) idToReplace value :
   | apply func args ihFunc ihArgs =>
     simp [ihFunc]
     (induction ihArgs with simp_all)
-  | bind id subst body ihSubst ihBody => split <;> simp_all
+  | bind id bound body ihBound ihBody => split <;> simp_all
   | prim _ args ih => induction ih with simp_all
 
 @[simp]
-def Constant.pureEval : Constant → Value
-  | .int bits => .immediate bits
-  | .string bytes => .block 252 <| .bytes bytes
+def Constant.toValue : Constant → Value
+  | .int bits =>
+    .immediate { bitsAboveLsb := bits }
+  | .string bytes =>
+    .indirection <| .immutable { tag := 252, contents := .bytes bytes }
 
 @[simp]
-def BlockKind.bindValues (tag : Nat) (contents : List Value) :
+def BlockKind.bindValues (natTag : Nat) (contents : List Value) :
     PureEvalResult Value := do
-  let tag8 ←
-    if lt : tag < UInt8.size
-    then .halted <| UInt8.ofNatLT tag lt
-    else .error <| .blockTagOutOfRange tag
-  match kind : BlockKind.ofTag tag8 with
-  | .values => .halted <| .block tag8 <| kind ▸ .values contents
-  | _ => .error <| .blockTagOutOfRange tag
+  let tag ←
+    if tagIsNotTooBig : _
+    then .halted <| UInt8.ofNatLT natTag tagIsNotTooBig
+    else .error <| .blockTagOutOfRange natTag
+  match kind : BlockKind.ofTag tag with
+  | .values =>
+    .halted <| .indirection <|
+    .immutable { tag, contents := kind ▸ .values contents }
+  | _ => .error <| .blockTagOutOfRange natTag
 
 @[simp]
 def StructuredConstant.pureEval : StructuredConstant → PureEvalResult Value
-  | .base c => .halted c.pureEval
+  | .base c => .halted c.toValue
   | .block tag fields => do
     let values ← fields.attach.mapM fun ⟨field, _⟩ ↦ field.pureEval
     BlockKind.bindValues tag values
@@ -112,7 +116,7 @@ def StructuredConstant.pureEval : StructuredConstant → PureEvalResult Value
 def Primitive.pureEval (args : List Value) : Primitive → PureEvalResult Value
   | .field index =>
     match args with
-    | [.block 0 <| .values values] =>
+    | [.indirection <| .immutable { tag := 0, contents := .values values }] =>
       match values[index]? with
       | .some value => .halted value
       | .none => .error <| .primFieldOutOfRange index values
@@ -123,10 +127,12 @@ def Primitive.pureEval (args : List Value) : Primitive → PureEvalResult Value
 def Lambda.pureEval : Expr → PureEvalResult Value
   | .var id => .error <| .unboundVariable id
   | .const c => c.pureEval
-  | .function f => .halted <| .block 247 <| .closure .nonrecursive f
+  | .function f =>
+    .halted <| .indirection <|
+    .immutable { tag := 247, contents := .closure .nonrecursive f }
   | .apply _ _ => .maybeNonterminating
-  | .bind id subst body => do
-    let value : Value ← subst.pureEval
+  | .bind id bound body => do
+    let value : Value ← bound.pureEval
     body.substitute id value |>.pureEval
   | .prim p args => do
     let args ← args.attach.mapM fun ⟨arg, _⟩ => arg.pureEval
@@ -148,4 +154,78 @@ def Lambda.pureEval! (lambda : Expr) : Value :=
 def PureEval (lambda : Expr) (value : Value) : Prop :=
   lambda.pureEval = .halted value
 
-notation:50 e " ⇓ " v => PureEval e v
+inductive List.allValues : List Expr → List Value → Prop where
+  | nil
+      : [].allValues []
+  | cons
+      {tailExprs tailValues}
+      (tailAllValues : tailExprs.allValues tailValues)
+      {headValue}
+      : (.value headValue :: tailExprs).allValues (headValue :: tailValues)
+
+inductive Primitive.stepsTo : Primitive → List Value → Value → Prop where
+  | makeBlock
+      {tag args v}
+      (thisIsABlockOfValues : BlockKind.bindValues tag args = .halted v)
+      : (Primitive.makeBlock tag).stepsTo args v
+
+mutual
+  inductive Lambda.stepsTo : Expr → Expr → Prop where
+    | const
+        {c : StructuredConstant} {v}
+        (step : c.pureEval = .halted v)
+        : (Lambda.const c).stepsTo (Lambda.value v)
+    | function {headParam tailParams body}
+        : Lambda.function { headParam, tailParams, body } |>.stepsTo <|
+            Lambda.value <| .indirection <| .immutable {
+              tag := 247,
+              contents :=
+                .closure .nonrecursive { headParam, tailParams, body },
+            }
+    | bindBody
+        {id v} {body : Expr}
+        : (Lambda.bind id (.value v) body).stepsTo (body.substitute id v)
+    | bindBound
+        {bound bound' : Expr}
+        (step : bound.stepsTo bound')
+        {id body}
+        : (Lambda.bind id bound body).stepsTo (Lambda.bind id bound' body)
+    | primWithArgumentsReady
+        {args : List Expr} {values : List Value}
+        (argsReady : args.allValues values)
+        {p : Primitive} {v}
+        (step : p.stepsTo values v)
+        : (Lambda.prim p args).stepsTo (.value v)
+    | primArgs
+        {args args' : List Expr}
+        (step : args.oneArgumentStepsTo args')
+        {p : Primitive}
+        : (Lambda.prim p args).stepsTo (Lambda.prim p args')
+
+  -- Note that argument evaluation order is unspecified.
+  inductive List.oneArgumentStepsTo : List Expr → List Expr → Prop where
+    | head
+        {head head' : Expr}
+        (step : head.stepsTo head')
+        {tail}
+        : (head :: tail).oneArgumentStepsTo (head' :: tail)
+    | tail
+        {tail tail' : List Expr}
+        (step : tail.oneArgumentStepsTo tail')
+        {head} -- no requirement that `head` cannot step
+        : (head :: tail).oneArgumentStepsTo (head :: tail')
+end
+
+@[simp]
+theorem valuesCannotStep {v e} : ¬(Lambda.value v).stepsTo e := nofun
+
+inductive Lambda.purelyEvaluatesTo : Expr → Value → Prop where
+  | alreadyValue {v} :
+    (Lambda.value v).purelyEvaluatesTo v
+  | deterministicStep {e e' : Expr} {v}
+    (step : e.stepsTo e')
+    (deterministic : forall e'', e.stepsTo e'' → e' = e'')
+    (transitive : e'.purelyEvaluatesTo v) :
+    e.purelyEvaluatesTo v
+
+notation:50 e:51 " ⇓ " v:51 => Lambda.purelyEvaluatesTo e v

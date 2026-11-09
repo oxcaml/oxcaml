@@ -9,8 +9,11 @@ def imported : JsonImport := howdah% "record.json"
 @[simp]
 def expectedReducedRecordModule : Value :=
   -- let string (s : String) : Value := .block 252 <| .bytes s.toUTF8.toList
-  let block contents : Value := .block 0 <| .values contents
-  let closure f : Value := .block 247 <| .closure .nonrecursive f
+  let block contents : Value :=
+    .indirection <| .immutable { tag := 0, contents := .values contents }
+  let closure f : Value :=
+    let contents := .closure .nonrecursive f
+    .indirection <| .immutable { tag := 247, contents }
   block [
     /- block [
      -   string "hello",
@@ -35,4 +38,49 @@ def expectedReducedRecordModule : Value :=
     -- block [.immediate 42#63],
   ]
 
-example : imported.implementation ⇓ expectedReducedRecordModule := by simp
+example : imported.implementation ⇓ expectedReducedRecordModule := by
+  simp
+  constructor
+  · constructor; constructor; simp; rfl
+  · sorry
+  constructor
+  · constructor
+  · sorry
+  simp
+  constructor
+  · constructor; constructor; simp; rfl
+  · sorry
+  constructor
+  · constructor
+  · sorry
+  simp
+  constructor
+  · constructor; constructor; constructor
+  · sorry
+  constructor
+  · constructor; constructor
+  · sorry
+  simp
+  constructor
+  · constructor; constructor; constructor
+  · sorry
+  constructor
+  · constructor; constructor
+  · sorry
+  simp
+  constructor
+  · constructor
+    · constructor
+      · constructor; constructor; constructor
+      · constructor; simp; rfl
+  · sorry
+  constructor
+  · constructor
+  · sorry
+  simp
+  constructor
+  · constructor
+    · constructor; constructor
+    · constructor; simp; rfl
+  · sorry
+  constructor

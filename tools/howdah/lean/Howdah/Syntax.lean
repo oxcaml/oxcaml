@@ -21,20 +21,6 @@ inductive TypeExpr where
   | string
   deriving Repr
 
-inductive BlockKind : Type where
-  | values
-  | bytes
-  | closure
-  | notYetSupported -- lazy, effect continuations, etc.
-  deriving Repr
-
-@[simp]
-def BlockKind.ofTag (tag : UInt8) : BlockKind :=
-  if tag = 247 then .closure else
-  if tag < 244 then .values else
-  if tag < 251 then .notYetSupported else
-  .bytes
-
 inductive StructuredConstant where
   | base (const : Constant)
   | block (tag : Nat) (fields : List StructuredConstant)
@@ -71,7 +57,7 @@ inductive Lambda (V : Type) : Type where
   /- Lfunction -/
   | function (function : Function (Lambda V))
   /- Llet -/
-  | bind (id : Ident) (subst : Lambda V) (body : Lambda V)
+  | bind (id : Ident) (bound : Lambda V) (body : Lambda V)
   /- TODO: Lmutlet -/
   /- TODO: Lletrec -/
   /- Lprim -/
@@ -95,18 +81,49 @@ inductive Lambda (V : Type) : Type where
   | value (value : V)
   deriving Repr
 
+inductive BlockKind : Type where
+  | values
+  | bytes
+  | closure
+  | notYetSupported -- lazy, effect continuations, etc.
+  deriving Repr
+
+inductive Loc : Type where
+  -- TODO
+  deriving Repr
+
+@[simp]
+def BlockKind.ofTag (tag : UInt8) : BlockKind :=
+  if tag < 244 then .values else
+  if tag > 250 then .bytes else
+  match tag with
+  | 247 => .closure
+  | _ => .notYetSupported
+
 mutual
   inductive Value : Type where
-    | immediate (bits : BitVec 63)
-    | block (tag : UInt8) (contents : BlockContents (.ofTag tag))
+    | immediate (immediate : Immediate)
+    | indirection (indirection : Indirection)
     deriving Repr
 
-  -- GADT
+  structure Immediate : Type where
+    bitsAboveLsb : BitVec 63
+    deriving Repr
+
+  inductive Indirection : Type where
+    | immutable (block : Block) -- use Lean's ambient model of indirection
+    | mutable (loc : Loc) -- block with a known, shared memory location
+    deriving Repr
+
+  structure Block : Type where
+    tag : UInt8
+    contents : BlockContents (BlockKind.ofTag tag) -- notably dependent on `tag`
+    deriving Repr
+
   inductive BlockContents : BlockKind → Type where
     | values (values : List Value) : BlockContents .values
     | bytes (bytes : List UInt8) : BlockContents .bytes
     | closure (rec : Recursive) (closure : Function (Lambda Value)) : BlockContents .closure
-    -- nothing for `.notYetSupported`
     deriving Repr
 
   inductive Recursive : Type where
@@ -116,16 +133,16 @@ mutual
 end
 
 instance : Inhabited Value where
-  default := .block 0 <| .values []
+  default := .indirection <| .immutable { tag := 0, contents := .values [] }
 
-abbrev Expr := Lambda Value
+notation "Expr" => Lambda Value
 
 @[simp]
 def Lambda.size {V} : Lambda V → Nat
   | .var _ | .const _ | .value _ => 1
   | .function f => f.body.size.succ
   | .apply func args => func.size + (args.map size).sum |>.succ
-  | .bind _ subst body => subst.size + body.size |>.succ
+  | .bind _ bound body => bound.size + body.size |>.succ
   | .prim _ args => args.map size |>.sum |>.succ
 decreasing_by
   all_goals first
@@ -184,10 +201,10 @@ def Lambda.induct' {V} {motive : Lambda V → Prop}
       motive body →
       motive (.function headParam tailParam body))
     (bind :
-      ∀ id subst body,
-      motive subst →
+      ∀ id bound body,
+      motive bound →
       motive body →
-      motive (.bind id subst body))
+      motive (.bind id bound body))
     (prim : ∀ prim args, List.forAll motive args → motive (.prim prim args))
     (value : ∀ value, motive (.value value))
     : ∀ l, motive l

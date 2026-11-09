@@ -20,6 +20,7 @@ instance : Lean.FromJson (BitVec 63) where
     | .some bits => return bits
     | .none => throw s!"{i} does not fit in a 63-bit immediate"
 
+deriving instance Lean.FromJson, Lean.ToExpr for Loc
 deriving instance Lean.FromJson, Lean.ToExpr for Constant
 deriving instance Lean.FromJson, Lean.ToExpr for Ident
 deriving instance Lean.FromJson, Lean.ToExpr for Path

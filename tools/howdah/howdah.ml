@@ -93,7 +93,7 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
   | Llet (Strict, _, id, _, value, body) ->
     Json.Object
       [ ("id", serialize_ident id);
-        ("subst", serialize_lambda value);
+        ("bound", serialize_lambda value);
         ("body", serialize_lambda body);
       ]
     |> tag "bind"
