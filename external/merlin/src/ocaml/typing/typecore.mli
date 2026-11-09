@@ -184,13 +184,9 @@ val type_option_none:
         Env.t -> type_expr -> Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
 val generalize_structure_exp: Typedtree.expression -> unit
-<<<<<<< Merlin:jbachurski/abstract-kinds-cannot-escape
+val lower_nongen: Location.t -> Env.t -> int -> module_type -> unit
 type delayed_check
 val delayed_checks: delayed_check list ref
-||||||| Compiler:last-imported
-=======
-val lower_nongen: Location.t -> Env.t -> int -> module_type -> unit
->>>>>>> Compiler:HEAD
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 
