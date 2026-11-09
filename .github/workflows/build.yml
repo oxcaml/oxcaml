@@ -29,6 +29,7 @@ jobs:
             build_debug: true
             build_ast_dependent_libs: true
             check_installed: true
+            check_hacking: true
             sysdeps: gdb
 
           - name: dissector-assembler (x86_64-linux)
@@ -409,6 +410,10 @@ jobs:
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Check that `make hacking` builds
+        if: matrix.check_hacking == true && steps.build.conclusion == 'success'
+        run: make check-hacking
 
       - name: Run OxCaml testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
