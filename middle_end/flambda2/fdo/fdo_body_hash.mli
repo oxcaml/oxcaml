@@ -27,16 +27,10 @@
  ******************************************************************************)
 
 (** The body hash of a function (see [Fdo_counter_identity]), computed from its
-    Lambda definition.
-
-    The body hash tells apart function bodies whose differences are likely to
-    change code layout decisions. In particular, it leaves out what varies
-    between compilations of the same code (like source positions, identifier
-    stamps, debug uids, static handler numbers) and the layouts, modes, kinds
-    and shapes of terms and primitives.
-
-    Counters inside the body are only comparable between builds with the same
-    body hash, which requires the same compiler version. *)
+    Lambda definition. Bodies with the same body hash number their counters
+    alike and connect them by the same explicit control flow. Other changes (to
+    constants, names, attributes, nested functions, ...) leave it unchanged,
+    even though they can make a profile stale. *)
 
 val of_function : Lambda.lfunction -> Fdo_counter.Body_hash.t
 
