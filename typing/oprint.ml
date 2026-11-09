@@ -1170,9 +1170,9 @@ and print_out_law_decl ppf ld =
     fprintf ppf "@ (%a : %a)" print_lident x !out_type ty
   in
   let print_assumption ppf spec =
-    fprintf ppf "%a ===>@ " print_out_spec spec
+    fprintf ppf "%a implies_@ " print_out_spec spec
   in
-  fprintf ppf "@[<2>law? %a%a :@ %a%a@]" print_lident ld.olaw_name
+  fprintf ppf "@[<2>law_? %a%a :@ %a%a@]" print_lident ld.olaw_name
     (fun ppf -> List.iter (print_param ppf)) ld.olaw_params
     (fun ppf -> List.iter (print_assumption ppf)) ld.olaw_assumptions
     print_out_spec ld.olaw_conclusion
@@ -1208,6 +1208,7 @@ let _ = out_module_type := print_out_module_type
 let _ = out_signature := print_out_signature
 let _ = out_sig_item := print_out_sig_item
 let _ = out_type_extension := print_out_type_extension
+let out_spec = ref print_out_spec
 
 (* Phrases *)
 

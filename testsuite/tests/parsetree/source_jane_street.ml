@@ -1922,22 +1922,15 @@ Error: Exclave expression should only be in tail position of the current region.
 (********)
 (* Laws *)
 
-(* Laws are parsed but not type checked yet. *)
-
-law_? length_nonneg (xs : 'a list) : List.length xs >= 0
+law_? max_ge (x : int) (y : int) : Int.max x y >= x
 [%%expect{|
-Line 1, characters 0-56:
-1 | law_? length_nonneg (xs : 'a list) : List.length xs >= 0
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+law_? max_ge (x : int) (y : int) : (Int.max x y) >= x
 |}]
 
-law_? sum_pos x (y : int) : x > 0 implies_ y > 0 implies_ x + y > 0
+law_? sum_pos (x : int) (y : int) : x > 0 implies_ y > 0 implies_ x + y > 0
 [%%expect{|
-Line 1, characters 0-67:
-1 | law_? sum_pos x (y : int) : x > 0 implies_ y > 0 implies_ x + y > 0
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+law_? sum_pos (x : int) (y : int) : x > (0) implies_ y > (0) implies_
+  (x + y) > (0)
 |}]
 
 module type S = sig
@@ -1945,18 +1938,19 @@ module type S = sig
   law_? f_id (x : int) : x >= 0 implies_ f x = x [@@test.attr]
 end
 [%%expect{|
-Line 3, characters 2-62:
-3 |   law_? f_id (x : int) : x >= 0 implies_ f x = x [@@test.attr]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+module type S =
+  sig
+    val f : int -> int
+    law_? f_id (x : int) : x >= (0) implies_ (f x) = x
+  end
 |}]
 
 law_? trivial : true
 [%%expect{|
-Line 1, characters 0-20:
+Line 1, characters 16-20:
 1 | law_? trivial : true
-    ^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+                    ^^^^
+Error: Laws do not support constructors.
 |}]
 
 (* Laws in every structure and signature position. *)
@@ -1979,10 +1973,10 @@ module type FC = sig law_? in_first_class_module : true end
 let first_class = (module M : FC)
 include (struct law_? in_included_structure : true end)
 [%%expect{|
-Line 2, characters 2-24:
+Line 2, characters 20-24:
 2 |   law_? in_module : true
-      ^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+                        ^^^^
+Error: Laws do not support constructors.
 |}]
 
 (* Parameters with and without type annotations. *)
@@ -1997,10 +1991,10 @@ law_? complex_types
   (r : < m : int >) (v : [ `A | `B of int ]) (t : (int, string) Hashtbl.t) :
   true
 [%%expect{|
-Line 1, characters 0-61:
+Line 1, characters 12-13:
 1 | law_? mixed x (y : int) z (t : 'a list) : x + y = z && t = []
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+                ^
+Error: The law parameter "x" must have a type annotation.
 |}]
 
 (* Any number of assumptions. *)
@@ -2009,10 +2003,9 @@ law_? one (x : int) : x > 0 implies_ x <> 0
 law_? three (x : int) (y : int) (z : int) :
   x > 0 implies_ y > 0 implies_ z > 0 implies_ x * y * z > 0
 [%%expect{|
-Line 1, characters 0-43:
-1 | law_? one (x : int) : x > 0 implies_ x <> 0
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+law_? one (x : int) : x > (0) implies_ x <> (0)
+law_? three (x : int) (y : int) (z : int) : x > (0) implies_ y > (0) implies_
+  z > (0) implies_ ((x * y) * z) > (0)
 |}]
 
 (* Attributes on laws and on parameter types. *)
@@ -2021,10 +2014,10 @@ law_? attributed : true [@@attr]
 law_? several_attributes (x : int) : x = x [@@attr1] [@@attr2 payload]
 law_? attributed_param_type (x : int [@attr]) : true
 [%%expect{|
-Line 1, characters 0-32:
+Line 1, characters 19-23:
 1 | law_? attributed : true [@@attr]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+                       ^^^^
+Error: Laws do not support constructors.
 |}]
 
 (* Clauses are [expr]s. The test below contains far reaching expressions ([let],
@@ -2037,12 +2030,10 @@ law_? clauses (a : bool) (n : int) :
   (match n with 0 -> true | _ -> a) implies_ (ignore n; a) implies_
   (fun b -> b) a implies_ (try a with _ -> false)
 [%%expect{|
-Lines 1-4, characters 0-49:
-1 | law_? clauses (a : bool) (n : int) :
+Line 2, characters 2-18:
 2 |   (let b = a in b) implies_ (if a then n else 0) >= 0 implies_
-3 |   (match n with 0 -> true | _ -> a) implies_ (ignore n; a) implies_
-4 |   (fun b -> b) a implies_ (try a with _ -> false)
-Error: Laws are not supported yet.
+      ^^^^^^^^^^^^^^^^
+Error: Laws do not support let-bindings.
 |}]
 
 (* The spaces around [?] are optional, except if the law has no arguments (see
@@ -2050,26 +2041,26 @@ Error: Laws are not supported yet.
 
 law_ ? spaced : true
 [%%expect{|
-Line 1, characters 0-20:
+Line 1, characters 16-20:
 1 | law_ ? spaced : true
-    ^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+                    ^^^^
+Error: Laws do not support constructors.
 |}]
 
 law_ ?space_before x : true
 [%%expect{|
-Line 1, characters 0-27:
+Line 1, characters 19-20:
 1 | law_ ?space_before x : true
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+                       ^
+Error: The law parameter "x" must have a type annotation.
 |}]
 
 law_?no_space x : true
 [%%expect{|
-Line 1, characters 0-22:
+Line 1, characters 14-15:
 1 | law_?no_space x : true
-    ^^^^^^^^^^^^^^^^^^^^^^
-Error: Laws are not supported yet.
+                  ^
+Error: The law parameter "x" must have a type annotation.
 |}]
 
 (* [law] is an ordinary identifier, even next to [?]. *)

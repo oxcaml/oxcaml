@@ -179,6 +179,7 @@ val tree_of_jkind_declaration:
     Ident.t -> jkind_declaration -> out_sig_item
 val tree_of_law_declaration:
     Ident.t -> law_declaration -> out_sig_item
+val tree_of_law_clause: law_declaration -> Spec.expression -> out_spec
 
 (** {1 Module types }*)
 

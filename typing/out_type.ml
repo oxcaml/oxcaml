@@ -3838,20 +3838,79 @@ and label_of_spec : Spec.arg_label -> Outcometree.arg_label = function
   | Spec.Nolabel -> Nolabel
   | Spec.Labelled s -> Labelled s
 
-let tree_of_law_declaration id decl =
+(* A type variable whose kind is not the default [value] is annotated with its
+   kind at its first occurrence in the parameters: [(x : ('a : k)) (y : 'a)]. *)
+let annotate_first_occurrences kinds params =
+  let pending = ref kinds in
+  let rec annotate (ty : out_type) : out_type =
+    match ty with
+    | Otyp_var (_, name) ->
+        begin match List.assoc_opt name !pending with
+        | Some kind ->
+            pending := List.remove_assoc name !pending;
+            Otyp_jkind_annot (ty, kind)
+        | None -> ty
+        end
+    | Otyp_constr (p, args) -> Otyp_constr (p, List.map annotate args)
+    | Otyp_arrow (label, modes, arg, ret) ->
+        let arg = annotate arg in
+        let ret = annotate ret in
+        Otyp_arrow (label, modes, arg, ret)
+    | Otyp_ret (modes, ty) -> Otyp_ret (modes, annotate ty)
+    | Otyp_tuple tys -> Otyp_tuple (List.map labelled tys)
+    | Otyp_unboxed_tuple tys -> Otyp_unboxed_tuple (List.map labelled tys)
+    | Otyp_alias { non_gen; aliased; alias } ->
+        Otyp_alias { non_gen; aliased = annotate aliased; alias }
+    | Otyp_poly (vars, ty) -> Otyp_poly (vars, annotate ty)
+    | Otyp_variant (Ovar_fields fields, closed, tags) ->
+        let field (tag, empty, tys) = (tag, empty, List.map annotate tys) in
+        Otyp_variant (Ovar_fields (List.map field fields), closed, tags)
+    | Otyp_variant (Ovar_typ ty, closed, tags) ->
+        Otyp_variant (Ovar_typ (annotate ty), closed, tags)
+    | Otyp_object { fields; open_row } ->
+        Otyp_object { fields = List.map labelled fields; open_row }
+    | Otyp_class (p, args) -> Otyp_class (p, List.map annotate args)
+    | Otyp_module { opack_path; opack_cstrs } ->
+        Otyp_module { opack_path; opack_cstrs = List.map labelled opack_cstrs }
+    | Otyp_mod (ty, modalities) -> Otyp_mod (annotate ty, modalities)
+    | Otyp_attribute (ty, attr) -> Otyp_attribute (annotate ty, attr)
+    | Otyp_abstract | Otyp_open | Otyp_manifest _ | Otyp_record _
+    | Otyp_record_unboxed_product _ | Otyp_stuff _ | Otyp_sum _ | Otyp_quote _
+    | Otyp_splice _ | Otyp_repr _ | Otyp_newlayout _ | Otyp_jkind_annot _
+    | Otyp_of_kind _ ->
+        ty
+  and labelled : 'l. 'l * out_type -> 'l * out_type =
+    fun (label, ty) -> (label, annotate ty)
+  in
+  List.map (fun (x, ty) -> (x, annotate ty)) params
+
+let tree_of_law_params params =
+  let tys = List.map snd params in
   let base = With_locality.Const.legacy in
-  prepare_for_printing (List.map snd decl.law_params);
-  let olaw_params =
+  prepare_for_printing tys;
+  let params =
     List.map
       (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
-      decl.law_params
+      params
   in
+  let non_default_kinds =
+    List.filter_map
+      (fun (name, kind) -> Option.map (fun kind -> (name, kind)) kind)
+      (zap_qtvs_if_boring (tree_of_qtvs (extract_qtvs tys)))
+  in
+  annotate_first_occurrences non_default_kinds params
+
+let tree_of_law_clause decl =
   let bound =
     List.fold_left
       (fun bound (x, _) -> String.Set.add (Ident.name x) bound)
       String.Set.empty decl.law_params
   in
-  let tree = tree_of_spec ~bound in
+  tree_of_spec ~bound
+
+let tree_of_law_declaration id decl =
+  let olaw_params = tree_of_law_params decl.law_params in
+  let tree = tree_of_law_clause decl in
   Osig_law
     { olaw_name = Ident.name id;
       olaw_params;

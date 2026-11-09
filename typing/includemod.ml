@@ -77,6 +77,8 @@ module Error = struct
     | Modalities of Mode.Modality.error
     | Jkind_declarations of
         (jkind_declaration, Includecore.jkind_mismatch) diff
+    | Law_declarations of
+        (law_declaration, Includecore.law_mismatch) diff
 
   type core_module_type_symptom =
     | Not_an_alias
@@ -308,6 +310,17 @@ module Core_inclusion = struct
     | None -> Ok Tcoerce_none
     | Some err ->
       Error Error.(Core(Jkind_declarations (diff decl1 decl2 err)))
+
+  (* Inclusion between laws *)
+
+  let law_declarations ~loc env ~direction:_ subst id ~mmodes:_ decl1 decl2 =
+    let decl2 = Subst.law_declaration subst decl2 in
+    match
+      Includecore.law_declarations ~loc env (Ident.name id) decl1 decl2
+    with
+    | None -> Ok Tcoerce_none
+    | Some err ->
+      Error Error.(Core(Law_declarations (diff decl1 decl2 err)))
 
   (* Inclusion between class declarations *)
 
@@ -663,6 +676,7 @@ type core_relation = {
   class_declarations: Types.class_declaration core_incl;
   class_type_declarations: Types.class_type_declaration core_incl;
   jkind_declarations: Types.jkind_declaration core_incl;
+  law_declarations: Types.law_declaration core_incl;
 }
 
 (* Quickly compare module types without expanding them, succeeding only if mty1
@@ -1163,6 +1177,13 @@ and signature_components :
            let item = mark_error_as_unrecoverable item in
            let shape_map = Shape.Map.add_jkind_proj shape_map id1 orig_shape in
            id1, item, (jd1.jkind_uid, jd2.jkind_uid), shape_map, false
+        | Sig_law (id1, ld1, _), Sig_law (_id2, ld2, _) ->
+           let item =
+             core.law_declarations ~loc env ~direction subst id1 ~mmodes ld1
+               ld2
+           in
+           let item = mark_error_as_unrecoverable item in
+           id1, item, (ld1.law_uid, ld2.law_uid), shape_map, false
         | _ ->
             assert false
       in
@@ -1327,6 +1348,7 @@ let make_core_inclusion ~self_check = Core_inclusion.{
   class_type_declarations;
   class_declarations;
   jkind_declarations;
+  law_declarations;
 }
 
 let core_inclusion = make_core_inclusion ~self_check:false
@@ -1355,6 +1377,7 @@ let core_consistency =
     class_type_declarations=accept;
     extension_constructors=accept;
     jkind_declarations=accept;
+    law_declarations=accept;
   }
 
 type explanation = Env.t * Error.all

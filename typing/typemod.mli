@@ -207,11 +207,19 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-  | Laws_not_supported
   | Unrepresentable_include of Env.unrepresentable_item
   | Unrepresentable_open of Env.unrepresentable_item
   | Unrepresentable_argument of
       Global_module.Parameter_name.t * Env.unrepresentable_item
+  | Law_parameter_not_representable of
+      { ty : type_expr; violation : Jkind.Violation.t }
+  | Law_duplicate_parameter of { parameter : string }
+  | Law_unannotated_parameter of { parameter : string }
+  | Law_wildcard_in_parameter
+  | Law_instantiated_type_variable of { variable : string; ty : type_expr }
+  | Law_refined_type_variable_kind of
+      { variable : string; jkind : jkind_lr }
+  | Law_in_recursive_module of { module_name : string; law : string }
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t
