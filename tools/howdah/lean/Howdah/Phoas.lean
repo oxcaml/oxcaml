@@ -15,30 +15,29 @@ private def quoteBlockValue
     (← `(.indirection (.immutable { tag := $tag, contents := $contents })))
     (some (mkApp (mkConst ``Value) identType))
 
-private partial def quoteConstant
+private partial def Syntax.StructuredConstant.quote
     (identType : Lean.Expr) : Syntax.StructuredConstant → TermElabM Lean.Expr
   | .base (.int bits) => do
-    let bits ← exprToSyntax (toExpr bits)
-    elabTermEnsuringType
-      (← `(.immediate { bitsAboveLsb := $bits }))
-      (some (mkApp (mkConst ``Value) identType))
+    let bits ← toExpr bits |> exprToSyntax
+    let imm ← `(.immediate { bitsAboveLsb := $bits })
+    elabTermEnsuringType imm (some (mkApp (mkConst ``Value) identType))
   | .base (.string bytes) =>
     quoteBlockValue identType 252
       (mkApp2 (mkConst ``BlockContents.bytes) identType (toExpr bytes))
   | .block natTag fields => do
-    if h : natTag < UInt8.size then
-      let tag := UInt8.ofNatLT natTag h
+    if tagIsNotTooBig : natTag < UInt8.size then
+      let tag := UInt8.ofNatLT natTag tagIsNotTooBig
       match BlockKind.ofTag tag with
       | .values =>
-        let fields ← fields.mapM (quoteConstant identType)
-        let fields ← mkListLit (mkApp (mkConst ``Value) identType) fields
+        let eachField ← fields.mapM (Syntax.StructuredConstant.quote identType)
+        let fields ← mkListLit (mkApp (mkConst ``Value) identType) eachField
         quoteBlockValue identType tag
           (mkApp2 (mkConst ``BlockContents.values) identType fields)
-      | _ => throwError "invalid block tag {natTag}"
+      | _ => throwError "invalid constant block tag {natTag}"
     else
-      throwError "invalid block tag {natTag}"
+      throwError "invalid constant block tag {natTag}"
 
-private def quoteLambda
+private def Syntax.Lambda.quote
     (identType : Lean.Expr)
     (env : Syntax.Ident → Option Lean.Expr) :
     Syntax.Lambda → TermElabM Lean.Expr
@@ -46,21 +45,21 @@ private def quoteLambda
     let some x := env id | throwError "unbound identifier {id.name}"
     return mkApp2 (mkConst ``_root_.Expr.var) identType x
   | .const c => do
-    let value ← quoteConstant identType c
+    let value ← c.quote identType
     return mkApp2 (mkConst ``_root_.Expr.value) identType value
   | .bind id bound body => do
-    let boundExpr ← quoteLambda identType env bound
+    let boundExpr ← bound.quote identType env
     let bodyExpr ← withLocalDeclD (Name.mkSimple id.name) identType fun x => do
       let env' := fun other => if other = id then some x else env other
-      let bodyExpr ← quoteLambda identType env' body
+      let bodyExpr ← body.quote identType env'
       mkLambdaFVars #[x] bodyExpr
     return mkApp3 (mkConst ``_root_.Expr.bind) identType boundExpr bodyExpr
   | .apply _ _ | .function _ | .prim _ _ =>
-    throwError "unsupported Lambda expression"
+    throwError s!"not yet supported"
 
 def Syntax.Lambda.toPhoas? (source : Syntax.Lambda) : TermElabM Lean.Expr :=
   withLocalDeclD `Ident (mkSort (.succ .zero)) fun identType => do
-    let body ← quoteLambda identType (fun _ => none) source
+    let body ← source.quote identType fun _ => none
     mkLambdaFVars #[identType] body
 
 namespace IdentityFunctionExample
