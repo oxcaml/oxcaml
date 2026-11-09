@@ -1,6 +1,14 @@
 import Lean
 import Howdah.Syntax
 
+@[delab app.Ident.mk]
+def delabIdent : Lean.PrettyPrinter.Delaborator.Delab := do
+  let ppAll ← Lean.PrettyPrinter.Delaborator.getPPOption Lean.getPPAll
+  guard (!ppAll)
+  let expr ← Lean.PrettyPrinter.Delaborator.SubExpr.getExpr
+  let .lit <| .strVal name := expr.getArg! 0 | failure
+  return Lean.mkIdent <| Lean.Name.mkSimple s!"«{name}»"
+
 instance : Lean.FromJson UInt8 where
   fromJson? json := do
     let n : Nat ← Lean.fromJson? json
@@ -22,6 +30,7 @@ instance : Lean.FromJson (BitVec 63) where
 
 deriving instance Lean.FromJson, Lean.ToExpr for Loc
 deriving instance Lean.FromJson, Lean.ToExpr for Constant
+deriving instance Lean.FromJson, Lean.ToExpr for IdentStamp
 deriving instance Lean.FromJson, Lean.ToExpr for Ident
 deriving instance Lean.FromJson, Lean.ToExpr for Path
 deriving instance Lean.FromJson, Lean.ToExpr for TypeExpr

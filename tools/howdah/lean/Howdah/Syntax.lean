@@ -3,12 +3,19 @@ inductive Constant where
   | string (bytes : List UInt8)
   deriving Repr
 
+inductive IdentStamp where
+  | predef
+  | global
+  | stamped (stamp : Nat)
+  deriving DecidableEq, Repr
+
 structure Ident where
-  uniqueToplevelName : String
+  name : String
+  stamp : IdentStamp
   deriving DecidableEq, Repr
 
 instance : ToString Ident where
-  toString := (·.uniqueToplevelName)
+  toString := (·.name)
 
 inductive Path where
   | ident (id : Ident)

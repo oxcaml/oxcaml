@@ -39,7 +39,17 @@ let serialize_constant : Typedtree.constant -> Json.t = function
 
 (* Serialize an identifier. *)
 let serialize_ident (id : Ident.t) : Json.t =
-  Json.String (Ident.unique_toplevel_name id) |> tag "uniqueToplevelName"
+  let name = Ident.name id in
+  let stamp =
+    if Ident.is_predef id then Json.String "predef" else
+    if Ident.is_global id then Json.String "global" else
+    Json.Object [("stamp", Ident.stamp id |> Json.int)]
+    |> tag "stamped"
+  in
+  Json.Object
+    [ ("name", Json.String name);
+      ("stamp", stamp);
+    ]
 
 (* Serialize a source-code path like [F(X).a.b.c]. *)
 let rec serialize_path ~(loc : Warnings.loc) : Path.t -> Json.t = function
