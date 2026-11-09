@@ -28,11 +28,10 @@
    %{dep:Import.lean})))
 
 (rule
- (targets Eval.olean)
+ (targets Expr.olean)
  (deps
   (sandbox preserve_file_kind)
-  Eval.lean
-  Syntax.olean)
+  Expr.lean)
  (action
   (run
    %{dep:../lean-with-flags}
@@ -40,4 +39,20 @@
    ..
    -o
    %{targets}
-   %{dep:Eval.lean})))
+   %{dep:Expr.lean})))
+
+(rule
+ (targets Phoas.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Phoas.lean
+  Syntax.olean
+  Expr.olean)
+ (action
+  (run
+   %{dep:../lean-with-flags}
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Phoas.lean})))

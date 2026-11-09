@@ -1,6 +1,11 @@
 import Lean
 import Howdah.Syntax
 
+structure JsonSchema : Type where
+  interface : Syntax.Signature
+  implementation : Syntax.Lambda
+  deriving Repr
+
 @[delab app.Ident.mk]
 def delabIdent : Lean.PrettyPrinter.Delaborator.Delab := do
   let ppAll ← Lean.PrettyPrinter.Delaborator.getPPOption Lean.getPPAll
@@ -28,29 +33,22 @@ instance : Lean.FromJson (BitVec 63) where
     | .some bits => return bits
     | .none => throw s!"{i} does not fit in a 63-bit immediate"
 
-deriving instance Lean.FromJson, Lean.ToExpr for Loc
-deriving instance Lean.FromJson, Lean.ToExpr for Constant
-deriving instance Lean.FromJson, Lean.ToExpr for IdentStamp
-deriving instance Lean.FromJson, Lean.ToExpr for Ident
-deriving instance Lean.FromJson, Lean.ToExpr for Path
-deriving instance Lean.FromJson, Lean.ToExpr for TypeExpr
-deriving instance Lean.FromJson, Lean.ToExpr for StructuredConstant
-deriving instance Lean.FromJson, Lean.ToExpr for BlockKind
-deriving instance Lean.FromJson, Lean.ToExpr for Primitive
-deriving instance Lean.FromJson, Lean.ToExpr for Function
-deriving instance Lean.FromJson, Lean.ToExpr for Lambda
-deriving instance Lean.FromJson, Lean.ToExpr for RecordLabelDecl
-deriving instance Lean.FromJson, Lean.ToExpr for RecordTypeDecl
-deriving instance Lean.FromJson, Lean.ToExpr for TypeDesc
-deriving instance Lean.FromJson, Lean.ToExpr for TypeDecl
-deriving instance Lean.FromJson, Lean.ToExpr for SignatureItem, ModuleType
-deriving instance Lean.FromJson, Lean.ToExpr for Signature
-
-instance : Lean.FromJson Value where
-  fromJson? _ := throw s!"don't import `Value`s"
-deriving instance Lean.ToExpr for Value
-
-deriving instance Lean.FromJson, Lean.ToExpr for JsonImport
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Constant
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.IdentStamp
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Ident
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Path
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.TypeExpr
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.StructuredConstant
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Primitive
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Function
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Lambda
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.RecordLabelDecl
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.RecordTypeDecl
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.TypeDesc
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.TypeDecl
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.SignatureItem
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Signature
+deriving instance Lean.FromJson, Lean.ToExpr for JsonSchema
 
 open Lean Elab Command
 
@@ -59,5 +57,5 @@ elab "howdah% " path:str : term => do
   let dir : System.FilePath := System.FilePath.mk filename |>.parent.getD "."
   let fileContents : String ← dir / path.getString |> IO.FS.readFile
   let json : Json ← Json.parse fileContents |> IO.ofExcept
-  let imported : JsonImport ← fromJson? json |> IO.ofExcept
+  let imported : JsonSchema ← fromJson? json |> IO.ofExcept
   return toExpr imported
