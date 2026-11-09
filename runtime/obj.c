@@ -393,7 +393,12 @@ struct queue_chunk {
  */
 CAMLprim value caml_succ_scannable_prefix_len (value v) {
 #ifdef NATIVE_CODE
-  return Val_long(Reserved_val(v));
+  header_t hd = Hd_val(v);
+  if (Has_scan_mask_hd(hd)) {
+    return Val_long(Scannable_wosize_hd(hd) + 1);
+  } else {
+    return Val_long(0);
+  }
 #else
   reserved_t reserved = Reserved_val(v);
   if (reserved == Faux_mixed_block_sentinel) {
