@@ -23,6 +23,8 @@ open Misc
 open Reg
 open Arch
 
+let fp = Config.with_frame_pointers
+
 (* Registers available for register allocation *)
 
 (* Integer register map:
@@ -440,7 +442,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
 
 let initial_stack_offset ~num_stack_slots ~contains_calls =
   Stack_class.Tbl.total_size_in_bytes num_stack_slots
-  + if contains_calls then 8 else 0
+  + (if fp then 16 else if contains_calls then 8 else 0)
 
 let trap_frame_size_in_bytes = 16
 
@@ -451,7 +453,9 @@ let frame_size ~stack_offset ~contains_calls ~num_stack_slots =
   Misc.align sz 16
 
 let frame_required ~fun_contains_calls ~fun_num_stack_slots =
-  fun_contains_calls || Stack_class.Tbl.exists fun_num_stack_slots ~f:(fun _stack_class num -> num > 0)
+  fp || fun_contains_calls
+  || Stack_class.Tbl.exists fun_num_stack_slots
+       ~f:(fun _stack_class num -> num > 0)
 
 let prologue_required ~fun_contains_calls ~fun_num_stack_slots =
   frame_required ~fun_contains_calls ~fun_num_stack_slots
