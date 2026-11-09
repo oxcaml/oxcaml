@@ -1042,6 +1042,8 @@ CAMLprim value caml_uniform_array_blit(
     return Val_unit;
   CAMLassert (Tag_val(a1) != Double_array_tag);
   CAMLassert (Tag_val(a2) != Double_array_tag);
+  CAMLassert (!Is_mixed_block_reserved(Reserved_val(a1)));
+  CAMLassert (!Is_mixed_block_reserved(Reserved_val(a2)));
   if (Is_young(a2) || caml_is_stack(a2)) {
     /* Arrays of values, destination is local or in young generation.
        Here too we can do a direct copy since this cannot create
@@ -1393,6 +1395,7 @@ static value uniform_array_gather(intnat num_arrays,
     if (mlsize_t_max - lengths[i] < size) caml_invalid_argument("Array.concat");
     size += lengths[i];
     CAMLassert(Tag_val(arrays[i]) != Double_array_tag);
+    CAMLassert(!Is_mixed_block_reserved(Reserved_val(arrays[i])));
   }
   if (size == 0) {
     /* If total size = 0, just return an empty array */
