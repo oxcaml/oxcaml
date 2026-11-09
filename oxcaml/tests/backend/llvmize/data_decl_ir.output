@@ -207,7 +207,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlData_decl__entry(i6
   %49 = alloca i64
   %50 = alloca ptr addrspace(1)
   %51 = alloca ptr addrspace(1)
-  %52 = alloca i64
+  %52 = alloca ptr
   %53 = alloca i64
   %54 = alloca i64
   %55 = alloca i64
@@ -447,8 +447,8 @@ L138:
   %188 = load ptr addrspace(1), ptr %50
   store ptr addrspace(1) %188, ptr %51
   %189 = load ptr addrspace(1), ptr %51
-  %190 = load i64, ptr addrspace(1) %189
-  store i64 %190, ptr %52
+  %190 = load ptr, ptr addrspace(1) %189
+  store ptr %190, ptr %52
   %191 = load i64, ptr %46
   store i64 %191, ptr %4
   %192 = load ptr addrspace(1), ptr %51
