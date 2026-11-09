@@ -68,6 +68,23 @@ typedef struct large_alloc {
 static_assert(sizeof(large_alloc) % sizeof(value) == 0, "");
 #define LARGE_ALLOC_HEADER_SZ sizeof(large_alloc)
 
+#ifdef ARCH_SIXTYFOUR
+/* The interleaved-block header fields (header_bits.h) must exactly
+ * fill the configured reserved bits, and the layout word must divide
+ * into its mask and repeat fields. */
+static_assert(HEADER_FORMAT_BITS + HEADER_REPEAT_BITS
+              + HEADER_SCAN_MASK_BITS == HEADER_RESERVED_BITS, "");
+static_assert(HEADER_SCAN_MASK_SHIFT == HEADER_RESERVED_SHIFT, "");
+static_assert(HEADER_REPEAT_SHIFT ==
+              HEADER_SCAN_MASK_SHIFT + HEADER_SCAN_MASK_BITS, "");
+static_assert(HEADER_FORMAT_SHIFT ==
+              HEADER_REPEAT_SHIFT + HEADER_REPEAT_BITS, "");
+static_assert(HEADER_FORMAT_SHIFT + HEADER_FORMAT_BITS == 64, "");
+static_assert(LAYOUT_WORD_MASK_BITS + LAYOUT_WORD_REPEAT_BITS == 64, "");
+static_assert(LAYOUT_WORD_REPEAT_SHIFT == LAYOUT_WORD_MASK_BITS, "");
+static_assert(LAYOUT_WORD_REPEAT_MAX <= LAYOUT_WORD_MASK_BITS, "");
+#endif
+
 /* A heap extent is an area of memory owned by code outside the
  * runtime, filled with blocks managed by the GC.
 */

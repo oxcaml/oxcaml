@@ -208,19 +208,14 @@ module Mixed_block_support : sig
 
   val make_header : Nativeint.t -> scannable_prefix:int -> Nativeint.t
 end = struct
-  (* CR mixed blocks v1: This "8" is duplicated in [typedecl.ml]. We should fix
-     up this duplication when we make the "8" configurable. *)
-  let required_reserved_header_bits = 8
+  let required_reserved_header_bits = Header_bits.reserved_bits
 
   let required_addr_size_bits = 64
 
-  (* Many of these checks are duplicated *)
-
-  (* CR mixed blocks v1: This is also duplicated in [typedecl.ml]. *)
-  (* Why 2? We'd subtract 1 if the mixed block encoding could use all 8 bits of
-     the prefix. But the all-0 prefix means "not a mixed block", so we can't use
-     the all-0 pattern, and we must subtract 2 instead. *)
-  let max_scannable_prefix = (1 lsl required_reserved_header_bits) - 2
+  (* The legacy scannable-prefix encoding stores prefix+1 in the reserved bits,
+     with 0 meaning "not a mixed block"; typedecl.ml enforces the 254 limit of
+     its original 8-bit field. *)
+  let max_scannable_prefix = 254
 
   let max_header =
     (1 lsl (required_addr_size_bits - required_reserved_header_bits)) - 1
@@ -273,7 +268,7 @@ end
 let block_header ?(block_kind = Regular_block) tag sz =
   let hdr =
     Nativeint.add
-      (Nativeint.shift_left (Nativeint.of_int sz) 10)
+      (Nativeint.shift_left (Nativeint.of_int sz) Header_bits.wosize_shift)
       (Nativeint.of_int tag)
   in
   match block_kind with

@@ -379,6 +379,7 @@ ocaml/primitives.new
 /utils/config.ml
 /utils/domainstate.ml
 /utils/domainstate.mli
+/utils/header_bits.ml
 
 /yacc/ocamlyacc
 /yacc/version.h

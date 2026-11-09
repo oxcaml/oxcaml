@@ -57,4 +57,17 @@
    (bash
     "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime/caml %{c}"))))
 
+(rule
+ (targets header_bits.ml)
+ (mode fallback)
+ (deps
+  (:conf ../Makefile.config)
+  (:c header_bits.ml.c)
+  (:h ../runtime/caml/header_bits.h))
+ (action
+  (with-stdout-to
+   %{targets}
+   (bash
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime/caml %{c}"))))
+
 (include_subdirs unqualified)

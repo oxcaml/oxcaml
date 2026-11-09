@@ -17,6 +17,7 @@
 #define CAML_MLVALUES_H
 
 #include "config.h"
+#include "header_bits.h"
 #include "misc.h"
 #include "camlatomic.h"
 #include "tsan.h"
@@ -190,41 +191,29 @@ Caml_inline int caml_result_is_exception(struct caml_result_private result)
 
 #define Result_unit Result_value(Val_unit)
 
-/* Structure of the header:
+/* Structure of the header word.
 
-For 16-bit and 32-bit architectures:
+For 32-bit architectures:
      +--------+-------+-----+
      | wosize | color | tag |
      +--------+-------+-----+
 bits  31    10 9     8 7   0
 
-For 64-bit architectures:
+For 64-bit architectures, see header_bits.h.
 
-     +----------+--------+-------+-----+
-     | reserved | wosize | color | tag |
-     +----------+--------+-------+-----+
-bits  63    64-R 63-R  10 9     8 7   0
-
-where 0 <= R <= 31 is HEADER_RESERVED_BITS. R is always
-set to 8 for the OxCaml compiler in order to support
-mixed blocks. In the upstream compiler, R is set with the
---enable-reserved-header-bits=R argument.
+The reserved bits currently hold the mixed-block scannable-prefix
+encoding (see below). They are being re-divided into the
+format/repeat/scan-mask fields of the interleaved-block design,
+defined in header_bits.h; the field macros exist (below) but nothing
+uses them yet.
 
 */
 
 #define HEADER_BITS (sizeof(header_t) * CHAR_BIT)
 
-#define HEADER_TAG_BITS 8
 #define HEADER_TAG_MASK ((1ull << HEADER_TAG_BITS) - 1ull)
-
-#define HEADER_COLOR_BITS 2
-#define HEADER_COLOR_SHIFT HEADER_TAG_BITS
 #define HEADER_COLOR_MASK (((1ull << HEADER_COLOR_BITS) - 1ull) \
                             << HEADER_COLOR_SHIFT)
-
-#define HEADER_WOSIZE_BITS (HEADER_BITS - HEADER_TAG_BITS \
-                            - HEADER_COLOR_BITS - HEADER_RESERVED_BITS)
-#define HEADER_WOSIZE_SHIFT (HEADER_COLOR_SHIFT  + HEADER_COLOR_BITS)
 #define HEADER_WOSIZE_MASK (((1ull << HEADER_WOSIZE_BITS) - 1ull) \
                              << HEADER_WOSIZE_SHIFT)
 
@@ -249,6 +238,32 @@ mixed blocks. In the upstream compiler, R is set with the
 #define Hd_reserved(res)  ((header_t)0)
 
 #endif
+
+/* Interleaved-block header fields: see header_bits.h. NOT YET IN USE:
+   the reserved bits still carry the scannable-prefix encoding below.
+
+   The layout-word accessors cover the shared 58+6 word format
+   intended for the extended header format, layout blocks and the mark
+   stack: 58 mask bits below a 6-bit repeat count. */
+
+#if defined(ARCH_SIXTYFOUR) && defined(CAML_INTERNALS)
+
+/* The field layout is checked against HEADER_RESERVED_BITS by
+   static_asserts in shared_heap.c. */
+
+#define Format_hd(hd) ((header_t)(hd) >> HEADER_FORMAT_SHIFT)
+#define Repeat_hd(hd)                                                   \
+  (((header_t)(hd) >> HEADER_REPEAT_SHIFT)                              \
+   & (((uintnat)1 << HEADER_REPEAT_BITS) - 1))
+#define Scan_mask_hd(hd)                                                \
+  (((header_t)(hd) >> HEADER_SCAN_MASK_SHIFT)                           \
+   & (((uintnat)1 << HEADER_SCAN_MASK_BITS) - 1))
+
+#define Layout_repeat(w) ((uintnat)(w) >> LAYOUT_WORD_REPEAT_SHIFT)
+#define Layout_scan_mask(w)                                             \
+  ((uintnat)(w) & (((uintnat)1 << LAYOUT_WORD_MASK_BITS) - 1))
+
+#endif /* ARCH_SIXTYFOUR && CAML_INTERNALS */
 
 
 /* Header bits reserved for mixed blocks */
@@ -764,7 +779,8 @@ CAMLextern value caml_set_oo_id(value obj);
 #define Assert_mixed_block_layout_v4 _Static_assert(0, "")
 #define Assert_mixed_block_layout_v5 _Static_assert(0, "")
 #define Assert_mixed_block_layout_v6 _Static_assert(0, "")
-#define Assert_mixed_block_layout_v7 _Static_assert(1, "")
+#define Assert_mixed_block_layout_v7 _Static_assert(0, "")
+#define Assert_mixed_block_layout_v8 _Static_assert(1, "")
 
 /* Header for out-of-heap blocks. */
 
