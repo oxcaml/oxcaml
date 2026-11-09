@@ -900,7 +900,9 @@ and b = let _ = new a in object end;;
 Line 1, characters 10-37:
 1 | class a = let _ = new b in object end
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of recursive class expression is not allowed
+Error: This kind of recursive class expression is not allowed.
+       It refers to the class "b",
+       which is defined in the same recursive group.
 |}];;
 
 class a = let _ = new a in object end;;
@@ -908,20 +910,31 @@ class a = let _ = new a in object end;;
 Line 1, characters 10-37:
 1 | class a = let _ = new a in object end;;
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of recursive class expression is not allowed
+Error: This kind of recursive class expression is not allowed.
+       It refers to the class "a",
+       which is defined in the same recursive group.
 |}];;
 
 (* More tests about recursion in class declarations *)
 class a = let _x() = new a in object end;;
 [%%expect{|
-class a : object  end
+Line 1, characters 10-40:
+1 | class a = let _x() = new a in object end;;
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of recursive class expression is not allowed.
+       It refers to the class "a",
+       which is defined in the same recursive group.
 |}];;
 
 class a = object end
 and b = let _x() = new a in object end;;
 [%%expect{|
-class a : object  end
-and b : object  end
+Line 2, characters 8-38:
+2 | and b = let _x() = new a in object end;;
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of recursive class expression is not allowed.
+       It refers to the class "a",
+       which is defined in the same recursive group.
 |}];;
 
 class a = let x() = new a in let y = x() in object end;;
@@ -929,7 +942,9 @@ class a = let x() = new a in let y = x() in object end;;
 Line 1, characters 10-54:
 1 | class a = let x() = new a in let y = x() in object end;;
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of recursive class expression is not allowed
+Error: This kind of recursive class expression is not allowed.
+       It refers to the class "a",
+       which is defined in the same recursive group.
 |}];;
 
 class a = object end
@@ -938,7 +953,9 @@ and b = let x() = new a in let y = x() in object end;;
 Line 2, characters 8-52:
 2 | and b = let x() = new a in let y = x() in object end;;
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of recursive class expression is not allowed
+Error: This kind of recursive class expression is not allowed.
+       It refers to the class "a",
+       which is defined in the same recursive group.
 |}];;
 
 class a = object val x = 3 val y = x + 2 end;;

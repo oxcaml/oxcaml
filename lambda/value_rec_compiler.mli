@@ -12,33 +12,50 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Overview of the compilation scheme
+(** Compilation of recursive definitions to Lambda. See the implementation
+    for the compilation scheme. *)
 
-    Given a set of recursive definitions, we sort them into four categories:
+open Lambda
 
-    - Non-recursive definitions (more precisely, definitions classified as
-      [Dynamic] by [Value_rec_check]). These are compiled as regular
-      let-bindings, inserted before the rest.
-    - Constant definitions. These are definitions that have been classified
-      as [Static], but cannot be pre-allocated and cannot end up actually using
-      recursive values (i.e. let rec x = let _ = x in 0). These are compiled to
-      regular bindings too, modulo some renaming to remove references to
-      recursive variables.
-    - Blocks of static size. These are pre-allocated, new values are computed
-      from the definitions, and the contents of the new values is copied back
-      to the original allocation.
-    - Functional values. These are defined together in a single recursive block
-      full of functions. The definition occurs after the pre-allocation
-      (so the functions can refer to the recursive blocks) but before the
-      back-patching (so the block definitions can refer to the functions).
+(** A member of a recursive group, or an item of the preamble of a member,
+    already translated to Lambda. The items of a group are listed in
+    evaluation order. *)
+type item =
+  | Preamble of (lambda -> lambda)
+      (** Code that does not refer to the group, such as [let x = e in] or
+          [e;], as a context for the rest of the group. *)
+  | Value of
+      { id : Ident.t; debug_uid : debug_uid; layout : layout; def : lambda }
+      (** A definition that does not refer to the group. *)
+  | Function of { wrap : lambda -> lambda; binding : rec_binding }
+      (** A syntactic function. [wrap] binds the class tables of the
+          immediate objects of the function; it is closed. *)
+  | Lazy of
+      { id : Ident.t; debug_uid : debug_uid; thunk : lambda;
+        loc : Debuginfo.Scoped_location.t }
+      (** [lazy e], where [thunk] is [fun () -> e]. *)
+  | Block of
+      { id : Ident.t; debug_uid : debug_uid; layout : layout; def : lambda }
+      (** A block, translated to an allocation [def] whose arguments that
+          refer to the group only allocate. *)
 
-    More detailed comments are available in the implementation.
-*)
+(** [compile_letrec items body] defines the items of a recursive group
+    around [body]. *)
+val compile_letrec : item list -> lambda -> lambda
 
-val compile_letrec :
-  (Ident.t *
-   Lambda.debug_uid *
-   Value_rec_types.recursive_binding_kind *
-   Lambda.lambda) list ->
-  Lambda.lambda ->
-  Lambda.lambda
+(** The kind of the definition of a class in a recursive group of classes,
+    as computed by [Translclass.transl_class]. *)
+type class_kind =
+  | Static
+      (** A definition that evaluates to a class block of size
+          [class_block_size] and may refer to the group. *)
+  | Dynamic
+      (** A definition that does not refer to the group. *)
+
+(** The size of a class block. *)
+val class_block_size : int
+
+(** [compile_class_bindings bindings body] defines a recursive group of
+    classes around [body]. *)
+val compile_class_bindings :
+  (Ident.t * debug_uid * class_kind * lambda) list -> lambda -> lambda

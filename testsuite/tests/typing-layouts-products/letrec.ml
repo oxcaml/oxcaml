@@ -39,12 +39,32 @@ and ubx = #{ ubx : bx; }
 
 let rec t = #{ ubx = { bx = t } }
 [%%expect{|
-val t : ubx = #{ubx = {bx = <cycle>}}
+Line 1, characters 12-33:
+1 | let rec t = #{ ubx = { bx = t } }
+                ^^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use "t" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 let rec t = { bx = #{ ubx = t } }
 [%%expect{|
-val t : bx = {bx = <cycle>}
+Line 1, characters 19-31:
+1 | let rec t = { bx = #{ ubx = t } }
+                       ^^^^^^^^^^^^
+Error: This expression may use "t" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 type bx = { bx : bx2# }
@@ -56,12 +76,32 @@ and bx2 = { bx2 : bx; }
 
 let rec t = #{ bx2 = { bx = t } }
 [%%expect{|
-val t : bx2# = #{bx2 = {bx = <cycle>}}
+Line 1, characters 12-33:
+1 | let rec t = #{ bx2 = { bx = t } }
+                ^^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use "t" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 let rec t = { bx = #{ bx2 = t } }
 [%%expect{|
-val t : bx = {bx = <cycle>}
+Line 1, characters 19-31:
+1 | let rec t = { bx = #{ bx2 = t } }
+                       ^^^^^^^^^^^^
+Error: This expression may use "t" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 (* The cycle-finding algorithm in genprintval does not store non-values in its
@@ -91,7 +131,14 @@ type t = #{ x : int64; }
 Line 2, characters 12-20:
 2 | let rec x = #{x = y} and y = 3L;;
                 ^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 type t = {x: int64}
@@ -101,7 +148,14 @@ type t = { x : int64; }
 Line 2, characters 12-20:
 2 | let rec x = #{x = y} and y = 3L;;
                 ^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 (* This test is not allowed if 'a' is unboxed, but should be accepted
@@ -118,7 +172,19 @@ let rec a =
 [%%expect{|
 type a = { a : b; }
 and b = X of a | Y
-val a : a = {a = X <cycle>}
+Lines 6-9, characters 4-9:
+6 | ....(if Sys.opaque_identity true then
+7 |        X a
+8 |      else
+9 |        Y)...
+Error: This expression may use "a" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 type a = #{ a: b }
@@ -139,7 +205,14 @@ Lines 5-9, characters 2-10:
 7 |        X a
 8 |      else
 9 |        Y)}..
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "a" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 type a = { a: b }
@@ -160,5 +233,12 @@ Lines 5-9, characters 2-10:
 7 |        X a
 8 |      else
 9 |        Y)}..
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "a" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;

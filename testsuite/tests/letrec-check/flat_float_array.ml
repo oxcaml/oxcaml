@@ -20,12 +20,22 @@
 *)
 
 (* In these tests, `z` is known to be a non-float,
-   so no unboxing or dynamic check happens, the definition is valid. *)
+   so no unboxing or dynamic check happens, but array literals are not
+   blocks in the sense of the let rec check, so it is still rejected. *)
 let f (z: int) = let rec x = [| y; z |] and y = z in x;;
 let f (z: bytes) = let rec x = [| y; z |] and y = z in x;;
 [%%expect {|
-val f : int -> int array = <fun>
-val f : bytes -> bytes array = <fun>
+Line 1, characters 29-39:
+1 | let f (z: int) = let rec x = [| y; z |] and y = z in x;;
+                                 ^^^^^^^^^^
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 (* In this test, `z` has a generic/polymorphic type,
@@ -36,7 +46,14 @@ let f z = let rec x = [| y; z |] and y = z in x;;
 Line 1, characters 22-32:
 1 | let f z = let rec x = [| y; z |] and y = z in x;;
                           ^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 (* In this test, `z` is known to be a float, so a float array will be
@@ -48,5 +65,12 @@ let f (z: float) = let rec x = [| y; z |] and y = z in x;;
 Line 1, characters 31-41:
 1 | let f (z: float) = let rec x = [| y; z |] and y = z in x;;
                                    ^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]

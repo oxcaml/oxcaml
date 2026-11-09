@@ -18,8 +18,15 @@ let rec x =
 and (m : (module T)) =
   (module (struct exception A of int end) : T);;
 [%%expect{|
-Lines 2-3, characters 2-8:
-2 | ..let module M = (val m) in
-3 |   M.A 42
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Line 2, characters 17-24:
+2 |   let module M = (val m) in
+                     ^^^^^^^
+Error: This expression may use "m" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;

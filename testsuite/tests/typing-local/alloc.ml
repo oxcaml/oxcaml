@@ -18,10 +18,10 @@
    don't cause a crash in the middle end (originally seen on
    oxcaml PR2180). *)
 
-(* This will never be called, caml_alloc_dummy is just chosen as a primitive that
+(* This will never be called, caml_obj_dup is just chosen as a primitive that
    exists in the bytecode runtime too *)
 external foo : unit -> ('a[@local_opt]) =
-  "caml_alloc_dummy" "caml_alloc_dummy" [@@noalloc]
+  "caml_obj_dup" "caml_obj_dup" [@@noalloc]
 
 let foo () = foo ()
 

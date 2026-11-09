@@ -15,10 +15,17 @@ let rec x = (g.f <- y; ()) and y = 2.0;;
 [%%expect{|
 type t = { mutable f : float; }
 val g : t = {f = 0.}
-Line 3, characters 12-26:
+Line 3, characters 13-21:
 3 | let rec x = (g.f <- y; ()) and y = 2.0;;
-                ^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+                 ^^^^^^^^
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 (* same example, with object instance variables
@@ -30,8 +37,15 @@ class c = object
 end;;
 let _ = print_float (new c)#m;;
 [%%expect{|
-Line 4, characters 16-28:
+Line 4, characters 17-23:
 4 |     let rec x = (f <- y; ()) and y = 2.0 in f
-                    ^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+                     ^^^^^^
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;

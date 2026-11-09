@@ -156,7 +156,11 @@ Error: The value "a" has type "int * lbl:(int * lbl:'a)"
 
 let rec l = ~lbl: 5, ~lbl2: 10 :: l
 [%%expect{|
-val l : (lbl:int * lbl2:int) list = [(~lbl:5, ~lbl2:10); <cycle>]
+Line 1, characters 34-35:
+1 | let rec l = ~lbl: 5, ~lbl2: 10 :: l
+                                      ^
+Error: This "let rec" would create a cycle of immutable values: "l" -> "l".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
 |}]
 
 (* Tuple containing labeled tuples *)

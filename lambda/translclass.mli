@@ -20,7 +20,7 @@ open Debuginfo.Scoped_location
 val transl_class :
   scopes:scopes -> Ident.t list -> Ident.t ->
   string list -> class_expr -> Asttypes.virtual_flag ->
-  lambda * Value_rec_types.recursive_binding_kind
+  lambda * Value_rec_compiler.class_kind
 
 type error = Tags of string * string
 
