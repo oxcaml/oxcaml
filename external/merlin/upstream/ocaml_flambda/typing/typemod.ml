@@ -4182,8 +4182,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
           }
         in
         let md_shape = Shape.set_uid_if_none md_shape md_uid in
-        (*prerr_endline (Ident.unique_toplevel_name id);*)
-        Mtype.lower_nongen outer_scope md.md_type;
+        Typecore.lower_nongen loc env outer_scope md.md_type;
         let id, newenv, sg =
           match name.txt with
           | None -> None, env, []
@@ -4596,7 +4595,7 @@ let type_package env m pack =
       end
     end
   in
-  Mtype.lower_nongen outer_scope modl.mod_type;
+  Typecore.lower_nongen modl.mod_loc env outer_scope modl.mod_type;
   let fl', env =
     match pack.pack_cstrs with
     | [] -> [], env
