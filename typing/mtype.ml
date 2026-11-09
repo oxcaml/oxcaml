@@ -932,8 +932,8 @@ let lower_nongen nglev mty =
           if level < generic_level && level > nglev then (
             set_level ty nglev;
             match Jkind.update_level Env.empty nglev jkind with
-            | Ok jkind ->
-              set_var_jkind ty jkind
+            | Ok None -> ()
+            | Ok (Some jkind) -> set_var_jkind ty jkind
             | Error Rigid ->
               Misc.fatal_error "Ctype.lower_nongen: rigid sort variable"
             | Error (Escape kind) ->

@@ -630,9 +630,13 @@ val generalize : current_level:int -> 'd Types.jkind -> unit
 (** Updates the levels of sort variables in the jkind.
 
     This function only succeeds if the kind can be expanded so that an abstract
-    kind does not escape its scope. This expansion is returned. *)
+    kind does not escape its scope. If no expansion is needed, [None] is
+    returned, otherwise the expanded kind is returned. *)
 val update_level :
-  Env.t -> int -> 'd Types.jkind -> ('d Types.jkind, Sort.level_error) result
+  Env.t ->
+  int ->
+  'd Types.jkind ->
+  ('d Types.jkind option, Sort.level_error) result
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)

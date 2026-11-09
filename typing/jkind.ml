@@ -3155,7 +3155,8 @@ let rec update_level_base_and_axes env level jkind =
 
 let update_level env level t =
   update_level_base_and_axes env level t.jkind
-  |> Result.map (fun jkind -> if jkind == t.jkind then t else { t with jkind })
+  |> Result.map (fun jkind ->
+      if jkind != t.jkind then Some { t with jkind } else None)
 
 let get t = Jkind_desc.get t.jkind
 
