@@ -1933,6 +1933,22 @@ Error: This expression has type "bool id option"
        Type "bool" is not compatible with type "int"
 |}]
 
+(* Modal bounds are preserved -- expanding [k] should lead to an error *)
+type ('a : any) id = 'a
+let cell_p = ref (None : (_ : any) id option)
+module G_p (X : sig end) = struct
+  kind_ k = value mod portable
+  let c = (cell_p : (_ : k) id option ref)
+end
+let () = cell_p := (None : (int -> int) id option)
+[%%expect{|
+type ('a : any) id = 'a
+val cell_p : '_weak3 id option ref = {contents = None}
+module G_p :
+  functor (X : sig end) ->
+    sig kind_ k = value mod portable val c : '_weak4 id option ref end
+|}]
+
 (************************************************************************)
 (* Test: Refining the kind of an outer variable can't make a kind escape *)
 
@@ -1950,17 +1966,14 @@ module B_refine = G_refine (K_refine)
 let () = A_refine.c := (None : int id option)
 let () = B_refine.c := (None : bool id option)
 [%%expect{|
-val cell_refine : '_weak3 id option ref = {contents = None}
+val cell_refine : '_weak5 id option ref = {contents = None}
 Line 6, characters 26-55:
 6 |   let () = cell_refine := (None : (_ : X.ka) id option)
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "'a id option"
-       but an expression was expected of type "'weak3 id option"
-       The kind of 'weak3 is any
-         because of the annotation on the wildcard _ at line 1, characters 30-39.
-       But the kind of 'weak3 must be a subkind of X.ka
-         because of the annotation on the wildcard _ at line 6, characters 34-44.
-       The kind constructor X.ka would escape its scope.
+Error: This expression has type "'a option"
+       but an expression was expected of type "'weak5 id option"
+       Type "'a" is not compatible with type "'weak5 id" = "'weak5"
+       The kind constructor "X.ka" would escape its scope
 |}]
 
 let f_refine (x : (_ : any) id option ref) =
@@ -1972,13 +1985,10 @@ let f_refine (x : (_ : any) id option ref) =
 Line 3, characters 18-47:
 3 |     let () = x := (None : (_ : X.ka) id option)
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "'a id option"
+Error: This expression has type "'a option"
        but an expression was expected of type "'b id option"
-       The kind of 'a is any
-         because of the annotation on the wildcard _ at line 1, characters 18-27.
-       But the kind of 'a must be a subkind of X.ka
-         because of the annotation on the wildcard _ at line 3, characters 26-36.
-       The kind constructor X.ka would escape its scope.
+       Type "'a" is not compatible with type "'b id" = "'b"
+       The kind constructor "X.ka" would escape its scope
 |}]
 
 (*************************************************************************)
@@ -1999,8 +2009,8 @@ Lines 2-6, characters 2-5:
 5 |   end in
 6 |   M.r
 Error: The type of this module,
-       sig kind_ k val r : '_weak4 id option ref end,
-       contains a non-generalized variable "'_weak4" of kind "k".
+       sig kind_ k val r : '_weak6 id option ref end,
+       contains a non-generalized variable "'_weak6" of kind "k".
        The kind constructor "k" would escape its scope.
 |}]
 
@@ -2023,9 +2033,9 @@ Lines 1-5, characters 0-3:
 Error: The type of this module,
        sig
          kind_ k = value
-         val r : '_weak5 id option ref
-         val get : unit -> '_weak5 id option
-       end, contains a non-generalized variable "'_weak5" of kind "k".
+         val r : '_weak7 id option ref
+         val get : unit -> '_weak7 id option
+       end, contains a non-generalized variable "'_weak7" of kind "k".
        The kind constructor "k" would escape its scope.
 |}]
 
@@ -2043,8 +2053,8 @@ Lines 1-5, characters 0-3:
 4 |   let r = ref (None : (_ : k) id option)
 5 | end
 Error: The type of this module,
-       sig kind_ k type t : k val r : '_weak6 id option ref end,
-       contains a non-generalized variable "'_weak6" of kind "k".
+       sig kind_ k type t : k val r : '_weak8 id option ref end,
+       contains a non-generalized variable "'_weak8" of kind "k".
        The kind constructor "k" would escape its scope.
 |}]
 
@@ -2071,10 +2081,10 @@ Lines 1-4, characters 0-3:
 Error: The type of this module,
        functor (X : sig kind_ ka end) ->
          sig
-           val c : '_weak7 id option ref
-           val get : unit -> '_weak7 id option
+           val c : '_weak9 id option ref
+           val get : unit -> '_weak9 id option
          end,
-       contains a non-generalized variable "'_weak7" of kind "X.ka".
+       contains a non-generalized variable "'_weak9" of kind "X.ka".
        The kind constructor "X.ka" would escape its scope.
 |}]
 
@@ -2092,8 +2102,8 @@ Lines 3-6, characters 10-5:
 5 |     let r = ref (None : (_ : k) id option)
 6 |   end.........
 Error: The type of this module,
-       sig kind_ k val r : '_weak8 id option ref end,
-       contains a non-generalized variable "'_weak8" of kind "k".
+       sig kind_ k val r : '_weak10 id option ref end,
+       contains a non-generalized variable "'_weak10" of kind "k".
        The kind constructor "k" would escape its scope.
 |}]
 
@@ -2145,6 +2155,36 @@ let () = M_include_anon_functor.c := (None : int id option)
 let (_ : bool id option) = M_include_anon_functor.get ()
 [%%expect{|
 >> Fatal error: Ctype.nondep_type_rec: weak variable copy
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Universal variables are never weak, so these examples should succeed. *)
+type ('a : any) id = 'a
+
+module G_u (X : sig kind_ ka end) = struct
+  let c = ref None
+  let () = c := Some (fun (_ : ('a : X.ka). 'a id -> unit) -> ())
+end
+[%%expect{|
+type ('a : any) id = 'a
+module G_u :
+  functor (X : sig kind_ ka end) ->
+    sig val c : ((('a : X.ka). 'a id -> unit) -> unit) option ref end
+|}]
+
+module A_u = G_u (struct kind_ ka = value end)
+[%%expect{|
+>> Fatal error: Ctype.nondep_type_rec: weak variable copy
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+module K_u = struct kind_ ka = value end
+module B_u = G_u (K_u)
+[%%expect{|
+module K_u : sig kind_ ka = value end
+>> Fatal error: Subst.typexp: weak variable copy
 Uncaught exception: Misc.Fatal_error
 
 |}]
