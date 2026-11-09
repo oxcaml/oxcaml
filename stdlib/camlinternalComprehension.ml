@@ -21,14 +21,29 @@ let rec rev_dlist_concat_map l f acc = exclave_
   | el :: l -> rev_dlist_concat_map l f (f el acc)
 ;;
 
+(* In the two functions below, we test [from = to_] before incrementing or
+   decrementing [from], as otherwise [from + 1] (resp. [from - 1]) would wrap
+   around when [to_] is [max_int] (resp. [min_int]) and the loop would never
+   terminate. *)
+
 let rec rev_dlist_concat_iterate_up from to_ f acc = exclave_
   if to_ < from
   then acc
-  else rev_dlist_concat_iterate_up (from + 1) to_ f (f from acc)
+  else begin
+    let acc = f from acc in
+    if from = to_
+    then acc
+    else rev_dlist_concat_iterate_up (from + 1) to_ f acc
+  end
 ;;
 
 let rec rev_dlist_concat_iterate_down from to_ f acc = exclave_
   if to_ > from
   then acc
-  else rev_dlist_concat_iterate_down (from - 1) to_ f (f from acc)
+  else begin
+    let acc = f from acc in
+    if from = to_
+    then acc
+    else rev_dlist_concat_iterate_down (from - 1) to_ f acc
+  end
 ;;

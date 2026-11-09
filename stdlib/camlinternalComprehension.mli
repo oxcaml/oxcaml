@@ -35,7 +35,7 @@ val rev_dlist_concat_map
 val rev_dlist_concat_iterate_up
   : int -> int -> local_ (int -> local_ 'a rev_dlist) -> local_ 'a rev_dlist
 
-(** [rev_dlist_concat_iterate_up high low f] is the same as
+(** [rev_dlist_concat_iterate_down high low f] is the same as
     [rev_dlist_concat_map range f] where [range] is the decreasing range from
     [high] to [low], inclusive. *)
 val rev_dlist_concat_iterate_down
