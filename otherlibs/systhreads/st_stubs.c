@@ -936,10 +936,10 @@ CAMLexport int caml_c_thread_register(void)
   /* If it fails, we release the lock and return an error. */
   if (th == NULL) goto out_err;
   thread_init_current(th);
+  Caml_state->thread_id = caml_fresh_thread_id();
   /* We can now allocate the thread descriptor on the major heap */
-  th->descr = caml_thread_new_descriptor(caml_fresh_thread_id(),
+  th->descr = caml_thread_new_descriptor(Caml_state->thread_id,
                                          Val_unit /* no closure */);
-  Caml_state->thread_id = Ident(th->descr);
 
   /* Acquire a tick, in case this is the only non-initial thread.
      This must happen after the thread is fully set up, since the tick
