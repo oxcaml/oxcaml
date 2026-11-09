@@ -2072,7 +2072,39 @@ end = struct
          (fun (original, _) -> eq_pair pair (pair_of_mode original))
          instances)
 
+  let equate_instances m ~instances_generic ~instances_rigid =
+    ignore
+      (With_locality.equate
+         (find_mode_instance m instances_generic)
+         (find_mode_instance m instances_rigid))
+
+  (** Equates every mode of the generic instance that is not a curry mode
+      with its rigid counterpart, so that both instances match everywhere
+      except at the curry modes. *)
+  let equate_non_curry_modes ~instances_generic ~instances_rigid ty =
+    let visited = ref [] in
+    let rec visit ty =
+      let px = proxy ty in
+      if not (List.memq px !visited) then begin
+        visited := px :: !visited;
+        begin match get_desc ty with
+        | Tarrow ((_, marg, mret), _, ty2, _) ->
+          equate_instances marg ~instances_generic ~instances_rigid;
+          begin match get_desc ty2 with
+          | Tarrow _ when is_generic_curry_mode mret -> ()
+          | _ -> equate_instances mret ~instances_generic ~instances_rigid
+          end
+        | _ -> ()
+        end;
+        printer_iter_type_expr visit (Fun.const ()) ty
+      end
+    in
+    visit ty
+
   let register_curry_mode ~m_generic m ~acc_mode_rigid =
+    (* We only consider a curry mode implicit if it has no upper bounds.
+       This check catches curry modes with a variable upper bound, such as
+       bounds to other curry modes. *)
     let has_upper_edges =
       not (List.is_empty (find_edges (pair_of_mode m)).upper)
     in
@@ -2081,8 +2113,8 @@ end = struct
     in
     let implied =
       (not has_upper_edges)
+      && (not (List.memq m !rejected_curries))
       && Result.is_ok (With_locality.equate m_generic curry_rigid)
-      && not (List.memq m !rejected_curries)
     in
     if implied then suppressed_curries := m :: !suppressed_curries
     else begin
@@ -2094,18 +2126,6 @@ end = struct
       List.concat_map heads_of_mode !suppressed_curries;
     implied
 
-  (** Decides which curry modes of [ty] are hidden. This must happen before
-      printing and after the edges are computed.
-
-      We only want to print the curry mode when it happens to be more specific than the
-      curry mode implied by preceding arguments; we check this using the same ideas
-      behind subsumption.
-
-      [register_suppressed_curries] walks [ty] as the printer does, threading the curry
-      accumulator along with its rigid instance. A generic curry mode is
-      hidden when the type with the curry mode replaced by the one implied by
-      the accumulator is as general, i.e. when its generic instance can be
-      equated with [Curry_mode.mode] of the rigid accumulator. *)
   let rec register_suppressed_curries ~instances_generic ~instances_rigid
       ~visited (acc_mode, acc_mode_rigid) ty =
     let px = proxy ty in
@@ -2139,9 +2159,16 @@ end = struct
         let hidden =
           match get_desc ty2 with
           | Tarrow _ when is_generic_curry_mode mret ->
-            register_curry_mode mret
-              ~m_generic:(find_mode_instance mret instances_generic)
-              ~acc_mode_rigid
+            let hidden =
+              register_curry_mode mret
+                ~m_generic:(find_mode_instance mret instances_generic)
+                ~acc_mode_rigid
+            in
+            (* If the curry mode is printed, we equate the generic and
+               rigid instances. *)
+            if not hidden then
+              equate_instances mret ~instances_generic ~instances_rigid;
+            hidden
           | Tarrow _ -> equate_with_const_curry mret acc_mode
           | _ -> false
         in
@@ -2156,6 +2183,33 @@ end = struct
         let acc = Curry_mode.Const With_locality.Const.legacy in
         printer_iter_type_expr (register (acc, acc)) (Fun.const ()) ty
     end
+
+  (** Decides which curry modes of [ty] are hidden. This must happen before
+      printing and after the edges are computed.
+
+      We only want to print the curry mode when it happens to be more specific
+      than the curry mode implied by preceding arguments; we check this using
+      the same ideas behind subsumption. *)
+  let suppress_curry_modes ~base ty =
+    (* Instantiate each mode at [generic_level]. *)
+    let instances_generic =
+      instantiate_modes ~level:With_locality.generic_level ty
+    in
+    (* Instantiate each mode at [rigid_level]: this is used to construct a
+       rigid implied curry mode. *)
+    let instances_rigid =
+      instantiate_modes ~level:With_locality.rigid_level ty
+    in
+    (* Link each non-curry mode (e.g. argument modes) between the two
+       instances. *)
+    equate_non_curry_modes ~instances_generic ~instances_rigid ty;
+    let acc = Curry_mode.Const base in
+    (* [register_suppressed_curries] walks [ty] as the printer does, threading
+       the curry accumulator along with its rigid instance. A generic curry
+       mode is hidden when the type with the curry mode replaced by the one
+       implied by the accumulator is as general. *)
+    register_suppressed_curries ~instances_generic ~instances_rigid
+      ~visited:[] (acc, acc) ty
 
   let print_raw_constraints { lo; hi } ppf pair =
     let { lower = edges_lower; upper = edges_upper } = find_edges pair in
@@ -2334,15 +2388,7 @@ end = struct
       register_visible_modes ty;
       add_visible_paths ();
       add_visible_edges ();
-      let instances_generic =
-        instantiate_modes ~level:With_locality.generic_level ty
-      in
-      let instances_rigid =
-        instantiate_modes ~level:With_locality.rigid_level ty
-      in
-      let acc = Curry_mode.Const base in
-      register_suppressed_curries ~instances_generic ~instances_rigid
-        ~visited:[] (acc, acc) ty
+      suppress_curry_modes ~base ty
     end
 
   let reserve ty = reserve_with_base ~base:With_locality.Const.legacy ty

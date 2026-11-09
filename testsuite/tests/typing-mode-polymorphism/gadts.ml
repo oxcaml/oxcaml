@@ -42,11 +42,12 @@ let pin (w : 'x arr) (g : 'x) =
 [%%expect{|
 val pin :
   (int -> int) arr @ 'n ->
-  (int -> int) @ [< 'm mod aliased contended immutable] -> int -> int = <fun>
+  (int -> int) @ [< 'm mod aliased contended immutable] ->
+  (int -> int) @ [> 'm] = <fun>
 |}, Principal{|
 val pin :
-  (int -> int) arr @ [< global] -> (int -> int) @ [< 'm] -> int -> int =
-  <fun>
+  (int -> int) arr @ [< global] ->
+  (int -> int) @ [< 'm] -> (int -> int) @ [> 'm] = <fun>
 |}]
 
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -117,6 +118,7 @@ let unpack (P f) = f
 [%%expect{|
 type packed = P : (int -> int) -> packed
 val pack : packed = P <fun>
-val unpack : packed @ [< 'm mod aliased contended immutable] -> int -> int =
+val unpack :
+  packed @ [< 'm mod aliased contended immutable] -> (int -> int) @ [> 'm] =
   <fun>
 |}]

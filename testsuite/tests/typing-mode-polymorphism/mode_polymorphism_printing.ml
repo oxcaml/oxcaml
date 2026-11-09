@@ -312,8 +312,8 @@ val foo :
 let foo (f : int -> int) x y = f
 [%%expect{|
 val foo :
-  (int -> int) @ [< 'n mod aliased contended immutable & global] ->
-  'a @ [< global] -> 'b @ 'm -> int -> int = <fun>
+  (int -> int) @ [< 'm mod aliased contended immutable & global] ->
+  'a @ [< global] -> 'b @ 'n -> (int -> int) @ [> 'm] = <fun>
 |}]
 
 let foo (f : intref @ local -> int) (x : intref) (y : intref) = f x
@@ -778,14 +778,16 @@ val empty_heads :
   'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
   (a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
   (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n mod aliased contended immutable] ->
-  (a:int -> b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
+  (a:int ->
+   (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'n | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
   <fun>
 |}, Principal{|
 val empty_heads :
   'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
   (a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
   (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n] ->
-  (a:int -> b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
+  (a:int ->
+   (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'n | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
   <fun>
 |}]
 
