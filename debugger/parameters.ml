@@ -33,7 +33,8 @@ let time = ref true
 let version = ref true
 
 let add_path dir =
-  Load_path.add_dir (Visible { cmx_guaranteed = false }) dir;
+  Load_path.add_dir
+    { visibility = Visible; cmx_presence = Cmx_not_guaranteed } dir;
   Envaux.reset_cache ~preserve_persistent_env:false
 
 let add_path_for mdl dir =

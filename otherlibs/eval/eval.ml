@@ -179,7 +179,8 @@ let eval (expr : 'a expr) =
                 { Persistent_env.Persistent_signature.filename =
                     Compilation_unit.Name.to_string unit_name;
                   cmi;
-                  visibility = Visible { cmx_guaranteed = false }
+                  include_flags =
+                    { visibility = Visible; cmx_presence = Cmx_not_guaranteed }
                 })
               (Compilation_unit.Name.Map.find_opt unit_name !cmis));
   let env = Compmisc.initial_env () in

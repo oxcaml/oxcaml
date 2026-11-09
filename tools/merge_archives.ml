@@ -24,7 +24,8 @@ let merge_cma ~target ~archives =
   Clflags.dllibs := [];
   List.iter
     (fun archive ->
-      Load_path.add_dir (Visible { cmx_guaranteed = false })
+      Load_path.add_dir
+        { visibility = Visible; cmx_presence = Cmx_not_guaranteed }
         (Filename.dirname archive))
     archives;
   let error reporter err =

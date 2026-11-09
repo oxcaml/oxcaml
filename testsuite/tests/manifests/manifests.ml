@@ -22,16 +22,20 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(hidden
   Load_path.init ~auto_include:Load_path.no_auto_include ~visible:[] ~hidden:[];
   List.iter (fun basename ->
     let path_with_visibility = try
-      let path, visibility = disable_interactive (fun () -> Load_path.find_normalized_with_visibility basename) in
+      let path, include_flags = disable_interactive (fun () -> Load_path.find_normalized_with_include_flags basename) in
       let path = if String.starts_with ~prefix:cwd path then (
         "$PWD" ^
           (String.sub path (String.length cwd) (String.length path - String.length cwd)))
       else path in
-      let visibility = match visibility with
-        | Load_path.Visible { cmx_guaranteed = true } ->
+      let visibility = match include_flags with
+        | { Load_path.visibility = Visible; cmx_presence = Cmx_guaranteed } ->
           "visible, cmx_guaranteed"
-        | Load_path.Visible { cmx_guaranteed = false } -> "visible"
-        | Hidden -> "hidden"
+        | { visibility = Visible; cmx_presence = Cmx_not_guaranteed } ->
+          "visible"
+        | { visibility = Hidden; cmx_presence = Cmx_guaranteed } ->
+          "hidden, cmx_guaranteed"
+        | { visibility = Hidden; cmx_presence = Cmx_not_guaranteed } ->
+          "hidden"
       in
       Format.sprintf "%s (%s)" path visibility
     with Not_found -> "Not_found"

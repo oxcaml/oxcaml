@@ -25,9 +25,15 @@
 (* CR aodintsov/mshinwell: merge the remaining oxcaml changes
    upstream *)
 
-type visibility = Visible of { cmx_guaranteed : bool } | Hidden
+type visibility = Visible | Hidden
 
-val add_dir : visibility -> string -> unit
+type cmx_presence = Cmx_guaranteed | Cmx_not_guaranteed
+
+type include_flags =
+  { visibility : visibility;
+    cmx_presence : cmx_presence }
+
+val add_dir : include_flags -> string -> unit
 (** Add a directory to the end of the load path (i.e. at lowest priority.) *)
 
 val remove_dir : string -> unit
@@ -40,7 +46,7 @@ module Dir : sig
   type t
   (** Represent one directory in the load path. *)
 
-  val create : visibility -> string -> t
+  val create : include_flags -> string -> t
 
   val basenames : t -> string list
   (** All the files in that directory. This doesn't include files in
@@ -91,8 +97,9 @@ val find_normalized : string -> string
     {!Misc.normalized_unit_filename}), i.e. if name is [Foo.ml], allow
     [/path/Foo.ml] and [/path/foo.ml] to match. *)
 
-val find_normalized_with_visibility : string -> string * visibility
-(** Same as [find_normalized], but also reports whether the cmi was found in a
+val find_normalized_with_include_flags : string -> string * include_flags
+(** Same as [find_normalized], but also reports the [include_flags] of the
+    load path entry the file was found in, e.g. whether it was found in a
     -I directory (Visible) or a -H directory (Hidden) *)
 
 val[@deprecated] add : Dir.t -> unit

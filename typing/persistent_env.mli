@@ -68,7 +68,7 @@ type import = private {
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
   imp_uid : Shape.Uid.t;
-  imp_visibility: Load_path.visibility;
+  imp_include_flags: Load_path.include_flags;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
 }
@@ -80,7 +80,7 @@ module Persistent_signature : sig
   type t =
     { filename : string; (** Name of the file containing the signature. *)
       cmi : Cmi_format.cmi_infos_lazy;
-      visibility : Load_path.visibility
+      include_flags : Load_path.include_flags
     }
 
   (** Function used to load a persistent signature. The default is to look for

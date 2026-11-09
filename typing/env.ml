@@ -3474,7 +3474,8 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
   let pers_sig =
     Persistent_env.Persistent_signature.{
       filename; cmi;
-      visibility = Visible { cmx_guaranteed = false }
+      include_flags =
+        { visibility = Visible; cmx_presence = Cmx_not_guaranteed }
     }
   in
   Persistent_env.save_cmi !persistent_env pers_sig;
