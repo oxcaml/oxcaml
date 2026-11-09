@@ -157,19 +157,37 @@ val l : unit# list = [<void>; <void>]
 let rec l = 1 :: l
 
 [%%expect {|
-val l : int list = [1; <cycle>]
+Line 1, characters 17-18:
+1 | let rec l = 1 :: l
+                     ^
+Error: This "let rec" would create a cycle of values of inductive types: "l" ->
+       "l".
+Hint: A cycle must go through a function, a "lazy" value, a mutable field
+or a value of a type not marked "[@@inductive]".
 |}];;
 
 let rec l = #1.0 :: l
 
 [%%expect {|
-val l : float# list = [<abstr>; <cycle>]
+Line 1, characters 20-21:
+1 | let rec l = #1.0 :: l
+                        ^
+Error: This "let rec" would create a cycle of values of inductive types: "l" ->
+       "l".
+Hint: A cycle must go through a function, a "lazy" value, a mutable field
+or a value of a type not marked "[@@inductive]".
 |}];;
 
 let rec l = #() :: l
 
 [%%expect {|
-val l : unit# list = [<void>; <cycle>]
+Line 1, characters 19-20:
+1 | let rec l = #() :: l
+                       ^
+Error: This "let rec" would create a cycle of values of inductive types: "l" ->
+       "l".
+Hint: A cycle must go through a function, a "lazy" value, a mutable field
+or a value of a type not marked "[@@inductive]".
 |}];;
 
 (* Regression test: void field of a record with an [any] parameter *)

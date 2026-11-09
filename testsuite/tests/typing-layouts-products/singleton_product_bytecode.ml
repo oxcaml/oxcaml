@@ -352,12 +352,17 @@ and self_inner = #{ me : self; k : int; }
 type self_mixed = { sm : self_mixed_inner; }
 and self_mixed_inner = #{ me_m : self_mixed; f : float#; }
 type cyc = Cyc of #(cyc * int)
-val x : self = {s = #{me = <cycle>; k = 1}}
-val x_props : int * bool * int = (2, true, 1)
-val y : self_mixed = {sm = #{me_m = <cycle>; f = <abstr>}}
-val y_props : int * bool * float = (2, true, 2.)
-val z : cyc = Cyc <unboxed product>
-val z_props : int * (bool * int) = (2, (true, 3))
+Line 12, characters 20-38:
+12 |   let rec x = { s = #{ me = x; k = 1 } } in
+                         ^^^^^^^^^^^^^^^^^^
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 (* Modules whose only binding is an unboxed product *)
