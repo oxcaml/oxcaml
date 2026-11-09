@@ -1457,6 +1457,32 @@ module Layout = struct
     | [lay] -> lay
     | lays -> Product lays
 
+  (* [constrain_below_addressable t] constrains [t < t addressable] *)
+  let rec constrain_below_addressable ~allow_mutation :
+      Sort.t t -> (unit, Sort.error) result = function
+    | Any _ -> Error Sort.Incompatible
+    | Addressable _ -> Ok ()
+    | Box _ -> Ok ()
+    | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
+    | Product ts ->
+      Misc.Stdlib.List.fold_left_result
+        (fun () t -> constrain_below_addressable ~allow_mutation t)
+        () ts
+
+  (* [constrain_above_addressable t] constrains [t addressable < t].
+     This differs from [constrain_below_addressable] only for kinds containing
+     [any]. *)
+  let rec constrain_above_addressable ~allow_mutation :
+      Sort.t t -> (unit, Sort.error) result = function
+    | Any _ -> Ok ()
+    | Addressable _ -> Ok ()
+    | Box _ -> Ok ()
+    | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
+    | Product ts ->
+      Misc.Stdlib.List.fold_left_result
+        (fun () -> constrain_above_addressable ~allow_mutation)
+        () ts
+
   let apply_operator t : Kind_operator.t -> _ t = function
     | Id -> t
     | Addressable -> Addressable t

@@ -258,5 +258,14 @@ module Layout : sig
 
   val product : 'a t list -> 'a t
 
+  (** [constrain_below_addressable t] constrains [t < t addressable], and
+      [constrain_above_addressable t] constrains [t addressable < t]; they
+      differ only for layouts containing [any]. *)
+  val constrain_below_addressable :
+    allow_mutation:bool -> Sort.t t -> (unit, Sort.error) result
+
+  val constrain_above_addressable :
+    allow_mutation:bool -> Sort.t t -> (unit, Sort.error) result
+
   val apply_operator : 'a t -> Kind_operator.t -> 'a t
 end
