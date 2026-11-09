@@ -997,7 +997,7 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
 let read penv modname a =
   read_pers_struct penv true modname a
 
-let read_cmi_file penv filename =
+let read_cmi_file penv ~cmx_presence filename =
   let cmi = read_cmi_lazy filename in
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
@@ -1006,8 +1006,7 @@ let read_cmi_file penv filename =
      are still reported as unbound; only transitive lookups can reach it. *)
   let pers_sig =
     { Persistent_signature.filename; cmi;
-      include_flags =
-        { visibility = Hidden; cmx_presence = Cmx_not_guaranteed } }
+      include_flags = { visibility = Hidden; cmx_presence } }
   in
   let import = acknowledge_import penv ~check:true unit_name pers_sig in
   let pers_name =

@@ -28,6 +28,7 @@ module type Common_options = sig
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
+  val _Hx : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
   val _H_file : string -> unit
@@ -50,6 +51,7 @@ module type Common_options = sig
   val _nocwd : unit -> unit
   val _open : string -> unit
   val _open_cmi : string -> unit
+  val _open_cmi_x : string -> unit
   val _ppx : string -> unit
   val _keywords: string -> unit
   val _principal : unit -> unit

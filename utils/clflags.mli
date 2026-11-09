@@ -59,7 +59,7 @@ type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
   | Fidelity_low | Fidelity_medium | Fidelity_high
   | Fidelity_very_high | Fidelity_ultra_high | Fidelity_unlimited
-type visible_include =
+type include_dir =
   { path : string;
     cmx_guaranteed : bool;
   }
@@ -81,8 +81,8 @@ val dllibs : string list ref
 val cmi_file : string option ref
 val compile_only : bool ref
 val output_name : string option ref
-val include_dirs : visible_include list ref
-val hidden_include_dirs : string list ref
+val include_dirs : include_dir list ref
+val hidden_include_dirs : include_dir list ref
 val include_manifests : string list ref
 val hidden_include_manifests : string list ref
 
@@ -135,7 +135,7 @@ val match_context_rows : int ref
 val safer_matching : bool ref
 type open_arg =
   | Open of string
-  | Open_cmi of string
+  | Open_cmi of { path : string; cmx_guaranteed : bool }
 
 val open_args : open_arg list ref
 val preprocessor : string option ref

@@ -1082,8 +1082,8 @@ end
    @return the list of analysed top modules. *)
 val analyse_files :
     ?merge_options:Odoc_types.merge_option list ->
-      ?include_dirs:Clflags.visible_include list ->
-        ?hidden_include_dirs:string list ->
+      ?include_dirs:Clflags.include_dir list ->
+        ?hidden_include_dirs:Clflags.include_dir list ->
           ?labels:bool ->
             ?sort_modules:bool ->
               ?no_stop:bool ->
