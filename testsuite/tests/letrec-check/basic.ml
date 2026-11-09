@@ -69,38 +69,32 @@ Hint: Each right-hand side of a "let rec" must have the form r:
   "let rec" are also allowed.
 |}];;
 
-(* Non-function bindings may not refer to the recursive group: no cyclic
-   values. *)
+(* Values of inductive types, such as lists, may not be cyclic. Values of
+   other types may. *)
 
 let rec x = 1 :: x;;
 [%%expect{|
 Line 1, characters 17-18:
 1 | let rec x = 1 :: x;;
                      ^
-Error: This "let rec" would create a cycle of immutable values: "x" -> "x".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+Error: This "let rec" would create a cycle of values of inductive types: "x" ->
+       "x".
+Hint: A cycle must go through a function, a "lazy" value, a mutable field
+or a value of a type not marked "[@@inductive]".
 |}];;
 
 type tup = T of tup * int
 let rec x = T (x, 0);;
 [%%expect{|
 type tup = T of tup * int
-Line 2, characters 15-16:
-2 | let rec x = T (x, 0);;
-                   ^
-Error: This "let rec" would create a cycle of immutable values: "x" -> "x".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+val x : tup = T (<cycle>, 0)
 |}];;
 
 type 'a stream = Cons of 'a * 'a stream
 let rec s = Cons (1, s);;
 [%%expect{|
 type 'a stream = Cons of 'a * 'a stream
-Line 2, characters 21-22:
-2 | let rec s = Cons (1, s);;
-                         ^
-Error: This "let rec" would create a cycle of immutable values: "s" -> "s".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+val s : int stream = Cons (1, <cycle>)
 |}];;
 
 type tree = Node of tree array
@@ -243,11 +237,8 @@ and y = B (x, 1);;
 [%%expect{|
 type a = A of b * int
 and b = B of a * int
-Line 3, characters 15-16:
-3 | let rec x = A (y, 0)
-                   ^
-Error: This "let rec" would create a cycle of immutable values: "y" -> "x" -> "y".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+val x : a = A (B (<cycle>, 1), 0)
+val y : b = B (A (<cycle>, 0), 1)
 |}];;
 
 let rec x = object method m = x end;;
@@ -386,6 +377,8 @@ class c = let rec x = 1 :: x in object method m = x end;;
 Line 1, characters 27-28:
 1 | class c = let rec x = 1 :: x in object method m = x end;;
                                ^
-Error: This "let rec" would create a cycle of immutable values: "x" -> "x".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+Error: This "let rec" would create a cycle of values of inductive types: "x" ->
+       "x".
+Hint: A cycle must go through a function, a "lazy" value, a mutable field
+or a value of a type not marked "[@@inductive]".
 |}];;

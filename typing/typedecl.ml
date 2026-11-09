@@ -1013,6 +1013,8 @@ let transl_declaration env sdecl (id, uid) =
     sdecl.ptype_cstrs
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
+  (* [@@inductive] is only read by [Value_rec_check]; mark it used here. *)
+  ignore (Builtin_attributes.has_inductive sdecl.ptype_attributes : bool);
   let represent_as_float_array =
     Builtin_attributes.has_represent_as_float_array sdecl.ptype_attributes
   in

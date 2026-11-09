@@ -24,9 +24,10 @@ type error =
     (** The subexpression at the location refers to the recursively bound
         name where it may not. *)
   | Illegal_cycle of Location.t * Ident.t list
-    (** The given names form a cycle of blocks that does not go through a
-        function, a lazy value or a mutable field. The location is that of
-        the reference that closes the cycle. *)
+    (** The given names form a cycle of blocks of inductive types that does
+        not go through a function, a lazy value, a mutable field or a block
+        of a type that is not inductive. The location is that of the
+        reference that closes the cycle. *)
 
 (** [classify_recursive_bindings bindings] checks the right-hand sides of
     the bindings [(x1, e1); ...; (xn, en)] of a [let rec] group, and returns

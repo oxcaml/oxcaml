@@ -211,19 +211,18 @@ let rec xs = 1 :: xs;;
 Line 1, characters 18-20:
 1 | let rec xs = 1 :: xs;;
                       ^^
-Error: This "let rec" would create a cycle of immutable values: "xs" -> "xs".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+Error: This "let rec" would create a cycle of values of inductive types: "xs" ->
+       "xs".
+Hint: A cycle must go through a function, a "lazy" value, a mutable field
+or a value of a type not marked "[@@inductive]".
 |}];;
 
 type c = C of c
 let rec a = C b and b = C a;;
 [%%expect{|
 type c = C of c
-Line 2, characters 14-15:
-2 | let rec a = C b and b = C a;;
-                  ^
-Error: This "let rec" would create a cycle of immutable values: "b" -> "a" -> "b".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+val a : c = C (C <cycle>)
+val b : c = C (C <cycle>)
 |}];;
 
 type d = D of d list * d Lazy.t
@@ -231,11 +230,15 @@ let rec a = D ([b], lazy b) and b = D ([], lazy a) and c = D ([a], lazy c)
 and d = D ([e], lazy d) and e = D ([d], lazy a);;
 [%%expect{|
 type d = D of d list * d Lazy.t
-Line 3, characters 12-13:
-3 | and d = D ([e], lazy d) and e = D ([d], lazy a);;
-                ^
-Error: This "let rec" would create a cycle of immutable values: "e" -> "d" -> "e".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+val a : d = D ([D ([], <cycle>)], lazy (D ([], <cycle>)))
+val b : d = D ([], lazy (D ([<cycle>], <cycle>)))
+val c : d = D ([D ([D ([], <cycle>)], lazy (D ([], <cycle>)))], <cycle>)
+val d : d =
+  D ([D ([<cycle>], lazy (D ([D ([], <cycle>)], lazy (D ([], <cycle>)))))],
+   <cycle>)
+val e : d =
+  D ([D ([<cycle>], <cycle>)],
+   lazy (D ([D ([], <cycle>)], lazy (D ([], <cycle>)))))
 |}];;
 
 let rec x = { f = (fun () -> 0); x = (fun () -> 1) () } and y = Some x;;

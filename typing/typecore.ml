@@ -14410,12 +14410,13 @@ let report_error ~loc env =
   | Illegal_letrec_cycle ids ->
       let hint =
         Location.msg
-          "@[Hint: A cycle must go through a function, a %a value or a \
-           mutable field.@]"
+          "@[Hint: A cycle must go through a function,@ a %a value,@ \
+           a mutable field@ or a value of a type not marked %a.@]"
           Style.inline_code "lazy"
+          Style.inline_code "[@@inductive]"
       in
       Location.errorf ~loc ~sub:[ hint ]
-        "This %a would create a cycle of immutable values:@ %a."
+        "This %a would create a cycle of values of inductive types:@ %a."
         Style.inline_code "let rec"
         (pp_print_list
            ~pp_sep:(fun ppf () -> fprintf ppf " ->@ ")

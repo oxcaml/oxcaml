@@ -160,7 +160,8 @@ val s : string = "abc"
 val r : r = {self = <cycle>; n = 3; s = "abc"}
 |}];;
 
-(* Immutable fields may not refer to the group. *)
+(* Immutable fields may refer to the group, as long as they do not read
+   it. *)
 
 type f = { f : unit -> f }
 let rec r = { f = (fun () -> r) };;

@@ -158,6 +158,7 @@ let builtin_attrs =
   ; "flatten_floats"
   ; "represent_as_float_array"
   ; "immediate_all_void_constructor"
+  ; "inductive"
   ]
 
 let builtin_attrs =
@@ -549,6 +550,7 @@ let explicit_arity attrs = has_attribute "explicit_arity" attrs
 let has_unboxed attrs = has_attribute "unboxed" attrs
 
 let has_boxed attrs = has_attribute "boxed" attrs
+let has_inductive attrs = has_attribute "inductive" attrs
 let has_atomic attrs = has_attribute "atomic" attrs
 
 let has_flatten_floats attrs = has_attribute "flatten_floats" attrs

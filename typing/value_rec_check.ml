@@ -48,17 +48,26 @@
     placeholders in the fields that mention the group, which are assigned once
     the whole group is defined.
 
-    Finally, every cycle in the data created by the group must go through a
-    function, a lazy block or a mutable field: the names of the group that
-    occur in the fields of a block, outside of functions, lazy expressions and
-    mutable fields (including references and arrays), must not form a cycle
-    between blocks. Definitions such as [let rec xs = 0 :: xs] or
+    Finally, the group may not create a cycle of values of inductive types.
+    A type is inductive if its declaration is marked [[@@inductive]];
+    [list] and [option] are inductive. The names of the group that occur in
+    the fields of a block, outside of functions, lazy expressions and mutable
+    fields (including references and arrays), and only under blocks of
+    inductive types, must not form a cycle between blocks of inductive types.
+    Tuples and polymorphic variants, whose types are structural, count as
+    inductive.
+    Definitions such as [let rec xs = 0 :: xs] or
     [let rec a = Some b and b = Some a] are thus rejected, whereas
-    [let rec r = { f = fun () -> r }] is accepted. This guarantee is about
-    types: a cycle must go through a field of a function, lazy or mutable
-    type, so values of immutable types such as lists are always finite, even
-    though [lazy x] may be represented as [x] itself. See
-    [Value_rec_compiler] for the compilation scheme.
+    [let rec r = { f = fun () -> r }] is accepted, and so is
+    [let rec r = { next = r }] if the type of [r] is not inductive.
+
+    This guarantee is about types: there is no cycle of immutable fields
+    between values whose types are all inductive. A structural recursion
+    that only descends through immutable fields of inductive types, such as
+    [List.length], thus terminates, even though [lazy x] may be represented
+    as [x] itself. A recursion that also descends through values of other
+    types gets no such guarantee. See [Value_rec_compiler] for the
+    compilation scheme.
 
     Recursive class definitions follow the same principle: the let-bindings
     in the spine of a class expression are evaluated when the class is
@@ -212,10 +221,42 @@ let block_fields e =
     | Some contents -> Some [ { contents; mutable_ = true; label = None } ]
     | None -> None
 
+let rec is_inductive_path env (path : Path.t) =
+  Path.same path Predef.path_list
+  || Path.same path Predef.path_option
+  ||
+  match Env.find_type path env with
+  | exception Not_found -> false
+  | decl ->
+    Builtin_attributes.has_inductive decl.type_attributes
+    ||
+    match decl.type_manifest with
+    | None -> false
+    | Some ty ->
+      match Types.get_desc (Ctype.expand_head env ty) with
+      | Tconstr (path', _, _) when not (Path.same path path') ->
+        is_inductive_path env path'
+      | _ -> false
+
+(* Whether the block [e] may be part of a cycle of values of inductive
+   types. Tuples and polymorphic variants have structural types, which cannot
+   be marked: they may be part of such a cycle, but a cycle made only of them
+   is rejected too. *)
+let is_inductive_block e =
+  match Types.get_desc (Ctype.expand_head e.exp_env e.exp_type) with
+  | Tconstr (Pextra_ty (_, (Pcstr_ty _ | Pext_ty)), _, _) ->
+    (* An inline record is part of the block of its constructor, whose type
+       is checked instead. *)
+    true
+  | Tconstr (path, _, _) -> is_inductive_path e.exp_env path
+  | Ttuple _ | Tvariant _ -> true
+  | _ -> false
+
 (* The state of the check of a group: the names bound by the group,
    including the members of preambles, the kinds of their definitions, and
-   the references between blocks that are not through a function, a lazy
-   expression or a mutable field. *)
+   the references between blocks of inductive types that are not through a
+   function, a lazy expression, a mutable field or a block of another
+   type. *)
 type state =
   { mutable ids : Ident.t list;
     mutable kinds : (Ident.t * Value_rec_types.definition) list;
@@ -224,42 +265,53 @@ type state =
 exception Not_a_construction
 
 (* Checks that [e], in a field of the block [src], is a construction (the [C]
-   of the grammar above), and records the references to the group in it. *)
-let rec construction st ~src ~mutable_ e =
-  let construction ?(mutable_ = mutable_) e =
-    construction st ~src ~mutable_ e
+   of the grammar above), and records the references to the group in it.
+   [inductive] is whether the blocks from [src] to [e] all have inductive
+   types. *)
+let rec construction st ~src ~mutable_ ~inductive e =
+  let construction ?(mutable_ = mutable_) ?(inductive = inductive) e =
+    construction st ~src ~mutable_ ~inductive e
   in
+  let block () = inductive && is_inductive_block e in
   match e.exp_desc with
   | Texp_function _ | Texp_lazy _ | Texp_constant _ -> ()
   | Texp_ident { path = Path.Pident id; _ } when is_member st.ids id ->
-    if not mutable_ then st.edges <- (src, id, e.exp_loc) :: st.edges
+    if inductive && not mutable_ then
+      st.edges <- (src, id, e.exp_loc) :: st.edges
   | Texp_ident _ -> ()
   | Texp_apply_layout (e, _) -> construction e
   | Texp_construct (_, _, _, args, _) ->
-    List.iter (fun (_, e) -> construction e) args
-  | Texp_tuple (args, _) -> List.iter (fun (_, e, _) -> construction e) args
-  | Texp_variant (_, arg) -> Option.iter (fun (e, _) -> construction e) arg
+    let inductive = block () in
+    List.iter (fun (_, e) -> construction ~inductive e) args
+  | Texp_tuple (args, _) ->
+    let inductive = block () in
+    List.iter (fun (_, e, _) -> construction ~inductive e) args
+  | Texp_variant (_, arg) ->
+    let inductive = block () in
+    Option.iter (fun (e, _) -> construction ~inductive e) arg
   | Texp_array (mut, _, args, _) ->
     let mutable_ = mutable_ || Types.is_mutable mut in
-    List.iter (construction ~mutable_) args
+    List.iter (construction ~mutable_ ~inductive:(block ())) args
   | Texp_record { fields; extended_expression = None; _ } ->
+    let inductive = block () in
     Array.iter
       (fun ((lbl : Data_types.label_description), _, definition) ->
          match definition with
          | Kept _ -> ()
          | Overridden (_, e) ->
-           construction ~mutable_:(mutable_ || Types.is_mutable lbl.lbl_mut) e)
+           construction ~inductive
+             ~mutable_:(mutable_ || Types.is_mutable lbl.lbl_mut) e)
       fields
   | _ ->
     match ref_contents e with
     | Some contents -> construction ~mutable_:true contents
     | None -> raise Not_a_construction
 
-let classify_field st ~src { contents; mutable_; label } =
+let classify_field st ~src ~inductive { contents; mutable_; label } =
   match find_value_reference st.ids contents with
   | None -> ()
   | Some id ->
-    begin match construction st ~src ~mutable_ contents with
+    begin match construction st ~src ~mutable_ ~inductive contents with
     | () -> ()
     | exception Not_a_construction -> illegal_reference contents.exp_loc id
     end;
@@ -279,7 +331,8 @@ let classify_definition st id e : Value_rec_types.definition =
     | _ ->
       match block_fields e with
       | Some fields ->
-        List.iter (classify_field st ~src:id) fields;
+        let inductive = is_inductive_block e in
+        List.iter (classify_field st ~src:id ~inductive) fields;
         Construction
       | None -> illegal_reference e.exp_loc ref_id
 

@@ -200,6 +200,11 @@ val explicit_arity: Parsetree.attributes -> bool
 
 val has_unboxed: Parsetree.attributes -> bool
 val has_boxed: Parsetree.attributes -> bool
+
+(** [has_inductive attrs] is true if [attrs] contains [@@inductive]. A
+    [let rec] may not create a cycle of immutable references between values
+    whose types are all inductive (see [Value_rec_check]). *)
+val has_inductive: Parsetree.attributes -> bool
 val has_flatten_floats: Parsetree.attributes -> bool
 val has_represent_as_float_array: Parsetree.attributes -> bool
 val has_immediate_all_void_constructor: Parsetree.attributes -> bool

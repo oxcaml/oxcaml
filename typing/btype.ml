@@ -129,10 +129,7 @@ type pool =
   { level: int;
     mutable pool: transient_expr list;
     mutable sort_pool: Jkind_types.Sort.t list;
-    mutable next: pool [@warning "-69"]
-    (* Only assigned by the recursive definition of [dummy] below, which the
-       upstream compiler used for bootstrapping does not count as a
-       mutation. *)}
+    next: pool}
 (* To avoid an indirection we choose to add a dummy level at the end of
    the list. It will never be accessed, as [pool_of_level] is always called
    with [level >= 0]. *)

@@ -159,8 +159,10 @@ let rec l = ~lbl: 5, ~lbl2: 10 :: l
 Line 1, characters 34-35:
 1 | let rec l = ~lbl: 5, ~lbl2: 10 :: l
                                       ^
-Error: This "let rec" would create a cycle of immutable values: "l" -> "l".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+Error: This "let rec" would create a cycle of values of inductive types: "l" ->
+       "l".
+Hint: A cycle must go through a function, a "lazy" value, a mutable field
+or a value of a type not marked "[@@inductive]".
 |}]
 
 (* Tuple containing labeled tuples *)

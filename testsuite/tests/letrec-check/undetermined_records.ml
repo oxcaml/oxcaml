@@ -49,11 +49,7 @@ type ('a : any) w = A of 'a * 'a w option
 
 let rec y = A (1, Some y)
 [%%expect{|
-Line 1, characters 23-24:
-1 | let rec y = A (1, Some y)
-                           ^
-Error: This "let rec" would create a cycle of immutable values: "y" -> "y".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+val y : int w = A (1, Some <cycle>)
 |}];;
 
 type q = { unwrap : q w }
@@ -64,11 +60,8 @@ type q = { unwrap : q w; }
 let rec c = { unwrap = d }
 and d = A (c, None)
 [%%expect{|
-Line 1, characters 23-24:
-1 | let rec c = { unwrap = d }
-                           ^
-Error: This "let rec" would create a cycle of immutable values: "d" -> "c" -> "d".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+val c : q = {unwrap = A (<cycle>, None)}
+val d : q w = A ({unwrap = <cycle>}, None)
 |}];;
 
 type ('a : any) opt = N | S of 'a
@@ -77,9 +70,5 @@ let rec leaf = { left = S leaf; right = S leaf; data = 42 }
 [%%expect{|
 type ('a : any) opt = N | S of 'a
 type tree = { left : tree opt; right : tree opt; data : int; }
-Line 3, characters 26-30:
-3 | let rec leaf = { left = S leaf; right = S leaf; data = 42 }
-                              ^^^^
-Error: This "let rec" would create a cycle of immutable values: "leaf" -> "leaf".
-Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+val leaf : tree = {left = S <cycle>; right = S <cycle>; data = 42}
 |}];;

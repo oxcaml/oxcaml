@@ -477,10 +477,6 @@ let
         --replace-fail '(name menhirLib)' '(name oxcaml_private_menhirlib)' \
         --replace-fail '(public_name menhirLib)' \
           '(public_name js_of_ocaml-compiler.private.menhirLib)'
-      # The empty stack is a cyclic let rec, which OxCaml only accepts
-      # through mutable fields (see also parsing/dune).
-      substituteInPlace lib/EngineTypes.ml \
-        --replace-fail '  next: (' '  mutable next: ('
     '';
   };
 
