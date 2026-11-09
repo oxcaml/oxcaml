@@ -2203,18 +2203,14 @@ module G_u :
 
 module A_u = G_u (struct kind_ ka = value end)
 [%%expect{|
->> Fatal error: Ctype.nondep_type_rec: weak variable copy
-Uncaught exception: Misc.Fatal_error
-
+module A_u : sig val c : (('a. 'a id -> unit) -> unit) option ref end
 |}]
 
 module K_u = struct kind_ ka = value end
 module B_u = G_u (K_u)
 [%%expect{|
 module K_u : sig kind_ ka = value end
->> Fatal error: Subst.typexp: weak variable copy
-Uncaught exception: Misc.Fatal_error
-
+module B_u : sig val c : (('a. 'a id -> unit) -> unit) option ref end
 |}]
 
 (****************************************************)

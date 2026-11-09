@@ -8722,22 +8722,26 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
   try TypeHash.find nondep_hash ty
   with Not_found ->
   match get_desc ty with
-  | (Tvar {name; jkind} | Tunivar {name; jkind}) as desc ->
+  | Tvar {name; jkind} ->
     let jkind' = nondep_jkind_base env ids jkind in
     if jkind' == jkind then ty
     else if get_level ty = generic_level then
-      let desc =
-        match desc with
-        | Tvar _ -> Tvar {name; jkind = jkind'}
-        | Tunivar _ -> Tunivar {name; jkind = jkind'}
-        | _ -> assert false
-      in
       let ty' =
-        newty3 ~level:(get_level ty) ~scope:(get_scope ty) desc
+        newty3 ~level:(get_level ty) ~scope:(get_scope ty)
+          (Tvar {name; jkind = jkind'})
       in
       TypeHash.add nondep_hash ty ty';
       ty'
     else Misc.fatal_error "Ctype.nondep_type_rec: weak variable copy"
+  | Tunivar {name; jkind} ->
+    let jkind' = nondep_jkind_base env ids jkind in
+    if jkind' == jkind then ty else
+    let ty' =
+      newty3 ~level:(get_level ty) ~scope:(get_scope ty)
+        (Tunivar {name; jkind = jkind'})
+    in
+    TypeHash.add nondep_hash ty ty';
+    ty'
   | _ ->
     let ty' = newgenstub ~scope:(get_scope ty)
                 (Jkind.Builtin.any ~why:Dummy_jkind) in
