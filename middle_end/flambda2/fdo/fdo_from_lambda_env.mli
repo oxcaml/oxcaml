@@ -36,8 +36,8 @@ type t
 val toplevel : Compilation_unit.t -> t
 
 (** The state for the body of the given function, defined in the code [t] is
-    for. *)
-val enter_function : t -> Lambda.lfunction -> t
+    for. [binder] is the identifier the function is bound to, if any. *)
+val enter_function : t -> binder:Ident.t option -> Lambda.lfunction -> t
 
 (** The counters of the entry edge of the function [t] is for. *)
 val entry_annotation : t -> Fdo_annotation.t

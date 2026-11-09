@@ -1,4 +1,5 @@
-(* function_ids.ml with some insertions. *)
+(* function_ids.ml with some insertions, and an optional argument added to
+   [opt]. *)
 
 let[@inline never] apply f x = f x
 
@@ -27,4 +28,13 @@ let[@inline never] shadowing n =
   let r = apply f n in
   p + q + r
 
-let () = Printf.printf "%d\n" (a0 + a + b + inner 3 + shadowing 5)
+let[@inline never] opt ?(x = 1) y = y + x
+
+class counter =
+  object
+    method incr x = x + 1
+  end
+
+let () =
+  Printf.printf "%d\n"
+    (a0 + a + b + inner 3 + shadowing 5 + opt 1 + (new counter)#incr 1)

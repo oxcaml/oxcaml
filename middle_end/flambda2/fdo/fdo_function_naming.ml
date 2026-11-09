@@ -130,7 +130,8 @@ let toplevel_function compilation_unit =
        ~name_str:(Compilation_unit.full_path_as_string compilation_unit)
        ~discriminator:0)
 
-let of_function (context : Context.t) (fn : L.lfunction) =
+let of_function (context : Context.t) ~(binder : Ident.t option)
+    (fn : L.lfunction) =
   let { L.loc; params; body; _ } = fn in
   let params = List.map (fun (p : L.lparam) -> p.name) params in
   let path, anonymous =
@@ -155,8 +156,17 @@ let of_function (context : Context.t) (fn : L.lfunction) =
       ( Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
           scopes,
         anonymous )
-    | Loc_unknown -> context.enclosing_path ^ ".(fun)", true
+    | Loc_unknown -> (
+      (* Compiler-generated code, e.g. classes. Prefer the name it is bound to,
+         as for [class c], [c_init]. *)
+      match binder with
+      | Some id -> context.enclosing_path ^ "." ^ Ident.name id, false
+      | None -> context.enclosing_path ^ ".(fun)", true)
   in
+  (* Compiler-generated stubs (like optional arg wrappers) have the same path as
+     the original, so we name them separately so that the original function's
+     discriminator doesn't change *)
+  let path = if fn.attr.stub then path ^ "(stub)" else path in
   let path =
     if anonymous
     then

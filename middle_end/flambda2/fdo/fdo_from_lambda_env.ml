@@ -38,9 +38,9 @@ let toplevel compilation_unit =
     function_ = Fdo_function_naming.toplevel_function compilation_unit
   }
 
-let enter_function t fn =
+let enter_function t ~binder fn =
   let function_, naming_context =
-    Fdo_function_naming.of_function t.naming_context fn
+    Fdo_function_naming.of_function t.naming_context ~binder fn
   in
   { naming_context; function_ }
 

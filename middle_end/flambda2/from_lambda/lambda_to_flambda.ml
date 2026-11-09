@@ -525,7 +525,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
        Consider introducing a special debug UID for closures. See #3967. *)
     let dbg = Debuginfo.from_location func.loc in
     let func =
-      cps_function env ~fid:id ~fuid:id_duid
+      cps_function env ~fid:id ~fuid:id_duid ~let_bound:false
         ~recursive:(Non_recursive : Recursive.t)
         func
     in
@@ -1383,19 +1383,22 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
   List.map
     (fun (fun_id, fun_uid, def) ->
       let fuid = Flambda_debug_uid.of_lambda_debug_uid fun_uid in
-      cps_function env ~fid:fun_id ~fuid ~recursive:(recursive fun_id)
+      cps_function env ~fid:fun_id ~fuid ~let_bound:true
+        ~recursive:(recursive fun_id)
         ~precomputed_free_idents:(Ident.Map.find fun_id free_idents)
         def)
     bindings_with_wrappers
 
-and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
+and cps_function env ~fid ~fuid ~let_bound ~(recursive : Recursive.t)
     ?precomputed_free_idents
     ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } as
      func :
       L.lfunction) : Function_decl.t =
   let fdo =
     Option.map
-      (fun fdo -> Fdo_from_lambda_env.enter_function fdo func)
+      (fun fdo ->
+        let binder = if let_bound then Some fid else None in
+        Fdo_from_lambda_env.enter_function fdo ~binder func)
       (Env.fdo env)
   in
   let contains_no_escaping_local_allocs =

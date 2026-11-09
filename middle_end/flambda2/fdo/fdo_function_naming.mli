@@ -51,9 +51,13 @@ end
 val toplevel_function : Compilation_unit.t -> Fdo_counter.Function.t
 
 (** The identity of a function defined in the given context, and the context of
-    the functions defined in its body. *)
+    the functions defined in its body. [binder] is the identifier the function
+    is bound to, if any, used only when the function has no location. *)
 val of_function :
-  Context.t -> Lambda.lfunction -> Fdo_counter.Function.t * Context.t
+  Context.t ->
+  binder:Ident.t option ->
+  Lambda.lfunction ->
+  Fdo_counter.Function.t * Context.t
 
 (** The first [limit] (5 by default) distinct tokens of a function. Only
     parameter and body identifiers, primitives, and constants are considered, in

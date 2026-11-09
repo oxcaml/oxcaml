@@ -1,7 +1,9 @@
 (* Anonymous functions are named by their enclosing scope and their first
    tokens, so inserting one should not rename the others. Additionally, shadowed
    functions or anonymous functons with the same body should be distinguished by
-   discriminators. *)
+   discriminators. Adding an optional argument should not rename the function
+   body, and compiler-generated functions bound to names (as in classes) should
+   be named by them. *)
 
 let[@inline never] apply f x = f x
 
@@ -29,4 +31,13 @@ let[@inline never] shadowing n =
 
 let[@inline never] shadowing n = shadowing n
 
-let () = Printf.printf "%d\n" (a + b + inner 3 + shadowing 5)
+let[@inline never] opt y = y + 1
+
+class counter =
+  object
+    method incr x = x + 1
+  end
+
+let () =
+  Printf.printf "%d\n"
+    (a + b + inner 3 + shadowing 5 + opt 1 + (new counter)#incr 1)
