@@ -210,8 +210,6 @@ type error =
   | Unrepresentable_open of Env.unrepresentable_item
   | Unrepresentable_argument of
       Global_module.Parameter_name.t * Env.unrepresentable_item
-  | Non_generalizable_escape of
-      { var : type_expr; mty: module_type; kind : Path.t }
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t

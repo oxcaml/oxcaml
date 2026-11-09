@@ -6781,6 +6781,12 @@ let generalize_structure_type_unboxed_access_result
       (el_ty, Uaccess_unboxed_field _) =
   generalize_structure el_ty
 
+let lower_nongen loc env level mty =
+  match Mtype.lower_nongen level mty with
+  | Ok () -> ()
+  | Error { var; kind } ->
+    Error.log_and_raise loc env (Non_generalizable_escape { mty; var; kind })
+
 let unique_use ~loc ~env mode_l mode_r  =
   if not (Language_extension.is_at_least Unique
             Language_extension.maturity_of_unique_for_drf) then begin
@@ -8982,12 +8988,7 @@ and type_expect_
           let modl, pres, id, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
               let modl, md_shape = !type_module env smodl in
-              begin match Mtype.lower_nongen lv modl.mod_type with
-              | Ok () -> ()
-              | Error { var; kind } ->
-                Error.log_and_raise loc env
-                  (Non_generalizable_escape { mty = modl.mod_type; var; kind })
-              end;
+              lower_nongen loc env lv modl.mod_type;
               let pres =
                 match modl.mod_type with
                 | Mty_alias _ -> Mp_absent
