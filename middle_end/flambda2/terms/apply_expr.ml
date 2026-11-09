@@ -105,7 +105,7 @@ let [@ocamlformat "disable"] print_normal ppf
       @[<hov 1>(call_kind@ %a)@]@ \
       @[<hov 1>(return_mode@ %a)@]@ \
       @[<hov 1>%t(dbg@ %a)%t@]@ \
-      @[<hov 1>(callsite_counter %a) \
+      @[<hov 1>(callsite_counter %a)@]@ \
       @[<hov 1>(inline@ %a)@]@ \
       @[<hov 1>(inlining_state@ %a)@]@ \
       %a\
