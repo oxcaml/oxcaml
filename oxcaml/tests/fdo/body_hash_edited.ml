@@ -33,7 +33,7 @@ let[@inline never] change_not x = if apply is_pos x then apply next x else 0
 let[@inline never] change_string_keys s =
   match s with "a" -> apply next 0 | "c" -> 1 | _ -> 2
 
-let[@inline never] change_array_kind (a : 'a array) b = blit a 0 b 0 1
+let[@inline never] change_array_kind (a : string array) b = blit a 0 b 0 1
 
 let[@inline never] change_arm x = if x > 0 then x else apply next x
 
