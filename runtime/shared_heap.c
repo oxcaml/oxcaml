@@ -61,18 +61,9 @@ static_assert(sizeof(pool) == Bsize_wsize(POOL_HEADER_WSIZE), "");
 #define POOL_BLOCKS(sz) ((POOL_WSIZE - POOL_HEADER_WSIZE) / \
                          whsize_sizeclass[sz])
 
-/* Free blocks are combined into adjacent runs. The first free block
-   in a run has a header with No_scan_tag and NOT_MARKABLE, and a size
-   field equal to the number of _additional_ blocks in the run (a run
-   of a single block has size field 0).
-
-   The first field is a pointer to the next free block _beyond_ this
-   run (or NULL if there are none). */
-
-#define POOL_BLOCK_FREE_HD(hd) \
-  (Tag_hd(hd) == No_scan_tag && (Color_hd(hd) == NOT_MARKABLE))
-#define POOL_BLOCK_FREE_HP(p) (POOL_BLOCK_FREE_HD(Hd_hp(p)))
-#define POOL_FREE_HEADER(wosize) Make_header(wosize, No_scan_tag, NOT_MARKABLE)
+/* Free blocks are combined into adjacent runs; the representation and
+   its macros (POOL_BLOCK_FREE_HD etc.) live in caml/shared_heap.h,
+   shared with the inline fast-allocation path. */
 
 typedef struct large_alloc {
   caml_domain_state* owner;
@@ -502,7 +493,8 @@ static intnat pool_sweep(struct caml_heap_state* local,
                          pool**,
                          sizeclass_t sz ,
                          int release_to_global_pool);
-static void pool_finalise(struct caml_heap_state* local, pool**, sizeclass_t sz);
+static void pool_finalise(struct caml_heap_state* local, pool**,
+                          sizeclass_t sz);
 
 /* Adopt pool from the pool_freelist avail and full pools
    to satisfy an allocation */
@@ -1799,7 +1791,8 @@ void compact_phase_one_mark(struct caml_heap_state* heap)
         }
       } while (p < end);
       CAMLassert(end == p);
-      CAMLassert(last_free != NULL); /* in an avail_pool, something must be free */
+      /* in an avail_pool, something must be free */
+      CAMLassert(last_free != NULL);
       last_free[1] = (header_t)NULL;
 
       cur_pool = cur_pool->next;
@@ -1885,7 +1878,8 @@ bool compact_phase_two_mark(int participating_count,
 
   if (!pool_array) {
     CAML_GC_MESSAGE(COMPACT,
-                    "Unable to allocate pool array for compaction phase two.\n");
+                    "Unable to allocate pool array for compaction "
+                    "phase two.\n");
     return false;
   }
 
