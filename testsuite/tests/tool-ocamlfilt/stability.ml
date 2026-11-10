@@ -36,9 +36,10 @@
    [make_adder] that gets copied into this unit by [-O3] inlining, and
    that every such copy demangles to a name the library defines itself
    ([-flambda2-simplify-stubs] makes the partial-application wrapper of
-   [bind_a] one of them). The reference lists the names each unit defines
-   itself; the cross-unit names are checked but not listed, so that the
-   reference holds whether or not that inlining happens (e.g. under
+   [bind_a] one of them). The reference lists the functions each unit
+   defines itself; the cross-unit names and the data symbols are checked
+   but not listed, so that the reference holds whether or not that
+   inlining, or the static allocation of a closure, happens (e.g. under
    [Oclassic]). *)
 
 let adder = Stability_lib.make_adder (Sys.opaque_identity 10)

@@ -4,11 +4,12 @@
 # the structured symbols of the object compiled from the source as written
 # and from its [_edited] variant are demangled, the [_edited] unit names are
 # rewritten to the original ones and the [unrelated_*] functions dropped,
-# and the two lists must then be identical. The names the unedited unit
+# and the two lists must then be identical. The functions the unedited unit
 # defines are printed, so that the reference documents the stable names;
 # cross-unit entries (references to the other unit, and copies of its
-# closures that -O3 inlining may or may not create) are compared but not
-# printed, so that the reference does not depend on the optimization level.
+# closures that -O3 inlining may or may not create) and data symbols (static
+# closures, which -O3 may or may not create) are compared but not printed,
+# so that the reference does not depend on the optimization level.
 # The names the consumer defines in the library's namespace are the copies
 # of library closures made by inlining; each must be a name the library
 # defines itself, or the copies would not aggregate with the original.
@@ -29,10 +30,14 @@ demangled_names () {
     | sed -E "$2" | grep -v 'unrelated_' | sort -u
 }
 
-# As [demangled_names], for the symbols the object defines (not those it
-# merely refers to).
-defined_names () {
-  nm "$1" | awk 'NF == 3 && $2 != "U" && $NF ~ /^_?_Caml[A-Z]/ { print $NF }' \
+# As [demangled_names], for the code symbols the object defines (not those it
+# merely refers to). Data symbols are left out: a closure has one
+# ([<code>.{closure}]) only if it is allocated statically, which depends on the
+# optimization level (Simplify lifts toplevel closures that capture inconstant
+# values, Oclassic does not) and, for a copy of a library closure, on the unit
+# that allocates it.
+defined_code_names () {
+  nm "$1" | awk 'NF == 3 && $2 ~ /^[Tt]$/ && $NF ~ /^_?_Caml[A-Z]/ { print $NF }' \
     | "$OCAMLFILT" --format structured \
     | sed -E "$2" | grep -v 'unrelated_' | sort -u
 }
@@ -53,7 +58,7 @@ check () {
     exit "$TEST_FAIL"
   fi
   echo "# $name"
-  grep "^$own" "$D/$name.as_written"
+  defined_code_names "$D/$name.o" "$2" | grep "^$own"
 }
 
 check stability_lib 's/^Stability_lib_edited\./Stability_lib./' \
@@ -64,7 +69,7 @@ check stability \
 
 # Without cross-module inlining (e.g. under [Oclassic]) there are no copies and
 # the check is vacuous.
-defined_names "$D/stability.o" 's/^//' | grep '^Stability_lib\.' > "$D/copies" \
+defined_code_names "$D/stability.o" 's/^//' | grep '^Stability_lib\.' > "$D/copies" \
   || true
 comm -23 "$D/copies" "$D/stability_lib.as_written" > "$D/foreign"
 if [ -s "$D/foreign" ]; then

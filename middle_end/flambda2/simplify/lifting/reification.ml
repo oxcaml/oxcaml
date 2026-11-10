@@ -112,9 +112,7 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
       dacc, symbol
     | None ->
       let symbol =
-        Symbol.manufacture
-          (Current_unit.get_cu_exn ())
-          (Variable.canonical_name bound_to)
+        Symbol.manufacture_for_variable (Current_unit.get_cu_exn ()) bound_to
       in
       if not (K.equal (T.kind ty) K.value)
       then
