@@ -80,21 +80,14 @@ let find_all_aliases env arg =
     arg
 
 (* The counters preserved in the handler the arm leads to go onto the arm (see
-   [Fdo_region_counters]). That handler is the specialized one if the arm's
-   continuation was specialized for this use. *)
+   [Fdo_region_counters]). Done here, before the arm's target can change, and
+   again once the whole body is rebuilt. *)
 let attach_fdo_region_counters uacc ~use_id action annotations =
-  let cont = AC.continuation action in
-  let cont =
-    match
-      Continuation_callsite_map.find cont use_id (UA.specialization_map uacc)
-    with
-    | exception Not_found -> cont
-    | specialized -> specialized
-  in
   let preserved =
-    Fdo_region_counters.counters_into
+    Fdo_region_counters.counters_into_handler
       (UA.fdo_region_counters uacc)
-      (Handler cont)
+      ~specialization_map:(UA.specialization_map uacc)
+      (AC.continuation action) ~use_id:(Some use_id)
   in
   if Fdo_annotation.is_empty preserved
   then annotations
@@ -798,6 +791,7 @@ let rebuild_switch
   let new_let_conts, arms, mergeable_arms =
     TI.Map.fold (rebuild_arm uacc) arms ([], TI.Map.empty, No_arms)
   in
+  let uacc = EB.add_fdo_successors_of_wrappers uacc new_let_conts in
   let num_arms = TI.Map.cardinal arms in
   let switch_merged =
     match mergeable_arms with
@@ -848,7 +842,10 @@ let rebuild_switch
           UA.notify_removed ~operation:Removed_operations.branch uacc
         in
         (* The arms' edges become a single jump (see [EB.create_switch]). *)
-        let uacc = EB.preserve_fdo_counters_of_arms uacc ~fdo_region arms in
+        let uacc =
+          EB.preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
+            ~target:dest
+        in
         (* CR bclement: should use a single unboxed product lookup table *)
         let rec rebuild_merged_switch mergeable_args args_rev =
           match mergeable_args with

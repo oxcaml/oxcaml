@@ -83,11 +83,13 @@ val create_switch :
   Rebuilt_expr.t * Upwards_acc.t
 
 (** Preserve the FDO counters of the given switch arms in the region (see
-    [Fdo_region_counters]), for a switch that collapses into a single jump. *)
-val preserve_fdo_counters_of_arms :
+    [Fdo_region_counters]), for a switch that collapses into a single jump to
+    [target]. *)
+val preserve_fdo_counters_of_collapsed_switch :
   Upwards_acc.t ->
   fdo_region:Fdo_region_counters.Region.t option ->
   Switch_arm.t Target_ocaml_int.Map.t ->
+  target:Continuation.t ->
   Upwards_acc.t
 
 type new_let_cont =
@@ -96,6 +98,11 @@ type new_let_cont =
     free_names_of_handler : Name_occurrences.t;
     cost_metrics_of_handler : Cost_metrics.t
   }
+
+(** Record that the given wrappers continue into the continuations they call
+    (see [Fdo_region_counters.add_successor]). *)
+val add_fdo_successors_of_wrappers :
+  Upwards_acc.t -> new_let_cont list -> Upwards_acc.t
 
 val bind_let_conts :
   Upwards_acc.t ->

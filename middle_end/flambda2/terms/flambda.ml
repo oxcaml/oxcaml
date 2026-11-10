@@ -1631,9 +1631,9 @@ module Let_cont_expr = struct
       (Non_recursive
          { handler; num_free_occurrences; is_applied_with_traps; can_be_lifted })
 
-  let create_non_recursive' ?(can_be_lifted = true) ~cont handler ~body
+  let create_non_recursive' ~cont handler ~body
       ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps =
-    create0 ~can_be_lifted ~cont handler ~body
+    create0 ~can_be_lifted:true ~cont handler ~body
       ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps
 
   let create_non_recursive0 ~can_be_lifted cont handler ~body
@@ -1665,6 +1665,59 @@ module Let_cont_expr = struct
 
   let apply_renaming = apply_renaming_let_cont_expr
 end
+
+(* Rebuilds the terms in place: they keep their bound names, so that the names
+   known from [expr] still apply, and the numbers of occurrences they record. *)
+let rec map_applies_and_switches expr ~apply ~switch : expr =
+  match descr expr with
+  | Let { let_abst; defining_expr } ->
+    let let_abst =
+      Let_expr.A.map_term let_abst ~f:(fun _ (t0 : let_expr_t0) ->
+          { t0 with body = map_applies_and_switches t0.body ~apply ~switch })
+    in
+    Let { let_abst; defining_expr }
+  | Let_cont
+      (Non_recursive
+         { handler; num_free_occurrences; is_applied_with_traps; can_be_lifted })
+    ->
+    let handler : non_recursive_let_cont_handler =
+      { continuation_and_body =
+          Non_recursive_let_cont_handler.Continuation_and_body.map_term
+            handler.continuation_and_body ~f:(fun _ body ->
+              map_applies_and_switches body ~apply ~switch);
+        handler =
+          map_applies_and_switches_of_handler handler.handler ~apply ~switch
+      }
+    in
+    Let_cont
+      (Non_recursive
+         { handler; num_free_occurrences; is_applied_with_traps; can_be_lifted })
+  | Let_cont (Recursive handlers) ->
+    let module R = Recursive_let_cont_handlers in
+    let handlers =
+      R.A1.map_term handlers
+        ~f:(fun _ ({ handlers; body } : recursive_let_cont_handlers_t0) ->
+          { handlers =
+              R.A0.map_term handlers ~f:(fun _ handlers ->
+                  Continuation.Lmap.map
+                    (map_applies_and_switches_of_handler ~apply ~switch)
+                    handlers);
+            body = map_applies_and_switches body ~apply ~switch
+          })
+    in
+    Let_cont (Recursive handlers)
+  | Apply apply_expr -> Apply (apply apply_expr)
+  | Switch switch_expr -> Switch (switch switch_expr)
+  | Apply_cont _ | Invalid _ -> expr
+
+and map_applies_and_switches_of_handler (handler : continuation_handler) ~apply
+    ~switch =
+  let cont_handler_abst =
+    Continuation_handler.A.map_term handler.cont_handler_abst
+      ~f:(fun _ (t0 : continuation_handler_t0) ->
+        { t0 with handler = map_applies_and_switches t0.handler ~apply ~switch })
+  in
+  { handler with cont_handler_abst }
 
 (* CR mshinwell: Check that apply_cont is well-formed when there is a trap
    installation or removal. *)
