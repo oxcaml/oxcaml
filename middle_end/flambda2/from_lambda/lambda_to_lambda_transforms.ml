@@ -950,7 +950,8 @@ let split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride ~load =
                  load_low,
                  result ) ) ))
 
-let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
+let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride
+    ~check_high ~store =
   let arr_id = Ident.create_local "arr" in
   let arr_duid = Lambda.debug_uid_none in
   let idx_id = Ident.create_local "idx" in
@@ -969,12 +970,25 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
         unboxed_vec256_field ~loc 1 (Lvar value_id),
         L.layout_unboxed_tupled_vector Unboxed_vec256 )
   in
+  let idx_high = offset ~loc ~index_kind ~idx:(Lvar idx_id) (16 / stride) in
   let store_low =
     L.Lprim (store true, [Lvar arr_id; Lvar idx_id; value_low], loc)
   in
   let store_high =
-    let idx = offset ~loc ~index_kind ~idx:(Lvar idx_id) (16 / stride) in
-    L.Lprim (store false, [Lvar arr_id; idx; value_high], loc)
+    L.Lprim (store false, [Lvar arr_id; idx_high; value_high], loc)
+  in
+  let stores = L.Lsequence (store_low, store_high) in
+  let stores =
+    match check_high with
+    | None -> stores
+    | Some load ->
+      L.Llet
+        ( Strict,
+          Punboxed_vector Unboxed_vec128,
+          Ident.create_local "check_high",
+          Lambda.debug_uid_none,
+          Lprim (load, [Lvar arr_id; idx_high], loc),
+          stores )
   in
   Transformed
     (Llet
@@ -995,7 +1009,13 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
                  idx_id,
                  idx_duid,
                  idx,
-                 Lsequence (store_low, store_high) ) ) ))
+                 stores ) ) ))
+
+let split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride
+    ~unsafe ~checked_load ~store =
+  split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride
+    ~check_high:(if unsafe then None else Some checked_load)
+    ~store:(fun low -> store ~unsafe:(unsafe || not low))
 
 (* CR mshinwell: this predicate does not look inside unboxed (or [@unpacked])
    products, so their vec256 components escape the splitting below and hit a
@@ -1231,18 +1251,28 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~load:(fun _ ->
         L.Punboxed_nativeint_array_load_vec
           { desc with size = Boxed_vec128; boxed = false })
-  | ( Pbytes_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+  | ( Pbytes_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:1
-      ~store:(fun _ ->
-        L.Pbytes_set_vec { desc with size = Boxed_vec128; boxed = false })
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:1 ~unsafe
+      ~checked_load:
+        (L.Pbytes_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
+        L.Pbytes_set_vec
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | ( Pbigstring_set_vec
         ({ size = Boxed_vec256; checks; index_kind; boxed; _ } as desc),
       [arr; idx; value] )
     when L.split_vectors ->
     split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:1
-      ~store:(fun low ->
+      ~check_high:None ~store:(fun low ->
         let checks =
           Option.map
             (fun (~len, ~align) ->
@@ -1251,74 +1281,157 @@ let transform_primitive0 env (prim : L.primitive) args loc =
         in
         L.Pbigstring_set_vec
           { desc with size = Boxed_vec128; checks; boxed = false })
-  | ( Pfloatarray_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+  | ( Pfloatarray_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
-      ~store:(fun _ ->
-        L.Pfloatarray_set_vec { desc with size = Boxed_vec128; boxed = false })
-  | ( Pint_array_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:8 ~unsafe
+      ~checked_load:
+        (L.Pfloatarray_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
+        L.Pfloatarray_set_vec
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
+  | ( Pint_array_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
-      ~store:(fun _ ->
-        L.Pint_array_set_vec { desc with size = Boxed_vec128; boxed = false })
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:8 ~unsafe
+      ~checked_load:
+        (L.Pint_array_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
+        L.Pint_array_set_vec
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | ( Punboxed_float_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+        { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
-      ~store:(fun _ ->
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:8 ~unsafe
+      ~checked_load:
+        (L.Punboxed_float_array_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
         L.Punboxed_float_array_set_vec
-          { desc with size = Boxed_vec128; boxed = false })
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | ( Punboxed_float32_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+        { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:4
-      ~store:(fun _ ->
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:4 ~unsafe
+      ~checked_load:
+        (L.Punboxed_float32_array_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
         L.Punboxed_float32_array_set_vec
-          { desc with size = Boxed_vec128; boxed = false })
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | ( Puntagged_int8_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+        { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:1
-      ~store:(fun _ ->
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:1 ~unsafe
+      ~checked_load:
+        (L.Puntagged_int8_array_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
         L.Puntagged_int8_array_set_vec
-          { desc with size = Boxed_vec128; boxed = false })
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | ( Puntagged_int16_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+        { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:2
-      ~store:(fun _ ->
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:2 ~unsafe
+      ~checked_load:
+        (L.Puntagged_int16_array_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
         L.Puntagged_int16_array_set_vec
-          { desc with size = Boxed_vec128; boxed = false })
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | ( Punboxed_int32_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+        { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:4
-      ~store:(fun _ ->
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:4 ~unsafe
+      ~checked_load:
+        (L.Punboxed_int32_array_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
         L.Punboxed_int32_array_set_vec
-          { desc with size = Boxed_vec128; boxed = false })
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | ( Punboxed_int64_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+        { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
-      ~store:(fun _ ->
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:8 ~unsafe
+      ~checked_load:
+        (L.Punboxed_int64_array_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
         L.Punboxed_int64_array_set_vec
-          { desc with size = Boxed_vec128; boxed = false })
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | ( Punboxed_nativeint_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+        { size = Boxed_vec256; unsafe; index_kind; boxed },
       [arr; idx; value] )
     when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
-      ~store:(fun _ ->
+    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+      ~stride:8 ~unsafe
+      ~checked_load:
+        (L.Punboxed_nativeint_array_load_vec
+           { size = Boxed_vec128;
+             unsafe = false;
+             index_kind;
+             mode = L.alloc_heap;
+             boxed = false
+           })
+      ~store:(fun ~unsafe ->
         L.Punboxed_nativeint_array_set_vec
-          { desc with size = Boxed_vec128; boxed = false })
+          { size = Boxed_vec128; unsafe; index_kind; boxed = false })
   | Pjoin_vec256, [low; high] ->
     if L.split_vectors
     then

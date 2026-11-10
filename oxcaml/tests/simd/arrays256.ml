@@ -60,6 +60,21 @@ let assert_raises_out_of_bounds thunk =
   | _ -> assert false
 ;;
 
+(* For an array of [len] elements, where a vector spans [width] of them, checks
+   that [set i] raises for every out-of-bounds [i]. [check] is run after each
+   failure to verify that nothing was written. *)
+let failed_sets_write_nothing ~len ~width ~set ~check =
+  for i = -width to len do
+    if i < 0 || i + width > len then begin
+      (try
+        set i;
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ());
+      check ()
+    end
+  done
+;;
+
 let test_data = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x00\x01\x02\x03\x04\x05\x06\x07"
 
 module Bytes (Primitives : sig
@@ -137,6 +152,15 @@ struct
         assert false
       with | Invalid_argument s when s = "index out of bounds" -> ()
     done;
+  ;;
+
+  let () =
+    let set = int8x32_of_int64s 0xFFFFFFFFFFFFFFFFL 0xFFFFFFFFFFFFFFFFL 0xFFFFFFFFFFFFFFFFL 0xFFFFFFFFFFFFFFFFL in
+    let before = Bytes.copy data in
+    failed_sets_write_nothing ~len:40 ~width:32
+      ~set:(fun i -> set_int8x32_unaligned data i set)
+      ~check:(fun () ->
+        if not (Bytes.equal before data) then Printf.printf "Failed set wrote to bytes\n")
   ;;
 
   (* Extra checks *)
@@ -996,6 +1020,47 @@ end) = struct
     fail [|#0.0s;#0.0s;#0.0s;#0.0s|] 1;
     fail [|#0.0s|] (-1)
   ;;
+
+  (* Out-of-bounds sets must not write anything *)
+
+  let () =
+    let a = floatarray () in
+    let set = float64x4_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = floatarray_get_float64x4 (floatarray ()) i in
+      let get = floatarray_get_float64x4 a i in
+      eq (float64x4_first_int64 expect) (float64x4_second_int64 expect) (float64x4_third_int64 expect) (float64x4_fourth_int64 expect) (float64x4_first_int64 get) (float64x4_second_int64 get) (float64x4_third_int64 get) (float64x4_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:5 ~width:4
+      ~set:(fun i -> floatarray_set_float64x4 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 1)
+  ;;
+
+  let () =
+    let a = unboxed_float_array () in
+    let set = float64x4_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = unboxed_float_array_get_float64x4 (unboxed_float_array ()) i in
+      let get = unboxed_float_array_get_float64x4 a i in
+      eq (float64x4_first_int64 expect) (float64x4_second_int64 expect) (float64x4_third_int64 expect) (float64x4_fourth_int64 expect) (float64x4_first_int64 get) (float64x4_second_int64 get) (float64x4_third_int64 get) (float64x4_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:5 ~width:4
+      ~set:(fun i -> unboxed_float_array_set_float64x4 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 1)
+  ;;
+
+  let () =
+    let a = unboxed_float32_array () in
+    let set = float32x8_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = unboxed_float32_array_get_float32x8 (unboxed_float32_array ()) i in
+      let get = unboxed_float32_array_get_float32x8 a i in
+      eq (float32x8_first_int64 expect) (float32x8_second_int64 expect) (float32x8_third_int64 expect) (float32x8_fourth_int64 expect) (float32x8_first_int64 get) (float32x8_second_int64 get) (float32x8_third_int64 get) (float32x8_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:9 ~width:8
+      ~set:(fun i -> unboxed_float32_array_set_float32x8 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 1)
+  ;;
 end
 
 module _ = Float_arrays(struct
@@ -1723,6 +1788,85 @@ end) = struct
     fail [|#0s|] (-1)
   ;;
 
+  (* Out-of-bounds sets must not write anything *)
+
+  let () =
+    let a = int_array () in
+    let set = int64x4_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = int_array_get_int64x4 (int_array ()) i in
+      let get = int_array_get_int64x4 a i in
+      eq (int64x4_first_int64 expect) (int64x4_second_int64 expect) (int64x4_third_int64 expect) (int64x4_fourth_int64 expect) (int64x4_first_int64 get) (int64x4_second_int64 get) (int64x4_third_int64 get) (int64x4_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:5 ~width:4
+      ~set:(fun i -> int_array_set_int64x4 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 1)
+  ;;
+
+  let () =
+    let a = unboxed_int64_array () in
+    let set = int64x4_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = unboxed_int64_array_get_int64x4 (unboxed_int64_array ()) i in
+      let get = unboxed_int64_array_get_int64x4 a i in
+      eq (int64x4_first_int64 expect) (int64x4_second_int64 expect) (int64x4_third_int64 expect) (int64x4_fourth_int64 expect) (int64x4_first_int64 get) (int64x4_second_int64 get) (int64x4_third_int64 get) (int64x4_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:5 ~width:4
+      ~set:(fun i -> unboxed_int64_array_set_int64x4 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 1)
+  ;;
+
+  let () =
+    let a = unboxed_nativeint_array () in
+    let set = int64x4_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = unboxed_nativeint_array_get_int64x4 (unboxed_nativeint_array ()) i in
+      let get = unboxed_nativeint_array_get_int64x4 a i in
+      eq (int64x4_first_int64 expect) (int64x4_second_int64 expect) (int64x4_third_int64 expect) (int64x4_fourth_int64 expect) (int64x4_first_int64 get) (int64x4_second_int64 get) (int64x4_third_int64 get) (int64x4_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:5 ~width:4
+      ~set:(fun i -> unboxed_nativeint_array_set_int64x4 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 1)
+  ;;
+
+  let () =
+    let a = unboxed_int32_array () in
+    let set = int32x8_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = unboxed_int32_array_get_int32x8 (unboxed_int32_array ()) i in
+      let get = unboxed_int32_array_get_int32x8 a i in
+      eq (int32x8_first_int64 expect) (int32x8_second_int64 expect) (int32x8_third_int64 expect) (int32x8_fourth_int64 expect) (int32x8_first_int64 get) (int32x8_second_int64 get) (int32x8_third_int64 get) (int32x8_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:10 ~width:8
+      ~set:(fun i -> unboxed_int32_array_set_int32x8 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 2)
+  ;;
+
+  let () =
+    let a = untagged_int16_array () in
+    let set = int16x16_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = untagged_int16_array_get_int16x16 (untagged_int16_array ()) i in
+      let get = untagged_int16_array_get_int16x16 a i in
+      eq (int16x16_first_int64 expect) (int16x16_second_int64 expect) (int16x16_third_int64 expect) (int16x16_fourth_int64 expect) (int16x16_first_int64 get) (int16x16_second_int64 get) (int16x16_third_int64 get) (int16x16_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:32 ~width:16
+      ~set:(fun i -> untagged_int16_array_set_int16x16 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 16)
+  ;;
+
+  let () =
+    let a = untagged_int8_array () in
+    let set = int8x32_of_int64s (-1L) (-1L) (-1L) (-1L) in
+    let unchanged i =
+      let expect = untagged_int8_array_get_int8x32 (untagged_int8_array ()) i in
+      let get = untagged_int8_array_get_int8x32 a i in
+      eq (int8x32_first_int64 expect) (int8x32_second_int64 expect) (int8x32_third_int64 expect) (int8x32_fourth_int64 expect) (int8x32_first_int64 get) (int8x32_second_int64 get) (int8x32_third_int64 get) (int8x32_fourth_int64 get)
+    in
+    failed_sets_write_nothing ~len:64 ~width:32
+      ~set:(fun i -> untagged_int8_array_set_int8x32 a i set)
+      ~check:(fun () -> unchanged 0; unchanged 32)
+  ;;
 end
 
 module _ = Int_arrays(struct
