@@ -41,10 +41,10 @@
     execute exactly as often.
 
     The counters are recorded during the downward traversal and when rebuilding.
-    They are read when rebuilding a switch arm (whose target may then change),
-    and once more for every arm and for the function entry when the whole body
-    has been rebuilt (the counters preserved in a loop header can be recorded
-    after a back edge into it was rebuilt). *)
+    They are read when rebuilding a switch arm, before its target can change,
+    and for the function entry when the whole body has been rebuilt. An arm
+    therefore misses the counters recorded after it was rebuilt (see
+    [Expr_builder.preserve_fdo_counters_of_collapsed_switch]). *)
 
 module Region : sig
   type t =
@@ -62,7 +62,7 @@ val add_counters : t -> Region.t -> Fdo_annotation.t -> t
 (** [region] continues into the handler of [cont], by the use [use_id] (for
     which [cont] may have been specialized). *)
 val add_successor :
-  t -> Region.t -> Continuation.t -> use_id:Apply_cont_rewrite_id.t option -> t
+  t -> Region.t -> Continuation.t -> use_id:Apply_cont_rewrite_id.t -> t
 
 (** The counters to attach to a continuation with use [use_id] (for which [cont]
     may have been specialized). *)
@@ -70,7 +70,7 @@ val counters_into_handler :
   t ->
   specialization_map:Continuation.t Continuation_callsite_map.t ->
   Continuation.t ->
-  use_id:Apply_cont_rewrite_id.t option ->
+  use_id:Apply_cont_rewrite_id.t ->
   Fdo_annotation.t
 
 (** The entry annotation of the code with the given code id, with the counters
@@ -81,10 +81,3 @@ val entry_annotation :
   Code_id.t ->
   Fdo_annotation.With_body_hash.t ->
   Fdo_annotation.With_body_hash.t
-
-(** Attach [t]'s branch counters to a rebuilt expresssion. *)
-val attach_to_switches :
-  t ->
-  specialization_map:Continuation.t Continuation_callsite_map.t ->
-  Flambda.Expr.t ->
-  Flambda.Expr.t
