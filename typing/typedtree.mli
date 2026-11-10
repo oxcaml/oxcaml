@@ -1028,8 +1028,8 @@ and module_expr_desc =
         (** The [Mode.Yielding.l] is the join of the yielding modes of the
             functor and its argument: if it is [Unyielding], applying the
             functor can never perform a free effect.
-            [Mode.Staticity.Const.t] is [Static] for template instantiations.
-            Otherwise, the application is dynamic. *)
+            [Mode.Staticity.Const.t] is [Static] for template instantiations and
+            [Dynamic] for ordinary applications. *)
   | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion

@@ -420,9 +420,11 @@ Exception: Match_failure ("", 2, 23).
 |}]
 
 (* Staticity interacts with functors as follows:
-   - non-template functors are dynamic.
-   - non-template functor applications are dynamic.
-   - instantiated template functors must be static. *)
+   - Functors with a parameter annotated as [static] are template functors,
+     otherwise they are non-template functors.
+   - Non-template functors are dynamic.
+   - Results of non-template functor applications are dynamic.
+   - Applied template functors must be static. *)
 
 (* A static functor takes a static parameter. *)
 module (F @ static) (X : sig end @ static) = struct end
@@ -592,31 +594,9 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-
-(* The functor's value is dynamic (implementation takes a
-   dynamic parameter) but its type promises a static parameter, so applying it
-   fails - even at a dynamic binding. *)
+(* A non-template functor cannot be coerced to a template functor *)
 module F : functor (X : sig end @ static) -> sig end =
   functor (X : sig end) -> struct end
-module Y = F(struct end)
-[%%expect{|
-Line 2, characters 10-37:
-2 |   functor (X : sig end) -> struct end
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         functor (X : sig end) -> sig end
-       is not included in
-         functor (X : sig end @ static) -> sig end
-       Their staticities disagree: one is a template functor
-       and the other is not.
-|}]
-
-(* [include functor] is an application, and is checked like one: the same
-   functor cannot be included either. *)
-module F : functor (X : sig end @ static) -> sig end =
-  functor (X : sig end) -> struct end
-module Y = struct include functor F end
 [%%expect{|
 Line 2, characters 10-37:
 2 |   functor (X : sig end) -> struct end
@@ -633,7 +613,7 @@ Error: Signature mismatch:
 (* The items bound by [include functor] follow the same rules
    as the result of a functor application. *)
 module M = struct
-  module F (X : sig end) = struct let x = 1 end
+  module F (X : sig end) @ static = struct let x = 1 end
   module Y = struct include functor F end
   let _ @ static = Y.x
 end
@@ -742,6 +722,7 @@ Error: Signature mismatch in included functor's parameter:
 |}]
 
 (* non-empty argument to [include functor] available with [@@ dynamic] *)
+(* CR jbachurski: fix -- [x] can be static here *)
 module M = struct
   module type F =
     functor (_ : sig val x : int end @ static) -> sig val x : int end

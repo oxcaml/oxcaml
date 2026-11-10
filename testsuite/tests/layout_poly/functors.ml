@@ -389,40 +389,7 @@ let _ =
 - : int = 1
 |}]
 
-(* Abstraction of a non-template functor with an inconsistent functor type
-   taking [@ static]. *)
-let _ =
-  let module M : sig
-    module F : functor (_ : Id @ static) -> Id
-  end = struct
-    module F (X : Id) = X
-  end in
-  (* [F] is [dynamic] because it's not defined as a template functor *)
-  let module M = M.F (struct let poly_ id x = x end) in
-  M.id 1
-[%%expect{|
-Lines 4-6, characters 8-5:
-4 | ........struct
-5 |     module F (X : Id) = X
-6 |   end...
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F : functor (X : Id) -> sig val poly_ id : 'a -> 'a end
-         end
-       is not included in
-         sig module F : Id @ static -> Id end
-       In module "F":
-       Modules do not match:
-         functor (X : Id) -> sig val poly_ id : 'a -> 'a end
-       is not included in
-         Id @ static -> Id
-       In module "F":
-       Their staticities disagree: one is a template functor
-       and the other is not.
-|}]
-
-(* Abstraction of a template functor with an inconsistent functor type
+(* Abstraction of a template functor with a weakened functor type
    returning [@ dynamic]. *)
 let _ =
   let module M : sig
