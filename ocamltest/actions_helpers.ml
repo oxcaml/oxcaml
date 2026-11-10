@@ -215,6 +215,7 @@ let run
     (can_skip : bool)
     (prog_variable : Variables.t)
     (args_variable : Variables.t option)
+    ?(environment = [||])
     (log : out_channel)
     (env : Environments.t)
   =
@@ -245,7 +246,7 @@ let run
     let expected_exit_status =
       exit_status_of_variable env Builtin_variables.exit_status
     in
-    let exit_status = run_cmd log env commandline in
+    let exit_status = run_cmd ~environment log env commandline in
     if exit_status=expected_exit_status
     then (Result.pass, env)
     else begin
@@ -255,20 +256,19 @@ let run
       else (Result.fail_with_reason reason, env)
     end
 
-(* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
-   here, for this action only, rather than in the initial environment:
-   the compilers and other tools run without them. *)
+(* [ocamlrunparam] becomes OCAMLRUNPARAM for the test program only; any
+   extra components given by -run-ocamlrunparam are appended to it, for
+   this action only. The compilers and other tools run without them. *)
 let run_program log env =
-  let env =
-    if Options.run_ocamlrunparam = "" then env
-    else begin
-      let existing =
-        Environments.safe_lookup Ocaml_variables.ocamlrunparam env in
-      let value =
-        if existing = "" then Options.run_ocamlrunparam
-        else existing ^ "," ^ Options.run_ocamlrunparam in
-      Environments.add Ocaml_variables.ocamlrunparam value env
-    end
+  let value =
+    let existing =
+      Environments.safe_lookup Builtin_variables.ocamlrunparam env in
+    if Options.run_ocamlrunparam = "" then existing
+    else if existing = "" then Options.run_ocamlrunparam
+    else existing ^ "," ^ Options.run_ocamlrunparam
+  in
+  let environment =
+    if value = "" then [||] else [| "OCAMLRUNPARAM=" ^ value |]
   in
   run
     "Running program"
@@ -276,6 +276,7 @@ let run_program log env =
     false
     Builtin_variables.program
     (Some Builtin_variables.arguments)
+    ~environment
     log env
 
 let run_script log env =
@@ -327,7 +328,16 @@ let run_hook hook_name log input_env =
   let hookenv = Environments.add
     Builtin_variables.ocamltest_response response_file input_env in
   let systemenv =
-    Environments.to_system_env hookenv in
+    (* Hook scripts (which may run the test program themselves) receive
+       OCAMLRUNPARAM like the run action does. *)
+    let environment =
+      match
+        Environments.lookup_nonempty Builtin_variables.ocamlrunparam hookenv
+      with
+      | None -> [||]
+      | Some value -> [| "OCAMLRUNPARAM=" ^ value |]
+    in
+    Environments.append_to_system_env environment hookenv in
   let timeout =
     Option.value ~default:0
       (Environments.lookup_as_int Builtin_variables.timeout input_env) in
