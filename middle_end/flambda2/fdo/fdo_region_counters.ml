@@ -142,10 +142,8 @@ let entry_annotation t ~specialization_map code_id entry_annotation =
        (counters_into t ~specialization_map (Function_entry code_id)))
 
 let attach_to_switches t ~specialization_map expr =
-  Flambda.map_applies_and_switches expr ~apply:Fun.id
-    ~switch:
-      (Fdo_term_counters.map_switch_counters ~f:(fun action counters ->
-           Fdo_annotation.combine counters
-             (counters_into_handler t ~specialization_map
-                (Apply_cont_expr.continuation action)
-                ~use_id:None)))
+  Flambda.map_fdo_counters expr ~callsite:Fun.id ~arm:(fun action counters ->
+      Fdo_annotation.combine counters
+        (counters_into_handler t ~specialization_map
+           (Apply_cont_expr.continuation action)
+           ~use_id:None))
