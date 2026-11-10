@@ -38,10 +38,6 @@ def expectedReducedRecordModule : Val := fun {Ident} =>
     -- block [.immediate 42#63],
   ]
 
-attribute [local simp]
-  Expression.join Function.join Value.join Indirection.join Block.join
-  BlockContents.join List.joinExprs List.joinValues Vector.get
-
 example : imported.implementation ⇓ expectedReducedRecordModule := by
   simp [imported]
   apply Expr.purelyEvaluatesTo.deterministicStep

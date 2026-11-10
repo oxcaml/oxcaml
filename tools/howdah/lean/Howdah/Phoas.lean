@@ -67,9 +67,11 @@ private partial def Syntax.Lambda.quote
       mkLambdaFVars xs (← f.body.quote identType env')
     let body ← withLocalDeclD `args
         (mkApp2 (mkConst ``Vector [.zero]) identType (toExpr params.length)) fun args => do
-      let xs ← (List.finRange params.length).mapM fun i =>
-        mkAppM ``Vector.get #[args, toExpr i]
-      mkLambdaFVars #[args] (mkAppN body xs.toArray)
+      let args' ← exprToSyntax args
+      let xs ← (List.range params.length).mapM fun i => do
+        elabTerm (← `($args'[$(Syntax.mkNumLit (toString i))])) none
+      synthesizeSyntheticMVarsNoPostponing
+      mkLambdaFVars #[args] (← instantiateMVars (mkAppN body xs.toArray))
     let body ← exprToSyntax body
     let additionalParams ← exprToSyntax (toExpr f.tailParams.length)
     elabTermEnsuringType

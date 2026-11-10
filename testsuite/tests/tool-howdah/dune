@@ -28,3 +28,34 @@
   (glob_files ../../../tools/howdah/lean/Howdah/*.olean))
  (action
   (run %{dep:../../../tools/howdah/lean/lean-with-flags} %{dep:Record.lean})))
+
+(rule
+ (targets even.cmi even.cmti even.cmt)
+ (deps even.mli even.ml)
+ (action
+  (run
+   %{exe:../../../main_native.exe}
+   -bin-annot
+   -stop-after
+   typing
+   -c
+   %{deps})))
+
+(rule
+ (targets even.json)
+ (mode (promote (until-clean)))
+ (action
+  (with-stdout-to
+   even.json
+   (run
+    %{exe:../../../tools/howdah/howdah.exe}
+    %{dep:even.cmi}
+    %{dep:even.cmt}))))
+
+(rule
+ (alias even)
+ (deps
+  even.json
+  (glob_files ../../../tools/howdah/lean/Howdah/*.olean))
+ (action
+  (run %{dep:../../../tools/howdah/lean/lean-with-flags} %{dep:Even.lean})))

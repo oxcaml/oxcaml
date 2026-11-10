@@ -15,23 +15,27 @@ mutual
       .ifThenElse condition.join bodyIfTrue.join bodyIfFalse.join
     | .value v => .value v.join
 
+  @[simp]
   def Value.join {Ident} :
       Value (Ident := Expression (Ident := Ident)) →
       Value (Ident := Ident)
     | .immediate i => .immediate i
     | .indirection i => .indirection i.join
 
+  @[simp]
   def Indirection.join {Ident} :
       Indirection (Ident := Expression (Ident := Ident)) →
       Indirection (Ident := Ident)
     | .immutable b => .immutable b.join
     | .mutable loc => .mutable loc
 
+  @[simp]
   def Block.join {Ident} :
       Block (Ident := Expression (Ident := Ident)) →
       Block (Ident := Ident)
     | { tag, contents } => { tag, contents := contents.join }
 
+  @[simp]
   def BlockContents.join {Ident kind} :
       BlockContents (Ident := Expression (Ident := Ident)) kind →
       BlockContents (Ident := Ident) kind
@@ -39,18 +43,21 @@ mutual
     | .bytes bytes => .bytes bytes
     | .closure .nonrecursive f => .closure .nonrecursive (Function.join f)
 
+  @[simp]
   def Function.join {Ident} :
       Function (Ident := Expression (Ident := Ident)) →
       Function (Ident := Ident)
     | { additionalParams, body } =>
       { additionalParams, body := fun args => (body (args.map .var)).join }
 
+  @[simp]
   def List.joinExprs {Ident} :
       List (Expression (Ident := Expression (Ident := Ident))) →
       List (Expression (Ident := Ident))
     | [] => []
     | e :: es => e.join :: es.joinExprs
 
+  @[simp]
   def List.joinValues {Ident} :
       List (Value (Ident := Expression (Ident := Ident))) →
       List (Value (Ident := Ident))
