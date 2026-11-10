@@ -242,26 +242,39 @@ let write_stdlib_jsir_dune_for_target ppf jsir_target =
              deps
         |> StrSet.of_list |> StrSet.to_list
       in
+      (* -S keeps the JSIR of the unit (.cm-jsir-js or .cm-jsir-wasm), with
+         which it can also be linked with -link-jsir. *)
       let action =
         run_ocamlopt
-          (sprintf "%s%s -I %%{ocaml_where} -cmi-file %s -o %s.%s -c %%{src}"
+          (sprintf
+             "%s%s -S -I %%{ocaml_where} -cmi-file %s -o %s.%s -c %%{src}"
              stdlib_flags (pp_flags ~awk_dir:stdlib_dir ~target)
              (installed (target ^ ".cmi")) target (ext "cmx"))
       in
-      rule ~ppf ~target ~exts:[ext "cmx"; ext "cmo"] ~src ~deps ~action
+      rule ~ppf ~target ~exts:[ext "cmx"; ext "cmo"; ext "cm-jsir"] ~src ~deps
+        ~action
     end);
   let modnames = setting "stdlib_modules" in
   let targets = List.map get_target modnames in
+  (* The library is created twice: for separate compilation (.cma-js or
+     .cma-wasm) and for -link-jsir (.cma-jsir-js or .cma-jsir-wasm, from the
+     JSIR of the units). Both write the same .cmxa-js or .cmxa-wasm. *)
   let action =
-    targets
-    |> List.map (fun t -> sprintf "%%{dep:%s.%s}" t (ext "cmx"))
-    |> String.concat " "
-    |> sprintf "-g -nostdlib -a -o stdlib.%s %s" (ext "cmxa")
-    |> run_ocamlopt
+    let archive flags =
+      targets
+      |> List.map (fun t -> sprintf "%%{dep:%s.%s}" t (ext "cmx"))
+      |> String.concat " "
+      |> sprintf "-g -nostdlib%s -a -o stdlib.%s %s" flags (ext "cmxa")
+      |> run_ocamlopt
+    in
+    sprintf "(progn %s %s)" (archive "") (archive " -link-jsir")
   in
-  rule ~ppf ~target:"stdlib" ~exts:[ext "cmxa"; ext "cma"]
+  rule ~ppf ~target:"stdlib" ~exts:[ext "cmxa"; ext "cma"; ext "cma-jsir"]
     ~src:(sprintf "%s/stdlib.ml" src_dir)
-    ~deps:(List.map (fun t -> t ^ "." ^ ext "cmo") targets)
+    ~deps:
+      (List.concat_map
+         (fun t -> [t ^ "." ^ ext "cmo"; t ^ "." ^ ext "cm-jsir"])
+         targets)
     ~action
 
 let write_stdlib_jsir_dune ppf =

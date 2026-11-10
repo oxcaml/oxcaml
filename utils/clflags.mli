@@ -239,9 +239,10 @@ val jsir_target_exn : unit -> Jsir_target.t
     [-target wasm_of_ocaml]) that options can be passed through to, with
     [-jsoo-opt-<phase>] (and [-jsoo-opt] for all of them):
     - [Compile]: [js_of_ocaml compile], producing a unit's [.cmo-js]
-      ([.cmo-wasm]);
+      ([.cmo-wasm]), or compiling the whole program when linking an executable
+      with [-link-jsir];
     - [Archive]: [js_of_ocaml link -a], producing a [.cma-js] ([.cma-wasm])
-      ([-a]);
+      ([-a]); not run with [-link-jsir];
     - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
     - [Link]: [js_of_ocaml link], when linking an executable. *)
 module Jsoo_phase : sig
@@ -272,6 +273,12 @@ module Jsoo_effects : sig
       for [Js] and [Jspi] for [Wasm]. *)
   val default : Jsir_target.t -> t
 end
+
+(** Whether the units of an executable are linked as JSIR into one program
+    that [js_of_ocaml] (or [wasm_of_ocaml]) compiles as a whole, instead of
+    being compiled one by one and linked by [js_of_ocaml link]. Object files
+    then hold JSIR (see [Jscomp]). *)
+val link_jsir : bool ref
 
 val set_jsoo_effects : Jsoo_effects.t -> unit
 val jsoo_effects : unit -> Jsoo_effects.t option
