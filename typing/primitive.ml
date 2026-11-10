@@ -52,10 +52,16 @@ type native_repr_or_elided = Native_repr of native_repr | Elided_void
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
 
+type mode_poly =
+  | Generic
+  | Instance of Mode.Locality.l
+  | Arbitrary
+
 type mode =
   | Prim_local
   | Prim_global
   | Prim_poly
+  | Prim_mode_poly of mode_poly
 
 (* CR-someday lmaurer: We should consider moving [prim_alloc], [prim_effects],
    and [prim_coeffects] into a variant to replace the [bool] in
@@ -406,7 +412,7 @@ let print p osig_val_decl =
   in
   let attrs_of_mode_and_repr (m, repr) =
     (match m with
-     | Prim_local | Prim_global -> []
+     | Prim_local | Prim_global | Prim_mode_poly _ -> []
      | Prim_poly -> [oattr_local_opt])
     @
     (match repr with
@@ -439,6 +445,12 @@ let print p osig_val_decl =
     oval_prims = prims;
     oval_type = add_native_repr_attributes osig_val_decl.oval_type type_attrs;
     oval_attributes = attrs }
+
+let with_modes p ~args ~res =
+  { p with
+    prim_native_repr_args =
+      List.map2 (fun mode (_, repr) -> mode, repr) args p.prim_native_repr_args;
+    prim_native_repr_res = res, snd p.prim_native_repr_res }
 
 let native_name p =
   if p.prim_native_name <> ""
