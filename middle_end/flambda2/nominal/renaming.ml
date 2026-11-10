@@ -278,24 +278,10 @@ let bind_variable t var1 =
     let bound_variables = Variable.Map.add var1 var2 t.bound_variables in
     { t with bound_variables }, var2
 
-let apply_variable_set t vars =
-  Variable.Set.fold
-    (fun var result ->
-      let var = apply_variable t var in
-      Variable.Set.add var result)
-    vars Variable.Set.empty
-
 let apply_symbol t symbol =
   match t.import_map with
   | None -> symbol
   | Some import_map -> Import_map.symbol import_map symbol
-
-let apply_symbol_set t symbols =
-  Symbol.Set.fold
-    (fun symbol result ->
-      let symbol = apply_symbol t symbol in
-      Symbol.Set.add symbol result)
-    symbols Symbol.Set.empty
 
 let apply_name t name =
   Name.pattern_match name
@@ -381,3 +367,80 @@ let value_slot_is_used t value_slot =
   match t.import_map with
   | None -> true (* N.B. not false! *)
   | Some import_map -> Import_map.value_slot_is_used import_map value_slot
+
+let not_renamed value _renaming = value
+
+let apply_set ~fold ~add ~empty ~rename_key renaming set =
+  if is_identity renaming
+  then set
+  else
+    let changed = ref false in
+    let set' =
+      fold
+        (fun key set' ->
+          let key' = rename_key renaming key in
+          if key != key' then changed := true;
+          add key' set')
+        set empty
+    in
+    if !changed then set' else set
+
+let apply_variable_set renaming variables =
+  apply_set ~fold:Variable.Set.fold ~add:Variable.Set.add
+    ~empty:Variable.Set.empty ~rename_key:apply_variable renaming variables
+
+let apply_symbol_set renaming symbols =
+  apply_set ~fold:Symbol.Set.fold ~add:Symbol.Set.add ~empty:Symbol.Set.empty
+    ~rename_key:apply_symbol renaming symbols
+
+let apply_name_set renaming names =
+  apply_set ~fold:Name.Set.fold ~add:Name.Set.add ~empty:Name.Set.empty
+    ~rename_key:apply_name renaming names
+
+let apply_code_id_set renaming code_ids =
+  apply_set ~fold:Code_id.Set.fold ~add:Code_id.Set.add ~empty:Code_id.Set.empty
+    ~rename_key:apply_code_id renaming code_ids
+
+let apply_map ~fold ~add ~empty ~rename_key ~rename_value renaming map =
+  if is_identity renaming
+  then map
+  else
+    let changed = ref false in
+    let map' =
+      fold
+        (fun key value map' ->
+          let key' = rename_key renaming key in
+          let value' = rename_value value renaming in
+          if key != key' || value != value' then changed := true;
+          add key' value' map')
+        map empty
+    in
+    if !changed then map' else map
+
+let apply_variable_map rename_value renaming map =
+  apply_map ~fold:Variable.Map.fold ~add:Variable.Map.add
+    ~empty:Variable.Map.empty ~rename_key:apply_variable ~rename_value renaming
+    map
+
+let apply_name_map rename_value renaming map =
+  apply_map ~fold:Name.Map.fold ~add:Name.Map.add ~empty:Name.Map.empty
+    ~rename_key:apply_name ~rename_value renaming map
+
+let apply_code_id_map rename_value renaming map =
+  apply_map ~fold:Code_id.Map.fold ~add:Code_id.Map.add ~empty:Code_id.Map.empty
+    ~rename_key:apply_code_id ~rename_value renaming map
+
+let apply_continuation_set renaming continuations =
+  apply_set ~fold:Continuation.Set.fold ~add:Continuation.Set.add
+    ~empty:Continuation.Set.empty ~rename_key:apply_continuation renaming
+    continuations
+
+let apply_continuation_map rename_value renaming map =
+  apply_map ~fold:Continuation.Map.fold ~add:Continuation.Map.add
+    ~empty:Continuation.Map.empty ~rename_key:apply_continuation ~rename_value
+    renaming map
+
+let apply_code_id_or_name_map rename_value renaming map =
+  apply_map ~fold:Code_id_or_name.Map.fold ~add:Code_id_or_name.Map.add
+    ~empty:Code_id_or_name.Map.empty ~rename_key:apply_code_id_or_name
+    ~rename_value renaming map

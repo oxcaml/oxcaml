@@ -240,17 +240,10 @@ module Applications = struct
     Code_id_or_name.Map.union (fun _ a b -> Some (union_bounds a b)) a b
 
   let ids_for_export t =
-    Code_id_or_name.Map.fold
-      (fun id _bounds ids -> Ids_for_export.add_code_id_or_name ids id)
-      t Ids_for_export.empty
+    Ids_for_export.ids_for_export_code_id_or_name_map Ids_for_export.no_ids t
 
   let apply_renaming t renaming =
-    Code_id_or_name.Map.fold
-      (fun id bounds t ->
-        Code_id_or_name.Map.add
-          (Renaming.apply_code_id_or_name renaming id)
-          bounds t)
-      t Code_id_or_name.Map.empty
+    Renaming.apply_code_id_or_name_map Renaming.not_renamed renaming t
 end
 
 type t =

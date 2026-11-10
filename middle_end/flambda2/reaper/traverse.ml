@@ -851,12 +851,8 @@ module Problem = struct
       } =
     Ids_for_export.union_list
       [ Global_flow_graph.ids_for_export deps;
-        Code_id.Map.fold
-          (fun code_id code_dep ids ->
-            Ids_for_export.union
-              (Ids_for_export.add_code_id ids code_id)
-              (Acc.Code_dep.ids_for_export code_dep))
-          code_deps Ids_for_export.empty;
+        Ids_for_export.ids_for_export_code_id_map Acc.Code_dep.ids_for_export
+          code_deps;
         Acc.Delayed_deps.ids_for_export delayed_deps;
         Acc.Applications.ids_for_export applications;
         Name_occurrences.ids_for_export free_names;
@@ -876,13 +872,8 @@ module Problem = struct
       } renaming =
     { deps = Global_flow_graph.apply_renaming deps renaming;
       code_deps =
-        Code_id.Map.fold
-          (fun code_id code_dep map ->
-            Code_id.Map.add
-              (Renaming.apply_code_id renaming code_id)
-              (Acc.Code_dep.apply_renaming code_dep renaming)
-              map)
-          code_deps Code_id.Map.empty;
+        Renaming.apply_code_id_map Acc.Code_dep.apply_renaming renaming
+          code_deps;
       delayed_deps = Acc.Delayed_deps.apply_renaming delayed_deps renaming;
       applications = Acc.Applications.apply_renaming applications renaming;
       free_names = Name_occurrences.apply_renaming free_names renaming;
@@ -911,30 +902,16 @@ module Skeleton = struct
         continuation_info;
         metadata
       } =
-    let ids = Rev_expr.ids_for_export toplevel_expr in
-    let ids =
-      Code_id.Map.fold
-        (fun code_id rev_code ids ->
-          Ids_for_export.union
-            (Ids_for_export.add_code_id ids code_id)
-            (Rev_expr.Rev_code.ids_for_export rev_code))
-        code ids
-    in
-    let ids = Array.fold_left Ids_for_export.add_code_id ids ordered_code_ids in
-    let ids =
-      Continuation.Set.fold
-        (fun cont ids -> Ids_for_export.add_continuation ids cont)
-        fixed_arity_continuations ids
-    in
-    let ids =
-      Ids_for_export.union ids (Flambda_unit.Metadata.ids_for_export metadata)
-    in
-    Continuation.Map.fold
-      (fun cont info ids ->
-        Ids_for_export.union
-          (Ids_for_export.add_continuation ids cont)
-          (Acc.Continuation_info.ids_for_export info))
-      continuation_info ids
+    Ids_for_export.union_list
+      [ Rev_expr.ids_for_export toplevel_expr;
+        Ids_for_export.ids_for_export_code_id_map
+          Rev_expr.Rev_code.ids_for_export code;
+        Array.fold_left Ids_for_export.add_code_id Ids_for_export.empty
+          ordered_code_ids;
+        Ids_for_export.ids_for_export_continuation_set fixed_arity_continuations;
+        Flambda_unit.Metadata.ids_for_export metadata;
+        Ids_for_export.ids_for_export_continuation_map
+          Acc.Continuation_info.ids_for_export continuation_info ]
 
   let apply_renaming
       { toplevel_expr;
@@ -946,31 +923,17 @@ module Skeleton = struct
       } renaming =
     let toplevel_expr = Rev_expr.apply_renaming toplevel_expr renaming in
     let code =
-      Code_id.Map.fold
-        (fun code_id rev_code code ->
-          Code_id.Map.add
-            (Renaming.apply_code_id renaming code_id)
-            (Rev_expr.Rev_code.apply_renaming rev_code renaming)
-            code)
-        code Code_id.Map.empty
+      Renaming.apply_code_id_map Rev_expr.Rev_code.apply_renaming renaming code
     in
     let ordered_code_ids =
       Array.map (Renaming.apply_code_id renaming) ordered_code_ids
     in
     let fixed_arity_continuations =
-      Continuation.Set.fold
-        (fun cont conts ->
-          Continuation.Set.add (Renaming.apply_continuation renaming cont) conts)
-        fixed_arity_continuations Continuation.Set.empty
+      Renaming.apply_continuation_set renaming fixed_arity_continuations
     in
     let continuation_info =
-      Continuation.Map.fold
-        (fun cont info map ->
-          Continuation.Map.add
-            (Renaming.apply_continuation renaming cont)
-            (Acc.Continuation_info.apply_renaming info renaming)
-            map)
-        continuation_info Continuation.Map.empty
+      Renaming.apply_continuation_map Acc.Continuation_info.apply_renaming
+        renaming continuation_info
     in
     let metadata = Flambda_unit.Metadata.apply_renaming metadata renaming in
     { toplevel_expr;

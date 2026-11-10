@@ -117,6 +117,44 @@ let union t1 t2 =
 let rec union_list ts =
   match ts with [] -> empty | t :: ts -> union t (union_list ts)
 
+let no_ids _ = empty
+
+let ids_for_export_set ~fold ~add_ids_key set =
+  fold (fun key ids -> add_ids_key ids key) set empty
+
+let ids_for_export_map ~fold ~add_ids_key ~ids_for_export_value map =
+  fold
+    (fun key value ids ->
+      union ids (add_ids_key (ids_for_export_value value) key))
+    map empty
+
+let ids_for_export_name_set names =
+  ids_for_export_set ~fold:Name.Set.fold ~add_ids_key:add_name names
+
+let ids_for_export_code_id_set code_ids = create ~code_ids ()
+
+let ids_for_export_continuation_set continuations = create ~continuations ()
+
+let ids_for_export_variable_map ids_for_export_value map =
+  ids_for_export_map ~fold:Variable.Map.fold ~add_ids_key:add_variable
+    ~ids_for_export_value map
+
+let ids_for_export_name_map ids_for_export_value map =
+  ids_for_export_map ~fold:Name.Map.fold ~add_ids_key:add_name
+    ~ids_for_export_value map
+
+let ids_for_export_code_id_map ids_for_export_value map =
+  ids_for_export_map ~fold:Code_id.Map.fold ~add_ids_key:add_code_id
+    ~ids_for_export_value map
+
+let ids_for_export_continuation_map ids_for_export_value map =
+  ids_for_export_map ~fold:Continuation.Map.fold ~add_ids_key:add_continuation
+    ~ids_for_export_value map
+
+let ids_for_export_code_id_or_name_map ids_for_export_value map =
+  ids_for_export_map ~fold:Code_id_or_name.Map.fold
+    ~add_ids_key:add_code_id_or_name ~ids_for_export_value map
+
 module Table_data = struct
   type ids = t
 
