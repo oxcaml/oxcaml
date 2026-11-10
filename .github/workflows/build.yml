@@ -346,11 +346,7 @@ jobs:
           if [[ -n "$MATRIX_CC" ]]; then
             export CC="$MATRIX_CC"
           fi
-          if [[ -n "$INSTALL_PATH" ]]; then
-            install_path="$INSTALL_PATH"
-          else
-            install_path="_install"
-          fi
+          install_path="${INSTALL_PATH:-_install}"
           dissector_config=""
           if [[ "$DISSECTOR_ASSEMBLER" == "true" ]]; then
             dissector_config="--enable-assembler-suitable-for-dissector=$GITHUB_WORKSPACE/oxcaml-llvm/bin/llvm-mc"
@@ -389,14 +385,7 @@ jobs:
       - name: Build OxCaml
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
         id: build
-        run: |
-          if [ "$COLLECT_METRICS" = "true" ]; then
-            mkdir $GITHUB_WORKSPACE/_profile_csv
-            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
-            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
-          fi
-          ulimit -c unlimited
-          make compiler
+        run: bash tools/ci/actions/run-make-target.sh compiler
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
@@ -410,13 +399,7 @@ jobs:
 
       - name: Run OxCaml testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
-        run: |
-          if [ "$COLLECT_METRICS" = "true" ]; then
-            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
-            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
-          fi
-          ulimit -c unlimited
-          make runtest
+        run: bash tools/ci/actions/run-make-target.sh runtest
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
@@ -426,13 +409,7 @@ jobs:
 
       - name: Run upstream testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
-        run: |
-          if [ "$COLLECT_METRICS" = "true" ]; then
-            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
-            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
-          fi
-          ulimit -c unlimited
-          make runtest-upstream
+        run: bash tools/ci/actions/run-make-target.sh runtest-upstream
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
@@ -448,13 +425,7 @@ jobs:
 
       - name: Run minimizer
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
-        run: |
-          if [ "$COLLECT_METRICS" = "true" ]; then
-            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
-            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
-          fi
-          ulimit -c unlimited
-          make minimizer
+        run: bash tools/ci/actions/run-make-target.sh minimizer
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
@@ -477,16 +448,7 @@ jobs:
         # Compute the diff for an arbitrary job, we expect all to have the same diff
         if: failure() && matrix.name == 'default (x86_64-linux)'
         continue-on-error: true
-        run: |
-          make promote-failed
-          if ! git diff --quiet; then
-            git diff > $GITHUB_WORKSPACE/test-diffs.patch
-            echo "Test output differences detected and saved to artifact"
-            echo "DIFF_CREATED=true" >> $GITHUB_ENV
-          else
-            echo "No test output differences found"
-            echo "DIFF_CREATED=false" >> $GITHUB_ENV
-          fi
+        run: bash tools/ci/actions/promote-and-capture-diff.sh promote-failed
 
       - name: Build and test OxCaml DWARF
         if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
@@ -499,16 +461,7 @@ jobs:
       - name: Promote failed DWARF tests and capture diffs
         if: failure() && matrix.dwarf_tests_only == true
         continue-on-error: true
-        run: |
-          make promote
-          if ! git diff --quiet; then
-            git diff > $GITHUB_WORKSPACE/test-diffs.patch
-            echo "Test output differences detected and saved to artifact"
-            echo "DIFF_CREATED=true" >> $GITHUB_ENV
-          else
-            echo "No test output differences found"
-            echo "DIFF_CREATED=false" >> $GITHUB_ENV
-          fi
+        run: bash tools/ci/actions/promote-and-capture-diff.sh promote
 
       - name: Build and test OxCaml Llvmize
         if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
@@ -521,16 +474,7 @@ jobs:
       - name: Promote failed llvmize tests and capture diffs
         if: failure() && matrix.llvmize_tests_only == true
         continue-on-error: true
-        run: |
-          make promote
-          if ! git diff --quiet; then
-            git diff > $GITHUB_WORKSPACE/test-diffs.patch
-            echo "Test output differences detected and saved to artifact"
-            echo "DIFF_CREATED=true" >> $GITHUB_ENV
-          else
-            echo "No test output differences found"
-            echo "DIFF_CREATED=false" >> $GITHUB_ENV
-          fi
+        run: bash tools/ci/actions/promote-and-capture-diff.sh promote
 
       - name: Upload test diffs
         if: failure() && env.DIFF_CREATED == 'true'
@@ -569,11 +513,7 @@ jobs:
         env:
           INSTALL_PATH: ${{ matrix.install_path }}
         run: |
-          if [[ -n "$INSTALL_PATH" ]]; then
-            install_path="$INSTALL_PATH"
-          else
-            install_path="_install"
-          fi
+          install_path="${INSTALL_PATH:-_install}"
           make debug || exit 1
           $install_path/bin/ocamldebug $install_path/bin/ocamlc <<< ""
 
