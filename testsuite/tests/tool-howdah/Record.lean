@@ -43,25 +43,25 @@ example : imported.implementation ⇓ expectedReducedRecordModule := by
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .letBindingBody
   · sorry
-  unfold Hole.substitute; simp
+  simp
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .letBindingBody
   · sorry
-  unfold Hole.substitute; simp
+  simp
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .letBindingBound (.letBindingBound .function)
   · sorry
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .letBindingBound .letBindingBody
   · sorry
-  unfold Hole.substitute; simp
+  simp
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .letBindingBound (.letBindingBound .function)
   · sorry
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .letBindingBound .letBindingBody
   · sorry
-  unfold Hole.substitute; simp
+  simp
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .letBindingBound
       (.primWithArgumentsReady (.cons (.cons .nil)) (.makeBlock rfl))
@@ -69,7 +69,7 @@ example : imported.implementation ⇓ expectedReducedRecordModule := by
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .letBindingBody
   · sorry
-  unfold Hole.substitute; simp
+  simp
   apply Expr.purelyEvaluatesTo.deterministicStep
   · exact .primWithArgumentsReady (.cons .nil) (.makeBlock rfl)
   · sorry

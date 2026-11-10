@@ -69,6 +69,8 @@ end
 def Hole.substitute (value : Val) (hole : Hole) : Expr := fun {Ident} =>
   (hole (Ident := Expression (Ident := Ident)) (.value value)).join
 
+attribute [simp] Hole.substitute.eq_unfold
+
 inductive List.allValues :
     List Expr →
     List Val →
