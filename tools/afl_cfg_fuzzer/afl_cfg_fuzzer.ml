@@ -28,10 +28,12 @@ let default_max_nodes = 256
 external abort : unit -> unit = "afl_cfg_fuzzer_abort"
 
 (* When [true], nodes unreachable from the entry are removed before building the
-   CFG, matching the validators' no-dead-code precondition. Setting it to
-   [false] is useful to check that fuzzing finds the known disagreement between
-   [Cfg_dominators] (which handles dead code, per component) and its validator
-   (which only derives immediate dominators for reachable nodes). *)
+   CFG, matching the validators' no-dead-code precondition. This is deliberately
+   not a command-line option: the absence of dead code is expected to become a
+   CFG invariant. Setting it to [false] is useful to check that fuzzing finds the
+   known disagreement between [Cfg_dominators] (which handles dead code, per
+   component) and its validator (which only derives immediate dominators for
+   reachable nodes). *)
 let prune_unreachable_nodes = true
 
 let crash graph ~keep message =
