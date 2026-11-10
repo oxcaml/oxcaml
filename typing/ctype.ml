@@ -7225,7 +7225,7 @@ let moregeneral_slow ~self_check env inst_nongen
 
 
 let moregeneral ~self_check env inst_nongen
-    pat_sch_sorts subj_sch_sorts pat_sch subst subj_sch =
+    pat_sch_sorts subj_sch_sorts pat_sch subst subj_sch subst_subj_sch =
   (* The fast path does not handle layout-polymorphic schemes, so only try it
      when there are no sort variables on either side. *)
   let fast =
@@ -7233,19 +7233,15 @@ let moregeneral ~self_check env inst_nongen
     | [], [] -> moregeneral_fast env pat_sch subst subj_sch
     | _, _ -> false
   in
-  if fast then [], None
+  if fast then []
   else
-    let subj_sch = Subst.type_expr subst subj_sch in
-    let tc_args =
-      moregeneral_slow ~self_check env inst_nongen
-        pat_sch_sorts subj_sch_sorts pat_sch subj_sch
-    in
-    tc_args, Some subj_sch
+    moregeneral_slow ~self_check env inst_nongen
+      pat_sch_sorts subj_sch_sorts pat_sch (Lazy.force subst_subj_sch)
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
     moregeneral ~self_check:false env inst_nongen [] []
-      pat_sch Subst.identity subj_sch
+      pat_sch Subst.identity subj_sch (Lazy.from_val subj_sch)
   with
   | _ -> true
   | exception Moregen _ -> false
