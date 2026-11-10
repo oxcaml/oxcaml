@@ -45,7 +45,7 @@ open Arch
 
 let types_are_compatible left right =
   match left.typ, right.typ with
-  | (Int | Val | Addr| Code_pointer), (Int | Val | Addr| Code_pointer)
+  | (Int | Val | Addr | Code_pointer), (Int | Val | Addr | Code_pointer)
   | Float, Float -> true
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
