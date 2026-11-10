@@ -211,17 +211,17 @@ let write_stdlib_jsir_sources_dune ppf =
 type jsir_target =
   { program : string; (* the value of -target *)
     env_var : string; (* where ocamlopt finds [program] *)
-    ext_prefix : string }
+    ext_suffix : string }
 
 let jsir_targets =
   [ { program = "js_of_ocaml"; env_var = "OXCAML_JS_OF_OCAML";
-      ext_prefix = "cmj" };
+      ext_suffix = "js" };
     { program = "wasm_of_ocaml"; env_var = "OXCAML_WASM_OF_OCAML";
-      ext_prefix = "cmw" } ]
+      ext_suffix = "wasm" } ]
 
 let write_stdlib_jsir_dune_for_target ppf jsir_target =
   let src_dir = "../src" and stdlib_dir = "../../stdlib" in
-  let ext suffix = jsir_target.ext_prefix ^ suffix in
+  let ext base = base ^ "-" ^ jsir_target.ext_suffix in
   let run_ocamlopt args =
     sprintf "(setenv %s %%{bin:%s} (run %%{ocamlopt} -target %s %s))"
       jsir_target.env_var jsir_target.program jsir_target.program args
@@ -236,7 +236,7 @@ let write_stdlib_jsir_dune_for_target ppf jsir_target =
         installed (target ^ ".cmi")
         :: List.map (fun dep ->
              match Filename.extension dep with
-             | ".cmx" -> Filename.remove_extension dep ^ "." ^ ext "x"
+             | ".cmx" -> Filename.remove_extension dep ^ "." ^ ext "cmx"
              | ".cmi" -> installed dep
              | s -> failwith ("Unexpected extension " ^ s))
              deps
@@ -246,22 +246,22 @@ let write_stdlib_jsir_dune_for_target ppf jsir_target =
         run_ocamlopt
           (sprintf "%s%s -I %%{ocaml_where} -cmi-file %s -o %s.%s -c %%{src}"
              stdlib_flags (pp_flags ~awk_dir:stdlib_dir ~target)
-             (installed (target ^ ".cmi")) target (ext "x"))
+             (installed (target ^ ".cmi")) target (ext "cmx"))
       in
-      rule ~ppf ~target ~exts:[ext "x"; ext "o"] ~src ~deps ~action
+      rule ~ppf ~target ~exts:[ext "cmx"; ext "cmo"] ~src ~deps ~action
     end);
   let modnames = setting "stdlib_modules" in
   let targets = List.map get_target modnames in
   let action =
     targets
-    |> List.map (fun t -> sprintf "%%{dep:%s.%s}" t (ext "x"))
+    |> List.map (fun t -> sprintf "%%{dep:%s.%s}" t (ext "cmx"))
     |> String.concat " "
-    |> sprintf "-g -nostdlib -a -o stdlib.%s %s" (ext "xa")
+    |> sprintf "-g -nostdlib -a -o stdlib.%s %s" (ext "cmxa")
     |> run_ocamlopt
   in
-  rule ~ppf ~target:"stdlib" ~exts:[ext "xa"; ext "a"]
+  rule ~ppf ~target:"stdlib" ~exts:[ext "cmxa"; ext "cma"]
     ~src:(sprintf "%s/stdlib.ml" src_dir)
-    ~deps:(List.map (fun t -> t ^ "." ^ ext "o") targets)
+    ~deps:(List.map (fun t -> t ^ "." ^ ext "cmo") targets)
     ~action
 
 let write_stdlib_jsir_dune ppf =

@@ -122,7 +122,7 @@ let options =
   in
   let input_file =
     let doc =
-      "Compile the bytecode program or JSIR file (.cmj) [$(docv)]. "
+      "Compile the bytecode program or JSIR file (.cm-jsir-js) [$(docv)]. "
       ^ "Use '-' to read from the standard input instead."
     in
     Arg.(value & pos ~rev:true 0 (some filepath) None & info [] ~docv:"PROGRAM" ~doc)
@@ -334,10 +334,11 @@ let options =
         let input =
           match input_file with
           | Some "-" -> `Bytecode_stdin
-          | Some x when Filename.check_suffix x ".cmj" || Filename.check_suffix x ".cmw"
-            ->
-              (* [.cmw] files are for wasm_of_ocaml, but reading them reports a clear
-                 error. *)
+          | Some x
+            when Filename.check_suffix x ".cm-jsir-js"
+                 || Filename.check_suffix x ".cm-jsir-wasm" ->
+              (* [.cm-jsir-wasm] files are for wasm_of_ocaml, but reading them reports a
+                 clear error. *)
               `Jsir_file x
           | Some x -> `Bytecode_file x
           | None -> `None
