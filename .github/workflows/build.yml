@@ -110,7 +110,6 @@ jobs:
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
-            sysdeps: gdb
 
           - name: debug regalloc (aarch64-darwin)
             config: --disable-warn-error
@@ -120,7 +119,6 @@ jobs:
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
             run_regalloc_tool: true
-            sysdeps: gdb
 
           - name: regalloc (aarch64-linux)
             config: --disable-warn-error
@@ -241,10 +239,6 @@ jobs:
             ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
             disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/basic-modules/recursive_module_init.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/simplify/variant_unboxing.ml'
             sysdeps: gdb
-
-    env:
-      J: "8"
-      run_testsuite: "true"
 
     steps:
       - name: Checkout the OxCaml repo
@@ -402,8 +396,7 @@ jobs:
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
           ulimit -c unlimited
-          make compiler \
-            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+          make compiler
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
@@ -423,8 +416,7 @@ jobs:
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
           ulimit -c unlimited
-          make runtest \
-            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+          make runtest
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
@@ -440,8 +432,7 @@ jobs:
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
           ulimit -c unlimited
-          make runtest-upstream \
-            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+          make runtest-upstream
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
@@ -463,8 +454,7 @@ jobs:
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
           ulimit -c unlimited
-          make minimizer \
-            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+          make minimizer
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
@@ -488,7 +478,6 @@ jobs:
         if: failure() && matrix.name == 'default (x86_64-linux)'
         continue-on-error: true
         run: |
-          export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
           make promote-failed
           if ! git diff --quiet; then
             git diff > $GITHUB_WORKSPACE/test-diffs.patch
@@ -511,7 +500,6 @@ jobs:
         if: failure() && matrix.dwarf_tests_only == true
         continue-on-error: true
         run: |
-          export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
           make promote
           if ! git diff --quiet; then
             git diff > $GITHUB_WORKSPACE/test-diffs.patch
@@ -534,7 +522,6 @@ jobs:
         if: failure() && matrix.llvmize_tests_only == true
         continue-on-error: true
         run: |
-          export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
           make promote
           if ! git diff --quiet; then
             git diff > $GITHUB_WORKSPACE/test-diffs.patch
