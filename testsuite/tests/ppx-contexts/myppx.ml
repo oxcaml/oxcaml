@@ -11,12 +11,22 @@ let () =
       Printf.eprintf "tool_name: %S\n"
         (tool_name ());
       (*
-         (* Note: we do not test include_dirs, load_path
-            as they produce non-portable paths *)
-      Printf.eprintf "include_dirs: [%s]\n"
-        (quote_strings !Clflags.include_dirs);
-      Printf.eprintf "load_path: [%s]\n"
-        (quote_strings !Config.load_path);
+         (* Note: we do not test include_dirs, hidden_include_dirs, load_path
+         as they produce non-portable paths. *)
+      let quote_dirs dirs =
+        List.map
+          (fun (d : Clflags.include_dir) ->
+            Printf.sprintf "%S%s" d.path
+              (if d.cmx_guaranteed then "(x)" else ""))
+          dirs
+        |> String.concat " "
+      in
+      Printf.eprintf "include_dirs: [%s]\n" (quote_dirs !Clflags.include_dirs);
+      Printf.eprintf "hidden_include_dirs: [%s]\n"
+        (quote_dirs !Clflags.hidden_include_dirs);
+      let Load_path.{ visible; hidden } = Load_path.get_paths () in
+      Printf.eprintf "load_path.visible: [%s]\n" (quote_dirs visible);
+      Printf.eprintf "load_path.hidden: [%s]\n" (quote_dirs hidden);
       *)
       let quote_open_arg : Clflags.open_arg -> string = function
         | Open s -> Printf.sprintf "Open(%S)" s
