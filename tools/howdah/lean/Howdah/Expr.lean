@@ -140,6 +140,38 @@ def Expr.prim (p : Primitive) (args : List Expr) : Expr :=
   fun {Ident} => Expression.prim p (args.map fun e => e (Ident := Ident))
 
 @[simp]
+def Expr.apply (func : Expr) (args : List Expr) : Expr :=
+  fun {Ident} =>
+    Expression.apply (func (Ident := Ident)) (args.map fun e => e (Ident := Ident))
+
+@[simp]
+def Expr.ifThenElse (condition bodyIfTrue bodyIfFalse : Expr) : Expr :=
+  fun {Ident} => Expression.ifThenElse (condition (Ident := Ident))
+    (bodyIfTrue (Ident := Ident)) (bodyIfFalse (Ident := Ident))
+
+@[simp]
+def Val.immediate (bits : BitVec 63) : Val :=
+  fun {Ident} => Value.immediate (Ident := Ident) { bitsAboveLsb := bits }
+
+@[simp]
+def Val.values (fields : List Val) : Val :=
+  fun {Ident} => Value.indirection (.immutable {
+    tag := 0,
+    contents := .values (fields.map fun v => v (Ident := Ident)),
+  })
+
+@[simp] abbrev Body (arity : Nat) :=
+  ∀ {Ident}, Vector Ident arity.succ → Expression (Ident := Ident)
+
+@[simp]
+def Val.closure (arity : Nat) (body : Body arity) : Val :=
+  fun {Ident} => Value.indirection (.immutable {
+    tag := 247,
+    contents := .closure .nonrecursive
+      { additionalParams := arity, body := body (Ident := Ident) },
+  })
+
+@[simp]
 def Val.indirection (indirect : Indirect) : Val :=
   fun {Ident} => Value.indirection (Ident := Ident) indirect
 

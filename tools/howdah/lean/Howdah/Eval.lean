@@ -89,6 +89,30 @@ inductive Primitive.stepsTo : Primitive → List Val → Val → Prop where
       (thisIsABlockOfValues : Blk.values? tag args = .some block)
       : (Primitive.makeBlock tag).stepsTo args
           (Val.indirection (Indirect.immutable block))
+  | field
+      {index} {fields : List Val} {field block : Val}
+      (isABlockOfValues : @block = @Val.values fields)
+      (inRange : fields[index]? = .some @field)
+      : (Primitive.field index).stepsTo [@block] @field
+  | physEqualImmediates
+      {lhs rhs : BitVec 63}
+      : Primitive.physEqual.stepsTo [Val.immediate lhs, Val.immediate rhs]
+          (Val.immediate (if lhs = rhs then 1 else 0))
+  | intModNonzero
+      {dividend divisor : BitVec 63}
+      (nonzero : divisor ≠ 0)
+      : Primitive.intMod.stepsTo [Val.immediate dividend, Val.immediate divisor]
+          (Val.immediate (dividend.srem divisor))
+
+@[simp]
+def Body.substitute {arity} (values : List Val)
+    (exactArity : values.length = arity.succ) (body : Body arity) : Expr :=
+  fun {Ident} =>
+    let args := values.map fun v => Expression.value (v (Ident := Ident))
+    (body (Ident := Expression (Ident := Ident))
+      ⟨args.toArray, by simp [args, exactArity]⟩).join
+
+attribute [simp] Body.substitute.eq_unfold
 
 mutual
   inductive Expr.stepsTo : Expr → Expr → Prop where
@@ -110,6 +134,27 @@ mutual
     | primArgs {args args' : List Expr}
         (step : args.oneArgumentStepsTo args') {p}
         : (@Expr.prim p args).stepsTo (Expr.prim p args')
+    | applyArgs {args args' : List Expr}
+        (step : args.oneArgumentStepsTo args') {func}
+        : (@Expr.apply func args).stepsTo (Expr.apply func args')
+    | applyFunc {func func' : Expr}
+        (step : func.stepsTo func') {args}
+        : (@Expr.apply func args).stepsTo (Expr.apply func' args)
+    | applyClosure {args values}
+        (argsReady : args.allValues values) {arity body}
+        (exactArity : values.length = arity.succ)
+        : (@Expr.apply (Expr.value (Val.closure arity body)) args).stepsTo
+            (Body.substitute values exactArity body)
+    | ifThenElseCondition {condition condition' : Expr}
+        (step : condition.stepsTo condition') {bodyIfTrue bodyIfFalse}
+        : (@Expr.ifThenElse condition bodyIfTrue bodyIfFalse).stepsTo
+            (Expr.ifThenElse condition' bodyIfTrue bodyIfFalse)
+    | ifThenElseFalse {bodyIfTrue bodyIfFalse}
+        : (@Expr.ifThenElse (Expr.value (Val.immediate 0))
+            bodyIfTrue bodyIfFalse).stepsTo bodyIfFalse
+    | ifThenElseTrue {bits} (nonzero : bits ≠ 0) {bodyIfTrue bodyIfFalse}
+        : (@Expr.ifThenElse (Expr.value (Val.immediate bits))
+            bodyIfTrue bodyIfFalse).stepsTo bodyIfTrue
 
   -- Note that argument evaluation order is unspecified.
   inductive List.oneArgumentStepsTo : List Expr → List Expr → Prop where

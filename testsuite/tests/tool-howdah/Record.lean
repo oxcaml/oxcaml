@@ -1,5 +1,5 @@
 import Howdah.Import
-import Howdah.Eval
+import Howdah.Determinism
 
 @[simp]
 def imported := howdah% "record.json"
@@ -40,37 +40,14 @@ def expectedReducedRecordModule : Val := fun {Ident} =>
 
 example : imported.implementation ⇓ expectedReducedRecordModule := by
   simp [imported]
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .letBindingBody
-  · sorry
-  simp
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .letBindingBody
-  · sorry
-  simp
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .letBindingBound (.letBindingBound .function)
-  · sorry
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .letBindingBound .letBindingBody
-  · sorry
-  simp
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .letBindingBound (.letBindingBound .function)
-  · sorry
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .letBindingBound .letBindingBody
-  · sorry
-  simp
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .letBindingBound
-      (.primWithArgumentsReady (.cons (.cons .nil)) (.makeBlock rfl))
-  · sorry
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .letBindingBody
-  · sorry
-  simp
-  apply Expr.purelyEvaluatesTo.deterministicStep
-  · exact .primWithArgumentsReady (.cons .nil) (.makeBlock rfl)
-  · sorry
+  howdah_step Deterministic.letBindingBody
+  howdah_step Deterministic.letBindingBody
+  howdah_step Deterministic.letBindingBound (Deterministic.letBindingBound Deterministic.function)
+  howdah_step Deterministic.letBindingBound Deterministic.letBindingBody
+  howdah_step Deterministic.letBindingBound (Deterministic.letBindingBound Deterministic.function)
+  howdah_step Deterministic.letBindingBound Deterministic.letBindingBody
+  howdah_step Deterministic.letBindingBound
+    (Deterministic.primWithArgumentsReady (.cons (.cons .nil)) (.makeBlock rfl))
+  howdah_step Deterministic.letBindingBody
+  howdah_step Deterministic.primWithArgumentsReady (.cons .nil) (.makeBlock rfl)
   exact .alreadyValue

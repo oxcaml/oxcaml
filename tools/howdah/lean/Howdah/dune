@@ -13,23 +13,6 @@
    %{dep:Syntax.lean})))
 
 (rule
- (targets Import.olean)
- (deps
-  (sandbox preserve_file_kind)
-  Import.lean
-  Syntax.olean
-  Expr.olean
-  Phoas.olean)
- (action
-  (run
-   %{dep:../lean-with-flags}
-   -R
-   ..
-   -o
-   %{targets}
-   %{dep:Import.lean})))
-
-(rule
  (targets Expr.olean)
  (deps
   (sandbox preserve_file_kind)
@@ -60,6 +43,23 @@
    %{dep:Phoas.lean})))
 
 (rule
+ (targets Import.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Import.lean
+  Syntax.olean
+  Expr.olean
+  Phoas.olean)
+ (action
+  (run
+   %{dep:../lean-with-flags}
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Import.lean})))
+
+(rule
  (targets Eval.olean)
  (deps
   (sandbox preserve_file_kind)
@@ -73,3 +73,19 @@
    -o
    %{targets}
    %{dep:Eval.lean})))
+
+(rule
+ (targets Determinism.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Determinism.lean
+  Expr.olean
+  Eval.olean)
+ (action
+  (run
+   %{dep:../lean-with-flags}
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Determinism.lean})))
