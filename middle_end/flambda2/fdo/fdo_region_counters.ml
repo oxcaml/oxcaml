@@ -54,15 +54,17 @@ module Region = struct
   end)
 end
 
-(* A [Use.t] is a successor of a [Region.t]. *)
+(* A [Use.t] is the (unique) successor of a [Region.t]. *)
 module Use = struct
   type t =
     { cont : Continuation.t;
+          (* This is the unique continuation called at the end of a region,
+             either via an [Apply_cont] or an [Apply]'s return continuation. *)
       use_id : Apply_cont_rewrite_id.t option
+          (* We use this to look up the specialized version of [cont] in a
+             [specialization_map] if it has been specialized. *)
     }
 
-  (* The handler of a continuation specialized for some of its uses is that of
-     the specialized continuation. *)
   let handler { cont; use_id } ~specialization_map : Region.t =
     match use_id with
     | None -> Handler cont
@@ -111,8 +113,8 @@ module Visit = struct
   let empty = { visited = Region.Set.empty; counters = Fdo_annotation.empty }
 end
 
-(* Regions can continue into each other in a cycle (a loop that never branches),
-   hence [visited]. *)
+(* Regions can continue into each other in a cycle (consider [let loop () = f
+   (); loop ()]), hence [visited]. *)
 let counters_into t ~specialization_map region =
   let rec visit region ({ visited; counters } : Visit.t) =
     if Region.Set.mem region visited
