@@ -14,7 +14,6 @@
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-open! Int_replace_polymorphic_compare
 open Asm_targets
 open Dwarf_high
 module DAH = Dwarf_attribute_helpers
@@ -64,16 +63,8 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
         | Some file -> file
         | None -> file
       in
-      let attributes = [DAH.create_decl_file (get_file_id file)] in
-      if line < 0
-      then attributes
-      else if startchar < 0
-      then DAH.create_decl_line line :: attributes
-      else
-        (* Both line and startchar are >= 0 *)
-        DAH.create_decl_line line
-        :: DAH.create_decl_column startchar
-        :: attributes
+      DAH.create_decl_line_and_column ~line ~column:startchar
+      @ [DAH.create_decl_file (get_file_id file)]
   in
   let _abstract_instance_root_proto_die, _abstract_instance_root_symbol =
     (* Add the abstract instance root for this function *)
