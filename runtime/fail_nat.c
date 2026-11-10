@@ -114,9 +114,12 @@ CAMLno_asan void caml_raise_async(value v)
   CAMLassert(!Is_exception_result(v));
 
   /* Free stacks until we get back to the stack on which the async exn
-     handler lives.  (Note that we cannot cross a C stack chunk, since
-     installation of such a chunk via the callback mechanism always involves
-     the installation of an async exn handler.) */
+     handler lives, using the same logic as SWITCH_OCAML_STACKS.  (Note that
+     we cannot cross a C stack chunk, since installation of such a chunk via
+     the callback mechanism always involves the installation of an async exn
+     handler.) */
+  Caml_state->current_stack->local_sp = Caml_state->local_sp;
+
   int found_async_exn_handler_stack = 0;
   while (!found_async_exn_handler_stack && Caml_state->current_stack != NULL) {
     struct stack_info* current_stack = Caml_state->current_stack;
