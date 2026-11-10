@@ -223,9 +223,6 @@ module Z3 = struct
     Buffer.contents buffer
 end
 
-let check_idom (cfg : Cfg.t) expected =
-  Internal.validate (Cfg_validation_facts.Graph.create cfg) expected
-
 let fallback cfg internal_failure z3_code =
   let z3_result = Cfg_z3.run_validation_fallback z3_code in
   Misc.fatal_errorf
@@ -247,3 +244,8 @@ let validate_idom (cfg : Cfg.t) expected =
         (Printexc.raw_backtrace_to_string backtrace)
     in
     fallback cfg error (z3_code ())
+
+module For_testing = struct
+  let check_idom (cfg : Cfg.t) expected =
+    Internal.validate (Cfg_validation_facts.Graph.create cfg) expected
+end

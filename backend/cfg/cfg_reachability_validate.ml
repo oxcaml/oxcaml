@@ -128,9 +128,6 @@ module Z3 = struct
     Buffer.contents buffer
 end
 
-let check_reachability (cfg : Cfg.t) =
-  Internal.validate (Cfg_validation_facts.Graph.create cfg)
-
 let fallback cfg internal_failure z3_code =
   let z3_result = Cfg_z3.run_validation_fallback z3_code in
   Misc.fatal_errorf
@@ -151,3 +148,8 @@ let validate_reachability (cfg : Cfg.t) =
         (Printexc.raw_backtrace_to_string backtrace)
     in
     fallback cfg error (z3_code ())
+
+module For_testing = struct
+  let check_reachability (cfg : Cfg.t) =
+    Internal.validate (Cfg_validation_facts.Graph.create cfg)
+end

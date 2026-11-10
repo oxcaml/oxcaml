@@ -20,8 +20,7 @@ val is_dominating : t -> Label.t -> Label.t -> bool
 
 (** [is_strictly_dominating doms x y] is [true] iff [x] is strictly dominating
     [y] according to [doms]. That is, [is_dominating doms x y = true] and [x] is
-    not equal [y]. All edges, regular and exceptional are treated the same way.
-*)
+    not equal [y]. All edges, regular and exceptional are treated the same way.*)
 val is_strictly_dominating : t -> Label.t -> Label.t -> bool
 
 (** [find_dominance_frontier doms label] returns the dominance frontier for

@@ -49,11 +49,11 @@ let validate graph ~keep =
     let cfg = Graph.to_cfg graph ~keep in
     (if prune_unreachable_nodes
      then
-       match Cfg_reachability_validate.check_reachability cfg with
+       match Cfg_reachability_validate.For_testing.check_reachability cfg with
        | Ok () -> ()
        | Error message -> crash graph ~keep ("reachability: " ^ message));
     let dominators = Cfg_dominators.build cfg in
-    Cfg_dominators_validate.check_idom cfg
+    Cfg_dominators_validate.For_testing.check_idom cfg
       (Cfg_dominators.For_testing.doms dominators)
   with
   | Ok () -> ()

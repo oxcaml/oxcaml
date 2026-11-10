@@ -3,8 +3,9 @@
 This directory contains an [AFL](https://lcamtuf.coredump.cx/afl/) harness that
 fuzzes the two *shape-only* CFG analysis validators in the backend:
 
-- **reachability** (`Cfg_reachability_validate.check_reachability`), and
-- **dominators** (`Cfg_dominators_validate.check_idom`).
+- **reachability**
+  (`Cfg_reachability_validate.For_testing.check_reachability`), and
+- **dominators** (`Cfg_dominators_validate.For_testing.check_idom`).
 
 Both validators re-derive an analysis with the in-tree `Flambda2_datalog` engine
 and compare it against what the compiler computed. They depend only on the
