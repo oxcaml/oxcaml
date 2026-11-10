@@ -78,6 +78,7 @@ jobs:
         persist-credentials: false
 
     - name: Assert Merlin is in sync with the compiler
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
       working-directory: oxcaml
       run: external/merlin/scripts/assert-in-sync.sh
 
