@@ -148,15 +148,15 @@ jobs:
 
           - name: cfg-invariants (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
-            ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
+            build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1'
+            ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1'
             check_arch: true
             sysdeps: gdb
 
           - name: cfg-invariants (aarch64-linux)
             os: warp-ubuntu-latest-arm64-8x
-            build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
-            ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
+            build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1"
+            ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1"
             check_arch: true
             sysdeps: gdb
 

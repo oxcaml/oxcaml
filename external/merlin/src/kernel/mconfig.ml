@@ -664,8 +664,6 @@ let ocaml_ignored_flags =
     "-dreaper";
     "-instantiate";
     "-dflambda-heavy-invariants";
-    "-cfg-eliminate-dead-trap-handlers";
-    "-no-cfg-eliminate-dead-trap-handlers";
     "-module-entry-functions-section";
     "-zero-alloc-checker-details-extra";
     "-no-zero-alloc-checker-details-extra";
