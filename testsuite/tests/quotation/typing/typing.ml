@@ -576,7 +576,13 @@ type 'a s = 'a
 
 type t = K : ('a : value). 'a s -> t [@@unboxed]
 [%%expect {|
-type t = K : 'a s -> t [@@unboxed]
+Line 1, characters 0-48:
+1 | type t = K : ('a : value). 'a s -> t [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of the existential variable "'a".
+       You should annotate it with "[@@ocaml.boxed]".
 |}]
 
 (* Separability in eval (and splices) *)
@@ -588,5 +594,11 @@ type 'a s = 'a eval
 
 type t = K : ('a : value). 'a s -> t [@@unboxed]
 [%%expect {|
-type t = K : 'a s -> t [@@unboxed]
+Line 1, characters 0-48:
+1 | type t = K : ('a : value). 'a s -> t [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of the existential variable "'a".
+       You should annotate it with "[@@ocaml.boxed]".
 |}]
