@@ -58,6 +58,13 @@ let fresh_index t =
   t.next_index <- index + 1;
   index
 
+(* CR yusumez: Scopes don't tell functor applications apart from other calls:
+   the calls of the unbound items ([let () = ...], [let _ = ...]) of a named
+   submodule or functor body are also numbered under the module's binder, so
+   inserting one shifts the counters of the others. Only functor applications
+   should be module-level calls, which needs [Translmod] to mark them in
+   [Lambda]. *)
+
 (* [Some path] if [loc] is that of a call that binds a module-level result with
    scope path [path] (see [Fdo_counter_identity] for why we care). *)
 let module_level_call_binding (loc : Lambda.scoped_location) =
@@ -136,6 +143,10 @@ module Lambda_switch_counters = struct
   let is_int t = t.is_int
 end
 
+(* CR yusumez: [Side] predicts the shape of the translated switch, as described
+   below. This can drift from what the actual translation does. Consider hooks
+   that [cps_switch] calls for the shape it chooses. *)
+
 (* The constant or the block side of a [Lambda] switch. A switch with both
    translates to a switch per side behind the dispatch on whether the scrutinee
    is an immediate. A side whose discriminants all go to one arm becomes a jump
@@ -189,6 +200,7 @@ let switch t
     |> FC.of_position |> Fdo_annotation.singleton
   in
   let has_default = Option.is_some sw_failaction in
+  (* We number the default arm as 0 followed by the consts and blocks. *)
   let failaction = if has_default then counter 0 else Fdo_annotation.empty in
   let side cases ~num ~first_arm =
     Side.create ~cases ~num ~has_default
