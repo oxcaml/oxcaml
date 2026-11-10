@@ -111,13 +111,13 @@ let ids_for_export t =
         (Code_or_metadata.ids_for_export code_or_metadata))
     t Ids_for_export.empty
 
-let apply_renaming code_id_importer renaming t =
+let apply_renaming renaming t =
   if Renaming.is_identity renaming
   then t
   else
     Code_id.Map.fold
       (fun code_id code_or_metadata all_code ->
-        let code_id = Code_id.import code_id_importer code_id in
+        let code_id = Renaming.apply_code_id renaming code_id in
         let code_or_metadata =
           Code_or_metadata.apply_renaming code_or_metadata renaming
         in

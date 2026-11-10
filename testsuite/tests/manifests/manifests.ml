@@ -129,26 +129,26 @@ quux.cmi -> $PWD/manifests/04/quux (hidden)
 let () =
   List.iter (fun entry ->
     match Clflags.parse_hidden_include_file ~cmx_guaranteed:false entry with
-    | Ok { visible_path; actual_path; _ } ->
-      Format.printf "%S -> %S %S@." entry visible_path actual_path
+    | Ok { basename; actual_path; _ } ->
+      Format.printf "%S -> %S %S@." entry basename actual_path
     | Error msg -> Format.printf "%S -> Error: %s@." entry msg)
-  [ "foo/foo.cmi:00/foo";
+  [ "foo.cmi:00/foo";
     "foo.cmi:00/foo:extra";
     "foo.cmi 00/foo";
     "foo.cmi" ]
 
 [%%expect{|
-"foo/foo.cmi:00/foo" -> "foo/foo.cmi" "00/foo"
-"foo.cmi:00/foo:extra" -> Error: Expected '<visible_path>:<actual_path>', got: foo.cmi:00/foo:extra
-"foo.cmi 00/foo" -> Error: Expected '<visible_path>:<actual_path>', got: foo.cmi 00/foo
-"foo.cmi" -> Error: Expected '<visible_path>:<actual_path>', got: foo.cmi
+"foo.cmi:00/foo" -> "foo.cmi" "00/foo"
+"foo.cmi:00/foo:extra" -> Error: Expected '<basename>:<actual_path>', got: foo.cmi:00/foo:extra
+"foo.cmi 00/foo" -> Error: Expected '<basename>:<actual_path>', got: foo.cmi 00/foo
+"foo.cmi" -> Error: Expected '<basename>:<actual_path>', got: foo.cmi
 |}]
 
 (* -H-file and -Hx-file *)
 let () =
   run_test ~hidden_include_files:[
-    { Clflags.visible_path = "foo/foo.cmi"; actual_path = "00/foo"; cmx_guaranteed = false };
-    { Clflags.visible_path = "qux/qux.cmi"; actual_path = "04/qux"; cmx_guaranteed = true };
+    { Clflags.basename = "foo.cmi"; actual_path = "00/foo"; cmx_guaranteed = false };
+    { Clflags.basename = "qux.cmi"; actual_path = "04/qux"; cmx_guaranteed = true };
   ] ~files_to_check:["foo.cmi"; "qux.cmi"; "baz.cmi"] ()
 
 [%%expect{|
@@ -162,7 +162,7 @@ let () =
   run_test ~hidden_include_manifests:[
     "03/03-manifest.txt";
   ] ~hidden_include_files:[
-    { Clflags.visible_path = "baz.cmi"; actual_path = "04/quux"; cmx_guaranteed = false };
+    { Clflags.basename = "baz.cmi"; actual_path = "04/quux"; cmx_guaranteed = false };
   ] ~files_to_check:["baz.cmi"] ()
 
 [%%expect{|
@@ -173,8 +173,8 @@ baz.cmi -> $PWD/manifests/04/quux (hidden)
    order) *)
 let () =
   run_test ~hidden_include_files:[
-    { Clflags.visible_path = "baz.cmi"; actual_path = "04/quux"; cmx_guaranteed = false };
-    { Clflags.visible_path = "baz.cmi"; actual_path = "04/qux"; cmx_guaranteed = false };
+    { Clflags.basename = "baz.cmi"; actual_path = "04/quux"; cmx_guaranteed = false };
+    { Clflags.basename = "baz.cmi"; actual_path = "04/qux"; cmx_guaranteed = false };
   ] ~files_to_check:["baz.cmi"] ()
 
 [%%expect{|

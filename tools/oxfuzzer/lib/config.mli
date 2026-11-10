@@ -40,7 +40,9 @@ val max_unboxed_tuple_arity : int
 
 val max_unboxed_tuple_depth : int
 
-(* Percentages. *)
+val max_probability : int
+
+(* Probabilities out of [max_probability]. *)
 val record_probability : int
 
 val variant_probability : int
@@ -50,6 +52,8 @@ val or_null_probability : int
 val unboxed_tuple_probability : int
 
 val match_in_match_probability : int
+
+val assert_false_probability : int
 
 val nested_record_probability : int
 

@@ -6,5 +6,5 @@
 
 (tests
  (names test)
- (build_if %{oxcaml_supported})
+ (build_if %{ocaml-config:ox})
  (modes byte js wasm))

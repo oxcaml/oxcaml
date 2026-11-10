@@ -14,6 +14,9 @@ OCaml 5.4.1
   (when empty) not to be equal to `[||]`.
   (Marc Lasson, review by Gabriel Scherer)
 
+- #14370: Fix headers for C++ inclusion.
+  (Antonin Décimo, review by Gabriel Scherer)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 

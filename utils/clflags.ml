@@ -76,16 +76,16 @@ type visible_include =
   }
 
 type hidden_include_file =
-  { visible_path : string;
+  { basename : string;
     actual_path : string;
     cmx_guaranteed : bool;
   }
 
 let parse_hidden_include_file ~cmx_guaranteed entry =
   match String.split_on_char ':' entry with
-  | [ visible_path; actual_path ] ->
-    Ok { visible_path; actual_path; cmx_guaranteed }
-  | _ -> Error ("Expected '<visible_path>:<actual_path>', got: " ^ entry)
+  | [ basename; actual_path ] ->
+    Ok { basename; actual_path; cmx_guaranteed }
+  | _ -> Error ("Expected '<basename>:<actual_path>', got: " ^ entry)
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)

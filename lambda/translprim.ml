@@ -163,8 +163,7 @@ let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
   match path with
     Some (Path.Pdot (path, _)) ->
-      let address = Env.find_module_address path env in
-      begin match Env.address_head address with
+      begin match Env.find_module_address_head loc path env with
       | AHunit cu ->
           if not (Hashtbl.mem units_with_used_primitives cu)
           then Hashtbl.add units_with_used_primitives cu loc
