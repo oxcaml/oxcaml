@@ -533,12 +533,17 @@ let add_fdo_successors_of_wrappers uacc new_let_conts =
   else
     List.fold_left
       (fun uacc { cont; free_names_of_handler; _ } ->
-        UA.map_fdo_region_counters uacc ~f:(fun region_counters ->
-            Name_occurrences.fold_continuations_including_in_trap_actions
-              free_names_of_handler ~init:region_counters
-              ~f:(fun region_counters target ->
-                Fdo_region_counters.add_successor region_counters (Handler cont)
-                  target ~use_id:None)))
+        (* The continuation of the jump the wrapper ends with, not those of its
+           trap action. *)
+        match
+          Continuation.Set.get_singleton
+            (Name_occurrences.continuations free_names_of_handler)
+        with
+        | None -> uacc
+        | Some target ->
+          UA.map_fdo_region_counters uacc ~f:(fun region_counters ->
+              Fdo_region_counters.add_successor region_counters (Handler cont)
+                target ~use_id:None))
       uacc new_let_conts
 
 let bind_let_cont (uacc : UA.t) (body : RE.t)
