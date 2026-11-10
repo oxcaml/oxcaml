@@ -32,6 +32,45 @@ let[@inline never] guarded b v =
    it. *)
 let[@inline never] rec count_down n = if n <= 0 then n else count_down (n - 1)
 
+(* The code a call is inlined into can be the arm of a switch ... *)
+let[@inline never] in_branch b x = if b then choose true x else 0
+
+(* ... or the return point of a call, which runs as often as the code before the
+   call ... *)
+let[@inline never] after_call x =
+  let y = side x in
+  choose true y
+
+(* ... or an exception handler, entered by a [raise]. *)
+let[@inline never] raised x =
+  try if x > 0 then raise Exit else 0 with Exit -> choose true x
+
+(* An arm into code that is left with just a jump goes straight to the jump's
+   target, but keeps the counters preserved in that code. *)
+let[@inline always] pure b x = if b then x else x + 1
+
+let[@inline never] absorbed c y =
+  let r = if c then pure true y else y * 2 in
+  side r
+
+(* In a loop, the edges into the header are the entry and the back edge. The
+   back edge is rebuilt before the header's switch is folded (into a table
+   lookup, or into a single jump when all its arms do the same), yet gets the
+   counters of the arms too. *)
+let[@inline never] loop_table n v =
+  let rec go i acc =
+    let t = match v with A -> 1 | B -> 5 | C -> 2 | D -> 8 in
+    if i >= n then acc + t else go (i + 1) (acc + t)
+  in
+  go 0 0
+
+let[@inline never] loop_same n v =
+  let rec go i acc =
+    let _ = match v with A | B -> 1 | C | D -> 2 in
+    if i >= n then acc else go (i + 1) (acc + i)
+  in
+  go 0 0
+
 (* An over-application that only Simplify can split, inside an inlined body: the
    context is added once. *)
 let[@inline never] curried x = fun y -> x + y

@@ -47,6 +47,9 @@ module Make (Bindable : Bindable.S) (Term : Term) : sig
   (** Same as [pattern_match]. *)
   val ( let<> ) : t -> (Bindable.t * Term.t -> 'a) -> 'a
 
+  (** [t] with [f] applied to its term, keeping the bound names. *)
+  val map_term : t -> f:(Bindable.t -> Term.t -> Term.t) -> t
+
   val apply_renaming : t -> Renaming.t -> t
 end
 

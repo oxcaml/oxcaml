@@ -32,9 +32,16 @@
     ([Code_metadata.fdo_entry_annotation]). *)
 
 (** [code] with [f] applied to each of its counters: those of its entry, and
-    those of the calls, switch arms and code bindings in its body. *)
+    those of the calls and switch arms of its body. *)
 val map_counters_of_code :
   f:(Fdo_counter.t -> Fdo_counter.t) -> Code.t -> Code.t
+
+(** [switch] with the counters of each arm replaced by [f] applied to the arm's
+    action and counters. *)
+val map_switch_counters :
+  f:(Apply_cont_expr.t -> Fdo_annotation.t -> Fdo_annotation.t) ->
+  Switch_expr.t ->
+  Switch_expr.t
 
 (** The counters of a call to [code] that is inlined out, as the call graph
     decoded from a profile would count the call had it not been: the entry
