@@ -295,7 +295,19 @@ let rewrite_simple_opt env = function
   | Some simple as simpl ->
     Simple.pattern_match simple
       ~name:(fun name ~coercion:_ ->
-        if is_name_used env name then simpl else None)
+        if
+          not
+            (Option.is_none
+               (Analysis.get_unboxed_fields env.solution
+                  (Code_id_or_name.name name)))
+        then
+          (* This can happen if two closures with a shared code_id only have an
+             application (which does not use the closure) for its only use, see
+             [shared_closure_unboxing.ml] test. *)
+          None
+        else if is_name_used env name
+        then simpl
+        else None)
       ~const:(fun _ -> simpl)
 
 let get_args env params_decisions args =
@@ -1953,9 +1965,10 @@ and rebuild_let_expr_holed env res ~(bound_pattern : Bound_pattern.t)
     ~(defining_expr : Rev_expr.rev_named) ~parent ~hole : RE.t * rebuild_result
     =
   if
-    Bound_pattern.fold_all_bound_vars bound_pattern
-      ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
-      ~init:false
+    (not (Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)))
+    && Bound_pattern.fold_all_bound_vars bound_pattern
+         ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
+         ~init:false
   then
     ( RE.from_expr
         ~expr:
