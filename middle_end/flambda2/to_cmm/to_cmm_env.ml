@@ -55,7 +55,8 @@ type cont =
       }
   | Inline of
       { handler_params : Bound_parameters.t;
-        handler_params_occurrences : Num_occurrences.t Variable.Map.t;
+        handler_params_occurrences :
+          Num_occurrences.By_name_mode.t Variable.Map.t;
         handler_body : Flambda.Expr.t;
         handler_body_inlined_debuginfo : Inlined_debuginfo.t
       }
@@ -341,8 +342,20 @@ let exported_offsets t = t.offsets
 
 (* Variables *)
 
-let gen_variable ~debug_uid v =
-  let user_visible = Variable.user_visible v in
+let gen_variable ~debug_uid ~needed_by_phantom_let v =
+  (* Binders needed by phantom lets (see
+     [Num_occurrences.By_name_mode.needed_by_phantom_let]) are treated like
+     user-visible ones here: the provenance causes [Name_for_debugger]
+     operations to be emitted during instruction selection (including via
+     [Cname_for_debugger]), without which the phantom lets' references to such
+     variables could not be resolved by the debugger. *)
+  (* CR mshinwell: Such binders remain subject to the usual inlining decisions
+     ([To_cmm_effects.classify_let_binding] and [add_alias]), which consult only
+     the normal-mode occurrence count. A binder with a single normal occurrence
+     may thus be inlined into its use and get no [Clet], hence no
+     [Name_for_debugger], exactly as for user-visible variables today. Consider
+     keeping such binders when compiling with -g. *)
+  let user_visible = Variable.user_visible v || needed_by_phantom_let in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
   let provenance =
@@ -366,12 +379,12 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env (v, debug_uid) =
+let create_bound_parameter env (v, debug_uid, ~needed_by_phantom_let) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"
       Variable.print v;
-  let v' = gen_variable v ~debug_uid in
+  let v' = gen_variable v ~debug_uid ~needed_by_phantom_let in
   let env = add_bound_param env v v' in
   env, v'
 
@@ -484,7 +497,7 @@ let rec is_cmm_simple cmm =
 (* Helper function to create bindings *)
 
 let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
-    (bound_expr : a bound_expr) =
+    ~needed_by_phantom_let (bound_expr : a bound_expr) =
   let order =
     let incr =
       match bound_expr with
@@ -495,12 +508,13 @@ let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
     !next_order
   in
   let cmm_var =
-    gen_variable ~debug_uid:(Bound_var.debug_uid var) (Bound_var.var var)
+    gen_variable ~debug_uid:(Bound_var.debug_uid var) ~needed_by_phantom_let
+      (Bound_var.var var)
   in
   let binding = Binding { order; inline; effs; cmm_var; bound_expr } in
   binding
 
-let create_binding (type a) effs var ~(inline : a inline)
+let create_binding (type a) effs var ~(inline : a inline) ~needed_by_phantom_let
     (bound_expr : a bound_expr) =
   (* In order to avoid generating binding of the form: "let x = y in ...", when
      'y' is trivial i.e. is a value that fits in a register, we mark 'x' as a
@@ -513,9 +527,10 @@ let create_binding (type a) effs var ~(inline : a inline)
        effects and coeffects *)
     let effs = Ece.pure_can_be_duplicated in
     create_binding_aux effs var ~inline:Must_inline_and_duplicate
+      ~needed_by_phantom_let
       (Split { cmm_expr; free_vars })
   | Simple _ | Split _ | Splittable_prim _ ->
-    create_binding_aux effs var ~inline bound_expr
+    create_binding_aux effs var ~inline ~needed_by_phantom_let bound_expr
 
 (* Binding splitting *)
 
@@ -787,18 +802,25 @@ and split_in_env env res var binding =
     env, res, split_binding
 
 let bind_variable_with_decision (type a) ?extra env res var ~inline
-    ~(defining_expr : a bound_expr) ~effects_and_coeffects_of_defining_expr:effs
-    =
-  let binding = create_binding ~inline effs var defining_expr in
+    ~needed_by_phantom_let ~(defining_expr : a bound_expr)
+    ~effects_and_coeffects_of_defining_expr:effs =
+  let binding =
+    create_binding ~inline ~needed_by_phantom_let effs var defining_expr
+  in
   add_binding_to_env ?extra env res (Bound_var.var var) binding
 
 let bind_variable ?extra env res var ~defining_expr ~free_vars_of_defining_expr
-    ~num_normal_occurrences_of_bound_vars
-    ~effects_and_coeffects_of_defining_expr =
+    ~num_occurrences_of_bound_vars ~effects_and_coeffects_of_defining_expr =
   let inline =
     To_cmm_effects.classify_let_binding (Bound_var.var var)
-      ~effects_and_coeffects_of_defining_expr
-      ~num_normal_occurrences_of_bound_vars
+      ~effects_and_coeffects_of_defining_expr ~num_occurrences_of_bound_vars
+  in
+  let needed_by_phantom_let =
+    let var = Bound_var.var var in
+    Num_occurrences.By_name_mode.needed_by_phantom_let
+      (Option.value ~default:Num_occurrences.By_name_mode.zero
+         (Variable.Map.find_opt var num_occurrences_of_bound_vars))
+      var
   in
   match inline with
   | Drop_defining_expr -> env, res
@@ -806,26 +828,26 @@ let bind_variable ?extra env res var ~defining_expr ~free_vars_of_defining_expr
     let defining_expr = simple defining_expr free_vars_of_defining_expr in
     bind_variable_with_decision ?extra env res var
       ~effects_and_coeffects_of_defining_expr ~defining_expr
-      ~inline:Do_not_inline
+      ~inline:Do_not_inline ~needed_by_phantom_let
   | May_inline_once ->
     let defining_expr = simple defining_expr free_vars_of_defining_expr in
     bind_variable_with_decision ?extra env res var
       ~effects_and_coeffects_of_defining_expr ~defining_expr
-      ~inline:May_inline_once
+      ~inline:May_inline_once ~needed_by_phantom_let
   | Must_inline_once ->
     let defining_expr =
       complex_no_split defining_expr free_vars_of_defining_expr
     in
     bind_variable_with_decision ?extra env res var
       ~effects_and_coeffects_of_defining_expr ~defining_expr
-      ~inline:Must_inline_once
+      ~inline:Must_inline_once ~needed_by_phantom_let
   | Must_inline_and_duplicate ->
     let defining_expr =
       complex_no_split defining_expr free_vars_of_defining_expr
     in
     bind_variable_with_decision ?extra env res var
       ~effects_and_coeffects_of_defining_expr ~defining_expr
-      ~inline:Must_inline_and_duplicate
+      ~inline:Must_inline_and_duplicate ~needed_by_phantom_let
 
 let bind_variable_to_primitive = bind_variable_with_decision
 
@@ -1046,8 +1068,8 @@ let make_alias env res var alias_of =
 
    In this case, we want to force splitting of the original binding, and then
    bind the new variable with a `must_inline` inline status *)
-let split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of
-    binding =
+let split_binding_and_rebind ~num_occurrences_of_var ~needed_by_phantom_let env
+    res ~var ~alias_of binding =
   let { env; res; expr = { cmm; free_vars; effs } } =
     split_and_inline env res alias_of binding
   in
@@ -1057,19 +1079,21 @@ let split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of
     | Zero | One -> Must_inline_once
     | More_than_one -> Must_inline_and_duplicate
   in
-  bind_variable_with_decision env res var ~inline ~defining_expr
-    ~effects_and_coeffects_of_defining_expr:effs
+  bind_variable_with_decision env res var ~inline ~needed_by_phantom_let
+    ~defining_expr ~effects_and_coeffects_of_defining_expr:effs
 
-let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
+let add_alias env res ~var ~alias_of ~num_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
-  let num_occurrences_of_var : Num_occurrences.t =
+  let (num_occurrences_of_var : Num_occurrences.t), needed_by_phantom_let =
     let var = Bound_var.var var in
-    match Variable.Map.find var num_normal_occurrences_of_bound_vars with
+    match Variable.Map.find var num_occurrences_of_bound_vars with
     | exception Not_found ->
       Misc.fatal_errorf
         "Missing occurrence in to_cmm for variable %a aliased to %a"
         Variable.print var Variable.print alias_of
-    | num_occurrences -> num_occurrences
+    | { Num_occurrences.By_name_mode.normal; phantom = _ } as num_occurrences ->
+      ( normal,
+        Num_occurrences.By_name_mode.needed_by_phantom_let num_occurrences var )
   in
   match Variable.Map.find alias_of env.bindings with
   | Binding ({ inline = Must_inline_once; _ } as b) -> (
@@ -1080,9 +1104,11 @@ let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
     | One -> make_alias env res (Bound_var.var var) alias_of
     | More_than_one ->
       let env = remove_binding env alias_of in
-      split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of b)
+      split_binding_and_rebind ~num_occurrences_of_var ~needed_by_phantom_let
+        env res ~var ~alias_of b)
   | Binding ({ inline = Must_inline_and_duplicate; _ } as b) ->
-    split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of b
+    split_binding_and_rebind ~num_occurrences_of_var ~needed_by_phantom_let env
+      res ~var ~alias_of b
   | (exception Not_found)
   | Binding { inline = Do_not_inline | May_inline_once; _ } ->
     (* generic case, we just inline the var/binding, and rebind it *)
@@ -1092,7 +1118,7 @@ let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
     bind_variable env res var ~defining_expr:cmm
       ~free_vars_of_defining_expr:free_vars
       ~effects_and_coeffects_of_defining_expr:effs
-      ~num_normal_occurrences_of_bound_vars
+      ~num_occurrences_of_bound_vars
 
 (* Flushing delayed bindings *)
 

@@ -106,18 +106,18 @@ let rec expr ~env ~res e =
 
 and let_expr ~env ~res e =
   Let.pattern_match' e
-    ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
+    ~f:(fun bound_pattern ~num_occurrences_of_bound_vars ~body ->
       match Bound_pattern.name_mode bound_pattern with
       | Normal ->
         let_expr_normal ~env ~res e ~bound_pattern
-          ~num_normal_occurrences_of_bound_vars ~body
+          ~num_occurrences_of_bound_vars ~body
       | Phantom -> expr ~env ~res body
       | In_types ->
         Misc.fatal_errorf "Cannot bind In_types variables in terms:@ %a"
           Let.print e)
 
 and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
-    ~num_normal_occurrences_of_bound_vars:_ ~body =
+    ~num_occurrences_of_bound_vars:_ ~body =
   let env, res =
     match bound_pattern, Let.defining_expr e with
     | Singleton v, Simple s ->

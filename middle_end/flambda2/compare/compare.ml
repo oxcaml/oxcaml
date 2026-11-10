@@ -424,7 +424,8 @@ and subst_let_cont env (let_cont_expr : Let_cont_expr.t) =
           Continuation.Lmap.map_sharing (subst_cont_handler env)
             (handlers |> Continuation_handlers.to_map)
         in
-        Let_cont_expr.create_recursive handlers ~invariant_params ~body)
+        Let_cont_expr.create_recursive handlers ~invariant_params ~body
+          ~free_names_of_handlers:Unknown)
 
 and subst_cont_handler env cont_handler =
   Continuation_handler.pattern_match cont_handler ~f:(fun params ~handler ->
@@ -1350,7 +1351,8 @@ and let_cont_exprs env (let_cont1 : Let_cont.t) (let_cont2 : Let_cont.t) :
           (body1, cont_handlers1 |> Continuation_handlers.to_map)
           (body2, cont_handlers2 |> Continuation_handlers.to_map)
         |> Comparison.map ~f:(fun (body, handlers) ->
-            Let_cont_expr.create_recursive handlers ~invariant_params ~body))
+            Let_cont_expr.create_recursive handlers ~invariant_params ~body
+              ~free_names_of_handlers:Unknown))
   | _, _ -> Different { approximant = subst_let_cont env let_cont1 }
 
 and cont_handlers env handler1 handler2 =

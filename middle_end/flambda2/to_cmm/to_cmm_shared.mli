@@ -101,12 +101,14 @@ val simple_list :
 val continuation_bound_parameters :
   To_cmm_env.t ->
   Bound_parameters.t ->
+  num_occurrences_of_params:Num_occurrences.By_name_mode.t Variable.Map.t ->
   To_cmm_env.t
   * (Backend_var.With_provenance.t * Cmm.machtype To_cmm_env.param_type) list
 
 val function_bound_parameters :
   To_cmm_env.t ->
   Bound_parameters.t ->
+  free_names_of_body:Name_occurrences.t Or_unknown.t ->
   To_cmm_env.t * (Backend_var.With_provenance.t * Cmm.machtype) list
 
 val invalid :

@@ -32,7 +32,8 @@ and expr_descr =
   | Invalid of { message : string }
 
 and let_expr_t0 =
-  { num_normal_occurrences_of_bound_vars : Num_occurrences.t Variable.Map.t;
+  { num_occurrences_of_bound_vars :
+      Num_occurrences.By_name_mode.t Variable.Map.t;
     body : expr
   }
 
@@ -65,7 +66,7 @@ and non_recursive_let_cont_handler =
   }
 
 and recursive_let_cont_handlers_t0 =
-  { handlers : continuation_handlers_t0;
+  { handlers : invariant_params_and_handlers;
     body : expr
   }
 
@@ -73,7 +74,7 @@ and recursive_let_cont_handlers =
   (Bound_continuations.t, recursive_let_cont_handlers_t0) Name_abstraction.t
 
 and continuation_handler_t0 =
-  { num_normal_occurrences_of_params : Num_occurrences.t Variable.Map.t;
+  { num_occurrences_of_params : Num_occurrences.By_name_mode.t Variable.Map.t;
     handler : expr
   }
 
@@ -84,8 +85,14 @@ and continuation_handler =
     is_cold : bool
   }
 
+and invariant_params_and_handlers =
+  (Bound_parameters.t, continuation_handlers_t0) Name_abstraction.t
+
 and continuation_handlers_t0 =
-  (Bound_parameters.t, continuation_handlers) Name_abstraction.t
+  { num_occurrences_of_invariant_params :
+      Num_occurrences.By_name_mode.t Variable.Map.t;
+    continuation_handlers : continuation_handlers
+  }
 
 and continuation_handlers = continuation_handler Continuation.Lmap.t
 
@@ -106,6 +113,16 @@ and static_const_or_code =
   | Static_const of Static_const.t
 
 and static_const_group = static_const_or_code list
+
+let apply_renaming_num_occurrences num_occurrences renaming =
+  let num_occurrences', is_identity =
+    Variable.Map.fold
+      (fun var num (all_occurrences, is_identity) ->
+        let var' = Renaming.apply_variable renaming var in
+        Variable.Map.add var' num all_occurrences, is_identity && var == var')
+      num_occurrences (Variable.Map.empty, true)
+  in
+  if is_identity then num_occurrences else num_occurrences'
 
 let rec descr expr = expr
 
@@ -153,21 +170,20 @@ and apply_renaming_named (named : named) renaming : named =
     let rec_info_expr' = Rec_info_expr.apply_renaming rec_info_expr renaming in
     if rec_info_expr == rec_info_expr' then named else Rec_info rec_info_expr'
 
-and apply_renaming_let_expr_t0
-    ({ body; num_normal_occurrences_of_bound_vars } as t) renaming =
+and apply_renaming_let_expr_t0 ({ body; num_occurrences_of_bound_vars } as t)
+    renaming =
   let body' = apply_renaming body renaming in
-  let changed = ref (body != body') in
-  let num_normal_occurrences_of_bound_vars =
-    Variable.Map.fold
-      (fun var num result ->
-        let var' = Renaming.apply_variable renaming var in
-        changed := !changed || var != var';
-        Variable.Map.add var' num result)
-      num_normal_occurrences_of_bound_vars Variable.Map.empty
+  let num_occurrences_of_bound_vars' =
+    apply_renaming_num_occurrences num_occurrences_of_bound_vars renaming
   in
-  if not !changed
+  if
+    body == body'
+    && num_occurrences_of_bound_vars == num_occurrences_of_bound_vars'
   then t
-  else { body = body'; num_normal_occurrences_of_bound_vars }
+  else
+    { body = body';
+      num_occurrences_of_bound_vars = num_occurrences_of_bound_vars'
+    }
 
 and apply_renaming_let_expr ({ let_abst; defining_expr } as t) renaming =
   let let_abst' =
@@ -219,20 +235,18 @@ and apply_renaming_recursive_let_cont_handlers t renaming =
   Name_abstraction.apply_renaming (module Bound_continuations) t renaming
 
 and apply_renaming_continuation_handler_t0
-    ({ handler; num_normal_occurrences_of_params } as t) renaming =
+    ({ handler; num_occurrences_of_params } as t) renaming =
   let handler' = apply_renaming handler renaming in
-  let num_normal_occurrences_of_params', is_identity_num_occurrences =
-    Variable.Map.fold
-      (fun var num (all_occurrences, is_identity) ->
-        let var' = Renaming.apply_variable renaming var in
-        Variable.Map.add var' num all_occurrences, is_identity && var == var')
-      num_normal_occurrences_of_params (Variable.Map.empty, true)
+  let num_occurrences_of_params' =
+    apply_renaming_num_occurrences num_occurrences_of_params renaming
   in
-  if handler == handler' && is_identity_num_occurrences
+  if
+    handler == handler'
+    && num_occurrences_of_params == num_occurrences_of_params'
   then t
   else
     { handler = handler';
-      num_normal_occurrences_of_params = num_normal_occurrences_of_params'
+      num_occurrences_of_params = num_occurrences_of_params'
     }
 
 and apply_renaming_continuation_handler
@@ -249,14 +263,35 @@ and apply_renaming_continuation_handler
 and apply_renaming_continuation_handlers t renaming =
   Name_abstraction.apply_renaming (module Bound_parameters) t renaming
 
-and apply_renaming_continuations_handlers_t0 t renaming =
-  Continuation.Lmap.of_list
-  @@ List.map
-       (fun (k, handler) ->
-         let k = Renaming.apply_continuation renaming k in
-         let handler = apply_renaming_continuation_handler handler renaming in
-         k, handler)
-       (Continuation.Lmap.bindings t)
+and apply_renaming_continuations_handlers_t0
+    ({ num_occurrences_of_invariant_params; continuation_handlers } as t)
+    renaming =
+  let continuation_handlers' =
+    (* [Lmap.bindings] and [Lmap.of_list] preserve sharing. *)
+    Continuation.Lmap.of_list
+      (Misc.Stdlib.List.map_sharing
+         (fun ((k, handler) as binding) ->
+           let k' = Renaming.apply_continuation renaming k in
+           let handler' =
+             apply_renaming_continuation_handler handler renaming
+           in
+           if Continuation.equal k k' && handler == handler'
+           then binding
+           else k', handler')
+         (Continuation.Lmap.bindings continuation_handlers))
+  in
+  let num_occurrences_of_invariant_params' =
+    apply_renaming_num_occurrences num_occurrences_of_invariant_params renaming
+  in
+  if
+    continuation_handlers == continuation_handlers'
+    && num_occurrences_of_invariant_params
+       == num_occurrences_of_invariant_params'
+  then t
+  else
+    { num_occurrences_of_invariant_params = num_occurrences_of_invariant_params';
+      continuation_handlers = continuation_handlers'
+    }
 
 and apply_renaming_function_params_and_body_base { expr; free_names } renaming =
   let expr = apply_renaming expr renaming in
@@ -298,7 +333,7 @@ and apply_renaming_static_const_group t renaming =
     t
 
 let rec ids_for_export_continuation_handler_t0
-    { handler; num_normal_occurrences_of_params = _ } =
+    { handler; num_occurrences_of_params = _ } =
   ids_for_export handler
 
 and ids_for_export_continuation_handler
@@ -315,14 +350,15 @@ and ids_for_export_continuation_handlers t =
     t ~ids_for_export_of_term:ids_for_export_continuation_handlers_t0
     ~apply_renaming_to_term:apply_renaming_continuations_handlers_t0
 
-and ids_for_export_continuation_handlers_t0 t =
+and ids_for_export_continuation_handlers_t0
+    { continuation_handlers; num_occurrences_of_invariant_params = _ } =
   Continuation.Lmap.fold
     (fun k handler ids ->
       Ids_for_export.union ids
         (Ids_for_export.add_continuation
            (ids_for_export_continuation_handler handler)
            k))
-    t Ids_for_export.empty
+    continuation_handlers Ids_for_export.empty
 
 and ids_for_export t =
   match descr t with
@@ -333,8 +369,7 @@ and ids_for_export t =
   | Switch switch -> Switch.ids_for_export switch
   | Invalid _ -> Ids_for_export.empty
 
-and ids_for_export_let_expr_t0
-    { body; num_normal_occurrences_of_bound_vars = _ } =
+and ids_for_export_let_expr_t0 { body; num_occurrences_of_bound_vars = _ } =
   ids_for_export body
 
 and ids_for_export_let_expr { let_abst; defining_expr } =
@@ -651,8 +686,8 @@ and print_let_cont_expr ppf t =
             (module Bound_parameters)
             handlers
             ~apply_renaming_to_term:apply_renaming_continuations_handlers_t0
-            ~f:(fun invariant_params handlers ->
-              print ~body ~invariant_params handlers))
+            ~f:(fun invariant_params { continuation_handlers; _ } ->
+              print ~body ~invariant_params continuation_handlers))
   in
   let let_conts, body = gather_let_conts [] t in
   fprintf ppf "@[<v 1>(%a@;" print body;
@@ -815,16 +850,17 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
     match (bound_pattern : Bound_pattern.t) with
     | Static _ | Set_of_closures _ -> ()
     | Singleton bound_var ->
-      fprintf ppf "%t #%a%t" Flambda_colours.elide Num_occurrences.print
+      fprintf ppf "%t %a%t" Flambda_colours.elide
+        Num_occurrences.By_name_mode.print
         (try Variable.Map.find (Bound_var.var bound_var) num_occurrences
-         with Not_found -> Num_occurrences.Zero)
+         with Not_found -> Num_occurrences.By_name_mode.zero)
         Flambda_colours.pop
   in
   let rec let_body (expr : expr) =
     match descr expr with
     | Let ({ let_abst = _; defining_expr } as t) ->
       let print (bound_pattern : Bound_pattern.t) ~body
-          ~num_normal_occurrences_of_bound_vars =
+          ~num_occurrences_of_bound_vars =
         match bound_pattern with
         | Singleton _ | Set_of_closures _ ->
           fprintf ppf "@ @[<hov 1>%t%a%t%t%a =%t@ %a@]"
@@ -832,7 +868,7 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
             Bound_pattern.print bound_pattern Flambda_colours.pop
             Flambda_colours.elide
             (print_num_occurrences bound_pattern)
-            num_normal_occurrences_of_bound_vars Flambda_colours.pop print_named
+            num_occurrences_of_bound_vars Flambda_colours.pop print_named
             defining_expr;
           let_body body
         | Static _ -> expr
@@ -840,12 +876,12 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
       Name_abstraction.pattern_match_for_printing
         (module Bound_pattern)
         t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-        ~f:(fun bound_pattern { body; num_normal_occurrences_of_bound_vars } ->
-          print bound_pattern ~body ~num_normal_occurrences_of_bound_vars)
+        ~f:(fun bound_pattern { body; num_occurrences_of_bound_vars } ->
+          print bound_pattern ~body ~num_occurrences_of_bound_vars)
     | Let_cont _ | Apply _ | Apply_cont _ | Switch _ | Invalid _ -> expr
   in
   let print (bound_pattern : Bound_pattern.t) ~body
-      ~num_normal_occurrences_of_bound_vars =
+      ~num_occurrences_of_bound_vars =
     match bound_pattern with
     | Static _ -> print_let_static ppf t
     | Singleton _ | Set_of_closures _ ->
@@ -854,7 +890,7 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
         Bound_pattern.print bound_pattern Flambda_colours.pop
         Flambda_colours.elide
         (print_num_occurrences bound_pattern)
-        num_normal_occurrences_of_bound_vars Flambda_colours.pop print_named
+        num_occurrences_of_bound_vars Flambda_colours.pop print_named
         defining_expr;
       let expr = let_body body in
       fprintf ppf "@]@ %a@]" print expr
@@ -862,8 +898,8 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
   Name_abstraction.pattern_match_for_printing
     (module Bound_pattern)
     t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-    ~f:(fun bound_pattern { body; num_normal_occurrences_of_bound_vars } ->
-      print bound_pattern ~body ~num_normal_occurrences_of_bound_vars)
+    ~f:(fun bound_pattern { body; num_occurrences_of_bound_vars } ->
+      print bound_pattern ~body ~num_occurrences_of_bound_vars)
 
 and print_named ppf (t : named) =
   let print_or_elide_debuginfo ppf dbg =
@@ -902,6 +938,20 @@ and print_static_const_or_code ppf static_const_or_code =
       Flambda_colours.pop
   | Static_const const -> Static_const.print ppf const
 
+(* The numbers of occurrences of the given parameters, by name mode, within the
+   scope of their binder, whose free names are [free_names]. *)
+let num_occurrences_of_params params
+    ~(free_names : Name_occurrences.t Or_unknown.t) =
+  match free_names with
+  | Unknown -> Variable.Map.empty
+  | Known free_names ->
+    ListLabels.fold_left (Bound_parameters.to_list params)
+      ~init:Variable.Map.empty ~f:(fun num_occurrences param ->
+        let var = Bound_parameter.var param in
+        Variable.Map.add var
+          (Name_occurrences.count_variable_by_name_mode free_names var)
+          num_occurrences)
+
 module Continuation_handler = struct
   module T0 = struct
     type t = continuation_handler_t0
@@ -915,23 +965,12 @@ module Continuation_handler = struct
 
   module A = Name_abstraction.Make (Bound_parameters) (T0)
 
-  let create params ~handler ~(free_names_of_handler : _ Or_unknown.t)
-      ~is_exn_handler ~is_cold =
+  let create params ~handler ~free_names_of_handler ~is_exn_handler ~is_cold =
     Bound_parameters.check_no_duplicates params;
-    let num_normal_occurrences_of_params =
-      match free_names_of_handler with
-      | Unknown -> Variable.Map.empty
-      | Known free_names_of_handler ->
-        ListLabels.fold_left (Bound_parameters.to_list params)
-          ~init:Variable.Map.empty ~f:(fun num_occurrences param ->
-            let var = Bound_parameter.var param in
-            let num =
-              Name_occurrences.count_variable_normal_mode free_names_of_handler
-                var
-            in
-            Variable.Map.add var num num_occurrences)
+    let num_occurrences_of_params =
+      num_occurrences_of_params params ~free_names:free_names_of_handler
     in
-    let t0 : T0.t = { num_normal_occurrences_of_params; handler } in
+    let t0 : T0.t = { num_occurrences_of_params; handler } in
     let cont_handler_abst = A.create params t0 in
     { cont_handler_abst; is_exn_handler; is_cold }
 
@@ -942,8 +981,8 @@ module Continuation_handler = struct
 
   let pattern_match' t ~f =
     A.pattern_match t.cont_handler_abst
-      ~f:(fun params { handler; num_normal_occurrences_of_params } ->
-        f params ~num_normal_occurrences_of_params ~handler)
+      ~f:(fun params { handler; num_occurrences_of_params } ->
+        f params ~num_occurrences_of_params ~handler)
 
   module Pattern_match_pair_error = struct
     type t = Parameter_lists_have_different_lengths
@@ -1081,10 +1120,8 @@ module Let_expr = struct
 
   let pattern_match' t ~f =
     A.pattern_match t.let_abst ~f:(fun bound_pattern t0 ->
-        let num_normal_occurrences_of_bound_vars =
-          t0.num_normal_occurrences_of_bound_vars
-        in
-        f bound_pattern ~num_normal_occurrences_of_bound_vars ~body:t0.body)
+        let num_occurrences_of_bound_vars = t0.num_occurrences_of_bound_vars in
+        f bound_pattern ~num_occurrences_of_bound_vars ~body:t0.body)
 
   module Pattern_match_pair_error = struct
     type t = Mismatched_let_bindings
@@ -1151,19 +1188,19 @@ module Let_expr = struct
       Misc.fatal_errorf
         "Cannot bind a non-[Static_const] to [Symbols]:@ %a =@ %a"
         Bound_pattern.print bound_pattern print_named defining_expr);
-    let num_normal_occurrences_of_bound_vars =
+    let num_occurrences_of_bound_vars =
       match free_names_of_body with
       | Unknown -> Variable.Map.empty
       | Known free_names_of_body ->
         let free_names_of_bindable = Bound_pattern.free_names bound_pattern in
         Name_occurrences.fold_variables free_names_of_bindable
           ~init:Variable.Map.empty ~f:(fun num_occurrences var ->
-            let num =
-              Name_occurrences.count_variable_normal_mode free_names_of_body var
-            in
-            Variable.Map.add var num num_occurrences)
+            Variable.Map.add var
+              (Name_occurrences.count_variable_by_name_mode free_names_of_body
+                 var)
+              num_occurrences)
     in
-    let t0 : T0.t = { num_normal_occurrences_of_bound_vars; body } in
+    let t0 : T0.t = { num_occurrences_of_bound_vars; body } in
     { let_abst = A.create bound_pattern t0; defining_expr }
 
   let defining_expr t = t.defining_expr
@@ -1207,7 +1244,7 @@ end
 
 module Recursive_let_cont_handlers = struct
   module T0 = struct
-    type t = continuation_handler Continuation.Lmap.t
+    type t = continuation_handlers_t0
 
     let apply_renaming = apply_renaming_continuations_handlers_t0
 
@@ -1229,9 +1266,36 @@ module Recursive_let_cont_handlers = struct
 
   type t = recursive_let_cont_handlers
 
-  let create ~body ~invariant_params handlers =
+  let create ~body ~invariant_params handlers ~free_names_of_handlers =
+    (match (free_names_of_handlers : _ Or_unknown.t) with
+    | Unknown -> ()
+    | Known free_names_of_handlers ->
+      (* Unused invariant parameters are removed by the passes that create
+         recursive groups, so every invariant parameter must occur in the
+         handlers' free names. This catches callers that have already removed
+         the invariant parameters from those names, which would silently zero
+         their occurrence counts. *)
+      ListLabels.iter (Bound_parameters.to_list invariant_params)
+        ~f:(fun param ->
+          if
+            not
+              (Name_occurrences.mem_var free_names_of_handlers
+                 (Bound_parameter.var param))
+          then
+            Misc.fatal_errorf
+              "Invariant parameter %a does not occur in the free names of the \
+               handlers:@ %a"
+              Bound_parameter.print param Name_occurrences.print
+              free_names_of_handlers));
     let bound = Continuation_handlers.domain handlers in
-    let handlers0 = T1.create ~body (A0.create invariant_params handlers) in
+    let num_occurrences_of_invariant_params =
+      num_occurrences_of_params invariant_params
+        ~free_names:free_names_of_handlers
+    in
+    let handlers0 : T0.t =
+      { num_occurrences_of_invariant_params; continuation_handlers = handlers }
+    in
+    let handlers0 = T1.create ~body (A0.create invariant_params handlers0) in
     let conts = Bound_continuations.create bound in
     A1.create conts handlers0
 
@@ -1239,8 +1303,19 @@ module Recursive_let_cont_handlers = struct
     let open A1 in
     let<> _, { body; handlers } = t in
     let open! A0 in
-    let<> invariant_params, handlers = handlers in
-    f ~invariant_params ~body handlers
+    let<> invariant_params, { continuation_handlers; _ } = handlers in
+    f ~invariant_params ~body continuation_handlers
+
+  let pattern_match' t ~f =
+    let open A1 in
+    let<> _, { body; handlers } = t in
+    let open! A0 in
+    let<> ( invariant_params,
+            { continuation_handlers; num_occurrences_of_invariant_params } ) =
+      handlers
+    in
+    f ~invariant_params ~num_occurrences_of_invariant_params ~body
+      continuation_handlers
 
   let pattern_match_pair t1 t2 ~f =
     A1.pattern_match_pair t1 t2
@@ -1253,7 +1328,8 @@ module Recursive_let_cont_handlers = struct
         let body2 = handlers0_2.body in
         A0.pattern_match_pair handlers0_1.handlers handlers0_2.handlers
           ~f:(fun invariant_params handlers1 handlers2 ->
-            f ~invariant_params ~body1 ~body2 handlers1 handlers2))
+            f ~invariant_params ~body1 ~body2 handlers1.continuation_handlers
+              handlers2.continuation_handlers))
 
   let apply_renaming = apply_renaming_recursive_let_cont_handlers
 end
@@ -1656,12 +1732,14 @@ module Let_cont_expr = struct
 
   let create_non_liftable = create_non_recursive0 ~can_be_lifted:false
 
-  let create_recursive ~invariant_params handlers ~body =
+  let create_recursive ~invariant_params handlers ~body ~free_names_of_handlers
+      =
     if Continuation_handlers.contains_exn_handler handlers
     then Misc.fatal_error "Exception-handling continuations cannot be recursive";
     Expr.create_let_cont
       (Recursive
-         (Recursive_let_cont_handlers.create ~invariant_params handlers ~body))
+         (Recursive_let_cont_handlers.create ~invariant_params handlers ~body
+            ~free_names_of_handlers))
 
   let apply_renaming = apply_renaming_let_cont_expr
 end

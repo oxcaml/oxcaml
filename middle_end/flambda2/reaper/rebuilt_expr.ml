@@ -94,7 +94,7 @@ let create_recursive_let_cont ~invariant_params handlers0 ~body =
   let handlers = create_continuation_handlers handlers0 in
   let expr =
     Flambda.Let_cont_expr.create_recursive ~invariant_params handlers.handlers
-      ~body:body.expr
+      ~body:body.expr ~free_names_of_handlers:(Known handlers.free_names)
   in
   let handlers_free_names =
     Name_occurrences.diff handlers.free_names

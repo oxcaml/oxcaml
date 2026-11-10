@@ -78,12 +78,14 @@ let keyword_table =
     "mask", KWD_MASK;
     "mutable", KWD_MUTABLE;
     "nativeint", KWD_NATIVEINT;
+    "needed_by_phantom_let", KWD_NEEDED_BY_PHANTOM_LET;
     "never", KWD_NEVER;
     "newer_version_of", KWD_NEWER_VERSION_OF;
     "noalloc", KWD_NOALLOC;
     "notrace", KWD_NOTRACE;
     "null", KWD_NULL;
     "of", KWD_OF;
+    "phantom", KWD_PHANTOM;
     "poison", KWD_POISON;
     "pop", KWD_POP;
     "product", KWD_PRODUCT;

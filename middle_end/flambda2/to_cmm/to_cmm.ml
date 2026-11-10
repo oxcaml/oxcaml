@@ -84,6 +84,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       (Bound_parameters.create
          [ Bound_parameter.create ret_var Flambda_kind.With_subkind.any_value
              ret_var_duid ])
+      ~num_occurrences_of_params:Variable.Map.empty
   in
   let return_cont, env =
     Env.add_jump_cont env

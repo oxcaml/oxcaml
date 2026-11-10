@@ -125,9 +125,12 @@ val create_non_recursive_let_cont_without_free_names :
   body:t ->
   t
 
+(** [free_names_of_handlers] must include the occurrences of the invariant
+    parameters within the handlers. *)
 val create_recursive_let_cont :
   Are_rebuilding_terms.t ->
   invariant_params:Bound_parameters.t ->
+  free_names_of_handlers:Name_occurrences.t ->
   Continuation_handler.t Continuation.Lmap.t ->
   body:t ->
   t
