@@ -196,7 +196,7 @@ let simplify_apply_cont dacc apply_cont ~down_to_up =
   let dacc =
     DA.add_fdo_region_successor dacc
       (AC.continuation apply_cont)
-      ~use_id:(Some rewrite_id)
+      ~use_id:rewrite_id
   in
   let dbg = AC.debuginfo apply_cont in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in

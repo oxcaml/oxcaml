@@ -47,9 +47,9 @@ let record_free_names_of_apply_as_used0 apply ~use_id ~exn_cont_use_id data_flow
 (* For applications that are not inlined out. *)
 let record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply =
   let dacc =
-    match Apply.continuation apply with
-    | Return k -> DA.add_fdo_region_successor dacc k ~use_id
-    | Never_returns -> dacc
+    match Apply.continuation apply, use_id with
+    | Return k, Some use_id -> DA.add_fdo_region_successor dacc k ~use_id
+    | Return _, None | Never_returns, _ -> dacc
   in
   DA.map_flow_acc dacc
     ~f:(record_free_names_of_apply_as_used0 ~use_id ~exn_cont_use_id apply)

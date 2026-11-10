@@ -47,12 +47,6 @@ module Make (Bindable : Bindable.S) (Term : Term) : sig
   (** Same as [pattern_match]. *)
   val ( let<> ) : t -> (Bindable.t * Term.t -> 'a) -> 'a
 
-  (** Internal: only for [Flambda.map_fdo_counters]. [t] with [f] applied to its
-      term, keeping the bound names, unlike [pattern_match]. [f] must not change
-      which names occur in the term, nor move terms into or out of it. Not for
-      renaming, which is [apply_renaming]. *)
-  val map_term : t -> f:(Bindable.t -> Term.t -> Term.t) -> t
-
   val apply_renaming : t -> Renaming.t -> t
 end
 

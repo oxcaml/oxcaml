@@ -80,14 +80,13 @@ let find_all_aliases env arg =
     arg
 
 (* The counters preserved in the handler the arm leads to go onto the arm (see
-   [Fdo_region_counters]). Done here, before the arm's target can change, and
-   again once the whole body is rebuilt. *)
+   [Fdo_region_counters]). Done here, before the arm's target can change. *)
 let attach_fdo_region_counters uacc ~use_id action annotations =
   let preserved =
     Fdo_region_counters.counters_into_handler
       (UA.fdo_region_counters uacc)
       ~specialization_map:(UA.specialization_map uacc)
-      (AC.continuation action) ~use_id:(Some use_id)
+      (AC.continuation action) ~use_id
   in
   if Fdo_annotation.is_empty preserved
   then annotations
@@ -791,7 +790,6 @@ let rebuild_switch
   let new_let_conts, arms, mergeable_arms =
     TI.Map.fold (rebuild_arm uacc) arms ([], TI.Map.empty, No_arms)
   in
-  let uacc = EB.add_fdo_successors_of_wrappers uacc new_let_conts in
   let num_arms = TI.Map.cardinal arms in
   let switch_merged =
     match mergeable_arms with
@@ -844,7 +842,6 @@ let rebuild_switch
         (* The arms' edges become a single jump (see [EB.create_switch]). *)
         let uacc =
           EB.preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
-            ~target:dest
         in
         (* CR bclement: should use a single unboxed product lookup table *)
         let rec rebuild_merged_switch mergeable_args args_rev =

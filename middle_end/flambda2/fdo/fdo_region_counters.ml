@@ -60,18 +60,15 @@ module Use = struct
     { cont : Continuation.t;
           (* This is the unique continuation called at the end of a region,
              either via an [Apply_cont] or an [Apply]'s return continuation. *)
-      use_id : Apply_cont_rewrite_id.t option
+      use_id : Apply_cont_rewrite_id.t
           (* We use this to look up the specialized version of [cont] in a
              [specialization_map] if it has been specialized. *)
     }
 
   let handler { cont; use_id } ~specialization_map : Region.t =
-    match use_id with
-    | None -> Handler cont
-    | Some use_id -> (
-      match Continuation_callsite_map.find cont use_id specialization_map with
-      | exception Not_found -> Handler cont
-      | specialized -> Handler specialized)
+    match Continuation_callsite_map.find cont use_id specialization_map with
+    | exception Not_found -> Handler cont
+    | specialized -> Handler specialized
 end
 
 type t =
@@ -140,10 +137,3 @@ let entry_annotation t ~specialization_map code_id entry_annotation =
     (Fdo_annotation.combine
        (Fdo_annotation.With_body_hash.annotation entry_annotation)
        (counters_into t ~specialization_map (Function_entry code_id)))
-
-let attach_to_switches t ~specialization_map expr =
-  Flambda.map_fdo_counters expr ~callsite:Fun.id ~arm:(fun action counters ->
-      Fdo_annotation.combine counters
-        (counters_into_handler t ~specialization_map
-           (Apply_cont_expr.continuation action)
-           ~use_id:None))

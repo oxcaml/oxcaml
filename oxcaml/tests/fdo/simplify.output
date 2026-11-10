@@ -36,12 +36,12 @@ simplify.simplify.fl:
   branch: "Simplify.absorbed":0:7f195994:0:branch(2) "Simplify.pure":0 <- "Simplify.absorbed":0:7f195994:1:call "Simplify.pure":0:b9895603:0:branch(2) <- "Simplify.absorbed":0:7f195994:1:call
   call: "Simplify.absorbed":0:7f195994:2:call
   entry: "Simplify.loop_table.go":0 "Simplify.loop_table.go":0:06f48e25:0:branch(1) "Simplify.loop_table.go":0:06f48e25:0:branch(2) "Simplify.loop_table.go":0:06f48e25:0:branch(3) "Simplify.loop_table.go":0:06f48e25:0:branch(4) body_hash:06f48e25
-  branch: "Simplify.loop_table.go":0:06f48e25:1:branch(1) "Simplify.loop_table.go":0:06f48e25:2:call "Simplify.loop_table.go":0:06f48e25:0:branch(1) "Simplify.loop_table.go":0:06f48e25:0:branch(2) "Simplify.loop_table.go":0:06f48e25:0:branch(3) "Simplify.loop_table.go":0:06f48e25:0:branch(4)
+  branch: "Simplify.loop_table.go":0:06f48e25:1:branch(1) "Simplify.loop_table.go":0:06f48e25:2:call
   branch: "Simplify.loop_table.go":0:06f48e25:1:branch(2)
   entry: "Simplify.loop_table":0 body_hash:e97a0351
   call: "Simplify.loop_table":0:e97a0351:0:call
   entry: "Simplify.loop_same.go":0 "Simplify.loop_same.go":0:ada87730:0:branch(1) "Simplify.loop_same.go":0:ada87730:0:branch(2) body_hash:ada87730
-  branch: "Simplify.loop_same.go":0:ada87730:1:branch(1) "Simplify.loop_same.go":0:ada87730:2:call "Simplify.loop_same.go":0:ada87730:0:branch(1) "Simplify.loop_same.go":0:ada87730:0:branch(2)
+  branch: "Simplify.loop_same.go":0:ada87730:1:branch(1) "Simplify.loop_same.go":0:ada87730:2:call
   branch: "Simplify.loop_same.go":0:ada87730:1:branch(2)
   entry: "Simplify.loop_same":0 body_hash:e97a0351
   call: "Simplify.loop_same":0:e97a0351:0:call
