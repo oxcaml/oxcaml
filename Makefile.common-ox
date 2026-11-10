@@ -405,14 +405,18 @@ ifeq ($(with_jsir),true)
 	  for target in js_of_ocaml:js wasm_of_ocaml:wasm; do \
 	    ocamlopt_jsir="../../ocamlopt.opt -target $${target%:*} -nostdlib \
 	      -I ../../stdlib" && \
-	    $$ocamlopt_jsir -c lib.ml && \
-	    $$ocamlopt_jsir -linkall -a -o testing.cmxa-$${target#*:} testing.ml \
+	    $$ocamlopt_jsir -S -c lib.ml && \
+	    $$ocamlopt_jsir -S -linkall -a -o testing.cmxa-$${target#*:} testing.ml && \
+	    $$ocamlopt_jsir -link-jsir -linkall -a \
+	      -o testing.cmxa-$${target#*:} testing.cmx-$${target#*:} \
 	      || exit 1; \
 	  done
 	cp _install/lib/ocaml/compiler-libs/*.cmx-js \
 	  _install/lib/ocaml/compiler-libs/*.cmx-wasm _runtest/utils
 	cp $(stdlib_jsir_build)/compiler-libs/*.cmo-js \
-	  $(stdlib_jsir_build)/compiler-libs/*.cmo-wasm _runtest/utils
+	  $(stdlib_jsir_build)/compiler-libs/*.cmo-wasm \
+	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-js \
+	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-wasm _runtest/utils
 endif
 test: install_for_test
 	if [ "$(middle_end)" = "flambda2" ]; then \

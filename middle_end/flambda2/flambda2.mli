@@ -33,6 +33,8 @@ val lambda_to_jsir :
   Lambda.program ->
   Optcomp_intf.jsir_program
 
+val link_jsir : Jsoo_imports.Code.jsir_file list -> Jsoo_imports.Code.program
+
 type flambda_result =
   { flambda : Flambda_unit.t;
     all_code : Exported_code.t;
