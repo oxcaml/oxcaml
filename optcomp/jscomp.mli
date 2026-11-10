@@ -29,21 +29,21 @@
 (** The JSIR backend of ocamlopt ([-target js_of_ocaml] and
     [-target wasm_of_ocaml]).
 
-    The JSIR of a compilation unit is written to a JSIR file, [.cmj] for JS or
-    [.cmw] for WASM, from which the [js_of_ocaml] executable produces JavaScript
-    or the [wasm_of_ocaml] executable produces WebAssembly, respectively. The
-    file is intermediate, and is deleted unless [-S] is given.
+    The JSIR of a compilation unit is written to a JSIR file, [.cm-jsir-js] for
+    JS or [.cm-jsir-wasm] for WASM, from which the [js_of_ocaml] executable
+    produces JavaScript or the [wasm_of_ocaml] executable produces WebAssembly,
+    respectively. The file is intermediate, and is deleted unless [-S] is given.
 
     The correspondence with the native backend's files is (with the
     wasm_of_ocaml extensions in parentheses):
 
-    - [.cmjx] ([.cmwx]): unit metadata, in the same format as [.cmx];
+    - [.cmx-js] ([.cmx-wasm]): unit metadata, in the same format as [.cmx];
 
-    - [.cmjo] ([.cmwo]): the JavaScript (WebAssembly) for a unit, analogous to
-      [.o];
+    - [.cmo-js] ([.cmo-wasm]): the JavaScript (WebAssembly) for a unit,
+      analogous to [.o];
 
-    - [.cmjxa] and [.cmja] ([.cmwxa] and [.cmwa]): libraries, analogous to
-      [.cmxa] and [.a];
+    - [.cmxa-js] and [.cma-js] ([.cmxa-wasm] and [.cma-wasm]): libraries,
+      analogous to [.cmxa] and [.a];
 
     - [.js] files given on the command line (and [.wat], [.wast] and [.wasm]
       files with wasm_of_ocaml): runtime stubs, analogous to C stubs. They are

@@ -19,24 +19,24 @@ module StrSet = Set.Make (String)
 module StrMap = Map.Make (String)
 
 (* Keep in sync with [jsir_targets] in stdlib/dune_rules/gen.ml. The files of
-   a target are named like the native ones, with [ext_prefix] for cm: .cmjx
-   for .cmx, .cmjo for .o, .cmjxa for .cmxa and .cmja for .a. *)
+   a target are named like the native ones, with [-ext_suffix] appended:
+   .cmx-js for .cmx, .cmo-js for .o, .cmxa-js for .cmxa and .cma-js for .a. *)
 type jsir_target =
   { program : string; (* the value of -target *)
     env_var : string; (* where ocamlopt finds [program] *)
-    ext_prefix : string }
+    ext_suffix : string }
 
 let jsir_targets =
   [ { program = "js_of_ocaml";
       env_var = "OXCAML_JS_OF_OCAML";
-      ext_prefix = "cmj"
+      ext_suffix = "js"
     };
     { program = "wasm_of_ocaml";
       env_var = "OXCAML_WASM_OF_OCAML";
-      ext_prefix = "cmw"
+      ext_suffix = "wasm"
     } ]
 
-let ext target suffix = "." ^ target.ext_prefix ^ suffix
+let ext target base = "." ^ base ^ "-" ^ target.ext_suffix
 
 let ocaml_bin = ref ""
 
@@ -146,7 +146,7 @@ let src_dir () = Filename.dirname !cmxa
 
 let lib_prefix () = String.capitalize_ascii !name ^ "__"
 
-(* The files of unit [Lib__Foo] are lib__Foo.cmi, lib__Foo.cmjx, ... *)
+(* The files of unit [Lib__Foo] are lib__Foo.cmi, lib__Foo.cmx-js, ... *)
 let file_of_unit unit_name ext = String.uncapitalize_ascii unit_name ^ ext
 
 let cmi_of_unit ~cmi_dir unit_name =
@@ -216,26 +216,27 @@ let find_unit_sources ~alias units =
     units
 
 type library_dep =
-  { dir : string; (* where its .cmjx are, relative to the rules *)
+  { dir : string; (* where its .cmx-js are, relative to the rules *)
     cmi_dir : string; (* where its .cmi are *)
     cmi_deps : string list; (* dune dependencies on its .cmi *)
-    cmjx_deps : jsir_target -> string list
-        (* dune dependencies on its .cmjx (or .cmwx, ...) *) }
+    jsir_cmx_deps : jsir_target -> string list
+        (* dune dependencies on its .cmx-js (or .cmx-wasm) *) }
 
-(* The compiler may read any .cmjx of a library this one depends on. *)
+(* The compiler may read any .cmx-js of a library this one depends on. *)
 let library_dep ~dir ~cmxa ~cmi_dir =
-  let cmjx_deps =
+  let jsir_cmx_deps =
     if dir = "."
     then
       (* A glob would include the outputs of the library being built, creating
          dependency cycles. *)
       let units = fst (read_cmxa cmxa) in
-      fun target -> List.map (fun u -> file_of_unit u (ext target "x")) units
+      fun target -> List.map (fun u -> file_of_unit u (ext target "cmx")) units
     else
-      fun target -> [Printf.sprintf "(glob_files %s/*%s)" dir (ext target "x")]
+      fun target ->
+        [Printf.sprintf "(glob_files %s/*%s)" dir (ext target "cmx")]
   in
   { dir; cmi_dir = dune_path cmi_dir; cmi_deps = cmi_deps_of_dir cmi_dir;
-    cmjx_deps }
+    jsir_cmx_deps }
 
 let parse_library_dep spec =
   match String.split_on_char '=' spec with
@@ -253,7 +254,7 @@ let read_library_deps () =
 (* Dependencies between units, from ocamldep: module [Foo] referenced from a
    unit is [Lib__Foo] when the library is wrapped (a reference to [Lib__Foo]
    itself also works), [Foo] otherwise. Closed transitively, as the compiler
-   may read the .cmjx of units imported by the ones a unit uses. *)
+   may read the .cmx-js of units imported by the ones a unit uses. *)
 let read_unit_deps ~alias units =
   let unit_names = List.map (fun u -> u.unit_name) units |> StrSet.of_list in
   let resolve modname =
@@ -337,7 +338,7 @@ let common_flags =
 let dedup l =
   List.fold_left (fun acc x -> if List.mem x acc then acc else acc @ [x]) [] l
 
-(* The .cmjx and the .cmi are in the current and native directories,
+(* The .cmx-js and the .cmi are in the current and native directories,
    respectively. *)
 let include_dirs library_deps =
   List.concat_map (fun d -> [d.dir; d.cmi_dir]) library_deps
@@ -371,19 +372,19 @@ let () =
     cmi_deps_of_dir !cmi_dir
     @ List.concat_map (fun d -> d.cmi_deps) library_deps
   in
-  let compile_rule target ~unit_name ~src_path ~cmjx_deps ~flags =
+  let compile_rule target ~unit_name ~src_path ~jsir_cmx_deps ~flags =
     let cmi = cmi_of_unit ~cmi_dir:!cmi_dir unit_name in
-    let cmjx = file_of_unit unit_name (ext target "x") in
+    let jsir_cmx = file_of_unit unit_name (ext target "cmx") in
     rule ~ppf
-      ~targets:[cmjx; file_of_unit unit_name (ext target "o")]
+      ~targets:[jsir_cmx; file_of_unit unit_name (ext target "cmo")]
       ~deps:
         ((Printf.sprintf "(:src %s)" src_path :: cmi :: cmi_deps)
-        @ List.map (fun d -> file_of_unit d (ext target "x")) cmjx_deps
-        @ List.concat_map (fun d -> d.cmjx_deps target) library_deps)
+        @ List.map (fun d -> file_of_unit d (ext target "cmx")) jsir_cmx_deps
+        @ List.concat_map (fun d -> d.jsir_cmx_deps target) library_deps)
       ~action:
         (ocamlopt_action target
            (common_flags @ flags @ include_dirs library_deps
-           @ ["-cmi-file"; cmi; "-o"; cmjx; "-c"; "-impl"; "%{src}"]))
+           @ ["-cmi-file"; cmi; "-o"; jsir_cmx; "-c"; "-impl"; "%{src}"]))
   in
   let write_rules target =
     List.iter
@@ -391,7 +392,7 @@ let () =
         let src_path = dune_path (Filename.concat (src_dir ()) u.source) in
         if Some u.unit_name = alias
         then
-          compile_rule target ~unit_name:u.unit_name ~src_path ~cmjx_deps:[]
+          compile_rule target ~unit_name:u.unit_name ~src_path ~jsir_cmx_deps:[]
             ~flags:["-w"; "-49"]
         else
           let unit_deps = StrSet.elements (unit_deps_of u.unit_name) in
@@ -401,22 +402,22 @@ let () =
             | Some alias -> [alias], ["-open"; alias]
           in
           compile_rule target ~unit_name:u.unit_name ~src_path
-            ~cmjx_deps:(alias_deps @ unit_deps)
+            ~jsir_cmx_deps:(alias_deps @ unit_deps)
             ~flags:(extra_flags @ alias_flags))
       units;
     rule ~ppf
-      ~targets:[!name ^ ext target "xa"; !name ^ ext target "a"]
+      ~targets:[!name ^ ext target "cmxa"; !name ^ ext target "cma"]
       ~deps:
-        (List.map (fun u -> file_of_unit u.unit_name (ext target "o")) units)
+        (List.map (fun u -> file_of_unit u.unit_name (ext target "cmo")) units)
       ~action:
         (ocamlopt_action target
            (["-g"; "-nostdlib"]
            @ (if force_link then ["-linkall"] else [])
-           @ ["-a"; "-o"; !name ^ ext target "xa"]
+           @ ["-a"; "-o"; !name ^ ext target "cmxa"]
            @ List.map
                (fun u ->
                  Printf.sprintf "%%{dep:%s}"
-                   (file_of_unit u.unit_name (ext target "x")))
+                   (file_of_unit u.unit_name (ext target "cmx")))
                units))
   in
   List.iter write_rules jsir_targets

@@ -24,10 +24,12 @@
 *.la
 *.cm[ioxats]
 *.cmx[as]
-*.cmj
-*.cmj[ox]
-*.cmjxa
-*.cmja
+*.cm[oxa]-js
+*.cm[oxa]-wasm
+*.cmxa-js
+*.cmxa-wasm
+*.cm-jsir-js
+*.cm-jsir-wasm
 *.cmti
 *.cmsi
 *.annot

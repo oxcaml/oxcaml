@@ -608,7 +608,7 @@ let run
        let ch = open_in_bin input_file in
        let res =
          if
-           List.exists [ ".cmw"; ".cmj" ] ~f:(fun ext ->
+           List.exists [ ".cm-jsir-wasm"; ".cm-jsir-js" ] ~f:(fun ext ->
                Filename.check_suffix input_file ext)
          then `Jsir (read_jsir_unit ~file:input_file ch)
          else
