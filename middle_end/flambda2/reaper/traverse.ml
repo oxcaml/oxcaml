@@ -155,23 +155,34 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
           names_and_function_slots))
     names_and_function_slots
 
+let traverse_block_allocation denv acc ~base block_shape fields =
+  List.iteri
+    (fun i from ->
+      let kind = K.Block_shape.element_kind block_shape i in
+      Acc.add_constructor_dep acc ~base (Field.block i kind) ~from)
+    fields;
+  let all_constants = Code_id_or_name.name (Env.all_constants denv) in
+  Acc.add_constructor_dep acc ~base Field.is_int ~from:all_constants;
+  Acc.add_constructor_dep acc ~base Field.get_tag ~from:all_constants
+
+let traverse_array_allocation acc ~base free_names =
+  (* The fields of arrays are not tracked. However, they must be kept if the
+     array is used. *)
+  Acc.add_any_source acc base;
+  Name_occurrences.fold_names free_names ~init:() ~f:(fun () name ->
+      Acc.add_use_dep acc ~to_:base ~from:(Code_id_or_name.name name))
+
 let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     ~(default_bp : (Code_id_or_name.t -> unit) -> unit) =
   match prim with
   | Variadic (Make_block (block_kind, _mutability, _), fields) ->
     let _tag, block_shape = Flambda_primitive.Block_kind.to_shape block_kind in
-    List.iteri
-      (fun i field ->
-        let kind = K.Block_shape.element_kind block_shape i in
-        let from = Acc.simple_to_node acc ~denv field in
-        default_bp (fun base ->
-            Acc.add_constructor_dep acc ~base (Field.block i kind) ~from))
-      fields;
+    let fields = List.map (Acc.simple_to_node acc ~denv) fields in
     default_bp (fun base ->
-        Acc.add_constructor_dep acc ~base Field.is_int
-          ~from:(Code_id_or_name.name (Env.all_constants denv));
-        Acc.add_constructor_dep acc ~base Field.get_tag
-          ~from:(Code_id_or_name.name (Env.all_constants denv)))
+        traverse_block_allocation denv acc ~base block_shape fields)
+  | Variadic (Make_array _, _) ->
+    let free_names = Flambda_primitive.free_names prim in
+    default_bp (fun base -> traverse_array_allocation acc ~base free_names)
   | Unary (Project_function_slot { move_from = _; move_to }, block) ->
     let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
@@ -243,7 +254,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         _ )
   | Quaternary
       ((Atomic_compare_and_set _ | Atomic_compare_exchange _), _, _, _, _)
-  | Variadic ((Begin_region _ | Begin_try_region _ | Make_array _), _) ->
+  | Variadic ((Begin_region _ | Begin_try_region _), _) ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
       | Arbitrary_effects, _, _, _ ->
@@ -291,35 +302,54 @@ let traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures =
 let traverse_block_like_static_const denv acc symbol
     (static_const : Static_const.t) =
   let name = Name.symbol symbol |> Code_id_or_name.name in
+  let all_constants = Code_id_or_name.name (Env.all_constants denv) in
+  let or_variable_to_node (or_variable : _ Or_variable.t) =
+    match or_variable with
+    | Const _ -> all_constants
+    | Var (var, _) -> Code_id_or_name.var var
+  in
+  let add_boxed_number_dep bn contents =
+    Acc.add_constructor_dep acc ~base:name (Field.boxed_number bn)
+      ~from:(or_variable_to_node contents)
+  in
+  let simples_to_nodes fields =
+    List.map
+      (fun field ->
+        Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field))
+      fields
+  in
   match static_const with
-  | Block (_, _, _, fields) | Immutable_value_array fields ->
-    List.iteri
-      (fun i (field : Simple.With_debuginfo.t) ->
-        let kind = Static_const.block_field_kind static_const i in
-        let from =
-          Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
-        in
-        Acc.add_constructor_dep acc ~base:name (Field.block i kind) ~from)
-      fields;
-    Acc.add_constructor_dep acc ~base:name Field.is_int
-      ~from:(Code_id_or_name.name (Env.all_constants denv));
-    Acc.add_constructor_dep acc ~base:name Field.get_tag
-      ~from:(Code_id_or_name.name (Env.all_constants denv))
+  | Block (_, _, shape, fields) ->
+    traverse_block_allocation denv acc ~base:name (Scannable shape)
+      (simples_to_nodes fields)
+  | Immutable_value_array fields ->
+    traverse_block_allocation denv acc ~base:name (Scannable Value_only)
+      (simples_to_nodes fields)
+  | Immutable_float_block fields ->
+    traverse_block_allocation denv acc ~base:name Float_record
+      (List.map or_variable_to_node fields)
+  | Boxed_float32 f -> add_boxed_number_dep Naked_float32 f
+  | Boxed_float f -> add_boxed_number_dep Naked_float f
+  | Boxed_int32 n -> add_boxed_number_dep Naked_int32 n
+  | Boxed_int64 n -> add_boxed_number_dep Naked_int64 n
+  | Boxed_nativeint n -> add_boxed_number_dep Naked_nativeint n
+  | Boxed_vec128 v -> add_boxed_number_dep Naked_vec128 v
+  | Boxed_vec256 v -> add_boxed_number_dep Naked_vec256 v
+  | Boxed_vec512 v -> add_boxed_number_dep Naked_vec512 v
+  | Boxed_mask m -> add_boxed_number_dep Naked_mask m
   | Set_of_closures _ ->
     Misc.fatal_errorf
       "Unexpected [Set_of_closures] in block_like static const traversal for \
        symbol %a"
       Symbol.print symbol
-  | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
-  | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-  | Boxed_mask _ | Immutable_float_block _ | Immutable_float_array _
-  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
-  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
-  | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
-  | Empty_array _ | Immutable_string _ ->
-    Acc.add_alias acc ~to_:name
-      ~from:(Code_id_or_name.name (Env.all_constants denv))
+  | Immutable_float_array _ | Immutable_float32_array _ | Immutable_int_array _
+  | Immutable_int8_array _ | Immutable_int16_array _ | Immutable_int32_array _
+  | Immutable_int64_array _ | Immutable_nativeint_array _
+  | Immutable_vec128_array _ | Immutable_vec256_array _
+  | Immutable_vec512_array _ | Immutable_mask_array _ | Empty_array _
+  | Immutable_string _ ->
+    traverse_array_allocation acc ~base:name
+      (Static_const.free_names static_const)
 
 let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
