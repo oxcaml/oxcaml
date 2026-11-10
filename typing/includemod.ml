@@ -1825,7 +1825,8 @@ and mark_signature_item_used = function
     (* Hidden items shouldn't be marked as used. *)
     ()
   | Sig_class _ | Sig_class_type _ ->
-    (* Classes are already marked as used elsewhere. *)
+    (* Classes are already marked as used via the [Sig_type] associated with the
+       class. *)
     ()
 
 and mark_modtype_used = function
