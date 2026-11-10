@@ -26,29 +26,25 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** FDO counters (see [Fdo_counter]) whose instruction Simplify removes while
-    the code they count stays: the entry counters of the callee of an inlined
-    call (see [Fdo_term_counters.of_inlined_call]); the counter of a self tail
-    call turned into a jump; the counters of the arms of a switch that collapses
-    into a single jump. Such a counter is preserved by attaching it to the edges
-    into the straight-line code it was in, which execute exactly as often.
+(** An [Fdo_region_counters.t] keeps track of FDO counters whose instruction
+    Simplify removes while the code they count stays. This includes:
 
-    A region is a stretch of straight-line control flow: a function body or a
-    continuation handler, up to its terminator. A region's successors are the
-    handlers it continues into: the one it jumps to unconditionally, or the
-    return point of the application it ends with. The counters preserved in a
-    region go onto the edges into it: the arms of the switches targeting its
-    continuation, the entry edge of its function; and, transitively, the edges
-    into the regions it is a successor of, since everything entering those
-    regions enters it too.
+    * The entry counters of the callee of an inlined call
 
-    Regions are named by continuations and code ids, which are unique within the
-    simplification of a compilation unit. The counters are recorded during the
-    downward traversal and when rebuilding. They are read when rebuilding a
-    switch arm (whose target may then change), and once more for every arm and
-    for the function entry when the whole body has been rebuilt (the counters
-    preserved in a loop header can be recorded after a back edge into it was
-    rebuilt). *)
+    * The counter of a self tail call turned into a jump
+
+    * The counters of the arms of a switch that collapses into a single jump.
+
+    A [Region.t] is a stretch of straight-line control flow: a function body or
+    a continuation handler, up to its terminator. The counters described above
+    are preserved by attaching them to the edges into its [Region.t], which
+    execute exactly as often.
+
+    The counters are recorded during the downward traversal and when rebuilding.
+    They are read when rebuilding a switch arm (whose target may then change),
+    and once more for every arm and for the function entry when the whole body
+    has been rebuilt (the counters preserved in a loop header can be recorded
+    after a back edge into it was rebuilt). *)
 
 module Region : sig
   type t =
