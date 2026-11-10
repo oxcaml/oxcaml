@@ -34,9 +34,6 @@ val print : Are_rebuilding_terms.t -> Format.formatter -> t -> unit
 (** This function may only be used when rebuilding terms. *)
 val to_expr : t -> Are_rebuilding_terms.t -> Expr.t
 
-(** The identity when not rebuilding terms. *)
-val map_expr : t -> Are_rebuilding_terms.t -> f:(Expr.t -> Expr.t) -> t
-
 val to_apply_cont : t -> Apply_cont.t option
 
 val is_cold : t -> bool
