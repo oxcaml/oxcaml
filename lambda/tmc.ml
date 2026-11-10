@@ -614,13 +614,29 @@ let declare_binding ctx (var, def) =
   let cand = { arity; dps_id; direct_kind; } in
   { specialized = Ident.Map.add var cand ctx.specialized }
 
+let non_tail_region_close = function
+  | Rc_close_at_apply -> Rc_normal
+  | (Rc_normal | Rc_nontail) as region_close -> region_close
+
 let rec choice ctx t =
   let rec choice ctx ~tail t =
     match t with
-    | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lsend _
+    | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _
       | Lassign _ | Lfor _ | Lwhile _) ->
         let t = traverse ctx t in
         Choice.lambda t
+    | Lsend (kind, met, obj, args, region_close, mode, loc, layout, yk) ->
+        let met = traverse ctx met in
+        let obj = traverse ctx obj in
+        let args = traverse_list ctx args in
+        let send region_close =
+          Lsend (kind, met, obj, args, region_close, mode, loc, layout, yk)
+        in
+        (* In the dps version, the result is written to the destination
+           after the call returns, so the call is not in tail position. *)
+        { (Choice.lambda (send (non_tail_region_close region_close))) with
+          direct = (fun () -> send region_close);
+        }
 
     (* [choice_prim] handles most primitives, but the important case
        of construction [Lprim(Pmakeblock(...), ...)] is handled by
@@ -788,12 +804,10 @@ let rec choice ctx t =
         { apply with ap_tailcall } in
       (* The call will not be in tail position, so the close-on-apply flag must
          not be set. *)
-      let ap_region_close =
-        match apply.ap_region_close with
-        | Rc_close_at_apply -> Rc_normal
-        | (Rc_normal | Rc_nontail) as reg_close -> reg_close
+      let apply =
+        { apply with
+          ap_region_close = non_tail_region_close apply.ap_region_close }
       in
-      let apply = { apply with ap_region_close } in
       { (Choice.lambda (Lapply apply)) with
         direct = (fun () -> Lapply apply_no_bailout);
       }
@@ -914,6 +928,23 @@ let rec choice ctx t =
           | _ -> invalid_arg "choice_prim" in
         let+ l1 = choice ctx ~tail l1 in
         Lprim (Popaque layout, [l1], loc)
+
+    (* The second argument of [&&] and [||] is in tail position. We
+       desugar them into conditionals so that, in the dps version, the
+       destination is also written when the second argument is not
+       evaluated. *)
+    | Psequand ->
+        let l1, l2 = match primargs with
+          | [l1; l2] -> l1, l2
+          | _ -> invalid_arg "choice_prim" in
+        choice ctx ~tail
+          (Lifthenelse (l1, l2, tagged_immediate 0, layout_int))
+    | Psequor ->
+        let l1, l2 = match primargs with
+          | [l1; l2] -> l1, l2
+          | _ -> invalid_arg "choice_prim" in
+        choice ctx ~tail
+          (Lifthenelse (l1, tagged_immediate 1, l2, layout_int))
 
     (* in common cases we just return *)
     | Pphys_equal _
@@ -1040,7 +1071,6 @@ let rec choice ctx t =
     | Pget_header _
     | Pctconst _
     | Pint_as_pointer _
-    | Psequand | Psequor
     | Ppoll
     | Ppeek _ | Ppoke _
     | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
