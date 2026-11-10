@@ -15,7 +15,9 @@
 
 name: Ad hoc command
 
-on:
+# No concurrency group on purpose: every dispatch is an independent run, and
+# concurrent dispatches must not cancel or queue behind each other.
+on: # zizmor: ignore[concurrency-limits]
   workflow_dispatch:
     inputs:
       command:
@@ -39,11 +41,11 @@ jobs:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout_minutes }}
     permissions:
-      actions: read
-      checks: read
+      actions: read # download artifacts and logs of other runs (gh run download)
+      checks: read # read check-run results for the ref under test (gh pr checks)
       contents: read
-      issues: read
-      pull-requests: read
+      issues: read # read issues the command may want to look at (gh issue view)
+      pull-requests: read # read PR metadata, labels and reviews (gh pr view)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
