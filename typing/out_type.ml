@@ -1334,6 +1334,8 @@ end = struct
     Desc.equal With_locality.obj_monadic mon0 mon1
     && Desc.equal With_locality.obj_comonadic com0 com1
 
+  let mem_pair pair pairs = List.exists (eq_pair pair) pairs
+
   (* The following preprocessing step registers all the
     modes pointed to by a type. Recall that a [With_locality.lr]
     has two parts: { monadic; comonadic }. We need to
@@ -1364,7 +1366,7 @@ end = struct
         let ({ monadic; comonadic } as pair) = pair_of_mode mode in
         add_visible With_locality.obj_monadic monadic;
         add_visible With_locality.obj_comonadic comonadic;
-        if not (List.exists (eq_pair pair) !visible_pairs) then
+        if not (mem_pair pair !visible_pairs) then
           visible_pairs := pair :: !visible_pairs
       end
 
@@ -2044,16 +2046,23 @@ end = struct
       if is_generic_curry_mode m then List.memq m !suppressed_curries
       else equate_with_const_curry m acc_mode
 
-  let instantiate_modes ~level ty =
+  type instance_mapping =
+    { mode : With_locality.lr;
+      instance : With_locality.lr }
+
+  let has_pair pair { mode; _ } = eq_pair pair (pair_of_mode mode)
+
+  let instantiate_modes ~level ty : instance_mapping list =
     Mode.with_copy_scope (fun copy_scope ->
       let instances = ref [] in
       let visited = ref TypeSet.empty in
       let instantiate_mode mode =
-        if not (List.mem_assq mode !instances) then begin
+        if not (List.exists (has_pair (pair_of_mode mode)) !instances)
+        then begin
           let instance =
             With_locality.instantiate ~copy_scope ~current_level:level mode
           in
-          instances := (mode, instance) :: !instances
+          instances := { mode; instance } :: !instances
         end
       in
       let rec visit ty =
@@ -2067,20 +2076,26 @@ end = struct
 
   let find_mode_instance m instances =
     let pair = pair_of_mode m in
-    snd
-      (List.find
-         (fun (original, _) -> eq_pair pair (pair_of_mode original))
-         instances)
+    let { instance; _ } = List.find (has_pair pair) instances in
+    instance
 
   let equate_instances m ~instances_generic ~instances_rigid =
-    ignore
-      (With_locality.equate
-         (find_mode_instance m instances_generic)
-         (find_mode_instance m instances_rigid))
+    let res =
+      With_locality.equate
+        (find_mode_instance m instances_generic)
+        (find_mode_instance m instances_rigid)
+    in
+    assert (Result.is_ok res)
+
+  (** We only consider a curry mode implicit if it has no upper bounds.
+      This check catches modes with a variable upper bound, such as
+      bounds to other curry modes. *)
+  let has_upper_edges m =
+    not (List.is_empty (find_edges (pair_of_mode m)).upper)
 
   (** Equates every mode of the generic instance that is not a curry mode
-      with its rigid counterpart, so that both instances match everywhere
-      except at the curry modes. *)
+      candidate with its rigid counterpart, so that both instances match
+      everywhere except at the curry modes. *)
   let equate_non_curry_modes ~instances_generic ~instances_rigid ty =
     let visited = ref [] in
     let rec visit ty =
@@ -2091,7 +2106,8 @@ end = struct
         | Tarrow ((_, marg, mret), _, ty2, _) ->
           equate_instances marg ~instances_generic ~instances_rigid;
           begin match get_desc ty2 with
-          | Tarrow _ when is_generic_curry_mode mret -> ()
+          | Tarrow _
+            when is_generic_curry_mode mret && not (has_upper_edges mret) -> ()
           | _ -> equate_instances mret ~instances_generic ~instances_rigid
           end
         | _ -> ()
@@ -2101,18 +2117,14 @@ end = struct
     in
     visit ty
 
+  (** Registers a curry mode, and returns [true] if the curry mode can be
+      hidden. *)
   let register_curry_mode ~m_generic m ~acc_mode_rigid =
-    (* We only consider a curry mode implicit if it has no upper bounds.
-       This check catches curry modes with a variable upper bound, such as
-       bounds to other curry modes. *)
-    let has_upper_edges =
-      not (List.is_empty (find_edges (pair_of_mode m)).upper)
-    in
     let curry_rigid =
       Curry_mode.mode ~level:With_locality.rigid_level acc_mode_rigid
     in
     let implied =
-      (not has_upper_edges)
+      (not (has_upper_edges m))
       && (not (List.memq m !rejected_curries))
       && Result.is_ok (With_locality.equate m_generic curry_rigid)
     in
@@ -2127,7 +2139,7 @@ end = struct
     implied
 
   let rec register_suppressed_curries ~instances_generic ~instances_rigid
-      ~visited (acc_mode, acc_mode_rigid) ty =
+      ~visited (~acc_mode, ~acc_mode_rigid) ty =
     let px = proxy ty in
     if not (List.memq px visited) then begin
       let visited = px :: visited in
@@ -2135,9 +2147,10 @@ end = struct
         register_suppressed_curries ~instances_generic ~instances_rigid ~visited
       in
       let acc_of_occurrence ~arg m =
-        curry_mode_of_occurrence ~arg m,
-        curry_mode_of_occurrence ~arg m
-          ~instance:(find_mode_instance m instances_rigid)
+        ( ~acc_mode:(curry_mode_of_occurrence ~arg m),
+          ~acc_mode_rigid:
+            (curry_mode_of_occurrence ~arg m
+               ~instance:(find_mode_instance m instances_rigid)) )
       in
       match get_desc ty with
       | Tarrow ((l, marg, mret), ty1, ty2, _) ->
@@ -2159,29 +2172,24 @@ end = struct
         let hidden =
           match get_desc ty2 with
           | Tarrow _ when is_generic_curry_mode mret ->
-            let hidden =
-              register_curry_mode mret
-                ~m_generic:(find_mode_instance mret instances_generic)
-                ~acc_mode_rigid
-            in
-            (* If the curry mode is printed, we equate the generic and
-               rigid instances. *)
-            if not hidden then
-              equate_instances mret ~instances_generic ~instances_rigid;
-            hidden
+            register_curry_mode mret
+              ~m_generic:(find_mode_instance mret instances_generic)
+              ~acc_mode_rigid
           | Tarrow _ -> equate_with_const_curry mret acc_mode
           | _ -> false
         in
         let acc_modes =
-          if hidden then acc_mode, acc_mode_rigid
+          if hidden then (~acc_mode, ~acc_mode_rigid)
           else acc_of_occurrence ~arg:false mret
         in
         register acc_modes ty2
-      | Tpoly (ty, _) | Trepr (ty, _) ->
-        register (acc_mode, acc_mode_rigid) ty
+      | Tpoly (ty, _) | Trepr (ty, _) | Tmod (ty, _) | Tquote ty | Tsplice ty ->
+        register (~acc_mode, ~acc_mode_rigid) ty
       | _ ->
         let acc = Curry_mode.Const With_locality.Const.legacy in
-        printer_iter_type_expr (register (acc, acc)) (Fun.const ()) ty
+        printer_iter_type_expr
+          (register (~acc_mode:acc, ~acc_mode_rigid:acc))
+          (Fun.const ()) ty
     end
 
   (** Decides which curry modes of [ty] are hidden. This must happen before
@@ -2209,7 +2217,7 @@ end = struct
        mode is hidden when the type with the curry mode replaced by the one
        implied by the accumulator is as general. *)
     register_suppressed_curries ~instances_generic ~instances_rigid
-      ~visited:[] (acc, acc) ty
+      ~visited:[] (~acc_mode:acc, ~acc_mode_rigid:acc) ty
 
   let print_raw_constraints { lo; hi } ppf pair =
     let { lower = edges_lower; upper = edges_upper } = find_edges pair in
@@ -2280,7 +2288,7 @@ end = struct
 
   let name_of_modes (modes : With_locality.lr) =
     let pair = pair_of_mode modes in
-    if not (List.exists (eq_pair pair) !visible_pairs) then
+    if not (mem_pair pair !visible_pairs) then
       fatal_error "Out_type.name_of_modes: modes not registered by reserve";
     if List.exists (fun (H v) -> mem_head !suppressed_curry_heads v)
          (heads_of_mode modes)
