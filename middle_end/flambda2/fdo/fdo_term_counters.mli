@@ -32,12 +32,6 @@
 val map_counters_of_code :
   f:(Fdo_counter.t -> Fdo_counter.t) -> Code.t -> Code.t
 
-(** [switch] with the counters of each arm replaced by a call to [f]. *)
-val map_switch_counters :
-  f:(Apply_cont_expr.t -> Fdo_annotation.t -> Fdo_annotation.t) ->
-  Switch_expr.t ->
-  Switch_expr.t
-
 (** The entry counters of [code] inlined at the call corresponding to
     [callsite_counter]. *)
 val of_inlined_call :

@@ -1666,14 +1666,33 @@ module Let_cont_expr = struct
   let apply_renaming = apply_renaming_let_cont_expr
 end
 
-(* Rebuilds the terms in place: they keep their bound names, so that the names
-   known from [expr] still apply, and the numbers of occurrences they record. *)
-let rec map_applies_and_switches expr ~apply ~switch : expr =
+let map_fdo_counters_of_switch switch ~arm =
+  let arms =
+    Target_ocaml_int.Map.map
+      (fun switch_arm ->
+        Switch_arm.map_annotations
+          (fun annotations ->
+            Branch_annotations.with_fdo_annotation annotations
+              (arm
+                 (Switch_arm.action switch_arm)
+                 (Branch_annotations.fdo_annotation annotations)))
+          switch_arm)
+      (Switch_expr.arms switch)
+  in
+  Switch_expr.create
+    ~condition_dbg:(Switch_expr.condition_dbg switch)
+    ~scrutinee:(Switch_expr.scrutinee switch)
+    ~arms
+
+(* Only the counters change, so the terms can keep their bound names (see
+   [Name_abstraction.Make.map_term]) and the numbers of occurrences they
+   record. *)
+let rec map_fdo_counters expr ~callsite ~arm : expr =
   match descr expr with
   | Let { let_abst; defining_expr } ->
     let let_abst =
       Let_expr.A.map_term let_abst ~f:(fun _ (t0 : let_expr_t0) ->
-          { t0 with body = map_applies_and_switches t0.body ~apply ~switch })
+          { t0 with body = map_fdo_counters t0.body ~callsite ~arm })
     in
     Let { let_abst; defining_expr }
   | Let_cont
@@ -1684,9 +1703,8 @@ let rec map_applies_and_switches expr ~apply ~switch : expr =
       { continuation_and_body =
           Non_recursive_let_cont_handler.Continuation_and_body.map_term
             handler.continuation_and_body ~f:(fun _ body ->
-              map_applies_and_switches body ~apply ~switch);
-        handler =
-          map_applies_and_switches_of_handler handler.handler ~apply ~switch
+              map_fdo_counters body ~callsite ~arm);
+        handler = map_fdo_counters_of_handler handler.handler ~callsite ~arm
       }
     in
     Let_cont
@@ -1700,22 +1718,25 @@ let rec map_applies_and_switches expr ~apply ~switch : expr =
           { handlers =
               R.A0.map_term handlers ~f:(fun _ handlers ->
                   Continuation.Lmap.map
-                    (map_applies_and_switches_of_handler ~apply ~switch)
+                    (map_fdo_counters_of_handler ~callsite ~arm)
                     handlers);
-            body = map_applies_and_switches body ~apply ~switch
+            body = map_fdo_counters body ~callsite ~arm
           })
     in
     Let_cont (Recursive handlers)
-  | Apply apply_expr -> Apply (apply apply_expr)
-  | Switch switch_expr -> Switch (switch switch_expr)
+  | Apply apply ->
+    Apply
+      (Apply_expr.with_callsite_counter apply
+         (callsite (Apply_expr.callsite_counter apply)))
+  | Switch switch -> Switch (map_fdo_counters_of_switch switch ~arm)
   | Apply_cont _ | Invalid _ -> expr
 
-and map_applies_and_switches_of_handler (handler : continuation_handler) ~apply
-    ~switch =
+and map_fdo_counters_of_handler (handler : continuation_handler) ~callsite ~arm
+    =
   let cont_handler_abst =
     Continuation_handler.A.map_term handler.cont_handler_abst
       ~f:(fun _ (t0 : continuation_handler_t0) ->
-        { t0 with handler = map_applies_and_switches t0.handler ~apply ~switch })
+        { t0 with handler = map_fdo_counters t0.handler ~callsite ~arm })
   in
   { handler with cont_handler_abst }
 
