@@ -28,21 +28,6 @@
 
 open! Flambda.Import
 
-let map_arm_counters ~f arm =
-  Switch_arm.map_annotations
-    (fun annotations ->
-      Branch_annotations.with_fdo_annotation annotations
-        (f (Switch_arm.action arm)
-           (Branch_annotations.fdo_annotation annotations)))
-    arm
-
-let map_switch_counters ~f switch =
-  Switch_expr.create
-    ~condition_dbg:(Switch_expr.condition_dbg switch)
-    ~scrutinee:(Switch_expr.scrutinee switch)
-    ~arms:
-      (Target_ocaml_int.Map.map (map_arm_counters ~f) (Switch_expr.arms switch))
-
 let map_counters_of_code ~f code =
   let entry_annotation = Code.fdo_entry_annotation code in
   let code_metadata =
@@ -52,11 +37,6 @@ let map_counters_of_code ~f code =
             (Fdo_annotation.With_body_hash.annotation entry_annotation)))
       (Code.code_metadata code)
   in
-  let apply apply =
-    Apply_expr.with_callsite_counter apply
-      (Option.map f (Apply_expr.callsite_counter apply))
-  in
-  let switch = map_switch_counters ~f:(fun _ -> Fdo_annotation.map f) in
   let params_and_body =
     Function_params_and_body.pattern_match (Code.params_and_body code)
       ~f:(fun
@@ -72,7 +52,9 @@ let map_counters_of_code ~f code =
         ->
         Function_params_and_body.create ~return_continuation ~exn_continuation
           params
-          ~body:(Flambda.map_applies_and_switches body ~apply ~switch)
+          ~body:
+            (Flambda.map_fdo_counters body ~callsite:(Option.map f)
+               ~arm:(fun _ -> Fdo_annotation.map f))
           ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth)
   in
   Code.create_with_metadata ~params_and_body
