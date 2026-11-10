@@ -114,11 +114,11 @@ module Foo : sig external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity" end
 |}];;
 
 (* A primitive can have a fully polymorphic curry mode. The following [add] will
-   have a curry mode with the mode @ [> close('m) | nonportable stateful dynamic].
-   Its locality will follow from the locality the primitive is instantiated at at
+   have a curry mode with the mode @ [> close('m) | nonportable stateful].
+   Its locality will follow from the locality the primitive is instantiated at
    the call-site. *)
 
-external add : int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]
+external add : int32 @ 'n -> int32 @ 'm -> int32 @ [> 'm | 'n]
   = "%int32_add"
 [%%expect{|
 external add : int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
@@ -266,17 +266,6 @@ external add_indep : int32 @ [< 'm] -> int32 @ [< 'n] -> int32 @ [> 'm]
 external add_indep : int32 @ [< 'm] -> int32 @ 'n -> int32 @ [> 'm]
   = "%int32_add"
 |}];;
-
-(* Although [add_indep] shows no relation between the second argument and
-   the return, [add_indep x y] is local when [y] is local.
-
-   This is because of our handling of the signature's locality axis: the locality of
-   a mode polymorphic argument/return in a primitive gets overwritten at the call-site,
-   where we conservatively approximate that the locality of a return is the join of all
-   preceding arguments. *)
-
-(* CR ageorges: perhaps this is not needed if we are able to distinguish curry-modes
-   from the final return *)
 
 (fun x (y @ local) -> add_indep x y);;
 [%%expect{|
@@ -455,6 +444,25 @@ Line 2, characters 2-57:
 Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
+external opt_tuple :
+  ('a [@local_opt]) -> ('a @ [< 'm] -> unit) * int -> unit = "caml_opt_tuple"
+[%%expect{|
+Line 2, characters 2-58:
+2 |   ('a [@local_opt]) -> ('a @ [< 'm] -> unit) * int -> unit = "caml_opt_tuple"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
+|}];;
+
+external opt_unboxed_tuple :
+  ('a [@local_opt]) -> #(('a @ [< 'm] -> unit) * int) -> unit
+  = "caml_opt_unboxed_tuple"
+[%%expect{|
+Line 2, characters 2-61:
+2 |   ('a [@local_opt]) -> #(('a @ [< 'm] -> unit) * int) -> unit
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
+|}];;
+
 external opt_returned_closure :
   (int32 [@local_opt]) -> (int32 @ [< 'm] -> int32 @ [> 'm])
   = "caml_opt_closure"
@@ -524,6 +532,8 @@ Hint: This is a partial application
       Adding 2 more arguments will make the value non-local
 |}];;
 
+(* Note that the implicit curry mode in the interface value has a [local] lower bound,
+   which is the conservative choice for arguments that range over [global] -- [local] *)
 module Set32_val : sig
   val set32 : bytes @ [< 'm] -> int @ [< 'm] -> int32 @ [< 'm] -> unit
 end = struct
@@ -611,8 +621,6 @@ external set32_local_bytes : bytes @ local -> int @ 'n -> int32 @ 'm -> unit
     (int32 @ [< global] -> unit) @ [> local nonportable unforkable yielding stateful dynamic]
 = <fun>
 |}];;
-
-(* The partial application of [eq] closes over a type that does not mode cross *)
 
 external eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool = "%equal"
 [%%expect{|
@@ -708,13 +716,28 @@ Error: Signature mismatch:
        The return mode was expected to be "global" but is "local"
 |}];;
 
-(* [p] becomes local because we apply it to the local [y], and the conservative estimate
-   of the locality of the curry mode takes every argument of the primite into account. *)
+(* Recall: [@local_opt] constrains every argument by the same locality *)
+external eq' : ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%equal"
 
-(* CR ageorges: This mimics the behavior of [@local_opt] but is it necessary? *)
+let eq_later_arg_local_localopt (y @ local) =
+  let p = eq' "a" in
+  let _ = p y in
+  let _ @ global = p in
+  p
+[%%expect{|
+external eq' : ('a [@local_opt]) -> ('a [@local_opt]) -> bool = "%equal"
+Line 6, characters 19-20:
+6 |   let _ @ global = p in
+                       ^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(* In contrast, mode polymorphism allows for [p] to be global even when we apply a local
+   argument to it *)
 let eq_later_arg_local (y @ local) =
   let p = eq "a" in
   let _ = p y in
+  let _ @ global = p in
   p
 [%%expect{|
 val eq_later_arg_local :
@@ -723,10 +746,22 @@ val eq_later_arg_local :
   <fun>
 |}];;
 
-(* If all uses are global [p] can be heap allocated *)
+(* If [p] is only applied to global arguments, both situations are similar *)
+let eq_later_arg_global_localopt (y : string) =
+  let p = eq' "a" in
+  let _ = p y in
+  let _ @ global = p in
+  p
+[%%expect{|
+val eq_later_arg_global_localopt :
+  string @ [< global] ->
+  (string -> bool) @ [> aliased nonportable stateful dynamic] = <fun>
+|}];;
+
 let eq_later_arg_global (y : string) =
   let p = eq "a" in
   let _ = p y in
+  let _ @ global = p in
   p
 [%%expect{|
 val eq_later_arg_global :
