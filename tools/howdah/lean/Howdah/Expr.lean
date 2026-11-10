@@ -24,6 +24,8 @@ structure Immediate : Type where
 inductive Primitive : Type where
   | makeBlock (tag : Nat)
   | field (index : Nat)
+  | physEqual
+  | intMod
   deriving Repr
 
 mutual
@@ -49,7 +51,7 @@ mutual
     /- TODO: Lstaticraise -/
     /- TODO: Lstaticcatch -/
     /- TODO: Ltrywith -/
-    /- TODO: Lifthenelse -/
+    | ifThenElse (condition bodyIfTrue bodyIfFalse : Expression)
     /- TODO: Lsequence -/
     /- TODO: Lwhile -/
     /- TODO: Lfor -/

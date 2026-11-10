@@ -36,7 +36,7 @@ private partial def Syntax.StructuredConstant.quote
       (← `(.indirection (.immutable $block)))
       (some (mkApp (mkConst ``Value) identType))
 
-private def Syntax.Lambda.quote
+private partial def Syntax.Lambda.quote
     (identType : Lean.Expr)
     (env : Syntax.Ident → Option Lean.Expr) :
     Syntax.Lambda → TermElabM Lean.Expr
@@ -53,8 +53,43 @@ private def Syntax.Lambda.quote
       let bodyExpr ← body.quote identType env'
       mkLambdaFVars #[x] bodyExpr
     return mkApp3 (mkConst ``_root_.Expression.letBinding) identType boundExpr bodyExpr
-  | .apply _ _ | .function _ | .prim _ _ | .ifThenElse _ _ _ =>
-    throwError s!"not yet supported"
+  | .apply func args => do
+    let func ← func.quote identType env
+    let args ← args.mapM (Syntax.Lambda.quote identType env)
+    let args ← mkListLit (mkApp (mkConst ``_root_.Expression) identType) args
+    return mkApp3 (mkConst ``_root_.Expression.apply) identType func args
+  | .function f => do
+    let params := f.headParam :: f.tailParams
+    let body ← withLocalDeclsDND
+        (params.toArray.map fun id => (Name.mkSimple id.name, identType)) fun xs => do
+      let env' := (params.zip xs.toList).foldl
+        (fun env (id, x) => fun other => if other = id then some x else env other) env
+      mkLambdaFVars xs (← f.body.quote identType env')
+    let body ← withLocalDeclD `args
+        (mkApp2 (mkConst ``Vector [.zero]) identType (toExpr params.length)) fun args => do
+      let xs ← (List.finRange params.length).mapM fun i =>
+        mkAppM ``Vector.get #[args, toExpr i]
+      mkLambdaFVars #[args] (mkAppN body xs.toArray)
+    let body ← exprToSyntax body
+    let additionalParams ← exprToSyntax (toExpr f.tailParams.length)
+    elabTermEnsuringType
+      (← `(.function { additionalParams := $additionalParams, body := $body }))
+      (some (mkApp (mkConst ``_root_.Expression) identType))
+  | .prim p args => do
+    let p := match p with
+      | .makeBlock tag => mkApp (mkConst ``_root_.Primitive.makeBlock) (toExpr tag)
+      | .field index => mkApp (mkConst ``_root_.Primitive.field) (toExpr index)
+      | .physEqual => mkConst ``_root_.Primitive.physEqual
+      | .intMod => mkConst ``_root_.Primitive.intMod
+    let args ← args.mapM (Syntax.Lambda.quote identType env)
+    let args ← mkListLit (mkApp (mkConst ``_root_.Expression) identType) args
+    return mkApp3 (mkConst ``_root_.Expression.prim) identType p args
+  | .ifThenElse condition bodyIfTrue bodyIfFalse => do
+    let condition ← condition.quote identType env
+    let bodyIfTrue ← bodyIfTrue.quote identType env
+    let bodyIfFalse ← bodyIfFalse.quote identType env
+    return mkApp4 (mkConst ``_root_.Expression.ifThenElse)
+      identType condition bodyIfTrue bodyIfFalse
 
 def Syntax.Lambda.toPhoas? (source : Syntax.Lambda) : TermElabM Lean.Expr :=
   withLocalDeclD `Ident (mkSort (.succ .zero)) fun identType => do

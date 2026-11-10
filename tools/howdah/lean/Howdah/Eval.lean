@@ -11,6 +11,8 @@ mutual
     | .letBinding bound body =>
       .letBinding bound.join (fun x => (body (.var x)).join)
     | .prim p args => .prim p args.joinExprs
+    | .ifThenElse condition bodyIfTrue bodyIfFalse =>
+      .ifThenElse condition.join bodyIfTrue.join bodyIfFalse.join
     | .value v => .value v.join
 
   def Value.join {Ident} :
