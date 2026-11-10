@@ -95,6 +95,13 @@ let loopify_decision_for_call dacc apply =
         then DE.loopify_state denv
         else Loopify_state.do_not_loopify)
 
+(* The terms of [expr] are built from the simplified [apply], whose debuginfo is
+   already in the current inlining context. *)
+let simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up =
+  simplify_expr
+    (DA.map_denv dacc ~f:DE.clear_inlined_debuginfo)
+    expr ~down_to_up
+
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
   Simplify_apply_cont_expr.simplify_apply_cont dacc
     (Apply_cont_expr.create self_cont ~args:(Apply.args apply)
@@ -179,7 +186,7 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
         |> Expr.create_let)
       vars_and_fields apply_expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let update_direct_call_benefit expr ~(original_call : Call_kind.Function_call.t)
     ~callee's_code_metadata =
@@ -859,7 +866,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
     let expr = SE.notify_removed ~operation:Removed_operations.call expr in
     down_to_up dacc expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     ~(original_call : Call_kind.Function_call.t) ~callee's_code_id
@@ -879,7 +886,7 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     in
     down_to_up dacc expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let replace_apply_by_invalid dacc ~down_to_up reason =
   down_to_up dacc (SE.simplified_invalid reason)
@@ -1407,7 +1414,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     let down_to_up dacc expr =
       down_to_up dacc (SE.notify_removed ~operation expr)
     in
-    simplify_expr dacc expr ~down_to_up
+    simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
   | Unchanged { return_types } ->
     let dacc, use_id =
       match Apply.continuation apply with

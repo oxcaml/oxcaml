@@ -144,6 +144,10 @@ val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
 
 val set_inlined_debuginfo : t -> from:t -> t
 
+(** For simplifying terms whose debuginfo is already in the current inlining
+    context. *)
+val clear_inlined_debuginfo : t -> t
+
 val merge_inlined_debuginfo_and_forward_inlined_attribute :
   t ->
   from_apply_expr:Inlined_debuginfo.t ->
