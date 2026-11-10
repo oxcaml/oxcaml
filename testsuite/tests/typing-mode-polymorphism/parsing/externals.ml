@@ -271,7 +271,7 @@ external add_indep : int32 @ [< 'm] -> int32 @ 'n -> int32 @ [> 'm]
    the return, [add_indep x y] is local when [y] is local.
 
    This is because of our handling of the signature's locality axis: the locality of
-   a mode polymorphic argument/return in a primite gets overwritten at the call-site,
+   a mode polymorphic argument/return in a primitive gets overwritten at the call-site,
    where we conservatively approximate that the locality of a return is the join of all
    preceding arguments. *)
 
