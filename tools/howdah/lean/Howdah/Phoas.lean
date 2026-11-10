@@ -25,17 +25,16 @@ private partial def Syntax.StructuredConstant.quote
     quoteBlockValue identType 252
       (mkApp2 (mkConst ``BlockContents.bytes) identType (toExpr bytes))
   | .block natTag fields => do
-    if tagIsNotTooBig : natTag < UInt8.size then
-      let tag := UInt8.ofNatLT natTag tagIsNotTooBig
-      match BlockKind.ofTag tag with
-      | .values =>
-        let eachField ← fields.mapM (Syntax.StructuredConstant.quote identType)
-        let fields ← mkListLit (mkApp (mkConst ``Value) identType) eachField
-        quoteBlockValue identType tag
-          (mkApp2 (mkConst ``BlockContents.values) identType fields)
-      | _ => throwError "invalid constant block tag {natTag}"
-    else
+    let eachField ← fields.mapM (Syntax.StructuredConstant.quote identType)
+    let fields ← mkListLit (mkApp (mkConst ``Value) identType) eachField
+    let block ← withTransparency .all <| whnf <|
+      mkApp3 (mkConst ``Block.values?) identType (toExpr natTag) fields
+    unless block.isAppOfArity ``Option.some 2 do
       throwError "invalid constant block tag {natTag}"
+    let block ← exprToSyntax (block.getArg! 1)
+    elabTermEnsuringType
+      (← `(.indirection (.immutable $block)))
+      (some (mkApp (mkConst ``Value) identType))
 
 private def Syntax.Lambda.quote
     (identType : Lean.Expr)
@@ -43,18 +42,18 @@ private def Syntax.Lambda.quote
     Syntax.Lambda → TermElabM Lean.Expr
   | .var id => do
     let some x := env id | throwError "unbound identifier {id.name}"
-    return mkApp2 (mkConst ``_root_.Expr.var) identType x
+    return mkApp2 (mkConst ``_root_.Expression.var) identType x
   | .const c => do
     let value ← c.quote identType
-    return mkApp2 (mkConst ``_root_.Expr.value) identType value
+    return mkApp2 (mkConst ``_root_.Expression.value) identType value
   | .letBinding id bound body => do
     let boundExpr ← bound.quote identType env
     let bodyExpr ← withLocalDeclD (Name.mkSimple id.name) identType fun x => do
       let env' := fun other => if other = id then some x else env other
       let bodyExpr ← body.quote identType env'
       mkLambdaFVars #[x] bodyExpr
-    return mkApp3 (mkConst ``_root_.Expr.letBinding) identType boundExpr bodyExpr
-  | .apply _ _ | .function _ | .prim _ _ =>
+    return mkApp3 (mkConst ``_root_.Expression.letBinding) identType boundExpr bodyExpr
+  | .apply _ _ | .function _ | .prim _ _ | .ifThenElse _ _ _ =>
     throwError s!"not yet supported"
 
 def Syntax.Lambda.toPhoas? (source : Syntax.Lambda) : TermElabM Lean.Expr :=
@@ -65,7 +64,9 @@ def Syntax.Lambda.toPhoas? (source : Syntax.Lambda) : TermElabM Lean.Expr :=
 namespace IdentityFunctionExample
   @[simp] def x : Syntax.Ident := { name := "x", stamp := .stamped 42 }
   @[simp] def f : Syntax.Lambda := .letBinding x (.const (.base (.int 42))) (.var x)
-  @[simp] def v {I} : @Expr I := .value (.immediate ⟨42⟩)
-  theorem asExpected I : (by_elab f.toPhoas?) I = .letBinding v .var := by
+  @[simp] def v {I : Type} : Expression (Ident := I) :=
+    .value (.immediate ⟨42⟩)
+  theorem asExpected (I : Type) :
+      (by_elab f.toPhoas?) I = Expression.letBinding v .var := by
     simp
 end IdentityFunctionExample

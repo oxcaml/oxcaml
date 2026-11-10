@@ -2,18 +2,20 @@ import Howdah.Import
 import Howdah.Eval
 
 @[simp]
-def imported : JsonImport := howdah% "record.json"
+def imported := howdah% "record.json"
 
-#eval imported
+#print imported
 
 @[simp]
-def expectedReducedRecordModule : Value :=
-  -- let string (s : String) : Value := .block 252 <| .bytes s.toUTF8.toList
-  let block contents : Value :=
+def expectedReducedRecordModule : Val := fun {Ident} =>
+  -- let string (s : String) : Val := .block 252 <| .bytes s.toUTF8.toList
+  let block contents : Value (Ident := Ident) :=
     .indirection <| .immutable { tag := 0, contents := .values contents }
-  let closure f : Value :=
-    let contents := .closure .nonrecursive f
-    .indirection <| .immutable { tag := 247, contents }
+  let closure f : Value (Ident := Ident) :=
+    .indirection <| .immutable {
+      tag := 247,
+      contents := .closure .nonrecursive f,
+    }
   block [
     /- block [
      -   string "hello",
@@ -25,14 +27,12 @@ def expectedReducedRecordModule : Value :=
      - ], -/
     block [
       closure {
-        headParam := ⟨"i/326"⟩,
-        tailParams := [],
-        body := .const <| .block 0 [.base <| .int 42#63],
+        additionalParams := 0,
+        body := fun _ => .value (block [.immediate { bitsAboveLsb := 42#63 }]),
       },
       closure {
-        headParam := ⟨"i/329"⟩,
-        tailParams := [],
-        body := .var ⟨"i/329"⟩,
+        additionalParams := 0,
+        body := fun args => .var args[0],
       },
     ],
     -- block [.immediate 42#63],

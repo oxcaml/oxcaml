@@ -115,6 +115,13 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
     |> tag "prim"
   | Lfunction f ->
     serialize_function f |> tag "function" |> tag "function"
+  | Lifthenelse (condition, body_if_true, body_if_false, _) ->
+    Json.Object
+      [ ("condition", serialize_lambda condition);
+        ("bodyIfTrue", serialize_lambda body_if_true);
+        ("bodyIfFalse", serialize_lambda body_if_false);
+      ]
+    |> tag "ifThenElse"
   | other_lambda ->
     Format.asprintf "Lambda term not yet supported:@ %a"
       Printlambda.lambda other_lambda
@@ -130,6 +137,9 @@ and serialize_primitive : Lambda.primitive -> Json.t = function
     Json.int index
     |> tag "index"
     |> tag "field"
+  | Pphys_equal Eq -> Json.String "physEqual"
+  | Pscalar (Binary (Integral (Value (Taggable Int), Mod (Safe, Signed)))) ->
+    Json.String "intMod"
   | other_primitive ->
     Format.asprintf "Lambda primitive not yet supported:@ %a"
       Printlambda.primitive other_primitive

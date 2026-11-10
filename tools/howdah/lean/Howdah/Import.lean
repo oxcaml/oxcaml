@@ -1,18 +1,14 @@
 import Lean
 import Howdah.Syntax
+import Howdah.Phoas
 
 structure JsonSchema : Type where
   interface : Syntax.Signature
   implementation : Syntax.Lambda
-  deriving Repr
 
-@[delab app.Ident.mk]
-def delabIdent : Lean.PrettyPrinter.Delaborator.Delab := do
-  let ppAll ← Lean.PrettyPrinter.Delaborator.getPPOption Lean.getPPAll
-  guard (!ppAll)
-  let expr ← Lean.PrettyPrinter.Delaborator.SubExpr.getExpr
-  let .lit <| .strVal name := expr.getArg! 0 | failure
-  return Lean.mkIdent <| Lean.Name.mkSimple s!"«{name}»"
+structure InterfaceAndImplementation : Type 1 where
+  interface : Syntax.Signature
+  implementation : Expr
 
 instance : Lean.FromJson UInt8 where
   fromJson? json := do
@@ -58,4 +54,9 @@ elab "howdah% " path:str : term => do
   let fileContents : String ← dir / path.getString |> IO.FS.readFile
   let json : Json ← Json.parse fileContents |> IO.ofExcept
   let imported : JsonSchema ← fromJson? json |> IO.ofExcept
-  return toExpr imported
+  let interface ← Term.exprToSyntax (toExpr imported.interface)
+  let phoas ← imported.implementation.toPhoas?
+  let implementation ← Term.exprToSyntax phoas
+  let r ← `({ interface := $interface, implementation := @$implementation })
+  Term.elabTermEnsuringType r
+    (some (mkConst ``InterfaceAndImplementation))
