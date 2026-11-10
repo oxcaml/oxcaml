@@ -61,18 +61,6 @@ module Use = struct
       use_id : Apply_cont_rewrite_id.t option
     }
 
-  let compare t1 t2 =
-    let c = Continuation.compare t1.cont t2.cont in
-    if c <> 0
-    then c
-    else Option.compare Apply_cont_rewrite_id.compare t1.use_id t2.use_id
-
-  module Set = Set.Make (struct
-    type nonrec t = t
-
-    let compare = compare
-  end)
-
   (* The handler of a continuation specialized for some of its uses is that of
      the specialized continuation. *)
   let handler { cont; use_id } ~specialization_map : Region.t =
@@ -86,7 +74,7 @@ end
 
 type t =
   { counters : Fdo_annotation.t Region.Map.t;
-    successors : Use.Set.t Region.Map.t
+    successors : Use.t Region.Map.t
   }
 
 let empty = { counters = Region.Map.empty; successors = Region.Map.empty }
@@ -95,9 +83,6 @@ let counters_of t region =
   Option.value
     (Region.Map.find_opt region t.counters)
     ~default:Fdo_annotation.empty
-
-let successors_of t region =
-  Option.value (Region.Map.find_opt region t.successors) ~default:Use.Set.empty
 
 let add_counters t region counters =
   if Fdo_annotation.is_empty counters
@@ -111,11 +96,10 @@ let add_counters t region counters =
     }
 
 let add_successor t region cont ~use_id =
+  if Flambda_features.check_invariants () && Region.Map.mem region t.successors
+  then Misc.fatal_error "Fdo_region_counters: region with two successors";
   { t with
-    successors =
-      Region.Map.add region
-        (Use.Set.add { cont; use_id } (successors_of t region))
-        t.successors
+    successors = Region.Map.add region { Use.cont; use_id } t.successors
   }
 
 module Visit = struct
@@ -130,20 +114,20 @@ end
 (* Regions can continue into each other in a cycle (a loop that never branches),
    hence [visited]. *)
 let counters_into t ~specialization_map region =
-  let rec visit region ({ visited; counters } as acc : Visit.t) : Visit.t =
+  let rec visit region ({ visited; counters } : Visit.t) =
     if Region.Set.mem region visited
-    then acc
+    then counters
     else
-      let acc_with_me : Visit.t =
+      let acc : Visit.t =
         { visited = Region.Set.add region visited;
           counters = Fdo_annotation.combine counters (counters_of t region)
         }
       in
-      Use.Set.fold
-        (fun use acc -> visit (Use.handler use ~specialization_map) acc)
-        (successors_of t region) acc_with_me
+      match Region.Map.find_opt region t.successors with
+      | None -> acc.counters
+      | Some use -> visit (Use.handler use ~specialization_map) acc
   in
-  (visit region Visit.empty).counters
+  visit region Visit.empty
 
 let counters_into_handler t ~specialization_map cont ~use_id =
   counters_into t ~specialization_map

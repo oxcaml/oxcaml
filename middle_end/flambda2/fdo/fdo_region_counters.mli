@@ -40,6 +40,15 @@
     are preserved by attaching them to the edges into its [Region.t], which
     execute exactly as often.
 
+    A region has at most one successor, the handler it continues into
+    unconditionally: the target of the [Apply_cont] it ends with, or the return
+    continuation of the application it ends with. Everything entering the region
+    enters its successor too, so the successor's counters also go onto the edges
+    into the region. A region ending with a switch has no successor: the arms
+    lead to handlers, regions of their own, whose counters go onto the arms. A
+    switch folded into its only arm becomes an [Apply_cont] to that arm's
+    handler.
+
     The counters are recorded during the downward traversal and when rebuilding.
     They are read when rebuilding a switch arm (whose target may then change),
     and once more for every arm and for the function entry when the whole body
