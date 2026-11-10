@@ -227,11 +227,16 @@ let check_invariant_reachability cfg_with_layout ~unreachable =
 
 let test_invariant_reachable_handler () =
   let handler = new_label 15 in
-  make_cfg_for_invariants
-    [ block ~exn:handler entry_label
-        (terminator ~arg:[| Proc.loc_exn_bucket |] (Raise Raise_regular));
-      block handler (terminator ~arg:[| Proc.loc_exn_bucket |] Return) ]
-  |> check_invariant_reachability ~unreachable:[]
+  let cfg_with_layout =
+    make_cfg_for_invariants
+      [ block ~exn:handler entry_label
+          (terminator ~arg:[| Proc.loc_exn_bucket |] (Raise Raise_regular));
+        block handler (terminator ~arg:[| Proc.loc_exn_bucket |] Return) ]
+  in
+  check_invariant_reachability cfg_with_layout ~unreachable:[];
+  let cfg_with_layout = Cfg_simplify.run cfg_with_layout in
+  assert (Cfg.mem_block (Cfg_with_layout.cfg cfg_with_layout) handler);
+  check_invariant_reachability cfg_with_layout ~unreachable:[]
 
 let test_invariant_dead_handler () =
   let handler = new_label 16 in
@@ -249,11 +254,17 @@ let test_invariant_dead_handler () =
 let test_invariant_dead_cycle () =
   let left = new_label 17 in
   let right = new_label 18 in
-  make_cfg_for_invariants
-    [ block entry_label (terminator ~arg:[| Proc.loc_exn_bucket |] Return);
-      block left (terminator (Always right));
-      block right (terminator (Always left)) ]
-  |> check_invariant_reachability ~unreachable:[left; right]
+  let cfg_with_layout =
+    make_cfg_for_invariants
+      [ block entry_label (terminator ~arg:[| Proc.loc_exn_bucket |] Return);
+        block left (terminator (Always right));
+        block right (terminator (Always left)) ]
+  in
+  check_invariant_reachability cfg_with_layout ~unreachable:[left; right];
+  let cfg_with_layout = Cfg_simplify.run cfg_with_layout in
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  assert (not (Cfg.mem_block cfg left || Cfg.mem_block cfg right));
+  check_invariant_reachability cfg_with_layout ~unreachable:[]
 
 let test_tailcall_self () =
   make_cfg

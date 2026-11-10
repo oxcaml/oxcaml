@@ -33,74 +33,31 @@ module DLL = Doubly_linked_list
 module Eliminate_dead_code : sig
   val run : Cfg_with_layout.t -> Label.Set.t
 end = struct
-  module Domain = struct
-    type t =
-      | Reachable
-      | Unreachable
-
-    let bot = Unreachable
-
-    let less_equal left right =
-      match left, right with
-      | Reachable, Reachable -> true
-      | Reachable, Unreachable -> false
-      | Unreachable, Reachable -> true
-      | Unreachable, Unreachable -> true
-
-    let join left right =
-      match left, right with
-      | Reachable, (Reachable | Unreachable) | Unreachable, Reachable ->
-        Reachable
-      | Unreachable, Unreachable -> Unreachable
-  end
-
-  module Transfer = struct
-    type domain = Domain.t
-
-    type context = unit
-
-    type image =
-      { normal : domain;
-        exceptional : domain
-      }
-
-    let basic value _ _ = value
-
-    let terminator value _ _ = { normal = value; exceptional = value }
-  end
-
-  module Dataflow = Cfg_dataflow.Forward (Domain) (Transfer)
-
   let run : Cfg_with_layout.t -> Label.Set.t =
    fun cfg_with_layout ->
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
-    match Dataflow.run cfg ~init:Reachable () with
-    | Result.Error _ ->
-      Misc.fatal_error
-        "Dataflow.run_dead_code: forward analysis did not reach a fix-point"
-    | Result.Ok map ->
-      let unreachable_labels =
-        Label.Tbl.fold
-          (fun label value acc ->
-            match value with
-            | Domain.Reachable -> acc
-            | Domain.Unreachable -> Label.Set.add label acc)
-          map Label.Set.empty
-      in
-      Label.Set.iter
-        (fun label ->
-          let block = Cfg.get_block_exn cfg label in
-          block.predecessors <- Label.Set.empty;
-          Label.Set.iter
-            (fun succ_label ->
-              let succ_block = Cfg.get_block_exn cfg succ_label in
-              succ_block.predecessors
-                <- Label.Set.remove label succ_block.predecessors)
-            (Cfg.successor_labels ~normal:true ~exn:true block);
-          block.terminator <- { block.terminator with desc = Cfg_intf.S.Never };
-          block.exn <- None)
-        unreachable_labels;
-      unreachable_labels
+    let unreachable_labels =
+      ref
+        (Cfg.fold_blocks cfg ~init:Label.Set.empty
+           ~f:(fun label _block labels -> Label.Set.add label labels))
+    in
+    Cfg.iter_blocks_dfs cfg ~f:(fun label _block ->
+        unreachable_labels := Label.Set.remove label !unreachable_labels);
+    let unreachable_labels = !unreachable_labels in
+    Label.Set.iter
+      (fun label ->
+        let block = Cfg.get_block_exn cfg label in
+        block.predecessors <- Label.Set.empty;
+        Label.Set.iter
+          (fun succ_label ->
+            let succ_block = Cfg.get_block_exn cfg succ_label in
+            succ_block.predecessors
+              <- Label.Set.remove label succ_block.predecessors)
+          (Cfg.successor_labels ~normal:true ~exn:true block);
+        block.terminator <- { block.terminator with desc = Cfg_intf.S.Never };
+        block.exn <- None)
+      unreachable_labels;
+    unreachable_labels
 end
 
 module Eliminate_fallthrough_blocks : sig
