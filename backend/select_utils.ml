@@ -340,7 +340,7 @@ let size_machtype mty =
 let size_expr_with ~size_of_var exp =
   let rec size localenv = function
     | Cconst_int _ | Cconst_natint _ -> Arch.size_int
-    | Cconst_symbol _ -> Arch.size_addr
+    | Cconst_symbol (_, ty, _) -> size_machtype ty
     | Cconst_float _ -> Arch.size_float
     | Cconst_float32 _ ->
       (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.
