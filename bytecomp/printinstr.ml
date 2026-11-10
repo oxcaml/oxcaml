@@ -32,11 +32,11 @@ let instruction ppf = function
   | Kreturn n -> fprintf ppf "\treturn %i" n
   | Krestart -> fprintf ppf "\trestart"
   | Kgrab n -> fprintf ppf "\tgrab %i" n
-  | Kclosure(lbl, n) ->
+  | Kclosure(lbl, n, _hint) ->
       fprintf ppf "\tclosure L%i, %i" lbl n
-  | Kclosurerec(lbls, n) ->
+  | Kclosurerec(lbl_hints, n) ->
       fprintf ppf "\tclosurerec";
-      List.iter (fun lbl -> fprintf ppf " %i" lbl) lbls;
+      List.iter (fun (lbl, _) -> fprintf ppf " %i" lbl) lbl_hints;
       fprintf ppf ", %i" n
   | Koffsetclosure n -> fprintf ppf "\toffsetclosure %i" n
   | Kgetglobal cu ->
@@ -48,18 +48,18 @@ let instruction ppf = function
   | Kgetpredef id -> fprintf ppf "\tgetpredef %a" Ident.print id
   | Kconst cst ->
       fprintf ppf "@[<10>\tconst@ %a@]" Printlambda.structured_constant cst
-  | Kmakeblock(n, m) ->
+  | Kmakeblock(n, m, _mut) ->
       fprintf ppf "\tmakeblock %i, %i" n m
   | Kmake_faux_mixedblock(n, m) ->
       fprintf ppf "\tmake_faux_mixedblock %i, %i" n m
-  | Kmakefloatblock(n) ->
+  | Kmakefloatblock(n, _mut) ->
       fprintf ppf "\tmakefloatblock %i" n
-  | Kgetfield n -> fprintf ppf "\tgetfield %i" n
+  | Kgetfield (n, _) -> fprintf ppf "\tgetfield %i" n
   | Ksetfield n -> fprintf ppf "\tsetfield %i" n
   | Kgetfloatfield n -> fprintf ppf "\tgetfloatfield %i" n
   | Ksetfloatfield n -> fprintf ppf "\tsetfloatfield %i" n
-  | Kvectlength -> fprintf ppf "\tvectlength"
-  | Kgetvectitem -> fprintf ppf "\tgetvectitem"
+  | Kvectlength _ -> fprintf ppf "\tvectlength"
+  | Kgetvectitem _ -> fprintf ppf "\tgetvectitem"
   | Ksetvectitem -> fprintf ppf "\tsetvectitem"
   | Kgetstringchar -> fprintf ppf "\tgetstringchar"
   | Kgetbyteschar -> fprintf ppf "\tgetbyteschar"
@@ -79,7 +79,7 @@ let instruction ppf = function
   | Kpoptrap -> fprintf ppf "\tpoptrap"
   | Kraise k-> fprintf ppf "\t%s" (Lambda.raise_kind k)
   | Kcheck_signals -> fprintf ppf "\tcheck_signals"
-  | Kccall(s, n) ->
+  | Kccall(s, n, _hint) ->
       fprintf ppf "\tccall %s, %i" s n
   | Knegint -> fprintf ppf "\tnegint"
   | Kaddint -> fprintf ppf "\taddint"
@@ -101,9 +101,11 @@ let instruction ppf = function
   | Kintcomp Geint -> fprintf ppf "\tgeint"
   | Kintcomp Ultint -> fprintf ppf "\tultint"
   | Kintcomp Ugeint -> fprintf ppf "\tugeint"
+  | Kphyscomp CPeq -> fprintf ppf "\tphyseq"
+  | Kphyscomp CPneq -> fprintf ppf "\tphysneq"
   | Koffsetint n -> fprintf ppf "\toffsetint %i" n
   | Koffsetref n -> fprintf ppf "\toffsetref %i" n
-  | Kisint -> fprintf ppf "\tisint"
+  | Kisint _ -> fprintf ppf "\tisint"
   | Kgetmethod -> fprintf ppf "\tgetmethod"
   | Kgetpubmet n -> fprintf ppf "\tgetpubmet %i" n
   | Kgetdynmet -> fprintf ppf "\tgetdynmet"
