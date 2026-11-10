@@ -114,12 +114,11 @@ CAMLno_asan void caml_raise_async(value v)
   CAMLassert(!Is_exception_result(v));
 
   /* Free stacks until we get back to the stack on which the async exn
-     handler lives, using the same logic as SWITCH_OCAML_STACKS.  (Note that
-     we cannot cross a C stack chunk, since installation of such a chunk via
-     the callback mechanism always involves the installation of an async exn
-     handler.) */
-  Caml_state->current_stack->local_sp = Caml_state->local_sp;
-
+     handler lives.  Each switch uses the same logic as SWITCH_OCAML_STACKS,
+     except that the exn handlers do not need updating, because we cannot
+     cross a C stack chunk: installation of such a chunk via the callback
+     mechanism always involves the installation of an async exn handler.
+     The exn handler is set to the async exn handler below. */
   int found_async_exn_handler_stack = 0;
   while (!found_async_exn_handler_stack && Caml_state->current_stack != NULL) {
     struct stack_info* current_stack = Caml_state->current_stack;
@@ -129,18 +128,20 @@ CAMLno_asan void caml_raise_async(value v)
       found_async_exn_handler_stack = 1;
     }
     else {
-      Caml_state->current_stack = Stack_parent(current_stack);
+      struct stack_info* parent = Stack_parent(current_stack);
+      current_stack->local_sp = Caml_state->local_sp;
+      Caml_state->current_stack = parent;
+      if (parent != NULL) {
+        Caml_state->local_sp = parent->local_sp;
+        Caml_state->local_top = parent->local_top;
+        Caml_state->local_limit = parent->local_limit;
+      }
       caml_free_stack(current_stack);
     }
   }
   if (!found_async_exn_handler_stack) {
     caml_fatal_error("Cannot find trap pointer during unwinding of stacks");
   }
-
-  /* Restore all local allocations state for the new stack */
-  Caml_state->local_sp = Caml_state->current_stack->local_sp;
-  Caml_state->local_top = Caml_state->current_stack->local_top;
-  Caml_state->local_limit = Caml_state->current_stack->local_limit;
 
   caml_fiber_switched();
 
