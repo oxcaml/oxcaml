@@ -18,6 +18,9 @@ that shape, runs the dominator computation, and checks it with the validators.
 Any disagreement or unexpected exception is a **finding**: the harness prints
 the graph and raises `SIGABRT` so that AFL records a crash.
 
+For examples that check the fuzzer against a known disagreement and deliberately
+introduced bugs, see [Testing the CFG fuzzer](TESTING.md).
+
 ## Layout
 
 | File | Purpose |

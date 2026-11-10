@@ -1,3 +1,9 @@
+# Testing the CFG fuzzer
+
+These examples check that the fuzzer reports a known dead-code disagreement and
+catches deliberately introduced dominator bugs. See the [README](README.md) for
+setup and normal usage.
+
 ## Reproducing the known dead-code disagreement
 
 The validators assume the CFG has **no dead code**. `Cfg_dominators` copes with
