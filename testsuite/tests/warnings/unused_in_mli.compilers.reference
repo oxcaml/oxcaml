@@ -1,0 +1,104 @@
+File "unused_in_mli.mli", line 70, characters 8-26:
+70 |     let shadowed_in_struct = 1 (* warning 32 *)
+             ^^^^^^^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value shadowed_in_struct.
+
+File "unused_in_mli.mli", line 72, characters 8-23:
+72 |     let shadowed_by_val = 1 (* warning 32 *)
+             ^^^^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value shadowed_by_val.
+
+File "unused_in_mli.mli", line 76, characters 10-16:
+76 |       let hidden = 1 (* warning 32 *)
+               ^^^^^^
+Warning 32 [unused-value-declaration]: unused value hidden.
+
+File "unused_in_mli.mli", line 80, characters 10-16:
+80 |       let opened = 1 (* warning 32 *)
+               ^^^^^^
+Warning 32 [unused-value-declaration]: unused value opened.
+
+File "unused_in_mli.mli", line 81, characters 6-19:
+81 |       type opened_t (* warning 34 *)
+           ^^^^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type opened_t.
+
+File "unused_in_mli.mli", line 82, characters 6-20:
+82 |       kind_ opened_k (* warning 191 *)
+           ^^^^^^^^^^^^^^
+Warning 191 [unused-kind-declaration]: unused kind opened_k.
+
+File "unused_in_mli.mli", line 89, characters 6-7:
+89 |   let a = 1 (* warning 32 *)
+           ^
+Warning 32 [unused-value-declaration]: unused value a.
+
+File "unused_in_mli.mli", line 95, characters 6-7:
+95 |   let b = 1 (* warning 32 *)
+           ^
+Warning 32 [unused-value-declaration]: unused value b.
+
+File "unused_in_mli.mli", line 101, characters 0-13:
+101 | module M := A (* warning 60 *)
+      ^^^^^^^^^^^^^
+Warning 60 [unused-module]: unused module M.
+
+File "unused_in_mli.mli", line 102, characters 0-13:
+102 | type t := int (* warning 34 *)
+      ^^^^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type t.
+
+File "unused_in_mli.mli", line 105, characters 0-11:
+105 | val x : int (* warning 32 *)
+      ^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value x.
+
+File "unused_in_mli.mli", line 108, characters 12-23:
+108 | include sig val z : int end (* warning 32 *)
+                  ^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value z.
+
+File "unused_in_mli.mli", line 114, characters 2-13:
+114 |   val v : int (* warning 32 *)
+        ^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value v.
+
+File "unused_in_mli.mli", line 115, characters 2-12:
+115 |   type t = A (* warning 34 *)
+        ^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type t.
+
+File "unused_in_mli.mli", line 116, characters 2-22:
+116 |   type r = { f : int } (* warning 34 *)
+        ^^^^^^^^^^^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type r.
+
+File "unused_in_mli.mli", line 117, characters 17-28:
+117 |   module M : sig val w : int end (* warnings 32, 60 *)
+                       ^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value w.
+
+File "unused_in_mli.mli", line 117, characters 2-32:
+117 |   module M : sig val w : int end (* warnings 32, 60 *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 60 [unused-module]: unused module M.
+
+File "unused_in_mli.mli", line 118, characters 2-9:
+118 |   kind_ k (* warning 191 *)
+        ^^^^^^^
+Warning 191 [unused-kind-declaration]: unused kind k.
+
+File "unused_in_mli.mli", line 119, characters 2-28:
+119 |   class type ct = object end (* warning 34 *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type ct.
+
+File "unused_in_mli.mli", line 121, characters 8-9:
+121 |     let s = 1 (* warning 32 *)
+              ^
+Warning 32 [unused-value-declaration]: unused value s.
+
+File "unused_in_mli.mli", line 126, characters 6-7:
+126 |   let u = 1 (* warning 32 *)
+            ^
+Warning 32 [unused-value-declaration]: unused value u.

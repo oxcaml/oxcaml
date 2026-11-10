@@ -1773,6 +1773,72 @@ let check_modtype_equiv ~loc env id mty1 mty2 =
                    Error.(In_Module_type_substitution (id,diff mty1 mty2 e)))
             )
 
+(* Mark any declarations in [sg] as used. Although we could instead do a
+   [Includemod.signatures] check against itself to achieve this, this is
+   substantially faster. *)
+let rec mark_signature_items_used sg = List.iter mark_signature_item_used sg
+
+and mark_signature_item_used = function
+  | Sig_value (_, vd, Exported) -> Env.mark_value_used vd.val_uid
+  | Sig_type (id, decl, _, Exported) ->
+    let is_fake_for_private_row_type =
+      Option.is_none decl.type_manifest && Btype.is_row_name (Ident.name id)
+    in
+    if not is_fake_for_private_row_type
+    then (
+      Env.mark_type_used decl.type_uid;
+      match decl.type_kind with
+      | Type_variant (cstrs, _, _) ->
+        let usage : Env.constructor_usage =
+          match decl.type_private with
+          | Public -> Exported
+          | Private -> Exported_private
+        in
+        List.iter
+          (fun cstr -> Env.mark_constructor_used usage cstr.cd_uid)
+          cstrs
+      | Type_record (lbls, _, _)
+      | Type_record_unboxed_product (lbls, _, _) ->
+        let usage : Env.label_usage =
+          match decl.type_private with
+          | Public -> Exported
+          | Private -> Exported_private
+        in
+        List.iter (fun lbl -> Env.mark_label_used usage lbl.ld_uid) lbls
+      | Type_abstract _ | Type_open -> ())
+  | Sig_typext (_, ext, _, Exported) ->
+    let usage : Env.constructor_usage =
+      match ext.ext_private with
+      | Public -> Exported
+      | Private -> Exported_private
+    in
+    Env.mark_extension_used usage ext.ext_uid
+  | Sig_module (_, _, md, _, Exported) ->
+    Env.mark_module_used md.md_uid;
+    mark_modtype_used md.md_type
+  | Sig_modtype (_, mtd, Exported) ->
+    Option.iter mark_modtype_used mtd.mtd_type
+  | Sig_jkind (_, jd, Exported) -> Env.mark_jkind_used jd.jkind_uid
+  | Sig_value (_, _, Hidden) | Sig_type (_, _, _, Hidden)
+  | Sig_typext (_, _, _, Hidden) | Sig_module (_, _, _, _, Hidden)
+  | Sig_modtype (_, _, Hidden) | Sig_jkind (_, _, Hidden) ->
+    (* Hidden items shouldn't be marked as used. *)
+    ()
+  | Sig_class _ | Sig_class_type _ ->
+    (* Classes are already marked as used elsewhere. *)
+    ()
+
+and mark_modtype_used = function
+  | Mty_signature sg -> mark_signature_items_used sg
+  | Mty_functor (param, res, _) ->
+      begin match param with
+      | Named (_, arg, _) -> mark_modtype_used arg
+      | Unit -> ()
+      end;
+      mark_modtype_used res
+  | Mty_strengthen (mty, _, _) -> mark_modtype_used mty
+  | Mty_ident _ | Mty_alias _ -> ()
+
 let item_ident_name item = item_ident_name (Subst.Lazy.of_signature_item item)
 let is_runtime_component item =
   is_runtime_component (Subst.Lazy.of_signature_item item)
