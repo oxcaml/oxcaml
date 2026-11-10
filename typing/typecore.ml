@@ -358,6 +358,8 @@ type error =
   | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
   | Useless_lpoly
+  | Non_generalizable_escape of
+      { var : type_expr; mty: Types.module_type; kind : Path.t }
 
 let not_principal fmt =
   Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
@@ -6779,6 +6781,12 @@ let generalize_structure_type_unboxed_access_result
       (el_ty, Uaccess_unboxed_field _) =
   generalize_structure el_ty
 
+let lower_nongen loc env level mty =
+  match Mtype.lower_nongen level mty with
+  | Ok () -> ()
+  | Error { var; kind } ->
+    Error.log_and_raise loc env (Non_generalizable_escape { mty; var; kind })
+
 let unique_use ~loc ~env mode_l mode_r  =
   if not (Language_extension.is_at_least Unique
             Language_extension.maturity_of_unique_for_drf) then begin
@@ -8980,7 +8988,7 @@ and type_expect_
           let modl, pres, id, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
               let modl, md_shape = !type_module env smodl in
-              Mtype.lower_nongen lv modl.mod_type;
+              lower_nongen loc env lv modl.mod_type;
               let pres =
                 match modl.mod_type with
                 | Mty_alias _ -> Mp_absent
@@ -14811,6 +14819,17 @@ let report_error ~loc env =
          Consider using a regular %a instead."
         Style.inline_code "poly_"
         Style.inline_code "let"
+  (* Same as [Typemod.Non_generalizable_escape] *)
+  | Non_generalizable_escape { mty; var; kind } ->
+      Out_type.add_type_to_preparation var;
+      Location.errorf ~loc
+        "The type of this module,@ %a,@ \
+         contains a non-generalized variable %a of kind@;<1 2>%a.@ \
+         The kind constructor@;<1 2>%a@ would escape its scope."
+        Printtyp.modtype mty
+        (Style.as_inline_code Out_type.prepared_type_scheme) var
+        (Style.as_inline_code Printtyp.path) kind
+        (Style.as_inline_code Printtyp.path) kind
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env
