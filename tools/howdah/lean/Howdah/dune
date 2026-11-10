@@ -89,3 +89,39 @@
    -o
    %{targets}
    %{dep:Determinism.lean})))
+
+(rule
+ (targets Per.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Per.lean
+  Expr.olean
+  Eval.olean)
+ (action
+  (run
+   %{dep:../lean-with-flags}
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Per.lean})))
+
+(rule
+ (targets Obligations.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Obligations.lean
+  Syntax.olean
+  Expr.olean
+  Phoas.olean
+  Import.olean
+  Eval.olean
+  Per.olean)
+ (action
+  (run
+   %{dep:../lean-with-flags}
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Obligations.lean})))
