@@ -1,0 +1,50 @@
+; A callee whose summary is missing because its .cmx is not available gets
+; a hint about missing build artifacts, unless it is caml internal (its
+; compilation unit is a [Camlinternal*] one). The callees are compiled under
+; both name-mangling schemes, and [Wrap] is inlined into [Caller] so that
+; [Caller] has direct calls to them: the hint must be given for the two
+; [Ordinary_*] callees only, whatever the scheme of the callee.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (targets test.output.corrected)
+ (deps
+  camlinternalza_flat.ml
+  camlinternalza_structured.ml
+  ordinary_flat.ml
+  ordinary_structured.ml
+  wrap.ml
+  caller.ml
+  ../filter.sh)
+ (action
+  (with-outputs-to
+   test.output.corrected
+   (progn
+    (run %{bin:ocamlopt.opt} -O3 -name-mangling-scheme flat -c
+     camlinternalza_flat.ml ordinary_flat.ml)
+    (run %{bin:ocamlopt.opt} -O3 -name-mangling-scheme structured -c
+     camlinternalza_structured.ml ordinary_structured.ml)
+    (run %{bin:ocamlopt.opt} -O3 -c wrap.ml)
+    (with-accepted-exit-codes
+     0
+     (bash "rm camlinternalza_*.cmx ordinary_*.cmx"))
+    (pipe-outputs
+     (with-accepted-exit-codes
+      2
+      (run %{bin:ocamlopt.opt} caller.ml -g -color never -error-style short
+       -c -O3 -w "-58"))
+     (run "../filter.sh")
+     (run sed -E "s/(D[0-9]+_)+\\)/_HIDE_STAMP)/g"))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (deps test.output test.output.corrected)
+ (action
+  (diff test.output test.output.corrected)))
