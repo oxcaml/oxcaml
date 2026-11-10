@@ -38,49 +38,43 @@ def expectedReducedRecordModule : Val := fun {Ident} =>
     -- block [.immediate 42#63],
   ]
 
+attribute [local simp]
+  Expression.join Function.join Value.join Indirection.join Block.join
+  BlockContents.join List.joinExprs List.joinValues Vector.get
+
 example : imported.implementation ⇓ expectedReducedRecordModule := by
-  simp
-  constructor
-  · constructor; constructor; simp; rfl
+  simp [imported]
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .letBindingBody
   · sorry
-  constructor
-  · constructor
+  unfold Hole.substitute; simp
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .letBindingBody
   · sorry
-  simp
-  constructor
-  · constructor; constructor; simp; rfl
+  unfold Hole.substitute; simp
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .letBindingBound (.letBindingBound .function)
   · sorry
-  constructor
-  · constructor
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .letBindingBound .letBindingBody
   · sorry
-  simp
-  constructor
-  · constructor; constructor; constructor
+  unfold Hole.substitute; simp
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .letBindingBound (.letBindingBound .function)
   · sorry
-  constructor
-  · constructor; constructor
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .letBindingBound .letBindingBody
   · sorry
-  simp
-  constructor
-  · constructor; constructor; constructor
+  unfold Hole.substitute; simp
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .letBindingBound
+      (.primWithArgumentsReady (.cons (.cons .nil)) (.makeBlock rfl))
   · sorry
-  constructor
-  · constructor; constructor
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .letBindingBody
   · sorry
-  simp
-  constructor
-  · constructor
-    · constructor
-      · constructor; constructor; constructor
-      · constructor; simp; rfl
+  unfold Hole.substitute; simp
+  apply Expr.purelyEvaluatesTo.deterministicStep
+  · exact .primWithArgumentsReady (.cons .nil) (.makeBlock rfl)
   · sorry
-  constructor
-  · constructor
-  · sorry
-  simp
-  constructor
-  · constructor
-    · constructor; constructor
-    · constructor; simp; rfl
-  · sorry
-  constructor
+  exact .alreadyValue
