@@ -6146,6 +6146,14 @@ let rec approx_type env sty =
       newty (Ttuple (List.map (fun (l, t) -> l, approx_type env t) args))
   | Ptyp_constr (lid, ctl) ->
       let path, decl = Env.lookup_type ~use:false ~loc:lid.loc lid.txt env in
+      let ctl =
+        (* Mirror [Typetexp.transl_type]: a single [_] argument stands for
+           all of the type's parameters. *)
+        match ctl with
+        | [ {ptyp_desc=Ptyp_any None} as t ] when decl.type_arity > 1 ->
+            List.map (fun _ -> t) decl.type_params
+        | _ -> ctl
+      in
       if List.length ctl <> decl.type_arity
       then newvar (Jkind.Builtin.any ~why:Dummy_jkind)
       else begin
