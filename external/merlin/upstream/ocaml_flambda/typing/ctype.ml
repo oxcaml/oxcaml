@@ -2169,7 +2169,8 @@ let curry_mode (type r)
     (arg : With_locality.lr) : With_locality.Comonadic.l =
   With_locality.Comonadic.join
     [(With_locality.close_over arg).comonadic;
-     (With_locality.Comonadic.disallow_right alloc)]
+     With_locality.Comonadic.disallow_right alloc]
+
 let curry_mode_const alloc arg : With_locality.Const.t =
   let acc =
     With_locality.Comonadic.Const.join
@@ -2177,8 +2178,49 @@ let curry_mode_const alloc arg : With_locality.Const.t =
       (With_locality.Const.partial_apply alloc)
   in
   With_locality.Const.merge
-    {comonadic = acc;
-     monadic = With_locality.Monadic.Const.legacy}
+    { comonadic = acc; monadic = With_locality.Monadic.Const.legacy }
+
+module Curry_mode = struct
+  type t =
+    | Const of With_locality.Const.t
+    | Variable of
+        { comonadic : With_locality.Comonadic.l;
+          areality : Locality.Const.t }
+
+  let comonadic = function
+    | Const c ->
+      With_locality.Comonadic.of_const (With_locality.Const.partial_apply c)
+    | Variable { comonadic; _ } -> comonadic
+
+  let areality = function
+    | Const c -> c.areality
+    | Variable { areality; _ } -> areality
+
+  let mode ~level = function
+    | Const c -> With_locality.of_const c
+    | Variable { comonadic; _ } ->
+      let comonadic, _ =
+        With_locality.Comonadic.newvar_above level comonadic
+      in
+      { comonadic; monadic = With_locality.Monadic.newvar level }
+
+  let add_arg t marg ~upper_areality =
+    let areality = Locality.Const.join (areality t) upper_areality in
+    let pinned =
+      With_locality.Comonadic.of_const
+        { With_locality.Comonadic.Const.min with areality }
+    in
+    Variable
+      { comonadic =
+          With_locality.Comonadic.join [curry_mode (comonadic t) marg; pinned];
+        areality }
+
+  let add_const_arg t (arg : With_locality.Const.t) =
+    match t with
+    | Const c -> Const (curry_mode_const c arg)
+    | Variable _ ->
+      add_arg t (With_locality.of_const arg) ~upper_areality:arg.areality
+end
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
