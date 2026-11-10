@@ -279,9 +279,6 @@ typedef uint64_t uintnat;
 /* Minimum amount of work to do in a major GC slice. */
 #define Major_slice_work_min 512
 
-/* Minimum amount of work to do in a major GC slice. */
-#define Major_slice_work_min 512
-
 /* Default allocation policy. */
 #define Allocation_policy_def caml_policy_best_fit
 
