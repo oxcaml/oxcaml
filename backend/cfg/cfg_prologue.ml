@@ -405,8 +405,7 @@ let find_prologue_and_epilogues_shrink_wrapped
       ~fun_num_stack_slots:cfg.fun_num_stack_slots
   then (
     let doms = Cfg_with_infos.dominators cfg_with_infos in
-    (* note: the other entries in the forest are dead code *)
-    let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
+    let tree = Cfg_dominators.dominator_tree doms in
     let loop_infos = Cfg_with_infos.loop_infos cfg_with_infos in
     let reachable_epilogues = Reachable_epilogues.build cfg in
     let path_needs_prologue = Path_needs_prologue.build cfg in

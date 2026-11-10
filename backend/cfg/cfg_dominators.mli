@@ -9,8 +9,9 @@ type dominator_tree = private
 
 type t
 
-(** Computes all dominator-related information, in particular immediate
-    dominators, dominance frontiers, and dominator forest for the passed CFG. *)
+(** Computes immediate dominators, dominance frontiers, and the dominator tree.
+    All blocks must be reachable from the CFG's entry through normal or
+    exceptional edges. *)
 val build : Cfg.t -> t
 
 (** [is_dominating doms x y] is [true] iff [x] is dominating [y] according to
@@ -29,15 +30,8 @@ val is_strictly_dominating : t -> Label.t -> Label.t -> bool
     dominates a predecessor of m, but does not strictly dominate m itself". *)
 val find_dominance_frontier : t -> Label.t -> Label.Set.t
 
-(** Returns all dominator trees. Typically one of these will correspond to the
-    entry point of the program and the remainder to dead code. *)
-val dominator_forest : t -> dominator_tree list
+(** Returns the dominator tree rooted at the CFG's entry. *)
+val dominator_tree : t -> dominator_tree
 
-(** Returns the unique dominator tree rooted at the entry point of the program
-    (thus ignoring any isolated trees that correspond to dead code). *)
-val dominator_tree_for_entry_point : t -> dominator_tree
-
-(** [iter_breadth_dominator_forest doms ~f] iterates over the dominator forest
-    from [doms] in a breadth-first manner (iterating over a whole tree of the
-    forest before moving to the next tree), applying [f] to visited nodes. *)
-val iter_breadth_dominator_forest : t -> f:(Label.t -> unit) -> unit
+(** Visits the labels of a dominator tree in breadth-first order. *)
+val iter_breadth_dominator_tree : dominator_tree -> f:(Label.t -> unit) -> unit
