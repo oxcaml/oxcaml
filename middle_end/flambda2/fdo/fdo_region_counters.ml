@@ -27,6 +27,9 @@
  ******************************************************************************)
 
 module Region = struct
+  (* Regions are named by continuations and code ids, which are unique within
+     the simplification of a compilation unit. Note that inlining doesn't start
+     a region. *)
   type t =
     | Function_entry of Code_id.t
     | Handler of Continuation.t
@@ -51,6 +54,7 @@ module Region = struct
   end)
 end
 
+(* A [Use.t] is a successor of a [Region.t]. *)
 module Use = struct
   type t =
     { cont : Continuation.t;
@@ -130,13 +134,14 @@ let counters_into t ~specialization_map region =
     if Region.Set.mem region visited
     then acc
     else
+      let acc_with_me : Visit.t =
+        { visited = Region.Set.add region visited;
+          counters = Fdo_annotation.combine counters (counters_of t region)
+        }
+      in
       Use.Set.fold
         (fun use acc -> visit (Use.handler use ~specialization_map) acc)
-        (successors_of t region)
-        ({ visited = Region.Set.add region visited;
-           counters = Fdo_annotation.combine counters (counters_of t region)
-         }
-          : Visit.t)
+        (successors_of t region) acc_with_me
   in
   (visit region Visit.empty).counters
 
