@@ -789,10 +789,6 @@ static int caml_float32_of_hex(const char * s, const char * end, float * res)
     }
   }
   if (n_bits == 0) return -1;
-  /* Convert mantissa to FP.  We use a signed conversion because we can
-     (m has 60 bits at most) and because it is faster
-     on several architectures. */
-  f = (float) (int64_t) m;
   /* Adjust exponent to take decimal point and extra digits into account */
   {
     int adj = x_bits;
@@ -805,6 +801,24 @@ static int caml_float32_of_hex(const char * s, const char * end, float * res)
     else
       exp = exp + adj;
   }
+  /* If the result is subnormal, m will be rounded below and then again in ldexp.
+     To avoid this, round m to odd, so its conversion to FP is exact or a tie.
+     Ties round to even, which ldexp then scales exactly. */
+  {
+    int sub_exp = FLT_MIN_EXP - FLT_MANT_DIG - 2;
+    if (exp < sub_exp) {
+      int shift = sub_exp - exp;
+      if (shift < 60)
+        m = (m >> shift) | ((m & (((int64_t) 1 << shift) - 1)) != 0);
+      else
+        m = (m != 0);
+      exp = sub_exp;
+    }
+  }
+  /* Convert mantissa to FP.  We use a signed conversion because we can
+     (m has 60 bits at most) and because it is faster
+     on several architectures. */
+  f = (float) (int64_t) m;
   /* Apply exponent if needed */
   if (exp != 0) f = ldexpf(f, exp);
   /* Done! */

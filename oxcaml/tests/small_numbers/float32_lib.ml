@@ -703,7 +703,21 @@ let () =
   check "0x1.000002000000001p+0" 0x1.000002000000001p+0s;
   check "0x1.00000200000000000000p+0" 0x1.00000200000000000000p+0s;
   check "0x1.00000200000000000001p+0" 0x1.00000200000000000001p+0s;
-  check "0x1.000003p+0" 0x1.000003p+0s
+  check "0x1.000003p+0" 0x1.000003p+0s;
+  (* Subnormals are rounded only once *)
+  let check s bits = bit_eq (F32.of_string s) (F32.of_bits bits) in
+  check "0x1p-149" 0x1l;
+  check "0x1p-150" 0x0l;
+  check "0x3p-150" 0x2l;
+  check "0x1000001p-174" 0x1l;
+  check "0x2FFFFFFp-174" 0x1l;
+  check "0x1.7FFFFFp-149" 0x1l;
+  check "0x1.00000000000000000001p-150" 0x1l;
+  check "-0x1000001p-174" 0x8000_0001l;
+  check "0x1.0000028p-127" 0x40_0001l;
+  check "0x1.0000027ffffffp-127" 0x40_0001l;
+  check "0x1.fffffap-127" 0x7f_fffel;
+  check "0x1.fffffep-127" 0x80_0000l
 
 let () =
   (* Cast & sqrt-with-memory intrinsics (see selection.ml) *)
