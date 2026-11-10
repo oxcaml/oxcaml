@@ -129,11 +129,12 @@ module Tag = struct
   let trywith = 23
 end
 
-(* The skeleton of a node: [None] if no construct is below it. *)
+(* Given hashed children (or [None] if they're not included), hash a node.
+   [None] if no children are included. *)
 let node ~tag children =
-  match List.filter_map Fun.id children with
-  | [] -> None
-  | children -> Some (H.node ~tag children)
+  if List.for_all Option.is_none children
+  then None
+  else Some (H.node ~tag (List.map H.of_option children))
 
 let construct ~tag components = Some (H.node ~tag components)
 
@@ -238,7 +239,7 @@ let rec lambda handlers (lam : L.lambda) =
     L.fatal_error_invalid_constructor lam
 
 and arguments handlers args =
-  args |> List.filter_map (lambda handlers) |> H.of_list
+  args |> List.map (fun lam -> lambda handlers lam |> H.of_option) |> H.of_list
 
 and default handlers action =
   action
@@ -294,7 +295,7 @@ and primitive handlers (prim : L.primitive) args =
              (L.array_kind_of_array_set_kind dst_array_set_kind));
         arguments handlers args ]
   | Praise _kind, _ -> construct ~tag:Tag.raise [arguments handlers args]
-  | _, _ -> node ~tag:Tag.prim (List.map (lambda handlers) args)
+  | _, _ -> args |> List.map (lambda handlers) |> node ~tag:Tag.prim
 
 and if_then_else handlers ~cond ~ifso ~ifnot =
   construct ~tag:Tag.if_then_else
