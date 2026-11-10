@@ -202,3 +202,5 @@ val alloc_mode_for_applications_to_cmx :
 
 val alloc_mode_for_allocations_to_cmm :
   Alloc_mode.For_allocations.t -> Cmm.Alloc_mode.t
+
+val fail_if_apply_with_probe : Flambda.Apply.t -> unit

@@ -104,6 +104,113 @@ let foo (r @ shared) = {r with a = best_bytes ()}
 val foo : r @ shared -> r @ shared = <fun>
 |}]
 
+(* TESTING unboxed records with mutable fields. These behave like [r] above.
+   Only reads are tested, since we cannot write to unboxed mutable fields. *)
+type unboxed_r = #{ mutable a : bytes; b : bytes }
+[%%expect{|
+type unboxed_r = #{ mutable a : bytes; b : bytes; }
+|}]
+
+(* Reading mutable field from contended unboxed record is rejected *)
+let read_mutable_from_contended (r : unboxed_r @ contended) = r.#a
+[%%expect{|
+Line 1, characters 62-63:
+1 | let read_mutable_from_contended (r : unboxed_r @ contended) = r.#a
+                                                                  ^
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
+|}]
+
+let read_mutable_from_contended_implicit (r : r# @ contended) = r.#a
+[%%expect{|
+Line 1, characters 64-65:
+1 | let read_mutable_from_contended_implicit (r : r# @ contended) = r.#a
+                                                                    ^
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
+|}]
+
+let update_overriding_mutable_from_contended (r : unboxed_r @ contended) =
+  #{ r with a = best_bytes () }
+let update_overriding_mutable_from_contended_implicit (r : r# @ contended) =
+  #{ r with a = best_bytes () }
+[%%expect{|
+val update_overriding_mutable_from_contended :
+  unboxed_r @ contended -> unboxed_r @ contended = <fun>
+val update_overriding_mutable_from_contended_implicit :
+  r# @ contended -> r# @ contended = <fun>
+|}]
+
+let update_keeping_mutable_from_contended (r : unboxed_r @ contended) =
+  #{ r with b = best_bytes () }
+[%%expect{|
+Line 2, characters 5-6:
+2 |   #{ r with b = best_bytes () }
+         ^
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
+|}]
+
+let update_keeping_mutable_from_contended_implicit (r : r# @ contended) =
+  #{ r with b = best_bytes () }
+[%%expect{|
+Line 2, characters 5-6:
+2 |   #{ r with b = best_bytes () }
+         ^
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
+|}]
+
+(* reading mutable field from shared unboxed record is fine *)
+let read_mutable_from_shared (r : unboxed_r @ shared) = r.#a
+let read_mutable_from_shared_implicit (r : r# @ shared) = r.#a
+let update_keeping_mutable_from_shared (r : unboxed_r @ shared) =
+  #{ r with b = best_bytes () }
+let update_keeping_mutable_from_shared_implicit (r : r# @ shared) =
+  #{ r with b = best_bytes () }
+let update_overriding_mutable_from_shared (r : unboxed_r @ shared) =
+  #{ r with a = best_bytes () }
+let update_overriding_mutable_from_shared_implicit (r : r# @ shared) =
+  #{ r with a = best_bytes () }
+[%%expect{|
+val read_mutable_from_shared : unboxed_r @ shared -> bytes @ shared = <fun>
+val read_mutable_from_shared_implicit : r# @ shared -> bytes @ shared = <fun>
+val update_keeping_mutable_from_shared :
+  unboxed_r @ shared -> unboxed_r @ shared = <fun>
+val update_keeping_mutable_from_shared_implicit : r# @ shared -> r# @ shared =
+  <fun>
+val update_overriding_mutable_from_shared :
+  unboxed_r @ shared -> unboxed_r @ shared = <fun>
+val update_overriding_mutable_from_shared_implicit :
+  r# @ shared -> r# @ shared = <fun>
+|}]
+
+(* reading immutable field from contended, corrupted or shared unboxed record is
+   fine *)
+let read_immutable_from_contended (r : unboxed_r @ contended) = r.#b
+let read_immutable_from_contended_implicit (r : r# @ contended) = r.#b
+let read_immutable_from_corrupted (r : unboxed_r @ corrupted) = r.#b
+let read_immutable_from_corrupted_implicit (r : r# @ corrupted) = r.#b
+let read_immutable_from_shared (r : unboxed_r @ shared) = r.#b
+let read_immutable_from_shared_implicit (r : r# @ shared) = r.#b
+[%%expect{|
+val read_immutable_from_contended :
+  unboxed_r @ contended -> bytes @ contended = <fun>
+val read_immutable_from_contended_implicit :
+  r# @ contended -> bytes @ contended = <fun>
+val read_immutable_from_corrupted :
+  unboxed_r @ corrupted -> bytes @ corrupted = <fun>
+val read_immutable_from_corrupted_implicit :
+  r# @ corrupted -> bytes @ corrupted = <fun>
+val read_immutable_from_shared : unboxed_r @ shared -> bytes @ shared = <fun>
+val read_immutable_from_shared_implicit : r# @ shared -> bytes @ shared =
+  <fun>
+|}]
+
 (* Force top level to be uncontended and nonportable *)
 let r @ contended = best_bytes ()
 [%%expect{|

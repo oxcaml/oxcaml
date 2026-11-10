@@ -23,7 +23,10 @@
 (executable
  (name expect)
  (modules expect)
- (libraries toplevel_expect_test js_of_ocaml-toplevel)
+ (libraries
+  toplevel_expect_test
+  js_of_ocaml-toplevel
+  js_of_ocaml-compiler.dynlink)
  (flags
   (:standard -linkall))
  (js_of_ocaml

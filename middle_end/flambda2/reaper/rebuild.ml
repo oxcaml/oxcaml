@@ -346,7 +346,8 @@ let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
 let rewrite_set_of_closures env res ~(bound : Name.t list)
-    ({ Rev_expr.function_decls; value_slots } : Rev_expr.rev_set_of_closures) =
+    ({ Rev_expr.function_decls; value_slots; dbg } :
+      Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
     List.exists
       (fun bound_name ->
@@ -513,7 +514,9 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
   let function_decls =
     Function_declarations.create (Function_slot.Lmap.of_list function_decls)
   in
-  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
+  let set_of_closures =
+    Set_of_closures.create ~value_slots ~dbg function_decls
+  in
   set_of_closures, { res with code_ids_to_remember }
 
 let rewrite_static_const env ~(bound_to : Symbol.t) (sc : SC.t) =
@@ -1183,15 +1186,12 @@ let rebuild_apply env apply =
                (Flambda_arity.unarize (Apply.args_arity apply)))
         in
         (* The calling convention is not changing, but the arguments might have
-           been replaced by poison, so we need to rewrite the arities. *)
+           been replaced by poison, so we need to rewrite the arities. The
+           structure of the arity must be preserved: for external calls it
+           determines the C struct layout of unboxed product arguments (see
+           [To_cmm_extcall]). *)
         let args_arity =
-          Flambda_arity.create
-            (List.map
-               (fun kinds ->
-                 Flambda_arity.Component_for_creation.(
-                   Unboxed_product (List.map (fun kind -> Singleton kind) kinds)))
-               (Flambda_arity.group_by_parameter (Apply.args_arity apply)
-                  args_arity))
+          Flambda_arity.with_unarized_kinds (Apply.args_arity apply) args_arity
         in
         let return_arity =
           match Apply.continuation apply with
@@ -1227,6 +1227,7 @@ let rebuild_apply env apply =
             ~callee:(rewrite_simple_opt env (Apply.callee apply))
             exn_continuation ~args ~args_arity ~return_arity ~call_kind
             ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
+            ~callsite_counter:(Apply.callsite_counter apply)
             ~inlined:(Apply.inlined apply)
             ~inlining_state:(Apply.inlining_state apply)
             ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -1353,7 +1354,9 @@ let rebuild_apply env apply =
       let make_apply ~continuation =
         Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
           ~return_arity ~call_kind ~return_mode:(Apply.return_mode apply)
-          (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+          (Apply.dbg apply)
+          ~callsite_counter:(Apply.callsite_counter apply)
+          ~inlined:(Apply.inlined apply)
           ~inlining_state:(Apply.inlining_state apply)
           ~probe:(Apply.probe apply) ~position:(Apply.position apply)
           ~relative_history:(Apply.relative_history apply)
@@ -2276,8 +2279,8 @@ and rebuild_function_params_and_body env res code_metadata
       res )
 
 and rebuild_code env res code_id
-    ({ params_and_body; free_names_of_params_and_body = _ } : Rev_expr.rev_code)
-    =
+    ({ params_and_body; free_names_of_params_and_body = _ } :
+      Rev_expr.Rev_code.t) =
   (* At rebuild time, [code_metadata] may only be changed for fields that will
      never be read again if we perform LTO, namely, code_size and
      inlining_decisions. All other changes to [code_metadata] must be done in
@@ -2358,16 +2361,14 @@ type 'f result =
     final_typing_env : ('f, typing_env) Traverse.With_types.t
   }
 
-let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
+let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
     ~(solution : f Analysis.solution) =
-  (* CR-soon ncourant: we shouldn't need the whole unit at this point, only the
-     metadata part. Once this is done, we can store it in the skeleton
-     instead. *)
   let { Traverse.Skeleton.toplevel_expr;
         code;
         ordered_code_ids;
         fixed_arity_continuations;
-        continuation_info
+        continuation_info;
+        metadata
       } =
     skeleton
   in
@@ -2396,7 +2397,7 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
   in
   let cont_params_to_keep =
     Continuation.Map.mapi
-      (fun cont (info : Traverse_acc.continuation_info) ->
+      (fun cont (info : Traverse_acc.Continuation_info.t) ->
         List.map2 (should_keep_param cont) info.params info.arity)
       continuation_info
   in
@@ -2450,7 +2451,7 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
       (Exported_code.mark_as_imported
          (Flambda_cmx.get_imported_code cmx_loader ()))
   in
-  { unit = Flambda_unit.with_body unit rebuilt_expr.expr;
+  { unit = Flambda_unit.create_from_metadata_and_body metadata rebuilt_expr.expr;
     exported_code;
     slot_offsets = Analysis.slot_offsets solution;
     final_typing_env = Analysis.final_typing_env solution

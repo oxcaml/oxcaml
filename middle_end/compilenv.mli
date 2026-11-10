@@ -47,7 +47,7 @@ val get_unit_export_info
   : Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
 
 val get_static_data :
-  Compilation_unit.t -> Slambdaeval.CU_data.t option
+  Compilation_unit.t -> Slambda.CU_data.t option
         (* Returns [None] if the .cmx file cannot be located. *)
 
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
@@ -55,6 +55,8 @@ val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
 
 val set_laws : Laws_file.t -> unit
         (* Record the laws file of the current unit *)
+val set_lto_info : Flambda2_reaper.Lto_info.t -> unit
+        (* Set the LTO information for the current unit. *)
 
 val need_curry_fun:
   Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit
@@ -80,12 +82,12 @@ val write_unit_info: unit_infos -> string -> unit
         (* Save the given infos in the given file *)
 val build_unit_info:
   main_module_block_format:Lambda.main_module_block_format ->
-  static_data:Slambdaeval.CU_data.t ->
+  static_data:Slambda.CU_data.t ->
   unit_infos
         (* Build the infos for the current unit. *)
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
-  static_data:Slambdaeval.CU_data.t ->
+  static_data:Slambda.CU_data.t ->
   unit
         (* Save the infos for the current unit in the given file *)
 val cache_unit_info: unit_infos -> unit

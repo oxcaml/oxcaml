@@ -32,6 +32,7 @@ open Spec
 type primitive_kind = Location
 
 type unsupported =
+  | Addresses
   | Arrays
   | Atomic_fields
   | Attributes
@@ -170,6 +171,7 @@ let rec spectree_pattern : type k. k general_pattern -> k spec_general_pattern =
     | Tpat_record_unboxed_product (fields, repr, closed) ->
       Stpat_record_unboxed_product (List.map field fields, repr, closed)
     | Tpat_array _ -> unsupported loc Arrays
+    | Tpat_addr _ -> unsupported loc Addresses
     | Tpat_fun_layout _ -> unsupported loc Layout_polymorphism
     | Tpat_lazy p -> Stpat_lazy (spectree_pattern p)
     | Tpat_value p -> Stpat_value (spectree_pattern (p :> Typedtree.pattern))
@@ -920,6 +922,7 @@ and typedtree_argument (lbl, e, sort) =
 let describe_primitive = function Location -> "location primitives"
 
 let describe = function
+  | Addresses -> "address patterns"
   | Arrays -> "arrays"
   | Atomic_fields -> "atomic fields"
   | Attributes -> "attributes"

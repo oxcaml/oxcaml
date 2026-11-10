@@ -839,7 +839,7 @@ module Jkind_of_outcometree = struct
     | Ojkind_const_abbreviation (_, _ :: _) -> unsupported "a kind with axes"
     | Ojkind_const_mod (Some base, ms) ->
         P.Jkind.mod_ (jkind_const base)
-          (List.map (fun m -> Parsetree.Mode m) ms)
+          (List.map (fun m -> Parsetree.Pmode m) ms)
     | Ojkind_const_mod (None, _) -> unsupported "a mod kind without a base"
     | Ojkind_const_with _ -> unsupported "a kind with a with-bound"
     | Ojkind_const_kind_of _ -> unsupported "the kind of a type"

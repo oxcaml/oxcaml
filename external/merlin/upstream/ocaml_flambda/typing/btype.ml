@@ -1761,6 +1761,35 @@ module Jkind0 = struct
           name = "bits64 mod everything"
         }
 
+      let addr_layout =
+        Layout.Const.product
+          [ base Scannable
+              { nullability = Maybe_null; separability = Maybe_separable };
+            base Bits64 Scannable_axes.max ]
+
+      (* Addresses have the same modal base kind as a record with a field of the
+         same mutability. *)
+      let kind_of_addr =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = mutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless"
+        }
+
+      let kind_of_addr_imm =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = immutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless \
+             immutable"
+        }
+
       let vec128 =
         { jkind =
             mk_jkind (base Vec128 Scannable_axes.max)
@@ -1940,17 +1969,6 @@ module Jkind0 = struct
         of_const Const.Builtin.immediate_or_null.jkind
     end
 
-    let product tys_modalities layouts =
-      let base = Layout (Jkind_types.Layout.product layouts) in
-      let mod_bounds = Mod_bounds.min in
-      let with_bounds =
-        List.fold_right
-          (fun (type_expr, modality) bounds ->
-            With_bounds.add_modality ~type_expr ~modality bounds)
-          tys_modalities No_with_bounds
-      in
-      { base; mod_bounds; with_bounds }
-
     let get_const t =
       Base_and_axes.map_layout_option Jkind_types.Layout.get_const t
   end
@@ -1959,7 +1977,7 @@ module Jkind0 = struct
     module Sub_failure_reason = struct
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
-        | Layout_disagreement
+        | Layout_disagreement of Jkind_types.Sort.error
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
@@ -2155,14 +2173,6 @@ module Jkind0 = struct
         fresh_jkind Jkind_desc.Builtin.immediate_or_null
           ~annotation:(mk_annot "immediate_or_null")
           ~why:(Immediate_or_null_creation why)
-
-      let product ~why tys_modalities layouts =
-        let desc = Jkind_desc.product tys_modalities layouts in
-        fresh_jkind_poly desc ~annotation:None ~why:(Product_creation why)
-        (* [mark_best] is correct here because the with-bounds of a product
-           jkind include all the components of the product. Accordingly, looking
-           through the product, by one step, never loses any information. *)
-        |> mark_best
 
       let product_of_any ~why arity =
         let layout =

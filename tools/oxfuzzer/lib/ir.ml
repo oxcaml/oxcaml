@@ -410,6 +410,12 @@ module Expr = struct
      mitigate, we should make [t] private and add smart constructors. *)
   type t =
     | Const of Number.t
+    | Assert_false
+    | Let of
+        { name : Name.t;
+          expr : t;
+          body : t
+        }
     | Read of place
     | Array_literal of t list
     | Array_make of
@@ -521,6 +527,10 @@ module Expr = struct
 
   let rec to_code : t -> Parsetree.expression = function
     | Const n -> Number.to_code n
+    | Assert_false ->
+      Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None)
+    | Let { name; expr; body } ->
+      bind name (to_code expr) (fun _ -> to_code body)
     | Read place -> place_to_code place
     | Array_literal elements ->
       Ast_helper.Exp.array Mutable (List.map to_code elements)

@@ -377,11 +377,13 @@ let print_cmx_infos (uir, sections, crc) =
       let cmx = Flambda2_cmx.Flambda_cmx_format.from_raw cmx ~sections in
       Format.printf "%a\n%!" (Flambda2_cmx.Flambda_cmx_format.print ~print_typing_env ~print_code ~print_offsets) cmx
   end;
+  if Option.is_some uir.uir_lto_info then
+    printf "Flambda 2 unit with LTO information\n";
   print_generic_fns uir.uir_generic_fns;
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
   Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
-    (Format_doc.compat Slambdaeval.CU_data.print)
-    (Slambdaeval.CU_data.read uir.uir_static_data ~sections);
+    (Format_doc.compat Slambda.CU_data.print)
+    (Slambda.CU_data.read uir.uir_static_data ~sections);
   if not (!no_code || !no_approx) then begin
     Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
   end

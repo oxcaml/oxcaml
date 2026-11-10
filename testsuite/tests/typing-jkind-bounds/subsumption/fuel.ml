@@ -3,7 +3,7 @@
     expect;
 *)
 
-type 'a my_list = 'a list = [] | ( :: ) of 'a * 'a my_list
+type ('a : any) my_list = 'a list = [] | ( :: ) of 'a * 'a my_list
 
 (* At the time this test is written, "fuel" is used to deal with recursive types. Two
    types that are equal can get different jkinds due to fuel running out at different
@@ -12,7 +12,7 @@ type 'a my_list = 'a list = [] | ( :: ) of 'a * 'a my_list
    to be true, and all instances of them in this file should also be updated. *)
 type t : immutable_data = int list my_list list my_list list my_list list my_list list my_list list my_list list
 [%%expect {|
-type 'a my_list = 'a list = [] | (::) of 'a * 'a my_list
+type ('a : any) my_list = 'a list = [] | (::) of 'a * 'a my_list
 type t =
     int list my_list list my_list list my_list list my_list list my_list list
     my_list list

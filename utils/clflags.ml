@@ -75,6 +75,18 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
+type hidden_include_file =
+  { basename : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+let parse_hidden_include_file ~cmx_guaranteed entry =
+  match String.split_on_char ':' entry with
+  | [ basename; actual_path ] ->
+    Ok { basename; actual_path; cmx_guaranteed }
+  | _ -> Error ("Expected '<basename>:<actual_path>', got: " ^ entry)
+
 let compile_only = ref false            (* -c *)
 and generate_laws = ref false           (* -generate-laws-implementation *)
 and output_name = ref (None : string option) (* -o *)
@@ -82,6 +94,8 @@ and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
+and hidden_include_files = (* -H-file, -Hx-file *)
+  ref ([] : hidden_include_file list)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
@@ -192,7 +206,6 @@ let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)
 and dump_shape = ref false              (* -dshape *)
 and dump_tlambda = ref false            (* -dtlambda *)
-and dump_slambda = ref false            (* -dslambda *)
 and dump_matchcomp = ref false          (* -dmatchcomp *)
 and dump_rawlambda = ref false          (* -drawlambda *)
 and dump_lambda = ref false             (* -dlambda *)

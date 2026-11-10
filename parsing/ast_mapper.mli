@@ -59,6 +59,9 @@ type mapper = {
   attribute: mapper -> attribute -> attribute;
   attributes: mapper -> attribute list -> attribute list;
   modes : mapper -> modes -> modes;
+  mode : mapper -> mode Location.loc -> mode Location.loc;
+  mode_bound : mapper -> mode_bound -> mode_bound;
+  mode_bound_var : mapper -> mode_bound_var -> mode_bound_var;
   modalities : mapper -> modalities -> modalities;
   binding_op: mapper -> binding_op -> binding_op;
   case: mapper -> case -> case;

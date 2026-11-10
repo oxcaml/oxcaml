@@ -22,7 +22,27 @@ end
 
 module Mode : sig
   (** The modes that can go on function arguments or return types *)
-  type t = mode = Mode of string [@@unboxed]
+  type t = mode =
+    | Pmode of string
+    | Pmode_var of string
+    | Pmode_bounded of bounded
+
+  and bounded = mode_bounded =
+    { pmode_upper : bound
+    ; pmode_lower : bound
+    }
+
+  and bound = bound_elem list
+
+  and bound_elem = mode_bound_elem =
+    | Pbound_var of bound_var
+    | Pbound_const of string loc list
+
+  and bound_var = mode_bound_var =
+    { pbound_morph : string loc option
+    ; pbound_var : string loc
+    ; pbound_mod : string loc list
+    }
 end
 
 module Modes : sig
@@ -132,6 +152,7 @@ module Value_binding : sig
     :  loc:Location.t
     -> pat:pattern
     -> expr:expression
+    -> constraint_:value_constraint option
     -> modes:Modes.t
     -> value_binding
 end
@@ -309,6 +330,7 @@ module Pattern_desc : sig
     | Ppat_or of pattern * pattern
     | Ppat_constraint of pattern * core_type option * Modes.t
     | Ppat_type of Astlib.Longident.t loc
+    | Ppat_addr of mutable_flag * pattern
     | Ppat_lazy of pattern
     | Ppat_unpack of string option loc
     | Ppat_exception of pattern
@@ -507,6 +529,7 @@ module Module_expr_desc : sig
     | Pmod_structure of structure
     | Pmod_functor of functor_parameter * module_expr
     | Pmod_apply of module_expr * module_expr
+    | Pmod_apply_unit of module_expr
     | Pmod_constraint of module_expr * module_type option * Modes.t
     | Pmod_unpack of expression
     | Pmod_extension of extension

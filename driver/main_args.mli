@@ -30,6 +30,8 @@ module type Common_options = sig
   val _H : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
+  val _H_file : string -> unit
+  val _Hx_file : string -> unit
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit
@@ -97,7 +99,6 @@ module type Core_options = sig
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
   val _dtlambda : unit -> unit
-  val _dslambda : unit -> unit
   val _dmatchcomp : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit

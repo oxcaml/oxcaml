@@ -31,6 +31,8 @@ type error =
   | Wrong_for_pack of string * CU.t
   | Assembler_error of string
   | File_not_found of string
+  | Pack_with_lto_support
+  | Member_with_lto_info of string
 
 exception Error of error
 
@@ -64,6 +66,9 @@ end) : S = struct
         then raise (Error (Illegal_renaming (name, file, CU.name info.ui_unit)));
         if not (CU.is_parent pack_path ~child:info.ui_unit)
         then raise (Error (Wrong_for_pack (file, pack_path)));
+        (* Packing with LTO sections are not supported. *)
+        if Option.is_some info.ui_lto_info
+        then raise (Error (Member_with_lto_info file));
         Backend.check_consistency linkenv file info crc;
         Compilenv.cache_unit_info info;
         PM_impl info
@@ -180,7 +185,7 @@ end) : S = struct
     let ui =
       (* [static_data] is empty as we don't support packs with layout poly. *)
       Compilenv.build_unit_info ~main_module_block_format
-        ~static_data:(Slambdaeval.CU_data.empty ())
+        ~static_data:(Slambda.CU_data.empty ())
     in
     let file_sections =
       let length =
@@ -231,6 +236,7 @@ end) : S = struct
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
         ui_static_data = ui.ui_static_data;
+        ui_lto_info = None;
         ui_file_sections = File_sections.Builder.build file_sections
       }
     in
@@ -270,6 +276,8 @@ end) : S = struct
       Unit_info.of_artifact Impl cmx ~dummy_source_file:targetcmx
     in
     let comp_unit = Unit_info.Artifact.modname cmx in
+    if Flambda2_ui.Flambda_features.lto_support ()
+    then raise (Error Pack_with_lto_support);
     Compilenv.reset unit_info;
     Misc.try_finally
       (fun () ->
@@ -301,6 +309,12 @@ let report_error ppf = function
     fprintf ppf "File %a not found" Style.inline_code file
   | Assembler_error file ->
     fprintf ppf "Error while assembling %a" Style.inline_code file
+  | Pack_with_lto_support ->
+    fprintf ppf "%a is not supported with %a" Style.inline_code "-pack"
+      Style.inline_code "-lto-support"
+  | Member_with_lto_info file ->
+    fprintf ppf "File %a@ was compiled with %a and cannot be packed"
+      Location.Doc.quoted_filename file Style.inline_code "-lto-support"
 
 let () =
   Location.register_error_of_exn (function
