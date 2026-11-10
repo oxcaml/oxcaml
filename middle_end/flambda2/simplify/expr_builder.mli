@@ -99,8 +99,8 @@ type new_let_cont =
     cost_metrics_of_handler : Cost_metrics.t
   }
 
-(** Record that the given wrappers continue into the continuations they call
-    (see [Fdo_region_counters.add_successor]). *)
+(** Record that each of the given wrappers continues into the continuation it
+    jumps to (see [Fdo_region_counters.add_successor]). *)
 val add_fdo_successors_of_wrappers :
   Upwards_acc.t -> new_let_cont list -> Upwards_acc.t
 
