@@ -1,10 +1,6 @@
 (* There is no wasm counterpart of the .cmis.js bundle: the toplevel reads the
-   compiler's stdlib cmis from disk. *)
+   compiler's stdlib cmis from disk, from OCAMLLIB. *)
 let () = Js_of_ocaml_toplevel.Direct.initialize ()
-
-let () =
-  Load_path.reset ();
-  Topdirs.dir_directory (Sys.getenv "TOPLEVEL_CMIS")
 
 let execute code =
   Js_of_ocaml_toplevel.Direct.execute true Format.std_formatter code
