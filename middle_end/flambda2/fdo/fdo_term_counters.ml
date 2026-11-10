@@ -28,6 +28,64 @@
 
 open! Flambda.Import
 
+let map_counters_of_switch ~f switch =
+  let arms =
+    Target_ocaml_int.Map.map
+      (Switch_arm.map_annotations (fun annotations ->
+           Branch_annotations.with_fdo_annotation annotations
+             (Fdo_annotation.map f
+                (Branch_annotations.fdo_annotation annotations))))
+      (Switch.arms switch)
+  in
+  Switch.create
+    ~condition_dbg:(Switch.condition_dbg switch)
+    ~scrutinee:(Switch.scrutinee switch) ~arms
+
+(* Occurrence counts are left unknown: Simplify recomputes them. *)
+let rec map_counters_of_expr ~f expr =
+  match Expr.descr expr with
+  | Let let_expr ->
+    Let.pattern_match let_expr ~f:(fun bound_pattern ~body ->
+        Let.create bound_pattern
+          (Let.defining_expr let_expr)
+          ~body:(map_counters_of_expr ~f body)
+          ~free_names_of_body:Unknown
+        |> Expr.create_let)
+  | Let_cont (Non_recursive { handler; can_be_lifted; _ }) ->
+    let create =
+      if can_be_lifted
+      then Let_cont.create_non_recursive
+      else Let_cont.create_non_liftable
+    in
+    Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
+        create cont
+          (map_counters_of_handler ~f
+             (Non_recursive_let_cont_handler.handler handler))
+          ~body:(map_counters_of_expr ~f body)
+          ~free_names_of_body:Unknown)
+  | Let_cont (Recursive handlers) ->
+    Recursive_let_cont_handlers.pattern_match handlers
+      ~f:(fun ~invariant_params ~body handlers ->
+        Let_cont.create_recursive ~invariant_params
+          (Continuation.Lmap.map
+             (map_counters_of_handler ~f)
+             (Continuation_handlers.to_map handlers))
+          ~body:(map_counters_of_expr ~f body))
+  | Apply apply ->
+    Apply.with_callsite_counter apply
+      (Option.map f (Apply.callsite_counter apply))
+    |> Expr.create_apply
+  | Switch switch -> Expr.create_switch (map_counters_of_switch ~f switch)
+  | Apply_cont _ | Invalid _ -> expr
+
+and map_counters_of_handler ~f handler =
+  Continuation_handler.pattern_match handler ~f:(fun params ~handler:body ->
+      Continuation_handler.create params
+        ~handler:(map_counters_of_expr ~f body)
+        ~free_names_of_handler:Unknown
+        ~is_exn_handler:(Continuation_handler.is_exn_handler handler)
+        ~is_cold:(Continuation_handler.is_cold handler))
+
 let map_counters_of_code ~f code =
   let entry_annotation = Code.fdo_entry_annotation code in
   let code_metadata =
@@ -52,9 +110,7 @@ let map_counters_of_code ~f code =
         ->
         Function_params_and_body.create ~return_continuation ~exn_continuation
           params
-          ~body:
-            (Flambda.map_fdo_counters body ~callsite:(Option.map f)
-               ~arm:(fun _ -> Fdo_annotation.map f))
+          ~body:(map_counters_of_expr ~f body)
           ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth)
   in
   Code.create_with_metadata ~params_and_body

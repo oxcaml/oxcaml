@@ -640,17 +640,6 @@ module Static_const_group : sig
   val is_fully_static : t -> bool
 end
 
-(** [expr] with the FDO counter of each of its calls replaced by [callsite]
-    applied to it, and the counters of each of its switch arms by [arm] applied
-    to the arm's action and counters. The code bound in [expr] is left as it is.
-    Nothing but the counters changes: bound names stay the same, so that the
-    names known from [expr] still apply to the result. *)
-val map_fdo_counters :
-  expr ->
-  callsite:(Fdo_counter.t option -> Fdo_counter.t option) ->
-  arm:(Apply_cont_expr.t -> Fdo_annotation.t -> Fdo_annotation.t) ->
-  expr
-
 module Apply = Apply_expr
 module Apply_cont = Apply_cont_expr
 module Function_declarations = Function_declarations

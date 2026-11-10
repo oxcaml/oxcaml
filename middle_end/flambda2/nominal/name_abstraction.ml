@@ -154,12 +154,6 @@ module Make (Bindable : Bindable.S) (Term : Term) = struct
       (module Bindable)
       t0 t1 ~f ~apply_renaming_to_term:Term.apply_renaming
 
-  let map_term t ~f =
-    let bindable, term =
-      descr (module Bindable) t ~apply_renaming_to_term:Term.apply_renaming
-    in
-    create bindable (f bindable term)
-
   let apply_renaming t renaming = apply_renaming (module Bindable) t renaming
 
   let[@inline always] ( let<> ) t f =

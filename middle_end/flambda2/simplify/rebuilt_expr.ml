@@ -118,11 +118,6 @@ let to_expr t are_rebuilding =
        [UA.do_not_rebuild_terms] is set"
   else to_expr0 t
 
-let map_expr t are_rebuilding ~f =
-  if ART.do_not_rebuild_terms are_rebuilding
-  then t
-  else { t with expr = f t.expr; contents_hash = Or_null.null }
-
 let descr t = Expr.descr t.expr
 
 let to_apply_cont t =
