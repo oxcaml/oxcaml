@@ -151,6 +151,7 @@
     %{bin:ocamlopt.opt}
     -c
     -fdo-counters
+    -dflambda-heavy-invariants
     -dfexpr-annot-after
     raw
     -color
@@ -184,6 +185,7 @@
     %{bin:ocamlopt.opt}
     -c
     -fdo-counters
+    -dflambda-heavy-invariants
     -dfexpr-annot-after
     simplify
     -color
@@ -216,6 +218,7 @@
     -O3
     -flambda2-match-in-match
     -fdo-counters
+    -dflambda-heavy-invariants
     -dfexpr-annot-after
     simplify
     -color
