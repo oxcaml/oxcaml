@@ -149,6 +149,17 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
     in
     rebuild_expr expr uacc ~after_rebuild:(fun expr uacc -> expr, uacc)
   in
+  let expr =
+    if Flambda_features.fdo_counters ()
+    then
+      RE.map_expr expr
+        (UA.are_rebuilding_terms uacc)
+        ~f:
+          (Fdo_region_counters.attach_to_switches
+             (UA.fdo_region_counters uacc)
+             ~specialization_map:(UA.specialization_map uacc))
+    else expr
+  in
   (* We don't check occurrences of variables or symbols here because the check
      required depends on whether we're dealing with a lambda or the whole
      compilation unit. Instead these checks are in [Simplify] or

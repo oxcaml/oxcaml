@@ -409,7 +409,6 @@ module Let_cont_expr : sig
     expr
 
   val create_non_recursive' :
-    ?can_be_lifted:bool ->
     cont:Continuation.t ->
     Continuation_handler.t ->
     body:expr ->
@@ -640,6 +639,14 @@ module Static_const_group : sig
 
   val is_fully_static : t -> bool
 end
+
+(** [expr] with [apply] and [switch] applied to each of its applications and
+    switches, except those in the code it binds. *)
+val map_applies_and_switches :
+  expr ->
+  apply:(Apply_expr.t -> Apply_expr.t) ->
+  switch:(Switch_expr.t -> Switch_expr.t) ->
+  expr
 
 module Apply = Apply_expr
 module Apply_cont = Apply_cont_expr

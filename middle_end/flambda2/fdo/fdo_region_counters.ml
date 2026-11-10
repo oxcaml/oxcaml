@@ -51,22 +51,49 @@ module Region = struct
   end)
 end
 
+module Use = struct
+  type t =
+    { cont : Continuation.t;
+      use_id : Apply_cont_rewrite_id.t option
+    }
+
+  let compare t1 t2 =
+    let c = Continuation.compare t1.cont t2.cont in
+    if c <> 0
+    then c
+    else Option.compare Apply_cont_rewrite_id.compare t1.use_id t2.use_id
+
+  module Set = Set.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
+
+  (* The handler of a continuation specialized for some of its uses is that of
+     the specialized continuation. *)
+  let handler { cont; use_id } ~specialization_map : Region.t =
+    match use_id with
+    | None -> Handler cont
+    | Some use_id -> (
+      match Continuation_callsite_map.find cont use_id specialization_map with
+      | exception Not_found -> Handler cont
+      | specialized -> Handler specialized)
+end
+
 type t =
   { counters : Fdo_annotation.t Region.Map.t;
-    continues_into : Continuation.Set.t Region.Map.t
+    successors : Use.Set.t Region.Map.t
   }
 
-let empty = { counters = Region.Map.empty; continues_into = Region.Map.empty }
+let empty = { counters = Region.Map.empty; successors = Region.Map.empty }
 
 let counters_of t region =
   Option.value
     (Region.Map.find_opt region t.counters)
     ~default:Fdo_annotation.empty
 
-let continuations_of t region =
-  Option.value
-    (Region.Map.find_opt region t.continues_into)
-    ~default:Continuation.Set.empty
+let successors_of t region =
+  Option.value (Region.Map.find_opt region t.successors) ~default:Use.Set.empty
 
 let add_counters t region counters =
   if Fdo_annotation.is_empty counters
@@ -79,12 +106,12 @@ let add_counters t region counters =
           t.counters
     }
 
-let add_continuation_into t region cont =
+let add_successor t region cont ~use_id =
   { t with
-    continues_into =
+    successors =
       Region.Map.add region
-        (Continuation.Set.add cont (continuations_of t region))
-        t.continues_into
+        (Use.Set.add { cont; use_id } (successors_of t region))
+        t.successors
   }
 
 module Visit = struct
@@ -98,14 +125,14 @@ end
 
 (* Regions can continue into each other in a cycle (a loop that never branches),
    hence [visited]. *)
-let counters_into t region =
+let counters_into t ~specialization_map region =
   let rec visit region ({ visited; counters } as acc : Visit.t) : Visit.t =
     if Region.Set.mem region visited
     then acc
     else
-      Continuation.Set.fold
-        (fun cont acc -> visit (Region.Handler cont) acc)
-        (continuations_of t region)
+      Use.Set.fold
+        (fun use acc -> visit (Use.handler use ~specialization_map) acc)
+        (successors_of t region)
         ({ visited = Region.Set.add region visited;
            counters = Fdo_annotation.combine counters (counters_of t region)
          }
@@ -113,8 +140,21 @@ let counters_into t region =
   in
   (visit region Visit.empty).counters
 
-let entry_annotation t code_id entry_annotation =
+let counters_into_handler t ~specialization_map cont ~use_id =
+  counters_into t ~specialization_map
+    (Use.handler { cont; use_id } ~specialization_map)
+
+let entry_annotation t ~specialization_map code_id entry_annotation =
   Fdo_annotation.With_body_hash.with_annotation entry_annotation
     (Fdo_annotation.combine
        (Fdo_annotation.With_body_hash.annotation entry_annotation)
-       (counters_into t (Function_entry code_id)))
+       (counters_into t ~specialization_map (Function_entry code_id)))
+
+let attach_to_switches t ~specialization_map expr =
+  Flambda.map_applies_and_switches expr ~apply:Fun.id
+    ~switch:
+      (Fdo_term_counters.map_switch_counters ~f:(fun action counters ->
+           Fdo_annotation.combine counters
+             (counters_into_handler t ~specialization_map
+                (Apply_cont_expr.continuation action)
+                ~use_id:None)))

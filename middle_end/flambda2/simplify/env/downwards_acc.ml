@@ -128,21 +128,18 @@ let with_fdo_region_counters t fdo_region_counters =
   { t with fdo_region_counters }
 
 let map_fdo_region_counters t ~f =
-  { t with fdo_region_counters = f t.fdo_region_counters }
-
-let map_fdo_region t ~f =
   match DE.fdo_region t.denv with
   | None -> t
   | Some region ->
-    map_fdo_region_counters t ~f:(fun counters -> f counters region)
+    { t with fdo_region_counters = f t.fdo_region_counters region }
 
 let preserve_fdo_counters t counters =
-  map_fdo_region t ~f:(fun region_counters region ->
+  map_fdo_region_counters t ~f:(fun region_counters region ->
       Fdo_region_counters.add_counters region_counters region counters)
 
-let fdo_region_continues_into t cont =
-  map_fdo_region t ~f:(fun region_counters region ->
-      Fdo_region_counters.add_continuation_into region_counters region cont)
+let add_fdo_region_successor t cont ~use_id =
+  map_fdo_region_counters t ~f:(fun region_counters region ->
+      Fdo_region_counters.add_successor region_counters region cont ~use_id)
 
 let[@inline always] map_denv t ~f = { t with denv = f t.denv }
 

@@ -74,7 +74,9 @@ let specialize_counters_of_copied_code t ~inlined_debuginfo code =
   let copy_context =
     Inlined_debuginfo.merge t.copy_context ~from_apply_expr:inlined_debuginfo
   in
-  if !Oxcaml_flags.fdo_counters && not (Inlined_debuginfo.is_none copy_context)
+  if
+    Flambda_features.fdo_counters ()
+    && not (Inlined_debuginfo.is_none copy_context)
   then
     Fdo_term_counters.map_counters_of_code code
       ~f:(Inlined_debuginfo.specialize_fdo_counter copy_context)
@@ -83,4 +85,6 @@ let specialize_counters_of_copied_code t ~inlined_debuginfo code =
 let region t = t.region
 
 let set_region t region =
-  if !Oxcaml_flags.fdo_counters then { t with region = Some region } else t
+  if Flambda_features.fdo_counters ()
+  then { t with region = Some region }
+  else t
