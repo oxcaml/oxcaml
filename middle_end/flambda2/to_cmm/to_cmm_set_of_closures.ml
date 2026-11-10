@@ -745,17 +745,26 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
   (* Generate symbols for the set of closures, and each of the closures *)
   let comp_unit = Current_unit.get_cu_exn () in
   let dbg = Env.add_inlined_debuginfo env (Set_of_closures.debuginfo set) in
-  let cids =
+  let decls =
     Function_declarations.funs_in_order (Set_of_closures.function_decls set)
-    |> Function_slot.Lmap.keys
+    |> Function_slot.Lmap.bindings
   in
+  let cids = List.map fst decls in
   let closure_symbols =
     List.map2
-      (fun cid v ->
+      (fun (cid, (decl : Function_declarations.code_id_in_function_declaration))
+           v ->
         let v = Bound_var.var v in
         let name = Variable.canonical_name v in
-        cid, Symbol.manufacture comp_unit name)
-      cids bound_vars
+        let code_id =
+          match decl with
+          | Code_id { code_id; only_full_applications = _ } -> Some code_id
+          | Deleted _ -> None
+        in
+        ( cid,
+          Symbol.manufacture_for_closure comp_unit ~name ~function_slot:cid
+            ~code_id ))
+      decls bound_vars
     |> Function_slot.Map.of_list
   in
   (* Statically allocate the set of closures *)

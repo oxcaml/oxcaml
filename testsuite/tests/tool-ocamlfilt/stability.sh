@@ -29,10 +29,13 @@ demangled_names () {
     | sed -E "$2" | grep -v 'unrelated_' | sort -u
 }
 
-# As [demangled_names], for the symbols the object defines (not those it
-# merely refers to).
-defined_names () {
-  nm "$1" | awk 'NF == 3 && $2 != "U" && $NF ~ /^_?_Caml[A-Z]/ { print $NF }' \
+# As [demangled_names], for the code symbols the object defines (not those it
+# merely refers to). Data symbols are left out: a closure of a library
+# function that the consumer allocates statically ([<code>.{closure}]) is named
+# after the code it points to, but the library itself may allocate that closure
+# dynamically and so define no such symbol.
+defined_code_names () {
+  nm "$1" | awk 'NF == 3 && $2 ~ /^[Tt]$/ && $NF ~ /^_?_Caml[A-Z]/ { print $NF }' \
     | "$OCAMLFILT" --format structured \
     | sed -E "$2" | grep -v 'unrelated_' | sort -u
 }
@@ -64,7 +67,7 @@ check stability \
 
 # Without cross-module inlining (e.g. under [Oclassic]) there are no copies and
 # the check is vacuous.
-defined_names "$D/stability.o" 's/^//' | grep '^Stability_lib\.' > "$D/copies" \
+defined_code_names "$D/stability.o" 's/^//' | grep '^Stability_lib\.' > "$D/copies" \
   || true
 comm -23 "$D/copies" "$D/stability_lib.as_written" > "$D/foreign"
 if [ -s "$D/foreign" ]; then

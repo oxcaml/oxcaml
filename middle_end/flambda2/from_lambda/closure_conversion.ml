@@ -57,13 +57,15 @@ let manufacture_symbol proposed_name =
   Symbol.manufacture (Current_unit.get_cu_exn ()) proposed_name
 
 let manufacture_symbol_of_variable v =
-  let name = Variable.canonical_name v in
-  manufacture_symbol name
+  Symbol.manufacture_for_variable (Current_unit.get_cu_exn ()) v
 
-let declare_symbol_for_function_slot env ident function_slot : Env.t * Symbol.t
-    =
+let declare_symbol_for_function_slot env ident function_slot ~code_id :
+    Env.t * Symbol.t =
   let symbol =
-    manufacture_symbol (Function_slot.canonical_name function_slot)
+    Symbol.manufacture_for_closure
+      (Current_unit.get_cu_exn ())
+      ~name:(Function_slot.canonical_name function_slot)
+      ~function_slot ~code_id:(Some code_id)
   in
   let env =
     Env.add_simple_to_substitute env ident (Simple.symbol symbol)
@@ -3390,17 +3392,20 @@ let close_functions acc external_env ~current_alloc_region ~current_region
     then
       Ident.Map.fold
         (fun ident function_slot (acc, env, symbol_map) ->
-          let env, symbol =
-            declare_symbol_for_function_slot env ident function_slot
-          in
-          let approx =
+          let code_id, function_slot, code =
             match Function_slot.Map.find function_slot approx_map with
             | Value_approximation.Closure_approximation
                 { code_id; function_slot; code; symbol = _ } ->
-              Value_approximation.Closure_approximation
-                { code_id; function_slot; code; symbol = Some symbol }
+              code_id, function_slot, code
             | _ -> assert false
             (* see above *)
+          in
+          let env, symbol =
+            declare_symbol_for_function_slot env ident function_slot ~code_id
+          in
+          let approx =
+            Value_approximation.Closure_approximation
+              { code_id; function_slot; code; symbol = Some symbol }
           in
           let acc = Acc.add_symbol_approximation acc symbol approx in
           acc, env, Function_slot.Map.add function_slot symbol symbol_map)

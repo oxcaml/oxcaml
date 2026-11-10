@@ -763,9 +763,18 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   let function_decls = Set_of_closures.function_decls set_of_closures in
   let closure_symbols =
     Function_slot.Lmap.mapi
-      (fun function_slot _func_decl ->
+      (fun function_slot
+           (func_decl : Function_declarations.code_id_in_function_declaration)
+         ->
         let name = Function_slot.canonical_name function_slot in
-        Symbol.manufacture (Current_unit.get_cu_exn ()) name)
+        let code_id =
+          match func_decl with
+          | Code_id { code_id; only_full_applications = _ } -> Some code_id
+          | Deleted _ -> None
+        in
+        Symbol.manufacture_for_closure
+          (Current_unit.get_cu_exn ())
+          ~name ~function_slot ~code_id)
       (Function_declarations.funs_in_order function_decls)
   in
   let closure_symbols_map =
