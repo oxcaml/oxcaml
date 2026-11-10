@@ -455,13 +455,17 @@ let place_lifted_constants uacc ~lifted_constants_from_defining_expr
   let body, uacc = put_bindings_around_body uacc ~body in
   place_constants uacc ~around:body lifted_constants_from_defining_expr
 
-let preserve_fdo_counters_of_arms uacc ~fdo_region arms =
+let preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms ~target =
   match fdo_region with
   | None -> uacc
   | Some region ->
     UA.map_fdo_region_counters uacc ~f:(fun region_counters ->
-        Fdo_region_counters.add_counters region_counters region
-          (Fdo_term_counters.of_switch_arms arms))
+        let region_counters =
+          Fdo_region_counters.add_counters region_counters region
+            (Fdo_term_counters.of_switch_arms arms)
+        in
+        Fdo_region_counters.add_successor region_counters region target
+          ~use_id:None)
 
 let create_switch uacc ~condition_dbg ~scrutinee ~arms ~fdo_region =
   if Target_ocaml_int.Map.cardinal arms < 1
@@ -472,7 +476,10 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms ~fdo_region =
     let change_to_apply_cont action =
       (* The arms' edges become a single jump, which runs every time: their
          counters are preserved in the region (see [Fdo_region_counters]). *)
-      let uacc = preserve_fdo_counters_of_arms uacc ~fdo_region arms in
+      let uacc =
+        preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
+          ~target:(Apply_cont.continuation action)
+      in
       let uacc =
         UA.add_free_names uacc (Apply_cont.free_names action)
         |> UA.notify_added ~code_size:(Code_size.apply_cont action)
@@ -519,6 +526,20 @@ type new_let_cont =
     free_names_of_handler : Name_occurrences.t;
     cost_metrics_of_handler : Cost_metrics.t
   }
+
+let add_fdo_successors_of_wrappers uacc new_let_conts =
+  if not (Flambda_features.fdo_counters ())
+  then uacc
+  else
+    List.fold_left
+      (fun uacc { cont; free_names_of_handler; _ } ->
+        UA.map_fdo_region_counters uacc ~f:(fun region_counters ->
+            Name_occurrences.fold_continuations_including_in_trap_actions
+              free_names_of_handler ~init:region_counters
+              ~f:(fun region_counters target ->
+                Fdo_region_counters.add_successor region_counters (Handler cont)
+                  target ~use_id:None)))
+      uacc new_let_conts
 
 let bind_let_cont (uacc : UA.t) (body : RE.t)
     { cont; handler; free_names_of_handler; cost_metrics_of_handler } =

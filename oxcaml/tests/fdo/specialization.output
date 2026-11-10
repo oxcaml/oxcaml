@@ -1,0 +1,9 @@
+specialization.simplify.fl:
+  entry: "Specialization.side":0 body_hash:00000000
+  entry: "Specialization.get":0 body_hash:b1902ca3
+  branch: "Specialization.get":0:b1902ca3:0:branch(1)
+  branch: "Specialization.get":0:b1902ca3:0:branch(2)
+  entry: "Specialization.specialized":0 body_hash:ccdfbcb1
+  branch: "Specialization.specialized":0:ccdfbcb1:0:branch(1) "Specialization.get":0 <- "Specialization.specialized":0:ccdfbcb1:2:call "Specialization.get":0:b1902ca3:0:branch(2) <- "Specialization.specialized":0:ccdfbcb1:2:call
+  branch: "Specialization.specialized":0:ccdfbcb1:0:branch(2) "Specialization.get":0 <- "Specialization.specialized":0:ccdfbcb1:2:call "Specialization.get":0:b1902ca3:0:branch(1) <- "Specialization.specialized":0:ccdfbcb1:2:call
+  call: "Specialization.specialized":0:ccdfbcb1:1:call

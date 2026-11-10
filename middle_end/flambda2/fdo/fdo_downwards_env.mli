@@ -64,8 +64,9 @@ val stub_callsite_counter : t -> Fdo_counter.t option
 val specialize_counters_of_copied_code :
   t -> inlined_debuginfo:Inlined_debuginfo.t -> Code.t -> Code.t
 
-(** The region (see [Fdo_region_counters]) being traversed: [None] at the unit
-    toplevel, or when FDO counters are disabled. *)
+(** The region (see [Fdo_region_counters]) being traversed: [None] in the unit
+    toplevel outside of continuation handlers, or when FDO counters are
+    disabled. *)
 val region : t -> Fdo_region_counters.Region.t option
 
 val set_region : t -> Fdo_region_counters.Region.t -> t

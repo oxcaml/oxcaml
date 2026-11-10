@@ -55,8 +55,9 @@ val with_fdo_region_counters : t -> Fdo_region_counters.t -> t
 val preserve_fdo_counters : t -> Fdo_annotation.t -> t
 
 (** The region being traversed continues into the handler of the given
-    continuation. *)
-val fdo_region_continues_into : t -> Continuation.t -> t
+    continuation, by the given use (see [Fdo_region_counters.add_successor]). *)
+val add_fdo_region_successor :
+  t -> Continuation.t -> use_id:Apply_cont_rewrite_id.t option -> t
 
 include Continuation_uses_env_intf.S with type t := t
 

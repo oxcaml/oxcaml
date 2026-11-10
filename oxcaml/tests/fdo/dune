@@ -200,3 +200,35 @@
  (deps simplify.output simplify.output.corrected)
  (action
   (diff simplify.output simplify.output.corrected)))
+
+; Continuation specialization, which needs match-in-match.
+
+(rule
+ (targets specialization.output.corrected)
+ (deps specialization.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -O3
+    -flambda2-match-in-match
+    -fdo-counters
+    -dfexpr-annot-after
+    simplify
+    -color
+    never
+    specialization.ml)
+   (with-stdout-to
+    specialization.output.corrected
+    (run ./fdo_annotations.exe list specialization.simplify.fl)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps specialization.output specialization.output.corrected)
+ (action
+  (diff specialization.output specialization.output.corrected)))

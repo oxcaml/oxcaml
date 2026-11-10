@@ -519,6 +519,7 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
     let fdo_entry_annotation =
       Fdo_region_counters.entry_annotation
         (UA.fdo_region_counters uacc_after_upwards_traversal)
+        ~specialization_map:(UA.specialization_map uacc_after_upwards_traversal)
         old_code_id
         (Code.fdo_entry_annotation code)
     in

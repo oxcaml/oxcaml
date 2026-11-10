@@ -193,7 +193,11 @@ let simplify_apply_cont dacc apply_cont ~down_to_up =
     in
     DA.map_flow_acc dacc ~f:record_args_for_data_flow
   in
-  let dacc = DA.fdo_region_continues_into dacc (AC.continuation apply_cont) in
+  let dacc =
+    DA.add_fdo_region_successor dacc
+      (AC.continuation apply_cont)
+      ~use_id:(Some rewrite_id)
+  in
   let dbg = AC.debuginfo apply_cont in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
   let apply_cont = AC.with_debuginfo apply_cont ~dbg in

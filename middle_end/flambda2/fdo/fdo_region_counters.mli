@@ -34,18 +34,21 @@
     into the straight-line code it was in, which execute exactly as often.
 
     A region is a stretch of straight-line control flow: a function body or a
-    continuation handler, up to its terminator. The counters preserved in a
+    continuation handler, up to its terminator. A region's successors are the
+    handlers it continues into: the one it jumps to unconditionally, or the
+    return point of the application it ends with. The counters preserved in a
     region go onto the edges into it: the arms of the switches targeting its
     continuation, the entry edge of its function; and, transitively, the edges
-    into the regions that continue into it (by a plain [Apply_cont], or as the
-    return point of an application), since everything entering such a region
-    enters it too.
+    into the regions it is a successor of, since everything entering those
+    regions enters it too.
 
     Regions are named by continuations and code ids, which are unique within the
     simplification of a compilation unit. The counters are recorded during the
-    downward traversal and when rebuilding, and read when rebuilding the
-    switches and functions whose edges they go onto, after the regions they lead
-    to have been rebuilt. *)
+    downward traversal and when rebuilding. They are read when rebuilding a
+    switch arm (whose target may then change), and once more for every arm and
+    for the function entry when the whole body has been rebuilt (the counters
+    preserved in a loop header can be recorded after a back edge into it was
+    rebuilt). *)
 
 module Region : sig
   type t =
@@ -60,17 +63,32 @@ val empty : t
 (** The given counters are preserved in [region]. *)
 val add_counters : t -> Region.t -> Fdo_annotation.t -> t
 
-(** [region] continues into the handler of [cont]: it jumps to it
-    unconditionally, or applies a function that returns to it. *)
-val add_continuation_into : t -> Region.t -> Continuation.t -> t
+(** [region] continues into the handler of [cont], by the use [use_id] (for
+    which [cont] may have been specialized). *)
+val add_successor :
+  t -> Region.t -> Continuation.t -> use_id:Apply_cont_rewrite_id.t option -> t
 
-(** The counters to attach to the edges into [region]. *)
-val counters_into : t -> Region.t -> Fdo_annotation.t
+(** The counters to attach to the edge [use_id] into the handler of [cont]. *)
+val counters_into_handler :
+  t ->
+  specialization_map:Continuation.t Continuation_callsite_map.t ->
+  Continuation.t ->
+  use_id:Apply_cont_rewrite_id.t option ->
+  Fdo_annotation.t
 
 (** The entry annotation of the code with the given code id, with the counters
-    to attach to the edges into its body's first region. *)
+    to attach to its entry edge. *)
 val entry_annotation :
   t ->
+  specialization_map:Continuation.t Continuation_callsite_map.t ->
   Code_id.t ->
   Fdo_annotation.With_body_hash.t ->
   Fdo_annotation.With_body_hash.t
+
+(** [expr], a rebuilt body, with the counters to attach to the arms of its
+    switches. *)
+val attach_to_switches :
+  t ->
+  specialization_map:Continuation.t Continuation_callsite_map.t ->
+  Flambda.Expr.t ->
+  Flambda.Expr.t
