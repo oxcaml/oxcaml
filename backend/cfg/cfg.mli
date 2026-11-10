@@ -210,6 +210,8 @@ val get_block : t -> Label.t -> basic_block option
 
 val get_block_exn : t -> Label.t -> basic_block
 
+(** Visits each block reachable from the entry once, in depth-first preorder,
+    following normal and exceptional edges. *)
 val iter_blocks_dfs : t -> f:(Label.t -> basic_block -> unit) -> unit
 
 val iter_blocks : t -> f:(Label.t -> basic_block -> unit) -> unit
