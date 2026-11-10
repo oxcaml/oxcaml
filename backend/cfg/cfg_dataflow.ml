@@ -304,7 +304,6 @@ module type Forward_S = sig
     Cfg.t ->
     ?max_iteration:int ->
     init:domain ->
-    handlers_are_entry_points:bool ->
     context ->
     (domain Label.Tbl.t, unit) result
 end
@@ -375,19 +374,13 @@ module Forward (D : Domain_S) (T : Forward_transfer with type domain = D.t) :
       Cfg.t ->
       ?max_iteration:int ->
       init:domain ->
-      handlers_are_entry_points:bool ->
       context ->
       (domain Label.Tbl.t, unit) result =
-   fun cfg ?(max_iteration = max_int) ~init ~handlers_are_entry_points
-       context ->
+   fun cfg ?(max_iteration = max_int) ~init context ->
     let work_state =
       Dataflow_impl.create cfg
         ~init:(fun block ->
-          if
-            Label.equal block.start cfg.entry_label
-            || (handlers_are_entry_points && block.is_trap_handler)
-          then Some init
-          else None)
+          if Label.equal block.start cfg.entry_label then Some init else None)
         ~store_instr:false
     in
     Dataflow_impl.run ~max_iteration work_state context
