@@ -107,6 +107,7 @@ mutual
     | typeDecl (decl : TypeDecl)
     | exprDecl (id : Ident) (type : TypeExpr)
     | moduleDecl (id : Ident) (type : ModuleType)
+    | law (id : Ident)
 
   inductive ModuleType where
     | signature (items : List SignatureItem)
@@ -114,5 +115,19 @@ end
 
 structure Signature where
   items : List SignatureItem
+
+structure AbstractTypeDefinition where
+  id : Ident
+  definition : TypeExpr
+
+structure LawParam where
+  id : Ident
+  type : TypeExpr
+
+structure Law where
+  name : String
+  params : List LawParam
+  assumptions : List (Function Lambda)
+  conclusion : Function Lambda
 
 end Syntax

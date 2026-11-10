@@ -3,7 +3,10 @@ import Howdah.Syntax
 import Howdah.Phoas
 
 structure JsonSchema : Type where
+  unitName : String
   interface : Syntax.Signature
+  abstractTypeDefinitions : List Syntax.AbstractTypeDefinition
+  laws : List Syntax.Law
   implementation : Syntax.Lambda
 
 structure InterfaceAndImplementation : Type 1 where
@@ -44,16 +47,21 @@ deriving instance Lean.FromJson, Lean.ToExpr for Syntax.TypeDesc
 deriving instance Lean.FromJson, Lean.ToExpr for Syntax.TypeDecl
 deriving instance Lean.FromJson, Lean.ToExpr for Syntax.SignatureItem
 deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Signature
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.AbstractTypeDefinition
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.LawParam
+deriving instance Lean.FromJson, Lean.ToExpr for Syntax.Law
 deriving instance Lean.FromJson, Lean.ToExpr for JsonSchema
 
 open Lean Elab Command
 
-elab "howdah% " path:str : term => do
-  let filename : String ← getFileName
-  let dir : System.FilePath := System.FilePath.mk filename |>.parent.getD "."
-  let fileContents : String ← dir / path.getString |> IO.FS.readFile
+def JsonSchema.read (sourceFile path : String) : IO JsonSchema := do
+  let dir : System.FilePath := System.FilePath.mk sourceFile |>.parent.getD "."
+  let fileContents : String ← dir / path |> IO.FS.readFile
   let json : Json ← Json.parse fileContents |> IO.ofExcept
-  let imported : JsonSchema ← fromJson? json |> IO.ofExcept
+  fromJson? json |> IO.ofExcept
+
+elab "howdah% " path:str : term => do
+  let imported ← JsonSchema.read (← getFileName) path.getString
   let interface ← Term.exprToSyntax (toExpr imported.interface)
   let phoas ← imported.implementation.toPhoas?
   let implementation ← Term.exprToSyntax phoas

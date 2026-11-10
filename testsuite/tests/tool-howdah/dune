@@ -4,6 +4,8 @@
  (action
   (run
    %{exe:../../../main_native.exe}
+   -extension
+   laws
    -bin-annot
    -stop-after
    typing
@@ -18,7 +20,7 @@
    record.json
    (run
     %{exe:../../../tools/howdah/howdah.exe}
-    %{dep:record.cmi}
+    %{dep:record.cmti}
     %{dep:record.cmt}))))
 
 (rule
@@ -35,6 +37,8 @@
  (action
   (run
    %{exe:../../../main_native.exe}
+   -extension
+   laws
    -bin-annot
    -stop-after
    typing
@@ -49,7 +53,7 @@
    even.json
    (run
     %{exe:../../../tools/howdah/howdah.exe}
-    %{dep:even.cmi}
+    %{dep:even.cmti}
     %{dep:even.cmt}))))
 
 (rule

@@ -3,7 +3,7 @@ exception Error_message of string
 
 (* CLI info for the [Arg] module. *)
 let flags : (string * Arg.spec * string) list = []
-let description : string = "Extract a matching `.cmi` and `.cmt` to Lean";;
+let description : string = "Extract a matching `.cmti` and `.cmt` to Lean";;
 
 (* Serialize a Lean constructor to JSON by tagging its constructor name. *)
 let tag (lean_ctor_name : string) (contents : Json.t) : Json.t =
@@ -221,7 +221,7 @@ let serialize_type_declaration (id : Ident.t) (decl : Types.type_declaration)
       ("desc", desc)
     ]
 
-(* Serialize an interface from an [.mli]/[.cmi] pair. *)
+(* Serialize an interface from an [.mli]/[.cmti] pair. *)
 let rec serialize_signature (signature : Types.signature) : Json.t =
   List.map serialize_signature_item signature
   |> fun items -> tag "items" (Json.Array items)
@@ -244,6 +244,7 @@ and serialize_signature_item : Types.signature_item -> Json.t = function
         ("type", serialize_module_type ~loc:decl.md_loc decl.md_type);
       ]
     |> tag "moduleDecl"
+  | Sig_law (id, _, _) -> tag "id" (serialize_ident id) |> tag "law"
   | other_item ->
     Format.asprintf "Signature item not yet supported:@ %a"
       Printtyp.signature [other_item]
@@ -280,52 +281,154 @@ let serialize_structure
   in
   serialize_lambda lambda
 
-(* Restore load-path information from the [.cmt] artifact. *)
-let rehydrate_envs (info : Cmt_format.cmt_infos) :
-    Typedtree.structure -> Typedtree.structure =
+let init_load_path (info : Cmt_format.cmt_infos) : unit =
   Load_path.init ~auto_include:Load_path.no_auto_include
-    ~visible:info.cmt_loadpath.visible ~hidden:info.cmt_loadpath.hidden;
-  let mapper =
-    { Tast_mapper.default with
-      env = fun _ env -> Envaux.env_of_only_summary env }
+    ~visible:info.cmt_loadpath.visible ~hidden:info.cmt_loadpath.hidden
+
+let rehydrate : Tast_mapper.mapper =
+  { Tast_mapper.default with
+    env = fun _ env -> Envaux.env_of_only_summary env }
+
+let rec check_no_local_types ~(loc : Warnings.loc) (ty : Types.type_expr) =
+  match Types.get_desc ty with
+  | Tconstr (path, args, _) ->
+    let is_external id = Ident.is_predef id || Ident.is_global id in
+    if List.for_all is_external (Path.heads path) then
+      List.iter (check_no_local_types ~loc) args
+    else
+      Format.asprintf "Local type in an abstract type's definition:@ %a:@ %a"
+        Location.print_loc loc Printtyp.type_expr ty
+      |> fun message -> raise (Error_message message)
+  | Tarrow (_, lhs, rhs, _) ->
+    check_no_local_types ~loc lhs;
+    check_no_local_types ~loc rhs
+  | _ -> ()
+
+let serialize_abstract_type_definitions
+    ~(interface : Types.signature) ~(implementation : Types.signature)
+  : Json.t =
+  let definition_in_implementation name =
+    List.find_map
+      (function
+        | Types.Sig_type (id, decl, _, _) when Ident.name id = name -> Some decl
+        | _ -> None)
+      implementation
   in
-  mapper.structure mapper
+  let serialize_definition : Types.signature_item -> Json.t option = function
+    | Sig_type
+        (id, { type_kind = Type_abstract _; type_manifest = None; _ }, _, _) ->
+      begin match definition_in_implementation (Ident.name id) with
+      | Some { type_manifest = Some ty; type_params = []; type_loc = loc; _ } ->
+        check_no_local_types ~loc ty;
+        Some
+          (Json.Object
+             [ ("id", serialize_ident id);
+               ("definition", serialize_type_expr ~loc ty);
+             ])
+      | _ ->
+        Printf.sprintf
+          "Abstract type `%s` must be a non-parameterized alias in the `.ml`"
+          (Ident.name id)
+        |> fun message -> raise (Error_message message)
+      end
+    | _ -> None
+  in
+  Json.Array (List.filter_map serialize_definition interface)
 
-(* Get the CRC hash of a `.cmi` file. *)
-let crc_of_cmi (cmi : Cmi_format.cmi_infos) =
-  Array.find_map
-    ( fun import ->
-        if Import_info.name import |> Compilation_unit.Name.equal cmi.cmi_name
-        then Import_info.crc import
-        else None )
+let field_positions (interface : Types.signature) : int Ident.Map.t =
+  List.filter Includemod.is_runtime_component interface
+  |> List.mapi (fun position item -> Types.signature_item_id item, position)
+  |> List.to_seq
+  |> Ident.Map.of_seq
 
-(* Check that the [.cmi] and [.cmt] file discuss the same source code. *)
+let serialize_law ~(positions : int Ident.Map.t)
+    (law : Typedtree.law_declaration) : Json.t =
+  let self = Ident.create_local "self" in
+  let project_from_self _ position : Lambda.lambda =
+    Lprim
+      ( Pfield (position, Pointer, Reads_agree),
+        [Lvar self],
+        Debuginfo.Scoped_location.Loc_unknown )
+  in
+  let components = Ident.Map.mapi project_from_self positions in
+  let params =
+    List.map (fun (param : Typedtree.law_param) -> param.lp_id) law.law_params
+  in
+  let serialize_clause (clause : Typedtree.spec_expression) : Json.t =
+    Translspec.typedtree clause
+    |> rehydrate.expr rehydrate
+    |> Translcore.transl_exp ~scopes:Debuginfo.Scoped_location.empty_scopes
+         Lambda.layout_int
+    |> Lambda.subst (fun _ _ env -> env) components
+    |> fun body ->
+    Json.Object
+      [ ("headParam", serialize_ident self);
+        ("tailParams", Json.Array (List.map serialize_ident params));
+        ("body", serialize_lambda body);
+      ]
+  in
+  let serialize_param (param : Typedtree.law_param) : Json.t =
+    Json.Object
+      [ ("id", serialize_ident param.lp_id);
+        ( "type",
+          serialize_type_expr ~loc:param.lp_type.ctyp_loc
+            param.lp_type.ctyp_type );
+      ]
+  in
+  Json.Object
+    [ ("name", Json.String law.law_name.txt);
+      ("params", Json.Array (List.map serialize_param law.law_params));
+      ( "assumptions",
+        Json.Array (List.map serialize_clause law.law_assumptions) );
+      ("conclusion", serialize_clause law.law_conclusion);
+    ]
+
+(* Check that the [.cmti] and [.cmt] file discuss the same source code. *)
 let check_same_compilation
-    (cmi : Cmi_format.cmi_infos) (cmt : Cmt_format.cmt_infos) : unit =
-  if crc_of_cmi cmi cmt.cmt_imports <> crc_of_cmi cmi cmi.cmi_crcs
-  then
+    ~(cmti : Cmt_format.cmt_infos) ~(cmt : Cmt_format.cmt_infos) : unit =
+  let unit_name = Compilation_unit.name cmti.cmt_modname in
+  let interface_crc_seen_by_implementation =
+    Array.find_map
+      ( fun import ->
+          if Import_info.name import |> Compilation_unit.Name.equal unit_name
+          then Import_info.crc import
+          else None )
+      cmt.cmt_imports
+  in
+  match interface_crc_seen_by_implementation, cmti.cmt_interface_digest with
+  | Some seen, Some actual when Digest.equal seen actual -> ()
+  | _ ->
     raise
       ( Error_message
-          "`.cmi` and `.cmt` were compiled from different units" )
+          "`.cmti` and `.cmt` were compiled from different units" )
 
 (* Handle the user's supplied (alleged) filenames, whatever those may be. *)
-let run ~(cmi_filename : string) ~(cmt_filename : string) : unit =
-  if Filename.extension cmi_filename <> ".cmi" then
-    raise (Error_message "first input file extension must be `.cmi`");
+let run ~(cmti_filename : string) ~(cmt_filename : string) : unit =
+  if Filename.extension cmti_filename <> ".cmti" then
+    raise (Error_message "first input file extension must be `.cmti`");
   if Filename.extension cmt_filename <> ".cmt" then
     raise (Error_message "second input file extension must be `.cmt`");
-  let cmi = Cmi_format.read_cmi cmi_filename in
+  let cmti = Cmt_format.read_cmt cmti_filename in
   let cmt = Cmt_format.read_cmt cmt_filename in
-  check_same_compilation cmi cmt;
-  let interface, _ = cmi.cmi_sign in
+  check_same_compilation ~cmti ~cmt;
+  init_load_path cmt;
+  let signature =
+    begin match cmti.cmt_annots with
+    | Interface signature -> rehydrate.signature rehydrate signature
+    | Implementation _ | Functorize | Packed _
+    | Partial_implementation _ | Partial_interface _ ->
+      raise (Error_message "input `.cmti` must come from a full `.mli` file")
+    end
+  in
   let structure =
     begin match cmt.cmt_annots with
-    | Implementation structure -> rehydrate_envs cmt structure
+    | Implementation structure -> rehydrate.structure rehydrate structure
     | Interface _ | Functorize | Packed _
     | Partial_implementation _ | Partial_interface _ ->
       raise (Error_message "input `.cmt` must come from a full `.ml` file")
     end
   in
+  let interface = signature.sig_type in
   (* Reorder fields in the [.ml] as necessary to match the [.mli]. *)
   let coercion, _ =
     let mode = Persistent_env.mode_pers_mod Mode.Staticity.Dynamic in
@@ -336,9 +439,24 @@ let run ~(cmi_filename : string) ~(cmt_filename : string) : unit =
       ~modes:(Includecore.Specific ((mode, None), mode))
       structure.str_type "(inferred signature)" interface Shape.dummy_mod
   in
+  let laws =
+    List.filter_map
+      (fun (item : Typedtree.signature_item) ->
+        match item.sig_desc with
+        | Tsig_law law -> Some law
+        | _ -> None)
+      signature.sig_items
+  in
+  let positions = field_positions interface in
   let json_output : Json.t =
     Json.Object
-      [ ("interface", serialize_signature interface);
+      [ ( "unitName",
+          Json.String (Compilation_unit.full_path_as_string cmt.cmt_modname) );
+        ("interface", serialize_signature interface);
+        ( "abstractTypeDefinitions",
+          serialize_abstract_type_definitions ~interface
+            ~implementation:structure.str_type );
+        ("laws", Json.Array (List.map (serialize_law ~positions) laws));
         ("implementation", serialize_structure cmt structure coercion);
       ]
   in
@@ -351,10 +469,11 @@ let main () : unit =
     let add_filename filename = filenames := filename :: !filenames in
     Arg.parse_expand flags add_filename description;
     begin match !filenames with
-    | [cmt_filename; cmi_filename] ->
+    | [cmt_filename; cmti_filename] ->
       (* reversed! (because of [::] above) *)
-      run ~cmi_filename ~cmt_filename
-    | _ -> raise (Error_message "expected exactly two files: `.cmi` then `.cmt`")
+      run ~cmti_filename ~cmt_filename
+    | _ ->
+      raise (Error_message "expected exactly two files: `.cmti` then `.cmt`")
     end
   with
   | Error_message message ->
