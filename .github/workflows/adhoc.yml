@@ -1,0 +1,67 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+#
+# Runs a bash command on a chosen runner against the dispatched ref, e.g. to
+# test a nix change without opening a PR:
+#
+#   gh workflow run adhoc.yml --ref BRANCH \
+#     -f command='nix build -L .#devShells.x86_64-linux.default.inputDerivation'
+#
+# This grants nothing beyond what write access already allows: anyone who can
+# dispatch it can also push a branch whose build runs arbitrary code. Like
+# nix-github-actions.yml, it must never see a secret or a write token; the
+# command gets a read-only GH_TOKEN for API calls. Inputs and logs are public.
+
+name: Ad hoc command
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: Bash command to run from the repository root
+        required: true
+        type: string
+      runner:
+        description: Runner label to run on
+        default: warp-ubuntu-latest-x64-16x
+        type: string
+      timeout_minutes:
+        description: Job timeout in minutes
+        default: 60
+        type: number
+
+permissions: {}
+
+jobs:
+  adhoc:
+    name: Ad hoc command
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          # Pin to nix 2.33.0; later versions of nix cause out of memory issues
+          # on darwin
+          install_url: https://releases.nixos.org/nix/nix-2.33.0/install
+
+      - name: Set up cache (read-only)
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          # Public caches are readable without credentials.
+          name: oxcaml
+
+      - name: Run command
+        env:
+          COMMAND: ${{ inputs.command }}
+          GH_TOKEN: ${{ github.token }}
+        run: eval "$COMMAND"
