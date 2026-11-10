@@ -698,7 +698,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                       refs_per_domain, participating_idx,
                       ref_start, ref_end);
 
-      for( r = ref_start ; r < foreign_major_ref->ptr && r < ref_end ; r++ )
+      for( r = ref_start ; r < ref_end ; r++ )
       {
         /* Because the work on the remembered set is shared, other threads may
            attempt to promote the same value; this is fine, but we need the
