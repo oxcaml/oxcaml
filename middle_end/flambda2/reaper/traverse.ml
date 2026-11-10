@@ -213,7 +213,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         Acc.add_accessor_dep acc ~to_ (Field.boxed_number bn) ~base:name)
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax )
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax )
   | Unary
       ( ( Duplicate_block _ | Duplicate_array _
         | Is_int { variant_only = false }

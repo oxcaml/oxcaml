@@ -3556,6 +3556,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ptls_get, _ -> [Nullary Tls_get]
   | Pdomain_index, _ -> [Nullary Domain_index]
+  | Pthread_self_id, _ -> [Nullary Thread_self_id]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
     if not (Target_system.is_64_bit ())
