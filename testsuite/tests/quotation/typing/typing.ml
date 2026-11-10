@@ -556,3 +556,37 @@ let x = <[ #("abc", #42L) ]>
 [%%expect {|
 val x : <[#(string * int64_u)]> expr = <[#("abc", #42L)]>
 |}]
+
+(* The following tests check that we cannot construct a type with an existential
+   that might both be a float and a non-float. *)
+
+(* Separability in expr *)
+
+type t = K : ('a : value). 'a expr -> t [@@unboxed]
+[%%expect {|
+type t = K : 'a expr -> t [@@unboxed]
+|}]
+
+(* Separability in quotes and splices *)
+
+type 'a s = <[$'a]>
+[%%expect {|
+type 'a s = 'a
+|}]
+
+type t = K : ('a : value). 'a s -> t [@@unboxed]
+[%%expect {|
+type t = K : 'a s -> t [@@unboxed]
+|}]
+
+(* Separability in eval (and splices) *)
+
+type 'a s = 'a eval
+[%%expect {|
+type 'a s = 'a eval
+|}]
+
+type t = K : ('a : value). 'a s -> t [@@unboxed]
+[%%expect {|
+type t = K : 'a s -> t [@@unboxed]
+|}]
