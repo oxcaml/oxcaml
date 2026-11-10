@@ -26,29 +26,22 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** The FDO counters (see [Fdo_counter]) carried by Flambda terms: on calls
-    ([Apply_expr.callsite_counter]), on the edges of switches
-    ([Switch_arm.annotations]) and on function entries
-    ([Code_metadata.fdo_entry_annotation]). *)
+(** Utility functions to work with Flambda terms containing FDO counters. *)
 
-(** [code] with [f] applied to each of its counters: those of its entry, and
-    those of the calls and switch arms of its body. *)
+(** [code] with [f] applied to each of its counters (entry, calls, branches) *)
 val map_counters_of_code :
   f:(Fdo_counter.t -> Fdo_counter.t) -> Code.t -> Code.t
 
-(** [switch] with the counters of each arm replaced by [f] applied to the arm's
-    action and counters. *)
+(** [switch] with the counters of each arm replaced by a call to [f]. *)
 val map_switch_counters :
   f:(Apply_cont_expr.t -> Fdo_annotation.t -> Fdo_annotation.t) ->
   Switch_expr.t ->
   Switch_expr.t
 
-(** The counters of a call to [code] that is inlined out, as the call graph
-    decoded from a profile would count the call had it not been: the entry
-    counters of the callee (its own, then those of the calls inlined at its
-    head), in the context of the call site. *)
+(** The entry counters of [code] inlined at the call corresponding to
+    [callsite_counter]. *)
 val of_inlined_call :
   callsite_counter:Fdo_counter.t option -> Code.t -> Fdo_annotation.t
 
-(** The counters of the edges of the given switch arms. *)
+(** The union of the counters of the edges of the given switch arms. *)
 val of_switch_arms : Switch_arm.t Target_ocaml_int.Map.t -> Fdo_annotation.t
