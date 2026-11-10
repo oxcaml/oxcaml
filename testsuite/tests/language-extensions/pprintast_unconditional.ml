@@ -177,6 +177,7 @@ end = struct
   let class_signature = test "class_signature" class_signature Example.class_signature
   let type_declaration = test "type_declaration" type_declaration Example.type_declaration
 
+  let is_infix_operator = is_infix_operator
   let string_of_expression = test_string_of "string_of_expression" string_of_expression Example.expression
   let string_of_structure = test_string_of "string_of_structure" string_of_structure Example.structure
 

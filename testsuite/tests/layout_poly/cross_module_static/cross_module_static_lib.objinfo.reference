@@ -34,10 +34,10 @@ Static data:
         (function {nlocal = 0} x/318[$layout_2] : $layout_2 x/318))))
   (Cross_module_static_lib/Stamper/3
     (closure [calls/323: *]
-      (template {nlocal = 0} X/350 is_a_functor never_inline never_loop
+      (template {nlocal = 0} X/353 is_a_functor never_inline never_loop
         (let
-          (X/329 =a X/350
-           *match*/349 =[value<int>] (+:=1 calls/323)
+          (X/329 =a X/353
+           *match*/352 =[value<int>] (+:=1 calls/323)
            initial/330 =[value<int>] (field_int 0 (field_imm 1 X/329))
            with_stamp/331 =
              (ktemplate layout_29
