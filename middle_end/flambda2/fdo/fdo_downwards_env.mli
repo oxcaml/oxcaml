@@ -34,10 +34,6 @@ type t
 (** At the unit toplevel. *)
 val none : t
 
-(** For the functions of a set of closures met where [t] is, in code whose
-    inlining context is [inlined_debuginfo]. The sets of closures met in an
-    inlined body, or in the body of a function of such a set, are copies of the
-    original definitions (e.g. by an inlined functor application). *)
 val enter_set_of_closures : t -> inlined_debuginfo:Inlined_debuginfo.t -> t
 
 (** For the body of an inlined function. The call site's counter already carries

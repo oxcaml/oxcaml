@@ -28,8 +28,9 @@
 
 (** Utility functions to work with Flambda terms containing FDO counters. *)
 
-(** [code] with [f] applied to each of its counters (entry, calls, branches),
-    but not to those of the code bound in its body. *)
+(** [code] with [f] applied to each of its counters (entry, calls, branches).
+    Nested code is skipped. Rebuilds the body, so it should be called before
+    Simplify starts traversing it. *)
 val map_counters_of_code :
   f:(Fdo_counter.t -> Fdo_counter.t) -> Code.t -> Code.t
 

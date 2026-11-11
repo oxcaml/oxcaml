@@ -28,10 +28,9 @@
 
 type t =
   { copy_context : Inlined_debuginfo.t;
-        (** The inlinings whose bodies defined the set of closures whose
-            function is being simplified, making it a copy of the original
-            definition. They do not add inlined frames to its debuginfo, which
-            keeps describing the original. *)
+        (** The inlinings for a specialized set of closures whose function we're
+            simplifying. Kept track of separately since debuginfo for
+            specializations doesn't change, while FDO names do. *)
     region : Fdo_region_counters.Region.t option;
     stub_callsite_counter : Fdo_counter.t option
         (** In the body of an inlined stub, the counter of the call it was
