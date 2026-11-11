@@ -852,6 +852,14 @@ async def fuzz(
     return finished_because
 
 
+# The CPUs this process may run on. os.sched_getaffinity does not exist on
+# macOS, so fall back to all the CPUs there.
+def available_cpus() -> int:
+    if hasattr(os, "sched_getaffinity"):
+        return len(os.sched_getaffinity(0))
+    return os.cpu_count() or 1
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(
         prog="oxfuzzer",
@@ -906,10 +914,10 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     parser.add_argument(
         "--jobs",
         type=int,
-        default=max(1, len(os.sched_getaffinity(0)) // 2),
+        default=1,
         metavar="N",
-        help="maximum concurrent compiler/program processes "
-        "(default: %(default)s, half the available CPUs)",
+        help="maximum concurrent compiler/program processes, or 0 for all "
+        "the available CPUs (default: %(default)s)",
     )
     parser.add_argument(
         "--seed",
@@ -936,8 +944,8 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         "`nix build .#oxcaml`) in place, instead of a build directory",
     )
     args = parser.parse_args()
-    if args.jobs < 1:
-        parser.error("--jobs must be at least 1")
+    if args.jobs < 0:
+        parser.error("--jobs must not be negative")
     if args.iterations is None and args.time_limit_minutes is None:
         parser.error(
             "at least one of --iterations and --time-limit-minutes is required"
@@ -996,7 +1004,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
                 toolchain=toolchain,
                 run_dir=Path(run_dir),
                 limits=limits,
-                jobs=args.jobs,
+                jobs=args.jobs or available_cpus(),
                 # CR-soon xclerc: We should instead create a temporary
                 # directory inside of args.output, so that there are no
                 # collisions on rerunning a command with the same output
