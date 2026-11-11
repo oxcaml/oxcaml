@@ -208,6 +208,10 @@ class CommandResult:
     stderr: bytes
     timed_out: bool
 
+    @property
+    def ok(self) -> bool:
+        return not self.timed_out and self.returncode == 0
+
 
 def kill_process_group(process: asyncio.subprocess.Process) -> None:
     try:
@@ -345,7 +349,7 @@ async def run_configuration(
         source.write_bytes(program)
         executable = work_dir / "program.exe"
         compilation = await compile(configuration, source=source, executable=executable)
-        if compilation.timed_out or compilation.returncode != 0:
+        if not compilation.ok:
             return ConfigurationResult(
                 configuration=configuration, compilation=compilation, execution=None
             )
@@ -354,6 +358,28 @@ async def run_configuration(
         return ConfigurationResult(
             configuration=configuration, compilation=compilation, execution=execution
         )
+
+
+async def run_configurations(
+    toolchain: Toolchain,
+    *,
+    seed: int,
+    program: bytes,
+    work_dir: Path,
+    slots: asyncio.Semaphore,
+) -> list[ConfigurationResult]:
+    return await asyncio.gather(
+        *(
+            run_configuration(
+                configuration,
+                seed=seed,
+                program=program,
+                work_dir=work_dir / configuration.name,
+                slots=slots,
+            )
+            for configuration in toolchain.configurations
+        )
+    )
 
 
 # Returns None if generation timed out.
@@ -616,73 +642,60 @@ def check_case(
     *,
     toolchain: Toolchain,
 ) -> None:
-    failed = [
-        r for r in results if r.compilation.timed_out or r.compilation.returncode != 0
-    ]
-    if failed:
-        names = ", ".join(
-            f"{r.configuration.name} ({status_text(r.compilation)})" for r in failed
-        )
+    def fail(reason: str) -> None:
         save_failure(
             output_dir,
             run_info,
             seed,
             program,
             results,
-            f"compilation failed or timed out: {names}",
+            reason,
             toolchain=toolchain,
         )
         stats.failed += 1
         stats.report()
+
+    failed = [r for r in results if not r.compilation.ok]
+    if failed:
+        names = ", ".join(
+            f"{r.configuration.name} ({status_text(r.compilation)})" for r in failed
+        )
+        fail(f"compilation failed or timed out: {names}")
         return
 
     # CR-soon xclerc: This is a bug, execution failures should take
     # precedence over timeouts and if any execution fails the test is considered
     # a failure.
 
+    # Every configuration compiled the program, so every one ran it.
+    executions = [
+        (r.configuration, r.execution) for r in results if r.execution is not None
+    ]
     # If any of the executions time out, we discard the case.
-    if any(r.execution.timed_out for r in results):
+    if any(execution.timed_out for _, execution in executions):
         stats.discarded += 1
         stats.report()
         return
     # Generated programs terminate normally by construction, so a non-zero exit
     # is a bug in the generator, the compiler or the runtime, even when all
     # configurations agree on it.
-    error = [r for r in results if r.execution.returncode != 0]
+    error = [(c, execution) for c, execution in executions if execution.returncode != 0]
     if error:
         names = ", ".join(
-            f"{r.configuration.name} ({status_text(r.execution)})" for r in error
+            f"{c.name} ({status_text(execution)})" for c, execution in error
         )
-        save_failure(
-            output_dir,
-            run_info,
-            seed,
-            program,
-            results,
-            f"error exit: {names}",
-            toolchain=toolchain,
-        )
-        stats.failed += 1
-        stats.report()
+        fail(f"error exit: {names}")
         return
-    reference, *others = results
-    for other in others:
-        reference_outcome = (reference.execution.stdout, reference.execution.stderr)
-        other_outcome = (other.execution.stdout, other.execution.stderr)
+    (reference_configuration, reference), *others = executions
+    for other_configuration, other in others:
+        reference_outcome = (reference.stdout, reference.stderr)
+        other_outcome = (other.stdout, other.stderr)
 
         if reference_outcome != other_outcome:
-            save_failure(
-                output_dir,
-                run_info,
-                seed,
-                program,
-                results,
-                f"{reference.configuration.name} and "
-                f"{other.configuration.name} disagree",
-                toolchain=toolchain,
+            fail(
+                f"{reference_configuration.name} and "
+                f"{other_configuration.name} disagree"
             )
-            stats.failed += 1
-            stats.report()
             return
     stats.passed += 1
     stats.report()
@@ -706,17 +719,8 @@ async def run_case(
             stats.discarded += 1
             stats.report()
             return
-        results = await asyncio.gather(
-            *(
-                run_configuration(
-                    configuration,
-                    seed=seed,
-                    program=program,
-                    work_dir=case_dir / configuration.name,
-                    slots=slots,
-                )
-                for configuration in toolchain.configurations
-            )
+        results = await run_configurations(
+            toolchain, seed=seed, program=program, work_dir=case_dir, slots=slots
         )
         check_case(
             seed, program, results, stats, output_dir, run_info, toolchain=toolchain
@@ -743,22 +747,16 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
             f"oxfuzzer: self-check failed: generation timed out for seed "
             f"{SELF_CHECK_SEED}."
         )
-    slots = asyncio.Semaphore(len(toolchain.configurations))
-    results = await asyncio.gather(
-        *(
-            run_configuration(
-                configuration,
-                seed=SELF_CHECK_SEED,
-                program=program,
-                work_dir=run_dir / "self-check" / configuration.name,
-                slots=slots,
-            )
-            for configuration in toolchain.configurations
-        )
+    results = await run_configurations(
+        toolchain,
+        seed=SELF_CHECK_SEED,
+        program=program,
+        work_dir=run_dir / "self-check",
+        slots=asyncio.Semaphore(len(toolchain.configurations)),
     )
     for result in results:
         name = result.configuration.name
-        if result.compilation.timed_out or result.compilation.returncode != 0:
+        if not result.compilation.ok:
             raise SystemExit(
                 f"oxfuzzer: self-check failed: {name} did not compile the program "
                 f"generated from seed {SELF_CHECK_SEED} "
@@ -766,7 +764,7 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
                 + result.compilation.stderr.decode(errors="replace")
             )
         assert result.execution is not None
-        if result.execution.timed_out or result.execution.returncode != 0:
+        if not result.execution.ok:
             raise SystemExit(
                 f"oxfuzzer: self-check failed: {name} did not run the program "
                 f"generated from seed {SELF_CHECK_SEED} "
