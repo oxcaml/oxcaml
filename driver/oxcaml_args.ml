@@ -591,6 +591,12 @@ let mk_llvm_flags f =
     Arg.String f,
     " Extra flags to pass to LLVM (like -march or -mtune)" )
 
+let mk_fdo_counters f =
+  ( "-fdo-counters",
+    Arg.Unit f,
+    " Attach FDO counters to function entries, branches, and call sites (no \
+     counters are attached in classic mode)" )
+
 module Flambda2 = Oxcaml_flags.Flambda2
 
 let mk_flambda2_result_types_functors_only f =
@@ -792,6 +798,22 @@ let mk_no_reaper_change_calling_conventions f =
       " Prevent the reaper from changing the calling conventions of \
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
+
+let mk_lto_support f =
+  ( "-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Store data the Reaper's link time optimisation data in the .cmx file, \
+       for use by -reaper-solve and -reaper-rebuild.%s (Flambda2 only)"
+      (format_default Flambda2.Default.lto_support) )
+
+let mk_no_lto_support f =
+  ( "-no-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not store the Reaper's link time optimisation data in the .cmx \
+       file.%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.lto_support) )
 
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",
@@ -1520,6 +1542,7 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+  val fdo_counters : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val reaper_debug_flags : string -> unit
@@ -1547,6 +1570,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val lto_support : unit -> unit
+  val no_lto_support : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
@@ -1742,6 +1767,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
       mk_llvm_flags F.llvm_flags;
+      mk_fdo_counters F.fdo_counters;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_reaper_debug_flags F.reaper_debug_flags;
@@ -1775,6 +1801,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
+      mk_lto_support F.lto_support;
+      mk_no_lto_support F.no_lto_support;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
@@ -2199,6 +2227,7 @@ module Oxcaml_options_impl = struct
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
+  let fdo_counters = set' Oxcaml_flags.fdo_counters
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
 
@@ -2282,6 +2311,8 @@ module Oxcaml_options_impl = struct
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
 
+  let lto_support = set Flambda2.lto_support
+  let no_lto_support = clear Flambda2.lto_support
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
   let stubs_forward_inlining = set' Clflags.stubs_forward_inlining
@@ -2784,6 +2815,7 @@ module Extra_params = struct
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
+    | "fdo-counters" -> set' Oxcaml_flags.fdo_counters
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "reaper-debug-flags" ->
         Oxcaml_flags.Flambda2.reaper_debug_flags :=
@@ -2974,6 +3006,7 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "lto-support" -> set Flambda2.lto_support
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
     | "stubs-forward-inlining" -> set' Clflags.stubs_forward_inlining
     | "dissector" -> set' Clflags.dissector

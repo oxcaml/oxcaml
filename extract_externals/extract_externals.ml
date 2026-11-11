@@ -93,8 +93,8 @@ let spec_list =
        hidden includes." );
     ( "-H-file",
       Arg.String (add_hidden_include_file ~cmx_guaranteed:false),
-      "A single '<visible_path>:<actual_path>' entry specifying an available \
-       .cmi file, for hidden includes." );
+      "A single '<basename>:<actual_path>' entry specifying an available .cmi \
+       file, for hidden includes." );
     ( "-Hx-file",
       Arg.String (add_hidden_include_file ~cmx_guaranteed:true),
       "Same as -H-file (the cmx_guaranteed distinction is not used by this \

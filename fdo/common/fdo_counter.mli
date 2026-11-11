@@ -93,6 +93,8 @@ val compare : t -> t -> int
 (** Canonical string representation for metadata and dumps. *)
 val to_string : t -> string
 
+val print : Format.formatter -> t -> unit
+
 (** Hash the position and each inlining level, innermost first. *)
 val hash : t -> Hashed.t
 

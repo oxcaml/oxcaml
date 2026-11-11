@@ -1136,6 +1136,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ptls_get -> unary (Ccall "caml_domain_tls_get")
     | Pdomain_index -> unary (Ccall "caml_ml_domain_index")
+    | Pthread_self_id -> unary (Ccall "caml_ml_thread_self_id")
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")

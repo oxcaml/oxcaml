@@ -426,7 +426,7 @@ Line 1, characters 35-51:
 Error: This expression has type "unboxed_rec"
        but an expression was expected of type "('a : value)"
        The layout of unboxed_rec is value_or_null
-         because it is the primitive type or_null.
+         because of the definition of unboxed_rec at line 1, characters 0-54.
        But the layout of unboxed_rec must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]
@@ -440,7 +440,7 @@ Line 1, characters 35-46:
 Error: This constructor has type "unboxed_var"
        but an expression was expected of type "('a : value)"
        The layout of unboxed_var is value_or_null
-         because it is the primitive type or_null.
+         because of the definition of unboxed_var at line 1, characters 0-50.
        But the layout of unboxed_var must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]
@@ -454,7 +454,7 @@ Line 1, characters 36-47:
 Error: This constructor has type "('a, 'a or_null) gadt"
        but an expression was expected of type "('b : value)"
        The layout of ('a, 'a or_null) gadt is value_or_null
-         because it is the primitive type or_null.
+         because of the definition of gadt at line 1, characters 0-89.
        But the layout of ('a, 'a or_null) gadt must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]

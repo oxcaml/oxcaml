@@ -31,6 +31,7 @@ external thread_uncaught_exception : exn -> unit @@ portable =
 external yield : unit -> unit @@ portable = "caml_thread_yield"
 external self : unit -> t @@ portable = "caml_thread_self" [@@noalloc]
 external id : t -> int @@ portable = "caml_thread_id" [@@noalloc]
+external self_id : unit -> int @@ portable = "%thread_self_id"
 external join : t -> unit @@ portable = "caml_thread_join"
 
 (* For new, make sure the function passed to thread_new never
