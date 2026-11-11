@@ -557,24 +557,47 @@ CAMLprim value caml_atomic_lxor(value obj, value incr)
   return caml_atomic_lxor_field(obj, Val_long(0), incr);
 }
 
-CAMLexport int caml_is_stack (value v)
+/* Whether [v] lies within the local arenas of [stack]. */
+static int is_in_local_arenas (struct stack_info* stack, value v)
 {
-  int i;
   // We elide a call to caml_refresh_locals here for speed, since we never
   // read the local sp.
-  struct caml_local_arenas* loc = Caml_state->current_stack->local_arenas;
-  if (!Is_block(v)) return 0;
-  if (Color_hd(Hd_val(v)) != NOT_MARKABLE) return 0;
+  struct caml_local_arenas* loc = stack->local_arenas;
   if (loc == NULL) return 0;
 
   /* Search local arenas, starting from the largest (last) */
-  for (i = 0; i < loc->count; i++) {
+  for (int i = 0; i < loc->count; i++) {
     struct caml_local_arena arena = loc->arenas[i];
     if (arena.base <= (char*)v && (char*)v < arena.base + arena.length)
       return 1;
   }
 
   return 0;
+}
+
+CAMLexport int caml_is_stack (value v)
+{
+  if (!Is_block(v)) return 0;
+  if (Color_hd(Hd_val(v)) != NOT_MARKABLE) return 0;
+
+  /* [v] may be allocated on the local stack of the current fiber or of any of
+     its ancestors. The ancestors are suspended beneath the current fiber, so
+     their local stacks are live and are scanned by the GC along with the
+     current one (see [caml_scan_stack]). */
+  for (struct stack_info* stack = Caml_state->current_stack;
+       stack != NULL;
+       stack = Stack_parent(stack)) {
+    if (is_in_local_arenas(stack, v)) return 1;
+  }
+
+  return 0;
+}
+
+int caml_is_stack_of_current_fiber (value v)
+{
+  if (!Is_block(v)) return 0;
+  if (Color_hd(Hd_val(v)) != NOT_MARKABLE) return 0;
+  return is_in_local_arenas(Caml_state->current_stack, v);
 }
 
 /* This version of [caml_modify] may additionally be used to mutate

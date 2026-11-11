@@ -194,6 +194,8 @@ CAMLalloc(caml_stat_free, 1) CAMLreturns_nonnull()
 CAMLextern wchar_t* caml_stat_wcsconcat(int n, ...);
 #endif
 
+/* Whether a value is allocated on the local stack of the current fiber or of
+   one of its ancestors. */
 CAMLextern int caml_is_stack(value);
 
 
@@ -284,6 +286,10 @@ CAMLextern void caml_use_local_arenas(caml_local_arenas* s, uintnat local_sp);
 // Free local arenas, if any exist. Does nothing if s is NULL.
 // Should only be called when a fiber is being destroyed.
 CAMLextern void caml_free_local_arenas(caml_local_arenas* s);
+
+// Like [caml_is_stack], but only considers the local stack of the current
+// fiber, i.e. the one that [Caml_state->local_sp] refers to.
+int caml_is_stack_of_current_fiber(value);
 
 #endif /* CAML_INTERNALS */
 
