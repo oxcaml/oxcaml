@@ -22,6 +22,7 @@
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
+#include "caml/scan_mask.h"
 #include "caml/signals.h"
 
 static const mlsize_t mlsize_t_max = CAML_UINTNAT_MAX;
@@ -71,6 +72,22 @@ CAMLprim value caml_array_get_addr(value array, value index)
   return Field(array, idx);
 }
 
+#ifdef DEBUG
+/* Whether word [i] of block [v] is scannable. Only use in debug code as
+ * this is O{i}. Could be reworked into an O(1) version in scan_mask.h. */
+static bool block_word_is_scannable(value v, intnat i)
+{
+  caml_block_scan bs;
+  mlsize_t k;
+  caml_block_scan_init(&bs, v, Hd_val(v));
+  while (caml_block_scan_next(&bs, &k)) {
+    if ((intnat)k == i) return true;
+    if ((intnat)k > i) break;
+  }
+  return false;
+}
+#endif
+
 /* [ floatarray -> int -> float ] */
 CAMLprim value caml_floatarray_get(value array, value index)
 {
@@ -82,7 +99,7 @@ CAMLprim value caml_floatarray_get(value array, value index)
   // or a mixed block.
   CAMLassert (  Wosize_val(array) == 0
              || Tag_val(array) == Double_array_tag
-             || index > Scannable_wosize_val(array) );
+             || !block_word_is_scannable(array, idx) );
 
   if (idx < 0 || idx >= Wosize_val(array) / Double_wosize)
     caml_array_bound_error();
@@ -102,7 +119,7 @@ CAMLprim value caml_floatarray_get_local(value array, value index)
   // [caml_floatarray_get] may be called on a floatarray
   // or a mixed block.
   CAMLassert (  Tag_val(array) == Double_array_tag
-             || index > Scannable_wosize_val(array) );
+             || !block_word_is_scannable(array, idx) );
 
   if (idx < 0 || idx >= Wosize_val(array) / Double_wosize)
     caml_array_bound_error();

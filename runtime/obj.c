@@ -193,7 +193,6 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
     res = caml_alloc_small_with_reserved(sz, tag_for_alloc, reserved);
     for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
   } else {
-    mlsize_t scannable_sz = Scannable_wosize_val(arg);
     reserved_t reserved = Reserved_val(arg);
 
     res = caml_alloc_shr_reserved(sz, tag_for_alloc, reserved);
@@ -212,13 +211,13 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
       CAMLassert(start_of_scannable_env >= 2);
 
       // These two can be equal when there is no scannable environment.
-      CAMLassert(start_of_scannable_env <= scannable_sz);
+      CAMLassert(start_of_scannable_env <= sz);
 
       for (i = 0; i < start_of_scannable_env; i++) {
         Field(res, i) = Field(arg, i);
       }
       // Copy the scannable environment.
-      for (; i < scannable_sz; i++) {
+      for (; i < sz; i++) {
         caml_initialize(&Field(res, i), Field(arg, i));
       }
     } else {
