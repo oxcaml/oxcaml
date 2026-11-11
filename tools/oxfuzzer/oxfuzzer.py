@@ -113,7 +113,8 @@ class Toolchain:
                     "-flambda2-result-types-all-functions",
                     "-flambda2-expert-can-inline-recursive-functions",
                     "-flambda2-match-in-match",
-                    "-flambda2-join-algorithm", "n-way",
+                    "-flambda2-join-algorithm",
+                    "n-way",
                     "-experimental-optimizations",
                     "-caml-apply-inline-fast-path",
                 ),
@@ -143,7 +144,11 @@ class Toolchain:
     def snapshot(self, destination: Path) -> "Toolchain":
         assert not self.installed
         for source in (
-            self.oxfuzzer, self.ocamlc, self.ocamlopt, self.ocamlrun, self.ocamllib,
+            self.oxfuzzer,
+            self.ocamlc,
+            self.ocamlopt,
+            self.ocamlrun,
+            self.ocamllib,
             *(self.library_dir(library) for library in LIBRARIES),
         ):
             target = destination / source.relative_to(self.root)
@@ -195,12 +200,14 @@ MAX_PROGRAM_BYTES = 1024 * 1024
 RATE_SMOOTHING = 0.01
 PROGRESS_INTERVAL_SEC = 30.0
 
+
 @dataclass(frozen=True)
 class CommandResult:
     returncode: int
     stdout: bytes
     stderr: bytes
     timed_out: bool
+
 
 def kill_process_group(process: asyncio.subprocess.Process) -> None:
     try:
@@ -212,13 +219,13 @@ def kill_process_group(process: asyncio.subprocess.Process) -> None:
 # stdout and stderr go to <output_prefix>.stdout and <output_prefix>.stderr
 # rather than pipes.
 async def run_command(
-        command: str,
-        args: Sequence[str],
-        *,
-        cwd: Path | None = None,
-        env: dict[str, str] | None = None,
-        timeout_sec: float,
-        output_prefix: Path,
+    command: str,
+    args: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+    timeout_sec: float,
+    output_prefix: Path,
 ) -> CommandResult:
     stdout_path = output_prefix.with_suffix(".stdout")
     stderr_path = output_prefix.with_suffix(".stderr")
@@ -265,6 +272,7 @@ class ConfigurationResult:
     configuration: Configuration
     compilation: CommandResult
     execution: CommandResult | None
+
 
 def source_filename(configuration: Configuration, seed: int) -> str:
     # Some compiler bugs depend on the source filename or compilation-unit name.
@@ -324,21 +332,19 @@ async def run(executable: Path) -> CommandResult:
 
 
 async def run_configuration(
-        configuration: Configuration,
-        *,
-        seed: int,
-        program: bytes,
-        work_dir: Path,
-        slots: asyncio.Semaphore,
+    configuration: Configuration,
+    *,
+    seed: int,
+    program: bytes,
+    work_dir: Path,
+    slots: asyncio.Semaphore,
 ) -> ConfigurationResult:
     async with slots:
         work_dir.mkdir(parents=True)
         source = work_dir / source_filename(configuration, seed)
         source.write_bytes(program)
         executable = work_dir / "program.exe"
-        compilation = await compile(
-            configuration, source=source, executable=executable
-        )
+        compilation = await compile(configuration, source=source, executable=executable)
         if compilation.timed_out or compilation.returncode != 0:
             return ConfigurationResult(
                 configuration=configuration, compilation=compilation, execution=None
@@ -349,10 +355,9 @@ async def run_configuration(
             configuration=configuration, compilation=compilation, execution=execution
         )
 
+
 # Returns None if generation timed out.
-async def generate(
-    seed: int, *, toolchain: Toolchain, work_dir: Path
-) -> bytes | None:
+async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes | None:
     work_dir.mkdir(parents=True, exist_ok=True)
     result = await run_command(
         str(toolchain.oxfuzzer),
@@ -381,6 +386,7 @@ async def generate(
 class Stats:
     """Statistics of a fuzzer's run. Describes how many programs passed, were
     discarded or failed."""
+
     passed: int = 0
     discarded: int = 0
     failed: int = 0
@@ -499,9 +505,7 @@ def run_metadata(base_seed: int, toolchain: Toolchain, revision: str) -> str:
 
 def failure_metadata(seed: int, run_info: str) -> str:
     return (
-        f"seed: {seed}\n"
-        f"time: {time.strftime('%Y-%m-%d %H:%M:%S %z')}\n"
-        + run_info
+        f"seed: {seed}\n" f"time: {time.strftime('%Y-%m-%d %H:%M:%S %z')}\n" + run_info
     )
 
 
@@ -527,11 +531,12 @@ def reproduction_script(
     directory: Path,
 ) -> str:
     if not toolchain.installed:
-        toolchain = Toolchain(Path(os.path.relpath(
-            toolchain.root.resolve(), directory.resolve()
-        )))
+        toolchain = Toolchain(
+            Path(os.path.relpath(toolchain.root.resolve(), directory.resolve()))
+        )
     configuration = next(
-        candidate for candidate in toolchain.configurations
+        candidate
+        for candidate in toolchain.configurations
         if candidate.name == configuration.name
     )
     source = Path(source_filename(configuration, seed))
@@ -584,9 +589,11 @@ def save_failure(
         directory = failure_dir / result.configuration.name
         directory.mkdir(exist_ok=True)
         script = directory / "run.sh"
-        script.write_text(reproduction_script(
-            result.configuration, seed, toolchain=toolchain, directory=directory
-        ))
+        script.write_text(
+            reproduction_script(
+                result.configuration, seed, toolchain=toolchain, directory=directory
+            )
+        )
         script.chmod(0o755)
         write_command_result(directory, "compile", result.compilation)
         if result.execution is not None:
@@ -610,16 +617,18 @@ def check_case(
     toolchain: Toolchain,
 ) -> None:
     failed = [
-        r for r in results
-        if r.compilation.timed_out or r.compilation.returncode != 0
+        r for r in results if r.compilation.timed_out or r.compilation.returncode != 0
     ]
     if failed:
         names = ", ".join(
-            f"{r.configuration.name} ({status_text(r.compilation)})"
-            for r in failed
+            f"{r.configuration.name} ({status_text(r.compilation)})" for r in failed
         )
         save_failure(
-            output_dir, run_info, seed, program, results,
+            output_dir,
+            run_info,
+            seed,
+            program,
+            results,
             f"compilation failed or timed out: {names}",
             toolchain=toolchain,
         )
@@ -642,11 +651,14 @@ def check_case(
     error = [r for r in results if r.execution.returncode != 0]
     if error:
         names = ", ".join(
-            f"{r.configuration.name} ({status_text(r.execution)})"
-            for r in error
+            f"{r.configuration.name} ({status_text(r.execution)})" for r in error
         )
         save_failure(
-            output_dir, run_info, seed, program, results,
+            output_dir,
+            run_info,
+            seed,
+            program,
+            results,
             f"error exit: {names}",
             toolchain=toolchain,
         )
@@ -718,6 +730,7 @@ SELF_CHECK_SEED = 0
 # CR-soon xclerc: Self check more than 1 case, possibly ~100, maybe turn
 # off swarm testing for this also.
 
+
 # Compile and run one generated program before running the fuzzer. This
 # is supposed to give more informative messages when the compilation
 # pipeline itself is broken.
@@ -773,10 +786,11 @@ class Limits:
     """When to stop fuzzing. Once a limit is reached no new cases are started,
     but cases in flight finish and save their results, so a run can exceed its
     time or failure limit."""
+
     iterations: int | None
     max_failures: int | None
     time_limit_minutes: float | None
-    start: float = field(default_factory=time.monotonic)    # A time.monotonic() value.
+    start: float = field(default_factory=time.monotonic)  # A time.monotonic() value.
 
     @property
     def deadline(self) -> float | None:
@@ -960,9 +974,9 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     print(f"revision: {revision}", file=sys.stderr)
     args.output.mkdir(parents=True, exist_ok=True)
     if not toolchain.installed:
-        toolchain_dir = Path(tempfile.mkdtemp(
-            prefix="toolchain-", dir=args.output.resolve()
-        ))
+        toolchain_dir = Path(
+            tempfile.mkdtemp(prefix="toolchain-", dir=args.output.resolve())
+        )
         # CR-someday xclerc: Clean up the snapshot after finishing fuzzing if
         # no failures were saved.
         toolchain = toolchain.snapshot(toolchain_dir)
