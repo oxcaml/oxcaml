@@ -48,7 +48,7 @@
 
 typedef struct caml_block_scan {
   uintnat window;        /* unconsumed mask bits; bit 0 covers [pos] */
-  uintnat refill;        /* the repeat pattern, replicated */
+  uintnat refill;        /* the repeat pattern, replicated on demand */
   uint32_t left;         /* valid bits in window; higher bits are 1 */
   uint32_t refill_len;   /* valid bits in refill; higher bits are 1 */
   mlsize_t pos;          /* block index of the next word to consider */
@@ -59,9 +59,9 @@ typedef struct caml_block_scan {
 
 /* Start consuming a mask of [bits] bits, to be followed by its last
    [repeat] bits, tiled. [mask] has no bits at or above [bits]. The
-   refill is the repeat pattern replicated a whole number of times,
-   so reloading it preserves phase and the iterator does no per-word
-   division. With no repeat the refill is all scannable. */
+   refill starts as one copy of the repeat pattern: most blocks end
+   within the mask, and never need more. With no repeat the refill is
+   all scannable. */
 Caml_inline void caml_block_scan_load(caml_block_scan* s, uintnat mask,
                                       uint32_t bits, uint32_t repeat)
 {
@@ -74,13 +74,9 @@ Caml_inline void caml_block_scan_load(caml_block_scan* s, uintnat mask,
     s->refill_len = CAML_SCAN_WINDOW_MAX;
   } else {
     CAMLassert(repeat <= bits);
-    uintnat pattern = mask >> (bits - repeat);
-    uintnat tiled = 0;
-    uint32_t k; /* read after the loop */
-    for (k = 0; k + repeat <= CAML_SCAN_WINDOW_MAX; k += repeat)
-      tiled |= pattern << k;
-    s->refill = tiled | ~Low_bits_mask(k); /* set all top bits */
-    s->refill_len = k;
+    s->refill = (mask >> (bits - repeat))
+                | ~Low_bits_mask(repeat); /* set all top bits */
+    s->refill_len = repeat;
   }
 }
 
@@ -100,6 +96,15 @@ Caml_inline void caml_block_scan_reload(caml_block_scan* s)
     caml_block_scan_load_word(s, (uintnat)*s->more);
     s->more++;
   } else {
+    /* The first use of the refill replicates the pattern, by doubling,
+       to a whole number of copies: reloading it then preserves phase,
+       and the iterator does no per-word division. */
+    while (2 * s->refill_len <= CAML_SCAN_WINDOW_MAX) {
+      /* The shifted copy brings the top bits with it. */
+      s->refill = (s->refill << s->refill_len)
+                  | Low_bits_of(s->refill, s->refill_len);
+      s->refill_len *= 2;
+    }
     s->window = s->refill;
     s->left = s->refill_len;
   }
@@ -150,10 +155,11 @@ Caml_inline bool caml_block_scan_next(caml_block_scan* s, mlsize_t* i_p)
 {
   while (s->pos < s->end) {
     if (s->window == ~(uintnat)0) {
-      /* No scannable word in this window. If only the repeat pattern
-         remains and it has none either, nor has the rest of the
-         block. */
+      /* No scannable word in this window, which may be exhausted. If
+         only the repeat pattern remains and it has none either, nor
+         has the rest of the block. */
       s->pos += s->left;
+      if (s->pos >= s->end) break;
       if (s->more == s->more_end && s->refill == ~(uintnat)0) break;
       caml_block_scan_reload(s);
       continue;
@@ -166,7 +172,6 @@ Caml_inline bool caml_block_scan_next(caml_block_scan* s, mlsize_t* i_p)
     /* An arithmetic shift, bringing ones in at the top. */
     s->window = (uintnat)((intnat)s->window >> (skip + 1));
     s->left -= skip + 1;
-    if (s->left == 0) caml_block_scan_reload(s);
     return true;
   }
   return false;
