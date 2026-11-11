@@ -16,6 +16,7 @@
 (* Definition of actions, basic blocks for tests *)
 
 type task_item =
+  | Predicate_pass of string
   | Chdir of string
   | Check_file_exists of { filename: string; reason: string }
   | Check_file_absent of { filename: string }
