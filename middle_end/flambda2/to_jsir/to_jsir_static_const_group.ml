@@ -311,9 +311,23 @@ let translate ~env ~res ~translate_body bound_static consts =
         emit_definitions_for_component ~env ~res definitions component)
       components res
   in
+  (* The registration of a closure symbol is given the location of its
+     closure. *)
+  let closure_locs =
+    Static_const_group.match_against_bound_static consts bound_static
+      ~init:Symbol.Map.empty
+      ~code:(fun locs _ _ -> locs)
+      ~deleted_code:(fun locs _ -> locs)
+      ~set_of_closures:(fun locs ~closure_symbols soc ->
+        To_jsir_set_of_closures.closure_symbol_locs ~env ~closure_symbols soc
+        |> Symbol.Map.disjoint_union locs)
+      ~block_like:(fun locs _ _ -> locs)
+  in
   let res =
     Symbol.Set.fold
-      (fun symbol res -> To_jsir_env.register_symbol_exn env ~res symbol)
+      (fun symbol res ->
+        let loc = Symbol.Map.find_opt symbol closure_locs in
+        To_jsir_env.register_symbol_exn env ~res ?loc symbol)
       symbols res
   in
   env, res

@@ -121,6 +121,21 @@ let dynamic_set_of_closures ~env ~res ~bound_vars soc =
   in
   env, To_jsir_result.add_var_aliases_exn res (aliases @ value_slot_bindings)
 
+let closure_symbol_locs ~env ~closure_symbols soc =
+  let funs = Set_of_closures.function_decls soc |> Function_declarations.funs in
+  Function_slot.Lmap.fold
+    (fun slot symbol locs ->
+      match
+        (Function_slot.Map.find slot funs
+          : Function_declarations.code_id_in_function_declaration)
+      with
+      | Deleted _ -> locs
+      | Code_id { code_id; only_full_applications = _ } -> (
+        match (To_jsir_env.get_code_id_exn env code_id).loc with
+        | None -> locs
+        | Some loc -> Symbol.Map.add symbol loc locs))
+    closure_symbols Symbol.Map.empty
+
 let prepare_static_set_of_closures ~env ~res ~closure_symbols soc =
   let add_to_env ~env ~res symbol fn_var =
     let var, res = To_jsir_env.get_symbol_exn env ~res symbol in

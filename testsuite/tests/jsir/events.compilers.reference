@@ -13,14 +13,19 @@ Entry point: 0
   v6 = imm{tag=248; 0 = v2; 1 = v4}
   v7 = "caml_register_symbol"("Events"j, "camlEvents__E_3"j, v6) 
   v9 = fun(v8){2 ()} [hint:(int)->float never_inline]
+  event events.ml:21:56
   v14 = "caml_register_symbol"("Events"j, "camlEvents__arith_4"j, v9) 
   v17 = fun(v15, v16){3 ()} [hint:(value,value)->int never_inline]
+  event events.ml:24:41
   v22 = "caml_register_symbol"("Events"j, "camlEvents__non_tail_5"j, v17) 
   v25 = fun(v23, v24){5 ()} [hint:(value,value)->value never_inline]
+  event events.ml:27:33
   v28 = "caml_register_symbol"("Events"j, "camlEvents__tail_6"j, v25) 
   v30 = fun(v29){6 ()} [hint:(int)->value never_inline]
+  event events.ml:30:48
   v33 = "caml_register_symbol"("Events"j, "camlEvents__c_call_7"j, v30) 
   v35 = fun(v34){7 ()} [hint:(int)->int never_inline]
+  event events.ml:33:67
   v39 = "caml_register_symbol"("Events"j, "camlEvents__raise_e_8"j, v35) 
   v41 = CONST{1}
   event events.ml:36:17

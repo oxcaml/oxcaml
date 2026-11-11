@@ -123,10 +123,13 @@ let parse_info_of_debuginfo dbg ~pos =
       | `Start -> Some (Parse_info.t_of_pos loc.loc_start)
       | `End -> Some (Parse_info.t_of_pos loc.loc_end)
 
+let add_event_at_exn t parse_info =
+  map_top_current_block_exn t ~f:(push_event parse_info)
+
 let add_event_exn t dbg ~pos =
   match parse_info_of_debuginfo dbg ~pos with
   | None -> t
-  | Some parse_info -> map_top_current_block_exn t ~f:(push_event parse_info)
+  | Some parse_info -> add_event_at_exn t parse_info
 
 let add_call_exn t instr =
   match t.call_events with
@@ -304,7 +307,7 @@ let symbol_is_for_compilation_unit symbol =
   let compilation_unit = Symbol.compilation_unit symbol in
   Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
 
-let register_symbol t symbol var =
+let register_symbol t ?loc symbol var =
   if symbol_is_for_compilation_unit symbol
   then
     (* We don't need to add this symbol to our symbol table, because we will
@@ -318,6 +321,7 @@ let register_symbol t symbol var =
     t
   else
     let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    let t = match loc with None -> t | Some loc -> add_event_at_exn t loc in
     add_instr_exn t
       (Let
          ( Jsir.Var.fresh (),
