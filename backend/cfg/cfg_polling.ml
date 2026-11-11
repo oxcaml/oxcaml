@@ -201,9 +201,10 @@ module Polls_before_prtc_transfer = struct
       Ok dom
     | Op
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+        | Tls_get | Domain_index | Thread_self_id | Pause | Const_int _
+        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+        | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
+        | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -407,7 +408,7 @@ let add_poll_or_alloc_basic :
     | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
     | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
     | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
-    | Pause ->
+    | Thread_self_id | Pause ->
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)

@@ -329,8 +329,12 @@ module Vars = Misc.Stdlib.String.Map
 
 (* Value descriptions *)
 
+type sort_or_unrepresentable =
+  | Representable of Jkind_types.Sort.t
+  | Unrepresentable
+
 type value_kind =
-    Val_reg of Jkind_types.Sort.t       (* Regular value *)
+    Val_reg of sort_or_unrepresentable  (* Regular value *)
   | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -766,8 +770,15 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  val sort_of_signature_item :
-    signature_item -> Jkind_types.Sort.t option
+  type signature_item_sort =
+    | Fixed of Jkind_types.Sort.t
+    | Unknown of Ident.t * value_description
+    | Absent_at_runtime
+
+  val sort_of_signature_item : signature_item -> signature_item_sort
+
+  val expect_fixed_representation :
+    signature_item list -> Jkind_types.Sort.t array
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
@@ -776,28 +787,41 @@ module Make_wrapped(Wrap : Wrap) = struct
   include M
 
   let sort_of_signature_item = function
-    | Sig_value(_, decl, _) ->
+    | Sig_value(id, decl, _) ->
       begin match decl.val_kind with
-      | Val_reg sort -> Some sort
+      | Val_reg Unrepresentable -> Unknown (id, decl)
+      | Val_reg (Representable sort) -> Fixed sort
       | Val_ivar _ ->
-        Some Jkind_types.Sort.(of_const Const.for_instance_var)
+        Fixed Jkind_types.Sort.(of_const Const.for_instance_var)
       | Val_self _ | Val_anc _ ->
-        Some Jkind_types.Sort.(of_const Const.for_object)
-      | Val_prim _ -> None (* Primitives are not stored in modules *)
+        Fixed Jkind_types.Sort.(of_const Const.for_object)
+      | Val_prim _ ->
+        Absent_at_runtime (* Primitives are not stored in modules *)
       | Val_mut _ ->
         Misc.fatal_error "Mutable variable found at the structure level"
       end
     | Sig_typext _ ->
-      Some Jkind_types.Sort.(of_const Const.for_type_extension)
+      Fixed Jkind_types.Sort.(of_const Const.for_type_extension)
     | Sig_module(_, pres, _, _, _) ->
       begin match pres with
       | Mp_present ->
-        Some Jkind_types.Sort.(of_const Const.for_module)
-      | Mp_absent -> None
+        Fixed Jkind_types.Sort.(of_const Const.for_module)
+      | Mp_absent -> Absent_at_runtime
       end
     | Sig_class _ ->
-        Some Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ -> None
+        Fixed Jkind_types.Sort.(of_const Const.for_class)
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ ->
+      Absent_at_runtime
+
+  let expect_fixed_representation items =
+    List.filter_map
+      (fun item ->
+         match sort_of_signature_item item with
+         | Fixed sort -> Some sort
+         | Absent_at_runtime -> None
+         | Unknown _ -> Misc.fatal_error "unrepresentable signature item")
+      items
+    |> Array.of_list
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -1086,17 +1110,25 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
 let find_unboxed_type decl =
   match decl.type_kind with
     Type_record
-      ([{ld_type = arg; ld_modalities = ms; _}],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _}],
        Record_unboxed, _)
   | Type_record
-      ([{ld_type = arg; ld_modalities = ms; _ }],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _ }],
        Record_inlined (_, _, Variant_unboxed), _)
   | Type_record_unboxed_product
-      ([{ld_type = arg; ld_modalities = ms; _ }],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _ }],
        (Record_unboxed_product | Record_unboxed_product_undetermined), _)
-  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
-  | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
-    Some (arg, ms)
+  | Type_variant
+      ([{cd_args =
+           Cstr_record
+             [{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _}];
+         _}],
+       Variant_unboxed, _) ->
+    Some (arg, ms, mut)
+  | Type_variant
+      ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}],
+       Variant_unboxed, _) ->
+    Some (arg, ms, Immutable)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_undetermined
@@ -1139,14 +1171,6 @@ let signature_item_id = function
   | Sig_class_type (id, _, _, _)
   | Sig_jkind (id, _, _)
     -> id
-
-let signature_item_representation sg =
-  match sort_of_signature_item sg with
-  | None -> None
-  | Some sort -> Some (signature_item_id sg, sort)
-
-let bound_value_identifiers_and_sorts sigs =
-  List.filter_map signature_item_representation sigs
 
 type arg_signature = {
   arg_param : Global_module.Parameter_name.t;
@@ -1354,7 +1378,16 @@ module Transient_expr = struct
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
-    | _ -> Misc.fatal_error "set_var_jkind called on non-var"
+    | _ -> Misc.fatal_error "set_var_jkind called on non-Tvar"
+  let set_jkind ty jkind' =
+    match ty.desc with
+    | Tvar { name; _ } ->
+      set_desc ty (Tvar { name; jkind = jkind' })
+    | Tunivar { name; _ } ->
+      set_desc ty (Tunivar { name; jkind = jkind' })
+    | Tof_kind _ ->
+      set_desc ty (Tof_kind jkind')
+    | _ -> Misc.fatal_error "set_jkind called on non-Tvar/Tunivar/Tof_kind"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1762,6 +1795,10 @@ let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
+let set_jkind ty jkind =
+  let ty = repr ty in
+  log_type ty;
+  Transient_expr.set_jkind ty jkind
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =

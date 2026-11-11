@@ -783,7 +783,8 @@ let of_node node =
       let name = Ident.name id in
       let sort =
         match vd.Types.val_kind with
-        | Types.Val_reg sort | Types.Val_mut (_, sort) -> sort
+        | Types.Val_reg (Representable sort) | Types.Val_mut (_, sort) -> sort
+        | Types.Val_reg Unrepresentable
         | Types.Val_prim _
         | Types.Val_ivar _
         | Types.Val_self _

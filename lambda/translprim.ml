@@ -163,8 +163,7 @@ let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
   match path with
     Some (Path.Pdot (path, _)) ->
-      let address = Env.find_module_address path env in
-      begin match Env.address_head address with
+      begin match Env.find_module_address_head loc path env with
       | AHunit cu ->
           if not (Hashtbl.mem units_with_used_primitives cu)
           then Hashtbl.add units_with_used_primitives cu loc
@@ -1341,6 +1340,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%domain_index" -> Primitive (Pdomain_index, 1)
+    | "%thread_self_id" -> Primitive (Pthread_self_id, 1)
     | "%poll" -> Primitive (Ppoll, 1)
     | "%unbox_nativeint" ->
       static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
@@ -2918,6 +2918,7 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   | Pobj_magic _ | Punbox_vector _ | Punbox_mask
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)

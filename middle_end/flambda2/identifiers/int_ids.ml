@@ -579,6 +579,20 @@ module Variable = struct
     let data = Table.import importer t in
     let user_visible = if data.user_visible then Some () else None in
     create ?user_visible data.name data.kind
+
+  type stamp_state = int
+
+  let export_stamp_state () = !previous_name_stamp
+
+  let restore_stamp_state state =
+    if !previous_name_stamp = -1
+    then previous_name_stamp := state
+    else
+      Misc.fatal_errorf
+        "Restoring variable stamp state would overwrite modified value %d"
+        !previous_name_stamp
+
+  let merge_stamp_state state1 state2 = Int.max state1 state2
 end
 
 module Symbol = struct
@@ -987,6 +1001,20 @@ module Code_id = struct
 
   let import importer t =
     Table.add !grand_table_of_code_ids (Table.import importer t)
+
+  type stamp_state = int
+
+  let export_stamp_state () = !previous_name_stamp
+
+  let restore_stamp_state state =
+    if !previous_name_stamp = -1
+    then previous_name_stamp := state
+    else
+      Misc.fatal_errorf
+        "Restoring code ID stamp state would overwrite modified value %d"
+        !previous_name_stamp
+
+  let merge_stamp_state state1 state2 = Int.max state1 state2
 end
 
 module Code_id_or_symbol = struct

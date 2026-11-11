@@ -654,8 +654,12 @@ let rec typexp copy_scope s ty =
         if jk == jk' then desc, false else
           let desc =
             match desc with
-            | Tvar tv -> Tvar { tv with jkind = jk' }
-            | Tunivar tv -> Tunivar { tv with jkind = jk' }
+            | Tvar tv ->
+              if get_level ty = generic_level
+              then Tvar { tv with jkind = jk' }
+              else Misc.fatal_error "Subst.typexp: weak variable copy"
+            | Tunivar tv ->
+              Tunivar { tv with jkind = jk' }
             | _ -> assert false
           in
           desc, true
