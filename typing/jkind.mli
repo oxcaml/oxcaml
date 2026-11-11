@@ -560,12 +560,6 @@ val product_of_fields :
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
-<<<<<<< HEAD
-(** Choose an appropriate jkind for a boxed record type *)
-val for_boxed_record_with_updates :
-  (Types.label_declaration * Types.type_expr * Sort.Const.t option) list ->
-  Types.jkind_l
-
 (** Choose an appropriate jkind for an [@@unboxed] record type. *)
 val for_at_at_unboxed_record :
   get_ty_base:
@@ -575,14 +569,6 @@ val for_at_at_unboxed_record :
   ld_type:Types.type_expr ->
   Types.jkind_l
 
-||||||| f3eb42d56c
-(** Choose an appropriate jkind for a boxed record type *)
-val for_boxed_record_with_updates :
-  (Types.label_declaration * Types.type_expr * Sort.Const.t option) list ->
-  Types.jkind_l
-
-=======
->>>>>>> origin/main
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record :
   (Types.label_declaration * Sort.t Layout.t) list -> Types.jkind_l

@@ -862,16 +862,4 @@ Error: The kind of type "packed_not_portable" is
        But the kind of type "packed_not_portable" must be a subkind of
            value mod portable
          because of the annotation on the declaration of the type packed_not_portable.
-<<<<<<< HEAD
 |}]
-||||||| f3eb42d56c
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
-|}]
-=======
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
-|}]
->>>>>>> origin/main

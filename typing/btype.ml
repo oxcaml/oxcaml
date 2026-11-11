@@ -2386,199 +2386,6 @@ module Jkind0 = struct
   (* Shared type-level implementation of Steps B1-B4 from
      Note [With-bounds for GADTs]. *)
   let gadt_payload_subst
-<<<<<<< HEAD
-      ~projected_params ~res_args ~payload_tys ~get_free_vars =
-    (* STEP B1 from Note [With-bounds for GADTs]: *)
-    let domain, range, seen =
-      List.fold_left2
-        (* CR ocaml-5.4: Use labeled tuples for the accumulator here *)
-          (fun ((domain, range, seen) as acc) res_arg projected_param ->
-          if TypeSet.mem res_arg seen
-          then
-            (* We've already seen this type parameter, so don't add it again.
-               See wrinkle BW1 from Note [With-bounds for GADTs]. *)
-            acc
-          else
-            match get_desc res_arg with
-            | Tvar { jkind; _ } ->
-              (* Only add types which are direct variables. Note that types
-                 which aren't variables might themselves /contain/ variables; if
-                 those variables don't show up on another parameter, they're
-                 treated as orphaned. See example K2 from Note [With-bounds for
-                 GADTs]. *)
-              let projected_param =
-                if Mod_bounds.is_max jkind.jkind.mod_bounds
-                then projected_param
-                else newgenty (Tmod (projected_param, jkind.jkind.mod_bounds))
-              in
-              res_arg :: domain, projected_param :: range,
-              TypeSet.add res_arg seen
-            | _ -> acc)
-        ([], [], TypeSet.empty)
-        res_args projected_params
-    in
-    (* STEP B2 from Note [With-bounds for GADTs]: *)
-    let orphaned_type_var_set = TypeSet.diff (get_free_vars payload_tys) seen in
-    let orphaned_type_var_list = TypeSet.elements orphaned_type_var_set in
-    (* STEP B3 from Note [With-bounds for GADTs]: *)
-    let mk_type_of_kind ty =
-      match get_desc ty with
-      (* use [newgenty] not [newty] here because we've already generalized the
-         declaration and want to keep things at [generic_level] *)
-      | Tvar { jkind; name = _ } -> newgenty (Tof_kind jkind)
-      | _ ->
-        Misc.fatal_error
-          "post-condition of [free_variable_set_of_list] violated"
-    in
-    let type_of_kind_list = List.map mk_type_of_kind orphaned_type_var_list in
-    (* STEP B4 from Note [With-bounds for GADTs]: *)
-    List.combine
-      (orphaned_type_var_list @ domain)
-      (type_of_kind_list @ range)
-
-  let add_with_bounds_for_cstr ~decl_params ~type_apply ~get_free_vars
-    jkind_so_far cstr =
-    let cstr_arg_tys, cstr_arg_modalities =
-      match cstr.cd_args with
-      | Cstr_tuple args ->
-        List.fold_left
-          (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
-          ([], []) args
-      | Cstr_record lbls ->
-        List.fold_left
-          (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
-          ([], []) lbls
-    in
-    let cstr_arg_tys =
-      match cstr.cd_res with
-      | None -> cstr_arg_tys
-      | Some res ->
-        (* See Note [With-bounds for GADTs] for an overview. *)
-        let apply_subst domain range tys =
-          if Misc.Stdlib.List.is_empty domain
-          then tys
-          else List.map (fun ty -> type_apply domain ty range) tys
-        in
-        let res_args =
-          match get_desc res with
-          | Tconstr (_, args, _) -> args
-          | _ -> Misc.fatal_error "cd_res must be Tconstr"
-        in
-        let extra_substs =
-          gadt_payload_subst
-            ~projected_params:decl_params
-            ~res_args
-            ~payload_tys:cstr_arg_tys
-            ~get_free_vars
-        in
-        let domain, range = List.split extra_substs in
-        let cstr_arg_tys =
-          apply_subst
-            domain
-            range
-            cstr_arg_tys
-        in
-        cstr_arg_tys
-    in
-    List.fold_left2
-      (fun jkind type_expr modality ->
-        add_with_bounds ~modality ~type_expr jkind)
-      jkind_so_far cstr_arg_tys cstr_arg_modalities
-
-  let for_unboxed_variant ~decl_params ~type_apply ~get_free_vars ~get_ty_base
-    cstr =
-    let inner_ty =
-      match cstr.cd_args with
-      | Cstr_tuple  [ { ca_type; _ } ] -> ca_type
-      | Cstr_record [ { ld_type; _ } ] -> ld_type
-      | (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _)) ->
-        assert false
-    in
-    let inner_jkind_base = get_ty_base inner_ty in
-    let jkind_of_base =
-      fresh_jkind
-        { base = inner_jkind_base;
-          mod_bounds = Mod_bounds.min;
-          with_bounds = No_with_bounds
-        }
-        ~annotation:None ~why:(Value_creation Unboxed_variant)
-    in
-    add_with_bounds_for_cstr ~decl_params ~type_apply ~get_free_vars
-      jkind_of_base cstr
-
-  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
-    let base =
-      let all_args_void =
-        List.for_all
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple args ->
-              List.for_all
-                (fun arg -> all_void_sort_option arg.ca_sort) args
-            | Cstr_record lbls -> all_void_labels lbls)
-          cstrs
-||||||| f3eb42d56c
-      ~projected_params ~res_args ~payload_tys ~get_free_vars =
-    (* STEP B1 from Note [With-bounds for GADTs]: *)
-    let domain, range, seen =
-      List.fold_left2
-        (* CR ocaml-5.4: Use labeled tuples for the accumulator here *)
-          (fun ((domain, range, seen) as acc) res_arg projected_param ->
-          if TypeSet.mem res_arg seen
-          then
-            (* We've already seen this type parameter, so don't add it again.
-               See wrinkle BW1 from Note [With-bounds for GADTs]. *)
-            acc
-          else
-            match get_desc res_arg with
-            | Tvar { jkind; _ } ->
-              (* Only add types which are direct variables. Note that types
-                 which aren't variables might themselves /contain/ variables; if
-                 those variables don't show up on another parameter, they're
-                 treated as orphaned. See example K2 from Note [With-bounds for
-                 GADTs]. *)
-              let projected_param =
-                if Mod_bounds.is_max jkind.jkind.mod_bounds
-                then projected_param
-                else newgenty (Tmod (projected_param, jkind.jkind.mod_bounds))
-              in
-              res_arg :: domain, projected_param :: range,
-              TypeSet.add res_arg seen
-            | _ -> acc)
-        ([], [], TypeSet.empty)
-        res_args projected_params
-    in
-    (* STEP B2 from Note [With-bounds for GADTs]: *)
-    let orphaned_type_var_set = TypeSet.diff (get_free_vars payload_tys) seen in
-    let orphaned_type_var_list = TypeSet.elements orphaned_type_var_set in
-    (* STEP B3 from Note [With-bounds for GADTs]: *)
-    let mk_type_of_kind ty =
-      match get_desc ty with
-      (* use [newgenty] not [newty] here because we've already generalized the
-         declaration and want to keep things at [generic_level] *)
-      | Tvar { jkind; name = _ } -> newgenty (Tof_kind jkind)
-      | _ ->
-        Misc.fatal_error
-          "post-condition of [free_variable_set_of_list] violated"
-    in
-    let type_of_kind_list = List.map mk_type_of_kind orphaned_type_var_list in
-    (* STEP B4 from Note [With-bounds for GADTs]: *)
-    List.combine
-      (orphaned_type_var_list @ domain)
-      (type_of_kind_list @ range)
-
-  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
-    let base =
-      let all_args_void =
-        List.for_all
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple args ->
-              List.for_all
-                (fun arg -> all_void_sort_option arg.ca_sort) args
-            | Cstr_record lbls -> all_void_labels lbls)
-          cstrs
-=======
       ~projected_params ~cstr_res ~payload_tys ~get_free_vars =
     match cstr_res with
     | None -> []
@@ -2587,7 +2394,6 @@ module Jkind0 = struct
         match get_desc res with
         | Tconstr (_, args, _) -> args
         | _ -> Misc.fatal_error "gadt_payload_subst: expected Tconstr"
->>>>>>> origin/main
       in
       (* STEP B1 from Note [With-bounds for GADTs]: *)
       let domain, range, seen =
@@ -2639,6 +2445,57 @@ module Jkind0 = struct
         (orphaned_type_var_list @ domain)
         (type_of_kind_list @ range)
 
+  let add_with_bounds_for_cstr ~decl_params ~type_apply ~get_free_vars
+    jkind_so_far cstr =
+    let cstr_arg_tys, cstr_arg_modalities =
+      match cstr.cd_args with
+      | Cstr_tuple args ->
+        List.fold_left
+          (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
+          ([], []) args
+      | Cstr_record lbls ->
+        List.fold_left
+          (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
+          ([], []) lbls
+    in
+    let extra_substs =
+      gadt_payload_subst
+        ~projected_params:decl_params ~cstr_res:cstr.cd_res
+        ~payload_tys:cstr_arg_tys ~get_free_vars
+    in
+    let cstr_arg_tys =
+      match extra_substs with
+      | [] -> cstr_arg_tys
+      | _ ->
+        let domain, range = List.split extra_substs in
+        List.map (fun ty -> type_apply domain ty range) cstr_arg_tys
+    in
+    List.fold_left2
+      (fun jkind type_expr modality ->
+        add_with_bounds ~modality ~type_expr jkind)
+      jkind_so_far cstr_arg_tys cstr_arg_modalities
+
+  let for_unboxed_variant ~decl_params ~type_apply ~get_free_vars ~get_ty_base
+    cstr =
+    let inner_ty =
+      match cstr.cd_args with
+      | Cstr_tuple  [ { ca_type; _ } ] -> ca_type
+      | Cstr_record [ { ld_type; _ } ] -> ld_type
+      | (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _)) ->
+        assert false
+    in
+    let inner_jkind_base = get_ty_base inner_ty in
+    let jkind_of_base =
+      fresh_jkind
+        { base = inner_jkind_base;
+          mod_bounds = Mod_bounds.min;
+          with_bounds = No_with_bounds
+        }
+        ~annotation:None ~why:(Value_creation Unboxed_variant)
+    in
+    add_with_bounds_for_cstr ~decl_params ~type_apply ~get_free_vars
+      jkind_of_base cstr
+
   let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars
       ~cstr_layouts cstrs =
     let base =
@@ -2672,87 +2529,8 @@ module Jkind0 = struct
         |> jkind_of_mutability ~why:Boxed_variant
     in
     let base = mark_best base in
-<<<<<<< HEAD
     let add_with_bounds_for_cstr =
       add_with_bounds_for_cstr ~type_apply ~decl_params ~get_free_vars
-||||||| f3eb42d56c
-    let add_with_bounds_for_cstr jkind_so_far cstr =
-      let cstr_arg_tys, cstr_arg_modalities =
-        match cstr.cd_args with
-        | Cstr_tuple args ->
-          List.fold_left
-            (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
-            ([], []) args
-        | Cstr_record lbls ->
-          List.fold_left
-            (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
-            ([], []) lbls
-      in
-      let cstr_arg_tys =
-        match cstr.cd_res with
-        | None -> cstr_arg_tys
-        | Some res ->
-          (* See Note [With-bounds for GADTs] for an overview. *)
-          let apply_subst domain range tys =
-            if Misc.Stdlib.List.is_empty domain
-            then tys
-            else List.map (fun ty -> type_apply domain ty range) tys
-          in
-          let res_args =
-            match get_desc res with
-            | Tconstr (_, args, _) -> args
-            | _ -> Misc.fatal_error "cd_res must be Tconstr"
-          in
-          let extra_substs =
-            gadt_payload_subst
-              ~projected_params:decl_params
-              ~res_args
-              ~payload_tys:cstr_arg_tys
-              ~get_free_vars
-          in
-          let domain, range = List.split extra_substs in
-          let cstr_arg_tys =
-            apply_subst
-              domain
-              range
-              cstr_arg_tys
-          in
-          cstr_arg_tys
-      in
-      List.fold_left2
-        (fun jkind type_expr modality ->
-          add_with_bounds ~modality ~type_expr jkind)
-        jkind_so_far cstr_arg_tys cstr_arg_modalities
-=======
-    let add_with_bounds_for_cstr jkind_so_far cstr =
-      let cstr_arg_tys, cstr_arg_modalities =
-        match cstr.cd_args with
-        | Cstr_tuple args ->
-          List.fold_left
-            (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
-            ([], []) args
-        | Cstr_record lbls ->
-          List.fold_left
-            (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
-            ([], []) lbls
-      in
-      let extra_substs =
-        gadt_payload_subst
-          ~projected_params:decl_params ~cstr_res:cstr.cd_res
-          ~payload_tys:cstr_arg_tys ~get_free_vars
-      in
-      let cstr_arg_tys =
-        match extra_substs with
-        | [] -> cstr_arg_tys
-        | _ ->
-          let domain, range = List.split extra_substs in
-          List.map (fun ty -> type_apply domain ty range) cstr_arg_tys
-      in
-      List.fold_left2
-        (fun jkind type_expr modality ->
-          add_with_bounds ~modality ~type_expr jkind)
-        jkind_so_far cstr_arg_tys cstr_arg_modalities
->>>>>>> origin/main
     in
     List.fold_left add_with_bounds_for_cstr base cstrs
 

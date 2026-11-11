@@ -2413,18 +2413,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   match form, lbls, rep with
   | Legacy, [lbl], Record_unboxed ->
     let jkind =
-<<<<<<< HEAD
       Jkind.for_at_at_unboxed_record
         ~get_ty_base:(Ctype.type_jkind_base env)
         ~lbl
-        ~ld_type
-||||||| f3eb42d56c
-      Ctype.type_jkind env ld_type |>
-      Jkind.apply_modality_l lbl.Types.ld_modalities
-=======
-      Ctype.type_jkind env lbl.ld_type |>
-      Jkind.apply_modality_l lbl.ld_modalities
->>>>>>> origin/main
+        ~ld_type:lbl.ld_type
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
     let ld_sort =

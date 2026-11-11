@@ -2943,7 +2943,6 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
-<<<<<<< HEAD
 let for_at_at_unboxed_record ~get_ty_base ~lbl ~ld_type =
   let inner_jkind_base = get_ty_base ld_type in
   let jkind_of_base =
@@ -2957,16 +2956,6 @@ let for_at_at_unboxed_record ~get_ty_base ~lbl ~ld_type =
   jkind_of_base
   |> add_with_bounds ~modality:lbl.Types.ld_modalities ~type_expr:ld_type
 
-let for_unboxed_record_with_updates lbls =
-  let open Types in
-  let tys_modalities =
-    List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
-||||||| f3eb42d56c
-let for_unboxed_record_with_updates lbls =
-  let open Types in
-  let tys_modalities =
-    List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
-=======
 let apply_modality_l modality jk =
   let bounds_mask = Mod_bounds.mask_of_modality ~modality in
   let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
@@ -2974,7 +2963,6 @@ let apply_modality_l modality jk =
     With_bounds.map
       (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
       jk.jkind.with_bounds
->>>>>>> origin/main
   in
   { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
   |> disallow_right
