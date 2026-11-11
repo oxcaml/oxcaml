@@ -56,6 +56,9 @@ val parse_info_of_debuginfo :
     immediately preceding it. Raises if there are no blocks being worked on. *)
 val add_event_exn : t -> Debuginfo.t -> pos:[`Start | `End] -> t
 
+(** Like [add_event_exn], for a location that is already a [Parse_info.t]. *)
+val add_event_at_exn : t -> Parse_info.t -> t
+
 (** Like [add_instr_exn], for an instruction that is a call. If run within
     [with_debuginfo_exn], the instruction is surrounded by [Event]s for the
     start and the end of the debuginfo. *)
@@ -103,10 +106,11 @@ val get_public_method :
 val import_compilation_unit : t -> Compilation_unit.t -> t
 
 (** Register [var] as the value of [symbol] in the global symbol table, so that
-    other compilation units can fetch it. Does nothing for symbols that no other
-    unit can refer to (those not in [reachable_names]), nor for module symbols,
-    which are fetched from the JSOO global data instead. *)
-val register_symbol : t -> Symbol.t -> Jsir.Var.t -> t
+    other compilation units can fetch it, with an [Event] for [loc] before the
+    registration. Does nothing for symbols that no other unit can refer to
+    (those not in [reachable_names]), nor for module symbols, which are fetched
+    from the JSOO global data instead. *)
+val register_symbol : t -> ?loc:Parse_info.t -> Symbol.t -> Jsir.Var.t -> t
 
 (** The variable holding the value of [symbol], which must be from another
     compilation unit. On the first call for a given symbol, the expression

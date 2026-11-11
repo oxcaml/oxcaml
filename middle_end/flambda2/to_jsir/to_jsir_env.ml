@@ -133,10 +133,11 @@ let get_symbol_exn t ~res symbol =
   | Some (v, res) -> v, res
   | None -> raise Not_found
 
-let register_symbol_exn t ~res symbol =
+let register_symbol_exn t ~res ?loc symbol =
   (* Using the map directly rather than using [get_symbol], because we don't
      want to load external symbols *)
-  To_jsir_result.register_symbol res symbol (Symbol.Map.find symbol t.symbols)
+  To_jsir_result.register_symbol res ?loc symbol
+    (Symbol.Map.find symbol t.symbols)
 
 let get_code_id_exn t code_id =
   match Code_id.Map.find_opt code_id t.code_ids with

@@ -108,6 +108,21 @@ let dynamic_set_of_closures ~env ~res ~bound_vars soc =
       To_jsir_env.add_var env var fn_var, res, [])
     soc
 
+let closure_symbol_locs ~env ~closure_symbols soc =
+  let funs = Set_of_closures.function_decls soc |> Function_declarations.funs in
+  Function_slot.Lmap.fold
+    (fun slot symbol locs ->
+      match
+        (Function_slot.Map.find slot funs
+          : Function_declarations.code_id_in_function_declaration)
+      with
+      | Deleted _ -> locs
+      | Code_id { code_id; only_full_applications = _ } -> (
+        match (To_jsir_env.get_code_id_exn env code_id).loc with
+        | None -> locs
+        | Some loc -> Symbol.Map.add symbol loc locs))
+    closure_symbols Symbol.Map.empty
+
 let static_set_of_closures ~env ~res ~closure_symbols soc =
   let add_to_env ~env ~res symbol fn_var =
     (* We may have already encountered the symbol when translating the code, so

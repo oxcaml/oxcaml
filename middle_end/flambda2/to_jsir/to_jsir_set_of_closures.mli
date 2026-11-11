@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 (** Translate a dynamically allocated [Set_of_closures.t] into a JSIR [Closure].
 *)
 val dynamic_set_of_closures :
@@ -43,3 +45,11 @@ val static_set_of_closures :
   closure_symbols:Symbol.t Function_slot.Lmap.t ->
   Set_of_closures.t ->
   To_jsir_env.t * To_jsir_result.t
+
+(** The locations of the closures of a statically allocated [Set_of_closures.t],
+    for its closure symbols. Closures without a location are left out. *)
+val closure_symbol_locs :
+  env:To_jsir_env.t ->
+  closure_symbols:Symbol.t Function_slot.Lmap.t ->
+  Set_of_closures.t ->
+  Parse_info.t Symbol.Map.t
