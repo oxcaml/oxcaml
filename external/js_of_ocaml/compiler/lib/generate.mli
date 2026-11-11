@@ -18,6 +18,13 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
+type output =
+  { program : Javascript.program
+  ; primitives : Stdlib.StringSet.t
+        (** The runtime accessor names the generated code uses, after resolving
+            aliases, including generated helpers *)
+  }
+
 val f :
      Code.program
   -> exported_runtime:bool
@@ -27,6 +34,6 @@ val f :
   -> should_export:bool
   -> warn_on_unhandled_effect:bool
   -> deadcode_sentinel:Code.Var.t
-  -> Javascript.program
+  -> output
 
 val init : unit -> unit

@@ -269,7 +269,7 @@ let run
       output_file =
     if check_sourcemap then check_debug one;
     let init_pseudo_fs = fs_external && standalone in
-    let sm, shapes =
+    let { Driver.sourcemaps = sm; shapes; primitives = _ } =
       match output_file with
       | `Stdout, formatter ->
           let instr =
