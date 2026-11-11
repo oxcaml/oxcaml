@@ -16,6 +16,7 @@
 (* Definition of actions, basic blocks for tests *)
 
 type task_item =
+  | Predicate_pass of string
   | Chdir of string
   | Check_file_exists of { filename: string; reason: string }
   | Check_file_absent of { filename: string }
@@ -49,8 +50,11 @@ let combine ~drop_skip tasks =
     tasks |> List.filter_map (function
       | Static ({ status = (Fail | Predicate false); _ } as r) ->
          raise (Is_static r)
-      | Static { status = (Pass | Predicate true); _ } ->
+      | Static { status = Pass; _ }
+      | Static { status = Predicate true; reason = None } ->
          None
+      | Static { status = Predicate true; reason = Some txt } ->
+         Some [Predicate_pass txt]
       | Static ({ status = Skip; _ } as r) ->
          if drop_skip then (dropped := true; None)
          else raise (Is_static r)

@@ -13,6 +13,8 @@ let promoted_output (files : Filecompare.files) =
   Filename.concat ref_dir name
 
 let run_task_item ~log : Actions.task_item -> Result.t = function
+  | Predicate_pass _ ->
+     Result.pass
   | Chdir dir  ->
      Builtin_actions.do_chdir dir
   | Check_file_exists { filename; reason } ->
@@ -116,6 +118,8 @@ let quote ~dirs name =
 let print_task_item ~dirs ~env (t : Actions.task_item) : unit =
   let quote t = quote ~dirs t in
   match t with
+  | Predicate_pass txt ->
+     Printf.printf "# %s\n" txt
   | Chdir dir ->
      Printf.printf "cd %s\n" (quote dir)
   | Check_file_exists {filename; reason=_} ->
