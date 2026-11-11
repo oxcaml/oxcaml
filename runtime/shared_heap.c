@@ -30,6 +30,7 @@
 #include "caml/mlvalues.h"
 #include "caml/platform.h"
 #include "caml/roots.h"
+#include "caml/scan_mask.h"
 #include "caml/shared_heap.h"
 #include "caml/sizeclasses.h"
 #include "caml/startup_aux.h"
@@ -1270,6 +1271,114 @@ void caml_verify_root(void* state, value v, volatile value* p)
 
 static scanning_action_flags verify_scanning_flags = 0;
 
+/* Check the header-format invariants of block [v], with header
+   [hd]: the canonical-form rules of the interleaved-block design
+   (see header_bits.h), less those that the current encoders do not
+   yet satisfy, marked TODO. */
+#ifdef DEBUG
+static void verify_format(value v, header_t hd)
+{
+#ifdef NATIVE_CODE
+  tag_t tag = Tag_hd(hd);
+  mlsize_t wosize = Wosize_hd(hd);
+
+  if (Format_hd(hd) == HEADER_FORMAT_LEGACY) {
+    /* No scan mask, so no mask or repeat bits. */
+    CAMLassert(Reserved_hd(hd) == 0);
+    return;
+  }
+
+  /* Only ordinary scannable blocks have scan masks: not No_scan
+     tags, the special tags, or (yet) closures. */
+  CAMLassert(Scannable_tag(tag));
+  CAMLassert(tag != Closure_tag && tag != Infix_tag && tag != Cont_tag);
+  CAMLassert(tag != Forward_tag && tag != Lazy_tag && tag != Forcing_tag);
+
+  switch (Format_hd(hd)) {
+  case HEADER_FORMAT_INLINE:
+    /* Some word is unscannable: otherwise this would be format 00.
+       (A zero mask is bytecode's faux mixed block sentinel.) */
+    CAMLassert(Scan_mask_hd(hd) != 0);
+    /* A block longer than the mask needs a repeat.
+       TODO: also assert that there is no repeat when the mask covers
+       the block, once the encoders are canonical. */
+    CAMLassert(wosize <= HEADER_SCAN_MASK_BITS || Repeat_hd(hd) != 0);
+    /* Mask bits beyond the end of the block are one. */
+    if (wosize < HEADER_SCAN_MASK_BITS) {
+      CAMLassert((Scan_mask_hd(hd) | Low_bits_mask(wosize))
+                 == Low_bits_mask(HEADER_SCAN_MASK_BITS));
+    }
+    break;
+  case HEADER_FORMAT_EXTENDED: {
+    /* The header mask and the layout word cover 16 + 58 user words;
+       the repeat is used only for blocks longer than that. */
+    uintnat layout_word = (uintnat)Field(v, 0);
+    uint32_t repeat = Layout_repeat(layout_word);
+    CAMLassert(Repeat_hd(hd) == 0);
+    CAMLassert(repeat <= LAYOUT_WORD_REPEAT_MAX);
+    /* At least 17 user words (after the layout word): fewer would
+       fit format 01. */
+    CAMLassert(wosize > HEADER_SCAN_MASK_BITS + 1);
+    CAMLassert((wosize - 1 <= HEADER_SCAN_MASK_BITS + LAYOUT_WORD_MASK_BITS)
+               == (repeat == 0));
+    /* Mask bits beyond the end of the block are one. The layout
+       word's bit 0 covers user word 16. */
+    mlsize_t in_layout_word = wosize - 1 - HEADER_SCAN_MASK_BITS;
+    if (in_layout_word < LAYOUT_WORD_MASK_BITS) {
+      CAMLassert((Layout_scan_mask(layout_word)
+                  | Low_bits_mask(in_layout_word))
+                 == Low_bits_mask(LAYOUT_WORD_MASK_BITS));
+    }
+    break;
+  }
+  default: { /* HEADER_FORMAT_EXTERNAL */
+    value layout_block = Field(v, 0);
+    CAMLassert(Scan_mask_hd(hd) == 0 && Repeat_hd(hd) == 0);
+    /* The layout block is static or in the major heap: never minor. */
+    CAMLassert(Is_block(layout_block) && !Is_young(layout_block));
+    CAMLassert(Tag_val(layout_block) == Abstract_tag);
+    mlsize_t words = Wosize_val(layout_block);
+    CAMLassert(wosize >= 1 && words >= 1);
+    /* Only the last scan word may have a repeat. */
+    for (mlsize_t j = 0; j + 1 < words; j++) {
+      CAMLassert(Layout_repeat((uintnat)Field(layout_block, j)) == 0);
+    }
+    /* TODO: repeat 63, for large trailing-array elements, is not yet
+       supported. */
+    uintnat last = (uintnat)Field(layout_block, words - 1);
+    uint32_t repeat = Layout_repeat(last);
+    CAMLassert(repeat <= LAYOUT_WORD_REPEAT_MAX);
+    /* The repeat is used only for blocks longer than the bitmap, and
+       an exact bitmap has no spare words. */
+    mlsize_t user = wosize - 1;
+    CAMLassert((user <= words * LAYOUT_WORD_MASK_BITS) == (repeat == 0));
+    CAMLassert(repeat != 0 || user > (words - 1) * LAYOUT_WORD_MASK_BITS);
+    /* Mask bits beyond the end of the block are one. */
+    if (repeat == 0) {
+      mlsize_t in_last = user - (words - 1) * LAYOUT_WORD_MASK_BITS;
+      if (in_last < LAYOUT_WORD_MASK_BITS) {
+        CAMLassert((Layout_scan_mask(last) | Low_bits_mask(in_last))
+                   == Low_bits_mask(LAYOUT_WORD_MASK_BITS));
+      }
+    }
+    break;
+  }
+  }
+#else
+  /* Bytecode has no real mixed blocks, only faux ones. */
+  (void)v;
+  CAMLassert(Reserved_hd(hd) == 0
+             || Reserved_hd(hd) == Faux_mixed_block_sentinel);
+#endif /* NATIVE_CODE */
+}
+#else
+static void verify_format(value v, header_t hd)
+{
+  (void)v;
+  (void)hd;
+}
+#endif
+
 static void verify_object(struct heap_verify_state* st, value v) {
   intnat* entry;
   if (!Is_block(v)) return;
@@ -1286,6 +1395,8 @@ static void verify_object(struct heap_verify_state* st, value v) {
   if (*entry != ADDRMAP_NOT_PRESENT) return;
   *entry = 1;
 
+  verify_format(v, Hd_val(v));
+
   if (Has_status_val(v, NOT_MARKABLE)) return;
   st->objs++;
 
@@ -1297,14 +1408,23 @@ static void verify_object(struct heap_verify_state* st, value v) {
     if (stk != NULL)
       caml_scan_stack(verify_push, verify_scanning_flags, st, stk, gc_regs);
   } else if (Scannable_val(v)) {
-    int i = 0;
+    header_t hd = Hd_val(v);
     if (Tag_val(v) == Closure_tag) {
-      i = Start_env_closinfo(Closinfo_val(v));
-    }
-    mlsize_t scannable_wosize = Scannable_wosize_val(v);
-    for (; i < scannable_wosize; i++) {
-      value f = Field(v, i);
-      if (Is_block(f)) verify_push(st, f, Op_val(v)+i);
+      /* Closures still use the startenv scheme. */
+      mlsize_t wosize = Wosize_val(v);
+      for (mlsize_t i = Start_env_closinfo(Closinfo_val(v));
+           i < wosize; i++) {
+        value f = Field(v, i);
+        if (Is_block(f)) verify_push(st, f, Op_val(v)+i);
+      }
+    } else {
+      caml_block_scan bs;
+      mlsize_t i;
+      caml_block_scan_init(&bs, v, hd);
+      while (caml_block_scan_next(&bs, &i)) {
+        value f = Field(v, i);
+        if (Is_block(f)) verify_push(st, f, Op_val(v)+i);
+      }
     }
   }
 }
@@ -1457,6 +1577,22 @@ static inline void compact_update_value_at(volatile value* p)
   compact_update_value(NULL, *p, p);
 }
 
+/* Update the scannable words of a block whose header carries a scan
+   mask. Kept out of line: such blocks are rare today, and
+   [compact_update_block] is hot. */
+Caml_noinline static void compact_update_masked_block(value v, header_t hd)
+{
+  caml_block_scan bs;
+  mlsize_t i;
+  /* In format 11 the layout word is itself updated (it is word 0),
+     while the iterator goes on reading the layout block through the
+     old pointer: the layout block may have moved, but its evacuated
+     copy is still intact. */
+  caml_block_scan_init(&bs, v, hd);
+  while (caml_block_scan_next(&bs, &i))
+    compact_update_value_at(&Field(v, i));
+}
+
 /* For each pointer in the block pointed to by `p`, check if it points
    to an evacuated block and if so update it using the forwarding
    pointer created by the compactor. */
@@ -1483,16 +1619,17 @@ static void compact_update_block(header_t* p)
       caml_scan_stack(&compact_update_value, 0, NULL, Ptr_val(stk), gc_regs);
     }
   } else {
-    uintnat offset = 0;
-
-    if (tag == Closure_tag) {
-      offset = Start_env_closinfo(Closinfo_val(Val_hp(p)));
-    }
-
     if (Scannable_tag(tag)) {
-      mlsize_t scannable_wosz = Scannable_wosize_hd(hd);
-      for (mlsize_t i = offset; i < scannable_wosz; i++) {
-        compact_update_value_at(&Field(Val_hp(p), i));
+      value v = Val_hp(p);
+      if (Has_scan_mask_hd(hd)) {
+        compact_update_masked_block(v, hd);
+      } else {
+        mlsize_t wosz = Wosize_hd(hd);
+        mlsize_t i =
+          (tag == Closure_tag) ? Start_env_closinfo(Closinfo_val(v)) : 0;
+        for (; i < wosz; i++) {
+          compact_update_value_at(&Field(v, i));
+        }
       }
     }
   }

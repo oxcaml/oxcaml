@@ -253,11 +253,9 @@ uses them yet.
 
 #define Format_hd(hd) ((header_t)(hd) >> HEADER_FORMAT_SHIFT)
 #define Repeat_hd(hd)                                                   \
-  (((header_t)(hd) >> HEADER_REPEAT_SHIFT)                              \
-   & (((uintnat)1 << HEADER_REPEAT_BITS) - 1))
+  Low_bits_of((header_t)(hd) >> HEADER_REPEAT_SHIFT, HEADER_REPEAT_BITS)
 #define Scan_mask_hd(hd)                                                \
-  (((header_t)(hd) >> HEADER_SCAN_MASK_SHIFT)                           \
-   & (((uintnat)1 << HEADER_SCAN_MASK_BITS) - 1))
+  Low_bits_of((header_t)(hd) >> HEADER_SCAN_MASK_SHIFT, HEADER_SCAN_MASK_BITS)
 
 /* Whether the block with header [hd] has a scan mask (in the header,
    a layout word or a layout block), so that some of its words may be
@@ -265,8 +263,7 @@ uses them yet.
 #define Has_scan_mask_hd(hd) CAMLunlikely(Reserved_hd(hd) != 0)
 
 #define Layout_repeat(w) ((uintnat)(w) >> LAYOUT_WORD_REPEAT_SHIFT)
-#define Layout_scan_mask(w)                                             \
-  ((uintnat)(w) & (((uintnat)1 << LAYOUT_WORD_MASK_BITS) - 1))
+#define Layout_scan_mask(w) Low_bits_of(w, LAYOUT_WORD_MASK_BITS)
 
 #endif /* ARCH_SIXTYFOUR && CAML_INTERNALS */
 
@@ -311,25 +308,23 @@ uses them yet.
 Caml_inline reserved_t
 Reserved_mixed_block_scannable_wosize_native(mlsize_t sz)
 {
-  uintnat mask_all = ((uintnat)1 << HEADER_SCAN_MASK_BITS) - 1;
+  uintnat mask_all = Low_bits_mask(HEADER_SCAN_MASK_BITS);
   CAMLassert(sz < HEADER_SCAN_MASK_BITS);
   return (reserved_t)
     (((uintnat)HEADER_FORMAT_INLINE
       << (HEADER_FORMAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
      | ((uintnat)1 << (HEADER_REPEAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
-     | (mask_all & ~(((uintnat)1 << sz) - 1)));
+     | (mask_all & ~Low_bits_mask(sz)));
 }
 
 /* The number of leading scannable words: the position of the first
    set mask bit. Exact while every mask is prefix-shaped. */
 Caml_inline mlsize_t Scannable_wosize_reserved_native(reserved_t res,
                                                       mlsize_t sz) {
-  uintnat mask;
-  mlsize_t prefix = 0;
   if (!Is_mixed_block_reserved(res)) return sz;
-  mask = (uintnat)res & (((uintnat)1 << HEADER_SCAN_MASK_BITS) - 1);
+  uintnat mask = Low_bits_of(res, HEADER_SCAN_MASK_BITS);
   if (mask == 0) return sz; /* includes the bytecode faux sentinel */
-  while (!(mask & 1)) { mask >>= 1; ++ prefix; }
+  mlsize_t prefix = caml_ctz(mask);
   return prefix < sz ? prefix : sz;
 }
 

@@ -424,6 +424,25 @@ CAMLnoret CAMLextern void caml_debug_abort(const char_os *, int);
 #define CAMLunlikely(e) (e)
 #endif
 
+/* A mask of the [n] low bits of a word. [n] must be less than the
+   number of bits in a word. */
+#define Low_bits_mask(n) (((uintnat)1 << (n)) - 1)
+
+/* The [n] low bits of [x]. */
+#define Low_bits_of(x, n) ((uintnat)(x) & Low_bits_mask(n))
+
+/* The number of trailing zero bits in [x], which must be non-zero. */
+Caml_inline uint32_t caml_ctz(uintnat x)
+{
+#if __has_builtin(__builtin_ctzll) || defined(__GNUC__)
+  return (uint32_t)__builtin_ctzll(x);
+#else
+  uint32_t n = 0;
+  while ((x & 1) == 0) { x >>= 1; ++ n; }
+  return n;
+#endif
+}
+
 #include "camlatomic.h"
 
 #ifdef CAML_INTERNALS
