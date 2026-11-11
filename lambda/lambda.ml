@@ -492,6 +492,7 @@ type primitive =
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
@@ -511,6 +512,7 @@ and extern_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Raw_pointer
 
 and external_call_description =
   (extern_repr, extern_repr) Primitive.description_gen
@@ -3036,6 +3038,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _
@@ -3239,7 +3242,7 @@ let primitive_can_raise prim =
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
   | Preperform -> true (* XXX! *)
-  | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
+  | Pdls_get | Ptls_get | Pdomain_index | Pthread_self_id | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_boxed_vector_as_tuple _
@@ -3319,6 +3322,8 @@ let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_or_untagged_integer Unboxed_nativeint ->
     layout_boxed_int Boxed_nativeint
   | Same_as_ocaml_repr s | Unpacked_product s -> layout_of_const_sort s
+  | Raw_pointer ->
+    layout_of_const_sort Jkind.Sort.Const.(product [scannable; bits64])
 
 let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
@@ -3328,7 +3333,7 @@ let extern_repr_involves_unboxed_products extern_repr =
   | Same_as_ocaml_repr (Base _)
   | Same_as_ocaml_repr (Addressable _)
   | Unboxed_vector _ | Unboxed_mask | Unboxed_float _
-  | Unboxed_or_untagged_integer _ ->
+  | Unboxed_or_untagged_integer _ | Raw_pointer ->
     false
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
@@ -3754,6 +3759,7 @@ let primitive_result_layout (p : primitive) =
   | Patomic_fetch_add_idx -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
+  | Pthread_self_id -> layout_int
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field
@@ -3960,9 +3966,13 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
     Misc.fatal_error
       "Lambda.count_initializers_array_kind: Punspecializedarray"
 
-(* CR mshinwell: This function might need revisiting for JSIR and any
-   Flambda 2 -> WASM backend *)
 let array_element_size_in_bytes (array_kind : array_kind) =
+  if Clflags.target_is_jsir () then
+    (* JSIR arrays have one slot per unarised element, and block index
+       arithmetic counts every slot as 8 bytes. In particular, arrays of small
+       scalars are not packed. *)
+    8 * count_initializers_array_kind array_kind
+  else
   match array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
     8

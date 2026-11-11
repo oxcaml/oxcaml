@@ -251,9 +251,9 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr
   | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
   | Cabsf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
-  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion
-  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
-  | Cpause ->
+  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
+  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
+  | Cthread_self_id | Cpoll | Cpause ->
     Use_default
 
 let select_operation
@@ -292,7 +292,8 @@ let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     | XInt8 -> Rewritten (Op (Specific Imove8), src, dst)
     | XInt16 -> Rewritten (Op (Specific Imove16), src, dst)
     | XInt32 -> Rewritten (Op (Specific Imove32), src, dst)
-    | XInt | XInt64 | XFloat32 | XFloat | XVec128 | XDummy_int | XDummy_float ->
+    | XInt | XInt64 | XFloat32 | XFloat | XVec128 | XDummy_int | XDummy_float
+    | XFat_pointer ->
       Use_default
     | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
@@ -310,9 +311,9 @@ let pseudoregs_for_operation op arg res =
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
   | Move | Spill | Reload | Pause | Begin_region | End_region | Dls_get
-  | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
-  | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+  | Tls_get | Domain_index | Thread_self_id | Poll | Const_int _
+  | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+  | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Intop _ | Int128op _
   | Intop_imm (_, _)

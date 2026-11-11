@@ -384,6 +384,7 @@ type nullary_primitive =
   | Dls_get  (** Obtain the domain-local state block. *)
   | Tls_get  (** Obtain the thread-local state block. *)
   | Domain_index  (** Obtain the current domain's index. *)
+  | Thread_self_id  (** Obtain the current systhread's id. *)
   | Poll
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and GC

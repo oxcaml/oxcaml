@@ -40,7 +40,9 @@ val max_unboxed_tuple_arity : int
 
 val max_unboxed_tuple_depth : int
 
-(* Percentages. *)
+val max_probability : int
+
+(* Probabilities out of [max_probability]. *)
 val record_probability : int
 
 val variant_probability : int
@@ -50,6 +52,8 @@ val or_null_probability : int
 val unboxed_tuple_probability : int
 
 val match_in_match_probability : int
+
+val assert_false_probability : int
 
 val nested_record_probability : int
 
@@ -79,6 +83,11 @@ val raise_notrace_probability : int
 
 val callee_raises_probability : int
 
+type assertion_mode =
+  | Disabled
+  | Unreachable_only
+  | May_raise
+
 module Swarm : sig
   type t =
     { floats : bool;
@@ -91,7 +100,7 @@ module Swarm : sig
       variants : bool;
       or_null : bool;
       matches : bool;
-      unreachable_assertions : bool;
+      assertions : assertion_mode;
       record_updates : bool;
       record_representation_conversions : bool;
       mutable_bindings : bool;

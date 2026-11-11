@@ -1100,39 +1100,43 @@ let axis_disagreement_reasons (axes : Jkind_axis.Axis.packed list) :
     Jkind.Sub_failure_reason.t list =
   List.map (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis) axes
 
-let label_mutability_contribution (ctx : Solver.ctx)
+let label_mutability_contribution (type rep)
+    (record_form : rep Data_types.record_form) (ctx : Solver.ctx)
     (lbl : Types.label_declaration) =
-  match lbl.ld_mutable with
+  match record_form, lbl.ld_mutable with
   (* [immediate] is below every base this is summed into, so omitting it keeps
      immutable fields out of the untracked part of a provenance residual. *)
-  | Immutable -> Ldd.bot
-  | Mutable { atomic = Atomic; _ } ->
+  | (Legacy | Unboxed_product), Immutable -> Ldd.bot
+  | Legacy, Mutable { atomic = Atomic; _ } ->
     Solver.with_provenance_text ctx
       (fun () -> "atomic mutable fields")
       (Ldd.const Axis_lattice.sync_data)
-  | Mutable { atomic = Nonatomic; _ } ->
+  | Legacy, Mutable { atomic = Nonatomic; _ } ->
     Solver.with_provenance_text ctx
       (fun () -> "mutable fields")
       (Ldd.const Axis_lattice.mutable_data)
+  | Unboxed_product, Mutable { atomic = Nonatomic; _ } ->
+    (* This is the best crossing we can give to unboxed versions so that boxing
+       them (joining with [immutable_data]) gives the boxed version's crossing.
+       (see [Jkind.Unboxed_field_transformation.mutable_label_axes]) *)
+    Solver.with_provenance_text ctx
+      (fun () -> "mutable fields")
+      (Ldd.const
+         (Axis_lattice.co_sub Axis_lattice.mutable_data
+            Axis_lattice.immutable_data))
+  | Unboxed_product, Mutable { atomic = Atomic; _ } ->
+    Misc.fatal_error
+      "Ikind.label_mutability_contribution: atomic label in an unboxed record"
 
-let sum_record_label_contributions ~(ctx : Solver.ctx) ~(base : Ldd.node)
-    ~(payload_kind : Types.type_expr -> Ldd.node)
-    ~(validate_label : Types.label_declaration -> unit)
+let sum_record_label_contributions (type rep)
+    ~(record_form : rep Data_types.record_form) ~(ctx : Solver.ctx)
+    ~(base : Ldd.node) ~(payload_kind : Types.type_expr -> Ldd.node)
     (lbls : Types.label_declaration list) : Ldd.node =
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
-      validate_label lbl;
       let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
       Ldd.join
-        (label_mutability_contribution ctx lbl)
+        (label_mutability_contribution record_form ctx lbl)
         (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
-
-let no_validation (_ : Types.label_declaration) = ()
-
-let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
-  match lbl.ld_mutable with
-  | Immutable -> ()
-  | Mutable _ ->
-    failwith "ikind: mutable fields in unboxed records are not supported"
 
 let decl_base_provenance (ctx : Solver.ctx) source poly =
   Solver.with_provenance_text ctx (fun () -> source) poly
@@ -1290,17 +1294,17 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
         in
         Ldd.const base_lat |> decl_base_provenance ctx source
       in
-      sum_record_label_contributions ~ctx ~base
+      sum_record_label_contributions ~record_form:Legacy ~ctx ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-        ~validate_label:no_validation lbls
+        lbls
     | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
       let base =
         Ldd.const Axis_lattice.immediate
         |> decl_base_provenance ctx "unboxed records"
       in
-      sum_record_label_contributions ~ctx ~base
+      sum_record_label_contributions ~record_form:Unboxed_product ~ctx ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-        ~validate_label:validate_immutable_unboxed_label lbls
+        lbls
     | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
       (* [Variant_with_null] (i.e. [or_null]) has semantics that are not
          captured by its constructors: nullability/separability and
@@ -1343,8 +1347,8 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
               let mask = Axis_lattice.mask_of_modality arg.ca_modalities in
               Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
         | Types.Cstr_record lbls ->
-          sum_record_label_contributions ~ctx ~base:Ldd.bot ~payload_kind
-            ~validate_label:no_validation lbls
+          sum_record_label_contributions ~record_form:Legacy ~ctx ~base:Ldd.bot
+            ~payload_kind lbls
       in
       Ldd.sum cstrs ~base ~f:constructor_contrib)
 

@@ -1,6 +1,6 @@
 (executables
  (names test_toplevel1 test_toplevel2 test_toplevel_wrapped)
- (libraries js_of_ocaml js_of_ocaml_toplevel re)
+ (libraries js_of_ocaml js_of_ocaml_toplevel js_of_ocaml-compiler.dynlink re)
  (flags
   (:standard -linkall))
  (modes byte))

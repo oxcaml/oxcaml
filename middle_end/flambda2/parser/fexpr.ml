@@ -266,7 +266,10 @@ type call_kind =
       { kind : Call_kind.Method_kind.t;
         obj : simple
       }
-  | C_call of { alloc : bool }
+  | C_call of
+      { alloc : bool;
+        fat_ptr_arg_starts : int list
+      }
 
 type function_arities =
   { params_arity : arity option;
@@ -296,6 +299,8 @@ type loopify_attribute = Loopify_attribute.t =
   | Already_loopified
   | Default_loopify_and_tailrec
   | Default_loopify_and_not_tailrec
+
+type fdo_annotation = Fdo_annotation.t
 
 type apply =
   { func : simple option;
@@ -414,7 +419,8 @@ and code =
     is_tupled : bool;
     stub : bool;
     loopify : loopify_attribute option;
-    result_mode : alloc_mode_for_return
+    result_mode : alloc_mode_for_return;
+    fdo_entry_annotation : fdo_annotation option
   }
 
 and code_size = int

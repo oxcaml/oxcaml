@@ -482,6 +482,7 @@ type primitive =
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   (* Poll for runtime actions. May run pending actions such as signal
      handlers, finalizers, memprof callbacks, etc, as well as GCs and
      GC slices, so should not be moved or optimised away. *)
@@ -513,6 +514,9 @@ and extern_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Raw_pointer
+  (** A fat-pointer argument (unboxed pair of a [value] base and a [bits64]
+      byte offset), passed to C as a single raw pointer: base + offset. *)
 
 and external_call_description =
   (extern_repr, extern_repr) Primitive.description_gen
@@ -1625,7 +1629,9 @@ val count_initializers_array_kind : array_kind -> int
 val ignorable_product_element_kind_involves_int :
   ignorable_product_element_kind -> bool
 
-(** This function currently assumes a 64-bit target. *)
+(** This function currently assumes a 64-bit target. When targeting JSIR,
+    every unarised element counts as 8 bytes (in particular, arrays are not
+    packed). *)
 val array_element_size_in_bytes : array_kind -> int
 
 (** Construction helpers *)

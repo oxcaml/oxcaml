@@ -48,13 +48,24 @@ Beware - immediates are 32 bits in JavaScript, instead of 63 or 31!
 Smallints (`Naked_int8` and `Naked_int16`) follow the same convention as bytecode and Cmm, where they are stored sign-extended.
 This means that JavaScript stubs receive exactly the same values for `int8#`/`int16#` arguments as they do in bytecode, and must likewise return sign-extended values.
 
+## Block indices
+JSIR blocks have the same flattened and reordered layout as native blocks. However, these blocks
+are represented as JavaScript arrays, and thus each (unarised) element always occupies one slot.
+In particular, arrays are never packed, and so always occupy the same number of slots as their length.
+
+We treat every slot as being 8 bytes wide. This means that the indexing behaviour differs
+compared to native code: for example, accessing the second element of a packed `int32# array` will
+require offset 4 in native code, but offset 8 in JSIR.
+
+External pointers (block index accesses with a null base) are unsupported as in bytecode.
+The JS runtime primitive `caml_check_idx_base` raises `Failure` when such an access is attempted.
+
 ## Known limitations
 
 ### Unsupported Flambda features
 The following are not yet supported in JSIR translation, and will raise an exception in the compiler when encountered:
 
 1. SIMD/vector types: `vec128`, `vec256` and `vec512`
-2. Block indices: `Read_offset` and `Write_offset`
 
 ### WASM
 The produced JSIR is not suitable for WASM compilation via `wasm_of_ocaml`, despite the two sharing the same IR.

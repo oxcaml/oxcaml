@@ -163,8 +163,7 @@ let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
   match path with
     Some (Path.Pdot (path, _)) ->
-      let address = Env.find_module_address path env in
-      begin match Env.address_head address with
+      begin match Env.find_module_address_head loc path env with
       | AHunit cu ->
           if not (Hashtbl.mem units_with_used_primitives cu)
           then Hashtbl.add units_with_used_primitives cu loc
@@ -227,6 +226,7 @@ let extern_repr_of_native_repr:
   | Unboxed_mask, _ -> Unboxed_mask
   | Unextended_bits8, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits8
   | Unextended_bits16, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits16
+  | Raw_pointer, _ -> Raw_pointer
   | Unpacked_product sort, _ ->
     Unpacked_product sort
 
@@ -236,6 +236,7 @@ let sort_of_native_repr ~poly_sort repr =
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.scannable
+  | Raw_pointer -> Jkind.Sort.Const.(product [scannable; bits64])
 
 let sort_of_native_repr_or_elided ~poly_sort = function
   | Elided_void -> Jkind.Sort.Const.void
@@ -1339,6 +1340,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%domain_index" -> Primitive (Pdomain_index, 1)
+    | "%thread_self_id" -> Primitive (Pthread_self_id, 1)
     | "%poll" -> Primitive (Ppoll, 1)
     | "%unbox_nativeint" ->
       static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
@@ -1857,7 +1859,7 @@ let layout_of_ty_for_idx_set env loc ty =
      respectively.
 
      We should consider tracking primitives' sort variables in the typedtree
-     itself, similar to what the comment above [type_representable_layout]
+     itself, similar to what the comment above [get_representable_layout_opt]
      in [Typeopt] suggests. *)
   let jkind = Ctype.type_jkind env ty in
   let layout =
@@ -2916,6 +2918,7 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   | Pobj_magic _ | Punbox_vector _ | Punbox_mask
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
