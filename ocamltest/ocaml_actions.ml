@@ -617,6 +617,7 @@ let objinfo log env =
   let ocamllib = [| (Printf.sprintf "OCAMLLIB=%s" tools_directory) |] in
   let systemenv =
     Environments.append_to_system_env
+      ~full:false
       (Array.concat
        [
          default_ocaml_env;
@@ -1307,6 +1308,8 @@ let config_variables _log env =
     Ocaml_variables.ocamlrun, Ocaml_files.ocamlrun;
     Ocaml_variables.ocamlc_byte, Ocaml_files.ocamlc;
     Ocaml_variables.ocamlopt_byte, Ocaml_files.ocamlopt;
+    Ocaml_variables.runtime, Ocaml_directories.runtime;
+    Ocaml_variables.stdlib, Ocaml_directories.stdlib;
     Ocaml_variables.bytecc_libs, Ocamltest_config.bytecc_libs;
     Ocaml_variables.nativecc_libs, Ocamltest_config.nativecc_libs;
     Ocaml_variables.mkdll, Ocamltest_config.mkdll;
@@ -1314,7 +1317,10 @@ let config_variables _log env =
     Ocaml_variables.cpp, Ocamltest_config.cpp;
     Ocaml_variables.cppflags, Ocamltest_config.cppflags;
     Ocaml_variables.cc, Ocamltest_config.cc;
+    Ocaml_variables.outputobj, Ocamltest_config.outputobj;
     Ocaml_variables.cflags, Ocamltest_config.cflags;
+    Ocaml_variables.cxx, Ocamltest_config.cxx;
+    Ocaml_variables.ccomp_type, Ocamltest_config.ccomp_type;
     Ocaml_variables.csc, Ocamltest_config.csc;
     Ocaml_variables.csc_flags, Ocamltest_config.csc_flags;
     Ocaml_variables.shared_library_cflags,
@@ -1596,7 +1602,7 @@ let compile_ocamldoc (basename,filetype as module_) log env =
   ] in
   let exit_status =
     Actions_helpers.run_cmd
-      ~environment:(Environments.to_system_env env)
+      ~environment:(Environments.to_system_env ~full:false env)
       ~stdin_variable: Ocaml_variables.compiler_stdin
       ~stdout_variable:Ocamldoc.output_variable
       ~stderr_variable:Ocamldoc.output_variable
@@ -1689,7 +1695,8 @@ let run_ocamldoc =
      "-o"; ocamldoc_o_flag env
    ] in
   let exit_status =
-    Actions_helpers.run_cmd ~environment:(Environments.to_system_env env)
+    Actions_helpers.run_cmd
+      ~environment:(Environments.to_system_env ~full:false env)
       ~stdin_variable: Ocaml_variables.compiler_stdin
       ~stdout_variable:Ocamldoc.output_variable
       ~stderr_variable:Ocamldoc.output_variable
@@ -1702,6 +1709,19 @@ let run_ocamldoc =
       "ocamldoc" (String.concat " " commandline) exit_status) in
     (Result.fail_with_reason reason, env)
   end
+
+let setup_ocamlfilt =
+  Actions.make ~name:"setup-ocamlfilt"
+    ~description:"Ensure ocamlfilt is available"
+    ~does_something:false
+    @@ fun _loc env ->
+  let filename = Ocaml_files.ocamlfilt in
+  let env = Environments.add Ocaml_variables.ocamlfilt filename env in
+  let reason = filename ^ " does not exist" in
+  if not (Sys.file_exists filename) then
+    (Result.fail_with_reason reason, env)
+  else
+    (Result.pass, env)
 
 let init () =
   Environments.register_initializer Environments.Post
@@ -1759,6 +1779,7 @@ let init () =
     setup_ocamldoc_build_env;
     run_ocamldoc;
     check_ocamldoc_output;
+    setup_ocamlfilt;
     ocamlmklib;
     fexpr;
     check_fexpr_dump;

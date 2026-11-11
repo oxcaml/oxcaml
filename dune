@@ -186,6 +186,7 @@
   fdo_prehash
   fdo_counter_identity
   fdo_counter
+  fdo_annotation
   file_sections
   lru
   id_counter
@@ -772,6 +773,7 @@
   flambda2_identifiers
   flambda2_cmx
   flambda2_datalog
+  flambda2_reaper
   jsoo_imports
   compiler_owee
   gc_timings

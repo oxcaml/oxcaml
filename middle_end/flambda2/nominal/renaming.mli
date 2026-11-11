@@ -63,12 +63,19 @@ val apply_variable : t -> Variable.t -> Variable.t
 
 val apply_variable_set : t -> Variable.Set.t -> Variable.Set.t
 
+val apply_variable_map :
+  ('a -> t -> 'a) -> t -> 'a Variable.Map.t -> 'a Variable.Map.t
+
 (* This is only used by the importing code. We don't permute symbols. *)
 val apply_symbol : t -> Symbol.t -> Symbol.t
 
 val apply_symbol_set : t -> Symbol.Set.t -> Symbol.Set.t
 
 val apply_name : t -> Name.t -> Name.t
+
+val apply_name_set : t -> Name.Set.t -> Name.Set.t
+
+val apply_name_map : ('a -> t -> 'a) -> t -> 'a Name.Map.t -> 'a Name.Map.t
 
 val add_continuation : t -> Continuation.t -> Continuation.t -> t
 
@@ -79,10 +86,23 @@ val bind_continuation : t -> Continuation.t -> t * Continuation.t
 
 val apply_continuation : t -> Continuation.t -> Continuation.t
 
+val apply_continuation_set : t -> Continuation.Set.t -> Continuation.Set.t
+
+val apply_continuation_map :
+  ('a -> t -> 'a) -> t -> 'a Continuation.Map.t -> 'a Continuation.Map.t
+
 (* This is only used by the importing code. We don't permute code ids. *)
 val apply_code_id : t -> Code_id.t -> Code_id.t
 
+val apply_code_id_set : t -> Code_id.Set.t -> Code_id.Set.t
+
+val apply_code_id_map :
+  ('a -> t -> 'a) -> t -> 'a Code_id.Map.t -> 'a Code_id.Map.t
+
 val apply_code_id_or_name : t -> Code_id_or_name.t -> Code_id_or_name.t
+
+val apply_code_id_or_name_map :
+  ('a -> t -> 'a) -> t -> 'a Code_id_or_name.Map.t -> 'a Code_id_or_name.Map.t
 
 (* This is only used by the importing code. We don't permute fields. *)
 val apply_field : t -> Field.t -> Field.t
@@ -93,3 +113,24 @@ val apply_const : t -> Reg_width_const.t -> Reg_width_const.t
 val apply_simple : t -> Simple.t -> Simple.t
 
 val value_slot_is_used : t -> Value_slot.t -> bool
+
+val not_renamed : 'a -> t -> 'a
+
+val apply_set :
+  fold:(('key -> 'set -> 'set) -> 'set -> 'set -> 'set) ->
+  add:('key -> 'set -> 'set) ->
+  empty:'set ->
+  rename_key:(t -> 'key -> 'key) ->
+  t ->
+  'set ->
+  'set
+
+val apply_map :
+  fold:(('key -> 'value -> 'map -> 'map) -> 'map -> 'map -> 'map) ->
+  add:('key -> 'value -> 'map -> 'map) ->
+  empty:'map ->
+  rename_key:(t -> 'key -> 'key) ->
+  rename_value:('value -> t -> 'value) ->
+  t ->
+  'map ->
+  'map
