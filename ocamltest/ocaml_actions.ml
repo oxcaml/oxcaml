@@ -883,9 +883,8 @@ let cc =
     ~does_something:true
     run_cc
 
-let run_expect_once input_file principal log env ~backend =
+let run_expect_file input_file log env ~backend =
   let expect_flags = Sys.safe_getenv "EXPECT_FLAGS" in
-  let principal_flag = if principal then "-principal" else "" in
   let command =
     match (backend : Ocaml_backends.t) with
     | Bytecode -> Ocaml_commands.expect
@@ -902,7 +901,6 @@ let run_expect_once input_file principal log env ~backend =
     directory_flags env;
     Ocaml_flags.include_toplevel_directory;
     flags env;
-    principal_flag;
     libraries backend env;
     binary_modules backend env;
     input_file
@@ -911,42 +909,22 @@ let run_expect_once input_file principal log env ~backend =
   let exit_status =
     Actions_helpers.run_cmd ~environment:default_ocaml_env log env commandline
   in
-  if exit_status=0 then (Result.pass, env, ~needs_principal:false)
-  else if exit_status=3 then (Result.pass, env, ~needs_principal:true)
-  else begin
+  if exit_status=0 then begin
+    let output_env = Environments.add_bindings
+    [
+      Builtin_variables.reference, input_file;
+      Builtin_variables.output, Filename.make_filename input_file "corrected"
+    ] env in
+    (Result.pass, output_env)
+  end else begin
     let reason = (Actions_helpers.mkreason
       "expect" (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env, ~needs_principal:false)
+    (Result.fail_with_reason reason, env)
   end
-
-let run_expect_twice input_file log env ~backend =
-  let corrected filename = Filename.make_filename filename "corrected" in
-  let (result1, env1, ~needs_principal) =
-    run_expect_once input_file false log env ~backend
-  in
-  if Result.is_pass result1 then begin
-    let intermediate_file = corrected input_file in
-    let (result2, env2, output_file) =
-      if needs_principal then
-        let (result2, env2, ..) =
-          run_expect_once intermediate_file true log env1 ~backend
-        in
-        (result2, env2, corrected intermediate_file)
-      else (result1, env1, intermediate_file)
-    in
-    if Result.is_pass result2 then begin
-      let output_env = Environments.add_bindings
-      [
-        Builtin_variables.reference, input_file;
-        Builtin_variables.output, output_file
-      ] env2 in
-      (Result.pass, output_env)
-    end else (result2, env2)
-  end else (result1, env1)
 
 let run_expect_with ~backend log env =
   let input_file = Actions_helpers.testfile env in
-  run_expect_twice input_file log env ~backend
+  run_expect_file input_file log env ~backend
 
 let run_expect =
   Actions.make ~name:"run-expect" ~description:"Run expect test"

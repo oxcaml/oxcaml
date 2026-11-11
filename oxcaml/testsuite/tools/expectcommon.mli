@@ -17,23 +17,37 @@
    a .corrected file containing the corrected expectations. The test is
    successful if there is no differences between the two files.
 
-   An [%%expect] node always contains both the expected outcome with and
-   without -principal. When the two differ the expectation is written as
-   follows:
+   The file is run several times: once without any parameters, and once with
+   each of the parameters (currently only [Principal]). An [%%expect] node
+   contains the expected output of each run. When the outputs differ, the
+   expectation is written as follows:
 
    {[
      [%%expect {|
-     output without -principal
+     output without parameters
      |}, Principal{|
      output with -principal
      |}]
    ]}
+
+   Several parameters used together are separated with a dot, as in
+   [Principal.Rectypes{|...|}], and parameter sets with the same output are
+   grouped in a tuple, as in [(Principal, Rectypes){|...|}]. An output that is
+   the same as the output without parameters is omitted.
 *)
 
 module type Toplevel = sig
   val override_sys_argv : string array -> unit
   val initialize_toplevel_env : unit -> unit
   val load_file : Format.formatter -> string -> bool
+  val max_printer_depth : int ref
+  val max_printer_steps : int ref
+
+  (* Runs the file with one set of parameters. [expectnat] runs each set in
+     its own process, as the native toplevel names the code of each phrase
+     using counters that cannot be reset without clashing with the code it has
+     already loaded. *)
+  val isolate_run : (unit -> 'a) -> 'a
 
   (* Either [Toploop.execute_phrase] or [Opttoploop.execute_phrase] *)
   val execute_phrase :

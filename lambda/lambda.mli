@@ -1543,6 +1543,8 @@ val return_mode_of_primitive_description :
 (* Get a new static failure ident *)
 val next_raise_count : unit -> static_label
 
+val reset_raise_count : unit -> unit
+
 val staticfail : lambda (* Anticipated static failure *)
 
 (* Check anticipated failure, substitute its final value *)

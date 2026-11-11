@@ -22,7 +22,81 @@ type string_constant =
   ; tag : string
   }
 
-type expectation_filter = Principal | X86_64 | Raw | Simplify | Reaper
+(* Compiler settings that can change the output of [%%expect] blocks. The
+   tool runs the whole file once for each set of parameters in
+   [parameter_sets], and an [%%expect] block records the output of each of
+   these runs. *)
+module Parameter = struct
+  type t =
+    | Principal
+    | Rectypes
+    | Nolabel
+
+  let to_string = function
+    | Principal -> "Principal"
+    | Rectypes -> "Rectypes"
+    | Nolabel -> "Nolabel"
+
+  let of_string = function
+    | "Principal" -> Some Principal
+    | "Rectypes" -> Some Rectypes
+    | "Nolabel" -> Some Nolabel
+    | _ -> None
+
+  let all = [Principal; Rectypes; Nolabel]
+
+  let is_set = function
+    | Principal -> !Clflags.principal
+    | Rectypes -> !Clflags.recursive_types
+    | Nolabel -> !Clflags.classic
+
+  let set parameter value =
+    match parameter with
+    | Principal -> Clflags.principal := value
+    | Rectypes -> Clflags.recursive_types := value
+    | Nolabel -> Clflags.classic := value
+
+  module Set = struct
+    include Set.Make (struct
+        type nonrec t = t
+        let compare = compare
+      end)
+
+    module Map = Map.Make (struct
+        type nonrec t = t
+        let compare = compare
+      end)
+
+    (* Written [Principal.Rectypes] in [%%expect] payloads *)
+    let to_string t =
+      String.concat ~sep:"." (List.map ~f:to_string (elements t))
+
+    let rec of_longident ~loc : Longident.t -> t = function
+      | Lident name ->
+        (match of_string name with
+         | Some parameter -> singleton parameter
+         | None -> Location.raise_errorf ~loc "unknown parameter \"%s\"" name)
+      | Ldot (lid, name) ->
+        union
+          (of_longident ~loc:lid.loc lid.txt)
+          (of_longident ~loc:name.loc (Longident.Lident name.txt))
+      | Lapply _ ->
+        Location.raise_errorf ~loc "unexpected functor application"
+
+    (* The flags passed on the command line stay set in every run. *)
+    let set_flags t ~command_line =
+      List.iter all ~f:(fun parameter ->
+        set parameter (mem parameter t || mem parameter command_line))
+
+    let of_flags () = of_list (List.filter ~f:is_set all)
+  end
+end
+
+(* The file is always run without any parameters first. *)
+let parameter_sets =
+  [ Parameter.Set.empty; Parameter.Set.singleton Parameter.Principal ]
+
+type expectation_filter = X86_64 | Raw | Simplify | Reaper
 
 type expectation_kind =
   | Expect_toplevel
@@ -32,10 +106,18 @@ type expectation_kind =
   | Expect_asm of { whole_function : bool }
   | Expect_fexpr
 
+type expected_output =
+  (* The output of each run, for [%%expect]. There is always an entry for the
+     empty set of parameters. *)
+  | Toplevel of string_constant Parameter.Set.Map.t
+  (* For [%%expect_asm] and [%%expect_fexpr], which only look at the run
+     without parameters. *)
+  | Filtered of (expectation_filter list * string_constant) list
+
 type expectation =
   { extid_loc       : Location.t (* Location of "expect" in "[%%expect ...]" *)
   ; payload_loc     : Location.t (* Location of the whole payload *)
-  ; expected_output : (expectation_filter list * string_constant) list
+  ; expected_output : expected_output
   ; kind            : expectation_kind
   }
 
@@ -55,13 +137,18 @@ let set_assembly_whole_function : (bool -> unit) option ref = ref None
 let register_compilation_unit_callback :
   ((Compilation_unit.t -> unit) -> unit) option ref = ref None
 
+(* The outputs of one run of the file *)
+type run =
+  { expectation_outputs : (expectation * string) list
+  ; trailing_output     : string
+  }
+
 type correction =
   { corrected_expectations : expectation list
-  ; trailing_output        : string
+  ; trailing_output        : string_constant Parameter.Set.Map.t
   }
 
 let filter_of_string = function
-  | "Principal" -> Some Principal
   | "X86_64" -> Some X86_64
   | "Raw" -> Some Raw
   | "Simplify" -> Some Simplify
@@ -69,7 +156,6 @@ let filter_of_string = function
   | _ -> None
 
 let string_of_filter = function
-  | Principal -> "Principal"
   | X86_64 -> "X86_64"
   | Raw -> "Raw"
   | Simplify -> "Simplify"
@@ -154,24 +240,72 @@ let match_expect_extension (ext : Parsetree.extension) =
     in
     let is_arch_filter = function
       | X86_64 -> true
-      | Principal | Raw | Simplify | Reaper -> false
+      | Raw | Simplify | Reaper -> false
     in
     let is_pass_filter = function
       | Raw | Simplify | Reaper -> true
-      | Principal | X86_64 -> false
+      | X86_64 -> false
     in
-    let validate_expect_toplevel entries =
-      (* Valid formats:
-         - [{|...|}] (one untagged)
-         - [{|...|}, Principal{|...|}] (non-principal + principal)*)
-      match entries with
-      | [([], _)] -> entries
-      | [([], _); ([Principal], _)]-> entries
+    (* Valid formats:
+       - [{|...|}]
+       - [{|...|}, Params{|...|}, ...], where [Params] is a set of parameters,
+         such as [Principal] or [Principal.Rectypes], or a tuple of sets that
+         have the same output, such as [(Principal, Rectypes)] *)
+    let parse_expect_toplevel (e : Parsetree.expression) =
+      let add_output ~loc parameters output outputs =
+        if Parameter.Set.Map.mem parameters outputs then
+          invalid_payload ~loc
+            ~msg:(Printf.sprintf "duplicate output for %s"
+                    (Parameter.Set.to_string parameters))
+            ();
+        Parameter.Set.Map.add parameters output outputs
+      in
+      let parameters (e : Parsetree.expression) =
+        match e.pexp_desc with
+        | Pexp_construct ({ txt; loc }, None) ->
+          Parameter.Set.of_longident ~loc txt
+        | _ ->
+          invalid_payload ~loc:e.pexp_loc ~msg:"expected parameters" ()
+      in
+      let add_entry outputs (label, (e : Parsetree.expression)) =
+        match label, e.pexp_desc with
+        | None, Pexp_construct ({ txt; loc }, Some output) ->
+          add_output ~loc
+            (Parameter.Set.of_longident ~loc txt)
+            (string_constant output)
+            outputs
+        | None,
+          Pexp_apply
+            ({ pexp_desc = Pexp_tuple parameter_sets; _ }, [Nolabel, output])
+          ->
+          let output = string_constant output in
+          List.fold_left parameter_sets ~init:outputs
+            ~f:(fun outputs (label, parameter_set) ->
+              match label with
+              | Some _ -> invalid_payload ~loc:e.pexp_loc ()
+              | None ->
+                add_output ~loc:parameter_set.Parsetree.pexp_loc
+                  (parameters parameter_set) output outputs)
+        | _ ->
+          invalid_payload ~loc:e.pexp_loc
+            ~msg:"expected Params{|...|}" ()
+      in
+      match e.pexp_desc with
+      | Pexp_tuple ((None, without_parameters) :: entries) ->
+        List.fold_left entries ~f:add_entry
+          ~init:(Parameter.Set.Map.singleton Parameter.Set.empty
+                   (string_constant without_parameters))
       | _ ->
-        let msg = "expected [%%expect {|...|}] or \
-                   [%%expect {|...|}, Principal{|...|}]"
-        in
-        invalid_payload ~msg ()
+        Parameter.Set.Map.singleton Parameter.Set.empty (string_constant e)
+    in
+    let parse_filtered (e : Parsetree.expression) =
+      match e.pexp_desc with
+      | Pexp_tuple elements ->
+        (* Multiple elements *)
+        List.map ~f:(fun (_, elem) -> parse_element elem) elements
+      | _ ->
+        (* Single element *)
+        [parse_element e]
     in
     let validate_expect_asm entries =
       (* All entries must have architecture tags *)
@@ -201,19 +335,11 @@ let match_expect_extension (ext : Parsetree.extension) =
       match payload with
       | PStr [{ pstr_desc = Pstr_eval (e, _attrs) }] ->
         let expected_output =
-          match e.pexp_desc with
-          | Pexp_tuple elements ->
-            (* Multiple elements *)
-            List.map ~f:(fun (_, elem) -> parse_element elem) elements
-          | _ ->
-            (* Single element *)
-            [parse_element e]
-        in
-        let expected_output =
           match kind with
-          | Expect_toplevel -> validate_expect_toplevel expected_output
-          | Expect_asm _ -> validate_expect_asm expected_output
-          | Expect_fexpr -> validate_expect_fexpr expected_output
+          | Expect_toplevel -> Toplevel (parse_expect_toplevel e)
+          | Expect_asm _ -> Filtered (validate_expect_asm (parse_filtered e))
+          | Expect_fexpr ->
+            Filtered (validate_expect_fexpr (parse_filtered e))
         in
         { extid_loc
         ; payload_loc = e.pexp_loc
@@ -226,7 +352,10 @@ let match_expect_extension (ext : Parsetree.extension) =
         | Expect_toplevel ->
           { extid_loc
           ; payload_loc = { extid_loc with loc_start = extid_loc.loc_end }
-          ; expected_output = [([], { tag = ""; str = "" })]
+          ; expected_output =
+              Toplevel
+                (Parameter.Set.Map.singleton Parameter.Set.empty
+                   { tag = ""; str = "" })
           ; kind
           }
         | Expect_asm _ | Expect_fexpr -> invalid_payload ())
@@ -320,47 +449,55 @@ let parse_contents ~fname contents =
   Location.input_lexbuf := Some lexbuf;
   Parse.use_file lexbuf
 
+let filters expectation =
+  match expectation.expected_output with
+  | Toplevel _ -> []
+  | Filtered expected -> List.concat_map ~f:fst expected
+
 let current_arch_filter () =
   match Target_system.architecture () with
   | X86_64 -> Some X86_64
   | AArch64 | IA32 | ARM | POWER | Z | Riscv -> None
 
-(* For [%%expect]:
-   - {|...|} alone: used for both principal and non-principal
-   - {|...|}, Principal{|...|}: first for non-principal, second for principal
-*)
-let eval_toplevel_expectation expectation ~output =
-  let corrected s = { s with str = output } in
-  let combine if_not_principal if_principal =
-    if if_not_principal.str = if_principal.str
-    then [([], if_not_principal)]
-    else [([], if_not_principal); ([Principal], if_principal)]
+(* Outputs that are the same as the output without parameters are omitted. *)
+let omit_redundant_outputs outputs =
+  let without_parameters =
+    Parameter.Set.Map.find Parameter.Set.empty outputs
   in
-  let expected_output =
-    match expectation.expected_output, !Clflags.principal with
-    | [([], if_not_principal)], false -> [([], corrected if_not_principal)]
-    | [([], expected)], true -> combine expected (corrected expected)
-    | [([], if_not_principal); ([Principal], if_principal)], false ->
-      combine (corrected if_not_principal) if_principal
-    | [([], if_not_principal); ([Principal], if_principal)], true ->
-      combine if_not_principal (corrected if_principal)
-    | _ -> Misc.fatal_error "impossible: already validated"
+  Parameter.Set.Map.filter (fun parameters output ->
+    Parameter.Set.is_empty parameters
+    || output.str <> without_parameters.str)
+    outputs
+
+(* For [%%expect]: [outputs] has the output of each run, the run without
+   parameters first. Outputs for parameters that were not run are dropped. *)
+let eval_toplevel_expectation expectation expected ~outputs =
+  let tag parameters =
+    match Parameter.Set.Map.find_opt parameters expected with
+    | Some s -> s.tag
+    | None -> (Parameter.Set.Map.find Parameter.Set.empty expected).tag
   in
-  if expected_output = expectation.expected_output
+  let corrected =
+    Parameter.Set.Map.of_list
+      (List.map outputs ~f:(fun (parameters, str) ->
+         parameters, { str; tag = tag parameters }))
+    |> omit_redundant_outputs
+  in
+  if Parameter.Set.Map.equal (=) corrected expected
   then None
-  else Some { expectation with expected_output }
+  else Some { expectation with expected_output = Toplevel corrected }
 
 (* For [%%expect_asm]:
    - All entries must have architecture tags (X86_64)
 *)
-let eval_filtered_expectation expectation ~output ~to_update =
+let eval_filtered_expectation expectation expected ~output ~to_update =
   match to_update with
   | [(filters, s)] when s.str <> output ->
     let s = { s with str = output } in
-    Some { expectation with expected_output =
+    Some { expectation with expected_output = Filtered (
       List.map
         ~f:(fun (f, e) -> (f, if List.equal ~eq:(=) f filters then s else e))
-        expectation.expected_output
+        expected)
     }
   | _ :: _ :: _ ->
     Location.raise_errorf
@@ -368,22 +505,24 @@ let eval_filtered_expectation expectation ~output ~to_update =
       "duplicate architectures in [%%%%expect_asm]"
   | _ -> None
 
-let eval_expectation expectation ~output =
-  match expectation.kind with
-  | Expect_toplevel -> eval_toplevel_expectation expectation ~output
-  | Expect_fexpr ->
-    eval_filtered_expectation expectation ~output
-      ~to_update:expectation.expected_output
-  | Expect_asm _ ->
+let eval_expectation expectation ~outputs =
+  match expectation.expected_output with
+  | Toplevel expected ->
+    eval_toplevel_expectation expectation expected ~outputs
+  | Filtered expected ->
+    let output = List.assoc Parameter.Set.empty outputs in
     let to_update =
-      List.filter
-        ~f:(fun (f, _) ->
-            match current_arch_filter () with
-            | None -> false
-            | Some arch -> List.mem ~set:f arch)
-        expectation.expected_output
+      match expectation.kind with
+      | Expect_asm _ ->
+        List.filter
+          ~f:(fun (f, _) ->
+              match current_arch_filter () with
+              | None -> false
+              | Some arch -> List.mem ~set:f arch)
+          expected
+      | Expect_toplevel | Expect_fexpr -> expected
     in
-    eval_filtered_expectation expectation ~output ~to_update
+    eval_filtered_expectation expectation expected ~output ~to_update
 
 let shift_lines delta phrases =
   let position (pos : Lexing.position) =
@@ -492,11 +631,11 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         | Raw -> read_dump_file "raw"
         | Simplify -> read_dump_file "simplify"
         | Reaper -> read_dump_file "reaper"
-        | Principal | X86_64 -> "")
+        | X86_64 -> "")
     |> String.concat ~sep:"\n"
     |> (^) "\n"
   in
-  let corrected_expectations =
+  let expectation_outputs =
     capture_everything buf ppf ~f:(fun () ->
       List.concat_map chunks ~f:(fun chunk ->
             let has_fexpr =
@@ -533,7 +672,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
               Clflags.keep_asm_file := keep_asm)
             (fun () -> exec_phrases chunk.phrases)
         in
-        List.filter_map chunk.expectations ~f:(fun expectation ->
+        List.map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
             | Expect_asm _ ->
@@ -543,13 +682,10 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
                 else toplevel_output
             | Expect_fexpr ->
                 if success then
-                  let filters =
-                    List.concat_map ~f:fst expectation.expected_output
-                  in
-                  fexpr_outputs last_unit filters
+                  fexpr_outputs last_unit (filters expectation)
                 else toplevel_output
           in
-          eval_expectation expectation ~output)))
+          expectation, output)))
   in
   let trailing_output =
     match trailing_code with
@@ -558,24 +694,64 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       capture_everything buf ppf
         ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
   in
-  let needs_principal =
-    Option.is_some trailing_code
-    ||
-    List.exists chunks ~f:(fun chunk ->
-      List.exists chunk.expectations ~f:(fun expectation ->
-        match expectation.kind with
-        | Expect_toplevel -> true
-        | Expect_asm _ | Expect_fexpr -> false))
+  { expectation_outputs; trailing_output }
+
+(* [runs] has the run without parameters first. *)
+let correct runs =
+  let expectations =
+    List.map (snd (List.hd runs)).expectation_outputs
+      ~f:(fun (expectation, _) -> expectation, [])
   in
-  { corrected_expectations; trailing_output }, ~needs_principal
+  let corrected_expectations =
+    List.fold_right runs ~init:expectations
+      ~f:(fun (parameters, run) expectations ->
+        List.map2 expectations run.expectation_outputs
+          ~f:(fun (expectation, outputs) (_, output) ->
+            expectation, (parameters, output) :: outputs))
+    |> List.filter_map ~f:(fun (expectation, outputs) ->
+      eval_expectation expectation ~outputs)
+  in
+  let trailing_output =
+    Parameter.Set.Map.of_list
+      (List.map runs ~f:(fun (parameters, (run : run)) ->
+         parameters, { str = run.trailing_output; tag = "" }))
+  in
+  { corrected_expectations; trailing_output }
 
 let output_slice oc s a b =
   output_string oc (String.sub s ~pos:a ~len:(b - a))
 
-let output_corrected oc ~file_contents correction =
-  let output_body oc { str; tag } =
-    Printf.fprintf oc "{%s|%s|%s}" tag str tag
+let output_body oc { str; tag } =
+  Printf.fprintf oc "{%s|%s|%s}" tag str tag
+
+(* Parameter sets with the same output are grouped together. *)
+let output_toplevel oc outputs =
+  let outputs = omit_redundant_outputs outputs in
+  output_body oc (Parameter.Set.Map.find Parameter.Set.empty outputs);
+  let rec group = function
+    | [] -> []
+    | (parameters, output) :: rest ->
+      let same, different =
+        List.partition rest ~f:(fun (_, output') -> output'.str = output.str)
+      in
+      (parameters :: List.map ~f:fst same, output) :: group different
   in
+  Parameter.Set.Map.remove Parameter.Set.empty outputs
+  |> Parameter.Set.Map.bindings
+  |> group
+  |> List.iter ~f:(fun (parameter_sets, output) ->
+    output_string oc ", ";
+    (match parameter_sets with
+     | [parameters] -> output_string oc (Parameter.Set.to_string parameters)
+     | _ ->
+       output_string oc "(";
+       output_string oc
+         (String.concat ~sep:", "
+            (List.map ~f:Parameter.Set.to_string parameter_sets));
+       output_string oc ")");
+    output_body oc output)
+
+let output_corrected oc ~file_contents correction =
   let output_entry oc (filter, str_const) =
     List.iter ~f:(fun f -> output_string oc (string_of_filter f)) filter;
     output_body oc str_const
@@ -585,8 +761,9 @@ let output_corrected oc ~file_contents correction =
       ~f:(fun ofs c ->
         output_slice oc file_contents ofs c.payload_loc.loc_start.pos_cnum;
         (match c.expected_output with
-        | [] -> ()
-        | entry :: rest ->
+        | Toplevel outputs -> output_toplevel oc outputs
+        | Filtered [] -> ()
+        | Filtered (entry :: rest) ->
           output_entry oc entry;
           List.iter ~f:(fun e ->
             output_string oc ", ";
@@ -595,16 +772,55 @@ let output_corrected oc ~file_contents correction =
         c.payload_loc.loc_end.pos_cnum)
   in
   output_slice oc file_contents ofs (String.length file_contents);
-  match correction.trailing_output with
-  | "" -> ()
-  | s  -> Printf.fprintf oc "\n[%%%%expect{|%s|}]\n" s
+  if Parameter.Set.Map.exists (fun _ output -> output.str <> "")
+       correction.trailing_output
+  then begin
+    output_string oc "\n[%%expect";
+    output_toplevel oc correction.trailing_output;
+    output_string oc "]\n"
+  end
 
 let write_corrected ~file ~file_contents correction =
   let oc = open_out file in
   output_corrected oc ~file_contents correction;
   close_out oc
 
-let process_expect_file fname ~execute_phrase =
+module type Toplevel = sig
+  val override_sys_argv : string array -> unit
+  val initialize_toplevel_env : unit -> unit
+  val load_file : Format.formatter -> string -> bool
+  val max_printer_depth : int ref
+  val max_printer_steps : int ref
+  val isolate_run : (unit -> 'a) -> 'a
+  val execute_phrase :
+    bool -> Format.formatter -> Parsetree.toplevel_phrase -> bool
+end
+
+(* Each run starts from a fresh toplevel, so that one run cannot affect the
+   output of the next. This includes the settings that phrases can change
+   with attributes and directives, and the state of [Random]. *)
+let with_fresh_toplevel (module Toplevel : Toplevel) ~random_state f =
+  Env.reset_required_globals ();
+  Lambda.reset_raise_count ();
+  Out_type.reset ();
+  Out_type.reset_weak_names ();
+  Lexer.reset_syntax_mode ();
+  Random.set_state (Random.State.copy random_state);
+  Misc.protect_refs
+    [ R (Clflags.zero_alloc_assert, !Clflags.zero_alloc_assert)
+    ; R (Clflags.include_dirs, !Clflags.include_dirs)
+    ; R (Clflags.hidden_include_dirs, !Clflags.hidden_include_dirs)
+    ; R (Clflags.debug, !Clflags.debug)
+    ; R (Clflags.all_ppx, !Clflags.all_ppx)
+    ; R (Toplevel.max_printer_depth, !Toplevel.max_printer_depth)
+    ; R (Toplevel.max_printer_steps, !Toplevel.max_printer_steps)
+    ]
+    (fun () ->
+      Local_store.with_store (Local_store.fresh ()) (fun () ->
+        Toplevel.initialize_toplevel_env ();
+        f ()))
+
+let process_expect_file fname toplevel =
   let corrected_fname = fname ^ ".corrected" in
   let file_contents =
     let ic = open_in_bin fname in
@@ -612,24 +828,28 @@ let process_expect_file fname ~execute_phrase =
     | s           -> close_in ic; Misc.normalise_eol s
     | exception e -> close_in ic; raise e
   in
-  let correction, ~needs_principal =
-    eval_expect_file fname ~file_contents ~execute_phrase
+  let module Toplevel = (val toplevel : Toplevel) in
+  let command_line = Parameter.Set.of_flags () in
+  let warnings = Warnings.backup () in
+  let random_state = Random.get_state () in
+  let runs =
+    List.map parameter_sets ~f:(fun parameters ->
+      Parameter.Set.set_flags parameters ~command_line;
+      let run =
+        Toplevel.isolate_run (fun () ->
+          Warnings.with_state warnings (fun () ->
+            with_fresh_toplevel toplevel ~random_state (fun () ->
+              eval_expect_file fname ~file_contents
+                ~execute_phrase:Toplevel.execute_phrase)))
+      in
+      parameters, run)
   in
-  write_corrected ~file:corrected_fname ~file_contents correction;
-  needs_principal
+  write_corrected ~file:corrected_fname ~file_contents (correct runs)
 
 let repo_root = ref None
 let keep_original_error_size = ref false
 let preload_objects = ref []
 let main_file = ref None
-
-module type Toplevel = sig
-  val override_sys_argv : string array -> unit
-  val initialize_toplevel_env : unit -> unit
-  val load_file : Format.formatter -> string -> bool
-  val execute_phrase :
-    bool -> Format.formatter -> Parsetree.toplevel_phrase -> bool
-end
 
 let is_object_file ~object_extensions fname =
   List.exists ~f:(fun ext -> Filename.check_suffix fname ext) object_extensions
@@ -676,10 +896,8 @@ let main (module Toplevel : Toplevel) fname =
       exit 2);
   (* We are in interactive mode and should record directive error on stdout *)
   Sys.interactive := true;
-  let needs_principal =
-    process_expect_file fname ~execute_phrase:Toplevel.execute_phrase
-  in
-  exit (if needs_principal then 3 else 0)
+  process_expect_file fname (module Toplevel);
+  exit 0
 
 let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
   let args =

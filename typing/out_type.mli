@@ -296,8 +296,10 @@ module Internal_names: sig
   val print_explanations: Env.t -> formatter -> unit
 end
 
-(** Reset all contexts *)
+(** Reset all contexts, except for weak names *)
 val reset: unit -> unit
+
+val reset_weak_names: unit -> unit
 
 (** Reset all contexts except for conflicts *)
 val reset_except_conflicts: unit -> unit
