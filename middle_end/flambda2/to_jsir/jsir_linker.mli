@@ -42,11 +42,14 @@ open! Jsoo_imports.Import
     used. Instead, the variable a unit binds to an imported symbol is replaced
     with the variable of the exporting unit that holds its value, and the
     [caml_register_symbol] calls are removed. js_of_ocaml can then see through
-    references across units. [caml_register_global] calls are kept. For this,
-    the exporting unit must come before the importing one, and linking fails
-    otherwise.
+    references across units. For this, the exporting unit must come before the
+    importing one, and linking fails otherwise.
+
+    The [caml_register_global] calls are removed too unless [register_globals],
+    so that js_of_ocaml can remove the fields of module blocks that are not
+    used.
 
     Units after one whose toplevel code never exits normally are left out, as
     they cannot run. *)
 
-val link : Jsir.jsir_file list -> Jsir.program
+val link : register_globals:bool -> Jsir.jsir_file list -> Jsir.program

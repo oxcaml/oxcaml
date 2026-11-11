@@ -65,8 +65,12 @@ module type Flambda2 = sig
     jsir_program
 
   (** Link the JSIR of compilation units, given in initialisation order, into
-      the JSIR of a whole program. *)
-  val link_jsir : Jsoo_imports.Code.jsir_file list -> Jsoo_imports.Code.program
+      the JSIR of a whole program. Module blocks are only registered with the
+      runtime if [register_globals]. *)
+  val link_jsir :
+    register_globals:bool ->
+    Jsoo_imports.Code.jsir_file list ->
+    Jsoo_imports.Code.program
 end
 
 module type File_extensions = sig

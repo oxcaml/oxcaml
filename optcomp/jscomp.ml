@@ -256,7 +256,9 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
        Lambda.program ->
        Optcomp_intf.jsir_program)
     ~(jsir_linker :
-       Jsoo_imports.Code.jsir_file list -> Jsoo_imports.Code.program) =
+       register_globals:bool ->
+       Jsoo_imports.Code.jsir_file list ->
+       Jsoo_imports.Code.program) =
   let extensions = extensions target in
   let program_name = Clflags.Jsir_target.program_name target in
   (module Optcompile.Make (struct
@@ -393,7 +395,8 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
           units_tolink
       in
       let program =
-        Profile.record_call "jsir_link" (fun () -> jsir_linker files)
+        Profile.record_call "jsir_link" (fun () ->
+            jsir_linker ~register_globals:!Clflags.link_everything files)
       in
       let imported_compilation_units =
         List.fold_left
