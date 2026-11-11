@@ -135,21 +135,43 @@ module Number = struct
     | Float | Float32 ->
       Misc.fatal_errorf "Number.of_integral_bits: expected an integral type"
 
-  let to_code = function
+  let to_code ~unboxed number =
+    let constant desc = Ast_helper.Exp.constant (Ast_helper.Const.mk desc) in
+    let integer value suffix =
+      constant
+        (if unboxed
+         then Pconst_unboxed_integer (value, suffix)
+         else Pconst_integer (value, if suffix = 'm' then None else Some suffix))
+    in
+    let floating_point ~value ~suffix ~unbox boxed =
+      if not unboxed
+      then boxed
+      else if Float.is_finite value
+      then
+        (* Hexadecimal literals preserve every finite value, including signed
+           zero and subnormals. NaNs and infinities have no literal spelling. *)
+        constant (Pconst_unboxed_float (Printf.sprintf "%h" value, suffix))
+      else apply unbox [boxed]
+    in
+    match number with
     | Float bits ->
-      apply
-        (qualified_ident "Int64" "float_of_bits")
-        [Ast_helper.Exp.constant (Ast_helper.Const.int64 bits)]
+      floating_point ~value:(Int64.float_of_bits bits) ~suffix:None
+        ~unbox:(qualified_ident "Float_u" "of_float")
+        (apply
+           (qualified_ident "Int64" "float_of_bits")
+           [Ast_helper.Exp.constant (Ast_helper.Const.int64 bits)])
     | Float32 bits ->
-      apply
-        (qualified_ident "Float32" "of_bits")
-        [Ast_helper.Exp.constant (Ast_helper.Const.int32 bits)]
-    | Int n -> Ast_helper.Exp.constant (Ast_helper.Const.int n)
-    | Nativeint n -> Ast_helper.Exp.constant (Ast_helper.Const.nativeint n)
-    | Int64 n -> Ast_helper.Exp.constant (Ast_helper.Const.int64 n)
-    | Int32 n -> Ast_helper.Exp.constant (Ast_helper.Const.int32 n)
-    | Int16 n -> Ast_helper.Exp.constant (Ast_helper.Const.int ~suffix:'S' n)
-    | Int8 n -> Ast_helper.Exp.constant (Ast_helper.Const.int ~suffix:'s' n)
+      floating_point ~value:(Int32.float_of_bits bits) ~suffix:(Some 's')
+        ~unbox:(qualified_ident "Float32_u" "of_float32")
+        (apply
+           (qualified_ident "Float32" "of_bits")
+           [Ast_helper.Exp.constant (Ast_helper.Const.int32 bits)])
+    | Int n -> integer (Int.to_string n) 'm'
+    | Nativeint n -> integer (Nativeint.to_string n) 'n'
+    | Int64 n -> integer (Int64.to_string n) 'L'
+    | Int32 n -> integer (Int32.to_string n) 'l'
+    | Int16 n -> integer (Int.to_string n) 'S'
+    | Int8 n -> integer (Int.to_string n) 's'
 end
 
 module Ty = struct
@@ -478,7 +500,10 @@ module Expr = struct
      mistake, as we can create for example a [Bin_op] with invalid types. To
      mitigate, we should make [t] private and add smart constructors. *)
   type t =
-    | Const of Number.t
+    | Const of
+        { number : Number.t;
+          unboxed : bool
+        }
     | Bool_const of bool
     | String_const of string
     | String_length of t
@@ -614,7 +639,7 @@ module Expr = struct
     constrain (Ty.Record record) (make fields source)
 
   let rec to_code : t -> Parsetree.expression = function
-    | Const n -> Number.to_code n
+    | Const { number; unboxed } -> Number.to_code ~unboxed number
     | Bool_const b -> Ast_helper.Exp.construct (lid (Bool.to_string b)) None
     | String_const s -> Ast_helper.Exp.constant (Ast_helper.Const.string s)
     | String_length expr ->

@@ -216,11 +216,8 @@ let safe_div_or_rem (st : State.t) (nty : NumberTy.t) op ~lhs ~rhs =
   let divisor = Expr.Read (Place.Variable rhs_name) in
   let ty = Ty.Number nty in
   let zero =
-    Expr.Convert
-      { expr = Expr.Const (Number.of_integral_bits nty.base 0L);
-        from = NumberTy.boxed nty.base;
-        to_ = nty
-      }
+    Expr.Const
+      { number = Number.of_integral_bits nty.base 0L; unboxed = nty.unboxed }
   in
   let body =
     Expr.If
@@ -492,9 +489,13 @@ let gen_array_index st (env : Env.t) size =
         { ty = Ty.Number (NumberTy.boxed Int);
           op = Bin_op.Add;
           lhs = Expr.Read (Place.Variable name);
-          rhs = Expr.Const (Number.Int offset)
+          rhs = Expr.Const { number = Number.Int offset; unboxed = false }
         }
-  else Expr.Const (Number.Int (random_int_in_range st ~min:0 ~max:(size - 1)))
+  else
+    Expr.Const
+      { number = Number.Int (random_int_in_range st ~min:0 ~max:(size - 1));
+        unboxed = false
+      }
 
 let gen_array_indices st env dimensions =
   List.map (gen_array_index st env) dimensions
@@ -649,7 +650,7 @@ let gen_scalar_const (st : State.t) (ty : Ty.t) =
                  10, Gen.create (fun () -> Random.State.bits64 st.random_state)
                ])
         in
-        Expr.Const (Number.of_integral_bits base bits))
+        Number.of_integral_bits base bits)
   in
   let gen_const_float =
     Gen.create (fun () ->
@@ -658,7 +659,7 @@ let gen_scalar_const (st : State.t) (ty : Ty.t) =
             ~bits_of_float:Int64.bits_of_float ~random_bits:(fun () ->
               Random.State.bits64 st.random_state)
         in
-        Expr.Const (Number.Float bits))
+        Number.Float bits)
   in
   let gen_const_float32 =
     Gen.create (fun () ->
@@ -669,21 +670,25 @@ let gen_scalar_const (st : State.t) (ty : Ty.t) =
               Int64.of_int32 (Random.State.bits32 st.random_state))
           |> Int64.to_int32
         in
-        Expr.Const (Number.Float32 bits))
+        Number.Float32 bits)
   in
   let gen_const (nty : NumberTy.t) =
-    let boxed =
+    let number =
       match nty.base with
       | Float -> gen_const_float
       | Float32 -> gen_const_float32
       | (Int | Nativeint | Int64 | Int32 | Int16 | Int8) as base ->
         gen_const_int base
     in
-    if nty.unboxed
-    then
-      Gen.map boxed ~f:(fun expr ->
-          Expr.Convert { expr; from = NumberTy.boxed nty.base; to_ = nty })
-    else boxed
+    Gen.map number ~f:(fun number ->
+        if nty.unboxed && Random.State.bool st.random_state
+        then
+          Expr.Convert
+            { expr = Expr.Const { number; unboxed = false };
+              from = NumberTy.boxed nty.base;
+              to_ = nty
+            }
+        else Expr.Const { number; unboxed = nty.unboxed })
   in
   let const =
     match ty with
@@ -871,16 +876,18 @@ and gen_shift_count (st : State.t) env (nty : NumberTy.t) =
       then random_element st [0; 1; width - 2; width - 1]
       else Random.State.int st.random_state width
     in
-    Expr.Const (Number.Int count)
+    Expr.Const { number = Number.Int count; unboxed = false }
   else
     let ty = Ty.Number (NumberTy.boxed Int) in
     let expr = gen_value st env ty in
     (* Make the remainder nonnegative, including for [min_int]. Unlike masking
        with [width - 1], this also covers every count for tagged integers. *)
     let nonnegative =
-      bin_op st ty Bit_and ~lhs:expr ~rhs:(Expr.Const (Number.Int max_int))
+      bin_op st ty Bit_and ~lhs:expr
+        ~rhs:(Expr.Const { number = Number.Int max_int; unboxed = false })
     in
-    bin_op st ty Rem ~lhs:nonnegative ~rhs:(Expr.Const (Number.Int width))
+    bin_op st ty Rem ~lhs:nonnegative
+      ~rhs:(Expr.Const { number = Number.Int width; unboxed = false })
 
 (* CR-someday xclerc: These function calls can have side effects, because of
    mutable records. Outside [May_raise] mode we rely on a de facto right-to-left
@@ -1315,7 +1322,8 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
             let init =
               maybe_opaque st ~enabled:st.swarm.opaque_loop_bounds
                 ~probability:Config.opaque_loop_bound_probability
-                (Expr.Const (Number.Int initial_value))
+                (Expr.Const
+                   { number = Number.Int initial_value; unboxed = false })
             in
             let loop_env =
               Env.extend_loop env
@@ -1329,7 +1337,9 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
               (Statement.Bounded_loop
                  { var = name;
                    init;
-                   bound = Expr.Const (Number.Int bound_value);
+                   bound =
+                     Expr.Const
+                       { number = Number.Int bound_value; unboxed = false };
                    stride = -scale;
                    body = inner
                  }))
