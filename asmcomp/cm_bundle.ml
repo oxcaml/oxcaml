@@ -86,6 +86,7 @@ let cmx_bundle ~quoted_cmx =
           uir_generic_fns = info.ui_generic_fns;
           uir_export_info = info.ui_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
+          uir_opaque = info.ui_opaque;
           uir_force_link = info.ui_force_link;
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;
           uir_section_toc = toc;

@@ -132,6 +132,7 @@ let read_unit_info filename =
       ui_generic_fns = uir.uir_generic_fns;
       ui_export_info = uir.uir_export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
+      ui_opaque = uir.uir_opaque;
       ui_force_link = uir.uir_force_link;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
@@ -206,15 +207,44 @@ let get_unit comp_unit =
           let (ui, crc) = read_unit_info filename in
           if not (CU.equal ui.ui_unit comp_unit) then
             raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
-          cache_zero_alloc_info ui.ui_zero_alloc_info;
-          (Some ui, Some crc)
+          if ui.ui_opaque then
+            (* The unit's interface was compiled with -opaque, so we must
+               not depend on the contents of its .cmx file. ([ui_opaque]
+               exists because this unit may not have been imported during
+               the current compilation, in which case
+               [Env.is_imported_opaque] above does not know about it.) *)
+            (None, None)
+          else begin
+            cache_zero_alloc_info ui.ui_zero_alloc_info;
+            (Some ui, Some crc)
+          end
         with Not_found ->
-          let warn =
-            Warnings.No_cmx_file
-              { missing_extension
-              ; module_name = CU.full_path_as_string comp_unit }
+          (* [Env.is_imported_opaque] only knows about interfaces imported
+             during the current compilation. The unit may instead be
+             referenced only from another unit's .cmx file (e.g. when
+             inlining code that mentions it), so consult its .cmi directly
+             before warning. *)
+          let interface_is_opaque =
+            match
+              let filename =
+                Load_path.find_normalized
+                  (CU.base_filename comp_unit ^ ".cmi")
+              in
+              Cmi_format.read_cmi_lazy filename
+            with
+            | exception (Not_found | Sys_error _ | Cmi_format.Error _) ->
+              false
+            | cmi ->
+              List.mem Cmi_format.Opaque cmi.cmi_flags
           in
-          Location.prerr_warning Location.none warn;
+          if not interface_is_opaque then begin
+            let warn =
+              Warnings.No_cmx_file
+                { missing_extension
+                ; module_name = CU.full_path_as_string comp_unit }
+            in
+            Location.prerr_warning Location.none warn
+          end;
           (None, None)
         end
     in
@@ -311,6 +341,7 @@ let write_unit_info info filename =
     uir_generic_fns = info.ui_generic_fns;
     uir_export_info = info.ui_export_info;
     uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
+    uir_opaque = info.ui_opaque;
     uir_force_link = info.ui_force_link;
     uir_requires_metaprogramming = info.ui_requires_metaprogramming;
     uir_section_toc = toc;
@@ -350,6 +381,9 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_generic_fns = current_unit.uib_generic_fns;
     ui_export_info = current_unit.uib_export_info;
     ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
+    ui_opaque =
+      !Clflags.opaque
+      || Env.is_imported_opaque (CU.name current_unit.uib_unit);
     ui_force_link = current_unit.uib_force_link;
     ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
     ui_static_data = static_data;

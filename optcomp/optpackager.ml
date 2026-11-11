@@ -227,6 +227,7 @@ end) : S = struct
             send_fun =
               union (List.map (fun info -> info.ui_generic_fns.send_fun) units)
           };
+        ui_opaque = !Clflags.opaque || Env.is_imported_opaque modname;
         ui_force_link = List.exists (fun info -> info.ui_force_link) units;
         ui_requires_metaprogramming =
           List.exists (fun info -> info.ui_requires_metaprogramming) units;
