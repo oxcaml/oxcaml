@@ -19,6 +19,7 @@ let print_and_remove_trace_files () =
   Sys.rmdir trace_dir
 
 let () =
+  Clflags.enable_action_trace := true;
   Unix.putenv "DUNE_ACTION_TRACE_DIR" trace_dir;
   (* [Action_trace] closes its trace file in an [at_exit] handler registered
      when the first event is written. [at_exit] handlers run in reverse order of

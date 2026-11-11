@@ -617,6 +617,8 @@ let read_one_param ppf position name v =
   | "dump-into-file" -> Clflags.dump_into_file := true
   | "dump-into-csv" -> Clflags.dump_into_csv := true
   | "dump-dir" -> Clflags.dump_dir := Some v
+  | "enable-action-trace" ->
+      set "enable-action-trace" [ Clflags.enable_action_trace ] v
   | "debug-action-trace" ->
       set "debug-action-trace" [ Clflags.debug_action_trace ] v
   | "profile-output" ->

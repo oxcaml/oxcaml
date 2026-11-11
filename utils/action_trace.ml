@@ -24,9 +24,9 @@ let category = "ocaml-compiler"
 
 let make_trace_dir =
   lazy
-    (match Lazy.force trace_dir with
-    | None -> None
-    | Some dir as some -> (
+    (match !Clflags.enable_action_trace, Lazy.force trace_dir with
+    | _, None | false, _ -> None
+    | true, (Some dir as some) -> (
       match Sys.mkdir dir 0o777 with
       | () -> some
       | exception Sys_error _ when Sys.file_exists dir && Sys.is_directory dir
