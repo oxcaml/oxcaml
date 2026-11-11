@@ -56,7 +56,9 @@ module type Sort = sig
   (** A sort variable that can be unified during type-checking. *)
   type var
 
-  type level_error = Rigid
+  type level_error =
+    | Rigid
+    | Escape of Path.t
 
   type error =
     | Incompatible
@@ -214,6 +216,8 @@ module type Sort = sig
     val for_effect : t
 
     val for_continuation : t
+
+    val for_primitive : t
 
     (** Wrap [t] in [Some], reusing a pre-allocated [Some] block when [t] is a
         base sort. Use this when constructing [_sort : Const.t option] fields
@@ -391,6 +395,11 @@ module History = struct
     | Signature_item
     | Layout_poly
     | Typing_recovery
+    | Module_projection
+    | Module_coercion
+    | Module_inclusion
+    | Module_open
+    | Module_argument
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
