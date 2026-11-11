@@ -979,6 +979,9 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride
   in
   let stores = L.Lsequence (store_low, store_high) in
   let stores =
+    (* If this is a checked store, we do a checked load of the upper half before
+       writing the lower half. The result of the load is unused, so the load is
+       eliminated, but the bounds check remains. *)
     match check_high with
     | None -> stores
     | Some load ->
