@@ -1,7 +1,7 @@
 (* TEST
  compile_only = "true";
  flambda2;
- ocamlopt_flags = "-dcanonical-ids -dcmm";
+ ocamlopt_flags = "-no-flambda2-reaper -dcanonical-ids -dcmm";
  setup-ocamlopt.byte-build-env;
  ocamlopt.byte;
  check-ocamlopt.byte-output;
