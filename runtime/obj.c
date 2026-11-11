@@ -25,6 +25,7 @@
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
+#include "caml/scan_mask.h"
 #include "caml/platform.h"
 #include "caml/signals.h"
 
@@ -216,19 +217,23 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
       for (i = 0; i < start_of_scannable_env; i++) {
         Field(res, i) = Field(arg, i);
       }
+      // Copy the scannable environment.
+      for (; i < scannable_sz; i++) {
+        caml_initialize(&Field(res, i), Field(arg, i));
+      }
     } else {
-      i = 0;
-    }
-
-    // Copy scannable values (for closures, this is only the scannable
-    // environment).
-    for (; i < scannable_sz; i++) {
-      caml_initialize(&Field(res, i), Field(arg, i));
-    }
-
-    // Copy any non-scannable flat suffix of a mixed block.
-    for (; i < sz; i++) {
-      Field(res, i) = Field(arg, i);
+      // Per-word copy: scannable words via [caml_initialize], the
+      // unscannable words between them raw.
+      header_t hd = Hd_val(arg);
+      caml_block_scan bs;
+      caml_block_scan_init(&bs, arg, hd);
+      mlsize_t copied = 0;
+      while (caml_block_scan_next(&bs, &i)) {
+        for (; copied < i; copied++) Field(res, copied) = Field(arg, copied);
+        caml_initialize(&Field(res, i), Field(arg, i));
+        copied = i + 1;
+      }
+      for (; copied < sz; copied++) Field(res, copied) = Field(arg, copied);
     }
 
     /* Give gc a chance to run, and run memprof callbacks */
@@ -499,21 +504,26 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
     Unsafe_store_tag_val(dummy, tag);
     size = Wosize_val(newval);
     CAMLassert (size == Wosize_val(dummy));
-    mlsize_t scannable_size = Scannable_wosize_val(newval);
-    CAMLassert (scannable_size == Scannable_wosize_val(dummy));
     /* See comment above why this is safe even if [tag == Closure_tag]
        and some of the "values" being copied are actually code pointers.
 
        This reasoning does not apply to arbitrary flat fields, which might have
-       the same shape as pointers into the minor heap, so we need to handle the
-       non-scannable suffix of mixed blocks specially.
+       the same shape as pointers into the minor heap, so we copy
+       unscannable words (and a format-10 scan word) raw, per the mask.
     */
-    for (mlsize_t i = 0; i < scannable_size; i++){
+    header_t hd = Hd_val(newval);
+    caml_block_scan bs;
+    caml_block_scan_init(&bs, newval, hd);
+    mlsize_t copied = 0;
+    mlsize_t i;
+    while (caml_block_scan_next(&bs, &i)) {
+      for (; copied < i; copied++)
+        Field(dummy, copied) = Field(newval, copied);
       caml_modify (&Field(dummy, i), Field(newval, i));
+      copied = i + 1;
     }
-    for (mlsize_t i = scannable_size; i < size; i++) {
-      Field(dummy, i) = Field(newval, i);
-    }
+    for (; copied < size; copied++)
+      Field(dummy, copied) = Field(newval, copied);
   }
   return Val_unit;
 }
