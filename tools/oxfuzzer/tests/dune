@@ -1,0 +1,4 @@
+(executable
+ (name reference_cases)
+ (flags (:standard -open Oxfuzzer_lib))
+ (libraries oxfuzzer_lib))

@@ -240,8 +240,8 @@ module Expr : sig
           result_name : Name.t;
           max_length : int
         }
-    | Assert_false
-        (** Non-returning expression, valid at any result type or layout. *)
+    | Assert_false of int
+        (** Stable observation ID; non-returning at any type or layout. *)
     | Let of
         { name : Name.t;
           expr : t;

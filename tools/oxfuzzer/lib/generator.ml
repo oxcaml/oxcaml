@@ -27,7 +27,8 @@ module State = struct
       mutable exceptions : Exn.t list;
       mutable variant_types : Ty.variant list;
       mutable matches_remaining : int;
-      mutable tries_remaining : int
+      mutable tries_remaining : int;
+      mutable next_assertion_id : int
     }
 
   let create random_state =
@@ -42,7 +43,8 @@ module State = struct
       exceptions = [];
       variant_types = [];
       matches_remaining = Config.max_match_count;
-      tries_remaining = Config.max_try_count
+      tries_remaining = Config.max_try_count;
+      next_assertion_id = 0
     }
 
   let fresh t = Fresh.next t.names
@@ -173,12 +175,17 @@ let random_int_in_range (st : State.t) ~min ~max =
 let with_probability (st : State.t) ~probability =
   Random.State.int st.random_state Config.max_probability < probability
 
+let gen_assert_false (st : State.t) =
+  let id = st.next_assertion_id in
+  st.next_assertion_id <- id + 1;
+  Expr.Assert_false id
+
 let maybe_assert (st : State.t) ~f =
   match st.swarm.assertions with
   | Disabled | Unreachable_only -> f ()
   | May_raise ->
     if with_probability st ~probability:Config.assert_false_probability
-    then Expr.Assert_false
+    then gen_assert_false st
     else f ()
 
 (* Comparison APIs specify only the sign of the result. Normalize before using
@@ -1234,7 +1241,7 @@ and gen_match (st : State.t) env result_ty =
               reachable_constructors
           in
           match st.swarm.assertions, reachable with
-          | (Unreachable_only | May_raise), false -> Expr.Assert_false
+          | (Unreachable_only | May_raise), false -> gen_assert_false st
           | Disabled, _ | (Unreachable_only | May_raise), true ->
             gen_value st env result_ty))
 
