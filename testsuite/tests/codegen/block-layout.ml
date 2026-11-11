@@ -17,8 +17,7 @@ let sum_loop (a : int array) =
   !acc
 [%%expect_asm X86_64{|
 sum_loop:
-  movq  %rax, %rbx
-  movq  -8(%rbx), %rdi
+  movq  -8(%rax), %rdi
   salq  $8, %rdi
   shrq  $17, %rdi
   orq   $1, %rdi
@@ -27,17 +26,18 @@ sum_loop:
   jl    .L1
   subq  $8, %rsp
   sarq  $1, %rsi
-  movl  $1, %eax
+  movl  $1, %ebx
   xorl  %edx, %edx
 .L0:
   leaq  1(%rdx,%rdx), %rcx
   cmpq  %rdi, %rcx
   jae   .L2
-  movq  -4(%rbx,%rcx,4), %rcx
-  leaq  -1(%rax,%rcx), %rax
+  movq  -4(%rax,%rcx,4), %rcx
+  leaq  -1(%rbx,%rcx), %rbx
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 .L1:

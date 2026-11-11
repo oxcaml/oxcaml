@@ -67,16 +67,17 @@ module Dune_manifests_reader : sig
       val root_override : string option ref
     end
 
-    module Load_root_relative : sig
-      type t
-
-      val of_string : string -> t
-    end
-
     module Cwd_relative : sig
       type t
 
       val to_string : t -> string
+    end
+
+    module Load_root_relative : sig
+      type t
+
+      val of_string : string -> t
+      val to_cwd_relative : t -> Cwd_relative.t
     end
   end
 
@@ -86,7 +87,7 @@ module Dune_manifests_reader : sig
 
   val read_manifest
     :  t
-    -> f:(filename:string -> location:Path.Cwd_relative.t ->
+    -> f:(basename:string -> location:Path.Cwd_relative.t ->
           cmx_guaranteed:bool -> unit)
     -> on_manifest:(Path.Load_root_relative.t -> unit)
     -> manifest_path:Path.Load_root_relative.t
@@ -192,7 +193,7 @@ end = struct
   module Entry = struct
     type t =
       | File of
-          { filename : string
+          { basename : string
           ; location : Path.Load_root_relative.t
           ; cmx_guaranteed : bool
           }
@@ -201,15 +202,15 @@ end = struct
 
   let parse_line ~buffer line =
     match split_and_unescape ~buffer line with
-    | [ "file"; filename; location ] ->
+    | [ "file"; basename; location ] ->
       let location = Path.Load_root_relative.of_string location in
-      Some (Entry.File { filename; location; cmx_guaranteed = false })
-    | [ "file_x"; filename; location ] ->
+      Some (Entry.File { basename; location; cmx_guaranteed = false })
+    | [ "file_x"; basename; location ] ->
       let location = Path.Load_root_relative.of_string location in
-      Some (Entry.File { filename; location; cmx_guaranteed = true })
+      Some (Entry.File { basename; location; cmx_guaranteed = true })
     | [ "manifest"; _; location ] ->
-      (* [filename] is included in "manifest" entry only for human
-         readability, so we discard them here. *)
+      (* The name is included in "manifest" entry only for human
+         readability, so we discard it here. *)
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.Manifest location)
     | [] -> None
@@ -222,9 +223,9 @@ end = struct
       iter_lines manifest_path ~f:(fun line ->
         match parse_line ~buffer line with
         | None -> ()
-        | Some (Entry.File { filename; location; cmx_guaranteed }) ->
+        | Some (Entry.File { basename; location; cmx_guaranteed }) ->
           visit t location ~f:(fun location ->
-            f ~filename ~location ~cmx_guaranteed)
+            f ~basename ~location ~cmx_guaranteed)
         | Some (Manifest manifest_path) -> on_manifest manifest_path))
   ;;
 end
@@ -276,6 +277,7 @@ end = struct
   type t = {
     path : string;
     files : entry list;
+    file_id : File_id.t;
     visibility : visibility;
   }
 
@@ -302,14 +304,20 @@ end = struct
     in
     List.find_map search t.files
 
+  (* Merlin: In server mode we need each typer instance to know that a directory
+     changed at some point. Relying on the global [Directory_content_cache]
+     means only the first such check will notice the invalidation but not
+     following ones. We thus use individual [file_id]s for directory
+     invalidation, so that every impacted instance is eventually updated. *)
+
   let check visibility t =
-    visibility_eq visibility t.visibility && Directory_content_cache.check t.path
+    visibility_eq visibility t.visibility && File_id.check (File_id.get t.path) t.file_id
 
   let create visibility path =
     let files = Array.to_list (Directory_content_cache.read path)
       |> List.map (
         fun basename -> { basename; path = Filename.concat path basename }) in
-    { path; files; visibility }
+    { path; files; file_id = File_id.get path; visibility }
 end
 
 (** Stores cached paths to files *)
@@ -493,8 +501,7 @@ let init_manifests () =
       !manifests_reader
       ~manifest_path
       ~on_manifest:load_visible_manifest
-      ~f:(fun ~filename ~location ~cmx_guaranteed ->
-          let basename = Filename.basename filename in
+      ~f:(fun ~basename ~location ~cmx_guaranteed ->
           visible_basenames := basename :: !visible_basenames;
           Path_cache.prepend_add_single
             ~hidden:false
@@ -535,8 +542,7 @@ let load_one_pending_manifest ~uncap fn =
       ~manifest_path
       ~on_manifest:(fun manifest_path ->
         Queue.add manifest_path !pending_hidden_manifests)
-      ~f:(fun ~filename ~location ~cmx_guaranteed:_ ->
-        let basename = Filename.basename filename in
+      ~f:(fun ~basename ~location ~cmx_guaranteed:_ ->
         let location =
           Dune_manifests_reader.Path.Cwd_relative.to_string location in
         if Option.is_none !found && basename_matches ~uncap fn basename

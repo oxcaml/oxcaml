@@ -81,7 +81,9 @@ val reset_additional_action_id: unit -> unit
 val change_locs: 'k subst -> Location.t -> 'k subst
 
 val module_path: t -> Path.t -> Path.t
+exception Not_path
 val type_path: t -> Path.t -> Path.t
+(* [type_path t p] may raise Not_path if t(p) is a type_function *)
 val modtype_path: t -> Path.t -> Path.t
 
 val type_expr: t -> type_expr -> type_expr

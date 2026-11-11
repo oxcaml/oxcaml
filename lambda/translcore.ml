@@ -199,9 +199,6 @@ let maybe_region get_layout lam =
        Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout, yielding)
     | Lregion _ as lam -> lam
     | Lexclave lam -> lam
-    | Lsplice _ ->
-      fatal_error "Translcore.remove_tail_markers_and_exclave: \
-        splices shouldn't be reachable"
     | lam ->
        Lambda.shallow_map ~tail:remove_tail_markers_and_exclave ~non_tail:Fun.id lam
   in
@@ -391,8 +388,8 @@ let can_apply_primitive p pmode pos args =
   if List.exists (fun (_, arg) -> is_omitted arg) args then false
   else begin
     let nargs = List.length args in
-    if nargs = p.prim_arity then true
-    else if nargs < p.prim_arity then false
+    if nargs = p.prim_type_arity then true
+    else if nargs < p.prim_type_arity then false
     else if pos <> Typedtree.Tail then true
     else begin
       let return_mode =
@@ -420,13 +417,16 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check c when c.arity = num_args && (use_opt || not c.opt) ->
+    | Check { strict; opt; arity; partial; loc; custom_error_msg = _ }
+      when Zero_alloc.applicable_arity ~arity ~partial ~num_args
+           && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =
-        { strict = c.strict;
+        { strict;
           never_returns_normally = false;
           never_raises = false;
-          arity = c.arity;
-          loc = c.loc }
+          arity;
+          partial;
+          loc }
       in
       Builtin_attributes.assume_zero_alloc ~inferred:true assume
     | Check _ | Default_zero_alloc | Ignore_assert_all | Assume _ ->
@@ -499,7 +499,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | ((_, arg_repr) :: prim_repr), ((_, Arg (x, _)) :: oargs) ->
           let arg_exps, extra_args = cut_args prim_repr oargs in
           let arg_sort =
-              Translprim.sort_of_native_repr arg_repr ~poly_sort:psort
+              Translprim.sort_of_native_repr_or_elided arg_repr ~poly_sort:psort
           in
           (x, arg_sort) :: arg_exps, extra_args
         | _, ((_, Omitted _) :: _) -> assert false
@@ -2421,15 +2421,17 @@ and transl_function
        | Assert_default -> Default_zero_alloc
        | Assert_all ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:false
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
+                      partial = false }
          else Default_zero_alloc
        | Assert_all_opt ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:true
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
+                      partial = false }
          else Default_zero_alloc)
-    | Check { strict; opt; arity = _; loc; custom_error_msg; } ->
+    | Check { strict; opt; arity = _; partial; loc; custom_error_msg; } ->
       if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-      then Check { strict; loc; custom_error_msg }
+      then Check { strict; loc; custom_error_msg; partial }
       else Default_zero_alloc
     | Assume { strict; never_returns_normally; never_raises; loc; arity = _; } ->
       Assume { strict; never_returns_normally; never_raises; loc }

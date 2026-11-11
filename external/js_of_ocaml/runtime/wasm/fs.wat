@@ -763,8 +763,11 @@
 (@else
    (func (export "caml_sys_file_exists")
       (param $name (ref eq)) (result (ref eq))
-      (return_call $file_exists
-         (call $unwrap (call $caml_jsstring_of_string (local.get $name)))))
+     ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+     ;; tail call cross
+      (return
+         (call $file_exists
+            (call $unwrap (call $caml_jsstring_of_string (local.get $name))))))
 ))
 
    (@string $no_such_file ": No such file or directory")

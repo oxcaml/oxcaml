@@ -126,8 +126,9 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
        products of values into individual value fields. *)
     let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
       match elem with
-      | L.Value vk ->
+      | Value vk ->
         K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
+      | Void -> acc
       | Product elts -> Array.fold_left collect_value_fields acc elts
       | Float_boxed ()
       | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
@@ -139,8 +140,8 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
     if num_fields <> fields_length
     then
       Misc.fatal_errorf
-        "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
-         fields"
+        "Flambda_arity.convert_block_shape: num_fields is %d yet the shape has \
+         %d fields"
         num_fields fields_length;
     fields
 
@@ -1114,7 +1115,8 @@ let multiple_word_array_access_validity_condition array ~machine_width
    load/store functions below *)
 
 let array_vector_access_validity_condition array ~machine_width
-    ~(vec_kind : Vector_types.Kind.t) (array_kind : P.Array_kind.t) index =
+    ~(vec_kind : Vector_types.Kind.t) (array_kind : P.Array_kind.t) ~index_kind
+    index =
   let size_of_element =
     match array_kind with
     | Naked_vec128s -> 16
@@ -1142,21 +1144,20 @@ let array_vector_access_validity_condition array ~machine_width
     (size_of_access + (size_of_element - 1)) / size_of_element
   in
   multiple_word_array_access_validity_condition array ~machine_width
-    (Array_kind array_kind) Ptagged_int_index
-    ~num_consecutive_elements_being_accessed ~index
+    (Array_kind array_kind) index_kind ~num_consecutive_elements_being_accessed
+    ~index
 
-let check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-    ~vec_kind primitive : H.expr_primitive =
+let check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+    ~index ~vec_kind primitive : H.expr_primitive =
   checked_access ~primitive
     ~conditions:
       [ array_vector_access_validity_condition ~machine_width ~vec_kind array
-          array_kind index ]
+          array_kind ~index_kind index ]
     ~dbg
 
 let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
     ~current_alloc_region ~current_region ~(vec_kind : Vector_types.Kind.t)
     array_kind array ~index_kind index =
-  let index = convert_index_to_tagged_int ~index ~index_kind in
   let load_kind, box =
     match vec_kind with
     | Vec128 -> P.Array_load_kind.Naked_vec128s, box_vec128
@@ -1164,6 +1165,7 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
     | Vec512 -> P.Array_load_kind.Naked_vec512s, box_vec512
   in
   let primitive =
+    let index = convert_index_to_tagged_int ~index ~index_kind in
     H.Binary (Array_load (array_kind, load_kind, Mutable), array, index)
   in
   let primitive =
@@ -1174,13 +1176,12 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
   if unsafe
   then primitive
   else
-    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-      ~vec_kind primitive
+    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+      ~index ~vec_kind primitive
 
 let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
     ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index
     new_value =
-  let index = convert_index_to_tagged_int ~index ~index_kind in
   let set_kind, unbox =
     match vec_kind with
     | Vec128 -> P.Array_set_kind.Naked_vec128s, unbox_vec128
@@ -1189,13 +1190,14 @@ let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
   in
   let new_value = if boxed then unbox new_value else new_value in
   let primitive =
+    let index = convert_index_to_tagged_int ~index ~index_kind in
     H.Ternary (Array_set (array_kind, set_kind), array, index, new_value)
   in
   if unsafe
   then primitive
   else
-    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-      ~vec_kind primitive
+    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+      ~index ~vec_kind primitive
 
 (* Bigarray accesses *)
 let bigarray_box_or_tag_raw_value_to_read kind alloc_mode =
@@ -1781,9 +1783,9 @@ let block_index_access_offsets_and_kinds ~machine_width layout idx =
       let add x y = H.Binary (Int_arith (Naked_int64, Add), Prim x, y) in
       let offset_from_offset : H.simple_or_prim =
         match mbe with
-        | Product _ ->
+        | Void | Product _ ->
           (* Products not produced by [L.mixed_block_element_leaves] *)
-          Misc.fatal_errorf "Unexpected product in block index access: %a"
+          Misc.fatal_errorf "Unexpected void/product in block index access: %a"
             Printlambda.layout layout
         (* Values are (values to left) beyond the offset *)
         | Value _ ->
@@ -1905,26 +1907,31 @@ let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
   check_non_negative_imm imm prim_name;
   imm, field_kind
 
-let mixed_block_shape_of_layout ~prim_name (layout : L.layout) :
-    L.mixed_block_shape =
+(* CR box: the current state of the world is a little sad. We either box small
+   numbers as tagged immediates and break representation invariants for
+   singleton unboxed records, or box them as tag-0 blocks and break numeric
+   layout invariants / optimizations. We uniformly pick the latter, in the
+   absence of addressability to tell us which decision to make.
+
+   Once we can box things as tagged immediates, the return type of this function
+   must change. *)
+let block_shape_for_boxing ~prim_name (layout : L.layout) : L.mixed_block_shape
+    =
   match layout with
+  | Pvoid -> [||]
   | Punboxed_product layouts ->
     Array.of_list (List.map L.mixed_block_element_of_layout layouts)
-  (* CR box: the current state of the world is a little sad. We either box small
-     numbers as tagged immediates and break representation invariants for
-     singleton unboxed records, or box them as tag-0 blocks and break numeric
-     layout invariants / optimizations. We pick the latter, but we need
-     addressability to properly handle these cases.
-
-     We can't use [Box_number], since it is immutable and can be optimized as
+  (* We can't use [Box_number], since it is immutable and can be optimized as
      such, but [Punboxed_vector] here really could correspond to a singleton
      unboxed record whose boxed version is mutable. This can unsoundly expose
      the immutable optimizations. *)
   | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
   | Punboxed_vector _ | Punboxed_mask ->
     [| L.mixed_block_element_of_layout layout |]
-  | Ptop -> Misc.fatal_errorf "convert_lprim: %s: Ptop layout" prim_name
-  | Pbottom -> Misc.fatal_errorf "convert_lprim: %s: Pbottom layout" prim_name
+  | Ptop ->
+    Misc.fatal_errorf "block_shape_for_boxing: %s: Ptop layout" prim_name
+  | Pbottom ->
+    Misc.fatal_errorf "block_shape_for_boxing: %s: Pbottom layout" prim_name
   | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
 
 let convert_block_creation ~machine_width ~prim_name tag (shape : L.block_shape)
@@ -2089,10 +2096,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
     let num_bytes = L.array_element_size_in_bytes array_kind in
-    [ Simple
-        (Simple.const_int
-           (Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
-              num_bytes)) ]
+    [Simple (Simple.const_int (Target_ocaml_int.of_int machine_width num_bytes))]
   | Pmake_idx_field pos, [] ->
     needs_64_bit_target prim dbg;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
@@ -2393,6 +2397,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Pred ->
           Binary
             (Int_arith (width, Sub), arg, Simple (const ~machine_width width 1))
+        | Not -> Unary (Int_arith (width, Not), arg)
       in
       [to_expr (maybe_wrap (Prim result))]
     | Floating (outer, op) ->
@@ -3551,6 +3556,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ptls_get, _ -> [Nullary Tls_get]
   | Pdomain_index, _ -> [Nullary Domain_index]
+  | Pthread_self_id, _ -> [Nullary Thread_self_id]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
     if not (Target_system.is_64_bit ())
@@ -3607,7 +3613,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~current_region
     in
     let shape : L.block_shape =
-      Shape (mixed_block_shape_of_layout ~prim_name:"Pbox" layout)
+      Shape (block_shape_for_boxing ~prim_name:"Pbox" layout)
     in
     (* A boxed all-void product must be [Immutable] for the middle-end *)
     (* CR box: we default to [Mutable], but we should consider storing
@@ -3620,7 +3626,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     convert_block_creation ~machine_width ~prim_name:"Pbox" Tag.Scannable.zero
       shape mutability mode args
   | Punbox layout, [[arg]] ->
-    let shape = mixed_block_shape_of_layout ~prim_name:"Punbox" layout in
+    let shape = block_shape_for_boxing ~prim_name:"Punbox" layout in
     (* CR box: always [Mutable], see [Pbox] above. In this case, we may actually
        want to store a list of mutabilities to determine which fields should be
        read (im)mutably. *)

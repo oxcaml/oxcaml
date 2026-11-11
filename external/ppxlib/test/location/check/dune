@@ -1,0 +1,6 @@
+(executable
+ (name driver)
+ (libraries ppxlib))
+
+(cram
+ (deps driver.exe))

@@ -77,6 +77,10 @@ let add_simple t simple =
 let add_code_id t code_id =
   { t with code_ids = Code_id.Set.add code_id t.code_ids }
 
+let add_code_id_or_name t code_id_or_name =
+  Code_id_or_name.pattern_match' code_id_or_name ~code_id:(add_code_id t)
+    ~name:(add_name t)
+
 let add_continuation t continuation =
   { t with continuations = Continuation.Set.add continuation t.continuations }
 
@@ -112,3 +116,131 @@ let union t1 t2 =
 
 let rec union_list ts =
   match ts with [] -> empty | t :: ts -> union t (union_list ts)
+
+let no_ids _ = empty
+
+let ids_for_export_set ~fold ~add_ids_key set =
+  fold (fun key ids -> add_ids_key ids key) set empty
+
+let ids_for_export_map ~fold ~add_ids_key ~ids_for_export_value map =
+  fold
+    (fun key value ids ->
+      union ids (add_ids_key (ids_for_export_value value) key))
+    map empty
+
+let ids_for_export_name_set names =
+  ids_for_export_set ~fold:Name.Set.fold ~add_ids_key:add_name names
+
+let ids_for_export_code_id_set code_ids = create ~code_ids ()
+
+let ids_for_export_continuation_set continuations = create ~continuations ()
+
+let ids_for_export_variable_map ids_for_export_value map =
+  ids_for_export_map ~fold:Variable.Map.fold ~add_ids_key:add_variable
+    ~ids_for_export_value map
+
+let ids_for_export_name_map ids_for_export_value map =
+  ids_for_export_map ~fold:Name.Map.fold ~add_ids_key:add_name
+    ~ids_for_export_value map
+
+let ids_for_export_code_id_map ids_for_export_value map =
+  ids_for_export_map ~fold:Code_id.Map.fold ~add_ids_key:add_code_id
+    ~ids_for_export_value map
+
+let ids_for_export_continuation_map ids_for_export_value map =
+  ids_for_export_map ~fold:Continuation.Map.fold ~add_ids_key:add_continuation
+    ~ids_for_export_value map
+
+let ids_for_export_code_id_or_name_map ids_for_export_value map =
+  ids_for_export_map ~fold:Code_id_or_name.Map.fold
+    ~add_ids_key:add_code_id_or_name ~ids_for_export_value map
+
+module Table_data = struct
+  type ids = t
+
+  type t =
+    { symbols : Symbol.importer;
+      variables : Variable.importer;
+      simples : Simple.importer;
+      consts : Reg_width_const.importer;
+      code_ids : Code_id.importer;
+      continuations : Continuation.importer;
+      fields : Field.importer
+    }
+
+  let create (exported_ids : ids) =
+    { symbols = Symbol.export exported_ids.symbols;
+      variables = Variable.export exported_ids.variables;
+      simples = Simple.export exported_ids.simples;
+      consts = Reg_width_const.export exported_ids.consts;
+      code_ids = Code_id.export exported_ids.code_ids;
+      continuations = Continuation.export exported_ids.continuations;
+      fields = Field.export exported_ids.fields
+    }
+
+  let create_import_map
+      { symbols; variables; simples; consts; code_ids; continuations; fields }
+      ~used_value_slots ~original_compilation_unit =
+    Renaming.create_import_map ~symbols ~variables ~simples ~consts ~code_ids
+      ~continuations ~fields ~used_value_slots ~original_compilation_unit
+end
+
+module Stamp_state = struct
+  type t =
+    { variables : Variable.stamp_state;
+      code_ids : Code_id.stamp_state;
+      continuations : Continuation.stamp_state;
+      function_slots : Function_slot.stamp_state;
+      value_slots : Value_slot.stamp_state;
+      symbols : Symbol.stamp_state
+    }
+
+  let save () =
+    { variables = Variable.export_stamp_state ();
+      code_ids = Code_id.export_stamp_state ();
+      continuations = Continuation.export_stamp_state ();
+      function_slots = Function_slot.export_stamp_state ();
+      value_slots = Value_slot.export_stamp_state ();
+      symbols = Symbol.export_stamp_state ()
+    }
+
+  let restore
+      { variables;
+        code_ids;
+        continuations;
+        function_slots;
+        value_slots;
+        symbols
+      } =
+    Variable.restore_stamp_state variables;
+    Code_id.restore_stamp_state code_ids;
+    Continuation.restore_stamp_state continuations;
+    Function_slot.restore_stamp_state function_slots;
+    Value_slot.restore_stamp_state value_slots;
+    Symbol.restore_stamp_state symbols
+
+  let merge
+      { variables = variables1;
+        code_ids = code_ids1;
+        continuations = continuations1;
+        function_slots = function_slots1;
+        value_slots = value_slots1;
+        symbols = symbols1
+      }
+      { variables = variables2;
+        code_ids = code_ids2;
+        continuations = continuations2;
+        function_slots = function_slots2;
+        value_slots = value_slots2;
+        symbols = symbols2
+      } =
+    { variables = Variable.merge_stamp_state variables1 variables2;
+      code_ids = Code_id.merge_stamp_state code_ids1 code_ids2;
+      continuations =
+        Continuation.merge_stamp_state continuations1 continuations2;
+      function_slots =
+        Function_slot.merge_stamp_state function_slots1 function_slots2;
+      value_slots = Value_slot.merge_stamp_state value_slots1 value_slots2;
+      symbols = Symbol.merge_stamp_state symbols1 symbols2
+    }
+end

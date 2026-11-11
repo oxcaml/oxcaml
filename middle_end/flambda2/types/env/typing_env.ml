@@ -846,19 +846,27 @@ let create_from_closure_conversion_approx ~machine_width ~resolver
     Symbol.Map.fold (fun sym _approx t -> add_symbol_definition t sym) symbols t
   in
   Symbol.Map.fold
-    (fun sym approx t ->
-      let ty = type_from_closure_conversion_approx ~machine_width approx in
-      (* Symbols without approximations must still be defined. *)
-      let t =
-        Name_occurrences.fold_names (TG.free_names ty) ~init:t ~f:(fun t name ->
-            Name.pattern_match name
-              ~var:(fun _ -> t)
-              ~symbol:(fun free_sym ->
-                if Current_unit.is_current (Symbol.compilation_unit free_sym)
-                then add_symbol_definition t free_sym
-                else t))
-      in
-      replace_equation t (Name.symbol sym) ty)
+    (fun sym (approx : _ Value_approximation.t) t ->
+      (* Don't add useless equations *)
+      match approx with
+      | Unknown _ ->
+        (* We already added a symbol definition above *)
+        t
+      | Value_const _ | Value_symbol _ | Block_approximation _
+      | Closure_approximation _ ->
+        let ty = type_from_closure_conversion_approx ~machine_width approx in
+        (* Symbols without approximations must still be defined. *)
+        let t =
+          Name_occurrences.fold_names (TG.free_names ty) ~init:t
+            ~f:(fun t name ->
+              Name.pattern_match name
+                ~var:(fun _ -> t)
+                ~symbol:(fun free_sym ->
+                  if Current_unit.is_current (Symbol.compilation_unit free_sym)
+                  then add_symbol_definition t free_sym
+                  else t))
+        in
+        replace_equation t (Name.symbol sym) ty)
     symbols t
 
 let aliases_add t ~canonical_element1 ~canonical_element2 =
@@ -1166,18 +1174,22 @@ end = struct
 
   let create_from_closure_conversion_approx ~machine_width
       (symbols : _ Value_approximation.t Symbol.Map.t) : t =
-    (* By using Cached_level.add_or_replace_binding below, we ensure that all
-       symbols have an equation (that may be Unknown). *)
-    let defined_symbols_without_equations = [] in
     let code_age_relation = Code_age_relation.empty in
-    let names_to_types =
+    let defined_symbols_without_equations, names_to_types =
       Symbol.Map.fold
-        (fun sym approx cached ->
-          Name.Map.add (Name.symbol sym)
-            ( type_from_closure_conversion_approx ~machine_width approx,
-              Binding_time.With_name_mode.symbols )
-            cached)
-        symbols Name.Map.empty
+        (fun sym (approx : _ Value_approximation.t)
+             (defined_symbols_without_equations, cached) ->
+          (* Don't add useless equations *)
+          match approx with
+          | Unknown _ -> sym :: defined_symbols_without_equations, cached
+          | Value_const _ | Value_symbol _ | Block_approximation _
+          | Closure_approximation _ ->
+            ( defined_symbols_without_equations,
+              Name.Map.add (Name.symbol sym)
+                ( type_from_closure_conversion_approx ~machine_width approx,
+                  Binding_time.With_name_mode.symbols )
+                cached ))
+        symbols ([], Name.Map.empty)
     in
     { defined_symbols_without_equations; code_age_relation; names_to_types }
 
@@ -1198,38 +1210,43 @@ end = struct
 
   let ids_for_export
       { defined_symbols_without_equations; code_age_relation; names_to_types } =
-    Ids_for_export.create
-      ~symbols:(Symbol.Set.of_list defined_symbols_without_equations)
-      ~code_ids:(Code_age_relation.all_code_ids_for_export code_age_relation)
-      ()
-    |> Name.Map.fold
-         (fun name (typ, _binding_time_and_mode) ids ->
-           Ids_for_export.add_name
-             (Ids_for_export.union ids (Type_grammar.ids_for_export typ))
-             name)
-         names_to_types
+    Ids_for_export.union
+      (Ids_for_export.create
+         ~symbols:(Symbol.Set.of_list defined_symbols_without_equations)
+         ~code_ids:(Code_age_relation.all_code_ids_for_export code_age_relation)
+         ())
+      (Ids_for_export.ids_for_export_name_map
+         (fun (typ, _binding_time_and_mode) -> Type_grammar.ids_for_export typ)
+         names_to_types)
 
   let apply_renaming
-      { defined_symbols_without_equations; code_age_relation; names_to_types }
-      renaming =
-    let defined_symbols_without_equations =
-      List.map
+      ({ defined_symbols_without_equations; code_age_relation; names_to_types }
+       as t) renaming =
+    let defined_symbols_without_equations' =
+      Misc.Stdlib.List.map_sharing
         (Renaming.apply_symbol renaming)
         defined_symbols_without_equations
     in
-    let code_age_relation =
+    let code_age_relation' =
       Code_age_relation.apply_renaming code_age_relation renaming
     in
-    let names_to_types =
-      Name.Map.fold
-        (fun name (ty, binding_time_and_mode) acc ->
-          Name.Map.add
-            (Renaming.apply_name renaming name)
-            (Type_grammar.apply_renaming ty renaming, binding_time_and_mode)
-            acc)
-        names_to_types Name.Map.empty
+    let names_to_types' =
+      Renaming.apply_name_map
+        (fun ((ty, binding_time_and_mode) as v) renaming ->
+          let ty' = Type_grammar.apply_renaming ty renaming in
+          if ty == ty' then v else ty', binding_time_and_mode)
+        renaming names_to_types
     in
-    { defined_symbols_without_equations; code_age_relation; names_to_types }
+    if
+      defined_symbols_without_equations == defined_symbols_without_equations'
+      && code_age_relation == code_age_relation'
+      && names_to_types == names_to_types'
+    then t
+    else
+      { defined_symbols_without_equations = defined_symbols_without_equations';
+        code_age_relation = code_age_relation';
+        names_to_types = names_to_types'
+      }
 
   let merge (t1 : t) (t2 : t) : t =
     let defined_symbols_without_equations =
@@ -1355,8 +1372,10 @@ end = struct
         Unknown (TG.kind ty)
       | Rec_info _ | Region _ -> assert false
     in
-    let symbol_ty, _binding_time_and_mode =
-      Name.Map.find (Name.symbol symbol) env.names_to_types
-    in
-    type_to_approx symbol_ty
+    match Name.Map.find_or_null (Name.symbol symbol) env.names_to_types with
+    | This (symbol_ty, _binding_time_and_mode) -> type_to_approx symbol_ty
+    | Null ->
+      if List.mem symbol env.defined_symbols_without_equations
+      then Value_approximation.Unknown K.value
+      else Misc.fatal_errorf "Undefined symbol %a" Symbol.print symbol
 end

@@ -783,3 +783,40 @@ let foo () =
 [%%expect{|
 val foo : unit -> unit = <fun>
 |}]
+
+(* Borrowing a field, then using the parent uniquely *)
+type r = { f : string }
+let foo r =
+  let y = borrow_ r.f in
+  unique_use r;
+  local_aliased_use y
+[%%expect{|
+type r = { f : string; }
+Line 4, characters 13-14:
+4 |   unique_use r;
+                 ^
+Error: This value is used as "unique" here, but it is being borrowed.
+Line 3, characters 10-21:
+3 |   let y = borrow_ r.f in
+              ^^^^^^^^^^^
+  The value is being borrowed
+Lines 3-5, characters 2-21:
+3 | ..let y = borrow_ r.f in
+4 |   unique_use r;
+5 |   local_aliased_use y
+  during this borrow context
+|}]
+
+(* Borrowing a field, then using the parent as aliased *)
+let foo r =
+  let y = borrow_ r.f in
+  global_aliased_use r;
+  local_aliased_use y
+[%%expect{|
+Line 3, characters 21-22:
+3 |   global_aliased_use r;
+                         ^
+Warning 216 [use-during-borrowing]: This value is used while being borrowed.
+
+val foo : r -> unit = <fun>
+|}]

@@ -116,9 +116,8 @@ module Extension = struct
     | AVX512VL -> "SkylakeXeon+"
 
   let enabled_by_default = function
-    (* We enable all Haswell extensions by default, unless the compiler
-       was configured on a CPU without support. Note SSE/SSE2 cannot be
-       disabled as they are included in baseline x86_64. *)
+    (* Extension defaults follow configure-time CPU detection.
+       SSE/SSE2 cannot be disabled as they are included in baseline x86_64. *)
     | POPCNT -> Config.has_popcnt
     | LZCNT -> Config.has_lzcnt
     | CLMUL -> Config.has_pclmul
@@ -133,9 +132,12 @@ module Extension = struct
     | AVX2 -> Config.has_avx2
     | F16C -> Config.has_f16c
     | FMA -> Config.has_fma
-    | PREFETCHW | PREFETCHWT1 | AVX512F | AVX512DQ | AVX512CD | AVX512BW
-    | AVX512VL ->
-      false
+    | AVX512F -> Config.has_avx512f
+    | AVX512DQ -> Config.has_avx512dq
+    | AVX512CD -> Config.has_avx512cd
+    | AVX512BW -> Config.has_avx512bw
+    | AVX512VL -> Config.has_avx512vl
+    | PREFETCHW | PREFETCHWT1 -> false
 
   let all =
     Set.of_list
@@ -383,6 +385,11 @@ let num_args_addressing = function
   | Iindexed2 _ -> 2
   | Iscaled _ -> 1
   | Iindexed2scaled _ -> 2
+
+let strength_reduce_mul mult =
+  match mult with
+  | 3 | 5 | 9 -> Some (Ilea (Iindexed2scaled (mult - 1, 0)))
+  | _ -> None
 
 let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
   match op with

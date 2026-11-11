@@ -43,7 +43,7 @@
 
 /* Force tick thread to use usleep instead of epoll. Settable with
    OCAMLRUNPARAM */
-extern uintnat caml_tick_use_usleep;   /* -Xtick_use_usleep= */
+extern uintnat caml_tick_use_usleep;   /* Xtick_use_usleep= */
 
 /* is the minor heap full or an external interrupt has been triggered */
 Caml_inline int caml_check_gc_interrupt(caml_domain_state * dom_st)
@@ -92,6 +92,9 @@ CAMLextern void caml_bt_enter_ocaml(void);
 CAMLextern void caml_bt_exit_ocaml(void);
 CAMLextern void caml_acquire_domain_lock(void);
 CAMLextern void caml_release_domain_lock(void);
+
+/* Allocate a new thread id (a tagged integer) for [Caml_state->thread_id]. */
+CAMLextern value caml_fresh_thread_id(void);
 
 /* Start the tick thread unless it is disabled. Returns nonzero in the case of
    an error. */

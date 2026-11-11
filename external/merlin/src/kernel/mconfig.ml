@@ -226,6 +226,12 @@ let dump x =
 
 let arguments_table = Hashtbl.create 67
 
+(* Parametrized compiler flags that are ignored only when they come from the
+   configuration (.merlin, dune's [FLG], [-flags]), not from the command line.
+   They cannot go in [ocaml_ignored_parametrized_flags] because they clash with
+   flags of merlin commands (e.g. [jump -target]). *)
+let config_only_ignored_parametrized_flags = [ "-target" ]
+
 let stdlib =
   let env =
     try Some (Sys.getenv "OCAMLLIB")
@@ -255,12 +261,17 @@ let normalize_step t =
     in
     let failures = ref [] in
     let warning failure = failures := failure :: !failures in
+    let local_spec =
+      List.map
+        ~f:(fun name -> (name, "", Marg.param_ignore))
+        config_only_ignored_parametrized_flags
+    in
     let t =
       List.fold_left
         ~f:(fun t { workdir; workval } ->
           fst
             (let_ref cwd (Some workdir)
-               (Marg.parse_all ~warning arguments_table [] workval t)))
+               (Marg.parse_all ~warning arguments_table local_spec workval t)))
         ~init:t flagss
     in
     { t with
@@ -468,7 +479,6 @@ let ocaml_ignored_flags =
     "-dparsetree-loc-ghost-invariants";
     "-dshape";
     "-dtlambda";
-    "-dslambda";
     "-drawclambda";
     "-drawflambda";
     "-drawlambda";
@@ -580,6 +590,8 @@ let ocaml_ignored_flags =
     "-no-symbol-visibility-protected";
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
+    "-lto-support";
+    "-no-lto-support";
     "-directory";
     "-typing-recovery";
     (* Jane Street specific *)
@@ -672,6 +684,7 @@ let ocaml_ignored_flags =
     "-keep-llvmir";
     "-llvm-backend";
     "-no-llvm-backend";
+    "-fdo-counters";
     "-ddwarf-types";
     "-ocamlcfg";
     "-cfg-eliminate-dead-code-validate";
@@ -808,7 +821,8 @@ let ocaml_ignored_flags =
     "-no-flambda2-simplify-stubs";
     "-flambda2-simplify-stubs";
     "-stubs-forward-inlining";
-    "-no-stubs-forward-inlining"
+    "-no-stubs-forward-inlining";
+    "-djsir"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -848,6 +862,8 @@ let ocaml_ignored_parametrized_flags =
     "-dump-dir";
     "-I-manifest";
     "-H-manifest";
+    "-H-file";
+    "-Hx-file";
     (* flambda-backend specific *)
     "-extension";
     "-extension-universe";
@@ -921,7 +937,12 @@ let ocaml_ignored_parametrized_flags =
     "-reaper-preserve-direct-calls";
     "-save-ir-after";
     "-X";
-    "-dissector-max-linker-parallelism"
+    "-dissector-max-linker-parallelism";
+    "-jsoo-opt";
+    "-jsoo-opt-compile";
+    "-jsoo-opt-archive";
+    "-jsoo-opt-runtime";
+    "-jsoo-opt-link"
   ]
 
 let ocaml_warnings_spec ~error =

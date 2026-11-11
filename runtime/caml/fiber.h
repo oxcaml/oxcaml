@@ -47,14 +47,28 @@ struct stack_handler {
  *  - accessing the stack_handler for the stack to handle effects
  *  - handling a freelist of OCaml stacks in a stack_cache
  */
+struct cached_stack;
+
 struct stack_info {
+  union {
+    /* While the stack is in use. */
+    struct {
 #ifdef NATIVE_CODE
-  void* sp;            /* stack pointer of the OCaml stack when suspended */
-  void* exception_ptr; /* exception pointer of OCaml stack when suspended */
+      void* sp;            /* stack pointer of the OCaml stack when suspended */
+      void* exception_ptr; /* exception pointer of OCaml stack when suspended */
 #else
-  value* sp;
-  value* exception_ptr;
+      value* sp;
+      value* exception_ptr;
 #endif
+    };
+    /* While the stack is in a stack cache (see [struct cached_stack]). */
+    struct {
+      /* The major cycle at which the stack was demoted, used to free
+         long-unused stacks; only set in the global and extra caches. */
+      uintnat cache_stamp;
+      struct cached_stack* cache_next; /* the next stack in this cache */
+    };
+  };
   struct stack_handler* handler; /* effect handling state for the fiber */
 
   /* [cache_bucket] is an index into the [Caml_state->stack_cache] array if
@@ -63,8 +77,7 @@ struct stack_info {
    * Stacks may be unpooled if either the stack size is not 2**N multiple of
    * [caml_fiber_wsz] or the stack is bigger than pooled sizes. */
   int cache_bucket;
-  int domain_idx; /* the index of the domain that allocated this fiber */
-  size_t size; /* only used when USE_MMAP_MAP_STACK is defined */
+  size_t size; /* size in bytes of this stack's memory */
   uintnat magic;
   int64_t id;
 
@@ -75,13 +88,28 @@ struct stack_info {
   void* local_top;
   intnat local_limit;
 
+  /* Thread-local storage. Non-preemptable fibers have [tls_state = Null]
+     and preemptable fibers (including domain and thread root fibers) have
+     [tls_state = This state]. */
+  value tls_state;
+
   /* The current dynamic binding node. Either [Val_null], or a block with three
      fields: dynamic key, bound value, and nullable parent node. */
   value dynamic;
+  int domain_idx; /* domain that made this fiber */
   bool is_task;
 
   /* Whether the fiber was allocated by [caml_alloc_stack_preemptible]. */
   bool is_preemptible;
+
+  /* NULL for a stack whose data is in ordinary stack memory. For an
+     "idle" stack -- one whose data has been copied into a malloced
+     buffer while its continuation sits on the major heap (see the
+     design comment in fiber.c) -- the [Stack_high] address of the
+     guarded stack the data last occupied, used to relocate
+     stack-internal pointers when the stack is woken. Last, so that the
+     assembly code's field offsets are unaffected. */
+  void* idled_from_high;
 };
 
 #ifdef STACK_GUARD_PAGES
@@ -101,7 +129,7 @@ struct stack_info {
 #define Stack_handle_effect(stk) (stk)->handler->handle_effect
 #define Stack_handle_tick(stk) (stk)->handler->handle_tick
 #define Stack_parent(stk) (stk)->handler->parent
-#define Stack_is_preemptible(stk) ((stk)->is_preemptible)
+#define Stack_is_preemptible(stk) ((stk)->tls_state != Val_null)
 
 /* Stack layout for native code. Stack grows downwards.
  *
@@ -133,27 +161,16 @@ struct stack_info {
  * +------------------------+ <--- Caml_state->current_stack
  */
 
-/* Some ABI reserve space at the bottom of every C stack frame. */
+#include "asm_offsets.h"
 
-#if defined(TARGET_amd64) && (defined(_WIN32) || defined(__CYGWIN__))
-/* Win64 ABI shadow store for argument registers */
-  #define Reserved_space_c_stack_link 4 * 8
-#elif defined(TARGET_s390x)
-  #define Reserved_space_c_stack_link 160
-#elif defined(TARGET_power)
-/* ELF ABI: 4 reserved words at bottom of C stack */
-  #define Reserved_space_c_stack_link 4 * 8
-#else
-  #define Reserved_space_c_stack_link 0
-#endif
-
-/* This structure is used for storing the OCaml return pointer when
- * transitioning from an OCaml stack to a C stack at a C call. When an OCaml
- * stack is reallocated, this linked list is walked to update the OCaml stack
- * pointers. It is also used for DWARF backtraces. */
+/* This structure resembles a stack frame, and is used for storing the
+ * OCaml return pointer when transitioning from an OCaml stack to a C
+ * stack at a C call. When an OCaml stack is reallocated, this linked
+ * list is walked to update the OCaml stack pointers. It is also used
+ * for DWARF backtraces. */
 struct c_stack_link {
-#if Reserved_space_c_stack_link > 0
-  char reserved[Reserved_space_c_stack_link];
+#if ABI_reserve > 0
+  char reserved[ABI_resrve];
 #endif
   /* The reference to the OCaml stack */
   struct stack_info* stack;
@@ -161,7 +178,9 @@ struct c_stack_link {
   void* sp;
   struct c_stack_link* prev;
   char* async_exn_handler;
-  void* padding; /* for stack alignment in caml_start_program */
+  /* Padding to keep the whole caml_start_program stack frame,
+     including the caller's return address, 16-byte aligned */
+  void* padding;
 };
 
 /* `gc_regs` and `gc_regs_buckets`.
@@ -315,8 +334,19 @@ enum tick_outcome {
   TICK_RESULT_CONTINUE = 1
 };
 
+/* A stack in one of the stack caches, which has no execution state: only
+   its geometry, [magic] and the cache arm of the union in [struct
+   stack_info] are live, and the stack data itself is dead (and may have
+   been reclaimed by the OS). A distinct type, so that a cached stack
+   cannot be passed where a runnable one is expected; it is the same
+   object, as a structure and its first member share an address (C11
+   6.7.2.1). */
+struct cached_stack {
+  struct stack_info stack;
+};
+
 struct stack_cache {
-  _Atomic(struct stack_info*) head;
+  _Atomic(struct cached_stack*) head;
   _Atomic(uintnat) len;
 };
 
@@ -324,6 +354,32 @@ struct stack_cache* caml_alloc_stack_caches(void);
 void caml_enable_stack_caches(struct stack_cache*);
 void caml_disable_stack_caches(struct stack_cache*);
 void caml_free_stack_caches(struct stack_cache*);
+
+#ifdef STACK_GUARD_PAGES
+/* Idle the stacks of continuation [cont], which is being promoted by
+   the current minor collection: copy them into malloced buffers,
+   recycling their guarded stacks and updating the continuation's
+   fiber fields. Returns the new head of the stack chain, for the
+   caller to scan. Stacks can only move inside a stop-the-world
+   section, when nothing can be running on them. */
+struct stack_info* caml_cont_idle_stacks_from_stw(value cont);
+
+/* Demote guarded stacks from the current domain's local caches to the
+   global cache.  Called by each domain at the start of a minor
+   collection. */
+void caml_stack_cache_flush_from_stw(void);
+
+/* Unmap all globally-cached guarded stacks. Called during
+   compaction. */
+void caml_stack_cache_compact_from_stw_single(void);
+
+/* Unmap excess cached stacks, and global-cache stacks unused for a
+   whole major cycle. Called at the end of each major cycle. */
+void caml_stack_cache_trim_from_stw_single(void);
+#endif
+
+/* Report the stack counters via CAML_GC_MESSAGE (STATS category). */
+void caml_stack_stats_print(void);
 
 CAMLextern struct stack_info* caml_alloc_main_stack (uintnat init_wsize);
 
@@ -333,17 +389,22 @@ void caml_scan_stack(
 
 value caml_alloc_stack(value hval, value hexn, value heff);
 value caml_alloc_stack_preemptible(value hval, value hexn, value heff, value htick);
-struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
-                                          value hexn, value heff, int64_t id);
+
 /* try to grow the stack until at least required_size words are available.
    returns nonzero on success */
 CAMLextern int caml_try_realloc_stack (asize_t required_wsize);
 
+/* Flushes cached fiber state (currently dynamic bindings and TLS state).
+   Should be called after every fiber switch. */
+CAMLextern void caml_fiber_switched(void);
+
 /* Parameters settable with OCAMLRUNPARAM */
-extern uintnat caml_init_main_stack_wsz;   /* -Xmain_stack_size= */
-extern uintnat caml_init_thread_stack_wsz; /* -Xthread_stack_size= */
-extern uintnat caml_init_fiber_stack_wsz;  /* -Xfiber_stack_size= */
-extern uintnat caml_cache_stacks_per_class;/* -Xcache_stacks_per_class= */
+extern uintnat caml_init_main_stack_wsz;   /* Xmain_stack_size= */
+extern uintnat caml_init_thread_stack_wsz; /* Xthread_stack_size= */
+extern uintnat caml_init_fiber_stack_wsz;  /* Xfiber_stack_size= */
+extern uintnat caml_cache_stacks_per_class;/* Xcache_stacks_per_class= */
+extern uintnat caml_max_guarded_stacks;    /* Xmax_guarded_stacks= */
+extern uintnat caml_idle_stacks;           /* Xidle_stacks= */
 
 #define STACK_SIZE_MAIN   0
 #define STACK_SIZE_THREAD 1
@@ -354,6 +415,13 @@ CAMLextern uintnat caml_get_init_stack_wsize(int context);
 void caml_change_max_stack_size (uintnat new_max_wsize);
 void caml_maybe_expand_stack(void);
 CAMLextern void caml_free_stack(struct stack_info* stk);
+
+/* Walk the parent chain of a running [stack] to find the nearest TLS. */
+struct stack_info* caml_tls_find_owner(struct stack_info* stack);
+
+/* Set [Caml_state->tls_state] to the nearest TLS. Typically called via
+   [caml_fiber_switched] upon switching fibers. */
+CAMLextern void caml_tls_update_cache(void);
 
 /* gc_regs_buckets is allocated on-demand by [maybe_expand_stack]. */
 CAMLextern void caml_free_gc_regs_buckets(value *gc_regs_buckets);
@@ -367,14 +435,50 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
                              struct stack_info *new_stack);
 #endif
 
+/* The fields of a continuation object (a [Cont_tag] block; the
+   assembly ports define the same names as byte offsets). [Cont_fiber]
+   is the head of the captured stack chain, as a tagged pointer
+   ([Val_ptr]; NULL once the continuation has been taken).
+   [Cont_last_fiber] is the chain's tail, kept for reperform to append
+   to; treat it as a cache. effect.ml's preemptible handlers store a
+   raw pointer there ([cont_set_last_fiber]) which idling the stacks
+   invalidates, so it is only sound to read immediately after a
+   wake. [Cont_gc_regs], present only in three-field continuations
+   (preemptions), is the suspended register buffer. */
+#define Cont_fiber(cont)      Field(cont, 0)
+#define Cont_last_fiber(cont) Field(cont, 1)
+#define Cont_gc_regs(cont)    Field(cont, 2)
+
 /* Consume a continuation, returning Val_ptr(stack)
 
    Once a continuation object has been made visible to the GC, it *must* be
    resumed exactly once by calling this function, and must not be resumed any
    other way (eg by reading the stack out directly).
+
+   The stacks of the result are ready to run: if the continuation had
+   been idled (see fiber.c), its stacks are woken onto fresh guarded
+   stacks by this call. (Equivalent to [caml_continuation_take_noexc]
+   followed by waking.)
  */
 value caml_continuation_use_noexc (value cont);
 value caml_continuation_use (value cont);
+
+/* Take the stack chain out of a continuation without waking idle
+   stacks. Not an accessor: like [caml_continuation_use_noexc], this
+   consumes the continuation. The result may not be run, only
+   inspected or updated, and must be given back with
+   [caml_continuation_replace]. */
+value caml_continuation_take_noexc (value cont);
+
+/* Wake the stacks of an idled continuation in place, leaving them
+   captured in [cont]: used by caml_reperform (amd64.S), whose raw
+   last-fiber argument went stale when a minor collection idled [cont]
+   mid-perform; the assembly reloads it from [cont] afterwards. Returns 0,
+   leaving [cont] as it was, if the stacks could not be obtained (or if
+   [cont] has already been taken): the caller must then raise through
+   [caml_raise_resume_failure] rather than use the stale last fiber.
+   Cannot raise; does not allocate on the OCaml heap. */
+intnat caml_cont_wake_stacks (value cont);
 
 /* Replace the stack of a continuation that was previously removed
    with caml_continuation_use. The GC must not be allowed to run
@@ -393,6 +497,12 @@ value* caml_continuation_gc_regs(value cont);
 caml_result caml_tick_fiber_res(struct stack_info* stack);
 
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
+
+/* Raise the exception for a resume that found no stack: [Out_of_fibers]
+   if waking the continuation ran out of guarded stacks, and
+   [Continuation_already_resumed] otherwise. The resume paths in the
+   assembly raise through here. */
+CAMLnoret CAMLextern void caml_raise_resume_failure (void);
 
 CAMLnoret CAMLextern void caml_raise_unhandled_effect (value effect);
 

@@ -753,7 +753,7 @@ Warning 40 [name-out-of-scope]: this unboxed record of type "M.t#" contains
   fields that are not visible in the current scope: "y".
   They will not be selected if the type becomes unknown.
 
-val g : M.t# -> unit -> #(M.t# * 'a list) = <fun>
+val g : ('a : any). M.t# -> unit -> #(M.t# * 'a list) = <fun>
 Line 4, characters 34-35:
 4 | let h (x : M.t#) () = #(#{ x with y = 'a' }, #(#{ x with y = 'b' }, []));;
                                       ^
@@ -780,5 +780,5 @@ Warning 40 [name-out-of-scope]: this unboxed record of type "M.t#" contains
   fields that are not visible in the current scope: "y".
   They will not be selected if the type becomes unknown.
 
-val h : M.t# -> unit -> #(M.t# * #(M.t# * 'a list)) = <fun>
+val h : ('a : any). M.t# -> unit -> #(M.t# * #(M.t# * 'a list)) = <fun>
 |}]

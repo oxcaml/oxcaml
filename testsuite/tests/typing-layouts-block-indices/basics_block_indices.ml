@@ -824,7 +824,7 @@ Line 1, characters 13-30:
 1 | let bad () = (.mut_not_global)
                  ^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be global, but this is not.
+       mutable elements must be global, but this is local.
 |}]
 
 let bad () = (.mut_not_many)
@@ -833,7 +833,7 @@ Line 1, characters 13-28:
 1 | let bad () = (.mut_not_many)
                  ^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be many, but this is not.
+       mutable elements must be many, but this is once.
 |}]
 
 let bad () = (.mut_not_unyielding)
@@ -842,7 +842,7 @@ Line 1, characters 13-34:
 1 | let bad () = (.mut_not_unyielding)
                  ^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be unyielding, but this is not.
+       mutable elements must be unyielding, but this is yielding.
 |}]
 
 let bad () = (.mut.#contended)
@@ -918,6 +918,89 @@ val ok :
 let ok () = (.mut.#mut_not_global.#item)
 [%%expect{|
 val ok : unit -> ('a box# mut_not_global# box_mut, 'a) idx_mut = <fun>
+|}]
+
+(* Mutable block indices can be made into stored unboxed records,
+   regardless of their mutability. *)
+type mut = #{ mutable i : int; j : int }
+type mut_ref = { mutable m : mut }
+let idx_to_mutable_field = (.m.#i)
+let idx_to_immutable_field = (.m.#j)
+[%%expect{|
+type mut = #{ mutable i : int; j : int; }
+type mut_ref = { mutable m : mut; }
+val idx_to_mutable_field : (mut_ref, int) idx_mut = <abstr>
+val idx_to_immutable_field : (mut_ref, int) idx_mut = <abstr>
+|}]
+
+(* Through an immutable boxed field, the index can't point to a [mutable]
+   unboxed label because of its implied modalities. *)
+type mut_box = { m : mut }
+let idx_bad = (.m.#i)
+[%%expect{|
+type mut_box = { m : mut; }
+Line 2, characters 14-21:
+2 | let idx_bad = (.m.#i)
+                  ^^^^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* Same for implicit unboxed records *)
+type mut_implicit = { mutable mi : int; mj : int }
+type mut_implicit_ref = { mutable m : mut_implicit# }
+let idx_to_mutable_field = (.m.#mi)
+let idx_to_immutable_field = (.m.#mj)
+[%%expect{|
+type mut_implicit = { mutable mi : int; mj : int; }
+type mut_implicit_ref = { mutable m : mut_implicit#; }
+val idx_to_mutable_field : (mut_implicit_ref, int) idx_mut = <abstr>
+val idx_to_immutable_field : (mut_implicit_ref, int) idx_mut = <abstr>
+|}]
+
+type mut_implicit_box = { m : mut_implicit# }
+let idx_bad = (.m.#mi)
+[%%expect{|
+type mut_implicit_box = { m : mut_implicit#; }
+Line 2, characters 14-22:
+2 | let idx_bad = (.m.#mi)
+                  ^^^^^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* A mutable index can write to an immutable field of a stored unboxed record,
+   even though the unboxed record is covariant in that field. This is sound
+   because the boxed record containing it is invariant. *)
+type +'a is_covariant = #{ mutable x : int; y : 'a }
+type 'a is_covariant_mut_box = { mutable inner : 'a is_covariant }
+type base = < base : int >
+type derived = < base : int; derived : int >
+let base : base = object method base = 42 end
+let derived : derived = object method base = 42 method derived = 42 end
+let wrap_derived : derived is_covariant_mut_box =
+  { inner = #{ x = 42; y = derived } }
+[%%expect{|
+type 'a is_covariant = #{ mutable x : int; y : 'a; }
+type 'a is_covariant_mut_box = { mutable inner : 'a is_covariant; }
+type base = < base : int >
+type derived = < base : int; derived : int >
+val base : base = <obj>
+val derived : derived = <obj>
+val wrap_derived : derived is_covariant_mut_box =
+  {inner = #{x = 42; y = <obj>}}
+|}]
+
+let () =
+  Idx_mut.set (wrap_derived :> base is_covariant_mut_box) (.inner.#y) base
+let bad = (wrap_derived.inner.#y)#derived
+[%%expect{|
+Line 2, characters 14-57:
+2 |   Idx_mut.set (wrap_derived :> base is_covariant_mut_box) (.inner.#y) base
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "derived is_covariant_mut_box" is not a subtype of
+         "base is_covariant_mut_box"
+       The second object type has no method "derived"
 |}]
 
 (******************************************************)
@@ -1055,14 +1138,46 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
 (*******************)
 (* Private records *)
 
-type t = private { i : int }
-let bad () = (.i)
+type t = private { i : int; mutable j : int }
+let ok () = (.i)
 [%%expect{|
-type t = private { i : int; }
-Line 2, characters 15-16:
-2 | let bad () = (.i)
+type t = private { i : int; mutable j : int; }
+val ok : unit -> (t, int) idx_imm = <fun>
+|}]
+
+let bad () = (.j)
+[%%expect{|
+Line 1, characters 15-16:
+1 | let bad () = (.j)
                    ^
-Error: Block indices do not support private records.
+Error: Block indices do not support private types in mutable positions.
+|}]
+
+(* Private unboxed records further down the path *)
+module Private_u : sig
+  type t = private #{ a : int; b : int }
+end = struct
+  type t = #{ a : int; b : int }
+end
+type has_private_u = { mutable pu : Private_u.t }
+let ok () = (.pu.#Private_u.a)
+[%%expect{|
+module Private_u : sig type t = private #{ a : int; b : int; } end
+type has_private_u = { mutable pu : Private_u.t; }
+val ok : unit -> (has_private_u, int) idx_mut = <fun>
+|}]
+
+type has_private_u_imm = { ipu : Private_u.t }
+let ok () = (.ipu.#Private_u.a)
+[%%expect{|
+type has_private_u_imm = { ipu : Private_u.t; }
+val ok : unit -> (has_private_u_imm, int) idx_imm = <fun>
+|}]
+
+let ok () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#Private_u.a)
+[%%expect{|
+val ok : unit -> (Private_u.t array, int) idx_mut = <fun>
 |}]
 
 (****************)

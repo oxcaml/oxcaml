@@ -240,7 +240,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
-    | Void -> Product [||])
+    | Void -> Void)
   | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_types_layout: Genvar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))

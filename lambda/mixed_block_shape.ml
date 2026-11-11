@@ -229,6 +229,7 @@ let singleton_or_product_of_mixed_block_element
   | Mask -> Singleton Mask
   | Word -> Singleton Word
   | Untagged_immediate -> Singleton Untagged_immediate
+  | Void -> Product [||]
   | Product sub_elements -> Product sub_elements
   | Splice_variable _ ->
     Misc.fatal_error

@@ -1,8 +1,7 @@
 (library
  (name js_of_ocaml_toplevel)
  (public_name js_of_ocaml-toplevel)
+ ; Bytecode only, like compiler-libs.toplevel.
+ (modes byte)
  (synopsis "Js_of_ocaml toplevel library")
- (libraries
-  js_of_ocaml-toplevel.protocol
-  js_of_ocaml-toplevel.common
-  js_of_ocaml-compiler.dynlink))
+ (libraries js_of_ocaml-toplevel.protocol js_of_ocaml-toplevel.common))

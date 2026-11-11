@@ -17,6 +17,7 @@ let set_filename loc fn =
   { loc with loc_start; loc_end }
 
 let none = in_file "_none_"
+let is_none v = Poly.( = ) v none
 
 let init lexbuf fname =
   let open Lexing in

@@ -290,6 +290,11 @@ let reg_tmp1_base = R.reg_x 16
 
 let reg_x_tmp1 = H.reg_x reg_tmp1
 
+(* Second scratch, used only by [emit_stack_probes] *)
+let reg_tmp2 = phys_reg Int X17
+
+let reg_x_tmp2 = H.reg_x reg_tmp2
+
 let reg_x_alloc_ptr = H.reg_x reg_alloc_ptr
 
 let reg_x8 = phys_reg Int X8
@@ -967,6 +972,18 @@ let emit_stack_ldr env reg r = emit_stack_load_store env LDR reg r
 
 let emit_stack_str env reg r = emit_stack_load_store env STR reg r
 
+(* Moves of 8- and 16-bit stack arguments. The store writes exactly the
+   argument's width; instruction selection only creates these moves with a
+   stack-slot destination, so every other shape is unexpected. *)
+let emit_sized_move env ~str (src : Reg.t) (dst : Reg.t) =
+  if not (Reg.same_loc src dst)
+  then
+    match src.loc, dst.loc with
+    | Reg _, Stack _ -> emit_stack_load_store env str (H.reg_w src) dst
+    | Reg _, Reg _ | Stack _, (Reg _ | Stack _) | _, Unknown | Unknown, _ ->
+      Misc.fatal_errorf "Emit.emit_sized_move: unexpected move (%a to %a)"
+        Printreg.reg src Printreg.reg dst
+
 let emit_stack_ldr_simd_and_fp env reg r =
   emit_stack_load_store env LDR_simd_and_fp reg r
 
@@ -1223,6 +1240,9 @@ let assembly_code_for_poll env i ~far ~return_label =
 
 let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
   (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
+  (* Reached only with stack checks enabled; [emit_stack_probes] handles the
+     disabled case and never needs the far/realloc machinery. *)
+  assert (not Config.no_stack_checks);
   let sc_label = L.create Text and sc_return = L.create Text in
   let threshold_offset =
     (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
@@ -1242,12 +1262,47 @@ let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
   D.define_label sc_return;
   sc_label, sc_return
 
-let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
-  let sc_label, sc_return =
-    assembly_code_for_stack_check0 ~far ~max_frame_size_bytes
+(* When stack checks are disabled, probe the prospective stack frame at
+   [Domainstate.stack_guard_stride]-byte strides so that a frame big enough to
+   step over the stack's guard page faults. Each probe loads (and discards) into
+   x16, a reserved temporary. *)
+let emit_stack_probes ~max_frame_size_bytes =
+  let stride = Domainstate.stack_guard_stride in
+  assert (stride > 0 && max_frame_size_bytes >= stride);
+  let full_pages = max_frame_size_bytes / stride in
+  let probe_at offset =
+    A.ins_mov_from_sp ~dst:reg_x_tmp1;
+    if offset <> 0 then emit_subimm reg_x_tmp1 reg_x_tmp1 offset;
+    A.ins2 LDR reg_x_tmp1 (H.mem reg_tmp1_base)
   in
-  Env.set_stack_realloc env
-    { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
+  probe_at 0;
+  let max_unrolled_pages = 4 in
+  if full_pages <= max_unrolled_pages
+  then
+    for i = 1 to full_pages do
+      probe_at (i * stride)
+    done
+  else (
+    A.ins_mov_reg reg_x_tmp2 O.xzr;
+    let loop = L.create Text in
+    D.define_label loop;
+    emit_addimm reg_x_tmp2 reg_x_tmp2 stride;
+    A.ins_mov_from_sp ~dst:reg_x_tmp1;
+    A.ins4 SUB_shifted_register reg_x_tmp1 reg_x_tmp1 reg_x_tmp2 O.optional_none;
+    A.ins2 LDR reg_x_tmp1 (H.mem reg_tmp1_base);
+    emit_cmpimm reg_x_tmp2 (full_pages * stride);
+    A.ins1 (B_cond (Branch_cond.Int CC)) (local_label loop));
+  if max_frame_size_bytes mod stride <> 0 then probe_at max_frame_size_bytes
+
+let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
+  if Config.no_stack_checks
+  then emit_stack_probes ~max_frame_size_bytes
+  else
+    let sc_label, sc_return =
+      assembly_code_for_stack_check0 ~far ~max_frame_size_bytes
+    in
+    Env.set_stack_realloc env
+      { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
@@ -1467,6 +1522,8 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
+  | Lop (Specific Imove8) -> emit_sized_move env ~str:STRB i.arg.(0) i.res.(0)
+  | Lop (Specific Imove16) -> emit_sized_move env ~str:STRH i.arg.(0) i.res.(0)
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
@@ -1531,7 +1588,33 @@ let emit_instr env i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point -> A.ins1 B (local_label tailrec_entry_point)
     else A.ins1 B (symbol (Needs_reloc JUMP26) (symbol_of_cmm_symbol func))
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; ty_args; _ }) ->
+    (* Fuse each fat-pointer argument, adding its offset register into its base
+       register, as part of emitting the call itself: no GC safepoint can
+       separate the addition from the call. *)
+    let (_ : int) =
+      List.fold_left
+        (fun k (ty_arg : Cmm.exttype) ->
+          match ty_arg with
+          | XFat_pointer ->
+            let rd = H.reg_x i.arg.(k) in
+            let offset = i.arg.(k + 1) in
+            (match offset.loc with
+            | Reg _ ->
+              A.ins4 ADD_shifted_register rd rd (H.reg_x offset) O.optional_none
+            | Stack _ ->
+              emit_stack_ldr env reg_x_tmp1 offset;
+              A.ins4 ADD_shifted_register rd rd reg_x_tmp1 O.optional_none
+            | Unknown ->
+              Misc.fatal_error
+                "Lextcall: fat-pointer offset has unknown location");
+            k + 2
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 ->
+            k + 1
+          | XDummy_int | XDummy_float -> k)
+        0 ty_args
+    in
     if stack_ofs > 0
     then (
       A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
@@ -1739,6 +1822,7 @@ let emit_instr env i =
       A.ins2 RBIT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0));
       A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.res.(0)))
   | Lop (Intop Iclz) -> A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
+  | Lop (Intop Inot) -> A.ins_mvn (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
   | Lop (Intop Iand) ->
     let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
     A.ins4 AND_shifted_register rd rn rm O.optional_none
@@ -1784,7 +1868,8 @@ let emit_instr env i =
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop
-      (Intop_imm ((Imul | Idiv _ | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
+      (Intop_imm
+         ((Imul | Idiv _ | Inot | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i
@@ -1892,6 +1977,8 @@ let emit_instr env i =
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_tls_state)
   | Lop Domain_index ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
+  | Lop Thread_self_id ->
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_thread_id)
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -2094,10 +2181,13 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
     in
     ()
   | Far_stackcheck { max_frame_size_bytes } ->
-    let _sc_label, _sc_return =
-      assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
-    in
-    ()
+    if Config.no_stack_checks
+    then emit_stack_probes ~max_frame_size_bytes
+    else
+      let _sc_label, _sc_return =
+        assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
+      in
+      ()
   | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
   | Branch lbl -> emit_branch lbl
 

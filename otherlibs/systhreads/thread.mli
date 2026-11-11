@@ -66,6 +66,9 @@ val id : t -> int
    is an integer that identifies uniquely the thread.
    It can be used to build data structures indexed by threads. *)
 
+val self_id : unit -> int
+(** Equivalent to [id (self ())], but faster. *)
+
 val set_current_thread_name : string -> unit
 (** Set the thread's name. This should be called from within the thread
     function. Setting thread name is available on most systems.
@@ -212,9 +215,9 @@ val use_domains : unit -> unit
     other than the initial one. It prevents the use of a custom locking
     scheme, such as the one used by pyocaml. *)
 
-(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value
-    for each thread. Domains can contain multiple threads, so [TLS] should be
-    preferred in nearly all cases. *)
+(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value for
+    every preemptible fiber. Preemptable fibers are the fundamental unit of
+    preemptive concurrency, so [TLS] should be nearly always preferred. *)
 module TLS : sig @@ portable
 
    type 'a key : value mod portable contended
@@ -227,8 +230,20 @@ module TLS : sig @@ portable
    (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
 
    val get : ('a : value mod portable). 'a key -> 'a @ contended
-   (** Like {!DLS.get}, but reads the value for the current thread. *)
+   (** Like {!DLS.get}, but reads the value for the current thread.
+       Raises [Failure] if the key is borrowed by {!access}. *)
 
    val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
-   (** Like {!DLS.set}, but sets the value for the current thread. *)
+   (** Like {!DLS.set}, but sets the value for the current thread.
+       Raises [Failure] if the key is borrowed by {!access}. *)
+
+   val access
+      : ('b : value_or_null).
+      'a key
+      -> ('a -> 'b @ contended local once portable unique)
+         @ local once portable unyielding
+      -> 'b @ contended local once portable unique
+   (** [access k f] provides uncontended access to the current value of [k]
+       for the duration of [f]. Raises if [f] re-enters [access k] or creates
+       a thread or preemptable fiber. *)
 end

@@ -154,16 +154,15 @@ let f (a : _ t_no_bound) (b : _ t_with_bound) (g : int -> int) =
 type 'a t_no_bound = unit
 type 'a t_with_bound = 'a option
 val id : 'a -> 'a = <fun>
-Line 5, characters 19-33:
+Line 5, characters 30-31:
 5 |   require_portable (id (a, b, g))
-                       ^^^^^^^^^^^^^^
-Error: This expression has type "unit * 'a t_with_bound * (int -> int)"
-       but an expression was expected of type "('b : value mod portable)"
-       The kind of unit * 'a t_with_bound * (int -> int) is
-           value non_float mod immutable with 'a
-         because it's a tuple type.
-       But the kind of unit * 'a t_with_bound * (int -> int) must be a subkind of
-         value mod portable
+                                  ^
+Error: The value "g" has type "int -> int" but an expression was expected of type
+         "('a : value_or_null mod portable)"
+       The kind of int -> int is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of int -> int must be a subkind of
+           value_or_null mod portable
          because of the definition of require_portable at line 1, characters 21-56.
 |}, Principal{|
 type 'a t_no_bound = unit

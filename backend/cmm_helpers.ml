@@ -788,9 +788,23 @@ let replace x ~with_ =
     with_
   | inner -> Csequence (inner, with_)
 
-let rec xor_const e n dbg =
+let rec not_int arg dbg =
+  map_tail1 arg ~f:(fun arg ->
+      match get_const arg with
+      | Some n -> natint_const_untagged dbg (Nativeint.lognot n)
+      | None -> (
+        match arg with
+        | Cop (Cnot, [x], _) -> x
+        | Cop (Cxor, [x; y], _) ->
+          if is_constant x
+          then xor_int y (not_int x dbg) dbg
+          else xor_int x (not_int y dbg) dbg
+        | _ -> Cop (Cnot, [arg], dbg)))
+
+and xor_const e n dbg =
   match n with
   | 0n -> e
+  | -1n -> not_int e dbg
   | n ->
     map_tail1 e ~f:(fun e ->
         match get_const e with
@@ -805,7 +819,16 @@ let rec xor_const e n dbg =
             match get_const y with
             | None -> default ()
             | Some y -> xor_const x (Nativeint.logxor y n) dbg)
+          | Cop (Cnot, [x], _) -> xor_const x (Nativeint.lognot n) dbg
           | _ -> default ()))
+
+and xor_int c1 c2 dbg =
+  map_tail2 c1 c2 ~f:(fun c1 c2 ->
+      match get_const c1, get_const c2 with
+      | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logxor c1 c2)
+      | None, Some c2 -> xor_const c1 c2 dbg
+      | Some c1, None -> xor_const c2 c1 dbg
+      | None, None -> Cop (Cxor, [c1; c2], dbg))
 
 let rec or_const e n dbg =
   match n with
@@ -829,14 +852,6 @@ let rec or_const e n dbg =
             | None -> default ()
             | Some y -> or_const x (Nativeint.logor y n) dbg)
           | _ -> default ()))
-
-let xor_int c1 c2 dbg =
-  map_tail2 c1 c2 ~f:(fun c1 c2 ->
-      match get_const c1, get_const c2 with
-      | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logxor c1 c2)
-      | None, Some c2 -> xor_const c1 c2 dbg
-      | Some c1, None -> xor_const c2 c1 dbg
-      | None, None -> Cop (Cxor, [c1; c2], dbg))
 
 let or_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -1095,6 +1110,9 @@ and low_bits ~bits ~dbg x =
               | Cor -> or_int x1 x2 dbg
               | Cxor -> xor_int x1 x2 dbg
               | _ -> Misc.fatal_error "impossible")
+            | Cop (Cnot, [x], dbg) ->
+              let x = low_bits ~bits ~dbg x in
+              not_int x dbg
             | _ -> x)))
       x
 
@@ -1444,10 +1462,6 @@ let udivimm_parameters d =
                                                      (* n * (M*d - 2^P) < 2^P *)
  *)
 
-let raise_symbol dbg symb =
-  Cop
-    (Craise Lambda.Raise_regular, [Cconst_symbol (global_symbol symb, dbg)], dbg)
-
 let[@inline] get_const = function
   | Cconst_int (i, _) -> Some (Nativeint.of_int i)
   | Cconst_natint (i, _) -> Some i
@@ -1478,9 +1492,18 @@ let make_safe_divmod operator ~if_divisor_is_negative_one
 
 let is_power_of_2_or_zero n = Nativeint.logand n (Nativeint.pred n) = 0n
 
-let divide_by_zero dividend ~dbg =
+let divide_by_zero_message = "Division by zero after check"
+
+let divide_by_zero_message_symbol =
+  { sym_name = "caml_divide_by_zero_uncaught"; sym_global = Global }
+
+let divide_by_zero dividend ~dbg:_ =
   bind "dividend" dividend (fun _ ->
-      raise_symbol dbg "caml_exn_Division_by_zero")
+      (* Unreachable code (since Flambda already introduces a check). *)
+      Cinvalid
+        { message = divide_by_zero_message;
+          symbol = divide_by_zero_message_symbol
+        })
 
 let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
   let if_divisor_is_negative_one ~dividend ~dbg = neg_int dividend dbg in
@@ -2230,6 +2253,7 @@ let rec sign_extend ~bits ~dbg e =
           or_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
         | Cop (Cxor, [x; y], _) when is_constant y ->
           xor_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+        | Cop (Cnot, [x], _) -> not_int (sign_extend ~bits x ~dbg) dbg
         | Cop (((Casr | Clsr) as op), [inner; Cconst_int (n, _)], _) as e
           when is_defined_shift n ->
           (* see middle_end/flambda2/z3/sign_extension.py for proof *)
@@ -2437,14 +2461,14 @@ let set_field_unboxed ~dbg memory_chunk block ~index_in_words newval =
 let string_length exp dbg =
   bind "str" exp (fun str ->
       let tmp_var = V.create_local "tmp" in
+      (* A string header never has reserved (mixed-block) bits set, so the size
+         can be read from the unmasked header. *)
+      let size = lsr_const (get_header str dbg) 10 dbg in
       Clet
         ( VP.create tmp_var,
           Cop
             ( Csubi,
-              [ Cop
-                  ( Clsl,
-                    [get_size str dbg; Cconst_int (log2_size_addr, dbg)],
-                    dbg );
+              [ Cop (Clsl, [size; Cconst_int (log2_size_addr, dbg)], dbg);
                 Cconst_int (1, dbg) ],
               dbg ),
           Cop
@@ -2589,6 +2613,7 @@ module Extended_machtype = struct
       typ_any_int
     | Pvalue { raw_kind = Pintval; _ } -> typ_tagged_int
     | Pvalue _ -> typ_val
+    | Pvoid -> [||]
     | Punboxed_product fields -> Array.concat (List.map of_layout fields)
 end
 
@@ -3416,7 +3441,7 @@ let load_mask = load_chunk Word_mask
 
 let set_mask = set_chunk Word_mask
 
-let opaque e dbg = Cop (Copaque, [e], dbg)
+let opaque ~ty e dbg = Cop (Copaque ty, [e], dbg)
 
 (* Build an actual switch (ie jump table) *)
 
@@ -3573,11 +3598,11 @@ module SArgBlocks = struct
           ifnot_a,
           ifnot,
           Debuginfo.none ),
-      Branch_annotations.add ifso_a ifnot_a )
+      Branch_annotations.fork_point [ifso_a; ifnot_a] )
 
   let make_switch dbg () arg cases actions =
     let annots =
-      Branch_annotations.sum_list
+      Branch_annotations.fork_point
         (Array.map (fun (_, annots) -> annots) actions |> Array.to_list)
     in
     let actions = Array.map (fun (expr, annots) -> expr, dbg, annots) actions in
@@ -4413,7 +4438,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
           fun_codegen_options = [];
           fun_dbg;
           fun_poll = Default_poll;
-          fun_ret_type = result
+          fun_ret_type = typ_val
         }
       ::
       (if has_nary
@@ -4763,6 +4788,12 @@ let fail_if_called_indirectly_function () =
     }
   in
   [Cdata string_data; Cfunction fn]
+
+(* Error message for division by zero after the check *)
+let emit_divide_by_zero_message () =
+  [ Cdata
+      (emit_string_constant divide_by_zero_message_symbol divide_by_zero_message
+         []) ]
 
 (* Generate the entry point *)
 (*
@@ -5179,6 +5210,19 @@ let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
 
 let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
+let cmp_int cmp ~dbg x y =
+  match x, y with
+  (* Bitwise-not reverses signed and unsigned order. We can use this to remove
+     an [lnot] from both sides of a comparison, e.g. [lnot x < lnot y] iff [x >
+     y]. This transformation can also remove a single [lnot] if the other side
+     is a constant. *)
+  | Cop (Cnot, _, _), Cop (Cnot, _, _)
+  | Cop (Cnot, _, _), (Cconst_int _ | Cconst_natint _)
+  | (Cconst_int _ | Cconst_natint _), Cop (Cnot, _, _) ->
+    let cmp = Cmm.swap_integer_comparison cmp in
+    binary (Ccmpi cmp) ~dbg (not_int x dbg) (not_int y dbg)
+  | _, _ -> binary (Ccmpi cmp) ~dbg x y
+
 let eq ~dbg x y =
   match x, y with
   | Cconst_int (n, _), Cop (Csubi, [Cconst_int (m, _); c], _)
@@ -5234,25 +5278,25 @@ let eq ~dbg x y =
      *   (check-sat)
      *)
     binary (Ccmpi Ceq) ~dbg c (Cconst_int (m - n, dbg))
-  | _, _ -> binary (Ccmpi Ceq) ~dbg x y
+  | _, _ -> cmp_int Ceq ~dbg x y
 
-let neq = binary (Ccmpi Cne)
+let neq = cmp_int Cne
 
-let lt = binary (Ccmpi Clt)
+let lt = cmp_int Clt
 
-let le = binary (Ccmpi Cle)
+let le = cmp_int Cle
 
-let gt = binary (Ccmpi Cgt)
+let gt = cmp_int Cgt
 
-let ge = binary (Ccmpi Cge)
+let ge = cmp_int Cge
 
-let ult = binary (Ccmpi Cult)
+let ult = cmp_int Cult
 
-let ule = binary (Ccmpi Cule)
+let ule = cmp_int Cule
 
-let ugt = binary (Ccmpi Cugt)
+let ugt = cmp_int Cugt
 
-let uge = binary (Ccmpi Cuge)
+let uge = cmp_int Cuge
 
 let float_abs = unary (Cabsf Float64)
 
@@ -5456,7 +5500,7 @@ let cmm_arith_size (e : Cmm.expression) =
     match e with
     | Cop
         ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
-          | Cxor | Clsl | Clsr | Casr ),
+          | Cxor | Cnot | Clsl | Clsr | Casr ),
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)
@@ -5677,6 +5721,8 @@ let dls_get ~dbg = Cop (Cdls_get, [], dbg)
 let tls_get ~dbg = Cop (Ctls_get, [], dbg)
 
 let domain_index ~dbg = Cop (Cdomain_index, [], dbg)
+
+let thread_self_id ~dbg = Cop (Cthread_self_id, [], dbg)
 
 let perform ~dbg eff =
   let cont =

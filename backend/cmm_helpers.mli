@@ -154,6 +154,8 @@ val or_int : expression -> expression -> Debuginfo.t -> expression
 
 val xor_int : expression -> expression -> Debuginfo.t -> expression
 
+val not_int : expression -> Debuginfo.t -> expression
+
 (** Similar to [add_int] but produces a result with machtype [Addr] iff
     [ptr_out_of_heap] is [false]. *)
 val add_int_ptr :
@@ -471,7 +473,7 @@ val make_mixed_alloc :
   expression
 
 (** Sys.opaque_identity *)
-val opaque : expression -> Debuginfo.t -> expression
+val opaque : ty:machtype -> expression -> Debuginfo.t -> expression
 
 (** Generic application functions *)
 
@@ -1237,6 +1239,8 @@ val apply_function :
 
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 
+val emit_divide_by_zero_message : unit -> Cmm.phrase list
+
 val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 
 val perform : dbg:Debuginfo.t -> expression -> expression
@@ -1580,6 +1584,8 @@ val dls_get : dbg:Debuginfo.t -> expression
 val tls_get : dbg:Debuginfo.t -> expression
 
 val domain_index : dbg:Debuginfo.t -> expression
+
+val thread_self_id : dbg:Debuginfo.t -> expression
 
 val cpu_relax : dbg:Debuginfo.t -> expression
 

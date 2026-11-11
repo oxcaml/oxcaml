@@ -61,8 +61,9 @@ Error: This value is "local" but is expected to be "global".
 let bar (x @ once) =
   fst x
 [%%expect{|
-val bar : 'a @ [< 'm & global > once] -> 'b @ 'n -> 'a @ [> 'm | once] =
-  <fun>
+val bar :
+  'a @ [< 'm & global > once] ->
+  ('b @ 'n -> 'a @ [> 'm | once]) @ [> close('m) | once dynamic] = <fun>
 |}]
 
 let bar (x @ unique) =

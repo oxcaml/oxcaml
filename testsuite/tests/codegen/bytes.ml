@@ -184,8 +184,7 @@ let bytes_safe_get_int32 (buf : bytes) (i : int) =
 [%%expect_asm X86_64{|
 bytes_safe_get_int32:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $18, %rdi
+  shrq  $10, %rdi
   leaq  -1(,%rdi,8), %rdi
   movzbq (%rax,%rdi), %rsi
   subq  %rsi, %rdi
@@ -193,7 +192,7 @@ bytes_safe_get_int32:
   sarq  $1, %rbx
   movq  %rdi, %rsi
   sarq  $63, %rsi
-  xorq  $-1, %rsi
+  notq  %rsi
   andq  %rdi, %rsi
   cmpq  %rsi, %rbx
   jae   .L0
@@ -399,8 +398,7 @@ let str_length (s : string) = String.length s
 [%%expect_asm X86_64{|
 str_length:
   movq  -8(%rax), %rbx
-  salq  $8, %rbx
-  shrq  $18, %rbx
+  shrq  $10, %rbx
   leaq  -1(,%rbx,8), %rbx
   movzbq (%rax,%rbx), %rax
   subq  %rax, %rbx
@@ -412,8 +410,7 @@ let buf_length (b : bytes) = Bytes.length b
 [%%expect_asm X86_64{|
 buf_length:
   movq  -8(%rax), %rbx
-  salq  $8, %rbx
-  shrq  $18, %rbx
+  shrq  $10, %rbx
   leaq  -1(,%rbx,8), %rbx
   movzbq (%rax,%rbx), %rax
   subq  %rax, %rbx

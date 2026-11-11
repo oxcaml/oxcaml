@@ -379,6 +379,7 @@ type simplify_function_result =
 
 let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     ~closure_bound_names_inside_function =
+  let original_outer_dacc = outer_dacc in
   let denv_prior_to_sets = C.dacc_prior_to_sets context |> DA.denv in
   let inlining_arguments_from_denv =
     denv_prior_to_sets |> DE.inlining_arguments
@@ -521,9 +522,10 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
-      ~inlining_arguments ~dbg ~is_tupled:(Code.is_tupled code)
-      ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
-      ~loopify
+      ~inlining_arguments ~dbg
+      ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
+      ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
+      ~absolute_history ~relative_history ~loopify
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in
@@ -535,7 +537,38 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       assert (Are_rebuilding_terms.do_rebuild_terms are_rebuilding);
       Rebuilding new_code
   in
-  { code_id; code = Some (code, code_const); outer_dacc; should_resimplify }
+  let old_code_was_simplified =
+    (* Simplifying records some crucial information so we can't really use an
+       unsimplified version *)
+    not (Code_id.Set.mem old_code_id (DA.code_ids_never_simplified outer_dacc))
+  in
+  let zero_improvements =
+    let removed_ops = Cost_metrics.removed cost_metrics in
+    Removed_operations.(equal zero removed_ops)
+  in
+  if
+    old_code_was_simplified && (not should_resimplify)
+    && C.single_set_of_size_one context
+    && zero_improvements
+  then
+    (* If there are no improvements to the specialisation, we keep the old
+       version.
+
+       We can't do that if the function was never specialised at least once. *)
+    (* If there is any potential use of the new code id (here the variable [code_id])
+       it must be defined. Keeping the old version would prevent that.
+       Those uses could exist in functions from the same set of closures being
+       simplified with the same context. So this is valid only whene there are no such functions.
+    *)
+    (* CR pchambart: we should lift that restriction to single set of size one,
+       maybe by creating let aliases of symbols, that are currently not possible *)
+    { code_id = old_code_id;
+      code = None;
+      outer_dacc = original_outer_dacc;
+      should_resimplify
+    }
+  else
+    { code_id; code = Some (code, code_const); outer_dacc; should_resimplify }
 
 let introduce_code dacc code_id code_const =
   let code = LC.create_code code_id code_const in
@@ -611,6 +644,10 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
     ~value_slot_types =
   let dacc = C.dacc_prior_to_sets context in
   let function_decls = Set_of_closures.function_decls set_of_closures in
+  let dbg =
+    DE.add_inlined_debuginfo (DA.denv dacc)
+      (Set_of_closures.debuginfo set_of_closures)
+  in
   let all_function_decls_in_set =
     Function_declarations.funs_in_order function_decls
   in
@@ -698,18 +735,26 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
   in
   let dacc =
     DA.map_denv dacc ~f:(fun denv ->
+        (* The types of each closure can refer to the other closures. The typing
+           env expects equations to refer only to names already defined, so we
+           first define all names then add all equations. *)
+        let denv_with_defined_symbols =
+          List.fold_left
+            (fun denv (bound_name, _closure_type) ->
+              (* In the lifting case the symbols could be defined already. *)
+              DE.define_name_if_undefined denv bound_name K.value)
+            denv closure_types_by_bound_name
+        in
         List.fold_left
           (fun denv (bound_name, closure_type) ->
-            (* In the lifting case the symbols could be defined already. *)
-            let denv = DE.define_name_if_undefined denv bound_name K.value in
             DE.add_equation_on_name denv
               (Bound_name.name bound_name)
               closure_type)
-          denv closure_types_by_bound_name)
+          denv_with_defined_symbols closure_types_by_bound_name)
   in
   let set_of_closures =
     Function_declarations.create all_function_decls_in_set
-    |> Set_of_closures.create ~value_slots
+    |> Set_of_closures.create ~value_slots ~dbg
   in
   { set_of_closures; dacc }
 
@@ -837,6 +882,10 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
   let closure_bound_names =
     Function_slot.Map.map Bound_name.create_var closure_bound_vars
   in
+  let function_declarations_in_order =
+    Function_declarations.funs_in_order
+      (Set_of_closures.function_decls set_of_closures)
+  in
   let context =
     C.create ~dacc_prior_to_sets:dacc ~simplify_function_body
       ~all_sets_of_closures:
@@ -889,10 +938,13 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
                       Code_metadata.function_slot_size code_metadata;
                     dbg = Code_metadata.dbg code_metadata
                   })
-            (Function_declarations.funs_in_order
-               (Set_of_closures.function_decls set_of_closures))
+            function_declarations_in_order
         in
-        Set_of_closures.create ~value_slots
+        let dbg =
+          DE.add_inlined_debuginfo (DA.denv dacc)
+            (Set_of_closures.debuginfo set_of_closures)
+        in
+        Set_of_closures.create ~value_slots ~dbg
           (Function_declarations.create function_decls)
       in
       { set_of_closures; dacc }

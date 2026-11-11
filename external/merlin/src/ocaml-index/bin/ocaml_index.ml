@@ -13,6 +13,7 @@ let output_file = ref "project.ocaml-index"
 let root = ref ""
 let rewrite_root = ref false
 let store_shapes = ref false
+let file_kind = ref Granular_marshal.File_kind.No_standalone
 let do_not_use_cmt_loadpath = ref false
 let cache_size_kb = ref 1_000_000
 
@@ -45,6 +46,18 @@ let anon_fun arg =
       input_files_rev := arg :: !input_files_rev)
   | Some _ -> input_files_rev := arg :: !input_files_rev
 
+(* Reading input files from a file keeps command lines short when there are
+   many input files. *)
+let add_input_files_from file =
+  let files =
+    try Arg.read_arg file with Sys_error msg -> raise (Arg.Bad msg)
+  in
+  Array.iter
+    (fun file ->
+      if not (String.equal file "") then
+        input_files_rev := file :: !input_files_rev)
+    files
+
 let speclist =
   [ ("--verbose", Arg.Set verbose, "Output more information");
     ("--debug", Arg.Set debug, "Output debugging information");
@@ -61,6 +74,15 @@ let speclist =
     ( "--store-shapes",
       Arg.Set store_shapes,
       "Aggregate input-indexes shapes and store them in the new index" );
+    ( "--standalone",
+      Arg.Unit (fun () -> file_kind := Standalone),
+      "The output index will not contain pointers to the input index/shape \
+       files. All data is copied into the output index." );
+    ( "--no-standalone",
+      Arg.Unit (fun () -> file_kind := No_standalone),
+      "The output may contain pointers to the input index/shape files. This \
+       will make the output index smaller, but to use it, the input \
+       index/shape files must still be available. (default)" );
     ( "-I",
       Arg.String
         (fun path ->
@@ -90,6 +112,9 @@ let speclist =
       Arg.Set do_not_use_cmt_loadpath,
       "Do not initialize the load path with the paths found in the first input \
        cmt file" );
+    ( "--files-from",
+      Arg.String add_input_files_from,
+      "<file> Read input files from <file>, one per line. Can be repeated." );
     ( "--cache-size",
       Arg.Set_int cache_size_kb,
       "Set LRU cache size in kb. Will bound memory usage in read-heavy \
@@ -103,13 +128,17 @@ let set_log_level debug verbose =
 
 let () =
   Arg.parse speclist anon_fun usage_msg;
+  (* As with positional input files, default to [aggregate] when input files
+     are only given with [--files-from]. *)
+  if Option.is_none !command && not (List.is_empty !input_files_rev) then
+    command := Some Aggregate;
   set_log_level !debug !verbose;
   Granular_marshal.set_lru_size (!cache_size_kb * 1000);
   try
     (match !command with
     | Some Aggregate ->
       let root = if String.equal "" !root then None else Some !root in
-      Index.from_files ~store_shapes:!store_shapes ~root
+      Index.from_files ~store_shapes:!store_shapes ~file_kind:!file_kind ~root
         ~rewrite_root:!rewrite_root ~output_file:!output_file
         ~build_path:
           { visible = List.rev !build_path_rev.visible;

@@ -591,6 +591,12 @@ let mk_llvm_flags f =
     Arg.String f,
     " Extra flags to pass to LLVM (like -march or -mtune)" )
 
+let mk_fdo_counters f =
+  ( "-fdo-counters",
+    Arg.Unit f,
+    " Attach FDO counters to function entries, branches, and call sites (no \
+     counters are attached in classic mode)" )
+
 module Flambda2 = Oxcaml_flags.Flambda2
 
 let mk_flambda2_result_types_functors_only f =
@@ -792,6 +798,22 @@ let mk_no_reaper_change_calling_conventions f =
       " Prevent the reaper from changing the calling conventions of \
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
+
+let mk_lto_support f =
+  ( "-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Store data the Reaper's link time optimisation data in the .cmx file, \
+       for use by -reaper-solve and -reaper-rebuild.%s (Flambda2 only)"
+      (format_default Flambda2.Default.lto_support) )
+
+let mk_no_lto_support f =
+  ( "-no-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not store the Reaper's link time optimisation data in the .cmx \
+       file.%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.lto_support) )
 
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",
@@ -1334,6 +1356,42 @@ let mk_cached_generic_functions_path f =
     "<file>  Set the path of the cached generic functions (default to \
      cached-generic-functions.o)" )
 
+let mk_target f =
+  ( "-target",
+    (* We leave out [-target native] even though we could support it, as
+       we are hoping to use this flag for cross-compilation triplets, and
+       we don't want anyone to rely on this behaviour before that is in
+       place. *)
+    Arg.Symbol ([ "js_of_ocaml" ], fun _ -> f Clflags.Target.Js_of_ocaml),
+    " Compile to JavaScript instead of native code" )
+
+let mk_jsoo_opt f =
+  let doc (phase : Clflags.Jsoo_phase.t) =
+    match phase with
+    | All -> "<opt>  Pass option <opt> to every js_of_ocaml invocation"
+    | Compile ->
+        "<opt>  Pass option <opt> to js_of_ocaml when compiling a unit \
+         (js_of_ocaml compile)"
+    | Archive ->
+        "<opt>  Pass option <opt> to js_of_ocaml when creating an archive with \
+         -a (js_of_ocaml link -a)"
+    | Runtime ->
+        "<opt>  Pass option <opt> to js_of_ocaml when building the runtime of \
+         an executable (js_of_ocaml build-runtime)"
+    | Link ->
+        "<opt>  Pass option <opt> to js_of_ocaml when linking an executable \
+         (js_of_ocaml link)"
+  in
+  List.map
+    (fun phase ->
+      ( Clflags.Jsoo_phase.flag phase,
+        Arg.String (f phase),
+        doc phase ^ " (with -target js_of_ocaml)" ))
+    Clflags.Jsoo_phase.all
+
+let mk_djsir f =
+  ("-djsir", Arg.Unit f, " Print the Js_of_ocaml IR (with -target js_of_ocaml)")
+
 let mk_x f = ("-X", Arg.String f, "(undocumented)")
 
 let set_long_frames_threshold n =
@@ -1471,6 +1529,7 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+  val fdo_counters : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val reaper_debug_flags : string -> unit
@@ -1498,6 +1557,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val lto_support : unit -> unit
+  val no_lto_support : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
@@ -1559,6 +1620,9 @@ module type Oxcaml_options = sig
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
+  val target : Clflags.Target.t -> unit
+  val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
+  val djsir : unit -> unit
   val x : string -> unit
 end
 
@@ -1689,6 +1753,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
       mk_llvm_flags F.llvm_flags;
+      mk_fdo_counters F.fdo_counters;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_reaper_debug_flags F.reaper_debug_flags;
@@ -1722,6 +1787,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
+      mk_lto_support F.lto_support;
+      mk_no_lto_support F.no_lto_support;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
@@ -1805,8 +1872,11 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dreaper F.dreaper;
       mk_use_cached_generic_functions F.use_cached_generic_functions;
       mk_cached_generic_functions_path F.cached_generic_functions_path;
+      mk_target F.target;
+      mk_djsir F.djsir;
       mk_x F.x;
     ]
+    @ mk_jsoo_opt F.jsoo_opt
 end
 
 let set_dissector_partition_size f =
@@ -2142,6 +2212,7 @@ module Oxcaml_options_impl = struct
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
+  let fdo_counters = set' Oxcaml_flags.fdo_counters
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
 
@@ -2225,6 +2296,8 @@ module Oxcaml_options_impl = struct
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
 
+  let lto_support = set Flambda2.lto_support
+  let no_lto_support = clear Flambda2.lto_support
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
   let stubs_forward_inlining = set' Clflags.stubs_forward_inlining
@@ -2395,6 +2468,9 @@ module Oxcaml_options_impl = struct
   let cached_generic_functions_path file =
     Oxcaml_flags.cached_generic_functions_path := file
 
+  let target = Clflags.set_target
+  let jsoo_opt = Compenv.add_first_jsoo_opt
+  let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
 
   (* Bundle of experimental codegen optimizations enabled by
@@ -2508,7 +2584,7 @@ module Debugging_options_impl = struct
 end
 
 module Extra_params = struct
-  let read_param ppf _position name v =
+  let read_param ppf position name v =
     let set option =
       let b = Compenv.check_bool ppf name v in
       option := Oxcaml_flags.Set b;
@@ -2723,6 +2799,7 @@ module Extra_params = struct
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
+    | "fdo-counters" -> set' Oxcaml_flags.fdo_counters
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "reaper-debug-flags" ->
         Oxcaml_flags.Flambda2.reaper_debug_flags :=
@@ -2867,6 +2944,19 @@ module Extra_params = struct
     | "cached-generic-functions-path" ->
         Oxcaml_flags.cached_generic_functions_path := v;
         true
+    | "target" -> (
+        match v with
+        | "js_of_ocaml" ->
+            (match position with
+            | Compenv.Before_args -> Clflags.set_target Js_of_ocaml
+            | Compenv.Before_compile _ | Compenv.Before_link ->
+                (* The backend has been chosen by then. *)
+                Compenv.fatal
+                  "OCAMLPARAM: target must be given before the _ separator");
+            true
+        | _ ->
+            Printf.ksprintf Compenv.fatal
+              "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml)" v)
     | "reaper" -> set Flambda2.enable_reaper
     | "reaper-preserve-direct-calls" ->
         (match String.lowercase_ascii v with
@@ -2889,6 +2979,7 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "lto-support" -> set Flambda2.lto_support
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
     | "stubs-forward-inlining" -> set' Clflags.stubs_forward_inlining
     | "dissector" -> set' Clflags.dissector
@@ -2971,5 +3062,8 @@ module Default = struct
     include Main_args.Default.Opttopmain
     include Oxcaml_options_impl
     include Debugging_options_impl
+
+    let target (_ : Clflags.Target.t) =
+      Compenv.fatal "-target is not supported by ocamlnat"
   end
 end

@@ -121,10 +121,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ regular_id : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's1
-         because of the definition of regular_id at line 2, characters 2-48.
-       But the kind of 'a must be representable
-         because of the definition of regular_id at line 4, characters 17-22.
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}]
 
 (* a [let poly_] binding of a tuple. The middle-end won't support this in the
@@ -704,4 +702,100 @@ Line 1, characters 36-45:
 1 | let poly_ f (p : 'a ptr) (x : 'a) = write p x
                                         ^^^^^^^^^
 Error: The poke primitive does not currently support layout polymorphic arguments
+|}]
+
+(* Modules containing lpoly items *)
+
+let with_int, with_unboxed_float =
+  (* this one might end up being all values *)
+  let poly_ make_m1 x =
+    let module M = struct
+      let k = x
+    end in
+    M.k
+  in
+  make_m1 42, to_float (make_m1 #42.5)
+[%%expect {|
+val with_int : int = 42
+val with_unboxed_float : float = 42.5
+|}]
+
+let with_int, with_unboxed_float =
+  (* this one always contains nonvalues *)
+  let poly_ make_m2 x =
+    let module M = struct
+      let j = #42.5
+      let k = x
+    end in
+    M.k
+  in
+  make_m2 42, to_float (make_m2 #42.5)
+[%%expect {|
+val with_int : int = 42
+val with_unboxed_float : float = 42.5
+|}]
+
+(* Test scannable prefix length check for lpoly local modules. *)
+type ('a : any) pair = #('a * 'a)
+type ('a : any) fields_256 = 'a pair pair pair pair pair pair pair pair
+[%%expect {|
+type ('a : any) pair = #('a * 'a)
+type ('a : any) fields_256 = 'a pair pair pair pair pair pair pair pair
+|}]
+
+(* This module has too many value fields before the flat suffix. *)
+let with_unboxed_float =
+  let poly_ make_large_module x =
+    let module M = struct
+      let padding : int fields_256 =
+        let p = #(0, 0) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        p
+      let k = x
+    end in
+    M.k
+  in
+  to_float (make_large_module #42.5)
+[%%expect {|
+Lines 3-15, characters 19-7:
+ 3 | ...................struct
+ 4 |       let padding : int fields_256 =
+ 5 |         let p = #(0, 0) in
+ 6 |         let p = #(p, p) in
+ 7 |         let p = #(p, p) in
+...
+12 |         let p = #(p, p) in
+13 |         p
+14 |       let k = x
+15 |     end...
+Error: Mixed blocks may contain at most 254 value fields prior to the flat suffix, but this one contains 256.
+|}]
+
+(* This module is all values, so it is a uniform block. *)
+let with_float =
+  let poly_ make_large_module x =
+    let module M = struct
+      let padding : int fields_256 =
+        let p = #(0, 0) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        let p = #(p, p) in
+        p
+      let k = x
+    end in
+    M.k
+  in
+  make_large_module 42.5
+[%%expect {|
+val with_float : float = 42.5
 |}]

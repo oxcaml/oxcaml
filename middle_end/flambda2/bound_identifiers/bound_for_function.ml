@@ -43,6 +43,14 @@ let[@ocamlformat "disable"] print ppf
 let create ~return_continuation ~exn_continuation ~params ~my_closure
     ~my_alloc_mode ~my_depth =
   Bound_parameters.check_no_duplicates params;
+  (if Flambda_features.check_light_invariants ()
+   then
+     match Continuation.sort return_continuation with
+     | Return -> ()
+     | Normal_or_exn | Define_root_symbol | Toplevel_return ->
+       Misc.fatal_errorf
+         "Return continuation %a has wrong sort (must be [Return])"
+         Continuation.print return_continuation);
   (if Flambda_features.check_invariants ()
    then
      let params_set = Bound_parameters.var_set params in

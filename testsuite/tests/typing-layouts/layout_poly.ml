@@ -34,6 +34,17 @@ Error: This expression has type "t_any" but an expression was expected of type
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
        But the layout of t_any must be representable
+         because we must know concretely how to return a function result.
+|}, Principal{|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+Line 3, characters 14-36:
+3 | let f () = id (assert false : t_any)
+                  ^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "t_any" but an expression was expected of type
+         "('a : '_representable_layout_1)"
+       The layout of t_any is any
+         because of the definition of t_any at line 3, characters 0-16.
+       But the layout of t_any must be representable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -536,6 +547,19 @@ let f (x: float#): int64_u = id x
 
 [%%expect{|
 external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
+Line 2, characters 32-33:
+2 | let f (x: float#): int64_u = id x
+                                    ^
+Error: The value "x" has type "float#" but an expression was expected of type
+         "('a : bits64)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a sublayout of bits64
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
+external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
 Line 2, characters 29-33:
 2 | let f (x: float#): int64_u = id x
                                  ^^^^
@@ -617,24 +641,34 @@ val f : unit -> int32_u M_any.t = <fun>
 
 
 (* doesn't work when the type constructor puts a constraint on ['a] *)
-external[@layout_poly] id : ('a : any). 'a list -> 'a list = "%identity"
+type ('a : value_or_null) value = 'a
+external[@layout_poly] id : ('a : any). 'a value -> 'a value = "%identity"
 
 [%%expect{|
-Line 1, characters 28-58:
-1 | external[@layout_poly] id : ('a : any). 'a list -> 'a list = "%identity"
-                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+type ('a : value_or_null) value = 'a
+Line 2, characters 28-60:
+2 | external[@layout_poly] id : ('a : any). 'a value -> 'a value = "%identity"
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable 'a was declared to have kind any.
        But it was inferred to have kind value_or_null
-         because the type argument of list has kind value_or_null.
+         because of the definition of value at line 1, characters 0-36.
 |}]
 
-(* Test this when sorts can be inside unboxed records *)
-(* type ('a : any) r = {field: 'a} [@@unboxed]
+type ('a : any) r = {field: 'a} [@@unboxed]
+
 external[@layout_poly] id : ('a : any). 'a M_any.t r -> 'a M_any.t r = "%identity"
 
 let f (): float# M_any.t r = id (assert false : float# M_any.t r)
 let f (): int64_u M_any.t r = id (assert false : int64_u M_any.t r)
-let f (): int32_u M_any.t r = id (assert false : int32_u M_any.t r) *)
+let f (): int32_u M_any.t r = id (assert false : int32_u M_any.t r)
+[%%expect{|
+type ('a : any) r = { field : 'a; } [@@unboxed]
+external id : ('a : any). 'a M_any.t r -> 'a M_any.t r = "%identity"
+  [@@layout_poly]
+val f : unit -> float# M_any.t r = <fun>
+val f : unit -> int64_u M_any.t r = <fun>
+val f : unit -> int32_u M_any.t r = <fun>
+|}]
 
 
 (********************************************)
@@ -667,7 +701,7 @@ let id' x = id x
 
 [%%expect{|
 external id : ('a : any separable). 'a t -> int = "%identity"
-val id' : ('a : value_maybe_null). 'a t -> int = <fun>
+val id' : ('a : any separable). 'a t -> int = <fun>
 |}]
 
 

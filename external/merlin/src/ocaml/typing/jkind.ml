@@ -62,7 +62,13 @@ end
 
 (* A *sort* is the information the middle/back ends need to be able to
    compile a manipulation (storing, passing, etc) of a runtime value. *)
-module Sort = Jkind_types.Sort
+module Sort = struct
+  include Jkind_types.Sort
+
+  let new_var = Btype.new_sort_var
+
+  let instance_with ~level = instance_with ~new_var:(fun () -> new_var ~level)
+end
 
 type sort = Sort.t
 
@@ -144,6 +150,14 @@ module Layout = struct
     | Any of Scannable_axes.t
     | Addressable of 'sort t
     | Box of 'sort t * Scannable_axes.t
+
+  type level_error = Sort.level_error =
+    | Rigid
+    | Escape of Path.t
+
+  type error = Sort.error =
+    | Incompatible
+    | Level of level_error
 
   module Const = struct
     include Jkind_types.Layout.Const
@@ -331,26 +345,30 @@ module Layout = struct
     | (Any _ | Product _ | Box _) as t -> t
 
   (* [constrain_below_addressable t] constrains [t < t addressable] *)
-  let rec constrain_below_addressable ~allow_mutation : Sort.t t -> bool =
-    function
-    | Any _ -> false
-    | Addressable _ -> true
-    | Box _ -> true
+  let rec constrain_below_addressable ~allow_mutation :
+      Sort.t t -> (unit, error) result = function
+    | Any _ -> Error Incompatible
+    | Addressable _ -> Ok ()
+    | Box _ -> Ok ()
     | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
     | Product ts ->
-      List.for_all (constrain_below_addressable ~allow_mutation) ts
+      Misc.Stdlib.List.fold_left_result
+        (fun () t -> constrain_below_addressable ~allow_mutation t)
+        () ts
 
   (* [constrain_above_addressable t] constrains [t addressable < t].
      This differs from [constrain_below_addressable] only for kinds containing
      [any]. *)
-  let rec constrain_above_addressable ~allow_mutation : Sort.t t -> bool =
-    function
-    | Any _ -> true
-    | Addressable _ -> true
-    | Box _ -> true
+  let rec constrain_above_addressable ~allow_mutation :
+      Sort.t t -> (unit, error) result = function
+    | Any _ -> Ok ()
+    | Addressable _ -> Ok ()
+    | Box _ -> Ok ()
     | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
     | Product ts ->
-      List.for_all (constrain_above_addressable ~allow_mutation) ts
+      Misc.Stdlib.List.fold_left_result
+        (fun () -> constrain_above_addressable ~allow_mutation)
+        () ts
 
   let rec is_surely_addressable_flat : Sort.Flat.t t -> bool = function
     | Addressable _ -> true
@@ -398,10 +416,10 @@ module Layout = struct
         ~separability:(box_scannable_axes t sa).separability Sort.scannable
 
   let rec equate_or_equal ~allow_mutation t1 t2 =
+    let ( let* ) = Result.bind in
     match t1, t2 with
     | Sort (s1, sa1), Sort (s2, sa2) ->
-      Sort.equate ~allow_mutation s1 s2
-      &&
+      let* () = Sort.equate ~allow_mutation s1 s2 in
       if
         Sort.is_scannable_or_var s1
         (* CR layouts-scannable: if [s1] and [s2] are both unfilled sort
@@ -411,19 +429,22 @@ module Layout = struct
             It is possible the unifying that (now shared) sort variable with
             [value] would lead to better error reporting. For now, it just
             (conservatively) concludes that they are not equal. *)
-      then Scannable_axes.equal sa1 sa2
-      else true
-    | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
+      then if Scannable_axes.equal sa1 sa2 then Ok () else Error Incompatible
+      else Ok ()
+    | Product ts, Sort (sort, _) | Sort (sort, _), Product ts ->
       (* CR-someday jbachurski: This might mutate [sort] even if
          [allow_mutation] is [false]. *)
-      match Sort.decompose_into_product sort (List.length ts) with
-      | None -> false
-      | Some sorts ->
-        let sorts = List.map (fun x -> Sort (x, Scannable_axes.max)) sorts in
-        List.equal (equate_or_equal ~allow_mutation) ts sorts)
+      let* sorts = Sort.decompose_into_product sort (List.length ts) in
+      let sorts = List.map (fun x -> Sort (x, Scannable_axes.max)) sorts in
+      Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
+        (fun () -> equate_or_equal ~allow_mutation)
+        () ts sorts
     | Product ts1, Product ts2 ->
-      List.equal (equate_or_equal ~allow_mutation) ts1 ts2
-    | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
+      Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
+        (fun () -> equate_or_equal ~allow_mutation)
+        () ts1 ts2
+    | Any sa1, Any sa2 ->
+      if Scannable_axes.equal sa1 sa2 then Ok () else Error Incompatible
     | Addressable l1, Addressable l2 ->
       (* Incomplete; see the [Addressable] cases in [Sort.equate]. *)
       equate_or_equal ~allow_mutation
@@ -433,15 +454,18 @@ module Layout = struct
       (* This is incomplete: see [implied_box_axes]. To do our best, we first
          equate [l1 = l2], because that could result in better implied scannable
          axes for the boxes. *)
-      equate_or_equal ~allow_mutation l1 l2
-      && Scannable_axes.equal
-           (box_scannable_axes l1 sa1)
-           (box_scannable_axes l2 sa2)
+      let* () = equate_or_equal ~allow_mutation l1 l2 in
+      if
+        Scannable_axes.equal
+          (box_scannable_axes l1 sa1)
+          (box_scannable_axes l2 sa2)
+      then Ok ()
+      else Error Incompatible
     | Addressable l1, ((Any _ | Sort _ | Product _ | Box _) as t2)
     | ((Any _ | Sort _ | Product _ | Box _) as t2), Addressable l1 ->
-      constrain_below_addressable ~allow_mutation t2
-      && equate_or_equal ~allow_mutation (Addressable l1) (Addressable t2)
-    | (Any _ | Sort _ | Product _ | Box _), _ -> false
+      let* () = constrain_below_addressable ~allow_mutation t2 in
+      equate_or_equal ~allow_mutation (Addressable l1) (Addressable t2)
+    | (Any _ | Sort _ | Product _ | Box _), _ -> Error Incompatible
 
   let rec get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa -> Some sa
@@ -466,133 +490,143 @@ module Layout = struct
     | Addressable t' -> Addressable (meet_root_scannable_axes t' sa)
     | Box (t', sa') -> Box (t', Scannable_axes.meet sa sa')
 
-  let sub t1 t2 =
-    let rec sub t1 t2 : Misc.Le_result.t =
-      match t1, t2 with
-      | Addressable l1, Addressable l2 ->
-        (* Incomplete; see the [Addressable] cases in [Sort.equate]. *)
-        sub (strip_head_addressable l1) (strip_head_addressable l2)
-      | Addressable l1, Any _ ->
-        (* Instead of [l1 addressable < any], we solve [l1 < any]
-           except return [Less] when the latter would return [Equal],
-           as [any] is strictly above every addressable layout. *)
-        Misc.Le_result.combine (sub (strip_head_addressable l1) t2) Less
-      | Addressable _, (Sort _ | Product _ | Box _) ->
-        if constrain_above_addressable ~allow_mutation:true t2
-        then sub t1 (Addressable t2)
-        else Not_le
-      | (Any _ | Sort _ | Product _ | Box _), Addressable _ ->
-        if constrain_below_addressable ~allow_mutation:true t1
-        then sub (Addressable t1) t2
-        else Not_le
-      | Box (l1, sa1), Box (l2, sa2) ->
-        (* Constrain the payloads first, as in [equate_or_equal]. *)
-        let contents = sub l1 l2 in
-        Misc.Le_result.combine contents
-          (Scannable_axes.less_or_equal
-             (box_scannable_axes l1 sa1)
-             (box_scannable_axes l2 sa2))
-      | Box (l1, sa1), Sort (s2, sa2) ->
-        (* A box kind lies strictly below a scannable kind with the same
-           scannable axes, so cap the result at [Less] *)
-        if Sort.equate ~allow_mutation:true s2 Sort.scannable
-        then
-          Misc.Le_result.combine
-            (Scannable_axes.less_or_equal (box_scannable_axes l1 sa1) sa2)
-            Less
-        else Not_le
-      | Box (l1, sa1), Any sa2 ->
-        Misc.Le_result.combine
-          (Scannable_axes.less_or_equal (box_scannable_axes l1 sa1) sa2)
-          Less
-      | Box _, Product _ -> Not_le
-      | (Any _ | Sort _ | Product _), Box _ -> Not_le
-      | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
-      | Sort (sort, sa1), Any sa2 ->
-        (* CR layouts-scannable: If [sort] has not been filled and
-           [sa1] </= [sa2], we conservatively say that it is [Not_le].
-           They can still become equal, though, in the case where [sort] is
-           filled in with anything other than [value]. Unifying [sort] with
-           [value] could potentially yield better error messages. Another
-           option could be to add to the [Layout_disagreement] type. *)
-        if Sort.is_scannable_or_var sort && not (Scannable_axes.le sa1 sa2)
-        then Not_le
-        else Less
-      | Product _, Any _ -> Less
-      | Any _, _ -> Not_le
-      | Sort (s1, sa1), Sort (s2, sa2) ->
-        if Sort.equate ~allow_mutation:true s1 s2
-        then
-          if Sort.is_scannable_or_var s1
-          then Scannable_axes.less_or_equal sa1 sa2
-          else Equal
-        else Not_le
-      | Product ts1, Product ts2 ->
-        if List.compare_lengths ts1 ts2 = 0
-        then Misc.Le_result.combine_list (List.map2 sub ts1 ts2)
-        else Not_le
-      | Product ts1, Sort (s2, _) -> (
-        match Sort.decompose_into_product s2 (List.length ts1) with
-        | None -> Not_le
-        | Some ss2 ->
-          Misc.Le_result.combine_list
-            (List.map2
-               (fun t1 s2 -> sub t1 (Sort (s2, Scannable_axes.max)))
-               ts1 ss2))
-      | Sort (s1, _), Product ts2 -> (
-        match Sort.decompose_into_product s1 (List.length ts2) with
-        | None -> Not_le
-        | Some ss1 ->
-          Misc.Le_result.combine_list
-            (List.map2
-               (fun s1 t2 -> sub (Sort (s1, Scannable_axes.max)) t2)
-               ss1 ts2))
-    in
-    Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
-        [Layout_disagreement])
+  module Less_or_equal = struct
+    type t =
+      | Less
+      | Equal
 
-  let rec intersection t1 t2 =
-    (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
+    let combine t1 t2 =
+      match t1, t2 with Less, _ | _, Less -> Less | Equal, Equal -> Equal
+
+    let of_le_result : Misc.Le_result.t -> (t, error) result = function
+      | Less -> Ok Less
+      | Equal -> Ok Equal
+      | Not_le -> Error Incompatible
+  end
+
+  let rec sub t1 t2 : (Less_or_equal.t, error) result =
+    let open Misc.Stdlib.Monad.Result.Syntax in
+    match t1, t2 with
+    | Addressable l1, Addressable l2 ->
+      (* Incomplete; see the [Addressable] cases in [Sort.equate]. *)
+      sub (strip_head_addressable l1) (strip_head_addressable l2)
+    | Addressable l1, Any _ ->
+      (* Instead of [l1 addressable < any], we solve [l1 < any]
+         except return [Less] when the latter would return [Equal],
+         as [any] is strictly above every addressable layout. *)
+      let+ _ = sub (strip_head_addressable l1) t2 in
+      Less_or_equal.Less
+    | Addressable _, (Sort _ | Product _ | Box _) ->
+      let* () = constrain_above_addressable ~allow_mutation:true t2 in
+      sub t1 (Addressable t2)
+    | (Any _ | Sort _ | Product _ | Box _), Addressable _ ->
+      let* () = constrain_below_addressable ~allow_mutation:true t1 in
+      sub (Addressable t1) t2
+    | Box (l1, sa1), Box (l2, sa2) ->
+      (* Constrain the payloads first, as in [equate_or_equal]. *)
+      let+ contents = sub l1 l2
+      and+ axes =
+        Scannable_axes.less_or_equal
+          (box_scannable_axes l1 sa1)
+          (box_scannable_axes l2 sa2)
+        |> Less_or_equal.of_le_result
+      in
+      Less_or_equal.combine contents axes
+    | Box (l1, sa1), Sort (s2, sa2) ->
+      (* A box kind lies strictly below a scannable kind with the same
+           scannable axes, so cap the result at [Less] *)
+      let+ () = Sort.equate ~allow_mutation:true s2 Sort.scannable
+      and+ result =
+        Scannable_axes.less_or_equal (box_scannable_axes l1 sa1) sa2
+        |> Less_or_equal.of_le_result
+      in
+      Less_or_equal.combine result Less
+    | Box (l1, sa1), Any sa2 ->
+      let+ result =
+        Scannable_axes.less_or_equal (box_scannable_axes l1 sa1) sa2
+        |> Less_or_equal.of_le_result
+      in
+      Less_or_equal.combine result Less
+    | Box _, Product _ -> Error Incompatible
+    | (Any _ | Sort _ | Product _), Box _ -> Error Incompatible
+    | Any sa1, Any sa2 ->
+      Scannable_axes.less_or_equal sa1 sa2 |> Less_or_equal.of_le_result
+    | Sort (sort, sa1), Any sa2 ->
+      (* CR layouts-scannable: If [sort] has not been filled and
+         [sa1] </= [sa2], we conservatively say that it is [Not_le].
+         They can still become equal, though, in the case where [sort] is
+         filled in with anything other than [value]. Unifying [sort] with
+         [value] could potentially yield better error messages. Another
+         option could be to add to the [Layout_disagreement] type. *)
+      if Sort.is_scannable_or_var sort && not (Scannable_axes.le sa1 sa2)
+      then Error Incompatible
+      else Ok Less
+    | Product _, Any _ -> Ok Less
+    | Any _, _ -> Error Incompatible
+    | Sort (s1, sa1), Sort (s2, sa2) ->
+      let* () = Sort.equate ~allow_mutation:true s1 s2 in
+      if Sort.is_scannable_or_var s1
+      then Scannable_axes.less_or_equal sa1 sa2 |> Less_or_equal.of_le_result
+      else Ok Less_or_equal.Equal
+    | Product ts1, Product ts2 -> sub_product ts1 ts2
+    | Product ts1, Sort (s2, _) ->
+      let* ts2 = Sort.decompose_into_product s2 (List.length ts1) in
+      sub_product ts1 (List.map (fun s2 -> Sort (s2, Scannable_axes.max)) ts2)
+    | Sort (s1, _), Product ts2 ->
+      let* ts1 = Sort.decompose_into_product s1 (List.length ts2) in
+      sub_product (List.map (fun s1 -> Sort (s1, Scannable_axes.max)) ts1) ts2
+
+  and sub_product ts1 ts2 =
+    Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
+      (fun acc t1 t2 -> sub t1 t2 |> Result.map (Less_or_equal.combine acc))
+      Less_or_equal.Equal ts1 ts2
+
+  let sub t1 t2 : Sub_result.t =
+    match sub t1 t2 with
+    | Ok Less -> Less
+    | Ok Equal -> Equal
+    | Error reason -> Not_le [Layout_disagreement reason]
+
+  let rec intersection t1 t2 : (sort t, error) result =
+    let open Misc.Stdlib.Monad.Result.Syntax in
     let products ts1 ts2 =
-      let components = List.map2 intersection ts1 ts2 in
-      Option.map
-        (fun x -> Product x)
-        (Misc.Stdlib.List.some_if_all_elements_are_some components)
+      let+ ts =
+        Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
+          (fun ts t1 t2 ->
+            let+ t = intersection t1 t2 in
+            t :: ts)
+          [] ts1 ts2
+      in
+      Product (List.rev ts)
     in
     match t1, t2 with
-    | _, Any sa2 -> Some (meet_root_scannable_axes t1 sa2)
-    | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
+    | _, Any sa2 -> Ok (meet_root_scannable_axes t1 sa2)
+    | Any sa1, _ -> Ok (meet_root_scannable_axes t2 sa1)
     | Addressable l1, Addressable l2 ->
       (* The meet of two addressable layouts is addressable. Incomplete; see
          the [Addressable] cases in [Sort.equate]. *)
-      Option.map
+      Result.map
         (fun l -> Addressable l)
         (intersection (strip_head_addressable l1) (strip_head_addressable l2))
     | Addressable l1, ((Sort _ | Product _ | Box _) as t2)
     | ((Sort _ | Product _ | Box _) as t2), Addressable l1 ->
-      if constrain_above_addressable ~allow_mutation:true t2
-      then intersection (Addressable l1) (Addressable t2)
-      else None
+      let* () = constrain_above_addressable ~allow_mutation:true t2 in
+      intersection (Addressable l1) (Addressable t2)
     | Box (l1, sa1), Box (l2, sa2) ->
-      Option.map
+      Result.map
         (fun l -> Box (l, Scannable_axes.meet sa1 sa2))
         (intersection l1 l2)
     | Box (l, sa), Sort (s, sa') | Sort (s, sa'), Box (l, sa) ->
-      if Sort.equate ~allow_mutation:true s Sort.scannable
-      then Some (Box (l, Scannable_axes.meet sa sa'))
-      else None
-    | Box _, Product _ | Product _, Box _ -> None
+      let+ () = Sort.equate ~allow_mutation:true s Sort.scannable in
+      Box (l, Scannable_axes.meet sa sa')
+    | Box _, Product _ | Product _, Box _ -> Error Incompatible
     | Sort (s1, sa1), Sort (s2, sa2) ->
-      if Sort.equate ~allow_mutation:true s1 s2
-      then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
-      else None
-    | Product ts1, Product ts2 ->
-      if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
-    | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
-      match Sort.decompose_into_product sort (List.length ts) with
-      | None -> None
-      | Some sorts ->
-        products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
+      let* () = Sort.equate ~allow_mutation:true s1 s2 in
+      Ok (Sort (s1, Scannable_axes.meet sa1 sa2))
+    | Product ts1, Product ts2 -> products ts1 ts2
+    | Product ts, Sort (sort, _) | Sort (sort, _), Product ts ->
+      let* sorts = Sort.decompose_into_product sort (List.length ts) in
+      products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts)
 
   let rec default_to_scannable_and_get : _ Layout.t -> Const.t = function
     | Any sa -> Const.any sa
@@ -627,10 +661,11 @@ module Layout = struct
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
-      | Addressable t ->
-        if constrain_below_addressable ~allow_mutation:false t
-        then pp_element ~nested ppf t
-        else Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t
+      | Addressable t -> (
+        match constrain_below_addressable ~allow_mutation:false t with
+        | Ok () -> pp_element ~nested ppf t
+        | Error _ ->
+          Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t)
       | Box (t, sa) ->
         let axes =
           Scannable_axes.to_string_list
@@ -647,6 +682,18 @@ module Layout = struct
     | Any _ -> ()
     | Addressable t -> generalize ~current_level t
     | Box (t, _) -> generalize ~current_level t
+
+  let rec update_level level : _ Layout.t -> (unit, level_error) result =
+    function
+    | Any _ -> Ok ()
+    | Sort (s, _) -> Sort.update_level level s
+    | Product ts -> Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
+    | Addressable t -> update_level level t
+    | Box (t, _) -> update_level level t
+
+  let of_new_sort_var ~level sa =
+    let sort = Sort.(of_var (new_var ~level)) in
+    Sort (sort, sa), sort
 end
 
 module Externality = Externality
@@ -965,21 +1012,21 @@ module Base = struct
       match Scannable_axes.less_or_equal sa1 sa2 with
       | Equal -> Sub_result.Equal
       | Less -> Sub_result.Less
-      | Not_le -> Sub_result.Not_le [Layout_disagreement])
+      | Not_le -> Sub_result.Not_le [Layout_disagreement Incompatible])
     | Kconstr (_, sa_k, _), Layout (Layout.Any sa_any)
     | ( Kconstr (_, sa_k, Addressable),
         Layout (Layout.Addressable (Layout.Any sa_any)) ) -> (
       match Scannable_axes.less_or_equal sa_k sa_any with
       | Equal | Less -> Sub_result.Less
-      | Not_le -> Sub_result.Not_le [Layout_disagreement])
+      | Not_le -> Sub_result.Not_le [Layout_disagreement Incompatible])
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ ->
-      Sub_result.Not_le [Layout_disagreement]
+      Sub_result.Not_le [Layout_disagreement Incompatible]
 
   (* This is only correct on bases that come from the output of
      [Base.expand_until_comparable]. See comment on that function. *)
   let has_intersection_expanded base1 base2 =
     match base1, base2 with
-    | Layout l1, Layout l2 -> Option.is_some (Layout.intersection l1 l2)
+    | Layout l1, Layout l2 -> Result.is_ok (Layout.intersection l1 l2)
     | Kconstr _, Kconstr _ -> true
     | Kconstr _, Layout (Layout.Any _) -> true
     | Layout (Layout.Any _), Kconstr _ -> true
@@ -992,6 +1039,8 @@ module Base = struct
     match b with
     | Layout l -> Layout (f l)
     | Kconstr (p, sa, op) -> Kconstr (p, sa, op)
+
+  let of_const = map_layout ~f:Layout.of_const
 
   let format format_layout ppf base =
     match base with
@@ -1011,7 +1060,6 @@ module Base = struct
         Some (Jkind0.Base_and_axes.meet_scannable_axes base sa))
 
   let expand_pair env t1 t2 =
-    let of_const = map_layout ~f:Layout.of_const in
     match expand_once env t1, expand_once env t2 with
     | None, None -> None
     | Some t1, None -> Some (of_const t1, t2)
@@ -1060,8 +1108,7 @@ end
 module Base_and_axes = struct
   include Jkind0.Base_and_axes
 
-  let jkind_desc_of_const const =
-    { const with base = Base.map_layout ~f:Layout.of_const const.base }
+  let jkind_desc_of_const const = { const with base = Base.of_const const.base }
 
   let debug_print format_layout ppf { base; mod_bounds; with_bounds } =
     Format.fprintf ppf "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a }"
@@ -1720,7 +1767,9 @@ module Jkind_desc = struct
       let t2 = Base_and_axes.jkind_desc_of_const t2 in
       Some (t1, t2)
 
-  let rec equate_or_equal ~allow_mutation env t1 t2 =
+  let rec equate_or_equal ~allow_mutation env t1 t2 : (unit, Sort.error) result
+      =
+    let open Misc.Stdlib.Monad.Result.Syntax in
     let { base = base1;
           mod_bounds = mod_bounds1;
           with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
@@ -1738,17 +1787,19 @@ module Jkind_desc = struct
       let refresh l mod_bounds =
         Mod_bounds.meet_externality (Layout.implied_externality l) mod_bounds
       in
-      Layout.equate_or_equal ~allow_mutation l1 l2
-      && Mod_bounds.equal (refresh l1 mod_bounds1) (refresh l2 mod_bounds2)
+      let* () = Layout.equate_or_equal ~allow_mutation l1 l2 in
+      if Mod_bounds.equal (refresh l1 mod_bounds1) (refresh l2 mod_bounds2)
+      then Ok ()
+      else Error Layout.Incompatible
     | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
            && Jkind_types.Kind_operator.equal op1 op2
            && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
-      true
+      Ok ()
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
-      | None -> false
+      | None -> Error Layout.Incompatible
       | Some (t1, t2) -> equate_or_equal ~allow_mutation env t1 t2)
 
   let sub_expanded (type l r)
@@ -1845,8 +1896,8 @@ module Jkind_desc = struct
     match base1, base2 with
     | Layout l1, Layout l2 -> (
       match Layout.intersection l1 l2 with
-      | None -> No_intersection
-      | Some l -> make_intersection (Layout l))
+      | Error _ -> No_intersection
+      | Ok l -> make_intersection (Layout l))
     | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2)
       when Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2 ->
       make_intersection (Kconstr (p1, Scannable_axes.meet sa1 sa2, op1))
@@ -1869,7 +1920,7 @@ module Jkind_desc = struct
 
   let sub_layout env t1 t2 =
     match Base.expand_until_comparable env t1.base t2.base with
-    | None -> Sub_result.Not_le [Layout_disagreement]
+    | None -> Sub_result.Not_le [Layout_disagreement Incompatible]
     | Some (t1, t2) -> (
       match t1, t2 with
       | Layout l1, Layout l2 -> Layout.sub l1 l2
@@ -1878,14 +1929,15 @@ module Jkind_desc = struct
         match Scannable_axes.less_or_equal sa1 sa2 with
         | Equal -> Sub_result.Equal
         | Less -> Sub_result.Less
-        | Not_le -> Sub_result.Not_le [Layout_disagreement])
-      | Kconstr _, Kconstr _ -> Sub_result.Not_le [Layout_disagreement]
+        | Not_le -> Sub_result.Not_le [Layout_disagreement Incompatible])
+      | Kconstr _, Kconstr _ ->
+        Sub_result.Not_le [Layout_disagreement Incompatible]
       | Kconstr (_, sa_k, _), Layout (Layout.Any sa_any)
       | ( Kconstr (_, sa_k, Addressable),
           Layout (Layout.Addressable (Layout.Any sa_any)) ) -> (
         match Scannable_axes.less_or_equal sa_k sa_any with
         | Equal | Less -> Sub_result.Less
-        | Not_le -> Sub_result.Not_le [Layout_disagreement])
+        | Not_le -> Sub_result.Not_le [Layout_disagreement Incompatible])
       | Kconstr _, Layout _ | Layout _, Kconstr _ ->
         Misc.fatal_error
           "Jkind.sub_layout: [expand_until_comparable] spec wrong")
@@ -2152,8 +2204,7 @@ module Const = struct
       in
       Option.map
         (fun bounds_to_print ->
-          Typemode.untransl_mod_bounds ~verbose:show_all_bounds bounds_to_print
-          |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s))
+          Typemode.untransl_mod_bounds ~verbose:show_all_bounds bounds_to_print)
         bounds_to_print
 
     (* Returns [None] if [actual] has any scannable axis strictly greater
@@ -2892,29 +2943,21 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
-let for_unboxed_record lbls =
-  let open Types in
-  let tys_modalities =
-    List.map
-      (fun ({ ld_type; ld_modalities; _ }, _layout) -> ld_type, ld_modalities)
-      lbls
+let apply_modality_l modality jk =
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
+  let with_bounds =
+    With_bounds.map
+      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
+      jk.jkind.with_bounds
   in
-  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
-  Builtin.product ~why:Unboxed_record tys_modalities layouts
+  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
+  |> disallow_right
 
-let for_abbreviation ~type_jkind_purely ~modality ty =
-  (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
-  let jkind = type_jkind_purely ty in
-  let with_bounds_types =
-    let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-    With_bounds_types.singleton ty { bounds_mask }
-  in
-  fresh_jkind_poly
-    { base = jkind.jkind.base;
-      mod_bounds = Mod_bounds.min;
-      with_bounds = With_bounds with_bounds_types
-    }
-    ~annotation:None ~why:Abbreviation
+let apply_modality_r modality jk =
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
+  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -2945,7 +2988,9 @@ let for_boxed_row row =
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most
+         cases. But if we ever allow open types to mode-cross, we have to get
+         rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
       (* Here we count how many rows are in the polymorphic variant and default
@@ -3080,16 +3125,32 @@ let get_layout env jk : Layout.Const.t option =
   Option.bind (extract_layout_opt env jk) Layout.get_const
 
 let default_to_scannable t =
-  (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
+  (* [Kconstr] cannot contain non-generic variables which could be defaulted. *)
   match t.jkind.base with
   | Kconstr _ -> ()
   | Layout l -> ignore (Layout.default_to_scannable_and_get l)
 
 let generalize ~current_level t =
-  (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
   match t.jkind.base with
+  (* [Kconstr] cannot contain non-generic variables to generalize. *)
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
+
+let rec update_level_base_and_axes env level jkind =
+  match jkind.base with
+  | Kconstr (path, _, _) when level < Path.scope path -> (
+    match Base_and_axes.expand_base_once_const env jkind with
+    | Expanded jkind' ->
+      Base_and_axes.jkind_desc_of_const jkind'
+      |> update_level_base_and_axes env level
+    | Not_expanded | Missing_cmi _ -> Error (Layout.Escape path))
+  | Kconstr _ -> Ok jkind
+  | Layout l -> Layout.update_level level l |> Result.map (fun () -> jkind)
+
+let update_level env level t =
+  update_level_base_and_axes env level t.jkind
+  |> Result.map (fun jkind ->
+      if jkind != t.jkind then Some { t with jkind } else None)
 
 let get t = Jkind_desc.get t.jkind
 
@@ -3193,22 +3254,6 @@ let of_mod_bounds ~history mod_bounds =
     ran_out_of_fuel_during_normalize = false;
     quality = Not_best
   }
-
-let apply_modality_l modality jk =
-  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
-  let with_bounds =
-    With_bounds.map
-      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
-      jk.jkind.with_bounds
-  in
-  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
-  |> disallow_right
-
-let apply_modality_r modality jk =
-  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
-  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let apply_or_null_l env jkind =
   let or_null_axes ({ nullability; separability } : Scannable_axes.t) :
@@ -3494,13 +3539,14 @@ module Format_history = struct
         "it's the layout polymorphic type in an external declaration@ \
          ([@@layout_poly] forces all variables of layout 'any' to be@ \
          representable at call sites)"
-    | Peek_or_poke ->
-      fprintf ppf "it's the type being used for a peek or poke primitive"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
          (idx_imm or idx_mut)"
+    | Address_contents ->
+      fprintf ppf
+        "it's the type of the value at an address@ in an address pattern"
     | Field_in_indexed_record ->
       fprintf ppf
         "it's the type of a field in a record type into which a@ block index \
@@ -3511,6 +3557,17 @@ module Format_history = struct
     | Layout_poly -> fprintf ppf "it's the layout polymorphic type"
     | Typing_recovery ->
       fprintf ppf "it's a fake kind created during error recovery"
+    | Module_projection ->
+      fprintf ppf "it's the type of an item in a module being projected from"
+    | Module_coercion ->
+      fprintf ppf "it's the type of an item in a module being coerced"
+    | Module_inclusion ->
+      fprintf ppf "it's the type of an item in a module being included"
+    | Module_open ->
+      fprintf ppf "it's the type of an item in a module being opened"
+    | Module_argument ->
+      fprintf ppf
+        "it's the type of an item in an argument for a parameterized library"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3639,6 +3696,8 @@ module Format_history = struct
       fprintf ppf
         "it's the element type of an array that is iterated over in a \
          comprehension"
+    | List_comprehension_element ->
+      fprintf ppf "it's the element type of a list comprehension"
     | Idx_base ->
       fprintf ppf
         "it's the base type (the first type parameter) for a@ block index (idx \
@@ -3856,6 +3915,20 @@ module Violation = struct
     *)
     match violation with
     | Not_a_subjkind (sub, super, reasons) -> (
+      begin match
+        List.find_map
+          (function
+            | Sub_failure_reason.Layout_disagreement (Level (Escape path)) ->
+              Some path
+            | _ -> None)
+          reasons
+      with
+      | Some path ->
+        fprintf ppf
+          "@;@[The kind constructor@;<1 2>%a@ would escape its scope.@]"
+          !printtyp_path path
+      | None -> ()
+      end;
       let disagreeing_axes =
         (* Collect all the axes that disagree into a set. If none disagree,
            then it is [None] *)
@@ -3866,7 +3939,7 @@ module Violation = struct
               Some (Axis_set.add disagreeing_axes_so_far axis)
             | Axis_disagreement (Pack axis), None ->
               Some (Axis_set.singleton axis)
-            | ( ( Layout_disagreement | Constrain_ran_out_of_fuel
+            | ( ( Layout_disagreement _ | Constrain_ran_out_of_fuel
                 | With_bounds_on_left ),
                 _ ) ->
               disagreeing_axes_so_far)
@@ -4321,6 +4394,167 @@ module Violation = struct
   let report_with_name ~name env = report_general env "" pp_print_string name
 end
 
+(*********************************)
+(* unboxed field transformations *)
+
+module Unboxed_field_transformation = struct
+  (* Transformations strengthen a [jkind_l]'s crossing based on the modality and
+     then weaken it based on the presence of a [mutable] label.
+
+     For [jkind_r]s, the bound restricted by the presence of a [mutable] label
+     and loosened by the modality. *)
+  type t =
+    { modality : Mode.Modality.Const.t;
+      mutability_transformation : Axis_lattice.t
+          (** Tracks how to weaken based on mutability, since outer modalities
+              allow some mutability contributions to be ignored (see [nest]).
+              Bottom on axes other than contention and visibility. *)
+    }
+
+  let id =
+    { modality = Mode.Modality.Const.id;
+      mutability_transformation = Axis_lattice.bot
+    }
+
+  (* A [mutable] label (without modalities) contributes only to the axes on
+     which [mutable_data] and [immutable_data] differ, currently contention and
+     visibility.
+
+     This is the best crossing we can give to unboxed versions so that boxing
+     them (joining with [immutable_data]) gives the boxed version's crossing. *)
+  let mutable_label_axes =
+    Axis_lattice.co_sub Axis_lattice.mutable_data Axis_lattice.immutable_data
+
+  let of_field ~(mutability : Types.mutability) ~modality =
+    let mutability_transformation =
+      match mutability with
+      | Immutable -> Axis_lattice.bot
+      | Mutable { atomic = Nonatomic; _ } -> mutable_label_axes
+      | Mutable { atomic = Atomic; _ } ->
+        Misc.fatal_error
+          "Jkind.Unboxed_field_transformation.of_field: atomic field"
+    in
+    { modality; mutability_transformation }
+
+  let of_modality modality = of_field ~mutability:Immutable ~modality
+
+  let of_label ({ ld_modalities; ld_mutable; _ } : Types.label_declaration) =
+    of_field ~mutability:ld_mutable ~modality:ld_modalities
+
+  (* The modality of [outer] masks the [mutability_transformation] of the
+     [inner].
+
+       type inner = #{ mutable y : int }
+       type outer = #{ x : inner @@ contended }
+
+     Here, the outer [@@contended] modality hides [inner]'s mutability
+     contribution on the contention axis, but not for visibility. *)
+  let nest ~outer ~inner =
+    let masked_inner_weakening =
+      Axis_lattice.meet
+        (Axis_lattice.mask_of_modality outer.modality)
+        inner.mutability_transformation
+    in
+    { modality = Mode.Modality.Const.concat outer.modality ~then_:inner.modality;
+      mutability_transformation =
+        Axis_lattice.join outer.mutability_transformation masked_inner_weakening
+    }
+
+  let weaken weakening (jk : _ jkind) =
+    (* Avoid allocation if possible *)
+    if Axis_lattice.equal weakening Axis_lattice.bot
+    then jk
+    else
+      { jk with
+        jkind =
+          { jk.jkind with
+            mod_bounds =
+              Mod_bounds.join_axis_lattice jk.jkind.mod_bounds weakening
+          }
+      }
+
+  (* We weaken by the mutability transformation after strengthening according to
+     the modality, since the following unboxed record (like the boxed version)
+     does not cross contention:
+
+       type 'a t = #{ mutable a : 'a @@ contended }
+   *)
+  let apply_l t jk =
+    apply_modality_l t.modality jk |> weaken t.mutability_transformation
+
+  (* The modality loosens the container's upper bound [jk], turning it into a
+     (potentially weaker) requirement on the contents.
+
+     The [mutability_transformation] restricts crossing regardless of the
+     record's contents; we fail if the [jk] bound requires more crossing than
+     the transformation allows. For instance, if [jk] requires crossing
+     contention and the transformation says it doesn't, we fail. *)
+  let apply_r t jk =
+    let satisfiable =
+      Axis_lattice.leq t.mutability_transformation
+        (Mod_bounds.to_axis_lattice jk.jkind.mod_bounds)
+    in
+    if satisfiable then Ok (apply_modality_r t.modality jk) else Error ()
+
+  (* The failure reasons carry over: [apply_r] only relaxes the requirement on
+     axes that [apply_l] strengthens, and [apply_r] succeeding means that the
+     weakening by [mutability_transformation] can't introduce new failures. *)
+  let unapply_violation ~context env t ~history jk
+      ({ violation; missing_cmi } : Violation.t) =
+    match violation with
+    | Not_a_subjkind (sub, _, reasons) ->
+      let sub = { (apply_l t sub) with history } in
+      Some
+        (Violation.of_ ~context ?missing_cmi env
+           (Not_a_subjkind (sub, jk, reasons)))
+    | No_intersection _ -> None
+end
+
+let product_of_fields ~why fields layouts =
+  let mod_bounds, with_bounds =
+    List.fold_right
+      (fun ( type_expr,
+             ({ modality; mutability_transformation } :
+               Unboxed_field_transformation.t) ) (mod_bounds, with_bounds) ->
+        ( Mod_bounds.join_axis_lattice mod_bounds mutability_transformation,
+          With_bounds.add_modality ~type_expr ~modality with_bounds ))
+      fields
+      (Mod_bounds.min, No_with_bounds)
+  in
+  fresh_jkind_poly
+    { base = Layout (Layout.product layouts); mod_bounds; with_bounds }
+    ~annotation:None ~why:(Product_creation why)
+  (* [mark_best] is correct here because the with-bounds of a product jkind
+     include all the components of the product. Accordingly, looking through
+     the product, by one step, never loses any information. *)
+  |> mark_best
+
+let for_unboxed_record lbls =
+  let fields =
+    List.map
+      (fun ((lbl : Types.label_declaration), _layout) ->
+        lbl.ld_type, Unboxed_field_transformation.of_label lbl)
+      lbls
+  in
+  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
+  product_of_fields ~why:Unboxed_record fields layouts
+
+let for_abbreviation ~type_jkind_purely wrapping ty =
+  (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
+  let jkind = type_jkind_purely ty in
+  let with_ty_bound =
+    With_bounds_types.singleton ty { bounds_mask = Axis_lattice.top }
+  in
+  let jkind_before_wrapping =
+    fresh_jkind_poly
+      { base = jkind.jkind.base;
+        mod_bounds = Mod_bounds.min;
+        with_bounds = With_bounds with_ty_bound
+      }
+      ~annotation:None ~why:Abbreviation
+  in
+  Unboxed_field_transformation.apply_l wrapping jkind_before_wrapping
+
 (******************************)
 (* relations *)
 
@@ -4664,6 +4898,36 @@ let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _ }; _ } ->
     false
 
+let is_obviously_sub (type r l) (sub : (allowed * r) jkind)
+    (super : (l * allowed) jkind) =
+  let base_le =
+    match sub.jkind.base, super.jkind.base with
+    | Layout l1, Layout l2 -> (
+      (* Only compare constant layouts, as [Layout.sub] may mutate *)
+      match Layout.get_const l1, Layout.get_const l2 with
+      | Some c1, Some c2 ->
+        Misc.Le_result.is_le (Layout.Const.less_or_equal c1 c2)
+      | (Some _ | None), _ -> false)
+    | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2) ->
+      Path.same p1 p2
+      && Kind_operator.equal op1 op2
+      && Scannable_axes.le sa1 sa2
+    | Kconstr (_, sa1, _), Layout (Any sa2) -> Scannable_axes.le sa1 sa2
+    | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
+  in
+  base_le
+  &&
+  let { base = _; mod_bounds = super_bounds; with_bounds = No_with_bounds } =
+    super.jkind
+  in
+  match sub.jkind.with_bounds with
+  | No_with_bounds ->
+    Sub_result.is_le
+      (Mod_bounds.less_or_equal sub.jkind.mod_bounds super_bounds)
+  | With_bounds _ ->
+    (* With-bounds can only matter if [super]'s mod bounds aren't max *)
+    Mod_bounds.is_max super_bounds
+
 let fully_expand_aliases env ({ jkind; _ } as jk) =
   { jk with jkind = Base_and_axes.fully_expand_aliases env jkind }
 
@@ -4733,14 +4997,19 @@ module Debug_printers = struct
     | Optional_arg_default -> fprintf ppf "Optional_arg_default"
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Tuple_element -> fprintf ppf "Tuple_element"
-    | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Address_contents -> fprintf ppf "Address_contents"
     | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
     | Layout_poly -> fprintf ppf "Layout_poly"
     | Typing_recovery -> fprintf ppf "Typing_recovery"
+    | Module_projection -> fprintf ppf "Module_projection"
+    | Module_coercion -> fprintf ppf "Module_coercion"
+    | Module_inclusion -> fprintf ppf "Module_inclusion"
+    | Module_open -> fprintf ppf "Module_open"
+    | Module_argument -> fprintf ppf "Module_argument"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -4830,6 +5099,7 @@ module Debug_printers = struct
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
       fprintf ppf "Array_comprehension_iterator_element"
+    | List_comprehension_element -> fprintf ppf "List_comprehension_element"
     | Idx_base -> fprintf ppf "Idx_base"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function

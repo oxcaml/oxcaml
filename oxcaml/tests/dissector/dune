@@ -682,7 +682,7 @@
  (target cstub.o)
  (deps cstub.c)
  (action
-  (run gcc -c -I %{ocaml_where} -o %{target} %{deps})))
+  (run %{cc} -c -I %{ocaml_where} -o %{target} %{deps})))
 
 ; Create static library from C stub
 (rule

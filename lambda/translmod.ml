@@ -102,7 +102,10 @@ let transl_type_extension ~scopes env rootpath tyext body =
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
   | Module_mixed (shape, _) ->
-    Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
+    (* Shapes containing splices are checked after static evaluation *)
+    if not (Lambda.mixed_block_shape_has_splices shape)
+    then
+      Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
     Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a coercion *)
@@ -691,12 +694,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
       ~body
   in
   match staticity with
-  | Static ->
-    let tmpl_func, tmpl_env =
-      Lambda.extract_free_var_env lfun
-        ~layout_of_ident:(Typeopt.layout_of_ident mexp.mod_env)
-    in
-    Ltemplate { tmpl_func; tmpl_env }
+  | Static -> Ltemplate lfun
   | Dynamic -> Lfunction lfun
 
 (* Compile a module expression *)
@@ -956,7 +954,8 @@ and transl_structure ~scopes loc
           Value_rec_compiler.compile_letrec class_bindings body, repr
       | Tstr_include incl ->
           let ids_with_sorts =
-            bound_value_identifiers_and_sorts incl.incl_type
+            List.combine (bound_value_identifiers incl.incl_type)
+              (Array.to_list incl.incl_repr)
           in
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
@@ -1012,7 +1011,8 @@ and transl_structure ~scopes loc
               transl_structure ~scopes loc fields cc rootpath final_env rem
           | _ ->
               let ids_with_sorts =
-                bound_value_identifiers_and_sorts od.open_bound_items
+                List.combine (bound_value_identifiers od.open_bound_items)
+                  (Array.to_list od.open_items_repr)
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
@@ -1058,19 +1058,18 @@ and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
     Translattribute.get_inlined_attribute_on_module modl
   in
   let modl = transl_module ~scopes Tcoerce_none None modl in
-  let params = if generative then [params;[]] else [params] in
-  let params = List.map (fun coercion ->
+  let arg =
     Lprim(block_of_module_representation ~loc:(to_location loc) input_repr,
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
-            coercion,
-          loc))
-    params
+            params,
+          loc)
   in
+  let args = if generative then [arg; lambda_unit] else [arg] in
   Lapply {
     ap_loc = loc;
     ap_func = modl;
-    ap_args = params;
+    ap_args = args;
     ap_result_layout = Lambda.layout_module;
     ap_region_close=Rc_normal;
     ap_mode = not_alloc_stack;
@@ -1170,15 +1169,29 @@ let add_runtime_parameters lam params =
        function call and actually substitutes. *)
     Always_inline
   in
-  lfunction
-    ~params
-    ~kind:(Curried { nlocal = 0 })
-    ~return:layout_module
-    ~attr:{ default_function_attribute with is_a_functor = true; inline }
-    ~loc:Loc_unknown
-    ~body:lam
-    ~mode:alloc_heap
-    ~ret_mode:not_alloc_stack
+  let attr = { default_function_attribute with is_a_functor = true; inline } in
+  (* A unit can have more runtime parameters than [Lambda.max_arity], so split
+     them into a curried chain of functions. [transl_instance] still passes all
+     the arguments at once, as an over-application. *)
+  let chunks = Misc.Stdlib.List.chunks_of (Lambda.max_arity ()) params in
+  let lam, _return =
+    List.fold_right
+      (fun params (body, return) ->
+        let lam =
+          lfunction
+            ~params
+            ~kind:(Curried { nlocal = 0 })
+            ~return
+            ~attr
+            ~loc:Loc_unknown
+            ~body
+            ~mode:alloc_heap
+            ~ret_mode:not_alloc_stack
+        in
+        lam, layout_functor)
+      chunks (lam, layout_module)
+  in
+  lam
 
 let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
   let path = global_path module_id in
@@ -1578,8 +1591,7 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr =
 let main_repr_of_argument_unit (swg : Signature_with_global_bindings.t) =
   let sign, _ = swg.sign in
   Subst.Lazy.force_signature_once sign
-  |> List.filter_map Subst.Lazy.sort_of_signature_item
-  |> Array.of_list
+  |> Subst.Lazy.expect_fixed_representation
   |> transl_module_representation
   |> add_arg_block_to_module_representation
 
@@ -1837,7 +1849,7 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
   let required_globals =
     Global_module.Map.fold
       (fun _gm (_id, cu) set -> Compilation_unit.Set.add cu set)
-      module_map Compilation_unit.Set.empty
+      module_map (scan_used_globals body)
   in
   let unit_ident = Ident.create_local "*unit*" in
   let func_params =

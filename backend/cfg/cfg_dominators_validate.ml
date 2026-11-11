@@ -244,3 +244,8 @@ let validate_idom (cfg : Cfg.t) expected =
         (Printexc.raw_backtrace_to_string backtrace)
     in
     fallback cfg error (z3_code ())
+
+module For_testing = struct
+  let check_idom (cfg : Cfg.t) expected =
+    Internal.validate (Cfg_validation_facts.Graph.create cfg) expected
+end

@@ -18,10 +18,13 @@
     --root Set the root path for all relative locations
     --rewrite-root Rewrite locations paths using the provided root
     --store-shapes Aggregate input-indexes shapes and store them in the new index
+    --standalone The output index will not contain pointers to the input index/shape files. All data is copied into the output index.
+    --no-standalone The output may contain pointers to the input index/shape files. This will make the output index smaller, but to use it, the input index/shape files must still be available. (default)
     -I An extra directory to add to the load path
     -Ix An extra directory to add to the load path (Like -I, but indicates that cmx files for modules in <dir> are always available)
     -H An extra hidden directory to add to the load path
     --no-cmt-load-path Do not initialize the load path with the paths found in the first input cmt file
+    --files-from <file> Read input files from <file>, one per line. Can be repeated.
     --cache-size Set LRU cache size in kb. Will bound memory usage in read-heavy scenarios. Defaults to 1_000_000 (1gb)
     -help  Display this list of options
     --help  Display this list of options

@@ -143,6 +143,25 @@ let invoke_compilation_unit_callbacks res =
   List.iter (( |> ) res) !compilation_unit_callbacks;
   compilation_unit_callbacks := []
 
+module Reaper_mode = struct
+  (* CR mvellacott: in the future it would be nice to allow running the reaper
+     on the present unit and supporting LTO at the same time, but at the moment
+     it isn't safe to run the reaper twice on the same code. *)
+  (* CR-soon ncourant: I'm very surprised by that statement, and I don't see why
+     running the reaper twice wouldn't be safe. *)
+  type t =
+    | Single_unit_run
+    | Lto_support
+    | Disabled
+
+  let of_flags () =
+    if Flambda_features.lto_support ()
+    then Lto_support
+    else if Flambda_features.enable_reaper ()
+    then Single_unit_run
+    else Disabled
+end
+
 let reaper_oclassic = Oxcaml_args.Extra_options.bool __LOC__ "reaper-oclassic"
 
 let flambda_to_flambda0 : type m.
@@ -161,9 +180,14 @@ let flambda_to_flambda0 : type m.
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
   dump_fexpr_annot ~prefixname "raw" raw_flambda;
-  let flambda, all_code, slot_offsets, prepare_cmx, last_pass_name =
+  let ( flambda,
+        ~all_code,
+        ~slot_offsets,
+        ~prepare_cmx,
+        ~last_pass_name,
+        ~lto_info ) =
     match mode, close_prog_metadata with
-    | Classic, Classic (all_code, approxs, free_names, slot_offsets) ->
+    | Classic, Classic (all_code, approxs, free_names, slot_offsets) -> (
       (if Flambda_features.inlining_report ()
        then
          let output_prefix = prefixname ^ ".cps_conv" in
@@ -171,8 +195,8 @@ let flambda_to_flambda0 : type m.
            Inlining_report.output_then_forget_decisions ~output_prefix
          in
          Compiler_hooks.execute Inlining_tree inlining_tree);
-      if Flambda_features.enable_reaper () && reaper_oclassic ()
-      then
+      match Reaper_mode.of_flags () with
+      | Single_unit_run when reaper_oclassic () ->
         (* The reaper needs to rewrite the typing environment, so we need to
            convert the value approximations to a real typing environment. *)
         let final_typing_env =
@@ -183,15 +207,20 @@ let flambda_to_flambda0 : type m.
         in
         let flambda, all_code, slot_offsets, final_typing_env =
           run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-            ~final_typing_env:(Some final_typing_env) ~free_names raw_flambda
+            ~final_typing_env ~free_names raw_flambda
         in
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
           Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
             ~used_value_slots ~exported_offsets ~sections all_code
         in
-        flambda, all_code, slot_offsets, prepare_cmx, "reaper"
-      else
+        ( flambda,
+          ~all_code,
+          ~slot_offsets,
+          ~prepare_cmx,
+          ~last_pass_name:"reaper",
+          ~lto_info:None )
+      | Disabled | Single_unit_run ->
         let slot_offsets = finalize_offsets ~free_names slot_offsets in
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
@@ -199,7 +228,36 @@ let flambda_to_flambda0 : type m.
             ~module_symbol ~exported_offsets ~used_value_slots ~sections
             all_code
         in
-        raw_flambda, all_code, slot_offsets, prepare_cmx, "raw"
+        ( raw_flambda,
+          ~all_code,
+          ~slot_offsets,
+          ~prepare_cmx,
+          ~last_pass_name:"raw",
+          ~lto_info:None )
+      | Lto_support ->
+        let problem, skeleton =
+          Flambda2_reaper.Traverse.run ~free_names
+            ~final_typing_env:Without_types raw_flambda
+        in
+        let imported_offsets = Exported_offsets.imported_offsets () in
+        let slot_offsets = finalize_offsets ~free_names slot_offsets in
+        let lto_info =
+          Flambda2_reaper.Lto_info.create_for_current_unit ~sections
+            ~imported_offsets ~used_value_slots:slot_offsets.used_value_slots
+            ~problem ~skeleton
+        in
+        let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
+            all_code =
+          Flambda_cmx.prepare_cmx_from_approx ~machine_width ~approxs
+            ~module_symbol ~exported_offsets ~used_value_slots ~sections
+            all_code
+        in
+        ( raw_flambda,
+          ~all_code,
+          ~slot_offsets,
+          ~prepare_cmx,
+          ~last_pass_name:"raw",
+          ~lto_info:(Some lto_info) ))
     | Normal, Normal ->
       let round = 0 in
       let { Simplify.free_names;
@@ -228,24 +286,62 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr (This_pass "simplify"))
         ppf flambda;
       dump_fexpr_annot ~prefixname "simplify" flambda;
-      let flambda, all_code, slot_offsets, final_typing_env, last_pass_name =
-        if Flambda_features.enable_reaper ()
-        then
+      let ( flambda,
+            ~all_code,
+            ~slot_offsets,
+            ~final_typing_env,
+            ~last_pass_name,
+            ~lto_info ) =
+        match Reaper_mode.of_flags () with
+        | Disabled ->
+          let slot_offsets = finalize_offsets ~free_names slot_offsets in
+          ( flambda,
+            ~all_code,
+            ~slot_offsets,
+            ~final_typing_env,
+            ~last_pass_name,
+            ~lto_info:None )
+        | Single_unit_run ->
           let flambda, all_code, slot_offsets, final_typing_env =
             run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
               ~final_typing_env ~free_names flambda
           in
-          flambda, all_code, slot_offsets, final_typing_env, "reaper"
-        else
+          ( flambda,
+            ~all_code,
+            ~slot_offsets,
+            ~final_typing_env,
+            ~last_pass_name:"reaper",
+            ~lto_info:None )
+        | Lto_support ->
+          let problem, skeleton =
+            Flambda2_reaper.Traverse.run ~free_names
+              ~final_typing_env:Without_types flambda
+          in
+          let imported_offsets = Exported_offsets.imported_offsets () in
           let slot_offsets = finalize_offsets ~free_names slot_offsets in
-          flambda, all_code, slot_offsets, final_typing_env, last_pass_name
+          let lto_info =
+            Flambda2_reaper.Lto_info.create_for_current_unit ~sections
+              ~imported_offsets ~used_value_slots:slot_offsets.used_value_slots
+              ~problem ~skeleton
+          in
+          ( flambda,
+            ~all_code,
+            ~slot_offsets,
+            ~final_typing_env,
+            ~last_pass_name,
+            ~lto_info:(Some lto_info) )
       in
       let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
           all_code =
         Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
           ~used_value_slots ~exported_offsets ~sections all_code
       in
-      flambda, all_code, slot_offsets, prepare_cmx, last_pass_name
+      ( flambda,
+        ~all_code,
+        ~slot_offsets,
+        ~prepare_cmx,
+        ~last_pass_name,
+        ~lto_info )
   in
   print_flambda last_pass_name (Flambda_features.dump_flambda ()) ppf flambda;
   print_fexpr last_pass_name (Flambda_features.dump_fexpr Last_pass) ppf flambda;
@@ -253,9 +349,11 @@ let flambda_to_flambda0 : type m.
     build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
   (match cmx with
-  | None ->
-    () (* Either opaque was passed, or there is no need to export offsets *)
+  | None -> () (* Opaque compilation *)
   | Some cmx -> Compilenv.set_export_info cmx);
+  (match lto_info with
+  | None -> ()
+  | Some lto_info -> Compilenv.set_lto_info lto_info);
   { flambda; offsets = exported_offsets; reachable_names; all_code }
 
 let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
@@ -344,5 +442,21 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     in
     if not keep_symbol_tables then reset_symbol_tables ();
     cmm
+  in
+  Profile.record_call "flambda2" run
+
+let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
+    (program : Lambda.program) : Optcomp_intf.jsir_program =
+  let run () =
+    let { flambda; all_code; offsets; reachable_names } =
+      lambda_to_flambda ~ppf_dump ~prefixname
+        ~machine_width:Thirty_two_no_gc_tag_bit program
+    in
+    let { Flambda2_to_jsir.To_jsir_result.program; imported_compilation_units }
+        =
+      Flambda2_to_jsir.To_jsir.unit ~offsets ~all_code ~reachable_names flambda
+    in
+    if not keep_symbol_tables then reset_symbol_tables ();
+    { Optcomp_intf.program; imported_compilation_units }
   in
   Profile.record_call "flambda2" run

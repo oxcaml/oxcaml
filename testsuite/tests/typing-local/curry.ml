@@ -79,6 +79,27 @@ let[@inline never] fheap () =
 
 let () = fheap ()
 
+module N : sig
+  val local_curry : int -> (int -> int -> int) @ local
+end = struct
+  let local_curry a b c = a + b + c
+end
+
+let[@inline never] flocal_curry () =
+  let n = Sys.opaque_identity 1 in
+  let a = N.local_curry n in
+  let b = a n in
+  let g = Sys.opaque_identity N.local_curry in
+  let c = g n in
+  let d = c n in
+  let e = g n n in
+  Gc.minor ();
+  Printf.printf "%20s: %d%d%d%d%d\n"
+    "local curry"
+    (loc a) (loc b) (loc c) (loc d) (loc e)
+
+let () = flocal_curry ()
+
 (* partial application of a local function *)
 let[@inline never] f z =
   let local_ g a b c d e f = [a;b;c;d;e;f;z] in

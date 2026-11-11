@@ -53,6 +53,10 @@ let b' x y = (a [@inlined hint]) x y
 
 let d' x = (c [@inlined hint]) x
 
+(* [@unrolled] on a partial application should mention [@unrolled],
+   not [@inlined]. *)
+let k x = (j [@unrolled 1]) x
+
 (* TEST
  flags = "-w +A-70";
  compile_only = "true";

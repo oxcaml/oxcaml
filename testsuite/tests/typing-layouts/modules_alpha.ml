@@ -30,10 +30,13 @@ type ('a : void) t1
 module type S1' = sig type ('a : void) t = t_void t1 type s = t_void t1 end
 |}];;
 
-module type S1'' = S1 with type 'a t = 'a list;;
+type ('a : value_or_null) value_list = 'a list
+
+module type S1'' = S1 with type 'a t = 'a value_list;;
 [%%expect {|
-Line 1, characters 32-34:
-1 | module type S1'' = S1 with type 'a t = 'a list;;
+type ('a : value_or_null) value_list = 'a list
+Line 3, characters 32-34:
+3 | module type S1'' = S1 with type 'a t = 'a value_list;;
                                     ^^
 Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : void)"
@@ -204,9 +207,9 @@ and Bar3 : sig type t : immediate end
 |}];;
 
 module rec Foo3 : sig
-  type 'a t = 'a Bar3.t * 'a list
+  type 'a t = 'a Bar3.t * 'a value_list
 end = struct
-  type t = 'a Bar3.t * 'a list
+  type t = 'a Bar3.t * 'a value_list
 end
 
 and Bar3 : sig
@@ -216,14 +219,14 @@ end = struct
 end;;
 [%%expect {|
 Line 2, characters 26-28:
-2 |   type 'a t = 'a Bar3.t * 'a list
+2 |   type 'a t = 'a Bar3.t * 'a value_list
                               ^^
 Error: This type "('a : void)" should be an instance of type
          "('b : value_or_null)"
        The layout of 'a is void
          because of the annotation on 'a in the declaration of the type t.
        But the layout of 'a must be a value layout
-         because the type argument of list has layout value_or_null.
+         because of the definition of value_list at line 1, characters 0-46.
 |}];;
 
 (* One downside of the current approach - this could be allowed, but isn't.  You
@@ -522,23 +525,12 @@ module F : sig end -> sig end
 |}];;
 
 (****************************************)
-(* Test 8: [val]s must be representable *)
+(* Test 8: [val]s may be unrepresentable *)
 
 module type S = sig val x : t_any end
 
-module M = struct
-  let x : t_void = assert false
-end
-
 [%%expect{|
-Line 1, characters 28-33:
-1 | module type S = sig val x : t_any end
-                                ^^^^^
-Error: The type of a module-level value must have a representable layout.
-       The layout of type t_any is any
-         because of the definition of t_any at line 1, characters 0-18.
-       But the layout of type t_any must be representable
-         because it's the type of something in a signature.
+module type S = sig val x : t_any end
 |}]
 
 (****************************************************************)

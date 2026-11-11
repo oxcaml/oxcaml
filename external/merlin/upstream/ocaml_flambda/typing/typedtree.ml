@@ -236,7 +236,6 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.With_regionality.l;
       lpoly: Lpoly.t;
-      env_locality_mode: locality_mode_r;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
@@ -268,6 +267,8 @@ and 'k pattern_desc =
       value pattern_desc
   | Tpat_array :
       mutability * Jkind.sort * value general_pattern list -> value pattern_desc
+  | Tpat_addr :
+      mutability * Jkind.sort * value general_pattern -> value pattern_desc
   | Tpat_lazy : value general_pattern -> value pattern_desc
   (* computation patterns *)
   | Tpat_value : tpat_value_argument -> computation pattern_desc
@@ -857,32 +858,33 @@ and open_description = (Path.t * Longident.t loc) open_infos
 
 and open_declaration = module_expr open_infos
 
-and include_kind =
+and 'repr include_kind =
   | Tincl_structure
   | Tincl_functor of
       { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
+      ; input_repr : 'repr
       ; yielding : Mode.Yielding.l
       }
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
+      ; input_repr : 'repr
       ; yielding : Mode.Yielding.l
       }
 
-and 'a include_infos =
+and ('a, 'repr) include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
-     incl_repr: Types.module_representation;
+     incl_repr: 'repr;
      incl_loc: Location.t;
-     incl_kind: include_kind;
+     incl_kind: 'repr include_kind;
      incl_attributes: attribute list;
     }
 
-and include_description = module_type include_infos
+and include_description = (module_type, unit) include_infos
 
-and include_declaration = module_expr include_infos
+and include_declaration =
+  (module_expr, Types.module_representation) include_infos
 
 and with_constraint =
     Twith_type of type_declaration
@@ -906,8 +908,8 @@ and core_type =
 
 and core_type_desc =
   | Ttyp_var of string option * Parsetree.jkind_annotation option
-  | Ttyp_arrow of arg_label * core_type * Mode.With_locality.Const.t modes *
-                  core_type * Mode.With_locality.Const.t modes
+  | Ttyp_arrow of arg_label * core_type * Mode.With_locality.lr modes *
+                  core_type * Mode.With_locality.lr modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list
@@ -1184,6 +1186,7 @@ let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   | Tpat_record _ -> Value
   | Tpat_record_unboxed_product _ -> Value
   | Tpat_array _ -> Value
+  | Tpat_addr _ -> Value
   | Tpat_lazy _ -> Value
   | Tpat_any -> Value
   | Tpat_var _ -> Value
@@ -1219,7 +1222,7 @@ let shallow_iter_pattern_desc
   | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
-  | Tpat_lazy p -> f.f p
+  | Tpat_addr (_, _, p) | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
   | Tpat_constant _
@@ -1254,6 +1257,7 @@ let shallow_map_pattern_desc
       Tpat_construct (lid, c, r, List.map (fun (s, p) -> s, f.f p) pats, ty)
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
+  | Tpat_addr (mut, arg_sort, p1) -> Tpat_addr (mut, arg_sort, f.f p1)
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
   | Tpat_variant (x1, Some p1, x2) ->
       Tpat_variant (x1, Some (f.f p1), x2)
@@ -1383,7 +1387,7 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
-      | Tpat_lazy p | Tpat_exception p -> loop f p
+      | Tpat_addr (_, _, p) | Tpat_lazy p | Tpat_exception p -> loop f p
       | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _ ->
         ()
   in
@@ -1443,6 +1447,7 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
                  Zero_alloc.create_const
                    (Check { strict = false;
                             arity;
+                            partial = false;
                             custom_error_msg = None;
                             loc = Location.none;
                             opt })

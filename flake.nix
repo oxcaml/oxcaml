@@ -2,7 +2,7 @@
   description = "OxCaml - A performance-focused fork of OCaml";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/0dd31db7e6dbf9ce05697c4545f6fe01accec994";
+    nixpkgs.url = "github:NixOS/nixpkgs/718f670e845328e9c2cecdd832835712b2cbd065";
     flake-utils.url = "github:numtide/flake-utils";
     nix-github-actions = {
       url = "github:nix-community/nix-github-actions";
@@ -36,7 +36,6 @@
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           ppxlib = oxcaml.mkPpxlibLibs oxcaml;
           jsoo = oxcaml.mkJsooLibs oxcaml;
-          jsoo-test = oxcaml.mkJsooTest oxcaml;
           jsoo-smoke-test = oxcaml.mkJsooSmokeTest oxcaml;
           installed-libraries = oxcaml.mkInstalledLibrariesCheck oxcaml;
           default = oxcaml;
@@ -49,7 +48,6 @@
             oxcaml-asan
             ppxlib
             jsoo
-            jsoo-test
             jsoo-smoke-test
             installed-libraries
             merlin
@@ -78,9 +76,9 @@
           "aarch64-darwin"
         ] self.checks;
         platforms = {
-          "x86_64-linux" = "warp-ubuntu-latest-x64-8x";
-          "aarch64-linux" = "warp-ubuntu-latest-arm64-8x";
-          "aarch64-darwin" = "warp-macos-15-arm64-6x";
+          "x86_64-linux" = "warp-ubuntu-latest-x64-16x";
+          "aarch64-linux" = "warp-ubuntu-latest-arm64-16x";
+          "aarch64-darwin" = "warp-macos-15-arm64-12x";
         };
       };
     };
