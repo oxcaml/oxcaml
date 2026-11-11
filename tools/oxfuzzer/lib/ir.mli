@@ -67,7 +67,7 @@ module Number : sig
 
   val of_integral_bits : NumberTy.Base.t -> int64 -> t
 
-  val to_code : t -> Parsetree.expression
+  val to_code : unboxed:bool -> t -> Parsetree.expression
 end
 
 module Ty : sig
@@ -242,7 +242,10 @@ end
 
 module Expr : sig
   type t =
-    | Const of Number.t
+    | Const of
+        { number : Number.t;
+          unboxed : bool
+        }
     | Bool_const of bool
     | String_const of string
     | String_length of t
