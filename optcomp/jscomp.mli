@@ -105,5 +105,8 @@ val make :
     keep_symbol_tables:bool ->
     Lambda.program ->
     Optcomp_intf.jsir_program) ->
-  jsir_linker:(Jsoo_imports.Code.jsir_file list -> Jsoo_imports.Code.program) ->
+  jsir_linker:
+    (register_globals:bool ->
+    Jsoo_imports.Code.jsir_file list ->
+    Jsoo_imports.Code.program) ->
   (module Optcompile.S)
