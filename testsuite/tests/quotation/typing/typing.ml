@@ -1,5 +1,6 @@
 (* TEST
  flags = "-extension runtime_metaprogramming";
+ flat-float-array;
  expect;
 *)
 
