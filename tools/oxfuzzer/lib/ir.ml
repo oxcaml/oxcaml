@@ -346,6 +346,11 @@ module Un_op = struct
     | Abs
     | Succ
     | Pred
+    | Sqrt
+    | Round
+    | Trunc
+    | Ceil
+    | Floor
     | Bit_not
     | Not
 
@@ -353,7 +358,9 @@ module Un_op = struct
     match ty with
     | Number nty ->
       let numeric = [Neg; Abs; Succ; Pred] in
-      if NumberTy.is_floating_point nty then numeric else numeric @ [Bit_not]
+      if NumberTy.is_floating_point nty
+      then numeric @ [Sqrt; Round; Trunc; Ceil; Floor]
+      else numeric @ [Bit_not]
     | Bool -> [Not]
     | String | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
       Misc.fatal_errorf "Un_op.ops_for_ty: expected a numeric or boolean type"
@@ -373,6 +380,11 @@ module Un_op = struct
       | Abs -> "abs"
       | Succ -> "succ"
       | Pred -> "pred"
+      | Sqrt -> "sqrt"
+      | Round -> "round"
+      | Trunc -> "trunc"
+      | Ceil -> "ceil"
+      | Floor -> "floor"
       | Bit_not -> "lognot"
       | Not -> "not"
     in
@@ -386,6 +398,10 @@ module Bin_op = struct
     | Mul
     | Div
     | Rem
+    | Min
+    | Max
+    | Min_num
+    | Max_num
     | Bit_and
     | Bit_or
     | Bit_xor
@@ -402,6 +418,10 @@ module Bin_op = struct
 
   let num_binops = [Add; Sub; Mul; Div; Rem]
 
+  (* CR-soon xclerc: Add FMA and copy_sign. FMA needs a ternary expression;
+     copy_sign must avoid NaN sign arguments, whose results are unspecified. *)
+  let floating_point_binops = num_binops @ [Min; Max; Min_num; Max_num]
+
   let integral_binops =
     num_binops
     @ [Bit_and; Bit_or; Bit_xor; Shift_left; Shift_right; Shift_right_logical]
@@ -409,7 +429,9 @@ module Bin_op = struct
   let ops_for_ty (ty : Ty.t) =
     match ty with
     | Number nty ->
-      if NumberTy.is_floating_point nty then num_binops else integral_binops
+      if NumberTy.is_floating_point nty
+      then floating_point_binops
+      else integral_binops
     | Bool | String | Array _ | Unboxed_tuple _ | Record _ | Variant _
     | Or_null _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
@@ -431,6 +453,10 @@ module Bin_op = struct
     | Mul -> call "mul"
     | Div -> call "div"
     | Rem -> call "rem"
+    | Min -> call "min"
+    | Max -> call "max"
+    | Min_num -> call "min_num"
+    | Max_num -> call "max_num"
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
     | Bit_xor -> call "logxor"
