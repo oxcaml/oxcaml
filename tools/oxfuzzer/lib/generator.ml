@@ -181,32 +181,6 @@ let maybe_assert (st : State.t) ~f =
     then Expr.Assert_false
     else f ()
 
-(* Make assertion outcomes independent of OCaml's unspecified operand order. *)
-let bind_operand (st : State.t) expr ~f =
-  match st.swarm.assertions with
-  | Disabled | Unreachable_only -> f expr
-  | May_raise ->
-    let name = State.fresh st in
-    Expr.Let { name; expr; body = f (Expr.Read (Place.Variable name)) }
-
-(* Evaluate operands right-to-left. *)
-let rec bind_operands st operands ~f =
-  match operands with
-  | [] -> f []
-  | expr :: rest ->
-    bind_operands st rest ~f:(fun rest ->
-        bind_operand st expr ~f:(fun expr -> f (expr :: rest)))
-
-let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
-  let make lhs rhs = Expr.Bin_op { ty; op; lhs; rhs } in
-  match op with
-  | And | Or -> make lhs rhs
-  | Add | Sub | Mul | Div | Rem | Min | Max | Min_num | Max_num | Bit_and
-  | Bit_or | Bit_xor | Shift_left | Shift_right | Shift_right_logical | Eq | Ne
-  | Lt | Le | Gt | Ge | Compare | Unsigned_compare ->
-    bind_operand st rhs ~f:(fun rhs ->
-        bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
-
 (* Comparison APIs specify only the sign of the result. Normalize before using
    it in arithmetic so that different magnitudes do not cause false
    positives. *)
@@ -253,17 +227,6 @@ let safe_div_or_rem (st : State.t) (nty : NumberTy.t) op ~lhs ~rhs =
       expr = rhs;
       body = Expr.Let { name = lhs_name; expr = lhs; body }
     }
-
-let assign (st : State.t) ty target expr =
-  match st.swarm.assertions with
-  | Disabled | Unreachable_only -> Statement.Assign (target, expr)
-  | May_raise ->
-    (* Evaluate the value before reading the target's mutable containers. *)
-    let binding = { Binding.name = State.fresh st; ty; is_mutable = false } in
-    Statement.Let
-      ( binding,
-        expr,
-        Statement.Assign (target, Expr.Read (Place.Variable binding.name)) )
 
 let maybe_opaque st ~enabled ~probability expr =
   if enabled && with_probability st ~probability then Expr.Opaque expr else expr
@@ -842,7 +805,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
           match binop with
           | (Div | Rem) when not (NumberTy.is_floating_point inner_ty) ->
             safe_div_or_rem st inner_ty binop ~lhs ~rhs
-          | _ -> bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
+          | _ -> Expr.Bin_op { ty = Ty.Number inner_ty; op = binop; lhs; rhs }
         in
         Expr.Convert { from = inner_ty; to_ = nty; expr })
   in
@@ -878,7 +841,7 @@ and gen_compare (st : State.t) env ty =
   let op = random_element st (Bin_op.compare_ops_for_ty ty) in
   let lhs = gen_value st env ty in
   let rhs = gen_value st env ty in
-  bin_op st ty op ~lhs ~rhs
+  Expr.Bin_op { ty; op; lhs; rhs }
 
 and gen_unary (st : State.t) env ty =
   let op =
@@ -919,18 +882,19 @@ and gen_shift_count (st : State.t) env (nty : NumberTy.t) =
     (* Make the remainder nonnegative, including for [min_int]. Unlike masking
        with [width - 1], this also covers every count for tagged integers. *)
     let nonnegative =
-      bin_op st ty Bit_and ~lhs:expr
-        ~rhs:(Expr.Const { number = Number.Int max_int; unboxed = false })
+      Expr.Bin_op
+        { ty;
+          op = Bit_and;
+          lhs = expr;
+          rhs = Expr.Const { number = Number.Int max_int; unboxed = false }
+        }
     in
-    bin_op st ty Rem ~lhs:nonnegative
-      ~rhs:(Expr.Const { number = Number.Int width; unboxed = false })
-
-(* CR-someday xclerc: These function calls can have side effects, because of
-   mutable records. Outside [May_raise] mode we rely on a de facto right-to-left
-   evaluation order, which holds in many cases but is not specified. We should
-   either do some sort of effect analysis in the style of Efftester, make sure
-   we pull function calls out of expressions into let-bindings for example. Or
-   we can just decide that we treat an evaluation order violation as a bug. *)
+    Expr.Bin_op
+      { ty;
+        op = Rem;
+        lhs = nonnegative;
+        rhs = Expr.Const { number = Number.Int width; unboxed = false }
+      }
 
 (* Generates a function call, possibly by creating a new function. This amounts
    to lazy function generation. Note that once [Config.max_function_count] have
@@ -961,9 +925,8 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
         (fun () ->
           let function_ = random_element st functions in
           let args = gen_arguments function_.params in
-          bind_operands st args ~f:(fun args ->
-              convert_value st function_.return_ty return_ty
-                (Expr.Call_toplevel { fun_name = function_.name; args })))
+          convert_value st function_.return_ty return_ty
+            (Expr.Call_toplevel { fun_name = function_.name; args }))
     in
     let new_function =
       Gen.create (fun () ->
@@ -1019,8 +982,7 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
              added to [st.top_level_functions]. This means that functions are
              topologically sorted by construction. *)
           st.top_level_functions <- function_ :: st.top_level_functions;
-          bind_operands st args ~f:(fun args ->
-              Expr.Call_toplevel { fun_name = name; args }))
+          Expr.Call_toplevel { fun_name = name; args })
     in
     Gen.weighted st.random_state [2, existing_function; 1, new_function]
 
@@ -1033,15 +995,13 @@ and gen_string (st : State.t) env =
     Gen.create (fun () ->
         let lhs = gen_value st env Ty.String in
         let rhs = gen_value st env Ty.String in
-        bind_operand st rhs ~f:(fun rhs ->
-            bind_operand st lhs ~f:(fun lhs ->
-                (* Bound repeated concatenation in loops as well as literals. *)
-                Expr.Bounded_string_concat
-                  { lhs;
-                    rhs;
-                    result_name = State.fresh st;
-                    max_length = Config.max_string_length
-                  })))
+        (* Bound repeated concatenation in loops as well as literals. *)
+        Expr.Bounded_string_concat
+          { lhs;
+            rhs;
+            result_name = State.fresh st;
+            max_length = Config.max_string_length
+          })
   in
   Gen.run_exn
     (Gen.weighted st.random_state
@@ -1056,7 +1016,7 @@ and gen_bool (st : State.t) env =
     Gen.create (fun () ->
         let lhs = gen_arg () in
         let rhs = gen_arg () in
-        bin_op st arg_ty op ~lhs ~rhs)
+        Expr.Bin_op { ty = arg_ty; op; lhs; rhs })
   in
   let nty = random_number_ty st in
   let gen_number_arg () = gen_value st env (Ty.Number nty) in
@@ -1077,10 +1037,12 @@ and gen_bool (st : State.t) env =
          ( 2,
            Gen.create (fun () ->
                let result = gen_compare st env (gen_scalar_type st) in
-               bin_op st
-                 (Ty.Number (NumberTy.boxed Int))
-                 comparison ~lhs:result
-                 ~rhs:(Expr.Const { number = Number.Int 0; unboxed = false })) );
+               Expr.Bin_op
+                 { ty = Ty.Number (NumberTy.boxed Int);
+                   op = comparison;
+                   lhs = result;
+                   rhs = Expr.Const { number = Number.Int 0; unboxed = false }
+                 }) );
          1, Gen.create (fun () -> gen_unary st env Ty.Bool);
          1, gen_bool_binop (random_element st Bin_op.[Eq; Ne]);
          1, gen_bool_binop Bin_op.And;
@@ -1143,12 +1105,7 @@ and gen_value (st : State.t) env ty =
       | Ty.Unboxed_tuple components ->
         let construct =
           Gen.create (fun () ->
-              Expr.Unboxed_tuple
-                (List.map
-                   (fun ty ->
-                     let name = State.fresh st in
-                     name, gen_value st env ty)
-                   components))
+              Expr.Unboxed_tuple (List.map (gen_value st env) components))
         in
         Gen.run_exn
           (Gen.weighted st.random_state
@@ -1166,16 +1123,13 @@ and gen_value (st : State.t) env ty =
                   (fun (field : Ty.field) -> gen_value st env field.ty)
                   record.fields
               in
-              bind_operands st values ~f:(fun values ->
-                  Expr.Record (record, values)))
+              Expr.Record (record, values))
         in
         let update =
           Gen.map existing ~f:(fun base ->
               let field = random_element st record.fields in
               let value = gen_value st env field.ty in
-              bind_operand st value ~f:(fun value ->
-                  bind_operand st base ~f:(fun base ->
-                      Expr.Record_update (record, base, field, value))))
+              Expr.Record_update (record, base, field, value))
           |> Gen.only_if st.swarm.record_updates
         in
         Gen.run_exn
@@ -1196,13 +1150,7 @@ and gen_sum_value (st : State.t) env sum =
          1, gen_match st env (Sum.ty sum) ])
 
 and gen_constructor st env sum (constructor : Ty.constructor) =
-  let args =
-    List.map
-      (fun ty ->
-        let name = State.fresh st in
-        name, gen_value st env ty)
-      constructor.args
-  in
+  let args = List.map (gen_value st env) constructor.args in
   Expr.Construct { sum; constructor; args }
 
 and gen_sum (st : State.t) env sum =
@@ -1324,7 +1272,7 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
             let ty, make = random_element st targets in
             let target = make () in
             let expr = gen_value st env ty in
-            continue env (assign st ty target expr))
+            continue env (Statement.Assign (target, expr)))
       in
       let gen_if =
         Gen.when_ st.swarm.conditionals (fun () ->
