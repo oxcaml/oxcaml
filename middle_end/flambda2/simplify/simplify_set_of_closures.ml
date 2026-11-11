@@ -602,6 +602,7 @@ let simplify_function context ~outer_dacc function_slot code_id
     | Code_present code
       when (not (Code.stub code))
            || C.stub_can_be_simplified (DA.denv outer_dacc) ->
+      (* The version of the code with its FDO counters renamed for this copy. *)
       let code =
         Option.value (C.code_to_simplify context code_id) ~default:code
       in
