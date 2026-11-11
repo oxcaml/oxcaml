@@ -69,22 +69,21 @@ type sort_map =
   | Nothing
     (* substitution has nothing to do with cmi operations *)
 
-let rec modules_path modules path =
+(* [module_path modules path] applies the module substitution [modules] to
+   [path] (i.e., replaces it or its subcomponents where applicable). *)
+let rec module_path modules path =
   match Path.Map.find_opt path modules with
   | Some p -> p
   | None ->
     match path with
     | Pident _ -> path
     | Pdot(p, n) ->
-       Pdot(modules_path modules p, n)
+       Pdot(module_path modules p, n)
     | Papply(p1, p2) ->
-       Papply(modules_path modules p1, modules_path modules p2)
+       Papply(module_path modules p1, module_path modules p2)
     | Pextra_ty _ ->
        fatal_error "Subst.module_path"
 
-(* The values of a substitution. Few substitutions are ever used to look up
-   a value identifier, so adding and composing take constant time and
-   lookups do the work. *)
 module Values : sig
   type t
 
@@ -92,16 +91,22 @@ module Values : sig
 
   val add : (Ident.t * Path.t) list -> t -> t
 
-  (* [add_lazy bindings vals] is similar to [add (Lazy.force bindings) vals],
-     but delays forcing the lazy to lookup time. *)
+  (** [add_lazy bindings vals] is similar to [add (Lazy.force bindings) vals],
+      but may delay forcing the lazy to lookup time. No assumption should be
+      made over when the lazy is forced. *)
   val add_lazy : (Ident.t * Path.t) list Lazy.t -> t -> t
 
-  (* [compose first ~modules second] maps an identifier as [first] does,
-     followed by the substitution whose modules are [modules] and whose
-     values are [second]. *)
-  val compose : t -> modules:Path.t Path.Map.t -> t -> t
+  (** [compose first modules second] returns [second o modules o first], the
+      value substitution where an identifier bound in [first] maps to its path
+      in [first], rewritten by [modules] (if it is a module component) or
+      [second] (if it is an identifier). Identifiers not bound in [first] are
+      looked up in [second]. *)
+  val compose : t -> Path.t Path.Map.t -> t -> t
 
+  (* Not used yet: no substitution looks up a value path. Should be considered
+     unreviewed and untested. *)
   val path : modules:Path.t Path.Map.t -> t -> Path.t -> Path.t
+  [@@warning "-32"]
 end = struct
   type t =
     | Empty
@@ -109,6 +114,13 @@ end = struct
     | Lazy_bindings of
         { bindings : (Ident.t * Path.t) list Lazy.t; rest : t }
     | Composed of { first : t; modules : Path.t Path.Map.t; second : t }
+  (* For value substitutions, lookups are more rare than insertions. They are
+     only used for type-level expressions (rare). As such, the internal
+     representation favors insertions over lookups: insertions are constant time
+     with [Bindings] and [Lazy_bindings], as is composition with [Composed],
+     and, in exchange, lookups are linear time. If the balance ever changes, it
+     could make sense to use maps and make both logarithmic. The interface
+     intentionally does not constrain the exact implementation. *)
 
   let empty = Empty
 
@@ -116,7 +128,7 @@ end = struct
 
   let add_lazy bindings rest = Lazy_bindings { bindings; rest }
 
-  let compose first ~modules second =
+  let compose first modules second =
     match first with
     | Empty -> second
     | Bindings _ | Lazy_bindings _ | Composed _ ->
@@ -125,7 +137,7 @@ end = struct
   let rec path ~modules vals p =
     match p with
     | Pident id -> Option.value (find id vals) ~default:p
-    | Pdot (q, n) -> Pdot (modules_path modules q, n)
+    | Pdot (q, n) -> Pdot (module_path modules q, n)
     | Papply _ | Pextra_ty _ -> fatal_error "Subst.Values.path"
 
   and find id = function
@@ -458,7 +470,7 @@ let attrs s x =
       else x
   | No_action -> x
 
-let module_path s path = modules_path s.modules path
+let module_path s path = module_path s.modules path
 
 let modtype_path s path =
       match Path.Map.find path s.modtypes with
@@ -486,8 +498,11 @@ let jkind_path s path =
     | Papply(_, _) | Pextra_ty _ ->
        fatal_error "Subst.jkind_path"
 
-(* For values, extension constructors, classes and class types *)
-let value_path s path = Values.path ~modules:s.modules s.values path
+let extension_constructor_path s path =
+  match path with
+  | Pident _ -> path
+  | Pdot(p, n) -> Pdot(module_path s p, n)
+  | Papply _ | Pextra_ty _ -> fatal_error "Subst.extension_constructor_path"
 
 let rec type_path s path =
   match Path.Map.find path s.types with
@@ -504,7 +519,7 @@ let rec type_path s path =
          match extra with
          | Pcstr_ty _ | Punboxed_ty ->
            Pextra_ty (type_path s p, extra)
-         | Pext_ty -> Pextra_ty (value_path s p, extra)
+         | Pext_ty -> Pextra_ty (extension_constructor_path s p, extra)
 
 let to_subst_by_type_function s p =
   match Path.Map.find p s.types with
@@ -1237,8 +1252,6 @@ let rename_bound_idents scoping s sg =
     | Make_local -> rename_ident s
     | Rescope scope -> (fun id -> create_scoped ~scope (name id))
   in
-  (* Values are collected and added at the end, which creates one node in
-     [values] for the whole signature instead of one per value. *)
   let rec rename_bound_idents s values sg = function
     | [] -> sg, add_values values s
     | Sig_type(id, td, rs, vis) :: rest ->
@@ -1478,7 +1491,7 @@ and compose s1 s2 =
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
           jkinds = merge_path_maps (jkind_replacement s2) s1.jkinds s2.jkinds;
-          values = Values.compose s1.values ~modules:s2.modules s2.values;
+          values = Values.compose s1.values s2.modules s2.values;
           additional_action = begin
             match s1.additional_action, s2.additional_action with
             | action, No_action | No_action, action -> action

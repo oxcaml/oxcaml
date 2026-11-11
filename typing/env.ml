@@ -2331,9 +2331,11 @@ let prefix_idents root prefixing_sub sg =
   let items_and_paths, prefixing_sub =
     prefix_idents root [] prefixing_sub sg
   in
-  (* Signatures tend to contain many value declarations, which would make
-     adding all of them to the substitution expensive. Lookup is much rarer
-     so we shift the cost to lookup time. *)
+  (* We could compute [values] eagerly as part of computing [prefix_idents],
+     which already does a recursive traversal of the signature. We make the
+     computation lazy for efficiency reasons. If values are never looked up,
+     then keeping the signature [sg] alive (captured by the lazy) tends to be
+     better than allocating a list of [Pdot] entries eagerly. See #7854. *)
   let values =
     lazy
       (List.filter_map
