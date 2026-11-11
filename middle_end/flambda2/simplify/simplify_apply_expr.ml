@@ -692,7 +692,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
               ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
-              dbg
+              (* [dbg] is already in the current inlining context, which the
+                 wrapper gets again when inlined at its applications. *)
+              Debuginfo.none
               (* This is the call to the callee made by the source partial
                  application, so it carries that application's counter. *)
               ~callsite_counter:(Apply.callsite_counter apply)

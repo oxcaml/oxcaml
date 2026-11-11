@@ -7,8 +7,10 @@
 *)
 
 (* Simplify rewrites these applications, which only appear once their callee is
-   inlined, into terms built from the application it has already simplified.
-   The frame of the inlined callee appears once in their backtraces. *)
+   inlined, into terms built from the application it has already simplified
+   (for [partial], a wrapper, which is then inlined at [p 2 3]). The frame of the
+   inlined callee appears once in their backtraces, which are the same as with
+   [-Oclassic]. *)
 
 let[@inline never] check name n = if n > 0 then raise (Failure name) else n
 
@@ -34,7 +36,7 @@ let[@inline never] via_tuple x = 1 + apply_pair tuple x
 
 let[@inline never] via_over x = 1 + apply2 over x
 
-let run f =
+let[@inline never] run f =
   match f 1 with
   | (_ : int) -> ()
   | exception Failure name ->
