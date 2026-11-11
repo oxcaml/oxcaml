@@ -1378,7 +1378,7 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
-  | Pdomain_index | Ppoll | Pcpu_relax ->
+  | Pdomain_index | Pthread_self_id | Ppoll | Pcpu_relax ->
     dyn old_prim
 
 (** {[

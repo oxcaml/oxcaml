@@ -1,5 +1,5 @@
 (* TEST
- readonly_files = "member.ml member2.ml use_member_directly.ml";
+ readonly_files = "member.ml use_member_directly.ml";
  setup-ocamlopt.byte-build-env;
  flags = "-for-pack Pack";
  module = "member.ml";

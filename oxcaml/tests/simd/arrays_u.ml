@@ -2122,3 +2122,77 @@ module _ = Int_arrays(struct
   let untagged_int8_array_set_int8x16_unsafe arr i v = untagged_int8_array_set_int8x16_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
 
 end)
+
+module _ = struct
+  external float_get_i64 : float# array -> int64_u -> float64x2
+    = "%caml_unboxed_float_array_get128#_indexed_by_int64#"
+  external float_set_i64 : float# array -> int64_u -> float64x2 -> unit
+    = "%caml_unboxed_float_array_set128#_indexed_by_int64#"
+  external float_get_n : float# array -> nativeint_u -> float64x2
+    = "%caml_unboxed_float_array_get128#_indexed_by_nativeint#"
+  external float_set_n : float# array -> nativeint_u -> float64x2 -> unit
+    = "%caml_unboxed_float_array_set128#_indexed_by_nativeint#"
+  external int32_get_i64 : int32_u array -> int64_u -> int32x4
+    = "%caml_unboxed_int32_array_get128#_indexed_by_int64#"
+  external int32_set_i64 : int32_u array -> int64_u -> int32x4 -> unit
+    = "%caml_unboxed_int32_array_set128#_indexed_by_int64#"
+  external int32_get_n : int32_u array -> nativeint_u -> int32x4
+    = "%caml_unboxed_int32_array_get128#_indexed_by_nativeint#"
+  external int32_set_n : int32_u array -> nativeint_u -> int32x4 -> unit
+    = "%caml_unboxed_int32_array_set128#_indexed_by_nativeint#"
+
+  let i64 i =
+    Stdlib_upstream_compatible.Int64_u.of_int64 (Sys.opaque_identity i)
+  let n i =
+    Stdlib_upstream_compatible.Nativeint_u.of_nativeint (Sys.opaque_identity i)
+
+  let bad_i64 = Int64.[ min_int; add min_int 3L; max_int ]
+  let bad_n = Nativeint.[ min_int; add min_int 3n; max_int ]
+
+  let float_3 = Int64.bits_of_float 3.0
+  let int32_34 = 0x0000_0004_0000_0003L
+
+  let () =
+    let a = [| #0.0; #1.0; #2.0; #3.0; #4.0 |] in
+    assert (float64x2_low_int64 (float_get_i64 a (i64 3L)) = float_3);
+    assert (float64x2_low_int64 (float_get_n a (n 3n)) = float_3);
+    float_set_i64 a (i64 0L) (float_get_i64 a (i64 3L));
+    assert (float64x2_low_int64 (float_get_i64 a (i64 0L)) = float_3);
+    float_set_n a (n 1n) (float_get_n a (n 0n));
+    assert (float64x2_low_int64 (float_get_n a (n 1n)) = float_3);
+    List.iter (fun i ->
+      assert_raises_out_of_bounds (fun () ->
+        let _ = float_get_i64 a (i64 i) in ());
+      assert_raises_out_of_bounds (fun () ->
+        float_set_i64 a (i64 i) (float_get_i64 a (i64 0L))))
+      bad_i64;
+    List.iter (fun i ->
+      assert_raises_out_of_bounds (fun () ->
+        let _ = float_get_n a (n i) in ());
+      assert_raises_out_of_bounds (fun () ->
+        float_set_n a (n i) (float_get_n a (n 0n))))
+      bad_n
+  ;;
+
+  let () =
+    let a = [| #0l; #1l; #2l; #3l; #4l; #5l; #6l |] in
+    assert (int32x4_low_int64 (int32_get_i64 a (i64 3L)) = int32_34);
+    assert (int32x4_low_int64 (int32_get_n a (n 3n)) = int32_34);
+    int32_set_i64 a (i64 0L) (int32_get_i64 a (i64 3L));
+    assert (int32x4_low_int64 (int32_get_i64 a (i64 0L)) = int32_34);
+    int32_set_n a (n 1n) (int32_get_n a (n 0n));
+    assert (int32x4_low_int64 (int32_get_n a (n 1n)) = int32_34);
+    List.iter (fun i ->
+      assert_raises_out_of_bounds (fun () ->
+        let _ = int32_get_i64 a (i64 i) in ());
+      assert_raises_out_of_bounds (fun () ->
+        int32_set_i64 a (i64 i) (int32_get_i64 a (i64 0L))))
+      bad_i64;
+    List.iter (fun i ->
+      assert_raises_out_of_bounds (fun () ->
+        let _ = int32_get_n a (n i) in ());
+      assert_raises_out_of_bounds (fun () ->
+        int32_set_n a (n i) (int32_get_n a (n 0n))))
+      bad_n
+  ;;
+end
