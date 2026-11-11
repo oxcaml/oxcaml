@@ -128,6 +128,9 @@ let counters_into t ~specialization_map region =
   in
   visit region Visit.empty
 
+(* CR-someday yusumez: A region entered by an exception (a handler) has no edge
+   for its preserved counters. We'd need to have annotations on exceptional
+   edges for that. *)
 let counters_into_handler t ~specialization_map cont ~use_id =
   counters_into t ~specialization_map
     (Use.handler { cont; use_id } ~specialization_map)
