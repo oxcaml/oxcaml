@@ -87,7 +87,7 @@ val include_manifests : string list ref
 val hidden_include_manifests : string list ref
 
 type hidden_include_file =
-  { visible_path : string;
+  { basename : string;
     actual_path : string;
     cmx_guaranteed : bool;
   }

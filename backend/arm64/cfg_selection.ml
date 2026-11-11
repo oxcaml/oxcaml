@@ -252,8 +252,8 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
   | Cabsf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
   | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
-  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
-  | Cpause ->
+  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
+  | Cthread_self_id | Cpoll | Cpause ->
     Use_default
 
 let select_operation
@@ -311,9 +311,9 @@ let pseudoregs_for_operation op arg res =
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
   | Move | Spill | Reload | Pause | Begin_region | End_region | Dls_get
-  | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
-  | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+  | Tls_get | Domain_index | Thread_self_id | Poll | Const_int _
+  | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+  | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Intop _ | Int128op _
   | Intop_imm (_, _)

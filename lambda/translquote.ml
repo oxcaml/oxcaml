@@ -2256,7 +2256,7 @@ let quote_arg_label loc = function
       Location.print_loc (to_location loc)
 
 let module_for_path_opt loc env path =
-  Env.add_required_global_for_quote path env;
+  Env.add_required_global_for_quote (to_location loc) path env;
   let rec go path =
     match path with
     | Path.Pident id ->

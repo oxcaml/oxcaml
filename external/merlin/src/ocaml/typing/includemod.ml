@@ -126,6 +126,7 @@ module Error = struct
     | Module_type_declaration of
         (modtype_declaration, module_type_declaration_symptom) diff
     | Module_type of module_type_diff
+    | Unrepresentable_item of type_expr * Jkind.Violation.t
 
   and module_type_declaration_symptom =
     | Illegal_permutation of Typedtree.module_coercion
@@ -471,15 +472,42 @@ let equal_modtype_paths env p1 subst p2 =
        (Env.normalize_modtype_path env
           (Subst.modtype_path subst p2))
 
-let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
-  let rec is_identity_coercion pos = function
+let is_identity_coercion pos_cc_list =
+  let rec loop pos = function
   | [] ->
       true
   | (n, c) :: rem ->
-      n = pos && c = Tcoerce_none && is_identity_coercion (pos + 1) rem in
-  if is_identity_coercion 0 pos_cc_list
-  then Tcoerce_none
-  else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
+      n = pos && c = Tcoerce_none && loop (pos + 1) rem in
+  loop 0 pos_cc_list
+
+let build_output_repr ~env input_repr pos_cc_list =
+  List.map
+    (fun (pos, cc) ->
+       if pos >= 0 then input_repr.(pos)
+       else
+         match cc with
+         | Tcoerce_alias _ -> Jkind.Sort.(of_const Const.for_module)
+         | Tcoerce_primitive pc ->
+           (match
+              Ctype.type_sort ~why:Signature_item ~allow_mutation:false env
+                pc.pc_type
+            with
+            | Ok sort -> sort
+            | Error _ ->
+              Misc.fatal_error
+                "build_output_repr: expected representable primitive")
+         (* We only ever encounter [Tcoerce_invalid] as part of the recursive
+            module consistency check. This coercion never gets translated, and
+            it doesn't exist at runtime, so we just assign it sort [void].
+
+           Eventually, we will build coercions and check inclusion separately,
+            at which point this case should be genuinely unreachable. *)
+         | Tcoerce_invalid -> Jkind.Sort.(of_const Const.void)
+         | Tcoerce_none | Tcoerce_structure _ | Tcoerce_functor _
+         | Tcoerce_kindtemplate _ ->
+           Misc.fatal_error "build_output_repr: unexpected coercion")
+    pos_cc_list
+  |> Array.of_list
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)
@@ -714,7 +742,11 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             match strengthened_modtypes ~core ~direction ~loc ~aliasable:true
                     env subst ~modes md.md_type p1 mty2 orig_shape
             with
-            | Ok _ as x -> x
+            | Ok _ as x ->
+              (* [Typemod.type_module_path_aux] normally enforces that module
+                 paths are representable, but it skips this check for aliases *)
+                Env.check_module_path_representable ~loc p1 env;
+                x
             | Error reason -> Error (Error.After_alias_expansion reason)
           end
         | exception Not_found ->
@@ -961,22 +993,29 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig1
-          |> Array.of_list
-        in
-        let output_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig2
-          |> Array.of_list
-        in
-        let coercion =
-          if runtime_len1 = runtime_len2 then (* see PR#5098 *)
-            simplify_structure_coercion input_repr output_repr cc id_pos_list
-          else
-            Tcoerce_structure
-              { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
-        in
-        Ok (coercion, shape)
+        (* see PR#5098 *)
+        if runtime_len1 = runtime_len2 && is_identity_coercion cc then
+          Ok (Tcoerce_none, shape)
+        else begin
+          match
+            Env.sorts_of_signature_items ~why:Module_coercion new_env sig1
+          with
+          | Error { item; item_type; violation; item_desc = _ } ->
+              Error {
+                Error.env=new_env;
+                subst;
+                missings = [];
+                incompatibles =
+                  [item, Error.Unrepresentable_item (item_type, violation)];
+              }
+          | Ok input_repr ->
+              let output_repr =
+                build_output_repr ~env:new_env input_repr cc
+              in
+              Ok (Tcoerce_structure
+                    { input_repr; output_repr; pos_cc_list = cc; id_pos_list },
+                  shape)
+        end
     | missings, incompatibles, _runtime_coercions, _leftovers ->
         Error {
           Error.env=new_env;
@@ -1058,7 +1097,14 @@ and signature_components :
                 | Mp_present, Mp_present, _ -> true, item
                 | _, Mp_absent, _ -> false, item
                 | Mp_absent, Mp_present, Mty_alias p1 ->
-                    true, Result.map (fun i -> Tcoerce_alias (env, p1, i)) item
+                    let materialize_alias cc =
+                      (* [Typemod.type_module_path_aux] normally enforces that
+                         module paths are representable, but it skips this
+                         check for aliases *)
+                      Env.check_module_path_representable ~loc p1 env;
+                      Tcoerce_alias (env, p1, cc)
+                    in
+                    true, Result.map materialize_alias item
                 | Mp_absent, Mp_present, _ -> assert false
               in
               let item = mark_error_as_unrecoverable item in

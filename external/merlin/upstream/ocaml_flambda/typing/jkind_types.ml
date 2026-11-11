@@ -68,7 +68,9 @@ module Sort = struct
       id : int
     }
 
-  type level_error = Rigid
+  type level_error =
+    | Rigid
+    | Escape of Path.t
 
   type error =
     | Incompatible
@@ -356,6 +358,8 @@ module Sort = struct
     let for_effect = scannable
 
     let for_continuation = scannable
+
+    let for_primitive = scannable
 
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
        once at module initialization and shared by [some] /
