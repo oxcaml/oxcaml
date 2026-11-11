@@ -341,12 +341,11 @@ end
 
 (* CR-someday xclerc: Add unary operations as well. *)
 module Bin_op = struct
-  (* CR-soon xclerc: Add more operators. Especially division and modulo (with
-     safe wrappers). *)
   type t =
     | Add
     | Sub
     | Mul
+    | Div
     | Rem
     | Bit_and
     | Bit_or
@@ -362,7 +361,7 @@ module Bin_op = struct
     | And
     | Or
 
-  let num_binops = [Add; Sub; Mul]
+  let num_binops = [Add; Sub; Mul; Div; Rem]
 
   let integral_binops =
     num_binops
@@ -389,6 +388,7 @@ module Bin_op = struct
     | Add -> call "add"
     | Sub -> call "sub"
     | Mul -> call "mul"
+    | Div -> call "div"
     | Rem -> call "rem"
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
@@ -417,6 +417,11 @@ module Expr = struct
         { name : Name.t;
           expr : t;
           body : t
+        }
+    | If of
+        { condition : t;
+          if_true : t;
+          if_false : t
         }
     | Read of place
     | Array_literal of t list
@@ -533,6 +538,9 @@ module Expr = struct
       Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None)
     | Let { name; expr; body } ->
       bind name (to_code expr) (fun _ -> to_code body)
+    | If { condition; if_true; if_false } ->
+      Ast_helper.Exp.ifthenelse (to_code condition) (to_code if_true)
+        (Some (to_code if_false))
     | Read place -> place_to_code place
     | Array_literal elements ->
       Ast_helper.Exp.array Mutable (List.map to_code elements)
