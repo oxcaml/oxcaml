@@ -12,25 +12,25 @@
       is ocamlopt compilation time.
    *)
    setup-ocamlopt.opt-build-env;
-   program = "${test_source_directory}/generate.out";
+   program = "${test_build_directory}/generate.out";
    all_modules = "generate_mixed_blocks_code.ml";
    ocamlopt.opt;
    arguments = "50 native";
-   output = "${test_source_directory}/generated_native_test.ml.corrected";
+   output = "${test_build_directory}/generated_native_test.ml.corrected";
    run;
-   output = "${test_source_directory}/generated_native_test.ml.corrected";
+   output = "${test_build_directory}/generated_native_test.ml.corrected";
    reference = "${test_source_directory}/generated_native_test.ml";
    check-program-output;
  }{
    (* Next, bytecode. *)
    setup-ocamlopt.opt-build-env;
-   program = "${test_source_directory}/generate.out";
+   program = "${test_build_directory}/generate.out";
    all_modules = "generate_mixed_blocks_code.ml";
    ocamlopt.opt;
    arguments = "200 byte";
-   output = "${test_source_directory}/generated_byte_test.ml.corrected";
+   output = "${test_build_directory}/generated_byte_test.ml.corrected";
    run;
-   output = "${test_source_directory}/generated_byte_test.ml.corrected";
+   output = "${test_build_directory}/generated_byte_test.ml.corrected";
    reference = "${test_source_directory}/generated_byte_test.ml";
    check-program-output;
  }

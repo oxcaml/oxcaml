@@ -514,6 +514,7 @@ let compute_static_size lam =
     | Pdls_get
     | Ptls_get
     | Pdomain_index
+    | Pthread_self_id
     | Ppeek _
     | Ppoke _
     | Pscalar _

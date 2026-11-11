@@ -121,17 +121,12 @@ and ids_for_export_holed (holed : rev_expr_holed) =
          (ids_for_export_holed parent))
       cont
   | Let_cont_rec { invariant_params; handlers; parent } ->
-    let ids = ids_for_export_holed parent in
-    let ids =
-      Continuation.Lmap.fold
-        (fun cont handler ids ->
-          let ids =
-            Ids_for_export.union ids (ids_for_export_cont_handler handler)
-          in
-          Ids_for_export.add_continuation ids cont)
-        handlers ids
-    in
-    Ids_for_export.union (Bound_parameters.ids_for_export invariant_params) ids
+    Ids_for_export.union_list
+      [ Bound_parameters.ids_for_export invariant_params;
+        Ids_for_export.ids_for_export_map ~fold:Continuation.Lmap.fold
+          ~add_ids_key:Ids_for_export.add_continuation
+          ~ids_for_export_value:ids_for_export_cont_handler handlers;
+        ids_for_export_holed parent ]
 
 and ids_for_export_named (named : rev_named) =
   match named with

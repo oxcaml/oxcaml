@@ -1116,24 +1116,28 @@ let parse_keyword_edition s =
 module String = Misc.Stdlib.String
 
 let arg_spec = ref []
-let arg_names = ref String.Map.empty
+let arg_names = String.Tbl.create 1024
 
 let reset_arguments () =
   arg_spec := [];
-  arg_names := String.Map.empty
+  String.Tbl.reset arg_names
 
 let add_arguments loc args =
-  List.iter (function (arg_name, _, _) as arg ->
-    try
-      let loc2 = String.Map.find arg_name !arg_names in
-      Printf.eprintf
-        "Warning: compiler argument %s is already defined:\n" arg_name;
-      Printf.eprintf "   First definition: %s\n" loc2;
-      Printf.eprintf "   New definition: %s\n" loc;
-    with Not_found ->
-      arg_spec := !arg_spec @ [ arg ];
-      arg_names := String.Map.add arg_name loc !arg_names
-  ) args
+  let added_rev =
+    List.fold_left (fun added_rev ((arg_name, _, _) as arg) ->
+      match String.Tbl.find_opt arg_names arg_name with
+      | Some loc2 ->
+        Printf.eprintf
+          "Warning: compiler argument %s is already defined:\n" arg_name;
+        Printf.eprintf "   First definition: %s\n" loc2;
+        Printf.eprintf "   New definition: %s\n" loc;
+        added_rev
+      | None ->
+        String.Tbl.add arg_names arg_name loc;
+        arg :: added_rev
+    ) [] args
+  in
+  arg_spec := !arg_spec @ List.rev added_rev
 
 let create_usage_msg program =
   Printf.sprintf "Usage: %s <options> <files>\n\

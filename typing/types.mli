@@ -1100,9 +1100,9 @@ and constructor_arguments =
 
 val tys_of_constr_args : constructor_arguments -> type_expr list
 
-(* Returns the inner type and its modalities, if unboxed. *)
+(* Returns the inner type, its modalities, and its mutability, if unboxed. *)
 val find_unboxed_type : type_declaration ->
-  (type_expr * Mode.Modality.Const.t) option
+  (type_expr * Mode.Modality.Const.t * mutability) option
 
 type extension_constructor =
   {
@@ -1448,6 +1448,8 @@ val set_level: type_expr -> int -> unit
 val set_scope: type_expr -> int -> unit
 val set_var_jkind: type_expr -> jkind_lr -> unit
         (* May only be called on Tvars *)
+val set_jkind: type_expr -> jkind_lr -> unit
+        (* May only be called on Tvars, Tunivars and Tof_kinds *)
 val set_name:
     (Path.t * type_expr list) option ref ->
     (Path.t * type_expr list) option -> unit

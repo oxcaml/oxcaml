@@ -492,6 +492,7 @@ type primitive =
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
@@ -3037,6 +3038,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _
@@ -3240,7 +3242,7 @@ let primitive_can_raise prim =
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
   | Preperform -> true (* XXX! *)
-  | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
+  | Pdls_get | Ptls_get | Pdomain_index | Pthread_self_id | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_boxed_vector_as_tuple _
@@ -3757,6 +3759,7 @@ let primitive_result_layout (p : primitive) =
   | Patomic_fetch_add_idx -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
+  | Pthread_self_id -> layout_int
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field

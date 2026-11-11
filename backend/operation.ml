@@ -333,6 +333,7 @@ type t =
   | Dls_get
   | Tls_get
   | Domain_index
+  | Thread_self_id
   | Poll
   | Pause
   | Alloc of
@@ -380,6 +381,7 @@ let is_pure = function
   | Dls_get -> true
   | Tls_get -> true
   | Domain_index -> true
+  | Thread_self_id -> true
   | Poll -> false
   | Pause -> false
   | Alloc _ -> false
@@ -477,6 +479,7 @@ let dump ppf op =
   | Dls_get -> Format.fprintf ppf "dls_get"
   | Tls_get -> Format.fprintf ppf "tls_get"
   | Domain_index -> Format.fprintf ppf "domain_index"
+  | Thread_self_id -> Format.fprintf ppf "thread_self_id"
   | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
   | Alloc { bytes; dbginfo = _; mode = Heap } ->
@@ -618,7 +621,7 @@ let equal left right =
     && Option.equal Int.equal left_wp right_wp
     && Option.equal Backend_var.Provenance.equal left_prov right_prov
   | Dls_get, Dls_get | Tls_get, Tls_get | Poll, Poll | Pause, Pause -> true
-  | Domain_index, Domain_index -> true
+  | Domain_index, Domain_index | Thread_self_id, Thread_self_id -> true
   | Int128op left_op, Int128op right_op ->
     equal_int128_operation left_op right_op
   | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
@@ -632,6 +635,6 @@ let equal left right =
       | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
       | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
       | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
-      | Poll | Pause | Alloc _ ),
+      | Thread_self_id | Poll | Pause | Alloc _ ),
       _ ) ->
     false

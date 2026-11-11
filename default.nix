@@ -125,6 +125,39 @@ let
     };
   });
 
+  # nixpkgs pins ocaml-lsp 1.25.0 for OCaml 5.4; we need at least 1.26.1.
+  # ocaml-lsp 1.26 links merlin-lib 5.7, so upgrade Merlin with it: ocamlmerlin
+  # and dot-merlin-reader should come from the same Merlin as ocaml-lsp.
+  editorOcamlPackages = pkgs.ocaml-ng.ocamlPackages_5_4.overrideScope (
+    _: osuper: {
+      # ocaml-lsp 1.26 needs dune-rpc >= 3.22; nixpkgs has 3.21. The dune
+      # libraries (dune-rpc, stdune, ...) take their version and src from dune,
+      # and buildDunePackage builds with dune_3.
+      inherit dune;
+      dune_3 = dune;
+
+      # lsp and ocaml-lsp take their version and src from jsonrpc.
+      jsonrpc = osuper.jsonrpc.overrideAttrs (old: rec {
+        version = "1.26.1";
+        name = lib.replaceStrings [ old.version ] [ version ] old.name;
+        src = pkgs.fetchurl {
+          url = "https://github.com/ocaml/ocaml-lsp/releases/download/${version}/lsp-${version}.tbz";
+          hash = "sha256-EPZ5JIly5WWKrUYp7WqlD4GUI1aRiqlDAchDn/4ZoN0=";
+        };
+      });
+
+      # merlin-lib and dot-merlin-reader take their version and src from merlin.
+      merlin = osuper.merlin.overrideAttrs (old: rec {
+        version = "5.7.1-504";
+        name = lib.replaceStrings [ old.version ] [ version ] old.name;
+        src = pkgs.fetchurl {
+          url = "https://github.com/ocaml/merlin/releases/download/v${version}/merlin-${version}.tbz";
+          hash = "sha256-E5sHPPkUs4tyXFT3W4tkL2VMNJjQpLqM+oMf8CqJcNU=";
+        };
+      });
+    }
+  );
+
   menhirVersion = "20231231";
 
   menhirSrc = pkgs.fetchFromGitLab {
@@ -297,7 +330,7 @@ let
   # reads OxCaml cmts and the boot build's are upstream OCaml's.
   ocamlIndex =
     let
-      ocamlPackages = pkgs.ocaml-ng.ocamlPackages_5_4;
+      ocamlPackages = editorOcamlPackages;
     in
     ocamlPackages.buildDunePackage {
       pname = "ocaml-index";
@@ -854,9 +887,9 @@ stdenv.mkDerivation {
     pkgs.autoconf
     menhir
     ocaml_5_4_0
-    pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
-    pkgs.ocaml-ng.ocamlPackages_5_4.merlin
-    pkgs.ocaml-ng.ocamlPackages_5_4.dot-merlin-reader
+    editorOcamlPackages.ocaml-lsp
+    editorOcamlPackages.merlin
+    editorOcamlPackages.dot-merlin-reader
     ocamlIndex
     dune
     pkgs.pkg-config
