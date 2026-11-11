@@ -48,6 +48,7 @@ val translate_external_call :
   is_c_builtin:bool ->
   effects:Effects.t ->
   coeffects:Coeffects.t ->
+  fat_ptr_arg_starts:int list ->
   Cmm.expression
   * To_cmm_env.free_vars
   * To_cmm_env.t

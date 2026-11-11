@@ -482,6 +482,7 @@ type primitive =
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   (* Poll for runtime actions. May run pending actions such as signal
      handlers, finalizers, memprof callbacks, etc, as well as GCs and
      GC slices, so should not be moved or optimised away. *)
@@ -513,8 +514,12 @@ and extern_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Raw_pointer
+  (** A fat-pointer argument (unboxed pair of a [value] base and a [bits64]
+      byte offset), passed to C as a single raw pointer: base + offset. *)
 
-and external_call_description = extern_repr Primitive.description_gen
+and external_call_description =
+  (extern_repr, extern_repr) Primitive.description_gen
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -633,7 +638,7 @@ and layout =
   | Punboxed_product of layout list
     (** Invariant: the layout list has length >= 2 *)
   | Pbottom
-  | Psplicevar of Slambdaident.t
+  | Psplicevar of Layout_ident.t
 
 and block_shape =
   | All_value
@@ -660,7 +665,7 @@ and 'a mixed_block_element =
   | Void
   | Product of 'a mixed_block_element array
     (** Invariant: the mixed_block_element array has length >= 2 *)
-  | Splice_variable of Slambdaident.t
+  | Splice_variable of Layout_ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -1007,17 +1012,16 @@ type pop_region =
   Compilation looks like: {[
     typedtree
     ---transl--> tlambda
-    --fracture-> slambda
     ----eval---> rawlambda
     ---simplif-> lambda
   ]}
-  where [tlambda], [slambda], [rawlambda], and [lambda] are all represented
-  using this type.
+  where [tlambda], [rawlambda], and [lambda] are all represented using this
+  type.
 
   Most constructors are valid at all stages, the constructors that aren't
   document this. The only other difference is that [layout] can contain
-  variables before eval ([tlambda] and [slambda]) and not after eval
-  ([rawlambda] and [lambda]).
+  variables before eval ([tlambda]) and not after eval ([rawlambda] and
+  [lambda]).
 *)
 type lambda =
     Lvar of Ident.t
@@ -1067,51 +1071,14 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  (* [Lsplice] should only exist in the slambda stage. *)
-  | Lsplice of scoped_location * slambda
   (* [Lkindtemplate] should only exist in the tlambda stage. *)
   | Lkindtemplate of lkindtemplate
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
   | Lkindinstantiate of lkindinstantiate
   (* [Ltemplate] should only exist in the tlambda stage. *)
-  | Ltemplate of ltemplate
+  | Ltemplate of lfunction
   (* [Linstantiate] should only exist in the tlambda stage. *)
   | Linstantiate of lambda_apply
-
-and slambda =
-  | SLlayout of layout
-  | SLglobal of Compilation_unit.t
-  | SLvar of Slambdaident.t
-  | SLmissing
-  | SLrecord of slambda list
-  | SLfield of slambda * int
-  | SLhalves of slambda_halves
-  | SLproj_comptime of slambda
-    (** Project out the compiletime half of a [slambda_halves] *)
-  | SLtemplate of slambda_function
-  | SLinstantiate of slambda_apply
-  | SLlet of slambda_let
-
-and slambda_halves =
-  { sval_comptime: slambda;
-    sval_runtime: lambda
-  }
-
-and slambda_function =
-  { sfun_params: Slambdaident.t array;
-    sfun_body: slambda
-  }
-
-and slambda_apply =
-  { sapp_func: slambda;
-    sapp_args: slambda array
-  }
-
-and slambda_let =
-  { slet_name: Slambdaident.t;
-    slet_value: slambda;
-    slet_body: slambda
-  }
 
 and rec_binding = {
   id : Ident.t;
@@ -1141,11 +1108,8 @@ and lfunction = private
   }
 
 and lkindtemplate =
-  { ktmpl_params: Slambdaident.t list;
+  { ktmpl_params: Layout_ident.t list;
     ktmpl_body: lfunction;
-    ktmpl_env: (lambda * layout) Ident.Map.t;
-    ktmpl_env_mode: locality_mode;
-    ktmpl_loc: scoped_location;
   }
 
 and lkindinstantiate =
@@ -1154,11 +1118,6 @@ and lkindinstantiate =
     kinst_result_layout: layout;
     kinst_mode: return_mode;
     kinst_loc: scoped_location;
-  }
-
-and ltemplate =
-  { tmpl_func: lfunction;
-    tmpl_env: (lambda * layout) Ident.Map.t;
   }
 
 and lambda_while =
@@ -1342,7 +1301,7 @@ val layout_instance_var : layout
 val layout_method : layout
 val layout_initializer : layout
 val layout_array_comprehension_element : layout
-val layout_list_element : layout
+val layout_list_comprehension_element : layout
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
 val layout_block_idx : layout
@@ -1396,8 +1355,8 @@ val iter_head_constructor: (lambda -> unit) -> lambda -> unit
     expression.
 
     Callers should note that you will need to handle stage specific
-    constructors ([Lsplice], etc) depending on what stage you are calling this
-    from.
+    constructors ([Lkindtemplate], etc) depending on what stage you are
+    calling this from.
 *)
 
 val shallow_iter:
@@ -1408,8 +1367,8 @@ val shallow_iter:
     sub-terms which are in tail position or not.
 
     Callers should note that you will need to handle stage specific
-    constructors ([Lsplice], etc) depending on what stage you are calling this
-    from.
+    constructors ([Lkindtemplate], etc) depending on what stage you are
+    calling this from.
 *)
 
 val transl_prim: string -> string -> lambda
@@ -1519,17 +1478,6 @@ val map : (lambda -> lambda) -> lambda -> lambda
 
 val map_lfunction : (lambda -> lambda) -> lfunction -> lfunction
   (** Apply the given transformation on the function's body *)
-
-val extract_free_var_env :
-  layout_of_ident:(Ident.t -> layout option) ->
-  lfunction ->
-  lfunction * (lambda * layout) Ident.Map.t
-(** [extract_free_var_env ~layout_of_ident lfun] computes an environment for the
-    provided function by renaming the free variables of [lfun] to fresh idents,
-    and returning the freshened function together with the mapping from new
-    idents to (lambda that evaluates to) the old idents.
-    Free variables for which [layout_of_ident] returns [None] are not
-    freshened. *)
 
 val shallow_map  :
   tail:(lambda -> lambda) ->
@@ -1681,7 +1629,9 @@ val count_initializers_array_kind : array_kind -> int
 val ignorable_product_element_kind_involves_int :
   ignorable_product_element_kind -> bool
 
-(** This function currently assumes a 64-bit target. *)
+(** This function currently assumes a 64-bit target. When targeting JSIR,
+    every unarised element counts as 8 bytes (in particular, arrays are not
+    packed). *)
 val array_element_size_in_bytes : array_kind -> int
 
 (** Construction helpers *)
@@ -1724,5 +1674,5 @@ val static_cast
   -> loc:scoped_location
   -> lambda
 
-val fatal_error_unevaluated_splice_var : Slambdaident.t -> 'a
+val fatal_error_unevaluated_splice_var : Layout_ident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a

@@ -213,7 +213,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         Acc.add_accessor_dep acc ~to_ (Field.boxed_number bn) ~base:name)
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax )
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax )
   | Unary
       ( ( Duplicate_block _ | Duplicate_array _
         | Is_int { variant_only = false }
@@ -539,7 +539,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
   let make_set_of_closures set_of_closures =
     let function_decls = Set_of_closures.function_decls set_of_closures in
     let value_slots = Set_of_closures.value_slots set_of_closures in
-    { function_decls; value_slots }
+    let dbg = Set_of_closures.debuginfo set_of_closures in
+    { function_decls; value_slots; dbg }
   in
   let named : rev_named =
     match defining_expr with
@@ -850,12 +851,8 @@ module Problem = struct
       } =
     Ids_for_export.union_list
       [ Global_flow_graph.ids_for_export deps;
-        Code_id.Map.fold
-          (fun code_id code_dep ids ->
-            Ids_for_export.union
-              (Ids_for_export.add_code_id ids code_id)
-              (Acc.Code_dep.ids_for_export code_dep))
-          code_deps Ids_for_export.empty;
+        Ids_for_export.ids_for_export_code_id_map Acc.Code_dep.ids_for_export
+          code_deps;
         Acc.Delayed_deps.ids_for_export delayed_deps;
         Acc.Applications.ids_for_export applications;
         Name_occurrences.ids_for_export free_names;
@@ -875,13 +872,8 @@ module Problem = struct
       } renaming =
     { deps = Global_flow_graph.apply_renaming deps renaming;
       code_deps =
-        Code_id.Map.fold
-          (fun code_id code_dep map ->
-            Code_id.Map.add
-              (Renaming.apply_code_id renaming code_id)
-              (Acc.Code_dep.apply_renaming code_dep renaming)
-              map)
-          code_deps Code_id.Map.empty;
+        Renaming.apply_code_id_map Acc.Code_dep.apply_renaming renaming
+          code_deps;
       delayed_deps = Acc.Delayed_deps.apply_renaming delayed_deps renaming;
       applications = Acc.Applications.apply_renaming applications renaming;
       free_names = Name_occurrences.apply_renaming free_names renaming;
@@ -910,30 +902,16 @@ module Skeleton = struct
         continuation_info;
         metadata
       } =
-    let ids = Rev_expr.ids_for_export toplevel_expr in
-    let ids =
-      Code_id.Map.fold
-        (fun code_id rev_code ids ->
-          Ids_for_export.union
-            (Ids_for_export.add_code_id ids code_id)
-            (Rev_expr.Rev_code.ids_for_export rev_code))
-        code ids
-    in
-    let ids = Array.fold_left Ids_for_export.add_code_id ids ordered_code_ids in
-    let ids =
-      Continuation.Set.fold
-        (fun cont ids -> Ids_for_export.add_continuation ids cont)
-        fixed_arity_continuations ids
-    in
-    let ids =
-      Ids_for_export.union ids (Flambda_unit.Metadata.ids_for_export metadata)
-    in
-    Continuation.Map.fold
-      (fun cont info ids ->
-        Ids_for_export.union
-          (Ids_for_export.add_continuation ids cont)
-          (Acc.Continuation_info.ids_for_export info))
-      continuation_info ids
+    Ids_for_export.union_list
+      [ Rev_expr.ids_for_export toplevel_expr;
+        Ids_for_export.ids_for_export_code_id_map
+          Rev_expr.Rev_code.ids_for_export code;
+        Array.fold_left Ids_for_export.add_code_id Ids_for_export.empty
+          ordered_code_ids;
+        Ids_for_export.ids_for_export_continuation_set fixed_arity_continuations;
+        Flambda_unit.Metadata.ids_for_export metadata;
+        Ids_for_export.ids_for_export_continuation_map
+          Acc.Continuation_info.ids_for_export continuation_info ]
 
   let apply_renaming
       { toplevel_expr;
@@ -945,31 +923,17 @@ module Skeleton = struct
       } renaming =
     let toplevel_expr = Rev_expr.apply_renaming toplevel_expr renaming in
     let code =
-      Code_id.Map.fold
-        (fun code_id rev_code code ->
-          Code_id.Map.add
-            (Renaming.apply_code_id renaming code_id)
-            (Rev_expr.Rev_code.apply_renaming rev_code renaming)
-            code)
-        code Code_id.Map.empty
+      Renaming.apply_code_id_map Rev_expr.Rev_code.apply_renaming renaming code
     in
     let ordered_code_ids =
       Array.map (Renaming.apply_code_id renaming) ordered_code_ids
     in
     let fixed_arity_continuations =
-      Continuation.Set.fold
-        (fun cont conts ->
-          Continuation.Set.add (Renaming.apply_continuation renaming cont) conts)
-        fixed_arity_continuations Continuation.Set.empty
+      Renaming.apply_continuation_set renaming fixed_arity_continuations
     in
     let continuation_info =
-      Continuation.Map.fold
-        (fun cont info map ->
-          Continuation.Map.add
-            (Renaming.apply_continuation renaming cont)
-            (Acc.Continuation_info.apply_renaming info renaming)
-            map)
-        continuation_info Continuation.Map.empty
+      Renaming.apply_continuation_map Acc.Continuation_info.apply_renaming
+        renaming continuation_info
     in
     let metadata = Flambda_unit.Metadata.apply_renaming metadata renaming in
     { toplevel_expr;
@@ -1024,16 +988,31 @@ let run0 unit acc ~free_names ~all_constants () =
          ~function_slots_to_keep ~value_slots_to_keep)
       acc (Flambda_unit.body unit) )
 
-let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
+let run (type f) (unit : Flambda_unit.t)
+    ~(final_typing_env : (f, _) With_types.t) ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
   let toplevel_return, holed =
     Profile.record_call ~accumulate:false "down"
       (run0 unit acc ~free_names ~all_constants)
   in
+  (* If we are forgetting types, forget the result types in the code metadata
+     now, to make sure they won't be stored. *)
+  let code_deps =
+    match final_typing_env with
+    | With_types _ -> Acc.code_deps acc
+    | Without_types ->
+      Code_id.Map.map
+        (fun (code_dep : Acc.Code_dep.t) ->
+          { code_dep with
+            code_metadata =
+              Code_metadata.with_result_types Unknown code_dep.code_metadata
+          })
+        (Acc.code_deps acc)
+  in
   let problem =
     { Problem.deps = Acc.deps acc;
-      code_deps = Acc.code_deps acc;
+      code_deps;
       delayed_deps = Acc.delayed_deps acc;
       applications = Acc.applications acc;
       free_names;

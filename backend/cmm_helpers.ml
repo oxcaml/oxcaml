@@ -3441,7 +3441,7 @@ let load_mask = load_chunk Word_mask
 
 let set_mask = set_chunk Word_mask
 
-let opaque e dbg = Cop (Copaque, [e], dbg)
+let opaque ~ty e dbg = Cop (Copaque ty, [e], dbg)
 
 (* Build an actual switch (ie jump table) *)
 
@@ -3598,11 +3598,11 @@ module SArgBlocks = struct
           ifnot_a,
           ifnot,
           Debuginfo.none ),
-      Branch_annotations.add ifso_a ifnot_a )
+      Branch_annotations.fork_point [ifso_a; ifnot_a] )
 
   let make_switch dbg () arg cases actions =
     let annots =
-      Branch_annotations.sum_list
+      Branch_annotations.fork_point
         (Array.map (fun (_, annots) -> annots) actions |> Array.to_list)
     in
     let actions = Array.map (fun (expr, annots) -> expr, dbg, annots) actions in
@@ -5721,6 +5721,8 @@ let dls_get ~dbg = Cop (Cdls_get, [], dbg)
 let tls_get ~dbg = Cop (Ctls_get, [], dbg)
 
 let domain_index ~dbg = Cop (Cdomain_index, [], dbg)
+
+let thread_self_id ~dbg = Cop (Cthread_self_id, [], dbg)
 
 let perform ~dbg eff =
   let cont =

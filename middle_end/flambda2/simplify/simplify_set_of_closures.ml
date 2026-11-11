@@ -522,9 +522,10 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
-      ~inlining_arguments ~dbg ~is_tupled:(Code.is_tupled code)
-      ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
-      ~loopify
+      ~inlining_arguments ~dbg
+      ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
+      ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
+      ~absolute_history ~relative_history ~loopify
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in
@@ -643,6 +644,10 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
     ~value_slot_types =
   let dacc = C.dacc_prior_to_sets context in
   let function_decls = Set_of_closures.function_decls set_of_closures in
+  let dbg =
+    DE.add_inlined_debuginfo (DA.denv dacc)
+      (Set_of_closures.debuginfo set_of_closures)
+  in
   let all_function_decls_in_set =
     Function_declarations.funs_in_order function_decls
   in
@@ -749,7 +754,7 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
   in
   let set_of_closures =
     Function_declarations.create all_function_decls_in_set
-    |> Set_of_closures.create ~value_slots
+    |> Set_of_closures.create ~value_slots ~dbg
   in
   { set_of_closures; dacc }
 
@@ -935,7 +940,11 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
                   })
             function_declarations_in_order
         in
-        Set_of_closures.create ~value_slots
+        let dbg =
+          DE.add_inlined_debuginfo (DA.denv dacc)
+            (Set_of_closures.debuginfo set_of_closures)
+        in
+        Set_of_closures.create ~value_slots ~dbg
           (Function_declarations.create function_decls)
       in
       { set_of_closures; dacc }

@@ -243,26 +243,50 @@ let callee_symbol_name res apply callee_simple =
         "To_cmm_extcall.callee_symbol_name: callee is not a symbol: %a"
         Simple.print callee_simple)
 
-let translate_external_call env res ~free_vars apply ~callee_simple ~args
-    ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-    ~coeffects =
+(* Fat-pointer ([@fat_ptr]) arguments: an unboxed pair (base, byte offset) that
+   C receives as a single raw pointer [base + offset]. The addition is performed
+   by the backend as part of emitting the call itself (see [Cmm.XFat_pointer]):
+   computing it any earlier would create a derived pointer that a GC safepoint
+   could invalidate while the base can still move. Until the call, the base
+   travels as an ordinary [Val]. Here we only merge each pair's two [exttype]s
+   into a single [XFat_pointer]; the two arguments themselves are passed through
+   unchanged.
+
+   Such calls bypass the struct-passing ABI below: the typing layer only lets
+   scalars through as the other arguments of a [@fat_ptr] external.
+
+   The offset is passed verbatim: [@fat_ptr] requires a plain byte offset (a
+   non-mixed pointee), so there are no mixed-block "gap" bits to strip. *)
+let translate_fat_pointer_external_call env res ~free_vars apply ~callee_simple
+    ~args ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
+    ~coeffects ~fat_ptr_arg_starts =
   C.fail_if_apply_with_probe apply;
-  (* Prepare arguments according to the ABI *)
-  let arg_slots = Abi.Arg_slots.create apply in
-  let arg_bindings, args =
-    if Abi.Arg_slots.in_argument_order arg_slots
-    then [], args
-    else bind_args_in_evaluation_order args
+  let callee = callee_symbol_name res apply callee_simple in
+  let ty_args =
+    List.map C.exttype_of_kind
+      (Flambda_arity.unarize (Apply.args_arity apply)
+      |> List.map K.With_subkind.kind)
   in
-  let args, ty_args = Pack.prepare_args ~dbg args arg_slots in
-  (* Prepare the return value representation *)
+  let ty_args =
+    let rec fuse index ty_args starts =
+      match starts, ty_args with
+      | [], _ -> ty_args
+      | start :: starts', _ :: _ :: ty_args' when start = index ->
+        Cmm.XFat_pointer :: fuse (index + 2) ty_args' starts'
+      | _ :: _, ty :: ty_args' -> ty :: fuse (index + 1) ty_args' starts
+      | _ :: _, [] ->
+        Misc.fatal_errorf
+          "translate_fat_pointer_external_call: malformed fat_ptr_arg_starts \
+           for %s"
+          callee
+    in
+    fuse 0 ty_args fat_ptr_arg_starts
+  in
   let return_abi = Abi.Return.create apply return_arity in
   let return_ty =
     Abi.Return.machtype return_abi
       ~return_ty:(C.Extended_machtype.to_machtype return_ty)
   in
-  (* Make the actual call *)
-  let callee = callee_symbol_name res apply callee_simple in
   let returns = Apply.returns apply in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
@@ -270,17 +294,58 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
     C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
       ~returns ~ty_args callee return_ty args
   in
-  (* Unpack the returned values *)
   let extcall_ident = Ident.create_local "extcall" in
   let extcall_var = Backend_var.With_provenance.create extcall_ident in
   let body =
     Unpack.prepare_return ~dbg ~builtin_sign_extends return_abi extcall_ident
   in
-  let extcall_unpacked = C.letin extcall_var ~defining_expr:extcall ~body in
-  (* Add the let bindings for the arguments to the beginning *)
-  let cmm =
-    List.fold_left
-      (fun body (var, defining_expr) -> C.letin var ~defining_expr ~body)
-      extcall_unpacked arg_bindings
-  in
+  let cmm = C.letin extcall_var ~defining_expr:extcall ~body in
   cmm, free_vars, env, res, Ece.all
+
+let translate_external_call env res ~free_vars apply ~callee_simple ~args
+    ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
+    ~coeffects ~fat_ptr_arg_starts =
+  match (fat_ptr_arg_starts : int list) with
+  | _ :: _ ->
+    translate_fat_pointer_external_call env res ~free_vars apply ~callee_simple
+      ~args ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin
+      ~effects ~coeffects ~fat_ptr_arg_starts
+  | [] ->
+    C.fail_if_apply_with_probe apply;
+    (* Prepare arguments according to the ABI *)
+    let arg_slots = Abi.Arg_slots.create apply in
+    let arg_bindings, args =
+      if Abi.Arg_slots.in_argument_order arg_slots
+      then [], args
+      else bind_args_in_evaluation_order args
+    in
+    let args, ty_args = Pack.prepare_args ~dbg args arg_slots in
+    (* Prepare the return value representation *)
+    let return_abi = Abi.Return.create apply return_arity in
+    let return_ty =
+      Abi.Return.machtype return_abi
+        ~return_ty:(C.Extended_machtype.to_machtype return_ty)
+    in
+    (* Make the actual call *)
+    let callee = callee_symbol_name res apply callee_simple in
+    let returns = Apply.returns apply in
+    let effects = To_cmm_effects.transl_c_call_effects effects in
+    let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
+    let { extcall; builtin_sign_extends } : Cmm_builtins.t =
+      C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
+        ~returns ~ty_args callee return_ty args
+    in
+    (* Unpack the returned values *)
+    let extcall_ident = Ident.create_local "extcall" in
+    let extcall_var = Backend_var.With_provenance.create extcall_ident in
+    let body =
+      Unpack.prepare_return ~dbg ~builtin_sign_extends return_abi extcall_ident
+    in
+    let extcall_unpacked = C.letin extcall_var ~defining_expr:extcall ~body in
+    (* Add the let bindings for the arguments to the beginning *)
+    let cmm =
+      List.fold_left
+        (fun body (var, defining_expr) -> C.letin var ~defining_expr ~body)
+        extcall_unpacked arg_bindings
+    in
+    cmm, free_vars, env, res, Ece.all

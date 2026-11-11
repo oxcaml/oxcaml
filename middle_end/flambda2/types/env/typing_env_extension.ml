@@ -110,42 +110,30 @@ module With_extra_variables = struct
 
   let free_names { existential_vars; equations } =
     let variables = Variable.Set.of_list existential_vars in
-    let free_names =
-      Name_occurrences.create_variables variables Name_mode.in_types
-    in
-    Name.Map.fold
-      (fun name ty free_names ->
-        let free_names =
-          Name_occurrences.add_name free_names name Name_mode.in_types
-        in
-        Name_occurrences.union free_names (TG.free_names ty))
-      equations free_names
+    Name_occurrences.union
+      (Name_occurrences.create_variables variables Name_mode.in_types)
+      (Name_occurrences.free_names_name_map TG.free_names equations
+         Name_mode.in_types)
 
-  let apply_renaming { existential_vars; equations } renaming =
+  let apply_renaming ({ existential_vars; equations } as t) renaming =
     (* Make sure to preserve order here! *)
-    let existential_vars =
-      List.map
+    let existential_vars' =
+      Misc.Stdlib.List.map_sharing
         (fun var -> Renaming.apply_variable renaming var)
         existential_vars
     in
-    let equations =
-      Name.Map.fold
-        (fun name ty result ->
-          let name' = Renaming.apply_name renaming name in
-          let ty' = TG.apply_renaming ty renaming in
-          Name.Map.add name' ty' result)
-        equations Name.Map.empty
+    let equations' =
+      Renaming.apply_name_map TG.apply_renaming renaming equations
     in
-    { existential_vars; equations }
+    if existential_vars == existential_vars' && equations == equations'
+    then t
+    else { existential_vars = existential_vars'; equations = equations' }
 
   let ids_for_export { existential_vars; equations } =
     let variables = Variable.Set.of_list existential_vars in
-    let ids = Ids_for_export.create ~variables () in
-    Name.Map.fold
-      (fun name ty ids ->
-        let ids = Ids_for_export.add_name ids name in
-        Ids_for_export.union ids (TG.ids_for_export ty))
-      equations ids
+    Ids_for_export.union
+      (Ids_for_export.create ~variables ())
+      (Ids_for_export.ids_for_export_name_map TG.ids_for_export equations)
 
   let existential_vars { existential_vars; _ } = existential_vars
 

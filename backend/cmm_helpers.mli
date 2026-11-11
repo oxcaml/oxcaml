@@ -473,7 +473,7 @@ val make_mixed_alloc :
   expression
 
 (** Sys.opaque_identity *)
-val opaque : expression -> Debuginfo.t -> expression
+val opaque : ty:machtype -> expression -> Debuginfo.t -> expression
 
 (** Generic application functions *)
 
@@ -1584,6 +1584,8 @@ val dls_get : dbg:Debuginfo.t -> expression
 val tls_get : dbg:Debuginfo.t -> expression
 
 val domain_index : dbg:Debuginfo.t -> expression
+
+val thread_self_id : dbg:Debuginfo.t -> expression
 
 val cpu_relax : dbg:Debuginfo.t -> expression
 

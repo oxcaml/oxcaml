@@ -1166,6 +1166,7 @@ let nullary_primitive _env res dbg prim =
   | Dls_get -> None, res, C.dls_get ~dbg
   | Tls_get -> None, res, C.tls_get ~dbg
   | Domain_index -> None, res, C.domain_index ~dbg
+  | Thread_self_id -> None, res, C.thread_self_id ~dbg
   | Poll -> None, res, C.poll ~dbg
   | Cpu_relax -> None, res, C.cpu_relax ~dbg
 
@@ -1211,8 +1212,9 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | String_length _ -> None, res, C.string_length arg dbg
   | Int_as_pointer _ -> None, res, C.int_as_pointer arg dbg
   | Opaque_identity { middle_end_only = true; kind = _ } -> None, res, arg
-  | Opaque_identity { middle_end_only = false; kind = _ } ->
-    None, res, C.opaque arg dbg
+  | Opaque_identity { middle_end_only = false; kind } ->
+    let ty = C.machtype_of_kind (KS.anything kind) in
+    None, res, C.opaque ~ty arg dbg
   | Int_arith (kind, op) ->
     None, res, unary_int_arith_primitive env dbg kind op arg
   | Float_arith (width, op) ->

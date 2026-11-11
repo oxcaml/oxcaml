@@ -43,10 +43,12 @@ type unit_infos_builder =
     mutable uib_force_link : bool;
     mutable uib_requires_metaprogramming : bool;
     mutable uib_external_symbols : string list;
+    mutable uib_lto_info :
+      Flambda2_reaper.Lto_info.t File_sections.Idx.t option;
     uib_file_sections : File_sections.Builder.t;
   }
 
-module Infos_table = Global_module.Name.Tbl
+module Infos_table = CU.Tbl
 
 let global_infos_table =
   (Infos_table.create 17 : unit_infos option Infos_table.t)
@@ -70,6 +72,7 @@ let current_unit =
     uib_force_link = false;
     uib_requires_metaprogramming = false;
     uib_external_symbols = [];
+    uib_lto_info = None;
     uib_file_sections = File_sections.Builder.create 0;
   }
 
@@ -95,6 +98,7 @@ let reset unit_info =
   current_unit.uib_requires_metaprogramming <-
     !Clflags.requires_metaprogramming;
   current_unit.uib_external_symbols <- [];
+  current_unit.uib_lto_info <- None;
   File_sections.Builder.clear current_unit.uib_file_sections
 
 let record_external_symbols () =
@@ -132,6 +136,7 @@ let read_unit_info filename =
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
       ui_static_data = uir.uir_static_data;
+      ui_lto_info = uir.uir_lto_info;
       ui_file_sections = sections;
     }
     in
@@ -185,9 +190,8 @@ let get_unit comp_unit =
   then
     Misc.fatal_error
       "get_unit: unable to get unit_info for current unit";
-  let name = CU.to_global_name_without_prefix comp_unit in
   try
-    Infos_table.find global_infos_table name
+    Infos_table.find global_infos_table comp_unit
   with Not_found ->
     let (infos, crc) =
       if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
@@ -208,7 +212,7 @@ let get_unit comp_unit =
           let warn =
             Warnings.No_cmx_file
               { missing_extension
-              ; module_name = Global_module.Name.to_string name }
+              ; module_name = CU.full_path_as_string comp_unit }
           in
           Location.prerr_warning Location.none warn;
           (None, None)
@@ -216,7 +220,7 @@ let get_unit comp_unit =
     in
     let import = Import_info.create_normal comp_unit ~crc in
     current_unit.uib_imports_cmx <- import :: current_unit.uib_imports_cmx;
-    Infos_table.add global_infos_table name infos;
+    Infos_table.add global_infos_table comp_unit infos;
     infos
 
 let get_unit_export_info comp_unit =
@@ -225,7 +229,7 @@ let get_unit_export_info comp_unit =
 let get_static_data comp_unit =
   Option.map
     (fun ui ->
-      Slambdaeval.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
+      Slambda.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
     (get_unit comp_unit)
 
 let which_cmx_file comp_unit =
@@ -236,13 +240,16 @@ let get_global_export_info comp_unit =
 
 let cache_unit_info ui =
   cache_zero_alloc_info ui.ui_zero_alloc_info;
-  Infos_table.add global_infos_table
-    (ui.ui_unit |> CU.to_global_name_without_prefix) (Some ui)
+  Infos_table.add global_infos_table ui.ui_unit (Some ui)
 
 (* Exporting cross-module information *)
 
 let set_export_info export_info =
   current_unit.uib_export_info <- Some export_info
+
+let set_lto_info lto_info =
+  current_unit.uib_lto_info <- Some
+    (File_sections.Builder.add current_unit.uib_file_sections lto_info)
 
 (* Record that a currying function or application function is needed *)
 
@@ -309,6 +316,7 @@ let write_unit_info info filename =
     uir_section_toc = toc;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
     uir_static_data = info.ui_static_data;
+    uir_lto_info = info.ui_lto_info;
     uir_sections_length = total_length;
   } in
   Misc.protect_output_to_file filename (fun oc ->
@@ -323,7 +331,7 @@ let build_unit_info ~main_module_block_format ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
   let static_data =
-    Slambdaeval.CU_data.write
+    Slambda.CU_data.write
       ~sections:current_unit.uib_file_sections
       static_data
   in
@@ -346,6 +354,7 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
     ui_static_data = static_data;
     ui_external_symbols = current_unit.uib_external_symbols;
+    ui_lto_info = current_unit.uib_lto_info;
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
   }

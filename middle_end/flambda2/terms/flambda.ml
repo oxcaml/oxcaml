@@ -156,18 +156,20 @@ and apply_renaming_named (named : named) renaming : named =
 and apply_renaming_let_expr_t0
     ({ body; num_normal_occurrences_of_bound_vars } as t) renaming =
   let body' = apply_renaming body renaming in
-  let changed = ref (body != body') in
-  let num_normal_occurrences_of_bound_vars =
-    Variable.Map.fold
-      (fun var num result ->
-        let var' = Renaming.apply_variable renaming var in
-        changed := !changed || var != var';
-        Variable.Map.add var' num result)
-      num_normal_occurrences_of_bound_vars Variable.Map.empty
+  let num_normal_occurrences_of_bound_vars' =
+    Renaming.apply_variable_map Renaming.not_renamed renaming
+      num_normal_occurrences_of_bound_vars
   in
-  if not !changed
+  if
+    body == body'
+    && num_normal_occurrences_of_bound_vars
+       == num_normal_occurrences_of_bound_vars'
   then t
-  else { body = body'; num_normal_occurrences_of_bound_vars }
+  else
+    { body = body';
+      num_normal_occurrences_of_bound_vars =
+        num_normal_occurrences_of_bound_vars'
+    }
 
 and apply_renaming_let_expr ({ let_abst; defining_expr } as t) renaming =
   let let_abst' =
@@ -221,14 +223,13 @@ and apply_renaming_recursive_let_cont_handlers t renaming =
 and apply_renaming_continuation_handler_t0
     ({ handler; num_normal_occurrences_of_params } as t) renaming =
   let handler' = apply_renaming handler renaming in
-  let num_normal_occurrences_of_params', is_identity_num_occurrences =
-    Variable.Map.fold
-      (fun var num (all_occurrences, is_identity) ->
-        let var' = Renaming.apply_variable renaming var in
-        Variable.Map.add var' num all_occurrences, is_identity && var == var')
-      num_normal_occurrences_of_params (Variable.Map.empty, true)
+  let num_normal_occurrences_of_params' =
+    Renaming.apply_variable_map Renaming.not_renamed renaming
+      num_normal_occurrences_of_params
   in
-  if handler == handler' && is_identity_num_occurrences
+  if
+    handler == handler'
+    && num_normal_occurrences_of_params == num_normal_occurrences_of_params'
   then t
   else
     { handler = handler';
@@ -250,12 +251,14 @@ and apply_renaming_continuation_handlers t renaming =
   Name_abstraction.apply_renaming (module Bound_parameters) t renaming
 
 and apply_renaming_continuations_handlers_t0 t renaming =
+  (* Unfortunately we can't use [Renaming.apply_map] here, as [Lmap.add] and
+     [Lmap.fold] will operate in inverse order. *)
   Continuation.Lmap.of_list
-  @@ List.map
-       (fun (k, handler) ->
-         let k = Renaming.apply_continuation renaming k in
-         let handler = apply_renaming_continuation_handler handler renaming in
-         k, handler)
+  @@ Misc.Stdlib.List.map_sharing
+       (fun ((k, handler) as p) ->
+         let k' = Renaming.apply_continuation renaming k in
+         let handler' = apply_renaming_continuation_handler handler renaming in
+         if k == k' && handler == handler' then p else k', handler')
        (Continuation.Lmap.bindings t)
 
 and apply_renaming_function_params_and_body_base { expr; free_names } renaming =
@@ -316,13 +319,9 @@ and ids_for_export_continuation_handlers t =
     ~apply_renaming_to_term:apply_renaming_continuations_handlers_t0
 
 and ids_for_export_continuation_handlers_t0 t =
-  Continuation.Lmap.fold
-    (fun k handler ids ->
-      Ids_for_export.union ids
-        (Ids_for_export.add_continuation
-           (ids_for_export_continuation_handler handler)
-           k))
-    t Ids_for_export.empty
+  Ids_for_export.ids_for_export_map ~fold:Continuation.Lmap.fold
+    ~add_ids_key:Ids_for_export.add_continuation
+    ~ids_for_export_value:ids_for_export_continuation_handler t
 
 and ids_for_export t =
   match descr t with

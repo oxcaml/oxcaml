@@ -3,4 +3,5 @@
  (libraries ppxlib))
 
 (cram
+ (package ppxlib)
  (deps print_stuff.exe))

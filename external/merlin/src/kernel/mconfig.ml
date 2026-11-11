@@ -479,7 +479,6 @@ let ocaml_ignored_flags =
     "-dparsetree-loc-ghost-invariants";
     "-dshape";
     "-dtlambda";
-    "-dslambda";
     "-drawclambda";
     "-drawflambda";
     "-drawlambda";
@@ -591,6 +590,8 @@ let ocaml_ignored_flags =
     "-no-symbol-visibility-protected";
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
+    "-lto-support";
+    "-no-lto-support";
     "-directory";
     "-typing-recovery";
     (* Jane Street specific *)
@@ -682,6 +683,7 @@ let ocaml_ignored_flags =
     "-keep-llvmir";
     "-llvm-backend";
     "-no-llvm-backend";
+    "-fdo-counters";
     "-ddwarf-types";
     "-ocamlcfg";
     "-cfg-eliminate-dead-code-validate";

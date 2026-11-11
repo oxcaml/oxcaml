@@ -972,6 +972,18 @@ let emit_stack_ldr env reg r = emit_stack_load_store env LDR reg r
 
 let emit_stack_str env reg r = emit_stack_load_store env STR reg r
 
+(* Moves of 8- and 16-bit stack arguments. The store writes exactly the
+   argument's width; instruction selection only creates these moves with a
+   stack-slot destination, so every other shape is unexpected. *)
+let emit_sized_move env ~str (src : Reg.t) (dst : Reg.t) =
+  if not (Reg.same_loc src dst)
+  then
+    match src.loc, dst.loc with
+    | Reg _, Stack _ -> emit_stack_load_store env str (H.reg_w src) dst
+    | Reg _, Reg _ | Stack _, (Reg _ | Stack _) | _, Unknown | Unknown, _ ->
+      Misc.fatal_errorf "Emit.emit_sized_move: unexpected move (%a to %a)"
+        Printreg.reg src Printreg.reg dst
+
 let emit_stack_ldr_simd_and_fp env reg r =
   emit_stack_load_store env LDR_simd_and_fp reg r
 
@@ -1510,6 +1522,8 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
+  | Lop (Specific Imove8) -> emit_sized_move env ~str:STRB i.arg.(0) i.res.(0)
+  | Lop (Specific Imove16) -> emit_sized_move env ~str:STRH i.arg.(0) i.res.(0)
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
@@ -1574,7 +1588,33 @@ let emit_instr env i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point -> A.ins1 B (local_label tailrec_entry_point)
     else A.ins1 B (symbol (Needs_reloc JUMP26) (symbol_of_cmm_symbol func))
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; ty_args; _ }) ->
+    (* Fuse each fat-pointer argument, adding its offset register into its base
+       register, as part of emitting the call itself: no GC safepoint can
+       separate the addition from the call. *)
+    let (_ : int) =
+      List.fold_left
+        (fun k (ty_arg : Cmm.exttype) ->
+          match ty_arg with
+          | XFat_pointer ->
+            let rd = H.reg_x i.arg.(k) in
+            let offset = i.arg.(k + 1) in
+            (match offset.loc with
+            | Reg _ ->
+              A.ins4 ADD_shifted_register rd rd (H.reg_x offset) O.optional_none
+            | Stack _ ->
+              emit_stack_ldr env reg_x_tmp1 offset;
+              A.ins4 ADD_shifted_register rd rd reg_x_tmp1 O.optional_none
+            | Unknown ->
+              Misc.fatal_error
+                "Lextcall: fat-pointer offset has unknown location");
+            k + 2
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 ->
+            k + 1
+          | XDummy_int | XDummy_float -> k)
+        0 ty_args
+    in
     if stack_ofs > 0
     then (
       A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
@@ -1937,6 +1977,8 @@ let emit_instr env i =
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_tls_state)
   | Lop Domain_index ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
+  | Lop Thread_self_id ->
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_thread_id)
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in

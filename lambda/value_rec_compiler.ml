@@ -277,12 +277,10 @@ let compute_static_size lam =
          the latter meaning that [Value_rec_check] should have forbidden that case.
       *)
       assert false
-    | Lsplice _ ->
-      fatal_error_invalid_constructor lam
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
     | Ltemplate tmpl ->
-      raise_error ~loc:tmpl.tmpl_func.loc Recursive_template
+      raise_error ~loc:tmpl.loc Recursive_template
     | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
@@ -516,6 +514,7 @@ let compute_static_size lam =
     | Pdls_get
     | Ptls_get
     | Pdomain_index
+    | Pthread_self_id
     | Ppeek _
     | Ppoke _
     | Pscalar _
@@ -898,8 +897,6 @@ let rec split_static_function lfun block_var local_idents lam :
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
-  | Lsplice _ ->
-    fatal_error_invalid_constructor lam
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =

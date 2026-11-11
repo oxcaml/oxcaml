@@ -516,6 +516,37 @@ type ('a, 'b) labeled_fn =
 type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
 |}]
 
+module type S_for_mode_polymorphism = sig
+  val variable : 'a @ 'm -> 'a @ 'm
+  val bounds : 'a @ [< 'm & 'n] -> 'a @ [> 'm | 'n]
+  val constants : 'a @ [< portable many] -> 'a @ [> local once]
+  val combined : 'a @ [< 'm & portable > 'n | dynamic] -> 'a @ [> 'm]
+  val past : 'a @ [< past('m)] -> 'a @ [> past('m)]
+  val modified :
+    'a @ [< 'm mod portable contended & past('n) mod global] ->
+    'a @ [> 'm mod many aliased | past('n) mod local]
+  val close :
+    'a @ [< 'm] ->
+    ('b @ 'n -> 'a @ [> 'm]) @
+      [> close('m) mod portable | close('n) | local once]
+end
+
+[%%expect{|
+>> Fatal error: Line 2, characters 22-24: mode variables and mode bounds are not yet supported
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+module type Mixed_mode_annotations = sig
+  val f : 'a @ portable many 'm contended 'n [< 'o] -> unit
+end
+
+[%%expect{|
+>> Fatal error: Line 2, characters 29-31: mode variables and mode bounds are not yet supported
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
 (* kitchen sink, with new @ syntax *)
 let f ~(x1 @ many)
       ~(x2 : string @ local)
@@ -1886,4 +1917,78 @@ Line 1, characters 21-34:
 1 | let left_parens () = (exclave_ ()); ()
                          ^^^^^^^^^^^^^
 Error: Exclave expression should only be in tail position of the current region.
+|}]
+
+(*********************)
+(* Address patterns *)
+
+type addr_variant = K of u addr | L of u addr_imm
+[%%expect{|
+type addr_variant = K of u addr | L of u addr_imm
+|}]
+
+let f = function
+  | K addr_ (A foo) -> foo
+  | K addr_ (B _ | C _ | D) -> ()
+  | L _ -> ()
+[%%expect{|
+val f : addr_variant -> unit = <fun>
+|}]
+
+let f (addr_ x) = x
+[%%expect{|
+val f : 'a addr -> 'a = <fun>
+|}]
+
+let f (addr_ (addr_ x)) = x
+[%%expect{|
+val f : 'a addr addr -> 'a = <fun>
+|}]
+
+let f (addr_ x : int addr) = x
+[%%expect{|
+val f : int addr -> int = <fun>
+|}]
+
+let f (addr_ x : string addr @ local) = x
+[%%expect{|
+val f : string addr @ local -> string @ local = <fun>
+|}]
+
+let f a = let addr_ x = a in x
+[%%expect{|
+val f : 'a addr -> 'a = <fun>
+|}]
+
+let f = function
+  | L addr_imm_ (A foo) -> foo
+  | L addr_imm_ (B _ | C _ | D) -> ()
+  | K _ -> ()
+[%%expect{|
+val f : addr_variant -> unit = <fun>
+|}]
+
+let f (addr_imm_ x) = x
+[%%expect{|
+val f : 'a addr_imm -> 'a = <fun>
+|}]
+
+let f (addr_imm_ (addr_imm_ x)) = x
+[%%expect{|
+val f : 'a addr_imm addr_imm -> 'a = <fun>
+|}]
+
+let f (addr_imm_ x : int addr_imm) = x
+[%%expect{|
+val f : int addr_imm -> int = <fun>
+|}]
+
+let f (addr_imm_ x : string addr_imm @ local) = x
+[%%expect{|
+val f : string addr_imm @ local -> string @ local = <fun>
+|}]
+
+let f a = let addr_imm_ x = a in x
+[%%expect{|
+val f : 'a addr_imm -> 'a = <fun>
 |}]
