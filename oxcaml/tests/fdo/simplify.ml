@@ -160,7 +160,8 @@ module Rerun (C : Stepper) = struct
       C.step r i
     done;
     let s = !r in
-    let[@inline never] rec up a = if a < C.limit + s then side a else down (a - 1)
+    let[@inline never] rec up a =
+      if a < C.limit + s then side a else down (a - 1)
     and[@inline never] down a = if a > s then up (a - 2) else a in
     up n + down (n + 1)
 end
