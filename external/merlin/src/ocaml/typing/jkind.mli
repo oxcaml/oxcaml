@@ -1044,8 +1044,8 @@ end
 
 (* For Merlin *)
 
-module Error : sig
-  type t
+type error
 
-  exception User_error of Location.t * t
+module Error : sig
+  type exn += private In_context of Location.t * error
 end
