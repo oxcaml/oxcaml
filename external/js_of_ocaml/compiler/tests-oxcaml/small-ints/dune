@@ -1,0 +1,11 @@
+(env
+ (_
+  (flags
+   (:standard
+    (-w -9-27-32)))))
+
+(tests
+ (names test_int8_u test_int16_u)
+ (build_if %{ocaml-config:ox})
+ (libraries ocaml.stdlib_stable ocaml.stdlib_upstream_compatible)
+ (modes js wasm))

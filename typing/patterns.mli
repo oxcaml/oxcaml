@@ -43,7 +43,7 @@ module Simple : sig
     | `Constant of constant
     | `Unboxed_unit
     | `Unboxed_bool of bool
-    | `Tuple of (string option * pattern) list
+    | `Tuple of (string option * pattern * Jkind.sort) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
         Longident.t loc * constructor_description * constructor_representation
@@ -56,6 +56,7 @@ module Simple : sig
         (Longident.t loc * unboxed_label_description * pattern) list
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
+    | `Addr of mutability * Jkind.sort * pattern
     | `Lazy of pattern
   ]
   type pattern = view pattern_data
@@ -74,12 +75,18 @@ end
 module General : sig
   type view = [
     | Half_simple.view
-    | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
+    | `Var of
+        Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.With_regionality.l
     | `Fun_layout of Ident.t * string loc * Uid.t
-                   * Jkind.Sort.t * Mode.Value.l * Types.Lpoly.t
-                   * alloc_mode_r
-    | `Alias of pattern * Ident.t * string loc * Uid.t
-                * Jkind.Sort.t * Mode.Value.l * Types.type_expr
+                   * Jkind.Sort.t * Mode.With_regionality.l * Types.Lpoly.t
+    | `Alias of
+        pattern
+        * Ident.t
+        * string loc
+        * Uid.t
+        * Jkind.Sort.t
+        * Mode.With_regionality.l
+        * Types.type_expr
   ]
   type pattern = view pattern_data
 
@@ -97,7 +104,7 @@ module Head : sig
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation
@@ -111,6 +118,7 @@ module Head : sig
           (* the row of the type may evolve if [close_variant] is called,
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
+    | Addr of mutability * Jkind.sort
     | Lazy
 
   type t = desc pattern_data

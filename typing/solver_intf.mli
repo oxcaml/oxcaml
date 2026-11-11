@@ -107,39 +107,10 @@ module type Lattices_mono = sig
   val compose :
     'c obj -> ('b, 'c, 'd) morph -> ('a, 'b, 'd) morph -> ('a, 'c, 'd) morph
 
-  (* Usual notion of adjunction:
-     Given two morphisms [f : A -> B] and [g : B -> A], we require [f a <= b]
-      iff [a <= g b] for each [a \in A] and [b \in B].
+  (* Definition (adjunction): Two morphisms [f : A -> B] and [g : B -> A], are
+     adjoint whenever [f a <= b] iff [a <= g b] for all [a \in A] and [b \in B].
 
-     Our solver accepts a wider notion of adjunction: Given two morphisms [f : A
-     -> B] and [g : B -> A], we require [f a <= b] iff [a <= g b] for each [a]
-      in the downward closure of [g]'s image and [b \in B].
-
-     We say [f] is a partial left adjoint of [g], because [f] is only
-     constrained in part of its domain. As a result, [f] is not unique, since
-     its valuation out of the constrained range can be arbitrarily chosen.
-
-     Dually, we can define the concept of partial right adjoint. Since partial
-     adjoints are not unique, they don't form a pair: i.e., a partial left
-     joint of a partial right adjoint of [f] is not [f] in general.
-
-     Concretely, the solver provides/requires the following guarantees
-     (continuing the example above):
-
-     For the user of the [Solvers_polarized].
-     - [g] applied to a right mode [m] can be used as a right mode without
-     any restriction.
-     - [f] applied to to a left mode [m] can be used as a left mode, given that
-     the [m] is fully within the downward closure of [g]. This is unfortunately
-     not enforcable by the ocaml type system, and we have to rely on user's
-     caution.
-
-     For the supplier of the [Lattices_mono]:
-     - The result of [left_adjoint g] is applied only on the downward closure of
-     [g]'s image.
-  *)
-
-  (* Note that [left_adjoint] and [right_adjoint] returns a [morph] weaker than
+     Note that [left_adjoint] and [right_adjoint] returns a [morph] weaker than
      what we want, which is "\exists r. allowed * r". But ocaml doesn't like
      existentials, and this weaker version is good enough for us *)
 
@@ -240,6 +211,10 @@ module type Solver_mono = sig
   (** Given a mode whose lower and upper bounds are equal, returns that bound.
       Raises exception if the condition does not hold. *)
   val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
+
+  (** Composes [to_const] and [of_const] while preserving the original hint *)
+  val to_of_const_exn :
+    'a obj -> ('a, allowed * allowed) mode -> ('a, allowed * allowed) mode
 
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
@@ -360,16 +335,24 @@ module type Solver_mono = sig
     ('a, 'l * 'r) mode
 
   (** Creates a new mode variable above the given mode and returns [true]. In
-      the speical case where the given mode is top, returns the constant top and
+      the special case where the given mode is top, returns the constant top and
       [false]. *)
   val newvar_above :
-    'a obj -> int -> ('a, allowed * 'r_) mode -> ('a, 'l * 'r) mode * bool
+    'a obj ->
+    int ->
+    ('a, allowed * 'r_) mode ->
+    log:changes ref option ->
+    ('a, 'l * 'r) mode * bool
 
   (** Creates a new mode variable below the given mode and returns [true]. In
-      the speical case where the given mode is bottom, returns the constant
+      the special case where the given mode is bottom, returns the constant
       bottom and [false]. *)
   val newvar_below :
-    'a obj -> int -> ('a, 'l_ * allowed) mode -> ('a, 'l * 'r) mode * bool
+    'a obj ->
+    int ->
+    ('a, 'l_ * allowed) mode ->
+    log:changes ref option ->
+    ('a, 'l * 'r) mode * bool
 
   (** Returns the join of the list of modes. *)
   val join : 'a obj -> ('a, allowed * 'r) mode list -> ('a, left_only) mode
@@ -519,13 +502,15 @@ module type Solver_mono = sig
       type ('b, 'd) t_with_morph =
         | Amorphvar : 'a t * ('a, 'b, 'd) morph -> ('b, 'd) t_with_morph
 
+      (** The exposed parts of a mode variable *)
       module Head : sig
         type 'a t =
-          { desc_id : int;
-            desc_upper : 'a;
-            desc_lower : 'a;
+          { desc_id : int;  (** The identifier of a mode variable *)
+            desc_upper : 'a;  (** The precise upper bound of a mode variable *)
+            desc_lower : 'a;  (** The precise lower bound of a mode variable *)
             desc_vlower : ('a, left_only) t_with_morph list;
-            desc_level : int
+                (** A list of variables directly under the current variable *)
+            desc_level : int  (** The level of a mode variable *)
           }
 
         val equal : 'a t -> 'b t -> bool

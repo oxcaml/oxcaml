@@ -678,14 +678,14 @@ int main_os(int argc, char_os **argv)
                     caml_data, sizeof(caml_data),
                     caml_sections, sizeof(caml_sections),
                     /* pooling */ 0,
-                    argv);
+                    (char_os const * const *) argv);
   caml_do_exit(0);
   return 0; /* not reached */
 }
 |}
        end else begin
          output_string outchan {|
-void caml_startup(char_os ** argv)
+void caml_startup(char_os const * const * argv)
 {
   caml_startup_code(caml_code, sizeof(caml_code),
                     caml_data, sizeof(caml_data),
@@ -694,7 +694,7 @@ void caml_startup(char_os ** argv)
                     argv);
 }
 
-value caml_startup_exn(char_os ** argv)
+value caml_startup_exn(char_os const * const * argv)
 {
   return caml_startup_code_exn(caml_code, sizeof(caml_code),
                                caml_data, sizeof(caml_data),
@@ -703,7 +703,7 @@ value caml_startup_exn(char_os ** argv)
                                argv);
 }
 
-void caml_startup_pooled(char_os ** argv)
+void caml_startup_pooled(char_os const * const * argv)
 {
   caml_startup_code(caml_code, sizeof(caml_code),
                     caml_data, sizeof(caml_data),
@@ -712,7 +712,7 @@ void caml_startup_pooled(char_os ** argv)
                     argv);
 }
 
-value caml_startup_pooled_exn(char_os ** argv)
+value caml_startup_pooled_exn(char_os const * const * argv)
 {
   return caml_startup_code_exn(caml_code, sizeof(caml_code),
                                caml_data, sizeof(caml_data),

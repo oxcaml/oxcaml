@@ -61,6 +61,18 @@ module Bound = struct
     let other_vars = List.map (fun var -> Variable.rename var) other_vars in
     { params; results; other_vars }
 
+  let import_and_rename { params; results; other_vars } renaming =
+    let renaming, params = Bound_parameters.import_and_rename params renaming in
+    let renaming, results =
+      Bound_parameters.import_and_rename results renaming
+    in
+    let renaming, other_vars =
+      List.fold_left_map
+        (fun renaming var -> Renaming.bind_variable renaming var)
+        renaming other_vars
+    in
+    renaming, { params; results; other_vars }
+
   let is_renamed_version_of t t' =
     Bound_parameters.is_renamed_version_of t.params t'.params
     && Bound_parameters.is_renamed_version_of t.results t'.results
@@ -128,9 +140,7 @@ let print ppf t =
         other_vars TEEV.print env_extension)
 
 let create ~params ~results env_extension =
-  let other_vars =
-    TEEV.existential_vars env_extension |> Variable.Set.elements
-  in
+  let other_vars = TEEV.existential_vars env_extension in
   let bound = { Bound.params; results; other_vars } in
   A.create bound env_extension
 
@@ -143,6 +153,7 @@ let free_names t =
   Name_abstraction.free_names
     (module Bound)
     t ~free_names_of_term:TEEV.free_names
+    ~apply_renaming_to_term:TEEV.apply_renaming
 
 let apply_renaming = A.apply_renaming
 

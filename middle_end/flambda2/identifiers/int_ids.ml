@@ -263,20 +263,15 @@ module Variable_data = struct
 
   let flags = var_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; name_stamp;
-                                           kind; user_visible; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(name_stamp@ %d)@]@ \
-        @[<hov 1>(kind@ %a)@]@ \
-        @[<hov 1>(user_visible@ %b)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      name_stamp
-      Flambda_kind.print kind
-      user_visible
+  let print ppf { compilation_unit; name; name_stamp; kind; user_visible } =
+    let open! Misc.Sexp in
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        s "name" name;
+        d "name_stamp" name_stamp;
+        a "kind" kind Flambda_kind.print;
+        b "user_visible" user_visible ]
 
   let hash
       { compilation_unit; name = _; name_stamp; kind = _; user_visible = _ } =
@@ -316,38 +311,54 @@ module Symbol_data = struct
 
   let flags = symbol_flags
 
-  let [@ocamlformat "disable"] print ppf symbol =
+  let print ppf symbol =
     let compilation_unit = Symbol0.compilation_unit symbol in
     let linkage_name = Symbol0.linkage_name symbol in
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(linkage_name@ %a)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      Linkage_name.print linkage_name
+    let open! Misc.Sexp in
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        a "linkage_name" linkage_name Linkage_name.print ]
 end
 
 module Code_id_data = struct
   type t =
     { compilation_unit : Compilation_unit.t;
       name : string;
+          (** The source-level name of the function, without any stamp. *)
+      slot_stamp : int option;
+          (** The stamp of the [Function_slot] whose code this is, if the code
+              was created for one. Kept separate from [name] so that it can be
+              recognized (and omitted) when demangling. *)
       debug_info : Debuginfo.t;
       linkage_name : Linkage_name.t
     }
 
   let flags = code_id_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; debug_info = _; linkage_name; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(linkage_name@ %a)@]@ \
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      Linkage_name.print linkage_name
+  (* The historical printed form, e.g. [my_fun_42], used for dumps and for
+     naming derived entities. *)
+  let name_with_slot_stamp ~name ~slot_stamp =
+    match slot_stamp with
+    | None -> name
+    | Some stamp -> Printf.sprintf "%s_%d" name stamp
 
-  let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
+  let print ppf
+      { compilation_unit; name; slot_stamp; debug_info = _; linkage_name } =
+    let open! Misc.Sexp in
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        s "name" (name_with_slot_stamp ~name ~slot_stamp);
+        a "linkage_name" linkage_name Linkage_name.print ]
+
+  let hash
+      { compilation_unit = _;
+        name = _;
+        slot_stamp = _;
+        debug_info = _;
+        linkage_name
+      } =
     (* Linkage names are unique across a whole project, so there's no need to
        hash the other fields. *)
     Linkage_name.hash linkage_name
@@ -355,11 +366,13 @@ module Code_id_data = struct
   let equal
       { compilation_unit = _;
         name = _;
+        slot_stamp = _;
         debug_info = _;
         linkage_name = linkage_name1
       }
       { compilation_unit = _;
         name = _;
+        slot_stamp = _;
         debug_info = _;
         linkage_name = linkage_name2
       } =
@@ -447,7 +460,7 @@ module Const = struct
 
     let hash = Id.hash
 
-    let [@ocamlformat "disable"] print ppf t = Const_data.print ppf (descr t)
+    let print ppf t = Const_data.print ppf (descr t)
   end
 
   include T0
@@ -497,14 +510,14 @@ module Variable = struct
 
   let previous_name_stamp = ref (-1)
 
-  let create ?user_visible name kind =
+  let create_in_compilation_unit ~compilation_unit ?user_visible name kind =
     let name_stamp =
       (* CR mshinwell: check for overflow on 32 bit *)
       incr previous_name_stamp;
       !previous_name_stamp
     in
     let data : Variable_data.t =
-      { compilation_unit = Current_unit.get_cu_exn ();
+      { compilation_unit;
         name;
         name_stamp;
         kind;
@@ -512,6 +525,11 @@ module Variable = struct
       }
     in
     Table.add !grand_table_of_variables data
+
+  let create ?user_visible name kind =
+    create_in_compilation_unit
+      ~compilation_unit:(Current_unit.get_cu_exn ())
+      ?user_visible name kind
 
   module T0 = struct
     let compare = Id.compare
@@ -522,7 +540,7 @@ module Variable = struct
 
     let print ppf t =
       let cu = compilation_unit t in
-      if Compilation_unit.equal cu (Current_unit.get_cu_exn ())
+      if Current_unit.is_current cu
       then
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
@@ -556,6 +574,25 @@ module Variable = struct
 
   let import importer t =
     Table.add !grand_table_of_variables (Table.import importer t)
+
+  let import_and_rename importer t =
+    let data = Table.import importer t in
+    let user_visible = if data.user_visible then Some () else None in
+    create ?user_visible data.name data.kind
+
+  type stamp_state = int
+
+  let export_stamp_state () = !previous_name_stamp
+
+  let restore_stamp_state state =
+    if !previous_name_stamp = -1
+    then previous_name_stamp := state
+    else
+      Misc.fatal_errorf
+        "Restoring variable stamp state would overwrite modified value %d"
+        !previous_name_stamp
+
+  let merge_stamp_state state1 state2 = Int.max state1 state2
 end
 
 module Symbol = struct
@@ -699,11 +736,9 @@ module Simple_data = struct
 
   let flags = simple_flags
 
-  let [@ocamlformat "disable"] print ppf { simple = _; coercion; } =
-    Format.fprintf ppf "@[<hov 1>\
-        @[<hov 1>(coercion@ %a)@]\
-        @]"
-      Coercion.print coercion
+  let print ppf { simple = _; coercion } =
+    let open! Misc.Sexp in
+    print ppf [a "coercion" coercion Coercion.print]
 
   let hash { simple; coercion } =
     Hashtbl.hash (Id.hash simple, Coercion.hash coercion)
@@ -789,17 +824,18 @@ module Simple = struct
     let hash = Id.hash
 
     let print ppf t =
-      let print ppf t =
+      let print_aux ppf t =
         pattern_match t
           ~name:(fun name ~coercion:_ -> Name.print ppf name)
           ~const:(fun cst -> Const.print ppf cst)
       in
       let coercion = coercion t in
       if Coercion.is_id coercion
-      then print ppf t
+      then print_aux ppf t
       else
-        Format.fprintf ppf "@[<hov 1>(coerce@ %a@ %a)@]" print t Coercion.print
-          coercion
+        let open! Misc.Sexp in
+        print ppf
+          [fmt "coerce"; fmt "%a" print_aux t; fmt "%a" Coercion.print coercion]
   end
 
   include T0
@@ -873,13 +909,13 @@ module Code_id = struct
 
   let linkage_name t = (find_data t).linkage_name
 
-  let name t = (find_data t).name
-
-  let debug t = (find_data t).debug_info
+  let name t =
+    let { Code_id_data.name; slot_stamp; _ } = find_data t in
+    Code_id_data.name_with_slot_stamp ~name ~slot_stamp
 
   let previous_name_stamp = ref (-1)
 
-  let create ~name ~(debug : Debuginfo.t) compilation_unit =
+  let create ~name ~slot_stamp ~(debug : Debuginfo.t) compilation_unit =
     let name_stamp =
       if !previous_name_stamp = max_int
       then Misc.fatal_error "Have run out of name stamps";
@@ -889,29 +925,36 @@ module Code_id = struct
     let linkage_name =
       match Compilation_unit.name_mangling_scheme_for_current_unit () with
       | Flat ->
+        let name_with_slot_stamp =
+          Code_id_data.name_with_slot_stamp ~name ~slot_stamp
+        in
         let name =
           if Flambda_features.Expert.shorten_symbol_names ()
-          then Printf.sprintf "%s_%d" name name_stamp
-          else Printf.sprintf "%s_%d_code" name name_stamp
+          then Printf.sprintf "%s_%d" name_with_slot_stamp name_stamp
+          else Printf.sprintf "%s_%d_code" name_with_slot_stamp name_stamp
         in
         Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
       | Structured ->
-        let suffix =
-          if Flambda_features.Expert.shorten_symbol_names ()
-          then Printf.sprintf "_%d" name_stamp
-          else Printf.sprintf "_%d_code" name_stamp
+        (* The stamps are emitted as their own path items so that the demangler
+           can omit them. There is no [_code] suffix in this scheme, and hence
+           nothing for [shorten_symbol_names] to shorten. *)
+        let stamps : _ Structured_mangling.path =
+          match slot_stamp with
+          | None -> [Stamp name_stamp]
+          | Some slot_stamp -> [Stamp slot_stamp; Stamp name_stamp]
         in
-        let path = Debuginfo.to_structured_mangling_path ~name debug in
-        Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
+        let path = Debuginfo.to_structured_mangling_path ~name debug @ stamps in
+        Symbol0.for_structured_mangling_path ~compilation_unit ~path
         |> Symbol0.linkage_name
     in
     let data : Code_id_data.t =
-      { compilation_unit; name; debug_info = debug; linkage_name }
+      { compilation_unit; name; slot_stamp; debug_info = debug; linkage_name }
     in
     Table.add !grand_table_of_code_ids data
 
   let rename t =
-    create ~name:(name t) ~debug:(debug t) (Current_unit.get_cu_exn ())
+    let { Code_id_data.name; slot_stamp; debug_info; _ } = find_data t in
+    create ~name ~slot_stamp ~debug:debug_info (Current_unit.get_cu_exn ())
 
   let in_compilation_unit t comp_unit =
     Compilation_unit.equal (get_compilation_unit t) comp_unit
@@ -958,6 +1001,20 @@ module Code_id = struct
 
   let import importer t =
     Table.add !grand_table_of_code_ids (Table.import importer t)
+
+  type stamp_state = int
+
+  let export_stamp_state () = !previous_name_stamp
+
+  let restore_stamp_state state =
+    if !previous_name_stamp = -1
+    then previous_name_stamp := state
+    else
+      Misc.fatal_errorf
+        "Restoring code ID stamp state would overwrite modified value %d"
+        !previous_name_stamp
+
+  let merge_stamp_state state1 state2 = Int.max state1 state2
 end
 
 module Code_id_or_symbol = struct
@@ -988,11 +1045,10 @@ module Code_id_or_symbol = struct
     let hash = Id.hash
 
     let print ppf t =
+      let open! Misc.Sexp in
       pattern_match t
-        ~code_id:(fun code_id ->
-          Format.fprintf ppf "@[<hov 1>(code_id@ %a)@]" Code_id.print code_id)
-        ~symbol:(fun symbol ->
-          Format.fprintf ppf "@[<hov 1>(symbol@ %a)@]" Symbol.print symbol)
+        ~code_id:(fun code_id -> print ppf [a "code_id" code_id Code_id.print])
+        ~symbol:(fun symbol -> print ppf [a "symbol" symbol Symbol.print])
   end
 
   include T0
@@ -1046,13 +1102,11 @@ module Code_id_or_name = struct
     let hash = Id.hash
 
     let print ppf t =
+      let open! Misc.Sexp in
       pattern_match t
-        ~code_id:(fun code_id ->
-          Format.fprintf ppf "@[<hov 1>(code_id@ %a)@]" Code_id.print code_id)
-        ~symbol:(fun symbol ->
-          Format.fprintf ppf "@[<hov 1>(symbol@ %a)@]" Symbol.print symbol)
-        ~var:(fun var ->
-          Format.fprintf ppf "@[<hov 1>(var@ %a)@]" Variable.print var)
+        ~code_id:(fun code_id -> print ppf [a "code_id" code_id Code_id.print])
+        ~symbol:(fun symbol -> print ppf [a "symbol" symbol Symbol.print])
+        ~var:(fun var -> print ppf [a "var" var Variable.print])
   end
 
   include T0

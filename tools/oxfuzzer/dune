@@ -1,0 +1,7 @@
+(executable
+ (name oxfuzzer)
+ (public_name oxfuzzer)
+ (modes native)
+ (flags (:standard -open Oxfuzzer_lib))
+ (libraries oxfuzzer_lib)
+ (package ocaml))

@@ -61,16 +61,22 @@ end
 
 val generic_level: int
         (* level of polymorphic variables; = Ident.highest_scope *)
+val subject_level: int
+        (* level of the subject of moregen; = generic_level - 1*)
 val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
 
-val with_new_pool: level:int -> (unit -> 'a) -> 'a * transient_expr list
-        (* [with_new_pool ~level f] executes [f] and returns the nodes
-           that were created at level [level] and above *)
+val with_new_pool:
+  level:int -> (unit -> 'a)
+  -> 'a * transient_expr list * Jkind_types.Sort.t list
+        (* [with_new_pool ~level f] executes [f] and returns the type and sort
+           nodes that were created at level [level] and above *)
 val add_to_pool: level:int -> transient_expr -> unit
         (* Add a type node to the pool associated to the level (which should
            be the level of the type node).
            Do nothing if [level = generic_level] or [level = lowest_level]. *)
+val add_to_sort_pool: level:int -> Jkind_types.Sort.t -> unit
+        (* Like [add_to_pool], but adds a sort to the pool. *)
 
 val newty3: level:int -> scope:int -> type_desc -> type_expr
         (* Create a type with a fresh id *)
@@ -93,6 +99,8 @@ val new_quote_eval_ty: type_expr -> type_expr
         (* Quote-eval a type expression *)
 val new_box_ty: type_expr -> type_expr
         (* Box a type expression *)
+
+val new_sort_var: level:int -> Jkind_types.Sort.var
 
 (**** Types ****)
 
@@ -158,11 +166,11 @@ val set_static_row_name: type_declaration -> Path.t -> unit
 (**** Utilities for type traversal ****)
 
 val iter_type_expr:
-  (type_expr -> unit) -> (Mode.Alloc.lr -> unit) ->
+  (type_expr -> unit) -> (Mode.With_locality.lr -> unit) ->
   type_expr -> unit
         (* Iteration on types *)
 val fold_type_expr:
-  ('a -> type_expr -> 'a) -> ('a -> Mode.Alloc.lr -> 'a) ->
+  ('a -> type_expr -> 'a) -> ('a -> Mode.With_locality.lr -> 'a) ->
   'a -> type_expr -> 'a
 val iter_row: (type_expr -> unit) -> row_desc -> unit
         (* Iteration on types in a row *)
@@ -205,7 +213,7 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
-    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_mode_expr: Mode.With_locality.lr -> unit;
     it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
@@ -224,7 +232,7 @@ val type_iterators_without_type_expr: type_iterators_without_type_expr
 
 val copy_type_desc:
     ?keep_names:bool -> (type_expr -> type_expr) ->
-    (Mode.Alloc.lr -> Mode.Alloc.lr) -> type_desc -> type_desc
+    (Mode.With_locality.lr -> Mode.With_locality.lr) -> type_desc -> type_desc
         (* Copy on types *)
 val copy_row:
     (type_expr -> type_expr) ->
@@ -246,21 +254,21 @@ module For_copy : sig
 
   val mode_instantiate :
     copy_scope -> current_level:int ->
-    Mode.Alloc.lr -> Mode.Alloc.lr
+    Mode.With_locality.lr -> Mode.With_locality.lr
         (* Instantiates a generic mode variable to level [current_level] *)
 
   val mode_copy_generic :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
         (* Copies the generic parts of a mode variable
            without changing its level *)
 
   val mode_copy_for_saving :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
         (* Deeply copies a mode variable without changing its level, giving
            the copies negative (persistent) ids, for storing in a cmi file. *)
 
   val mode_copy_for_restoring :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
         (* Deeply copies a mode variable without changing its level.
            Asserts that the original has negative ids. *)
 
@@ -598,6 +606,12 @@ module Jkind0 : sig
       (** The jkind of block indices with mode crossing. *)
       val kind_of_idx : t
 
+      (** The jkind of mutable addresses ([addr]) with mode crossing. *)
+      val kind_of_addr : t
+
+      (** The jkind of immutable addresses ([addr_imm]) with mode crossing. *)
+      val kind_of_addr_imm : t
+
       (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
       val vec128 : t
 
@@ -638,7 +652,7 @@ module Jkind0 : sig
     module Sub_failure_reason : sig
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
-        | Layout_disagreement
+        | Layout_disagreement of Jkind_types.Sort.error
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
@@ -703,8 +717,6 @@ module Jkind0 : sig
     val map_type_expr :
       (type_expr -> type_expr) -> ('l * 'r) jkind -> ('l * 'r) jkind
 
-    val instance : jkind_lr -> jkind_lr
-
     val has_with_bounds : jkind_l -> bool
 
     module Builtin : sig
@@ -734,11 +746,6 @@ module Jkind0 : sig
         ('l * disallowed) jkind
       val immediate_or_null :
         why:Jkind_intf.History.immediate_or_null_creation_reason -> 'd jkind
-      val product :
-        why:Jkind_intf.History.product_creation_reason ->
-        (type_expr * Mode.Modality.Const.t) list ->
-        Jkind_types.Sort.t Jkind_types.Layout.t list ->
-        jkind_l
       val product_of_any :
         why:Jkind_intf.History.product_creation_reason ->
         int ->

@@ -375,12 +375,16 @@ type nullary_primitive =
           Semaphore initialization code may be emitted as a consequence of
           seeing this instruction, but the emitter checks that all occurrences
           of [enabled_at_init] are consistent for a given probe [name]. *)
-  | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
+  | Enter_inlined_apply of
+      { dbg : Inlined_debuginfo.t;
+        inlined_attribute : Inlined_attribute.t
+      }
       (** Used in classic mode to denote the start of an inlined function body.
           This is then used in to_cmm to correctly add inlined debuginfo. *)
   | Dls_get  (** Obtain the domain-local state block. *)
   | Tls_get  (** Obtain the thread-local state block. *)
   | Domain_index  (** Obtain the current domain's index. *)
+  | Thread_self_id  (** Obtain the current systhread's id. *)
   | Poll
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and GC
@@ -395,7 +399,9 @@ type nullary_primitive =
     encoding a 16-bit quantity (described in the least significant 16 bits of
     the immediate after untagging) and exchanges the two halves of the 16-bit
     quantity. The higher-order bits are zeroed. *)
-type unary_int_arith_op = Swap_byte_endianness
+type unary_int_arith_op =
+  | Swap_byte_endianness
+  | Not
 (* CR mshinwell/jvanburen: we should consider splitting this swapping primitive
    into two, based on the semantics *)
 
@@ -691,10 +697,16 @@ module Without_args : sig
 
   val print : Format.formatter -> t -> unit
 
+  val equal : t -> t -> bool
+
+  val free_names : t -> Name_occurrences.t
+
   (** Describe the effects and coeffects that the application of the given
       primitive may have. *)
   val effects_and_coeffects : t -> Effects_and_coeffects.t
 end
+
+val without_args : t -> Without_args.t
 
 (** A description of the kind of values which a unary primitive expects as its
     arguments. *)

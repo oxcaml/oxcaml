@@ -49,13 +49,17 @@ module Sort : sig
        and type var = Jkind_types.Sort.var
        and type univar = Jkind_types.Sort.univar
        and type base = Jkind_types.Sort.base
+       and type level_error = Jkind_types.Sort.level_error
+       and type error = Jkind_types.Sort.error
        and type Const.t = Jkind_types.Sort.Const.t
+
+  val new_var : level:int -> var
 
   module Flat : sig
     (** A flat sort is returned from [get]. *)
     type t =
       | Var of Var.id (* [Var.id] is for debugging / printing only *)
-      | Genvar of var (* generic sort variable, level = Ident.highest_scope *)
+      | Genvar of var
       | Univar of univar
       | Base of base
   end
@@ -66,7 +70,7 @@ type sort = Sort.t
 module Sub_failure_reason : sig
   type t = Jkind0.Violation.Sub_failure_reason.t =
     | Axis_disagreement of Jkind_axis.Axis.packed
-    | Layout_disagreement
+    | Layout_disagreement of Jkind_types.Sort.error
     | With_bounds_on_left
     | Constrain_ran_out_of_fuel
 end
@@ -104,6 +108,7 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t  (** See Note [Addressable kinds] *)
+    | Box of 'sort t * Scannable_axes.t  (** See [Jkind_types.Layout.t] *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -123,11 +128,7 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
-  (** Updates the nullability on the layout's scannable axis. *)
-  val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
-
-  (** Updates the separability on the layout's scannable axis. *)
-  val set_root_separability : Sort.t t -> Jkind_axis.Separability.t -> Sort.t t
+  val implied_externality : Sort.t t -> Jkind_axis.Externality.t
 
   module Debug_printers : sig
     val t :
@@ -300,7 +301,11 @@ module Const : sig
   (** Creates an abstract jkind, with max with-bounds, from the path. *)
   val of_path : Path.t -> (allowed * allowed) t
 
-  val equal : Env.t -> (allowed * allowed) t -> (allowed * allowed) t -> bool
+  val equal :
+    Env.t ->
+    (allowed * allowed) t ->
+    (allowed * allowed) t ->
+    (unit, Sort.error) result
 
   (* [use_abstract_jkinds] controls whether references to other kinds here count
      as uses of them for unused abstract kind warnings. *)
@@ -362,22 +367,6 @@ module Builtin : sig
   (** Values of types of this jkind are either immediate or null pointers *)
   val immediate_or_null :
     why:History.immediate_or_null_creation_reason -> 'd Types.jkind
-
-  (** Build a jkind of unboxed products, from a list of types with their
-      layouts. Errors if zero inputs are given.
-
-      Precondition: both input lists are the same length.
-
-      This returns an [jkind_l] simply as a matter of convenience; it can be
-      generalized if need be.
-
-      The resulting jkind has quality [Best], because all the components of the
-      product are represented in the with-bounds. *)
-  val product :
-    why:History.product_creation_reason ->
-    (Types.type_expr * Mode.Modality.Const.t) list ->
-    Sort.t Layout.t list ->
-    Types.jkind_l
 
   (** Build a jkind of unboxed products, given only an arity. This jkind will
       not mode-cross (and has kind [Not_best] accordingly), even though unboxed
@@ -496,6 +485,78 @@ val of_type_decl_overapproximate_unknown :
   Parsetree.type_declaration ->
   Types.jkind_l option
 
+module Unboxed_field_transformation : sig
+  (** The kind of an unboxed container is built from the kinds of its unboxed
+      contents (which get stored inline), transformed based on the modalities
+      and [mutable] labels on its fields (to strengthen or weaken mode crossing,
+      respectively).
+
+      An [Unboxed_field_transformation.t] represents such a kind transformation
+      as data. *)
+  type t
+
+  (** The identity transformation, for immutable fields without modalities. *)
+  val id : t
+
+  (** Constructs the transformation for a field declared with the given
+      mutability and modality, representing the transformation of [t]'s kind
+      into [r]'s in the following example:
+      {[
+        type r = #{ <<mutability>> x : t @@ <<modality>> }
+      ]} *)
+  val of_field :
+    mutability:Types.mutability -> modality:Mode.Modality.Const.t -> t
+
+  (** Constructs the transformation for an immutable field declared with the
+      given modality. *)
+  val of_modality : Mode.Modality.Const.t -> t
+
+  (** Constructs the transformation for an field with the given label. *)
+  val of_label : Types.label_declaration -> t
+
+  (** [nest ~outer ~inner] composes transformations, for fields reached through
+      nested unboxed containers. *)
+  val nest : outer:t -> inner:t -> t
+
+  (** Executes [t]'s transformation on the kind of some unboxed contents to turn
+      it into (its contribution to) the kind of its unboxed container. *)
+  val apply_l : t -> (allowed * 'r) Types.jkind -> Types.jkind_l
+
+  (** Executes [t]'s transformation on an expectation for an unboxed container
+      to turn it into an expectation on its unboxed contents, checking if the
+      transformation result is satisfiable and failing if it is not. *)
+  val apply_r : t -> ('l * allowed) Types.jkind -> (Types.jkind_r, unit) result
+
+  (** Translates a violation from checking some unboxed contents against
+      [apply_r t jk] into a violation of their unboxed container against [jk].
+      Returns [None] if the violation is not a [Not_a_subjkind]. *)
+  val unapply_violation :
+    context:jkind_context ->
+    Env.t ->
+    t ->
+    history:Types.jkind_history ->
+    ('l * allowed) Types.jkind ->
+    Violation.t ->
+    Violation.t option
+end
+
+(** Build a jkind of unboxed products, from a list of types, their layouts, and
+    how they are transformed when placed in an unboxed container. Errors if zero
+    inputs are given.
+
+    Precondition: both input lists are the same length.
+
+    This returns an [jkind_l] simply as a matter of convenience; it can be
+    generalized if need be.
+
+    The resulting jkind has quality [Best], because all the components of the
+    product are represented in the with-bounds. *)
+val product_of_fields :
+  why:History.product_creation_reason ->
+  (Types.type_expr * Unboxed_field_transformation.t) list ->
+  Sort.t Layout.t list ->
+  Types.jkind_l
+
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
@@ -557,8 +618,9 @@ val for_object : Types.jkind_l
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
 
-(** The jkind for an abbreviation declaration. This implements the design in
-    rule FIND_ABBREV in kind-inference.md, where we consider a definition
+(** The jkind for an abbreviation declaration (including unboxed singletons).
+    This implements the design in rule FIND_ABBREV in kind-inference.md, where
+    we consider a definition
 
     {[
       type ... = rhs
@@ -573,10 +635,13 @@ val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
       end = struct
         type 'a t = 'a
       end
-    ]} *)
+    ]}
+
+    For unboxed singletons, we further transform this kind using the given
+    transformation, as it may have modalities or a [mutable] label. *)
 val for_abbreviation :
   type_jkind_purely:(Types.type_expr -> Types.jkind_l) ->
-  modality:Mode.Modality.Const.t ->
+  Unboxed_field_transformation.t ->
   Types.type_expr ->
   Types.jkind_l
 
@@ -621,6 +686,17 @@ val default_to_scannable : 'd Types.jkind -> unit
 (** Generalize the sorts in a jkind when in sort generalization context. Only
     has an effect when called within {!Sort.generalize_with}. *)
 val generalize : current_level:int -> 'd Types.jkind -> unit
+
+(** Updates the levels of sort variables in the jkind.
+
+    This function only succeeds if the kind can be expanded so that an abstract
+    kind does not escape its scope. If no expansion is needed, [None] is
+    returned, otherwise the expanded kind is returned. *)
+val update_level :
+  Env.t ->
+  int ->
+  'd Types.jkind ->
+  ('d Types.jkind option, Sort.level_error) result
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)
@@ -668,6 +744,11 @@ val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
 
+(** Construct a kind with the given modal bounds, unrestricted layout, and no
+    with-bounds. [history] records the origin of the requirement. *)
+val of_mod_bounds :
+  history:Types.jkind_history -> Mod_bounds.t -> 'd Types.jkind
+
 (** Change a jkind to be appropriate for a type that appears under a modality.
     This means that the jkind will definitely cross the axes modified by the
     modality, by setting the mod-bounds appropriately and propagating the
@@ -681,16 +762,15 @@ val apply_modality_l :
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
-(** Change a jkind to be appropriate for ['a or_null] based on passed ['a].
-    Adjusts nullability to be [Maybe_null], and separability to be
-    [Maybe_separable] if it is already [Separable]. If the jkind is already
-    [Maybe_null], fails. *)
+(** Given a kind [k], returns the kind of [(_ : k) or_null]. Fails if [or_null]
+    cannot be applied to types of kind [k]. *)
 val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
 
-(** Change a jkind to be appropriate for an expectation of a type passed to the
-    [or_null] constructor. Adjusts nullability to be [Non_null], and
-    separability to be [Non_float] if it is demanded to be [Separable]. If the
-    jkind is already [Non_null], fails. *)
+(** Given some kind [k], try to produce some kind [k'] such that [type : kind]
+    constraints like [t or_null : k] can be reduced to [t : k'] (where the
+    latter implies the former).
+
+    Fails if no [or_null] type could have kind [k]. *)
 val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Given a jkind [k], produce a list of jkinds [ks] such that [k] is equivalent
@@ -752,6 +832,11 @@ val format_type_expr : Types.type_expr Format_doc.printer
     module. *)
 val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 
+(** Provides [Ctype.estimate_type_jkind] back up the dependency chain to this
+    module. *)
+val set_estimate_type_jkind :
+  (Env.t -> Types.type_expr -> Types.jkind_l) -> unit
+
 val format : Env.t -> Format_doc.formatter -> 'd Types.jkind -> unit
 
 module Format_verbosity : sig
@@ -790,14 +875,16 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds equal,
     if possible. e.g. [equate] on a var and [value] will set the variable to be
     [value] *)
-val equate : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equate :
+  Env.t -> Types.jkind_lr -> Types.jkind_lr -> (unit, Sort.error) result
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
-val equal : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equal :
+  Env.t -> Types.jkind_lr -> Types.jkind_lr -> (unit, Sort.error) result
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate sort
     variables. Works over any mix of l- and r-jkinds, because the only way not
@@ -932,7 +1019,8 @@ val mod_bounds_are_obviously_max : 'd Types.jkind -> bool
 
 (** Fully expands the jkind's base - useful to avoid expanding twice for clients
     that both want to inspect the mod bounds and apply other functions to the
-    jkind that would expand it. *)
+    jkind that would expand it. Also lowers the resulting externality bound to
+    the bound implied by the layout. *)
 val fully_expand_aliases : Env.t -> 'd Types.jkind -> 'd Types.jkind
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)

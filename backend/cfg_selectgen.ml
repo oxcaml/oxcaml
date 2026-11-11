@@ -20,7 +20,7 @@
 
 open! Int_replace_polymorphic_compare
 
-[@@@ocaml.warning "+a-4-9-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 module DLL = Doubly_linked_list
 module Or_never_returns = Select_utils.Or_never_returns
@@ -76,24 +76,68 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Csequence (e1, e2) -> is_simple_expr e1 && is_simple_expr e2
     | Cop (op, args, _) -> (
       match op with
-      (* Cextcall with neither effects nor coeffects is simple if its arguments
-         are *)
-      | Cextcall { effects = No_effects; coeffects = No_coeffects } ->
+      (* A [Cextcall] with neither effects nor coeffects is simple if its
+         arguments are, provided it cannot allocate. An allocating external call
+         goes through [caml_c_call] and may trigger a GC, so it must not be
+         deferred: in particular, [emit_stores] evaluates the deferred arguments
+         of a [Calloc] after the [Alloc] instruction, and a GC during such a
+         call would see the uninitialised fields of the new block. *)
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = false;
+            builtin = _;
+            returns = _;
+            effects = No_effects;
+            coeffects = No_coeffects
+          } ->
         List.for_all is_simple_expr args
-        (* The following may have side effects *)
-      | Capply _ | Cextcall _ | Calloc _ | Cstore _ | Craise _ | Catomic _
-      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
+        (* The following may have side effects (or, in the first case, trigger a
+           GC) *)
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = true;
+            builtin = _;
+            returns = _;
+            effects = No_effects;
+            coeffects = No_coeffects
+          }
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = _;
+            builtin = _;
+            returns = _;
+            effects = Arbitrary_effects;
+            coeffects = _
+          }
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = _;
+            builtin = _;
+            returns = _;
+            effects = No_effects;
+            coeffects = Has_coeffects
+          }
+      | Capply _ | Calloc _ | Cstore _ | Craise _ | Catomic _ | Cprobe _
+      | Cprobe_is_enabled _ | Copaque _ | Cpoll | Cpause ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
       | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
-      | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _
-      | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
-      | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
-      | Cdls_get | Ctls_get | Cdomain_index ->
+      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr
+      | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt
+      | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+      | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _
+      | Ccmpf _ | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id ->
         List.for_all is_simple_expr args)
     | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> false
 
@@ -126,14 +170,24 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
     | Cname_for_debugger (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
-    | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+    | Cifthenelse
+        (cond, _ifso_dbg, _ifso_p, ifso, _ifnot_dbg, _ifnot_p, ifnot, _dbg) ->
       EC.join (effects_of cond) (EC.join (effects_of ifso) (effects_of ifnot))
     | Cop (op, args, _) ->
       let from_op =
         match op with
-        | Cextcall { effects = e; coeffects = ce } ->
+        | Cextcall
+            { func = _;
+              ty = _;
+              ty_args = _;
+              alloc = _;
+              builtin = _;
+              returns = _;
+              effects = e;
+              coeffects = ce
+            } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
-        | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
+        | Capply _ | Cprobe _ | Copaque _ | Cpoll | Cpause -> EC.arbitrary
         | Calloc (Heap, _) -> EC.none
         | Calloc (Local, _) -> EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
@@ -141,14 +195,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Cprefetch _ -> EC.arbitrary
         | Catomic _ -> EC.arbitrary
         | Craise _ -> EC.effect_only Raise
-        | Cload { mutability = Immutable; is_atomic } ->
+        | Cload { memory_chunk = _; mutability = Immutable; is_atomic } ->
           if is_atomic then EC.arbitrary else EC.none
-        | Cload { mutability = Mutable; is_atomic } ->
+        | Cload { memory_chunk = _; mutability = Mutable; is_atomic } ->
           if is_atomic then EC.arbitrary else EC.coeffect_only Read_mutable
-        | Cdls_get | Ctls_get | Cdomain_index -> EC.coeffect_only Read_mutable
+        | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id ->
+          EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-        | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
+        | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Cbswap _
         | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
         | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
         | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
@@ -172,7 +227,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Use_default -> (
       match op with
       | Ilsl | Ilsr | Iasr -> n >= 0 && n < Arch.size_int * 8
-      | _ -> false)
+      | Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Inot | Iclz | Ictz | Ipopcnt | Icomp _ ->
+        false)
 
   let is_immediate_test cmp n =
     match Target.is_immediate_test cmp n with
@@ -187,13 +244,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_natint (n, dbg)
       when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
       Cconst_int (Nativeint.to_int n, dbg)
-    | _ -> expr
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
+    | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+    | Cexit _ | Cinvalid _ ->
+      expr
 
   (* Instruction selection for conditionals *)
 
   let select_condition (arg : Cmm.expression) : Operation.test * Cmm.expression
       =
-    match arg with
+    match[@ocaml.warning "-fragile-match"] arg with
     | Cop (Ccmpi cmp, [arg1; arg2], _) -> (
       match normalize_int_constant arg1, normalize_int_constant arg2 with
       | arg1, Cconst_int (n, _) when is_immediate_test cmp n ->
@@ -208,7 +270,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | _ -> Itruetest, arg
 
   let is_store (op : Operation.t) =
-    match op with Store (_, _, _) -> true | _ -> false
+    match op with
+    | Store (_, _, _) -> true
+    | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+    | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+    | Const_mask _ | Stackoffset _ | Load _ | Intop _ | Int128op _ | Intop_imm _
+    | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+    | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+    | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Thread_self_id
+    | Poll | Pause | Alloc _ ->
+      false
 
   let bind_let (env : SU.environment) sub_cfg v r1 =
     let env =
@@ -257,7 +328,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comm (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match List.map normalize_int_constant args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | [Cconst_int (n, _); arg] when is_immediate op n ->
@@ -267,7 +340,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match List.map normalize_int_constant args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | _ -> SU.basic_op (Intop op), args
@@ -275,7 +350,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comp (cmp : Operation.integer_comparison)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match List.map normalize_int_constant args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate (Operation.Icomp cmp) n ->
       SU.basic_op (Intop_imm (Icomp cmp, n)), [arg]
     | [Cconst_int (n, _); arg]
@@ -314,7 +391,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Cconst_symbol (func, _dbg) :: rem ->
         Terminator (Call { op = Direct func; label_after }), rem
       | _ -> Terminator (Call { op = Indirect callees; label_after }), args)
-    | Cextcall { func; alloc; ty; ty_args; returns; builtin; effects } ->
+    | Cextcall
+        { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
+      ->
       if builtin && not !Oxcaml_flags.disable_builtin_check
       then raise (Error (Builtin_not_recognized func, dbg));
       let external_call =
@@ -364,6 +443,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cdls_get -> SU.basic_op Dls_get, args
     | Ctls_get -> SU.basic_op Tls_get, args
     | Cdomain_index -> SU.basic_op Domain_index, args
+    | Cthread_self_id -> SU.basic_op Thread_self_id, args
     | Calloc (mode, alloc_block_kind) ->
       let placeholder_for_alloc_block_kind : Cmm.alloc_dbginfo_item =
         { alloc_words = 0; alloc_block_kind; alloc_dbg = Debuginfo.none }
@@ -386,6 +466,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cand -> select_arith_comm Iand args
     | Cor -> select_arith_comm Ior args
     | Cxor -> select_arith_comm Ixor args
+    | Cnot -> SU.basic_op (Intop Inot), args
     | Clsl -> select_arith Ilsl args
     | Clsr -> select_arith Ilsr args
     | Casr -> select_arith Iasr args
@@ -438,10 +519,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         args )
     | Cprobe_is_enabled { name; enabled_at_init } ->
       SU.basic_op (Probe_is_enabled { name; enabled_at_init }), []
+    | Copaque _ -> SU.basic_op Opaque, args
     | Cbeginregion -> SU.basic_op Begin_region, []
     | Cendregion -> SU.basic_op End_region, args
-    | Cpackf32 | Copaque | Cbswap _ | Cprefetch _ | Craise _
-    | Ctuple_field (_, _) ->
+    | Cpackf32 | Cbswap _ | Cprefetch _ | Craise _ | Ctuple_field (_, _) ->
       Misc.fatal_error "Selection.select_oper"
 
   let rec select_operation (op : Cmm.operation) (args : Cmm.expression list)
@@ -546,6 +627,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
      right-to-left evaluation order as required by the Flambda [Un_anf] pass
      (and to be consistent with the bytecode compiler). *)
 
+  (* CR ttebbi: This duplicates [Select_utils.emit_parts_list], which the SSA
+     pipeline uses. Once [Cfg_compare] has validated the two against each other
+     for a while, we can use the [Select_utils] version. *)
   let rec emit_parts env sub_cfg ~effects_after exp : _ Or_never_returns.t =
     let module EC = SU.Effect_and_coeffect in
     let may_defer_evaluation =
@@ -648,13 +732,34 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | _ :: _ -> ty_args
     in
     let locs, stack_ofs, align = Proc.loc_external_arguments ty_args in
-    let ty_args = Array.of_list ty_args in
     if stack_ofs <> 0
     then SU.insert env sub_cfg (SU.make_stack_offset stack_ofs) [||] [||];
-    List.iteri
-      (fun i arg ->
-        insert_move_extcall_arg env sub_cfg ty_args.(i) arg locs.(i) dbg)
-      args;
+    (* An [XFat_pointer] entry corresponds to two Cmm arguments (base and
+       offset) and a two-register [locs] entry; the addition happens when the
+       call itself is emitted. All other [exttype]s are one argument each. *)
+    let rec move_args i (ty_args : Cmm.exttype list) args =
+      match ty_args, args with
+      | [], [] -> ()
+      | XFat_pointer :: ty_args', base :: offset :: args' ->
+        SU.insert_moves env sub_cfg base [| locs.(i).(0) |];
+        SU.insert_moves env sub_cfg offset [| locs.(i).(1) |];
+        move_args (i + 1) ty_args' args'
+      | ( (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+           | XVec128 | XVec256 | XVec512 | XDummy_int | XDummy_float ) as ty_arg)
+          :: ty_args',
+          arg :: args' ) ->
+        insert_move_extcall_arg env sub_cfg ty_arg arg locs.(i) dbg;
+        move_args (i + 1) ty_args' args'
+      | XFat_pointer :: _, ([] | [_])
+      | ( ( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 | XDummy_int | XDummy_float )
+          :: _,
+          [] )
+      | [], _ :: _ ->
+        Misc.fatal_error
+          "emit_extcall_args: arguments do not match the declared [ty_args]"
+    in
+    move_args 0 ty_args args;
     Ok (Array.concat (Array.to_list locs), stack_ofs, align)
 
   and emit_stores env sub_cfg dbg (args : Cmm.expression list) regs_addr =
@@ -714,19 +819,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | None ->
           for i = 0 to Array.length regs - 1 do
             let r = regs.(i) in
-            let chunk : Cmm.memory_chunk =
-              match r.Reg.typ with
-              | Float -> Double
-              | Float32 -> Single { reg = Float32 }
-              (* SIMD memory operations are unaligned by default. Aligned
-                 bigarray operations are handled separately via cmm. *)
-              | Vec128 -> Onetwentyeight_unaligned
-              | Vec256 -> Twofiftysix_unaligned
-              | Vec512 -> Fivetwelve_unaligned
-              | Mask -> Word_mask
-              | Val | Addr | Int -> Word_val
-              | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            in
+            let chunk = SU.chunk_of_machtype_component r.Reg.typ in
             insert_debug env sub_cfg
               (Op (Store (chunk, !addressing_mode, false)))
               dbg
@@ -832,13 +925,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok (simple_list, ext_env) -> emit_tuple ext_env sub_cfg simple_list)
     | Cop (Craise k, args, dbg) -> emit_expr_raise env sub_cfg k args dbg
-    | Cop (Copaque, args, dbg) -> (
-      match emit_parts_list env sub_cfg args with
-      | Never_returns -> Never_returns
-      | Ok (simple_args, env) ->
-        let* rs = emit_tuple env sub_cfg simple_args in
-        let rd = Reg.createv_with_typs rs in
-        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rd))
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
       match emit_expr env sub_cfg arg ~bound_name:None with
       | Never_returns -> Never_returns
@@ -853,14 +939,27 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Array.sub loc_exp size_before (Array.length fields_layout.(field))
         in
         Ok field_slice)
-    | Cop (op, args, dbg) -> emit_expr_op env sub_cfg bound_name op args dbg
+    | Cop
+        ( (( Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi
+           | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128
+           | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
+           | Cbswap _ | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _
+           | Catomic _ | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _
+           | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
+           | Cstatic_cast _ | Ccmpf _ | Cprobe _ | Cprobe_is_enabled _
+           | Copaque _ | Cbeginregion | Cendregion | Ctuple_field _ | Cdls_get
+           | Ctls_get | Cdomain_index | Cthread_self_id | Cpoll | Cpause ) as op),
+          args,
+          dbg ) ->
+      emit_expr_op env sub_cfg bound_name op args dbg
     | Csequence (e1, e2) -> (
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> Never_returns
       | Ok _ -> emit_expr env sub_cfg e2 ~bound_name)
-    | Cifthenelse (econd, ifso_dbg, eif, ifnot_dbg, eelse, dbg) ->
-      emit_expr_ifthenelse env sub_cfg bound_name econd ifso_dbg eif ifnot_dbg
-        eelse dbg
+    | Cifthenelse (econd, ifso_dbg, ifso_p, eif, ifnot_dbg, ifnot_p, eelse, dbg)
+      ->
+      emit_expr_ifthenelse env sub_cfg bound_name econd ifso_dbg ifso_p eif
+        ifnot_dbg ifnot_p eelse dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_expr_switch env sub_cfg bound_name esel index ecases dbg
     | Ccatch (_, [], e1) -> emit_expr env sub_cfg e1 ~bound_name
@@ -880,15 +979,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let env = SU.env_add_phantom_let var defining_expr env in
       emit_tail env sub_cfg body
     | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
-    | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
-      ->
+    | Cop
+        ( (Capply { result_type = ty; region = Rc_normal; callees = _ } as op),
+          args,
+          dbg ) ->
       emit_tail_apply env sub_cfg ty op args dbg
     | Csequence (e1, e2) -> (
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok _ -> emit_tail env sub_cfg e2)
-    | Cifthenelse (econd, ifso_dbg, eif, ifnot_dbg, eelse, dbg) ->
-      emit_tail_ifthenelse env sub_cfg econd ifso_dbg eif ifnot_dbg eelse dbg
+    | Cifthenelse (econd, ifso_dbg, ifso_p, eif, ifnot_dbg, ifnot_p, eelse, dbg)
+      ->
+      emit_tail_ifthenelse env sub_cfg econd ifso_dbg ifso_p eif ifnot_dbg
+        ifnot_p eelse dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_tail_switch env sub_cfg esel index ecases dbg
     | Ccatch (_, [], e1) -> emit_tail env sub_cfg e1
@@ -897,7 +1000,24 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cinvalid { message; symbol } ->
       let ok = emit_invalid env sub_cfg message symbol in
       insert_return env sub_cfg ok (SU.pop_all_traps env)
-    | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cop
+        ( ( Capply
+              { result_type = _;
+                region = Rc_nontail | Rc_close_at_apply;
+                callees = _
+              }
+          | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
+          | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _
+          | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr | Cbswap _ | Ccsel _
+          | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv
+          | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+          | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _
+          | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
+          | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
+          | Cthread_self_id | Cpoll | Cpause ),
+          _,
+          _ )
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
@@ -1073,20 +1193,34 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Misc.fatal_errorf
           "Selection Alloc: expected a single placehold in dbginfo, found %d"
           (List.length dbginfo)
-      | Basic (Op op) ->
+      | Basic
+          (Op
+             (( Move | Spill | Reload | Const_int _ | Const_float32 _
+              | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+              | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+              | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
+              | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+              | Opaque | Begin_region | End_region | Specific _
+              | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+              | Thread_self_id | Poll | Pause ) as op)) ->
         let* r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         add_naming_op_for_bound_name sub_cfg rd;
         Ok (insert_op_debug env sub_cfg op dbg r1 rd)
-      | Basic basic ->
+      | Basic
+          (( Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+           | Stack_check _ ) as basic) ->
         Misc.fatal_errorf "unexpected basic (%a)" Printcfg.basic_desc basic
-      | Terminator term ->
+      | Terminator
+          (( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+           | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+           | Tailcall_func _ | Invalid _ ) as term) ->
         Misc.fatal_errorf "unexpected terminator (%a)"
           (Printcfg.terminator_desc ~sep:"")
           term)
 
-  and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg eif
-      (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) :
+  and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg ifso_a eif
+      (_ifnot_dbg : Debuginfo.t) ifnot_a eelse (_dbg : Debuginfo.t) :
       _ Or_never_returns.t =
     (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
@@ -1094,8 +1228,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Never_returns -> Never_returns
     | Ok rarg ->
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
-      let rif, sub_if = emit_new_sub_cfg env eif ~bound_name in
-      let relse, sub_else = emit_new_sub_cfg env eelse ~bound_name in
+      let rif, sub_if =
+        emit_new_sub_cfg
+          ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifso_a))
+          env eif ~bound_name
+      in
+      let relse, sub_else =
+        emit_new_sub_cfg
+          ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifnot_a))
+          env eelse ~bound_name
+      in
       let r = SU.join env rif sub_if relse sub_else ~bound_name in
       let term_desc =
         SU.terminator_of_test cond
@@ -1119,7 +1261,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases : (Reg.t array Or_never_returns.t * Sub_cfg.t) array =
         Array.map
-          (fun (case, _dbg) -> emit_new_sub_cfg env case ~bound_name)
+          (fun (case, _dbg, annots) ->
+            emit_new_sub_cfg
+              ~is_cold:
+                (Likelihood.is_cold (Branch_annotations.likelihood annots))
+              env case ~bound_name)
           ecases
       in
       let r = SU.join_array env sub_cases ~bound_name in
@@ -1323,10 +1469,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Misc.fatal_error "Selection.emit_expr: Return with too many arguments"
         ))
 
-  and emit_new_sub_cfg ?at_start env exp ~bound_name : _ * Sub_cfg.t =
+  and emit_new_sub_cfg ?at_start ?(is_cold = false) env exp ~bound_name :
+      _ * Sub_cfg.t =
     let sub_cfg = Sub_cfg.make_empty () in
     (match at_start with None -> () | Some f -> f sub_cfg);
     let r = emit_expr env sub_cfg exp ~bound_name in
+    if is_cold then mark_sub_cfg_as_cold sub_cfg;
     r, sub_cfg
 
   (* Same, but in tail position *)
@@ -1394,18 +1542,31 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.set_traps_for_raise env;
           SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
           insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
-      | _ -> Misc.fatal_error "Cfg_selectgen.emit_tail")
+      | Basic _
+      | Terminator
+          ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+          | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+          | Tailcall_func _ | Invalid _ | Call_no_return _ | Prim _ ) ->
+        Misc.fatal_error "Cfg_selectgen.emit_tail")
 
-  and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif
-      (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) =
+  and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) ifso_a
+      eif (_ifnot_dbg : Debuginfo.t) ifnot_a eelse (_dbg : Debuginfo.t) =
     (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
     match emit_expr env sub_cfg earg ~bound_name:None with
     | Never_returns -> ()
     | Ok rarg ->
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
-      let sub_if = emit_tail_new_sub_cfg env eif in
-      let sub_else = emit_tail_new_sub_cfg env eelse in
+      let sub_if =
+        emit_tail_new_sub_cfg
+          ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifso_a))
+          env eif
+      in
+      let sub_else =
+        emit_tail_new_sub_cfg
+          ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifnot_a))
+          env eelse
+      in
       let term_desc =
         SU.terminator_of_test cond
           ~label_true:(Sub_cfg.start_label sub_if)
@@ -1422,7 +1583,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ok rsel ->
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases =
-        Array.map (fun (case, _dbg) -> emit_tail_new_sub_cfg env case) ecases
+        Array.map
+          (fun (case, _dbg, annots) ->
+            emit_tail_new_sub_cfg
+              ~is_cold:
+                (Likelihood.is_cold (Branch_annotations.likelihood annots))
+              env case)
+          ecases
       in
       let term_desc : Cfg.terminator =
         Switch
@@ -1546,10 +1713,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     Sub_cfg.join_tail ~from:(s_body :: s_handlers) ~to_:sub_cfg
 
-  and emit_tail_new_sub_cfg ?at_start env exp : Sub_cfg.t =
+  and emit_tail_new_sub_cfg ?at_start ?(is_cold = false) env exp : Sub_cfg.t =
     let sub_cfg = Sub_cfg.make_empty () in
     (match at_start with None -> () | Some f -> f sub_cfg);
     emit_tail env sub_cfg exp;
+    if is_cold then mark_sub_cfg_as_cold sub_cfg;
     sub_cfg
 
   let insert_param_name_for_debugger env block fun_args loc_arg num_regs_per_arg

@@ -28,13 +28,18 @@ module CU := Compilation_unit
 
 type unit_info = {
   ui_unit : CU.t;
-  ui_arg_descr : Lambda.arg_descr option;
   ui_format : Lambda.main_module_block_format;
 }
 
+(** Each of [args] is either the path of an argument's [.cmo]/[.cmx] file (if
+    it ends with [expected_extension]) or the name of an argument's
+    compilation unit, which may be an instance such as [Arg[P:P_arg]] (see
+    [Parse.unprefixed_compilation_unit]). *)
+(* CR-soon zqian: stop accepting file paths in [args]; only accept compilation
+   unit names. *)
 val instantiate
    : src:Misc.filepath
-  -> args:Misc.filepath list
+  -> args:string list
   -> Misc.filepath
   -> expected_extension:string
   -> read_unit_info:(Misc.filepath -> unit_info)
@@ -43,14 +48,12 @@ val instantiate
       output_prefix:string ->
       compilation_unit:CU.t ->
       runtime_args:Translmod.runtime_arg list ->
-      main_module_block_repr:Lambda.module_representation ->
-      arg_descr:Lambda.arg_descr option -> unit)
+      main_module_block_repr:Lambda.module_representation -> unit)
   -> unit
 
 type error =
   | Not_compiled_as_argument of {
       compilation_unit : CU.t;
-      filename : Misc.filepath;
       base_unit : CU.t;
     }
   | Incorrect_target_filename of {
@@ -63,7 +66,10 @@ type error =
       compilation_unit : CU.t;
       filename : Misc.filepath;
     }
-  | Missing_argument of { param : Global_module.Parameter_name.t }
+  | Missing_argument of {
+      imported : Global_module.Name.t;
+      param : Global_module.Parameter_name.t;
+    }
   | No_such_parameter of {
       base_unit : CU.t;
       available_params : Global_module.Parameter_name.t list;

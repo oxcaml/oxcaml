@@ -21,7 +21,6 @@ open Dwarf_low
 module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module L = Linear
-module Json = Misc.Json
 
 type t =
   { state : DS.t;
@@ -134,28 +133,28 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
       available_ranges_vars inlined_frame_ranges;
     { fun_end_label; fundecl }
 
-let format_variable_json (variable : DS.Diagnostics.variable_reduction) =
+let format_variable_json (variable : DS.Diagnostics.variable_reduction) : Json.t
+    =
   let layout =
     Format_doc.asprintf "%a" Jkind_types.Sort.Const.format variable.type_layout
   in
   let type_with_layout = Printf.sprintf "%s @ %s" variable.type_name layout in
-  Json.object_
-    [ Json.field "type" (Json.string type_with_layout);
-      Json.field "shape_size_before_reduction_in_bytes"
-        (Json.int variable.shape_size_before_reduction_in_bytes);
-      Json.field "shape_size_after_reduction_in_bytes"
-        (Json.int variable.shape_size_after_reduction_in_bytes);
-      Json.field "shape_size_after_evaluation_in_bytes"
-        (Json.int variable.shape_size_after_evaluation_in_bytes);
-      Json.field "reduction_steps" (Json.int variable.reduction_steps);
-      Json.field "evaluation_steps" (Json.int variable.evaluation_steps);
-      Json.field "dwarf_die_size" (Json.int variable.dwarf_die_size);
-      Json.field "cms_files_loaded" (Json.int variable.cms_files_loaded);
-      Json.field "cms_files_cached" (Json.int variable.cms_files_cached);
-      Json.field "cms_files_missing"
-        (Json.array (List.map Json.string variable.cms_files_missing));
-      Json.field "cms_files_unreadable"
-        (Json.array (List.map Json.string variable.cms_files_unreadable)) ]
+  let strings l : Json.t = Array (List.map (fun s : Json.t -> String s) l) in
+  Object
+    [ "type", String type_with_layout;
+      ( "shape_size_before_reduction_in_bytes",
+        Json.int variable.shape_size_before_reduction_in_bytes );
+      ( "shape_size_after_reduction_in_bytes",
+        Json.int variable.shape_size_after_reduction_in_bytes );
+      ( "shape_size_after_evaluation_in_bytes",
+        Json.int variable.shape_size_after_evaluation_in_bytes );
+      "reduction_steps", Json.int variable.reduction_steps;
+      "evaluation_steps", Json.int variable.evaluation_steps;
+      "dwarf_die_size", Json.int variable.dwarf_die_size;
+      "cms_files_loaded", Json.int variable.cms_files_loaded;
+      "cms_files_cached", Json.int variable.cms_files_cached;
+      "cms_files_missing", strings variable.cms_files_missing;
+      "cms_files_unreadable", strings variable.cms_files_unreadable ]
 
 let emit_stats_file t =
   let stats_filename =
@@ -164,39 +163,34 @@ let emit_stats_file t =
     | None -> DS.sourcefile t.state ^ ".debug-stats.json"
   in
   let { DS.Diagnostics.variables } = DS.diagnostics t.state in
-  let oc = open_out stats_filename in
-  (* Format variables array *)
-  let variable_jsons = List.rev_map format_variable_json variables in
-  (* Create the main JSON object *)
-  let main_object =
-    Json.object_
-      [ Json.field "compilation_parameters"
-          (Json.object_
-             [ Json.field "type_to_shape_max_depth"
-                 (Json.option Json.int !Clflags.type_to_shape_max_depth);
-               Json.field "gdwarf_config_shape_reduce_depth"
-                 (Json.option Json.int
-                    !Clflags.gdwarf_config_shape_reduce_depth);
-               Json.field "gdwarf_config_shape_eval_depth"
-                 (Json.option Json.int !Clflags.gdwarf_config_shape_eval_depth);
-               Json.field "gdwarf_config_max_cms_files_per_unit"
-                 (Json.option Json.int
-                    !Clflags.gdwarf_config_max_cms_files_per_unit);
-               Json.field "gdwarf_config_max_cms_files_per_variable"
-                 (Json.option Json.int
-                    !Clflags.gdwarf_config_max_cms_files_per_variable);
-               Json.field "gdwarf_config_max_shape_reduce_steps_per_variable"
-                 (Json.option Json.int
-                    !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable);
-               Json.field "gdwarf_config_max_evaluation_steps_per_variable"
-                 (Json.option Json.int
-                    !Clflags.gdwarf_config_max_evaluation_steps_per_variable);
-               Json.field "gdwarf_config_shape_reduce_fuel"
-                 (Json.option Json.int !Clflags.gdwarf_config_shape_reduce_fuel)
-             ]);
-        Json.field "variables" (Json.array variable_jsons) ]
+  let optional_int flag = Json.option (Option.map Json.int !flag) in
+  let main_object : Json.t =
+    Object
+      [ ( "compilation_parameters",
+          Object
+            [ ( "type_to_shape_max_depth",
+                optional_int Clflags.type_to_shape_max_depth );
+              ( "gdwarf_config_shape_reduce_depth",
+                optional_int Clflags.gdwarf_config_shape_reduce_depth );
+              ( "gdwarf_config_shape_eval_depth",
+                optional_int Clflags.gdwarf_config_shape_eval_depth );
+              ( "gdwarf_config_max_cms_files_per_unit",
+                optional_int Clflags.gdwarf_config_max_cms_files_per_unit );
+              ( "gdwarf_config_max_cms_files_per_variable",
+                optional_int Clflags.gdwarf_config_max_cms_files_per_variable );
+              ( "gdwarf_config_max_shape_reduce_steps_per_variable",
+                optional_int
+                  Clflags.gdwarf_config_max_shape_reduce_steps_per_variable );
+              ( "gdwarf_config_max_evaluation_steps_per_variable",
+                optional_int
+                  Clflags.gdwarf_config_max_evaluation_steps_per_variable );
+              ( "gdwarf_config_shape_reduce_fuel",
+                optional_int Clflags.gdwarf_config_shape_reduce_fuel ) ] );
+        "variables", Array (List.rev_map format_variable_json variables) ]
   in
-  Printf.fprintf oc "%s\n" main_object;
+  let oc = open_out stats_filename in
+  let ppf = Format.formatter_of_out_channel oc in
+  Format.fprintf ppf "%a@." (Json.print ~mode:Pretty) main_object;
   close_out oc
 
 let emit t ~binary_backend_available =
@@ -220,7 +214,19 @@ let emit t ~binary_backend_available =
     Proto_die.add_or_replace_attribute_value
       (DS.compilation_unit_proto_die t.state)
       (DAH.create_addr_base
-         (Address_table.base_addr (DS.address_table t.state))));
+         (Address_table.base_addr (DS.address_table t.state)));
+    if !Dwarf_flags.gdwarf_offsets
+    then (
+      (* [DW_FORM_loclistx] and [DW_FORM_rnglistx] indices are resolved via the
+         offset arrays whose positions these attributes give. *)
+      Proto_die.add_or_replace_attribute_value
+        (DS.compilation_unit_proto_die t.state)
+        (DAH.create_loclists_base
+           (Location_list_table.base_addr (DS.location_list_table t.state)));
+      Proto_die.add_or_replace_attribute_value
+        (DS.compilation_unit_proto_die t.state)
+        (DAH.create_rnglists_base
+           (Range_list_table.base_addr (DS.range_list_table t.state)))));
   Dwarf_world.emit ~asm_directives:t.asm_directives
     ~compilation_unit_proto_die:(DS.compilation_unit_proto_die t.state)
     ~compilation_unit_header_label:(DS.compilation_unit_header_label t.state)

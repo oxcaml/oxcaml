@@ -96,10 +96,9 @@ and instruction_desc =
   | Lcall_op of call_operation
   | Lreloadretaddr
   | Lreturn
-  | Llabel of
-      { label : label;
-        section_name : string option
-      }
+  | Llabel_for_jump_target of label
+  | Llabel_for_dwarf of label
+      (** Only delimits DWARF ranges, never a jump target. *)
   | Lbranch of label
   | Lcondbranch of Operation.test * label
   | Lcondbranch3 of label option * label option * label option
@@ -156,7 +155,6 @@ type fundecl =
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_frame_required : bool;
     fun_prologue_required : bool;
-    fun_section_name : string option;
     fun_phantom_lets :
       (Backend_var.Provenance.t option * phantom_defining_expr)
       Backend_var.Map.t

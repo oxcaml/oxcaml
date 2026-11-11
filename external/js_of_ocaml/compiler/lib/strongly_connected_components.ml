@@ -16,12 +16,6 @@
 
 open! Stdlib
 
-module IntSet = Set.Make (struct
-  type t = int
-
-  let compare = compare
-end)
-
 module Kosaraju : sig
   type component_graph =
     { sorted_connected_components : int list array
@@ -111,13 +105,37 @@ end = struct
     }
 end
 
+module type SET = sig
+  type elt
+
+  type t
+
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+end
+
+module type MAP = sig
+  type key
+
+  type 'a t
+
+  val cardinal : 'a t -> int
+
+  val bindings : 'a t -> (key * 'a) list
+
+  val empty : 'a t
+
+  val find : key -> 'a t -> 'a
+
+  val add : key -> 'a -> 'a t -> 'a t
+end
+
 module type S = sig
   module Id : sig
     type t
 
-    module Map : Map.S with type key = t
+    module Map : MAP with type key = t
 
-    module Set : Set.S with type elt = t
+    module Set : SET with type elt = t
   end
 
   type directed_graph = Id.Set.t Id.Map.t
@@ -134,9 +152,9 @@ end
 module Make (Id : sig
   type t
 
-  module Map : Map.S with type key = t
+  module Map : MAP with type key = t
 
-  module Set : Set.S with type elt = t
+  module Set : SET with type elt = t
 end) =
 struct
   module Id = Id
@@ -146,12 +164,6 @@ struct
   type component =
     | Has_loop of Id.t list
     | No_loop of Id.t
-
-  type numbering =
-    { back : int Id.Map.t
-    ; forth : Id.t array
-    }
-  [@@ocaml.warning "-unused-field"]
 
   let number graph =
     let size = Id.Map.cardinal graph in
@@ -170,15 +182,15 @@ struct
           let _, dests = a.(i) in
           Id.Set.fold
             (fun dest acc ->
-              let v = try Id.Map.find dest back with Not_found -> assert false in
+              let v = Id.Map.find dest back in
               v :: acc)
             dests
             [])
     in
-    { back; forth }, integer_graph
+    forth, integer_graph
 
   let component_graph graph =
-    let numbering, integer_graph = number graph in
+    let forth, integer_graph = number graph in
     let { Kosaraju.sorted_connected_components; component_edges } =
       Kosaraju.component_graph integer_graph
     in
@@ -188,11 +200,11 @@ struct
         | [] -> assert false
         | [ node ] ->
             ( (if List.mem ~eq:Int.equal node integer_graph.(node)
-               then Has_loop [ numbering.forth.(node) ]
-               else No_loop numbering.forth.(node))
+               then Has_loop [ forth.(node) ]
+               else No_loop forth.(node))
             , component_edges.(component) )
         | _ :: _ ->
-            ( Has_loop (List.map ~f:(fun node -> numbering.forth.(node)) nodes)
+            ( Has_loop (List.map ~f:(fun node -> forth.(node)) nodes)
             , component_edges.(component) ))
       sorted_connected_components
 

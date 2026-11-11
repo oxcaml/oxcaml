@@ -19,6 +19,8 @@
 
 #include "mlvalues.h"
 #include "roots.h"
+#include <stddef.h>
+#include "misc.h"
 
 /* Define a new dynamic value, which is an immediate unique ID. */
 CAMLprim value caml_dynamic_make(value unit);
@@ -60,15 +62,11 @@ typedef struct dynamic_binding_s {
   value val;
 } dynamic_binding_s, *dynamic_binding_t;
 
-/* If you change DYNAMIC_CACHE_BITS, you must also update the assembly-language
-   stubs such as amd64.S.
-
-   TODO: single source of truth for things like this. */
+/* If you change this, update FLUSH_DYNAMIC_CACHE in the asm stubs */
 #define DYNAMIC_CACHE_BITS 3
 #define DYNAMIC_CACHE_SIZE (1 << DYNAMIC_CACHE_BITS)
 
 /* Per-thread cache of the most recently queried dynamic bindings.
-   Layout must match Dynamic_ definitions in amd64.S.
 
    TODO: Stephen Dolan's wild plan to use vector instructions to do a fully-
    associative LRU cache. */
@@ -86,8 +84,8 @@ extern void caml_dynamic_cache_delete(dynamic_cache_t);
    Called by [st_stubs.c] upon switching threads. */
 extern void caml_dynamic_cache_enter_thread(dynamic_cache_t);
 
-/* Clear a dynamic cache.
-   Called upon switching fibers or when the parent of the current fiber changes. */
+/* Clear a dynamic cache. Typically called via [caml_fiber_switched] upon
+   switching fibers. */
 extern void caml_dynamic_cache_flush(dynamic_cache_t);
 
 /* Apply a GC scanning action to all bindings in a dynamic cache. */

@@ -74,11 +74,11 @@ module Spilling_heuristics : sig
 
   val to_string : t -> string
 
-  val value : t Lazy.t
+  val value : t Param.t
 end
 
 module Interf_threshold : sig
   type t = int option
 
-  val value : t Lazy.t
+  val value : t Param.t
 end

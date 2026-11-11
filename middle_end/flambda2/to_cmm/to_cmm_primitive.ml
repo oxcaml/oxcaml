@@ -853,6 +853,12 @@ let scalar_type_of_standard_int_or_float :
 
 let unary_int_arith_primitive _env dbg kind op arg =
   match (op : P.unary_int_arith_op) with
+  | Not -> (
+    match (kind : K.Standard_int.t) with
+    | Tagged_immediate -> C.xor_int arg (C.int ~dbg (-2)) dbg
+    | Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
+    | Naked_nativeint ->
+      C.not_int arg dbg)
   | Swap_byte_endianness -> (
     (* CR lthls: Swap_byte_endianness is a weird primitive, that is only defined
        on a subset of the naked types with tricky semantics, so I would be in
@@ -1160,6 +1166,7 @@ let nullary_primitive _env res dbg prim =
   | Dls_get -> None, res, C.dls_get ~dbg
   | Tls_get -> None, res, C.tls_get ~dbg
   | Domain_index -> None, res, C.domain_index ~dbg
+  | Thread_self_id -> None, res, C.thread_self_id ~dbg
   | Poll -> None, res, C.poll ~dbg
   | Cpu_relax -> None, res, C.cpu_relax ~dbg
 
@@ -1205,8 +1212,9 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | String_length _ -> None, res, C.string_length arg dbg
   | Int_as_pointer _ -> None, res, C.int_as_pointer arg dbg
   | Opaque_identity { middle_end_only = true; kind = _ } -> None, res, arg
-  | Opaque_identity { middle_end_only = false; kind = _ } ->
-    None, res, C.opaque arg dbg
+  | Opaque_identity { middle_end_only = false; kind } ->
+    let ty = C.machtype_of_kind (KS.anything kind) in
+    None, res, C.opaque ~ty arg dbg
   | Int_arith (kind, op) ->
     None, res, unary_int_arith_primitive env dbg kind op arg
   | Float_arith (width, op) ->
@@ -1294,8 +1302,9 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
            (C.eq arg (C.int 0 ~dbg) ~dbg)
            dbg)
         ~dbg ~then_:(C.int 0 ~dbg) ~then_dbg:dbg
+        ~then_annots:Branch_annotations.default
         ~else_:(C.eq (C.get_tag arg dbg) (C.int Obj.double_tag ~dbg) ~dbg)
-        ~else_dbg:dbg )
+        ~else_dbg:dbg ~else_annots:Branch_annotations.default )
   | Is_flat_float_array ->
     None, res, C.eq ~dbg (C.get_tag arg dbg) (C.floatarray_tag dbg)
   | End_region { ghost = false } | End_try_region { ghost = false } ->
@@ -1416,6 +1425,8 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
           C.ite ~dbg base_is_null
             ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
             ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
+            ~then_annots:Branch_annotations.default
+            ~else_annots:Branch_annotations.default
       else
         let addr = C.add_int x y dbg in
         C.store ~dbg memory_chunk Assignment ~addr ~new_value:z

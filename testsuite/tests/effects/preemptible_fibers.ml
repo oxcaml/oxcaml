@@ -63,7 +63,7 @@ let preempt_on_tick () =
           preempted := true;
           continue k ())
         | _ -> None)
-    ; tickc = (fun () -> Preempt)
+    ; tickc = This (fun () -> Preempt)
     };
   assert !preempted;
   print_endline "OK"
@@ -89,7 +89,7 @@ let preempt_after_two_ticks () =
           preempted := true;
           continue k ())
         | _ -> None)
-    ; tickc = (fun () ->
+    ; tickc = This (fun () ->
         incr ticks_received;
         if !ticks_received = 2
         then Preempt
@@ -373,9 +373,15 @@ let resume_preempted_with_inner_preemptible () =
         match eff with
         | Preemption ->
           Some (fun (k : (a, _) continuation) ->
-            preempted_phase_1 := true;
-            saved_k := Some k;
-            phase := 2)
+            if !phase = 1 then begin
+              preempted_phase_1 := true;
+              saved_k := Some k;
+              phase := 2
+            end else
+              (* A tick can preempt again while an earlier Preemption is
+                 still being forwarded here, so the earlier one arrives
+                 after phase 2 has started. *)
+              continue k ())
         | _ -> None)
     };
   assert !preempted_phase_1;
@@ -601,8 +607,10 @@ let multiple_layers_outer_preempts () =
 ;;
 
 let () =
+  (* Run before ticks are enabled: once they are, a tick can legitimately
+     arrive while the fiber runs (e.g. if this process is descheduled). *)
+  perform_normal_effect ();
   Domain.Tick.with_ ~interval_usec:1_000 (fun _ ->
-    perform_normal_effect ();
     preempt_on_tick ();
     preempt_after_two_ticks ();
     two_preemptible_inner_handles_tick ();

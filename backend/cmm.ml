@@ -165,6 +165,15 @@ type exttype =
   | XVec128
   | XVec256
   | XVec512
+  | XDummy_int
+  | XDummy_float
+  | XFat_pointer
+
+let is_dummy_exttype = function
+  | XDummy_int | XDummy_float -> true
+  | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
+  | XVec256 | XVec512 | XFat_pointer ->
+    false
 
 let machtype_of_exttype = function
   | XInt ->
@@ -180,6 +189,9 @@ let machtype_of_exttype = function
   | XVec128 -> typ_vec128
   | XVec256 -> typ_vec256
   | XVec512 -> typ_vec512
+  | XDummy_int -> typ_int
+  | XDummy_float -> typ_float
+  | XFat_pointer -> Array.append typ_val typ_int
 
 let machtype_of_exttype_list xtl =
   Array.concat (List.map machtype_of_exttype xtl)
@@ -587,6 +599,7 @@ type operation =
   | Cand
   | Cor
   | Cxor
+  | Cnot
   | Clsl
   | Clsr
   | Casr
@@ -626,13 +639,14 @@ type operation =
       { name : string;
         enabled_at_init : bool option
       }
-  | Copaque
+  | Copaque of machtype
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Cpause
 
@@ -695,12 +709,17 @@ and expression =
   | Cifthenelse of
       expression
       * Debuginfo.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
   | Cswitch of
-      expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
+      expression
+      * int array
+      * (expression * Debuginfo.t * Branch_annotations.t) array
+      * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
   | Cinvalid of
@@ -779,7 +798,8 @@ let iter_shallow_tail f = function
     ->
     f body;
     true
-  | Cifthenelse (_cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+  | Cifthenelse
+      (_cond, _ifso_dbg, _ifso_p, ifso, _ifnot_dbg, _ifnot_p, ifnot, _dbg) ->
     f ifso;
     f ifnot;
     true
@@ -787,7 +807,7 @@ let iter_shallow_tail f = function
     f e2;
     true
   | Cswitch (_e, _tbl, el, _dbg') ->
-    Array.iter (fun (e, _dbg) -> f e) el;
+    Array.iter (fun (e, _dbg, _annots) -> f e) el;
     true
   | Ccatch (_flag, handlers, body) ->
     List.iter (fun { body = h; _ } -> f h) handlers;
@@ -799,10 +819,10 @@ let iter_shallow_tail f = function
   | Cconst_symbol _ | Cvar _ | Ctuple _
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
-        | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
-        | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-        | Capply _ | Cextcall _ | Cload _
+        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
+        | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque _ | Cbeginregion
+        | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
+        | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _ | Catomic _
         | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -818,11 +838,14 @@ let map_shallow_tail f = function
   | Clet (id, exp, body) -> Clet (id, exp, f body)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, f body)
   | Cname_for_debugger (var, body) -> Cname_for_debugger (var, f body)
-  | Cifthenelse (cond, ifso_dbg, ifso, ifnot_dbg, ifnot, dbg) ->
-    Cifthenelse (cond, ifso_dbg, f ifso, ifnot_dbg, f ifnot, dbg)
+  | Cifthenelse (cond, ifso_dbg, ifso_p, ifso, ifnot_dbg, ifnot_p, ifnot, dbg)
+    ->
+    Cifthenelse
+      (cond, ifso_dbg, ifso_p, f ifso, ifnot_dbg, ifnot_p, f ifnot, dbg)
   | Csequence (e1, e2) -> Csequence (e1, f e2)
   | Cswitch (e, tbl, el, dbg') ->
-    Cswitch (e, tbl, Array.map (fun (e, dbg) -> f e, dbg) el, dbg')
+    Cswitch
+      (e, tbl, Array.map (fun (e, dbg, annots) -> f e, dbg, annots) el, dbg')
   | Ccatch (flag, handlers, body) ->
     let map_h { label; params; body = handler; dbg; is_cold } =
       { label; params; body = f handler; dbg; is_cold }
@@ -834,10 +857,10 @@ let map_shallow_tail f = function
     | Cconst_symbol _ | Cvar _ | Ctuple _
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
-          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
-          | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-          | Capply _ | Cextcall _ | Cload _
+          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
+          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque _ | Cbeginregion
+          | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
+          | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _
           | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
@@ -860,7 +883,7 @@ let map_tail f =
       | Cphantom_let (_, _, _)
       | Cname_for_debugger _
       | Csequence (_, _)
-      | Cifthenelse (_, _, _, _, _, _)
+      | Cifthenelse (_, _, _, _, _, _, _, _)
       | Cswitch (_, _, _, _)
       | Ccatch (_, _, _) ) as cmm ->
       map_shallow_tail loop cmm
@@ -878,13 +901,14 @@ let iter_shallow f = function
   | Csequence (e1, e2) ->
     f e1;
     f e2
-  | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+  | Cifthenelse
+      (cond, _ifso_dbg, _ifso_p, ifso, _ifnot_dbg, _ifnot_p, ifnot, _dbg) ->
     f cond;
     f ifso;
     f ifnot
   | Cswitch (e, _ia, ea, _dbg) ->
     f e;
-    Array.iter (fun (e, _) -> f e) ea
+    Array.iter (fun (e, _, _) -> f e) ea
   | Ccatch (_f, hl, body) ->
     let iter_h { body = handler; _ } = f handler in
     List.iter iter_h hl;
@@ -940,7 +964,8 @@ let equal_machtype left right =
 
 let equal_exttype
     (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
-     | XVec256 | XVec512 ) as left) right =
+     | XVec256 | XVec512 | XDummy_int | XDummy_float | XFat_pointer ) as left)
+    right =
   (* we can use polymorphic compare as long as exttype is all constant
      constructors *)
   Stdlib.( = ) left right

@@ -1622,34 +1622,27 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
     let complex_shape_flattened =
       Complex_shape.flatten_complex_shape complex_shape
     in
+    let non_void_shapes = RS.Or_void.erase_void complex_shape_flattened in
     let runtime_shape =
-      match complex_shape_flattened, unboxed_projection with
-      | [Other runtime_shape], None -> Some runtime_shape
-      | ([] | _ :: _ :: _ | [Void]), None ->
+      match non_void_shapes, unboxed_projection with
+      | [runtime_shape], None -> Some runtime_shape
+      | ([] | _ :: _ :: _), None ->
         err ~fallback:None (fun f ->
             f "Expected a single runtime shape, but got %a" Complex_shape.print
               complex_shape)
-      | _, Some i -> (
-        if i < 0 || i >= List.length complex_shape_flattened
+      | _, Some i ->
+        if i < 0 || i >= List.length non_void_shapes
         then
           err ~fallback:None (fun f ->
               f
-                "Attempted to access field %d of a layout with %d fields, \
-                 namely %a"
+                "Attempted to access field %d of a layout with %d non-void \
+                 fields, namely %a"
                 i
-                (List.length complex_shape_flattened)
+                (List.length non_void_shapes)
                 (Format.pp_print_list ~pp_sep:Format.pp_print_space
                    (RS.Or_void.print RS.print))
                 complex_shape_flattened)
-        else
-          match List.nth complex_shape_flattened i with
-          | Other runtime_shape -> Some runtime_shape
-          | Void ->
-            err ~fallback:None (fun f ->
-                f
-                  "Unarization projection %d is a void field without a runtime \
-                   shape"
-                  i))
+        else Some (List.nth non_void_shapes i)
     in
     match runtime_shape with
     | None ->

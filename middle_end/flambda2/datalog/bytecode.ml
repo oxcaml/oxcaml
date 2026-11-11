@@ -1,0 +1,726 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ *                        Basile Clément, OCamlPro                            *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2024 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
+open Datalog_imports
+
+type _ columns =
+  | Nil : nil columns
+  | Cons : (_, 'h, _) Column.id * 'k columns -> ('h -> 'k) columns
+
+type 'a output_ref = { mutable contents : 'a Or_null.t }
+
+let create_output () = { contents = Or_null.null }
+
+let get_and_clear_output ({ contents } as t) =
+  t.contents <- Or_null.null;
+  contents
+
+type stats_ref =
+  { mutable time : float;
+    mutable num_outputs : int;
+    mutable num_iterations : int
+  }
+
+let create_stats () = { time = 0.; num_outputs = 0; num_iterations = 0 }
+
+type stats =
+  { total_time : float;
+    num_outputs : int;
+    num_iterations : int
+  }
+
+let get_and_clear_stats
+    ({ time; num_outputs; num_iterations } as stats_ref : stats_ref) =
+  stats_ref.time <- 0.;
+  stats_ref.num_iterations <- 0;
+  stats_ref.num_outputs <- 0;
+  { total_time = time; num_outputs; num_iterations }
+
+let print_stats ppf { total_time; num_outputs; num_iterations } =
+  if num_iterations = 0
+  then Format.fprintf ppf "---"
+  else
+    Format.fprintf ppf
+      "%d iteration(s) (total: %f, mean: %f), producing %d output(s) (average: \
+       %f, average time: %f)"
+      num_iterations total_time
+      (total_time /. float num_iterations)
+      num_outputs
+      (float num_outputs /. float num_iterations)
+      (total_time /. float num_outputs)
+
+type timer = { mutable start_time : float }
+
+type metrics_code =
+  | Timer_start of timer
+  | Timer_stop of timer
+  | Increase_outputs_count
+
+type bindings_ref =
+  | Bindings_ref_innermost_first :
+      ('k columns * 'k Or_null_receiver.hlist with_names)
+      -> bindings_ref
+[@@unboxed]
+
+module Make (Iterator : Leapfrog.Iterator) = struct
+  module Join_iterator = Leapfrog.Join (Iterator)
+
+  type label = Label of int [@@unboxed]
+
+  (* In order to produce a bytecode structure that follows the bytecode
+     structure of loops, all opcodes that take a destination labels, except for
+     [Advance], fall through if the condition *succeeeds*, and jumps to the label if
+     the condition fails.
+
+     This is a bit counter-intuitive: one could reasonably expect that an opcode
+     called e.g. [absent] would jump if the value is absent. However, this makes
+     each opcode read like an assertion mapping to the corresponding condition
+     in the original rule and plan, as in the example below. This is deemed more
+     useful than renaming e.g. [absent] to [jump_if_in]. *)
+  (* f(x) :- P(x), ~Q(x).
+   *
+   * for x in P:
+   *   if x not in Q:
+   *       f(x)
+   *
+   *       init x, [P], 005        # jump to 005 if P is empty
+   * 002:    absent Q, [x], 004    # jump to 004 if x in Q
+   *         call f, [x]
+   * 004:    advance x, [P], 002   # jump to 002 if P is *not* exhausted
+   * 005:  exit
+   *)
+  type code =
+    | Exit of unit
+      (* Make sure this is represented as a block, not an immediate, to avoid a
+         nested switch on %is_int / %get_tag *)
+    | Goto : label -> code
+    | Init :
+        'k Or_null_sender.t * string * 'k Join_iterator.t * string list * label
+        -> code
+    | Advance :
+        'k Or_null_sender.t * string * 'k Join_iterator.t * string list * label
+        -> code
+    | Absent :
+        ('t, 'k, 'v) Column.hlist
+        * 't Or_null_receiver.t
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * label
+        -> code
+    | Distinct :
+        (_, 'k, _) Column.id
+        * 'k Or_null_receiver.t
+        * string
+        * 'k Or_null_receiver.t
+        * string
+        * label
+        -> code
+    | Seek :
+        'k Join_iterator.t
+        * string list
+        * 'k Or_null_receiver.t
+        * string
+        * label
+        -> code
+    | Filter :
+        ('k Constant.hlist -> bool)
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * label
+        -> code
+    | If_let :
+        'v Or_null_sender.t
+        * string
+        * ('k Constant.hlist -> 'v Or_null.t)
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * label
+        -> code
+    | Call_with_bindings :
+        (bindings_ref -> 'b Constant.hlist -> unit)
+        * string
+        * bindings_ref
+        * 'b Or_null_receiver.hlist
+        * string list
+        -> code
+    | Union :
+        ('t, 'k, 's) Column.hlist
+        * 't output_ref
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * 's Or_null_receiver.t
+        * string
+        * ('s, _, 'v) Column.hlist
+        * 'v Table.result_repr
+        -> code
+    | Metrics : metrics_code * stats_ref -> code
+
+  let labels = function
+    | Exit () | Union _ | Call_with_bindings _ | Metrics _ -> []
+    | Goto lab
+    | Init (_, _, _, _, lab)
+    | Advance (_, _, _, _, lab)
+    | Absent (_, _, _, _, _, lab)
+    | Distinct (_, _, _, _, _, lab)
+    | Seek (_, _, _, _, lab)
+    | Filter (_, _, _, _, lab)
+    | If_let (_, _, _, _, _, _, lab) ->
+      [lab]
+
+  let print_list =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+      Format.pp_print_string
+
+  let print_label digits ppf (Label lab) = Format.fprintf ppf "%0*d" digits lab
+
+  let print_code digits ppf = function
+    | Exit () -> Format.fprintf ppf "exit"
+    | Goto lab -> Format.fprintf ppf "goto@ %a" (print_label digits) lab
+    | Init (_sender, name, _iterator, names, if_empty) ->
+      Format.fprintf ppf "init@ %s,@ [@[%a]@],@ %a" name print_list names
+        (print_label digits) if_empty
+    | Advance (_sender, name, _iterator, names, if_not_empty) ->
+      Format.fprintf ppf "advance@ %s,@ [@[%a]@],@ %a" name print_list names
+        (print_label digits) if_not_empty
+    | Distinct (_, _, name1, _, name2, if_equal) ->
+      Format.fprintf ppf "distinct@ %s,@ %s,@ %a" name1 name2
+        (print_label digits) if_equal
+    | Absent (_, _, table, _, args, if_not_in) ->
+      Format.fprintf ppf "absent@ [@[%a]@],@ %s,@ %a" print_list args table
+        (print_label digits) if_not_in
+    | Seek (_, names, _, name, if_empty) ->
+      Format.fprintf ppf "seek@ %s,@ [@[%a]@],@ %a" name print_list names
+        (print_label digits) if_empty
+    | Filter (_, name, _, names, if_false) ->
+      Format.fprintf ppf "filter@ %s,@ [@[%a]@],@ %a" name print_list names
+        (print_label digits) if_false
+    | If_let (_, name, _, fn, _, names, if_null) ->
+      Format.fprintf ppf "call@ %s,@ %s,@ [@[%a]@],@ %a" name fn print_list
+        names (print_label digits) if_null
+    | Call_with_bindings (_, name, _, _, names) ->
+      Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
+    | Union (_, _, name, _, names, _, value_name, _, _) ->
+      Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
+        print_list names value_name
+    | Metrics (Timer_start _timer, _stats) -> Format.fprintf ppf "timer.start"
+    | Metrics (Timer_stop _timer, _stats) -> Format.fprintf ppf "timer.stop"
+    | Metrics (Increase_outputs_count, _stats) -> Format.fprintf ppf "count++"
+
+  let print_code_iarray ppf code =
+    let length = Iarray.length code in
+    let digits = max 3 (log10 (float length) |> ceil |> int_of_float) in
+    let all_labels = Hashtbl.create 0 in
+    Iarray.iter
+      (fun code ->
+        List.iter
+          (fun (Label lab) -> Hashtbl.replace all_labels lab ())
+          (labels code))
+      code;
+    let depth = ref 0 in
+    let pop_depths = ref [] in
+    Format.fprintf ppf "@[<v>";
+    for i = 0 to length - 1 do
+      let instruction = Iarray.get code i in
+      while
+        match !pop_depths with
+        | d :: rest when d = i ->
+          decr depth;
+          pop_depths := rest;
+          true
+        | _ -> false
+      do
+        ()
+      done;
+      if i > 0 then Format.fprintf ppf "@ ";
+      if Hashtbl.mem all_labels i
+      then Format.fprintf ppf "%0*d: " digits i
+      else Format.pp_print_string ppf (String.make (digits + 2) ' ');
+      Format.pp_print_string ppf (String.make (2 * !depth) ' ');
+      Format.fprintf ppf "@[<hv 2>%a@]" (print_code digits) instruction;
+      match[@warning "-fragile-match"] instruction with
+      | Init (_, _, _, _, Label lab) when lab > i ->
+        incr depth;
+        pop_depths := lab :: !pop_depths
+      | _ -> ()
+    done;
+    assert (List.is_empty !pop_depths);
+    Format.fprintf ppf "@]"
+
+  (* Assembly is performed in two iterations in order to be able to deal with
+     forward jumps:
+
+     - In the first iteration, we lay out the instructions and compute the
+     position of the labels;
+
+     - In the second iteration, we actually emit the instructions with their
+     appropriate label.
+
+     The [late] type below is used to represent as closures the instructions
+     with unresolved labels emitted during the first iteration. The closure
+     takes as argument the resolved offsets for the labels.
+
+     Unconditional jumps ([goto]) are explicitly represented in the [state] type
+     in order to simplify code when a jump is either followed immediately by its
+     label or by an instruction insn without label (which becomes
+     unreachable). *)
+
+  type label_id = Label_id of int [@@unboxed]
+
+  type late = Late of (label iarray -> code)
+
+  (** [code] and [labels] are accumulated across the whole code; [bindings] are
+      used to implement structured primitives and depend on the context only. *)
+  type state =
+    { code : late Dynarray.t;
+      pending_jump : (label_id * fused_labels:label_id list) option ref;
+          (** Pending [goto] instruction not yet added to the [code] array.
+
+              The [fused_labels] are placed after the goto, i.e. a
+              [pending_jump] of [l, ~fused_labels:[l1, ..., ln]] represents a
+              trail of:
+
+              goto l; label l1, ..., ln:
+
+              This is used to optimise the case where a [goto] is immediately
+              followed by its label: in this case, we can replace:
+
+              goto l; label l1, ..., ln, l:
+
+              with just:
+
+              label l1, ..., ln, l: *)
+      labels : int Dynarray.t;
+          (** Map from label ids to their resolved offset. -1 for unresolved
+              labels. *)
+      bindings : bindings_ref
+          (** Used to implement [Callback_with_bindings]; contains the variables
+              in the current scope. *)
+    }
+
+  type assembler = state -> unit
+
+  let ( let* ) (x : state -> _) f : state -> _ =
+   fun st ->
+    let x = x st in
+    f x st
+
+  let lab st =
+    let lab = Dynarray.length st.labels in
+    Dynarray.add_last st.labels (-1);
+    Label_id lab
+
+  let get_label offsets (Label_id label) = Iarray.get offsets label
+
+  let record_labels labels st =
+    List.iter
+      (fun (Label_id label) ->
+        Dynarray.set st.labels label (Dynarray.length st.code))
+      labels
+
+  let flush_pending_jump st =
+    match !(st.pending_jump) with
+    | None -> ()
+    | Some (target, ~fused_labels) ->
+      st.pending_jump := None;
+      Dynarray.add_last st.code
+        (Late (fun offsets -> Goto (get_label offsets target)));
+      record_labels fused_labels st
+
+  let run_late (Late f) offsets = f offsets
+
+  let here (Label_id label) st =
+    if Dynarray.get st.labels label >= 0
+    then Misc.fatal_error "here: label already defined";
+    match !(st.pending_jump) with
+    | None -> Dynarray.set st.labels label (Dynarray.length st.code)
+    | Some (Label_id pending_jump, ~fused_labels) when pending_jump = label ->
+      st.pending_jump := None;
+      record_labels (Label_id label :: fused_labels) st
+    | Some ((Label_id _ as jump_target), ~fused_labels) ->
+      st.pending_jump
+        := Some (jump_target, ~fused_labels:(Label_id label :: fused_labels))
+
+  let is_dead st =
+    (* If we have seen an unconditional jump and no labels since that jump,
+       nobody can reach us -- no need to emit anything. *)
+    match !(st.pending_jump) with
+    | Some (_, ~fused_labels:[]) -> true
+    | None | Some _ -> false
+
+  let emit0 insn st =
+    if not (is_dead st)
+    then (
+      flush_pending_jump st;
+      Dynarray.add_last st.code (Late insn))
+
+  let emit insn st = emit0 (fun _ -> insn) st
+
+  let emit_with_label f label st =
+    emit0 (fun offsets -> f (get_label offsets label)) st
+
+  let goto lab st =
+    if not (is_dead st)
+    then (
+      flush_pending_jump st;
+      st.pending_jump := Some (lab, ~fused_labels:[]))
+
+  let nop _ = ()
+
+  let with_binding repr receiver body st =
+    let (Bindings_ref_innermost_first (reprs, receivers)) = st.bindings in
+    body
+      { value = receiver; name = repr.name }
+      { st with
+        bindings =
+          Bindings_ref_innermost_first
+            ( Cons (repr.value, reprs),
+              { values = receiver :: receivers.values;
+                names = repr.name :: receivers.names
+              } )
+      }
+
+  let init receiver iterator =
+    emit_with_label (fun label ->
+        Init
+          (receiver.value, receiver.name, iterator.values, iterator.names, label))
+
+  let advance receiver iterator =
+    emit_with_label (fun label ->
+        Advance
+          (receiver.value, receiver.name, iterator.values, iterator.names, label))
+
+  let absent columns { value = trie; name } { values = args; names } =
+    emit_with_label (fun label ->
+        Absent (columns, trie, name, args, names, label))
+
+  let distinct column key1 key2 =
+    emit_with_label (fun label ->
+        Distinct (column, key1.value, key1.name, key2.value, key2.name, label))
+
+  let seek iterator { value = receiver; name } =
+    emit_with_label (fun label ->
+        Seek (iterator.values, iterator.names, receiver, name, label))
+
+  let filter { value = fn; name } { values = args; names } =
+    emit_with_label (fun label -> Filter (fn, name, args, names, label))
+
+  let ( ++ ) fn1 fn2 code =
+    fn1 code;
+    fn2 code
+
+  let list xs st = List.iter (fun x -> x st) xs
+
+  let exists cond body =
+    let* after = lab in
+    list [cond ~accept:(body ++ goto after); here after]
+
+  let for_in repr iterators body =
+    let iterator =
+      { iterators with values = Join_iterator.create iterators.values }
+    in
+    let* start_of_body = lab in
+    let* after_loop = lab in
+    let sender, receiver = Channel.create_or_null Or_null.null in
+    with_binding repr receiver (fun receiver ->
+        list
+          [ init { repr with value = sender } iterator after_loop;
+            here start_of_body;
+            body receiver;
+            advance { repr with value = sender } iterator start_of_body;
+            here after_loop ])
+
+  let if_template test body =
+    let* after_body = lab in
+    list [test after_body; body; here after_body]
+
+  let if_in key iterators body =
+    let iterator =
+      { iterators with values = Join_iterator.create iterators.values }
+    in
+    if_template (seek iterator key) body
+
+  let if_not_in columns table args body =
+    if_template (absent columns table args) body
+
+  let if_not_equal column arg1 arg2 body =
+    if_template (distinct column arg1 arg2) body
+
+  let if_ fn args body = if_template (filter fn args) body
+
+  let if_let name fn args body st =
+    let sender, receiver = Channel.create_or_null Or_null.null in
+    let receiver = { value = receiver; name } in
+    if_template
+      (emit_with_label (fun label ->
+           If_let
+             (sender, name, fn.value, fn.name, args.values, args.names, label)))
+      (body receiver) st
+
+  let call_with_bindings { value = fn; name } { values = args; names } st =
+    emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
+
+  let union columns { value = table; name } { values = args; names }
+      { value; name = value_name } inner_columns repr =
+    emit
+      (Union
+         ( columns,
+           table,
+           name,
+           args,
+           names,
+           value,
+           value_name,
+           inner_columns,
+           repr ))
+
+  let with_timer ~stats body st =
+    let timer = { start_time = 0. } in
+    emit (Metrics (Timer_start timer, stats)) st;
+    body st;
+    emit (Metrics (Timer_stop timer, stats)) st
+
+  let increase_count ~stats st =
+    emit (Metrics (Increase_outputs_count, stats)) st
+
+  (* Use a [private] type from an anonymous module to ensure that we only ever
+     construct bytecode that satisfies the requirements of [exec] below (namely,
+     there are no out-of-range labels, and the code ends with an [Exit]
+     instruction) . *)
+  include (
+    struct
+      type t = { code : code iarray }
+
+      let validate ~length code =
+        List.for_all (fun (Label lab) -> 0 <= lab && lab < length) (labels code)
+
+      let is_exit = function[@warning "-fragile-match"]
+        | Exit () -> true
+        | _ -> false
+
+      let create code =
+        if
+          (not (Iarray.for_all (validate ~length:(Iarray.length code)) code))
+          || not (is_exit (Iarray.get code (Iarray.length code - 1)))
+        then Misc.fatal_error "Invalid datalog bytecode (out-of-range labels)";
+        { code }
+    end :
+      sig
+        type t = private { code : code iarray }
+
+        val create : code iarray -> t
+      end)
+
+  let print ppf { code } = print_code_iarray ppf code
+
+  let assemble text =
+    let delayed = Dynarray.create () in
+    let labels = Dynarray.create () in
+    let st =
+      { code = delayed;
+        pending_jump = ref None;
+        bindings =
+          Bindings_ref_innermost_first (Nil, { values = []; names = [] });
+        labels
+      }
+    in
+    text st;
+    (* The last instruction is always an [Exit], which means we can use
+       [unsafe_get] in [exec] after incrementing the program counter. *)
+    emit (Exit ()) st;
+    assert (Option.is_none !(st.pending_jump));
+    let len = Dynarray.length delayed in
+    let labels =
+      Iarray.init (Dynarray.length labels) (fun i ->
+          let offset = Dynarray.get labels i in
+          if not (0 <= offset && offset < len)
+          then Misc.fatal_errorf "out-of-range (unresolved) label (at %d)" i;
+          Label offset)
+    in
+    Dynarray.unsafe_to_iarray ~capacity:len (fun code ->
+        Dynarray.iter
+          (fun insn -> Dynarray.add_last code (run_late insn labels))
+          delayed)
+    |> create
+
+  let read_or_null = Channel.recv_or_null
+
+  let read = Or_null_receiver.recv
+
+  let read_hlist = Or_null_receiver.recv_hlist
+
+  let write = Or_null_sender.send
+
+  let rec find_or_null_read_hlist : type t k v.
+      (t, k, v) Column.hlist -> k Or_null_receiver.hlist -> t -> v Or_null.t =
+   fun columns args t ->
+    match args, columns with
+    | [], [] -> Or_null.this t
+    | arg :: args, column :: columns -> (
+      match Column.find_or_null column (read arg) t with
+      | Null -> Or_null.null
+      | This s -> find_or_null_read_hlist columns args s)
+
+  let rec read_singleton : type t k v.
+      (t, k, v) Column.hlist ->
+      k Or_null_receiver.hlist ->
+      v Or_null_receiver.t ->
+      t =
+   fun columns args value ->
+    match args, columns with
+    | [], [] -> read value
+    | arg :: args, column :: columns ->
+      Column.singleton column (read arg) (read_singleton columns args value)
+
+  (* Isomorphic to [unit], but with a different type so that accidentally
+     returning instead of calling [next] is a type error. *)
+  type explicit_exit = Explicit_exit
+
+  let[@loop] rec exec code pc : explicit_exit =
+    (* This assumes that the bytecode is well-formed, i.e. there are no
+       out-of-range labels and the last instruction is an [Exit], in order to
+       avoid performing a bounds check on the read of the [code] array.
+
+       Codes created from the [assemble] function are guaranteed to satisfy
+       these requirements. *)
+    let[@inline] goto (Label new_pc) = exec code new_pc in
+    let[@inline] next () = goto (Label (pc + 1)) in
+    match Iarray.unsafe_get code pc with
+    | Exit () -> Explicit_exit
+    | Goto lab -> goto lab
+    | Init (key_out, _name, iterator, _names, if_empty) -> (
+      Join_iterator.init iterator;
+      match Join_iterator.current iterator with
+      | Null -> goto if_empty
+      | This current_key ->
+        Join_iterator.accept iterator;
+        write key_out current_key;
+        next ())
+    | Advance (key_out, _name, iterator, _names, if_not_empty) -> (
+      Join_iterator.advance iterator;
+      match Join_iterator.current iterator with
+      | Null -> next ()
+      | This current_key ->
+        Join_iterator.accept iterator;
+        write key_out current_key;
+        goto if_not_empty)
+    | Seek (iterator, _names, key_in, _name, if_not_in) -> (
+      let key = read key_in in
+      Join_iterator.init iterator;
+      Join_iterator.seek iterator key;
+      match Join_iterator.current iterator with
+      | This current_key when Join_iterator.equal_key iterator current_key key
+        ->
+        Join_iterator.accept iterator;
+        next ()
+      | This _ | Null -> goto if_not_in)
+    | Absent (columns, table, _name, args, _names, if_mem) -> (
+      match read_or_null table with
+      | Null -> next ()
+      | This table -> (
+        match find_or_null_read_hlist columns args table with
+        | This _ -> goto if_mem
+        | Null -> next ()))
+    | Distinct (column, key1, _name1, key2, _name2, if_equal) ->
+      if Column.equal_key column (read key1) (read key2)
+      then goto if_equal
+      else next ()
+    | Filter (func, _name, args, _names, if_false) ->
+      if func (read_hlist args) then next () else goto if_false
+    | If_let (sender, _name, fn, _fn_name, args, _names, if_null) -> (
+      match fn (read_hlist args) with
+      | Null -> goto if_null
+      | This value ->
+        write sender value;
+        next ())
+    | Call_with_bindings (func, _name, bindings, args, _names) ->
+      func bindings (read_hlist args);
+      next ()
+    | Union (columns, table, _, args, _, value, _, inner_cols, repr) ->
+      let entry = read_singleton columns args value in
+      (match table.contents with
+      | Null -> table.contents <- Or_null.this entry
+      | This contents ->
+        let union_value = Table.result_repr_union repr in
+        let contents =
+          Column.union_total_hlist columns
+            (fun s1 s2 -> Column.union_total_hlist inner_cols union_value s1 s2)
+            contents entry
+        in
+        table.contents <- Or_null.this contents);
+      next ()
+    | Metrics (Timer_start timer, stats) ->
+      stats.num_iterations <- stats.num_iterations + 1;
+      timer.start_time <- Sys.time ();
+      next ()
+    | Metrics (Timer_stop timer, stats) ->
+      let time = Sys.time () in
+      stats.time <- stats.time +. (time -. timer.start_time);
+      next ()
+    | Metrics (Increase_outputs_count, stats) ->
+      stats.num_outputs <- stats.num_outputs + 1;
+      next ()
+
+  let run t =
+    let Explicit_exit = exec t.code 0 in
+    ()
+end
+[@@inline]
+
+(* API for the [Cursor]-based [Scheduler]. *)
+
+type bindings =
+  | Bindings_innermost_first :
+      'a columns * 'a Constant.hlist with_names
+      -> bindings
+
+let get_bindings (Bindings_ref_innermost_first (reprs, receivers)) =
+  let values = Or_null_receiver.recv_hlist receivers.values in
+  Bindings_innermost_first (reprs, { receivers with values })
+
+let print_bindings ppf (Bindings_innermost_first (reprs, { values; names })) =
+  let rec loop : type a.
+      Format.formatter -> a columns -> a Constant.hlist -> string list -> bool =
+   fun ppf reprs values names ->
+    match reprs, values, names with
+    | Nil, [], _ :: _ | Cons (_, _), _ :: _, [] ->
+      Misc.fatal_error "Wrong number of names"
+    | Nil, [], [] -> true
+    | Cons (column, reprs), value :: values, name :: names ->
+      let first = loop ppf reprs values names in
+      if not first then Format.fprintf ppf ";@,";
+      Format.fprintf ppf "@[<1>%s =@ %a@]" name (Column.print_key column) value;
+      false
+  in
+  Format.fprintf ppf "@[<2>{ @[<v>";
+  ignore (loop ppf reprs values names);
+  Format.fprintf ppf "@] }@]"

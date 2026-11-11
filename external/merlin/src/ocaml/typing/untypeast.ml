@@ -106,7 +106,7 @@ let rec extract_letop_patterns n pat =
   if n = 0 then pat, []
   else begin
     match pat.pat_desc with
-    | Tpat_tuple([None, first; None, rest]) ->
+    | Tpat_tuple([None, first, _; None, rest, _]) ->
         (* Labels should always be None, from when [Texp_letop] are created in
            [Typecore.type_expect] *)
         let next, others = extract_letop_patterns (n-1) rest in
@@ -223,8 +223,10 @@ let structure_item sub item =
 let modalities_of_val_modal_info = function
   | Valmi_sig_value modalities -> Typemode.untransl_modalities modalities
   | Valmi_str_primitive modes ->
-      let modality_of_mode { txt = Mode mode; loc } =
-        { txt = Modality mode; loc }
+      let modality_of_mode = function
+        | { txt = Pmode mode; loc } -> { txt = Modality mode; loc }
+        | { txt = Pmode_var _ | Pmode_bounded _; _ } ->
+            Misc.fatal_error "Untypeast.modality_of_mode: non-constant mode"
       in
       List.map modality_of_mode (Typemode.untransl_mode modes)
 
@@ -298,7 +300,7 @@ let mutable_ (mut : Types.mutability) : mutable_flag =
   match mut with
   | Immutable -> Immutable
   | Mutable { mode; atomic = _ } ->
-      let open Mode.Value.Comonadic in
+      let open Mode.With_regionality.Comonadic in
       equate_exn mode legacy;
       Mutable
 
@@ -391,7 +393,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_unboxed_bool b -> Ppat_unboxed_bool b
     | Tpat_tuple list ->
         Ppat_tuple
-          (List.map (fun (label, p) -> label, sub.pat sub p) list, Closed)
+          (List.map (fun (label, p, _) -> label, sub.pat sub p) list, Closed)
     | Tpat_unboxed_tuple list ->
         Ppat_unboxed_tuple
           (List.map (fun (label, p, _) -> label, sub.pat sub p) list,
@@ -432,6 +434,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
+    | Tpat_addr (mut, _, p) -> Ppat_addr (mutable_ mut, sub.pat sub p)
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
 
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)
@@ -671,7 +674,7 @@ let expression sub exp =
     | Texp_unboxed_unit -> Pexp_unboxed_unit
     | Texp_unboxed_bool b -> Pexp_unboxed_bool b
     | Texp_tuple (list, _) ->
-        Pexp_tuple (List.map (fun (lbl, e) -> lbl, sub.expr sub e) list)
+        Pexp_tuple (List.map (fun (lbl, e, _) -> lbl, sub.expr sub e) list)
     | Texp_unboxed_tuple list ->
         Pexp_unboxed_tuple
           (List.map (fun (lbl, e, _) -> lbl, sub.expr sub e) list)
@@ -693,7 +696,7 @@ let expression sub exp =
             | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields
         in
-        Pexp_record (list, Option.map (fun (exp, _, _) -> sub.expr sub exp)
+        Pexp_record (list, Option.map (fun (exp, _, _, _) -> sub.expr sub exp)
                              extended_expression)
     | Texp_record_unboxed_product { fields; extended_expression; _ } ->
         let list = Array.fold_left (fun l -> function

@@ -16,9 +16,27 @@
 )
 
 (package
-  (name ocaml_runtime_stdlib)
+  (name oxcaml-dev)
+)
+
+; Public names for libraries that installed compilers provide through findlib,
+; for the vendored libraries in external/ast-dependent-libs, which are separate
+; dune projects and cannot see this project's private libraries:
+; compiler-libs.common is ocamlcommon, and so on, and
+; compiler-libs.internal.flambda2_floats is a dependency of ocamlfrontend.
+; Nothing installs these packages.
+(package
+  (name compiler-libs)
 )
 
 (package
-  (name oxcaml-dev)
+  (name unix)
+)
+
+(package
+  (name str)
+)
+
+(package
+  (name runtime_events)
 )

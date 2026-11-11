@@ -36,7 +36,7 @@ let labelled_insn_end = { label = Label.none; insn = Linear.end_instr }
 
 let rec defines_label (i : Linear.instruction) =
   match i.desc with
-  | Lend | Llabel _ -> true
+  | Lend | Llabel_for_jump_target _ | Llabel_for_dwarf _ -> true
   | Ladjust_stack_offset _ -> defines_label i.next
   | Lprologue | Lepilogue_open | Lepilogue_close | Lop _ | Lcall_op _
   | Lreloadretaddr | Lreturn | Lbranch _ | Lcondbranch _ | Lcondbranch3 _

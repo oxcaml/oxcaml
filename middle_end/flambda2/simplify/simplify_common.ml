@@ -16,24 +16,29 @@
 
 open Simplify_import
 
-type 'a after_rebuild = Rebuilt_expr.t -> Upwards_acc.t -> 'a
+type after_rebuild =
+  Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t
 
-type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
+type 'a rebuild =
+  'a ->
+  Upwards_acc.t ->
+  after_rebuild:after_rebuild ->
+  Rebuilt_expr.t * Upwards_acc.t
 
-type ('a, 'b) down_to_up = Downwards_acc.t -> rebuild:'a rebuild -> 'b
+type 'a down_to_up =
+  Downwards_acc.t -> 'a -> Simplified_expr.t * Downwards_acc.t
 
 type 'a expr_simplifier =
   Downwards_acc.t ->
   'a ->
-  down_to_up:
-    (Rebuilt_expr.t * Upwards_acc.t, Rebuilt_expr.t * Upwards_acc.t) down_to_up ->
-  Rebuilt_expr.t * Upwards_acc.t
+  down_to_up:Simplified_expr.t down_to_up ->
+  Simplified_expr.t * Downwards_acc.t
 
 type simplify_toplevel =
   Downwards_acc.t ->
   Expr.t ->
   return_continuation:Continuation.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:[`Complex] Flambda_arity.t ->
   exn_continuation:Continuation.t ->
   Rebuilt_expr.t * Upwards_acc.t
 
@@ -41,7 +46,7 @@ type simplify_function_body =
   Downwards_acc.t ->
   Expr.t ->
   return_continuation:Continuation.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:[`Complex] Flambda_arity.t ->
   exn_continuation:Continuation.t ->
   loopify_state:Loopify_state.t ->
   params:Bound_parameters.t ->
@@ -171,8 +176,11 @@ let split_direct_over_application apply ~callee's_code_id
       ~args:remaining_args ~args_arity:remaining_arity
       ~return_arity:(Apply.return_arity apply)
       ~call_kind:Call_kind.indirect_function_call_unknown_arity
-      ~return_mode:outer_apply_alloc_mode (Apply.dbg apply)
-      ~inlined:(Apply.inlined apply)
+      ~return_mode:outer_apply_alloc_mode
+      (Apply.dbg apply)
+      (* The source call has a single counter, on the full application of the
+         callee below. This application of its result has none. *)
+      ~callsite_counter:None ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
       ~relative_history:(Apply.relative_history apply)
@@ -199,7 +207,7 @@ let split_direct_over_application apply ~callee's_code_id
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components (Apply.return_arity apply))
+          (Flambda_arity.unarize (Apply.return_arity apply))
       in
       let call_return_continuation, call_return_continuation_free_names =
         match Apply.continuation apply with
@@ -271,7 +279,7 @@ let split_direct_over_application apply ~callee's_code_id
                Bound_parameter.create
                  (Variable.create "over_app_result" (KS.kind kind))
                  kind Flambda_debug_uid.none)
-             (Flambda_arity.unarized_components full_apply_result_arity))
+             (Flambda_arity.unarize full_apply_result_arity))
       in
       Continuation_handler.create params
         ~handler:(Expr.create_invalid (Over_application_never_returns apply))
@@ -295,6 +303,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~return_arity:(Code_metadata.result_arity callee's_code_metadata)
       ~call_kind:(Call_kind.direct_function_call callee's_code_id)
       ~return_mode:inner_apply_alloc_mode (Apply.dbg apply)
+      ~callsite_counter:(Apply.callsite_counter apply)
       ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)

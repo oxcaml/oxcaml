@@ -1,3 +1,3 @@
 (tests
- (names interf_graph)
+ (names interf_graph copy_propagation)
  (libraries ocamloptcomp))

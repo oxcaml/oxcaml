@@ -75,7 +75,8 @@ let int_shift_op =
 let unary_int_arith_op =
   D.(
     constructor_flag
-      (["bswp", Swap_byte_endianness] : (string * P.unary_int_arith_op) list))
+      (["bswp", Swap_byte_endianness; "not", Not]
+        : (string * P.unary_int_arith_op) list))
 
 let binary_int_arith_op =
   D.(
@@ -617,7 +618,16 @@ let kind_with_subkind =
             fun _ num_fields -> Float_block { num_fields } )
         in
         let| variant =
-          let item = param2 block_shape (list full_kind) in
+          let item =
+            maps
+              (option (param2 block_shape (list full_kind)))
+              ~from:(fun _ -> function
+                | None -> Undetermined
+                | Some (shape, fields) -> Determined (shape, fields))
+              ~to_:(fun _ -> function
+                | Undetermined -> None
+                | Determined (shape, fields) -> Some (shape, fields))
+          in
           let map_bind = positional (param2 scannable_tag item) in
           let tag_map =
             maps (list map_bind)
@@ -728,10 +738,14 @@ let probe_is_enabled =
 let enter_inlined_apply =
   D.(
     nullary "%inlined_apply" ~params:param0 (fun _env () ->
-        P.Enter_inlined_apply { dbg = Inlined_debuginfo.none }))
+        P.Enter_inlined_apply
+          { dbg = Inlined_debuginfo.none; inlined_attribute = Default_inlined }))
 
 let domain_index =
   D.(nullary "%domain_index" ~params:param0 (fun _env () -> P.Domain_index))
+
+let thread_self_id =
+  D.(nullary "%thread_self_id" ~params:param0 (fun _env () -> P.Thread_self_id))
 
 let dls_get = D.(nullary "%dls_get" ~params:param0 (fun _env () -> P.Dls_get))
 
@@ -883,6 +897,9 @@ let project_value_slot =
      if the value slot's definition (in a "with" clause, where kinds are
      supported) has already been parsed, the slot registered under this name
      will have the correct kind and the kind here is ignored. *)
+  (* If a function slot is fresh when defining a primitive, it means it does not
+  exist in constructions, but only in projections. As such, it will be deleted
+  when computing the slot_offsets. This means we can give it a dummy size. *)
   let kind = Flambda_kind.value in
   D.(
     unary "%project_value_slot"
@@ -890,7 +907,8 @@ let project_value_slot =
         (param2
            (maps (positional string)
               ~from:(fun env pf ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf
+                  ~size:0)
               ~to_:(fun env pf ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env pf))
            (maps (positional string)
@@ -909,12 +927,14 @@ let project_function_slot =
         (param2
            (maps (positional string)
               ~from:(fun env mf ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf
+                  ~size:0)
               ~to_:(fun env mf ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mf))
            (maps (positional string)
               ~from:(fun env mt ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt
+                  ~size:0)
               ~to_:(fun env mt ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mt)))
       (fun _ (move_from, move_to) ->
@@ -1340,8 +1360,10 @@ module OfFlambda = struct
     | Optimised_out kind -> optimised_out env kind
     | Probe_is_enabled { name; enabled_at_init } ->
       probe_is_enabled env (wrap_loc name, enabled_at_init)
-    | Enter_inlined_apply { dbg = _ } -> enter_inlined_apply env ()
+    | Enter_inlined_apply { dbg = _; inlined_attribute = _ } ->
+      enter_inlined_apply env ()
     | Domain_index -> domain_index env ()
+    | Thread_self_id -> thread_self_id env ()
     | Dls_get -> dls_get env ()
     | Tls_get -> tls_get env ()
     | Poll -> poll env ()

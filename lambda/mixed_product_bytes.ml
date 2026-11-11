@@ -61,6 +61,7 @@ let rec count (el : _ Lambda.mixed_block_element) : t =
   | Vec256 -> { value = 0; flat = 32 }
   | Vec512 -> { value = 0; flat = 64 }
   | Mask -> { value = 0; flat = 8 }
+  | Void -> zero
   | Product layouts ->
     Array.fold_left (fun cts l -> add cts (count l)) zero layouts
   | Splice_variable _ ->
@@ -98,8 +99,6 @@ let value_prefix_len t = Byte_count.on_64_bit_arch t.value / 8
 let size_in_words t =
   Byte_count.on_64_bit_arch (Byte_count.add t.value t.flat) / 8
 
-let types_shape_is_all_value shape = all_value (count_types_shape shape)
-
 module Wrt_path = struct
   type nonrec t =
     { here : t;
@@ -119,7 +118,8 @@ module Wrt_path = struct
       match el with
       | Product shape -> count_shape_wrt_path shape i path_rest
       | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-      | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate ->
+      | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate
+      | Void ->
         Misc.fatal_error "Mixed_product_bytes_wrt_path: bad mixed block path"
       | Splice_variable _ ->
         Misc.fatal_error

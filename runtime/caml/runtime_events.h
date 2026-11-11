@@ -28,7 +28,10 @@
 #ifndef CAML_RUNTIME_EVENTS_H
 #define CAML_RUNTIME_EVENTS_H
 
+#include "misc.h"
 #include "mlvalues.h"
+#include <stdint.h>
+#include "camlatomic.h"
 
 #ifdef CAML_INSTR
 #define CAML_EV_ALLOC(s) caml_ev_alloc(s)
@@ -154,6 +157,12 @@ typedef enum {
     EV_C_MAJOR_SLICE_TOTAL_WORK,
     EV_C_MAJOR_SLICE_BUDGET,
     EV_C_MAJOR_SLICE_WORK_DONE,
+
+    /* Fiber stack lifecycle */
+    EV_C_STACK_CREATED,
+    EV_C_STACK_FREED,
+    EV_C_STACK_IDLED,
+    EV_C_STACK_WOKEN,
 } ev_runtime_counter;
 
 typedef enum {

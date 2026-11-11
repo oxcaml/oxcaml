@@ -1,4 +1,11 @@
 (env
  (_ (flags (:standard -no-principal -w -69-70))))
 
-(vendored_dirs gc-timings js_of_ocaml memtrace ocaml-jit owee)
+(vendored_dirs gc-timings memtrace ocaml-jit owee)
+
+; Data for the sources that middle_end/flambda2/to_jsir/jsoo_imports copies.
+; js_of_ocaml itself is built through ast-dependent-libs/, which links to it.
+(data_only_dirs js_of_ocaml)
+
+; Built through ast-dependent-libs/, which links to them.
+(dirs :standard \ ppxlib ppxlib_jane)

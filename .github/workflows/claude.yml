@@ -1,5 +1,5 @@
-# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source
-# code repo. If you want this functionality, ask for help from a subset of:
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
 # @jvanburen @glittershark @mshinwell
 #
 # (This workflow complies: repository contents are read-only. Claude cannot
@@ -139,7 +139,11 @@ jobs:
       # Claude's build environment is the flake devShell -- the same toolchain
       # as the nix CI builds:
 
-      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          # Pin to nix 2.33.0; later versions of nix cause out of memory issues
+          # on darwin
+          install_url: https://releases.nixos.org/nix/nix-2.33.0/install
       - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
           name: oxcaml
@@ -152,7 +156,19 @@ jobs:
         uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
 
       - name: Run Claude Code
-        uses: anthropics/claude-code-action@6b082c41935b4c8a3b8b0ef85ba4ba4d9eeb8975 # v1.0.189
+        uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1.0.240
+        env:
+          # The session is non-interactive: it ends as soon as Claude ends its
+          # turn. If Claude starts a build or test with Bash run_in_background
+          # and then ends its turn to wait for it, the session finishes there,
+          # reports success with its checklist half done, and job cleanup kills
+          # the still-running build. Disabling background tasks removes
+          # run_in_background, so long commands run in the foreground instead.
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
+          # Foreground Bash commands are capped at 10 minutes by default, which
+          # a compiler build or test run can exceed. Raise the cap to 80
+          # minutes, leaving headroom under the job's timeout-minutes.
+          BASH_MAX_TIMEOUT_MS: "4800000"
         with:
           # Workload Identity Federation identifiers, not credentials (see the
           # WIF section in .github/claude-code-security.md).
@@ -225,6 +241,13 @@ jobs:
             otherwise. Do not claim you cannot build or test because of environment
             limits or missing permissions; if a build or test actually fails,
             report the real error output.
+
+            RUN COMMANDS IN THE FOREGROUND. Your session ends as soon as you
+            stop calling tools, and nothing will wake you up again: there are no
+            background task notifications here. Run builds and tests as ordinary
+            foreground Bash commands, passing a timeout long enough for them to
+            finish (a compiler build and a test directory can each take many
+            minutes), and wait for their output before you continue.
 
             NO PUSH. The GitHub token in this job is read-only. The task prompt
             tells you to commit and push your changes to the PR branch: ignore

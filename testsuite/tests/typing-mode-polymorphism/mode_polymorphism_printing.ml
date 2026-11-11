@@ -3,11 +3,6 @@
  expect;
 *)
 
-(*
- * This file tests printing of poymorphic mode variables
-*)
-
-
 let id x = x
 [%%expect{|
 val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
@@ -290,6 +285,18 @@ val foo :
   'c @ [< 'm & portable] -> 'a * 'b * 'c @ [> 'm | 'n | 'o | local] = <fun>
 |}]
 
+(* middle mode annotations *)
+
+let foo (x @ read) = ()
+[%%expect{|
+val foo : 'a @ [< read > read] -> unit @ 'm = <fun>
+|}]
+
+let foo x : _ @ read = x
+[%%expect{|
+val foo : 'a @ [< 'm & read] -> 'a @ [< read > 'm | read] = <fun>
+|}]
+
 (* if a type is annotated, mode crossing has an effect on the bounds of mode variable *)
 
 type intref = { mutable v : int }
@@ -326,19 +333,17 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 let map f l = List.map f l
 [%%expect{|
 val map :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
+  ('a @ [> aliased stateful dynamic] -> 'b @ [< global many read_write]) @ [< global many] ->
   'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  'b list @ [> aliased stateful dynamic] = <fun>
 |}]
 
 let map_eta f = fun l -> List.map f l
 [%%expect{|
 val map_eta :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
+  ('a @ [> aliased stateful dynamic] -> 'b @ [< global many read_write]) @ [< global many] ->
   'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  'b list @ [> aliased stateful dynamic] = <fun>
 |}]
 
 (* modules *)
@@ -440,6 +445,7 @@ Error: Signature mismatch:
        The type
          "t @ [< 'm > stateful dynamic] -> t @ [> 'm | stateful dynamic]"
        is not compatible with the type "t -> t @ portable"
+       The return mode was expected to be "portable" but is "nonportable"
 |}]
 
 (* variant types *)
@@ -592,4 +598,14 @@ let flip f = fun x -> fun y -> f y x
 val flip :
   ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
   'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
+|}]
+
+let k a b = a
+let foo x = (k x).contents
+[%%expect{|
+val k : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
+Line 2, characters 12-17:
+2 | let foo x = (k x).contents
+                ^^^^^
+Error: This expression has type "'a -> 'b" which is not a record type.
 |}]

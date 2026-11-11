@@ -287,6 +287,7 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
        is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module Fail_less_polymorphic_unique : module type of Base = struct
@@ -308,6 +309,7 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm & unique] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
+       The argument mode was expected to be "unique" but is "aliased"
 |}]
 
 module Fail_less_polymorphic_global : module type of Base = struct
@@ -329,6 +331,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm & global] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
+       The argument mode was expected to be "global"
+       because it crosses with something but is "local"
 |}]
 
 module Fail_less_polymorphic_portable : module type of Base = struct
@@ -350,6 +354,7 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm & portable] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
+       The argument mode was expected to be "portable" but is "nonportable"
 |}]
 
 module Producer = struct
@@ -397,6 +402,7 @@ Error: Signature mismatch:
          "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
        is not compatible with the type
          "'a @ [< past('o) & global] -> 'b @ [< 'p & past('n)] -> 'b @ [> 'p]"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module Fail_local_escapes : sig
@@ -422,6 +428,8 @@ Error: Signature mismatch:
          "'a @ [< 'm > local aliased stateful dynamic] ->
          'a @ [> 'm | local aliased stateful dynamic]"
        is not compatible with the type "'a @ local -> 'a"
+       The return mode was expected to be "global"
+       because it crosses with something but is "local"
 |}]
 
 module Fail_arg_needs_portable : sig
@@ -447,6 +455,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        The type "'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]"
        is not compatible with the type "'a -> 'a"
+       The argument mode was expected to be "portable" but is "nonportable"
 |}]
 
 module Fail_nonportable_modality : sig

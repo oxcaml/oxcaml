@@ -20,6 +20,9 @@
 
 #include "misc.h"
 #include "domain.h"
+#include "domain_state.h"
+#include "mlvalues.h"
+#include "tsan.h"
 
 typedef enum {
   SCANNING_ONLY_YOUNG_VALUES = 1, // action is a no-op outside the minor heap
@@ -47,6 +50,7 @@ CAMLextern void caml_do_local_roots(
   struct stack_info *current_stack,
   value * v_gc_regs,
   dynamic_cache_t dynamic_bindings,
+  value * tls_state,
   struct c_stack_link* c_stack);
 
 #endif /* CAML_INTERNALS */

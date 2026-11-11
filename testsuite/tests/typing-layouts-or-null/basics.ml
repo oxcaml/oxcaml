@@ -1,5 +1,5 @@
 (* TEST
- flags += "-extension comprehensions -extension layouts_beta -w -181";
+ flags += "-extension comprehensions -w -181";
  expect;
 *)
 
@@ -52,19 +52,13 @@ Error: Record element types must have a representable layout.
          because it's the type of a field in a record being projected from.
 |}]
 
+(* Unrepresentable type is allowed in a signature *)
 module type S1 = sig
   val x : t_any_mod_separable
 end
 
 [%%expect{|
-Line 2, characters 10-29:
-2 |   val x : t_any_mod_separable
-              ^^^^^^^^^^^^^^^^^^^
-Error: The type of a module-level value must have a representable layout.
-       The layout of type t_any_mod_separable is any separable
-         because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of type t_any_mod_separable must be representable
-         because it's the type of something in a signature.
+module type S1 = sig val x : t_any_mod_separable end
 |}]
 
 module type S2 = sig

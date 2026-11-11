@@ -87,95 +87,43 @@ end
 module M3_5 : sig val f : float32_u -> float32_u val y : float32_u end
 |}];;
 
-(*************************************)
-(* Test 4: No putting them in tuples *)
+(**********************************)
+(* Test 4: Putting them in tuples *)
 
 let f4_1 (x : t_float32) = x, false;;
 [%%expect{|
-Line 1, characters 27-28:
-1 | let f4_1 (x : t_float32) = x, false;;
-                               ^
-Error: The value "x" has type "t_float32" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_float32 is float32
-         because of the definition of t_float32 at line 1, characters 0-24.
-       But the layout of t_float32 must be a value layout
-         because it's the type of a tuple element.
+val f4_1 : t_float32 -> t_float32 * bool = <fun>
 |}];;
 
 let f4_2 (x : 'a t_float32_id) = x, false;;
 [%%expect{|
-Line 1, characters 33-34:
-1 | let f4_2 (x : 'a t_float32_id) = x, false;;
-                                     ^
-Error: The value "x" has type "'a t_float32_id" = "('a : float32)"
-       but an expression was expected of type "('b : value_or_null)"
-       The layout of 'a t_float32_id is float32
-         because of the definition of t_float32_id at line 2, characters 0-37.
-       But the layout of 'a t_float32_id must be a value layout
-         because it's the type of a tuple element.
+val f4_2 : ('a : float32). 'a t_float32_id -> 'a t_float32_id * bool = <fun>
 |}];;
 
 let f4_3 (x : float32_u) = x, false;;
 [%%expect{|
-Line 1, characters 27-28:
-1 | let f4_3 (x : float32_u) = x, false;;
-                               ^
-Error: The value "x" has type "float32_u" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of float32_u is float32
-         because it is the primitive type float32_u.
-       But the layout of float32_u must be a value layout
-         because it's the type of a tuple element.
+val f4_3 : float32_u -> float32_u * bool = <fun>
 |}];;
 
 type t4_4 = t_float32 * string;;
 [%%expect{|
-Line 1, characters 12-21:
-1 | type t4_4 = t_float32 * string;;
-                ^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_float32" is float32
-         because of the definition of t_float32 at line 1, characters 0-24.
-       But the layout of "t_float32" must be a value layout
-         because it's the type of a tuple element.
+type t4_4 = t_float32 * string
 |}];;
 
 type t4_5 = int * float32_u;;
 [%%expect{|
-Line 1, characters 18-27:
-1 | type t4_5 = int * float32_u;;
-                      ^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "float32_u" is float32
-         because it is the primitive type float32_u.
-       But the layout of "float32_u" must be a value layout
-         because it's the type of a tuple element.
+type t4_5 = int * float32_u
 |}];;
 
 type ('a : float32) t4_6 = 'a * 'a
 [%%expect{|
-Line 1, characters 27-29:
-1 | type ('a : float32) t4_6 = 'a * 'a
-                               ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is float32
-         because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : float32) t4_6 = 'a * 'a
 |}];;
 
 (* check for layout propagation *)
 type ('a : float32, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
 [%%expect{|
-Line 1, characters 46-48:
-1 | type ('a : float32, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
-                                                  ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is float32
-         because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : float32, 'b) t4_7 = 'a -> 'a * 'a constraint 'b = 'a
 |}]
 
 (*****************************************)

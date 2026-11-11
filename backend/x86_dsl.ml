@@ -182,6 +182,8 @@ module I = struct
 
   let nop () = emit NOP
 
+  let not_ x = emit (NOT x)
+
   let or_ x y = emit (OR (x, y))
 
   let pause () = emit PAUSE

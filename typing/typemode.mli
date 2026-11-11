@@ -5,7 +5,7 @@ module Jkind = Btype.Jkind0
 
 type 'a modes =
   { mode_modes : 'a;
-    mode_desc : Mode.Alloc.atom Location.loc list
+    mode_desc : Mode.With_locality.atom Location.loc list
   }
 
 type modalities =
@@ -15,16 +15,17 @@ type modalities =
 
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified
 *)
-val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t modes
-
-val apply_mode_implications :
-  Mode.Alloc.Const.Option.t -> Mode.Alloc.Const.Option.t
+val transl_mode_annots :
+  Parsetree.modes -> Mode.With_locality.Const.Option.t modes
 
 val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t modes
+val transl_mode_with_locality :
+  Parsetree.modes -> Mode.With_locality.Const.t modes
+
+val legacy_modes : Mode.With_locality.lr modes
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
@@ -49,6 +50,9 @@ val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
 
 (** Get the default modalities implied by the mutability of a field. *)
 val mutable_modalities : Types.mutability -> Mode.Modality.Const.t
+
+(** The modalities of the contents of an address of the given mutability. *)
+val address_modalities : Types.mutability -> Mode.Modality.Const.t
 
 (** Similar to [transl_modalities] but takes an explicit [default] modality
     instead of computing it from mutability. Used when merging explicit
@@ -93,6 +97,6 @@ val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)
-val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> Parsetree.modes
+val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> string list
 
-val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
+val block_path_expected_modalities : Types.mutability -> Mode.Modality.Const.t

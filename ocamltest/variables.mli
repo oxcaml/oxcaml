@@ -17,7 +17,7 @@
 
 type value = string
 
-type exporter = value -> string * string
+type exporter = string * (string -> string)
 
 type t
 
@@ -36,6 +36,8 @@ val make : string * string -> t
 val make_with_exporter : exporter -> string * string -> t
 
 val name_of_variable : t -> string
+
+val exported_name : t -> string
 
 val description_of_variable : t -> string
 

@@ -213,6 +213,7 @@ module Predef : sig
     | Unboxed_int8
     | Unboxed_mask
     | Unboxed_simd of simd_vec_split
+    | Unboxed_unit
 
   type t =
     | Array

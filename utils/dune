@@ -29,8 +29,10 @@
   (:c domainstate.ml.c)
   (:tbl
    ../runtime/caml/domain_state.tbl)
-  (glob_files
-   ../runtime/caml/{config,m,s,compatibility}.h))
+  ../runtime/caml/config.h
+  ../runtime/caml/m.h
+  ../runtime/caml/s.h
+  ../runtime/caml/compatibility.h)
  (action
   (with-stdout-to
    %{targets}
@@ -45,8 +47,10 @@
   (:c domainstate.mli.c)
   (:tbl
    ../runtime/caml/domain_state.tbl)
-  (glob_files
-   ../runtime/caml/{config,m,s,compatibility}.h))
+  ../runtime/caml/config.h
+  ../runtime/caml/m.h
+  ../runtime/caml/s.h
+  ../runtime/caml/compatibility.h)
  (action
   (with-stdout-to
    %{targets}

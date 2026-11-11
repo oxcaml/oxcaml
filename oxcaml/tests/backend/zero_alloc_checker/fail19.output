@@ -1,18 +1,18 @@
 File "fail19.ml", line 6, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Fail19.foo (camlFail19.foo_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Fail19.foo (camlFail19__foo_HIDE_STAMP).
 
 File "fail19.ml", line 10, characters 9-13:
 Error: allocation of 24 bytes
 
 File "fail19.ml", line 12, characters 12-17:
-Error: called function may allocate (direct call camlFail19.bar_HIDE_STAMP)
+Error: called function may allocate (direct call camlFail19__bar_HIDE_STAMP)
 
 File "fail19.ml", line 13, characters 15-18:
 Error: called function may allocate (indirect call)
 
 File "fail19.ml", line 15, characters 8-37:
 Error: expression may allocate
-       (probe "test" handler camlFail19.probe_handler_test_HIDE_STAMP)
+       (probe "test" handler camlFail19__probe_handler_test_HIDE_STAMP)
 
 File "fail19.ml", line 16, characters 8-16:
 Error: allocation of 24 bytes

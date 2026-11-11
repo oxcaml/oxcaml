@@ -730,7 +730,7 @@ Error: Unrecognized modality separable.
 
 module M : sig
   type ('a : bits64) t : bits64 mod portable with 'a @@ external_
-  (* CR layouts: the below type should also be [portable with 'a @@ external_]*)
+  (* CR layouts: the below type should also be [mod portable with 'a] *)
   type ('a : bits64) t2 : bits64 with 'a @@ external_
 end = struct
   type ('a : bits64) t = { x : 'a } [@@unboxed]
@@ -742,7 +742,7 @@ type 'a check_m_t2_always_external : bits64 = 'a M.t2
 [%%expect{|
 module M :
   sig
-    type ('a : bits64) t : bits64 mod portable with 'a @@ external_
+    type ('a : bits64) t : bits64 mod portable with 'a
     type ('a : bits64) t2 : bits64
   end
 type ('a : bits64) check_m_t_always_external = 'a M.t
@@ -754,13 +754,10 @@ type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
 Line 1, characters 0-65:
 1 | type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a M.t" is bits64 mod portable with 'a @@ external_
+Error: The kind of type "'a M.t" is bits64 mod portable with 'a
          because of the definition of t at line 2, characters 2-65.
        But the kind of type "'a M.t" must be a subkind of any mod portable
          because of the definition of check_m_t_not_always_portable at line 1, characters 0-65.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
 |}]
 
 type 'a check_m_t2_not_always_portable : any mod portable = 'a M.t2
@@ -787,8 +784,7 @@ type 'a check_m_t_always_external : bits64 & bits64 = 'a M.t
 module M :
   sig
     type ('a : bits64) t
-      : bits64 mod portable with 'a @@ external_
-        & bits64 mod portable with 'a @@ external_
+      : bits64 mod portable with 'a & bits64 mod portable with 'a
   end
 type ('a : bits64) check_m_t_always_external = 'a M.t
 |}]
@@ -799,14 +795,10 @@ Line 1, characters 0-65:
 1 | type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "'a M.t" is
-           bits64 mod portable with 'a @@ external_
-           & bits64 mod portable with 'a @@ external_
+           bits64 mod portable with 'a & bits64 mod portable with 'a
          because of the definition of t at line 2, characters 2-74.
        But the kind of type "'a M.t" must be a subkind of any mod portable
          because of the definition of check_m_t_not_always_portable at line 1, characters 0-65.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
 |}]
 
 

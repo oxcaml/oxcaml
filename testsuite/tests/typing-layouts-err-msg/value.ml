@@ -41,14 +41,7 @@ Error: The types of variables bound by a 'let' in a class function
 (* Tuple_element *)
 type t = t_any * t_any
 [%%expect{|
-Line 1, characters 9-14:
-1 | type t = t_any * t_any
-             ^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_any" is any
-         because of the definition of t_any at line 1, characters 0-18.
-       But the layout of "t_any" must be a value layout
-         because it's the type of a tuple element.
+type t = t_any * t_any
 |}];;
 
 (* Probe *)
@@ -174,17 +167,16 @@ Error: This constant has type "string" but an expression was expected of type
 |}];;
 
 (* Type_argument *)
-let f (x: t_void) = [x]
+let f (x: t_void Lazy.t) = x
 [%%expect{|
-Line 1, characters 21-22:
-1 | let f (x: t_void) = [x]
-                         ^
-Error: The value "x" has type "t_void" but an expression was expected of type
-         "('a : value_or_null)"
+Line 1, characters 10-16:
+1 | let f (x: t_void Lazy.t) = x
+              ^^^^^^
+Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
        But the layout of t_void must be a value layout
-         because the type argument of list has layout value_or_null.
+         because the type argument of Lazy.t has this layout.
 |}];;
 
 (* Tuple *)

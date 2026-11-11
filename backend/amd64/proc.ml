@@ -374,14 +374,106 @@ let win64_loc_external_arguments arg =
   done;
   (loc, Misc.align !ofs 16, Align_16) (* keep stack 16-aligned *)
 
-let loc_external_arguments ty_args =
-  let arg = Cmm.machtype_of_exttype_list ty_args in
-  let loc, stack_ofs, align =
-    if win64
-    then win64_loc_external_arguments arg
-    else unix_loc_external_arguments arg
+(* [XFat_pointer] arguments: the base goes in the slot's real C argument
+   register; the offset in a leftover C integer argument register. The
+   addition is emitted as part of the call itself. *)
+let unix_loc_external_arguments_fat ty_args =
+  let int_arg_regs = Regs.[RDI; RSI; RDX; RCX; R8; R9] in
+  let real_component (t : Cmm.exttype) : machtype_component =
+    match t with
+    | XFat_pointer -> Val
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 -> Int
+    | XFloat -> Float
+    | XFloat32 -> Float32
+    | XVec128 -> Vec128
+    | XVec256 -> Vec256
+    | XVec512 -> Vec512
+    | XDummy_int -> Int
+    | XDummy_float -> Float
   in
-  Array.map (fun reg -> [|reg|]) loc, stack_ofs, align
+  let reals = Array.of_list (List.map real_component ty_args) in
+  let loc, stack_ofs, align = unix_loc_external_arguments reals in
+  let next_stack_ofs = ref stack_ofs in
+  let ints_consumed =
+    Array.fold_left
+      (fun k (c : machtype_component) ->
+        match c with
+        | Val | Int | Addr -> k + 1
+        | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask | Valx2 -> k)
+      0 reals
+  in
+  let leftover_int_regs =
+    ref (List.filteri (fun i _ -> i >= ints_consumed) int_arg_regs)
+  in
+  let locs =
+    List.mapi
+      (fun i (t : Cmm.exttype) ->
+        match t with
+        | XFat_pointer ->
+          (match (loc.(i).Reg.loc : Reg.location) with
+          | Reg _ -> ()
+          | Stack _ | Unknown ->
+            Misc.fatal_error
+              "Fat-pointer external arguments passed on the stack are not \
+               supported (too many integer arguments)");
+          let offset_loc =
+            match !leftover_int_regs with
+            | offset_reg :: rest ->
+              leftover_int_regs := rest;
+              phys_reg Int (P offset_reg)
+            | [] ->
+              (* Stash offset in an extra stack word after the real arguments.*)
+              let ofs = !next_stack_ofs in
+              next_stack_ofs := ofs + size_int;
+              stack_slot (Outgoing ofs) Int
+          in
+          [| loc.(i); offset_loc |]
+        | XDummy_int | XDummy_float -> (
+          match (loc.(i).Reg.loc : Reg.location) with
+          | Reg _ -> [||]
+          | Stack _ | Unknown ->
+            Misc.fatal_error
+              "Proc.loc_external_arguments: no register left for a dummy")
+        | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32 | XVec128
+        | XVec256 | XVec512 ->
+          [| loc.(i) |])
+      ty_args
+  in
+  let alignment =
+    match (align : Cmm.stack_align) with
+    | Align_16 -> 16
+    | Align_32 -> 32
+    | Align_64 -> 64
+  in
+  Array.of_list locs, Misc.align !next_stack_ofs alignment, align
+
+let loc_external_arguments ty_args =
+  if List.mem Cmm.XFat_pointer ty_args
+  then
+    if win64
+    then
+      Misc.fatal_error
+        "Fat-pointer external arguments are not supported on Win64"
+    else unix_loc_external_arguments_fat ty_args
+  else
+    let arg = Cmm.machtype_of_exttype_list ty_args in
+    let loc, stack_ofs, align =
+      if win64
+      then win64_loc_external_arguments arg
+      else unix_loc_external_arguments arg
+    in
+    let loc =
+      List.mapi (fun i ty_arg ->
+          match Cmm.is_dummy_exttype ty_arg, (loc.(i) : Reg.t).loc with
+          | false, _ -> [| loc.(i) |]
+          | true, Reg _ -> [||]
+          | true, (Stack _ | Unknown) ->
+            Misc.fatal_error
+              "Proc.loc_external_arguments: no register left for a dummy")
+        ty_args
+      |> Array.of_list
+    in
+    loc, stack_ofs, align
 
 let loc_exn_bucket = rax
 
@@ -507,7 +599,8 @@ let destroyed_by_simd_op (op : Simd.operation) =
        | Pcompare_string _ | Vpcompare_string _
        | Ptestz | Ptestc | Ptestnzc
        | Vptestz_X  | Vptestc_X  | Vptestnzc_X
-       | Vptestz_Y  | Vptestc_Y  | Vptestnzc_Y -> [||])
+       | Vptestz_Y  | Vptestc_Y  | Vptestnzc_Y
+       | Kflag _ -> [||])
 
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
@@ -576,11 +669,11 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
-               | Iasr | Ipopcnt | Iclz | Ictz
+               | Iasr | Ipopcnt | Inot | Iclz | Ictz
                )
        | Int128op (Iadd128 | Isub128 | Imul64 _)
        | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
-                    | Ilsr | Iasr | Ipopcnt | Iclz | Ictz ),_)
+                    | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz ),_)
        | Floatop _
        | Csel _
        | Reinterpret_cast _
@@ -592,7 +685,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
                   | Isextend32 | Izextend32 | Ineg
                   | Ilfence | Isfence | Imfence)
-       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
+       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+       | Thread_self_id | Pause)
   | Poptrap _ | Prologue | Epilogue ->
     if fp then destroyed_rbp else [||]
   | Stack_check _ ->
@@ -747,7 +841,7 @@ let operation_supported = function
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Caddi128 | Csubi128 | Cmuli64 _
-  | Cand | Cor | Cxor | Clsl | Clsr | Casr
+  | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _
   | Cclz | Cctz
@@ -755,11 +849,12 @@ let operation_supported = function
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
   | Craise _
-  | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
+  | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion | Cendregion
   | Ctuple_field _
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Cpause
   | Creinterpret_cast (Int_of_value | Value_of_int |

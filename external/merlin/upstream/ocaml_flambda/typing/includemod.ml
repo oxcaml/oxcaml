@@ -31,8 +31,8 @@ type pos =
 type modes = Includecore.mmodes =
   | All
   | Specific:
-      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.Value.t ->
+      Mode.((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      Mode.(('l * allowed) With_regionality.t) ->
       modes
 
 module Error = struct
@@ -62,7 +62,7 @@ module Error = struct
 
   type class_declaration_symptom =
     | Class_type of Ctype.class_match_failure list
-    | Class_mode of Mode.Value.error
+    | Class_mode of Mode.With_regionality.error
 
   type core_sigitem_symptom =
     | Value_descriptions of
@@ -91,7 +91,7 @@ module Error = struct
     | Functor of functor_symptom
     | Invalid_module_alias of Path.t
     | After_alias_expansion of module_type_diff
-    | Mode of Mode.Value.error
+    | Mode of Mode.With_regionality.error
 
 
   and module_type_diff = (module_type, module_type_symptom) mdiff
@@ -126,6 +126,7 @@ module Error = struct
     | Module_type_declaration of
         (modtype_declaration, module_type_declaration_symptom) diff
     | Module_type of module_type_diff
+    | Unrepresentable_item of type_expr * Jkind.Violation.t
 
   and module_type_declaration_symptom =
     | Illegal_permutation of Typedtree.module_coercion
@@ -445,6 +446,10 @@ let rec print_coercion ppf c =
       pr "@[<2>alias %a@ (%a)@]"
         Printtyp.path p
         print_coercion c
+  | Tcoerce_kindtemplate { tc_params; tc_args } ->
+      pr "@[<2>kindtemplate (%a => _ %a)@]"
+        (print_list Jkind.Sort.Debug_printers.var) tc_params
+        (print_list Jkind.Sort.Const.Debug_printers.t) tc_args
   | Tcoerce_invalid ->
       pr "invalid_coercion"
 and print_coercion2 ppf (n, c) =
@@ -467,16 +472,42 @@ let equal_modtype_paths env p1 subst p2 =
        (Env.normalize_modtype_path env
           (Subst.modtype_path subst p2))
 
-let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
-  let rec is_identity_coercion pos = function
+let is_identity_coercion pos_cc_list =
+  let rec loop pos = function
   | [] ->
       true
   | (n, c) :: rem ->
-      n = pos && c = Tcoerce_none && is_identity_coercion (pos + 1) rem in
-  if is_identity_coercion 0 pos_cc_list
-  then Tcoerce_none
-  else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
+      n = pos && c = Tcoerce_none && loop (pos + 1) rem in
+  loop 0 pos_cc_list
 
+let build_output_repr ~env input_repr pos_cc_list =
+  List.map
+    (fun (pos, cc) ->
+       if pos >= 0 then input_repr.(pos)
+       else
+         match cc with
+         | Tcoerce_alias _ -> Jkind.Sort.(of_const Const.for_module)
+         | Tcoerce_primitive pc ->
+           (match
+              Ctype.type_sort ~why:Signature_item ~allow_mutation:false env
+                pc.pc_type
+            with
+            | Ok sort -> sort
+            | Error _ ->
+              Misc.fatal_error
+                "build_output_repr: expected representable primitive")
+         (* We only ever encounter [Tcoerce_invalid] as part of the recursive
+            module consistency check. This coercion never gets translated, and
+            it doesn't exist at runtime, so we just assign it sort [void].
+
+           Eventually, we will build coercions and check inclusion separately,
+            at which point this case should be genuinely unreachable. *)
+         | Tcoerce_invalid -> Jkind.Sort.(of_const Const.void)
+         | Tcoerce_none | Tcoerce_structure _ | Tcoerce_functor _
+         | Tcoerce_kindtemplate _ ->
+           Misc.fatal_error "build_output_repr: unexpected coercion")
+    pos_cc_list
+  |> Array.of_list
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)
@@ -688,17 +719,14 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
     begin match Includecore.check_modes env ~item:Module
       ~crossing:Ctype.mode_crossing_module modes with
     | Error e ->
-        let mty1 = Mtype.reduce_alias_lazy env mty1 in
-        let mty2 =
-          Subst.Lazy.modtype Keep subst mty2 |> Mtype.reduce_alias_lazy env
-        in
-        begin match mty1, mty2 with
-        | Some mty1, Some mty2 ->
-            try_modtypes ~core ~direction ~loc env subst ~modes mty1 mty2
-              orig_shape
-        | _, _ ->
-            Error (Error.Mode e)
-        end
+        let mty2 = Subst.Lazy.modtype Keep subst mty2 in
+        let mty1' = Mtype.scrape_alias_lazy env mty1 in
+        let mty2' = Mtype.scrape_alias_lazy env mty2 in
+        if mty1' == mty1 || mty2' == mty2 then
+          Error (Error.Mode e)
+        else
+          try_modtypes ~core ~direction ~loc env subst ~modes mty1' mty2'
+            orig_shape
     | Ok () ->
     Ok (Tcoerce_none, orig_shape)
     end
@@ -706,7 +734,7 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
     match
       Env.normalize_module_path (Some Location.none) env p1
     with
-    | exception Env.Error (Env.Missing_module (_, _, path)) ->
+    | exception Env.Error.In_context (Env.Missing_module (_, _, path)) ->
         Error Error.(Mt_core(Unbound_module_path path))
     | p1 ->
         begin match Env.find_module_lazy p1 env with
@@ -714,7 +742,11 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             match strengthened_modtypes ~core ~direction ~loc ~aliasable:true
                     env subst ~modes md.md_type p1 mty2 orig_shape
             with
-            | Ok _ as x -> x
+            | Ok _ as x ->
+              (* [Typemod.type_module_path_aux] normally enforces that module
+                 paths are representable, but it skips this check for aliases *)
+                Env.check_module_path_representable ~loc p1 env;
+                x
             | Error reason -> Error (Error.After_alias_expansion reason)
           end
         | exception Not_found ->
@@ -760,8 +792,8 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             var, Shape.app orig_shape ~arg:shape_var
       in
       let cc_res : (_, _ Error.mdiff) result =
-        let mres1 = Mode.alloc_as_value mres1 in
-        let mres2 = Mode.alloc_as_value mres2 in
+        let mres1 = Mode.with_locality_as_regionality mres1 in
+        let mres2 = Mode.with_locality_as_regionality mres2 in
         modtypes ~core ~direction ~loc env subst res1 res2 res_shape
           ~modes:(Specific ((mres1, None), mres2))
       in
@@ -784,14 +816,16 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             let param_yielding =
               match (param2 : Subst.Lazy.functor_parameter) with
               | Named (_, _, mm) ->
-                [Yielding.disallow_right (Alloc.proj_comonadic Yielding mm)]
+                [Yielding.disallow_right
+                   (With_locality.proj_comonadic Yielding mm)]
               | Unit -> []
             in
             let funct_yielding =
               match modes with
               | All -> Yielding.disallow_right Yielding.max
               | Specific ((m, _locks), _) ->
-                Yielding.disallow_right (Value.proj_comonadic Yielding m)
+                Yielding.disallow_right
+                  (With_regionality.proj_comonadic Yielding m)
             in
             Ctype.create_yielding_mode_l
               (Yielding.join (funct_yielding :: param_yielding))
@@ -868,8 +902,8 @@ and functor_param ~core ~direction ~loc env subst param1 param2 =
       Ok Tcoerce_none, env, subst
   | Named (name1, arg1, marg1), Named (name2, arg2, marg2) ->
       let arg2' = Subst.Lazy.modtype Keep subst arg2 in
-      let marg1 = Mode.alloc_as_value marg1 in
-      let marg2 = Mode.alloc_as_value marg2 in
+      let marg1 = Mode.with_locality_as_regionality marg1 in
+      let marg2 = Mode.with_locality_as_regionality marg2 in
       let cc_arg =
         match
           modtypes ~core ~direction ~loc env Subst.identity arg2' arg1
@@ -957,22 +991,29 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig1
-          |> Array.of_list
-        in
-        let output_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig2
-          |> Array.of_list
-        in
-        let coercion =
-          if runtime_len1 = runtime_len2 then (* see PR#5098 *)
-            simplify_structure_coercion input_repr output_repr cc id_pos_list
-          else
-            Tcoerce_structure
-              { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
-        in
-        Ok (coercion, shape)
+        (* see PR#5098 *)
+        if runtime_len1 = runtime_len2 && is_identity_coercion cc then
+          Ok (Tcoerce_none, shape)
+        else begin
+          match
+            Env.sorts_of_signature_items ~why:Module_coercion new_env sig1
+          with
+          | Error { item; item_type; violation; item_desc = _ } ->
+              Error {
+                Error.env=new_env;
+                subst;
+                missings = [];
+                incompatibles =
+                  [item, Error.Unrepresentable_item (item_type, violation)];
+              }
+          | Ok input_repr ->
+              let output_repr =
+                build_output_repr ~env:new_env input_repr cc
+              in
+              Ok (Tcoerce_structure
+                    { input_repr; output_repr; pos_cc_list = cc; id_pos_list },
+                  shape)
+        end
     | missings, incompatibles, _runtime_coercions, _leftovers ->
         Error {
           Error.env=new_env;
@@ -1054,7 +1095,14 @@ and signature_components :
                 | Mp_present, Mp_present, _ -> true, item
                 | _, Mp_absent, _ -> false, item
                 | Mp_absent, Mp_present, Mty_alias p1 ->
-                    true, Result.map (fun i -> Tcoerce_alias (env, p1, i)) item
+                    let materialize_alias cc =
+                      (* [Typemod.type_module_path_aux] normally enforces that
+                         module paths are representable, but it skips this
+                         check for aliases *)
+                      Env.check_module_path_representable ~loc p1 env;
+                      Tcoerce_alias (env, p1, cc)
+                    in
+                    true, Result.map materialize_alias item
                 | Mp_absent, Mp_present, _ -> assert false
               in
               let item = mark_error_as_unrecoverable item in
@@ -1592,7 +1640,7 @@ module Functor_app_diff = struct
                 Result.Error (Error.Incompatible_params(arg,param))
             | ( Anonymous | Named _ | Empty_struct ),
               Named (_, param, param_m) ->
-               let param_m = Mode.alloc_as_value param_m in
+               let param_m = Mode.with_locality_as_regionality param_m in
                let direction = Directionality.unknown ~mark:false in
                 match
                   modtypes ~core:core_inclusion ~direction ~loc state.env

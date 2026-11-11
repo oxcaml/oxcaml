@@ -17,6 +17,7 @@
 #define CAML_UNIXSUPPORT_H
 
 #include <caml/misc.h>
+#include <caml/mlvalues.h>
 
 #ifdef _WIN32 /* Windows */
 #define WIN32_LEAN_AND_MEAN
@@ -46,7 +47,7 @@ struct filedescr {
     SOCKET socket;
   } fd;                   /* Real windows handle */
   enum { KIND_HANDLE, KIND_SOCKET } kind;
-  _Atomic int crt_fd;     /* C runtime descriptor */
+  atomic_int crt_fd;      /* C runtime descriptor */
   unsigned int flags_fd;  /* See FLAGS_FD_* */
 };
 

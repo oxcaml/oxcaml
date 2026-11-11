@@ -108,7 +108,8 @@ end
 
 (**** Type level management ****)
 
-let generic_level = Mode.Alloc.generic_level
+let generic_level = Mode.With_locality.generic_level
+let subject_level = generic_level - 1
 let lowest_level = Ident.lowest_scope
 
 (**** leveled type pool ****)
@@ -124,12 +125,16 @@ let lowest_level = Ident.lowest_scope
    the only function returning the contents of a pool is [with_new_pool],
    so that the initial pool can be added to, but never read from. *)
 
-type pool = {level: int; mutable pool: transient_expr list; next: pool}
+type pool =
+  { level: int;
+    mutable pool: transient_expr list;
+    mutable sort_pool: Jkind_types.Sort.t list;
+    next: pool}
 (* To avoid an indirection we choose to add a dummy level at the end of
    the list. It will never be accessed, as [pool_of_level] is always called
    with [level >= 0]. *)
-let rec dummy = {level = max_int; pool = []; next = dummy}
-let pool_stack = s_table (fun () -> {level = 0; pool = []; next = dummy}) ()
+let rec dummy = {level = max_int; pool = []; sort_pool = []; next = dummy}
+let pool_stack = s_table (fun () -> { dummy with level = 0 }) ()
 
 (* Lookup in the stack is linear, but the depth is the number of nested
    generalization points (e.g. lhs of let-definitions), which in ML is known
@@ -146,16 +151,24 @@ let rec pool_of_level level pool =
 
 (* Create a new pool at given level, and use it locally. *)
 let with_new_pool ~level f =
-  let pool = {level; pool = []; next = !pool_stack} in
+  let pool = {level; pool = []; sort_pool = []; next = !pool_stack} in
   let r =
     Misc.protect_refs [ R(pool_stack, pool) ] f
   in
-  (r, pool.pool)
+  (r, pool.pool, pool.sort_pool)
 
 let add_to_pool ~level ty =
   if level >= generic_level || level <= lowest_level then () else
   let pool = pool_of_level level !pool_stack in
   pool.pool <- ty :: pool.pool
+
+let add_to_sort_pool ~level v =
+  if level >= generic_level || level <= lowest_level then () else
+  let pool = pool_of_level level !pool_stack in
+  pool.sort_pool <- v :: pool.sort_pool
+
+let () =
+  Jkind_types.Sort.set_add_to_pool add_to_sort_pool
 
 (**** Some type creators ****)
 
@@ -176,6 +189,14 @@ let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
 let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
 let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
+
+(**** Some sort creators ****)
+
+let new_sort_var ~level =
+  let open Jkind_types.Sort in
+  let var = proto_new_var ~level in
+  add_to_sort_pool ~level (of_var var);
+  var
 
 (**** Check some types ****)
 
@@ -451,7 +472,7 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
-    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_mode_expr: Mode.With_locality.lr -> unit;
     it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
@@ -592,23 +613,8 @@ let copy_row f fixed row keep more =
 
 let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 
-let instance_jkind (t : jkind_lr) : jkind_lr =
-  let rec instance_layout (l : Jkind_types.Sort.t Jkind_types.Layout.t)
-      : Jkind_types.Sort.t Jkind_types.Layout.t =
-    match l with
-    | Any _ -> l
-    | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
-    | Product ts -> Product (List.map instance_layout ts)
-    | Addressable l -> Addressable (instance_layout l)
-  in
-  match t.jkind.base with
-  | Kconstr _ -> t
-  | Layout l ->
-    { t with jkind = { t.jkind with base = Layout (instance_layout l) } }
-
 let rec copy_type_desc ?(keep_names=false) f fm = function
     Tvar { name; jkind } ->
-     let jkind = instance_jkind jkind in
      if keep_names then Tvar { name; jkind } else Tvar { name=None; jkind }
   | Tarrow ((p, m1, m2), ty1, ty2, c)->
     Tarrow ((p, fm m1, fm m2), f ty1, f ty2, copy_commu c)
@@ -650,14 +656,16 @@ module For_copy : sig
 
   val mode_instantiate :
     copy_scope -> current_level:int ->
-    Mode.Alloc.lr -> Mode.Alloc.lr
+    Mode.With_locality.lr -> Mode.With_locality.lr
 
   val mode_copy_generic :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_saving : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_saving :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_restoring : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_restoring :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
   val with_scope: (copy_scope -> 'a) -> 'a
 end = struct
@@ -674,19 +682,19 @@ end = struct
 
   let mode_instantiate copy_scope ~current_level m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.instantiate ~copy_scope ~current_level m
+    Mode.With_locality.instantiate ~copy_scope ~current_level m
 
   let mode_copy_generic copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_generic ~copy_scope m
+    Mode.With_locality.copy_generic ~copy_scope m
 
   let mode_copy_for_saving copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_saving ~copy_scope m
+    Mode.With_locality.copy_for_saving ~copy_scope m
 
   let mode_copy_for_restoring copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_restoring ~copy_scope m
+    Mode.With_locality.copy_for_restoring ~copy_scope m
 
   (* Restore type descriptions. *)
   let cleanup { saved_desc; _ } =
@@ -1754,6 +1762,35 @@ module Jkind0 = struct
           name = "bits64 mod everything"
         }
 
+      let addr_layout =
+        Layout.Const.product
+          [ base Scannable
+              { nullability = Maybe_null; separability = Maybe_separable };
+            base Bits64 Scannable_axes.max ]
+
+      (* Addresses have the same modal base kind as a record with a field of the
+         same mutability. *)
+      let kind_of_addr =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = mutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless"
+        }
+
+      let kind_of_addr_imm =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = immutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless \
+             immutable"
+        }
+
       let vec128 =
         { jkind =
             mk_jkind (base Vec128 Scannable_axes.max)
@@ -1933,17 +1970,6 @@ module Jkind0 = struct
         of_const Const.Builtin.immediate_or_null.jkind
     end
 
-    let product tys_modalities layouts =
-      let base = Layout (Jkind_types.Layout.product layouts) in
-      let mod_bounds = Mod_bounds.min in
-      let with_bounds =
-        List.fold_right
-          (fun (type_expr, modality) bounds ->
-            With_bounds.add_modality ~type_expr ~modality bounds)
-          tys_modalities No_with_bounds
-      in
-      { base; mod_bounds; with_bounds }
-
     let get_const t =
       Base_and_axes.map_layout_option Jkind_types.Layout.get_const t
   end
@@ -1952,7 +1978,7 @@ module Jkind0 = struct
     module Sub_failure_reason = struct
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
-        | Layout_disagreement
+        | Layout_disagreement of Jkind_types.Sort.error
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
@@ -2149,14 +2175,6 @@ module Jkind0 = struct
           ~annotation:(mk_annot "immediate_or_null")
           ~why:(Immediate_or_null_creation why)
 
-      let product ~why tys_modalities layouts =
-        let desc = Jkind_desc.product tys_modalities layouts in
-        fresh_jkind_poly desc ~annotation:None ~why:(Product_creation why)
-        (* [mark_best] is correct here because the with-bounds of a product
-           jkind include all the components of the product. Accordingly, looking
-           through the product, by one step, never loses any information. *)
-        |> mark_best
-
       let product_of_any ~why arity =
         let layout =
           Jkind_types.Layout.product
@@ -2202,8 +2220,6 @@ module Jkind0 = struct
 
     let get_const t = Jkind_desc.get_const t.jkind
 
-    let instance = instance_jkind
-
     let map_type_expr f t =
       if has_with_bounds t
       then { t with jkind = Jkind_desc.map_type_expr f t.jkind }
@@ -2222,16 +2238,6 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
-    let all_void_sort_option sort =
-      match sort with
-      | Some sort -> Jkind_types.Sort.Const.all_void sort
-      | None -> false
-
-    let all_void_labels lbls =
-      List.for_all
-        (fun { ld_sort; _ } -> all_void_sort_option ld_sort)
-        lbls
-
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
         (fun { ld_type; ld_modalities; _ } ->
@@ -2239,17 +2245,14 @@ module Jkind0 = struct
         lbls jkind
 
     let for_boxed_record lbls =
-      if all_void_labels lbls
-      then Builtin.immediate ~why:Empty_record
-      else
-        let base =
-          lbls
-          |> List.map (fun { ld_mutable; _ } -> ld_mutable)
-          |> List.fold_left combine_mutability Immutable
-          |> jkind_of_mutability ~why:Boxed_record
-          |> mark_best
-        in
-        add_labels_as_with_bounds lbls base
+      let base =
+        lbls
+        |> List.map (fun { ld_mutable; _ } -> ld_mutable)
+        |> List.fold_left combine_mutability Immutable
+        |> jkind_of_mutability ~why:Boxed_record
+        |> mark_best
+      in
+      add_labels_as_with_bounds lbls base
 
     let for_non_float ~(why : Jkind_intf.History.value_creation_reason) =
       let mod_bounds =

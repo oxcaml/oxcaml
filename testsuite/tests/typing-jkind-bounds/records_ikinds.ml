@@ -779,6 +779,15 @@ Error: This type "(unit -> unit) t" should be an instance of type
 
 type ('a : value mod contended) t_test = 'a t require_portable
 [%%expect {|
+Line 1, characters 6-30:
+1 | type ('a : value mod contended) t_test = 'a t require_portable
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+  was annotated with kind `value mod contended'
+  but was inferred to have kind `value mod portable contended'.
+
+type ('a : value mod portable contended) t_test = 'a t require_portable
+|}, Principal{|
 Line 1, characters 41-45:
 1 | type ('a : value mod contended) t_test = 'a t require_portable
                                              ^^^^
@@ -979,4 +988,263 @@ type ('a : immutable_data) t : immutable_data = 'a list
 type ('a : immutable_data) t = { x : 'a option; }
 type ('a : immutable_data) t = { x : 'a; }
 type ('a : immutable_data) t = 'a list
+|}]
+
+(***************************************************)
+(* Unboxed versions of records with mutable fields *)
+
+type t = { mutable x : int; y : int }
+[%%expect {|
+type t = { mutable x : int; y : int; }
+|}]
+
+(* Unboxed records, mutable or not, aren't blocks, so they cross locality,
+   uniqueness, and externality. *)
+let f (x : t# @ local) : t# = x
+let f (x : t# @ aliased) : t# @ unique = x
+type k : (value mod external_) & (value mod external_) = t#
+[%%expect {|
+val f : t# @ local -> t# = <fun>
+val f : t# -> t# @ unique = <fun>
+type k = t#
+|}]
+
+(* Like mutable boxed records, they don't cross contention or visibility.
+   These are the axes on which [mutable_data] and [immutable_data] differ. *)
+let f (x : t# @ contended) : t# @ uncontended = x
+[%%expect {|
+Line 1, characters 48-49:
+1 | let f (x : t# @ contended) : t# @ uncontended = x
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let f (x : t# @ immutable) : t# @ read_write = x
+[%%expect {|
+Line 1, characters 47-48:
+1 | let f (x : t# @ immutable) : t# @ read_write = x
+                                                   ^
+Error: This value is "immutable" but is expected to be "read_write".
+|}]
+
+type k : immutable_data & immutable_data = t#
+[%%expect {|
+Line 1, characters 0-45:
+1 | type k : immutable_data & immutable_data = t#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t#" is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of type "t#" must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of k at line 1, characters 0-45.
+|}]
+
+type int_ref = { mutable x : int }
+let f (x : int_ref# @ contended) = use_uncontended x
+[%%expect {|
+type int_ref = { mutable x : int; }
+Line 2, characters 51-52:
+2 | let f (x : int_ref# @ contended) = use_uncontended x
+                                                       ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+type wrapper = #{ inner : int_ref# }
+let f (x : wrapper @ contended) = use_uncontended x
+[%%expect {|
+type wrapper = #{ inner : int_ref#; }
+Line 2, characters 50-51:
+2 | let f (x : wrapper @ contended) = use_uncontended x
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(* The modalities implied by [mutable] still apply *)
+type t
+type t_ref = { mutable c : t }
+let implied_global_modality (x : t_ref# @ local) = use_global x
+let no_implied_portable_modality (x : t_ref# @ nonportable) = use_portable x
+[%%expect {|
+type t
+type t_ref = { mutable c : t; }
+val implied_global_modality : t_ref# @ local -> unit = <fun>
+Line 4, characters 75-76:
+4 | let no_implied_portable_modality (x : t_ref# @ nonportable) = use_portable x
+                                                                               ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(* A [contended] modality above a mutable label hides its mutability on
+   contention... *)
+type mut_inner = #{ mutable y : int }
+type mod_outer = #{ x : mut_inner @@ contended }
+let f (x : mod_outer @ contended) = use_uncontended x
+[%%expect {|
+type mut_inner = #{ mutable y : int; }
+type mod_outer = #{ x : mut_inner @@ contended; }
+val f : mod_outer @ contended -> unit = <fun>
+|}]
+
+(* ...but not on visibility *)
+let f (x : mod_outer @ immutable) : mod_outer @ read_write = x
+[%%expect {|
+Line 1, characters 61-62:
+1 | let f (x : mod_outer @ immutable) : mod_outer @ read_write = x
+                                                                 ^
+Error: This value is "immutable" but is expected to be "read_write".
+|}]
+
+(* A [shared] modality above a mutable label only partly hides its mutability:
+   [shared_outer] crosses contention from [shared], but not from [contended] *)
+type shared_outer = #{ s : mut_inner @@ shared }
+let f (x : shared_outer @ shared) = use_uncontended x
+[%%expect {|
+type shared_outer = #{ s : mut_inner @@ shared; }
+val f : shared_outer @ shared -> unit = <fun>
+|}]
+
+let f (x : shared_outer @ contended) = use_uncontended x
+[%%expect {|
+Line 1, characters 55-56:
+1 | let f (x : shared_outer @ contended) = use_uncontended x
+                                                           ^
+Error: This value is "corrupted" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "uncontended".
+|}]
+
+(* As a kind, it crosses contention only up to [shared] *)
+let f (x : shared_outer) : (_ : value mod shared) = x
+let f (x : shared_outer) : (_ : value mod contended) = x
+[%%expect {|
+val f : shared_outer -> shared_outer = <fun>
+Line 2, characters 55-56:
+2 | let f (x : shared_outer) : (_ : value mod contended) = x
+                                                           ^
+Error: The value "x" has type "shared_outer"
+       but an expression was expected of type "('a : value mod contended)"
+       The kind of shared_outer is
+           mutable_data non_pointer
+             mod global shared dynamic unforkable yielding
+         because of the definition of shared_outer at line 1, characters 0-48.
+       But the kind of shared_outer must be a subkind of value mod contended
+         because of the annotation on the wildcard _ at line 2, characters 27-52.
+|}]
+
+(* In contrast, a [contended] modality below a mutable label doesn't impact the
+   wrapper's crossing *)
+type mod_inner = #{ i : int @@ contended }
+type mut_outer = #{ mutable u : mod_inner }
+let f (x : mut_outer @ contended) = use_uncontended x
+[%%expect {|
+type mod_inner = #{ i : int @@ contended; }
+type mut_outer = #{ mutable u : mod_inner; }
+Line 3, characters 52-53:
+3 | let f (x : mut_outer @ contended) = use_uncontended x
+                                                        ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(* Nor does one on the mutable label itself, since it applies only to the
+   label's contents *)
+type mut_mod = #{ mutable v : int @@ contended }
+let f (x : mut_mod @ contended) = use_uncontended x
+[%%expect {|
+type mut_mod = #{ mutable v : int @@ contended; }
+Line 2, characters 50-51:
+2 | let f (x : mut_mod @ contended) = use_uncontended x
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(* With an [any] field, the declared kind is imprecise, so the kind of an
+   instance is recomputed from its labels. This still accounts for mutable
+   labels. (Under -principal, jkinds don't recompute here.) *)
+type ('a : any) any_mut = #{ a : 'a; mutable m : int }
+let crosses_locality (x : int any_mut @ local) : int any_mut @ global = x
+let but_not_contention (x : int any_mut @ contended) : int any_mut @ uncontended = x
+[%%expect {|
+type ('a : any) any_mut = #{ a : 'a; mutable m : int; }
+val crosses_locality : int any_mut @ local -> int any_mut = <fun>
+Line 3, characters 83-84:
+3 | let but_not_contention (x : int any_mut @ contended) : int any_mut @ uncontended = x
+                                                                                       ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(* Single-label unboxed records are looked through when checking a kind, which
+   can refine the declared layout. But no contents could make [ref_hash] cross
+   contention, so a requirement to cross contention fails without checking the
+   contents. *)
+type 'a ref_hash = #{ mutable contents : 'a }
+let f (x : int ref_hash) : (_ : value non_pointer) = x
+[%%expect {|
+type 'a ref_hash = #{ mutable contents : 'a; }
+val f : int ref_hash -> int ref_hash = <fun>
+|}]
+
+let f (x : int ref_hash) : (_ : immediate) = x
+[%%expect {|
+Line 1, characters 45-46:
+1 | let f (x : int ref_hash) : (_ : immediate) = x
+                                                 ^
+Error: The value "x" has type "int ref_hash"
+       but an expression was expected of type "('a : immediate)"
+       The kind of int ref_hash is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because of the definition of ref_hash at line 1, characters 0-45.
+       But the kind of int ref_hash must be a subkind of immediate
+         because of the annotation on the wildcard _ at line 1, characters 27-42.
+|}]
+
+(* The kind reported here is recomputed from the contents, so the failure
+   reasons must be too. Under -principal, the per-axis explanation must not
+   list portability, which [int port] crosses. *)
+type 'a port = { x : 'a @@ portable }
+let f (x : int port ref_hash) : (_ : immutable_data) = x
+[%%expect {|
+type 'a port = { x : 'a @@ portable; }
+Line 2, characters 55-56:
+2 | let f (x : int port ref_hash) : (_ : immutable_data) = x
+                                                           ^
+Error: The value "x" has type "int port ref_hash"
+       but an expression was expected of type "('a : immutable_data)"
+       The kind of int port ref_hash is
+           mutable_data mod global dynamic unforkable yielding
+         because of the definition of ref_hash at line 1, characters 0-45.
+       But the kind of int port ref_hash must be a subkind of immutable_data
+         because of the annotation on the wildcard _ at line 2, characters 32-52.
+|}, Principal{|
+type 'a port = { x : 'a @@ portable; }
+Line 2, characters 55-56:
+2 | let f (x : int port ref_hash) : (_ : immutable_data) = x
+                                                           ^
+Error: The value "x" has type "int port ref_hash"
+       but an expression was expected of type "('a : immutable_data)"
+       The kind of int port ref_hash is
+           mutable_data
+             mod global dynamic unforkable yielding
+             with int @@ global many portable dynamic
+         because of the definition of ref_hash at line 1, characters 0-45.
+       But the kind of int port ref_hash must be a subkind of immutable_data
+         because of the annotation on the wildcard _ at line 2, characters 32-52.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+         statefulness: mod stateless with int ≰ mod stateless
+         visibility: mod read_write ≰ mod immutable
+|}]
+
+(* A mutable label contributes to the kind of an unboxed record declaration,
+   so it can violate the declaration's kind annotation *)
+type t : immutable_data = #{ mutable x : int }
+[%%expect {|
+Line 1, characters 0-46:
+1 | type t : immutable_data = #{ mutable x : int }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because mutable fields are not mod immutable.
 |}]

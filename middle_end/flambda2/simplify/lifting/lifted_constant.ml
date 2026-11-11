@@ -14,21 +14,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module DE = Downwards_env
 module T = Flambda2_types
 
 module Definition = struct
   type descr =
     | Code of Code_id.t
     | Set_of_closures of
-        { denv : Downwards_env.t;
+        { typing_env : Typing_env.t;
           closure_symbols_with_types :
             (Symbol.t * Flambda2_types.t) Function_slot.Lmap.t;
           symbol_projections : Symbol_projection.t Variable.Map.t
         }
     | Block_like of
         { symbol : Symbol.t;
-          denv : Downwards_env.t;
+          typing_env : Typing_env.t;
           ty : Flambda2_types.t;
           symbol_projections : Symbol_projection.t Variable.Map.t
         }
@@ -96,22 +95,24 @@ module Definition = struct
 
   let code code_id defining_expr = { descr = Code code_id; defining_expr }
 
-  let set_of_closures denv ~closure_symbols_with_types ~symbol_projections
+  let set_of_closures typing_env ~closure_symbols_with_types ~symbol_projections
       defining_expr =
     { descr =
-        Set_of_closures { denv; closure_symbols_with_types; symbol_projections };
+        Set_of_closures
+          { typing_env; closure_symbols_with_types; symbol_projections };
       defining_expr
     }
 
-  let block_like denv symbol ty ~symbol_projections defining_expr =
-    { descr = Block_like { symbol; denv; ty; symbol_projections };
+  let block_like typing_env symbol ty ~symbol_projections defining_expr =
+    { descr = Block_like { symbol; typing_env; ty; symbol_projections };
       defining_expr
     }
 
-  let denv t =
+  let typing_env t =
     match t.descr with
     | Code _ -> None
-    | Set_of_closures { denv; _ } | Block_like { denv; _ } -> Some denv
+    | Set_of_closures { typing_env; _ } | Block_like { typing_env; _ } ->
+      Some typing_env
 
   let bound_static_pattern t =
     let module P = Bound_static.Pattern in
@@ -126,13 +127,13 @@ module Definition = struct
   let types_of_symbols t =
     match t.descr with
     | Code _ -> Symbol.Map.empty
-    | Set_of_closures { denv; closure_symbols_with_types; _ } ->
+    | Set_of_closures { typing_env; closure_symbols_with_types; _ } ->
       Function_slot.Lmap.fold
         (fun _function_slot (symbol, ty) types_of_symbols ->
-          Symbol.Map.add symbol (denv, ty) types_of_symbols)
+          Symbol.Map.add symbol (typing_env, ty) types_of_symbols)
         closure_symbols_with_types Symbol.Map.empty
-    | Block_like { symbol; denv; ty; _ } ->
-      Symbol.Map.singleton symbol (denv, ty)
+    | Block_like { symbol; typing_env; ty; _ } ->
+      Symbol.Map.singleton symbol (typing_env, ty)
 end
 
 type t =
@@ -285,10 +286,9 @@ let apply_projection t proj =
   in
   match matching_defining_exprs with
   | [matched_defining_expr] -> (
-    let denv, ty =
+    let typing_env, ty =
       Symbol.Map.find symbol (Definition.types_of_symbols matched_defining_expr)
     in
-    let typing_env = DE.typing_env denv in
     let meet_shortcut =
       match Symbol_projection.projection proj with
       | Block_load { index; block_shape = _ } ->

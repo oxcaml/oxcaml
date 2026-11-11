@@ -6,6 +6,8 @@ hash_consed.ml
 hash_consed.mli
 import_info.ml
 import_info.mli
+json.ml
+json.mli
 language_extension_kernel.ml
 language_extension_kernel.mli
 zero_alloc_utils.ml

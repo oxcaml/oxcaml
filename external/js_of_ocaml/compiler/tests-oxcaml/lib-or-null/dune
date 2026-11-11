@@ -1,0 +1,5 @@
+(tests
+ (names test more_tests)
+ (build_if %{ocaml-config:ox})
+ (libraries ocaml.stdlib_stable)
+ (modes js wasm))

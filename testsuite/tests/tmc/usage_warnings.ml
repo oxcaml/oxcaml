@@ -275,3 +275,23 @@ module All_annotations_flipped :
     val map_wrong : ('a -> 'b) -> 'a t -> 'b t
   end
 |}]
+
+(* The body of a [try] is not in TMC position: the call would not be a tail
+   call, as the exception handler must be removed after it returns. *)
+let[@tail_mod_cons] rec count_down n =
+  try
+    if n = 0 then raise Exit;
+    n :: count_down (n - 1)
+  with Exit -> []
+[%%expect {|
+Lines 1-5, characters 35-17:
+1 | ...................................n =
+2 |   try
+3 |     if n = 0 then raise Exit;
+4 |     n :: count_down (n - 1)
+5 |   with Exit -> []
+Warning 71 [unused-tmc-attribute]: This function is marked "@tail_mod_cons"
+  but is never applied in TMC position.
+
+val count_down : int -> int list = <fun>
+|}]

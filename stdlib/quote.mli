@@ -29,6 +29,7 @@
 (* CR metaprogramming aivaskovic: This file has not been code reviewed *)
 
 #syntax quotations on
+open! Stdlib
 
 module Expr : sig
   val bool : bool -> <[bool]> expr

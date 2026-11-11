@@ -30,6 +30,7 @@ module Import_map : sig
     consts:Const.importer ->
     code_ids:Code_id.importer ->
     continuations:Continuation.importer ->
+    fields:Field.importer ->
     used_value_slots:Value_slot.Set.t ->
     original_compilation_unit:Compilation_unit.t ->
     t
@@ -38,6 +39,8 @@ module Import_map : sig
 
   val variable : t -> Variable.t -> Variable.t
 
+  val fresh_variable : t -> Variable.t -> Variable.t
+
   val symbol : t -> Symbol.t -> Symbol.t
 
   val simple :
@@ -45,7 +48,11 @@ module Import_map : sig
 
   val code_id : t -> Code_id.t -> Code_id.t
 
+  val field : t -> Field.t -> Field.t
+
   val continuation : t -> Continuation.t -> Continuation.t
+
+  val fresh_continuation : t -> Continuation.t -> Continuation.t
 
   val value_slot_is_used : t -> Value_slot.t -> bool
 end = struct
@@ -56,6 +63,7 @@ end = struct
       consts : Const.importer;
       code_ids : Code_id.importer;
       continuations : Continuation.importer;
+      fields : Field.importer;
       used_value_slots : Value_slot.Set.t;
       (* CR vlaviron: [used_value_slots] is here because we need to rewrite the
          types to remove occurrences of unused value slots, as otherwise the
@@ -78,13 +86,14 @@ end = struct
     }
 
   let create ~symbols ~variables ~simples ~consts ~code_ids ~continuations
-      ~used_value_slots ~original_compilation_unit =
+      ~fields ~used_value_slots ~original_compilation_unit =
     { symbols;
       variables;
       simples;
       consts;
       code_ids;
       continuations;
+      fields;
       used_value_slots;
       original_compilation_unit
     }
@@ -93,11 +102,18 @@ end = struct
 
   let variable t orig = Variable.import t.variables orig
 
+  let fresh_variable t orig = Variable.import_and_rename t.variables orig
+
   let const t orig = Const.import t.consts orig
 
   let code_id t orig = Code_id.import t.code_ids orig
 
+  let field t orig = Field.import t.fields orig
+
   let continuation t orig = Continuation.import t.continuations orig
+
+  let fresh_continuation t orig =
+    Continuation.import_and_rename t.continuations orig
 
   let simple t simple ~import_var =
     (* Constants and symbols are never permuted, only freshened upon import. *)
@@ -116,20 +132,26 @@ end
 type t =
   { continuations : Continuations.t;
     variables : Variables.t;
-    import_map : Import_map.t option
+    import_map : Import_map.t option;
+    (* [bound_variables] and [bound_continuations] replace importing and must
+       not go through the import map. *)
+    bound_variables : Variable.t Variable.Map.t;
+    bound_continuations : Continuation.t Continuation.Map.t
   }
 
 let empty =
   { continuations = Continuations.empty;
     variables = Variables.empty;
-    import_map = None
+    import_map = None;
+    bound_variables = Variable.Map.empty;
+    bound_continuations = Continuation.Map.empty
   }
 
 let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
-    ~continuations ~used_value_slots ~original_compilation_unit =
+    ~continuations ~fields ~used_value_slots ~original_compilation_unit =
   let import_map =
     Import_map.create ~symbols ~variables ~simples ~consts ~code_ids
-      ~continuations ~used_value_slots ~original_compilation_unit
+      ~continuations ~fields ~used_value_slots ~original_compilation_unit
   in
   (* It's tempting to set [import_map] to [None] if everything is empty, but
      this is incorrect: an import map of [None] is equivalent to having _all_
@@ -139,17 +161,30 @@ let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
 let has_import_map t = Option.is_some t.import_map
 
 let [@ocamlformat "disable"] print ppf
-      { continuations; variables; import_map = _; } =
+      { continuations; variables; import_map = _;
+        bound_variables; bound_continuations } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(continuations@ %a)@]@ \
+      @[<hov 1>(bound_continuations@ %a)@])@ \
       @[<hov 1>(variables@ %a)@])@ \
+      @[<hov 1>(bound_variables@ %a)@])@ \
       @]"
     Continuations.print continuations
+    (Continuation.Map.print Continuation.print) bound_continuations
     Variables.print variables
+    (Variable.Map.print Variable.print) bound_variables
 
-let is_identity { continuations; variables; import_map } =
+let is_identity
+    { continuations;
+      variables;
+      import_map;
+      bound_variables;
+      bound_continuations
+    } =
   Continuations.is_empty continuations
   && Variables.is_empty variables
+  && Continuation.Map.is_empty bound_continuations
+  && Variable.Map.is_empty bound_variables
   &&
   match import_map with
   | None -> true
@@ -163,12 +198,16 @@ let compose0
     ~second:
       ({ continuations = continuations2;
          variables = variables2;
-         import_map = import_map2
+         import_map = import_map2;
+         bound_variables = bound_variables2;
+         bound_continuations = bound_continuations2
        } as second)
     ~first:
       ({ continuations = continuations1;
          variables = variables1;
-         import_map = import_map1
+         import_map = import_map1;
+         bound_variables = bound_variables1;
+         bound_continuations = bound_continuations1
        } as first) =
   { continuations =
       Continuations.compose ~second:continuations2 ~first:continuations1;
@@ -184,7 +223,23 @@ let compose0
         Misc.fatal_errorf
           "Cannot compose renamings; only the [first] renaming may have an \
            import map.  first:@ %a@ second:@ %a"
-          print first print second)
+          print first print second);
+    bound_variables =
+      (if Variable.Map.is_empty bound_variables2
+       then bound_variables1
+       else
+         Misc.fatal_errorf
+           "Cannot compose renamings; only the [first] renaming may have bound \
+            variables.  first:@ %a@ second:@ %a"
+           print first print second);
+    bound_continuations =
+      (if Continuation.Map.is_empty bound_continuations2
+       then bound_continuations1
+       else
+         Misc.fatal_errorf
+           "Cannot compose renamings; only the [first] renaming may have bound \
+            continuations.  first:@ %a@ second:@ %a"
+           print first print second)
   }
 
 let compose ~second ~first =
@@ -206,28 +261,27 @@ let apply_variable t var =
   let var =
     match t.import_map with
     | None -> var
-    | Some import_map -> Import_map.variable import_map var
+    | Some import_map -> (
+      match Variable.Map.find_or_null var t.bound_variables with
+      | This var -> var
+      | Null -> Import_map.variable import_map var)
   in
   Variables.apply t.variables var
 
-let apply_variable_set t vars =
-  Variable.Set.fold
-    (fun var result ->
-      let var = apply_variable t var in
-      Variable.Set.add var result)
-    vars Variable.Set.empty
+let bind_variable t var1 =
+  match t.import_map with
+  | None ->
+    let var2 = Variable.rename var1 in
+    add_fresh_variable t (apply_variable t var1) ~guaranteed_fresh:var2, var2
+  | Some import_map ->
+    let var2 = Import_map.fresh_variable import_map var1 in
+    let bound_variables = Variable.Map.add var1 var2 t.bound_variables in
+    { t with bound_variables }, var2
 
 let apply_symbol t symbol =
   match t.import_map with
   | None -> symbol
   | Some import_map -> Import_map.symbol import_map symbol
-
-let apply_symbol_set t symbols =
-  Symbol.Set.fold
-    (fun symbol result ->
-      let symbol = apply_symbol t symbol in
-      Symbol.Set.add symbol result)
-    symbols Symbol.Set.empty
 
 let apply_name t name =
   Name.pattern_match name
@@ -248,14 +302,39 @@ let apply_continuation t k =
   let k =
     match t.import_map with
     | None -> k
-    | Some import_map -> Import_map.continuation import_map k
+    | Some import_map -> (
+      match Continuation.Map.find_or_null k t.bound_continuations with
+      | This k -> k
+      | Null -> Import_map.continuation import_map k)
   in
   Continuations.apply t.continuations k
+
+let bind_continuation t k1 =
+  match t.import_map with
+  | None ->
+    let k2 = Continuation.rename k1 in
+    add_fresh_continuation t (apply_continuation t k1) ~guaranteed_fresh:k2, k2
+  | Some import_map ->
+    let k2 = Import_map.fresh_continuation import_map k1 in
+    let bound_continuations =
+      Continuation.Map.add k1 k2 t.bound_continuations
+    in
+    { t with bound_continuations }, k2
 
 let apply_code_id t code_id =
   match t.import_map with
   | None -> code_id
   | Some import_map -> Import_map.code_id import_map code_id
+
+let apply_code_id_or_name t code_id_or_name =
+  Code_id_or_name.pattern_match' code_id_or_name
+    ~code_id:(fun code_id -> Code_id_or_name.code_id (apply_code_id t code_id))
+    ~name:(fun name -> Code_id_or_name.name (apply_name t name))
+
+let apply_field t field =
+  match t.import_map with
+  | None -> field
+  | Some import_map -> Import_map.field import_map field
 
 let apply_const t cst =
   match t.import_map with
@@ -288,3 +367,80 @@ let value_slot_is_used t value_slot =
   match t.import_map with
   | None -> true (* N.B. not false! *)
   | Some import_map -> Import_map.value_slot_is_used import_map value_slot
+
+let not_renamed value _renaming = value
+
+let apply_set ~fold ~add ~empty ~rename_key renaming set =
+  if is_identity renaming
+  then set
+  else
+    let changed = ref false in
+    let set' =
+      fold
+        (fun key set' ->
+          let key' = rename_key renaming key in
+          if key != key' then changed := true;
+          add key' set')
+        set empty
+    in
+    if !changed then set' else set
+
+let apply_variable_set renaming variables =
+  apply_set ~fold:Variable.Set.fold ~add:Variable.Set.add
+    ~empty:Variable.Set.empty ~rename_key:apply_variable renaming variables
+
+let apply_symbol_set renaming symbols =
+  apply_set ~fold:Symbol.Set.fold ~add:Symbol.Set.add ~empty:Symbol.Set.empty
+    ~rename_key:apply_symbol renaming symbols
+
+let apply_name_set renaming names =
+  apply_set ~fold:Name.Set.fold ~add:Name.Set.add ~empty:Name.Set.empty
+    ~rename_key:apply_name renaming names
+
+let apply_code_id_set renaming code_ids =
+  apply_set ~fold:Code_id.Set.fold ~add:Code_id.Set.add ~empty:Code_id.Set.empty
+    ~rename_key:apply_code_id renaming code_ids
+
+let apply_map ~fold ~add ~empty ~rename_key ~rename_value renaming map =
+  if is_identity renaming
+  then map
+  else
+    let changed = ref false in
+    let map' =
+      fold
+        (fun key value map' ->
+          let key' = rename_key renaming key in
+          let value' = rename_value value renaming in
+          if key != key' || value != value' then changed := true;
+          add key' value' map')
+        map empty
+    in
+    if !changed then map' else map
+
+let apply_variable_map rename_value renaming map =
+  apply_map ~fold:Variable.Map.fold ~add:Variable.Map.add
+    ~empty:Variable.Map.empty ~rename_key:apply_variable ~rename_value renaming
+    map
+
+let apply_name_map rename_value renaming map =
+  apply_map ~fold:Name.Map.fold ~add:Name.Map.add ~empty:Name.Map.empty
+    ~rename_key:apply_name ~rename_value renaming map
+
+let apply_code_id_map rename_value renaming map =
+  apply_map ~fold:Code_id.Map.fold ~add:Code_id.Map.add ~empty:Code_id.Map.empty
+    ~rename_key:apply_code_id ~rename_value renaming map
+
+let apply_continuation_set renaming continuations =
+  apply_set ~fold:Continuation.Set.fold ~add:Continuation.Set.add
+    ~empty:Continuation.Set.empty ~rename_key:apply_continuation renaming
+    continuations
+
+let apply_continuation_map rename_value renaming map =
+  apply_map ~fold:Continuation.Map.fold ~add:Continuation.Map.add
+    ~empty:Continuation.Map.empty ~rename_key:apply_continuation ~rename_value
+    renaming map
+
+let apply_code_id_or_name_map rename_value renaming map =
+  apply_map ~fold:Code_id_or_name.Map.fold ~add:Code_id_or_name.Map.add
+    ~empty:Code_id_or_name.Map.empty ~rename_key:apply_code_id_or_name
+    ~rename_value renaming map

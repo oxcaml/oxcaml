@@ -25,14 +25,14 @@ module Definition : sig
   type descr = private
     | Code of Code_id.t
     | Set_of_closures of
-        { denv : Downwards_env.t;
+        { typing_env : Typing_env.t;
           closure_symbols_with_types :
             (Symbol.t * Flambda2_types.t) Function_slot.Lmap.t;
           symbol_projections : Symbol_projection.t Variable.Map.t
         }
     | Block_like of
         { symbol : Symbol.t;
-          denv : Downwards_env.t;
+          typing_env : Typing_env.t;
           ty : Flambda2_types.t;
           symbol_projections : Symbol_projection.t Variable.Map.t
         }
@@ -43,12 +43,12 @@ module Definition : sig
 
   val defining_expr : t -> Rebuilt_static_const.t
 
-  val denv : t -> Downwards_env.t option
+  val typing_env : t -> Typing_env.t option
 
   val code : Code_id.t -> Rebuilt_static_const.t -> t
 
   val set_of_closures :
-    Downwards_env.t ->
+    Typing_env.t ->
     closure_symbols_with_types:
       (Symbol.t * Flambda2_types.t) Function_slot.Lmap.t ->
     symbol_projections:Symbol_projection.t Variable.Map.t ->
@@ -56,7 +56,7 @@ module Definition : sig
     t
 
   val block_like :
-    Downwards_env.t ->
+    Typing_env.t ->
     Symbol.t ->
     Flambda2_types.t ->
     symbol_projections:Symbol_projection.t Variable.Map.t ->
@@ -80,12 +80,12 @@ val create_block_like :
   Symbol.t ->
   symbol_projections:Symbol_projection.t Variable.Map.t ->
   Rebuilt_static_const.t ->
-  Downwards_env.t ->
+  Typing_env.t ->
   Flambda2_types.t ->
   t
 
 val create_set_of_closures :
-  Downwards_env.t ->
+  Typing_env.t ->
   closure_symbols_with_types:(Symbol.t * Flambda2_types.t) Function_slot.Lmap.t ->
   symbol_projections:Symbol_projection.t Variable.Map.t ->
   Rebuilt_static_const.t ->
@@ -101,7 +101,7 @@ val bound_static : t -> Bound_static.t
 
 val defining_exprs : t -> Rebuilt_static_const.Group.t
 
-val types_of_symbols : t -> (Downwards_env.t * Flambda2_types.t) Symbol.Map.t
+val types_of_symbols : t -> (Typing_env.t * Flambda2_types.t) Symbol.Map.t
 
 val symbol_projections : t -> Symbol_projection.t Variable.Map.t
 

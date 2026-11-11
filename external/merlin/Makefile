@@ -1,5 +1,4 @@
 PARENT := $(abspath ../..)
-DUNE_OPTS := --workspace=$(PARENT)/duneconf/boot.ws
 
 # Pull in RUNTIME_DIR from the parent's generated config; the parent's dune
 # rules reference it, and they're in scope when we invoke dune against the
@@ -21,7 +20,7 @@ parent-install:
 	$(MAKE) -C $(PARENT) install
 
 build: parent-boot-config
-	$(dune) build $(DUNE_OPTS) $(ARGS)
+	$(dune) build $(ARGS)
 
 # If the caller didn't point us at an installed compiler, build and install
 # the parent ourselves before running the tests.

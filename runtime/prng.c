@@ -13,7 +13,6 @@
 /*                                                                        */
 /**************************************************************************/
 
-#include <string.h>
 #include "caml/alloc.h"
 #include "caml/bigarray.h"
 #include "caml/mlvalues.h"

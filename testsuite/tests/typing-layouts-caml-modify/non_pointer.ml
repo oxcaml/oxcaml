@@ -39,7 +39,7 @@ external[@layout_poly] unsafe_set_ptr :
 (* Mutating abstract types of kind value non_pointer should skip caml_modify *)
 
 module Mnp : sig
-  type t : value non_pointer (* not mod external_ *)
+  type t : value non_pointer
   val mk : int -> t
 end = struct
   type t = int
@@ -331,3 +331,16 @@ let () =
       t.t <- M.y;
       ignore (Sys.opaque_identity t))
 *)
+
+(* Projecting an abstract non_pointer component out of a mixed tuple and
+   storing it *)
+let () =
+  let open struct
+    type holder = { mutable x : Mnp.t }
+  end in
+  let[@inline never] set h (t : Mnp.t * float#) =
+    let (x, _) = t in h.x <- x
+  in
+  let h = { x = Mnp.mk 0 } in
+  test ~expect_caml_modifies:0
+    (fun () -> set h (Mnp.mk 1, #2.0); ignore (Sys.opaque_identity h))

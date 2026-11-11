@@ -13,6 +13,7 @@ Error: Signature mismatch:
          val f : 'a -> 'b -> 'b @@ stateless
        The type 'a @ local -> 'b -> 'b is not compatible with the type
          'a -> 'b -> 'b
+       The return mode was expected to be global but is local
        File "curry_mode_subsumption.ml", line 17, characters 6-7:
          Expected declaration
        File "curry_mode_subsumption.ml", line 21, characters 6-7:

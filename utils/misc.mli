@@ -126,6 +126,9 @@ module Stdlib : sig
     (** [is_empty l] is true if and only if [l] has no elements. It is equivalent to
         [compare_length_with l 0 = 0].  *)
 
+    val count : ('a -> bool) -> 'a t -> int
+    (** [count p l] is the number of elements of [l] that satisfy [p]. *)
+
     val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
     (** The lexicographic order supported by the provided order.
         There is no constraint on the relative lengths of the lists. *)
@@ -152,6 +155,20 @@ module Stdlib : sig
     (** [mapi_result f l] is similar to [map_option f l] but returns the first
         error result if [f] returns one. *)
 
+    val fold_left_result
+      : ('ok -> 'a -> ('ok, 'error) result) ->
+        'ok ->
+        'a t ->
+        ('ok, 'error) result
+
+    val fold_left2_result
+      : unequal_lengths:'error ->
+        ('ok -> 'a -> 'b -> ('ok, 'error) result) ->
+        'ok ->
+        'a t ->
+        'b t ->
+        ('ok, 'error) result
+
     val map2_option : ('a -> 'b -> 'c option) -> 'a t -> 'b t -> 'c t option
 
     val map2_prefix : ('a -> 'b -> 'c) -> 'a t -> 'b t -> ('c t * 'b t)
@@ -160,6 +177,8 @@ module Stdlib : sig
         r1 is [List.map2 f l1 h1] and r2 is t2. *)
 
     val map3 : ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
+
+    val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
 
     val concat_map2 : ('a -> 'b -> 'c list) -> 'a list -> 'b list -> 'c list
     (** [concat_map2 f l1 l2] gives the same result as [concat (map2 f l1 l2)].
@@ -315,6 +334,10 @@ module Stdlib : sig
 
     val concat_arrays : 'a array array -> 'a array
     (** Concatenate an array of arrays into a single array. *)
+
+    val filteri : (int -> 'a -> bool) -> 'a array -> 'a array
+    (** Filter an array with the current index into a new array, possibly
+        reducing the array length. *)
   end
 
 (** {2 Extensions to the String module} *)
@@ -1250,42 +1273,6 @@ type alerts = string Stdlib.String.Map.t
 
 val remove_double_underscores : string -> string
 
-(** {1 JSON utilities} *)
-module Json : sig
-  (** Simple (and not very robust) JSON generation utilities.
-
-      Everything is string based, creating lots of intermediate strings.
-      Moreover, [Json.string] uses a custom string encoding based on the code
-      for the format specifier [%S], but with escapes for [\u00HH] instead of
-      OCaml's [\DDD]. *)
-
-  val field : string -> string -> string
-  (** [field name value] creates a JSON field with the given name and value. *)
-
-  val string : string -> string
-  (** [string value] formats a string value as a JSON string. *)
-
-  val int : int -> string
-  (** [int value] formats an integer value as a JSON number. *)
-
-  val float : float -> string
-  (** [float value] formats a float value as a JSON number. *)
-
-  val object_ : string list -> string
-  (** [object_ fields] creates a JSON object from a list of field strings. *)
-
-  val array : string list -> string
-  (** [array items] creates a JSON array from a list of item strings. *)
-
-  val null : string
-  (** [null] is the JSON null literal. *)
-
-  val option : ('a -> string) -> 'a option -> string
-  (** [option f opt] formats an optional value as JSON.
-      Returns the JSON [null] literal for [None],
-      or applies [f] to the value for [Some v]. *)
-end
-
 (** Non-empty lists *)
 module Nonempty_list : sig
   type nonrec 'a t = ( :: ) of 'a * 'a list
@@ -1367,6 +1354,50 @@ module Colours : sig
   (** Run [f] with colour output globally disabled, restoring the previous
       setting when [f] returns (or raises). *)
   val without_colours : f:(unit -> 'a) -> 'a
+
+  (* "wrap" a printing function, introducing the directive before it, and then
+     a pop afterwards *)
+  val wrap :
+    directive ->
+    (Format.formatter -> 'a -> unit) ->
+    (Format.formatter -> 'a -> unit)
+end
+
+(** {1 {Sexp printing utilities} *)
+module Sexp : sig
+
+  type field
+  (** Fields (or atoms) of s-expressions *)
+
+  val d : ?colour:Colours.directive -> string -> int -> field
+  val b : ?colour:Colours.directive -> string -> bool -> field
+  val f : ?colour:Colours.directive -> string -> float -> field
+  val s : ?colour:Colours.directive -> string -> string -> field
+  val a :
+    ?colour:Colours.directive ->
+    string -> 'a -> (Format.formatter -> 'a -> unit) -> field
+  (** Convenient functions for creating fields. These functions use the same
+      one-letter shorthands as found in printf/format strings:
+      - 'd' for integers
+      - 'b' for booleans
+      - 'f' for floating point numbers
+      - 's' for strings
+      - 'a' for a custom printing function *)
+
+  val o :
+    ?colour:Colours.directive ->
+    string -> 'a option -> (Format.formatter -> 'a -> unit) -> field
+  (** Create an optional field: if the provided value is [None], then the field
+      will not be printed. *)
+
+  val fmt :
+    ?colour:Colours.directive ->
+    ('a, Format.formatter, unit, field) format4 -> 'a
+  (* Create an atom with no field name, from a custom format string. *)
+
+  val print : Format.formatter -> field list -> unit
+  (** Print a list of fields/atoms as an s-expression. *)
+
 end
 
 (** Nullable values, unboxed via [@@or_null]. Not a full [Stdlib.Monad.S]: a

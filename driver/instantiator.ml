@@ -29,7 +29,6 @@ module CU = Compilation_unit
 type error =
   | Not_compiled_as_argument of {
       compilation_unit : CU.t;
-      filename : Misc.filepath;
       base_unit : CU.t;
     }
   | Incorrect_target_filename of {
@@ -42,7 +41,10 @@ type error =
       compilation_unit : CU.t;
       filename : Misc.filepath;
     }
-  | Missing_argument of { param : Global_module.Parameter_name.t }
+  | Missing_argument of {
+      imported : Global_module.Name.t;
+      param : Global_module.Parameter_name.t;
+    }
   | No_such_parameter of {
       base_unit : CU.t;
       available_params : Global_module.Parameter_name.t list;
@@ -62,7 +64,6 @@ let error e = raise (Error e)
 
 type unit_info = {
   ui_unit : CU.t;
-  ui_arg_descr : Lambda.arg_descr option;
   ui_format : Lambda.main_module_block_format;
 }
 
@@ -70,18 +71,34 @@ let instantiate
       ~src ~args targetcm ~expected_extension ~read_unit_info ~compile =
   let base_unit_info = read_unit_info src in
   let base_compilation_unit = base_unit_info.ui_unit in
-  let arg_info_of_cm_path cm_path =
-    let unit_info = read_unit_info cm_path in
-    match unit_info.ui_arg_descr with
+  let arg_info compilation_unit =
+    let { Persistent_env.imp_arg_signature; imp_raw_sign; _ } =
+      Env.find_import ~chain:[] (CU.name compilation_unit)
+    in
+    match imp_arg_signature with
     | None ->
       error (Not_compiled_as_argument
-               { compilation_unit = unit_info.ui_unit;
-                 filename = cm_path;
-                 base_unit = base_unit_info.ui_unit; })
-    | Some { arg_param; arg_block_idx; main_repr } ->
-      arg_param, (unit_info.ui_unit, arg_block_idx, main_repr)
+               { compilation_unit; base_unit = base_compilation_unit; })
+    | Some { Types.arg_param; arg_block_idx } ->
+      let main_repr = Translmod.main_repr_of_argument_unit imp_raw_sign in
+      arg_param, (compilation_unit, arg_block_idx, main_repr)
   in
-  let arg_infos = List.map arg_info_of_cm_path args in
+  let arg_info_of_cm_path cm_path =
+    arg_info (read_unit_info cm_path).ui_unit
+  in
+  (* Only the [.cmi]s of arguments given by name are loaded. *)
+  let arg_info_of_unit_name unit_name =
+    let lexbuf = Lexing.from_string unit_name in
+    Location.init lexbuf
+      (Printf.sprintf "command line argument: -instantiate %S" unit_name);
+    arg_info (Parse.unprefixed_compilation_unit lexbuf)
+  in
+  let arg_info_of_arg arg =
+    if Filename.check_suffix arg expected_extension
+    then arg_info_of_cm_path arg
+    else arg_info_of_unit_name arg
+  in
+  let arg_infos = List.map arg_info_of_arg args in
   let arg_pairs : CU.argument list =
     List.map
       (fun (param, (value, _, _)) : CU.argument ->
@@ -123,7 +140,7 @@ let instantiate
       Env.global_of_instance_compilation_unit compilation_unit
     with
     | Persistent_env.Error (Imported_module_has_unset_parameter e) ->
-      error (Missing_argument { param = e.parameter })
+      error (Missing_argument { imported = e.imported; param = e.parameter })
     | Persistent_env.Error (Imported_module_has_no_such_parameter e) ->
       begin
         match e.valid_parameters with
@@ -180,10 +197,9 @@ let instantiate
              Unit)
   in
   let output_prefix = output_filename_without_extension in
-  let arg_descr = base_unit_info.ui_arg_descr in
   compile
     ~source_file:src ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr;
+    ~main_module_block_repr;
   ()
 
 (* Error report *)
@@ -199,7 +215,7 @@ let pp_parameters ppf params =
 
 let report_error ppf = function
   | Not_compiled_as_argument
-      { base_unit; compilation_unit; filename } ->
+      { base_unit; compilation_unit } ->
     (* CR lmaurer: Would be nice to list out the parameters of the base unit
        here but that turns out to be very awkward (this gets raised before we've
        gotten [Persistent_env] involved and that's what knows the parameters).
@@ -211,7 +227,7 @@ let report_error ppf = function
          @[<hov>Compile %a@ with @{<inline_code>-as-argument-for Foo@}@ where \
            @{<inline_code>Foo@} is a parameter of %a.@]@]"
       CU.print_as_inline_code compilation_unit
-      (Style.as_inline_code Location.Doc.filename) filename
+      CU.Name.print_as_inline_code (CU.name compilation_unit)
       CU.print_as_inline_code base_unit
   | Incorrect_target_filename
       { expected_basename; expected_extension; actual_basename;
@@ -231,9 +247,10 @@ let report_error ppf = function
          @[<hov>Compile %a@ with @{<inline_code>-parameter@}.@]@]"
       CU.print_as_inline_code compilation_unit
       (Style.as_inline_code Location.Doc.filename) filename
-  | Missing_argument { param } ->
-    fprintf ppf "No argument given for parameter %a"
+  | Missing_argument { imported; param } ->
+    fprintf ppf "@[<hov>No argument given for parameter %a@ of %a@]"
       (Style.as_inline_code Global_module.Parameter_name.print) param
+      (Style.as_inline_code Global_module.Name.print) imported
   | No_such_parameter { base_unit; available_params; param; arg } ->
     fprintf ppf
       "@[<hov>Module %a@ is an argument for parameter %a,@ \

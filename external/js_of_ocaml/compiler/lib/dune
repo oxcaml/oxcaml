@@ -5,16 +5,43 @@
  (libraries
   compiler-libs.common
   compiler-libs.bytecomp
-  menhirLib
-  sedlex
-  time_now
-  yojson)
+  ppxlib_ast.private.compiler_libs
+  oxcaml_private_menhirlib
+  oxcaml_private_sedlex
+  oxcaml_private_yojson)
  (flags
-  (:standard -w -7-37 -safe-string))
+  (:standard
+   -w
+   -7-37
+   -safe-string
+   -open
+   Oxcaml_private_menhirlib
+   -open
+   Oxcaml_private_sedlex
+   -open
+   Oxcaml_private_yojson
+   -open
+   Oxcaml_private_compiler_libs))
+ (foreign_stubs
+  (language c)
+  (names float32_stubs))
  (preprocess
-  (pps ppx_optcomp_light sedlex.ppx)))
+  (pps ppx_optcomp_light oxcaml_private_sedlex_ppx)))
 
 (ocamllex annot_lexer)
+
+(rule
+ (target ocaml_or_oxcaml.ml)
+ (enabled_if %{oxcaml_supported})
+ (action
+  (copy ocaml_or_oxcaml.oxcaml.ml %{target})))
+
+(rule
+ (target ocaml_or_oxcaml.ml)
+ (enabled_if
+  (not %{oxcaml_supported}))
+ (action
+  (copy ocaml_or_oxcaml.ocaml.ml %{target})))
 
 (menhir
  (modules js_parser)
@@ -29,9 +56,7 @@
   --unused-token
   TCommentLineDirective
   --unused-token
-  T_ERROR
-  --unused-token
-  T_AT))
+  T_ERROR))
 
 (menhir
  (modules annot_parser))

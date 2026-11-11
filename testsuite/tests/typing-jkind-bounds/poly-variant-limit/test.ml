@@ -1,10 +1,10 @@
 (* TEST
  flags = "-no-ikinds";
- readonly_files = "gen_types.sh types.ml";
+ readonly_files = "gen_types.sh";
  setup-ocamlc.byte-build-env;
 
  (* Generate a file that defines some large polymorphic variants. *)
- script = "/usr/bin/env bash gen_types.sh types.ml";
+ script = "sh gen_types.sh types.ml";
  script;
  module = "types.ml";
  ocamlc.byte;

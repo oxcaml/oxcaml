@@ -244,9 +244,11 @@ and variant_subkind ppf consts non_consts =
       | _ :: _, _ :: _ -> Format.fprintf ppf "@ | "
     in
     let pp_pair ppf (tag, sk) =
-      Format.fprintf ppf "@[<hov 2>%d of %a@]" tag
-        (pp_star_list kind_with_subkind)
-        sk
+      let pp_fields ppf = function
+        | None -> Format.pp_print_string ppf "any"
+        | Some fields -> pp_star_list kind_with_subkind ppf fields
+      in
+      Format.fprintf ppf "@[<hov 2>%d of %a@]" tag pp_fields sk
     in
     pp_pipe_list pp_pair ppf non_consts;
     Format.fprintf ppf "@ ]@]"
@@ -603,11 +605,22 @@ let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
       cl
       (alloc_mode_for_applications region ~space:Before)
       alloc_mode
-  | C_call { alloc } ->
+  | C_call { alloc; fat_ptr_arg_starts } ->
     let noalloc_kwd = if alloc then None else Some "noalloc" in
-    pp_spaced ~space ppf "ccall%a"
+    let pp_fat_ptr_arg_starts ppf starts =
+      Format.fprintf ppf "fat_ptr(%a)"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_int)
+        starts
+    in
+    pp_spaced ~space ppf "ccall%a%a"
       (pp_option ~space:Before Format.pp_print_string)
       noalloc_kwd
+      (pp_option ~space:Before pp_fat_ptr_arg_starts)
+      (match fat_ptr_arg_starts with
+      | [] -> None
+      | _ :: _ -> Some fat_ptr_arg_starts)
   | Method { kind; obj } ->
     pp_spaced ~space ppf "mcall(%a%a)" method_kind kind
       (fun ppf -> pp_spaced ~space:Before ppf "%a" simple)
@@ -632,6 +645,7 @@ let inlined_attribute ~space ppf (i : Fexpr.inlined_attribute) =
     match i with
     | Always_inlined -> Some "inlined(always)"
     | Hint_inlined -> Some "inlined(hint)"
+    | Forward_inlined -> Some "inlined(forward)"
     | Never_inlined -> Some "inlined(never)"
     | Unroll i -> Some (Format.sprintf "unroll(%d)" i)
     | Default_inlined -> None
@@ -684,10 +698,9 @@ let parens ~if_scope_is scope ppf f =
   | (Outer | Where_body | Continuation_body), _ -> f scope ppf
 
 let rec expr scope ppf = function
-  | Invalid { message } ->
-    Format.fprintf ppf "@[%tinvalid%t \"%s\"@]" Flambda_colours.invalid_keyword
+  | Invalid ->
+    Format.fprintf ppf "%tinvalid%t" Flambda_colours.invalid_keyword
       Flambda_colours.pop
-      (message |> String.escaped)
   | Apply_cont ac ->
     Format.fprintf ppf "@[%tcont%t %a@]" Flambda_colours.expr_keyword
       Flambda_colours.pop apply_cont ac
@@ -848,11 +861,12 @@ and code_binding ppf
        is_tupled;
        stub;
        loopify;
-       result_mode
+       result_mode;
+       fdo_entry_annotation
      } :
       code) =
   Format.fprintf ppf
-    "@[<hv 2>%tcode%t@[<h>%t%a%a%a@ size(%a)%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
+    "@[<hv 2>%tcode%t@[<h>%t%a%a%a@ size(%a)%a%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
     Flambda_colours.static_keyword Flambda_colours.pop Flambda_colours.elide
     (recursive ~space:Before) rec_
     (inline_attribute_opt ~space:Before)
@@ -864,7 +878,10 @@ and code_binding ppf
     (fun ppf is_tupled -> if is_tupled then Format.fprintf ppf "@ tupled@ ")
     is_tupled
     (fun ppf stub -> if stub then Format.fprintf ppf "@ stub")
-    stub Flambda_colours.pop code_id id;
+    stub
+    (pp_option ~space:Before
+       (pp_like "fdo_entry_annotation%a" Fdo_annotation.print))
+    fdo_entry_annotation Flambda_colours.pop code_id id;
   let { params; closure_var; region_vars; depth_var; ret_cont; exn_cont; body }
       =
     params_and_body

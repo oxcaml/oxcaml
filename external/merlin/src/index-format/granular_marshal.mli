@@ -1,5 +1,20 @@
+(** Core module for reading and writing granular values.
+
+    Note on file paths: when writing a value that was read from an existing
+    granular file, only a pointer to the original file is present in the new
+    one. This means the original file should not be moved or deleted.
+
+    These pointers are relative to the working directory of the tool that wrote
+    the new file. *)
+
 (** A pointer to an ['a] value, either residing in memory or on disk. *)
 type 'a link
+
+type cached
+
+(* val create_lru : int -> unit *)
+val set_lru_size : int -> unit
+val get_lru : unit -> cached Dbllist.t
 
 (** [link v] returns a new link to the in-memory value [v]. *)
 val link : 'a -> 'a link
@@ -11,6 +26,9 @@ val reuse : 'a link -> unit
 (** [cache (module Hash)] returns a function to de-duplicate links which share
     the same value, resulting in a compressed file. *)
 val cache : 'a. (module Hashtbl.HashedType with type t = 'a) -> 'a link -> unit
+
+(** [is_on_disk link] tests if [link] is stored in another index file. *)
+val is_on_disk : 'a link -> bool
 
 (** [fetch lnk] returns the value pointed by the link [lnk].
 
@@ -53,13 +71,44 @@ and iter = { yield : 'a. 'a link -> 'a link Type.Id.t -> 'a schema -> unit }
 (** A schema usable when the ['a] value does not contain any links. *)
 val schema_no_sublinks : 'a schema
 
-(** [write oc schema value] writes the [value] in the output channel [oc],
-    creating unmarshalling boundaries on every link in [value] specified
-    by the [schema]. *)
+module Outdated_store : sig
+  type t =
+    { filename : string; reason : [ `Missing_file | `Index_ids_do_not_match ] }
+
+  module Set : Set.S with type elt := t
+end
+
+(** Exception raised when attempting to consult an outdated store. *)
+exception Outdated_store of Outdated_store.t
+
+module File_kind : sig
+  type t =
+    | No_standalone
+        (** The file may point at other files on disk. This reduces the size of
+            the file, but the pointed-at files must be available when reading
+            the file. *)
+    | Standalone
+        (** The file cannot point at other files. The file is larger as a
+            result, but it is standalone. *)
+end
+
+(** [write oc ~filename ~file_kind schema value] writes the [value] in the
+    output channel [oc], creating unmarshalling boundaries on every link in
+    [value] specified by the [schema]. File pointers are made relative to the
+    directory of [filename], the final location of the file. [file_kind]
+    determines whether the output may point into the files that [value] was
+    read from. *)
 val write :
-  ?flags:Marshal.extern_flags list -> out_channel -> 'a schema -> 'a -> unit
+  ?flags:Marshal.extern_flags list ->
+  out_channel ->
+  filename:string ->
+  file_kind:File_kind.t ->
+  'a schema ->
+  'a ->
+  unit
 
 (** [read ic schema] reads the value marshalled in the input channel [ic],
     stopping the unmarshalling on every link boundary indicated by the [schema].
-    It returns the root [value] read.  *)
+    It returns the root [value] read. File pointers are resolved relatively to
+    the current working directory.  *)
 val read : string -> in_channel -> 'a schema -> 'a

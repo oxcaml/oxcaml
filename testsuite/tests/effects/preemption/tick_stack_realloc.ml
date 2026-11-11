@@ -53,7 +53,7 @@ let reuse_freed_stacks () =
   Preemptible.match_with (fun () -> ignore (grow depth)) ()
     { retc = (fun () -> ());
       exnc = raise;
-      tickc = wrong_tickc;
+      tickc = This wrong_tickc;
       effc = (fun (type a) (_ : a t) -> None) }
 
 let parent_tickc () =
@@ -86,12 +86,12 @@ let parent () =
   Preemptible.match_with child ()
     { retc = (fun () -> ());
       exnc = raise;
-      tickc = child_tickc;
+      tickc = This child_tickc;
       effc = (fun (type a) (_ : a t) -> None) }
 
 let () =
   Preemptible.match_with parent ()
     { retc = (fun () -> ());
       exnc = raise;
-      tickc = parent_tickc;
+      tickc = This parent_tickc;
       effc = (fun (type a) (_ : a t) -> None) }

@@ -1415,6 +1415,8 @@ module Pat : sig
 
   val or_ : Debuginfo.Scoped_location.t -> t -> t -> t'
 
+  val addr : Debuginfo.Scoped_location.t -> t -> bool -> t'
+
   val lazy_ : Debuginfo.Scoped_location.t -> t -> t'
 
   val any_module : t'
@@ -1477,6 +1479,8 @@ end = struct
     apply1 "Pat" "array" loc (mk_list ~loc (List.map extract a1))
 
   let or_ loc a1 a2 = apply2 "Pat" "or_" loc (extract a1) (extract a2)
+
+  let addr loc a1 a2 = apply2 "Pat" "addr" loc (extract a1) (transl_bool a2)
 
   let lazy_ loc a1 = apply1 "Pat" "lazy_" loc (extract a1)
 
@@ -2252,7 +2256,7 @@ let quote_arg_label loc = function
       Location.print_loc (to_location loc)
 
 let module_for_path_opt loc env path =
-  Env.add_required_global_for_quote path env;
+  Env.add_required_global_for_quote (to_location loc) path env;
   let rec go path =
     match path with
     | Path.Pident id ->
@@ -2457,7 +2461,8 @@ let rec with_new_idents_pat pat =
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
-  | Tpat_tuple args -> List.iter (fun (_, pat) -> with_new_idents_pat pat) args
+  | Tpat_tuple args ->
+    List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
   | Tpat_construct (_, _, _, args, _) ->
     List.iter (fun (_, pat) -> with_new_idents_pat pat) args
   | Tpat_variant (_, argo, _) -> (
@@ -2473,7 +2478,7 @@ let rec with_new_idents_pat pat =
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
-  | Tpat_lazy pat -> with_new_idents_pat pat
+  | Tpat_addr (_, _, pat) | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
 let rec without_idents_pat pat =
@@ -2489,7 +2494,8 @@ let rec without_idents_pat pat =
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
-  | Tpat_tuple args -> List.iter (fun (_, pat) -> without_idents_pat pat) args
+  | Tpat_tuple args ->
+    List.iter (fun (_, pat, _) -> without_idents_pat pat) args
   | Tpat_construct (_, _, _, args, _) ->
     List.iter (fun pat -> without_idents_pat pat) (List.map snd args)
   | Tpat_variant (_, argo, _) -> (
@@ -2505,7 +2511,7 @@ let rec without_idents_pat pat =
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
-  | Tpat_lazy pat -> without_idents_pat pat
+  | Tpat_addr (_, _, pat) | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 
 let with_new_param fp =
@@ -2532,7 +2538,10 @@ let without_param fp =
 
 let quote_modes loc modes =
   Typemode.untransl_mode modes
-  |> List.map (function { loc = _; txt = Parsetree.Mode m } -> m)
+  |> List.map (function
+    | { loc = _; txt = Parsetree.Pmode m } -> m
+    | { loc = _; txt = Parsetree.(Pmode_var _ | Pmode_bounded _) } ->
+      fatal_error "Translquote.quote_modes: non-constant mode")
   |> Modes.of_string_list loc |> Modes.wrap
 
 let type_constraint_of_ambiguity loc env ambiguity =
@@ -2627,9 +2636,9 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_arrow
             ( arg_label,
               go ty,
-              Typemode.transl_alloc_mode [],
+              Typemode.legacy_modes,
               go ty',
-              Typemode.transl_alloc_mode [] )
+              Typemode.legacy_modes )
         | Tpoly (ty, tyl) -> (
           let cty = go ty in
           match List.filter_map unwrap_univar tyl with
@@ -2782,7 +2791,8 @@ and quote_value_pattern ~scopes p =
     | Tpat_tuple pats ->
       let pats =
         List.map
-          (fun (lbl, p) -> quote_nonopt loc lbl, quote_value_pattern ~scopes p)
+          (fun (lbl, p, _) ->
+            quote_nonopt loc lbl, quote_value_pattern ~scopes p)
           pats
       in
       Pat.tuple loc pats
@@ -2858,6 +2868,9 @@ and quote_value_pattern ~scopes p =
         match closed with Asttypes.Closed -> true | Asttypes.Open -> false
       in
       Pat.unboxed_record loc lbl_pats closed
+    | Tpat_addr (mut, _, pat) ->
+      let pat = quote_value_pattern ~scopes pat in
+      Pat.addr loc pat (Types.is_mutable mut)
     | Tpat_lazy pat ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.lazy_ loc pat
@@ -3412,9 +3425,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
                     | Some sch ->
                       type_for_annotation ~env ~loc:(to_location loc) sch
                     | None -> newcorevar env loc),
-                    Typemode.transl_alloc_mode [],
+                    Typemode.legacy_modes,
                     spine,
-                    Typemode.transl_alloc_mode [] );
+                    Typemode.legacy_modes );
               ctyp_type = newvar ();
               ctyp_env = env;
               ctyp_loc = to_location loc;
@@ -3607,7 +3620,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
     | Texp_tuple (exps, _) ->
       let exps =
         List.map
-          (fun (lab, exp) ->
+          (fun (lab, exp, _) ->
             quote_nonopt loc lab, quote_expression ~scopes ~transl stage exp)
           exps
       in
@@ -3660,7 +3673,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       in
       let base =
         Option.map
-          (fun (e, _, _) -> quote_expression ~scopes ~transl stage e)
+          (fun (e, _, _, _) -> quote_expression ~scopes ~transl stage e)
           extended_expression
       in
       Exp_desc.record loc (Array.to_list lbl_exps) base

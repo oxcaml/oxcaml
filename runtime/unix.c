@@ -64,14 +64,10 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
-#include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/osdeps.h"
 #include "caml/signals.h"
-#include "caml/sys.h"
-#include "caml/io.h"
-#include "caml/alloc.h"
 #include "caml/platform.h"
 #include "caml/startup_aux.h"
 
@@ -552,11 +548,16 @@ void *caml_plat_mem_map(uintnat size, uintnat caml_flags, const char* name)
 #else
   uintnat reserve_only = caml_flags & CAML_MAP_RESERVE_ONLY;
   uintnat no_hugetlb = caml_flags & CAML_MAP_NO_HUGETLB;
+  uintnat populate = caml_flags & CAML_MAP_POPULATE;
   (void)no_hugetlb; /* avoid unused variable warning */
+  (void)populate;
 
   void* mem;
   int prot = reserve_only ? PROT_NONE : (PROT_READ | PROT_WRITE);
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+#ifdef MAP_POPULATE
+  if (populate && !reserve_only) flags |= MAP_POPULATE;
+#endif
 
   if (size < alignment || alignment < caml_plat_pagesize) {
     /* Short mapping or unknown/bad hugepagesize.

@@ -31,6 +31,8 @@ type error =
   | Wrong_for_pack of string * CU.t
   | Assembler_error of string
   | File_not_found of string
+  | Pack_with_lto_support
+  | Member_with_lto_info of string
 
 exception Error of error
 
@@ -64,6 +66,9 @@ end) : S = struct
         then raise (Error (Illegal_renaming (name, file, CU.name info.ui_unit)));
         if not (CU.is_parent pack_path ~child:info.ui_unit)
         then raise (Error (Wrong_for_pack (file, pack_path)));
+        (* Packing with LTO sections are not supported. *)
+        if Option.is_some info.ui_lto_info
+        then raise (Error (Member_with_lto_info file));
         Backend.check_consistency linkenv file info crc;
         Compilenv.cache_unit_info info;
         PM_impl info
@@ -98,7 +103,7 @@ end) : S = struct
     Profile.record_call pack_name (fun () ->
         let objtemp =
           if !Clflags.keep_asm_file
-          then Unit_info.Artifact.prefix target ^ ".pack" ^ Config.ext_obj
+          then Unit_info.Artifact.prefix target ^ ".pack" ^ Backend.ext_obj
           else
             (* Put the full name of the module in the temporary file name to
                avoid collisions with MSVC's link /lib in case of successive
@@ -107,7 +112,7 @@ end) : S = struct
               Current_unit.symbol () |> Symbol.linkage_name
               |> Linkage_name.to_string
             in
-            Filename.temp_file name Config.ext_obj
+            Filename.temp_file name Backend.ext_obj
         in
         let components =
           List.map
@@ -135,14 +140,9 @@ end) : S = struct
                 Module_value_only { field_count = main_module_block_size }
             }
         in
-        let arg_block_idx =
-          (* Packs not supported as argument modules *)
-          None
-        in
         let program =
           { Lambda.code;
             main_module_block_format;
-            arg_block_idx;
             compilation_unit;
             required_globals
           }
@@ -152,7 +152,7 @@ end) : S = struct
           ~prefixname ~ppf_dump program;
         let objfiles =
           List.map
-            (fun m -> Filename.remove_extension m.pm_file ^ Config.ext_obj)
+            (fun m -> Filename.remove_extension m.pm_file ^ Backend.ext_obj)
             (List.filter (fun m -> m.pm_kind <> PM_intf) members)
         in
         Misc.try_finally
@@ -183,10 +183,9 @@ end) : S = struct
         members []
     in
     let ui =
-      (* [arg_descr] is None because we don't allow packs to be arguments.
-         [static_data] is empty as we don't support packs with layout poly. *)
-      Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
-        ~static_data:(Slambdaeval.CU_data.empty ())
+      (* [static_data] is empty as we don't support packs with layout poly. *)
+      Compilenv.build_unit_info ~main_module_block_format
+        ~static_data:(Slambda.CU_data.empty ())
     in
     let file_sections =
       let length =
@@ -212,7 +211,6 @@ end) : S = struct
         ui_defines =
           List.flatten (List.map (fun info -> info.ui_defines) units)
           @ [ui.ui_unit];
-        ui_arg_descr = None;
         ui_imports_cmi =
           Import_info.create modname
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))
@@ -237,6 +235,7 @@ end) : S = struct
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
         ui_static_data = ui.ui_static_data;
+        ui_lto_info = None;
         ui_file_sections = File_sections.Builder.build file_sections
       }
     in
@@ -265,7 +264,10 @@ end) : S = struct
     let for_pack_prefix = CU.Prefix.from_clflags () in
     let cmx = Unit_info.Artifact.from_filename ~for_pack_prefix targetcmx in
     let cmi = Unit_info.companion_cmi cmx in
-    let obj = Unit_info.companion_obj cmx in
+    let obj =
+      Unit_info.Artifact.from_filename ~for_pack_prefix
+        (Unit_info.Artifact.prefix cmx ^ Backend.ext_obj)
+    in
     (* Set the name of the current "input" *)
     Location.input_name := targetcmx;
     (* Set the name of the current compunit *)
@@ -273,6 +275,8 @@ end) : S = struct
       Unit_info.of_artifact Impl cmx ~dummy_source_file:targetcmx
     in
     let comp_unit = Unit_info.Artifact.modname cmx in
+    if Flambda2_ui.Flambda_features.lto_support ()
+    then raise (Error Pack_with_lto_support);
     Compilenv.reset unit_info;
     Misc.try_finally
       (fun () ->
@@ -304,6 +308,12 @@ let report_error ppf = function
     fprintf ppf "File %a not found" Style.inline_code file
   | Assembler_error file ->
     fprintf ppf "Error while assembling %a" Style.inline_code file
+  | Pack_with_lto_support ->
+    fprintf ppf "%a is not supported with %a" Style.inline_code "-pack"
+      Style.inline_code "-lto-support"
+  | Member_with_lto_info file ->
+    fprintf ppf "File %a@ was compiled with %a and cannot be packed"
+      Location.Doc.quoted_filename file Style.inline_code "-lto-support"
 
 let () =
   Location.register_error_of_exn (function

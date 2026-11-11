@@ -1,4 +1,3 @@
-# 2 "gc.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -468,12 +467,6 @@ let run_with_memory_limit (limit : int) (f : unit -> 'a) : 'a =
 val delete_alarm : alarm -> unit
 (** [delete_alarm a] will stop the calls to the function associated
    to [a]. Calling [delete_alarm a] again has no effect. *)
-
-val eventlog_pause : unit -> unit
-[@@ocaml.deprecated "Use Runtime_events.pause instead."]
-
-val eventlog_resume : unit -> unit
-[@@ocaml.deprecated "Use Runtime_events.resume instead."]
 
 (** Submodule containing non-backwards-compatible functions which enforce thread safety
     via modes. *)

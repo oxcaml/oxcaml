@@ -56,7 +56,7 @@ module Simple = struct
     | `Constant of constant
     | `Unboxed_unit
     | `Unboxed_bool of bool
-    | `Tuple of (string option * pattern) list
+    | `Tuple of (string option * pattern * Jkind.sort) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
         Longident.t loc * constructor_description * constructor_representation
@@ -69,6 +69,7 @@ module Simple = struct
         (Longident.t loc * unboxed_label_description * pattern) list
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
+    | `Addr of mutability * Jkind.sort * pattern
     | `Lazy of pattern
   ]
 
@@ -89,12 +90,18 @@ end
 module General = struct
   type view = [
     | Half_simple.view
-    | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
+    | `Var of
+        Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.With_regionality.l
     | `Fun_layout of Ident.t * string loc * Uid.t
-                   * Jkind.Sort.t * Mode.Value.l * Types.Lpoly.t
-                   * alloc_mode_r
-    | `Alias of pattern * Ident.t * string loc
-                * Uid.t * Jkind.Sort.t * Mode.Value.l * Types.type_expr
+                   * Jkind.Sort.t * Mode.With_regionality.l * Types.Lpoly.t
+    | `Alias of
+        pattern
+        * Ident.t
+        * string loc
+        * Uid.t
+        * Jkind.Sort.t
+        * Mode.With_regionality.l
+        * Types.type_expr
   ]
   type pattern = view pattern_data
 
@@ -103,9 +110,8 @@ module General = struct
        `Any
     | Tpat_var { id; name = str; uid; sort; mode } ->
        `Var (id, str, uid, sort, mode)
-    | Tpat_fun_layout { id; name = str; uid; sort; mode; lpoly;
-                        env_alloc_mode } ->
-       `Fun_layout (id, str, uid, sort, mode, lpoly, env_alloc_mode)
+    | Tpat_fun_layout { id; name = str; uid; sort; mode; lpoly } ->
+       `Fun_layout (id, str, uid, sort, mode, lpoly)
     | Tpat_alias { pattern = p; id; name = str; uid; sort; mode;
                    type_expr = ty } ->
        `Alias (p, id, str, uid, sort, mode, ty)
@@ -129,6 +135,7 @@ module General = struct
        `Record_unboxed_product (fields, repr, closed)
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
+    | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
     | Tpat_lazy p -> `Lazy p
 
   let view p : pattern =
@@ -138,9 +145,8 @@ module General = struct
     | `Any -> Tpat_any
     | `Var (id, str, uid, sort, mode) ->
        Tpat_var { id; name = str; uid; sort; mode }
-    | `Fun_layout (id, str, uid, sort, mode, lpoly, env_alloc_mode) ->
-       Tpat_fun_layout { id; name = str; uid; sort; mode; lpoly;
-                         env_alloc_mode }
+    | `Fun_layout (id, str, uid, sort, mode, lpoly) ->
+       Tpat_fun_layout { id; name = str; uid; sort; mode; lpoly }
     | `Alias (p, id, str, uid, sort, mode, ty) ->
        Tpat_alias { pattern = p; id; name = str; uid; sort; mode;
                     type_expr = ty }
@@ -159,6 +165,7 @@ module General = struct
        Tpat_record_unboxed_product (fields, repr, closed)
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
+    | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
     | `Lazy p -> Tpat_lazy p
 
   let erase p : Typedtree.pattern =
@@ -181,7 +188,7 @@ module Head : sig
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation
@@ -193,6 +200,7 @@ module Head : sig
           cstr_row: row_desc ref;
           type_row : unit -> row_desc; }
     | Array of mutability * Jkind.sort * int
+    | Addr of mutability * Jkind.sort
     | Lazy
 
   type t = desc pattern_data
@@ -214,7 +222,7 @@ end = struct
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation
@@ -228,6 +236,7 @@ end = struct
           (* the row of the type may evolve if [close_variant] is called,
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
+    | Addr of mutability * Jkind.sort
     | Lazy
 
   type t = desc pattern_data
@@ -239,7 +248,9 @@ end = struct
       | `Unboxed_unit -> Unboxed_unit, []
       | `Unboxed_bool b -> Unboxed_bool b, []
       | `Tuple args ->
-          Tuple (List.map fst args), (List.map snd args)
+          let labels_and_sorts = List.map (fun (l, _, s) -> l, s) args in
+          let pats = List.map (fun (_, p, _) -> p) args in
+          Tuple labels_and_sorts, pats
       | `Unboxed_tuple args ->
           let labels_and_sorts = List.map (fun (l, _, s) -> l, s) args in
           let pats = List.map (fun (_, p, _) -> p) args in
@@ -268,6 +279,8 @@ end = struct
           let lbls = List.map (fun (_,lbl,_) -> lbl) largs in
           let pats = List.map (fun (_,_,pat) -> pat) largs in
           Record_unboxed_product (lbls, repr), pats
+      | `Addr (mut, arg_sort, p) ->
+          Addr (mut, arg_sort), [p]
       | `Lazy p ->
           Lazy, [p]
     in
@@ -287,6 +300,7 @@ end = struct
       | Record (l, _) -> List.length l
       | Record_unboxed_product (l, _) -> List.length l
       | Variant { has_arg; _ } -> if has_arg then 1 else 0
+      | Addr _ -> 1
       | Lazy -> 1
 
   let to_omega_pattern t =
@@ -294,12 +308,13 @@ end = struct
       let mkloc x = Location.mkloc x t.pat_loc in
       match t.pat_desc with
       | Any -> Tpat_any
+      | Addr (mut, arg_sort) -> Tpat_addr (mut, arg_sort, omega)
       | Lazy -> Tpat_lazy omega
       | Constant c -> Tpat_constant c
       | Unboxed_unit -> Tpat_unboxed_unit
       | Unboxed_bool b -> Tpat_unboxed_bool b
       | Tuple lbls ->
-          Tpat_tuple (List.map (fun lbl -> lbl, omega) lbls)
+          Tpat_tuple (List.map (fun (lbl, sort) -> lbl, omega, sort) lbls)
       | Unboxed_tuple lbls_and_sorts ->
           Tpat_unboxed_tuple
             (List.map (fun (lbl, sort) -> lbl, omega, sort) lbls_and_sorts)
