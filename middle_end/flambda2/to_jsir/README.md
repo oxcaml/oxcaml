@@ -37,13 +37,27 @@ ocamlopt -target js_of_ocaml -link-jsir -o prog.js lib.cmxa-js main.cmx-js     #
 
 The compiler runs the `js_of_ocaml` (`wasm_of_ocaml`) executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` (`OXCAML_WASM_OF_OCAML`) environment variable is populated.
 Every `wasm_of_ocaml` command is given `--enable=portable-int`, as we use 63-bit integers.
-We can print JSIR with `-djsir`, `-g` makes `js_of_ocaml` keep debug information, and `-verbose` shows the `js_of_ocaml` commands.
+We can print JSIR with `-djsir`, and `-verbose` shows the `js_of_ocaml` commands.
 C sources and objects and `-ccopt`/`-cclib` are ignored (with a warning under `-verbose`).
 
 `-jsoo-effects` selects the implementation of effect handlers, passed as `--effects` to `compile` and `build-runtime`: `disabled`, `cps` or `double-translation` (the default) for `js_of_ocaml`, and `disabled`, `cps`, `jspi` (the default) or `native` for `wasm_of_ocaml`.
 Only `jspi` (and `disabled`, which uses the same runtime) has a precompiled `wasm_of_ocaml` runtime for 63-bit integers; with `cps` or `native`, `build-runtime` compiles the runtime from its sources every time an executable is linked, which is slow.
 
 Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. They apply to the same `wasm_of_ocaml` commands. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc., and also `target=` and `jsoo-effects=`.
+
+## Debug information
+With `-g`, the JSIR of a unit carries the debug information that `js_of_ocaml` otherwise reads from bytecode:
+- debug events (source locations), at the start of functions, before calls (and after those that are not tail calls), before raises, and before the registration of closure symbols;
+- the names of the variables and functions of the source, which JSIR files record as `var_names` in [`Code.jsir_file`](../../../external/js_of_ocaml/compiler/lib/code.mli), and which the JSIR linker keeps.
+
+`-g` does not change the `js_of_ocaml` commands: what `js_of_ocaml` does with this information is chosen with `-jsoo-opt`, for example `--source-map`, `--pretty`, or `--debuginfo` (which puts the locations in comments in the generated JavaScript).
+
+For source maps, pass `-jsoo-opt --source-map-inline`.
+`--source-map` (a separate `.map` file) only works for the link of an executable, as `js_of_ocaml link` ignores source maps that are not inline in the files it is given. To get the source map of an executable in a separate file:
+
+```
+-jsoo-opt-compile --source-map-inline -jsoo-opt-archive --source-map-inline -jsoo-opt-runtime --source-map-inline -jsoo-opt-link --source-map
+```
 
 ## JSIR linking
 By default, `js_of_ocaml compile` runs on each unit when it is compiled, and `js_of_ocaml link` links the results: units can be compiled in parallel and are only recompiled when they change, but `js_of_ocaml` cannot optimise across units, and symbols of other units are looked up at runtime.

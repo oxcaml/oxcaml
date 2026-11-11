@@ -279,6 +279,14 @@ module Linkage_name : sig
   module Hashtbl : Hashtbl.S with type key = t
 end
 
+module Variable_name : sig
+  type t
+
+  val of_var : Var.t -> t option
+
+  val set : Var.t -> t -> unit
+end
+
 type jsir_file =
   { target : jsir_target
   ; program : Marshalable_program.t
@@ -286,6 +294,10 @@ type jsir_file =
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so the OxCaml JSIR backend must communicate it to
             [js_of_ocaml] to keep the two in sync. *)
+  ; var_names : (Var.t * Variable_name.t) list
+        (** The names of the variables of [program]. [Var] keeps these in
+            mutable state too, so the OxCaml JSIR backend must communicate them
+            to [js_of_ocaml]. *)
   ; imported_compilation_units : string list
         (** Full paths of the compilation units that must be linked, and
             initialised, before [program]: those whose symbols it fetches from
