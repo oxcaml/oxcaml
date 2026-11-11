@@ -161,27 +161,16 @@ struct stack_info {
  * +------------------------+ <--- Caml_state->current_stack
  */
 
-/* Some ABI reserve space at the bottom of every C stack frame. */
+#include "asm_offsets.h"
 
-#if defined(TARGET_amd64) && (defined(_WIN32) || defined(__CYGWIN__))
-/* Win64 ABI shadow store for argument registers */
-  #define Reserved_space_c_stack_link 4 * 8
-#elif defined(TARGET_s390x)
-  #define Reserved_space_c_stack_link 160
-#elif defined(TARGET_power)
-/* ELF ABI: 4 reserved words at bottom of C stack */
-  #define Reserved_space_c_stack_link 4 * 8
-#else
-  #define Reserved_space_c_stack_link 0
-#endif
-
-/* This structure is used for storing the OCaml return pointer when
- * transitioning from an OCaml stack to a C stack at a C call. When an OCaml
- * stack is reallocated, this linked list is walked to update the OCaml stack
- * pointers. It is also used for DWARF backtraces. */
+/* This structure resembles a stack frame, and is used for storing the
+ * OCaml return pointer when transitioning from an OCaml stack to a C
+ * stack at a C call. When an OCaml stack is reallocated, this linked
+ * list is walked to update the OCaml stack pointers. It is also used
+ * for DWARF backtraces. */
 struct c_stack_link {
-#if Reserved_space_c_stack_link > 0
-  char reserved[Reserved_space_c_stack_link];
+#if ABI_reserve > 0
+  char reserved[ABI_resrve];
 #endif
   /* The reference to the OCaml stack */
   struct stack_info* stack;
@@ -189,7 +178,9 @@ struct c_stack_link {
   void* sp;
   struct c_stack_link* prev;
   char* async_exn_handler;
-  void* padding; /* for stack alignment in caml_start_program */
+  /* Padding to keep the whole caml_start_program stack frame,
+     including the caller's return address, 16-byte aligned */
+  void* padding;
 };
 
 /* `gc_regs` and `gc_regs_buckets`.

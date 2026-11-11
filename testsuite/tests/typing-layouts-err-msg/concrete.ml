@@ -200,15 +200,100 @@ Error: This expression has type "t_any" but an expression was expected of type
          because it's the type of a statement.
 |}]
 
-(* Signature item *)
-module type S = sig type t : any val x : t end
+(* Module_projection *)
+type t_any : any
 [%%expect{|
-Line 1, characters 41-42:
-1 | module type S = sig type t : any val x : t end
-                                             ^
-Error: The type of a module-level value must have a representable layout.
-       The layout of type t is any
-         because of the definition of t at line 1, characters 20-32.
-       But the layout of type t must be representable
-         because it's the type of something in a signature.
+type t_any : any
+|}]
+
+module F(M : sig val x : t_any end) = struct
+  let x = M.x
+end
+[%%expect{|
+Line 2, characters 10-13:
+2 |   let x = M.x
+              ^^^
+Error: This path projects from a module that contains unrepresentable items.
+Line 1, characters 17-30:
+1 | module F(M : sig val x : t_any end) = struct
+                     ^^^^^^^^^^^^^
+  "x" is not representable.
+  The layout of t_any is any
+    because of the definition of t_any at line 1, characters 0-16.
+  But the layout of t_any must be representable
+    because it's the type of an item in a module being projected from.
+|}]
+
+(* Module_coercion *)
+module type S = sig
+  val x : t_any
+  val y : int
+end
+
+module type U = sig
+  val y : int
+end
+
+module G (X : U) = struct type u = int end
+[%%expect{|
+module type S = sig val x : t_any val y : int end
+module type U = sig val y : int end
+module G : functor (X : U) -> sig type u = int end
+|}]
+
+module F (M : S) = struct
+  (* This checks S <: U *)
+  type v = G(M).u
+end
+[%%expect{|
+Line 3, characters 11-15:
+3 |   type v = G(M).u
+               ^^^^
+Error: Modules do not match: sig val x : t_any val y : int end
+     is not included in U
+     Signatures containing unrepresentable items cannot be
+     coerced to other module types.
+     "x" is not representable.
+     The layout of t_any is any
+       because of the definition of t_any at line 1, characters 0-16.
+     But the layout of t_any must be representable
+       because it's the type of an item in a module being coerced.
+|}]
+
+(* Module_inclusion *)
+module F(M : sig val x : t_any end) = struct
+  include M
+end
+[%%expect{|
+Line 2, characters 2-11:
+2 |   include M
+      ^^^^^^^^^
+Error: This module contains unrepresentable items, so it cannot be included.
+Line 1, characters 17-30:
+1 | module F(M : sig val x : t_any end) = struct
+                     ^^^^^^^^^^^^^
+  "x" is not representable.
+  The layout of t_any is any
+    because of the definition of t_any at line 1, characters 0-16.
+  But the layout of t_any must be representable
+    because it's the type of an item in a module being included.
+|}]
+
+(* Module_open *)
+module F(M : sig val x : t_any end) = struct
+  open (M : sig val x : t_any end)
+end
+[%%expect{|
+Line 2, characters 2-34:
+2 |   open (M : sig val x : t_any end)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This module contains unrepresentable items, so it cannot be opened.
+Line 2, characters 16-29:
+2 |   open (M : sig val x : t_any end)
+                    ^^^^^^^^^^^^^
+  "x" is not representable.
+  The layout of t_any is any
+    because of the definition of t_any at line 1, characters 0-16.
+  But the layout of t_any must be representable
+    because it's the type of an item in a module being opened.
 |}]

@@ -2,6 +2,10 @@
 # This primarily looks for hex addresses, process ids, filepaths and
 # other specific details of the machine the test is running on.
 {
+    # LLDB versions differ in the indentation of stopped-frame summaries.
+    if ($0 ~ /^[ \t]*frame #[0-9]+:/)
+        sub(/^[ \t]*/, "    ")
+
     # Replace single quoted file paths
     gsub(/'(.*)'/,"'XXXX'")
 
