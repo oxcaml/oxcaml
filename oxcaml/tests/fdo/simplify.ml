@@ -145,6 +145,33 @@ module N = Nested (struct
   let limit = 7
 end)
 
+(* The copy of [count] is simplified again, since inlining [step] lets Simplify
+   unbox [r]: the closures defined in it are only renamed once. *)
+module type Stepper = sig
+  val limit : int
+
+  val step : int ref -> int -> unit
+end
+
+module Rerun (C : Stepper) = struct
+  let[@inline never] count n =
+    let r = ref 0 in
+    for i = 0 to n do
+      C.step r i
+    done;
+    let s = !r in
+    let[@inline never] rec up a = if a < C.limit + s then side a else down (a - 1)
+    and[@inline never] down a = if a > s then up (a - 2) else a in
+    up n + down (n + 1)
+end
+[@@inline always]
+
+module R = Rerun (struct
+  let limit = 3
+
+  let[@inline always] step r i = r := !r + i
+end)
+
 (* A closure defined in an inlined function body is a copy when something is
    known about its environment in the copy, and the original otherwise. *)
 let[@inline] make k =

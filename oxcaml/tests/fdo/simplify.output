@@ -117,6 +117,41 @@ simplify.simplify.fl:
   entry: "Simplify.Nested.after":0@("Simplify":0:module("Simplify.N":0):0:call) "Simplify.Nested.inl":0 <- "Simplify.Nested.after":0@("Simplify":0:module("Simplify.N":0):0:call):33a16f6f:0:call body_hash:33a16f6f
   branch: "Simplify.Nested.inl":0:b9895603:0:branch(1) <- "Simplify.Nested.after":0@("Simplify":0:module("Simplify.N":0):0:call):33a16f6f:0:call
   branch: "Simplify.Nested.inl":0:b9895603:0:branch(2) <- "Simplify.Nested.after":0@("Simplify":0:module("Simplify.N":0):0:call):33a16f6f:0:call
+  entry: "Simplify.Rerun.count.down":0 body_hash:6fcbb642
+  branch: "Simplify.Rerun.count.down":0:6fcbb642:0:branch(1)
+  branch: "Simplify.Rerun.count.down":0:6fcbb642:0:branch(2)
+  call: "Simplify.Rerun.count.down":0:6fcbb642:1:call
+  entry: "Simplify.Rerun.count.up":0 body_hash:16665463
+  branch: "Simplify.Rerun.count.up":0:16665463:0:branch(1)
+  branch: "Simplify.Rerun.count.up":0:16665463:0:branch(2)
+  call: "Simplify.Rerun.count.up":0:16665463:2:call
+  call: "Simplify.Rerun.count.up":0:16665463:1:call
+  entry: "Simplify.Rerun.count":0 body_hash:1b112816
+  branch: "Simplify.Rerun.count":0:1b112816:0:branch(1)
+  branch: "Simplify.Rerun.count":0:1b112816:0:branch(2)
+  call: "Simplify.Rerun.count":0:1b112816:1:call
+  branch: "Simplify.Rerun.count":0:1b112816:2:branch(1)
+  branch: "Simplify.Rerun.count":0:1b112816:2:branch(2)
+  call: "Simplify.Rerun.count":0:1b112816:3:call
+  call: "Simplify.Rerun.count":0:1b112816:4:call
+  entry: "Simplify.Rerun":0 body_hash:00000000
+  entry: "Simplify.R.step":0 body_hash:00000000
+  entry: "Simplify.Rerun.count.down":0@("Simplify":0:module("Simplify.R":0):0:call) body_hash:6fcbb642
+  branch: "Simplify.Rerun.count.down":0@("Simplify":0:module("Simplify.R":0):0:call):6fcbb642:0:branch(1)
+  branch: "Simplify.Rerun.count.down":0@("Simplify":0:module("Simplify.R":0):0:call):6fcbb642:0:branch(2)
+  call: "Simplify.Rerun.count.down":0@("Simplify":0:module("Simplify.R":0):0:call):6fcbb642:1:call
+  entry: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call) body_hash:16665463
+  branch: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call):16665463:0:branch(1)
+  branch: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call):16665463:0:branch(2)
+  call: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call):16665463:2:call
+  call: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call):16665463:1:call
+  entry: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call) body_hash:1b112816
+  branch: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:0:branch(1)
+  branch: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:0:branch(2) "Simplify.R.step":0 <- "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:1:call
+  branch: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:2:branch(1)
+  branch: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:2:branch(2) "Simplify.R.step":0 <- "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:1:call
+  call: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:3:call
+  call: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:4:call
   entry: "Simplify.make.f":0 body_hash:6fcbb642
   branch: "Simplify.make.f":0:6fcbb642:0:branch(1)
   branch: "Simplify.make.f":0:6fcbb642:0:branch(2)

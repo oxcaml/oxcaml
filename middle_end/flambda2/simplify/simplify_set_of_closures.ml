@@ -26,10 +26,11 @@ open! Simplify_import
 
 module C = Simplify_set_of_closures_context
 
-let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
-    ~my_depth function_slot_opt ~closure_bound_names_inside_function
-    ~inlining_arguments ~absolute_history code_id ~return_continuation
-    ~exn_continuation ~loopify_state code_metadata =
+let dacc_inside_function context ~outer_dacc ~resimplifying ~params ~my_closure
+    ~my_alloc_mode ~my_depth function_slot_opt
+    ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
+    code_id ~return_continuation ~exn_continuation ~loopify_state code_metadata
+    =
   let dacc = C.dacc_inside_functions context in
   let alloc_modes = Code_metadata.param_modes code_metadata in
   let denv =
@@ -40,6 +41,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
          (Inlining_history.Tracker.inside_function absolute_history)
   in
   let denv = DE.set_fdo_region denv (Function_entry code_id) in
+  (* The previous run renamed the FDO counters of the sets of closures met in
+     the body. *)
+  let denv = if resimplifying then DE.clear_inlined_debuginfo denv else denv in
   let denv =
     if Code_metadata.stub code_metadata
     then DE.enter_stub_function denv
@@ -189,7 +193,7 @@ type simplify_function_body_result =
     uacc_after_upwards_traversal : UA.t
   }
 
-let simplify_function_body context ~outer_dacc function_slot_opt
+let simplify_function_body context ~outer_dacc ~resimplifying function_slot_opt
     ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
     code_id code ~return_continuation ~exn_continuation params ~body ~my_closure
     ~is_my_closure_used:_ ~my_alloc_mode ~my_depth ~free_names_of_body:_ =
@@ -199,10 +203,11 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     else Loopify_state.do_not_loopify
   in
   let dacc_at_function_entry =
-    dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
-      ~my_depth function_slot_opt ~closure_bound_names_inside_function
-      ~inlining_arguments ~absolute_history code_id ~return_continuation
-      ~exn_continuation ~loopify_state (Code.code_metadata code)
+    dacc_inside_function context ~outer_dacc ~resimplifying ~params ~my_closure
+      ~my_alloc_mode ~my_depth function_slot_opt
+      ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
+      code_id ~return_continuation ~exn_continuation ~loopify_state
+      (Code.code_metadata code)
   in
   let dacc = dacc_at_function_entry in
   if not (DA.no_lifted_constants dacc)
@@ -434,9 +439,9 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
     Function_params_and_body.pattern_match
       (Code.params_and_body code)
       ~f:
-        (simplify_function_body context ~outer_dacc function_slot_opt
-           ~closure_bound_names_inside_function ~inlining_arguments
-           ~absolute_history code_id code)
+        (simplify_function_body context ~outer_dacc ~resimplifying
+           function_slot_opt ~closure_bound_names_inside_function
+           ~inlining_arguments ~absolute_history code_id code)
   in
   let should_resimplify = UA.resimplify uacc_after_upwards_traversal in
   let outer_dacc, lifted_consts_this_function =
