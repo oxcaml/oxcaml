@@ -347,15 +347,13 @@ static value callbackN(value closure, int narg, value args[])
    global value, but if their runtime arity does not match the call
    they may locally allocate some temporary intermediate closures.
    These wrappers remove such closures from the stack.
-   This mirrors what is done by caml_apply3, as opposed to caml_apply3L.
-   Only the current fiber's local stack is reset, so that is the only one the
-   result is checked against. */
+   This mirrors what is done by caml_apply3, as opposed to caml_apply3L */
 static value callback2_global(value closure, value arg1, value arg2)
 {
   Caml_check_caml_state();
   intnat sp = Caml_state->local_sp;
   value res = callback2(closure, arg1, arg2);
-  CAMLassert(!caml_is_stack_of_current_fiber(res));
+  CAMLassert(!caml_is_stack(res));
   Caml_state->local_sp = sp;
   return res;
 }
@@ -365,7 +363,7 @@ static value callback3_global(value closure, value arg1, value arg2, value arg3)
   Caml_check_caml_state();
   intnat sp = Caml_state->local_sp;
   value res = callback3(closure, arg1, arg2, arg3);
-  CAMLassert(!caml_is_stack_of_current_fiber(res));
+  CAMLassert(!caml_is_stack(res));
   Caml_state->local_sp = sp;
   return res;
 }
@@ -375,7 +373,7 @@ static value callbackN_global(value closure, int narg, value args[])
   Caml_check_caml_state();
   intnat sp = Caml_state->local_sp;
   value res = callbackN(closure, narg, args);
-  CAMLassert(!caml_is_stack_of_current_fiber(res));
+  CAMLassert(!caml_is_stack(res));
   Caml_state->local_sp = sp;
   return res;
 }

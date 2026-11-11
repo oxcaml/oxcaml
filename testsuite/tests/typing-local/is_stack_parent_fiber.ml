@@ -115,28 +115,27 @@ let test_is_stack ~depth =
   from_fiber cell ~depth (fun cell -> assert (is_stack cell)) [@nontail]
 
 external callback2
-  : ('a @ local -> unit -> 'a @ local) -> 'a @ local -> unit -> 'a @ local
+  : ('a @ local -> unit -> 'b) -> 'a @ local -> unit -> 'b
   = "test_callback2"
 
 external callback3
-  :  ('a @ local -> unit -> unit -> 'a @ local)
-  -> 'a @ local -> unit -> unit -> 'a @ local
+  :  ('a @ local -> unit -> unit -> 'b)
+  -> 'a @ local -> unit -> unit -> 'b
   = "test_callback3"
 
 external callbackN
-  :  ('a @ local -> unit -> unit -> unit -> 'a @ local)
-  -> 'a @ local -> unit -> unit -> unit -> 'a @ local
+  :  ('a @ local -> unit -> unit -> unit -> 'b)
+  -> 'a @ local -> unit -> unit -> unit -> 'b
   = "test_callbackN"
 
-(* [caml_callback2], [caml_callback3] and [caml_callbackN] reset the local
-   stack of the fiber they run on, so their result must not be on it. A result
-   on the local stack of an ancestor is unaffected. *)
+(* [caml_callback2], [caml_callback3] and [caml_callbackN] assert that the
+   closure's result is not local. Its arguments may be. *)
 let test_callback ~depth =
-  let cell = stack_ { plain = fresh 0; atomic = fresh 0 } in
+  let cell = stack_ { plain = fresh 1; atomic = fresh 0 } in
   from_fiber cell ~depth (fun cell ->
-    assert (callback2 (fun x () -> x) cell () == cell);
-    assert (callback3 (fun x () () -> x) cell () () == cell);
-    assert (callbackN (fun x () () () -> x) cell () () () == cell))
+    assert (!(callback2 (fun x () -> x.plain) cell ()) = 1);
+    assert (!(callback3 (fun x () () -> x.plain) cell () ()) = 1);
+    assert (!(callbackN (fun x () () () -> x.plain) cell () () ()) = 1))
   [@nontail]
 
 let tests ~depth =
