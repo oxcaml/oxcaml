@@ -200,15 +200,22 @@ module Bin_op : sig
     | Shift_left
     | Shift_right
     | Shift_right_logical
-    | Eq (* CR-someday xclerc: Also add non-equality. *)
+    | Eq
+    | Ne
     | Lt
     | Le
     | Gt
     | Ge
+    | Compare
+    | Unsigned_compare
     | And
     | Or
 
+  (** Numeric operations returning [ty]. *)
   val ops_for_ty : Ty.t -> t list
+
+  (** Comparisons of operands of type [ty], returning a boxed [int]. *)
+  val compare_ops_for_ty : Ty.t -> t list
 
   val to_code :
     Ty.t ->

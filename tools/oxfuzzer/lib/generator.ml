@@ -202,10 +202,32 @@ let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
   match op with
   | And | Or -> make lhs rhs
   | Add | Sub | Mul | Div | Rem | Min | Max | Min_num | Max_num | Bit_and
-  | Bit_or | Bit_xor | Shift_left | Shift_right | Shift_right_logical | Eq | Lt
-  | Le | Gt | Ge ->
+  | Bit_or | Bit_xor | Shift_left | Shift_right | Shift_right_logical | Eq | Ne
+  | Lt | Le | Gt | Ge | Compare | Unsigned_compare ->
     bind_operand st rhs ~f:(fun rhs ->
         bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
+
+(* Comparison APIs specify only the sign of the result. Normalize before using
+   it in arithmetic so that different magnitudes do not cause false
+   positives. *)
+let normalize_comparison (st : State.t) expr =
+  let name = State.fresh st in
+  let result = Expr.Read (Place.Variable name) in
+  let ty = Ty.Number (NumberTy.boxed Int) in
+  let const n = Expr.Const { number = Number.Int n; unboxed = false } in
+  let test op = Expr.Bin_op { ty; op; lhs = result; rhs = const 0 } in
+  Expr.Let
+    { name;
+      expr;
+      body =
+        Expr.If
+          { condition = test Lt;
+            if_true = const (-1);
+            if_false =
+              Expr.If
+                { condition = test Gt; if_true = const 1; if_false = const 0 }
+          }
+    }
 
 (* Evaluate both operands once, right-to-left, even when the divisor is zero.
    Return the dividend in that case rather than raising [Division_by_zero]. *)
@@ -835,6 +857,14 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
          3, gen_binop nty;
          ( 1,
            Gen.create (fun () ->
+               let expr = gen_compare st env (gen_scalar_type st) in
+               Expr.Convert
+                 { expr = normalize_comparison st expr;
+                   from = NumberTy.boxed Int;
+                   to_ = nty
+                 }) );
+         ( 1,
+           Gen.create (fun () ->
                Expr.Convert
                  { expr = Expr.String_length (gen_value st env Ty.String);
                    from = NumberTy.boxed Int;
@@ -843,6 +873,12 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
          1, gen_fun_call st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
+
+and gen_compare (st : State.t) env ty =
+  let op = random_element st (Bin_op.compare_ops_for_ty ty) in
+  let lhs = gen_value st env ty in
+  let rhs = gen_value st env ty in
+  bin_op st ty op ~lhs ~rhs
 
 and gen_unary (st : State.t) env ty =
   let op =
@@ -1026,7 +1062,7 @@ and gen_bool (st : State.t) env =
   let gen_number_arg () = gen_value st env (Ty.Number nty) in
   let gen_bool_arg () = gen_value st env Ty.Bool in
   let gen_bool_binop op = gen_binop op Ty.Bool gen_bool_arg in
-  let comparison = random_element st Bin_op.[Eq; Lt; Le; Gt; Ge] in
+  let comparison = random_element st Bin_op.[Eq; Ne; Lt; Le; Gt; Ge] in
   let leaf =
     Gen.weighted st.random_state
       [2, gen_var st env Ty.Bool; 1, gen_scalar_const st Ty.Bool]
@@ -1038,8 +1074,15 @@ and gen_bool (st : State.t) env =
          ( 1,
            gen_binop comparison Ty.String (fun () -> gen_value st env Ty.String)
          );
+         ( 2,
+           Gen.create (fun () ->
+               let result = gen_compare st env (gen_scalar_type st) in
+               bin_op st
+                 (Ty.Number (NumberTy.boxed Int))
+                 comparison ~lhs:result
+                 ~rhs:(Expr.Const { number = Number.Int 0; unboxed = false })) );
          1, Gen.create (fun () -> gen_unary st env Ty.Bool);
-         1, gen_bool_binop Bin_op.Eq;
+         1, gen_bool_binop (random_element st Bin_op.[Eq; Ne]);
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or;
          1, gen_fun_call st env Ty.Bool;
