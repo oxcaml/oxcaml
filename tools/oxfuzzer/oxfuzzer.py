@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 import enum
 import math
 from collections.abc import Iterator, Sequence
+from typing import Literal
 import tempfile
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -36,7 +37,25 @@ class Configuration:
     name: str
     compiler: Path
     flags: tuple[str, ...]
-    ocamllib: Path
+    ocamllib: Path | None
+    source_extension: Literal["ml", "cpp"] = "ml"
+
+
+@dataclass(frozen=True)
+class GeneratedProgram:
+    ocaml: bytes
+    cpp: bytes | None = None
+
+    def source(self, configuration: Configuration) -> bytes:
+        if configuration.source_extension == "cpp":
+            assert self.cpp is not None
+            return self.cpp
+        return self.ocaml
+
+    def exceeds_size_limit(self) -> bool:
+        return len(self.ocaml) > MAX_PROGRAM_BYTES or (
+            self.cpp is not None and len(self.cpp) > MAX_PROGRAM_BYTES
+        )
 
 
 @dataclass(frozen=True)
@@ -45,6 +64,7 @@ class Toolchain:
     # installation directory as created by `make install` or `nix build .#oxcaml`.
     root: Path
     installed: bool = False
+    cpp_compiler: Path | None = None
 
     def path(self, *, build: str, installed: str) -> Path:
         return self.root / (installed if self.installed else build)
@@ -98,7 +118,7 @@ class Toolchain:
 
     @property
     def configurations(self) -> tuple[Configuration, ...]:
-        return (
+        ocaml = (
             Configuration(
                 name="ocamlc",
                 compiler=self.ocamlc,
@@ -138,6 +158,15 @@ class Toolchain:
             #     ocamllib=self.ocamllib,
             # ),
         )
+        if self.cpp_compiler is None:
+            return ocaml
+        return (*ocaml, Configuration(
+            name="cpp-reference",
+            compiler=self.cpp_compiler,
+            flags=("-std=c++17", "-O0", "-fno-fast-math", "-ffp-contract=off"),
+            ocamllib=None,
+            source_extension="cpp",
+        ))
 
     # Snapshotting is mainly useful for development and running the fuzzer locally.
     # Without copying the toolchain from the compiler repo to another directory, any
@@ -160,7 +189,7 @@ class Toolchain:
                 shutil.copytree(source, target)
             else:
                 shutil.copy2(source, target)
-        return Toolchain(destination)
+        return Toolchain(destination, cpp_compiler=self.cpp_compiler)
 
     # Make sure `make compiler` was run before the fuzzer is executed and that
     # all necessary dependencies are available.
@@ -170,6 +199,8 @@ class Toolchain:
             for path in [self.oxfuzzer, self.ocamlc, self.ocamlopt, self.ocamlrun]
             if not path.is_file() or not os.access(path, os.X_OK)
         ]
+        if self.cpp_compiler is not None and not os.access(self.cpp_compiler, os.X_OK):
+            missing.append(self.cpp_compiler)
         if not self.ocamllib.is_dir():
             missing.append(self.ocamllib)
 
@@ -289,7 +320,7 @@ def source_filename(configuration: Configuration, seed: int) -> str:
     # Vary names across configurations so output comparisons can expose them,
     # without depending on scheduling or the case RNG.
     digest = hashlib.sha256(f"{seed}:{configuration.name}".encode()).hexdigest()
-    return f"program_{digest[:16]}.ml"
+    return f"program_{digest[:16]}.{configuration.source_extension}"
 
 
 def compile_command(
@@ -316,7 +347,10 @@ async def compile(
             command[0],
             command[1:],
             cwd=source.parent,
-            env={"OCAMLLIB": str(configuration.ocamllib)},
+            env=(
+                None if configuration.ocamllib is None
+                else {"OCAMLLIB": str(configuration.ocamllib)}
+            ),
             timeout_sec=COMPILE_TIMEOUT_SEC,
             output_prefix=source.parent / "compile",
         )
@@ -351,14 +385,14 @@ async def run_configuration(
     configuration: Configuration,
     *,
     seed: int,
-    program: bytes,
+    program: GeneratedProgram,
     work_dir: Path,
     slots: asyncio.Semaphore,
 ) -> ConfigurationResult:
     async with slots:
         work_dir.mkdir(parents=True)
         source = work_dir / source_filename(configuration, seed)
-        source.write_bytes(program)
+        source.write_bytes(program.source(configuration))
         executable = work_dir / "program.exe"
         compilation = await compile(configuration, source=source, executable=executable)
         if not compilation.ok:
@@ -376,7 +410,7 @@ async def run_configurations(
     toolchain: Toolchain,
     *,
     seed: int,
-    program: bytes,
+    program: GeneratedProgram,
     work_dir: Path,
     slots: asyncio.Semaphore,
 ) -> list[ConfigurationResult]:
@@ -395,12 +429,18 @@ async def run_configurations(
 
 
 # Returns None if generation timed out.
-async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes | None:
+async def generate(
+    seed: int, *, toolchain: Toolchain, work_dir: Path
+) -> GeneratedProgram | None:
     work_dir.mkdir(parents=True, exist_ok=True)
+    arguments = ["-seed", str(seed)]
+    cpp_path = work_dir / "program.cpp"
+    if toolchain.cpp_compiler is not None:
+        arguments += ["-cpp-output", str(cpp_path)]
     try:
         result = await run_command(
             str(toolchain.oxfuzzer),
-            ["-seed", str(seed)],
+            arguments,
             timeout_sec=GENERATE_TIMEOUT_SEC,
             output_prefix=work_dir / "generate",
         )
@@ -422,7 +462,10 @@ async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes 
             f"{stderr}"
         )
 
-    return result.stdout
+    return GeneratedProgram(
+        ocaml=result.stdout,
+        cpp=cpp_path.read_bytes() if toolchain.cpp_compiler is not None else None,
+    )
 
 
 @dataclass(frozen=True)
@@ -597,6 +640,8 @@ def run_metadata(base_seed: str, toolchain: Toolchain, revision: str) -> str:
         f"compile timeout: {COMPILE_TIMEOUT_SEC}s",
         f"run timeout: {RUN_TIMEOUT_SEC}s",
     ]
+    if toolchain.cpp_compiler is not None:
+        lines.append(f"C++ version: {command_output([str(toolchain.cpp_compiler), '--version']) or 'unknown'}")
     for binary in (toolchain.oxfuzzer, *(c.compiler for c in toolchain.configurations)):
         modified = time.strftime(
             "%Y-%m-%d %H:%M:%S", time.localtime(binary.stat().st_mtime)
@@ -636,7 +681,8 @@ def reproduction_script(
 ) -> str:
     if not toolchain.installed:
         toolchain = Toolchain(
-            Path(os.path.relpath(toolchain.root.resolve(), directory.resolve()))
+            Path(os.path.relpath(toolchain.root.resolve(), directory.resolve())),
+            cpp_compiler=toolchain.cpp_compiler,
         )
     configuration = next(
         candidate
@@ -658,9 +704,11 @@ def reproduction_script(
             "# Run with: bash run.bash",
             "set -eu",
             'cd "$(dirname "$0")"',
-            f"export OCAMLLIB={shlex.quote(str(configuration.ocamllib))}",
-            # Keep program.ml editable for minimization, but preserve the basename.
-            shlex.join(["cp", "../program.ml", str(source)]),
+            *([] if configuration.ocamllib is None else [
+                f"export OCAMLLIB={shlex.quote(str(configuration.ocamllib))}"
+            ]),
+            # Keep sources editable for minimization, preserving unit basenames.
+            shlex.join(["cp", f"../program.{configuration.source_extension}", str(source)]),
             shlex.join(command),
             "./program.exe",
             "",
@@ -682,7 +730,7 @@ def save_failure(
     output_dir: Path,
     run_info: str,
     seed: int,
-    program: bytes,
+    program: GeneratedProgram,
     results: Sequence[ConfigurationResult],
     reason: str,
     *,
@@ -692,7 +740,9 @@ def save_failure(
     # Dot-prefixed, so that a leftover is not taken for a failure.
     staging_dir = Path(tempfile.mkdtemp(prefix=f".{seed}.", dir=output_dir))
     staging_dir.chmod(0o755)
-    (staging_dir / "program.ml").write_bytes(program)
+    (staging_dir / "program.ml").write_bytes(program.ocaml)
+    if program.cpp is not None:
+        (staging_dir / "program.cpp").write_bytes(program.cpp)
     (staging_dir / "reason.txt").write_text(reason + "\n", encoding="utf-8")
     (staging_dir / "meta.txt").write_text(
         failure_metadata(seed, run_info), encoding="utf-8"
@@ -728,7 +778,7 @@ def save_failure(
 # any execution exits with a non-zero status, or the outputs differ.
 def check_case(
     seed: int,
-    program: bytes,
+    program: GeneratedProgram,
     results: Sequence[ConfigurationResult],
     stats: Stats,
     output_dir: Path,
@@ -810,7 +860,7 @@ async def run_case(
         program = await generate(seed, toolchain=toolchain, work_dir=case_dir)
         if program is None:
             stats.generation_timeouts += 1
-        if program is None or len(program) > MAX_PROGRAM_BYTES:
+        if program is None or program.exceeds_size_limit():
             stats.discarded += 1
             stats.report()
             return
@@ -864,6 +914,13 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
                 f"generated from seed {SELF_CHECK_SEED} "
                 f"({status_text(result.execution)}).\n"
                 + result.execution.stderr.decode(errors="replace")
+            )
+    reference, *others = results
+    for other in others:
+        if other.execution != reference.execution:
+            raise Fatal(
+                f"self-check failed: {reference.configuration.name} "
+                f"and {other.configuration.name} disagree for seed {SELF_CHECK_SEED}."
             )
 
 
@@ -1240,6 +1297,11 @@ self-check or a toolchain that cannot be run.""",
         "(a number below 2^62) runs that case first, so with --iterations 1 it "
         "runs a saved failure's case again (default: random, printed)",
     )
+    parser.add_argument(
+        "--cpp-compiler",
+        metavar="CXX",
+        help="also compare with the independent C++17 reference (e.g. g++)",
+    )
     toolchain_group = parser.add_mutually_exclusive_group()
     toolchain_group.add_argument(
         "--build-dir",
@@ -1286,10 +1348,20 @@ self-check or a toolchain that cannot be run.""",
         max_failures=args.max_failures,
         time_limit_minutes=args.time_limit_minutes,
     )
+    cpp_compiler = None
+    if args.cpp_compiler is not None:
+        compiler = shutil.which(args.cpp_compiler)
+        if compiler is None:
+            parser.error(f"C++ compiler not found: {args.cpp_compiler}")
+        cpp_compiler = Path(compiler).absolute()
     if args.install_dir is not None:
-        toolchain = Toolchain(args.install_dir.resolve(), installed=True)
+        toolchain = Toolchain(args.install_dir.resolve(), installed=True,
+                              cpp_compiler=cpp_compiler)
     else:
-        toolchain = Toolchain((args.build_dir or REPOSITORY_ROOT / "_build").resolve())
+        toolchain = Toolchain(
+            (args.build_dir or REPOSITORY_ROOT / "_build").resolve(),
+            cpp_compiler=cpp_compiler,
+        )
     base_seed = (
         args.seed
         if args.seed is not None
