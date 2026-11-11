@@ -75,6 +75,78 @@ let failed_sets_write_nothing ~len ~width ~set ~check =
   done
 ;;
 
+(* An index type narrower than a machine word can address a vector whose last
+   elements lie beyond the largest index of that type. When such an access is
+   split in two, the index of the high half must not wrap. The accesses under
+   test are compared against the primitives in [Int_indexed], which take an
+   [int] index. Vectors are represented by their four int64s. *)
+
+let int8x32_lanes (v : int8x32) = int8x32_first_int64 v, int8x32_second_int64 v, int8x32_third_int64 v, int8x32_fourth_int64 v
+let int8x32_of_lanes (a, b, c, d) : int8x32 = int8x32_of_int64s a b c d
+let int16x16_lanes (v : int16x16) = int16x16_first_int64 v, int16x16_second_int64 v, int16x16_third_int64 v, int16x16_fourth_int64 v
+let int16x16_of_lanes (a, b, c, d) : int16x16 = int16x16_of_int64s a b c d
+let int32x8_lanes (v : int32x8) = int32x8_first_int64 v, int32x8_second_int64 v, int32x8_third_int64 v, int32x8_fourth_int64 v
+let int32x8_of_lanes (a, b, c, d) : int32x8 = int32x8_of_int64s a b c d
+let int64x4_lanes (v : int64x4) = int64x4_first_int64 v, int64x4_second_int64 v, int64x4_third_int64 v, int64x4_fourth_int64 v
+let int64x4_of_lanes (a, b, c, d) : int64x4 = int64x4_of_int64s a b c d
+let float32x8_lanes (v : float32x8) = float32x8_first_int64 v, float32x8_second_int64 v, float32x8_third_int64 v, float32x8_fourth_int64 v
+let float32x8_of_lanes (a, b, c, d) : float32x8 = float32x8_of_int64s a b c d
+let float64x4_lanes (v : float64x4) = float64x4_first_int64 v, float64x4_second_int64 v, float64x4_third_int64 v, float64x4_fourth_int64 v
+let float64x4_of_lanes (a, b, c, d) : float64x4 = float64x4_of_int64s a b c d
+
+external[@layout_poly] make_array : ('a : any mod separable). int -> 'a -> 'a array = "%makearray_dynamic"
+
+module Int_indexed = struct
+  external bytes_get : bytes -> int -> int8x32 = "%caml_bytes_getu256"
+  external string_get : string -> int -> int8x32 = "%caml_string_getu256"
+  external floatarray_get : floatarray -> int -> float64x4 = "%caml_floatarray_get256"
+  external unboxed_float_array_get : float# array -> int -> float64x4 = "%caml_unboxed_float_array_get256"
+  external unboxed_float32_array_get : float32_u array -> int -> float32x8 = "%caml_unboxed_float32_array_get256"
+  external int_array_get : int array -> int -> int64x4 = "%caml_int_array_get256"
+  external unboxed_int64_array_get : int64_u array -> int -> int64x4 = "%caml_unboxed_int64_array_get256"
+  external unboxed_nativeint_array_get : nativeint_u array -> int -> int64x4 = "%caml_unboxed_nativeint_array_get256"
+  external unboxed_int32_array_get : int32_u array -> int -> int32x8 = "%caml_unboxed_int32_array_get256"
+  external untagged_int16_array_get : int16# array -> int -> int16x16 = "%caml_untagged_int16_array_get256"
+  external untagged_int8_array_get : int8# array -> int -> int8x32 = "%caml_untagged_int8_array_get256"
+end
+
+(* Checks accesses at index [i] of [a], where a vector spans [width] elements.
+   The [width] elements on either side of the vector must exist, and must not
+   be written to. *)
+let check_access_at i ~width ~get ~get_unsafe ~set ~set_unsafe ~ref_get a =
+  let below = ref_get a (i - width) in
+  let above = ref_get a (i + width) in
+  let check_set name set v =
+    set a i v;
+    List.iter
+      (fun (j, expect) ->
+        if ref_get a j <> expect then Printf.printf "%s at index %d: wrong contents at index %d\n" name i j)
+      [ i, v; i - width, below; i + width, above ]
+  in
+  let check_get name get v =
+    if get a i <> v then Printf.printf "%s at index %d: wrong result\n" name i
+  in
+  (* Each lane is a valid immediate, as required by [int array]. *)
+  let v1 = 0x0706050403020101L, 0x0f0e0d0c0b0a0909L, 0x1716151413121111L, 0x1f1e1d1c1b1a1919L in
+  let v2 = 0x2726252423222121L, 0x2f2e2d2c2b2a2929L, 0x3736353433323131L, 0x3f3e3d3c3b3a3939L in
+  check_set "set" set v1;
+  check_get "get" get v1;
+  check_set "unsafe set" set_unsafe v2;
+  check_get "unsafe get" get_unsafe v2
+;;
+
+(* Checks every access that extends beyond [max_index], if the index type is
+   narrow enough for such an array to be allocated. *)
+let check_accesses_beyond ~max_index ~width ~make ~get ~get_unsafe ~set ~set_unsafe ~ref_get =
+  Option.iter
+    (fun max_index ->
+      let a = make (max_index + (2 * width)) in
+      for i = max_index - width + 2 to max_index do
+        check_access_at i ~width ~get ~get_unsafe ~set ~set_unsafe ~ref_get a
+      done)
+    max_index
+;;
+
 let test_data = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x00\x01\x02\x03\x04\x05\x06\x07"
 
 module Bytes (Primitives : sig
@@ -83,6 +155,7 @@ module Bytes (Primitives : sig
   val set_int8x32_unaligned : bytes -> int -> int8x32 -> unit
   val set_int8x32_unaligned_unsafe : bytes -> int -> int8x32 -> unit
   val extra_checks : bytes -> unit
+  val narrow_max_index : int option
 end) =
 struct
   open Primitives
@@ -163,12 +236,25 @@ struct
         if not (Bytes.equal before data) then Printf.printf "Failed set wrote to bytes\n")
   ;;
 
+  (* Accesses beyond the largest index of a narrow index type *)
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:32
+      ~make:(fun len -> Bytes.make len '\000')
+      ~get:(fun a i -> int8x32_lanes (get_int8x32_unaligned a i))
+      ~get_unsafe:(fun a i -> int8x32_lanes (get_int8x32_unaligned_unsafe a i))
+      ~set:(fun a i v -> set_int8x32_unaligned a i (int8x32_of_lanes v))
+      ~set_unsafe:(fun a i v -> set_int8x32_unaligned_unsafe a i (int8x32_of_lanes v))
+      ~ref_get:(fun a i -> int8x32_lanes (Int_indexed.bytes_get a i))
+  ;;
+
   (* Extra checks *)
 
   let () = extra_checks data
 end
 
 module _ = Bytes(struct
+  let narrow_max_index = None
   external get_int8x32_unaligned : bytes -> int -> int8x32 = "%caml_bytes_getu256"
   external get_int8x32_unaligned_unsafe : bytes -> int -> int8x32 = "%caml_bytes_getu256u"
 
@@ -188,6 +274,7 @@ module _ = Bytes(struct
 end)
 
 module _ = Bytes(struct
+  let narrow_max_index = Some 127
   external get_int8x32_unaligned_prim : bytes -> int8# -> int8x32 = "%caml_bytes_getu256_indexed_by_int8#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_stable.Int8_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : bytes -> int8# -> int8x32 = "%caml_bytes_getu256u_indexed_by_int8#"
@@ -212,6 +299,7 @@ module _ = Bytes(struct
 end)
 
 module _ = Bytes(struct
+  let narrow_max_index = Some 32767
   external get_int8x32_unaligned_prim : bytes -> int16# -> int8x32 = "%caml_bytes_getu256_indexed_by_int16#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_stable.Int16_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : bytes -> int16# -> int8x32 = "%caml_bytes_getu256u_indexed_by_int16#"
@@ -236,6 +324,7 @@ module _ = Bytes(struct
 end)
 
 module _ = Bytes(struct
+  let narrow_max_index = None
   external get_int8x32_unaligned_prim : bytes -> int32_u -> int8x32 = "%caml_bytes_getu256_indexed_by_int32#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : bytes -> int32_u -> int8x32 = "%caml_bytes_getu256u_indexed_by_int32#"
@@ -260,6 +349,7 @@ module _ = Bytes(struct
 end)
 
 module _ = Bytes(struct
+  let narrow_max_index = None
   external get_int8x32_unaligned_prim : bytes -> int64_u -> int8x32 = "%caml_bytes_getu256_indexed_by_int64#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : bytes -> int64_u -> int8x32 = "%caml_bytes_getu256u_indexed_by_int64#"
@@ -284,6 +374,7 @@ module _ = Bytes(struct
 end)
 
 module _ = Bytes(struct
+  let narrow_max_index = None
   external get_int8x32_unaligned_prim : bytes -> nativeint_u -> int8x32 = "%caml_bytes_getu256_indexed_by_nativeint#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : bytes -> nativeint_u -> int8x32 = "%caml_bytes_getu256u_indexed_by_nativeint#"
@@ -311,6 +402,7 @@ module String_ (Primitives : sig
   val get_int8x32_unaligned : string -> int -> int8x32
   val get_int8x32_unaligned_unsafe : string -> int -> int8x32
   val extra_checks : string -> unit
+  val narrow_max_index : int option
 end) =
 struct
   open Primitives
@@ -344,12 +436,29 @@ struct
     done;
   ;;
 
+  (* Accesses beyond the largest index of a narrow index type *)
+
+  let () =
+    Option.iter
+      (fun max_index ->
+        let data = String.init (max_index + 32) (fun i -> Char.chr (i land 0xff)) in
+        for i = max_index - 30 to max_index do
+          let expect = int8x32_lanes (Int_indexed.string_get data i) in
+          if int8x32_lanes (get_int8x32_unaligned data i) <> expect
+          then Printf.printf "get at index %d: wrong result\n" i;
+          if int8x32_lanes (get_int8x32_unaligned_unsafe data i) <> expect
+          then Printf.printf "unsafe get at index %d: wrong result\n" i
+        done)
+      narrow_max_index
+  ;;
+
   (* Extra checks *)
 
   let () = extra_checks data
 end
 
 module _ = String_(struct
+  let narrow_max_index = None
   external get_int8x32_unaligned : string -> int -> int8x32 = "%caml_string_getu256"
   external get_int8x32_unaligned_unsafe : string -> int -> int8x32 = "%caml_string_getu256u"
 
@@ -364,6 +473,7 @@ module _ = String_(struct
 end)
 
 module _ = String_(struct
+  let narrow_max_index = Some 127
   external get_int8x32_unaligned_prim : string -> int8# -> int8x32 = "%caml_string_getu256_indexed_by_int8#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_stable.Int8_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : string -> int8# -> int8x32 = "%caml_string_getu256u_indexed_by_int8#"
@@ -381,6 +491,7 @@ module _ = String_(struct
 end)
 
 module _ = String_(struct
+  let narrow_max_index = Some 32767
   external get_int8x32_unaligned_prim : string -> int16# -> int8x32 = "%caml_string_getu256_indexed_by_int16#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_stable.Int16_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : string -> int16# -> int8x32 = "%caml_string_getu256u_indexed_by_int16#"
@@ -398,6 +509,7 @@ module _ = String_(struct
 end)
 
 module _ = String_(struct
+  let narrow_max_index = None
   external get_int8x32_unaligned_prim : string -> int32_u -> int8x32 = "%caml_string_getu256_indexed_by_int32#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : string -> int32_u -> int8x32 = "%caml_string_getu256u_indexed_by_int32#"
@@ -415,6 +527,7 @@ module _ = String_(struct
 end)
 
 module _ = String_(struct
+  let narrow_max_index = None
   external get_int8x32_unaligned_prim : string -> int64_u -> int8x32 = "%caml_string_getu256_indexed_by_int64#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : string -> int64_u -> int8x32 = "%caml_string_getu256u_indexed_by_int64#"
@@ -432,6 +545,7 @@ module _ = String_(struct
 end)
 
 module _ = String_(struct
+  let narrow_max_index = None
   external get_int8x32_unaligned_prim : string -> nativeint_u -> int8x32 = "%caml_string_getu256_indexed_by_nativeint#"
   let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
   external get_int8x32_unaligned_unsafe_prim : string -> nativeint_u -> int8x32 = "%caml_string_getu256u_indexed_by_nativeint#"
@@ -464,6 +578,7 @@ open struct
     val set_int8x32_aligned_unsafe : bigstring -> int -> int8x32 -> unit
 
     val extra_checks : bigstring -> unit
+    val narrow_max_index : int option
   end) =
   struct
     open Primitives
@@ -590,12 +705,48 @@ open struct
       done;
     ;;
 
+    (* Accesses beyond the largest index of a narrow index type *)
+
+    external ref_get : bigstring -> int -> int8x32 = "%caml_bigstring_getu256"
+    external ref_get_aligned : bigstring -> int -> int8x32 = "%caml_bigstring_geta256"
+
+    let () =
+      check_accesses_beyond ~max_index:narrow_max_index ~width:32
+        ~make:(fun len -> Array1.create char c_layout len)
+        ~get:(fun a i -> int8x32_lanes (get_int8x32_unaligned a i))
+        ~get_unsafe:(fun a i -> int8x32_lanes (get_int8x32_unaligned_unsafe a i))
+        ~set:(fun a i v -> set_int8x32_unaligned a i (int8x32_of_lanes v))
+        ~set_unsafe:(fun a i v -> set_int8x32_unaligned_unsafe a i (int8x32_of_lanes v))
+        ~ref_get:(fun a i -> int8x32_lanes (ref_get a i))
+    ;;
+
+    let () =
+      Option.iter
+        (fun max_index ->
+          (* The only aligned access whose high half is beyond [max_index]. *)
+          let i = max_index - 15 in
+          let a = Array1.create char c_layout (max_index + 96) in
+          let zero =
+            try let _ = ref_get_aligned a i in 0 with
+            | _ -> 16
+          in
+          check_access_at i ~width:32
+            ~get:(fun a i -> int8x32_lanes (get_int8x32_aligned a i))
+            ~get_unsafe:(fun a i -> int8x32_lanes (get_int8x32_aligned_unsafe a i))
+            ~set:(fun a i v -> set_int8x32_aligned a i (int8x32_of_lanes v))
+            ~set_unsafe:(fun a i v -> set_int8x32_aligned_unsafe a i (int8x32_of_lanes v))
+            ~ref_get:(fun a i -> int8x32_lanes (ref_get a i))
+            (Array1.sub a zero (max_index + 64)))
+        narrow_max_index
+    ;;
+
     (* Extra checks *)
 
     let () = extra_checks data
   end
 
   module _ = Bigstring(struct
+    let narrow_max_index = None
     external get_int8x32_unaligned : bigstring -> int -> int8x32 = "%caml_bigstring_getu256"
     external get_int8x32_unaligned_unsafe : bigstring -> int -> int8x32 = "%caml_bigstring_getu256u"
     external get_int8x32_aligned : bigstring -> int -> int8x32 = "%caml_bigstring_geta256"
@@ -624,6 +775,7 @@ open struct
   end)
 
   module _ = Bigstring(struct
+    let narrow_max_index = Some 127
     external get_int8x32_unaligned_prim : bigstring -> int8# -> int8x32 = "%caml_bigstring_getu256_indexed_by_int8#"
     let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_stable.Int8_u.of_int i)
     external get_int8x32_unaligned_unsafe_prim : bigstring -> int8# -> int8x32 = "%caml_bigstring_getu256u_indexed_by_int8#"
@@ -661,6 +813,7 @@ open struct
   end)
 
   module _ = Bigstring(struct
+    let narrow_max_index = Some 32767
     external get_int8x32_unaligned_prim : bigstring -> int16# -> int8x32 = "%caml_bigstring_getu256_indexed_by_int16#"
     let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_stable.Int16_u.of_int i)
     external get_int8x32_unaligned_unsafe_prim : bigstring -> int16# -> int8x32 = "%caml_bigstring_getu256u_indexed_by_int16#"
@@ -698,6 +851,7 @@ open struct
   end)
 
   module _ = Bigstring(struct
+    let narrow_max_index = None
     external get_int8x32_unaligned_prim : bigstring -> int32_u -> int8x32 = "%caml_bigstring_getu256_indexed_by_int32#"
     let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
     external get_int8x32_unaligned_unsafe_prim : bigstring -> int32_u -> int8x32 = "%caml_bigstring_getu256u_indexed_by_int32#"
@@ -735,6 +889,7 @@ open struct
   end)
 
   module _ = Bigstring(struct
+    let narrow_max_index = None
     external get_int8x32_unaligned_prim : bigstring -> int64_u -> int8x32 = "%caml_bigstring_getu256_indexed_by_int64#"
     let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
     external get_int8x32_unaligned_unsafe_prim : bigstring -> int64_u -> int8x32 = "%caml_bigstring_getu256u_indexed_by_int64#"
@@ -772,6 +927,7 @@ open struct
   end)
 
   module _ = Bigstring(struct
+    let narrow_max_index = None
     external get_int8x32_unaligned_prim : bigstring -> nativeint_u -> int8x32 = "%caml_bigstring_getu256_indexed_by_nativeint#"
     let get_int8x32_unaligned b i = get_int8x32_unaligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
     external get_int8x32_unaligned_unsafe_prim : bigstring -> nativeint_u -> int8x32 = "%caml_bigstring_getu256u_indexed_by_nativeint#"
@@ -810,6 +966,8 @@ open struct
 end
 
 module Float_arrays (Primitives : sig
+
+  val narrow_max_index : int option
 
   val floatarray_get_float64x4 : floatarray -> int -> float64x4
   val floatarray_get_float64x4_unsafe : floatarray -> int -> float64x4
@@ -1061,9 +1219,42 @@ end) = struct
       ~set:(fun i -> unboxed_float32_array_set_float32x8 a i set)
       ~check:(fun () -> unchanged 0; unchanged 1)
   ;;
+
+  (* Accesses beyond the largest index of a narrow index type *)
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:4
+      ~make:(fun len -> Float.Array.make len 0.0)
+      ~get:(fun a i -> float64x4_lanes (floatarray_get_float64x4 a i))
+      ~get_unsafe:(fun a i -> float64x4_lanes (floatarray_get_float64x4_unsafe a i))
+      ~set:(fun a i v -> floatarray_set_float64x4 a i (float64x4_of_lanes v))
+      ~set_unsafe:(fun a i v -> floatarray_set_float64x4_unsafe a i (float64x4_of_lanes v))
+      ~ref_get:(fun a i -> float64x4_lanes (Int_indexed.floatarray_get a i))
+  ;;
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:4
+      ~make:(fun len -> make_array len #0.0)
+      ~get:(fun a i -> float64x4_lanes (unboxed_float_array_get_float64x4 a i))
+      ~get_unsafe:(fun a i -> float64x4_lanes (unboxed_float_array_get_float64x4_unsafe a i))
+      ~set:(fun a i v -> unboxed_float_array_set_float64x4 a i (float64x4_of_lanes v))
+      ~set_unsafe:(fun a i v -> unboxed_float_array_set_float64x4_unsafe a i (float64x4_of_lanes v))
+      ~ref_get:(fun a i -> float64x4_lanes (Int_indexed.unboxed_float_array_get a i))
+  ;;
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:8
+      ~make:(fun len -> make_array len #0.0s)
+      ~get:(fun a i -> float32x8_lanes (unboxed_float32_array_get_float32x8 a i))
+      ~get_unsafe:(fun a i -> float32x8_lanes (unboxed_float32_array_get_float32x8_unsafe a i))
+      ~set:(fun a i v -> unboxed_float32_array_set_float32x8 a i (float32x8_of_lanes v))
+      ~set_unsafe:(fun a i v -> unboxed_float32_array_set_float32x8_unsafe a i (float32x8_of_lanes v))
+      ~ref_get:(fun a i -> float32x8_lanes (Int_indexed.unboxed_float32_array_get a i))
+  ;;
 end
 
 module _ = Float_arrays(struct
+  let narrow_max_index = None
 
   external floatarray_get_float64x4 : floatarray -> int -> float64x4 = "%caml_floatarray_get256"
   external floatarray_get_float64x4_unsafe : floatarray -> int -> float64x4 = "%caml_floatarray_get256u"
@@ -1086,6 +1277,7 @@ module _ = Float_arrays(struct
 end)
 
 module _ = Float_arrays(struct
+  let narrow_max_index = Some 127
 
   external floatarray_get_float64x4 : floatarray -> int8# -> float64x4 = "%caml_floatarray_get256_indexed_by_int8#"
   let floatarray_get_float64x4 arr i = floatarray_get_float64x4 arr (Stdlib_stable.Int8_u.of_int i)
@@ -1120,6 +1312,7 @@ module _ = Float_arrays(struct
 end)
 
 module _ = Float_arrays(struct
+  let narrow_max_index = Some 32767
 
   external floatarray_get_float64x4 : floatarray -> int16# -> float64x4 = "%caml_floatarray_get256_indexed_by_int16#"
   let floatarray_get_float64x4 arr i = floatarray_get_float64x4 arr (Stdlib_stable.Int16_u.of_int i)
@@ -1154,6 +1347,7 @@ module _ = Float_arrays(struct
 end)
 
 module _ = Float_arrays(struct
+  let narrow_max_index = None
 
   external floatarray_get_float64x4 : floatarray -> int32_u -> float64x4 = "%caml_floatarray_get256_indexed_by_int32#"
   let floatarray_get_float64x4 arr i = floatarray_get_float64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
@@ -1188,6 +1382,7 @@ module _ = Float_arrays(struct
 end)
 
 module _ = Float_arrays(struct
+  let narrow_max_index = None
 
   external floatarray_get_float64x4 : floatarray -> int64_u -> float64x4 = "%caml_floatarray_get256_indexed_by_int64#"
   let floatarray_get_float64x4 arr i = floatarray_get_float64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
@@ -1222,6 +1417,7 @@ module _ = Float_arrays(struct
 end)
 
 module _ = Float_arrays(struct
+  let narrow_max_index = None
 
   external floatarray_get_float64x4 : floatarray -> nativeint_u -> float64x4 = "%caml_floatarray_get256_indexed_by_nativeint#"
   let floatarray_get_float64x4 arr i = floatarray_get_float64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
@@ -1256,6 +1452,8 @@ module _ = Float_arrays(struct
 end)
 
 module Int_arrays (Primitives : sig
+
+  val narrow_max_index : int option
 
   val int_array_get_int64x4 : int array -> int -> int64x4
   val int_array_get_int64x4_unsafe : int array -> int -> int64x4
@@ -1867,9 +2065,72 @@ end) = struct
       ~set:(fun i -> untagged_int8_array_set_int8x32 a i set)
       ~check:(fun () -> unchanged 0; unchanged 32)
   ;;
+
+  (* Accesses beyond the largest index of a narrow index type *)
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:4
+      ~make:(fun len -> make_array len 0)
+      ~get:(fun a i -> int64x4_lanes (int_array_get_int64x4 a i))
+      ~get_unsafe:(fun a i -> int64x4_lanes (int_array_get_int64x4_unsafe a i))
+      ~set:(fun a i v -> int_array_set_int64x4 a i (int64x4_of_lanes v))
+      ~set_unsafe:(fun a i v -> int_array_set_int64x4_unsafe a i (int64x4_of_lanes v))
+      ~ref_get:(fun a i -> int64x4_lanes (Int_indexed.int_array_get a i))
+  ;;
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:4
+      ~make:(fun len -> make_array len #0L)
+      ~get:(fun a i -> int64x4_lanes (unboxed_int64_array_get_int64x4 a i))
+      ~get_unsafe:(fun a i -> int64x4_lanes (unboxed_int64_array_get_int64x4_unsafe a i))
+      ~set:(fun a i v -> unboxed_int64_array_set_int64x4 a i (int64x4_of_lanes v))
+      ~set_unsafe:(fun a i v -> unboxed_int64_array_set_int64x4_unsafe a i (int64x4_of_lanes v))
+      ~ref_get:(fun a i -> int64x4_lanes (Int_indexed.unboxed_int64_array_get a i))
+  ;;
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:4
+      ~make:(fun len -> make_array len #0n)
+      ~get:(fun a i -> int64x4_lanes (unboxed_nativeint_array_get_int64x4 a i))
+      ~get_unsafe:(fun a i -> int64x4_lanes (unboxed_nativeint_array_get_int64x4_unsafe a i))
+      ~set:(fun a i v -> unboxed_nativeint_array_set_int64x4 a i (int64x4_of_lanes v))
+      ~set_unsafe:(fun a i v -> unboxed_nativeint_array_set_int64x4_unsafe a i (int64x4_of_lanes v))
+      ~ref_get:(fun a i -> int64x4_lanes (Int_indexed.unboxed_nativeint_array_get a i))
+  ;;
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:8
+      ~make:(fun len -> make_array len #0l)
+      ~get:(fun a i -> int32x8_lanes (unboxed_int32_array_get_int32x8 a i))
+      ~get_unsafe:(fun a i -> int32x8_lanes (unboxed_int32_array_get_int32x8_unsafe a i))
+      ~set:(fun a i v -> unboxed_int32_array_set_int32x8 a i (int32x8_of_lanes v))
+      ~set_unsafe:(fun a i v -> unboxed_int32_array_set_int32x8_unsafe a i (int32x8_of_lanes v))
+      ~ref_get:(fun a i -> int32x8_lanes (Int_indexed.unboxed_int32_array_get a i))
+  ;;
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:16
+      ~make:(fun len -> make_array len #0S)
+      ~get:(fun a i -> int16x16_lanes (untagged_int16_array_get_int16x16 a i))
+      ~get_unsafe:(fun a i -> int16x16_lanes (untagged_int16_array_get_int16x16_unsafe a i))
+      ~set:(fun a i v -> untagged_int16_array_set_int16x16 a i (int16x16_of_lanes v))
+      ~set_unsafe:(fun a i v -> untagged_int16_array_set_int16x16_unsafe a i (int16x16_of_lanes v))
+      ~ref_get:(fun a i -> int16x16_lanes (Int_indexed.untagged_int16_array_get a i))
+  ;;
+
+  let () =
+    check_accesses_beyond ~max_index:narrow_max_index ~width:32
+      ~make:(fun len -> make_array len #0s)
+      ~get:(fun a i -> int8x32_lanes (untagged_int8_array_get_int8x32 a i))
+      ~get_unsafe:(fun a i -> int8x32_lanes (untagged_int8_array_get_int8x32_unsafe a i))
+      ~set:(fun a i v -> untagged_int8_array_set_int8x32 a i (int8x32_of_lanes v))
+      ~set_unsafe:(fun a i v -> untagged_int8_array_set_int8x32_unsafe a i (int8x32_of_lanes v))
+      ~ref_get:(fun a i -> int8x32_lanes (Int_indexed.untagged_int8_array_get a i))
+  ;;
 end
 
 module _ = Int_arrays(struct
+  let narrow_max_index = None
 
   external int_array_get_int64x4 : int array -> int -> int64x4 = "%caml_int_array_get256"
   external int_array_get_int64x4_unsafe : int array -> int -> int64x4 = "%caml_int_array_get256u"
@@ -1912,6 +2173,7 @@ module _ = Int_arrays(struct
 end)
 
 module _ = Int_arrays(struct
+  let narrow_max_index = Some 127
 
   external int_array_get_int64x4 : int array -> int8# -> int64x4 = "%caml_int_array_get256_indexed_by_int8#"
   let int_array_get_int64x4 arr i = int_array_get_int64x4 arr (Stdlib_stable.Int8_u.of_int i)
@@ -1980,6 +2242,7 @@ module _ = Int_arrays(struct
 end)
 
 module _ = Int_arrays(struct
+  let narrow_max_index = Some 32767
 
   external int_array_get_int64x4 : int array -> int16# -> int64x4 = "%caml_int_array_get256_indexed_by_int16#"
   let int_array_get_int64x4 arr i = int_array_get_int64x4 arr (Stdlib_stable.Int16_u.of_int i)
@@ -2049,6 +2312,7 @@ module _ = Int_arrays(struct
 end)
 
 module _ = Int_arrays(struct
+  let narrow_max_index = None
 
   external int_array_get_int64x4 : int array -> int32_u -> int64x4 = "%caml_int_array_get256_indexed_by_int32#"
   let int_array_get_int64x4 arr i = int_array_get_int64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
@@ -2118,6 +2382,7 @@ module _ = Int_arrays(struct
 end)
 
 module _ = Int_arrays(struct
+  let narrow_max_index = None
 
   external int_array_get_int64x4 : int array -> int64_u -> int64x4 = "%caml_int_array_get256_indexed_by_int64#"
   let int_array_get_int64x4 arr i = int_array_get_int64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
@@ -2187,6 +2452,7 @@ module _ = Int_arrays(struct
 end)
 
 module _ = Int_arrays(struct
+  let narrow_max_index = None
 
   external int_array_get_int64x4 : int array -> nativeint_u -> int64x4 = "%caml_int_array_get256_indexed_by_nativeint#"
   let int_array_get_int64x4 arr i = int_array_get_int64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
