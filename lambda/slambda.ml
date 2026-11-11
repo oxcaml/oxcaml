@@ -223,6 +223,8 @@ module rec Types : sig
   type closure =
     { clo_template : template;
       clo_runtime_env : (Ident.t * layout) list;
+      (* This value duplicates information in [clo_env], but it defines the
+         order of the closure block. *)
       clo_env : Env.t
     }
 
@@ -242,6 +244,8 @@ module rec Types : sig
     | Vclosure of Template_id.t
 
   val print_closure : Fmt.formatter -> closure -> unit
+
+  val print_value : Fmt.formatter -> value -> unit
 
   val print_value_or_missing : Fmt.formatter -> value Or_missing.t -> unit
 end = struct
@@ -270,7 +274,7 @@ end = struct
     | Vrecord of record
     | Vclosure of Template_id.t
 
-  let print_closure ppf { clo_template; clo_runtime_env; clo_env = _ } =
+  let print_closure ppf { clo_template; clo_runtime_env; clo_env } =
     let body =
       match clo_template with
       | Kind template -> Lkindtemplate template
@@ -290,8 +294,8 @@ end = struct
            pp_item)
         env
     in
-    Fmt.fprintf ppf "@[<2>(@[<hv>closure@ %a@]@ %a)@]" pp_runtime_env
-      clo_runtime_env
+    Fmt.fprintf ppf "@[<2>(@[<hv>closure@ %a@ %a@]@ %a)@]" Env.print clo_env
+      pp_runtime_env clo_runtime_env
       (Fmt.deprecated Printlambda.lambda)
       body
 
@@ -332,6 +336,8 @@ and Env : sig
 
   (** Rename every ident to a fresh one, returning the renaming. *)
   val freshen_idents : t -> t * Ident.t Ident.Map.t
+
+  val print : Fmt.formatter -> t -> unit
 end = struct
   type t =
     { idents : (layout * Types.value Or_missing.t) Ident.Map.t;
@@ -396,6 +402,28 @@ end = struct
         (Ident.Map.empty, Ident.Map.empty)
     in
     { t with idents }, renaming
+
+  let print fmt { idents; sort_vars } =
+    Fmt.fprintf fmt "@[<hv 2>{";
+    Ident.Map.iter
+      (fun id (_layout, value) ->
+        match (value : _ Or_missing.t) with
+        | Present value ->
+          Fmt.fprintf fmt "@ @[<2>%a =@ %a;@]"
+            (Fmt.deprecated Ident.print)
+            id Types.print_value value
+        | Missing -> ())
+      idents;
+    Layout_ident.Map.iter
+      (fun id value ->
+        Fmt.fprintf fmt "@ @[<2>%a =@ %a;@]"
+          (Fmt.deprecated Layout_ident.print)
+          id
+          (Fmt.deprecated Printlambda.layout)
+          value)
+      sort_vars;
+    Fmt.fprintf fmt "@;<1 -2>}@]";
+    ()
 end
 
 module Template_store = struct
@@ -501,26 +529,26 @@ module CU_data = struct
       Template_store.print templates
 end
 
-(** Each instantiation gets its own copy of the closure with fresh idents, so
-    instantiations have distinct binders and the idents of closures loaded from
-    other compilation units can't clash with local ones. Instantiation arguments
-    are static values, which contain no idents, so they need no renaming.
-
-    [clo_runtime_env] is renamed in place rather than rebuilt from [clo_env]
-    because its order must match the fields of the runtime environment block,
-    which may have been built in another compilation unit. *)
+(** Freshen all the idents in the given closure. This is used by instantiation
+    to prevent identifiers between different instantiations or from other
+    compilation units clashing with local ones. *)
 let freshen_closure { Types.clo_template; clo_runtime_env; clo_env } =
-  let clo_env, renaming = Env.freshen_idents clo_env in
-  let duplicate = Lambda.duplicate_function ~rename:renaming in
+  (* This doesn't freshen the layout idents because they won't appear in the
+     evaluated lambda and the closure carries it's own environment so they can't
+     clash with ones from outside this context. *)
+  let clo_env, rename = Env.freshen_idents clo_env in
   let clo_template : Types.template =
     match clo_template with
     | Kind { ktmpl_params; ktmpl_body } ->
-      Kind { ktmpl_params; ktmpl_body = duplicate ktmpl_body }
-    | Value func -> Value (duplicate func)
+      Kind
+        { ktmpl_params;
+          ktmpl_body = Lambda.duplicate_function ~rename ktmpl_body
+        }
+    | Value func -> Value (Lambda.duplicate_function ~rename func)
   in
   let clo_runtime_env =
     List.map
-      (fun (id, layout) -> Ident.Map.find id renaming, layout)
+      (fun (id, layout) -> Ident.Map.find id rename, layout)
       clo_runtime_env
   in
   { Types.clo_template; clo_runtime_env; clo_env }
@@ -602,6 +630,12 @@ end = struct
         | None ->
           Misc.fatal_errorf_doc "Template not found: %a" Template_id.print id)
     in
+    (* Freshen the closure so the idents don't overlap with existing ones, it
+       evaluates a closed function so we don't need to worry about free
+       variables.
+       The arguments don't need freshening as they're evaluated static values
+       which don't contain any idents *)
+    let closure = freshen_closure closure in
     let arg_names = List.map Mangling.symbol_arg_of_value args in
     let name =
       Fmt.asprintf "%a_%a" Template_id.print id
@@ -621,9 +655,7 @@ end = struct
         (* eval_apply might recursively call this function so mark this name as
            visited before calling it. *)
         Ident.Tbl.replace t.instantiated_templates name None;
-        let { Types.slv_comptime; slv_runtime } =
-          eval_apply (freshen_closure closure) args
-        in
+        let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
         Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
         t.instantiations <- (name, slv_runtime) :: t.instantiations;
         slv_comptime
@@ -1717,10 +1749,6 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
         List.fold_left2
           (fun env var arg ->
             let layout = arg |> expect_not_missing |> expect Tlayout in
-            (* Static values are fully evaluated, so they never contain sort
-               variables. This means that the sort variables in a closure from
-               another compilation unit can't clash with local ones, so
-               [freshen_closure] doesn't need to rename them. *)
             (try assert_layout_contains_no_splices layout
              with Found_a_splice ->
                Misc.fatal_errorf
