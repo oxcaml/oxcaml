@@ -104,6 +104,12 @@ module Context = struct
               shared by all of its contexts. *)
     }
 
+  (* CR yusumez: With [-for-pack], this and [toplevel_function] give the unit's
+     path with the pack prefix ("Pack.Q"), but [Translmod] enters scopes with
+     [name_as_string] ("Q"), so a unit names its functions in two schemes.
+     Consider [name_as_string] for both: units of the same name in different
+     packs would then share their toplevel identity, as scope-named functions
+     already do. *)
   let toplevel compilation_unit =
     let enclosing_path =
       Compilation_unit.full_path_as_string compilation_unit
@@ -161,6 +167,9 @@ let of_function (context : Context.t) ~(binder : Ident.t option)
          as for [class c], [c_init]. *)
       match binder with
       | Some id -> context.enclosing_path ^ "." ^ Ident.name id, false
+      (* CR-someday yusumez: Unbound code without a location, like the
+         initialisation of a virtual class, gets an anonymous name in the
+         enclosing path, told apart only by its discriminator. *)
       | None -> context.enclosing_path ^ ".(fun)", true)
   in
   (* Compiler-generated stubs (like optional arg wrappers) have the same path as
