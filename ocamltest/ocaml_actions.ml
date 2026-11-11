@@ -218,7 +218,8 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
   let output_variable = Compiler.output_variable in
   let prepare = prepare_module output_variable log env in
   let module_tasks, modules =
-    List.split (List.map prepare (List.map Ocaml_filetypes.filetype all_modules))
+    List.split
+      (List.map prepare(List.map Ocaml_filetypes.filetype all_modules))
   in
   let modules = List.concat modules in
   let module_tasks = Actions.seq module_tasks in
@@ -403,7 +404,8 @@ let setup_tool_build_env (tool : Ocaml_tools.tool) log env =
   let env =
     Environments.add Builtin_variables.test_build_directory build_dir env in
   let task, env =
-    Actions_helpers.setup_build_env false ~remove:[tool_output_file] source_modules log env
+    Actions_helpers.setup_build_env
+      false ~remove:[tool_output_file] source_modules log env
   in
   Actions.seq [extra_deps; task], env
 

@@ -422,10 +422,13 @@ let compare_files kind_of_output output_filename reference_filename log
       Filecompare.lines = skip_lines;
       Filecompare.bytes = skip_bytes;
     } in
-  let promote = Environments.lookup_as_bool Builtin_variables.promote env = Some true in
+  let promote =
+    Environments.lookup_as_bool Builtin_variables.promote env = Some true in
   let tool =
     Filecompare.make_cmp_tool ~ignore:ignore_header_conf in
-  Actions.Task [Compare_files {kind_of_output; files; tool; reference_exists; promote;}], env
+  Actions.Task
+    [Compare_files {kind_of_output; files; tool; reference_exists; promote;}],
+  env
 
 let do_compare_files ~kind_of_output ~files ~tool ~promote log =
   let Filecompare.{filetype=_; reference_filename; output_filename} = files in
