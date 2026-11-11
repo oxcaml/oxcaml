@@ -44,6 +44,7 @@
 #include "caml/obj.h"
 #include "caml/runtime_events.h"
 #include "caml/startup_aux.h"
+#include "caml/scan_mask.h"
 #include "caml/shared_heap.h"
 #ifdef NATIVE_CODE
 #include "caml/stack.h"
@@ -842,6 +843,29 @@ static void fill_arena_free_space(struct caml_local_arena arena, intnat sp)
 }
 #endif
 
+/* Scan the word at [p], in a local block at [sp] in arena
+   [arena_ix]. */
+Caml_inline void scan_local_word(scanning_action f, void* fdata,
+                                 caml_local_arenas* loc,
+                                 struct global_heap_state colors,
+                                 value* p, intnat sp, int arena_ix)
+{
+  int marked_ix = visit(f, fdata, loc, colors, p);
+  if (marked_ix != -1) {
+    struct caml_local_arena a = loc->arenas[marked_ix];
+    intnat newsp = (char*)*p - (a.base + a.length);
+    if (sp <= newsp) {
+      /* forwards pointer, common case */
+      CAMLassert(marked_ix <= arena_ix);
+    } else {
+      /* If backwards pointers are ever supported (e.g. local recursive
+         values), then this should reset sp and iterate to a fixpoint */
+      CAMLassert(marked_ix >= arena_ix);
+      caml_fatal_error("backwards local pointer");
+    }
+  }
+}
+
 static void scan_local_allocations(scanning_action f, void* fdata,
                                    caml_local_arenas* loc, uintnat local_sp)
 {
@@ -894,28 +918,19 @@ static void scan_local_allocations(scanning_action f, void* fdata,
       sp += Bhsize_hd(hd);
       continue;
     }
-    i = 0;
-    if (Tag_hd(hd) == Closure_tag)
-      i = Start_env_closinfo(Closinfo_val(Val_hp(hp)));
-
-    mlsize_t scannable_wosize = Scannable_wosize_hd(hd);
-
-    for (; i < scannable_wosize; i++) {
-      value *p = Op_val(Val_hp(hp)) + i;
-      int marked_ix = visit(f, fdata, loc, colors, p);
-      if (marked_ix != -1) {
-        struct caml_local_arena a = loc->arenas[marked_ix];
-        intnat newsp = (char*)*p - (a.base + a.length);
-        if (sp <= newsp) {
-          /* forwards pointer, common case */
-          CAMLassert(marked_ix <= arena_ix);
-        } else {
-          /* If backwards pointers are ever supported (e.g. local recursive
-             values), then this should reset sp and iterate to a fixpoint */
-          CAMLassert(marked_ix >= arena_ix);
-          caml_fatal_error("backwards local pointer");
-        }
-      }
+    value v = Val_hp(hp);
+    if (Has_scan_mask_hd(hd)) {
+      caml_block_scan bs;
+      mlsize_t k;
+      caml_block_scan_init(&bs, v, hd);
+      while (caml_block_scan_next(&bs, &k))
+        scan_local_word(f, fdata, loc, colors, Op_val(v) + k, sp, arena_ix);
+    } else {
+      mlsize_t wosize = Wosize_hd(hd);
+      i = (Tag_hd(hd) == Closure_tag)
+        ? Start_env_closinfo(Closinfo_val(v)) : 0;
+      for (; i < wosize; i++)
+        scan_local_word(f, fdata, loc, colors, Op_val(v) + i, sp, arena_ix);
     }
     sp += Bhsize_hd(hd);
   }

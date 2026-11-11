@@ -27,14 +27,33 @@
 #include "caml/custom.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
+#include "caml/scan_mask.h"
+
+/* Initialize the scannable words of the new block [v], so that the
+   GC can scan it. As an optimization, unscannable words are left
+   uninitialized. */
+static void block_init_scannable(value v)
+{
+  header_t hd = Hd_val(v);
+  if (Has_scan_mask_hd(hd)) {
+    /* A block with a layout word would need it stored before this. */
+    CAMLassert(Format_hd(hd) == HEADER_FORMAT_INLINE);
+    caml_block_scan bs;
+    mlsize_t i;
+    caml_block_scan_init(&bs, v, hd);
+    while (caml_block_scan_next(&bs, &i))
+      Field(v, i) = Val_unit;
+  } else {
+    mlsize_t wosize = Wosize_hd(hd);
+    for (mlsize_t i = 0; i < wosize; i++)
+      Field(v, i) = Val_unit;
+  }
+}
 
 CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
                                            reserved_t reserved)
 {
   value result;
-
-  // Optimization: for mixed blocks, don't fill in non-scannable fields
-  mlsize_t scannable_wosize = Scannable_wosize_reserved(reserved, wosize);
 
   CAMLassert (tag < Num_tags);
   CAMLassert (tag != Infix_tag);
@@ -45,17 +64,11 @@ CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
       Caml_check_caml_state();
       Alloc_small_with_reserved (result, wosize, tag, Alloc_small_enter_GC,
                                  reserved);
-      if (Scannable_tag(tag)) {
-        for (mlsize_t i = 0; i < scannable_wosize; i++)
-          Field (result, i) = Val_unit;
-      }
+      if (Scannable_tag(tag)) block_init_scannable(result);
     }
   } else {
     result = caml_alloc_shr_reserved (wosize, tag, reserved);
-    if (Scannable_tag(tag)) {
-      for (mlsize_t i = 0; i < scannable_wosize; i++)
-        Field (result, i) = Val_unit;
-    }
+    if (Scannable_tag(tag)) block_init_scannable(result);
     result = caml_check_urgent_gc (result);
   }
   return result;
@@ -81,12 +94,7 @@ value caml_alloc_shr_reserved_check_gc (mlsize_t wosize, tag_t tag,
   CAMLassert (tag != Infix_tag);
   caml_check_urgent_gc (Val_unit);
   value result = caml_alloc_shr_reserved (wosize, tag, reserved);
-  if (Scannable_tag(tag)) {
-    mlsize_t scannable_wosize = Scannable_wosize_val(result);
-    for (mlsize_t i = 0; i < scannable_wosize; i++) {
-      Field (result, i) = Val_unit;
-    }
-  }
+  if (Scannable_tag(tag)) block_init_scannable(result);
   return result;
 }
 
