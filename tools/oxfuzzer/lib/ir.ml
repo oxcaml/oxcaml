@@ -557,7 +557,7 @@ module Expr = struct
           init_name : Name.t;
           init : t
         }
-    | Unboxed_tuple of (Name.t * t) list
+    | Unboxed_tuple of t list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -569,7 +569,7 @@ module Expr = struct
     | Construct of
         { sum : Sum.t;
           constructor : Ty.constructor;
-          args : (Name.t * t) list
+          args : t list
         }
     | Match of
         { sum : Sum.t;
@@ -706,18 +706,8 @@ module Expr = struct
           in
           make dimensions)
     | Unboxed_tuple components ->
-      let body =
-        Ast_helper.Exp.unboxed_tuple
-          (List.map
-             (fun (name, _) -> None, ident (Name.to_string name))
-             components)
-      in
-      (* CR-soon xclerc for xclerc: here to, we may want to not let-bind. *)
-      (* As with constructor payloads, sequence effectful components
-         explicitly. *)
-      List.fold_right
-        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
-        components body
+      Ast_helper.Exp.unboxed_tuple
+        (List.map (fun expr -> None, to_code expr) components)
     | Record (record, values) ->
       if List.length record.fields <> List.length values
       then Misc.fatal_errorf "Record: incorrect number of fields";
@@ -746,9 +736,7 @@ module Expr = struct
     | Construct { sum; constructor; args } ->
       if List.length args <> List.length constructor.args
       then Misc.fatal_errorf "Constructor: incorrect number of arguments";
-      let values =
-        List.map (fun (name, _) -> ident (Name.to_string name)) args
-      in
+      let values = List.map to_code args in
       let arg =
         match values with
         | [] -> None
@@ -757,17 +745,7 @@ module Expr = struct
           Some
             (Ast_helper.Exp.tuple (List.map (fun value -> None, value) values))
       in
-      let body =
-        Ast_helper.Exp.construct
-          (lid (Sum.constructor_name sum constructor))
-          arg
-      in
-      (* CR-soon xclerc for xclerc: we may want to avoid these bindings. *)
-      (* Payload expressions can have effects: explicitly sequence their
-         evaluation. *)
-      List.fold_right
-        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
-        args body
+      Ast_helper.Exp.construct (lid (Sum.constructor_name sum constructor)) arg
     | Match { sum; scrutinee; cases } ->
       Ast_helper.Exp.match_
         (constrain (Sum.ty sum) (to_code scrutinee))
