@@ -201,6 +201,22 @@ let closure n =
   ignore_local f;
   ()
 
+let recclosure n =
+  let rec f = stack_ (fun i -> if i = 0 then n else f (i - 1)) in
+  let r = f 3 in
+  assert (r = n);
+  ignore_local f;
+  ()
+
+let mutrecclosure n =
+  let rec even = stack_ (fun i -> if i = 0 then n else odd (i - 1))
+  and odd = stack_ (fun i -> if i = 0 then -n else even (i - 1)) in
+  let r = even 3 in
+  assert (r = -n);
+  ignore_local even;
+  ignore_local odd;
+  ()
+
 let local_arg_fn ~a:(local_ a) ~b:(local_ b) =
   ignore_local (a, b); ()
 let currylocal1 n =
@@ -509,6 +525,8 @@ let () =
   run "arith32" arithint32 42l;
   run "arithfloat" arithfloat 42.0;
   run "closure" closure 1;
+  run "recclosure" recclosure 1;
+  run "mutrecclosure" mutrecclosure 1;
   run "currylocal1" currylocal1 1;
   run "currylocal2" currylocal2 1;
   run "currylocal3" currylocal3 1;

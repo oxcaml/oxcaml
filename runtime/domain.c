@@ -784,6 +784,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   /* [tls_state] is scanned directly in [caml_do_roots] and by the minor GC. */
   domain_state->tls_state = Atom(0) /* Empty array */;
 
+  domain_state->thread_id = caml_fresh_thread_id();
+
   // Must happen after taking the domain lock
   caml_enable_stack_caches(domain_state->stack_caches);
 
@@ -1523,6 +1525,19 @@ CAMLprim value caml_ml_domain_index(value unit)
   return Val_long(domain_self->id);
 }
 
+static atomic_uintnat next_thread_id = 0;
+
+CAMLexport value caml_fresh_thread_id(void)
+{
+  return Val_long(atomic_fetch_add(&next_thread_id, 1));
+}
+
+CAMLprim value caml_ml_thread_self_id(value unit)
+{
+  CAMLnoalloc;
+  return Caml_state->thread_id;
+}
+
 /* Global barrier implementation */
 
 Caml_inline int global_barrier_is_nth(barrier_status b, int n) {
@@ -2145,7 +2160,9 @@ void caml_handle_gc_interrupt(void)
    kqueue in the future), we interrupt the ticker thread's sleep, causing it to
    recompute the tick interval. This provides prompt changes to the tick
    interval; otherwise we'd have to wait for the longer tick to expire before
-   reducing the tick interval.
+   reducing the tick interval. The next tick is always scheduled relative to
+   the previous one, so that frequent changes to the interval can't keep
+   pushing it back.
 
    Disabling the tick thread
    -------------------------
@@ -2212,7 +2229,15 @@ fail:
   return -1;
 }
 
-static void tick_thread_arm_timer(uintnat interval_usec)
+static uint64_t tick_thread_now_usec(void)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (uint64_t)ts.tv_sec * 1000000 + (uint64_t)ts.tv_nsec / 1000;
+}
+
+/* Arm the timer to go off at [deadline_usec]. */
+static void tick_thread_arm_timer(uint64_t deadline_usec)
 {
   struct itimerspec its;
   /* CR-someday aspsmith: We ostensibly could get better behavior / performance
@@ -2221,9 +2246,9 @@ static void tick_thread_arm_timer(uintnat interval_usec)
      worth it. But we should at least measure and see. */
   its.it_interval.tv_sec = 0;
   its.it_interval.tv_nsec = 0;
-  its.it_value.tv_sec = (time_t)(interval_usec / 1000000);
-  its.it_value.tv_nsec = (long)(interval_usec % 1000000) * 1000;
-  timerfd_settime(tick_thread.timer_fd, 0, &its, NULL);
+  its.it_value.tv_sec = (time_t)(deadline_usec / 1000000);
+  its.it_value.tv_nsec = (long)(deadline_usec % 1000000) * 1000;
+  timerfd_settime(tick_thread.timer_fd, TFD_TIMER_ABSTIME, &its, NULL);
 }
 
 static void tick_thread_wake(void)
@@ -2396,6 +2421,11 @@ static void* caml_tick(void *arg)
      version, which makes the epoll_wait ticker extremely expensive */
   if (!caml_tick_use_usleep && caml_globalsym("onload_is_present") != NULL)
     caml_tick_use_usleep = 1;
+
+#ifdef HAS_INTERRUPTIBLE_TICK
+  uint64_t last_tick_usec = tick_thread_now_usec();
+#endif
+
   while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. We use the (quite loose)
@@ -2415,14 +2445,18 @@ static void* caml_tick(void *arg)
     } else if (interval == 0) {
       /* No domain wants ticks; sleep until woken by the eventfd. */
       tick_thread_wait();
+      last_tick_usec = tick_thread_now_usec();
     } else {
-      tick_thread_arm_timer(interval);
+      tick_thread_arm_timer(last_tick_usec + interval);
       if (tick_thread_wait()) {
+        last_tick_usec = tick_thread_now_usec();
         caml_do_tick_all_domains();
       }
 
       /* If we were interrupted (rather than the timer going off), we loop back
-         to recalculate the interval and re-arm the timer. */
+         to recalculate the interval and re-arm the timer. Since the deadline
+         is measured from the last tick, this doesn't delay the next tick unless
+         the interval increased. */
     }
 #else
     if (interval > 0) {

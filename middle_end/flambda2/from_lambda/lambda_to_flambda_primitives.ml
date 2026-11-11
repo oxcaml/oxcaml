@@ -1115,7 +1115,8 @@ let multiple_word_array_access_validity_condition array ~machine_width
    load/store functions below *)
 
 let array_vector_access_validity_condition array ~machine_width
-    ~(vec_kind : Vector_types.Kind.t) (array_kind : P.Array_kind.t) index =
+    ~(vec_kind : Vector_types.Kind.t) (array_kind : P.Array_kind.t) ~index_kind
+    index =
   let size_of_element =
     match array_kind with
     | Naked_vec128s -> 16
@@ -1143,21 +1144,20 @@ let array_vector_access_validity_condition array ~machine_width
     (size_of_access + (size_of_element - 1)) / size_of_element
   in
   multiple_word_array_access_validity_condition array ~machine_width
-    (Array_kind array_kind) Ptagged_int_index
-    ~num_consecutive_elements_being_accessed ~index
+    (Array_kind array_kind) index_kind ~num_consecutive_elements_being_accessed
+    ~index
 
-let check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-    ~vec_kind primitive : H.expr_primitive =
+let check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+    ~index ~vec_kind primitive : H.expr_primitive =
   checked_access ~primitive
     ~conditions:
       [ array_vector_access_validity_condition ~machine_width ~vec_kind array
-          array_kind index ]
+          array_kind ~index_kind index ]
     ~dbg
 
 let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
     ~current_alloc_region ~current_region ~(vec_kind : Vector_types.Kind.t)
     array_kind array ~index_kind index =
-  let index = convert_index_to_tagged_int ~index ~index_kind in
   let load_kind, box =
     match vec_kind with
     | Vec128 -> P.Array_load_kind.Naked_vec128s, box_vec128
@@ -1165,6 +1165,7 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
     | Vec512 -> P.Array_load_kind.Naked_vec512s, box_vec512
   in
   let primitive =
+    let index = convert_index_to_tagged_int ~index ~index_kind in
     H.Binary (Array_load (array_kind, load_kind, Mutable), array, index)
   in
   let primitive =
@@ -1175,13 +1176,12 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
   if unsafe
   then primitive
   else
-    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-      ~vec_kind primitive
+    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+      ~index ~vec_kind primitive
 
 let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
     ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index
     new_value =
-  let index = convert_index_to_tagged_int ~index ~index_kind in
   let set_kind, unbox =
     match vec_kind with
     | Vec128 -> P.Array_set_kind.Naked_vec128s, unbox_vec128
@@ -1190,13 +1190,14 @@ let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
   in
   let new_value = if boxed then unbox new_value else new_value in
   let primitive =
+    let index = convert_index_to_tagged_int ~index ~index_kind in
     H.Ternary (Array_set (array_kind, set_kind), array, index, new_value)
   in
   if unsafe
   then primitive
   else
-    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-      ~vec_kind primitive
+    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+      ~index ~vec_kind primitive
 
 (* Bigarray accesses *)
 let bigarray_box_or_tag_raw_value_to_read kind alloc_mode =
@@ -2095,10 +2096,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
     let num_bytes = L.array_element_size_in_bytes array_kind in
-    [ Simple
-        (Simple.const_int
-           (Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
-              num_bytes)) ]
+    [Simple (Simple.const_int (Target_ocaml_int.of_int machine_width num_bytes))]
   | Pmake_idx_field pos, [] ->
     needs_64_bit_target prim dbg;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
@@ -2399,6 +2397,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Pred ->
           Binary
             (Int_arith (width, Sub), arg, Simple (const ~machine_width width 1))
+        | Not -> Unary (Int_arith (width, Not), arg)
       in
       [to_expr (maybe_wrap (Prim result))]
     | Floating (outer, op) ->
@@ -3557,6 +3556,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ptls_get, _ -> [Nullary Tls_get]
   | Pdomain_index, _ -> [Nullary Domain_index]
+  | Pthread_self_id, _ -> [Nullary Thread_self_id]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
     if not (Target_system.is_64_bit ())

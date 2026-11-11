@@ -49,7 +49,11 @@ module Sort : sig
        and type var = Jkind_types.Sort.var
        and type univar = Jkind_types.Sort.univar
        and type base = Jkind_types.Sort.base
+       and type level_error = Jkind_types.Sort.level_error
+       and type error = Jkind_types.Sort.error
        and type Const.t = Jkind_types.Sort.Const.t
+
+  val new_var : level:int -> var
 
   module Flat : sig
     (** A flat sort is returned from [get]. *)
@@ -66,7 +70,7 @@ type sort = Sort.t
 module Sub_failure_reason : sig
   type t = Jkind0.Violation.Sub_failure_reason.t =
     | Axis_disagreement of Jkind_axis.Axis.packed
-    | Layout_disagreement
+    | Layout_disagreement of Jkind_types.Sort.error
     | With_bounds_on_left
     | Constrain_ran_out_of_fuel
 end
@@ -297,7 +301,11 @@ module Const : sig
   (** Creates an abstract jkind, with max with-bounds, from the path. *)
   val of_path : Path.t -> (allowed * allowed) t
 
-  val equal : Env.t -> (allowed * allowed) t -> (allowed * allowed) t -> bool
+  val equal :
+    Env.t ->
+    (allowed * allowed) t ->
+    (allowed * allowed) t ->
+    (unit, Sort.error) result
 
   (* [use_abstract_jkinds] controls whether references to other kinds here count
      as uses of them for unused abstract kind warnings. *)
@@ -359,22 +367,6 @@ module Builtin : sig
   (** Values of types of this jkind are either immediate or null pointers *)
   val immediate_or_null :
     why:History.immediate_or_null_creation_reason -> 'd Types.jkind
-
-  (** Build a jkind of unboxed products, from a list of types with their
-      layouts. Errors if zero inputs are given.
-
-      Precondition: both input lists are the same length.
-
-      This returns an [jkind_l] simply as a matter of convenience; it can be
-      generalized if need be.
-
-      The resulting jkind has quality [Best], because all the components of the
-      product are represented in the with-bounds. *)
-  val product :
-    why:History.product_creation_reason ->
-    (Types.type_expr * Mode.Modality.Const.t) list ->
-    Sort.t Layout.t list ->
-    Types.jkind_l
 
   (** Build a jkind of unboxed products, given only an arity. This jkind will
       not mode-cross (and has kind [Not_best] accordingly), even though unboxed
@@ -493,6 +485,78 @@ val of_type_decl_overapproximate_unknown :
   Parsetree.type_declaration ->
   Types.jkind_l option
 
+module Unboxed_field_transformation : sig
+  (** The kind of an unboxed container is built from the kinds of its unboxed
+      contents (which get stored inline), transformed based on the modalities
+      and [mutable] labels on its fields (to strengthen or weaken mode crossing,
+      respectively).
+
+      An [Unboxed_field_transformation.t] represents such a kind transformation
+      as data. *)
+  type t
+
+  (** The identity transformation, for immutable fields without modalities. *)
+  val id : t
+
+  (** Constructs the transformation for a field declared with the given
+      mutability and modality, representing the transformation of [t]'s kind
+      into [r]'s in the following example:
+      {[
+        type r = #{ <<mutability>> x : t @@ <<modality>> }
+      ]} *)
+  val of_field :
+    mutability:Types.mutability -> modality:Mode.Modality.Const.t -> t
+
+  (** Constructs the transformation for an immutable field declared with the
+      given modality. *)
+  val of_modality : Mode.Modality.Const.t -> t
+
+  (** Constructs the transformation for an field with the given label. *)
+  val of_label : Types.label_declaration -> t
+
+  (** [nest ~outer ~inner] composes transformations, for fields reached through
+      nested unboxed containers. *)
+  val nest : outer:t -> inner:t -> t
+
+  (** Executes [t]'s transformation on the kind of some unboxed contents to turn
+      it into (its contribution to) the kind of its unboxed container. *)
+  val apply_l : t -> (allowed * 'r) Types.jkind -> Types.jkind_l
+
+  (** Executes [t]'s transformation on an expectation for an unboxed container
+      to turn it into an expectation on its unboxed contents, checking if the
+      transformation result is satisfiable and failing if it is not. *)
+  val apply_r : t -> ('l * allowed) Types.jkind -> (Types.jkind_r, unit) result
+
+  (** Translates a violation from checking some unboxed contents against
+      [apply_r t jk] into a violation of their unboxed container against [jk].
+      Returns [None] if the violation is not a [Not_a_subjkind]. *)
+  val unapply_violation :
+    context:jkind_context ->
+    Env.t ->
+    t ->
+    history:Types.jkind_history ->
+    ('l * allowed) Types.jkind ->
+    Violation.t ->
+    Violation.t option
+end
+
+(** Build a jkind of unboxed products, from a list of types, their layouts, and
+    how they are transformed when placed in an unboxed container. Errors if zero
+    inputs are given.
+
+    Precondition: both input lists are the same length.
+
+    This returns an [jkind_l] simply as a matter of convenience; it can be
+    generalized if need be.
+
+    The resulting jkind has quality [Best], because all the components of the
+    product are represented in the with-bounds. *)
+val product_of_fields :
+  why:History.product_creation_reason ->
+  (Types.type_expr * Unboxed_field_transformation.t) list ->
+  Sort.t Layout.t list ->
+  Types.jkind_l
+
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
@@ -554,8 +618,9 @@ val for_object : Types.jkind_l
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
 
-(** The jkind for an abbreviation declaration. This implements the design in
-    rule FIND_ABBREV in kind-inference.md, where we consider a definition
+(** The jkind for an abbreviation declaration (including unboxed singletons).
+    This implements the design in rule FIND_ABBREV in kind-inference.md, where
+    we consider a definition
 
     {[
       type ... = rhs
@@ -570,10 +635,13 @@ val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
       end = struct
         type 'a t = 'a
       end
-    ]} *)
+    ]}
+
+    For unboxed singletons, we further transform this kind using the given
+    transformation, as it may have modalities or a [mutable] label. *)
 val for_abbreviation :
   type_jkind_purely:(Types.type_expr -> Types.jkind_l) ->
-  modality:Mode.Modality.Const.t ->
+  Unboxed_field_transformation.t ->
   Types.type_expr ->
   Types.jkind_l
 
@@ -618,6 +686,17 @@ val default_to_scannable : 'd Types.jkind -> unit
 (** Generalize the sorts in a jkind when in sort generalization context. Only
     has an effect when called within {!Sort.generalize_with}. *)
 val generalize : current_level:int -> 'd Types.jkind -> unit
+
+(** Updates the levels of sort variables in the jkind.
+
+    This function only succeeds if the kind can be expanded so that an abstract
+    kind does not escape its scope. If no expansion is needed, [None] is
+    returned, otherwise the expanded kind is returned. *)
+val update_level :
+  Env.t ->
+  int ->
+  'd Types.jkind ->
+  ('d Types.jkind option, Sort.level_error) result
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)
@@ -796,14 +875,16 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds equal,
     if possible. e.g. [equate] on a var and [value] will set the variable to be
     [value] *)
-val equate : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equate :
+  Env.t -> Types.jkind_lr -> Types.jkind_lr -> (unit, Sort.error) result
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
-val equal : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equal :
+  Env.t -> Types.jkind_lr -> Types.jkind_lr -> (unit, Sort.error) result
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate sort
     variables. Works over any mix of l- and r-jkinds, because the only way not

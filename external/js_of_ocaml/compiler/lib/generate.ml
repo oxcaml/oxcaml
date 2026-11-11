@@ -434,7 +434,8 @@ module Ctx = struct
     ; share : Share.t
     ; exported_runtime : (Code.Var.t * bool ref) option
     ; should_export : bool
-    ; effect_warning : bool ref
+    ; effect_warning : bool ref [@warning "-69"]
+    (* Downstream: only read by the code commented out in the [%perform] case. *)
     ; trampolined_calls : Effects.trampolined_calls
     ; deadcode_sentinel : Var.t
     ; mutated_vars : Code.Var.Set.t Code.Addr.Map.t
@@ -1460,6 +1461,10 @@ let _ =
       let s = J.EBin (J.Plus, str_js_utf8 "", cx) in
       ocaml_string ~ctx ~loc s);
   register_un_prim "%direct_obj_tag" `Pure (fun cx _loc -> Mlvalue.Block.tag cx);
+  (* Emitted by the OxCaml JSIR backend when the argument is not known to be a
+     block. *)
+  register_un_prim "%direct_obj_tag_nullish" `Pure (fun cx _loc ->
+      Mlvalue.Block.tag_nullish cx);
   register_bin_prims
     [ "caml_array_unsafe_get"
     ; "caml_array_unsafe_get_float"

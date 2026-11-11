@@ -83,5 +83,6 @@ let _ =
  reason = "Backtraces are broken by the use of reraise";
  flags = "-g";
  ocamlrunparam += ",b=1";
+ readonly_files = "sanitize-backtrace.sh";
  skip;
 *)

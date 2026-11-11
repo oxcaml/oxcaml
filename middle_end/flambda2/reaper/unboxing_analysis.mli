@@ -99,8 +99,8 @@ val find_code_metadata :
 val pp_result : Format.formatter -> result -> unit
 
 val perform_analysis :
+  ?stats:Datalog.Schedule.stats ->
   Datalog.database ->
-  stats:Datalog.Schedule.stats ->
   analysis_scope:Analysis_scope.t ->
   result
 
@@ -115,5 +115,5 @@ val compute_code_changes :
     results:(Variable.t * Points_to_analysis.keep_or_delete) list ->
     Result_types.t ->
     Result_types.t Or_unknown_or_bottom.t) ->
-  code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+  code_deps:Traverse_acc.Code_dep.t Code_id.Map.t ->
   code_changes

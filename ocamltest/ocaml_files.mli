@@ -50,6 +50,7 @@ val ocamldoc : string
 val ocamldebug : string
 val ocamlobjinfo : string
 val ocamlmklib : string
+val ocamlfilt : string
 val codegen : string
 
 val fexprc : string

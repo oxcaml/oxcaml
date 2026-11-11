@@ -647,3 +647,102 @@ let [@warning "-26"] foo_21 =
 [%%expect{|
 val foo_21 : int = 42
 |}]
+
+(* Test 22: the body of a [try], and the scrutinee of a [match] with exception
+   cases, are regions for the purpose of environment lookups. The handler frees
+   everything stack-allocated in them, so a value assigned there to a mutable
+   variable bound outside must not have been allocated inside. *)
+type r_22 = { mutable a_22 : int }
+
+let foo_22 n =
+  let mutable x = { a_22 = 1 } in
+  (try x <- stack_ { a_22 = n }; raise Exit with Exit -> ());
+  x.a_22
+[%%expect{|
+type r_22 = { mutable a_22 : int; }
+Line 5, characters 12-31:
+5 |   (try x <- stack_ { a_22 = n }; raise Exit with Exit -> ());
+                ^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
+|}]
+
+let bar_22 n =
+  let mutable x = { a_22 = 1 } in
+  (match x <- stack_ { a_22 = n }; raise Exit with
+   | () -> ()
+   | exception Exit -> ());
+  x.a_22
+[%%expect{|
+Line 3, characters 14-33:
+3 |   (match x <- stack_ { a_22 = n }; raise Exit with
+                  ^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
+|}]
+
+(* Heap values, and values from the caller's region, are fine. *)
+let baz_22 n (local_ r : r_22) =
+  let mutable x = { a_22 = 1 } in
+  (try x <- { a_22 = n }; x <- r; raise Exit with Exit -> ());
+  x.a_22
+[%%expect{|
+val baz_22 : int -> r_22 @ local -> int = <fun>
+|}]
+
+(* Values allocated before the [try] are fine. *)
+let before_22 n =
+  let mutable x = { a_22 = 1 } in
+  let y = stack_ { a_22 = n } in
+  (try x <- y; raise Exit with Exit -> ());
+  x.a_22
+[%%expect{|
+val before_22 : int -> int = <fun>
+|}]
+
+(* Values allocated inside the [try] are not, even when bound to a variable. *)
+let inside_22 n =
+  let mutable x = { a_22 = 1 } in
+  (try let y = stack_ { a_22 = n } in x <- y; raise Exit with Exit -> ());
+  x.a_22
+[%%expect{|
+Line 3, characters 43-44:
+3 |   (try let y = stack_ { a_22 = n } in x <- y; raise Exit with Exit -> ());
+                                               ^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
+|}]
+
+(* The value of the [try] is allowed to be local, since the body is not closed
+   on the normal path. *)
+let value_22 n =
+  let r = try stack_ { a_22 = n } with Exit -> stack_ { a_22 = 0 } in
+  r.a_22
+[%%expect{|
+val value_22 : int -> int = <fun>
+|}]
+
+(* The body has no tail, so [exclave_] is not allowed in it. *)
+let exclave_22 n =
+  let mutable x = { a_22 = 1 } in
+  (try exclave_ (x <- stack_ { a_22 = n }; raise Exit) with Exit -> ());
+  x.a_22
+[%%expect{|
+Line 3, characters 7-54:
+3 |   (try exclave_ (x <- stack_ { a_22 = n }; raise Exit) with Exit -> ());
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Exclave expression should only be in tail position of the current region.
+|}]
+
+let exclave_match_22 n =
+  let mutable x = { a_22 = 1 } in
+  (match exclave_ (x <- stack_ { a_22 = n }; raise Exit) with
+   | () -> ()
+   | exception Exit -> ());
+  x.a_22
+[%%expect{|
+Line 3, characters 9-56:
+3 |   (match exclave_ (x <- stack_ { a_22 = n }; raise Exit) with
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Exclave expression should only be in tail position of the current region.
+|}]

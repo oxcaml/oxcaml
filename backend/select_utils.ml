@@ -226,13 +226,15 @@ let oper_result_type = function
   | Cdls_get -> typ_val
   | Ctls_get -> typ_val
   | Cdomain_index -> typ_int
+  | Cthread_self_id -> typ_int
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
-  | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Cnot | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _
+  | Ccmpf _ ->
     typ_int
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
@@ -290,7 +292,7 @@ let oper_result_type = function
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void
   | Cprobe_is_enabled _ -> typ_int
-  | Copaque -> typ_val
+  | Copaque ty -> ty
   | Cpoll | Cpause -> typ_void
   | Cbeginregion ->
     (* This must not be typ_val; the begin-region operation returns a naked
@@ -690,7 +692,7 @@ module Stack_offset_and_exn = struct
         | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
         | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
         | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Poll | Pause | Alloc _ )
+        | Domain_index | Thread_self_id | Poll | Pause | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
@@ -761,8 +763,6 @@ let make_const_vec256 x = Operation.Const_vec256 x
 let make_const_vec512 x = Operation.Const_vec512 x
 
 let make_const_symbol x = Operation.Const_symbol x
-
-let make_opaque () = Operation.Opaque
 
 let insert_debug (env : environment) sub_cfg basic dbg arg res =
   let phantom_available_before = phantom_vars_from_env env in

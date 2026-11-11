@@ -379,8 +379,9 @@ let attrs s x =
   | No_action -> x
 
 let rec module_path s path =
-  try Path.Map.find path s.modules
-  with Not_found ->
+  match Path.Map.find_opt path s.modules with
+  | Some p -> p
+  | None ->
     match path with
     | Pident _ -> path
     | Pdot(p, n) ->
@@ -659,8 +660,12 @@ let rec typexp copy_scope s ty =
         if jk == jk' then desc, false else
           let desc =
             match desc with
-            | Tvar tv -> Tvar { tv with jkind = jk' }
-            | Tunivar tv -> Tunivar { tv with jkind = jk' }
+            | Tvar tv ->
+              if get_level ty = generic_level
+              then Tvar { tv with jkind = jk' }
+              else Misc.fatal_error "Subst.typexp: weak variable copy"
+            | Tunivar tv ->
+              Tunivar { tv with jkind = jk' }
             | _ -> assert false
           in
           desc, true

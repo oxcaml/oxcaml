@@ -57,6 +57,7 @@ type pinpoint = Location.t * pinpoint_desc
 type mutable_part =
   | Record_field of string
   | Array_elements
+  | Address_contents
 
 type always_dynamic =
   | Application
@@ -70,7 +71,10 @@ type legacy =
   | Quoted
 
 (* CR-soon zqian: add loop and function body to [region_desc] *)
-type region_desc = Borrow
+type region_desc =
+  | Borrow
+  | Try_body
+  | Match_with_exception
 
 type region = Location.t * region_desc
 
@@ -89,6 +93,7 @@ type containing =
   | Tuple
   | Record of string * modality
   | Array of modality
+  | Address of modality
   | Constructor of string * modality
   | Structure of structure_item * modality
 (* Some structure items (such as classes) don't have modalities. We gloss over
@@ -178,7 +183,6 @@ type allocation_desc =
   | Optional_argument
   | Function_coercion
   | Float_projection
-  | Lpoly_captured_environment
   | Captured_by_partial_application
 
 type allocation = allocation_desc Location.loc

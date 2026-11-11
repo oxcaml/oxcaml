@@ -135,3 +135,29 @@ let db = Schedule.run schedule db
 
 let () =
   Format.eprintf "@[<v 2>Database after schedule:@ @[<v>%a@]@]@.@." print db
+
+(* Tests of the value API - propagate the minimum ID of an ancestor node *)
+
+let int_min_repr =
+  lattice_repr ~print:Format.pp_print_int ~meet:min ~diff_or_null:(fun y x ->
+      if y >= x then Null else This y)
+
+let min_ancestor = create_table ~name:"min_ancestor" [node] int_min_repr
+
+let db =
+  db
+  |> set_table min_ancestor
+       (Node.Map.of_list [n1, 1; n2, 2; n3, 3; n4, 4; n5, 5])
+
+let schedule =
+  Schedule.saturate
+    [ compile ["X"; "Y"; "V"] (fun [x; y; v] ->
+          where
+            [edge [x; y]; less_than_or_equal min_ancestor [x] v]
+            (deduce (less_than_or_equal min_ancestor [y] v))) ]
+
+let db = Schedule.run schedule db
+
+let () =
+  Format.eprintf
+    "@[<v 2>Database after min_ancestor computation:@ @[<v>%a@]@]@.@." print db

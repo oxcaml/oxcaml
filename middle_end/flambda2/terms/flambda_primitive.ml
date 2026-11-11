@@ -989,11 +989,15 @@ type num_dimensions = int
 
 let print_num_dimensions ppf d = Format.fprintf ppf "%d" d
 
-type unary_int_arith_op = Swap_byte_endianness
+type unary_int_arith_op =
+  | Swap_byte_endianness
+  | Not
 
 let print_unary_int_arith_op ppf o =
   let fprintf = Format.fprintf in
-  match o with Swap_byte_endianness -> fprintf ppf "bswap"
+  match o with
+  | Swap_byte_endianness -> fprintf ppf "bswap"
+  | Not -> fprintf ppf "not"
 
 type unary_float_arith_op =
   | Abs
@@ -1031,12 +1035,13 @@ type nullary_primitive =
   | Dls_get
   | Tls_get
   | Domain_index
+  | Thread_self_id
   | Poll
   | Cpu_relax
 
 let nullary_primitive_eligible_for_cse = function
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax ->
     false
 
 let compare_nullary_primitive p1 p2 =
@@ -1049,8 +1054,9 @@ let compare_nullary_primitive p1 p2 =
     | Dls_get -> 4
     | Tls_get -> 5
     | Domain_index -> 6
-    | Poll -> 7
-    | Cpu_relax -> 8
+    | Thread_self_id -> 7
+    | Poll -> 8
+    | Cpu_relax -> 9
   in
   match p1, p2 with
   | Invalid k1, Invalid k2 -> K.compare k1 k2
@@ -1071,10 +1077,11 @@ let compare_nullary_primitive p1 p2 =
   | Dls_get, Dls_get -> 0
   | Tls_get, Tls_get -> 0
   | Domain_index, Domain_index -> 0
+  | Thread_self_id, Thread_self_id -> 0
   | Poll, Poll -> 0
   | Cpu_relax, Cpu_relax -> 0
   | ( ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ),
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax ),
       _ ) ->
     Int.compare
       (nullary_primitive_numbering p1)
@@ -1101,6 +1108,7 @@ let print_nullary_primitive ppf p =
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
   | Tls_get -> Format.pp_print_string ppf "Tls_get"
   | Domain_index -> Format.pp_print_string ppf "Domain_index"
+  | Thread_self_id -> Format.pp_print_string ppf "Thread_self_id"
   | Poll -> Format.pp_print_string ppf "Poll"
   | Cpu_relax -> Format.pp_print_string ppf "Cpu_relax"
 
@@ -1110,7 +1118,7 @@ let result_kind_of_nullary_primitive p : result_kind =
   | Optimised_out k -> Singleton k
   | Probe_is_enabled _ -> Singleton K.naked_immediate
   | Enter_inlined_apply _ -> Unit
-  | Dls_get | Tls_get -> Singleton K.value
+  | Dls_get | Tls_get | Thread_self_id -> Singleton K.value
   | Domain_index -> Singleton K.naked_immediate
   | Poll | Cpu_relax -> Unit
 
@@ -1132,7 +1140,7 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
     (* This doesn't really have effects, but without effects, these primitives
        get deleted during lambda_to_flambda. *)
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
-  | Dls_get | Tls_get | Domain_index ->
+  | Dls_get | Tls_get | Domain_index | Thread_self_id ->
     No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Poll | Cpu_relax ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
@@ -1140,13 +1148,13 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
 let nullary_classify_for_printing p =
   match p with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax ->
     Neither
 
 let free_names_nullary_primitive p =
   match p with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax ->
     Name_occurrences.empty
 
 module Reinterpret_64_bit_word = struct
@@ -1603,7 +1611,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
       Can't_move_before_any_branch )
   | Opaque_identity _ ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
-  | Int_arith (_, Swap_byte_endianness)
+  | Int_arith (_, (Swap_byte_endianness | Not))
   | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
   | Reinterpret_boxed_vector ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
@@ -2847,7 +2855,8 @@ let apply_renaming t renaming =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax )
+    ->
     t
   | Unary (prim, x0) ->
     let prim' = apply_renaming_unary_primitive prim renaming in
@@ -2886,7 +2895,8 @@ let ids_for_export t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax )
+    ->
     Ids_for_export.empty
   | Unary (prim, x0) ->
     Ids_for_export.union

@@ -71,8 +71,8 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     Acc.create_unknown_arity_call_witnesses acc code_id ~is_tupled ~arity
       ~params ~returns:return ~exn
   in
-  let code_dep =
-    { Traverse_acc.code_metadata = Code.code_metadata code;
+  let code_dep : Acc.Code_dep.t =
+    { code_metadata = Code.code_metadata code;
       return;
       my_closure;
       exn;
@@ -213,7 +213,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         Acc.add_accessor_dep acc ~to_ (Field.boxed_number bn) ~base:name)
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax )
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax )
   | Unary
       ( ( Duplicate_block _ | Duplicate_array _
         | Is_int { variant_only = false }
@@ -539,7 +539,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
   let make_set_of_closures set_of_closures =
     let function_decls = Set_of_closures.function_decls set_of_closures in
     let value_slots = Set_of_closures.value_slots set_of_closures in
-    { function_decls; value_slots }
+    let dbg = Set_of_closures.debuginfo set_of_closures in
+    { function_decls; value_slots; dbg }
   in
   let named : rev_named =
     match defining_expr with
@@ -689,7 +690,7 @@ and traverse_cont_handler : type a.
       k handler acc)
 
 and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
-    ~all_constants ~function_slots_to_keep ~value_slots_to_keep : rev_code =
+    ~all_constants ~function_slots_to_keep ~value_slots_to_keep : Rev_code.t =
   let params_and_body = Code.params_and_body code in
   Function_params_and_body.pattern_match params_and_body
     ~f:(fun
@@ -709,7 +710,7 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
 
 and traverse_function_params_and_body acc code_id code ~return_continuation
     ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~all_constants
-    ~function_slots_to_keep ~value_slots_to_keep ~my_depth : rev_code =
+    ~function_slots_to_keep ~value_slots_to_keep ~my_depth : Rev_code.t =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
   (* Note: this significantly degrades the analysis on code being checked by the
@@ -824,8 +825,8 @@ end
 module Problem = struct
   type 'f t =
     { deps : Global_flow_graph.graph;
-      code_deps : Traverse_acc.code_dep Code_id.Map.t;
-      delayed_deps : Traverse_acc.delayed_deps;
+      code_deps : Traverse_acc.Code_dep.t Code_id.Map.t;
+      delayed_deps : Traverse_acc.Delayed_deps.t;
       applications : Acc.Applications.t;
       free_names : Name_occurrences.t;
       toplevel_return : Code_id_or_name.t;
@@ -836,15 +837,111 @@ module Problem = struct
       final_typing_env : ('f, typing_env) With_types.t;
       module_symbol : ('f, Symbol.t) With_types.t
     }
+
+  let ids_for_export
+      { deps;
+        code_deps;
+        delayed_deps;
+        applications;
+        free_names;
+        toplevel_return;
+        all_sets_of_closures = Without_types;
+        final_typing_env = Without_types;
+        module_symbol = Without_types
+      } =
+    Ids_for_export.union_list
+      [ Global_flow_graph.ids_for_export deps;
+        Ids_for_export.ids_for_export_code_id_map Acc.Code_dep.ids_for_export
+          code_deps;
+        Acc.Delayed_deps.ids_for_export delayed_deps;
+        Acc.Applications.ids_for_export applications;
+        Name_occurrences.ids_for_export free_names;
+        Ids_for_export.add_code_id_or_name Ids_for_export.empty toplevel_return
+      ]
+
+  let apply_renaming
+      { deps;
+        code_deps;
+        delayed_deps;
+        applications;
+        free_names;
+        toplevel_return;
+        all_sets_of_closures = Without_types;
+        final_typing_env = Without_types;
+        module_symbol = Without_types
+      } renaming =
+    { deps = Global_flow_graph.apply_renaming deps renaming;
+      code_deps =
+        Renaming.apply_code_id_map Acc.Code_dep.apply_renaming renaming
+          code_deps;
+      delayed_deps = Acc.Delayed_deps.apply_renaming delayed_deps renaming;
+      applications = Acc.Applications.apply_renaming applications renaming;
+      free_names = Name_occurrences.apply_renaming free_names renaming;
+      toplevel_return = Renaming.apply_code_id_or_name renaming toplevel_return;
+      all_sets_of_closures = Without_types;
+      final_typing_env = Without_types;
+      module_symbol = Without_types
+    }
 end
 
 module Skeleton = struct
   type t =
     { toplevel_expr : Rev_expr.t;
-      code : Rev_expr.rev_code Code_id.Map.t;
+      code : Rev_expr.Rev_code.t Code_id.Map.t;
       ordered_code_ids : Code_id.t array;
       fixed_arity_continuations : Continuation.Set.t;
-      continuation_info : Acc.continuation_info Continuation.Map.t
+      continuation_info : Acc.Continuation_info.t Continuation.Map.t;
+      metadata : Flambda_unit.Metadata.t
+    }
+
+  let ids_for_export
+      { toplevel_expr;
+        code;
+        ordered_code_ids;
+        fixed_arity_continuations;
+        continuation_info;
+        metadata
+      } =
+    Ids_for_export.union_list
+      [ Rev_expr.ids_for_export toplevel_expr;
+        Ids_for_export.ids_for_export_code_id_map
+          Rev_expr.Rev_code.ids_for_export code;
+        Array.fold_left Ids_for_export.add_code_id Ids_for_export.empty
+          ordered_code_ids;
+        Ids_for_export.ids_for_export_continuation_set fixed_arity_continuations;
+        Flambda_unit.Metadata.ids_for_export metadata;
+        Ids_for_export.ids_for_export_continuation_map
+          Acc.Continuation_info.ids_for_export continuation_info ]
+
+  let apply_renaming
+      { toplevel_expr;
+        code;
+        ordered_code_ids;
+        fixed_arity_continuations;
+        continuation_info;
+        metadata
+      } renaming =
+    let toplevel_expr = Rev_expr.apply_renaming toplevel_expr renaming in
+    let code =
+      Renaming.apply_code_id_map Rev_expr.Rev_code.apply_renaming renaming code
+    in
+    let ordered_code_ids =
+      Array.map (Renaming.apply_code_id renaming) ordered_code_ids
+    in
+    let fixed_arity_continuations =
+      Renaming.apply_continuation_set renaming fixed_arity_continuations
+    in
+    let continuation_info =
+      Renaming.apply_continuation_map Acc.Continuation_info.apply_renaming
+        renaming continuation_info
+    in
+    let metadata = Flambda_unit.Metadata.apply_renaming metadata renaming in
+    { toplevel_expr;
+      code;
+      ordered_code_ids;
+      fixed_arity_continuations;
+      continuation_info;
+      metadata
     }
 end
 
@@ -891,16 +988,31 @@ let run0 unit acc ~free_names ~all_constants () =
          ~function_slots_to_keep ~value_slots_to_keep)
       acc (Flambda_unit.body unit) )
 
-let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
+let run (type f) (unit : Flambda_unit.t)
+    ~(final_typing_env : (f, _) With_types.t) ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
   let toplevel_return, holed =
     Profile.record_call ~accumulate:false "down"
       (run0 unit acc ~free_names ~all_constants)
   in
+  (* If we are forgetting types, forget the result types in the code metadata
+     now, to make sure they won't be stored. *)
+  let code_deps =
+    match final_typing_env with
+    | With_types _ -> Acc.code_deps acc
+    | Without_types ->
+      Code_id.Map.map
+        (fun (code_dep : Acc.Code_dep.t) ->
+          { code_dep with
+            code_metadata =
+              Code_metadata.with_result_types Unknown code_dep.code_metadata
+          })
+        (Acc.code_deps acc)
+  in
   let problem =
     { Problem.deps = Acc.deps acc;
-      code_deps = Acc.code_deps acc;
+      code_deps;
       delayed_deps = Acc.delayed_deps acc;
       applications = Acc.applications acc;
       free_names;
@@ -921,7 +1033,8 @@ let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
       code = Acc.get_all_code acc;
       ordered_code_ids = Acc.sort_code_ids acc;
       fixed_arity_continuations = Acc.fixed_arity_continuations acc;
-      continuation_info = Acc.get_continuation_info acc
+      continuation_info = Acc.get_continuation_info acc;
+      metadata = Flambda_unit.metadata unit
     }
   in
   problem, skeleton

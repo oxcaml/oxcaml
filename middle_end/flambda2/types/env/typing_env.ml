@@ -1210,38 +1210,43 @@ end = struct
 
   let ids_for_export
       { defined_symbols_without_equations; code_age_relation; names_to_types } =
-    Ids_for_export.create
-      ~symbols:(Symbol.Set.of_list defined_symbols_without_equations)
-      ~code_ids:(Code_age_relation.all_code_ids_for_export code_age_relation)
-      ()
-    |> Name.Map.fold
-         (fun name (typ, _binding_time_and_mode) ids ->
-           Ids_for_export.add_name
-             (Ids_for_export.union ids (Type_grammar.ids_for_export typ))
-             name)
-         names_to_types
+    Ids_for_export.union
+      (Ids_for_export.create
+         ~symbols:(Symbol.Set.of_list defined_symbols_without_equations)
+         ~code_ids:(Code_age_relation.all_code_ids_for_export code_age_relation)
+         ())
+      (Ids_for_export.ids_for_export_name_map
+         (fun (typ, _binding_time_and_mode) -> Type_grammar.ids_for_export typ)
+         names_to_types)
 
   let apply_renaming
-      { defined_symbols_without_equations; code_age_relation; names_to_types }
-      renaming =
-    let defined_symbols_without_equations =
-      List.map
+      ({ defined_symbols_without_equations; code_age_relation; names_to_types }
+       as t) renaming =
+    let defined_symbols_without_equations' =
+      Misc.Stdlib.List.map_sharing
         (Renaming.apply_symbol renaming)
         defined_symbols_without_equations
     in
-    let code_age_relation =
+    let code_age_relation' =
       Code_age_relation.apply_renaming code_age_relation renaming
     in
-    let names_to_types =
-      Name.Map.fold
-        (fun name (ty, binding_time_and_mode) acc ->
-          Name.Map.add
-            (Renaming.apply_name renaming name)
-            (Type_grammar.apply_renaming ty renaming, binding_time_and_mode)
-            acc)
-        names_to_types Name.Map.empty
+    let names_to_types' =
+      Renaming.apply_name_map
+        (fun ((ty, binding_time_and_mode) as v) renaming ->
+          let ty' = Type_grammar.apply_renaming ty renaming in
+          if ty == ty' then v else ty', binding_time_and_mode)
+        renaming names_to_types
     in
-    { defined_symbols_without_equations; code_age_relation; names_to_types }
+    if
+      defined_symbols_without_equations == defined_symbols_without_equations'
+      && code_age_relation == code_age_relation'
+      && names_to_types == names_to_types'
+    then t
+    else
+      { defined_symbols_without_equations = defined_symbols_without_equations';
+        code_age_relation = code_age_relation';
+        names_to_types = names_to_types'
+      }
 
   let merge (t1 : t) (t2 : t) : t =
     let defined_symbols_without_equations =

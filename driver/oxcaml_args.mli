@@ -134,6 +134,7 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+  val fdo_counters : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val reaper_debug_flags : string -> unit
@@ -161,6 +162,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val lto_support : unit -> unit
+  val no_lto_support : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
@@ -222,6 +225,9 @@ module type Oxcaml_options = sig
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
+  val target : Clflags.Target.t -> unit
+  val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
+  val djsir : unit -> unit
   val x : string -> unit
 end
 

@@ -18,12 +18,7 @@ open Effect.Deep
 let num_keys = 300
 module TLS = Domain.Safe.TLS
 
-let get (type a : value mod many portable contended) (k : a ref TLS.key) : a =
-  (TLS.access k (fun r -> { Modes.Global.global = !r })).global
-let set (type a : value mod many portable contended) (k : a ref TLS.key) (v : a) =
-  TLS.access k (fun r -> r := v) [@nontail]
-
-let keys = Array.init num_keys (fun _ -> TLS.new_key (fun () -> ref (-1)))
+let keys = Array.init num_keys (fun _ -> TLS.new_key (fun () -> -1))
 
 let () =
   let preemptions = ref 0 in
@@ -33,12 +28,12 @@ let () =
             (* Even indices are written from a nested non-preemptible fiber,
                which shares (and grows) this fiber's state. *)
             if i mod 2 = 0 then
-              match_with (fun () -> set keys.(i) (i * i)) ()
+              match_with (fun () -> TLS.set keys.(i) (i * i)) ()
                 { retc = Fun.id; exnc = raise;
                   effc = (fun (type a) (_ : a Effect.t) -> None) }
-            else set keys.(i) (i * i);
+            else TLS.set keys.(i) (i * i);
             for j = 0 to i do
-              assert (get keys.(j) = j * j)
+              assert (TLS.get keys.(j) = j * j)
             done
           done;
           (* Make sure at least one preemption actually interleaved. *)
@@ -47,7 +42,7 @@ let () =
             if Sys.time () -. start_at > 5. then failwith "Timed out after 5s"
           done;
           for j = 0 to num_keys - 1 do
-            assert (get keys.(j) = j * j)
+            assert (TLS.get keys.(j) = j * j)
           done)
         ()
         { retc = Fun.id; exnc = raise;
@@ -59,5 +54,5 @@ let () =
             | _ -> None);
           tickc = This (fun () -> Preempt) });
   (* The thread's own keys were never set. *)
-  assert (get keys.(0) = -1);
+  assert (TLS.get keys.(0) = -1);
   print_endline "OK"
