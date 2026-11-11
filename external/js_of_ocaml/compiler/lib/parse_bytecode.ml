@@ -3670,6 +3670,7 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
   let { Code.target
       ; program
       ; last_var
+      ; var_names
       ; imported_compilation_units
       ; exported_compilation_unit
       ; force_link
@@ -3682,6 +3683,7 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
      This means that it is enough for fresh variables to be larger than any
      variable of any unit. *)
   Code.Var.set_last last_var;
+  List.iter var_names ~f:(fun (var, name) -> Code.Variable_name.set var name);
   let unit =
     { name = exported_compilation_unit
     ; target

@@ -109,8 +109,6 @@ let run ?input_left_in ~target ~(phase : Clflags.Jsoo_phase.t) subcommand args =
   | exception Sys_error _ ->
     raise (Error (Program_not_found { target; program }))
 
-let debuginfo_args () = if !Clflags.debug then ["--debuginfo"] else []
-
 (* The files of a target that correspond to the native backend's. *)
 type extensions =
   { obj : string;
@@ -159,14 +157,33 @@ let jsir_target : Clflags.Jsir_target.t -> Jsoo_imports.Code.jsir_target =
   | Js -> Js
   | Wasm -> Wasm
 
+(* [Var] also keeps the names of variables in mutable state. This returns those
+   of the variables from [first_var] on. *)
+let var_names ~first_var =
+  let open Jsoo_imports.Code in
+  let rec names i acc =
+    if i < first_var
+    then acc
+    else
+      let var = Var.of_idx i in
+      match Variable_name.of_var var with
+      | Some name -> names (i - 1) ((var, name) :: acc)
+      | None -> names (i - 1) acc
+  in
+  names (Var.idx (Var.last ())) []
+
+(* [first_var] is the first variable that [program] may use: the variables
+   before it belong to the units compiled earlier by this process. *)
 let jsir_file ~target ~compilation_unit ~imported_compilation_units
-    ~symbol_imports ~symbol_exports program : Jsoo_imports.Code.jsir_file =
+    ~symbol_imports ~symbol_exports ~first_var program :
+    Jsoo_imports.Code.jsir_file =
   { target = jsir_target target;
     program = Jsoo_imports.Code.Marshalable_program.of_program program;
     (* [Var] numbers variables with mutable state. js_of_ocaml needs to know the
        highest number used so that the variables it creates do not clash with
        these. *)
     last_var = Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ());
+    var_names = var_names ~first_var;
     imported_compilation_units;
     exported_compilation_unit = compilation_unit;
     force_link = !Clflags.link_everything;
@@ -282,6 +299,9 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
         ~ppf_dump (program : Lambda.program) =
       Compilation_unit.Set.iter Compilenv.require_global
         program.required_globals;
+      let first_var =
+        Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ()) + 1
+      in
       let { Optcomp_intf.program = jsir;
             imported_compilation_units;
             symbol_imports;
@@ -306,7 +326,8 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
           (jsir_file ~target
              ~compilation_unit:
                (Compilation_unit.full_path_as_string program.compilation_unit)
-             ~imported_compilation_units ~symbol_imports ~symbol_exports jsir);
+             ~imported_compilation_units ~symbol_imports ~symbol_exports
+             ~first_var jsir);
         if not link_jsir
         then
           let obj = prefixname ^ extensions.obj in
@@ -315,7 +336,7 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
             (fun () ->
               Profile.record_call program_name (fun () ->
                   run ~target "compile" ~phase:Compile ~input_left_in:ir_file
-                    (debuginfo_args () @ ["-o"; obj; ir_file]));
+                    ["-o"; obj; ir_file]);
               if not !Clflags.keep_asm_file then Misc.remove_file ir_file)
 
     let create_archive archive_name objfiles =
@@ -343,8 +364,7 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
           if not !Clflags.keep_startup_file then Misc.remove_file runtime)
         ~exceptionally:(fun () -> remove_link_outputs ~target output_name)
         (fun () ->
-          run ~target "build-runtime" ~phase:Runtime
-            (debuginfo_args () @ ["-o"; runtime] @ stubs ());
+          run ~target "build-runtime" ~phase:Runtime (["-o"; runtime] @ stubs ());
           run ~target "link" ~phase:Link
             (linkall_args () @ ["-o"; output_name; runtime] @ objfiles))
 
@@ -424,12 +444,12 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
             (jsir_file ~target
                ~compilation_unit:(program_unit_name output_name)
                ~imported_compilation_units ~symbol_imports:[] ~symbol_exports:[]
-               program);
+               ~first_var:0 program);
           Profile.record_call program_name (fun () ->
               run ~target "compile" ~phase:Compile ~input_left_in:ir_file
-                (debuginfo_args () @ ["-o"; obj; ir_file]);
+                ["-o"; obj; ir_file];
               run ~target "build-runtime" ~phase:Runtime
-                (debuginfo_args () @ ["-o"; runtime] @ stubs ());
+                (["-o"; runtime] @ stubs ());
               run ~target "link" ~phase:Link
                 (linkall_args () @ ["-o"; output_name; runtime; obj]));
           if not !Clflags.keep_asm_file then Misc.remove_file ir_file)
