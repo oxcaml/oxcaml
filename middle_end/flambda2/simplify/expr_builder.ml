@@ -455,9 +455,6 @@ let place_lifted_constants uacc ~lifted_constants_from_defining_expr
   let body, uacc = put_bindings_around_body uacc ~body in
   place_constants uacc ~around:body lifted_constants_from_defining_expr
 
-(* CR yusumez: Back edges into a loop header are rebuilt before the header's own
-   switch, so if that switch collapses here, its arms' counters miss them and
-   only reach the edges entering the loop. *)
 let preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms =
   match fdo_region with
   | None -> uacc

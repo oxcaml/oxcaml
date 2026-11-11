@@ -161,8 +161,10 @@ let split_recursive_let_cont handlers =
     Continuation.Lmap.map
       (fun handler ->
         let is_cold = CH.is_cold handler in
+        let fdo_back_edge_counters = CH.fdo_back_edge_counters handler in
         CH.pattern_match handler ~f:(fun params ~handler ->
-            One_recursive_handler.create ~params ~handler ~is_cold))
+            One_recursive_handler.create ~params ~handler ~is_cold
+              ~fdo_back_edge_counters))
       handlers
   in
   body, invariant_params, continuation_handlers
@@ -815,8 +817,14 @@ let rebuild_single_recursive_handler ~rebuild_expr cont
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
       in
+      let fdo_back_edge_counters =
+        Fdo_region_counters.counters_into
+          (UA.fdo_region_counters uacc)
+          ~specialization_map:(UA.specialization_map uacc)
+          (Handler cont)
+      in
       let cont_handler =
-        RE.Continuation_handler.create
+        RE.Continuation_handler.create ~fdo_back_edge_counters
           (UA.are_rebuilding_terms uacc)
           variant_params ~handler ~free_names_of_handler:free_names
           ~is_exn_handler:false ~is_cold:handler_to_rebuild.is_cold
@@ -1436,8 +1444,9 @@ and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
     is_exn_handler,
     join_result.extra_params_and_args )
 
-and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
-    ~invariant_params ~params cont dacc handler k =
+and simplify_handler ?(fdo_back_edge_counters = Fdo_annotation.empty)
+    ~simplify_expr ~is_recursive ~is_exn_handler ~invariant_params ~params cont
+    dacc handler k =
   let dacc =
     DA.with_continuation_uses_env dacc
       ~cont_uses_env:(CUE.reset_uses (DA.continuation_uses_env dacc))
@@ -1453,6 +1462,11 @@ and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
   let dacc =
     DA.map_denv dacc ~f:(fun denv -> DE.set_fdo_region denv (Handler cont))
   in
+  (* Recorded by a previous simplification of this loop header. *)
+  let dacc =
+    DA.preserve_fdo_counters dacc
+      (DE.inline_fdo_annotation (DA.denv dacc) fdo_back_edge_counters)
+  in
   simplify_expr dacc handler ~down_to_up:(fun dacc simplified_handler ->
       let dacc = DA.map_flow_acc ~f:(Flow.Acc.exit_continuation cont) dacc in
       let cont_uses_env_in_handler = DA.continuation_uses_env dacc in
@@ -1466,7 +1480,8 @@ and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
 and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
     ~invariant_params ~consts_lifted_after_fork all_handlers_set denv_to_reset
     dacc cont
-    ({ params; handler; is_cold } as original : One_recursive_handler.t) k =
+    ({ params; handler; is_cold; fdo_back_edge_counters } as original :
+      One_recursive_handler.t) k =
   (* Here we perform the downwards traversal on a single handler.
 
      We also make unboxing decisions at this step, which are necessary to
@@ -1499,8 +1514,8 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
     handler_env, decisions, dacc
   in
   let dacc = DA.with_denv dacc handler_env in
-  simplify_handler ~simplify_expr ~is_recursive:true ~is_exn_handler:false
-    ~params ~invariant_params cont dacc handler
+  simplify_handler ~fdo_back_edge_counters ~simplify_expr ~is_recursive:true
+    ~is_exn_handler:false ~params ~invariant_params cont dacc handler
     (fun dacc simplified_handler cont_uses_env_in_handler ->
       let cont_uses_env_so_far =
         CUE.union cont_uses_env_so_far cont_uses_env_in_handler
@@ -2025,8 +2040,10 @@ let simplify_as_recursive_let_cont ~simplify_expr dacc (body, handlers)
     Continuation.Lmap.map
       (fun handler ->
         let is_cold = CH.is_cold handler in
+        let fdo_back_edge_counters = CH.fdo_back_edge_counters handler in
         CH.pattern_match handler ~f:(fun params ~handler ->
-            One_recursive_handler.create ~params ~handler ~is_cold))
+            One_recursive_handler.create ~params ~handler ~is_cold
+              ~fdo_back_edge_counters))
       handlers
   in
   let data : simplify_let_cont_data =

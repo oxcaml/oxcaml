@@ -556,6 +556,50 @@ let invalid env res ~message =
   in
   cmm, free_vars, symbol_inits, res
 
+(* FDO back-edge counters *)
+
+(* The continuation that the straight-line code of [expr] continues into
+   unconditionally, if any. *)
+let rec straight_line_successor expr =
+  match Expr.descr expr with
+  | Let let_expr ->
+    Let.pattern_match let_expr ~f:(fun _ ~body -> straight_line_successor body)
+  | Let_cont (Non_recursive { handler; _ }) ->
+    Non_recursive_let_cont_handler.pattern_match handler ~f:(fun _ ~body ->
+        straight_line_successor body)
+  | Let_cont (Recursive handlers) ->
+    Recursive_let_cont_handlers.pattern_match handlers
+      ~f:(fun ~invariant_params:_ ~body _ -> straight_line_successor body)
+  | Apply_cont apply_cont -> Some (Apply_cont.continuation apply_cont)
+  | Apply apply -> (
+    match Apply.continuation apply with
+    | Return k -> Some k
+    | Never_returns -> None)
+  | Switch _ | Invalid _ -> None
+
+(* A handler continuing into a loop header gets its back-edge counters too, so
+   that the edges into the loop header through it get them. *)
+let add_fdo_back_edge_counters_through env k handler =
+  if not (Env.in_loop_with_fdo_back_edge_counters env)
+  then env
+  else
+    match
+      Continuation_handler.pattern_match handler ~f:(fun _ ~handler ->
+          straight_line_successor handler)
+    with
+    | None -> env
+    | Some successor ->
+      Env.add_fdo_back_edge_counters env k
+        (Env.fdo_back_edge_counters env successor)
+
+let add_fdo_back_edge_counters_to_arm env arm =
+  let annotations = Switch_arm.annotations arm in
+  Branch_annotations.with_fdo_annotation annotations
+    (Fdo_annotation.combine
+       (Branch_annotations.fdo_annotation annotations)
+       (Env.fdo_back_edge_counters env
+          (Apply_cont.continuation (Switch_arm.action arm))))
+
 (* The main set of translation functions for expressions *)
 
 let rec expr env res e :
@@ -705,6 +749,7 @@ and let_cont env res (let_cont : Flambda.Let_cont.t) =
       } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
         let handler = Non_recursive_let_cont_handler.handler handler in
+        let env = add_fdo_back_edge_counters_through env k handler in
         match
           To_cmm_effects.classify_continuation_handler k handler
             ~num_free_occurrences ~is_applied_with_traps
@@ -833,6 +878,13 @@ and let_cont_rec env res invariant_params conts body =
   let wrap, env, res = Env.flush_delayed_lets ~mode:Entering_loop env res in
   (* Compute the environment for Ccatch ids *)
   let conts_to_handlers = Continuation_handlers.to_map conts in
+  let env =
+    Continuation.Lmap.fold
+      (fun k handler env ->
+        Env.add_fdo_back_edge_counters env k
+          (Continuation_handler.fdo_back_edge_counters handler))
+      conts_to_handlers env
+  in
   let env =
     Continuation.Lmap.fold
       (fun k handler acc ->
@@ -1162,7 +1214,7 @@ and switch env res switch =
         action_free_vars,
         action_symbol_inits,
         Env.add_inlined_debuginfo env (Apply_cont.debuginfo action),
-        Switch_arm.annotations arm ),
+        add_fdo_back_edge_counters_to_arm env arm ),
       res )
   in
   match Target_ocaml_int.Map.cardinal arms with

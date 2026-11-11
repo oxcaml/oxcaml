@@ -197,7 +197,8 @@ module Continuation_handler = struct
           handler : Flambda.expr;
           free_names_of_handler : Name_occurrences.t;
           is_exn_handler : bool;
-          is_cold : bool
+          is_cold : bool;
+          fdo_back_edge_counters : Fdo_annotation.t
         }
     | Continuation_handler_not_rebuilt
 
@@ -210,7 +211,13 @@ module Continuation_handler = struct
     match t with
     | Continuation_handler_not_rebuilt -> dummy
     | Continuation_handler
-        { params; handler; free_names_of_handler; is_exn_handler; is_cold } ->
+        { params;
+          handler;
+          free_names_of_handler;
+          is_exn_handler;
+          is_cold;
+          fdo_back_edge_counters
+        } ->
       (* If the body of the continuation handler is cold, then it is the
          responsibility of our context to introduce a coldness boundary (at
          another continuation handler or function definition).
@@ -229,7 +236,7 @@ module Continuation_handler = struct
          situation. Sinking the definition of [k1] to the dominator of its uses
          would cleanly prevent this issue. *)
       let is_cold = is_cold && not body_is_cold in
-      Continuation_handler.create params ~handler
+      Continuation_handler.create ~fdo_back_edge_counters params ~handler
         ~free_names_of_handler:(Known free_names_of_handler) ~is_exn_handler
         ~is_cold
 
@@ -237,8 +244,8 @@ module Continuation_handler = struct
     Continuation_handler.print ~cont ~recursive ppf
       (to_continuation_handler ~body_is_cold:false ch)
 
-  let create are_rebuilding params ~handler ~free_names_of_handler
-      ~is_exn_handler ~is_cold =
+  let create ?(fdo_back_edge_counters = Fdo_annotation.empty) are_rebuilding
+      params ~handler ~free_names_of_handler ~is_exn_handler ~is_cold =
     if ART.do_not_rebuild_terms are_rebuilding
     then Continuation_handler_not_rebuilt
     else
@@ -247,7 +254,8 @@ module Continuation_handler = struct
           handler = handler.expr;
           free_names_of_handler;
           is_exn_handler;
-          is_cold
+          is_cold;
+          fdo_back_edge_counters
         }
 end
 

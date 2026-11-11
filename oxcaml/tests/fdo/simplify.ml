@@ -55,8 +55,8 @@ let[@inline never] absorbed c y =
 
 (* In a loop, the edges into the header are the entry and the back edge. The
    back edge is rebuilt before the header's switch is folded (into a table
-   lookup, or into a single jump when all its arms do the same), so only the
-   entry gets the counters of the arms. *)
+   lookup, or into a single jump when all its arms do the same): it only gets
+   the counters of the arms in To_cmm. *)
 let[@inline never] loop_table n v =
   let rec go i acc =
     let t = match v with A -> 1 | B -> 5 | C -> 2 | D -> 8 in
@@ -70,6 +70,17 @@ let[@inline never] loop_same n v =
     if i >= n then acc else go (i + 1) (acc + i)
   in
   go 0 0
+
+(* A copy of a loop whose header's switch was folded in the original: its back
+   edge gets the counters of the arms when the copy is simplified. *)
+let[@inline] loop_copied n v =
+  let rec go i acc =
+    let t = match v with A -> 1 | B -> 5 | C -> 2 | D -> 8 in
+    if i >= n then acc + t else go (i + 1) (acc + t)
+  in
+  go 0 0
+
+let[@inline never] use_loop_copied v = loop_copied 10 v
 
 (* An over-application that only Simplify can split, inside an inlined body: the
    context is added once. *)

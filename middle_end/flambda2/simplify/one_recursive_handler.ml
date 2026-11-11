@@ -16,12 +16,14 @@
 type t =
   { params : Bound_parameters.t;
     handler : Flambda.Expr.t;
-    is_cold : bool
+    is_cold : bool;
+    fdo_back_edge_counters : Fdo_annotation.t
   }
 
-let create ~params ~handler ~is_cold = { params; handler; is_cold }
+let create ~params ~handler ~is_cold ~fdo_back_edge_counters =
+  { params; handler; is_cold; fdo_back_edge_counters }
 
-let print ppf { params; handler; is_cold } =
+let print ppf { params; handler; is_cold; fdo_back_edge_counters = _ } =
   Format.fprintf ppf
     "@[<hov 1>(@[<hv 1>(params@ %a)@]@ @[<hv 1>(is_cold@ %b)@]@ @[<hv \
      1>(handler@ %a)@])@]"

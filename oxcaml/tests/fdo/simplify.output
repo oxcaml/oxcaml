@@ -45,6 +45,16 @@ simplify.simplify.fl:
   branch: "Simplify.loop_same.go":0:ada87730:1:branch(2)
   entry: "Simplify.loop_same":0 body_hash:e97a0351
   call: "Simplify.loop_same":0:e97a0351:0:call
+  entry: "Simplify.loop_copied.go":0 "Simplify.loop_copied.go":0:06f48e25:0:branch(1) "Simplify.loop_copied.go":0:06f48e25:0:branch(2) "Simplify.loop_copied.go":0:06f48e25:0:branch(3) "Simplify.loop_copied.go":0:06f48e25:0:branch(4) body_hash:06f48e25
+  branch: "Simplify.loop_copied.go":0:06f48e25:1:branch(1) "Simplify.loop_copied.go":0:06f48e25:2:call
+  branch: "Simplify.loop_copied.go":0:06f48e25:1:branch(2)
+  entry: "Simplify.loop_copied":0 body_hash:e97a0351
+  call: "Simplify.loop_copied":0:e97a0351:0:call
+  entry: "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(1) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(2) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(3) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(4) body_hash:06f48e25
+  branch: "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:1:branch(1) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:2:call "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(1) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(2) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(3) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(4)
+  branch: "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:1:branch(2)
+  entry: "Simplify.use_loop_copied":0 "Simplify.loop_copied":0 <- "Simplify.use_loop_copied":0:e97a0351:0:call body_hash:e97a0351
+  call: "Simplify.loop_copied":0:e97a0351:0:call <- "Simplify.use_loop_copied":0:e97a0351:0:call
   entry: "Simplify.curried.(fun)@y,int_add,x":0 body_hash:00000000
   entry: "Simplify.curried":0 body_hash:00000000
   entry: "Simplify.apply2":0 body_hash:e97a0351

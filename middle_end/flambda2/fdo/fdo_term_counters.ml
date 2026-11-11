@@ -80,7 +80,11 @@ let rec map_counters_of_expr ~f expr =
 
 and map_counters_of_handler ~f handler =
   Continuation_handler.pattern_match handler ~f:(fun params ~handler:body ->
-      Continuation_handler.create params
+      Continuation_handler.create
+        ~fdo_back_edge_counters:
+          (Fdo_annotation.map f
+             (Continuation_handler.fdo_back_edge_counters handler))
+        params
         ~handler:(map_counters_of_expr ~f body)
         ~free_names_of_handler:Unknown
         ~is_exn_handler:(Continuation_handler.is_exn_handler handler)

@@ -42,9 +42,8 @@
 
     The counters are recorded during the downward traversal and when rebuilding.
     They are read when rebuilding a switch arm, before its target can change,
-    and for the function entry when the whole body has been rebuilt. An arm
-    therefore misses the counters recorded after it was rebuilt (see
-    [Expr_builder.preserve_fdo_counters_of_collapsed_switch]). *)
+    and when rebuilding a function or a loop header, for its entry or its back
+    edges. *)
 
 module Region : sig
   type t =
@@ -63,6 +62,13 @@ val add_counters : t -> Region.t -> Fdo_annotation.t -> t
     which [cont] may have been specialized). *)
 val add_successor :
   t -> Region.t -> Continuation.t -> use_id:Apply_cont_rewrite_id.t -> t
+
+(** The counters to attach to the edges into [region]. *)
+val counters_into :
+  t ->
+  specialization_map:Continuation.t Continuation_callsite_map.t ->
+  Region.t ->
+  Fdo_annotation.t
 
 (** The counters to attach to a continuation with use [use_id] (for which [cont]
     may have been specialized). *)

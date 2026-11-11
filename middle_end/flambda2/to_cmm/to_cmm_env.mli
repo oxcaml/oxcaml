@@ -134,6 +134,15 @@ val currently_in_inlined_body : t -> bool
 
 (** {2 Continuations} *)
 
+(** Record the FDO back-edge counters of the loop headers that [k] continues
+    into. *)
+val add_fdo_back_edge_counters : t -> Continuation.t -> Fdo_annotation.t -> t
+
+(** The counters to add to the switch arms targeting the given continuation. *)
+val fdo_back_edge_counters : t -> Continuation.t -> Fdo_annotation.t
+
+val in_loop_with_fdo_back_edge_counters : t -> bool
+
 (** Returns the exception continuation of the environment. *)
 val exn_continuation : t -> Continuation.t
 
