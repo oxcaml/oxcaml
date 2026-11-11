@@ -210,6 +210,15 @@ function caml_ml_domain_index(_unit) {
   return caml_domain_id;
 }
 
+//Provides: caml_ml_thread_self_id
+//Requires: caml_domain_id
+//Version: >= 5.4
+//If: oxcaml
+function caml_ml_thread_self_id(_unit) {
+  // There are no systhreads, so each domain has a single thread.
+  return caml_domain_id;
+}
+
 //Provides: caml_domain_id
 //Version: >= 5
 var caml_domain_id = 0;

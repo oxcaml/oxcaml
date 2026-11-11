@@ -685,7 +685,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
                   | Isextend32 | Izextend32 | Ineg
                   | Ilfence | Isfence | Imfence)
-       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
+       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+       | Thread_self_id | Pause)
   | Poptrap _ | Prologue | Epilogue ->
     if fp then destroyed_rbp else [||]
   | Stack_check _ ->
@@ -853,6 +854,7 @@ let operation_supported = function
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Cpause
   | Creinterpret_cast (Int_of_value | Value_of_int |

@@ -954,7 +954,8 @@ and transl_structure ~scopes loc
           Value_rec_compiler.compile_letrec class_bindings body, repr
       | Tstr_include incl ->
           let ids_with_sorts =
-            bound_value_identifiers_and_sorts incl.incl_type
+            List.combine (bound_value_identifiers incl.incl_type)
+              (Array.to_list incl.incl_repr)
           in
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
@@ -1010,7 +1011,8 @@ and transl_structure ~scopes loc
               transl_structure ~scopes loc fields cc rootpath final_env rem
           | _ ->
               let ids_with_sorts =
-                bound_value_identifiers_and_sorts od.open_bound_items
+                List.combine (bound_value_identifiers od.open_bound_items)
+                  (Array.to_list od.open_items_repr)
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
@@ -1589,8 +1591,7 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr =
 let main_repr_of_argument_unit (swg : Signature_with_global_bindings.t) =
   let sign, _ = swg.sign in
   Subst.Lazy.force_signature_once sign
-  |> List.filter_map Subst.Lazy.sort_of_signature_item
-  |> Array.of_list
+  |> Subst.Lazy.expect_fixed_representation
   |> transl_module_representation
   |> add_arg_block_to_module_representation
 
