@@ -431,10 +431,13 @@ module Bin_op = struct
     | Shift_right
     | Shift_right_logical
     | Eq
+    | Ne
     | Lt
     | Le
     | Gt
     | Ge
+    | Compare
+    | Unsigned_compare
     | And
     | Or
 
@@ -457,6 +460,16 @@ module Bin_op = struct
     | Bool | String | Array _ | Unboxed_tuple _ | Record _ | Variant _
     | Or_null _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
+
+  let compare_ops_for_ty (ty : Ty.t) =
+    match ty with
+    | Number nty ->
+      if NumberTy.is_floating_point nty
+      then [Compare]
+      else [Compare; Unsigned_compare]
+    | Bool | String -> [Compare]
+    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
+      Misc.fatal_errorf "Bin_op.compare_ops_for_ty: expected a scalar type"
 
   let to_code ty binop ~lhs ~rhs =
     let module_name =
@@ -486,11 +499,24 @@ module Bin_op = struct
     | Shift_right -> call "shift_right"
     | Shift_right_logical -> call "shift_right_logical"
     | Eq -> call "equal"
-    (* CR-someday xclerc: Sometimes emit compare x y = 0 instead. *)
+    | Ne -> apply (qualified_ident "Bool" "not") [call "equal"]
     | Lt -> op "<" [call "compare"; int 0]
     | Le -> op "<=" [call "compare"; int 0]
     | Gt -> op ">" [call "compare"; int 0]
     | Ge -> op ">=" [call "compare"; int 0]
+    | Compare -> call "compare"
+    | Unsigned_compare -> (
+      match ty with
+      | Ty.Number { base = Int; unboxed = false } ->
+        (* [Int] has no [unsigned_compare]. Flipping the sign bit maps unsigned
+           order to signed order without changing the operand width. *)
+        let flip_sign expr =
+          apply
+            (qualified_ident "Int" "logxor")
+            [expr; qualified_ident "Int" "min_int"]
+        in
+        apply (qualified_ident "Int" "compare") [flip_sign lhs; flip_sign rhs]
+      | _ -> call "unsigned_compare")
     | And -> op "&&" [lhs; rhs]
     | Or -> op "||" [lhs; rhs]
 end
