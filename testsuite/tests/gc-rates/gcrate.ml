@@ -11,8 +11,8 @@
 
    Build a live heap of mixed structure, then churn it, while consuming my own
    runtime-events stream, accumulating time spent inside EV_MAJOR_SWEEP and
-   EV_MAJOR_MARK spans. Stderr redirected to a file with GC slice messages
-   enabled to obtain per-slice sweep and mark work. Finally measure
+   EV_MAJOR_MARK spans, and per-slice sweep and mark work from the
+   EV_C_MAJOR_SLICE_*_WORK counters. Finally measure
    compaction three times: at steady state (live data, garbage-laden heap),
    immediately again (live data, compacted heap), and after dropping the data
    (near-empty), timing the EV_COMPACT span and its sub-phases.
@@ -280,22 +280,6 @@ let rec checksum node depth acc =
       checksum b (depth + 1) (checksum a (depth + 1) acc)
     | Rec r -> acc + r.id
 
-(* ---------------- GC log capture and parsing ---------------- *)
-
-let log_path = Filename.temp_file "gcrate" ".gclog"
-let compact_log_path = Filename.temp_file "gcrate" ".compactlog"
-let saved_stderr = Unix.dup Unix.stderr
-
-let redirect_stderr_to path =
-  flush stderr;
-  let fd = Unix.openfile path [ Unix.O_WRONLY; Unix.O_TRUNC ] 0o600 in
-  Unix.dup2 fd Unix.stderr;
-  Unix.close fd
-
-let restore_stderr () =
-  flush stderr;
-  Unix.dup2 saved_stderr Unix.stderr
-
 (* System load (1/5/15 min), for judging interference from other work on
    the machine.  Linux-only; reports "n/a" elsewhere. *)
 let loadavg () =
@@ -310,68 +294,8 @@ let loadavg () =
 
 (* Disable auto-compaction: Gc.full_major runs its last cycle with
    Compaction_auto, which fires once the roots are dropped and would compact
-   the heap before the measured Gc.compact sees it.  Must precede
-   [set_verbose] capturing the control record below. *)
+   the heap before the measured Gc.compact sees it. *)
 let () = Gc.set { (Gc.get ()) with Gc.max_overhead = 1000000 }
-
-(* Prebuilt controls: Gc.set at a measurement boundary must not allocate.
-   4 = slice messages, 8 = compaction messages. *)
-let set_verbose =
-  let ctl = Gc.get () in
-  let slice_on = { ctl with Gc.verbose = 4 } in
-  let compact_on = { ctl with Gc.verbose = 8 } in
-  let off = { ctl with Gc.verbose = 0 } in
-  fun v ->
-    Gc.set (if v = 4 then slice_on else if v = 8 then compact_on else off)
-
-let find_sub line sub =
-  let n = String.length line and m = String.length sub in
-  let rec go i =
-    if i + m > n then None
-    else if String.sub line i m = sub then Some i
-    else go (i + 1)
-  in
-  go 0
-
-type work =
-  { mutable slices : int;
-    mutable sweep : int;
-    mutable mark : int;
-    mutable blocks : int;
-    mutable ephe_mark : int;
-    mutable ephe_sweep : int
-  }
-
-let parse_gclog path =
-  let w =
-    { slices = 0; sweep = 0; mark = 0; blocks = 0; ephe_mark = 0;
-      ephe_sweep = 0 }
-  in
-  let ic = open_in path in
-  (try
-     while true do
-       let line = input_line ic in
-       match find_sub line "Major slice completed" with
-       | None -> ()
-       | Some i -> (
-         match String.index_from_opt line i ':' with
-         | None -> ()
-         | Some j ->
-           let rest = String.sub line (j + 1) (String.length line - j - 1) in
-           (try
-              Scanf.sscanf rest
-                " %d sweep, %d mark (%d blocks), %d ephe mark, %d ephe sweep"
-                (fun s m b em es ->
-                  w.slices <- w.slices + 1;
-                  w.sweep <- w.sweep + s;
-                  w.mark <- w.mark + m;
-                  w.blocks <- w.blocks + b;
-                  w.ephe_mark <- w.ephe_mark + em;
-                  w.ephe_sweep <- w.ephe_sweep + es)
-            with Scanf.Scan_failure _ | Failure _ | End_of_file -> ()))
-     done
-   with End_of_file -> close_in ic);
-  w
 
 (* ---------------- reporting ---------------- *)
 
@@ -564,10 +488,8 @@ let () =
   Gc.full_major ();
   Gc.full_major ();
   let stat0 = Gc.quick_stat () in
-  redirect_stderr_to log_path;
   poll ();
   reset_tallies ();
-  set_verbose 4;
   let wall0 = Unix.gettimeofday () in
   let load0 = loadavg () in
   let cpu0 = Sys.time () in
@@ -614,21 +536,31 @@ let () =
      done
    with Exit -> ());
   poll ();
-  set_verbose 0;
   poll ();
   let wall1 = Unix.gettimeofday () in
   let load1 = loadavg () in
   let cpu1 = Sys.time () in
   let stat1 = Gc.quick_stat () in
-  restore_stderr ();
-  let w = parse_gclog log_path in
+  (* Per-slice work totals from the runtime-events counters. *)
+  let counter_tally c =
+    match Hashtbl.find_opt counter_total c with
+    | Some (n, t) -> (!n, !t)
+    | None -> (0, 0)
+  in
+  let slices, sweep_work = counter_tally RE.EV_C_MAJOR_SLICE_SWEEP_WORK in
+  let _, mark_work = counter_tally RE.EV_C_MAJOR_SLICE_MARK_WORK in
+  let _, ephe_mark_work =
+    counter_tally RE.EV_C_MAJOR_SLICE_EPHE_MARK_WORK in
+  let _, ephe_sweep_work =
+    counter_tally RE.EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK in
   let sweep_spans, sweep_ns = span RE.EV_MAJOR_SWEEP in
   let mark_spans, mark_ns = span RE.EV_MAJOR_MARK in
   let minor_spans, minor_ns = span RE.EV_MINOR in
   let minor_allocated =
     int_of_float (stat1.minor_words -. stat0.minor_words) in
   let promoted = int_of_float (stat1.promoted_words -. stat0.promoted_words) in
-  let log_total = w.sweep + w.mark + w.ephe_mark + w.ephe_sweep in
+  let phase_work = sweep_work + mark_work + ephe_mark_work
+                   + ephe_sweep_work in
   let ev_total =
     match Hashtbl.find_opt counter_total RE.EV_C_MAJOR_SLICE_WORK_DONE with
     | Some (_, t) -> !t
@@ -638,16 +570,12 @@ let () =
      below reset them. *)
   let churn_tallies = tallies_snapshot () in
   let churn_lost = !lost_total in
-  redirect_stderr_to compact_log_path;
-  set_verbose 8;
   let c1 = measure_compaction "steady" 0 in
   let c2 = measure_compaction "compacted" c1.heap_after in
   Array.fill slots 0 nslots Leaf;
   Array.fill recs 0 nslots None;
   let c3 = measure_compaction "emptied" c2.heap_after in
   let load2 = loadavg () in
-  set_verbose 0;
-  restore_stderr ();
   if manual then begin
     Printf.printf
       "META config: live_gib=%.3f duration=%.1f seed=%d slots=%d \
@@ -663,12 +591,12 @@ let () =
     report_stat "stat1" stat1;
     report_tallies churn_tallies;
     Printf.printf
-      "\nslices=%d blocks_marked=%d ephe_mark=%d ephe_sweep=%d\n"
-      w.slices w.blocks w.ephe_mark w.ephe_sweep;
-    Printf.printf "work cross-check: log total %d vs event counter %d\n"
-      log_total ev_total;
-    report_rate "sweep" w.sweep sweep_ns;
-    report_rate "mark" w.mark mark_ns;
+      "\nslices=%d ephe_mark=%d ephe_sweep=%d\n"
+      slices ephe_mark_work ephe_sweep_work;
+    Printf.printf "work cross-check: per-phase sum %d vs work_done %d\n"
+      phase_work ev_total;
+    report_rate "sweep" sweep_work sweep_ns;
+    report_rate "mark" mark_work mark_ns;
     Printf.printf
       "minor: %d collections in %.3f s (mean pause %.0f us), %d words \
        allocated, %d promoted (%.1f%% survival)\n"
@@ -680,13 +608,11 @@ let () =
        else 100. *. float_of_int promoted /. float_of_int minor_allocated);
     report_rate "promotion (minor live evacuation)" promoted minor_ns;
     report_rate "minor absorption (allocated/pause)" minor_allocated minor_ns;
-    if w.mark > 0 && mark_ns > 0 && sweep_ns > 0 then
+    if mark_work > 0 && mark_ns > 0 && sweep_ns > 0 then
       Printf.printf
         "sweep/mark rate ratio: %.2f (runtime assumes \
          percent_sweep_per_mark=120, i.e. 1.20)\n"
-        (rate w.sweep sweep_ns /. rate w.mark mark_ns);
-    Printf.printf "GC logs kept in %s (churn) and %s (compaction)\n"
-      log_path compact_log_path;
+        (rate sweep_work sweep_ns /. rate mark_work mark_ns);
     print_newline ();
     report_compaction c1;
     report_compaction c2;
@@ -694,8 +620,8 @@ let () =
     compaction_summary c1 c2 c3;
     let gib_s words ns = rate words ns *. 8. /. (1024. *. 1024. *. 1024.) in
     Printf.printf "\nsummary:\n";
-    Printf.printf "  sweep      %7.2f GiB/s\n" (gib_s w.sweep sweep_ns);
-    Printf.printf "  mark       %7.2f GiB/s\n" (gib_s w.mark mark_ns);
+    Printf.printf "  sweep      %7.2f GiB/s\n" (gib_s sweep_work sweep_ns);
+    Printf.printf "  mark       %7.2f GiB/s\n" (gib_s mark_work mark_ns);
     Printf.printf
       "  compaction %7.2f GiB/s (steady: %.2f GiB heap compacted in \
        %.3f s)\n"
@@ -708,22 +634,22 @@ let () =
       (Printf.sprintf "heap_words=%d < target=%d" stat1.heap_words
          target_words);
     check "slices measured"
-      (w.slices >= 10 && w.sweep > 0 && w.mark > 0 && sweep_spans > 0
+      (slices >= 10 && sweep_work > 0 && mark_work > 0 && sweep_spans > 0
        && mark_spans > 0 && churn_lost = 0)
       (Printf.sprintf
          "slices=%d sweep_words=%d mark_words=%d sweep_spans=%d \
           mark_spans=%d lost=%d"
-         w.slices w.sweep w.mark sweep_spans mark_spans churn_lost);
+         slices sweep_work mark_work sweep_spans mark_spans churn_lost);
     check "work cross-check"
-      (ev_total > 0 && abs (log_total - ev_total) * 20 <= ev_total)
-      (Printf.sprintf "log=%d events=%d" log_total ev_total);
+      (ev_total > 0 && abs (phase_work - ev_total) * 20 <= ev_total)
+      (Printf.sprintf "phases=%d work_done=%d" phase_work ev_total);
     check "sweep rate"
-      (rate w.sweep sweep_ns >= min_sweep_rate)
-      (Printf.sprintf "%.1f Mwords/s < %.1f" (rate w.sweep sweep_ns /. 1e6)
+      (rate sweep_work sweep_ns >= min_sweep_rate)
+      (Printf.sprintf "%.1f Mwords/s < %.1f" (rate sweep_work sweep_ns /. 1e6)
          (min_sweep_rate /. 1e6));
     check "mark rate"
-      (rate w.mark mark_ns >= min_mark_rate)
-      (Printf.sprintf "%.1f Mwords/s < %.1f" (rate w.mark mark_ns /. 1e6)
+      (rate mark_work mark_ns >= min_mark_rate)
+      (Printf.sprintf "%.1f Mwords/s < %.1f" (rate mark_work mark_ns /. 1e6)
          (min_mark_rate /. 1e6));
     check "minor collections measured"
       (minor_spans >= 10 && minor_ns > 0 && promoted > 0)
@@ -744,6 +670,5 @@ let () =
       (Printf.sprintf "%.1f Mwords/s < %.1f"
          (rate c1.live_before c1.compact_ns /. 1e6)
          (min_compact_rate /. 1e6));
-    Sys.remove log_path;
-    Sys.remove compact_log_path
+    ()
   end
