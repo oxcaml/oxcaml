@@ -163,6 +163,20 @@ module Handler : sig
     }
 end
 
+module Un_op : sig
+  type t =
+    | Neg
+    | Abs
+    | Succ
+    | Pred
+    | Bit_not
+    | Not
+
+  val ops_for_ty : Ty.t -> t list
+
+  val to_code : Ty.t -> t -> arg:Parsetree.expression -> Parsetree.expression
+end
+
 module Bin_op : sig
   type t =
     | Add
@@ -236,6 +250,11 @@ module Expr : sig
           cases : case list
         }
     | Opaque of t
+    | Un_op of
+        { ty : Ty.t;
+          op : Un_op.t;
+          arg : t
+        }
     | Bin_op of
         { ty : Ty.t;
           op : Bin_op.t;

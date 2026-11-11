@@ -13,6 +13,7 @@ module Place = Ir.Place
 module Statement = Ir.Statement
 module Sum = Ir.Sum
 module Ty = Ir.Ty
+module Un_op = Ir.Un_op
 
 module State = struct
   type t =
@@ -742,6 +743,12 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
       (Gen.weighted st.random_state
          [1, Gen.create (fun () -> random_number_ty st); 3, Gen.return nty])
   in
+  let gen_unop nty =
+    Gen.create (fun () ->
+        let inner_ty = gen_ty nty in
+        let expr = gen_unary st env (Ty.Number inner_ty) in
+        Expr.Convert { from = inner_ty; to_ = nty; expr })
+  in
   let gen_binop nty =
     Gen.create (fun () ->
         let inner_ty = gen_ty nty in
@@ -778,10 +785,23 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
   Gen.run_exn
     (Gen.weighted st.random_state
        [ 5, leaf;
+         2, gen_unop nty;
          3, gen_binop nty;
          1, gen_fun_call st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
+
+and gen_unary (st : State.t) env ty =
+  let op =
+    Un_op.ops_for_ty ty
+    |> List.filter (fun (op : Un_op.t) ->
+        match op with
+        | Bit_not -> st.swarm.bitwise_operations
+        | Neg | Abs | Succ | Pred | Not -> true)
+    |> random_element st
+  in
+  let arg = gen_value st env ty in
+  Expr.Un_op { ty; op; arg }
 
 and gen_shift_count (st : State.t) env (nty : NumberTy.t) =
   let width =
@@ -927,6 +947,7 @@ and gen_bool (st : State.t) env =
   Gen.run_exn
     (Gen.weighted st.random_state
        [ 5, gen_binop comparison (Ty.Number nty) gen_number_arg;
+         1, Gen.create (fun () -> gen_unary st env Ty.Bool);
          1, gen_bool_binop Bin_op.Eq;
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or;
