@@ -100,8 +100,8 @@ let loopify_decision_for_call dacc apply =
         then DE.loopify_state denv
         else Loopify_state.do_not_loopify)
 
-(* For an expression built from the simplified [apply] (see
-   [DE.clear_inlined_debuginfo]). *)
+(* The terms of [expr] are built from the simplified [apply], whose debuginfo is
+   already in the current inlining context. *)
 let simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up =
   simplify_expr
     (DA.map_denv dacc ~f:DE.clear_inlined_debuginfo)

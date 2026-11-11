@@ -839,7 +839,6 @@ let rebuild_switch
         let uacc =
           UA.notify_removed ~operation:Removed_operations.branch uacc
         in
-        (* The arms' edges become a single jump (see [EB.create_switch]). *)
         let uacc =
           EB.preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
         in
@@ -1085,12 +1084,11 @@ let simplify_switch dacc switch ~down_to_up =
   in
   match TI.Map.get_singleton arms with
   | Some (_, (arm, env_at_use)) ->
-    (* Rewrite to a regular apply_cont so that it is an inlinable use. The arm's
-       edge disappears with the switch, but the code it leads to runs as often:
-       its counters are preserved in the current region (see
-       [Fdo_region_counters]). *)
+    (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let dacc = DA.with_denv dacc denv_at_use in
+    (* The arm's edge disappears with the switch, but the code it leads to runs
+       as often: its counters are preserved in the current region *)
     let dacc =
       DA.preserve_fdo_counters dacc
         (DE.inline_fdo_annotation denv_at_use

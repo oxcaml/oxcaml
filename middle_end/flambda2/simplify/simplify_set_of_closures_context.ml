@@ -249,9 +249,8 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
 
 (* The code of the functions to be simplified, by old code id. A set of closures
    met in an inlined body defines copies of its functions (e.g. an inlined
-   functor application): their FDO counters are renamed here, once, before
-   anything looks at the code (see
-   [DE.specialize_fdo_counters_of_copied_code]). *)
+   functor application), and their FDO counters should be renamed before
+   anything looks at the code. *)
 let compute_code_to_simplify denv ~old_to_new_code_ids_all_sets =
   Code_id.Map.mapi
     (fun old_code_id _new_code_id ->

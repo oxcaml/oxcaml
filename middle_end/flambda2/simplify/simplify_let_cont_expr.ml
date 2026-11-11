@@ -817,6 +817,11 @@ let rebuild_single_recursive_handler ~rebuild_expr cont
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
       in
+      (* The back edges into [cont] are in its handler, so they were rebuilt
+         before some of the counters into [cont] were recorded (e.g. those of a
+         switch of the handler that collapsed). All of them are known now: they
+         are kept on the handler, for To_cmm to add to the back edges, and for a
+         later simplification of the handler to preserve again. *)
       let fdo_back_edge_counters =
         Fdo_region_counters.counters_into
           (UA.fdo_region_counters uacc)
