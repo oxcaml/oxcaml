@@ -110,10 +110,13 @@ let parse_info_of_debuginfo dbg ~pos =
       | `Start -> Some (Parse_info.t_of_pos loc.loc_start)
       | `End -> Some (Parse_info.t_of_pos loc.loc_end)
 
+let add_event_at_exn t parse_info =
+  map_top_current_block_exn t ~f:(push_event parse_info)
+
 let add_event_exn t dbg ~pos =
   match parse_info_of_debuginfo dbg ~pos with
   | None -> t
-  | Some parse_info -> map_top_current_block_exn t ~f:(push_event parse_info)
+  | Some parse_info -> add_event_at_exn t parse_info
 
 let add_call_exn t instr =
   match t.call_events with

@@ -54,6 +54,9 @@ val parse_info_of_debuginfo :
     immediately preceding it. Raises if there are no blocks being worked on. *)
 val add_event_exn : t -> Debuginfo.t -> pos:[`Start | `End] -> t
 
+(** Like [add_event_exn], for a location that is already a [Parse_info.t]. *)
+val add_event_at_exn : t -> Parse_info.t -> t
+
 (** Like [add_instr_exn], for an instruction that is a call. If run within
     [with_debuginfo_exn], the instruction is surrounded by [Event]s for the
     start and the end of the debuginfo. *)

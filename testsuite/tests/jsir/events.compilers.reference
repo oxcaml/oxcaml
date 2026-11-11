@@ -27,6 +27,7 @@ Entry point: 0
   return v13
 
 ==== 3 (v14) ====
+  event events.ml:21:56
   v15 = "caml_register_symbol"("Events"j, "camlEvents__arith_4"j, v14) 
   v18 = fun(v16, v17){4 ()} [hint:(value,value)->int never_inline]
   branch 6 (v18)
@@ -42,6 +43,7 @@ Entry point: 0
   return v21
 
 ==== 6 (v22) ====
+  event events.ml:24:41
   v23 = "caml_register_symbol"("Events"j, "camlEvents__non_tail_5"j, v22) 
   v26 = fun(v24, v25){7 ()} [hint:(value,value)->value never_inline]
   branch 8 (v26)
@@ -52,6 +54,7 @@ Entry point: 0
   return v27
 
 ==== 8 (v28) ====
+  event events.ml:27:33
   v29 = "caml_register_symbol"("Events"j, "camlEvents__tail_6"j, v28) 
   v31 = fun(v30){9 ()} [hint:(int)->value never_inline]
   branch 10 (v31)
@@ -62,6 +65,7 @@ Entry point: 0
   return v32
 
 ==== 10 (v33) ====
+  event events.ml:30:48
   v34 = "caml_register_symbol"("Events"j, "camlEvents__c_call_7"j, v33) 
   v36 = fun(v35){11 ()} [hint:(int)->int never_inline]
   branch 14 (v36)
@@ -80,6 +84,7 @@ Entry point: 0
   return v35
 
 ==== 14 (v39) ====
+  event events.ml:33:67
   v40 = "caml_register_symbol"("Events"j, "camlEvents__raise_e_8"j, v39) 
   v42 = CONST{1}
   event events.ml:36:17
@@ -101,6 +106,7 @@ Entry point: 0
   return v47
 
 ==== 18 (v48) ====
+  event events.ml:37:43
   v49 = "caml_register_symbol"("Events"j, "camlEvents__fn[events.ml:37,27--43]_9"j, v48) 
   v50 = CONST{2}
   event events.ml:37:17
@@ -121,6 +127,7 @@ Entry point: 0
   return v55
 
 ==== 21 (v56) ====
+  event events.ml:38:39
   v57 = "caml_register_symbol"("Events"j, "camlEvents__fn[events.ml:38,23--39]_10"j, v56) 
   v58 = CONST{3}
   event events.ml:38:17

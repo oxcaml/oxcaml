@@ -174,10 +174,24 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
             To_jsir_static_const.block_like ~env ~res symbol static_const)
       in
       (* Now that the symbols are defined, we must remember to register all the
-         symbols to the global symbol table. *)
+         symbols to the global symbol table. The registration of a closure
+         symbol is given the location of its closure. *)
+      let closure_locs =
+        Static_const_group.match_against_bound_static consts bound_static
+          ~init:Symbol.Map.empty
+          ~code:(fun locs _code_id _code -> locs)
+          ~deleted_code:(fun locs _code_id -> locs)
+          ~set_of_closures:(fun locs ~closure_symbols soc ->
+            To_jsir_set_of_closures.closure_symbol_locs ~env ~closure_symbols
+              soc
+            |> Symbol.Map.disjoint_union locs)
+          ~block_like:(fun locs _symbol _static_const -> locs)
+      in
       let res =
         Symbol.Set.fold
-          (fun symbol res -> To_jsir_env.register_symbol_exn env ~res symbol)
+          (fun symbol res ->
+            let loc = Symbol.Map.find_opt symbol closure_locs in
+            To_jsir_env.register_symbol_exn env ~res ?loc symbol)
           symbols res
       in
       env, res

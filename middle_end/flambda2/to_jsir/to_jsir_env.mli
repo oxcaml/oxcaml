@@ -96,14 +96,15 @@ val add_symbol :
     compilation units. *)
 val add_symbol_without_registering : t -> Symbol.t -> Jsir.Var.t -> t
 
-(** Register the given symbol to the global symbol table. Raises if the symbol
-    is not in the environment.
+(** Register the given symbol to the global symbol table, with an [Event] for
+    [loc] before the registration. Raises if the symbol is not in the
+    environment.
 
     Note that calling this function is usually a mistake, as most functions that
     add symbols will automatically call this function. However, it is necessary
     for [add_symbol_without_registering]. *)
 val register_symbol_exn :
-  t -> res:To_jsir_result.t -> Symbol.t -> To_jsir_result.t
+  t -> res:To_jsir_result.t -> ?loc:Parse_info.t -> Symbol.t -> To_jsir_result.t
 
 (** Set [var]/[symbol] to be an alias of [alias_of]. Raises if [alias_of] is
     from the current compilation unit and is not found in the environment. *)
