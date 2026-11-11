@@ -9,6 +9,13 @@
 (* Measure the rates at which the major GC marks and sweeps, the minor GC
    promotes, and the compactor compacts.
 
+   The measurement is taken entirely from OUTSIDE the measured process:
+   a child runs the workload with runtime events enabled, and the parent
+   watches the child's event ring, accumulating phase spans and the
+   per-slice work counters.  `gcrate watch DIR PID SECONDS` attaches the
+   same watcher to any process started with OCAML_RUNTIME_EVENTS_START=1.
+   Rates are whole-run averages over the watched window.
+
    Build a live heap of mixed structure, then churn it, while consuming my own
    runtime-events stream, accumulating time spent inside EV_MAJOR_SWEEP and
    EV_MAJOR_MARK spans, and per-slice sweep and mark work from the
@@ -26,6 +33,7 @@
 module RE = Runtime_events
 
 let manual = Array.length Sys.argv > 1
+let watch_mode = manual && Sys.argv.(1) = "watch"
 
 let usage =
   "usage: gcrate [LIVE-GIB [SECONDS [SEED]]]\n\
@@ -49,7 +57,7 @@ let () =
     | _ -> ()
 
 let arg conv i default =
-  if Array.length Sys.argv > i then
+  if (not watch_mode) && Array.length Sys.argv > i then
     match conv Sys.argv.(i) with
     | Some v -> v
     | None ->
@@ -127,12 +135,6 @@ let poll () =
   match !cursor with
   | None -> ()
   | Some c -> ignore (RE.read_poll c callbacks None)
-
-let reset_tallies () =
-  Hashtbl.reset phase_total;
-  Hashtbl.reset phase_open;
-  Hashtbl.reset counter_total;
-  lost_total := 0
 
 let span phase =
   match Hashtbl.find_opt phase_total phase with
@@ -311,27 +313,6 @@ let report_stat prefix (s : Gc.stat) =
     s.major_collections s.heap_words s.top_heap_words s.compactions
     s.forced_major_collections
 
-let tallies_snapshot () =
-  let phases =
-    Hashtbl.fold
-      (fun p (c, t) acc -> (RE.runtime_phase_name p, !c, !t) :: acc)
-      phase_total []
-  and counters =
-    Hashtbl.fold
-      (fun k (c, t) acc -> (RE.runtime_counter_name k, !c, !t) :: acc)
-      counter_total []
-  in
-  (List.sort compare phases, List.sort compare counters)
-
-let report_tallies (phases, counters) =
-  List.iter
-    (fun (name, c, t) -> Printf.printf "PHASE %s count=%d ns=%d\n" name c t)
-    phases;
-  List.iter
-    (fun (name, c, t) ->
-      Printf.printf "COUNTER %s count=%d total=%d\n" name c t)
-    counters
-
 let report_rate what words ns =
   Printf.printf "%-8s %16d words in %9.3f s -> %7.1f Mwords/s (%.2f GiB/s)\n"
     what words (secs ns)
@@ -347,124 +328,43 @@ type compaction =
   { clabel : string;
     live_before : int;
     heap_before : int;
-    mapped_before : int;
     heap_after : int;
     runs : int; (* Gc.stat compactions delta: 1 if it really ran *)
-    wall : float; (* around Gc.compact, including its full major *)
-    compact_ns : int;
-    evacuate_ns : int;
-    forward_ns : int;
-    release_ns : int;
-    (* span counts: >1 forward pass means phase two of the default
-       algorithm ran its own fixup *)
-    evacuate_spans : int;
-    forward_spans : int;
-    release_spans : int
+    wall : float
   }
 
-let measure_compaction clabel mapped_before =
+(* Compaction timing on the workload side is wall-clock: compaction is
+   a stop-the-world phase, so this matches the EV_COMPACT span that the
+   watcher sees, without needing event access from inside. *)
+let measure_compaction clabel =
   if manual then Printf.printf "# compacting (%s)\n%!" clabel;
   Gc.full_major ();
   let b = Gc.quick_stat () in
-  poll ();
-  reset_tallies ();
   let t0 = Unix.gettimeofday () in
   Gc.compact ();
   let t1 = Unix.gettimeofday () in
-  poll ();
   let a = Gc.quick_stat () in
-  let evacuate_spans, evacuate_ns = span RE.EV_COMPACT_EVACUATE in
-  let forward_spans, forward_ns = span RE.EV_COMPACT_FORWARD in
-  let release_spans, release_ns = span RE.EV_COMPACT_RELEASE in
   { clabel;
     live_before = b.live_words;
     heap_before = b.heap_words;
-    mapped_before = max mapped_before b.heap_words;
     heap_after = a.heap_words;
     runs = a.compactions - b.compactions;
-    wall = t1 -. t0;
-    compact_ns = snd (span RE.EV_COMPACT);
-    evacuate_ns;
-    forward_ns;
-    release_ns;
-    evacuate_spans;
-    forward_spans;
-    release_spans
+    wall = t1 -. t0
   }
 
 let report_compaction c =
   Printf.printf
-    "COMPACT %s: live_before=%d heap_before=%d mapped_before=%d \
-     heap_after=%d runs=%d wall=%.3f compact_ns=%d evacuate_ns=%d \
-     forward_ns=%d release_ns=%d evacuate_spans=%d forward_spans=%d \
-     release_spans=%d\n"
-    c.clabel c.live_before c.heap_before c.mapped_before c.heap_after c.runs
-    c.wall c.compact_ns c.evacuate_ns c.forward_ns c.release_ns
-    c.evacuate_spans c.forward_spans c.release_spans
-
-let compaction_summary c1 c2 c3 =
-  List.iter
-    (fun c ->
-      Printf.printf
-        "compact %-9s: %6.1f Mw live, %7.1f -> %6.1f Mw heap, \
-         %7.3f s (evac %.3f fwd %.3f rel %.3f), %6.1f Mwords(live)/s\n"
-        c.clabel
-        (float_of_int c.live_before /. 1e6)
-        (float_of_int c.mapped_before /. 1e6)
-        (float_of_int c.heap_after /. 1e6)
-        (secs c.compact_ns) (secs c.evacuate_ns) (secs c.forward_ns)
-        (secs c.release_ns)
-        (rate c.live_before c.compact_ns /. 1e6))
-    [ c1; c2; c3 ];
-  (* The phases separate the factors directly: forward (pointer fixup)
-     scans all live words; evacuate copies live blocks out of mostly-empty
-     pools (cost tracks the garbage-laden heap; moved words are not
-     instrumented); release returns pools to the OS. *)
-  Printf.printf
-    "live-size factor, forward fixup: %.1f Mwords(live)/s per pass steady \
-     (%d passes), %.1f compacted (%d passes)\n"
-    (rate (c1.live_before * max 1 c1.forward_spans) c1.forward_ns /. 1e6)
-    c1.forward_spans
-    (rate (c2.live_before * max 1 c2.forward_spans) c2.forward_ns /. 1e6)
-    c2.forward_spans;
-  Printf.printf
-    "heap-size factor, release: %.0f Mwords(freed)/s steady, %.0f emptied\n"
-    (rate (c1.mapped_before - c1.heap_after) c1.release_ns /. 1e6)
-    (rate (c3.mapped_before - c3.heap_after) c3.release_ns /. 1e6);
-  Printf.printf
-    "evacuate (copy): %.3f s steady vs %.3f s freshly compacted\n"
-    (secs c1.evacuate_ns) (secs c2.evacuate_ns);
-  (* Crude two-point fit T = a*live + b*mapped from the steady and emptied
-     compactions; the middle compaction checks it (expect a poor fit: the
-     evacuate cost depends on garbage, which this model cannot see). *)
-  let l1 = float_of_int c1.live_before
-  and h1 = float_of_int c1.mapped_before
-  and t1 = secs c1.compact_ns in
-  let l3 = float_of_int c3.live_before
-  and h3 = float_of_int c3.mapped_before
-  and t3 = secs c3.compact_ns in
-  let det = (l1 *. h3) -. (l3 *. h1) in
-  if det <> 0. then begin
-    let a = ((t1 *. h3) -. (t3 *. h1)) /. det in
-    let b = ((l1 *. t3) -. (l3 *. t1)) /. det in
-    Printf.printf
-      "two-point fit: %.2f ns/live word (%.1f Mwords/s) + %.3f ns/heap word \
-       (%.1f Mwords/s); predicts %s = %.3f s (measured %.3f s)\n"
-      (a *. 1e9) (1e-6 /. a) (b *. 1e9) (1e-6 /. b) c2.clabel
-      ((a *. float_of_int c2.live_before)
-       +. (b *. float_of_int c2.mapped_before))
-      (secs c2.compact_ns)
-  end
+    "META compaction %s: live_before=%d heap_before=%d heap_after=%d \
+     runs=%d wall=%.3f\n"
+    c.clabel c.live_before c.heap_before c.heap_after c.runs c.wall
 
 let check name ok detail =
   if ok then Printf.printf "%s: ok\n" name
   else Printf.printf "%s: FAIL (%s)\n" name detail
 
-(* ---------------- main ---------------- *)
+(* ---------------- workload: the watched child ---------------- *)
 
-let () =
-  RE.start ();
-  cursor := Some (RE.create_cursor None);
+let run_workload () =
   let rng = Random.State.make [| seed |] in
   if manual then
     Printf.printf "# building %.3f GiB live: %d slots of ~%d words\n%!"
@@ -478,7 +378,6 @@ let () =
     slots.(i) <- s;
     recs.(i) <- first_record s 0;
     if i mod tick = 0 then begin
-      poll ();
       if manual && i / tick < 10 then
         Printf.printf "# build %d%%\n%!" (i / tick * 10)
     end
@@ -488,10 +387,7 @@ let () =
   Gc.full_major ();
   Gc.full_major ();
   let stat0 = Gc.quick_stat () in
-  poll ();
-  reset_tallies ();
   let wall0 = Unix.gettimeofday () in
-  let load0 = loadavg () in
   let cpu0 = Sys.time () in
   let iters = ref 0 in
   let sink = ref 0 in
@@ -520,7 +416,6 @@ let () =
            r.hits <- r.hits + 1;
            r.score <- r.score +. 0.5
        done;
-       if !iters land 31 = 0 then poll ();
        if !iters land 255 = 0 then begin
          let now = Unix.gettimeofday () in
          if now > deadline then raise Exit;
@@ -535,13 +430,69 @@ let () =
        end
      done
    with Exit -> ());
-  poll ();
-  poll ();
   let wall1 = Unix.gettimeofday () in
-  let load1 = loadavg () in
   let cpu1 = Sys.time () in
   let stat1 = Gc.quick_stat () in
-  (* Per-slice work totals from the runtime-events counters. *)
+  let c1 = measure_compaction "steady" in
+  let c2 = measure_compaction "compacted" in
+  Array.fill slots 0 nslots Leaf;
+  Array.fill recs 0 nslots None;
+  let c3 = measure_compaction "emptied" in
+  if manual then begin
+    Printf.printf
+      "META config: live_gib=%.3f duration=%.1f seed=%d slots=%d \
+       slot_words=%d minor_heap_size=%d space_overhead=%d\n"
+      live_gib duration seed nslots slot_words (Gc.get ()).minor_heap_size
+      (Gc.get ()).space_overhead;
+    Printf.printf "META churn: wall=%.3f cpu=%.3f iters=%d sink=%d\n"
+      (wall1 -. wall0) (cpu1 -. cpu0) !iters !sink;
+    report_stat "stat0" stat0;
+    report_stat "stat1" stat1;
+    report_compaction c1;
+    report_compaction c2;
+    report_compaction c3
+  end
+  else begin
+    check "heap built" (stat1.heap_words >= target_words)
+      (Printf.sprintf "heap_words=%d < target=%d" stat1.heap_words
+         target_words);
+    check "compaction runs"
+      (c1.runs = 1 && c2.runs = 1 && c3.runs = 1
+       && c1.heap_after < c1.heap_before
+       && c3.live_before * 4 < c1.live_before)
+      (Printf.sprintf "runs=%d,%d,%d heap=%d->%d live=%d->%d" c1.runs c2.runs
+         c3.runs c1.heap_before c1.heap_after c1.live_before c3.live_before);
+    check "compaction rate"
+      (rate c1.live_before (int_of_float (c1.wall *. 1e9))
+       >= min_compact_rate)
+      (Printf.sprintf "%.1f Mwords/s < %.1f"
+         (rate c1.live_before (int_of_float (c1.wall *. 1e9)) /. 1e6)
+         (min_compact_rate /. 1e6))
+  end
+
+(* ---------------- watcher ---------------- *)
+
+(* Attach to the ring of [pid] under [dir] and poll it until
+   [still_running] turns false, then drain. *)
+let watch_target dir pid ~still_running =
+  let rec attach tries =
+    match RE.create_cursor (Some (dir, pid)) with
+    | c -> c
+    | exception _ when tries > 0 -> Unix.sleepf 0.05; attach (tries - 1)
+  in
+  let c = attach 100 in
+  cursor := Some c;
+  let rec loop () =
+    poll ();
+    if still_running () then begin Unix.sleepf 0.02; loop () end
+  in
+  loop ();
+  poll ();
+  poll ();
+  RE.free_cursor c;
+  cursor := None
+
+let report_watch ~test =
   let counter_tally c =
     match Hashtbl.find_opt counter_total c with
     | Some (n, t) -> (!n, !t)
@@ -553,46 +504,52 @@ let () =
     counter_tally RE.EV_C_MAJOR_SLICE_EPHE_MARK_WORK in
   let _, ephe_sweep_work =
     counter_tally RE.EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK in
+  let _, ev_total = counter_tally RE.EV_C_MAJOR_SLICE_WORK_DONE in
+  let phase_work = sweep_work + mark_work + ephe_mark_work
+                   + ephe_sweep_work in
+  (* Both minor counters are emitted in bytes. *)
+  let minor_colls, promoted_bytes = counter_tally RE.EV_C_MINOR_PROMOTED in
+  let promoted = promoted_bytes / 8 in
+  let _, minor_allocated_bytes = counter_tally RE.EV_C_MINOR_ALLOCATED in
+  let minor_allocated = minor_allocated_bytes / 8 in
   let sweep_spans, sweep_ns = span RE.EV_MAJOR_SWEEP in
   let mark_spans, mark_ns = span RE.EV_MAJOR_MARK in
   let minor_spans, minor_ns = span RE.EV_MINOR in
-  let minor_allocated =
-    int_of_float (stat1.minor_words -. stat0.minor_words) in
-  let promoted = int_of_float (stat1.promoted_words -. stat0.promoted_words) in
-  let phase_work = sweep_work + mark_work + ephe_mark_work
-                   + ephe_sweep_work in
-  let ev_total =
-    match Hashtbl.find_opt counter_total RE.EV_C_MAJOR_SLICE_WORK_DONE with
-    | Some (_, t) -> !t
-    | None -> 0
-  in
-  (* Snapshot the churn tallies and losses: the compaction measurements
-     below reset them. *)
-  let churn_tallies = tallies_snapshot () in
-  let churn_lost = !lost_total in
-  let c1 = measure_compaction "steady" 0 in
-  let c2 = measure_compaction "compacted" c1.heap_after in
-  Array.fill slots 0 nslots Leaf;
-  Array.fill recs 0 nslots None;
-  let c3 = measure_compaction "emptied" c2.heap_after in
-  let load2 = loadavg () in
-  if manual then begin
-    Printf.printf
-      "META config: live_gib=%.3f duration=%.1f seed=%d slots=%d \
-       slot_words=%d minor_heap_size=%d space_overhead=%d\n"
-      live_gib duration seed nslots slot_words (Gc.get ()).minor_heap_size
-      (Gc.get ()).space_overhead;
-    Printf.printf "META churn: wall=%.3f cpu=%.3f iters=%d sink=%d \
+  let compact_spans, compact_ns = span RE.EV_COMPACT in
+  if test then begin
+    check "slices measured"
+      (slices >= 10 && sweep_work > 0 && mark_work > 0 && sweep_spans > 0
+       && mark_spans > 0 && !lost_total = 0)
+      (Printf.sprintf
+         "slices=%d sweep_words=%d mark_words=%d sweep_spans=%d \
+          mark_spans=%d lost=%d"
+         slices sweep_work mark_work sweep_spans mark_spans !lost_total);
+    check "work cross-check"
+      (ev_total > 0 && abs (phase_work - ev_total) * 20 <= ev_total)
+      (Printf.sprintf "phases=%d work_done=%d" phase_work ev_total);
+    check "sweep rate"
+      (rate sweep_work sweep_ns >= min_sweep_rate)
+      (Printf.sprintf "%.1f Mwords/s < %.1f"
+         (rate sweep_work sweep_ns /. 1e6) (min_sweep_rate /. 1e6));
+    check "mark rate"
+      (rate mark_work mark_ns >= min_mark_rate)
+      (Printf.sprintf "%.1f Mwords/s < %.1f"
+         (rate mark_work mark_ns /. 1e6) (min_mark_rate /. 1e6));
+    check "minor collections measured"
+      (minor_spans >= 10 && minor_ns > 0 && promoted > 0)
+      (Printf.sprintf "spans=%d ns=%d promoted=%d" minor_spans minor_ns
+         promoted);
+    check "promotion rate"
+      (rate promoted minor_ns >= min_promote_rate)
+      (Printf.sprintf "%.1f Mwords/s < %.1f"
+         (rate promoted minor_ns /. 1e6) (min_promote_rate /. 1e6));
+    check "compactions seen" (compact_spans = 3)
+      (Printf.sprintf "compact_spans=%d" compact_spans)
+  end
+  else begin
+    Printf.printf "\nwatched: slices=%d ephe_mark=%d ephe_sweep=%d \
                    lost_events=%d\n"
-      (wall1 -. wall0) (cpu1 -. cpu0) !iters !sink churn_lost;
-    Printf.printf "META loadavg: churn %s -> %s, after compaction %s\n"
-      load0 load1 load2;
-    report_stat "stat0" stat0;
-    report_stat "stat1" stat1;
-    report_tallies churn_tallies;
-    Printf.printf
-      "\nslices=%d ephe_mark=%d ephe_sweep=%d\n"
-      slices ephe_mark_work ephe_sweep_work;
+      slices ephe_mark_work ephe_sweep_work !lost_total;
     Printf.printf "work cross-check: per-phase sum %d vs work_done %d\n"
       phase_work ev_total;
     report_rate "sweep" sweep_work sweep_ns;
@@ -600,75 +557,60 @@ let () =
     Printf.printf
       "minor: %d collections in %.3f s (mean pause %.0f us), %d words \
        allocated, %d promoted (%.1f%% survival)\n"
-      minor_spans (secs minor_ns)
+      minor_colls (secs minor_ns)
       (if minor_spans = 0 then 0.
        else secs minor_ns *. 1e6 /. float_of_int minor_spans)
       minor_allocated promoted
       (if minor_allocated = 0 then 0.
        else 100. *. float_of_int promoted /. float_of_int minor_allocated);
     report_rate "promotion (minor live evacuation)" promoted minor_ns;
-    report_rate "minor absorption (allocated/pause)" minor_allocated minor_ns;
+    Printf.printf "compaction: %d runs in %.3f s total\n"
+      compact_spans (secs compact_ns);
     if mark_work > 0 && mark_ns > 0 && sweep_ns > 0 then
       Printf.printf
         "sweep/mark rate ratio: %.2f (runtime assumes \
          percent_sweep_per_mark=120, i.e. 1.20)\n"
-        (rate sweep_work sweep_ns /. rate mark_work mark_ns);
-    print_newline ();
-    report_compaction c1;
-    report_compaction c2;
-    report_compaction c3;
-    compaction_summary c1 c2 c3;
-    let gib_s words ns = rate words ns *. 8. /. (1024. *. 1024. *. 1024.) in
-    Printf.printf "\nsummary:\n";
-    Printf.printf "  sweep      %7.2f GiB/s\n" (gib_s sweep_work sweep_ns);
-    Printf.printf "  mark       %7.2f GiB/s\n" (gib_s mark_work mark_ns);
-    Printf.printf
-      "  compaction %7.2f GiB/s (steady: %.2f GiB heap compacted in \
-       %.3f s)\n"
-      (gib_s c1.heap_before c1.compact_ns)
-      (float_of_int c1.heap_before *. 8. /. (1024. *. 1024. *. 1024.))
-      (secs c1.compact_ns)
+        (rate sweep_work sweep_ns /. rate mark_work mark_ns)
+  end
+
+(* ---------------- dispatch ---------------- *)
+
+let () =
+  if watch_mode then begin
+    (* gcrate watch DIR PID SECONDS: attach to any process started with
+       OCAML_RUNTIME_EVENTS_START=1. *)
+    let dir = Sys.argv.(2) in
+    let pid = int_of_string Sys.argv.(3) in
+    let secs = float_of_string Sys.argv.(4) in
+    let deadline = Unix.gettimeofday () +. secs in
+    let load0 = loadavg () in
+    watch_target dir pid
+      ~still_running:(fun () -> Unix.gettimeofday () < deadline);
+    Printf.printf "META loadavg: %s -> %s\n" load0 (loadavg ());
+    report_watch ~test:false
   end
   else begin
-    check "heap built" (stat1.heap_words >= target_words)
-      (Printf.sprintf "heap_words=%d < target=%d" stat1.heap_words
-         target_words);
-    check "slices measured"
-      (slices >= 10 && sweep_work > 0 && mark_work > 0 && sweep_spans > 0
-       && mark_spans > 0 && churn_lost = 0)
-      (Printf.sprintf
-         "slices=%d sweep_words=%d mark_words=%d sweep_spans=%d \
-          mark_spans=%d lost=%d"
-         slices sweep_work mark_work sweep_spans mark_spans churn_lost);
-    check "work cross-check"
-      (ev_total > 0 && abs (phase_work - ev_total) * 20 <= ev_total)
-      (Printf.sprintf "phases=%d work_done=%d" phase_work ev_total);
-    check "sweep rate"
-      (rate sweep_work sweep_ns >= min_sweep_rate)
-      (Printf.sprintf "%.1f Mwords/s < %.1f" (rate sweep_work sweep_ns /. 1e6)
-         (min_sweep_rate /. 1e6));
-    check "mark rate"
-      (rate mark_work mark_ns >= min_mark_rate)
-      (Printf.sprintf "%.1f Mwords/s < %.1f" (rate mark_work mark_ns /. 1e6)
-         (min_mark_rate /. 1e6));
-    check "minor collections measured"
-      (minor_spans >= 10 && minor_ns > 0 && promoted > 0)
-      (Printf.sprintf "spans=%d ns=%d promoted=%d" minor_spans minor_ns
-         promoted);
-    check "promotion rate"
-      (rate promoted minor_ns >= min_promote_rate)
-      (Printf.sprintf "%.1f Mwords/s < %.1f" (rate promoted minor_ns /. 1e6)
-         (min_promote_rate /. 1e6));
-    check "compaction runs"
-      (c1.runs = 1 && c2.runs = 1 && c3.runs = 1
-       && c1.heap_after < c1.heap_before
-       && c3.live_before * 4 < c1.live_before)
-      (Printf.sprintf "runs=%d,%d,%d heap=%d->%d live=%d->%d" c1.runs c2.runs
-         c3.runs c1.heap_before c1.heap_after c1.live_before c3.live_before);
-    check "compaction rate"
-      (rate c1.live_before c1.compact_ns >= min_compact_rate)
-      (Printf.sprintf "%.1f Mwords/s < %.1f"
-         (rate c1.live_before c1.compact_ns /. 1e6)
-         (min_compact_rate /. 1e6));
-    ()
+    let load0 = loadavg () in
+    match Unix.fork () with
+    | 0 ->
+      (* Keep the ring file after exit so the watcher can drain it. *)
+      Unix.putenv "OCAML_RUNTIME_EVENTS_PRESERVE" "1";
+      RE.start ();
+      run_workload ();
+      exit 0
+    | child ->
+      let finished = ref false in
+      let still_running () =
+        !finished = false
+        && (match Unix.waitpid [ Unix.WNOHANG ] child with
+            | 0, _ -> true
+            | _ -> finished := true; false)
+      in
+      watch_target "." child ~still_running;
+      if not !finished then ignore (Unix.waitpid [] child);
+      (try Sys.remove (string_of_int child ^ ".events")
+       with Sys_error _ -> ());
+      if manual then
+        Printf.printf "META loadavg: %s -> %s\n" load0 (loadavg ());
+      report_watch ~test:(not manual)
   end
