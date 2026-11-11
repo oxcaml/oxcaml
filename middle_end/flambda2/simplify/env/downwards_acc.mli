@@ -44,6 +44,21 @@ val with_flow_acc : Flow.Acc.t -> t -> t
 (** Map the dataflow analysis accumulator of the given dacc. *)
 val map_flow_acc : t -> f:(Flow.Acc.t -> Flow.Acc.t) -> t
 
+(** The FDO counters preserved so far (see [Fdo_region_counters]). *)
+val fdo_region_counters : t -> Fdo_region_counters.t
+
+val with_fdo_region_counters : t -> Fdo_region_counters.t -> t
+
+(** Preserve, in the region being traversed (see [Fdo_region_counters]), the
+    counters of an instruction that is removed while the code it counts stays.
+    They must already be in the current inlining context. *)
+val preserve_fdo_counters : t -> Fdo_annotation.t -> t
+
+(** The region being traversed continues into the handler of the given
+    continuation, by the given use (see [Fdo_region_counters.add_successor]). *)
+val add_fdo_region_successor :
+  t -> Continuation.t -> use_id:Apply_cont_rewrite_id.t -> t
+
 include Continuation_uses_env_intf.S with type t := t
 
 val continuation_uses_env : t -> Continuation_uses_env.t

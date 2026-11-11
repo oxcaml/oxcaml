@@ -1,0 +1,178 @@
+simplify.simplify.fl:
+  entry: "Simplify.side":0 body_hash:00000000
+  entry: "Simplify.choose":0 body_hash:6fcbb642
+  branch: "Simplify.choose":0:6fcbb642:0:branch(1)
+  branch: "Simplify.choose":0:6fcbb642:0:branch(2)
+  call: "Simplify.choose":0:6fcbb642:1:call
+  entry: "Simplify.kept":0 "Simplify.choose":0 <- "Simplify.kept":0:e97a0351:0:call body_hash:e97a0351
+  branch: "Simplify.choose":0:6fcbb642:0:branch(1) <- "Simplify.kept":0:e97a0351:0:call
+  branch: "Simplify.choose":0:6fcbb642:0:branch(2) <- "Simplify.kept":0:e97a0351:0:call
+  call: "Simplify.choose":0:6fcbb642:1:call <- "Simplify.kept":0:e97a0351:0:call
+  entry: "Simplify.folded":0 "Simplify.choose":0 <- "Simplify.folded":0:e97a0351:0:call "Simplify.choose":0:6fcbb642:0:branch(2) <- "Simplify.folded":0:e97a0351:0:call body_hash:e97a0351
+  call: "Simplify.choose":0:6fcbb642:1:call <- "Simplify.folded":0:e97a0351:0:call
+  entry: "Simplify.table":0 "Simplify.table":0:7f2676c4:0:branch(1) "Simplify.table":0:7f2676c4:0:branch(2) "Simplify.table":0:7f2676c4:0:branch(3) "Simplify.table":0:7f2676c4:0:branch(4) body_hash:7f2676c4
+  entry: "Simplify.guarded":0 body_hash:2056ac26
+  branch: "Simplify.guarded":0:2056ac26:0:branch(1)
+  branch: "Simplify.guarded":0:2056ac26:0:branch(2) "Simplify.guarded":0:2056ac26:1:branch(1) "Simplify.guarded":0:2056ac26:1:branch(2) "Simplify.guarded":0:2056ac26:1:branch(3) "Simplify.guarded":0:2056ac26:1:branch(4)
+  entry: "Simplify.count_down":0 body_hash:fcdba42a
+  branch: "Simplify.count_down":0:fcdba42a:0:branch(1) "Simplify.count_down":0:fcdba42a:1:call
+  branch: "Simplify.count_down":0:fcdba42a:0:branch(2)
+  entry: "Simplify.in_branch":0 body_hash:64a59e5a
+  branch: "Simplify.in_branch":0:64a59e5a:0:branch(1)
+  branch: "Simplify.in_branch":0:64a59e5a:0:branch(2) "Simplify.choose":0 <- "Simplify.in_branch":0:64a59e5a:1:call "Simplify.choose":0:6fcbb642:0:branch(2) <- "Simplify.in_branch":0:64a59e5a:1:call
+  call: "Simplify.choose":0:6fcbb642:1:call <- "Simplify.in_branch":0:64a59e5a:1:call
+  entry: "Simplify.after_call":0 "Simplify.choose":0 <- "Simplify.after_call":0:07355c9b:1:call "Simplify.choose":0:6fcbb642:0:branch(2) <- "Simplify.after_call":0:07355c9b:1:call body_hash:07355c9b
+  call: "Simplify.after_call":0:07355c9b:0:call
+  call: "Simplify.choose":0:6fcbb642:1:call <- "Simplify.after_call":0:07355c9b:1:call
+  entry: "Simplify.raised":0 body_hash:19993bab
+  branch: "Simplify.raised":0:19993bab:0:branch(1)
+  branch: "Simplify.raised":0:19993bab:0:branch(2) "Simplify.raised":0:19993bab:1:branch(2) "Simplify.choose":0 <- "Simplify.raised":0:19993bab:2:call "Simplify.choose":0:6fcbb642:0:branch(2) <- "Simplify.raised":0:19993bab:2:call
+  call: "Simplify.choose":0:6fcbb642:1:call <- "Simplify.raised":0:19993bab:2:call
+  entry: "Simplify.pure":0 body_hash:b9895603
+  branch: "Simplify.pure":0:b9895603:0:branch(1)
+  branch: "Simplify.pure":0:b9895603:0:branch(2)
+  entry: "Simplify.absorbed":0 body_hash:7f195994
+  branch: "Simplify.absorbed":0:7f195994:0:branch(1)
+  branch: "Simplify.absorbed":0:7f195994:0:branch(2) "Simplify.pure":0 <- "Simplify.absorbed":0:7f195994:1:call "Simplify.pure":0:b9895603:0:branch(2) <- "Simplify.absorbed":0:7f195994:1:call
+  call: "Simplify.absorbed":0:7f195994:2:call
+  entry: "Simplify.loop_table.go":0 "Simplify.loop_table.go":0:06f48e25:0:branch(1) "Simplify.loop_table.go":0:06f48e25:0:branch(2) "Simplify.loop_table.go":0:06f48e25:0:branch(3) "Simplify.loop_table.go":0:06f48e25:0:branch(4) body_hash:06f48e25
+  branch: "Simplify.loop_table.go":0:06f48e25:1:branch(1) "Simplify.loop_table.go":0:06f48e25:2:call
+  branch: "Simplify.loop_table.go":0:06f48e25:1:branch(2)
+  entry: "Simplify.loop_table":0 body_hash:e97a0351
+  call: "Simplify.loop_table":0:e97a0351:0:call
+  entry: "Simplify.loop_same.go":0 "Simplify.loop_same.go":0:ada87730:0:branch(1) "Simplify.loop_same.go":0:ada87730:0:branch(2) body_hash:ada87730
+  branch: "Simplify.loop_same.go":0:ada87730:1:branch(1) "Simplify.loop_same.go":0:ada87730:2:call
+  branch: "Simplify.loop_same.go":0:ada87730:1:branch(2)
+  entry: "Simplify.loop_same":0 body_hash:e97a0351
+  call: "Simplify.loop_same":0:e97a0351:0:call
+  entry: "Simplify.loop_copied.go":0 "Simplify.loop_copied.go":0:06f48e25:0:branch(1) "Simplify.loop_copied.go":0:06f48e25:0:branch(2) "Simplify.loop_copied.go":0:06f48e25:0:branch(3) "Simplify.loop_copied.go":0:06f48e25:0:branch(4) body_hash:06f48e25
+  branch: "Simplify.loop_copied.go":0:06f48e25:1:branch(1) "Simplify.loop_copied.go":0:06f48e25:2:call
+  branch: "Simplify.loop_copied.go":0:06f48e25:1:branch(2)
+  entry: "Simplify.loop_copied":0 body_hash:e97a0351
+  call: "Simplify.loop_copied":0:e97a0351:0:call
+  entry: "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(1) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(2) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(3) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(4) body_hash:06f48e25
+  branch: "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:1:branch(1) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:2:call "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(1) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(2) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(3) "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:0:branch(4)
+  branch: "Simplify.loop_copied.go":0@("Simplify.use_loop_copied":0:e97a0351:0:call):06f48e25:1:branch(2)
+  entry: "Simplify.use_loop_copied":0 "Simplify.loop_copied":0 <- "Simplify.use_loop_copied":0:e97a0351:0:call body_hash:e97a0351
+  call: "Simplify.loop_copied":0:e97a0351:0:call <- "Simplify.use_loop_copied":0:e97a0351:0:call
+  entry: "Simplify.curried.(fun)@y,int_add,x":0 body_hash:00000000
+  entry: "Simplify.curried":0 body_hash:00000000
+  entry: "Simplify.apply2":0 body_hash:e97a0351
+  call: "Simplify.apply2":0:e97a0351:0:call
+  entry: "Simplify.over":0 "Simplify.apply2":0 <- "Simplify.over":0:e97a0351:0:call body_hash:e97a0351
+  call: "Simplify.apply2":0:e97a0351:0:call <- "Simplify.over":0:e97a0351:0:call
+  entry: "Simplify.classify":0 body_hash:925c8338
+  branch: "Simplify.classify":0:925c8338:0:branch(1)
+  branch: "Simplify.classify":0:925c8338:0:branch(2)
+  entry: "Simplify.Make.count":0 "Simplify.classify":0 <- "Simplify.Make.count":0:e41f8e18:0:call body_hash:e41f8e18
+  branch: "Simplify.classify":0:925c8338:0:branch(1) <- "Simplify.Make.count":0:e41f8e18:0:call
+  branch: "Simplify.classify":0:925c8338:0:branch(2) <- "Simplify.Make.count":0:e41f8e18:0:call
+  branch: "Simplify.Make.count":0:e41f8e18:1:branch(1)
+  branch: "Simplify.Make.count":0:e41f8e18:1:branch(2)
+  branch: "Simplify.Make.count":0:e41f8e18:3:branch(1)
+  branch: "Simplify.Make.count":0:e41f8e18:3:branch(2)
+  call: "Simplify.Make.count":0:e41f8e18:4:call
+  call: "Simplify.Make.count":0:e41f8e18:2:call
+  entry: "Simplify.Make":0 body_hash:00000000
+  entry: "Simplify.Outer.run":0 body_hash:3371523c
+  call: "Simplify.Outer.run":0:3371523c:0:call
+  entry: "Simplify.Outer":0 "Simplify.Make":0 <- "Simplify.Outer":0:module("Simplify.Outer.Inner":0):0:call body_hash:33a16f6f
+  entry: "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call) "Simplify.classify":0 <- "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:0:call body_hash:e41f8e18
+  branch: "Simplify.classify":0:925c8338:0:branch(1) <- "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:0:call
+  branch: "Simplify.classify":0:925c8338:0:branch(2) <- "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:0:call
+  branch: "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:1:branch(1)
+  branch: "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:1:branch(2)
+  branch: "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:3:branch(1)
+  branch: "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:3:branch(2)
+  call: "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:4:call
+  call: "Simplify.Make.count":0@("Simplify":0:module("Simplify.Low":0):0:call):e41f8e18:2:call
+  entry: "Simplify.Outer.run":0@("Simplify":0:module("Simplify.Low":0):0:call) body_hash:3371523c
+  call: "Simplify.Outer.run":0@("Simplify":0:module("Simplify.Low":0):0:call):3371523c:0:call
+  entry: "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call) "Simplify.classify":0 <- "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:0:call body_hash:e41f8e18
+  branch: "Simplify.classify":0:925c8338:0:branch(1) <- "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:0:call
+  branch: "Simplify.classify":0:925c8338:0:branch(2) <- "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:0:call
+  branch: "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:1:branch(1)
+  branch: "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:1:branch(2)
+  branch: "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:3:branch(1)
+  branch: "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:3:branch(2)
+  call: "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:4:call
+  call: "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:2:call
+  entry: "Simplify.Outer.run":0@("Simplify":0:module("Simplify.High":0):0:call) body_hash:3371523c
+  call: "Simplify.Outer.run":0@("Simplify":0:module("Simplify.High":0):0:call):3371523c:0:call
+  entry: "Simplify.Wrap.f":0 body_hash:915a3e01
+  call: "Simplify.Wrap.f":0:915a3e01:0:call
+  entry: "Simplify.Wrap":0 body_hash:00000000
+  entry: "Simplify.g":0 body_hash:b9895603
+  branch: "Simplify.g":0:b9895603:0:branch(1)
+  branch: "Simplify.g":0:b9895603:0:branch(2)
+  entry: "Simplify.Wrap.f":0@("Simplify":0:module("Simplify.W":0):0:call) "Simplify.g":0 <- "Simplify.Wrap.f":0@("Simplify":0:module("Simplify.W":0):0:call):915a3e01:0:call body_hash:915a3e01
+  branch: "Simplify.g":0:b9895603:0:branch(1) <- "Simplify.Wrap.f":0@("Simplify":0:module("Simplify.W":0):0:call):915a3e01:0:call
+  branch: "Simplify.g":0:b9895603:0:branch(2) <- "Simplify.Wrap.f":0@("Simplify":0:module("Simplify.W":0):0:call):915a3e01:0:call
+  entry: "Simplify.Nested.after.h":0 body_hash:b9895603
+  branch: "Simplify.Nested.after.h":0:b9895603:0:branch(1)
+  branch: "Simplify.Nested.after.h":0:b9895603:0:branch(2)
+  entry: "Simplify.Nested.after":0 "Simplify.Nested.inl":0 <- "Simplify.Nested.after":0:33a16f6f:0:call body_hash:33a16f6f
+  branch: "Simplify.Nested.inl":0:b9895603:0:branch(1) <- "Simplify.Nested.after":0:33a16f6f:0:call
+  branch: "Simplify.Nested.inl":0:b9895603:0:branch(2) <- "Simplify.Nested.after":0:33a16f6f:0:call
+  entry: "Simplify.Nested.inl":0 body_hash:b9895603
+  branch: "Simplify.Nested.inl":0:b9895603:0:branch(1)
+  branch: "Simplify.Nested.inl":0:b9895603:0:branch(2)
+  entry: "Simplify.Nested":0 body_hash:00000000
+  entry: "Simplify.Nested.inl":0@("Simplify":0:module("Simplify.N":0):0:call) body_hash:b9895603
+  branch: "Simplify.Nested.inl":0@("Simplify":0:module("Simplify.N":0):0:call):b9895603:0:branch(1)
+  branch: "Simplify.Nested.inl":0@("Simplify":0:module("Simplify.N":0):0:call):b9895603:0:branch(2)
+  entry: "Simplify.Nested.after.h":0@("Simplify":0:module("Simplify.N":0):0:call) body_hash:b9895603
+  branch: "Simplify.Nested.after.h":0@("Simplify":0:module("Simplify.N":0):0:call):b9895603:0:branch(1)
+  branch: "Simplify.Nested.after.h":0@("Simplify":0:module("Simplify.N":0):0:call):b9895603:0:branch(2)
+  entry: "Simplify.Nested.after":0@("Simplify":0:module("Simplify.N":0):0:call) "Simplify.Nested.inl":0 <- "Simplify.Nested.after":0@("Simplify":0:module("Simplify.N":0):0:call):33a16f6f:0:call body_hash:33a16f6f
+  branch: "Simplify.Nested.inl":0:b9895603:0:branch(1) <- "Simplify.Nested.after":0@("Simplify":0:module("Simplify.N":0):0:call):33a16f6f:0:call
+  branch: "Simplify.Nested.inl":0:b9895603:0:branch(2) <- "Simplify.Nested.after":0@("Simplify":0:module("Simplify.N":0):0:call):33a16f6f:0:call
+  entry: "Simplify.Rerun.count.down":0 body_hash:6fcbb642
+  branch: "Simplify.Rerun.count.down":0:6fcbb642:0:branch(1)
+  branch: "Simplify.Rerun.count.down":0:6fcbb642:0:branch(2)
+  call: "Simplify.Rerun.count.down":0:6fcbb642:1:call
+  entry: "Simplify.Rerun.count.up":0 body_hash:16665463
+  branch: "Simplify.Rerun.count.up":0:16665463:0:branch(1)
+  branch: "Simplify.Rerun.count.up":0:16665463:0:branch(2)
+  call: "Simplify.Rerun.count.up":0:16665463:2:call
+  call: "Simplify.Rerun.count.up":0:16665463:1:call
+  entry: "Simplify.Rerun.count":0 body_hash:1b112816
+  branch: "Simplify.Rerun.count":0:1b112816:0:branch(1)
+  branch: "Simplify.Rerun.count":0:1b112816:0:branch(2)
+  call: "Simplify.Rerun.count":0:1b112816:1:call
+  branch: "Simplify.Rerun.count":0:1b112816:2:branch(1)
+  branch: "Simplify.Rerun.count":0:1b112816:2:branch(2)
+  call: "Simplify.Rerun.count":0:1b112816:3:call
+  call: "Simplify.Rerun.count":0:1b112816:4:call
+  entry: "Simplify.Rerun":0 body_hash:00000000
+  entry: "Simplify.R.step":0 body_hash:00000000
+  entry: "Simplify.Rerun.count.down":0@("Simplify":0:module("Simplify.R":0):0:call) body_hash:6fcbb642
+  branch: "Simplify.Rerun.count.down":0@("Simplify":0:module("Simplify.R":0):0:call):6fcbb642:0:branch(1)
+  branch: "Simplify.Rerun.count.down":0@("Simplify":0:module("Simplify.R":0):0:call):6fcbb642:0:branch(2)
+  call: "Simplify.Rerun.count.down":0@("Simplify":0:module("Simplify.R":0):0:call):6fcbb642:1:call
+  entry: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call) body_hash:16665463
+  branch: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call):16665463:0:branch(1)
+  branch: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call):16665463:0:branch(2)
+  call: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call):16665463:2:call
+  call: "Simplify.Rerun.count.up":0@("Simplify":0:module("Simplify.R":0):0:call):16665463:1:call
+  entry: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call) body_hash:1b112816
+  branch: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:0:branch(1)
+  branch: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:0:branch(2) "Simplify.R.step":0 <- "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:1:call
+  branch: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:2:branch(1)
+  branch: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:2:branch(2) "Simplify.R.step":0 <- "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:1:call
+  call: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:3:call
+  call: "Simplify.Rerun.count":0@("Simplify":0:module("Simplify.R":0):0:call):1b112816:4:call
+  entry: "Simplify.make.f":0 body_hash:6fcbb642
+  branch: "Simplify.make.f":0:6fcbb642:0:branch(1)
+  branch: "Simplify.make.f":0:6fcbb642:0:branch(2)
+  call: "Simplify.make.f":0:6fcbb642:1:call
+  entry: "Simplify.make":0 body_hash:00000000
+  entry: "Simplify.make.f":0@("Simplify.known":0:3371523c:0:call) body_hash:6fcbb642
+  branch: "Simplify.make.f":0@("Simplify.known":0:3371523c:0:call):6fcbb642:0:branch(1)
+  branch: "Simplify.make.f":0@("Simplify.known":0:3371523c:0:call):6fcbb642:0:branch(2)
+  call: "Simplify.make.f":0@("Simplify.known":0:3371523c:0:call):6fcbb642:1:call
+  entry: "Simplify.known":0 "Simplify.make":0 <- "Simplify.known":0:3371523c:0:call body_hash:3371523c
+  entry: "Simplify.unknown":0 "Simplify.make":0 <- "Simplify.unknown":0:3371523c:0:call body_hash:3371523c
+  entry: "Simplify.scale":0 body_hash:00000000
+  entry: "Simplify.scaled":0 body_hash:3371523c
+  call: "Simplify.scaled":0:3371523c:0:call

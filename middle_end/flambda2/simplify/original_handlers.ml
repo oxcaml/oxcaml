@@ -70,9 +70,10 @@ let add_params_to_lift t params_to_lift =
     then
       let continuation_handlers =
         Continuation.Lmap.map
-          (fun ({ params; handler; is_cold } : One_recursive_handler.t) ->
-            let handler = Flambda.Expr.apply_renaming handler renaming in
-            One_recursive_handler.create ~params ~handler ~is_cold)
+          (fun (one_handler : One_recursive_handler.t) ->
+            One_recursive_handler.with_handler
+              (Flambda.Expr.apply_renaming one_handler.handler renaming)
+              one_handler)
           continuation_handlers
       in
       Recursive { recursive with lifted_params; continuation_handlers }

@@ -112,6 +112,14 @@ val mutable_unboxing_result : t -> Flow_types.Mutable_unboxing_result.t
 
 val set_resimplify : t -> t
 
+(** The FDO counters preserved so far (see [Fdo_region_counters]): those of the
+    downward traversal this accumulator was created from, and those preserved
+    while rebuilding. *)
+val fdo_region_counters : t -> Fdo_region_counters.t
+
+val map_fdo_region_counters :
+  t -> f:(Fdo_region_counters.t -> Fdo_region_counters.t) -> t
+
 val resimplify : t -> bool
 
 val specialization_map : t -> Continuation.t Continuation_callsite_map.t

@@ -81,7 +81,8 @@ and continuation_handler =
   { cont_handler_abst :
       (Bound_parameters.t, continuation_handler_t0) Name_abstraction.t;
     is_exn_handler : bool;
-    is_cold : bool
+    is_cold : bool;
+    fdo_back_edge_counters : Fdo_annotation.t
   }
 
 and continuation_handlers_t0 =
@@ -235,8 +236,8 @@ and apply_renaming_continuation_handler_t0
       num_normal_occurrences_of_params = num_normal_occurrences_of_params'
     }
 
-and apply_renaming_continuation_handler
-    ({ cont_handler_abst; is_exn_handler; is_cold } as t) renaming =
+and apply_renaming_continuation_handler ({ cont_handler_abst; _ } as t) renaming
+    =
   let cont_handler_abst' =
     Name_abstraction.apply_renaming
       (module Bound_parameters)
@@ -244,7 +245,7 @@ and apply_renaming_continuation_handler
   in
   if cont_handler_abst == cont_handler_abst'
   then t
-  else { cont_handler_abst = cont_handler_abst'; is_exn_handler; is_cold }
+  else { t with cont_handler_abst = cont_handler_abst' }
 
 and apply_renaming_continuation_handlers t renaming =
   Name_abstraction.apply_renaming (module Bound_parameters) t renaming
@@ -302,7 +303,11 @@ let rec ids_for_export_continuation_handler_t0
   ids_for_export handler
 
 and ids_for_export_continuation_handler
-    { cont_handler_abst; is_exn_handler = _; is_cold = _ } =
+    { cont_handler_abst;
+      is_exn_handler = _;
+      is_cold = _;
+      fdo_back_edge_counters = _
+    } =
   Name_abstraction.ids_for_export
     (module Bound_parameters)
     cont_handler_abst
@@ -521,8 +526,11 @@ and print ppf (t : expr) =
       (String.split_on_char '\n' message)
 
 and print_continuation_handler (recursive : Recursive.t) invariant_params ppf k
-    ({ cont_handler_abst = _; is_exn_handler; is_cold } as t) occurrences ~first
-    =
+    ({ cont_handler_abst = _;
+       is_exn_handler;
+       is_cold;
+       fdo_back_edge_counters = _
+     } as t) occurrences ~first =
   let fprintf = Format.fprintf in
   if not first then fprintf ppf "@ ";
   let print params ~handler =
@@ -915,8 +923,8 @@ module Continuation_handler = struct
 
   module A = Name_abstraction.Make (Bound_parameters) (T0)
 
-  let create params ~handler ~(free_names_of_handler : _ Or_unknown.t)
-      ~is_exn_handler ~is_cold =
+  let create ?(fdo_back_edge_counters = Fdo_annotation.empty) params ~handler
+      ~(free_names_of_handler : _ Or_unknown.t) ~is_exn_handler ~is_cold =
     Bound_parameters.check_no_duplicates params;
     let num_normal_occurrences_of_params =
       match free_names_of_handler with
@@ -933,7 +941,7 @@ module Continuation_handler = struct
     in
     let t0 : T0.t = { num_normal_occurrences_of_params; handler } in
     let cont_handler_abst = A.create params t0 in
-    { cont_handler_abst; is_exn_handler; is_cold }
+    { cont_handler_abst; is_exn_handler; is_cold; fdo_back_edge_counters }
 
   let pattern_match t ~f =
     let open A in
@@ -975,6 +983,8 @@ module Continuation_handler = struct
   let is_exn_handler t = t.is_exn_handler
 
   let is_cold t = t.is_cold
+
+  let fdo_back_edge_counters t = t.fdo_back_edge_counters
 
   let apply_renaming = apply_renaming_continuation_handler
 end

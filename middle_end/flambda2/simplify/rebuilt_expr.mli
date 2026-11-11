@@ -92,6 +92,7 @@ module Continuation_handler : sig
     unit
 
   val create :
+    ?fdo_back_edge_counters:Fdo_annotation.t ->
     Are_rebuilding_terms.t ->
     Bound_parameters.t ->
     handler:rebuilt_expr ->

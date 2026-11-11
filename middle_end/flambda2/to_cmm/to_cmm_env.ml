@@ -175,6 +175,9 @@ type t =
        handler inlined, or else reached via a jump. *)
     exn_handlers : Continuation.Set.t;
     (* All continuations that act as exception handlers. *)
+    fdo_back_edge_counters : Fdo_annotation.t Continuation.Map.t;
+    (* The FDO counters of the loop headers that each continuation continues
+       into, for the switch arms targeting it. *)
     vars_extra : extra_info Variable.Map.t;
     (* Extra information associated with Flambda variables. *)
     vars : (Cmm.expression * free_vars) Variable.Map.t;
@@ -299,6 +302,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
     vars = Variable.Map.empty;
     conts;
     exn_handlers = Continuation.Set.singleton exn_continuation;
+    fdo_back_edge_counters = Continuation.Map.empty;
     symbol_inits = Backend_var.Map.empty
   }
 
@@ -327,6 +331,23 @@ let currently_in_inlined_body t =
 (* Continuations *)
 
 let exn_continuation env = env.exn_continuation
+
+let add_fdo_back_edge_counters env k counters =
+  if Fdo_annotation.is_empty counters
+  then env
+  else
+    { env with
+      fdo_back_edge_counters =
+        Continuation.Map.add k counters env.fdo_back_edge_counters
+    }
+
+let fdo_back_edge_counters env k =
+  Option.value
+    (Continuation.Map.find_opt k env.fdo_back_edge_counters)
+    ~default:Fdo_annotation.empty
+
+let in_loop_with_fdo_back_edge_counters env =
+  not (Continuation.Map.is_empty env.fdo_back_edge_counters)
 
 (* Code and closures *)
 

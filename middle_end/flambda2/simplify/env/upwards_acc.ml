@@ -30,12 +30,14 @@ type t =
     cost_metrics : Cost_metrics.t;
     slot_offsets : Slot_offsets.t Or_unknown.t;
     flow_result : Flow_types.Flow_result.t;
+    fdo_region_counters : Fdo_region_counters.t;
     resimplify : bool
   }
 
 let [@ocamlformat "disable"] print ppf
       { uenv; creation_dacc = _; lifted_constants; name_occurrences;
-        all_code = _; cost_metrics; slot_offsets; flow_result; resimplify;
+        all_code = _; cost_metrics; slot_offsets; flow_result;
+        fdo_region_counters = _; resimplify;
       } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(uenv@ %a)@]@ \
@@ -73,6 +75,7 @@ let create ~flow_result ~compute_slot_offsets uenv dacc =
     cost_metrics = Cost_metrics.zero;
     slot_offsets;
     flow_result;
+    fdo_region_counters = DA.fdo_region_counters dacc;
     resimplify = false
   }
 
@@ -177,6 +180,11 @@ let continuation_param_aliases t = t.flow_result.aliases_result
 let mutable_unboxing_result t = t.flow_result.mutable_unboxing_result
 
 let set_resimplify t = { t with resimplify = true }
+
+let fdo_region_counters t = t.fdo_region_counters
+
+let map_fdo_region_counters t ~f =
+  { t with fdo_region_counters = f t.fdo_region_counters }
 
 let resimplify t = t.resimplify
 

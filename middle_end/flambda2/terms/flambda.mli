@@ -299,6 +299,7 @@ module Continuation_handler : sig
 
   (** Create the representation of a single continuation handler. *)
   val create :
+    ?fdo_back_edge_counters:Fdo_annotation.t ->
     Bound_parameters.t ->
     handler:expr ->
     free_names_of_handler:Name_occurrences.t Or_unknown.t ->
@@ -349,6 +350,10 @@ module Continuation_handler : sig
   val is_exn_handler : t -> bool
 
   val is_cold : t -> bool
+
+  (** The FDO counters of a loop header, for the edges into it built before they
+      were known (its back edges). *)
+  val fdo_back_edge_counters : t -> Fdo_annotation.t
 end
 
 module Continuation_handlers : sig

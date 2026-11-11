@@ -16,11 +16,16 @@
 type t = private
   { params : Bound_parameters.t;
     handler : Flambda.Expr.t;
-    is_cold : bool
+    is_cold : bool;
+    fdo_back_edge_counters : Fdo_annotation.t
   }
 
 val create :
-  params:Bound_parameters.t -> handler:Flambda.Expr.t -> is_cold:bool -> t
+  params:Bound_parameters.t ->
+  handler:Flambda.Expr.t ->
+  is_cold:bool ->
+  fdo_back_edge_counters:Fdo_annotation.t ->
+  t
 
 val print : Format.formatter -> t -> unit
 

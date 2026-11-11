@@ -45,6 +45,11 @@ val dacc_prior_to_sets : t -> DA.t
    code (not just the metadata). *)
 val old_to_new_code_ids_all_sets : t -> Code_id.t Code_id.Map.t
 
+(** The code to simplify for the given (old) code id. Note that if this is a
+    copy of an original, it might not be identical to the original (e.g. due to
+    having rewritten FDO counters). *)
+val code_to_simplify : t -> Code_id.t -> Code.t option
+
 val closure_bound_names_inside_functions_all_sets :
   t -> Bound_name.t Function_slot.Map.t list
 
