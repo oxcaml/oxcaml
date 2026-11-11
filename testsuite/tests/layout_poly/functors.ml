@@ -208,7 +208,8 @@ let c1 =
   let module R = U (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
+>> Fatal error: slambda eval: Expected value at line 7, characters 17-50
+to not be missing because it's a template being instantiated
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -395,7 +396,8 @@ let k6 =
   let module R = K (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
+>> Fatal error: slambda eval: Expected value at line 3, characters 32-36
+to not be missing because it's a kind template being instantiated
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -487,7 +489,8 @@ let x12 =
   end in
   Recursive.M12.id 7
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
+>> Fatal error: slambda eval: Expected value at line 12, characters 2-18
+to not be missing because it's a kind template being instantiated
 Uncaught exception: Misc.Fatal_error
 
 |}]
