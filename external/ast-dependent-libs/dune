@@ -61,4 +61,5 @@
   (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest-js)
   (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest-wasm)
   (alias_rec js_of_ocaml/lib/tests/runtest-js)
-  (alias_rec js_of_ocaml/lib/tests/runtest-wasm)))
+  (alias_rec js_of_ocaml/lib/tests/runtest-wasm)
+  (alias_rec js_of_ocaml/runtime/wasm/test-static-chunks/runtest)))
