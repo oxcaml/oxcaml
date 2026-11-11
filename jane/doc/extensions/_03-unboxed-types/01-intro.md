@@ -377,17 +377,6 @@ Here by defining module type `S` with layout `any` and using `with` constraints,
 reason about modules with similar shapes but that operate on different layouts. This removes code
 duplication and can aid ppxs in supporting unboxed types.
 
-There is one limitation: All fields in a module type must have a representable
-layout. For example, the following is not allowed, regardless of how `S` is used:
-```ocaml
-module type S = sig
-  type t : any
-
-  val one : t
-end
-```
-We plan on lifting this restriction in the future.
-
 # `[@layout_poly]` attribute {#layout_poly-attribute}
 
 The attribute enables support for **limited layout polymorphism on external
