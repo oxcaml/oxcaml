@@ -358,9 +358,9 @@ static int caml_float_of_hex(const char * s, const char * end, double * res)
     else
       exp = exp + adj;
   }
-  /* If the result is subnormal, m will be rounded below and then again in ldexp.
-     To avoid this, round m to odd, so its conversion to FP is exact or a tie.
-     Ties round to even, which ldexp then scales exactly. */
+  /* If the result is subnormal, m will be rounded below and then again in
+     ldexp. To avoid this, round m to odd, so its conversion to FP is exact
+     or a tie. Ties round to even, which ldexp then scales exactly. */
   {
     int sub_exp = DBL_MIN_EXP - DBL_MANT_DIG - 2;
     if (exp < sub_exp) {

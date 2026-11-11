@@ -717,7 +717,20 @@ let () =
   check "0x1.0000028p-127" 0x40_0001l;
   check "0x1.0000027ffffffp-127" 0x40_0001l;
   check "0x1.fffffap-127" 0x7f_fffel;
-  check "0x1.fffffep-127" 0x80_0000l
+  check "0x1.fffffep-127" 0x80_0000l;
+  (* Literals go through the compiler's own parser, which must agree *)
+  let check lit bits = bit_eq lit (F32.of_bits bits) in
+  check 0x1p-149s 0x1l;
+  check 0x1p-150s 0x0l;
+  check 0x3p-150s 0x2l;
+  check 0x1000001p-174s 0x1l;
+  check 0x2FFFFFFp-174s 0x1l;
+  check 0x1.7FFFFFp-149s 0x1l;
+  check 0x1.00000000000000000001p-150s 0x1l;
+  check 0x1.0000028p-127s 0x40_0001l;
+  check 0x1.0000027ffffffp-127s 0x40_0001l;
+  check 0x1.fffffap-127s 0x7f_fffel;
+  check 0x1.fffffep-127s 0x80_0000l
 
 let () =
   (* Cast & sqrt-with-memory intrinsics (see selection.ml) *)
