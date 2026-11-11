@@ -42,46 +42,49 @@ let max_unboxed_tuple_arity = 4
 
 let max_unboxed_tuple_depth = 2
 
-(* Probabilities in percent, conditional on reaching each choice. *)
-let record_probability = 25
+let max_probability = 10_000
 
-let variant_probability = 25
+(* Probabilities out of [max_probability], conditional on reaching each
+   choice. *)
+let record_probability = 2_500
 
-let or_null_probability = 25
+let variant_probability = 2_500
 
-let unboxed_tuple_probability = 25
+let or_null_probability = 2_500
 
-let match_in_match_probability = 50
+let unboxed_tuple_probability = 2_500
+
+let match_in_match_probability = 5_000
 
 let assert_false_probability = 1
 
-let nested_record_probability = 15
+let nested_record_probability = 1_500
 
-let mutable_binding_probability = 75
+let mutable_binding_probability = 7_500
 
-let mutable_field_probability = 50
+let mutable_field_probability = 5_000
 
-let array_probability = 25
+let array_probability = 2_500
 
-let array_literal_probability = 50
+let array_literal_probability = 5_000
 
-let bounded_index_probability = 75
+let bounded_index_probability = 7_500
 
-let opaque_initializer_probability = 50
+let opaque_initializer_probability = 5_000
 
-let opaque_leaf_probability = 5
+let opaque_leaf_probability = 500
 
-let opaque_loop_bound_probability = 50
+let opaque_loop_bound_probability = 5_000
 
-let exception_payload_probability = 50
+let exception_payload_probability = 5_000
 
-let payload_binding_probability = 75
+let payload_binding_probability = 7_500
 
-let catch_all_probability = 25
+let catch_all_probability = 2_500
 
-let raise_notrace_probability = 50
+let raise_notrace_probability = 5_000
 
-let callee_raises_probability = 50
+let callee_raises_probability = 5_000
 
 type assertion_mode =
   | Disabled

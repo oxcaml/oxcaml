@@ -479,12 +479,15 @@ let instance_name global =
 
 let ident_stdlib = Ident.create_persistent "Stdlib"
 
-let non_shadowed_pervasive = function
-  | Pdot(Pident id, s) as path ->
-      Ident.same id ident_stdlib &&
-      (match in_printing_env (Env.find_type_by_name (Lident s)) with
-       | (path', _) -> Path.same path path'
-       | exception Not_found -> true)
+(* [non_shadowed_pervasive namespace path] checks whether [path] is [Stdlib.s]
+   and can be printed as just [s] in [namespace]. *)
+let non_shadowed_pervasive namespace = function
+  | Pdot(Pident id, s) as path when Ident.same id ident_stdlib ->
+      let namespace = Option.value namespace ~default:Type in
+      begin match Namespace.lookup (Some namespace) s with
+      | path' -> Path.same path path'
+      | exception Not_found -> true
+      end
   | _ -> false
 
 let find_double_underscore s =
@@ -583,7 +586,7 @@ let rec rewrite_double_underscore_longidents env (l : Longident.t) =
 let rec tree_of_path namespace = function
   | Pident id ->
       Oide_ident (ident_name namespace id)
-  | Pdot(_, s) as path when non_shadowed_pervasive path ->
+  | Pdot(_, s) as path when non_shadowed_pervasive namespace path ->
       Oide_ident (Ident_names.pervasives_name namespace s)
   | Pdot(p, s) ->
       Oide_dot (tree_of_path (Some Module) p, s)

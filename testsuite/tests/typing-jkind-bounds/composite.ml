@@ -1283,7 +1283,7 @@ Line 4, characters 62-63:
 Error: The value "x" has type "'a poly_unboxed"
        but an expression was expected of type "('b : value mod portable)"
        The kind of 'a poly_unboxed is value non_float mod portable with 'a
-         because it's a tuple type.
+         because of the definition of poly_unboxed at lines 1-3, characters 0-11.
        But the kind of 'a poly_unboxed must be a subkind of
            value mod portable
          because of the definition of id_portable at line 1, characters 4-15.
@@ -1298,7 +1298,7 @@ Error: The value "x" has type "'a poly_unboxed"
        but an expression was expected of type "('b : value mod portable)"
        The kind of 'a poly_unboxed is
            immutable_data with 'a with (type : value mod portable) option
-         because it's a tuple type.
+         because of the definition of poly_unboxed at lines 1-3, characters 0-11.
        But the kind of 'a poly_unboxed must be a subkind of
            value mod portable
          because of the definition of id_portable at line 1, characters 4-15.

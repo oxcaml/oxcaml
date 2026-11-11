@@ -177,6 +177,7 @@ type t =
   | Dls_get
   | Tls_get
   | Domain_index
+  | Thread_self_id
   | Poll
   | Pause
   | Alloc of

@@ -54,6 +54,14 @@ val import : importer -> t -> t
 
 val import_and_rename : importer -> t -> t
 
+type stamp_state
+
+val export_stamp_state : unit -> stamp_state
+
+val restore_stamp_state : stamp_state -> unit
+
+val merge_stamp_state : stamp_state -> stamp_state -> stamp_state
+
 val initialise : unit -> unit
 
 val reset : unit -> unit

@@ -330,8 +330,8 @@ and emit env c (exp : Cmm.expression) ~tail : result =
         ( (( Ctuple_field _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _
            | Caddi128 | Csubi128 | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
            | Cclz | Cctz | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion
-           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-           | Capply _ | Cextcall _ | Cload _
+           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
+           | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
            | Calloc (_, _)
            | Cstore (_, _)
            | Cmulhi _ | Cmuli64 _ | Cbswap _ | Ccsel _ | Cprefetch _ | Catomic _
@@ -440,7 +440,7 @@ and emit_expr_op env c op args dbg : result =
   | Basic
       ( Op
           ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-          | Tls_get | Domain_index | Poll | Pause | Const_int _
+          | Tls_get | Domain_index | Thread_self_id | Poll | Pause | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
           | Load _
