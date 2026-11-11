@@ -170,6 +170,11 @@ module Un_op : sig
     | Abs
     | Succ
     | Pred
+    | Sqrt
+    | Round
+    | Trunc
+    | Ceil
+    | Floor
     | Bit_not
     | Not
 
@@ -185,6 +190,10 @@ module Bin_op : sig
     | Mul
     | Div
     | Rem
+    | Min
+    | Max
+    | Min_num
+    | Max_num
     | Bit_and
     | Bit_or
     | Bit_xor

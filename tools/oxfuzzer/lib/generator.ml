@@ -201,8 +201,9 @@ let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
   let make lhs rhs = Expr.Bin_op { ty; op; lhs; rhs } in
   match op with
   | And | Or -> make lhs rhs
-  | Add | Sub | Mul | Div | Rem | Bit_and | Bit_or | Bit_xor | Shift_left
-  | Shift_right | Shift_right_logical | Eq | Lt | Le | Gt | Ge ->
+  | Add | Sub | Mul | Div | Rem | Min | Max | Min_num | Max_num | Bit_and
+  | Bit_or | Bit_xor | Shift_left | Shift_right | Shift_right_logical | Eq | Lt
+  | Le | Gt | Ge ->
     bind_operand st rhs ~f:(fun rhs ->
         bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
 
@@ -579,14 +580,25 @@ let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
         let powers =
           List.map
             (fun exponent -> bits_of_float (Float.ldexp 1. exponent))
-            [0; 7; 15; 31; Sys.int_size - 1; 63; fraction_bits + 1]
+            [ 0;
+              7;
+              15;
+              31;
+              Sys.int_size - 1;
+              63;
+              fraction_bits;
+              fraction_bits + 1 ]
         in
+        let rounding = List.map bits_of_float [0.5; 1.5; 2.5] in
         let bits =
-          random_element st (1L :: min_normal :: Int64.pred infinity :: powers)
+          random_element st
+            ([1L; min_normal; Int64.pred infinity] @ rounding @ powers)
         in
         let offset = random_int_in_range st ~min:(-1) ~max:1 in
         with_sign (Int64.add bits (Int64.of_int offset)))
   in
+  (* Explicitly sample infinities and NaNs with either sign. Nonzero payloads
+     cover both quiet and signalling NaNs. *)
   let special =
     Gen.create (fun () ->
         let payload =
@@ -833,7 +845,8 @@ and gen_unary (st : State.t) env ty =
     |> List.filter (fun (op : Un_op.t) ->
         match op with
         | Bit_not -> st.swarm.bitwise_operations
-        | Neg | Abs | Succ | Pred | Not -> true)
+        | Neg | Abs | Succ | Pred | Sqrt | Round | Trunc | Ceil | Floor | Not ->
+          true)
     |> random_element st
   in
   let arg = gen_value st env ty in
