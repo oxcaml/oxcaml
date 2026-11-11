@@ -77,6 +77,7 @@ module Ty : sig
     | Variant of variant
     | Or_null of t
     | Bool
+    | String
 
   and record =
     { id : int;
@@ -212,6 +213,14 @@ module Expr : sig
   type t =
     | Const of Number.t
     | Bool_const of bool
+    | String_const of string
+    | String_length of t
+    | Bounded_string_concat of
+        { lhs : t;
+          rhs : t;
+          result_name : Name.t;
+          max_length : int
+        }
     | Assert_false
         (** Non-returning expression, valid at any result type or layout. *)
     | Let of
