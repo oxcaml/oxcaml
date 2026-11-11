@@ -380,7 +380,8 @@ let find_test_dirs dir =
           if Sys.is_directory s then begin
             let subdir_has_tests = loop s in
             if not subdir_has_tests then subdirs := s :: !subdirs;
-          end else if not !contains_tests && is_test s then contains_tests := true
+          end else if not !contains_tests && is_test s then
+            contains_tests := true
         end
       ) (Sys.readdir dir);
     if !contains_tests then res := (dir, sort_strings !subdirs) :: !res;

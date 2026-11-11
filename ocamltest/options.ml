@@ -132,7 +132,7 @@ let commandline_options =
   ("-no-ocamlsrcdir", Arg.Unit (fun () -> no_ocamlsrcdir := true),
    " Do not use OCAMLSRCDIR to find dependencies");
   ("-no-diff", Arg.Unit (fun () -> no_diff := true),
-   " Do not run 'diff' but instead copy generated outputs back to the source directory");
+   " Instead of running diff, copy generated outputs to the source directory");
   ("-override", Arg.String add_override,
    " Specify path to an OCaml component");
   ("-shell", Arg.Unit (fun () -> shell := true),
