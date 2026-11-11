@@ -1571,18 +1571,25 @@ let apply_pmd_modalities env modalities mty =
     is annotated [@ static], while generative functors are never templates.
 
     Returned hints may be used to constrain the mode of the functor and result:
-    non-template functors are always [dynamic] and have [dynamic] results. *)
+    non-template functors are always [dynamic] and have [dynamic] results.
+
+    Note that the hints can only be used in lower bounds. Hence, they are
+    only non-trivial if the bound is [dynamic], like the hint acknowledges.  *)
 let transl_functor_staticity_of_parameter
-  : Parsetree.functor_parameter -> Staticity.Const.t * _ * _ = function
+  : Parsetree.functor_parameter ->
+    Staticity.Const.t *
+    funct_hint:Allowance.left_only Allowance.neg Hint.const *
+    res_hint:Allowance.left_only Allowance.neg Hint.const =
+  function
   | Unit ->
     Dynamic,
-    Mode_hint.Always_dynamic Generative_functor,
-    Mode_hint.Always_dynamic Generative_functor_application
+    ~funct_hint:(Mode_hint.Always_dynamic Generative_functor),
+    ~res_hint:(Mode_hint.Always_dynamic Generative_functor_application)
   | Named (_, _, marg) ->
     let { mode_modes } = Typemode.transl_mode_with_locality marg in
     (With_locality.Const.split mode_modes).monadic.staticity,
-    Mode_hint.Always_dynamic Non_template_functor,
-    Mode_hint.Always_dynamic Non_template_functor_application
+    ~funct_hint:(Mode_hint.Always_dynamic Non_template_functor),
+    ~res_hint:(Mode_hint.Always_dynamic Non_template_functor_application)
 
 
 (* Auxiliary for translating recursively-defined module types.
@@ -1607,7 +1614,11 @@ let rec approx_modtype env smty =
   | Pmty_signature ssg ->
       Mty_signature(approx_sig env ssg)
   | Pmty_functor(param, sres, mres) ->
-      let staticity, _, _ = transl_functor_staticity_of_parameter param in
+      (* Since we are only approximating the structure of the module types,
+         we do not incorporate mode constraints from the functor's staticity. *)
+      let staticity, ~funct_hint:_, ~res_hint:_ =
+        transl_functor_staticity_of_parameter param
+      in
       let (param, newenv) =
         match param with
         | Unit -> Types.Unit, env
@@ -2206,7 +2217,9 @@ and transl_modtype_aux md_mode env smty =
   | Pmty_functor(sarg_opt, sres, mres) ->
       let tmres = Typemode.transl_mode_with_locality mres in
       let mres = tmres.mode_modes |> With_locality.of_const in
-      let staticity, _, res_hint =
+      (* Since we are translating a module type, and module types have no modes,
+         there's no functor mode to constrain. *)
+      let staticity, ~funct_hint:_, ~res_hint =
         transl_functor_staticity_of_parameter sarg_opt
       in
       Staticity.submode_err (loc, Functor_return)
@@ -3439,7 +3452,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           (smod.pmod_loc, Functor)
           closed_over_mode.comonadic env
       in
-      let staticity, funct_hint, ret_hint =
+      let staticity, ~funct_hint, ~res_hint =
         transl_functor_staticity_of_parameter arg_opt
       in
       Staticity.submode_err (smod.pmod_loc, Functor)
@@ -3489,7 +3502,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         body_mode
         (ret_mode |> with_locality_as_regionality);
       Staticity.submode_err (body.mod_loc, Module)
-        (Staticity.of_const ~hint:ret_hint staticity)
+        (Staticity.of_const ~hint:res_hint staticity)
         (With_locality.proj_monadic Staticity ret_mode);
       (* Apply currying constraints if the body is a functor,
          similar to constraints for functions. *)
