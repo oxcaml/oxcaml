@@ -29,7 +29,7 @@ let with_invariant enabled f =
   Fun.protect ~finally:(fun () -> set previous) f
 ;;
 
-let parse ?exported_unit ~include_cmis ~debug ~deferred eager =
+let parse ?exported_unit ~include_cmis ~debug ~deferred ~dependencies eager =
   let channels = ref [] in
   let open_file file =
     let ic = open_in_bin file in
@@ -39,8 +39,8 @@ let parse ?exported_unit ~include_cmis ~debug ~deferred eager =
   Fun.protect
     ~finally:(fun () -> List.iter !channels ~f:close_in_noerr)
     (fun () ->
-      match eager, deferred, exported_unit with
-      | [ file ], [], None when Filename.check_suffix file ".cma" ->
+      match eager, deferred, dependencies, exported_unit with
+      | [ file ], [], [], None when Filename.check_suffix file ".cma" ->
         let ic = open_file file in
         (match Parse_bytecode.from_channel ic with
          | `Cma lib -> Parse_bytecode.from_cma ~include_cmis ~debug lib ic
@@ -64,6 +64,7 @@ let parse ?exported_unit ~include_cmis ~debug ~deferred eager =
           ~include_cmis
           ~debug
           ~deferred
+          ~dependencies:(read_units dependencies)
           (read_units eager |> Parse_bytecode.Code_unit.create))
 ;;
 
@@ -218,7 +219,8 @@ let run state = function
 ;;
 
 let usage =
-  "driver.exe parse [OPTION...] [UNIT.cmo...] [-root ID UNIT.cmo...]... [ACTION...]\n\n\
+  "driver.exe parse [OPTION...] [UNIT.cmo...] [-root ID UNIT.cmo...]... [-dependency \
+   FILE]... [ACTION...]\n\n\
    Parses eager units, or a single archive, and the deferred roots jointly. Actions run \
    in command-line order on the resulting program."
 ;;
@@ -226,6 +228,7 @@ let usage =
 let main argv =
   let eager = ref [] in
   let deferred = ref [] in
+  let dependencies = ref [] in
   let exported_unit = ref None in
   let include_cmis = ref false in
   let debug = ref false in
@@ -243,6 +246,10 @@ let main argv =
       [ ( "-root"
         , Arg.String (fun id -> deferred := (id, []) :: !deferred)
         , "ID Start deferred root ID; subsequent units belong to it" )
+      ; ( "-dependency"
+        , Arg.String (fun file -> dependencies := file :: !dependencies)
+        , "FILE Let the compiler place FILE, a unit or an archive, where it is needed \
+           (repeatable)" )
       ; ( "-exported-unit"
         , Arg.String
             (fun name ->
@@ -314,6 +321,7 @@ let main argv =
           ~include_cmis:!include_cmis
           ~debug:!debug
           ~deferred:(List.rev_map !deferred ~f:(fun (id, files) -> id, List.rev files))
+          ~dependencies:(List.rev !dependencies)
           (List.rev !eager)
       with
       | Invalid_argument message ->

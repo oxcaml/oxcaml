@@ -88,6 +88,13 @@ end
     [exported_unit] selects modules to register for lookup by name (default: all).
     [[]] disables registration, not initialization.
 
+    [dependencies] are units the compiler places itself, following the units each
+    compilation unit requires. A dependency needed by eager code is eager, one needed by a
+    single deferred root belongs to that root, and one nothing needs is dropped. One
+    needed only by several deferred roots is shared deferred code: it is initialized the
+    first time one of those roots runs, at most once. A dependency must not require the
+    eager or deferred units passed explicitly.
+
     Deferred roots must contain bytecode. Input channels are repositioned, not closed. *)
 val from_units :
      ?includes:string list
@@ -95,6 +102,7 @@ val from_units :
   -> ?exported_unit:string list
   -> ?debug:bool
   -> ?deferred:Deferred_code.t list
+  -> ?dependencies:(Ocaml_compiler.Cmo_format.t * in_channel) list
   -> Code_unit.t
   -> one
 

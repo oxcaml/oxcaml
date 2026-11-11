@@ -574,21 +574,22 @@ The raise happens before startup registers either root, so neither is here
   Registered roots: []
   $ stop_js
 
-# CR-soon amin: Update this test to use the [-dependency] syntax, so the compiler
-# infers where [Shared_by_deferreds], [Shared_with_eager], [Only_in_a], and 
-# [Eager_only] go instead of the test placing them by hand.
-
-Each initializer runs exactly once, wherever its side effect is needed:
+Each initializer runs exactly once, wherever its side effect is needed.
+-dependency hands a unit to the compiler, which places it according to which
+parts require it:
 
 1. Shared_by_deferreds is used by both roots but not by eager code.
 2. Shared_with_eager is used by eager code (Main) and by root A.
 3. Eager_only is used only by eager code.
-4. Only_in_a belongs to root A alone.
+4. Only_in_a is used only by root A.
+5. Unused is used by nothing.
 
-A unit used by more than one root, or by eager code, must be eager, so 1-3
-initialize once at startup, before any root is loaded. Only_in_a initializes
-once, when A is loaded. Each unit counts its initializations, and every user
-reports the count it sees.
+A unit used by eager code must be eager, so 2 and 3 initialize at startup. A
+unit used by a single root belongs to it, so Only_in_a initializes when A is
+loaded. A unit used only by several roots is shared deferred code: 1
+initializes the first time either root is loaded, and not again for the other.
+5 is dropped, as when linking a library. Each unit counts its initializations,
+and every user reports the count it sees.
 
   $ cat > shared_by_deferreds.ml <<'EOF'
   > external report_progress : string -> unit = "report_progress"
@@ -617,6 +618,13 @@ reports the count it sees.
   > let () =
   >   incr initializations;
   >   report_progress "Only_in_a: initialized"
+  > EOF
+  $ cat > unused.ml <<'EOF'
+  > external report_progress : string -> unit = "report_progress"
+  > let initializations = ref 0
+  > let () =
+  >   incr initializations;
+  >   report_progress "Unused: initialized"
   > EOF
   $ cat > main.ml <<'EOF'
   > external report_value : string -> int -> unit = "report_value"
@@ -649,33 +657,111 @@ reports the count it sees.
   >     !Shared_by_deferreds.initializations
   > EOF
   $ compile shared_by_deferreds.ml shared_with_eager.ml eager_only.ml only_in_a.ml \
-  >   main.ml deferred_a.ml deferred_b.ml
+  >   unused.ml main.ml deferred_a.ml deferred_b.ml
   $ ./driver.exe parse -invariants -no-exports \
-  >   shared_by_deferreds.cmo shared_with_eager.cmo eager_only.cmo main.cmo \
-  >   -root A only_in_a.cmo deferred_a.cmo \
+  >   main.cmo \
+  >   -root A deferred_a.cmo \
   >   -root B deferred_b.cmo \
-  >   -optimize-for-partition -emit-js once.js
+  >   -dependency shared_by_deferreds.cmo \
+  >   -dependency shared_with_eager.cmo \
+  >   -dependency eager_only.cmo \
+  >   -dependency only_in_a.cmo \
+  >   -dependency unused.cmo \
+  >   -check-invariant -optimize-for-partition -check-invariant -emit-js once.js
+  IR invariants: [valid]
+  IR invariants: [valid]
+  $ grep -c -F '"Unused: initialized"' once.js
+  0
+  [1]
 
-Startup initializes Shared_by_deferreds, Shared_with_eager and Eager_only, but
-nothing from either root:
+Startup initializes Shared_with_eager and Eager_only, but nothing that only
+the roots use:
 
   $ start_js
   $ load_js once.js
-  Shared_by_deferreds: initialized
   Shared_with_eager: initialized
   Eager_only: initialized
   Main: Eager_only initializations [1]
   Main: Shared_with_eager initializations [1]
 
-Loading B, then A, initializes only what each root owns:
+Loading B initializes Shared_by_deferreds. Loading A then initializes only
+Only_in_a, and sees the same Shared_by_deferreds:
 
   $ js 'loadDeferredRoot.B(0)'
+  Shared_by_deferreds: initialized
   Deferred_b: Shared_by_deferreds initializations [1]
   $ js 'loadDeferredRoot.A(0)'
   Only_in_a: initialized
   Deferred_a: Shared_by_deferreds initializations [1]
   Deferred_a: Shared_with_eager initializations [1]
   Deferred_a: Only_in_a initializations [1]
+  $ stop_js
+
+The same placement compiles to Wasm:
+
+  $ ./driver.exe parse -target wasm -invariants -no-exports \
+  >   main.cmo \
+  >   -root A deferred_a.cmo \
+  >   -root B deferred_b.cmo \
+  >   -dependency shared_by_deferreds.cmo \
+  >   -dependency shared_with_eager.cmo \
+  >   -dependency eager_only.cmo \
+  >   -dependency only_in_a.cmo \
+  >   -dependency unused.cmo \
+  >   -optimize-for-wasm -print-split-anchors
+  Root [A] initializer arity: [1]
+  Root [B] initializer arity: [1]
+
+Shared deferred code fails like any other deferred code. Loading C, then A,
+then B and D behaves like eager code running C, then the shared code A needs,
+which raises: nothing after it runs, so loading B or D raises the same
+exception, whether or not the root needs the shared code.
+
+  $ cat > raising_shared.ml <<'EOF'
+  > let value = 1
+  > let () =
+  >   Shared.report_progress "Raising_shared: raising";
+  >   raise Shared.exn
+  > EOF
+  $ cat > needs_raising_a.ml <<'EOF'
+  > let () =
+  >   Shared.report_value "Needs_raising_a: Raising_shared.value is" Raising_shared.value
+  > EOF
+  $ cat > needs_raising_b.ml <<'EOF'
+  > let () =
+  >   Shared.report_value "Needs_raising_b: Raising_shared.value is" Raising_shared.value
+  > EOF
+  $ cat > independent_c.ml <<'EOF'
+  > let () = Shared.report_progress "Independent_c: initialized"
+  > EOF
+  $ cat > independent_d.ml <<'EOF'
+  > let () = Shared.report_progress "Independent_d: initialized"
+  > EOF
+  $ compile raising_shared.ml needs_raising_a.ml needs_raising_b.ml independent_c.ml \
+  >   independent_d.ml
+  $ ./driver.exe parse -invariants -no-exports \
+  >   shared.cmo \
+  >   -root A needs_raising_a.cmo \
+  >   -root B needs_raising_b.cmo \
+  >   -root C independent_c.cmo \
+  >   -root D independent_d.cmo \
+  >   -dependency raising_shared.cmo \
+  >   -check-invariant -optimize-for-partition -check-invariant \
+  >   -emit-js raising-shared.js
+  IR invariants: [valid]
+  IR invariants: [valid]
+  $ start_js
+  $ load_js raising-shared.js
+  Shared: initialized
+  $ js 'loadDeferredRoot.C(0)'
+  Independent_c: initialized
+  $ js 'loadDeferredRoot.A(0)'
+  Raising_shared: raising
+  Raised Shared.exn
+  $ js 'loadDeferredRoot.B(0)'
+  Raised Shared.exn
+  $ js 'loadDeferredRoot.D(0)'
+  Raised Shared.exn
   $ stop_js
 
 A unit can't appear in more than one place: initializing it twice would define
