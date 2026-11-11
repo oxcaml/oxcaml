@@ -131,9 +131,9 @@ Caml_inline status caml_allocation_status(void) {
 }
 
 /* Free blocks in pools are combined into runs (see shared_heap.c).  A
-   run's head block has this header; its size field holds the number of
-   additional blocks in the run, and its first field points to the next
-   run (or NULL). */
+   run's head block has this header; its size field holds the extent in
+   words of the additional blocks in the run (a multiple of the size
+   class), and its first field points to the next run (or NULL). */
 #define POOL_BLOCK_FREE_HD(hd) \
   (Tag_hd(hd) == No_scan_tag && (Color_hd(hd) == NOT_MARKABLE))
 #define POOL_BLOCK_FREE_HP(p) (POOL_BLOCK_FREE_HD(Hd_hp(p)))
@@ -187,12 +187,12 @@ Caml_inline void *caml_shared_fast_alloc (mlsize_t whsize,
   CAMLassert(block != NULL);
   CAMLassert(POOL_BLOCK_FREE_HP(block));
   value *next;
-  mlsize_t run = Wosize_hp(block); /* free blocks following in this run */
+  mlsize_t run = Wosize_hp(block); /* words of free blocks following */
   if (run > 0) {
     /* Carve the head block off the run: the remainder becomes the new
        head, inheriting the next-run pointer. */
     next = block + whsize_sizeclass[sz];
-    *(header_t*)next = POOL_FREE_HEADER(run - 1);
+    *(header_t*)next = POOL_FREE_HEADER(run - whsize_sizeclass[sz]);
     next[1] = block[1];
   } else {
     next = (value*)(block[1]);

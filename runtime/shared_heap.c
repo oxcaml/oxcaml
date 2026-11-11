@@ -451,7 +451,7 @@ static void calc_pool_stats(pool* a, sizeclass_t sz, struct heap_stats* s)
   do {
     header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
     if (POOL_BLOCK_FREE_HD(hd)) {
-      p += wh * Wosize_hd(hd); /* skip contiguous free blocks */
+      p += Wosize_hd(hd); /* skip the rest of this free run */
     } else {
       s->pool_live_words += Whsize_hd(hd);
       s->pool_frag_words += wh - Whsize_hd(hd);
@@ -476,7 +476,7 @@ Caml_inline void pool_initialize(pool* r,
   r->next_obj = (value*)p;
   r->sz = sz;
 
-  p[0] = POOL_FREE_HEADER(POOL_BLOCKS(sz)-1);
+  p[0] = POOL_FREE_HEADER((POOL_BLOCKS(sz)-1) * whsize_sizeclass[sz]);
   p[1] = 0;
 
 #ifdef DEBUG
@@ -653,7 +653,7 @@ static void* pool_allocate(struct caml_heap_state* local, sizeclass_t sz) {
   if( Wosize_hp(p) > 0 ) {
     next = (value*)(p + whsize_sizeclass[sz]);
     /* we update the pool header of the next block */
-    *next = POOL_FREE_HEADER(Wosize_hp(p) - 1);
+    *next = POOL_FREE_HEADER(Wosize_hp(p) - whsize_sizeclass[sz]);
     /* also copy the next_obj pointer from p */
     CAMLassert(p[1] == 0 || POOL_BLOCK_FREE_HP(p[1]));
     next[1] = p[1];
@@ -830,6 +830,10 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
   {
     header_t* p = POOL_FIRST_BLOCK(a, sz);
     header_t* last_free_block = NULL;
+    /* One past the end of the run headed by [last_free_block], and the
+       word extent currently stored in its header. */
+    header_t* last_free_end = NULL;
+    uintnat last_free_words = 0;
     header_t* end = POOL_END(a);
     mlsize_t wh = whsize_sizeclass[sz];
     int all_used = 1;
@@ -863,6 +867,9 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
       /* If the current block is now free, either merge it into the
       previous free run or make it the start of a new run */
       if (POOL_BLOCK_FREE_HD(hd)) {
+        /* one past the end of the free run headed by this block */
+        header_t* next_p = p + Wosize_hd(hd) + wh;
+
         /* if any block is free then this is no longer a full pool */
         all_used = 0;
 
@@ -870,31 +877,33 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
         if (last_free_block) {
           CAMLassert(POOL_BLOCK_FREE_HP(last_free_block));
 
-          if (last_free_block + (1 + Wosize_hp(last_free_block)) * wh == p) {
-            /* if we can then update the wosize of the last free block */
-            *last_free_block = POOL_FREE_HEADER(Wosize_hp(last_free_block)
-                                                + Wosize_hd(hd) + 1);
+          if (last_free_end == p) { /* contiguous with the previous run */
+            last_free_words += Wosize_hd(hd) + wh;
+            *last_free_block = POOL_FREE_HEADER(last_free_words);
           } else {
             /* Can't merge; update the next pointer */
             last_free_block[1] = (value)p;
             last_free_block = p;
+            last_free_words = Wosize_hd(hd);
           }
         } else {
           /* if we're the first free block then set the next_obj pointer
             for the pool (which indicates the start of the freelist) */
           a->next_obj = (value*)p;
           last_free_block = p;
+          last_free_words = Wosize_hd(hd);
         }
 
-        /* skip over any free blocks following this one */
-        p += wh * Wosize_hd(hd);
+        /* skip the rest of this free run */
+        last_free_end = next_p;
+        p = next_p;
       } else {
         /* there's still a live block, the pool can't be released to the
             global freelist */
         release_to_global_pool = 0;
         work += wh;
+        p += wh;
       }
-      p += wh;
     } while (p < end);
     CAMLassert(p == end);
 
@@ -1198,7 +1207,7 @@ void caml_redarken_pool(struct pool* r, scanning_action f, void* fdata) {
   do {
     header_t hd = p[0];
     if (POOL_BLOCK_FREE_HD(hd)) {
-      p += wh * Wosize_hd(hd); /* skip contiguous free blocks */
+      p += Wosize_hd(hd); /* skip the rest of this free run */
     } else {
       if (Has_status_hd(hd, caml_global_heap_state.MARKED)) {
         f(fdata, Val_hp(p), 0);
@@ -1388,7 +1397,7 @@ static void compact_debug_check_pools(pool* pool, bool full)
       header_t hd = Hd_hp(p);
       if (POOL_BLOCK_FREE_HD(hd)) {
         CAMLassert(!full);
-        p += wh * Wosize_hd(hd); /* skip contiguous free blocks */
+        p += Wosize_hd(hd); /* skip the rest of this free run */
       } else {
         sizeclass_t sz = sizeclass_whsize[Whsize_hd(hd)];
         CAMLassert(sz == pool->sz);
@@ -1563,7 +1572,7 @@ static void compact_update_pools(pool *cur_pool)
     do {
       header_t hd = Hd_hp(p);
       if (POOL_BLOCK_FREE_HD(hd)) {
-        p += wh * Wosize_hd(hd); /* skip contiguous free blocks */
+        p += Wosize_hd(hd); /* skip the rest of this free run */
       } else {
         if (Has_status_hd(hd, caml_global_heap_state.UNMARKED)) {
           compact_update_block(p);
@@ -1768,10 +1777,10 @@ void compact_phase_one_mark(struct caml_heap_state* heap)
           *p = hd = POOL_FREE_HEADER(0);
         }
         if (POOL_BLOCK_FREE_HD(hd)) {
-          mlsize_t free_blocks = Wosize_hd(hd) + 1;
+          mlsize_t free_run = Wosize_hd(hd) + wh; /* words in this run */
           if (p == last_end) { /* contiguous with previous run */
-            *last_free = POOL_FREE_HEADER(Wosize_hp(last_free) + free_blocks);
-            last_end += free_blocks * wh;
+            *last_free = POOL_FREE_HEADER(Wosize_hp(last_free) + free_run);
+            last_end += free_run;
           } else { /* Not contiguous with preceding run */
             if (last_free) {
               last_free[1] = (header_t)p;
@@ -1779,7 +1788,7 @@ void compact_phase_one_mark(struct caml_heap_state* heap)
               cur_pool->next_obj = (value*)p;
             }
             last_free = p;
-            last_end = p + free_blocks * wh;
+            last_end = p + free_run;
           }
           p = last_end;
         } else {
@@ -2158,7 +2167,7 @@ void compact_run_phase(struct caml_heap_state* heap,
       do {
         header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
         if (POOL_BLOCK_FREE_HD(hd)) {
-          p += wh * Wosize_hd(hd); /* skip contiguous free blocks */
+          p += Wosize_hd(hd); /* skip the rest of this free run */
         } else {
           CAMLassert (!Has_status_hd(hd, caml_global_heap_state.MARKED));
           CAMLassert (!Has_status_hd(hd, NOT_MARKABLE));
@@ -2182,11 +2191,11 @@ void compact_run_phase(struct caml_heap_state* heap,
 
             /* Get free slot from to_pool free list */
             value* new_p = to_pool->next_obj;
-            mlsize_t run_length = Wosize_hp(new_p);
+            mlsize_t run_words = Wosize_hp(new_p);
             value *next = (value*)new_p[1];
-            if (run_length > 0) {
+            if (run_words > 0) {
               next = new_p + wh;
-              next[0] = POOL_FREE_HEADER(run_length - 1);
+              next[0] = POOL_FREE_HEADER(run_words - wh);
               next[1] = new_p[1];
             }
             to_pool->next_obj = next;
@@ -2398,8 +2407,8 @@ static void verify_pool(pool* a, sizeclass_t sz, struct mem_stats* s) {
       if (POOL_BLOCK_FREE_HD(hd)) {
         /* count the free block and any that follow it (stored in the
            size bits in the header)*/
-        s->free += wh * (1 + Wosize_hd(hd));
-        p += wh * Wosize_hd(hd); /* skip contiguous free blocks */
+        s->free += wh + Wosize_hd(hd);
+        p += Wosize_hd(hd); /* skip the rest of this free run */
       } else {
         CAMLassert(!Has_status_hd(hd, caml_global_heap_state.GARBAGE));
         s->live += Whsize_hd(hd);
