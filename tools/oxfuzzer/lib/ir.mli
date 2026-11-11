@@ -168,6 +168,7 @@ module Bin_op : sig
     | Add
     | Sub
     | Mul
+    | Div
     | Rem
     | Bit_and
     | Bit_or
@@ -203,6 +204,11 @@ module Expr : sig
           expr : t;
           body : t
         }  (** Immutable binding. *)
+    | If of
+        { condition : t;
+          if_true : t;
+          if_false : t
+        }
     | Read of place
     | Array_literal of t list
     | Array_make of

@@ -200,10 +200,38 @@ let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
   let make lhs rhs = Expr.Bin_op { ty; op; lhs; rhs } in
   match op with
   | And | Or -> make lhs rhs
-  | Add | Sub | Mul | Rem | Bit_and | Bit_or | Bit_xor | Shift_left
+  | Add | Sub | Mul | Div | Rem | Bit_and | Bit_or | Bit_xor | Shift_left
   | Shift_right | Shift_right_logical | Eq | Lt | Le | Gt | Ge ->
     bind_operand st rhs ~f:(fun rhs ->
         bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
+
+(* Evaluate both operands once, right-to-left, even when the divisor is zero.
+   Return the dividend in that case rather than raising [Division_by_zero]. *)
+let safe_div_or_rem (st : State.t) (nty : NumberTy.t) op ~lhs ~rhs =
+  let lhs_name = State.fresh st in
+  let rhs_name = State.fresh st in
+  let dividend = Expr.Read (Place.Variable lhs_name) in
+  let divisor = Expr.Read (Place.Variable rhs_name) in
+  let ty = Ty.Number nty in
+  let zero =
+    Expr.Convert
+      { expr = Expr.Const (Number.of_integral_bits nty.base 0L);
+        from = NumberTy.boxed nty.base;
+        to_ = nty
+      }
+  in
+  let body =
+    Expr.If
+      { condition = Expr.Bin_op { ty; op = Eq; lhs = divisor; rhs = zero };
+        if_true = dividend;
+        if_false = Expr.Bin_op { ty; op; lhs = dividend; rhs = divisor }
+      }
+  in
+  Expr.Let
+    { name = rhs_name;
+      expr = rhs;
+      body = Expr.Let { name = lhs_name; expr = lhs; body }
+    }
 
 let assign (st : State.t) ty target expr =
   match st.swarm.assertions with
@@ -735,11 +763,13 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
             gen_shift_count st env inner_ty
           | _ -> gen_value st env (Ty.Number inner_ty)
         in
-        Expr.Convert
-          { from = inner_ty;
-            to_ = nty;
-            expr = bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
-          })
+        let expr =
+          match binop with
+          | (Div | Rem) when not (NumberTy.is_floating_point inner_ty) ->
+            safe_div_or_rem st inner_ty binop ~lhs ~rhs
+          | _ -> bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
+        in
+        Expr.Convert { from = inner_ty; to_ = nty; expr })
   in
   let leaf =
     Gen.weighted st.random_state
