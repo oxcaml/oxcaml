@@ -20,8 +20,7 @@ val fail_with_reason : string -> Actions.t
 val skip_with_reason : string -> Actions.t
 
 val predicate
-  : bool -> string -> string -> out_channel -> Environments.t
-         -> Result.t * Environments.t
+  : bool -> string -> string -> Actions.code
 
 val mkreason : string -> string -> int -> string
 
@@ -39,7 +38,7 @@ val readonly_files : Environments.t -> string list
 
 val setup_symlinks : string -> string -> string list -> unit
 
-val setup_build_env : bool -> string list -> Actions.code
+val setup_build_env : bool -> ?remove:string list -> string list -> Actions.code
 
 val setup_simple_build_env : bool -> string list -> Actions.code
 
@@ -50,14 +49,42 @@ val run_cmd :
   ?stderr_variable : Variables.t ->
   ?append : bool ->
   ?timeout : int ->
-  out_channel -> Environments.t -> string list -> int
+  ?exits:(int * Result.t) list ->
+  what:string ->
+  out_channel -> Environments.t -> string list -> Actions.task
 
 val run_program : Actions.code
 
 val run_script : Actions.code
+
+val run_config_script : Actions.code
 
 val run_hook : string -> Actions.code
 
 val compare_files : string -> string -> string -> Actions.code
 
 val check_output : string -> Variables.t -> Variables.t -> Actions.code
+
+(* Action evaluators *)
+val do_setup_build_env :
+  source_dir:string ->
+  build_dir:string ->
+  remove:string list ->
+  files:string list ->
+  subdirs:string list ->
+  Result.t
+
+val do_run_cmd :
+  settings:Run_command.settings ->
+  message:string ->
+  exits:(int * Result.t) list ->
+  out_channel ->
+  Result.t
+
+val do_compare_files : 
+  kind_of_output:string ->
+  files:Filecompare.files ->
+  tool:Filecompare.tool ->
+  promote:bool ->
+  out_channel ->
+  Result.t

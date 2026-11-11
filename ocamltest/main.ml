@@ -90,38 +90,11 @@ let report_error loc e bt =
 
 type summary = Pass | Skip | Fail
 
-let summary_of_status : Result.status -> summary = function
+let summary_of_result (r : Result.t) : summary =
+  match r.status with
   | Pass | Predicate true -> Pass
   | Skip | Predicate false -> Skip
   | Fail -> Fail
-
-(* The sequential join passes if both tests pass.
-
-   This implies that a linear sequence of actions, a path along the
-   test tree, is considered successful if all actions passed. *)
-let join_sequential r1 r2 =
-  match r1, r2 with
-  | Fail, _ | _, Fail -> Fail
-  | Pass, Pass -> Pass
-  | Skip, _ | _, Skip -> Skip
-
-(* The parallel join passes if either test passes.
-
-   This implies that a test formed of several parallel branches is
-   considered successful if at least one of the branches is successful.
-*)
-let join_parallel r1 r2 =
-  match r1, r2 with
-  | Fail, _ | _, Fail -> Fail
-  | Pass, _ | _, Pass -> Pass
-  | Skip, Skip -> Skip
-
-let join_list_parallel results = List.fold_left join_parallel Skip results
-
-let string_of_summary = function
-  | Pass -> "passed"
-  | Fail -> "failed"
-  | Skip -> "skipped"
 
 let string_of_test_location ~branches line =
   String.concat ""
@@ -129,26 +102,26 @@ let string_of_test_location ~branches line =
        branches)
   ^ Printf.sprintf "line %d" line
 
-let run_test_tree log add_msg behavior env summ ast =
+let run_test_tree log add_msg behavior env ast =
   (* Interpret the statements contained in [stmts] and [segments] (effectively,
      run [stmts @ List.concat segments]), then go into each of the subtrees in
      [subs]. [branches] is a list of indices of [split] arms that we've
      descended into. *)
-  let rec run_statements behavior env summ stmts segments subs ~branches
-      ~must_do_something =
+  let rec run_statements behavior env stmts segments subs ~branches =
     match stmts with
     | Environment_statement s :: rest ->
       begin match interpret_environment_statement env s with
       | env ->
-        run_statements behavior env summ rest segments subs ~branches
-          ~must_do_something
+        run_statements behavior env rest segments subs ~branches
       | exception e ->
         let bt = Printexc.get_backtrace () in
         let line = s.loc.Location.loc_start.Lexing.pos_lnum in
-        Printf.ksprintf add_msg "%s %s"
+        let msg = Printf.sprintf "%s %s"
           (string_of_test_location ~branches line)
-          (report_error s.loc e bt);
-        Fail
+          (report_error s.loc e bt)
+        in
+        Printf.ksprintf add_msg "%s" msg;
+        Actions.Static (Result.fail_with_reason msg)
       end
     | Test (_, name, mods) :: rest ->
       let skip_all =
@@ -165,74 +138,63 @@ let run_test_tree log add_msg behavior env summ ast =
       in
       let name = { name with node = Environments.expand env name.node } in
       let test = lookup_test name in
-      let (msg, behavior, env, result) =
+      let (tasks, env) =
         match behavior with
-        | Skip_all -> ("", Skip_all, env, Result.skip)
+        | Skip_all -> (Actions.Static Result.skip, env)
         | Run ->
           begin try
             let testenv = List.fold_left apply_modifiers env mods in
-            let (result, newenv) = Tests.run log testenv test in
-            let msg = Result.string_of_result result in
-            let sub_behavior =
-              if Result.is_pass result then Run else Skip_all in
-            (msg, sub_behavior, newenv, result)
+            Printf.fprintf log "Running test %s with %d actions\n%!"
+              test.test_name
+              (List.length test.test_actions);
+            Tests.collect log testenv test
           with e ->
-            let bt = Printexc.get_backtrace () in
-            (report_error name.loc e bt, Skip_all, env, Result.fail)
+            if not skip_all then
+              Printf.ksprintf add_msg "%s (%s) %s" locstr name.node
+                (report_error name.loc e (Printexc.get_backtrace ()));
+            (Actions.Static Result.fail, env)
           end
       in
-      if not skip_all then
-        Printf.ksprintf add_msg "%s (%s) %s" locstr name.node msg;
-      let summ = join_sequential summ (summary_of_status result.status) in
-      let must_do_something =
-        must_do_something && not (Tests.does_something test)
-      in
-      run_statements behavior env summ rest segments subs ~branches
-        ~must_do_something
+      Actions.seq [tasks;
+                   run_statements behavior env rest segments subs ~branches]
     | Split alternatives :: rest ->
       let count = List.length alternatives in
       let run_alternative i alternative =
         Printf.fprintf log "Running split branch %d of %d\n%!" (i + 1) count;
-        run_statements behavior env summ alternative (rest :: segments)
-          subs ~branches:(i + 1 :: branches) ~must_do_something
+        run_statements behavior env alternative (rest :: segments)
+          subs ~branches:(i + 1 :: branches)
       in
-      join_list_parallel (List.mapi run_alternative alternatives)
+      Actions.par (List.mapi run_alternative alternatives)
     | [] ->
-      run_segments behavior env summ segments subs ~branches ~must_do_something
-  and run_segments behavior env summ segments subs ~branches
-      ~must_do_something =
+      run_segments behavior env segments subs ~branches
+  and run_segments behavior env segments subs ~branches =
     match segments with
     | segment :: segments ->
-        run_statements behavior env summ segment segments subs ~branches
-          ~must_do_something
+        run_statements behavior env segment segments subs ~branches
     | [] ->
         (* If [subs] is empty, there are no further test actions to
            perform: we are at the end of a test path and can report
            our current summary. Otherwise we continue with each
            branch, and parallel-join the result summaries. *)
         begin match subs with
-        | [] ->
-          if not must_do_something then summ
-          else (
-            match summ with
-            | Pass ->
-              add_msg "does the test tree do something? => failed";
-              Fail
-            | Skip | Fail -> summ
-          )
+        | [] -> Actions.Static Result.pass
         | _ ->
         (* CR mshinwell/xclerc: maybe sequences of actions that "do something"
            and then have further actions that do not "do something" should be
            flagged *)
-            join_list_parallel
+            Actions.par
               (List.map
-                (run_tree behavior env summ ~branches ~must_do_something)
+                (run_tree behavior env ~branches)
                 subs)
         end
-  and run_tree behavior env summ (Ast (stmts, subs)) ~branches
-      ~must_do_something =
-    run_statements behavior env summ stmts [] subs ~branches ~must_do_something
-  in run_tree behavior env summ ast ~branches:[] ~must_do_something:true
+  and run_tree behavior env (Ast (stmts, subs)) ~branches =
+    run_statements behavior env stmts [] subs ~branches
+  in
+  match run_tree behavior env ast ~branches:[] with
+  | Static r when Result.is_pass r ->
+     add_msg "does the test tree do something? => failed";
+     Actions.Static Result.fail
+  | (Static _ | Task _) as t -> t
 
 let get_test_source_directory test_dirname =
   if (Filename.is_relative test_dirname) then
@@ -258,7 +220,6 @@ let extract_rootenv (Ast (stmts, subs)) =
   (env, Ast (stmts, subs))
 
 let test_file test_filename =
-  let start = if Options.show_timings then Unix.gettimeofday () else 0.0 in
   let skip_test = List.mem test_filename !tests_to_skip in
   let tsl_ast = tsl_parse_file_safe test_filename in
   let (rootenv_statements, tsl_ast) = extract_rootenv tsl_ast in
@@ -287,21 +248,8 @@ let test_file test_filename =
   let hookname_prefix = Filename.concat test_source_directory test_prefix in
   let test_build_directory_prefix =
     get_test_build_directory_prefix test_directory in
-  let clean_test_build_directory () =
-    try
-      Sys.rm_rf test_build_directory_prefix
-    with Sys_error _ -> ()
-  in
-  clean_test_build_directory ();
-  Sys.make_directory test_build_directory_prefix;
-  let log_filename =
-    Filename.concat test_build_directory_prefix (test_prefix ^ ".log") in
-  let log =
-    if Options.log_to_stderr then stderr else begin
-      open_out log_filename
-    end in
-  let summary = Sys.with_chdir test_build_directory_prefix
-    (fun () ->
+  let log = if Options.log_to_stderr then stderr else open_out Filename.null in
+  let rootenv, msgs, task =
        let promote = string_of_bool Options.promote in
        let default_timeout = string_of_int Options.default_timeout in
        let install_hook name =
@@ -336,7 +284,7 @@ let test_file test_filename =
        let rootenv, initial_status, initial_summary =
          let rec loop env stmts =
            match stmts with
-           | [] -> (env, initial_status, Pass)
+           | [] -> (env, initial_status, Actions.Static Result.pass)
            | s :: t ->
              begin match interpret_environment_statement env s with
              | env -> loop env t
@@ -345,32 +293,57 @@ let test_file test_filename =
                let line = s.loc.Location.loc_start.Lexing.pos_lnum in
                Printf.ksprintf add_msg "line %d %s" line
                  (report_error s.loc e bt);
-               (env, Skip_all, Fail)
+               (env, Skip_all, Actions.Static Result.fail)
              end
          in
          loop rootenv rootenv_statements
        in
        let rootenv = Environments.initialize Environments.Post log rootenv in
-       let summary =
-         run_test_tree log add_msg initial_status rootenv initial_summary
-           tsl_ast
-       in
+       rootenv,
+       List.rev !msgs,
+       Actions.seq [initial_summary;
+                    run_test_tree log add_msg initial_status rootenv tsl_ast]
+  in
+  Actions.clear_all_hooks();
+  if not Options.log_to_stderr then close_out log;
+  rootenv, msgs, task
+
+let run_test ~rootenv ~msgs ~task =
+  let start = if Options.show_timings then Unix.gettimeofday () else 0.0 in
+  let test_build_directory_prefix = Environments.safe_lookup
+    Builtin_variables.test_build_directory_prefix rootenv
+  in
+  let test_basename = Environments.safe_lookup
+    Builtin_variables.test_file rootenv
+  in
+  let test_prefix = Filename.chop_extension test_basename in
+  let clean_test_build_directory () =
+    try
+      Sys.rm_rf test_build_directory_prefix
+    with Sys_error _ -> ()
+  in
+  clean_test_build_directory ();
+  Sys.make_directory test_build_directory_prefix;
+  let log_filename =
+    Filename.concat test_build_directory_prefix (test_prefix ^ ".log") in
+  let log = if Options.log_to_stderr then stderr else open_out log_filename in
+  let summary = Sys.with_chdir test_build_directory_prefix
+    (fun () ->
+       let result = Actions_eval.run_task ~log task in
        let common_prefix = " ... testing '" ^ test_basename ^ "'" in
-       let msgs = List.rev !msgs in
-       if summary = Skip && msgs <> [] then
+       if Result.is_skip result && msgs <> [] then
          List.iter (Printf.printf "%s with %s\n%!" common_prefix) msgs
        else begin
-         Printf.printf "%s => %s%s\n%!" common_prefix
-           (string_of_summary summary)
-           (if Options.show_timings && summary = Pass then
+         Printf.printf "%s %s%s\n%!" common_prefix
+           (Result.string_of_result result)
+           (if Options.show_timings && Result.is_pass result then
               let wall_clock_duration = Unix.gettimeofday () -. start in
               Printf.sprintf " (wall clock: %.02fs)" wall_clock_duration
             else "");
-         if summary = Fail then
+         if Result.is_fail result then
            List.iter (Printf.printf "%s with %s\n%!" common_prefix) msgs
        end;
-       Actions.clear_all_hooks();
-       summary
+       summary_of_result result
     ) in
   if not Options.log_to_stderr then close_out log;
   begin match summary with
@@ -380,7 +353,8 @@ let test_file test_filename =
   | Pass | Skip ->
       if not Options.keep_test_dir_on_success then
         clean_test_build_directory ()
-  end
+  end;
+  summary
 
 let is_test filename =
   let input_channel = open_in filename in
@@ -397,19 +371,24 @@ let sort_strings = List.sort String.compare
 let find_test_dirs dir =
   let res = ref [] in
   let rec loop dir =
+    let subdirs = ref [] in
     let contains_tests = ref false in
     Array.iter (fun s ->
         if ignored s then ()
         else begin
           let s = dir ^ "/" ^ s in
-          if Sys.is_directory s then loop s
-          else if not !contains_tests && is_test s then contains_tests := true
+          if Sys.is_directory s then begin
+            let subdir_has_tests = loop s in
+            if not subdir_has_tests then subdirs := s :: !subdirs;
+          end else if not !contains_tests && is_test s then
+            contains_tests := true
         end
       ) (Sys.readdir dir);
-    if !contains_tests then res := dir :: !res
+    if !contains_tests then res := (dir, sort_strings !subdirs) :: !res;
+    !contains_tests
   in
-  loop dir;
-  sort_strings !res
+  loop dir |> ignore;
+  List.sort (fun (a,_) (b,_) -> String.compare a b) !res
 
 let list_tests dir =
   let res = ref [] in
@@ -428,7 +407,7 @@ let list_tests dir =
 let find_tests dir =
   if Sys.is_directory dir then
     List.concat_map
-      (fun test_dir ->
+      (fun (test_dir,_) ->
          List.map (Filename.concat test_dir) (list_tests test_dir))
       (find_test_dirs dir)
   else if is_test dir then [dir]
@@ -450,22 +429,40 @@ let () =
 let () =
   let failed = ref false in
   let work_done = ref false in
+  let list_all_tests dir =
+    find_test_dirs dir |> List.iter (fun (dir,_) ->
+      list_tests dir |> List.iter (fun test ->
+        print_endline (Filename.concat dir test)))
+  in
   let list_tests dir =
     match list_tests dir with
     | [] -> failed := true
-    | res -> List.iter print_endline res
+    | res ->
+       List.iter print_endline res
   in
-  let find_test_dirs dir = List.iter print_endline (find_test_dirs dir) in
+  let find_test_dirs dir =
+    let dirs = find_test_dirs dir in
+    List.iter (fun (d,_) -> print_endline d) dirs
+  in
   let find_tests dir = List.iter print_endline (find_tests dir) in
   let doit f x = work_done := true; f x in
   List.iter (doit find_test_dirs) Options.find_test_dirs;
   List.iter (doit list_tests) Options.list_tests;
   List.iter (doit find_tests) Options.find_tests;
-  let do_file =
+  List.iter (doit list_all_tests) Options.list_all_tests;
+  let do_file f =
     if Options.translate then
-      Translate.file ~style:Options.style ~compact:Options.compact
+      Translate.file ~style:Options.style ~compact:Options.compact f
     else
-      test_file
+      let rootenv, msgs, task = test_file f in
+      if Options.shell then
+        Actions_eval.print_task_commands rootenv task
+      else
+        let summary = run_test ~rootenv ~msgs ~task in
+        match summary with
+        | Pass | Skip -> ()
+        | Fail ->
+           if not Options.exit_0_on_failure then failed := true
   in
   List.iter (doit do_file) Options.files_to_test;
   if not !work_done then print_usage();

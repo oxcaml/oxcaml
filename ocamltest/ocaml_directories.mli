@@ -17,6 +17,8 @@
 
 val srcdir : string
 
+val srcdir_path : string list -> string
+
 val stdlib : string
 
 val libunix : string
