@@ -4004,7 +4004,8 @@ let rec tree_of_modtype ?abbrev = function
       Omty_ident (tree_of_path (Some Module_type) p)
   | Mty_signature sg ->
       Omty_signature (tree_of_signature ?abbrev sg)
-  | Mty_functor(param, ty_res, m_res) ->
+  | Mty_functor(param, ty_res, m_res, _st) ->
+    (* [_st]aticity is printed as part of mode annotations on [param] *)
       wrap_mutation (fun () ->
       let param, env =
         tree_of_functor_parameter ?abbrev param
