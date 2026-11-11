@@ -478,7 +478,7 @@ def source_revision(directory: Path) -> str:
     return "unknown"
 
 
-def run_metadata(base_seed: int, toolchain: Toolchain, revision: str) -> str:
+def run_metadata(base_seed: str, toolchain: Toolchain, revision: str) -> str:
     lines = [
         f"command: {shlex.join(sys.argv)}",
         f"base seed: {base_seed}",
@@ -823,10 +823,12 @@ async def fuzz(
     limits: Limits,
     jobs: int,
     output_dir: Path,
-    base_seed: int,
+    base_seed: str,
     run_info: str,
     stats: Stats,
 ) -> FinishReason:
+    # Python seeds with all of a string, so any string is a seed, and it gives
+    # the same sequence of case seeds on every platform.
     rng = random.Random(base_seed)
     seed_indices = (
         itertools.count() if limits.iterations is None else range(limits.iterations)
@@ -921,9 +923,9 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     )
     parser.add_argument(
         "--seed",
-        type=int,
         default=None,
-        help="seed for the sequence of case seeds (default: random, printed)",
+        help="seed for the sequence of case seeds: any string "
+        "(default: random, printed)",
     )
     toolchain_group = parser.add_mutually_exclusive_group()
     toolchain_group.add_argument(
@@ -970,7 +972,9 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     toolchain.check_dependencies()
     revision = source_revision(toolchain.root)
     base_seed = (
-        args.seed if args.seed is not None else random.SystemRandom().getrandbits(62)
+        args.seed
+        if args.seed is not None
+        else str(random.SystemRandom().getrandbits(62))
     )
     print(f"seed: {base_seed}", file=sys.stderr)
     limits.print_summary()
