@@ -1,6 +1,6 @@
 #!/bin/sh
 # Test ocamlfilt demangling with the Structured scheme (OxCaml)
-OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
+OCAMLFILT="${ocamlfilt}"
 
 ${OCAMLFILT} --format structured \
   "_CamlU3FooM3BarF3baz" \

@@ -62,7 +62,7 @@ module CtxStore(A:CtxStored) = struct
       | Some (key, weight) ->
           begin try
             let (_shared,total,i) = AMap.find key st.map in
-            let total = Branch_annotations.add weight total in
+            let total = Branch_annotations.join_point [weight; total] in
             st.map <- AMap.add key (true,total,i) st.map ;
             i
           with Not_found ->

@@ -786,11 +786,17 @@ let make_apply_wrapper env
           match rev_args_or_invalid with
           | Invalid -> Invalid
           | Ok (i, rev_args) -> (
+            (* The decisions might not match, because [apply_decision] is the
+               decision for the return continuation of the apply (it might have
+               other uses, if the apply is in the branch of a conditional), and
+               [func_decision] is the decision for the function (it might have
+               other uses, if the function is called somewhere else) *)
             match
               ( (apply_decision : Unboxing_analysis.param_decision),
                 (func_decision : Unboxing_analysis.param_decision) )
             with
-            | Unbox _, (Keep _ | Delete) | (Keep _ | Delete), Unbox _ ->
+            | Delete, _ -> Ok (i + 1, rev_args)
+            | Unbox _, (Keep _ | Delete) | Keep _, Unbox _ ->
               let[@inline] error () =
                 Misc.fatal_errorf
                   "Inconsistent apply (%a) and func (%a) decisions:@ %a@."
@@ -812,7 +818,6 @@ let make_apply_wrapper env
               (* CR ncourant: restore this check *)
               let has_any_source = false in
               if has_any_source then error () else Invalid
-            | Delete, _ -> Ok (i + 1, rev_args)
             | Keep (_, _), Keep (v, _) -> Ok (i + 1, Simple.var v :: rev_args)
             | Keep (_, kind), Delete ->
               Ok
@@ -1227,6 +1232,7 @@ let rebuild_apply env apply =
             ~callee:(rewrite_simple_opt env (Apply.callee apply))
             exn_continuation ~args ~args_arity ~return_arity ~call_kind
             ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
+            ~callsite_counter:(Apply.callsite_counter apply)
             ~inlined:(Apply.inlined apply)
             ~inlining_state:(Apply.inlining_state apply)
             ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -1354,7 +1360,9 @@ let rebuild_apply env apply =
       let make_apply ~continuation =
         Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
           ~return_arity ~call_kind ~return_mode:(Apply.return_mode apply)
-          (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+          (Apply.dbg apply)
+          ~callsite_counter:(Apply.callsite_counter apply)
+          ~inlined:(Apply.inlined apply)
           ~inlining_state:(Apply.inlining_state apply)
           ~probe:(Apply.probe apply) ~position:(Apply.position apply)
           ~yielding:(Apply.yielding apply)

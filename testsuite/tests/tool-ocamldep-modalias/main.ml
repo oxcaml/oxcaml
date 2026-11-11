@@ -2,9 +2,9 @@
  readonly_files = "A.ml B.ml C.ml D.ml lib_impl.ml lib.mli Makefile.build Makefile.build2";
  set sources = "A.ml B.ml C.ml D.ml";
  set links = "LibA.ml LibB.ml LibC.ml LibD.ml";
- set stdlib = "-nostdlib -I ${ocamlsrcdir}/stdlib";
- set OCAMLC = "${ocamlrun} ${ocamlc_byte} ${stdlib}";
- set OCAMLOPT = "${ocamlrun} ${ocamlopt_byte} ${stdlib}";
+ set stdlib_args = "-nostdlib -I ${stdlib}";
+ set OCAMLC = "${ocamlrun} ${ocamlc_byte} ${stdlib_args}";
+ set OCAMLOPT = "${ocamlrun} ${ocamlopt_byte} ${stdlib_args}";
  {
    compiler_directory_suffix = ".depend.mk";
    compiler_output = "${test_build_directory}/depend.mk";

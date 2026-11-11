@@ -28,6 +28,8 @@ val classic_mode : unit -> bool
 
 val mode : unit -> any_mode
 
+val fdo_counters : unit -> bool
+
 val join_points : unit -> bool
 
 val unbox_along_intra_function_control_flow : unit -> bool
@@ -64,6 +66,8 @@ val reaper_unbox : unit -> bool
 val reaper_max_unbox_size : unit -> int
 
 val reaper_change_calling_conventions : unit -> bool
+
+val lto_support : unit -> bool
 
 val simplify_stubs : unit -> bool
 
