@@ -29,6 +29,13 @@ type optimized_result =
   ; shapes : Shape.t StringMap.t
   }
 
+(** Optimize under the current target and effects configuration, stopping before
+    field-sensitive dead-code elimination, exact-call/effects lowering, and
+    [Generate_closure]. The result remains suitable for graph partitioning and
+    subsequent ordinary compilation. This stage introduces no dead-field sentinel
+    or backend lowering metadata. *)
+val optimize_for_partition : profile:Profile.t -> Code.program -> Code.program
+
 val optimize_for_wasm :
      shapes:bool
   -> profile:Profile.t

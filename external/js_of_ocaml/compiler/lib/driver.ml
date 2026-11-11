@@ -718,19 +718,22 @@ let link_and_pack ?(standalone = true) ?(wrap_with_fun = `Iife) ?(link = `No) p 
   |> pack ~wrap_with_fun ~standalone
   |> check_js
 
+let optimize_for_partition ~profile =
+  Specialize.switches
+  +> specialize_js_once_before
+  +> (match (profile : Profile.t) with
+    | O1 -> o1
+    | O2 -> o2
+    | O3 -> o3)
+  +> specialize_js_once_after
+
 let optimize ~shapes ~profile ~keep_flow_data p =
   let deadcode_sentinel =
     (* If deadcode is disabled, this field is just fresh variable *)
     Code.Var.fresh_n "dummy"
   in
   let opt =
-    Specialize.switches
-    +> specialize_js_once_before
-    +> (match (profile : Profile.t) with
-      | O1 -> o1
-      | O2 -> o2
-      | O3 -> o3)
-    +> specialize_js_once_after
+    optimize_for_partition ~profile
     +> effects_and_exact_calls ~keep_flow_data ~deadcode_sentinel ~shapes profile
     +> map_fst5
          (match Config.target (), Config.effects () with

@@ -466,13 +466,18 @@ end
 module Blocks : sig
   type t
 
-  val analyse : bytecode -> t * Addr.Set.t
+  val analyse : ?boundaries:Addr.Set.t -> bytecode -> t * Addr.Set.t
 
   val next : t -> int -> int
 
   val is_empty : t -> bool
+
+  val is_boundary : t -> int -> bool
 end = struct
-  type t = int array
+  type t =
+    { blocks : int array
+    ; boundaries : Addr.Set.t
+    }
 
   let add blocks pc = Addr.Set.add pc blocks
 
@@ -548,19 +553,22 @@ end = struct
       let k = (i + j) / 2 in
       if a.(k) <= x then find a k j x else find a i k x
 
-  let next blocks pc = find blocks 0 (Array.length blocks - 1) pc
+  let next { blocks; _ } pc = find blocks 0 (Array.length blocks - 1) pc
 
-  let is_empty x = Array.length x <= 1
+  let is_empty { blocks; _ } = Array.length blocks <= 1
 
-  let analyse code =
+  let is_boundary t pc = Addr.Set.mem pc t.boundaries
+
+  let analyse ?(boundaries = Addr.Set.empty) code =
     let len = String.length code / 4 in
     let blocks, starts, repeats =
       scan Addr.Set.empty Addr.Set.empty Addr.Set.empty code 0 len
     in
     let joins = Addr.Set.union repeats (Addr.Set.diff blocks starts) in
+    let blocks = Addr.Set.union blocks boundaries in
     let blocks = add blocks 0 in
     let blocks = add blocks len in
-    Array.of_list (Addr.Set.elements blocks), joins
+    { blocks = Array.of_list (Addr.Set.elements blocks); boundaries }, joins
 end
 
 (* Parse constants *)
@@ -1093,7 +1101,18 @@ let read_cont state ~nargs =
   in
   state, prelude, stack, args, Pv last
 
+let check_and_reset_state_if_deferred blocks pc (state : State.t) =
+  if Blocks.is_boundary blocks pc
+  then (
+    if not (List.is_empty state.stack)
+       || not (List.is_empty state.handlers)
+       || Array.length state.env <> 0
+    then failwith "Deferred initializer has a live stack or exception handler";
+    State.initial state.globals state.immutable)
+  else state
+
 let rec compile_block blocks joins hints debug_data code pc state : unit =
+  let state = check_and_reset_state_if_deferred blocks pc state in
   match Addr.Map.find_opt pc !tagged_blocks with
   | Some old_state -> (
       (* Check that the shape of the stack is compatible with the one used to compile the block *)
@@ -1132,6 +1151,7 @@ let rec compile_block blocks joins hints debug_data code pc state : unit =
          [accu] was [Unset] for that block, we make the current accu
          [Unset] *)
       let adjust_state pc =
+        let state' = check_and_reset_state_if_deferred blocks pc state' in
         match state', Addr.Map.find_opt pc !tagged_blocks with
         | _, None -> state'
         | { State.accu = Var _; _ }, Some { State.accu = Unset; _ } ->
@@ -3042,11 +3062,351 @@ type one =
   ; debug : Debug.summary
   }
 
-let parse_bytecode code globals hints debug_data =
+module Code_unit = struct
+  type t = 
+    { units: (Ocaml_compiler.Cmo_format.t * in_channel) list
+    ; num_words: int
+    }
+
+  let code_size units =
+    List.fold_left units ~init:0 ~f:(fun n (unit, _) -> n + unit.Cmo_format.cu_codesize) / 4
+
+  let create (units : (Ocaml_compiler.Cmo_format.t * in_channel) list) = 
+    { units
+    ; num_words = code_size units 
+    }
+
+  let empty =
+    { units = []
+    ; num_words = 0
+    }
+end 
+
+module Deferred_code = struct
+  type t = 
+    { id: string 
+    ; code: Code_unit.t
+    }
+
+  let create units ~id = 
+    let code = Code_unit.create units in 
+    if code.num_words = 0 then invalid_arg "Deferred_code.create: empty deferred code is not allowed";
+    { id 
+    ; code 
+    }
+end 
+
+let split_anchor = "caml_jsoo_split_anchor"
+
+let split_anchor_prefix = split_anchor ^ "__"
+
+let split_anchor_for_root root = split_anchor_prefix ^ root
+
+(* Runs a deferred root's code, given the program's deferred failure state *)
+let split_run = "caml_jsoo_split_run"
+
+let split_anchor_root name =
+  if String.starts_with ~prefix:split_anchor_prefix name
+  then
+    let pos = String.length split_anchor_prefix in
+    Some (String.sub name ~pos ~len:(String.length name - pos))
+  else None
+
+(* [program] is one initializer, with the eager code first and each deferred root's code
+   after it, in [deferred_roots] order. Each entry of [deferred_roots] names a root and
+   the block where its code starts. Returns a program that runs only the eager code at
+   startup and passes each root's code, as a closure, to that root's split anchor. *)
+let defer_initializers (program : Code.program) ~deferred_roots =
+  let deferred_root_starts = Addr.Set.of_list (List.map deferred_roots ~f:snd) in
+  (* Control falls through from one part into the next, so a part's blocks are those
+     reachable from its entry without entering another root's entry. *)
+  let leaves_region ~start pc = 
+    pc <> start && Addr.Set.mem pc deferred_root_starts 
+  in
+  let region start =
+    Code.traverse
+      { fold =
+          (fun blocks pc f acc ->
+            if leaves_region ~start pc then acc else Code.fold_children blocks pc f acc)
+      }
+      (fun pc acc -> if leaves_region ~start pc then acc else Addr.Set.add pc acc)
+      start
+      program.blocks
+      Addr.Set.empty
+  in
+  let starts_in_deferred_root = Addr.Set.mem program.start deferred_root_starts in
+  let eager_blocks =
+    if starts_in_deferred_root
+    then Addr.Set.empty
+    else region program.start
+  in
+  let deferred =
+    List.map deferred_roots ~f:(fun (id, start) -> id, start, region start)
+  in
+  let (_ : Addr.Set.t) = 
+    List.fold_left 
+      deferred 
+      ~init:eager_blocks 
+      ~f:(fun owned (_, _, blocks) -> 
+        if not (Addr.Set.is_empty (Addr.Set.inter blocks owned)) 
+        then 
+          failwith "Deferred initializer regions overlap"; 
+        Addr.Set.union owned blocks)
+  in
+  (* Each root becomes its own closure, so it can only use values defined by the
+     eager part or by itself. A value defined by a sibling root would be out of
+     scope, as would a root's value used by eager code. *)
+  let code_from start =
+    let rec visit visited pc =
+      if (Addr.Set.mem pc visited)
+      then visited
+      else (
+        let visited = Addr.Set.add pc visited in 
+        let visited = 
+          List.fold_left 
+            (Addr.Map.find pc program.blocks).body 
+            ~init:visited
+            ~f:(fun visited -> function 
+              | Let (_, Closure (_, (body, _), _)) -> visit visited body 
+              | _ -> visited)
+        in 
+        fold_children
+          program.blocks
+          pc
+          (fun pc visited -> 
+             if not (leaves_region ~start pc) 
+             then visit visited pc
+             else visited)
+          visited)
+    in
+    visit Addr.Set.empty start
+  in
+  let regions =
+    (if (* There is no eager code in this case *)
+      starts_in_deferred_root
+     then []
+     else [ `Eager, code_from program.start ])
+    @ List.map deferred_roots ~f:(fun (id, start) -> `Deferred id, code_from start)
+  in
+  let defining_region = Var.Hashtbl.create 17 in
+  List.iter regions ~f:(fun (part, pcs) ->
+      Addr.Set.iter
+        (fun pc ->
+          let block = Addr.Map.find pc program.blocks in
+          let define x =
+            if Var.Hashtbl.mem defining_region x
+            then
+              failwith
+                (Format.asprintf
+                   "Parse_bytecode.defer_initializers: variable %a is defined more than once"
+                   Var.print
+                   x);
+            Var.Hashtbl.add defining_region x part
+          in
+          Freevars.iter_block_bound_vars define block;
+          List.iter block.body ~f:(function
+            | Let (_, Closure (params, _, _)) -> List.iter params ~f:define
+            | _ -> ()))
+        pcs);
+  let same_part a b =
+    match a, b with
+    | `Eager, `Eager -> true
+    | `Deferred a, `Deferred b -> String.equal a b
+    | `Eager, `Deferred _ | `Deferred _, `Eager -> false
+  in
+  List.iter regions ~f:(fun (part, pcs) ->
+      Addr.Set.iter
+        (fun pc ->
+          Freevars.iter_block_free_vars
+            (fun x ->
+              match Var.Hashtbl.find_opt defining_region x with
+                | Some (`Deferred id) when not (same_part (`Deferred id) part) -> 
+                  let part = match part with 
+                    | `Eager -> "eager code" 
+                    | `Deferred id -> Printf.sprintf "deferred root %S" id 
+                  in
+                  invalid_arg
+                    (Printf.sprintf
+                       "Parse_bytecode.from_units: %s uses a value defined by deferred \
+                        root %S"
+                       part
+                       id)
+              | Some _ | None -> ())
+            (Addr.Map.find pc program.blocks))
+        pcs);
+  (* [deferred_initializers_pc] registers all of the deferred roots *)
+  let deferred_initializers_pc = program.free_pc in
+  (* Each root gets its own return block: a block shared by several closures would be
+     part of several functions, which optimization passes (e.g. reference unboxing,
+     which adds parameters to a function's blocks) don't expect. *)
+  let return_pcs =
+    List.mapi deferred ~f:(fun i (_, start, _) -> start, deferred_initializers_pc + 1 + i)
+  in
+  let return_pc_of start =
+    Option.get
+      (List.find_map return_pcs ~f:(fun (start', pc) ->
+           if start = start' then Some pc else None))
+  in
+  let free_pc = ref (deferred_initializers_pc + 1 + List.length return_pcs) in
+  let fresh_pc () =
+    let pc = !free_pc in
+    incr free_pc;
+    pc
+  in
+  let return_unit ~before =
+    let returned = Var.fresh_n "split_unit" in
+    { params = []; body = before @ [ Let (returned, const 0) ]; branch = Return returned }
+  in
+  (* The deferred roots run as if they were the rest of the eager code, in the order they
+     are loaded, each at most once: once one raises an exception it doesn't handle, no
+     further deferred code runs, and every later load raises that exception again.
+     [failure] is the state [caml_jsoo_split_run] keeps: [0] until then, and a nonzero
+     kind with the exception in field 1 afterwards. *)
+  let failure = Var.fresh_n "deferred_failure" in
+  let map_branch f = function
+    | Branch c -> Branch (f c)
+    | Cond (v, a, b) -> Cond (v, f a, f b)
+    | Switch (v, cs) -> Switch (v, Array.map cs ~f)
+    | Pushtrap (body, exn, handler) -> Pushtrap (f body, exn, f handler)
+    | Poptrap c -> Poptrap (f c)
+    | (Return _ | Raise _ | Stop) as branch -> branch
+  in
+  let ensure_empty_stack_and_return args pc =
+    assert (List.is_empty args); 
+    pc, []
+  in
+  let blocks =
+    Addr.Map.mapi
+      (fun pc block ->
+        if Addr.Set.mem pc eager_blocks
+        then
+          { block with
+            branch =
+              map_branch
+                (fun ((target, args) as cont) ->
+                  if Addr.Set.mem target deferred_root_starts
+                  then (ensure_empty_stack_and_return args deferred_initializers_pc)
+                  else cont)
+                block.branch
+          }
+        else
+          match 
+            (* There should be no overlaps, so [pc] should only be a member of at most
+               1 deferred block *)
+            List.filter deferred ~f:(fun (_, _, blocks) -> Addr.Set.mem pc blocks) 
+          with
+          | [] -> block
+          | [ (_, start, _) ] ->
+              let enters_other_root target =
+                target <> start && Addr.Set.mem target deferred_root_starts
+              in 
+              let return_pc = return_pc_of start in
+              let branch =
+                match block.branch with
+                | Stop -> Branch (return_pc, [])
+                | branch ->
+                    map_branch
+                      (fun ((target, args) as cont) ->
+                        if enters_other_root target
+                        then (ensure_empty_stack_and_return args return_pc)
+                        else cont)
+                      branch
+              in
+              { block with branch }
+          | _ :: _ :: _ as owners ->
+            (* This should not be reachable due to the overlap check we did prior *)
+            failwith
+              (Printf.sprintf
+                 "Parse_bytecode.defer_initializers: block [%d] should belong to a single \
+                  deferred root, but belongs to roots %s"
+                 pc
+                 (String.concat
+                    ~sep:", "
+                    (List.map owners ~f:(fun (id, _, _) -> Printf.sprintf "[%S]" id)))))
+      program.blocks
+  in
+  (* Each root's closure runs its code through [caml_jsoo_split_run], which raises the
+     recorded exception if earlier deferred code failed, and otherwise records an
+     exception escaping the root before throwing it on unchanged. The root's code itself
+     runs at most once. *)
+  let blocks, entries =
+    List.fold_left_map deferred ~init:blocks ~f:(fun blocks (id, start, _) ->
+        let thunk_pc = fresh_pc () in
+        let check_pc = fresh_pc () in
+        let run_pc = fresh_pc () in
+        let done_pc = fresh_pc () in
+        let ran = Var.fresh_n ("ran_" ^ id) in
+        let already = Var.fresh_n "already_ran" in
+        let one = Var.fresh () in
+        let code = Var.fresh_n ("deferred_code_" ^ id) in
+        let result = Var.fresh () in
+        let blocks =
+          blocks
+          |> Addr.Map.add
+               thunk_pc
+               { params = []
+               ; body =
+                   [ Let (code, Closure ([ Var.fresh_n "unit" ], (check_pc, []), (None, None)))
+                   ; Let (result, Prim (Extern (split_run, None), [ Pv failure; Pv code ]))
+                   ]
+               ; branch = Return result
+               }
+          |> Addr.Map.add
+               check_pc
+               { params = []
+               ; body = [ Let (already, Field (ran, 0, Non_float)) ]
+               ; branch = Cond (already, (done_pc, []), (run_pc, []))
+               }
+          |> Addr.Map.add
+               run_pc
+               { params = []
+               ; body = [ Let (one, const 1); Set_field (ran, 0, Non_float, one) ]
+               ; branch = Branch (start, [])
+               }
+          |> Addr.Map.add (return_pc_of start) (return_unit ~before:[])
+          |> Addr.Map.add done_pc (return_unit ~before:[])
+        in
+        blocks, (id, start, thunk_pc, ran))
+  in
+  let register_deferred_initializers_fn =
+    let zero = Var.fresh () in
+    [ Let (zero, const 0)
+    ; Let (failure, Block (0, [| zero; zero |], NotArray, Maybe_mutable))
+    ]
+    @ List.concat_map entries ~f:(fun (id, start, entry_pc, ran) ->
+        let entry = Addr.Map.find start blocks in
+        if not (List.is_empty entry.params)
+        then failwith "Deferred initializer has live-in parameters";
+        let thunk = Var.fresh_n ("deferred_init_" ^ id) in
+        let argument = Var.fresh_n "unit" in
+        [ Let (ran, Block (0, [| zero |], NotArray, Maybe_mutable))
+        ; Let (thunk, Closure ([ argument ], (entry_pc, []), (None, None)))
+        ; Let (Var.fresh (), Prim (Extern (split_anchor_for_root id, None), [ Pv thunk ]))
+        ])
+  in
+  { start = (
+      if Addr.Set.mem program.start deferred_root_starts 
+      then deferred_initializers_pc else program.start)
+  ; blocks =
+      blocks
+      |> Addr.Map.add deferred_initializers_pc { 
+        params = []
+      ; body = register_deferred_initializers_fn
+      ; branch = Stop 
+      }
+  ; free_pc = !free_pc
+  }
+
+let parse_bytecode ?deferred_roots code globals hints debug_data =
   let immutable = Code.Var.Hashtbl.create 0 in
   let state = State.initial globals immutable in
   Code.Var.reset ();
-  let blocks', joins = Blocks.analyse code in
+  let boundaries =
+    match deferred_roots with
+    | Some roots -> Addr.Set.of_list (List.map roots ~f:snd)
+    | None -> Addr.Set.empty
+  in
+  let blocks', joins = Blocks.analyse ~boundaries code in
   Shape.State.reset ();
   let p =
     if not (Blocks.is_empty blocks')
@@ -3054,6 +3414,18 @@ let parse_bytecode code globals hints debug_data =
       let start = 0 in
 
       compile_block blocks' joins hints debug_data code start state;
+      (* [compile_block] only compiles what it reaches from its starting block, and code
+         before a root can always raise (e.g. [let () = raise Exit]), so nothing falls
+         through into the root. Compile each root from its own entry, so that it is present 
+         either way. 
+
+         Roots start from an empty initial state, like the program
+         itself; a root reached by fall-through is reset to the same state, and
+         [compile_block] skips any root it has already compiled. *)
+      Addr.Set.iter
+        (fun pc ->
+          compile_block blocks' joins hints debug_data code pc (State.initial globals immutable))
+        boundaries;
       let blocks =
         Addr.Map.mapi
           (fun _ (state, instr, last) ->
@@ -3079,6 +3451,18 @@ let parse_bytecode code globals hints debug_data =
   in
   compiled_blocks := Addr.Map.empty;
   tagged_blocks := Addr.Map.empty;
+  let p =
+    (* [Code.invariant] requires every block to be reachable from [start], but an
+       initializer that always raises can leave blocks unreachable after
+       [defer_initializers]:
+       - if the eager code always raises, startup never branches to the anchor block, so
+         the anchor block and every root become unreachable;
+       - if a root always raises, nothing branches to its return block.
+       Remove those blocks. *)
+    match deferred_roots with
+    | Some roots -> Deadcode.remove_unused_blocks (defer_initializers p ~deferred_roots:roots)
+    | None -> p
+  in
   let p = Code.compact p in
   let body =
     List.fold_left globals.cache_ids ~init:[] ~f:(fun body cache_id ->
@@ -3549,16 +3933,47 @@ module Reloc = struct
     globals
 end
 
-let from_compilation_units ~includes:_ ~include_cmis ~hints ~debug_data l =
+let from_compilation_units
+    ?exported_unit
+    ?deferred_roots
+    ~includes:_
+    ~include_cmis
+    ~hints
+    ~debug_data
+    l =
   let reloc = Reloc.create () in
   List.iter l ~f:(fun (compunit, code) -> Reloc.step1 reloc compunit code);
   List.iter l ~f:(fun (compunit, code) -> Reloc.step2 reloc compunit code);
   let globals = Reloc.make_globals reloc in
+  (* [exported_unit] selects which compilation units register themselves by name in the
+     global registry ([caml_register_global]) so that code outside this program can look
+     them up. 
+
+     By default, jsoo exports all units. 
+
+     When [exported_unit] is given, we effectively un-export units not in the set. 
+    
+     A unit that isn't exported is still initialized, and its [named_value] stays set, 
+     so a reference to a unit outside this program is still looked up through the registry 
+     ([caml_get_global]). 
+     
+     Only compilation units are affected; predefined exceptions keep their default. *)
+  (match exported_unit with
+  | None -> ()
+  | Some names ->
+      let names = StringSet.of_list names in
+      Array.iteri
+        ~f:(fun i -> function
+          | Some (Global_name.Glob_compunit (Compunit name)) ->
+              (* Keep [named_value] so imports still use the global registry. *)
+              globals.is_exported.(i) <- StringSet.mem name names
+          | None | Some (Glob_predef _) -> ())
+        globals.named_value);
   let code =
     let l = List.map l ~f:(fun (_, c) -> Bytes.to_string c) in
     String.concat ~sep:"" l
   in
-  let prog = parse_bytecode code globals hints debug_data in
+  let prog = parse_bytecode ?deferred_roots code globals hints debug_data in
   let body =
     Array.fold_right_i globals.vars ~init:[] ~f:(fun i var l ->
         match var with
@@ -3623,13 +4038,46 @@ let from_cmo ?(includes = []) ?(include_cmis = false) ?(debug = false) compunit 
   Code.invariant p.code;
   p
 
-let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
+let from_units
+    ?(includes = [])
+    ?(include_cmis = false)
+    ?exported_unit
+    ?(debug = false)
+    ?(deferred = [])
+    (static : Code_unit.t) =
   let debug_data = Debug.create ~include_cmis debug in
   let hints = Hints.create () in
   let orig = ref 0 in
-  let t = ref 0. in
+  let t = ref 0. in 
+  List.iter deferred ~f:(fun { Deferred_code.id ; _} -> 
+    Primitive.register (split_anchor_for_root id) `Mutator None (Some 1));
+  if not (List.is_empty deferred) then Primitive.register split_run `Mutator None (Some 2);
+  let (_ : int), deferred_roots =  
+    List.fold_left_map 
+      ~init:static.num_words
+      (deferred : Deferred_code.t list) ~f:(fun start { Deferred_code.id ; code } ->
+        let next_start = start + code.num_words in
+        next_start, (id, start))
+  in 
   let units =
-    List.map lib.Cmo_format.lib_units ~f:(fun compunit ->
+    let all_code = 
+      static.units 
+      @ List.concat_map deferred ~f:(fun { Deferred_code.code; _ } -> code.units) 
+    in
+    (* Ensure each compilation unit only appears once as initializing a unit twice would 
+       define its globals/run its side effects twice. *)
+    let (_ : StringSet.t) =
+      List.fold_left all_code ~init:StringSet.empty ~f:(fun seen (compunit, _) ->
+          let (Global_name.Compunit name) = Ocaml_compiler.Cmo_format.name compunit in
+          if StringSet.mem name seen
+          then
+            invalid_arg
+              (Printf.sprintf
+                 "Parse_bytecode.from_units: compilation unit %s appears more than once"
+                 name);
+          StringSet.add name seen)
+    in
+    List.map all_code ~f:(fun (compunit, ic) ->
         seek_in ic compunit.Cmo_format.cu_pos;
         let code = Bytes.create compunit.Cmo_format.cu_codesize in
         really_input ic code 0 compunit.Cmo_format.cu_codesize;
@@ -3647,9 +4095,25 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
         compunit, code)
   in
   if times () then Format.eprintf "    read debug events: %.2f@." !t;
-  let p = from_compilation_units ~includes ~include_cmis ~hints ~debug_data units in
+  let p =
+    from_compilation_units
+      ?exported_unit
+      ~deferred_roots
+      ~includes
+      ~include_cmis
+      ~hints
+      ~debug_data
+      units
+  in
   Code.invariant p.code;
   p
+
+let from_cma ?includes ?include_cmis ?debug lib ic =
+  from_units
+    ?includes
+    ?include_cmis
+    ?debug
+    (Code_unit.create (List.map lib.Cmo_format.lib_units ~f:(fun compunit -> compunit, ic)))
 
 type jsir_unit =
   { name : string
