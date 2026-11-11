@@ -71,6 +71,21 @@ let[@inline never] loop_same n v =
   in
   go 0 0
 
+(* A partial application in an inlined body becomes a wrapper. Its call takes
+   the counter of the application of the wrapper where the wrapper is inlined,
+   and keeps the counter of the partial application where it is not. *)
+let[@inline never] add3 a b c = a + b + c
+
+let[@inline always] apply_partial k x =
+  let p = k x in
+  p 2 3
+
+let[@inline never] partial_inlined x = apply_partial add3 x
+
+let[@inline always] make_partial k x = k x
+
+let[@inline never] partial_escaping x = make_partial add3 x
+
 (* An over-application that only Simplify can split, inside an inlined body: the
    context is added once. *)
 let[@inline never] curried x = fun y -> x + y
