@@ -355,7 +355,45 @@ module Handler = struct
     Ast_helper.Exp.case (pattern_to_code pattern) (body_to_code body)
 end
 
-(* CR-someday xclerc: Add unary operations as well. *)
+module Un_op = struct
+  type t =
+    | Neg
+    | Abs
+    | Succ
+    | Pred
+    | Bit_not
+    | Not
+
+  let ops_for_ty (ty : Ty.t) =
+    match ty with
+    | Number nty ->
+      let numeric = [Neg; Abs; Succ; Pred] in
+      if NumberTy.is_floating_point nty then numeric else numeric @ [Bit_not]
+    | Bool -> [Not]
+    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
+      Misc.fatal_errorf "Un_op.ops_for_ty: unexpected aggregate"
+
+  let to_code ty unop ~arg =
+    let module_name =
+      match ty with
+      | Ty.Number nty -> NumberTy.to_module nty
+      | Ty.Bool -> "Bool"
+      | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
+      | Ty.Or_null _ ->
+        Misc.fatal_errorf "Un_op.to_code: unexpected aggregate"
+    in
+    let name =
+      match unop with
+      | Neg -> "neg"
+      | Abs -> "abs"
+      | Succ -> "succ"
+      | Pred -> "pred"
+      | Bit_not -> "lognot"
+      | Not -> "not"
+    in
+    apply (qualified_ident module_name name) [arg]
+end
+
 module Bin_op = struct
   type t =
     | Add
@@ -466,6 +504,11 @@ module Expr = struct
           cases : case list
         }
     | Opaque of t
+    | Un_op of
+        { ty : Ty.t;
+          op : Un_op.t;
+          arg : t
+        }
     | Bin_op of
         { ty : Ty.t;
           op : Bin_op.t;
@@ -649,6 +692,7 @@ module Expr = struct
            cases)
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
+    | Un_op { ty; op; arg } -> Un_op.to_code ty op ~arg:(to_code arg)
     | Bin_op { ty; op; lhs; rhs } ->
       Bin_op.to_code ty op ~lhs:(to_code lhs) ~rhs:(to_code rhs)
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
