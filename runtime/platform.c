@@ -20,21 +20,17 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-#include <errno.h>
 #include "caml/osdeps.h"
 #include "caml/platform.h"
-#include "caml/fail.h"
 #include "caml/lf_skiplist.h"
 #include "caml/misc.h"
 #include "caml/signals.h"
 #ifdef HAS_SYS_MMAN_H
-#include <sys/mman.h>
 #endif
 #ifdef _WIN32
 #include <windows.h>
 #endif
 
-#include "caml/alloc.h"
 #include "caml/lf_skiplist.h"
 #include "sync_posix.h"
 
@@ -428,8 +424,8 @@ void* caml_mem_map(uintnat size, uintnat flags, const char* name)
 {
 #ifdef DEBUG
   if (mmap_blocks.head == NULL) {
-    /* The first call to caml_mem_map should be during caml_init_domains, called
-       by caml_init_gc during startup - i.e. before any domains have started. */
+    /* The first call to caml_mem_map should be during caml_init_gc
+       on startup: before any domains have started. */
     CAMLassert(atomic_load_acquire(&caml_num_domains_running) <= 1);
     caml_lf_skiplist_init(&mmap_blocks);
   }

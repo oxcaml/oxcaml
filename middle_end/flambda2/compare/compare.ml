@@ -278,7 +278,7 @@ let subst_set_of_closures env set =
         subst_value_slot env var, subst_simple env simple)
     |> Value_slot.Map.of_list
   in
-  Set_of_closures.create ~value_slots decls
+  Set_of_closures.create ~value_slots ~dbg:(Set_of_closures.debuginfo set) decls
 
 let subst_rec_info_expr _env ri =
   (* Only depth variables can occur in [Rec_info_expr], and we only mess with
@@ -447,9 +447,10 @@ and subst_apply env apply =
   let position = Apply_expr.position apply in
   let args_arity = Apply_expr.args_arity apply in
   let return_arity = Apply_expr.return_arity apply in
+  let callsite_counter = Apply_expr.callsite_counter apply in
   Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind
-    ~return_mode dbg ~inlined ~inlining_state ~probe:None ~position
-    ~relative_history ~args_arity ~return_arity
+    ~return_mode dbg ~callsite_counter ~inlined ~inlining_state ~probe:None
+    ~position ~relative_history ~args_arity ~return_arity
   |> Expr.create_apply
 
 and subst_apply_cont env apply_cont =
@@ -459,10 +460,12 @@ and subst_apply_cont env apply_cont =
   let dbg = Apply_cont_expr.debuginfo apply_cont in
   Apply_cont_expr.create ?trap_action cont ~args ~dbg
 
+and subst_switch_arm env arm = Switch_arm.map_action (subst_apply_cont env) arm
+
 and subst_switch env switch =
   let scrutinee = subst_simple env (Switch_expr.scrutinee switch) in
   let arms =
-    Target_ocaml_int.Map.map_sharing (subst_apply_cont env)
+    Target_ocaml_int.Map.map_sharing (subst_switch_arm env)
       (Switch_expr.arms switch)
   in
   Expr.create_switch
@@ -995,19 +998,22 @@ let call_kinds env (call_kind1 : Call_kind.t) (call_kind2 : Call_kind.t) :
         { needs_caml_c_call = needs_caml_c_call1;
           is_c_builtin = is_c_builtin1;
           effects = effects1;
-          coeffects = coeffects1
+          coeffects = coeffects1;
+          fat_ptr_arg_starts = fat_ptr_arg_starts1
         },
       C_call
         { needs_caml_c_call = needs_caml_c_call2;
           is_c_builtin = is_c_builtin2;
           effects = effects2;
-          coeffects = coeffects2
+          coeffects = coeffects2;
+          fat_ptr_arg_starts = fat_ptr_arg_starts2
         } ) ->
     if
       Bool.equal needs_caml_c_call1 needs_caml_c_call2
       && Bool.equal is_c_builtin1 is_c_builtin2
       && Effects.compare effects1 effects2 = 0
       && Coeffects.compare coeffects1 coeffects2 = 0
+      && List.equal Int.equal fat_ptr_arg_starts1 fat_ptr_arg_starts2
     then Equivalent
     else Different { approximant = call_kind1 }
   | _, _ -> Different { approximant = call_kind1 }
@@ -1038,6 +1044,9 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
     && Alloc_mode.For_applications.compare (Apply.return_mode apply1)
          (Apply.return_mode apply2)
        = 0
+    && Option.equal Fdo_counter.equal
+         (Apply.callsite_counter apply1)
+         (Apply.callsite_counter apply2)
   in
   let ok = ref atomic_things_equal in
   let callee1' =
@@ -1063,6 +1072,7 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
             (Apply.exn_continuation apply1)
             ~args:args1' ~call_kind:call_kind1'
             ~return_mode:(Apply.return_mode apply1) (Apply.dbg apply1)
+            ~callsite_counter:(Apply.callsite_counter apply1)
             ~inlined:(Apply.inlined apply1)
             ~inlining_state:(Apply.inlining_state apply1)
             ~probe:None ~position:(Apply.position apply1)
@@ -1099,15 +1109,21 @@ let apply_cont_exprs env apply_cont1 apply_cont2 : Apply_cont.t Comparison.t =
           ~dbg:(Apply_cont.debuginfo apply_cont1))
   else Different { approximant = subst_apply_cont env apply_cont1 }
 
+let switch_arms env arm1 arm2 : Switch_arm.t Comparison.t =
+  let action1 = Switch_arm.action arm1 in
+  let action2 = Switch_arm.action arm2 in
+  apply_cont_exprs env action1 action2
+  |> Comparison.map ~f:(fun action ->
+      Switch_arm.map_action (fun _ -> action) arm1)
+
 let switch_exprs env switch1 switch2 : Expr.t Comparison.t =
   let compare_arms env arms1 arms2 =
     lists
       ~f:
         (pairs
            ~f1:(Comparator.of_predicate Target_ocaml_int.equal)
-           ~f2:apply_cont_exprs ~subst2:subst_apply_cont)
-      ~subst:(fun env (target_imm, apply_cont) ->
-        target_imm, subst_apply_cont env apply_cont)
+           ~f2:switch_arms ~subst2:subst_switch_arm)
+      ~subst:(fun env (target_imm, arm) -> target_imm, subst_switch_arm env arm)
       ~subst_snd:true env
       (Target_ocaml_int.Map.bindings arms1)
       (Target_ocaml_int.Map.bindings arms2)
@@ -1267,7 +1283,10 @@ and codes env (code1 : Code.t) (code2 : Code.t) =
          && Bool.equal (Code.stub code1) (Code.stub code2)
          && Inline_attribute.equal (Code.inline code1) (Code.inline code2)
          && Bool.equal (Code.is_a_functor code1) (Code.is_a_functor code2)
-         && Recursive.equal (Code.recursive code1) (Code.recursive code2))
+         && Recursive.equal (Code.recursive code1) (Code.recursive code2)
+         && Fdo_annotation.equal
+              (Code.fdo_entry_annotation code1)
+              (Code.fdo_entry_annotation code2))
 
 and let_cont_exprs env (let_cont1 : Let_cont.t) (let_cont2 : Let_cont.t) :
     Expr.t Comparison.t =
@@ -1366,12 +1385,6 @@ let flambda_units u1 u2 =
   let toplevel_my_alloc_region =
     Variable.create "toplevel_my_alloc_region" Flambda_kind.region
   in
-  let toplevel_my_region =
-    Variable.create "toplevel_my_region" Flambda_kind.region
-  in
-  let toplevel_my_ghost_region =
-    Variable.create "toplevel_my_ghost_region" Flambda_kind.region
-  in
   let mk_renaming u =
     let renaming = Renaming.empty in
     let renaming =
@@ -1389,16 +1402,6 @@ let flambda_units u1 u2 =
         (Flambda_unit.toplevel_my_alloc_region u)
         ~guaranteed_fresh:toplevel_my_alloc_region
     in
-    let renaming =
-      Renaming.add_fresh_variable renaming
-        (Flambda_unit.toplevel_my_region u)
-        ~guaranteed_fresh:toplevel_my_region
-    in
-    let renaming =
-      Renaming.add_fresh_variable renaming
-        (Flambda_unit.toplevel_my_ghost_region u)
-        ~guaranteed_fresh:toplevel_my_ghost_region
-    in
     renaming
   in
   let env = Env.create () in
@@ -1409,4 +1412,4 @@ let flambda_units u1 u2 =
       let module_symbol = Flambda_unit.module_symbol u1 in
       Flambda_unit.create ~return_continuation:ret_cont
         ~exn_continuation:exn_cont ~body ~module_symbol
-        ~toplevel_my_alloc_region ~toplevel_my_region ~toplevel_my_ghost_region)
+        ~toplevel_my_alloc_region)

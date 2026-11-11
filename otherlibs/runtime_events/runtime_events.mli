@@ -163,6 +163,24 @@ The budget in 'work' that a domain has to do during the major slice.
 (**
 Total work done by this domain in a slice.
 @since 5.4 *)
+| EV_C_STACK_CREATED
+(**
+Memory for a fiber stack was allocated (value: its size in bytes).
+@since 5.4 *)
+| EV_C_STACK_FREED
+(**
+Memory for a fiber stack was freed (value: its size in bytes).
+@since 5.4 *)
+| EV_C_STACK_IDLED
+(**
+A stack was idled: copied out of its mapping into malloced memory
+because its continuation was promoted (value: bytes copied).
+@since 5.4 *)
+| EV_C_STACK_WOKEN
+(**
+An idle stack was woken: copied onto a fresh guarded stack for
+resumption (value: bytes copied).
+@since 5.4 *)
 
 (** The type for span events emitted by the runtime. *)
 type runtime_phase =

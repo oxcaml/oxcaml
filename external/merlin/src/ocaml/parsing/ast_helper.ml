@@ -234,6 +234,7 @@ module Pat = struct
   let or_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_or (a, b))
   let constraint_ ?loc ?attrs a b c = mk ?loc ?attrs (Ppat_constraint (a, b, c))
   let type_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_type a)
+  let addr ?loc ?attrs a b = mk ?loc ?attrs (Ppat_addr (a, b))
   let lazy_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_lazy a)
   let unpack ?loc ?attrs a = mk ?loc ?attrs (Ppat_unpack a)
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_open (a, b))
@@ -241,9 +242,6 @@ module Pat = struct
   let effect_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_effect(a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ppat_extension a)
 end
-
-(* Merlin's holes *)
-let hole_txt = "merlin.hole"
 
 module Exp = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
@@ -355,10 +353,8 @@ module Mod = struct
     mk ?loc ?attrs (Pmod_constraint (m, ty, mode))
   let unpack ?loc ?attrs e = mk ?loc ?attrs (Pmod_unpack e)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pmod_extension a)
+  let hole ?loc ?attrs () = mk ?loc ?attrs Pmod_hole
   let instance ?loc ?attrs a = mk ?loc ?attrs (Pmod_instance a)
-  let hole ?(loc = !default_loc) ?attrs () =
-    let id = Location.mkloc hole_txt loc in
-    mk ~loc ?attrs  @@ Pmod_extension (id, PStr [])
 end
 
 module Sig = struct

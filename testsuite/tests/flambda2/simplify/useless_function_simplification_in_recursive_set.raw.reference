@@ -1,0 +1,46 @@
+let $camlUseless_function_simplification_in_recursive_set__first_const_0 =
+  Block 0 ()
+in
+(let code size(3)
+       g_1 (param : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let x = %project_value_slot.[g].[x] (my_closure) in
+   let h = %project_function_slot.[g].[h] (my_closure) in
+   cont k1 (0)
+ in
+ let code size(7)
+       h_2 (param : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let x = %project_value_slot.[h].[x] (my_closure) in
+   let g = %project_function_slot.[h].[g] (my_closure) in
+   apply direct(g_1 &my_alloc_region)
+     (g ~ depth my_depth -> next_depth : _ -> imm tagged) (0) -> k3 * k2
+     where k3 (apply_result : imm tagged) =
+       cont k1 (x)
+ in
+ let code inline(always) size(22)
+       make_0 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : val =
+   let next_depth = rec_info (succ my_depth) in
+   let g = closure g_1 @g &my_alloc_region
+   and h = closure h_2 @h &my_alloc_region
+   with { x = x }
+   in
+   cont k1 (h)
+ in
+ let make = closure make_0 @make &toplevel in
+ apply direct(make_0 &toplevel) (make : _ -> val) (0) -> k1 * error
+   where k1 (h : val) =
+     let Pmakeblock = %block.[`0`].`toplevel` (make, h) in
+     cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
+    let $camlUseless_function_simplification_in_recursive_set =
+      Block 0 (field_0, field_1)
+    in
+    cont done ($camlUseless_function_simplification_in_recursive_set)

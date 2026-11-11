@@ -1,0 +1,57 @@
+(* TEST
+ flambda2;
+ flags = "-extension layouts_beta";
+ { expect.opt; }
+ { flags += " -Oclassic"; expect.opt; }
+ { flags += " -O3"; expect.opt; }
+*)
+
+(* Native boxed all-[void] records are empty blocks with tag 0. *)
+
+type t = { x : unit#; kept : unit# }
+type p = { y : #(unit# * unit#) }
+type m = { mutable z : unit# }
+let describe x =
+  let repr = Obj.repr (Sys.opaque_identity x) in
+  if Obj.is_int repr then "immediate"
+  else Printf.sprintf "block tag %d size %d" (Obj.tag repr) (Obj.size repr)
+let r = { x = #(); kept = #() }
+[%%expect{|
+type t = { x : unit#; kept : unit#; }
+type p = { y : #(unit# * unit#); }
+type m = { mutable z : unit#; }
+val describe : 'a -> string = <fun>
+val r : t = {x = <void>; kept = <void>}
+|}]
+
+let description = describe r
+[%%expect{|
+val description : string = "block tag 0 size 0"
+|}]
+
+let description = describe { r with x = #() }
+[%%expect{|
+val description : string = "block tag 0 size 0"
+|}]
+
+let description = describe { y = #(#(), #()) }
+[%%expect{|
+val description : string = "block tag 0 size 0"
+|}]
+
+let description = describe { z = #() }
+[%%expect{|
+val description : string = "block tag 0 size 0"
+|}]
+
+let[@inline always] make () = { x = #(); kept = #() }
+let[@inline never] flow choose =
+  let r = if choose then make () else Sys.opaque_identity (make ()) in
+  let rec loop n r = if n = 0 then r else loop (n - 1) r in
+  loop 10 r
+let flowed = List.map describe [flow true; flow false]
+[%%expect{|
+val make : unit -> t = <fun>
+val flow : bool -> t = <fun>
+val flowed : string list = ["block tag 0 size 0"; "block tag 0 size 0"]
+|}]

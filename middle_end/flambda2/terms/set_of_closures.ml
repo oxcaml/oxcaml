@@ -16,25 +16,18 @@
 
 type t =
   { function_decls : Function_declarations.t;
-    value_slots : Simple.t Value_slot.Map.t
+    value_slots : Simple.t Value_slot.Map.t;
+    dbg : Debuginfo.t
   }
 
-let [@ocamlformat "disable"] print_with_extra_fields extra_fields ppf
-      { function_decls;
-        value_slots
-      } =
-  Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
-      %t\
-      @[<hov 1>(function_decls@ %a)@]@ \
-      @[<hov 1>(value_slots@ %a)@]\
-      )@]"
-    Flambda_colours.prim_constructive
-    Flambda_colours.pop
-    extra_fields
-    (Function_declarations.print) function_decls
-    (Value_slot.Map.print Simple.print) value_slots
+let sexp_fields { function_decls; value_slots; dbg } =
+  let open! Misc.Sexp in
+  [ fmt ~colour:Flambda_colours.prim_constructive "set_of_closures";
+    a "function_decls" function_decls Function_declarations.print;
+    a "value_slots" value_slots (Value_slot.Map.print Simple.print) ]
+  @ if Debuginfo.is_none dbg then [] else [a "dbg" dbg Debuginfo.print_compact]
 
-let print ppf t = print_with_extra_fields (fun _ppf -> ()) ppf t
+let print ppf t = Misc.Sexp.print ppf (sexp_fields t)
 
 include Container_types.Make (struct
   type nonrec t = t
@@ -43,50 +36,57 @@ include Container_types.Make (struct
 
   let hash _ = Misc.fatal_error "Not yet implemented"
 
-  let compare { function_decls = function_decls1; value_slots = value_slots1 }
-      { function_decls = function_decls2; value_slots = value_slots2 } =
+  let compare
+      { function_decls = function_decls1;
+        value_slots = value_slots1;
+        dbg = dbg1
+      }
+      { function_decls = function_decls2;
+        value_slots = value_slots2;
+        dbg = dbg2
+      } =
     let c = Function_declarations.compare function_decls1 function_decls2 in
     if c <> 0
     then c
-    else Value_slot.Map.compare Simple.compare value_slots1 value_slots2
+    else
+      let c = Value_slot.Map.compare Simple.compare value_slots1 value_slots2 in
+      if c <> 0 then c else Debuginfo.compare dbg1 dbg2
 
   let equal t1 t2 = compare t1 t2 = 0
 end)
 
-let is_empty { function_decls; value_slots } =
+let is_empty { function_decls; value_slots; dbg = _ } =
   Function_declarations.is_empty function_decls
   && Value_slot.Map.is_empty value_slots
 
-let create ~value_slots function_decls = { function_decls; value_slots }
+let create ~value_slots ~dbg function_decls =
+  { function_decls; value_slots; dbg }
 
 let function_decls t = t.function_decls
 
 let value_slots t = t.value_slots
 
+let debuginfo t = t.dbg
+
 let is_closed t = Value_slot.Map.is_empty t.value_slots
 
-let [@ocamlformat "disable"] print ppf
-      { function_decls;
-        value_slots;
-      } =
-  if Value_slot.Map.is_empty value_slots then
-    Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
-        @[<hov 1>%a@]\
-        )@]"
-      Flambda_colours.prim_constructive
-      Flambda_colours.pop
-      (Function_declarations.print) function_decls
-  else
-    Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
-        @[<hov 1>%a@]@ \
-        @[<hov 1>(env@ %a)@]\
-        )@]"
-      Flambda_colours.prim_constructive
-      Flambda_colours.pop
-      Function_declarations.print function_decls
-      (Value_slot.Map.print Simple.print) value_slots
+let print ppf { function_decls; value_slots; dbg } =
+  let open! Misc.Sexp in
+  let value_slots =
+    if Value_slot.Map.is_empty value_slots
+    then []
+    else [a "env" value_slots (Value_slot.Map.print Simple.print)]
+  in
+  let dbg =
+    if Debuginfo.is_none dbg then [] else [a "dbg" dbg Debuginfo.print_compact]
+  in
+  print ppf
+    (fmt "%tset_of_closures%t" Flambda_colours.prim_constructive
+       Flambda_colours.pop
+    :: fmt "%a" Function_declarations.print function_decls
+    :: (value_slots @ dbg))
 
-let free_names { function_decls; value_slots } =
+let free_names { function_decls; value_slots; dbg = _ } =
   let free_names_of_value_slots =
     Value_slot.Map.fold
       (fun value_slot simple free_names ->
@@ -99,7 +99,7 @@ let free_names { function_decls; value_slots } =
     (Function_declarations.free_names function_decls)
     free_names_of_value_slots
 
-let apply_renaming ({ function_decls; value_slots } as t) renaming =
+let apply_renaming ({ function_decls; value_slots; dbg } as t) renaming =
   let function_decls' =
     Function_declarations.apply_renaming function_decls renaming
   in
@@ -119,9 +119,9 @@ let apply_renaming ({ function_decls; value_slots } as t) renaming =
   in
   if function_decls == function_decls' && not !changed
   then t
-  else { function_decls = function_decls'; value_slots = value_slots' }
+  else { function_decls = function_decls'; value_slots = value_slots'; dbg }
 
-let ids_for_export { function_decls; value_slots } =
+let ids_for_export { function_decls; value_slots; dbg = _ } =
   let function_decls_ids =
     Function_declarations.ids_for_export function_decls
   in

@@ -83,10 +83,10 @@ and 'a uu = unit
 
 (* If a type with an unboxed version is shadowed by another, [#]
    also points to the new type. *)
-type float = int32
-type t : bits32 = float#
+type float = int
+type t : untagged_immediate = float#
 [%%expect{|
-type float = int32
+type float = int
 type t = float#
 |}]
 
@@ -272,12 +272,62 @@ Line 3, characters 34-35:
 Error: The value "x" has type "r#" but an expression was expected of type "r2#"
 |}]
 
-(* Mutable fields imply modalities *)
+(* Mutable fields imply modalities, which the unboxed version inherits *)
 type r = { i : int ; mutable s : string }
-type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
+type u = r# = #{ i : int ; mutable s : string @@ global many aliased unyielding dynamic }
 [%%expect{|
 type r = { i : int; mutable s : string; }
-type u = r# = #{ i : int; s : string @@ global many dynamic; }
+type u = r# = #{ i : int; mutable s : string; }
+|}]
+
+(* [mutable] on an unboxed record label implies the same modalities, so they
+   agree with those of the unboxed version and needn't be written *)
+type u = r# = #{ i : int ; mutable s : string }
+[%%expect{|
+type u = r# = #{ i : int; mutable s : string; }
+|}]
+
+(* Unboxed versions of records with mutable fields are invariant *)
+type 'a r = { mutable x : 'a; y : int }
+type +'a t_bad_co = 'a r#
+[%%expect{|
+type 'a r = { mutable x : 'a; y : int; }
+Line 2, characters 0-25:
+2 | type +'a t_bad_co = 'a r#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+type -'a t_bad_contra = 'a r#
+[%%expect{|
+Line 1, characters 0-29:
+1 | type -'a t_bad_contra = 'a r#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be contravariant,
+       but it is injective invariant.
+|}]
+
+type !'a t_inv = 'a r#
+[%%expect{|
+type 'a t_inv = 'a r#
+|}]
+
+(* As for boxed records, only parameters in mutable fields are invariant *)
+type 'a mut_isn't_param = { mutable x : int; y : 'a }
+type +'a t_ok_co = 'a mut_isn't_param#
+[%%expect{|
+type 'a mut_isn't_param = { mutable x : int; y : 'a; }
+type 'a t_ok_co = 'a mut_isn't_param#
+|}]
+
+type 'a param_isn't_mut = { x : 'a; y : int }
+type +'a t = 'a param_isn't_mut#
+[%%expect{|
+type 'a param_isn't_mut = { x : 'a; y : int; }
+type 'a t = 'a param_isn't_mut#
 |}]
 
 (*******************)
@@ -321,13 +371,13 @@ val id : itu -> it# = <fun>
 
 (* CR layouts v7.2: "float/2#" makes sense with the view of [#] as an operator,
    but we may aesthetically prefer "float#/2". *)
-let bad : itu -> int32# = fun x -> x
+let bad : itu -> int# = fun x -> x
 [%%expect{|
-Line 1, characters 35-36:
-1 | let bad : itu -> int32# = fun x -> x
-                                       ^
+Line 1, characters 33-34:
+1 | let bad : itu -> int# = fun x -> x
+                                     ^
 Error: The value "x" has type "itu" = "float/2#"
-       but an expression was expected of type "int32#"
+       but an expression was expected of type "int#"
        Line 1, characters 0-20:
          Definition of type "float/1"
        File "_none_", line 1:
@@ -553,32 +603,32 @@ Error: The type abbreviation "t" is cyclic:
 (* Module inclusion *)
 
 module M = struct
-  type i32 = int32
+  type f = float
 end
 [%%expect{|
-module M : sig type i32 = int32 end
+module M : sig type f = float end
 |}]
 
 include M
-type t : bits32 = i32#
+type t : float64 = f#
 [%%expect{|
-type i32 = int32
-type t = i32#
+type f = float
+type t = f#
 |}]
 
 module Bad = struct
   module M = struct
-    type int32
+    type float
   end
   include M
 
-  type bad = int32#
+  type bad = float#
 end
 [%%expect{|
 Line 7, characters 13-19:
-7 |   type bad = int32#
+7 |   type bad = float#
                  ^^^^^^
-Error: The type "int32" has no unboxed version.
+Error: The type "float" has no unboxed version.
 |}]
 
 (*************************)
@@ -763,20 +813,20 @@ Error: In this "with" constraint, the new definition of "t"
 
 (* Can't substitute an unboxed version for a different unboxed version *)
 module type Bad = sig
-  type t = int32#
+  type t = int#
 end with type t := float#
 [%%expect{|
 Lines 1-3, characters 18-25:
 1 | ..................sig
-2 |   type t = int32#
+2 |   type t = int#
 3 | end with type t := float#
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
          type t = float#
        is not included in
-         type t = int32#
-       The type "float/1#" = "float/2#" is not equal to the type "int32#"
+         type t = int#
+       The type "float/1#" = "float/2#" is not equal to the type "int#"
        Line 1, characters 0-20:
          Definition of type "float/1"
        File "_none_", line 1:
@@ -1285,10 +1335,10 @@ module M : sig type s = FloatId.t end
    erroneously reject the last example here.
 *)
 
-type 'a t = int32
+type 'a t = int
 type packed = P : 'a t# -> packed [@@unboxed]
 [%%expect{|
-type 'a t = int32
+type 'a t = int
 type packed = P : 'a t# -> packed [@@unboxed]
 |}]
 

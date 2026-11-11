@@ -13,7 +13,7 @@ module Float32_u = Stdlib_stable.Float32_u
 
 type t =
   | Mutable_str of { mutable x : string }
-  | Float32 of float32#
+  | Float32 of float32_u
 
 let[@inline always] go x y =
   let f =

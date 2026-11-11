@@ -30,6 +30,8 @@ module type Common_options = sig
   val _H : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
+  val _H_file : string -> unit
+  val _Hx_file : string -> unit
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit
@@ -60,6 +62,8 @@ module type Common_options = sig
   val _no_strict_sequence : unit -> unit
   val _strict_formats : unit -> unit
   val _no_strict_formats : unit -> unit
+  val _syntax_quotations : unit -> unit
+  val _no_syntax_quotations : unit -> unit
   val _unboxed_types : unit -> unit
   val _no_unboxed_types : unit -> unit
   val _dump_debug_uids : unit -> unit
@@ -95,7 +99,6 @@ module type Core_options = sig
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
   val _dtlambda : unit -> unit
-  val _dslambda : unit -> unit
   val _dmatchcomp : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
@@ -157,6 +160,7 @@ module type Compiler_options = sig
   val _with_runtime : unit -> unit
   val _without_runtime : unit -> unit
   val _short_paths : unit -> unit
+  val _typing_recovery : unit -> unit
   val _thread : unit -> unit
   val _v : unit -> unit
   val _verbose : unit -> unit
@@ -306,40 +310,6 @@ module type Opttop_options = sig
   val _S : unit -> unit
 end
 
-module type Jscomp_options = sig
-  include Core_options
-  include Compiler_options
-
-  val _inline : string -> unit
-  val _inline_toplevel : string -> unit
-  val _inlining_report : unit -> unit
-  val _dump_pass : string -> unit
-  val _inline_max_depth : string -> unit
-  val _rounds : int -> unit
-  val _inline_max_unroll : string -> unit
-  val _inline_call_cost : string -> unit
-  val _inline_alloc_cost : string -> unit
-  val _inline_prim_cost : string -> unit
-  val _inline_branch_cost : string -> unit
-  val _inline_indirect_cost : string -> unit
-  val _inline_lifting_benefit : string -> unit
-  val _inline_branch_factor : string -> unit
-
-  val _dflambda : unit -> unit
-  val _dflambda_heavy_invariants : unit -> unit
-  val _dflambda_invariants : unit -> unit
-  val _dflambda_let : int -> unit
-  val _dflambda_no_invariants : unit -> unit
-  val _dflambda_verbose : unit -> unit
-  val _djsir : unit -> unit
-  val _drawflambda : unit -> unit
-
-  val _classic_inlining : unit -> unit
-  val _o2 : unit -> unit
-  val _o3 : unit -> unit
-  val _o4 : unit -> unit
-end
-
 module type Ocamldoc_options = sig
   include Common_options
   val _impl : string -> unit
@@ -360,7 +330,6 @@ module Make_bytecomp_options : Bytecomp_options -> Arg_list
 module Make_bytetop_options : Bytetop_options -> Arg_list
 module Make_optcomp_options : Optcomp_options -> Arg_list
 module Make_opttop_options : Opttop_options -> Arg_list
-module Make_jscomp_options : Jscomp_options -> Arg_list
 module Make_ocamldoc_options : Ocamldoc_options -> Arg_list
 
 (** [options_with_command_line_syntax options r] returns [options2] that behaves
@@ -378,6 +347,5 @@ module Default: sig
   module Opttopmain: Opttop_options
   module Main: Bytecomp_options
   module Optmain: Optcomp_options
-  module Jsmain : Jscomp_options
   module Odoc_args: Ocamldoc_options
 end

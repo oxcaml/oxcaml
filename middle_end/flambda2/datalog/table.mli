@@ -13,11 +13,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Datalog_imports
+type _ result_repr
 
-module Type : sig
-  type (_, _) eq = Equal : ('a, 'a) eq
-end
+val unit_repr : unit result_repr
+
+val lattice_repr :
+  print:(Format.formatter -> 'a -> unit) ->
+  meet:('a -> 'a -> 'a) ->
+  diff_or_null:('a -> 'a -> 'a Or_null.t) ->
+  'a result_repr
+
+val result_repr_print : 'v result_repr -> Format.formatter -> 'v -> unit
+
+val result_repr_union : 'v result_repr -> 'v -> 'v -> 'v
+
+val result_repr_diff_or_null : 'v result_repr -> 'v -> 'v -> 'v Or_null.t
+
+val result_repr_is_unit : 'v result_repr -> ('v, unit) Type.eq option
 
 module Id : sig
   type (!'t, !'k, !'v) t
@@ -48,7 +60,7 @@ module Id : sig
 
   val columns : ('t, 'k, 'v) t -> ('t, 'k, 'v) Column.hlist
 
-  val is_trie : ('t, 'k, 'v) t -> ('t, 'k, 'v) Trie.is_trie
+  val result_repr : ('t, 'k, 'v) t -> 'v result_repr
 
   val has_provenance : ('t, 'k, 'v) t -> bool
 
@@ -58,12 +70,66 @@ module Id : sig
     provenance:bool ->
     name:string ->
     columns:('t, 'k, 'v) Column.hlist ->
-    default_value:'v ->
+    result_repr:'v result_repr ->
     ('t, 'k, 'v) t
 
-  val create_iterator :
-    ('t, 'k, 'v) t ->
-    't Channel.sender * 'k Trie.Iterator.hlist with_names * 'v Channel.receiver
+  module Map : sig
+    module type S = sig
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type t
+
+      type 'a elt
+
+      type binding = B : ('t, 'k, 'v) id * 't elt -> binding
+
+      val empty : t
+
+      val singleton : ('t, 'k, 'v) id -> 't elt -> t
+
+      val add : ('t, 'k, 'v) id -> 't elt -> t -> t
+
+      val remove : ('t, 'k, 'v) id -> t -> t
+
+      val find : ('t, 'k, 'v) id -> t -> 't elt
+
+      val fold : (binding -> 'a -> 'a) -> t -> 'a -> 'a
+
+      val iter : (binding -> unit) -> t -> unit
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) : S with type 'a elt = 'a T.t
+
+    module Or_null_sender : S with type 'a elt = 'a Channel.or_null_sender
+
+    module Or_null_receiver : S with type 'a elt = 'a Channel.or_null_receiver
+  end
+
+  module Tbl : sig
+    module type S = sig
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type 'a elt
+
+      type binding = B : ('a, _, _) id * 'a elt -> binding
+
+      type t
+
+      val create : int -> t
+
+      val replace : t -> ('t, 'k, 'v) id -> 't elt -> unit
+
+      val find : t -> ('t, 'k, 'v) id -> 't elt
+
+      val iter : (binding -> unit) -> t -> unit
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) : S with type 'a elt = 'a T.t
+  end
 end
 
 module Map : sig
@@ -75,7 +141,9 @@ module Map : sig
 
   val is_empty : t -> bool
 
-  val get : ('t, 'k, 'v) Id.t -> t -> 't
+  val get_or_null : ('t, 'k, 'v) Id.t -> t -> 't Or_null.t
+
+  val set_or_null : ('t, 'k, 'v) Id.t -> 't Or_null.t -> t -> t
 
   val set : ('t, 'k, 'v) Id.t -> 't -> t -> t
 
@@ -84,4 +152,6 @@ module Map : sig
   type binding = Binding : ('t, 'k, 'v) Id.t * 't -> binding
 
   val fold : f:(binding -> 'a -> 'a) -> t -> init:'a -> 'a
+
+  val send : t -> Id.Map.Or_null_sender.t -> unit
 end

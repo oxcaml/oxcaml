@@ -11,7 +11,13 @@ let liveness_analysis : Cfg_with_layout.t -> liveness =
   match
     Cfg_liveness.Liveness.run cfg ~init ~map:Cfg_liveness.Liveness.Instr ()
   with
-  | Ok liveness -> liveness
+  | Ok liveness ->
+    if !Oxcaml_flags.cfg_liveness_validate
+    then
+      Profile.record ~accumulate:true "validate_liveness"
+        (Cfg_liveness_validate.validate_liveness cfg)
+        liveness;
+    liveness
   | Aborted _ -> .
   | Max_iterations_reached ->
     Misc.fatal_errorf "Unable to compute liveness from CFG for function %s@."
@@ -65,8 +71,7 @@ let dominators t =
   compute_if_necessary t.dominators ~f:(fun () -> Cfg_dominators.build (cfg t))
 
 let loop_infos t =
-  compute_if_necessary t.loop_infos ~f:(fun () ->
-      Cfg_loop_infos.build (cfg t) (dominators t))
+  compute_if_necessary t.loop_infos ~f:(fun () -> Cfg_loop_infos.build (cfg t))
 
 let invalidate_loop_infos t = t.loop_infos := None
 

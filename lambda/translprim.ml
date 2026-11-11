@@ -33,6 +33,7 @@ type error =
   | Unknown_builtin_primitive of string
   | Wrong_arity_builtin_primitive of string
   | Wrong_layout_for_peek_or_poke of string
+  | Layout_poly_arguments_unsupported of string
   | Invalid_floatarray_glb
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
@@ -64,7 +65,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
 let event_before loc exp lam = match lam with
 | Lstaticraise (_,_) -> lam
 | _ ->
-  if !Clflags.debug && not !Clflags.native_code
+  if !Clflags.debug && not (Clflags.target_is_native ())
   then Levent(lam, {lev_loc = loc;
                     lev_kind = Lev_before;
                     lev_repr = None;
@@ -72,7 +73,7 @@ let event_before loc exp lam = match lam with
   else lam
 
 let event_after loc exp lam =
-  if !Clflags.debug && not !Clflags.native_code
+  if !Clflags.debug && not (Clflags.target_is_native ())
   then Levent(lam, {lev_loc = loc;
                     lev_kind = Lev_after exp.exp_type;
                     lev_repr = None;
@@ -113,7 +114,9 @@ type atomic_field_kind =
   | Loc   (* operation on a first-class field (takes a (pointer, offset) pair *)
 
 type atomic_idx_kind =
-  | Idx (* operation on an idx_atomic (takes a pointer and an idx) *)
+  | Idx (* takes a base (block pointer) and an offset (idx) *)
+  | Ptr (* takes an unboxed pair of (base, offset) *)
+  | Ext_ptr (* takes an offset (idx), treats base as null *)
 
 type atomic_kind =
   | Field_like of atomic_field_kind * immediate_or_pointer
@@ -160,8 +163,7 @@ let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
   match path with
     Some (Path.Pdot (path, _)) ->
-      let address = Env.find_module_address path env in
-      begin match Env.address_head address with
+      begin match Env.find_module_address_head loc path env with
       | AHunit cu ->
           if not (Hashtbl.mem units_with_used_primitives cu)
           then Hashtbl.add units_with_used_primitives cu loc
@@ -222,22 +224,30 @@ let extern_repr_of_native_repr:
   | Unboxed_or_untagged_integer i, _ -> Unboxed_or_untagged_integer i
   | Unboxed_vector i, _ -> Unboxed_vector i
   | Unboxed_mask, _ -> Unboxed_mask
+  | Unextended_bits8, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits8
+  | Unextended_bits16, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits16
+  | Raw_pointer, _ -> Raw_pointer
   | Unpacked_product sort, _ ->
-    (* The product sort is unarized into separate C arguments by
-       [unarize_extern_repr] in [closure_conversion.ml]. *)
-    Same_as_ocaml_repr sort
+    Unpacked_product sort
 
 let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
-  | Same_as_ocaml_repr s -> s
+  | Same_as_ocaml_repr s | Unpacked_product s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.scannable
+  | Raw_pointer -> Jkind.Sort.Const.(product [scannable; bits64])
+
+let sort_of_native_repr_or_elided ~poly_sort = function
+  | Elided_void -> Jkind.Sort.Const.void
+  | Native_repr r -> sort_of_native_repr ~poly_sort r
 
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =
-    List.map
-    (fun (m, r) -> m, extern_repr_of_native_repr ~poly_sort r)
+    List.filter_map
+    (function
+      | _, Elided_void -> None
+      | m, Native_repr r -> Some (m, extern_repr_of_native_repr ~poly_sort r))
       prim.prim_native_repr_args
   in
   let native_repr_res =
@@ -268,7 +278,7 @@ let bigstring_checks ~unsafe ~aligned size =
     let align = if aligned then len else 0 in
     Some (~len, ~align)
 
-let indexing_primitives =
+let indexing_primitives = lazy (
   let types_and_widths =
     [
       ( Printf.sprintf "%%caml_bigstring_geti8%s%s%s",
@@ -523,9 +533,9 @@ let indexing_primitives =
    let arity = if String.is_substring string ~substring:"get" then 2 else 3 in
    [ (string, fun ~mode -> Primitive (primitive ~mode, arity)) ])
   |> List.to_seq
-  |> String.Map.of_seq
+  |> String.Map.of_seq)
 
-let array_vec_primitives =
+let array_vec_primitives = lazy (
   let array_types_and_primitives =
     [
       ("floatarray",
@@ -614,7 +624,7 @@ let array_vec_primitives =
       fun ~mode:_ -> Primitive (set_prim ~size ~unsafe ~index_kind ~boxed, 3))
    ])
   |> List.to_seq
-  |> String.Map.of_seq
+  |> String.Map.of_seq)
 
 (* Resolve a primitive according to its name. The return value is unspecialized
    in the sense that the array kind in the various primitives that deal with
@@ -624,7 +634,12 @@ let array_vec_primitives =
 let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
   let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
   let arg_modes =
-    List.map (to_modify_mode ~poly:poly_mode) p.prim_native_repr_args
+    List.filter_map
+      (function
+        | _, Elided_void -> None
+        | (_, Native_repr _) as repr ->
+          Some (to_modify_mode ~poly:poly_mode repr))
+      p.prim_native_repr_args
   in
   let get_first_arg_mode () =
     match arg_modes with
@@ -676,12 +691,55 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
   in
   let i = Scalar.integral in
   let f = Scalar.floating in
+  let int_layout = Pvalue { raw_kind = Pintval; nullable = Non_nullable } in
   let get_arg_layouts () =
     List.map
       (fun (_, repr) -> Lambda.layout_of_extern_repr repr)
       lambda_prim.prim_native_repr_args
   in
-  let int_layout = Pvalue { raw_kind = Pintval; nullable = Non_nullable } in
+  let get_res_layout () =
+    let _, repr = lambda_prim.prim_native_repr_res in
+    Lambda.layout_of_extern_repr repr
+  in
+  let mixed_block_shape_of_layouts layouts =
+    if List.for_all (function Pvalue _ -> true | _ -> false) layouts
+    then None
+    else Some (List.map mixed_block_element_of_layout layouts |> Array.of_list)
+  in
+  let get_shape_of_all_args () =
+    match get_arg_layouts () |> mixed_block_shape_of_layouts with
+    | None -> All_value
+    | Some shape -> Shape shape
+  in
+  let field0_singleton sem =
+    let mixed_block_shape =
+      (* Since this primitive only works for a block with one field, we can get
+         the whole block shape from the layout of the result. *)
+      [ get_res_layout () ] |> mixed_block_shape_of_layouts
+    in
+    let prim =
+      match mixed_block_shape with
+      | None -> Pfield (0, Pointer, sem)
+      | Some shape -> Pmixedfield ([0], shape, sem)
+    in
+    Primitive (prim, 1)
+  in
+  let setfield0_singleton () =
+    let mixed_block_shape =
+      (* Since this primitive only works for a block with one field, we can get
+         the whole block shape from the layout of the second argument (the new
+         value for the field). *)
+      let second_arg_layout = List.nth (get_arg_layouts ()) 1 in
+      [ second_arg_layout ] |> mixed_block_shape_of_layouts
+    in
+    let prim =
+      let mode = get_first_arg_mode () in
+      match mixed_block_shape with
+      | None -> Psetfield (0, Pointer, Assignment mode)
+      | Some shape -> Psetmixedfield ([0], shape, Assignment mode)
+    in
+    Primitive (prim, 2)
+  in
   let prim = match p.prim_name with
     | "%identity" -> Identity
     | "%bytes_to_string" -> Primitive (Pbytes_to_string, 1)
@@ -697,18 +755,21 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%loc_FUNCTION" -> Loc Loc_FUNCTION
     | "%field0" -> Primitive (Pfield (0, Pointer, Reads_vary), 1)
     | "%field1" -> Primitive (Pfield (1, Pointer, Reads_vary), 1)
+    | "%field0_singleton" -> field0_singleton Reads_vary
     | "%field0_immut" -> Primitive ((Pfield (0, Pointer, Reads_agree)), 1)
     | "%field1_immut" -> Primitive ((Pfield (1, Pointer, Reads_agree)), 1)
+    | "%field0_singleton_immut" -> field0_singleton Reads_agree
     | "%setfield0" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(0, Pointer, Assignment mode)), 2)
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
+    | "%setfield0_singleton" -> setfield0_singleton ()
     | "%makeblock" ->
-       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Immutable, get_shape_of_all_args (), mode)), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Mutable, get_shape_of_all_args (), mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -724,7 +785,6 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%ostype_unix" -> Primitive ((Pctconst Ostype_unix), 1)
     | "%ostype_win32" -> Primitive ((Pctconst Ostype_win32), 1)
     | "%ostype_cygwin" -> Primitive ((Pctconst Ostype_cygwin), 1)
-    | "%runtime5" -> Primitive ((Pctconst Runtime5), 1)
     | "%arch_amd64" -> Primitive ((Pctconst Arch_amd64), 1)
     | "%arch_arm64" -> Primitive ((Pctconst Arch_arm64), 1)
     | "%frame_pointers" -> Frame_pointers
@@ -1145,6 +1205,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_load_field" -> Atomic(Load, Field_like (Field, Pointer))
     | "%atomic_load_loc" -> Atomic(Load, Field_like (Loc, Pointer))
     | "%atomic_load_idx" -> Atomic(Load, Idx_like (Idx, layout))
+    | "%unsafe_atomic_load_ptr" -> Atomic(Load, Idx_like (Ptr, layout))
+    | "%unsafe_atomic_load_ext_ptr" -> Atomic(Load, Idx_like (Ext_ptr, layout))
     | "%atomic_set" ->
       Atomic(Set (get_first_arg_mode ()), Field_like (Ref, Pointer))
     | "%atomic_set_field" ->
@@ -1154,6 +1216,12 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Atomic(Set (get_first_arg_mode ()), Idx_like (Idx, layout))
+    | "%unsafe_atomic_set_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Set (get_first_arg_mode ()), Idx_like (Ptr, layout))
+    | "%unsafe_atomic_set_ext_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Set (get_first_arg_mode ()), Idx_like (Ext_ptr, layout))
     | "%atomic_exchange" ->
       Atomic(Exchange (get_first_arg_mode ()), Field_like (Ref, Pointer))
     | "%atomic_exchange_field" ->
@@ -1163,6 +1231,12 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_exchange_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Atomic(Exchange (get_first_arg_mode ()), Idx_like (Idx, layout))
+    | "%unsafe_atomic_exchange_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Exchange (get_first_arg_mode ()), Idx_like (Ptr, layout))
+    | "%unsafe_atomic_exchange_ext_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Exchange (get_first_arg_mode ()), Idx_like (Ext_ptr, layout))
     | "%atomic_compare_exchange" ->
       Atomic(Compare_exchange (get_first_arg_mode ()),
              Field_like (Ref, Pointer))
@@ -1175,6 +1249,13 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_compare_exchange_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Atomic(Compare_exchange (get_first_arg_mode ()), Idx_like (Idx, layout))
+    | "%unsafe_atomic_compare_exchange_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Compare_exchange (get_first_arg_mode ()), Idx_like (Ptr, layout))
+    | "%unsafe_atomic_compare_exchange_ext_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Compare_exchange (get_first_arg_mode ()),
+             Idx_like (Ext_ptr, layout))
     | "%atomic_cas" ->
       Atomic(Compare_and_set (get_first_arg_mode ()), Field_like (Ref, Pointer))
     | "%atomic_cas_field" ->
@@ -1185,37 +1266,68 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_cas_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Atomic(Compare_and_set (get_first_arg_mode ()), Idx_like (Idx, layout))
+    | "%unsafe_atomic_cas_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Compare_and_set (get_first_arg_mode ()), Idx_like (Ptr, layout))
+    | "%unsafe_atomic_cas_ext_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Compare_and_set (get_first_arg_mode ()),
+             Idx_like (Ext_ptr, layout))
     | "%atomic_fetch_add" -> Atomic(Fetch_add, Field_like (Ref, Immediate))
     | "%atomic_fetch_add_field" ->
       Atomic(Fetch_add, Field_like (Field, Immediate))
     | "%atomic_fetch_add_loc" -> Atomic(Fetch_add, Field_like (Loc, Immediate))
     | "%atomic_fetch_add_idx" ->
       Atomic(Fetch_add, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_fetch_add_ptr" ->
+      Atomic(Fetch_add, Idx_like (Ptr, int_layout))
+    | "%unsafe_atomic_fetch_add_ext_ptr" ->
+      Atomic(Fetch_add, Idx_like (Ext_ptr, int_layout))
     | "%atomic_add" -> Atomic(Add, Field_like (Ref, Immediate))
     | "%atomic_add_field" -> Atomic(Add, Field_like (Field, Immediate))
     | "%atomic_add_loc" -> Atomic(Add, Field_like (Loc, Immediate))
     | "%atomic_add_idx" ->
       Atomic(Add, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_add_ptr" ->
+      Atomic(Add, Idx_like (Ptr, int_layout))
+    | "%unsafe_atomic_add_ext_ptr" ->
+      Atomic(Add, Idx_like (Ext_ptr, int_layout))
     | "%atomic_sub" -> Atomic(Sub, Field_like (Ref, Immediate))
     | "%atomic_sub_field" -> Atomic(Sub, Field_like (Field, Immediate))
     | "%atomic_sub_loc" -> Atomic(Sub, Field_like (Loc, Immediate))
     | "%atomic_sub_idx" ->
       Atomic(Sub, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_sub_ptr" ->
+      Atomic(Sub, Idx_like (Ptr, int_layout))
+    | "%unsafe_atomic_sub_ext_ptr" ->
+      Atomic(Sub, Idx_like (Ext_ptr, int_layout))
     | "%atomic_land" -> Atomic(Land, Field_like (Ref, Immediate))
     | "%atomic_land_field" -> Atomic(Land, Field_like (Field, Immediate))
     | "%atomic_land_loc" -> Atomic(Land, Field_like (Loc, Immediate))
     | "%atomic_land_idx" ->
       Atomic(Land, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_land_ptr" ->
+      Atomic(Land, Idx_like (Ptr, int_layout))
+    | "%unsafe_atomic_land_ext_ptr" ->
+      Atomic(Land, Idx_like (Ext_ptr, int_layout))
     | "%atomic_lor" -> Atomic(Lor, Field_like (Ref, Immediate))
     | "%atomic_lor_field" -> Atomic(Lor, Field_like (Field, Immediate))
     | "%atomic_lor_loc" -> Atomic(Lor, Field_like (Loc, Immediate))
     | "%atomic_lor_idx" ->
       Atomic(Lor, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_lor_ptr" ->
+      Atomic(Lor, Idx_like (Ptr, int_layout))
+    | "%unsafe_atomic_lor_ext_ptr" ->
+      Atomic(Lor, Idx_like (Ext_ptr, int_layout))
     | "%atomic_lxor" -> Atomic(Lxor, Field_like (Ref, Immediate))
     | "%atomic_lxor_field" -> Atomic(Lxor, Field_like (Field, Immediate))
     | "%atomic_lxor_loc" -> Atomic(Lxor, Field_like (Loc, Immediate))
     | "%atomic_lxor_idx" ->
       Atomic(Lxor, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_lxor_ptr" ->
+      Atomic(Lxor, Idx_like (Ptr, int_layout))
+    | "%unsafe_atomic_lxor_ext_ptr" ->
+      Atomic(Lxor, Idx_like (Ext_ptr, int_layout))
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
     | "%with_stack" -> Primitive (Pwith_stack, 5)
     | "%with_stack_preemptible" -> Primitive (Pwith_stack_preemptible, 6)
@@ -1228,6 +1340,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%domain_index" -> Primitive (Pdomain_index, 1)
+    | "%thread_self_id" -> Primitive (Pthread_self_id, 1)
     | "%poll" -> Primitive (Ppoll, 1)
     | "%unbox_nativeint" ->
       static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
@@ -1310,11 +1423,16 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
       Primitive(Pset_ext_ptr (layout, get_first_arg_mode ()), 2)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
+    | "%box" ->
+      let layout = List.nth (get_arg_layouts ()) 0 in
+      Primitive(Pbox (layout, mode), 1)
+    | "%unbox" ->
+      Primitive(Punbox layout, 1)
     | s when String.length s > 0 && s.[0] = '%' ->
-      (match String.Map.find_opt s indexing_primitives with
+      (match String.Map.find_opt s (Lazy.force indexing_primitives) with
        | Some prim -> prim ~mode
        | None ->
-         match String.Map.find_opt s array_vec_primitives with
+         match String.Map.find_opt s (Lazy.force array_vec_primitives) with
          | Some prim -> prim ~mode
          | None ->
            match Scalar.Operation.With_percent_prefix.of_string s with
@@ -1695,32 +1813,33 @@ let glb_array_set_type loc t1 t2 =
   (* Pfloatarray is a minimum *)
   | Pfloatarray_set, Pfloatarray -> Pfloatarray_set
 
-let peek_or_poke_layout_from_type ~prim_name error_loc env ty
-      : Lambda.peek_or_poke option =
-  match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
-  | Error _ -> None
-  | Ok sort ->
-    let sort = Jkind.Sort.default_to_scannable_and_get sort in
-    let layout = Typeopt.layout env error_loc sort ty in
-    match layout with
-    | Punboxed_float Unboxed_float32 -> Some Ppp_unboxed_float32
-    | Punboxed_float Unboxed_float64 -> Some Ppp_unboxed_float
-    | Punboxed_or_untagged_integer Untagged_int8 -> Some Ppp_untagged_int8
-    | Punboxed_or_untagged_integer Untagged_int16 -> Some Ppp_untagged_int16
-    | Punboxed_or_untagged_integer Unboxed_int32 -> Some Ppp_unboxed_int32
-    | Punboxed_or_untagged_integer Unboxed_int64 -> Some Ppp_unboxed_int64
-    | Punboxed_or_untagged_integer Unboxed_nativeint ->
-      Some Ppp_unboxed_nativeint
-    | Punboxed_or_untagged_integer Untagged_int -> Some Ppp_untagged_immediate
-    | Pvalue { raw_kind = Pintval ; _ } -> Some Ppp_tagged_immediate
-    | Ptop
-    | Pvalue _
-    | Punboxed_vector _
-    | Punboxed_mask
-    | Punboxed_product _
-    | Pbottom
-    | Psplicevar _ ->
-      raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
+let peek_or_poke_layout ~prim_name error_loc env ~poly_sort contents_repr ty
+      : Lambda.peek_or_poke =
+  let sort = sort_of_native_repr ~poly_sort contents_repr in
+  match Typeopt.layout env error_loc sort ty with
+  | Punboxed_float Unboxed_float32 -> Ppp_unboxed_float32
+  | Punboxed_float Unboxed_float64 -> Ppp_unboxed_float
+  | Punboxed_or_untagged_integer Untagged_int8 -> Ppp_untagged_int8
+  | Punboxed_or_untagged_integer Untagged_int16 -> Ppp_untagged_int16
+  | Punboxed_or_untagged_integer Unboxed_int32 -> Ppp_unboxed_int32
+  | Punboxed_or_untagged_integer Unboxed_int64 -> Ppp_unboxed_int64
+  | Punboxed_or_untagged_integer Unboxed_nativeint -> Ppp_unboxed_nativeint
+  | Punboxed_or_untagged_integer Untagged_int -> Ppp_untagged_immediate
+  | Pvalue { raw_kind = Pintval ; _ } -> Ppp_tagged_immediate
+  | Psplicevar _ ->
+    (* CR layout poly: We can't pick a [Lambda.peek_or_poke] constructor here
+       if the argument is layout polymorphic; we'd have to wait until after
+       slambda evaluation. Other primitives have similar dilemmas. We should
+       consider moving all of primitive specialization after slambda eval. *)
+    raise (Error (error_loc, Layout_poly_arguments_unsupported prim_name))
+  | Ptop
+  | Pvalue _
+  | Punboxed_vector _
+  | Punboxed_mask
+  | Pvoid
+  | Punboxed_product _
+  | Pbottom ->
+    raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
 
 let should_specialize_primitive p =
   match p.prim_name with
@@ -1734,24 +1853,24 @@ let should_specialize_primitive p =
     true
 
 let layout_of_ty_for_idx_set env loc ty =
-  (* CR layouts: This is gross - particularly the call to [type_jkind] and the
-    conversion to and from [mixed_block_element]! The slightly less gross
-    thing would be to change [layout_of_const_sort_generic] in the same way
-    that we have changed [transl_mixed_block_element] to desecend into
-    products. But that's a big change that (a) will have substantial
-    performance impacts for lots of cases that don't matter, and (b) will
-    become obsolete when we do complex values. So for now, the gross
-    thing. *)
+  (* CR layouts: This function is a bit sad. We call [type_jkind] (which is
+     already not ideal) and then immediately consult the type and jkind to
+     refine the [Lambda.mixed_block_element] and apply externality bounds,
+     respectively.
+
+     We should consider tracking primitives' sort variables in the typedtree
+     itself, similar to what the comment above [get_representable_layout_opt]
+     in [Typeopt] suggests. *)
   let jkind = Ctype.type_jkind env ty in
-  let mbe = Typedecl.mixed_block_element env ty jkind in
-  let mbe =
-    match mbe with
-    | Some mbe -> mbe
-    | None ->
-      Misc.fatal_errorf "layout_of_ty_for_idx_set %a"
-        Printtyp.type_expr ty
+  let layout =
+    match Jkind.get_layout_defaulting_to_scannable env jkind with
+    | Some layout -> layout
+    | None -> Misc.fatal_error "layout_of_ty_for_idx_set: expected layout"
   in
-  let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
+  let mbe =
+    transl_layout layout
+    |> refine_mixed_block_element env (to_location loc) ty
+  in
   let context = Ctype.mk_jkind_context_check_principal env in
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
   layout_of_mixed_block_element_for_idx_set ext mbe
@@ -1759,20 +1878,27 @@ let layout_of_ty_for_idx_set env loc ty =
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
    check error message.  Take it out when we remove that. *)
-let specialize_primitive env loc ty ~has_constant_constructor prim =
-  let param_tys, rest_ty =
-    match is_function_type env ty with
-    | None -> [], ty
-    | Some (p1, rhs) ->
-      match is_function_type env rhs with
-      | None -> [p1], rhs
-      | Some (p2, rhs) ->
-        match is_function_type env rhs with
-        | None -> [p1;p2], rhs
-        | Some (p3, rhs) ->
-          match is_function_type env rhs with
-          | None -> [p1;p2;p3], rhs
-          | Some (p4, rhs) -> [p1;p2;p3;p4], rhs
+let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
+      prim_desc prim =
+  let rec parameter_types reprs ty =
+    match reprs with
+    | [] -> [], [], ty
+    | (_, repr) :: reprs ->
+      match is_function_type env ty with
+      | None ->
+          (* [p.prim_native_repr_args] were derived from the annotated type, so
+             by construction [ty] must have at least as many arrows as [p] has
+             args. *)
+          Misc.fatal_errorf "Primitive %s type does not match arity"
+            prim_desc.prim_name
+      | Some (arg_ty, result_ty) ->
+        let param_tys, param_reprs, rest_ty = parameter_types reprs result_ty in
+        match repr with
+        | Elided_void -> param_tys, param_reprs, rest_ty
+        | Native_repr repr -> arg_ty :: param_tys, repr :: param_reprs, rest_ty
+  in
+  let param_tys, param_reprs, res_ty =
+    parameter_types prim_desc.prim_native_repr_args ty
   in
   match prim, param_tys with
   | Primitive (Psetfield(n, Pointer, init), arity), [_; p2] -> begin
@@ -1782,10 +1908,17 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     end
   | Primitive (Pfield (n, Pointer, mut), arity), _ ->
       (* try strength reduction based on the *result type* *)
-      let is_int = match is_function_type env ty with
-        | None -> Pointer
-        | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
+      let is_int = fst (maybe_pointer_type env res_ty) in
       Some (Primitive (Pfield (n, is_int, mut), arity))
+  | Primitive (Psetmixedfield ([0], [| elt |], init), arity), [_; p2] ->
+      (* CR-someday lmaurer: What's really important here is to find out whether
+         we can skip the [caml_modify], and for that we could just see whether
+         each value leaf [Ctype.is_always_gc_ignorable]. *)
+      let elt = refine_mixed_block_element env (to_location loc) p2 elt in
+      Some (Primitive (Psetmixedfield ([0], [| elt |], init), arity))
+  | Primitive (Pmixedfield ([0], [| elt |], sem), arity), _ ->
+      let elt = refine_mixed_block_element env (to_location loc) res_ty elt in
+      Some (Primitive (Pmixedfield ([0], [| elt |], sem), arity))
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
       let array_type =
@@ -1798,7 +1931,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let loc = to_location loc in
       let array_ref_type =
         glb_array_ref_type loc rt
-          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
+          (array_type_kind ~elt_ty:(Some res_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1816,7 +1949,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let loc = to_location loc in
       let array_ref_type =
         glb_array_ref_type loc rt
-          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
+          (array_type_kind ~elt_ty:(Some res_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1846,7 +1979,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     _ :: [] -> begin
       let loc = to_location loc in
       let new_array_kind =
-        array_type_kind ~elt_ty:None env loc rest_ty
+        array_type_kind ~elt_ty:None env loc res_ty
         |> glb_array_type loc array_kind
       in
       unboxed_product_uninitialized_array_check loc new_array_kind;
@@ -1934,42 +2067,29 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       None
     end
   | Peek _, _ -> (
-    match is_function_type env ty with
-    | None -> None
-    | Some (_p1, result_ty) ->
-      match
-        peek_or_poke_layout_from_type ~prim_name:"peek"
-          (to_location loc) env result_ty
-      with
-      | None -> None
-      | Some contents_layout -> Some (Peek (Some contents_layout))
+    let _, result_repr = prim_desc.prim_native_repr_res in
+    let contents_layout =
+      peek_or_poke_layout ~prim_name:"peek" (to_location loc) env
+        ~poly_sort result_repr res_ty
+    in
+    Some (Peek (Some contents_layout))
   )
   | Poke _, _ptr_ty :: new_value_ty :: _ -> (
-    match
-      peek_or_poke_layout_from_type ~prim_name:"poke"
-        (to_location loc) env new_value_ty
-    with
-    | None -> None
-    | Some contents_layout -> Some (Poke (Some contents_layout))
+    match param_reprs with
+    | [_; new_value_repr] ->
+      let contents_layout =
+        peek_or_poke_layout ~prim_name:"poke" (to_location loc) env
+          ~poly_sort new_value_repr new_value_ty
+      in
+      Some (Poke (Some contents_layout))
+    | _ ->
+      (* [check_primitive_arity] would have rejected this *)
+      Misc.fatal_error "Translprim.specialize_primitive: wrong arity for Poke"
   )
-  | Atomic (Load, Field_like ((Ref | Loc) as kind, Pointer)), _ ->
-    (match is_function_type env ty with
-    | None -> None
-    | Some (_, rhs) ->
-      match fst (maybe_pointer_type env rhs) with
-      | Pointer -> None
-      | Immediate -> Some (Atomic (Load, Field_like (kind, Immediate))))
-  | Atomic (Load, Field_like (Field, Pointer)), _ ->
-    (match is_function_type env ty with
-    | None -> None
-    | Some (_, ty) ->
-      match is_function_type env ty with
-      | None -> None
-      | Some (_, rhs) ->
-        match fst (maybe_pointer_type env rhs) with
-        | Pointer -> None
-        | Immediate ->
-          Some (Atomic (Load, Field_like (Field, Immediate))))
+  | Atomic (Load, Field_like ((Ref | Loc | Field) as kind, Pointer)), _ ->
+    (match fst (maybe_pointer_type env res_ty) with
+    | Pointer -> None
+    | Immediate -> Some (Atomic (Load, Field_like (kind, Immediate))))
   | Atomic (Set _ as op, Field_like ((Ref | Loc) as kind, Pointer)), [_; v]
   | Atomic (Set _ as op, Field_like (Field as kind, Pointer)), [_; _; v]
   | Atomic (Exchange _ as op, Field_like ((Ref | Loc) as kind, Pointer)),
@@ -1993,6 +2113,18 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Atomic (Compare_exchange _ as op, Idx_like (Idx, _)), [_; _; _; v] ->
     let l = layout_of_ty_for_idx_set env loc v in
     Some (Atomic (op, Idx_like (Idx, l)))
+  | Atomic (Set _ as op, Idx_like (Ptr, _)), [_; v]
+  | Atomic (Exchange _ as op, Idx_like (Ptr, _)), [_; v]
+  | Atomic (Compare_and_set _ as op, Idx_like (Ptr, _)), [_; _; v]
+  | Atomic (Compare_exchange _ as op, Idx_like (Ptr, _)), [_; _; v] ->
+    let l = layout_of_ty_for_idx_set env loc v in
+    Some (Atomic (op, Idx_like (Ptr, l)))
+  | Atomic (Set _ as op, Idx_like (Ext_ptr, _)), [_; v]
+  | Atomic (Exchange _ as op, Idx_like (Ext_ptr, _)), [_; v]
+  | Atomic (Compare_and_set _ as op, Idx_like (Ext_ptr, _)), [_; _; v]
+  | Atomic (Compare_exchange _ as op, Idx_like (Ext_ptr, _)), [_; _; v] ->
+    let l = layout_of_ty_for_idx_set env loc v in
+    Some (Atomic (op, Idx_like (Ext_ptr, l)))
   | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p3 in
     Some (Primitive (Pset_idx (l, m), arity))
@@ -2006,10 +2138,10 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     let loc = to_location loc in
     let err () =
       raise (Error (loc,
-        Unable_to_specialize_array_idx_primitive rest_ty))
+        Unable_to_specialize_array_idx_primitive res_ty))
     in
     let array_ty, elt_ty =
-      match Types.get_desc (Ctype.expand_head env rest_ty) with
+      match Types.get_desc (Ctype.expand_head env res_ty) with
       | Tconstr (p, [array_ty; elt_ty], _)
         when Path.same p Predef.path_idx_mut
           || Path.same p Predef.path_idx_imm ->
@@ -2225,7 +2357,7 @@ let atomic_arity op (kind : atomic_kind) =
   in
   let extra_kind_arity =
     match kind with
-    | Field_like ((Ref | Loc), _) -> 0
+    | Field_like ((Ref | Loc), _) | Idx_like ((Ptr | Ext_ptr), _) -> 0
     | Field_like (Field, _) | Idx_like (Idx, _) -> 1
   in
   arity_of_op + extra_kind_arity
@@ -2258,7 +2390,7 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
         | Lor -> Patomic_lor_field
         | Lxor -> Patomic_lxor_field
     end
-    | Idx_like (Idx, layout) -> begin
+    | Idx_like (_, layout) -> begin
         match op with
         | Load -> Patomic_load_idx { layout }
         | Set mode -> Patomic_set_idx { layout; mode }
@@ -2314,8 +2446,38 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
             Strict, Pvalue { raw_kind = Pgenval; nullable = Non_nullable},
             varg, Lambda.debug_uid_none, loc_arg, Lprim (prim, args, loc))
       end
+  | Idx_like (Ptr, _) ->
+      (* the primitive application
+           [Lprim(%unsafe_atomic_exchange_ptr, [ptr; v])]
+         becomes
+           [Llet(p, ptr,
+              Lprim(Patomic_exchange_idx,
+                    [Unboxed_product_field(p, 0);
+                     Unboxed_product_field(p, 1); v]))]
+      *)
+      let ptr_arg, rest = split args in
+      (* [prim_has_valid_reprs] guarantees the argument is a
+         [#(scannable, bits64)] product. *)
+      let layouts =
+        [layout_any_value; Punboxed_or_untagged_integer Unboxed_int64]
+      in
+      let varg = Ident.create_local "atomic_ptr" in
+      let field pos =
+        Lprim (Punboxed_product_field (pos, layouts), [Lvar varg], loc)
+      in
+      Llet (
+        Strict, layout_unboxed_product layouts,
+        varg, Lambda.debug_uid_none, ptr_arg,
+        Lprim (prim, field 0 :: field 1 :: rest, loc))
+  | Idx_like (Ext_ptr, _) ->
+      (* the primitive application
+           [Lprim(%unsafe_atomic_exchange_ext_ptr, [addr; v])]
+         becomes
+           [Lprim(Patomic_exchange_idx, [null; addr; v])]
+      *)
+      Lprim (prim, Lconst Const_null :: args, loc)
   | Field_like (Field, _)
-  | Idx_like _ ->
+  | Idx_like (Idx, _) ->
       Lprim (prim, args, loc)
 
 let caml_restore_raw_backtrace =
@@ -2386,7 +2548,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
             loc, layout, Unyielding)
   | Send_cache (apos, layout), [obj; meth; cache; pos] ->
       (* Cached mode only works in the native backend *)
-      if !Clflags.native_code then
+      if Clflags.target_is_native () then
         Lsend(Cached, meth, obj, [cache; pos], apos,
               not_alloc_stack, loc, layout,
               Unyielding)
@@ -2394,7 +2556,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
         Lsend(Public, meth, obj, [], apos, not_alloc_stack,
               loc, layout, Unyielding)
   | Frame_pointers, [] ->
-     (of_bool (!Clflags.native_code && Config.with_frame_pointers))
+     (of_bool (Clflags.target_is_native () && Config.with_frame_pointers))
   | Identity, [arg] -> arg
   | Apply (pos, layout), [func; arg]
   | Revapply (pos, layout), [arg; func] ->
@@ -2464,23 +2626,33 @@ let check_primitive_arity loc p =
   in
   let ok =
     match prim with
-    | Primitive (_,arity) -> arity = p.prim_arity
+    | Primitive (_,arity) -> arity = p.prim_apply_arity
     | External _ -> true
-    | Sys_argv -> p.prim_arity = 0
-    | Comparison _ -> p.prim_arity = 2
-    | Raise _ -> p.prim_arity = 1
-    | Raise_with_backtrace -> p.prim_arity = 2
-    | Lazy_force _ -> p.prim_arity = 1
-    | Loc _ -> p.prim_arity = 1 || p.prim_arity = 0
-    | Send _ | Send_self _ -> p.prim_arity = 2
-    | Send_cache _ -> p.prim_arity = 4
-    | Frame_pointers -> p.prim_arity = 0
-    | Identity | Peek _ -> p.prim_arity = 1
-    | Apply _ | Revapply _ | Poke _ -> p.prim_arity = 2
-    | Atomic (op, kind) -> p.prim_arity = atomic_arity op kind
+    | Sys_argv -> p.prim_apply_arity = 0
+    | Comparison _ -> p.prim_apply_arity = 2
+    | Raise _ -> p.prim_apply_arity = 1
+    | Raise_with_backtrace -> p.prim_apply_arity = 2
+    | Lazy_force _ -> p.prim_apply_arity = 1
+    | Loc _ -> p.prim_apply_arity = 1 || p.prim_apply_arity = 0
+    | Send _ | Send_self _ -> p.prim_apply_arity = 2
+    | Send_cache _ -> p.prim_apply_arity = 4
+    | Frame_pointers -> p.prim_apply_arity = 0
+    | Identity | Peek _ -> p.prim_apply_arity = 1
+    | Apply _ | Revapply _ | Poke _ -> p.prim_apply_arity = 2
+    | Atomic (op, kind) -> p.prim_apply_arity = atomic_arity op kind
     | Unsupported _ -> true
   in
   if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
+
+(* For an [args] list zippable with the parameters of [p], produce the
+   sublist of [args] that corresponds to the non-elided parameters of [p]. *)
+let filter_elided_args (p : Primitive.description) args =
+  List.filter_map
+    (fun ((_, repr), arg) ->
+      match repr with
+      | Elided_void -> None
+      | Native_repr _ -> Some arg)
+    (List.combine p.prim_native_repr_args args)
 
 (* Eta-expand a primitive *)
 
@@ -2502,7 +2674,10 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
     | _ -> false
   in
   if should_specialize_primitive p then
-    match specialize_primitive env loc ty ~has_constant_constructor prim with
+    match
+      specialize_primitive env loc ty ~has_constant_constructor ~poly_sort p
+        prim
+    with
     | None -> prim
     | Some prim -> prim
   else
@@ -2514,7 +2689,7 @@ let transl_primitive
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
   in
-  let to_locality = to_locality ~poly:poly_mode in
+  let to_locality repr = to_locality ~poly:poly_mode repr in
   let error_loc = to_location loc in
   let rec make_params ty repr_args repr_res =
     match repr_args, repr_res with
@@ -2527,7 +2702,7 @@ let transl_primitive
           Misc.fatal_errorf "Primitive %s type does not correspond to arity"
             (Primitive.byte_name p)
       | Some (arg_ty, ret_ty) ->
-          let arg_sort = sort_of_native_repr arg_repr ~poly_sort in
+          let arg_sort = sort_of_native_repr_or_elided arg_repr ~poly_sort in
           let arg_layout =
             Typeopt.layout env error_loc arg_sort arg_ty
           in
@@ -2547,7 +2722,9 @@ let transl_primitive
   let params, return =
     make_params ty p.prim_native_repr_args p.prim_native_repr_res
   in
-  let args = List.map (fun p -> Lvar p.name) params in
+  let args =
+    filter_elided_args p (List.map (fun p -> Lvar p.name) params)
+  in
   let yielding = transl_yielding_mode_l yielding in
   match params with
   | [] -> lambda_of_prim p.prim_name prim ~yielding loc args None
@@ -2609,9 +2786,9 @@ let transl_primitive
      let zero_alloc : Lambda.zero_alloc_attribute =
        match (zero_alloc_check : Zero_alloc.check option) with
        | None -> Default_zero_alloc
-       | Some { strict; opt; arity = _; loc; custom_error_msg } ->
+       | Some { strict; opt; arity = _; partial; loc; custom_error_msg } ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-         then Check { strict; loc; custom_error_msg }
+         then Check { strict; loc; custom_error_msg; partial }
          else Default_zero_alloc
      in
      lfunction
@@ -2686,9 +2863,13 @@ let lambda_primitive_needs_event_after = function
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Preperform
   | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
-  | Ppoll | Pobj_dup | Pget_header _ -> true
-  (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
-     bytecode, because int64# is actually represented as a boxed value. *)
+  | Ppoll | Pobj_dup | Pget_header _
+  | Pbox _ -> true
+  (* In general, [Punbox] may allocate in bytecode, since unboxed structures
+     are actually represented as boxed values. *)
+  | Punbox _ -> true
+  (* [Preinterpret_tagged_int63_as_unboxed_int64] similarly has to allocate in
+     bytecode, because int64_u is actually represented as a boxed value. *)
   | Preinterpret_tagged_int63_as_unboxed_int64 -> true
 
   | Pphys_equal _
@@ -2737,6 +2918,7 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   | Pobj_magic _ | Punbox_vector _ | Punbox_mask
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
@@ -2762,9 +2944,10 @@ let primitive_needs_event_after = function
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     ~yielding path exp args arg_exps pos =
+  let apply_arg_exps = filter_elided_args p arg_exps in
   let prim =
     transl_primitive_common
-      loc ~poly_mode ~poly_sort pos p env ty (Some path) arg_exps
+      loc ~poly_mode ~poly_sort pos p env ty (Some path) apply_arg_exps
   in
   if stack then begin
     match prim with
@@ -2789,19 +2972,51 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
-  let lam =
-    lambda_of_prim p.prim_name prim ~yielding loc args (Some arg_exps)
-  in
-  let lam =
-    if primitive_needs_event_after prim then begin
+  (* CR layouts: We are sad to move considerations of argument evaluation
+     order so far into the frontend, but this is the easiest way to implement
+     [[@elide_void]] for now. The evaluation component of elision would be
+     more properly at home in unarization, which also handles the calling
+     convention for normal [void] arguments. However, there is no analogous
+     precedent in the bytecode compiler. Once we move to JSIR, the switch to
+     the more principled implementation should be easier. *)
+  let build args =
+    let lam =
+      lambda_of_prim p.prim_name prim ~yielding loc args (Some apply_arg_exps)
+    in
+    if primitive_needs_event_after prim then
       match exp with
       | None -> lam
       | Some exp -> event_after loc exp lam
-    end else begin
-      lam
-    end
+    else lam
   in
-  lam
+  if p.prim_apply_arity = p.prim_type_arity then build args
+  else
+    let short_circuit =
+      match p.prim_name with
+      | "%sequand" | "%sequor" -> true
+      | _ -> false
+    in
+    (* Evaluate strict arguments right-to-left, discarding only elided
+       arguments. We eagerly evaluate the elided arguments of short-circuiting
+       operators (while keeping the RHS lazy). *)
+    let rec bind_args reprs args arg_exps k =
+      match reprs, args, arg_exps with
+      | [], [], [] -> k []
+      | (_, repr) :: reprs, arg :: args, arg_exp :: arg_exps ->
+        bind_args reprs args arg_exps (fun args ->
+          match repr with
+          | Elided_void -> Lsequence (arg, k args)
+          | Native_repr _ when short_circuit -> k (arg :: args)
+          | Native_repr repr ->
+            let sort = sort_of_native_repr ~poly_sort repr in
+            let layout =
+              Typeopt.layout env arg_exp.exp_loc sort arg_exp.exp_type
+            in
+            name_lambda Strict arg layout (fun id -> k (Lvar id :: args)))
+      | _ ->
+        Misc.fatal_error "transl_primitive_application: argument mismatch"
+    in
+    bind_args p.prim_native_repr_args args arg_exps build
 
 (* Error report *)
 
@@ -2816,6 +3031,11 @@ let report_error_doc ppf = function
         Style.inline_code prim_name
   | Wrong_layout_for_peek_or_poke prim_name ->
       fprintf ppf "Unsupported layout for the %s primitive" prim_name
+  | Layout_poly_arguments_unsupported prim_name ->
+      fprintf ppf
+        "The %s primitive does not currently support layout polymorphic \
+         arguments"
+        prim_name
   | Invalid_floatarray_glb ->
       fprintf ppf
         "@[Floatarray primitives can't be used on arrays containing@ \

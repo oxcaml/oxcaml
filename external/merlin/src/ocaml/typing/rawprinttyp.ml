@@ -60,7 +60,6 @@ let string_of_label : Types.arg_label -> string = function
 
 let out_modalities_of_mod_bounds mod_bounds =
   Typemode.untransl_mod_bounds mod_bounds
-  |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
 
 let visited = ref []
 let rec raw_type ppf ty =
@@ -105,13 +104,13 @@ and raw_type_desc ppf ty =
   let env = Env.empty in
   match ty with
     Tvar { name; jkind } ->
-      fprintf ppf "Tvar (@,%a,@,%a)"
-        print_name name (Format_doc.compat (Jkind.format env)) jkind
+      fprintf ppf "@[<hov1>Tvar (@,%a,@,%a)]"
+        print_name name Jkind.Debug_printers.t jkind
   | Tarrow((l,arg,ret),t1,t2,c) ->
       fprintf ppf "@[<hov1>Tarrow((\"%s\",%a,%a),@,%a,@,%a,@,%s)@]"
         (string_of_label l)
-        (Format_doc.compat (Alloc.print ~verbose:true ())) arg
-        (Format_doc.compat (Alloc.print ~verbose:true ())) ret
+        (Format_doc.compat (With_locality.print ~verbose:true ())) arg
+        (Format_doc.compat (With_locality.print ~verbose:true ())) ret
         raw_type t1 raw_type t2
         (if is_commu_ok c then "Cok" else "Cunknown")
   | Ttuple tl ->
@@ -148,8 +147,8 @@ and raw_type_desc ppf ty =
   | Tsubst (t, Some t') ->
       fprintf ppf "@[<1>Tsubst@,(%a,@ Some%a)@]" raw_type t raw_type t'
   | Tunivar { name; jkind } ->
-      fprintf ppf "Tunivar (@,%a,@,%a)"
-        print_name name (Format_doc.compat (Jkind.format env)) jkind
+      fprintf ppf "@[<hov1>Tunivar (@,%a,@,%a)]"
+        print_name name Jkind.Debug_printers.t jkind
   | Tpoly (t, tl) ->
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t

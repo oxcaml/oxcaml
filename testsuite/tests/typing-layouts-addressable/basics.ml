@@ -91,6 +91,33 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
 type t : bits8 addressable & bits16 addressable
 |}]
 
+type t : (any mod portable) addressable addressable
+[%%expect{|
+Line 1, characters 40-51:
+1 | type t : (any mod portable) addressable addressable
+                                            ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "(any mod portable) addressable".
+
+type t : any addressable mod portable
+|}]
+
+(* Mod bounds print after the addressable operator *)
+type t : bits8 addressable mod portable
+[%%expect{|
+type t : bits8 addressable mod portable
+|}]
+
+type t : any addressable mod portable
+[%%expect{|
+type t : any addressable mod portable
+|}]
+
+type t : (bits8 & bits16) addressable mod portable
+[%%expect{|
+type t : (bits8 & bits16) addressable mod portable
+|}]
+
 (**** Equalities: [k addressable = k] for addressable [k] ****)
 
 module M : sig
@@ -463,15 +490,15 @@ type ok = t8 req
 type ok = t8 req
 |}]
 
-type ok = int64# req
+type ok = int64_u req
 [%%expect{|
-type ok = int64# req
+type ok = int64_u req
 |}]
 
 (* An unboxed product is addressable iff all of its components are *)
-type ok = #(int64# * string) req
+type ok = #(int64_u * string) req
 [%%expect{|
-type ok = #(int64# * string) req
+type ok = #(int64_u * string) req
 |}]
 
 type bad = #(float# * string) req
@@ -681,9 +708,9 @@ let g (x : t8) (y : string) = y
 val g : t8 -> string -> string = <fun>
 |}]
 
-type r : bits8 addressable & bits64 = #{ a : t8; b : int64# }
+type r : bits8 addressable & bits64 = #{ a : t8; b : int64_u }
 [%%expect{|
-type r = #{ a : t8; b : int64#; }
+type r = #{ a : t8; b : int64_u; }
 |}]
 
 let proj (#{ a; b = _ } : r) = a
@@ -779,20 +806,20 @@ type ('a : any non_null addressable) refined = 'a req
    [addressable] is not ignored *)
 type t : bits8 addressable non_null
 [%%expect{|
-Line 1, characters 9-35:
+Line 1, characters 27-35:
 1 | type t : bits8 addressable non_null
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_null" have no effect on the kind "bits8".
+                               ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "bits8".
 
 type t : bits8 addressable
 |}]
 
 type t : bits8 non_null addressable
 [%%expect{|
-Line 1, characters 9-35:
+Line 1, characters 15-23:
 1 | type t : bits8 non_null addressable
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_null" have no effect on the kind "bits8".
+                   ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "bits8".
 
 type t : bits8 addressable
 |}]
@@ -806,9 +833,9 @@ type t : value mod portable
 
 (* Addressability does not change the out-of-block product representation,
    so a made-addressable product can be unpacked into C stub arguments. *)
-type tup : (bits8 & bits16) addressable
+type tup : (bits32 & bits32) addressable
 [%%expect{|
-type tup : (bits8 & bits16) addressable
+type tup : (bits32 & bits32) addressable
 |}]
 
 external ext_unpack_addressable : (tup [@unpacked]) -> int = "foo" "bar"
@@ -858,18 +885,18 @@ type t
 
 (* A wrapper made redundant by unification (here, the second component's
    variable is filled with [value]) is not printed back. *)
-let bad (x : ('a : (float64 & value) addressable)) (y : #('b * 'c)) =
+let bad (x : ('a : (value & float64) addressable)) (y : #('b * 'c)) =
   if true then x else y
 [%%expect{|
 Line 2, characters 22-23:
 2 |   if true then x else y
                           ^
 Error: The value "y" has type "#('b * 'c)" but an expression was expected of type
-         "('a : (float64 & value) addressable)"
+         "('a : (value & float64) addressable)"
        The layout of #('b * 'c) is
-           '_representable_layout_2 addressable & value_or_null
+           value_or_null & '_representable_layout_2 addressable
          because it is an unboxed tuple.
        But the layout of #('b * 'c) must be a sublayout of
-           (float64 & value) addressable
+           (value & float64) addressable
          because of the annotation on the type variable 'a.
 |}]

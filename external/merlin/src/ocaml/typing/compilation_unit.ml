@@ -45,6 +45,8 @@ module Name : sig
 
   val of_head_of_global_name : Global_module.Name.t -> t
 
+  val of_head_of_global : Global_module.t -> t
+
   val of_parameter_name : Global_module.Parameter_name.t -> t
 
   val to_global_name : t -> Global_module.Name.t
@@ -90,6 +92,8 @@ end = struct
     else str
 
   let of_head_of_global_name (name : Global_module.Name.t) = of_string name.head
+
+  let of_head_of_global (glob : Global_module.t) = of_string glob.head
 
   let of_parameter_name (name : Global_module.Parameter_name.t) =
     of_string (Global_module.Parameter_name.to_string name)

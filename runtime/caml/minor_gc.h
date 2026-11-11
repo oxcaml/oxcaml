@@ -34,6 +34,7 @@
 #define CAML_TABLE_STRUCT(t) { \
   t *base;                     \
   t *end;                      \
+  t *threshold;                \
   t *ptr;                      \
   t *limit;                    \
   asize_t size;                \
@@ -93,6 +94,8 @@ CAMLextern void caml_minor_collection (void);
 
 #ifdef CAML_INTERNALS
 #include <stdbool.h>
+#include "domain_state.h"
+#include "mlvalues.h"
 
 extern void caml_set_minor_heap_size (asize_t); /* size in bytes */
 extern void caml_empty_minor_heap_no_major_slice_from_stw
@@ -100,6 +103,9 @@ extern void caml_empty_minor_heap_no_major_slice_from_stw
     caml_domain_state** participating); /* in STW */
 extern int caml_try_empty_minor_heap_on_all_domains(void); /* out STW */
 extern void caml_empty_minor_heaps_once(void); /* out STW */
+
+/* Ask for a minor collection at the next safe point. */
+extern void caml_minor_gc_request(void);
 void caml_alloc_small_dispatch (caml_domain_state* domain,
                                 intnat wosize, int flags,
                                 int nallocs, unsigned char* encoded_alloc_lens);

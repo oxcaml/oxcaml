@@ -225,7 +225,29 @@ end
 let () =
   print_endline "Expected: 99.0 24 data_processed";
   Printf.printf
-    "Actual:   %.1f %d %s\n"
+    "Actual:   %.1f %d %s\n\n"
     (Float_u.to_float (id Result_8.z))
     (id Result_8.result)
     (id Result_8.description)
+
+
+let () = print_endline "Test: Generative include functor with mixed input"
+
+module Generative (M : sig val x : float# val s : string end) () = struct
+  let tripled = Float_u.mul M.x #3.0
+  let s_gen = M.s ^ "_gen"
+end
+
+module Result_9 = struct
+  let x = #2.5
+  let s = "input"
+  include functor Generative
+end
+
+let () =
+  print_endline "Expected: 2.5 7.5 input_gen";
+  Printf.printf
+    "Actual:   %.1f %.1f %s\n"
+    (Float_u.to_float (id Result_9.x))
+    (Float_u.to_float (id Result_9.tripled))
+    (id Result_9.s_gen)

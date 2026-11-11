@@ -107,13 +107,13 @@ Error: Found 32-bit float literal 0.0s, but float32 is not enabled. You must ena
 
 (* Unboxed float32 *)
 
-type t = float32#;;
+type t = float32_u;;
 [%%expect{|
-Line 1, characters 9-17:
-1 | type t = float32#;;
-             ^^^^^^^^
-Error: Unbound type constructor "float32"
-Hint:              Did you mean "float", "float32x4" or "float32x8"?
+Line 1, characters 9-18:
+1 | type t = float32_u;;
+             ^^^^^^^^^
+Error: Unbound type constructor "float32_u"
+Hint:              Did you mean "float32x4" or "float32x8"?
 |}];;
 
 let () = ignore #1.0s;;

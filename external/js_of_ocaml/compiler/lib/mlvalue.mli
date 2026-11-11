@@ -22,6 +22,8 @@ module Block : sig
 
   val tag : Javascript.expression -> Javascript.expression
 
+  val tag_nullish : Javascript.expression -> Javascript.expression
+
   val field : Javascript.expression -> int -> Javascript.expression
 end
 

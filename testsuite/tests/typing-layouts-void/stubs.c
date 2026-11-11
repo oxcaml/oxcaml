@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "caml/alloc.h"
 #include "caml/memory.h"
+#include "caml/misc.h"
 #include "caml/mlvalues.h"
 
 void void_to_void() {
@@ -98,4 +99,95 @@ value void_to_void_void_bytecode(value unit) {
   Field(res, 0) = Val_unit;
   Field(res, 1) = Val_unit;
   CAMLreturn (res);
+}
+
+/* Stubs for [elide_void_runtime.ml]. Arguments are small ints and the
+   result concatenates them as decimal digits, so a void argument that is
+   passed (as unit, i.e. 0) or shifts the others changes the result. The
+   [argv] stub also records [argn]. */
+
+value elide_digits1(value a) {
+  return Val_long(Long_val(a));
+}
+
+value elide_digits2(value a, value b) {
+  return Val_long(Long_val(a) * 10 + Long_val(b));
+}
+
+value elide_digits3(value a, value b, value c) {
+  return Val_long((Long_val(a) * 10 + Long_val(b)) * 10 + Long_val(c));
+}
+
+value elide_digits6(value a, value b, value c, value d, value e, value f) {
+  long r = 0;
+  value args[6] = { a, b, c, d, e, f };
+  for (int i = 0; i < 6; i++) r = r * 10 + Long_val(args[i]);
+  return Val_long(60000000 + r);
+}
+
+value elide_digits_argv(value *argv, int argn) {
+  long r = 0;
+  for (int i = 0; i < argn; i++) r = r * 10 + Long_val(argv[i]);
+  return Val_long(argn * 10000000 + r);
+}
+
+/* Ordinary void arguments are passed as unit in bytecode. The native
+   bindings use the same stubs as their [@elide_void] counterparts. */
+
+value elide_first_normal(value unit, value a, value b) {
+  assert(unit == Val_unit);
+  return elide_digits2(a, b);
+}
+
+value elide_mid_normal(value a, value unit, value b) {
+  assert(unit == Val_unit);
+  return elide_digits2(a, b);
+}
+
+value elide_last_normal(value a, value b, value unit) {
+  assert(unit == Val_unit);
+  return elide_digits2(a, b);
+}
+
+value elide_mixed_normal(value unit1, value unit2, value a) {
+  assert(unit1 == Val_unit);
+  assert(unit2 == Val_unit);
+  return elide_digits1(a);
+}
+
+value elide_seven_last_normal(value *argv, int argn) {
+  assert(argn == 7);
+  assert(argv[6] == Val_unit);
+  return elide_digits6(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+}
+
+value elide_six_source_normal(value *argv, int argn) {
+  assert(argn == 6);
+  assert(argv[1] == Val_unit);
+  assert(argv[3] == Val_unit);
+  assert(argv[5] == Val_unit);
+  return elide_digits3(argv[0], argv[2], argv[4]);
+}
+
+CAMLextern value caml_hypot_float(value, value);
+
+value elide_hypot_normal(value a, value unit, value b) {
+  assert(unit == Val_unit);
+  return caml_hypot_float(a, b);
+}
+
+/* The native toplevel resolves this symbol when loading the declaration,
+   but every call must be lowered to the intrinsic. */
+int64_t caml_csel_int64_unboxed(value cond, int64_t ifso, int64_t ifnot) {
+  caml_fatal_error("caml_csel_int64_unboxed was not intrinsified");
+}
+
+/* Bytecode fallbacks for the conditional-select intrinsic. */
+value elide_select(value cond, value ifso, value ifnot) {
+  return Bool_val(cond) ? ifso : ifnot;
+}
+
+value elide_select_normal(value cond, value ifso, value unit, value ifnot) {
+  assert(unit == Val_unit);
+  return elide_select(cond, ifso, ifnot);
 }

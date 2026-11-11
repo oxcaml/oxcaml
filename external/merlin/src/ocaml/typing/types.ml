@@ -110,7 +110,7 @@ type atomic =
 type mutability =
   | Immutable
   | Mutable of
-      { mode : Mode.Value.Comonadic.lr
+      { mode : Mode.With_regionality.Comonadic.lr
       ; atomic : atomic
       }
 
@@ -125,9 +125,9 @@ let is_atomic = function
 
 (** Takes [m0] which is the parameter of [let mutable], returns the
     mode of new values in future writes. *)
-let mutable_mode m0 : _ Mode.Value.t =
+let mutable_mode m0 : _ Mode.With_regionality.t =
   { comonadic = m0
-  ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
+  ; monadic = Mode.With_regionality.Monadic.(min |> allow_left |> allow_right)
   }
 
 (* Type expressions for the core language *)
@@ -138,10 +138,10 @@ type mod_bounds =
   }
 
 module With_bounds_type_info = struct
-  type t = {relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
-  let join { relevant_axes = axes1 } { relevant_axes = axes2 } =
-    { relevant_axes = Jkind_axis.Axis_set.union axes1 axes2 }
+  let join { bounds_mask = bounds1 } { bounds_mask = bounds2 } =
+    { bounds_mask = Axis_lattice.join bounds1 bounds2 }
 end
 
 type transient_expr =
@@ -186,7 +186,7 @@ and arg_label =
   | Position of string
 
 and arrow_desc =
-  arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+  arg_label * Mode.With_locality.lr * Mode.With_locality.lr
 
 and package =
     { pack_path : Path.t;
@@ -328,9 +328,13 @@ module Vars = Misc.Stdlib.String.Map
 
 (* Value descriptions *)
 
+type sort_or_unrepresentable =
+  | Representable of Jkind_types.Sort.t
+  | Unrepresentable
+
 type value_kind =
-    Val_reg of Jkind_types.Sort.t       (* Regular value *)
-  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+    Val_reg of sort_or_unrepresentable  (* Regular value *)
+  | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
@@ -481,7 +485,7 @@ and type_decl_kind =
   (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : Mode.Crossing.t
+  { unsafe_mod_bounds : mod_bounds
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 
@@ -562,6 +566,7 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
+  | Constructor_immediate_all_void
   | Constructor_undetermined
   | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
 
@@ -723,7 +728,7 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
+  | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
@@ -731,11 +736,11 @@ module type Wrapped = sig
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type * Mode.Alloc.lr
+  | Named of Ident.t option * module_type * Mode.With_locality.lr
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Value.l
+  and persistent_signature = signature * Mode.With_regionality.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -765,8 +770,15 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  val sort_of_signature_item :
-    signature_item -> Jkind_types.Sort.t option
+  type signature_item_sort =
+    | Fixed of Jkind_types.Sort.t
+    | Unknown of Ident.t * value_description
+    | Absent_at_runtime
+
+  val sort_of_signature_item : signature_item -> signature_item_sort
+
+  val expect_fixed_representation :
+    signature_item list -> Jkind_types.Sort.t array
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
@@ -775,28 +787,41 @@ module Make_wrapped(Wrap : Wrap) = struct
   include M
 
   let sort_of_signature_item = function
-    | Sig_value(_, decl, _) ->
+    | Sig_value(id, decl, _) ->
       begin match decl.val_kind with
-      | Val_reg sort -> Some sort
+      | Val_reg Unrepresentable -> Unknown (id, decl)
+      | Val_reg (Representable sort) -> Fixed sort
       | Val_ivar _ ->
-        Some Jkind_types.Sort.(of_const Const.for_instance_var)
+        Fixed Jkind_types.Sort.(of_const Const.for_instance_var)
       | Val_self _ | Val_anc _ ->
-        Some Jkind_types.Sort.(of_const Const.for_object)
-      | Val_prim _ -> None (* Primitives are not stored in modules *)
+        Fixed Jkind_types.Sort.(of_const Const.for_object)
+      | Val_prim _ ->
+        Absent_at_runtime (* Primitives are not stored in modules *)
       | Val_mut _ ->
         Misc.fatal_error "Mutable variable found at the structure level"
       end
     | Sig_typext _ ->
-      Some Jkind_types.Sort.(of_const Const.for_type_extension)
+      Fixed Jkind_types.Sort.(of_const Const.for_type_extension)
     | Sig_module(_, pres, _, _, _) ->
       begin match pres with
       | Mp_present ->
-        Some Jkind_types.Sort.(of_const Const.for_module)
-      | Mp_absent -> None
+        Fixed Jkind_types.Sort.(of_const Const.for_module)
+      | Mp_absent -> Absent_at_runtime
       end
     | Sig_class _ ->
-        Some Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ -> None
+        Fixed Jkind_types.Sort.(of_const Const.for_class)
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ ->
+      Absent_at_runtime
+
+  let expect_fixed_representation items =
+    List.filter_map
+      (fun item ->
+         match sort_of_signature_item item with
+         | Fixed sort -> Some sort
+         | Absent_at_runtime -> None
+         | Unknown _ -> Misc.fatal_error "unrepresentable signature item")
+      items
+    |> Array.of_list
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -965,6 +990,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
+  | Constructor_immediate_all_void, Constructor_immediate_all_void -> true
   | Constructor_undetermined, Constructor_undetermined -> true
   (* [Constructor_variable] only appears in the typedtree, never in a decl. *)
   | Constructor_variable _, _ | _, Constructor_variable _ ->
@@ -972,7 +998,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
         "equal_constructor_representation_up_to_scannable_axes: variable \
          representation"
   | (Constructor_mixed _ | Constructor_uniform_value
-    | Constructor_undetermined), _
+    | Constructor_immediate_all_void | Constructor_undetermined), _
     -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
@@ -1000,11 +1026,8 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
   | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
-      (* Equality of tag and variant representation imply equality of
-         constructor representation. *)
-      ignore (cr1 : constructor_representation);
-      ignore (cr2 : constructor_representation);
       equal_tag tag1 tag2 &&
+        equal_constructor_representation_up_to_scannable_axes cr1 cr2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed, Record_boxed ->
       true
@@ -1042,29 +1065,45 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
          variable representation"
   | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
-(* The scannable axes in the resulting  are always [max] *)
+let cstr_layout_is_constant (layout : cstr_layout) =
+  match layout with
+  | Cstr_layout_known { shape = Constructor_immediate_all_void; _ } -> true
+  | Cstr_layout_known
+      { shape = Constructor_uniform_value | Constructor_mixed _
+              | Constructor_undetermined | Constructor_variable _;
+        sorts } ->
+    Array.length sorts = 0
+  | Cstr_layout_undetermined -> false
+
+let mixed_block_element_of_base (base : Jkind_types.Sort.base) scannable_axes
+    : mixed_block_element =
+  match base with
+  | Scannable -> Scannable scannable_axes
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Float32 -> Float32
+  | Float64 -> Float64
+  | Untagged_immediate -> Untagged_immediate
+  | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec512
+  | Mask -> Mask
+  | Word -> Word
+  | Void -> Void
+
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
   (* CR layouts-scannable: since sorts do not store scannable axis information,
      we are forced to default to max. It would be good to store the scannable
      axis information, but doing so takes a sizable refactor. See the comment
      on [Sort] in [jkind_intf.ml] *)
-  | Base Scannable -> Scannable Jkind_types.Scannable_axes.max
-  | Base Bits8 -> Bits8
-  | Base Bits16 -> Bits16
-  | Base Bits32 -> Bits32
-  | Base Bits64 -> Bits64
-  | Base Float32 -> Float32
-  | Base Float64 -> Float64
-  | Base Untagged_immediate -> Untagged_immediate
-  | Base Vec128 -> Vec128
-  | Base Vec256 -> Vec256
-  | Base Vec512 -> Vec512
-  | Base Mask -> Mask
-  | Base Word -> Word
+  | Base base ->
+    mixed_block_element_of_base base Jkind_types.Scannable_axes.max
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
-  | Base Void -> Void
   | Addressable sort -> Addressable (mixed_block_element_of_const_sort sort)
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
@@ -1072,17 +1111,25 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
 let find_unboxed_type decl =
   match decl.type_kind with
     Type_record
-      ([{ld_type = arg; ld_modalities = ms; _}],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _}],
        Record_unboxed, _)
   | Type_record
-      ([{ld_type = arg; ld_modalities = ms; _ }],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _ }],
        Record_inlined (_, _, Variant_unboxed), _)
   | Type_record_unboxed_product
-      ([{ld_type = arg; ld_modalities = ms; _ }],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _ }],
        (Record_unboxed_product | Record_unboxed_product_undetermined), _)
-  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
-  | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
-    Some (arg, ms)
+  | Type_variant
+      ([{cd_args =
+           Cstr_record
+             [{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _}];
+         _}],
+       Variant_unboxed, _) ->
+    Some (arg, ms, mut)
+  | Type_variant
+      ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}],
+       Variant_unboxed, _) ->
+    Some (arg, ms, Immutable)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_undetermined
@@ -1126,13 +1173,10 @@ let signature_item_id = function
   | Sig_jkind (id, _, _)
     -> id
 
-let signature_item_representation sg =
-  match sort_of_signature_item sg with
-  | None -> None
-  | Some sort -> Some (signature_item_id sg, sort)
-
-let bound_value_identifiers_and_sorts sigs =
-  List.filter_map signature_item_representation sigs
+type arg_signature = {
+  arg_param : Global_module.Parameter_name.t;
+  arg_block_idx : int;
+}
 
 let rec mixed_block_element_to_string = function
   | Scannable _ -> "Scannable"
@@ -1196,8 +1240,8 @@ type change =
   | Cuniv : type_expr option ref * type_expr option -> change
   | Cmodes : Mode.changes -> change
   | Cfun of (unit -> unit)
-  | Csort : Jkind_types.Sort.change -> change
-  | Czero_alloc : Zero_alloc.change -> change
+  | Csort : Jkind_types.Sort.Change.t -> change
+  | Czero_alloc : Zero_alloc.Change.t -> change
 
 type changes =
     Change of change * changes ref
@@ -1215,8 +1259,8 @@ let log_change ch =
 
 let () =
   Mode.set_append_changes (fun changes -> log_change (Cmodes !changes));
-  Jkind_types.Sort.set_change_log (fun change -> log_change (Csort change));
-  Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change))
+  Jkind_types.Sort.set_log (fun change -> log_change (Csort change));
+  Zero_alloc.set_log (fun change -> log_change (Czero_alloc change))
 
 (* constructor and accessors for [field_kind] *)
 
@@ -1339,7 +1383,16 @@ module Transient_expr = struct
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
-    | _ -> Misc.fatal_error "set_var_jkind called on non-var"
+    | _ -> Misc.fatal_error "set_var_jkind called on non-Tvar"
+  let set_jkind ty jkind' =
+    match ty.desc with
+    | Tvar { name; _ } ->
+      set_desc ty (Tvar { name; jkind = jkind' })
+    | Tunivar { name; _ } ->
+      set_desc ty (Tunivar { name; jkind = jkind' })
+    | Tof_kind _ ->
+      set_desc ty (Tof_kind jkind')
+    | _ -> Misc.fatal_error "set_jkind called on non-Tvar/Tunivar/Tof_kind"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1496,7 +1549,6 @@ module With_bounds_types : sig
   val update : type_expr -> (info option -> info option) -> t -> t
   val find_opt : type_expr -> t -> info option
   val for_all : (type_expr -> info -> bool) -> t -> bool
-  val exists : (type_expr -> info -> bool) -> t -> bool
 end = struct
   module M = Map.Make(struct
       (* CR layouts v2.8: A [Map] with mutable values (of which [type_expr] is
@@ -1531,37 +1583,11 @@ end = struct
   let update te f t = update te f (to_map t) |> of_map
   let find_opt te t = find_opt te (to_map t)
   let for_all f t = for_all f (to_map t)
-  let exists f t = exists f (to_map t)
   let map_with_key f t =
     fold (fun key value acc ->
       let key, value = f key value in
       M.add key value acc) (to_map t) M.empty |> of_map
 end
-
-let equal_unsafe_mode_crossing
-      ~type_equal
-      { unsafe_mod_bounds = mc1; unsafe_with_bounds = wb2 }
-      umc2 =
-  Misc.Le_result.equal ~le:Mode.Crossing.le mc1 umc2.unsafe_mod_bounds
-  && (match wb2, umc2.unsafe_with_bounds with
-    | No_with_bounds, No_with_bounds -> true
-    | No_with_bounds, With_bounds _ | With_bounds _, No_with_bounds -> false
-    | With_bounds wb1, With_bounds wb2 ->
-      (* It's tough (impossible?) to do better than a double subset check here because of
-         the fact that these maps are best-effort. But in practice these will usually not
-         be huge, and the attribute triggering this check is (hopefully) rare. *)
-      With_bounds_types.for_all
-        (fun ty1 _info ->
-           With_bounds_types.exists
-             (fun ty2 _info -> type_equal ty1 ty2)
-             wb2)
-        wb1
-      && With_bounds_types.for_all
-        (fun ty2 _info ->
-           With_bounds_types.exists
-             (fun ty1 _info -> type_equal ty1 ty2)
-             wb1)
-        wb2)
 
 (* Constructor and accessors for [row_desc] *)
 
@@ -1712,8 +1738,8 @@ let undo_change = function
   | Cuniv  (r, v)    -> r := v
   | Cmodes c -> Mode.undo_changes c
   | Cfun f -> f ()
-  | Csort change -> Jkind_types.Sort.undo_change change
-  | Czero_alloc c -> Zero_alloc.undo_change c
+  | Csort change -> Jkind_types.Sort.Change.undo change
+  | Czero_alloc c -> Zero_alloc.Change.undo c
 
 type snapshot = changes ref * int
 let last_snapshot = Local_store.s_ref 0
@@ -1779,6 +1805,10 @@ let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
+let set_jkind ty jkind =
+  let ty = repr ty in
+  log_type ty;
+  Transient_expr.set_jkind ty jkind
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =
@@ -1880,11 +1910,17 @@ let undo_compress (changes, _old) =
 
 let class_mode =
   let hint : _ Mode.Hint.const = Legacy Class in
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)
 
 let toplevel_mode =
   let hint : _ Mode.Hint.const = Legacy Toplevel in
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)
 
 (* Merlin specific *)
 let linked_variables () = !linked_variables

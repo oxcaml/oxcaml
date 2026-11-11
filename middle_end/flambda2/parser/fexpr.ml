@@ -50,8 +50,6 @@ type continuation_sort =
 type region =
   | Named of variable
   | Toplevel_alloc_region
-  | Toplevel_region
-  | Toplevel_ghost_region
 
 type tag_scannable = int
 
@@ -69,7 +67,7 @@ type subkind =
   | Tagged_immediate
   | Variant of
       { consts : targetint list;
-        non_consts : (tag_scannable * kind_with_subkind list) list
+        non_consts : (tag_scannable * kind_with_subkind list option) list
       }
   | Float_block of { num_fields : int }
   | Float_array
@@ -268,7 +266,10 @@ type call_kind =
       { kind : Call_kind.Method_kind.t;
         obj : simple
       }
-  | C_call of { alloc : bool }
+  | C_call of
+      { alloc : bool;
+        fat_ptr_arg_starts : int list
+      }
 
 type function_arities =
   { params_arity : arity option;
@@ -285,6 +286,7 @@ type inline_attribute = Inline_attribute.t =
 type inlined_attribute =
   | Always_inlined
   | Hint_inlined
+  | Forward_inlined
   | Never_inlined
   | Unroll of int
   | Default_inlined
@@ -297,6 +299,8 @@ type loopify_attribute = Loopify_attribute.t =
   | Already_loopified
   | Default_loopify_and_tailrec
   | Default_loopify_and_not_tailrec
+
+type fdo_annotation = Fdo_annotation.t
 
 type apply =
   { func : simple option;
@@ -332,7 +336,7 @@ type expr =
       { scrutinee : simple;
         cases : (int * apply_or_inlined_cont) list
       }
-  | Invalid of { message : string }
+  | Invalid
 
 and apply_or_inlined_cont =
   | Inlined_goto of expr
@@ -415,7 +419,8 @@ and code =
     is_tupled : bool;
     stub : bool;
     loopify : loopify_attribute option;
-    result_mode : alloc_mode_for_return
+    result_mode : alloc_mode_for_return;
+    fdo_entry_annotation : fdo_annotation option
   }
 
 and code_size = int

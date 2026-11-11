@@ -87,6 +87,8 @@ module type S = sig
 
   val find_opt : key -> 'a t -> 'a option
 
+  val is_singleton : 'a t -> bool
+
   val get_singleton : 'a t -> (key * 'a) option
 
   val get_singleton_exn : 'a t -> key * 'a
@@ -96,6 +98,8 @@ module type S = sig
   val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t
 
   val map_sharing : ('a -> 'a) -> 'a t -> 'a t
+
+  val map_keys : (key -> key) -> 'a t -> 'a t
 
   val filter_map : (key -> 'a -> 'b option) -> 'a t -> 'b t
 

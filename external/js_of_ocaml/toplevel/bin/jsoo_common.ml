@@ -52,12 +52,12 @@ let read_cmi ~dir cmi =
     with Not_found -> (
       match cmi with
       (* HACK: here a list of known "hidden" cmi from the OCaml distribution. *)
-      | "dynlink_config.cmi"
-      | "dynlink_types.cmi"
-      | "dynlink_platform_intf.cmi"
-      | "dynlink_common.cmi"
-      | "dynlink_symtable.cmi"
-      | "dynlink_compilerlibs.cmi" -> raise Not_found
+      | "Dynlink_config.cmi"
+      | "Dynlink_types.cmi"
+      | "Dynlink_platform_intf.cmi"
+      | "Dynlink_common.cmi"
+      | "Dynlink_symtable.cmi"
+      | "Dynlink_compilerlibs.cmi" -> raise Not_found
       | cmi ->
           Format.eprintf
             "Could not find cmi %s or %s in %s@."
@@ -72,16 +72,16 @@ let cmis_of_cma ~dir cma_path =
   in
   let contains = unit_of_cma cma_path in
   let dir = Filename.dirname cma_path in
-  List.filter_map contains ~f:(fun s ->
+  List.filter_map contains ~f:(fun (Js_of_ocaml_compiler.Global_name.Compunit s) ->
       try Some (read_cmi ~dir (s ^ ".cmi")) with Not_found -> None)
 
 let cmis_of_package pkg : string list =
   try
-    let dir = Findlib.package_directory pkg in
+    let dir = Jsoo_findlib.package_directory pkg in
     let fs : string list ref = ref [] in
     let add filename = fs := filename :: !fs in
     let archive =
-      try Findlib.package_property [ "byte" ] pkg "archive"
+      try Jsoo_findlib.package_property [ "byte" ] pkg "archive"
       with exc -> if String.equal pkg "stdlib" then "stdlib.cma" else raise exc
     in
     let l = String.split_on_char ~sep:' ' archive in
@@ -119,7 +119,7 @@ let cmis files =
           match String.split_on_char ~sep:':' s with
           | [ s ] -> read_cmi ~dir:"." s :: fs
           | [ pkg; s ] ->
-              let dir = Findlib.package_directory pkg in
+              let dir = Jsoo_findlib.package_directory pkg in
               read_cmi ~dir s :: fs
           | [] | _ :: _ :: _ :: _ -> assert false)
       | `Cma s -> cmis_of_cma ~dir:"." s @ fs)

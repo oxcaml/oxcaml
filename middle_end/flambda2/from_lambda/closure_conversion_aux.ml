@@ -78,7 +78,7 @@ module IR = struct
       ghost_region : Ident.t option;
       alloc_region : Ident.t;
       args_arity : [`Complex] Flambda_arity.t;
-      return_arity : [`Unarized] Flambda_arity.t
+      return_arity : [`Complex] Flambda_arity.t
     }
 
   type switch =
@@ -777,9 +777,11 @@ module Function_decls = struct
     type calling_convention =
       | Normal_calling_convention
       | Unboxed_calling_convention of
-          unboxing_kind option list
-          * unboxing_return_kind option
-          * Function_slot.t
+          { params_unboxing : unboxing_kind option list;
+            return_unboxing : unboxing_return_kind option;
+            unboxed_function_slot : Function_slot.t;
+            needs_region_wrapper : bool
+          }
 
     type t =
       { let_rec_ident : Ident.t;
@@ -789,7 +791,7 @@ module Function_decls = struct
         params : param list;
         removed_params : Ident.Set.t;
         params_arity : [`Complex] Flambda_arity.t;
-        return : [`Unarized] Flambda_arity.t;
+        return : [`Complex] Flambda_arity.t;
         calling_convention : calling_convention;
         return_continuation : Continuation.t;
         exn_continuation : IR.exn_continuation;
@@ -1109,7 +1111,7 @@ module Let_with_acc = struct
             ~find_code_characteristics:(fun code_id ->
               let code = Code_id.Map.find code_id code_mapping in
               { cost_metrics = Code.cost_metrics code;
-                params_arity = Flambda_arity.num_params (Code.params_arity code)
+                function_slot_size = Code.function_slot_size code
               })
             set_of_closures
         | Rec_info _ -> Cost_metrics.zero

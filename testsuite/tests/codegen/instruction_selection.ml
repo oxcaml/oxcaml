@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -85,6 +86,64 @@ logand_branch:
   ret
 |}]
 
+let lognot_branch x y f = if Int64_u.equal (Int64_u.lognot x) #0L then f ()
+[%%expect_asm X86_64{|
+lognot_branch:
+  movq  %rdi, %rbx
+  cmpq  $-1, %rax
+  jne   .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
+let lognot_neq_branch x f =
+  if Int64_u.to_int64 (Int64_u.lognot x) <> 0L then f ()
+[%%expect_asm X86_64{|
+lognot_neq_branch:
+  cmpq  $-1, %rax
+  je    .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
+let lognot_lt_branch x f =
+  if Int64_u.to_int64 (Int64_u.lognot x) < 7L then f ()
+[%%expect_asm X86_64{|
+lognot_lt_branch:
+  cmpq  $-8, %rax
+  jle   .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
+let lognot_lognot_lte_branch x y f =
+  if Int64_u.to_int64 (Int64_u.lognot x) <= Int64_u.to_int64 (Int64_u.lognot y)
+  then f ()
+[%%expect_asm X86_64{|
+lognot_lognot_lte_branch:
+  movq  %rbx, %rsi
+  movq  %rdi, %rbx
+  cmpq  %rsi, %rax
+  jl    .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: We materialize comparison result bits despite
    only using them for a single branch. Also, the `_ -> 0`
@@ -96,36 +155,29 @@ let combine_comparisons r f =
 ;;
 [%%expect_asm X86_64{|
 combine_comparisons:
-  movq  (%rax), %rdi
-  xorl  %ebx, %ebx
-  cmpq  $41, %rdi
-  setl  %bl
-  movq  %rdi, %rax
+  movq  (%rax), %rax
   cmpq  $11, %rax
   jle   .L0
-  testq %rbx, %rbx
-  je    .L0
+  cmpq  $41, %rax
+  jge   .L0
   ret
 .L0:
   movl  $1, %eax
   ret
 |}]
 
-(* CR ttebbi: We branch twice on the same comparison, materializing a boolean
-   for the second branch. *)
+(* CR ttebbi: We branch twice on the same comparison. *)
 let repeat_comparisons r _f =
   let a = !r > 5 in
   let b = !r > 5 in
   if a && b then 1 else 2
 [%%expect_asm X86_64{|
 repeat_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $11, %rbx
-  setg  %al
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
-  je    .L0
+  cmpq  $11, %rax
+  jle   .L0
   movl  $3, %eax
   ret
 .L0:
@@ -214,20 +266,20 @@ let two_element_list x = [x; x]
 [%%expect_asm X86_64{|
 two_element_list:
   subq  $8, %rsp
-  movq  %rax, %rdi
   subq  $48, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rbx
-  addq  $24, %rbx
+  leaq  8(%r15), %rdi
+  addq  $24, %rdi
+  movq  $2048, -8(%rdi)
+  movq  %rax, (%rdi)
+  movq  $1, 8(%rdi)
+  leaq  -24(%rdi), %rbx
   movq  $2048, -8(%rbx)
-  movq  %rdi, (%rbx)
-  movq  $1, 8(%rbx)
-  leaq  -24(%rbx), %rax
-  movq  $2048, -8(%rax)
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rax, (%rbx)
+  movq  %rdi, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -256,9 +308,9 @@ constant_folding:
 
 
 
-type ptr = nativeint#
+type ptr = nativeint_u
 external memcmp :
-  ptr -> ptr -> len:nativeint# -> int32#
+  ptr -> ptr -> len:nativeint_u -> int32_u
   @@ portable
   = "caml_no_bytecode_impl" "memcmp"
 [@@noalloc]
@@ -268,10 +320,11 @@ let int32_box_unbox_after_call (a : ptr) (b : ptr) =
 [%%expect_asm X86_64{|
 int32_box_unbox_after_call:
   subq  $8, %rsp
+  movl  $5, %edx
   movq  %rax, %rdi
   movq  %rbx, %rsi
-  movl  $5, %edx
   call  memcmp@PLT
+  movslq %eax, %rax
   movslq %eax, %rax
   addq  $8, %rsp
   ret
@@ -418,13 +471,12 @@ let branch_or_tailcall x =
 [%%expect_asm X86_64{|
 branch_or_tailcall:
   cmpq  $5, %rax
-  jbe   .L0
+  jbe   .L1
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  call  caml_reraise_exn@PLT
 .L0:
+.L1:
   movq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
@@ -432,16 +484,15 @@ branch_or_tailcall:
 
 
 (* CR ttebbi: The final bitwise or is unnecessary. *)
-let shift_of_logand (a : int64#) =
+let shift_of_logand (a : int64_u) =
   let b = Int64_u.logand a #1L in
   let c = Int64_u.shift_right_logical #3L (Int64_u.to_int b) in
   reinterpret_unboxed_int64_as_tagged_int63 c
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
-  movl  $1, %ebx
   movq  %rax, %rcx
-  andq  %rbx, %rcx
+  andl  $1, %ecx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax

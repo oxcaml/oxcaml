@@ -34,9 +34,9 @@ end
 module Map (T : Container_types.S_plus_iterator) = struct
   type _ t =
     | Iterator :
-        { mutable iterator : 'v T.Map.iterator;
-          map : 'v T.Map.t Channel.receiver;
-          handler : 'v Channel.sender
+        { iterator : 'v T.Map.Mutable_iterator.iterator;
+          map : 'v T.Map.t Channel.or_null_receiver;
+          handler : 'v Channel.or_null_sender
         }
         -> T.t t
 
@@ -45,33 +45,41 @@ module Map (T : Container_types.S_plus_iterator) = struct
   let compare_key (type a) (Iterator _ : a t) : a -> a -> int = T.compare
 
   let current (type a) (Iterator i : a t) : a Or_null.t =
-    match T.Map.current i.iterator with
+    match T.Map.Mutable_iterator.current i.iterator with
     | Some (key, _) -> This key
     | None -> Null
 
   let advance (type a) (Iterator i : a t) : unit =
-    i.iterator <- T.Map.advance i.iterator
+    T.Map.Mutable_iterator.advance i.iterator
 
   let seek (type a) (Iterator i : a t) (k : a) : unit =
-    i.iterator <- T.Map.seek i.iterator k
+    T.Map.Mutable_iterator.seek i.iterator k
 
   let init (type a) (Iterator i : a t) : unit =
-    i.iterator <- T.Map.iterator (Channel.recv i.map)
+    let map =
+      match Channel.recv_or_null i.map with
+      | Null -> T.Map.empty
+      | This map -> map
+    in
+    T.Map.Mutable_iterator.init i.iterator map
 
   let accept (type a) (Iterator i : a t) : unit =
-    match T.Map.current i.iterator with
+    match T.Map.Mutable_iterator.current i.iterator with
     | None -> invalid_arg "accept: iterator is exhausted"
-    | Some (_, value) -> Channel.send i.handler value
+    | Some (_, value) -> Channel.send_or_null i.handler (Or_null.this value)
 
   let create cell handler =
-    Iterator { iterator = T.Map.iterator T.Map.empty; map = cell; handler }
+    Iterator
+      { iterator = T.Map.Mutable_iterator.create (); map = cell; handler }
 end
+[@@inline always]
 
 module Join (Iterator : Iterator) : sig
   include Iterator
 
   val create : 'a Iterator.t list -> 'a t
 end = struct
+  (* [create] rejects empty arrays, and their length never changes. *)
   type 'k t =
     { iterators : 'k Iterator.t array;
       mutable at_end : bool
@@ -80,11 +88,15 @@ end = struct
   let current (type a) ({ iterators; at_end } : a t) : a Or_null.t =
     if at_end
     then Null
-    else Iterator.current iterators.(Array.length iterators - 1)
+    else
+      Iterator.current (Array.unsafe_get iterators (Array.length iterators - 1))
 
   let rec search : type a. a Iterator.t array -> int -> a -> a Or_null.t =
    fun iterators index_of_lowest_key highest_key ->
-    let iterator_with_lowest_key = iterators.(index_of_lowest_key) in
+    (* [repair] starts at zero; recursive calls wrap modulo the array length. *)
+    let iterator_with_lowest_key =
+      Array.unsafe_get iterators index_of_lowest_key
+    in
     let equal = Iterator.equal_key iterator_with_lowest_key in
     match Iterator.current iterator_with_lowest_key with
     | Null -> Null
@@ -104,7 +116,7 @@ end = struct
     assert (not at_end);
     if Array.length iterators > 1
     then
-      let iterator = iterators.(Array.length iterators - 1) in
+      let iterator = Array.unsafe_get iterators (Array.length iterators - 1) in
       match Iterator.current iterator with
       | Null -> j.at_end <- true
       | This highest_key -> (
@@ -115,7 +127,9 @@ end = struct
   let advance (type a) ({ iterators; at_end } as t : a t) =
     if not at_end
     then (
-      let highest_iterator = iterators.(Array.length iterators - 1) in
+      let highest_iterator =
+        Array.unsafe_get iterators (Array.length iterators - 1)
+      in
       Iterator.advance highest_iterator;
       repair t)
 
@@ -123,7 +137,9 @@ end = struct
     let { iterators; at_end } = t in
     if not at_end
     then (
-      let highest_iterator = iterators.(Array.length iterators - 1) in
+      let highest_iterator =
+        Array.unsafe_get iterators (Array.length iterators - 1)
+      in
       Iterator.seek highest_iterator key;
       repair t)
 
@@ -151,9 +167,11 @@ end = struct
     if at_end then invalid_arg "Joined_iterator.accept: iterator is exhausted";
     Array.iter Iterator.accept iterators
 
-  let equal_key { iterators; _ } = Iterator.equal_key iterators.(0)
+  let equal_key { iterators; _ } =
+    Iterator.equal_key (Array.unsafe_get iterators 0)
 
-  let compare_key { iterators; _ } = Iterator.compare_key iterators.(0)
+  let compare_key { iterators; _ } =
+    Iterator.compare_key (Array.unsafe_get iterators 0)
 
   let create (iterators : _ Iterator.t list) : _ t =
     match iterators with

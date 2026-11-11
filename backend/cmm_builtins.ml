@@ -89,12 +89,12 @@ let shift ~bits make_op arg count dbg =
     | Cname_for_debugger _ | Ctuple _
     | Cop (_, _, _)
     | Csequence (_, _)
-    | Cifthenelse (_, _, _, _, _, _)
+    | Cifthenelse (_, _, _, _, _, _, _, _)
     | Cswitch (_, _, _, _)
     | Ccatch (_, _, _)
     | Cexit (_, _, _)
     | Cinvalid _ ->
-      Cop (Cand, [count; Cconst_int (mask, dbg)], dbg)
+      and_int count (Cconst_int (mask, dbg)) dbg
   in
   Some (make_op arg count dbg)
 
@@ -1229,7 +1229,11 @@ let transl_builtin name args dbg typ_res =
     bigstring_cas Sixtyfour (four_args name args) dbg
   | "caml_bigstring_compare_and_swap_int32_unboxed" ->
     bigstring_cas Thirtytwo (four_args name args) dbg
-  | "caml_pause_hint" -> Some (Cop (Cpause, args, dbg))
+  | "caml_pause_hint" ->
+    (* [Cpause] takes no operands, but the unit argument may be an effectful
+       expression, so sequence it before the pause. *)
+    Some
+      (return_unit dbg (Csequence (one_arg name args, Cop (Cpause, [], dbg))))
   | _ -> transl_vec_builtin name args dbg typ_res
 
 let builtin_even_if_not_annotated = function

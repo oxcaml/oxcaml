@@ -485,6 +485,94 @@ let test_meet_array_element_kinds () =
   | Bottom -> Format.eprintf "@.Bottom@."
   | Ok (meet_ty, _env) -> Format.eprintf "@[<v>@;<1 2>%a@]@.@." T.print meet_ty
 
+let test_make_suitable_with_removed_alias () =
+  (* This test is ensuring that [make_suitable_environment] does not
+     accidentally lose aliases for removed variables that are only reachable
+     through value slots.
+
+     Specifically, we test that making the following environment:
+
+     f: Closure { value_slot : (= vs) }
+
+     vs: (= x)
+
+     suitable for a context where only [f] and [x] are available correctly
+     results in a type for [f] that is:
+
+     f: Closure { value_slot : (= x) }
+
+     and not
+
+     f: Closure { value_slot : T } *)
+  let initial_env = create_env () in
+  let define ?(kind = K.value) v env =
+    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
+    TE.add_definition env (Bound_name.create_var v') kind
+  in
+  let add_equation v ty env = TE.add_equation env (Name.var v) ty in
+  let equals ?(kind = K.value) v = T.alias_type_of kind (Simple.var v) in
+  let f = Variable.create "f" K.value in
+  let x = Variable.create "x" K.value in
+  let outer_env = initial_env |> define f |> define x in
+  let vs = Variable.create "vs" K.value in
+  let function_slot =
+    Function_slot.create (Current_unit.get_cu_exn ()) ~name:"f" ~size:0
+  in
+  let value_slot =
+    Value_slot.create
+      (Current_unit.get_cu_exn ())
+      ~name:"vs" ~is_always_immediate:false K.value
+  in
+  let make_closure_type vs_type =
+    T.exactly_this_closure function_slot
+      ~all_function_slots_in_set:
+        (Function_slot.Map.singleton function_slot
+           Flambda2_lattices.Or_unknown.Unknown)
+      ~all_closure_types_in_set:
+        (Function_slot.Map.singleton function_slot
+           (T.alias_type_of K.value (Simple.var f)))
+      ~all_value_slots_in_set:(Value_slot.Map.singleton value_slot vs_type)
+      Alloc_mode.For_types.heap
+  in
+  let env_removed_alias =
+    outer_env |> define vs
+    |> add_equation f (make_closure_type (equals vs))
+    |> add_equation vs (equals x)
+  in
+  let env_direct_alias =
+    outer_env |> add_equation f (make_closure_type (equals x))
+  in
+  let make_extension env =
+    let teev =
+      T.make_suitable_for_environment env (Everything_not_in outer_env)
+        [Name.var f, TE.find env (Name.var f) (Some K.value)]
+    in
+    Format.eprintf
+      "@[<v>The projection of:@ @;\
+       <1 2>@[%a@]@ @ into environment@ @;\
+       <1 2>@[%a@]@ @ is:@ @;\
+       <1 2>@[%a@]@]@."
+      TE.print env TE.print outer_env
+      T.Typing_env_extension.With_extra_variables.print teev;
+    let env' = TE.add_env_extension_with_extra_variables outer_env teev in
+    let wrong_result msg =
+      Misc.fatal_errorf
+        "Expected type of value slot %a to be (= %a), but got: %t instead."
+        Value_slot.print value_slot Variable.print x msg
+    in
+    match
+      T.meet_project_value_slot_simple env' ~min_name_mode:Name_mode.normal
+        (equals f) value_slot
+    with
+    | Known_result simple when Simple.equal simple (Simple.var x) -> ()
+    | Known_result simple ->
+      wrong_result (Format.dprintf "(= %a)" Simple.print simple)
+    | Need_meet -> wrong_result (Format.dprintf "need meet")
+    | Invalid -> wrong_result (Format.dprintf "invalid")
+  in
+  make_extension env_direct_alias;
+  make_extension env_removed_alias
+
 let () =
   let comp_unit = "Meet_test" |> Compilation_unit.of_string in
   let unit_info = Unit_info.make_dummy ~input_name:"meet_test" comp_unit in
@@ -506,4 +594,6 @@ let () =
   Format.eprintf "@.JOIN WITH COMPLEX EXTENSIONS@\n@.";
   test_join_with_complex_extensions ();
   Format.eprintf "@.MEET ARRAY ELEMENT KINDS@\n@.";
-  test_meet_array_element_kinds ()
+  test_meet_array_element_kinds ();
+  Format.eprintf "@.MAKE SUITABLE WITH REMOVED ALIASES@\n@.";
+  test_make_suitable_with_removed_alias ()

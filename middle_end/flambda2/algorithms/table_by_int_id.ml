@@ -50,8 +50,14 @@ struct
   module HT = Hashtbl.Make (struct
     type t = int
 
-    (* CR mshinwell: maybe this should be a proper hash function *)
-    let hash (t : t) = Hashtbl.hash t
+    (* As of writing, every [E.hash] reaching this table is already well
+       distributed in the low bits and the identity function would do; we mix
+       defensively against future ones that aren't. The mixer is a bijection, so
+       it never merges distinct ids. Multiplier from xxHash. *)
+    let hash (t : t) =
+      let mixed = t lxor (t lsr 31) in
+      let h = mixed * 0x27d4eb2f in
+      h lxor (h lsr 29)
 
     let equal t1 t2 = t1 == t2
   end)
@@ -68,11 +74,11 @@ struct
 
   let add t elt =
     let id = Id.create (E.hash elt) E.flags in
-    match HT.find t id with
-    | exception Not_found ->
+    match HT.find_opt t id with
+    | None ->
       HT.add t id elt;
       id
-    | existing_elt -> (
+    | Some existing_elt -> (
       if E.equal elt existing_elt
       then id
       else

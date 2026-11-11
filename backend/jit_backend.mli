@@ -52,3 +52,6 @@ val register : callback -> unit
 
 (** Unregister the JIT callback and restore previous state. *)
 val unregister : unit -> unit
+
+(** Whether a JIT callback is currently registered. *)
+val is_registered : unit -> bool

@@ -36,6 +36,7 @@ let print_macro_transformed source =
 
 let print_macro_transformed source =
   Jsoo.Targetint.set_num_bits 32;
+  Jsoo.Targetnativeint.set_num_bits 32;
   try print_macro_transformed source with Failure s -> Format.printf "failure: %s%!" s
 
 let%expect_test "BLOCK()" =
@@ -84,7 +85,7 @@ let%expect_test "BLOCK(0779, a)" =
 
 let%expect_test "TAG(a)" =
   print_macro_transformed "TAG(a)";
-  [%expect {| a?.[0]; |}]
+  [%expect {| a[0]; |}]
 
 let%expect_test "LENGTH(a)" =
   print_macro_transformed "LENGTH(a)";

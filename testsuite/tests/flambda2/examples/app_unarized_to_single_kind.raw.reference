@@ -19,9 +19,9 @@ let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
    let g = %project_value_slot.[h].[g] (my_closure) in
    apply direct(g_1 &my_alloc_region) (g : _ -> imm tagged) (f, x) -> k1 * k2
  in
- let f = closure f_0 @f &toplevel.alloc_region in
- let g = closure g_1 @g &toplevel.alloc_region in
- let h = closure h_2 @h &toplevel.alloc_region with { f = f; g = g } in
+ let f = closure f_0 @f &toplevel in
+ let g = closure g_1 @g &toplevel in
+ let h = closure h_2 @h &toplevel with { f = f; g = g } in
  let Pmakeblock = %block.[`0`].`toplevel` (f, g, h) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

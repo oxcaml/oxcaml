@@ -126,6 +126,12 @@ let[@inline always] with_denv t denv = { t with denv }
 let with_continuation_uses_env t ~cont_uses_env =
   { t with continuation_uses_env = cont_uses_env }
 
+let record_continuation t cont arity =
+  let cont_uses_env =
+    CUE.record_continuation t.continuation_uses_env cont arity
+  in
+  with_continuation_uses_env t ~cont_uses_env
+
 let record_continuation_use t cont use_kind ~env_at_use ~arg_types =
   let cont_uses_env, id =
     CUE.record_continuation_use t.continuation_uses_env cont use_kind
@@ -165,7 +171,9 @@ let add_to_lifted_constant_accumulator ?also_add_to_env t constants =
   in
   let lifted_constants = LCS.union t.lifted_constants constants in
   let denv =
-    if also_add_to_env then LCS.add_to_denv t.denv constants else t.denv
+    if also_add_to_env
+    then DE.add_lifted_constant_state t.denv constants
+    else t.denv
   in
   { t with lifted_constants; denv }
 

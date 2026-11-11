@@ -42,7 +42,6 @@ and cmxs_magic_number = {magic|@CMXS_MAGIC_NUMBER@|magic}
 and cmt_magic_number = {magic|@CMT_MAGIC_NUMBER@|magic}
 and cms_magic_number = {magic|@CMS_MAGIC_NUMBER@|magic}
 and cmj_magic_number = {magic|@CMJ_MAGIC_NUMBER@|magic}
-and cmja_magic_number = {magic|@CMJA_MAGIC_NUMBER@|magic}
 and linear_magic_number = {magic|@LINEAR_MAGIC_NUMBER@|magic}
 and cfg_magic_number = {magic|@CFG_MAGIC_NUMBER@|magic}
 
@@ -114,6 +113,7 @@ let configuration_variables () =
   p "system" system;
   p "asm" asm;
   p_bool "asm_cfi_supported" asm_cfi_supported;
+  p_bool "asm_file0_supported" asm_file0_supported;
   p_bool "asm_size_type_directives" asm_size_type_directives;
   p_bool "with_frame_pointers" with_frame_pointers;
   p_bool "with_address_sanitizer" with_address_sanitizer;
@@ -159,7 +159,6 @@ let configuration_variables () =
   p "cmt_magic_number" cmt_magic_number;
   p "cms_magic_number" cms_magic_number;
   p "cmj_magic_number" cmj_magic_number;
-  p "cmja_magic_number" cmja_magic_number;
   p "linear_magic_number" linear_magic_number;
 
   (* "flambda_backend" is still printed for compatibility *)
@@ -167,7 +166,6 @@ let configuration_variables () =
   p_bool "probes" probes;
   p_bool "stack_allocation" stack_allocation;
 
-  p_bool "runtime5" true;
   p_bool "no_stack_checks" no_stack_checks;
   p_bool "multidomain" multidomain;
   p_bool "poll_insertion" poll_insertion;

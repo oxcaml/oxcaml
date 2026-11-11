@@ -43,6 +43,13 @@
 
 open Lambda
 
+type error = | Recursive_template
+
+exception Error of (Location.t * error)
+
+let raise_error ~loc error =
+  raise (Error (Debuginfo.Scoped_location.to_location loc, error))
+
 (** Allocation and backpatching primitives *)
 
 let alloc_prim =
@@ -78,6 +85,9 @@ type mixed_block_size = { size : int; value_prefix_len : int }
 (* Simple blocks *)
 type block_size =
   | Regular_block of int
+  | Empty_block of { tag : int }
+  (** Distinct from [Regular_block], which always creates tag-0 blocks then
+      back-patches the header *)
   | Float_record of int
   | Lazy_block
   | Mixed_block of mixed_block_size
@@ -181,14 +191,19 @@ let find_size_of_alloc_prim prim args =
     | _ -> None
   else None
 
+let bytecode_block_size shape =
+  match singleton_product_shape_for_bytecode shape with
+  | Some elements -> Array.length elements
+  | None -> Array.length shape
+
 let compute_mixed_block_size shape =
-  if !Clflags.native_code then
+  if Clflags.target_is_native () then
     let bytes = Mixed_product_bytes.count (Product shape) in
     let value_prefix_len = Mixed_product_bytes.value_prefix_len bytes in
     let size = Mixed_product_bytes.size_in_words bytes in
     { size; value_prefix_len }
   else
-    let size = Array.length shape in
+    let size = bytecode_block_size shape in
     { size; value_prefix_len = size }
 
 let compute_static_size lam =
@@ -221,8 +236,8 @@ let compute_static_size lam =
           env bindings
       in
       compute_expression_size env body
-    | Lprim (p, args, _) ->
-      size_of_primitive env p args
+    | Lprim (p, args, loc) ->
+      size_of_primitive env loc p args
     | Lswitch (_, sw, _, _) ->
       let fail_case =
         match sw.sw_failaction with
@@ -262,11 +277,11 @@ let compute_static_size lam =
          the latter meaning that [Value_rec_check] should have forbidden that case.
       *)
       assert false
-    | Lsplice _ ->
-      fatal_error_invalid_constructor lam
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
-    | Lkindinstantiate _ -> dynamic_size lam
+    | Ltemplate tmpl ->
+      raise_error ~loc:tmpl.loc Recursive_template
+    | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -283,13 +298,27 @@ let compute_static_size lam =
      number of value fields only. In bytecode, void fields are kept, so the
      block size includes all fields. *)
   and all_value_mixed_block_size shape =
-    if !Clflags.native_code then
+    if Clflags.target_is_native () then
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
-    else Array.length shape
-  and all_value_mixed_block_size_types shape =
-    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
-  and size_of_primitive env p args =
+    else bytecode_block_size shape
+  and uniform_block_size ~tag size =
+    if size = 0 then Empty_block { tag } else Regular_block size
+  and size_of_primitive env loc p args =
+    let check_shape shape =
+      if Lambda.mixed_block_shape_has_splices shape then
+        Location.raise_errorf ~loc:(Debuginfo.Scoped_location.to_location loc)
+          "Recursive definitions of layout-polymorphic blocks are not \
+           currently supported."
+    in
+    begin match p with
+    | Pmakeblock (_, _, Shape shape, _)
+    | Pduprecord
+        ((Record_mixed shape
+         | Record_inlined (_, Constructor_mixed shape, _)), _) ->
+      check_shape shape
+    | _ -> ()
+    end;
     match p with
     | Pignore
     | Psetfield _
@@ -334,37 +363,40 @@ let compute_static_size lam =
     | Pduprecord (repres, size) ->
         begin match repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value,
-                          (Variant_boxed _ | Variant_extensible)) ->
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed) ->
             Block (Regular_block size)
+        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+            (* Extensible variants require an extra machine word
+               to identify a constructor. *)
+            Block (Regular_block (size + 1))
         | Record_float ->
             Block (Float_record size)
+        | Record_inlined
+              (Ordinary { runtime_tag; _ },
+               Constructor_mixed shape,
+               Variant_boxed)
+              when Mixed_product_bytes.shape_is_all_value shape ->
+            let size = all_value_mixed_block_size shape in
+            Block (uniform_block_size ~tag:runtime_tag size)
         | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
+                          (Variant_boxed | Variant_extensible))
         | Record_mixed shape ->
-            if Mixed_product_bytes.types_shape_is_all_value shape
+            if Mixed_product_bytes.shape_is_all_value shape
             then
               Block (Regular_block
-                (all_value_mixed_block_size_types shape))
+                (all_value_mixed_block_size shape))
             else
-              let size =
-                compute_mixed_block_size
-                  (Lambda.transl_mixed_product_shape shape)
+              let size = compute_mixed_block_size shape
               in
               Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
-        | Record_dummy _ ->
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
             Misc.fatal_error
-              "size_of_primitive: unexpected dummy representation"
-        | Record_undetermined | Record_variable _
-        | Record_inlined (_, (Constructor_undetermined
-                             | Constructor_variable _), _) ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected variable representation"
+              "size_of_primitive: unexpected immediate representation"
         end
-    | Pmakeblock (_, _, shape, _) ->
+    | Pmakeblock (tag, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
@@ -378,7 +410,7 @@ let compute_static_size lam =
              | All_value -> List.length args
              | Shape shape -> all_value_mixed_block_size shape
            in
-           Block (Regular_block size)
+           Block (uniform_block_size ~tag size)
          | Some arr -> Block (Mixed_block (compute_mixed_block_size arr)))
     | Pmakelazyblock _ ->
         Block Lazy_block
@@ -482,6 +514,7 @@ let compute_static_size lam =
     | Pdls_get
     | Ptls_get
     | Pdomain_index
+    | Pthread_self_id
     | Ppeek _
     | Ppoke _
     | Pscalar _
@@ -556,7 +589,9 @@ let compute_static_size lam =
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
     | Preinterpret_boxed_vector_as_tuple _
-    | Preinterpret_tuple_as_boxed_vector _ ->
+    | Preinterpret_tuple_as_boxed_vector _
+    | Pbox _
+    | Punbox _ ->
         dynamic_size lam
   in
   compute_expression_size Ident.Map.empty lam
@@ -663,7 +698,7 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_args = List.map (fun p -> Lvar (p.name)) params;
         ap_loc = no_loc;
         ap_tailcall = Default_tailcall;
-        ap_inlined = Default_inlined;
+        ap_inlined = forward_inlined_attribute ();
         ap_specialised = Default_specialise;
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
@@ -855,13 +890,13 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lifused _
   | Lexclave _
   | Lkindtemplate _
-  | Lkindinstantiate _ ->
+  | Lkindinstantiate _
+  | Ltemplate _
+  | Linstantiate _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
-  | Lsplice _ ->
-    fatal_error_invalid_constructor lam
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =
@@ -1011,6 +1046,9 @@ let compile_alloc size =
   match size with
   | Regular_block size ->
       alloc alloc_prim [size]
+  | Empty_block { tag } ->
+      Lprim (Pmakeblock (tag, Immutable, All_value, Lambda.alloc_heap),
+             [], no_loc)
   | Float_record size ->
       alloc alloc_float_record_prim [size]
   | Lazy_block ->
@@ -1023,7 +1061,7 @@ let compile_alloc size =
 let compile_update size dummy newval =
   let prim, newval =
     match size with
-    | Regular_block _ | Float_record _ | Mixed_block _ ->
+    | Regular_block _ | Empty_block _ | Float_record _ | Mixed_block _ ->
       update_prim, newval
     | Lazy_block ->
       (* Consider the following example from Vincent Laviron:
@@ -1150,3 +1188,18 @@ let compile_letrec input_bindings body =
       body_with_dynamic_values all_bindings_rev.static
   in
   body_with_pre_allocations
+
+open Format_doc
+
+let report_error ppf = function
+  | Recursive_template ->
+    fprintf ppf "Recursive static functors are not supported"
+
+let () =
+  Location.register_error_of_exn
+    (function
+      | Error (loc, err) ->
+          Some (Location.error_of_printer ~loc report_error err)
+      | _ ->
+          None
+    )

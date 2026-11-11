@@ -39,6 +39,8 @@
 
 (copy_files# utils/*.ml{,i})
 
+(copy_files# fdo/common/*.ml{,i})
+
 (copy_files# parsing/*.ml{,i})
 
 (copy_files parsing/parser.mly)
@@ -62,6 +64,8 @@
 (copy_files# tools/simdgen/*.ml{,i})
 
 (copy_files# backend/cfg/*.ml{,i})
+
+(copy_files# backend/ssa/*.ml{,i})
 
 (copy_files# backend/debug/*.ml{,i})
 
@@ -110,6 +114,7 @@
 
 (library
  (name ocamlcommon)
+ (public_name compiler-libs.common)
  (wrapped false)
  (flags
   (:standard
@@ -134,6 +139,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  json
   arrayset
   config
   build_path_prefix_map
@@ -167,6 +173,8 @@
   structured_mangling
   symbol
   lazy_backtrack
+  with_backtracking_intf
+  with_backtracking
   diffing
   diffing_with_keys
   linkdeps
@@ -174,8 +182,15 @@
   zero_alloc_utils
   zero_alloc_annotations
   doubly_linked_list
+  ;; fdo/common/
+  fdo_prehash
+  fdo_counter_identity
+  fdo_counter
+  fdo_annotation
   file_sections
   lru
+  id_counter
+  likelihood
   ;; PARSING
   location
   longident
@@ -201,6 +216,8 @@
   parsetree ; mli only file
   ;; DRIVER
   pparse
+  compenv
+  makedepend
   ;; TYPING (these depend only on utils/, so live here to let
   ;; compilation_unit and symbol reference them)
   ident
@@ -208,6 +225,7 @@
 
 (library
  (name ocamlfrontend)
+ (public_name compiler-libs.frontend)
  (wrapped false)
  (flags
   (:standard
@@ -227,7 +245,6 @@
   annot
   value_rec_types
   cmo_format
-  cmj_format
   outcometree
   debug_event
   solver_intf
@@ -296,6 +313,8 @@
   typedecl
   typeopt
   value_rec_check
+  typing_recovery_state
+  typing_recovery
   typecore
   solver_intf
   solver
@@ -316,6 +335,7 @@
   outcometree
   allowance
   ;; lambda/
+  branch_annotations
   debuginfo
   lambda
   static_label
@@ -326,10 +346,8 @@
   runtimedef
   tmc
   simplif
-  slambda_fracture
   slambda
-  slambdaeval
-  slambdaident
+  layout_ident
   switch
   value_rec_compiler
   translmode
@@ -343,6 +361,7 @@
   translobj
   translprim
   translquote
+  translrepr
   ;; bytecomp/
   debug_event
   meta
@@ -352,9 +371,7 @@
   symtable
   ;; some of COMP
   main_args
-  compenv
   compmisc
-  makedepend
   compile_common
   instantiator
   functorizer
@@ -362,12 +379,12 @@
   annot
   value_rec_types
   cmo_format
-  cmj_format
   outcometree
   debug_event))
 
 (library
  (name ocamlbytecomp)
+ (public_name compiler-libs.bytecomp)
  (wrapped false)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
@@ -410,24 +427,6 @@
  (libraries ocamlbytecomp ocamlfrontend)
  (modules main_native))
 
-(library
- (name ocamljcomp)
- (wrapped false)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (libraries ocamlfrontend flambda2)
- (modules jsmaindriver jscompile jslibrarian))
-
-(executable
- (name ocamlj)
- (modes native)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamljcomp ocamlfrontend flambda2)
- (modules ocamlj))
-
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
 
@@ -465,11 +464,22 @@
 (rule
  (targets ocamlopt_flags.sexp)
  (enabled_if
-  (or
-   (= %{context_name} "main")
-   (= %{context_name} "runtime_stdlib")))
+   (= %{context_name} "main"))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
+; Write empty files in an unconfigured tree
+(rule
+ (target Makefile.config)
+ (mode fallback)
+ (action
+  (write-file %{target} "")))
+
+(rule
+ (target Makefile.build_config)
+ (mode fallback)
+ (action
+  (write-file %{target} "")))
 
 (install
  (files ocamlyacc)
@@ -493,12 +503,6 @@
  (section bin)
  (package ocaml))
 
-(install
- (files
-  (ocamlj.exe as ocamlj.opt))
- (section bin)
- (package ocaml))
-
 ; For the moment we don't install optmain.{cmo,cmx,o} and opttopstart.{cmx,o}.
 ; When built with Dune, these have the "dune exe" module prefixes, so won't
 ; be named as a client would expect.  There should also be a patch upstream
@@ -517,14 +521,6 @@
   (ocamlbytecomp.cma as compiler-libs/ocamlbytecomp.cma)
   (ocamlfrontend.cma as compiler-libs/ocamlfrontend.cma)
   (ocamlcommon.cma as compiler-libs/ocamlcommon.cma))
- (section lib)
- (package ocaml))
-
-(install
- (files
-  Makefile.build_config
-  Makefile.config_if_required
-  Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -622,6 +618,7 @@
   simd_selection
   amd64_simd_defs
   amd64_simd_instrs
+  amd64_simd_intrins
   stack_check
   sub_cfg
   reg
@@ -654,6 +651,8 @@
   cfg
   cfg_available_regs
   cfg_colours
+  cfg_compare
+  cfg_copy_propagation
   cfg_edge
   cfg_intf
   cfg_quick_hash
@@ -665,14 +664,19 @@
   cfg_dataflow
   cfg_deadcode
   cfg_liveness
+  cfg_validation_facts
+  cfg_liveness_validate
   cfg_dominators
+  cfg_dominators_validate
   cfg_loop_infos
   cfg_to_linear_desc
   cfg_cse
   cfg_cse_target_intf
+  cfg_reachability_validate
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_z3
   cfg_prologue
   cfg_merge_blocks
   cfg_block_layout
@@ -710,8 +714,17 @@
   regalloc_utils
   regalloc_validate
   ;; file_formats/
+  ir_config_fingerprint
   linear_format
   cfg_format
+  ;; backend/ssa/
+  ssa
+  ssa_print
+  ssa_reducer
+  ssa_simplify
+  ssa_tail_call
+  ssa_of_cmm
+  cfg_of_ssa
   ;; backend/debug/
   available_ranges_vars
   compute_ranges
@@ -725,6 +738,7 @@
   ;; build it as part of that library.
   dwarf
   dwarf_abstract_instances
+  dwarf_base_address_selection
   dwarf_compilation_unit
   dwarf_concrete_instances
   dwarf_inlined_frames
@@ -736,6 +750,7 @@
   complex_shape
   dwarf_type
   ;; optcomp/
+  jscomp
   linkenv
   optcompile
   optlibrarian
@@ -757,6 +772,9 @@
   oxcaml_common
   flambda2_identifiers
   flambda2_cmx
+  flambda2_datalog
+  flambda2_reaper
+  jsoo_imports
   compiler_owee
   gc_timings
   arm64_ast
@@ -889,8 +907,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.a}
    %{dep:external/owee/compiler_owee.a}
    %{dep:external/gc-timings/gc_timings.a}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.a}
    %{dep:ocamloptcomp.a}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.a}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.a}
    %{dep:middle_end/flambda2/flambda2.a})))
 
 (rule
@@ -930,8 +950,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.cma}
    %{dep:external/owee/compiler_owee.cma}
    %{dep:external/gc-timings/gc_timings.cma}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.cma}
    %{dep:ocamloptcomp.cma}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cma}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.cma}
    %{dep:middle_end/flambda2/flambda2.cma})))
 
 (rule
@@ -971,8 +993,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.cmxa}
    %{dep:external/owee/compiler_owee.cmxa}
    %{dep:external/gc-timings/gc_timings.cmxa}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.cmxa}
    %{dep:ocamloptcomp.cmxa}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cmxa}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.cmxa}
    %{dep:middle_end/flambda2/flambda2.cmxa})))
 
 (install
@@ -1009,6 +1033,12 @@
   (middle_end/flambda2/algorithms/libflambda2_algorithms_stubs.a
    as
    compiler-libs/libflambda2_algorithms_stubs_native.a)
+  (middle_end/flambda2/to_jsir/jsoo_imports/libjsoo_imports_stubs.a
+   as
+   compiler-libs/libjsoo_imports_stubs.a)
+  (middle_end/flambda2/to_jsir/jsoo_imports/libjsoo_imports_stubs.a
+   as
+   compiler-libs/libjsoo_imports_stubs_native.a)
   ; for special_dune compat
   (ocamloptcomp_with_flambda2.cma as compiler-libs/ocamloptcomp.cma)
   (ocamloptcomp_with_flambda2.cmxa as compiler-libs/ocamloptcomp.cmxa)
@@ -1027,7 +1057,6 @@
   (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmt,cmti})
-  (glob_files .ocamljcomp.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .oxcaml_common.objs/byte/*.{cmi,cmt,cmti})
   (alias_rec middle_end/check)
   (alias_rec backend/check)
@@ -1039,67 +1068,167 @@
   (alias_rec extract_externals/check)
   (alias_rec ocamltest/check)))
 
+; Index files for Merlin's project-wide occurrences (find-all-references) in
+; the same code as merlin-support. The root ocaml-index alias would also pull in
+; code that doesn't build in this workspace, so list the root libraries'
+; indexes explicitly.
+(alias
+ (name merlin-index)
+ (deps
+  .ocamlcommon.objs/cctx.ocaml-index
+  .ocamlfrontend.objs/cctx.ocaml-index
+  .ocamlbytecomp.objs/cctx.ocaml-index
+  .ocamloptcomp.objs/cctx.ocaml-index
+  .oxcaml_common.objs/cctx.ocaml-index
+  (alias_rec middle_end/ocaml-index)
+  (alias_rec backend/ocaml-index)
+  (alias_rec driver/ocaml-index)
+  (alias_rec file_formats/ocaml-index)
+  (alias_rec lex/ocaml-index)
+  (alias_rec printer/ocaml-index)
+  (alias_rec chamelon/ocaml-index)
+  (alias_rec extract_externals/ocaml-index)
+  (alias_rec ocamltest/ocaml-index)))
+
+; The interfaces of the compiler libraries (some of which
+; tools/gen_compiler_libs_installation.ml renames or leaves out) and their
+; compiled files. The interfaces are copies of the sources, which exist from
+; the start: Dune only knows what any package of the build installs once it
+; has read every list such as this one, so a list computed from compiled files
+; would hold up all installation until the end of the build.
 (rule
  (targets compiler-libs-installation.sexp)
  (deps
-  ; Note that Dune doesn't allow globbing in the path part of the filename,
-  ; so this is a bit more repetitive than it could be. Also, as far as I can
-  ; tell, (glob_files_rec) simply doesn't work.
   (glob_files *.mli)
-  (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamlbytecomp.objs/native/*.cmx)
-  (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamlfrontend.objs/native/*.cmx)
-  (glob_files .ocamlcommon.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamlcommon.objs/native/*.cmx)
-  (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamloptcomp.objs/native/*.cmx)
-  (glob_files
-   backend/asm_targets/.asm_targets.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files_rec backend/asm_targets/.asm_targets.objs/native/*.cmx)
-  (glob_files
-   backend/binary_emitter_intf/.binary_emitter_intf.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files
-   backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx)
-  (glob_files
-   backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files backend/arm64/ast/.arm64_ast.objs/native/*.cmx)
-  (glob_files
-   backend/arm64/binary_emitter/.arm64_binary_emitter.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files
-   backend/arm64/binary_emitter/.arm64_binary_emitter.objs/native/*.cmx)
-  (glob_files middle_end/flambda2/.flambda2objs/byte/flambda2.{cmi,cmt})
-  (glob_files
-   middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/byte/flambda2_to_cmm{,__To_cmm}.{cmi,cmt})
-  (glob_files
-   .oxcaml_common.objs/byte/oxcaml_{args,flags}.{cmi,cmo,cmt,cmti})
-  (glob_files .oxcaml_common.objs/native/oxcaml_{args,flags}.cmx)
-  backend/debug/dwarf/dwarf_flags/dwarf_flags.mli
-  (glob_files
-   backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/byte/dwarf_flags.{cmi,cmo,cmt,cmti})
-  backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/native/dwarf_flags.cmx
-  (glob_files
-   backend/debug/dwarf/dwarf_low/.dwarf_low.objs/byte/*.{cmi,cmo,cmt})
-  (glob_files backend/debug/dwarf/dwarf_low/.dwarf_low.objs/native/*.cmx)
-  (glob_files
-   backend/debug/dwarf/dwarf_high/.dwarf_high.objs/byte/*.{cmi,cmo,cmt})
-  (glob_files backend/debug/dwarf/dwarf_high/.dwarf_high.objs/native/*.cmx)
-  (glob_files backend/debug/dwarf/dwarf_ocaml/.dwarf_ocaml.objs/native/*.cmx)
-  (glob_files external/owee/.compiler_owee.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files external/owee/.compiler_owee.objs/native/*.cmx)
-  (glob_files
-   external/gc-timings/.gc_timings.objs/byte/gc_timings.{cmi,cmti})
-  external/gc-timings/.gc_timings.objs/native/gc_timings.cmx)
+  backend/debug/dwarf/dwarf_flags/dwarf_flags.mli)
  (action
   (with-stdout-to
    compiler-libs-installation.sexp
    (run tools/gen_compiler_libs_installation.exe %{deps}))))
 
+; Dune does not glob in directory names, hence the repetition.
 (install
  (section lib)
  (package ocaml)
  (files
-  (include compiler-libs-installation.sexp)))
+  (include compiler-libs-installation.sexp)
+  (glob_files
+   (.ocamlbytecomp.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.ocamlbytecomp.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (.ocamlfrontend.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.ocamlfrontend.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (.ocamlcommon.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.ocamlcommon.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (.ocamloptcomp.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.ocamloptcomp.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/asm_targets/.asm_targets.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/asm_targets/.asm_targets.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/binary_emitter_intf/.binary_emitter_intf.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/arm64/ast/.arm64_ast.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/arm64/binary_emitter/.arm64_binary_emitter.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/arm64/binary_emitter/.arm64_binary_emitter.objs/native/*.cmx with_prefix compiler-libs))
+  ; ocamloptcomp's interface mentions the js_of_ocaml IR (Optcomp_intf).
+  (glob_files
+   (middle_end/flambda2/to_jsir/jsoo_imports/.jsoo_imports.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/to_jsir/jsoo_imports/.jsoo_imports.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (.oxcaml_common.objs/byte/oxcaml_{args,flags}.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.oxcaml_common.objs/native/oxcaml_{args,flags}.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/byte/dwarf_flags.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/native/dwarf_flags.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_low/.dwarf_low.objs/byte/*.{cmi,cmo,cmt} with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_low/.dwarf_low.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_high/.dwarf_high.objs/byte/*.{cmi,cmo,cmt} with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_high/.dwarf_high.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_ocaml/.dwarf_ocaml.objs/native/*.cmx with_prefix compiler-libs))
+  ; Only the interfaces of flambda2. Dune cannot glob across directories, so
+  ; every flambda2 sub-library has to be listed here by hand; a test in
+  ; middle_end/flambda2/dune fails if one is missing.
+  (glob_files
+   (middle_end/flambda2/.flambda2.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/algorithms/.flambda2_algorithms.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/bound_identifiers/.flambda2_bound_identifiers.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/classic_mode_types/.flambda2_classic_mode_types.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/cmx/.flambda2_cmx.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/compare/.flambda2_compare.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/datalog/.flambda2_datalog.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/from_lambda/.flambda2_from_lambda.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/identifiers/.flambda2_identifiers.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/import/.flambda2_import.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/kinds/.flambda2_kinds.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/lattices/.flambda2_lattices.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/nominal/.flambda2_nominal.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/numbers/.flambda2_numbers.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/numbers/floats/.flambda2_floats.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/parser/.flambda2_parser.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/reaper/.flambda2_reaper.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/simplify/.flambda2_simplify.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/simplify_shared/.flambda2_simplify_shared.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/term_basics/.flambda2_term_basics.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/terms/.flambda2_terms.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/to_jsir/.flambda2_to_jsir.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/types/.flambda2_types.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/ui/.flambda2_ui.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  ; The vendored libraries go in the main library directory.
+  (glob_files
+   (external/owee/.compiler_owee.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix .))
+  (glob_files
+   (external/owee/.compiler_owee.objs/native/*.cmx with_prefix .))
+  (glob_files
+   (external/gc-timings/.gc_timings.objs/byte/gc_timings.{cmi,cmti} with_prefix .))
+  (glob_files
+   (external/gc-timings/.gc_timings.objs/native/gc_timings.cmx with_prefix .))))
 
 ; This is entirely redundant, but without it, each target in these libraries
 ; and their dependencies waits until ocamlfrontend is built, including those

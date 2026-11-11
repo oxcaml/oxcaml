@@ -34,8 +34,8 @@ type _ t = Int : int -> int t | True : bool t | False : bool t
                                value<
                                 (consts (1 0)) (non_consts ([0: value<int>]))>]))>]
        : int
-       (let (*match*/0 =o? (field_mut 0 (field_imm 0 param/0)))
-         (switch* (field_imm 1 param/0)
+       (let (*match*/0 =o? (field_mut 0 (mixedfield 0  (?,?) param/0)))
+         (switch* (mixedfield 1  (?,?) param/0)
           case int 0: 0
           case int 1:
            (let
@@ -63,8 +63,8 @@ let lazy_needs_partial : _ * bool t ref -> int = function
        param/1[value<(consts ()) (non_consts ([0: *, *]))>] : int
        (catch
          (let
-           (*match*/2 =a? (field_imm 0 param/1)
-            *match*/3 =o? (field_mut 0 (field_imm 1 param/1)))
+           (*match*/2 =a? (mixedfield 0  (?,?) param/1)
+            *match*/3 =o? (field_mut 0 (mixedfield 1  (?,?) param/1)))
            (switch* *match*/3
             case int 0: 0
             case int 1:
@@ -76,7 +76,7 @@ let lazy_needs_partial : _ * bool t ref -> int = function
                         (apply (field_imm 1 (global CamlinternalLazy!))
                           (opaque *match*/2) never_inline)
                         *match*/2)))
-                *match*/5 =o? (field_mut 0 (field_imm 1 param/1)))
+                *match*/5 =o? (field_mut 0 (mixedfield 1  (?,?) param/1)))
                (if (isint *match*/5) (if *match*/5 12 (exit 3)) (exit 3)))))
         with (3)
          (raise (makeblock 0 (getpredef Match_failure/0!!) [0: "" 1 49])))))

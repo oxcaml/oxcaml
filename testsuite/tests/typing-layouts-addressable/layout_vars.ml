@@ -27,13 +27,13 @@ module type Check = module type of struct
   module F (M : S @ static) = struct
     (* Check that [x addressable = x] when [x] is addressable, for different
        instantiations of the layout variable [x] *)
-    let g1 (a : int64#) (b : int64#) = M.f a b
+    let g1 (a : int64_u) (b : int64_u) = M.f a b
 
     let g2 (a : string) (b : string) = M.f a b
 
     let g3 (a : b8a) (b : b8a) = M.f a b
 
-    let g4 (a : int64#) = M.f a a
+    let g4 (a : int64_u) = M.f a a
   end
 end
 [%%expect{|
@@ -42,17 +42,17 @@ module type Check =
     module F :
       functor (M : S @ static) ->
         sig
-          val g1 : int64# -> int64# -> unit
+          val g1 : int64_u -> int64_u -> unit
           val g2 : string -> string -> unit
           val g3 : b8a -> b8a -> unit
-          val g4 : int64# -> unit
+          val g4 : int64_u -> unit
         end
       @@ stateless
   end
 |}]
 
 (* CR layouts: Inference for addressable is incomplete! These tests show that.
-   See [Jkind.Sort.equate_sort_addressable].
+   See the [Addressable] cases in [Sort.equate].
 
    We should make these complete through "fixing the kind system." *)
 
@@ -135,9 +135,6 @@ Error: The value "b" has type "b8" but an expression was expected of type
 
 (** Inclusion checks with [addressable] **)
 
-(* CR-soon jbachurski: Module coercion errors still show that [moregen]
-   succeeded and will go away soon. *)
-
 (* succeeds *)
 module type Inclusion_narrowing = module type of struct
   module F (M : sig
@@ -147,24 +144,20 @@ module type Inclusion_narrowing = module type of struct
   end = M
 end
 [%%expect{|
-Line 12, characters 8-9:
-12 |   end = M
-             ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ g : 'a -> 'a end
-       is not included in
-         sig val g : layout_ l. ('a : l addressable). 'a -> 'a end
-       Values do not match:
-         val poly_ g : 'a -> 'a
-       is not included in
-         val g : layout_ l. ('a : l addressable). 'a -> 'a
-       The layout parameter at position 1 in the first
-       is instantiated with an unconstrained layout variable,
-       which is not supported yet.
+module type Inclusion_narrowing =
+  sig
+    module F :
+      functor (M : sig val poly_ g : 'a -> 'a end @ static) ->
+        sig val g : layout_ l. ('a : l addressable). 'a -> 'a end
+      @@ stateless
+  end
 |}]
 
 (* fails *)
+(* CR-someday jbachurski: The error message mentions <genvar> because the ['a]
+   comes from a type scheme with a [poly_], which does not introduce named
+   sort variables using [print_with_genvars].
+   That logic should be fixed anyhow so names appear like written by the user. *)
 module type Inclusion_widening = module type of struct
   module F (M : sig
     val g : layout_ x. ('a : x addressable). 'a -> 'a
@@ -186,9 +179,9 @@ Error: Signature mismatch:
        is not included in
          val poly_ g : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's1 addressable
+       The kind of 'a is <genvar> addressable
          because of the definition of g at line 5, characters 4-41.
-       But the kind of 'a must be addressable
+       But the kind of 'a must be a subkind of <genvar> addressable
          because of the definition of g at line 3, characters 4-53.
 |}]
 
@@ -232,20 +225,16 @@ module type Inclusion_incomplete_but_ok = module type of struct
   end = M
 end
 [%%expect{|
-Line 6, characters 8-9:
-6 |   end = M
-            ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b end
-       is not included in
-         sig val g : ('a : bits8 addressable) ('b : bits8). 'a -> 'b end
-       Values do not match:
-         val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b
-       is not included in
-         val g : ('a : bits8 addressable) ('b : bits8). 'a -> 'b
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+module type Inclusion_incomplete_but_ok =
+  sig
+    module F :
+      functor
+        (M : sig
+               val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b
+             end @ static)
+        -> sig val g : ('a : bits8 addressable) ('b : bits8). 'a -> 'b end
+      @@ stateless
+  end
 |}]
 
 (* fine -- correct in this order, since we set [x = bits8 addressable] first *)
@@ -257,22 +246,17 @@ module type Inclusion_incomplete_but_swapped_ok = module type of struct
   end = M
 end
 [%%expect{|
-Line 6, characters 8-9:
-6 |   end = M
-            ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val g : layout_ l. ('a : l) ('b : l addressable). 'a -> 'b end
-       is not included in
-         sig
-           val g :
-             ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
-         end
-       Values do not match:
-         val g : layout_ l. ('a : l) ('b : l addressable). 'a -> 'b
-       is not included in
-         val g : ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+module type Inclusion_incomplete_but_swapped_ok =
+  sig
+    module F :
+      functor
+        (M : sig
+               val g : layout_ l. ('a : l) ('b : l addressable). 'a -> 'b
+             end @ static)
+        ->
+        sig
+          val g : ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
+        end
+      @@ stateless
+  end
 |}]
-

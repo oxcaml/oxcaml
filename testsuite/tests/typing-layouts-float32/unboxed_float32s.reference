@@ -126,7 +126,7 @@ Test 9, record update and mutation:
   b: 4.55
   c: 42.00
   d: 25.00
-Test 10, float32# records in recursive groups.
+Test 10, float32_u records in recursive groups.
   a: 1.10
   b: 2.20
   c: 3.20
@@ -235,7 +235,7 @@ Test 14.1, variant update and mutation:
   d: 25.00
   e: -6.00
   f: -27.10
-Test 15, (float32#+float32) records in recursive groups:
+Test 15, (float32_u+float32) records in recursive groups:
   a: 1.10
   b: 2.00
   c: 3.30
@@ -311,7 +311,7 @@ Test 17, record update and mutation:
   d: 25.00
   e: -6
   f: -27.10
-Test 18, (float32#+imm) records in recursive groups:
+Test 18, (float32_u+imm) records in recursive groups:
   a: 1.10
   b: 2
   c: 3.30

@@ -51,7 +51,8 @@ let is_renamed_version_of t t' =
   && Variable.is_renamed_version_of t.var t'.var
 
 let apply_renaming t renaming =
-  with_var t (Renaming.apply_variable renaming t.var)
+  let var' = Renaming.apply_variable renaming t.var in
+  if t.var == var' then t else with_var t var'
 
 let free_names t = Name_occurrences.singleton_variable t.var t.name_mode
 
@@ -63,3 +64,7 @@ let renaming { var; debug_uid = _; name_mode = _ } ~guaranteed_fresh =
     guaranteed_fresh
   in
   Renaming.add_fresh_variable Renaming.empty var ~guaranteed_fresh
+
+let import_and_rename t renaming =
+  let renaming, var = Renaming.bind_variable renaming t.var in
+  renaming, with_var t var

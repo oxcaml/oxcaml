@@ -85,6 +85,16 @@ val include_dirs : visible_include list ref
 val hidden_include_dirs : string list ref
 val include_manifests : string list ref
 val hidden_include_manifests : string list ref
+
+type hidden_include_file =
+  { basename : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+val hidden_include_files : hidden_include_file list ref
+val parse_hidden_include_file :
+  cmx_guaranteed:bool -> string -> (hidden_include_file, string) result
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref
@@ -158,6 +168,7 @@ val recursive_types : bool ref
 val strict_sequence : bool ref
 val strict_formats : bool ref
 val applicative_functors : bool ref
+val typing_recovery : bool ref
 val make_runtime : bool ref
 val c_compiler : string option ref
 val no_auto_link : bool ref
@@ -180,7 +191,6 @@ val dump_parsetree : bool ref
 val dump_typedtree : bool ref
 val dump_shape : bool ref
 val dump_tlambda : bool ref
-val dump_slambda : bool ref
 val dump_matchcomp : bool ref
 val dump_rawlambda : bool ref
 val dump_lambda : bool ref
@@ -200,8 +210,36 @@ val dump_cse : bool ref
 val dump_linear : bool ref
 val debug_ocaml : bool ref
 val keep_startup_file : bool ref
-val native_code : bool ref
-val jsir : bool ref
+
+module Target : sig
+  type t =
+    | Bytecode
+    | Native
+    | Js_of_ocaml
+end
+
+val set_target : Target.t -> unit
+val target_is_native : unit -> bool
+val target_is_jsir : unit -> bool
+
+(** The js_of_ocaml invocations of [ocamlopt -target js_of_ocaml] that options
+    can be passed through to, with [-jsoo-opt-<phase>] (and [-jsoo-opt] for all
+    of them):
+    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo];
+    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([-a]);
+    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
+    - [Link]: [js_of_ocaml link], when linking an executable. *)
+module Jsoo_phase : sig
+  type t = All | Compile | Archive | Runtime | Link
+
+  val all : t list
+
+  (** The command-line flag, e.g. [-jsoo-opt-compile]. *)
+  val flag : t -> string
+end
+
+(** The options given for a phase, most recent first. *)
+val jsoo_opts : Jsoo_phase.t -> string list ref
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref
@@ -285,6 +323,10 @@ val dump_dir : string option ref
 
 val keyword_edition: string option ref
 val parse_keyword_edition: string -> (int*int) option * string list
+
+(** Whether quotation syntax is lexed in a file that has not yet used the
+    [#syntax quotations] directive. Defaults to the configure-time setting. *)
+val syntax_quotations : bool ref
 
 (* Support for flags that can also be set from an environment variable *)
 type 'a env_reader = {
@@ -433,6 +475,8 @@ val ddissector_sizes : bool ref
 val ddissector_verbose : bool ref
 val ddissector_partitions : bool ref
 val ddissector_inputs : string option ref
+
+val stubs_forward_inlining : bool ref
 
 val prepend_directory : string -> string
 

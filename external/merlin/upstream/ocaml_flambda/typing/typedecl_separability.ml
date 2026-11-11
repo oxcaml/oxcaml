@@ -53,11 +53,16 @@ let structure : type_definition -> type_structure = fun def ->
   | Type_abstract _, _ ->
       begin match def.type_manifest with
       | None -> Abstract
-      | Some type_expr -> Synonym type_expr
+      | Some type_expr ->
+          if !Clflags.typing_recovery
+          && Typing_recovery.erroneous_type_check type_expr
+          then Abstract
+          else Synonym type_expr
       end
   | (Type_record _ | Type_variant _), None -> Algebraic
   | Type_record_unboxed_product _, None -> Algebraic
-  | (Type_record _ | Type_record_unboxed_product _ | Type_variant _), Some (ty, _) ->
+  | (Type_record _ | Type_record_unboxed_product _ | Type_variant _),
+    Some (ty, _, _) ->
       let params =
         match def.type_kind with
         | Type_variant ([{cd_res = Some ret_type}], _, _) ->

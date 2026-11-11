@@ -8,8 +8,6 @@ let code loopify(never) size(4) newer_version_of(main_0)
   let tagged_scrutinee = %tag_imm (prim) in
   cont k (tagged_scrutinee)
 in
-let $camlN_way_join_null__main_1 =
-  closure main_0_1 @main &toplevel.alloc_region
-in
+let $camlN_way_join_null__main_1 = closure main_0_1 @main &toplevel in
 let $camlN_way_join_null = Block 0 ($camlN_way_join_null__main_1) in
 cont done ($camlN_way_join_null)

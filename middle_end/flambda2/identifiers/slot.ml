@@ -19,12 +19,9 @@ module type S = sig
 
   module Lmap : Lmap.S with type key = t
 
-  val create :
-    Compilation_unit.t ->
-    name:string ->
-    is_always_immediate:bool ->
-    Flambda_kind.t ->
-    t
+  type payload
+
+  val create : Compilation_unit.t -> name:string -> payload -> t
 
   val get_compilation_unit : t -> Compilation_unit.t
 
@@ -36,25 +33,36 @@ module type S = sig
 
   val name : t -> string
 
+  val stamp : t -> int
+
   val canonical_name : t -> string
 
-  val kind : t -> Flambda_kind.t
-
-  val is_always_immediate : t -> bool
+  val payload : t -> payload
 
   val rename : t -> t
+
+  type stamp_state
+
+  val export_stamp_state : unit -> stamp_state
+
+  val restore_stamp_state : stamp_state -> unit
+
+  val merge_stamp_state : stamp_state -> stamp_state -> stamp_state
 end
 
 module Make (P : sig
   val colour : Format.formatter -> unit
-end) : S = struct
+
+  type payload
+
+  val print_payload : Format.formatter -> payload -> unit
+end) : S with type payload := P.payload = struct
   type t =
     { compilation_unit : Compilation_unit.t;
       name : string;
       name_stamp : int;
           (** [name_stamp]s are unique within any given compilation unit. *)
-      kind : Flambda_kind.t;
-      is_always_immediate : bool
+      payload : P.payload
     }
 
   module Self = Container_types.Make (struct
@@ -64,14 +72,12 @@ end) : S = struct
         ({ compilation_unit = compilation_unit1;
            name = _;
            name_stamp = name_stamp1;
-           kind = _;
-           is_always_immediate = _
+           payload = _
          } as t1)
         ({ compilation_unit = compilation_unit2;
            name = _;
            name_stamp = name_stamp2;
-           kind = _;
-           is_always_immediate = _
+           payload = _
          } as t2) =
       if t1 == t2
       then 0
@@ -88,14 +94,13 @@ end) : S = struct
 
     let print ppf t =
       Format.fprintf ppf "@[%t(" P.colour;
-      if Compilation_unit.equal t.compilation_unit (Current_unit.get_cu_exn ())
+      if Current_unit.is_current t.compilation_unit
       then Format.fprintf ppf "%s/%d" t.name t.name_stamp
       else
         Format.fprintf ppf "%a.%s/%d"
           (Format_doc.compat Compilation_unit.print)
           t.compilation_unit t.name t.name_stamp;
-      Format.fprintf ppf " @<1>\u{2237} %a%s" Flambda_kind.print t.kind
-        (if t.is_always_immediate then "(immediate)" else "");
+      P.print_payload ppf t.payload;
       Format.fprintf ppf ")%t@]" Flambda_colours.pop
   end)
 
@@ -114,13 +119,22 @@ end) : S = struct
     incr next_stamp;
     stamp
 
-  let create compilation_unit ~name ~is_always_immediate kind =
-    { compilation_unit;
-      name;
-      name_stamp = get_next_stamp ();
-      kind;
-      is_always_immediate
-    }
+  type stamp_state = int
+
+  let export_stamp_state () = !next_stamp
+
+  let restore_stamp_state state =
+    if !next_stamp = 0
+    then next_stamp := state
+    else
+      Misc.fatal_errorf
+        "Restoring slot stamp state would overwrite modified value %d"
+        !next_stamp
+
+  let merge_stamp_state stamp1 stamp2 = Int.max stamp1 stamp2
+
+  let create compilation_unit ~name payload =
+    { compilation_unit; name; name_stamp = get_next_stamp (); payload }
 
   let get_compilation_unit t = t.compilation_unit
 
@@ -133,11 +147,11 @@ end) : S = struct
 
   let name t = t.name
 
+  let stamp t = t.name_stamp
+
   let canonical_name t = if !Clflags.canonical_ids then name t else to_string t
 
-  let kind t = t.kind
-
-  let is_always_immediate t = t.is_always_immediate
+  let payload t = t.payload
 
   let rename t = { t with name_stamp = get_next_stamp () }
 end

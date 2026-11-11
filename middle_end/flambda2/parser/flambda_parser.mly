@@ -137,6 +137,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_END   [@symbol "end"]
 %token KWD_ERROR [@symbol "error"]
 %token KWD_EXN   [@symbol "exn"]
+%token KWD_FAT_PTR [@symbol "fat_ptr"]
 %token KWD_FLOAT [@symbol "float"]
 %token KWD_FLOAT32 [@symbol "float32"]
 %token KWD_HCF   [@symbol "halt_and_catch_fire"]
@@ -318,7 +319,9 @@ code:
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
         params_and_body = { params; closure_var; region_vars; depth_var;
                             ret_cont; exn_cont; body };
-        code_size; is_tupled; stub; loopify; result_mode; } }
+        code_size; is_tupled; stub; loopify; result_mode;
+        (* CR yusumez: parse FDO annotations *)
+        fdo_entry_annotation = None; } }
 ;
 
 code_header:
@@ -505,7 +508,9 @@ nonconst_ctors_nonempty:
   | ctors = separated_nonempty_list(PIPE, nonconst_ctor) { ctors }
 ;
 nonconst_ctor:
-  | tag = tag; KWD_OF; kinds = kinds_with_subkinds_nonempty { tag, kinds }
+  | tag = tag; KWD_OF; kinds = kinds_with_subkinds_nonempty
+      { tag, Some kinds }
+  | tag = tag; KWD_OF; KWD_ANY { tag, None }
 ;
 return_arity:
   | { None }
@@ -562,9 +567,9 @@ inlined_expr:
 ;
 
 atomic_expr:
-  | KWD_HCF { Invalid { message = "halt-and-catch-fire" } }
-  | KWD_UNREACHABLE { Invalid { message =  "treat-as-unreachable" } }
-  | KWD_INVALID; message = STRING { Invalid { message } }
+  | KWD_HCF { Invalid }
+  | KWD_UNREACHABLE { Invalid }
+  | KWD_INVALID { Invalid }
   | KWD_CONT; ac = apply_cont_expr { Apply_cont ac }
   | KWD_APPLY e = apply_expr { Apply e }
   | LPAREN; e = expr; RPAREN { e }
@@ -660,8 +665,10 @@ call_kind:
       alloc = alloc_mode_for_applications;
     RPAREN
     { (Function (Direct { code_id; function_slot; }), alloc) }
-  | KWD_CCALL; noalloc = boption(KWD_NOALLOC); AMP; alloc_region = region
-    { (C_call { alloc = not noalloc },
+  | KWD_CCALL; noalloc = boption(KWD_NOALLOC);
+    fat_ptr_arg_starts = loption(fat_ptr_arg_starts); AMP;
+    alloc_region = region
+    { (C_call { alloc = not noalloc; fat_ptr_arg_starts },
       (Not_alloc_stack { alloc_region }
         : region alloc_mode_for_applications)) }
   | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN;
@@ -711,13 +718,7 @@ loopify:
 
 region:
   | v = variable { Named v }
-  | KWD_TOPLEVEL; DOT; i = IDENT {
-    match i with
-    | "alloc_region" -> Toplevel_alloc_region
-    | "region" -> Toplevel_region
-    | "ghost_region" -> Toplevel_ghost_region
-    | _ -> Misc.fatal_errorf "toplevel. must be followed \
-      by alloc_region, region or ghost_region" }
+  | KWD_TOPLEVEL { Toplevel_alloc_region }
 ;
 
 result_continuation:
@@ -899,6 +900,11 @@ tag:
 
 plain_int:
   i = INT { make_plain_int i }
+;
+
+fat_ptr_arg_starts:
+  | KWD_FAT_PTR; LPAREN; starts = separated_list(COMMA, plain_int); RPAREN
+    { starts }
 ;
 
 field_of_block:

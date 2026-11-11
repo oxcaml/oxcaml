@@ -16,21 +16,21 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
-type t = float32#
+type t = float32_u
 
 external box_float : float# -> (float[@local_opt]) @@ portable = "%box_float"
 
 external unbox_float : (float[@local_opt]) -> float# @@ portable
   = "%unbox_float"
 
-external box_int32 : int32# -> (int32[@local_opt]) @@ portable = "%box_int32"
+external box_int32 : int32_u -> (int32[@local_opt]) @@ portable = "%box_int32"
 
-external unbox_int32 : (int32[@local_opt]) -> int32# @@ portable
+external unbox_int32 : (int32[@local_opt]) -> int32_u @@ portable
   = "%unbox_int32"
 
-external box_int64 : int64# -> (int64[@local_opt]) @@ portable = "%box_int64"
+external box_int64 : int64_u -> (int64[@local_opt]) @@ portable = "%box_int64"
 
-external unbox_int64 : (int64[@local_opt]) -> int64# @@ portable
+external unbox_int64 : (int64[@local_opt]) -> int64_u @@ portable
   = "%unbox_int64"
 
 external to_float32 : t -> (float32[@local_opt]) @@ portable = "%box_float32"
@@ -224,13 +224,13 @@ module Bigstring = struct
 
   type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
-  external get : t -> pos:int -> float32# @@ portable
+  external get : t -> pos:int -> float32_u @@ portable
     = "%caml_bigstring_getf32#"
-  external unsafe_get : t -> pos:int -> float32# @@ portable
+  external unsafe_get : t -> pos:int -> float32_u @@ portable
     = "%caml_bigstring_getf32u#"
-  external set : t -> pos:int -> float32# -> unit @@ portable
+  external set : t -> pos:int -> float32_u -> unit @@ portable
     = "%caml_bigstring_setf32#"
-  external unsafe_set : t -> pos:int -> float32# -> unit @@ portable
+  external unsafe_set : t -> pos:int -> float32_u -> unit @@ portable
     = "%caml_bigstring_setf32u#"
 end
 

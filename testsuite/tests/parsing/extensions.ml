@@ -26,6 +26,8 @@ let [%foo: include S with type t = t ]
 
 [%%foo _ ~_ ~_:_ ?_ ?_:_ _]
 
+[%%foo module M = _]
+
 (* TEST
  flags = "-dparsetree";
  ocamlc_byte_exit_status = "2";

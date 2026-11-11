@@ -70,6 +70,8 @@ type abstract_non_value_type_constr = [
   | `Idx_imm
   | `Idx_mut
   | `Idx_atomic
+  | `Addr
+  | `Addr_imm
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -138,6 +140,8 @@ let base_type_constrs : type_constr list = [
   `Idx_imm;
   `Idx_mut;
   `Idx_atomic;
+  `Addr;
+  `Addr_imm;
 ]
 
 let or_null_extension_type_constrs : type_constr list = [
@@ -159,9 +163,6 @@ let simd_stable_extension_type_constrs : type_constr list = [
   `Float16x16;
   `Float32x8;
   `Float64x4;
-]
-
-let simd_beta_extension_type_constrs : type_constr list = [
   `Int8x64;
   `Int16x32;
   `Int32x16;
@@ -194,7 +195,6 @@ let all_type_constrs = (
   @ or_null_extension_type_constrs
   @ small_number_extension_type_constrs
   @ simd_stable_extension_type_constrs
-  @ simd_beta_extension_type_constrs
   @ metaprogramming_extension_type_constrs
 )
 
@@ -240,6 +240,8 @@ and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
 and ident_idx_atomic = ident_create "idx_atomic"
+and ident_addr = ident_create "addr"
+and ident_addr_imm = ident_create "addr_imm"
 
 and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
@@ -305,6 +307,8 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
   | `Idx_atomic -> ident_idx_atomic
+  | `Addr -> ident_addr
+  | `Addr_imm -> ident_addr_imm
   | `Int8x16 -> ident_int8x16
   | `Int16x8 -> ident_int16x8
   | `Int32x4 -> ident_int32x4
@@ -366,6 +370,8 @@ and path_unativeint_u = Pident ident_unativeint_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_idx_atomic = Pident ident_idx_atomic
+and path_addr = Pident ident_addr
+and path_addr_imm = Pident ident_addr_imm
 and path_expr = Pident ident_expr
 and path_eval = Pident ident_eval
 and path_box = Pident ident_box
@@ -398,14 +404,10 @@ and path_mask = Pident ident_mask
 let path_unboxed_float = Path.unboxed_version path_float
 and path_unboxed_unit = Path.unboxed_version path_unit
 and path_unboxed_bool = Path.unboxed_version path_bool
-and path_unboxed_float32 = Path.unboxed_version path_float32
-and path_unboxed_nativeint = Path.unboxed_version path_nativeint
 and path_unboxed_char = Path.unboxed_version path_char
 and path_unboxed_int = Path.unboxed_version path_int
 and path_unboxed_int8 = Path.unboxed_version path_int8
 and path_unboxed_int16 = Path.unboxed_version path_int16
-and path_unboxed_int32 = Path.unboxed_version path_int32
-and path_unboxed_int64 = Path.unboxed_version path_int64
 
 and path_unboxed_int8x16 = Path.unboxed_version path_int8x16
 and path_unboxed_int16x8 = Path.unboxed_version path_int16x8
@@ -464,10 +466,6 @@ and type_expr t = tconstr path_expr [t]
 and type_unboxed_unit = tconstr path_unboxed_unit []
 and type_unboxed_bool = tconstr path_unboxed_bool []
 and type_unboxed_float = tconstr path_unboxed_float []
-and type_unboxed_float32 = tconstr path_unboxed_float32 []
-and type_unboxed_nativeint = tconstr path_unboxed_nativeint []
-and type_unboxed_int32 = tconstr path_unboxed_int32 []
-and type_unboxed_int64 = tconstr path_unboxed_int64 []
 and type_unboxed_char = tconstr path_unboxed_char []
 and type_unboxed_int = tconstr path_unboxed_int []
 and type_unboxed_int8 = tconstr path_unboxed_int8 []
@@ -485,6 +483,8 @@ and type_or_null t = tconstr path_or_null [t]
 and type_idx_imm t1 t2 = tconstr path_idx_imm [t1; t2]
 and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
 and type_idx_atomic t1 t2 = tconstr path_idx_atomic [t1; t2]
+and type_addr t = tconstr path_addr [t]
+and type_addr_imm t = tconstr path_addr_imm [t]
 
 and type_int8x16 = tconstr path_int8x16 []
 and type_int16x8 = tconstr path_int16x8 []
@@ -601,14 +601,21 @@ let all_predef_constrs = [
   ident_this;
 ]
 
-let option_argument_sort = Jkind_types.Sort.Const.scannable
-let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
+let option_argument_sort = None
+let option_argument_jkind = Jkind.Builtin.any ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
+
+(* The jkind of an optional argument, as opposed to
+   [option_argument_jkind], the jkind of the argument to the [option]
+   type. *)
+(* CR-soon lmaurer: Consider removing this or [option_argument_jkind] now that
+   they're the same. *)
+let optional_argument_jkind = option_argument_jkind
 
 let unrestricted tvar ca_sort =
   {
     ca_type=tvar;
-    ca_sort=Jkind_types.Sort.Const.some ca_sort;
+    ca_sort;
     ca_modalities=Mode.Modality.Const.id;
     ca_loc=Location.none
   }
@@ -628,9 +635,9 @@ let list_jkind param =
   Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param |>
   Jkind.mark_best
 
-let list_sort = Jkind_types.Sort.Const.scannable
-let list_argument_sort = Jkind_types.Sort.Const.scannable
-let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
+let list_sort = Jkind_types.Sort.Const.(some scannable)
+let list_argument_sort = None
+let list_argument_jkind = Jkind.Builtin.any ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
 let ikind_of_jkind_ref :
@@ -656,7 +663,7 @@ let add_predef_jkinds add_jkind env =
     (fun env (id, jkind) -> add_jkind id jkind env) env
     predef_jkinds
 
-let or_null_argument_sort = Jkind_types.Sort.Const.scannable
+let or_null_argument_sort = Jkind_types.Sort.Const.(some scannable)
 
 let or_null_jkind param =
   Jkind.Const.Builtin.value_or_null_mod_everything
@@ -838,20 +845,11 @@ let decl_of_type_constr type_constr =
   | `Floatarray ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.mutable_data) ()
   | `Nativeint ->
-    decl0
-      ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_nativeint
-      ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Int32 ->
-    decl0
-      ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
-      ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Int64 ->
-    decl0
-      ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int64
-      ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Extension_constructor ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Bool ->
@@ -939,17 +937,13 @@ let decl_of_type_constr type_constr =
       ~jkind:(fun _ -> Jkind.for_non_float ~why:(Primitive ident_lazy_t))
       ()
   | `Nativeint_u ->
-    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_nativeint)
-      ~manifest:(tconstr (Path.unboxed_version path_nativeint) []) ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_nativeint) ()
   | `Int32_u ->
-    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int32)
-      ~manifest:(tconstr (Path.unboxed_version path_int32) []) ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int32) ()
   | `Int64_u ->
-    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64)
-      ~manifest:(tconstr (Path.unboxed_version path_int64) []) ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64) ()
   | `Float32_u ->
-    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_float32)
-      ~manifest:(tconstr (Path.unboxed_version path_float32) []) ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_float32) ()
   (* The unboxed unsigned integer types are abstract: they support no
      operations and exist only to be distinct from their signed
      counterparts, e.g. for use as GADT indices. *)
@@ -1001,12 +995,42 @@ let decl_of_type_constr type_constr =
            position = 1;
            arity = 2;
          }),
-         Jkind.Builtin.value_or_null ~why:(Type_argument {
+         Jkind.Builtin.any ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_atomic;
            position = 2;
            arity = 2;
          }))
        ~jkind:(builtin2 Jkind.Const.Builtin.kind_of_idx)
+       ()
+  | `Addr ->
+    decl1 ~variance:Variance.full
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_addr;
+           position = 1;
+           arity = 1;
+         }))
+       ~jkind:(fun param ->
+         builtin Jkind.Const.Builtin.kind_of_addr |>
+         Jkind.add_with_bounds
+           ~modality:(Typemode.address_modalities (Mutable {
+             mode = Mode.With_regionality.Comonadic.legacy;
+             atomic = Nonatomic }))
+           ~type_expr:param)
+       ()
+  | `Addr_imm ->
+    decl1 ~variance:Variance.covariant
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_addr_imm;
+           position = 1;
+           arity = 1;
+         }))
+       ~jkind:(fun param ->
+         builtin Jkind.Const.Builtin.kind_of_addr_imm |>
+         Jkind.add_with_bounds
+           ~modality:(Typemode.address_modalities Immutable)
+           ~type_expr:param)
        ()
   | `Lexing_position ->
     decl0
@@ -1153,8 +1177,7 @@ let decl_of_type_constr type_constr =
     decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_mask ()
   | `Float32 ->
-    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_float32 ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Int8 ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.immediate)
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int8 ()
@@ -1268,10 +1291,7 @@ let add_simd_stable_extension_types add_type env =
     add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
   ) env simd_stable_extension_type_constrs
 
-let add_simd_beta_extension_types add_type env =
-  List.fold_left (fun env tconstr ->
-    add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
-  ) env simd_beta_extension_type_constrs
+let add_simd_beta_extension_types _add_type env = env
 
 let add_simd_alpha_extension_types _add_type env = env
 

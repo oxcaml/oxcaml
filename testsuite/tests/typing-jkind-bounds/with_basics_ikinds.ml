@@ -1184,6 +1184,9 @@ Error: This type "(int, int) t" should be an instance of type
 
 type ('a, 'b) t_test = ('a, 'b) t require_contended
 [%%expect {|
+type ('a : value mod contended, 'b : value mod contended) t_test =
+    ('a, 'b) t require_contended
+|}, Principal{|
 Line 1, characters 23-33:
 1 | type ('a, 'b) t_test = ('a, 'b) t require_contended
                            ^^^^^^^^^^
@@ -1558,4 +1561,15 @@ type 'k t2 = { x : 'k t1; }
 type packed = T : 'a t2 -> packed [@@unboxed]
 type q = { x : packed; }
 module type S = sig type t = q end
+|}]
+
+type 'a middle_bound_gadt =
+  | Middle : ('b : value mod shareable). 'b -> 'b middle_bound_gadt
+
+type middle_bound_gadt_int : value mod portable = int middle_bound_gadt
+
+[%%expect{|
+type 'a middle_bound_gadt =
+    Middle : ('b : value mod shareable). 'b -> 'b middle_bound_gadt
+type middle_bound_gadt_int = int middle_bound_gadt
 |}]

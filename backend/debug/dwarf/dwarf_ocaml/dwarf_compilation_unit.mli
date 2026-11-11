@@ -27,4 +27,5 @@ val add_code_ranges_to_compile_unit_proto_die :
   code_layout:Dwarf_state.code_layout ->
   ranges:Dwarf_state.function_range list ->
   debug_ranges_table:Debug_ranges_table.t ->
+  range_list_table:Range_list_table.t ->
   unit

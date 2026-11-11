@@ -12,6 +12,6 @@
   (:standard -no-principal -w -27-32))
  (libraries utils))
 (tests
- (names check_prologue_validation)
- (modules check_prologue_validation)
+ (names check_prologue_validation check_cfg_analysis_validation)
+ (modules check_prologue_validation check_cfg_analysis_validation)
  (libraries utils))

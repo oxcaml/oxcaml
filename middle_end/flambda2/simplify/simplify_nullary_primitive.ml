@@ -37,10 +37,11 @@ let simplify_nullary_primitive dacc original_prim (prim : P.nullary_primitive)
     in
     let dacc = DA.add_variable dacc result_var ty in
     Simplify_primitive_result.create named ~try_reify:false dacc
-  | Enter_inlined_apply { dbg } ->
+  | Enter_inlined_apply { dbg; inlined_attribute } ->
     let dacc =
       DA.map_denv dacc ~f:(fun denv ->
-          DE.merge_inlined_debuginfo denv ~from_apply_expr:dbg)
+          DE.merge_inlined_debuginfo_and_forward_inlined_attribute denv
+            ~from_apply_expr:dbg ~inlined_attribute)
     in
     let machine_width = DE.machine_width (DA.denv dacc) in
     let named = Named.create_simple (Simple.const_unit machine_width) in
@@ -60,6 +61,11 @@ let simplify_nullary_primitive dacc original_prim (prim : P.nullary_primitive)
   | Domain_index ->
     let named = Named.create_prim original_prim dbg in
     let ty = T.any_naked_immediate in
+    let dacc = DA.add_variable dacc result_var ty in
+    Simplify_primitive_result.create named ~try_reify:false dacc
+  | Thread_self_id ->
+    let named = Named.create_prim original_prim dbg in
+    let ty = T.any_tagged_immediate in
     let dacc = DA.add_variable dacc result_var ty in
     Simplify_primitive_result.create named ~try_reify:false dacc
   | Poll ->

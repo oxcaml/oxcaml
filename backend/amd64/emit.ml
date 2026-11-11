@@ -46,10 +46,6 @@ module L = Asm_targets.Asm_label
 (* Name of current function *)
 let function_name = ref ""
 
-(* Keep the name of the current block section to get back to it after emitting
-   data. *)
-let current_basic_block_section = ref ""
-
 (* These callbacks are just instrumentation for expect_asm tests. *)
 let expect_asm_callbacks = ref []
 
@@ -62,8 +58,6 @@ let asm_collected_for_expect_asm = ref []
 let expect_asm_whole_function = ref false
 
 let register_expect_asm_callback f =
-  (* Reset label counter to make assembly more predictable. *)
-  Label.reset ();
   expect_asm_callbacks := f :: !expect_asm_callbacks
 
 let invoke_expect_asm_callbacks () =
@@ -382,7 +376,7 @@ let load_symbol_addr (s : Cmm.symbol) arg =
 (* Output .text section directive, or named .text.caml.<name> if enabled and
    supported on the target system. *)
 
-let emit_named_text_section ?(suffix = "") func_name =
+let emit_named_text_section func_name =
   (* CR-someday ksvetlitski: In the future we should consider extending this to
      also place other known-cold functions in a separate section (specifically
      [.text.unlikely.caml]). This would necessitate adding a new constructor to
@@ -412,7 +406,7 @@ let emit_named_text_section ?(suffix = "") func_name =
          specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
-  else if !Clflags.function_sections || !Oxcaml_flags.basic_block_sections
+  else if !Clflags.function_sections
   then (
     match[@ocaml.warning "-4"] system with
     | S_macosx
@@ -424,9 +418,7 @@ let emit_named_text_section ?(suffix = "") func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      let name =
-        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
-      in
+      let name = Printf.sprintf ".text.caml.%s" (emit_symbol func_name) in
       D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
       Emitaux.enter_code_section name;
@@ -441,29 +433,6 @@ let emit_named_text_section ?(suffix = "") func_name =
     (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
        function boundaries need not break delta chains. *)
     Emitaux.enter_code_section ".text")
-
-let emit_function_or_basic_block_section_name () =
-  let suffix =
-    if String.length !current_basic_block_section = 0
-    then ""
-    else "." ^ !current_basic_block_section
-  in
-  emit_named_text_section !function_name ~suffix
-
-let emit_Llabel fallthrough lbl section_name =
-  (if !Oxcaml_flags.basic_block_sections
-   then
-     match section_name with
-     | Some name ->
-       if not (String.equal name !current_basic_block_section)
-       then (
-         current_basic_block_section := name;
-         D.cfi_endproc ();
-         emit_function_or_basic_block_section_name ();
-         D.cfi_startproc ())
-     | None -> ());
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
-  D.define_label lbl
 
 (* Output a pseudo-register *)
 
@@ -821,6 +790,41 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
        }
        :: !stack_realloc
 
+(* Probe the prospective stack frame at [Domainstate.stack_guard_stride]-byte
+   strides, descending, so that a frame big enough to step over the stack's
+   guard page faults in it instead; the SEGV handler raises [Stack_overflow].
+   Used instead of [emit_stack_check] when stack checks are disabled. The probes
+   touch but do not change memory. Since a shrink-wrapped prologue may already
+   have moved %rsp by up to a page, we start probing at offset zero. We unroll
+   up to four strides; beyond that we generate a loop. *)
+let emit_stack_probes ~size_in_bytes ~save_registers =
+  let stride = Domainstate.stack_guard_stride in
+  assert (stride > 0 && size_in_bytes >= stride);
+  let full_strides = size_in_bytes / stride in
+  let probe ofs = I.or_ (int 0) (mem64 QWORD (-ofs) (Scalar RSP)) in
+  let max_unrolled_strides = 4 in
+  if full_strides <= max_unrolled_strides
+  then (
+    probe 0;
+    for i = 1 to full_strides do
+      probe (i * stride)
+    done)
+  else (
+    (* [r10] may be live here unless this is the function's first instruction
+       (cf. [Proc.destroyed_at_basic]); the push doubles as the anchoring probe,
+       and [bias] keeps the probed addresses the same either way. *)
+    if save_registers then push r10 else probe 0;
+    let bias = if save_registers then 8 else 0 in
+    let lbl = L.create Text in
+    I.mov (int (-(stride - bias))) r10;
+    D.define_label lbl;
+    I.or_ (int 0) (mem64 QWORD ~base:RSP 0 (Scalar R10));
+    I.sub (int stride) r10;
+    I.cmp (int (-(full_strides * stride) + bias)) r10;
+    I.j GE (emit_asm_label_arg lbl);
+    if save_registers then pop r10);
+  if size_in_bytes mod stride <> 0 then probe size_in_bytes
+
 (* Record jump tables *)
 type jump_table =
   { table_lbl : L.t;
@@ -877,7 +881,8 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
+  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Inot | Iclz | Ictz | Icomp _ ->
+    assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -1750,9 +1755,17 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
       then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
       else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
   | V256_of_vec Vec512 ->
-    if distinct then I.simd vmovupd_Y_Ym256 [| argY i 0; res i 0 |]
+    if distinct
+    then
+      if Reg.is_stack i.res.(0)
+      then I.simd vmovupd_Ym256_Y [| argY i 0; res i 0 |]
+      else I.simd vmovupd_Y_Ym256 [| argY i 0; res i 0 |]
   | V512_of_vec (Vec128 | Vec256 | Vec512) ->
-    if distinct then I.simd vmovupd_Z_Zm512 [| argZ i 0; res i 0 |]
+    if distinct
+    then
+      if Reg.is_stack i.res.(0)
+      then I.simd vmovupd_Zm512_Z [| argZ i 0; res i 0 |]
+      else I.simd vmovupd_Z_Zm512 [| argZ i 0; res i 0 |]
   | Float_of_int64 | Int64_of_float -> movq (arg i 0) (res i 0)
   | Float32_of_int32 -> movd (arg32 i 0) (res i 0)
   | Int32_of_float32 -> movd (arg i 0) (res32 i 0)
@@ -1880,28 +1893,33 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   assert (res_used = Array.length instr.res);
   (* Gathers require that all args are distinct registers. *)
-  match[@warning "-4"] simd.id with
-  | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
-  | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
-  | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
+  if
+    String.starts_with ~prefix:"vpgather" simd.mnemonic
+    || String.starts_with ~prefix:"vgather" simd.mnemonic
+  then
     let module Set = Reg.UsingLocEquality.Set in
     let set = Array.fold_right Set.add instr.arg Set.empty in
     assert (Set.cardinal set = Array.length instr.arg)
-  | _ -> ()
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
+  | Some R128 -> arg_as_xmm (arg instr i)
+  | Some R256 -> arg_as_ymm (arg instr i)
+  | Some R512 -> arg_as_zmm (arg instr i)
+  | Some R64 | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> res instr i
+  | Some R128 -> arg_as_xmm (res instr i)
+  | Some R256 -> arg_as_ymm (res instr i)
+  | Some R512 -> arg_as_zmm (res instr i)
+  | Some R64 | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -1955,7 +1973,10 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
             let n = num_args_addressing mode in
             let typ = to_addr_width arg.loc in
             let address = addressing mode typ instr idx in
-            emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
+            (* We do not sanitize masked loads and stores, which only access the
+               unmasked elements. *)
+            if not (Simd.instr_expects_mask simd)
+            then emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
             idx + n, address :: args
           | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
       (0, []) simd.args
@@ -2029,11 +2050,11 @@ let emit_simd ?mode (op : Simd.operation) instr =
       emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestz | Vptestz_X | Vptestz_Y ->
+    | Ptestz | Vptestz_X | Vptestz_Y | Kflag Zf ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestc | Vptestc_X | Vptestc_Y ->
+    | Ptestc | Vptestc_X | Vptestc_Y | Kflag Cf ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
@@ -2050,6 +2071,11 @@ let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
 let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
+
+let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
+  let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
+  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  D.define_label lbl
 
 (* Emit an instruction *)
 let emit_instr ~first ~last ~fallthrough i =
@@ -2200,7 +2226,23 @@ let emit_instr ~first ~last ~fallthrough i =
     else (
       add_used_symbol func.sym_name;
       emit_jump func)
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; ty_args; _ }) ->
+    (* Fuse each fat-pointer argument, adding its offset register into its base
+       register, as part of emitting the call itself, so no GC safepoint can
+       separate the addition from the call. *)
+    let (_ : int) =
+      List.fold_left
+        (fun k (ty_arg : Cmm.exttype) ->
+          match ty_arg with
+          | XFat_pointer ->
+            I.add (arg i (k + 1)) (arg i k);
+            k + 2
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 ->
+            k + 1
+          | XDummy_int | XDummy_float -> k)
+        0 ty_args
+    in
     add_used_symbol func;
     if stack_ofs > 0
     then (
@@ -2434,6 +2476,7 @@ let emit_instr ~first ~last ~fallthrough i =
     when Reg.equal_location i.arg.(1).loc i.res.(0).loc && Reg.is_reg i.res.(0)
     ->
     I.xor (res32 i 0) (res32 i 0)
+  | Lop (Intop Inot) -> I.not_ (res i 0)
   | Lop (Intop (Idiv { signed = true } | Imod { signed = true })) ->
     I.cqo ();
     I.idiv (arg i 1)
@@ -2683,11 +2726,14 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Dls_get -> I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
   | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
+  | Lop Thread_self_id ->
+    I.mov (domain_field Domainstate.Domain_thread_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
-  | Llabel { label = lbl; section_name } ->
-    let lbl = label_to_asm_label ~section:Text lbl in
-    emit_Llabel fallthrough lbl section_name
+  | Llabel_for_jump_target label ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:false label
+  | Llabel_for_dwarf label ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:true label
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
     emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))
@@ -2773,9 +2819,14 @@ let emit_instr ~first ~last ~fallthrough i =
       I.pop r11;
       I.jmp r11)
   | Lstackcheck { max_frame_size_bytes } ->
-    emit_stack_check ~size_in_bytes:max_frame_size_bytes
-      ~save_registers:(not first)
-      ~save_simd:(must_save_simd_regs i.live)
+    if Config.no_stack_checks
+    then
+      emit_stack_probes ~size_in_bytes:max_frame_size_bytes
+        ~save_registers:(not first)
+    else
+      emit_stack_check ~size_in_bytes:max_frame_size_bytes
+        ~save_registers:(not first)
+        ~save_simd:(must_save_simd_regs i.live)
 
 let emit_instr ~first ~last ~fallthrough i =
   try emit_instr ~first ~last ~fallthrough i with
@@ -2806,7 +2857,7 @@ let emit_function_type_and_size fun_sym =
   (* Note: Symbol types and sizes are only needed on some platforms/systems.
      These functions check internally whether they are needed. *)
   D.type_symbol ~ty:Function fun_sym;
-  if not !Oxcaml_flags.basic_block_sections then D.size fun_sym
+  D.size fun_sym
 
 (* Emission of a function declaration *)
 
@@ -2830,9 +2881,7 @@ let fundecl fundecl =
   prologue_required := fundecl.fun_prologue_required;
   frame_required := fundecl.fun_frame_required;
   all_functions := fundecl :: !all_functions;
-  current_basic_block_section
-    := Option.value fundecl.fun_section_name ~default:"";
-  emit_function_or_basic_block_section_name ();
+  emit_named_text_section fundecl.fun_name;
   D.align ~fill:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
   let fundecl_sym = S.create_global fundecl.fun_name in
@@ -3141,7 +3190,11 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if (not Config.no_stack_checks) && n >= Stack_check.stack_threshold_size
+  if Config.no_stack_checks
+  then (
+    if Domainstate.stack_guard_stride > 0 && n >= Domainstate.stack_guard_stride
+    then emit_stack_probes ~size_in_bytes:n ~save_registers:true)
+  else if n >= Stack_check.stack_threshold_size
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
       ~save_simd:(must_save_simd_regs p.probe_insn.live);

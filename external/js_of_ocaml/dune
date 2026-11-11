@@ -2,6 +2,10 @@
  (dev
   (flags
    (:standard -w +a-4-40-41-42-44-48-58-66-70))
+  (js_of_ocaml
+   (flags
+    (:include ci.flags)
+    (:standard)))
   (binaries
    (tools/node_wrapper.exe as node)
    (tools/node_wrapper.exe as node.exe)))
@@ -9,11 +13,12 @@
   (js_of_ocaml
    (compilation_mode separate)
    (flags
-    (:standard --enable effects)))
+    (:include ci.flags)
+    (:standard --effects cps)))
   (wasm_of_ocaml
    (compilation_mode separate)
    (flags
-    (:standard --enable effects)))
+    (:standard --effects cps)))
   (binaries
    (tools/node_wrapper.exe as node)
    (tools/node_wrapper.exe as node.exe)))
@@ -21,6 +26,7 @@
   (js_of_ocaml
    (compilation_mode separate)
    (flags
+    (:include ci.flags)
     (:standard --effects double-translation))
    (build_runtime_flags
     (:standard --effects double-translation)))
@@ -30,6 +36,41 @@
   (binaries
    (tools/node_wrapper.exe as node)
    (tools/node_wrapper.exe as node.exe)))
+ (with-native-effects
+  (js_of_ocaml
+   ;; Native effects is not supported in js
+   (enabled_if false))
+  (wasm_of_ocaml
+   (compilation_mode separate)
+   (flags
+    (:standard --effects native)))
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe)))
+ (wasi
+  (wasm_of_ocaml
+   (flags
+    (:standard --pretty --enable wasi))
+   ; Wasmtime is slow on large binaries, so use whole program compilation
+   (compilation_mode whole_program))
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe))
+  (env-vars
+   (JSOO_TEST_ENGINE wasi)))
+ (wasi-with-native-effects
+  (js_of_ocaml
+   ;; Native effects is not supported in js
+   (enabled_if false))
+  (wasm_of_ocaml
+   (compilation_mode separate)
+   (flags
+    (:standard --effects native --enable wasi)))
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe))
+  (env-vars
+   (JSOO_TEST_ENGINE wasi)))
  (bench_no_debug
   (flags
    (:standard \ -g))
@@ -40,6 +81,12 @@
   (binaries
    (tools/node_wrapper.exe as node)
    (tools/node_wrapper.exe as node.exe)))
+ (quickjs
+  (binaries
+   (tools/quickjs_wrapper.exe as node)
+   (tools/quickjs_wrapper.exe as node.exe))
+  (env-vars
+   (JSOO_TEST_ENGINE quickjs)))
  (_
   (binaries
    (tools/node_wrapper.exe as node)
@@ -50,12 +97,27 @@
  (action
   (with-stdout-to
    %{targets}
-   (progn
-   (echo "let s = String.trim \"")
-   (cat %{dep:VERSION})
-   (echo "\"")
-   (echo "let git_version = \"\"")
-   ))))
+   (run
+    %{dep:tools/version/gen/gen.exe}
+    %{dep:VERSION}
+    %{dep:tools/version/GIT-VERSION}))))
+
+(rule
+ (target ci.flags)
+ (enabled_if
+  (not %{env:CI=false}))
+ (action
+  (with-stdout-to
+   %{target}
+   (echo "()"))))
+
+(rule
+ (target ci.flags)
+ (enabled_if %{env:CI=false})
+ (action
+  (with-stdout-to
+   %{target}
+   (echo "(--debug invariant)"))))
 
 (data_only_dirs _wikidoc doc-dev janestreet)
 

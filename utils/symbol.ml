@@ -49,7 +49,7 @@ let caml_symbol_prefix = "caml"
 
 (* NB OCaml 5.4 uses [.] as a separator only on Linux and uses $ on other
       systems. The mangling convention in OxCaml has not yet been changed
-      to match.4 merge. *)
+      to match *)
 let upstream_symbol_separator =
   match Config.ccomp_type with
   | "msvc" -> '$' (* MASM does not allow for dots in symbol names *)
@@ -108,9 +108,9 @@ let for_name compilation_unit name =
     linkage_name;
     hash = Hashtbl.hash linkage_name; }
 
-let for_structured_mangling_path ~compilation_unit ~path ~suffix =
+let for_structured_mangling_path ~compilation_unit ~path =
   let name = Structured_mangling.mangle_ident compilation_unit path in
-  let linkage_name = name ^ suffix |> Linkage_name.of_string in
+  let linkage_name = Linkage_name.of_string name in
   { compilation_unit;
     linkage_name;
     hash = Hashtbl.hash linkage_name; }

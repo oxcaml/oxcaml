@@ -1049,11 +1049,11 @@ val f : ('a. 'a -> 'a) -> string * int = <fun>
 |}]
 
 let f (x : ('a : word mod external_ many aliased). 'a -> 'a) =
-  let native_int : nativeint# = assert false in
+  let native_int : nativeint_u = assert false in
   x native_int
 
 [%%expect {|
-val f : (('a : word mod many aliased). 'a -> 'a) -> nativeint# = <fun>
+val f : (('a : word mod many aliased). 'a -> 'a) -> nativeint_u = <fun>
 |}]
 
 let f (x : ('a : immediate). 'a -> 'a) = x "string"
@@ -1770,14 +1770,14 @@ type t = int as (_ : value)
 type t = int as (_ : immediate)
 type t = int as (_ : value mod global)
 type t = int as (_ : immediate mod global)
-type t = nativeint# as (_ : word mod external_ many aliased)
+type t = nativeint_u as (_ : word mod external_ many aliased)
 
 [%%expect {|
 type t = int
 type t = int
 type t = int
 type t = int
-type t = nativeint#
+type t = nativeint_u
 |}]
 
 (*********************************************************)
@@ -1793,17 +1793,20 @@ type packed = T : ('a : float64). 'a -> packed
 val f : packed -> unit = <fun>
 |}]
 
+type ('a : value) boxed = Box of 'a
+
 let bad p =
   match p with
-  | T (type (a : float64)) (x : a) -> Some x
+  | T (type (a : float64)) (x : a) -> Box x
 [%%expect{|
-Line 3, characters 43-44:
-3 |   | T (type (a : float64)) (x : a) -> Some x
-                                               ^
+type 'a boxed = Box of 'a
+Line 5, characters 42-43:
+5 |   | T (type (a : float64)) (x : a) -> Box x
+                                              ^
 Error: The value "x" has type "a" but an expression was expected of type
-         "('a : value_or_null)"
+         "('a : value)"
        The layout of a is float64
          because of the annotation on the existential variable a.
        But the layout of a must be a value layout
-         because the type argument of option has layout value_or_null.
+         because of the definition of boxed at line 1, characters 0-35.
 |}]

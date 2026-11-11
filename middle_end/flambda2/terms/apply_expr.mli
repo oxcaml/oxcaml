@@ -52,10 +52,11 @@ val create :
   Exn_continuation.t ->
   args:Simple.t list ->
   args_arity:[`Complex] Flambda_arity.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:[`Complex] Flambda_arity.t ->
   call_kind:Call_kind.t ->
   return_mode:Alloc_mode.For_applications.t ->
   Debuginfo.t ->
+  callsite_counter:Fdo_counter.t option ->
   inlined:Inlined_attribute.t ->
   inlining_state:Inlining_state.t ->
   probe:Probe.t ->
@@ -80,7 +81,7 @@ val args : t -> Simple.t list
 val args_arity : t -> [`Complex] Flambda_arity.t
 
 (** The arity of the result(s) of the application. *)
-val return_arity : t -> [`Unarized] Flambda_arity.t
+val return_arity : t -> [`Complex] Flambda_arity.t
 
 (** Information about what kind of call is involved (direct function call,
     method call, etc). *)
@@ -132,3 +133,8 @@ val relative_history : t -> Inlining_history.Relative.t
 val returns : t -> bool
 
 val with_inlined_attribute : t -> Inlined_attribute.t -> t
+
+(** The FDO counter of the callsite (see [Fdo_counter]) *)
+val callsite_counter : t -> Fdo_counter.t option
+
+val with_callsite_counter : t -> Fdo_counter.t option -> t

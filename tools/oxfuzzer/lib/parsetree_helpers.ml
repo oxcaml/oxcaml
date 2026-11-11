@@ -1,0 +1,36 @@
+open Asttypes
+
+let loc name = { Location.txt = name; loc = Location.none }
+
+let lid name = loc (Longident.Lident name)
+
+let ldot module_name name = loc (Longident.Ldot (lid module_name, loc name))
+
+let ident name = Ast_helper.Exp.ident (lid name)
+
+let qualified_ident module_name name =
+  Ast_helper.Exp.ident (ldot module_name name)
+
+let int n = Ast_helper.Exp.constant (Ast_helper.Const.int n)
+
+let unit_ = Ast_helper.Exp.construct (lid "()") None
+
+let apply id args =
+  Ast_helper.Exp.apply id (List.map (fun a -> Nolabel, a) args)
+
+let opaque_identity expr = apply (qualified_ident "Sys" "opaque_identity") [expr]
+
+let op name args = apply (ident name) args
+
+let value_param pattern : Parsetree.function_param =
+  { pparam_loc = Location.none;
+    pparam_desc = Pparam_val (Nolabel, None, pattern)
+  }
+
+let function_ params body =
+  Ast_helper.Exp.function_ params
+    { mode_annotations = [];
+      ret_mode_annotations = [];
+      ret_type_constraint = None
+    }
+    (Pfunction_body body)

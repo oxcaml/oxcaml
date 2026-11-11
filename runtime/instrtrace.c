@@ -20,19 +20,23 @@
 #ifdef DEBUG
 
 #include <stdio.h>
-#include <string.h>
 #include <ctype.h>
 
 #include "caml/fiber.h"
-#include "caml/domain.h"
 #include "caml/instrtrace.h"
 #include "caml/instruct.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
-#include "caml/opnames.h"
 #include "caml/prims.h"
 #include "caml/startup.h"
 #include "caml/backtrace_prim.h"
+
+#define OPCODE_NAME(name) #name,
+static char * names_of_instructions [] = {
+  CAML_ZINC_OPCODES(OPCODE_NAME)
+  "FIRST_UNIMPLEMENTED_OP"
+};
+#undef OPCODE_NAME
 
 extern code_t caml_start_code;
 

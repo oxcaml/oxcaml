@@ -154,6 +154,8 @@ val or_int : expression -> expression -> Debuginfo.t -> expression
 
 val xor_int : expression -> expression -> Debuginfo.t -> expression
 
+val not_int : expression -> Debuginfo.t -> expression
+
 (** Similar to [add_int] but produces a result with machtype [Addr] iff
     [ptr_out_of_heap] is [false]. *)
 val add_int_ptr :
@@ -471,7 +473,7 @@ val make_mixed_alloc :
   expression
 
 (** Sys.opaque_identity *)
-val opaque : expression -> Debuginfo.t -> expression
+val opaque : ty:machtype -> expression -> Debuginfo.t -> expression
 
 (** Generic application functions *)
 
@@ -719,7 +721,11 @@ val setfield_computed :
 
 (** [transl_switch_clambda loc kind arg index cases] *)
 val transl_switch_clambda :
-  Debuginfo.t -> expression -> int array -> expression array -> expression
+  Debuginfo.t ->
+  expression ->
+  int array ->
+  (expression * Branch_annotations.t) array ->
+  expression
 
 (** Method call : [send kind met obj args dbg]
 
@@ -878,8 +884,10 @@ val sequence : expression -> expression -> expression
 val ite :
   dbg:Debuginfo.t ->
   then_dbg:Debuginfo.t ->
+  then_annots:Branch_annotations.t ->
   then_:expression ->
   else_dbg:Debuginfo.t ->
+  else_annots:Branch_annotations.t ->
   else_:expression ->
   expression ->
   expression
@@ -1060,6 +1068,9 @@ val load :
   addr:expression ->
   expression
 
+(** [store ~dbg memory_chunk init ~addr ~new_value] stores [new_value] at
+    [addr]. For integer chunks narrower than a word, [new_value] is simplified
+    with [low_bits] since only its low bits are stored. *)
 val store :
   dbg:Debuginfo.t ->
   memory_chunk ->
@@ -1228,61 +1239,7 @@ val apply_function :
 
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 
-(* Atomics *)
-
-val atomic_load_field :
-  dbg:Debuginfo.t ->
-  Lambda.immediate_or_pointer ->
-  expression ->
-  field:expression ->
-  expression
-
-val atomic_exchange_field :
-  dbg:Debuginfo.t ->
-  Lambda.immediate_or_pointer ->
-  mode:Lambda.modify_mode ->
-  expression ->
-  field:expression ->
-  new_value:expression ->
-  expression
-
-val atomic_fetch_and_add_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
-
-val atomic_add_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
-
-val atomic_sub_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
-
-val atomic_land_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
-
-val atomic_lor_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
-
-val atomic_lxor_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
-
-val atomic_compare_and_set_field :
-  dbg:Debuginfo.t ->
-  Lambda.immediate_or_pointer ->
-  mode:Lambda.modify_mode ->
-  expression ->
-  field:expression ->
-  old_value:expression ->
-  new_value:expression ->
-  expression
-
-val atomic_compare_exchange_field :
-  dbg:Debuginfo.t ->
-  Lambda.immediate_or_pointer ->
-  mode:Lambda.modify_mode ->
-  expression ->
-  field:expression ->
-  old_value:expression ->
-  new_value:expression ->
-  expression
+val emit_divide_by_zero_message : unit -> Cmm.phrase list
 
 val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 
@@ -1628,6 +1585,8 @@ val tls_get : dbg:Debuginfo.t -> expression
 
 val domain_index : dbg:Debuginfo.t -> expression
 
+val thread_self_id : dbg:Debuginfo.t -> expression
+
 val cpu_relax : dbg:Debuginfo.t -> expression
 
 val poll : dbg:Debuginfo.t -> expression
@@ -1786,3 +1745,69 @@ module Scalar_type : sig
     val static_cast : t static_cast
   end
 end
+
+(* Atomics *)
+
+type atomic_offset =
+  | Field_index of
+      { index : expression;
+        index_type : Scalar_type.Integral.t
+      }
+  | Byte_offset of
+      { offset : expression;
+        offset_type : Scalar_type.Integral.t
+      }
+
+val atomic_load :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  expression ->
+  atomic_offset ->
+  expression
+
+val atomic_exchange :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
+  expression ->
+  atomic_offset ->
+  new_value:expression ->
+  expression
+
+val atomic_fetch_and_add :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_add :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_sub :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_land :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_lor :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_lxor :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_compare_and_set :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
+  expression ->
+  atomic_offset ->
+  old_value:expression ->
+  new_value:expression ->
+  expression
+
+val atomic_compare_exchange :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
+  expression ->
+  atomic_offset ->
+  old_value:expression ->
+  new_value:expression ->
+  expression

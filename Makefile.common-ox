@@ -2,9 +2,7 @@
 # Build rules common to ocaml-ox and oxcaml
 #
 
-ws_boot   = --root=. --workspace=duneconf/boot.ws
-ws_runstd = --root=. --workspace=duneconf/runtime_stdlib.ws
-ws_main   = --root=. --workspace=duneconf/main.ws
+ws_main   = --workspace=duneconf/main.ws
 
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
@@ -14,52 +12,22 @@ else
   ocaml_subdirs_to_ignore=
 endif
 
-define dune_boot_context
-(lang dune 2.8)
-; We need to call the boot context "default" so that dune selects it for merlin
-(context (default
-  (name default)
-  (profile dev)
-  (env (_
-    (flags (:standard -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
-    (env-vars
-      ("OCAMLPARAM" "")
-
-      ; Avoid using the full OC_CFLAGS for C code compiled during the boot
-      ; In particular, we should avoid using ASan here even if it is otherwise
-      ; enabled, since (a) it is of little benefit, because it has no effect
-      ; on the final compiler, and (b) it breaks, because linking is missing
-      ; the matching -fsanitize=address flag
-      ("OC_CFLAGS_SEXP" "boot_oc_cflags.sexp"))))))
-endef
-
-ifneq ($(origin BUILD_OCAMLPARAM), undefined)
-ENV_VARS := (env-vars ("OCAMLPARAM" "$(BUILD_OCAMLPARAM)"))
-else
-ENV_VARS :=
+# The libraries of external/ast-dependent-libs, which the main context can
+# build, use $ as an ordinary operator, which compilers configured with
+# --enable-syntax-quotations reject by default. Settings before any "_" in
+# OCAMLPARAM are defaults, which command-line flags override.
+main_ocamlparam = syntax-quotations=0,_
+ifneq ($(BUILD_OCAMLPARAM),)
+main_ocamlparam = syntax-quotations=0,$(BUILD_OCAMLPARAM)
 endif
 
+# Also for the libraries of external/ast-dependent-libs, as js_of_ocaml and
+# wasm_of_ocaml ship with the compiler.
 ifeq ($(main_build_profile),dev)
 main_ocamlopt_optimization_flags :=
 else
 main_ocamlopt_optimization_flags := -O3
 endif
-
-define dune_runtime_stdlib_context
-(lang dune 3.23)
-(using oxcaml 0.1)
-(context (default
-  (name runtime_stdlib)
-  (profile main)
-  (cms_cmt_dependency cms)
-  (paths
-    (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
-    (OCAMLLIB ("$(CURDIR)/_build/_bootinstall/lib/ocaml")))
-  (env (_
-    (bin_annot_cms true)
-    (flags (:standard -directory stdlib -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
-    $(ENV_VARS)))))
-endef
 
 define dune_main_context
 (lang dune 3.23)
@@ -68,20 +36,40 @@ define dune_main_context
   (name main)
   (profile $(main_build_profile))
   (cms_cmt_dependency cms)
+  ; Findlib packages from outside the build are compiled by other compilers.
   (paths
     (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
-    (OCAMLLIB ("$(CURDIR)/_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib")))
+    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/build"))
+    (OCAMLPATH ("$(CURDIR)/_build/main/no-findlib-packages"))
+    (OCAMLFIND_CONF ("/dev/null")))
   (env (_
+    ; Not the toplevel of this build, which only runs once installed.
+    (binaries (duneconf/ocaml as ocaml))
+    ; For the tests of js_of_ocaml (see jsoo-test in Makefile), as its
+    ; dune-workspace and with-effects profile set them up.
+    (js_of_ocaml
+     (compilation_mode separate)
+     (flags (:standard -w no-missing-effects-backend))
+     (link_flags (:standard -w no-missing-effects-backend))
+     (runtest_alias runtest-js))
+    (wasm_of_ocaml
+     (enabled_if %{env:WASM_OF_OCAML=false})
+     (compilation_mode separate)
+     (flags (:standard --effects cps))
+     (runtest_alias runtest-wasm))
     (bin_annot_cms true)
-    (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
+    ; The root project's profiles add -warn-error +A (see the root dune file):
+    ; this environment also applies to the libraries of
+    ; external/ast-dependent-libs.
+    (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
-    $(ENV_VARS)))))
+    (env-vars ("OCAMLPARAM" "$(main_ocamlparam)"))))))
 endef
 
 
 .DEFAULT_GOAL := compiler
-.PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest runtest-llvmize runtest-dwarf
+.PHONY: boot-compiler boot-runtest compiler runtest runtest-llvmize runtest-dwarf
 
 boot_targets = \
   $(boot_ocamlc) \
@@ -92,33 +80,16 @@ boot_targets = \
   ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
-	$(dune) build $(ws_boot) $(coverage_dune_flags) @merlin-support $(boot_targets)
+	$(dune) build --always-show-command-line $(coverage_dune_flags) @merlin-support $(boot_targets) @runtime_all @stdlib
 
 boot-runtest: boot-compiler
-	$(dune) build $(ws_boot) $(coverage_dune_flags) --force $(runtest_targets)
+	$(dune) build $(coverage_dune_flags) --force $(runtest_targets)
 
-runtime-stdlib: boot-compiler
-	$(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
-	rm -rf _build/runtime_stdlib_install
-# Dune 3.11+ clears `_build/install` before building, move the runtime stdlib
-# to a separate directory.
-	$(cpl) -R _build/install/runtime_stdlib _build/runtime_stdlib_install
-# Dune does not believe the compiler can make .cmxs unless the following file exists.
-	@touch _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink.cmxa
-# Dune will look here if the system compiler is OCaml 5 instead.
-	@mkdir -p _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/
-	@touch _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/dynlink.cmxa
-
-# This target is a polling version of "make runtime-stdlib"
-.PHONY: runtime-stdlib-hacking
-runtime-stdlib-hacking: boot-compiler
-	$(dune) build -w $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
-
-compiler: runtime-stdlib
+compiler: boot-compiler
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
-          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
-          $(dune) build $(ws_main) \
-          --only-package=ocaml @install \
+          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" $(compiler_jsoo_env) \
+          $(dune) build --always-show-command-line $(ws_main) \
+          --promote-install-files=false ocaml.install $(compiler_jsoo_targets) \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/expectnat.exe \
@@ -130,12 +101,12 @@ compiler: runtime-stdlib
           $(ocamldir)/tools/dumpobj.bc
 
 .PHONY: minimize-failure
-minimize-failure: boot-minimizer boot-compiler runtime-stdlib
+minimize-failure: boot-minimizer boot-compiler
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           ./_build/default/chamelon/chamelon.exe dune build \
           $(ws_main) \
-          --only-packages=ocaml @install \
+          ocaml.install \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/expectnat.exe \
@@ -144,12 +115,6 @@ minimize-failure: boot-minimizer boot-compiler runtime-stdlib
           testsuite/lib/lib.cm{,x}a \
           testsuite/lib/testing.cm{,x}a \
           $(ocamldir)/tools/dumpobj.bc
-
-.PHONY: minimize-stdlib
-minimize-stdlib: boot-minimizer boot-compiler
-	./_build/default/chamelon/chamelon.exe dune build \
-          $(ws_runstd) \
-          --only-packages=ocaml_runtime_stdlib @install
 
 # We want to be able to build the @runtest dune alias, but exclude
 # external/merlin from that (since Merlin only builds in the boot workspace).
@@ -174,10 +139,8 @@ runtest-dwarf: compiler
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
-duneconf/boot.ws: export contents = $(dune_boot_context)
-duneconf/runtime_stdlib.ws: export contents = $(dune_runtime_stdlib_context)
 duneconf/main.ws: export contents = $(dune_main_context)
-duneconf/%.ws:
+duneconf/%.ws: Makefile.common-ox
 	echo "$$contents" > $@
 
 # We need to disable ocaml/otherlibs when compiling with coverage, because we
@@ -191,16 +154,22 @@ duneconf/%.ws:
 $(ocamldir)/duneconf/dirs-to-ignore.inc:
 	echo "(data_only_dirs yacc $(ocaml_subdirs_to_ignore))" > $@
 
+# The toplevel that runs build scripts in the main context, as %{ocaml} or
+# ocaml: the system one, which must not see the stdlib of this build.
+duneconf/ocaml: Makefile.common-ox
+	printf '#!/bin/sh\nexec env -u OCAMLLIB -u OCAMLPARAM "%s" "$$@"\n' \
+	  "`$(opam_exec) which ocaml`" > $@
+	chmod +x $@
+
 # Targets that should be prerequisites to any target that runs Dune
 dune_config_targets = \
-  duneconf/boot.ws \
-  duneconf/runtime_stdlib.ws \
   duneconf/main.ws \
+  duneconf/ocaml \
   $(ocamldir)/duneconf/dirs-to-ignore.inc \
   $(ocamldir)/duneconf/ox-extra.inc \
   dune-project
 
-_build/_bootinstall: Makefile.config $(dune_config_targets)
+_build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
 
 # flags.sexp
@@ -208,6 +177,9 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 # See: https://github.com/ocaml/dune/issues/13225
 	echo '($(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
 	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
+	{ for flag in $(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,); do \
+	    echo "$$flag"; \
+	  done > ocamlopt_stdlib_flags.txt; }
 	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
 	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
@@ -218,12 +190,14 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	rm -rf _build/_bootinstall
 	mkdir -p _build/_bootinstall/{bin,lib/ocaml}
 	cp $^ _build/_bootinstall/lib/ocaml
+	ln -sf ../../default/runtime/ocamlrun _build/_bootinstall/bin/ocamlrun
 	ln -sf ../../default/$(boot_ocamlopt) _build/_bootinstall/bin/ocamlopt.opt
 	ln -sf ../../default/$(boot_ocamlc) _build/_bootinstall/bin/ocamlc.opt
 	ln -sf ../../default/$(boot_ocamlmklib) _build/_bootinstall/bin/ocamlmklib.opt
 	ln -sf ../../default/$(boot_ocamldep) _build/_bootinstall/bin/ocamldep.opt
 	ln -sf ../../default/$(boot_ocamlobjinfo) _build/_bootinstall/bin/ocamlobjinfo.opt
 	ln -sf "`$(opam_exec) which ocamllex`" _build/_bootinstall/bin/ocamllex.opt
+	cp duneconf/ocaml _build/_bootinstall/bin/ocaml
 	for prog in ocamlopt ocamlc ocamllex ocamldep ocamlmklib; do \
 	  ln -sf "$$prog.opt" "_build/_bootinstall/bin/$$prog"; \
 	done
@@ -241,11 +215,15 @@ cpl=$(if $(filter linux,$(SYSTEM)),cp -l,cp -L)
 _install: compiler
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
-	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
-	$(cpl) _build/install/main/bin/* _install/bin/
+	$(cpl) _build/default/runtime/ocamlrun{,d} _install/bin/
+# Only the executables of the ocaml package, as listed in ocaml.install: the
+# main build can also build those of js_of_ocaml (see WITH_JSOO in Makefile).
+	$(cpl) `grep -o '"_build/install/main/bin/[^"]*"' _build/main/ocaml.install \
+	  | tr -d '"'` _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
-	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* _install/lib/ocaml/
-	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa,dynlink/dynlink.cmxa}
+	$(cpl) -R _build/default/stdlib/build/* _install/lib/ocaml/
+	rm -f _install/lib/ocaml/{META,dune-package,dynlink.cmxa,dynlink/dynlink.cmxa}
+	rm -f _install/lib/ocaml/{stdlib,camlinternal}*.{o,cmo}
 	$(cpl) -R _build/install/main/lib/ocaml/* _install/lib/ocaml/
 	if [ "x$(legacy_layout)" == "xyes" ] ; \
 	then \
@@ -262,10 +240,6 @@ _install: compiler
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
-	find _build/main/ \( -name "flambda2*.cmi" \
-          -or -name "flambda2*.cmsi" -or -name "flambda2*.cms" \
-          -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
-          -exec cp -f {} _install/lib/ocaml/compiler-libs \;
 
 
 # Copy _install to the final install directory (no-op if they are the same)
@@ -317,15 +291,6 @@ install_for_test: install
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.testing.objs/native/testing.cm* \
           _runtest/testsuite/lib/
-	 # replace backend-specific testsuite/tests/asmcomp with their new versions
-	rm _runtest/testsuite/tests/asmcomp/*
-	cp -a oxcaml/testsuite/tests/asmcomp/* _runtest/testsuite/tests/asmcomp/
-	 # replace backend-specific testsuite/tests/asmgen with their new versions
-	rm _runtest/testsuite/tests/asmgen/*
-	cp -a oxcaml/testsuite/tests/asmgen/* _runtest/testsuite/tests/asmgen/
-	 # add extension library tests that are not supported by the upstream compiler
-	rm _runtest/testsuite/tests/lib-extensions/*
-	cp -a oxcaml/testsuite/tests/lib-extensions/* _runtest/testsuite/tests/lib-extensions
 
 	cp $(ocamldir)/Makefile.* _runtest/
 
@@ -434,6 +399,23 @@ test: install_for_test
                fi \
              fi)
 
+.PHONY: test-typing
+test-typing: install_for_test
+	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
+	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 if $$(which gfortran > /dev/null 2>&1); then \
+	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
+	 fi; \
+	 cd _runtest/testsuite \
+      && if $$(which parallel > /dev/null 2>&1); \
+         then \
+              echo "Running typing testsuite in parallel (nproc=$$(nproc))"; \
+              make --no-print-directory parallel-typing; \
+	       else \
+              echo "Running typing testsuite sequentially"; \
+              make --no-print-directory all-typing; \
+         fi)
+
 promote-failed:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
@@ -475,10 +457,30 @@ promote-one-no-rebuild:
 	 fi; \
 	 cd _runtest/testsuite && make promote $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
 
+# Also build the indexes for Merlin's find-all-references (merlin-index) when
+# an ocaml-index is on PATH; it must come from the same Merlin as the editor's
+# ocaml-lsp, as the one in the dev shell does. Restrict dune to our packages so
+# that it runs that ocaml-index rather than external/merlin's, which can't read
+# the boot compiler's cmt files. Both aliases are defined only in the root, and
+# under --only-packages the recursive forms fail on external/merlin's promoted
+# parsers, so build them non-recursively.
+merlin_index_packages = ocaml,oxcaml,oxcaml-dev,compiler-libs
+have_ocaml_index = $(shell $(opam_exec) which ocaml-index 2>/dev/null)
+merlin_index_flags = $(if $(have_ocaml_index),--only-packages $(merlin_index_packages))
+merlin_index_target = $(if $(have_ocaml_index),@@merlin-index)
+hacking_targets = @@merlin-support $(merlin_index_target) $(boot_targets)
+
 # This target is like a polling version of upstream "make ocamlopt"
 .PHONY: hacking
 hacking: _build/_bootinstall
-	$(dune) build $(ws_boot) -w @merlin-support $(boot_targets)
+	$(dune) build -w $(merlin_index_flags) $(hacking_targets)
+
+# A one-shot build of what `make hacking` builds, for CI. It always restricts
+# dune to $(merlin_index_packages), even without ocaml-index on PATH, so that
+# it catches libraries those packages leave out.
+.PHONY: check-hacking
+check-hacking: _build/_bootinstall
+	$(dune) build --only-packages $(merlin_index_packages) $(hacking_targets)
 
 # The `hacking-emacs-poller` and `hacking-emacs-builder` targets make it
 # possible to run the polling build with Emacs's `M-x compile`.  You should run
@@ -488,46 +490,16 @@ hacking: _build/_bootinstall
 
 .PHONY: hacking-emacs-poller
 hacking-emacs-poller: _build/_bootinstall
-	$(dune) build $(ws_boot) --passive-watch-mode
+	$(dune) build --passive-watch-mode $(merlin_index_flags)
 
 .PHONY: hacking-emacs-builder
 hacking-emacs-builder: _build/_bootinstall
-	$(dune) rpc build $(ws_boot) -w @merlin-support $(boot_targets)
+	$(dune) rpc build -w $(hacking_targets)
 	$(dune) diagnostics
 
 .PHONY: debug-printers
-debug-printers: runtime-stdlib # required for $(ws_main) to work
+debug-printers: boot-compiler # required for $(ws_main) to work
 	 $(dune) build $(ws_main) $(ocamldir)/tools/debug_printers
 	@echo
 	@echo To load into ocamldebug, use:
 	@echo source \"$$(realpath _build/main/$(ocamldir)/tools/debug_printers)\"
-
-# boot-_install installs the bootstrapped compiler into _install. It is mostly
-# just copied from the install phrase.
-# This allows tools/compare.sh to function as expected, which is useful because
-# it allows us to easily run the bootstrapped compiler, especially with
-# tools/compare.sh
-.PHONY: boot-_install
-boot-_install: runtime-stdlib
-	rm -rf _install
-	mkdir -p _install/{bin,lib/ocaml}
-	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
-	# can't use a hard link here because ocamllex comes from the system and
-	# is possibly on a different device
-	ln -sf $(realpath _build/_bootinstall/bin/ocamllex.opt) _install/bin/ocamllex.opt
-	$(cpl) _build/_bootinstall/bin/ocaml{c,opt,mklib,dep,objinfo}.opt _install/bin/
-	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
-	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* \
-    _install/lib/ocaml/
-	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa,dynlink/dynlink.cmxa}
-	$(cpl) -R _build/_bootinstall/lib/ocaml/* _install/lib/ocaml/
-	rm -f _install/lib/ocaml/{META,dune-package}
-	rm -f _install/lib/ocaml/compiler-libs/*.cmo
-	mkdir _install/lib/stublibs
-	find _build/default -name "dll*.so" \
-       -print0 | xargs -0 -I '{}' cp -f '{}' _install/lib/stublibs
-	mkdir -p _install/lib/ocaml/compiler-libs
-	cp _build/default/parser.cmly _install/lib/ocaml/compiler-libs/
-	find _build/default/ \( -name "flambda2*.cmi" \
-          -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
-          -print0 | xargs -0 -I '{}' cp -f '{}' _install/lib/ocaml/compiler-libs

@@ -17,8 +17,6 @@
 
 /* Start-up code */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "caml/alloc.h"
 #include "caml/callback.h"
@@ -28,16 +26,13 @@
 #include "caml/runtime_events.h"
 #include "caml/fiber.h"
 #include "caml/fail.h"
-#include "caml/gc.h"
 #include "caml/gc_ctrl.h"
-#include "caml/intext.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/osdeps.h"
 #include "caml/printexc.h"
 #include "caml/signals.h"
-#include "caml/stack.h"
 #include "caml/startup_aux.h"
 #include "caml/sys.h"
 #include "caml/globroots.h"
@@ -105,7 +100,7 @@ extern void caml_install_invalid_parameter_handler(void);
 
 #endif
 
-value caml_startup_common(char_os **argv, int pooling)
+value caml_startup_common(char_os const * const * argv, int pooling)
 {
   const char_os * exe_name, * proc_self_exe;
   value res;
@@ -157,29 +152,29 @@ value caml_startup_common(char_os **argv, int pooling)
   return res;
 }
 
-value caml_startup_exn(char_os **argv)
+value caml_startup_exn(char_os const * const * argv)
 {
   return caml_startup_common(argv, /* pooling */ 0);
 }
 
-void caml_startup(char_os **argv)
+void caml_startup(char_os const * const * argv)
 {
   value res = caml_startup_exn(argv);
   if (Is_exception_result(res))
     caml_fatal_uncaught_exception(Extract_exception(res));
 }
 
-void caml_main(char_os **argv)
+void caml_main(char_os const * const * argv)
 {
   caml_startup(argv);
 }
 
-value caml_startup_pooled_exn(char_os **argv)
+value caml_startup_pooled_exn(char_os const * const * argv)
 {
   return caml_startup_common(argv, /* pooling */ 1);
 }
 
-void caml_startup_pooled(char_os **argv)
+void caml_startup_pooled(char_os const * const * argv)
 {
   value res = caml_startup_pooled_exn(argv);
   if (Is_exception_result(res))

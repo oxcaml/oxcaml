@@ -1,6 +1,10 @@
 (* TEST
- flags = "-extension layouts_beta";
- expect;
+ {
+   expect;
+ }{
+   flags = "-extension layouts_beta";
+   expect;
+ }
 *)
 
 (* Tests for jkinds in algebraic datatypes *)
@@ -411,11 +415,25 @@ let zero () = (id { l = #0L }).l
 [%%expect{|
 type ('a : bits64) r = { l : 'a; } [@@unboxed]
 val id : ('a : bits64). 'a -> 'a = <fun>
-val zero : unit -> int64# = <fun>
+val zero : unit -> int64_u = <fun>
 |}]
 
 let zero x = { (id x) with l = #0L } [@@warning "-23"]
 
 [%%expect {|
-val zero : ('a : bits64). 'a r -> int64# r = <fun>
+val zero : ('a : bits64). 'a r -> int64_u r = <fun>
+|}]
+
+(*******************************************************)
+(* Test 12: [@@unboxed] with an [any]-kinded field.    *)
+
+type ru = { x : t_any } [@@unboxed]
+type ('a : any) ru' = { x : 'a } [@@unboxed]
+type vu = VU of t_any [@@unboxed]
+type ('a : any) vu' = VU of 'a [@@unboxed]
+[%%expect{|
+type ru = { x : t_any; } [@@unboxed]
+type ('a : any) ru' = { x : 'a; } [@@unboxed]
+type vu = VU of t_any [@@unboxed]
+type ('a : any) vu' = VU of 'a [@@unboxed]
 |}]

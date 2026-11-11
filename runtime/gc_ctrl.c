@@ -17,8 +17,6 @@
 
 #include "caml/alloc.h"
 #include "caml/custom.h"
-#include "caml/finalise.h"
-#include "caml/gc.h"
 #include "caml/gc_ctrl.h"
 #include "caml/gc_stats.h"
 #include "caml/major_gc.h"
@@ -34,7 +32,6 @@
 #endif
 #include "caml/domain.h"
 #include "caml/fiber.h"
-#include "caml/globroots.h"
 #include "caml/signals.h"
 #include "caml/startup.h"
 #include "caml/fail.h"
@@ -49,14 +46,15 @@ uintnat caml_fiber_wsz;
 /* TODO: turn these into atomics to avoid data races */
 extern uintnat caml_custom_work_max_multiplier; /* see major_gc.c */
 extern uintnat caml_prelinking_in_use;    /* see startup_nat.c */
-extern uintnat caml_compaction_algorithm; /* see shared_heap.c */
-extern uintnat caml_compact_unmap;        /* see shared_heap.c */
 extern uintnat caml_pool_min_chunk_bsz;  /* see shared_heap.c */
 extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
 extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
 extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
 extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
 uintnat caml_measure_frametables = 0; /* see frame_descriptors.c */
+/* Test-only override for the size of systhreads' Multicore domain table
+   (see otherlibs/systhreads/multicore.ml). */
+uintnat caml_override_max_domains = 0;
 
 /* runtime config parameters set with caml_gc_set */
 extern atomic_uintnat caml_major_heap_increment; /* percent or words; see shared_heap.c */
@@ -460,8 +458,6 @@ static struct gc_tweak gc_tweaks[] = {
   { "custom_work_max_multiplier", &caml_custom_work_max_multiplier, 0 },
   { "small_heap_limit", &caml_small_heap_limit, 0 },
   { "prelinking_in_use", &caml_prelinking_in_use, 0 },
-  { "compaction", &caml_compaction_algorithm, 0 },
-  { "compact_unmap", &caml_compact_unmap, 0 },
   { "pool_min_chunk_size", &caml_pool_min_chunk_bsz, 0 },
   { "main_stack_size", &caml_init_main_stack_wsz, 0 },
   { "thread_stack_size", &caml_init_thread_stack_wsz, 0 },
@@ -471,8 +467,12 @@ static struct gc_tweak gc_tweaks[] = {
   { "nohugepage_stacks", &caml_nohugepage_stacks, 0 },
   { "enable_segv_handler", &caml_enable_segv_handler, 0 },
   { "cache_stacks_per_class", &caml_cache_stacks_per_class, 0 },
+  { "max_guarded_stacks", &caml_max_guarded_stacks, 0 },
+  { "idle_stacks", &caml_idle_stacks, 0 },
   { "tick_use_usleep", &caml_tick_use_usleep, 0 },
   { "measure_frametables", &caml_measure_frametables, 0 },
+  { "override_max_domains_test_only_not_for_prod",
+    &caml_override_max_domains, 0 },
 };
 
 enum {N_GC_TWEAKS = sizeof(gc_tweaks)/sizeof(gc_tweaks[0])};

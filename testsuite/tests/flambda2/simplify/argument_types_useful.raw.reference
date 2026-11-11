@@ -39,17 +39,16 @@ let $camlArgument_types_useful__first_const_0 = Block 0 () in
        -> k1 * k2
  in
  let unbox_int_and_add_one =
-   closure unbox_int_and_add_one_0 @unbox_int_and_add_one
-     &toplevel.alloc_region
+   closure unbox_int_and_add_one_0 @unbox_int_and_add_one &toplevel
  in
  let unbox_int_and_add_one_wrapper =
    closure unbox_int_and_add_one_wrapper_1 @unbox_int_and_add_one_wrapper
-     &toplevel.alloc_region
+     &toplevel
  with { unbox_int_and_add_one = unbox_int_and_add_one }
  in
  let box_int_then_call_unbox_int_and_add_one_wrapper =
    closure box_int_then_call_unbox_int_and_add_one_wrapper_2
-     @box_int_then_call_unbox_int_and_add_one_wrapper &toplevel.alloc_region
+     @box_int_then_call_unbox_int_and_add_one_wrapper &toplevel
  with { unbox_int_and_add_one_wrapper = unbox_int_and_add_one_wrapper }
  in
  let Pmakeblock =

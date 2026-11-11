@@ -430,7 +430,9 @@ module Usage : sig
 
   exception Cannot_force of cannot_force_error
 
-  exception Unique_use_during_borrowing of unique_use_during_borrowing_error
+  module Unique_use_during_borrowing : sig
+    type exn += private In_context of unique_use_during_borrowing_error
+  end
 
   (** Unused *)
   val empty : t
@@ -562,7 +564,20 @@ end = struct
 
   exception Cannot_force of cannot_force_error
 
-  exception Unique_use_during_borrowing of unique_use_during_borrowing_error
+  module Unique_use_during_borrowing : sig
+    type exn += private In_context of unique_use_during_borrowing_error
+
+    val log_or_raise : unique_use_during_borrowing_error -> unit
+  end = struct
+    type exn += In_context of unique_use_during_borrowing_error
+
+    let log_or_raise err = Typing_recovery.log_or_raise (In_context err)
+
+    let () =
+      Typing_recovery.register_recoverable (function
+        | In_context _ -> true
+        | _ -> false)
+  end
 
   let force_aliased_multiuse t order there =
     match Maybe_unique.mark_multi_use t with
@@ -700,16 +715,15 @@ end = struct
       let usage_occ = Aliased.extract_occurrence aliased_value in
       Location.prerr_warning usage_occ.loc Warnings.Use_during_borrowing;
       usage
-    | Maybe_unique mu -> (
+    | Maybe_unique mu ->
       let usage_occ = Maybe_unique.extract_occurrence mu in
-      match Maybe_unique.mark_multi_use mu with
+      (match Maybe_unique.mark_multi_use mu with
       | Ok () ->
-        Location.prerr_warning usage_occ.loc Warnings.Use_during_borrowing;
-        Aliased (Aliased.singleton usage_occ In_borrowing)
+        Location.prerr_warning usage_occ.loc Warnings.Use_during_borrowing
       | Error cannot_force ->
-        raise
-          (Unique_use_during_borrowing { region_loc; borrow_occ; cannot_force })
-      )
+        Unique_use_during_borrowing.log_or_raise
+          { region_loc; borrow_occ; cannot_force });
+      Aliased (Aliased.singleton usage_occ In_borrowing)
     | Antiquote inner -> Antiquote (confine_borrow ~region_loc borrow_occ inner)
 
   let rec print ppf =
@@ -890,9 +904,9 @@ module Overwrites : sig
   val promote_mutation_to_children : t -> t
 
   (** We may not overwrite a tag we do not know. At the end of the analysis,
-      this function should be called to ensure all overwrites are on known tags.
-  *)
-  val check_no_remaining_overwritten_as : t -> unit
+      this function should be called to find any overwrites that are not on
+      known tags. *)
+  val remaining_overwritten_as : t -> error list
 
   (** Accept the overwrites using tags that we have learned from a
       pattern-match. *)
@@ -1009,24 +1023,18 @@ end = struct
     | Tag_was_mutated -> Tag_was_mutated
     | Tags { was_mutated } -> if was_mutated then Tag_was_mutated else empty
 
-  let check_no_remaining_overwritten_as t =
+  let remaining_overwritten_as t =
     match t with
-    | Tags { overwritten } -> (
-      match Tag.Map.choose_opt overwritten with
-      | None -> ()
-      | Some (tag_overwritten, have_learned) ->
-        raise
-          (Error
-             (match Tag.Set.choose_opt have_learned with
-             | None ->
-               Changed_tag
-                 { old_tag = Old_tag_unknown; new_tag = tag_overwritten }
-             | Some tag_learned ->
-               Changed_tag
-                 { old_tag = Old_tag_was tag_learned;
-                   new_tag = tag_overwritten
-                 })))
-    | Tag_was_mutated -> ()
+    | Tags { overwritten } ->
+      Tag.Map.bindings overwritten
+      |> List.map (fun (tag_overwritten, have_learned) ->
+          match Tag.Set.choose_opt have_learned with
+          | None ->
+            Changed_tag { old_tag = Old_tag_unknown; new_tag = tag_overwritten }
+          | Some tag_learned ->
+            Changed_tag
+              { old_tag = Old_tag_was tag_learned; new_tag = tag_overwritten })
+    | Tag_was_mutated -> []
 
   let assert_empty t =
     match t with
@@ -1165,7 +1173,20 @@ type error =
   | Borrowed_out_of_context of Location.t
   | Borrowed_value_used_uniquely of Maybe_unique.cannot_force
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
+
+  val log_or_raise : error -> unit
+end = struct
+  type exn += In_context of error
+
+  let log_or_raise err = Typing_recovery.log_or_raise (In_context err)
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
 
 (** lifting module Usage to trees *)
 module Usage_tree : sig
@@ -1308,12 +1329,14 @@ end = struct
       (fun first_is_of_second t0 t1 ->
         try fu t0 t1
         with Usage.Cannot_force inner ->
-          raise (Error (Cannot_force { inner; first_is_of_second })))
+          Error.log_or_raise (Cannot_force { inner; first_is_of_second });
+          t0)
       fl
       (fun t0 t1 ->
         try fo t0 t1
         with Overwrites.Error error ->
-          raise (Error (Overwrite_changed_tag error)))
+          Error.log_or_raise (Overwrite_changed_tag error);
+          t0)
       t0 t1
 
   let choose t0 t1 =
@@ -1345,8 +1368,9 @@ end = struct
     Projection.Map.iter
       (fun _ t -> check_no_remaining_overwritten_as t)
       children;
-    try Overwrites.check_no_remaining_overwritten_as overwrites
-    with Overwrites.Error error -> raise (Error (Overwrite_changed_tag error))
+    List.iter
+      (fun error -> Error.log_or_raise (Overwrite_changed_tag error))
+      (Overwrites.remaining_overwritten_as overwrites)
 
   let rec split_usage_tags { children; usage; overwrites; learned } =
     let split_children = Projection.Map.map split_usage_tags children in
@@ -1398,8 +1422,15 @@ end = struct
         Projection.Map.update proj
           (function
             | None ->
-              (* Path doesn't exist, treat as Unused and create node *)
-              Some (update ~f rest empty)
+              (* A missing child has the usage of its parent, as in [mapi2] *)
+              let child =
+                { empty with
+                  usage = tree.usage;
+                  overwrites =
+                    Overwrites.promote_mutation_to_children tree.overwrites
+                }
+              in
+              Some (update ~f rest child)
             | Some child -> Some (update ~f rest child))
           tree.children
       in
@@ -1642,6 +1673,10 @@ module Paths : sig
       where [gf] is the appropriate modality for mutability [mut]. *)
   val array_index : Types.mutability -> int -> t -> t
 
+  (** [address_load mut t] are the paths of the value loaded from an address
+      with paths [t] and mutability [mut]. *)
+  val address_load : Types.mutability -> t -> t
+
   (** [memory_address t] is [child Projection.Memory_address t]. *)
   val memory_address : t -> t
 
@@ -1676,14 +1711,17 @@ end = struct
 
   let child proj t = List.map (UF.Path.child proj) t
 
-  let modal_child modalities proj t =
+  let tracked_under modalities =
     (* CR zqian: Instead of just ignoring such children, we should add modality
        to [Projection.t] and add corresponding logic in [UsageTree]. *)
     let uni = Modality.Const.proj (Monadic Uniqueness) modalities in
     let lin = Modality.Const.proj (Comonadic Linearity) modalities in
     match uni, lin with
-    | Join_const Aliased, Meet_const Many -> untracked
-    | _ -> child proj t
+    | Join_const Aliased, Meet_const Many -> false
+    | _ -> true
+
+  let modal_child modalities proj t =
+    if tracked_under modalities then child proj t else untracked
 
   let tuple_field i t = child (Projection.Tuple_field i) t
 
@@ -1700,6 +1738,10 @@ end = struct
   let array_index mut i t =
     let modality = Typemode.mutable_modalities mut in
     modal_child modality (Projection.Array_index i) t
+
+  let address_load mut t =
+    let modality = Typemode.address_modalities mut in
+    if tracked_under modality then t else untracked
 
   let memory_address t = child Projection.Memory_address t
 
@@ -1738,14 +1780,14 @@ let force_aliased_boundary unique_use occ ~reason =
   let maybe_unique = Maybe_unique.singleton unique_use occ in
   match Maybe_unique.mark_multi_use maybe_unique with
   | Ok () -> ()
-  | Error cannot_force -> raise (Error (Boundary { cannot_force; reason }))
+  | Error cannot_force -> Error.log_or_raise (Boundary { cannot_force; reason })
 
 let force_aliased_borrow unique_use occ =
   let maybe_unique = Maybe_unique.singleton unique_use occ in
   match Maybe_unique.mark_multi_use maybe_unique with
   | Ok () -> ()
   | Error cannot_force ->
-    raise (Error (Borrowed_value_used_uniquely cannot_force))
+    Error.log_or_raise (Borrowed_value_used_uniquely cannot_force)
 
 module Value : sig
   (** See [existing] for its meaning *)
@@ -1993,7 +2035,7 @@ let rec pattern_match_tuple pat values =
     (* No read: the tuple does not exist in memory *)
     Unique_barrier.enable pat.pat_unique_barrier;
     List.map2
-      (fun (_, pat) value ->
+      (fun (_, pat, _) value ->
         let paths =
           match Value.paths value with
           | None -> Paths.fresh ()
@@ -2073,6 +2115,7 @@ and pattern_match_barrier pat paths : UF.t =
     (* Lazy patterns consume their memory anyway since
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
+  | Tpat_addr _ -> borrow_memory_address ()
   | Tpat_tuple _ -> borrow_memory_address ()
   | Tpat_unboxed_unit ->
     (* unboxed units are not allocations *)
@@ -2156,9 +2199,12 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let uf_force = Paths.mark_aliased occ Lazy paths in
       let ext, uf_arg = pattern_match_single arg (Paths.fresh ()) in
       ext, UF.par uf_force uf_arg
+    | Tpat_addr (mut, _, arg) ->
+      let paths = Paths.address_load mut paths in
+      pattern_match_single arg paths
     | Tpat_tuple args ->
       List.mapi
-        (fun i (_, arg) ->
+        (fun i (_, arg, _) ->
           let paths = Paths.tuple_field i paths in
           pattern_match_single arg paths)
         args
@@ -2443,7 +2489,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_tuple (es, _) ->
     UF.pars
       (List.mapi
-         (fun i (_, e) ->
+         (fun i (_, e, _) ->
            check_uniqueness_exp
              ~overwrite:(descend (Projection.Tuple_field i) overwrite)
              ienv e)
@@ -2470,7 +2516,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     let value, uf_ext =
       match extended_expression with
       | None -> Value.fresh, UF.unused
-      | Some (exp, _, unique_barrier) ->
+      | Some (exp, _, _, unique_barrier) ->
         let value, uf_exp = check_uniqueness_exp_as_value ienv exp in
         Unique_barrier.enable unique_barrier;
         let uf_read =
@@ -2766,7 +2812,9 @@ and is_borrowed ~borrows ienv exp =
       exp.exp_extra
   then (
     match borrows with
-    | None -> raise (Error (Borrowed_out_of_context exp.exp_loc))
+    | None ->
+      Error.log_or_raise (Borrowed_out_of_context exp.exp_loc);
+      None
     | Some borrows_ref ->
       let value, uf =
         check_uniqueness_exp_desc_as_value ~borrows ienv ~loc:exp.exp_loc
@@ -2798,7 +2846,7 @@ and check_uniqueness_exp_desc_for_match ~borrows ienv ~loc :
     let values, ufs =
       List.split
         (List.map
-           (fun (_, e) -> check_uniqueness_exp_as_value ~borrows ienv e)
+           (fun (_, e, _) -> check_uniqueness_exp_as_value ~borrows ienv e)
            es)
     in
     Match_tuple values, UF.pars ufs
@@ -3122,7 +3170,7 @@ let report_error err =
 
 let () =
   Location.register_error_of_exn (function
-    | Error e -> Some (report_error e)
-    | Usage.Unique_use_during_borrowing inner ->
+    | Error.In_context e -> Some (report_error e)
+    | Usage.Unique_use_during_borrowing.In_context inner ->
       Some (report_unique_use_during_borrowing inner)
     | _ -> None)

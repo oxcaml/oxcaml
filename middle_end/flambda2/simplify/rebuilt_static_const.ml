@@ -108,16 +108,10 @@ let find_code_characteristics find_code_metadata code_id :
     Cost_metrics.code_characteristics =
   let code_metadata = find_code_metadata code_id in
   { cost_metrics = Code_metadata.cost_metrics code_metadata;
-    params_arity =
-      Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
+    function_slot_size = Code_metadata.function_slot_size code_metadata
   }
 
 let create_set_of_closures are_rebuilding ~find_code_metadata set =
-  let set =
-    Set_of_closures.create
-      ~value_slots:(Set_of_closures.value_slots set)
-      (Set_of_closures.function_decls set)
-  in
   let free_names = Set_of_closures.free_names set in
   let cost_metrics =
     Cost_metrics.set_of_closures
@@ -472,7 +466,7 @@ module Group = struct
   let function_params_and_body_for_code_not_rebuilt =
     lazy
       (Function_params_and_body.create
-         ~return_continuation:(Continuation.create ())
+         ~return_continuation:(Continuation.create ~sort:Return ())
          ~exn_continuation:(Continuation.create ()) Bound_parameters.empty
          ~body:(Expr.create_invalid Code_not_rebuilt)
          ~free_names_of_body:Unknown

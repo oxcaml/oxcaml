@@ -107,39 +107,10 @@ module type Lattices_mono = sig
   val compose :
     'c obj -> ('b, 'c, 'd) morph -> ('a, 'b, 'd) morph -> ('a, 'c, 'd) morph
 
-  (* Usual notion of adjunction:
-     Given two morphisms [f : A -> B] and [g : B -> A], we require [f a <= b]
-      iff [a <= g b] for each [a \in A] and [b \in B].
+  (* Definition (adjunction): Two morphisms [f : A -> B] and [g : B -> A], are
+     adjoint whenever [f a <= b] iff [a <= g b] for all [a \in A] and [b \in B].
 
-     Our solver accepts a wider notion of adjunction: Given two morphisms [f : A
-     -> B] and [g : B -> A], we require [f a <= b] iff [a <= g b] for each [a]
-      in the downward closure of [g]'s image and [b \in B].
-
-     We say [f] is a partial left adjoint of [g], because [f] is only
-     constrained in part of its domain. As a result, [f] is not unique, since
-     its valuation out of the constrained range can be arbitrarily chosen.
-
-     Dually, we can define the concept of partial right adjoint. Since partial
-     adjoints are not unique, they don't form a pair: i.e., a partial left
-     joint of a partial right adjoint of [f] is not [f] in general.
-
-     Concretely, the solver provides/requires the following guarantees
-     (continuing the example above):
-
-     For the user of the [Solvers_polarized].
-     - [g] applied to a right mode [m] can be used as a right mode without
-     any restriction.
-     - [f] applied to to a left mode [m] can be used as a left mode, given that
-     the [m] is fully within the downward closure of [g]. This is unfortunately
-     not enforcable by the ocaml type system, and we have to rely on user's
-     caution.
-
-     For the supplier of the [Lattices_mono]:
-     - The result of [left_adjoint g] is applied only on the downward closure of
-     [g]'s image.
-  *)
-
-  (* Note that [left_adjoint] and [right_adjoint] returns a [morph] weaker than
+     Note that [left_adjoint] and [right_adjoint] returns a [morph] weaker than
      what we want, which is "\exists r. allowed * r". But ocaml doesn't like
      existentials, and this weaker version is good enough for us *)
 
@@ -241,14 +212,21 @@ module type Solver_mono = sig
       Raises exception if the condition does not hold. *)
   val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
 
+  (** Composes [to_const] and [of_const] while preserving the original hint *)
+  val to_of_const_exn :
+    'a obj -> ('a, allowed * allowed) mode -> ('a, allowed * allowed) mode
+
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
 
   (** The maximum mode in the lattice *)
   val max : 'a obj -> ('a, 'l * 'r) mode
 
-  (** The level of generic variables *)
+  (** The level of generic variables. *)
   val generic_level : int
+
+  (** The level of rigid variables used during subsumption. *)
+  val rigid_level : int
 
   (* CR-someday zqian: [zap_*] should take optional hint, pointing to the location in
      the source code where zapping happens *)
@@ -306,6 +284,13 @@ module type Solver_mono = sig
   val update_level :
     int -> 'a obj -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
 
+  (** Moves a variable [u] whose level is above [current_level] and below
+      [generic_level] to [generic_level + i], where [i] is the difference
+      between [u.level] and [current_level] (the same is then done to all of
+      [u]'s children) *)
+  val generalize_topology :
+    current_level:int -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
+
   (** Generalizes a variable whose level is above [current_level], by putting
       its level to [generic_level], and all its children above [current_level]
       to [generic_level + i] for some nonzero [i]. *)
@@ -344,22 +329,30 @@ module type Solver_mono = sig
     copy_from_level:int ->
     copy_below_level:int ->
     ?copy_to_level:int ->
-    ?persistent:bool ->
+    ?cause:[`Save | `Restore | `Neither] ->
     'a obj ->
     ('a, 'l * 'r) mode ->
     ('a, 'l * 'r) mode
 
   (** Creates a new mode variable above the given mode and returns [true]. In
-      the speical case where the given mode is top, returns the constant top and
+      the special case where the given mode is top, returns the constant top and
       [false]. *)
   val newvar_above :
-    'a obj -> int -> ('a, allowed * 'r_) mode -> ('a, 'l * 'r) mode * bool
+    'a obj ->
+    int ->
+    ('a, allowed * 'r_) mode ->
+    log:changes ref option ->
+    ('a, 'l * 'r) mode * bool
 
   (** Creates a new mode variable below the given mode and returns [true]. In
-      the speical case where the given mode is bottom, returns the constant
+      the special case where the given mode is bottom, returns the constant
       bottom and [false]. *)
   val newvar_below :
-    'a obj -> int -> ('a, 'l_ * allowed) mode -> ('a, 'l * 'r) mode * bool
+    'a obj ->
+    int ->
+    ('a, 'l_ * allowed) mode ->
+    log:changes ref option ->
+    ('a, 'l * 'r) mode * bool
 
   (** Returns the join of the list of modes. *)
   val join : 'a obj -> ('a, allowed * 'r) mode list -> ('a, left_only) mode
@@ -392,6 +385,47 @@ module type Solver_mono = sig
 
   (** Returns true if the mode is a constant or a mode variable at level 0 *)
   val check_const_or_level_0 : ('a, 'l * 'r) mode -> bool
+
+  (** Returns true if the mode includes a mode variable at generic level *)
+  val check_generic : ('a, 'l * 'r) mode -> bool
+
+  type var_iterator =
+    { iter : 'a. 'a obj -> ('a, allowed * allowed) mode -> unit }
+  [@@unboxed]
+
+  val mode_iter : 'a obj -> ('a, 'l * 'r) mode -> var_iterator -> unit
+
+  type 'b packed_morph = Packed_morph : ('a, 'b, 'd) morph -> 'b packed_morph
+
+  (** Applies an iterator over every reachable covariant (left-) constraint
+      variable. The iterator is only applied to constraint variables at level 0,
+      and exposes the int identifier of the constraint variable. WARNING: the
+      iterator is only applied once per constraint, even when it appears as a
+      constraint multiple times via different morphisms *)
+  val iter_covariant :
+    'a obj ->
+    ('a, allowed * 'r) mode ->
+    (id:int ->
+    level:int ->
+    morph:'a packed_morph ->
+    ('a, allowed * disallowed) mode ->
+    unit) ->
+    unit
+
+  (** Applies an iterator over every reachable contravariant (right-) constraint
+      variable. The iterator is only applied to constraint variables at level 0,
+      and exposes the int identifier of the constraint variable. WARNING: the
+      iterator is only applied once per constraint, even when it appears as a
+      constraint multiple times via different morphisms *)
+  val iter_contravariant :
+    'a obj ->
+    ('a, 'l * allowed) mode ->
+    (id:int ->
+    level:int ->
+    morph:'a packed_morph ->
+    ('a, disallowed * allowed) mode ->
+    unit) ->
+    unit
 
   (** Apply a monotone morphism explained by an optional hint *)
   val apply :
@@ -459,6 +493,54 @@ module type Solver_mono = sig
     val apply :
       'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
   end
+
+  (** The exposed description of modes *)
+  module Desc : sig
+    module Var : sig
+      type 'a t
+
+      type ('b, 'd) t_with_morph =
+        | Amorphvar : 'a t * ('a, 'b, 'd) morph -> ('b, 'd) t_with_morph
+
+      (** The exposed parts of a mode variable *)
+      module Head : sig
+        type 'a t =
+          { desc_id : int;  (** The identifier of a mode variable *)
+            desc_upper : 'a;  (** The precise upper bound of a mode variable *)
+            desc_lower : 'a;  (** The precise lower bound of a mode variable *)
+            desc_vlower : ('a, left_only) t_with_morph list;
+                (** A list of variables directly under the current variable *)
+            desc_level : int  (** The level of a mode variable *)
+          }
+
+        val equal : 'a t -> 'b t -> bool
+
+        val hash : 'a t -> int
+      end
+
+      val force : 'a obj -> 'a t -> 'a Head.t
+    end
+
+    type ('b, 'd) morphvar =
+      | Amorphvar : 'a Var.Head.t * ('a, 'b, 'd) morph -> ('b, 'd) morphvar
+
+    type ('a, 'd) t =
+      | Amode : 'a -> ('a, 'l * 'r) t
+      | Amodevar : ('a, 'd) morphvar -> ('a, 'd) t
+      | Amodejoin :
+          'a * ('a, 'l * disallowed) morphvar list
+          -> ('a, 'l * disallowed) t
+      | Amodemeet :
+          'a * ('a, disallowed * 'r) morphvar list
+          -> ('a, disallowed * 'r) t
+
+    val equal : 'a obj -> ('a, 'l * 'r) t -> ('a, 'l * 'r) t -> bool
+
+    val print : 'a obj -> Fmt.formatter -> ('a, 'l * 'r) t -> unit
+  end
+
+  (** Returns the description of a mode. *)
+  val desc : 'a obj -> ('a, 'd) mode -> ('a, 'd) Desc.t
 end
 
 (** Hint module to be provided by the user of the solver. *)

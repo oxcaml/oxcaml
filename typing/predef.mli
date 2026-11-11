@@ -54,6 +54,8 @@ type abstract_non_value_type_constr = [
   | `Idx_imm
   | `Idx_mut
   | `Idx_atomic
+  | `Addr
+  | `Addr_imm
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -123,14 +125,10 @@ val type_expr: type_expr -> type_expr
 val type_unboxed_unit: type_expr
 val type_unboxed_bool: type_expr
 val type_unboxed_float:type_expr
-val type_unboxed_float32:type_expr
-val type_unboxed_nativeint:type_expr
 val type_unboxed_char: type_expr
 val type_unboxed_int: type_expr
 val type_unboxed_int8: type_expr
 val type_unboxed_int16: type_expr
-val type_unboxed_int32:type_expr
-val type_unboxed_int64:type_expr
 val type_nativeint_u: type_expr
 val type_int32_u: type_expr
 val type_int64_u: type_expr
@@ -144,6 +142,8 @@ val type_or_null: type_expr -> type_expr
 val type_idx_imm : type_expr -> type_expr -> type_expr
 val type_idx_mut : type_expr -> type_expr -> type_expr
 val type_idx_atomic : type_expr -> type_expr -> type_expr
+val type_addr : type_expr -> type_expr
+val type_addr_imm : type_expr -> type_expr
 
 val type_int8x16: type_expr
 val type_int16x8: type_expr
@@ -223,14 +223,10 @@ val path_box: Path.t
 val path_unboxed_unit : Path.t
 val path_unboxed_bool : Path.t
 val path_unboxed_float: Path.t
-val path_unboxed_float32: Path.t
-val path_unboxed_nativeint: Path.t
 val path_unboxed_char: Path.t
 val path_unboxed_int: Path.t
 val path_unboxed_int8: Path.t
 val path_unboxed_int16: Path.t
-val path_unboxed_int32: Path.t
-val path_unboxed_int64: Path.t
 val path_nativeint_u: Path.t
 val path_int32_u: Path.t
 val path_int64_u: Path.t
@@ -244,6 +240,8 @@ val path_or_null: Path.t
 val path_idx_imm: Path.t
 val path_idx_mut: Path.t
 val path_idx_atomic: Path.t
+val path_addr: Path.t
+val path_addr_imm: Path.t
 
 val path_int8x16: Path.t
 val path_int16x8: Path.t
@@ -308,9 +306,11 @@ val ident_some : Ident.t
 val ident_or_null : Ident.t
 val ident_idx_imm : Ident.t
 val ident_idx_mut : Ident.t
+val ident_addr : Ident.t
+val ident_addr_imm : Ident.t
 
 (* The jkind used for optional function argument types *)
-val option_argument_jkind : jkind_lr
+val optional_argument_jkind : jkind_lr
 (* The jkind used for list argument types *)
 val list_argument_jkind : jkind_lr
 

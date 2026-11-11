@@ -20,10 +20,12 @@ open Stdlib
 
 let debug = Debug.find "binaryen"
 
+let times = Debug.find "binaryen-times"
+
 let command cmdline =
   let cmdline = String.concat ~sep:" " cmdline in
   if debug () then Format.eprintf "+ %s@." cmdline;
-  let res = Sys.command cmdline in
+  let res = Sys.command ((if times () then "BINARYEN_PASS_DEBUG=1 " else "") ^ cmdline) in
   if res <> 0 then failwith ("the following command terminated unsuccessfully: " ^ cmdline)
 
 let common_options () =
@@ -36,9 +38,17 @@ let common_options () =
     ; "--enable-bulk-memory"
     ; "--enable-nontrapping-float-to-int"
     ; "--enable-strings"
+    ; "--enable-multimemory" (* To keep wasm-merge happy *)
     ]
   in
-  if Config.Flag.pretty () then "-g" :: l else l
+  let l =
+    match Config.effects () with
+    | `Native -> "--enable-stack-switching" :: l
+    | `Disabled | `Jspi | `Cps | `Double_translation -> l
+  in
+  let l = if Config.Flag.pretty () then "-g" :: l else l in
+  let l = if times () then "--no-validation" :: l else l in
+  l
 
 let opt_flag flag v =
   match v with
@@ -131,11 +141,16 @@ let optimize
     ~output_file
     () =
   command
-    ("wasm-opt"
-     :: (common_options ()
-        @ (match options with
-          | Some o -> o
-          | None -> optimization_options profile)
-        @ [ Filename.quote input_file; "-o"; Filename.quote output_file ])
+    (* [--emit-exnref] is needed even though [Wasm_output] and
+       [Wat_output] now emit [try_table] directly when targeting WASI:
+       the runtime [.wat] files still use the legacy [try]/[catch] syntax,
+       and this flag converts them to [try_table] so the whole output is
+       uniformly in the new form. *)
+    (("wasm-opt" :: (if Config.Flag.wasi () then [ "--emit-exnref" ] else []))
+    @ common_options ()
+    @ (match options with
+      | Some o -> o
+      | None -> optimization_options profile)
+    @ [ Filename.quote input_file; "-o"; Filename.quote output_file ]
     @ opt_flag "--input-source-map" opt_input_sourcemap
     @ opt_flag "--output-source-map" opt_output_sourcemap)

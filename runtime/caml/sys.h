@@ -19,6 +19,8 @@
 #ifdef CAML_INTERNALS
 
 #include "misc.h"
+#include "mlvalues.h"
+#include <stddef.h>
 
 CAMLextern char * caml_strerror(int errnum, char * buf, size_t buflen);
 
@@ -29,7 +31,8 @@ CAMLnoret CAMLextern void caml_sys_error (value);
 CAMLnoret CAMLextern void caml_sys_io_error (value);
 
 CAMLextern double caml_sys_time_unboxed(value);
-CAMLextern void caml_sys_init (const char_os * exe_name, char_os ** argv);
+CAMLextern void caml_sys_init (const char_os * exe_name,
+                               char_os const * const * argv);
 
 CAMLnoret CAMLextern void caml_do_exit (int);
 

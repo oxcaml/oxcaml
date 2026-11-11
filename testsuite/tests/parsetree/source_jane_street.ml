@@ -161,10 +161,10 @@ type t17b : (value & value) non_pointer
 type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
-Line 4, characters 12-39:
+Line 4, characters 28-39:
 4 | type t17b : (value & value) non_pointer
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+                                ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "value & value".
 
 type t17b : value & value
 |}]
@@ -172,7 +172,7 @@ type t17b : value & value
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
   ('a : value mod immutable global)
 [%%expect{|
-type ('a : value mod everything non_float) t18 = 'a
+type ('a : (value mod everything) non_float) t18 = 'a
 |}]
 
 type t = #(int * float#)
@@ -514,6 +514,37 @@ type ('a, 'b) labeled_fn =
     'a @ local portable contended ->
     (int -> 'b @ local once unique) @ portable
 type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
+|}]
+
+module type S_for_mode_polymorphism = sig
+  val variable : 'a @ 'm -> 'a @ 'm
+  val bounds : 'a @ [< 'm & 'n] -> 'a @ [> 'm | 'n]
+  val constants : 'a @ [< portable many] -> 'a @ [> local once]
+  val combined : 'a @ [< 'm & portable > 'n | dynamic] -> 'a @ [> 'm]
+  val past : 'a @ [< past('m)] -> 'a @ [> past('m)]
+  val modified :
+    'a @ [< 'm mod portable contended & past('n) mod global] ->
+    'a @ [> 'm mod many aliased | past('n) mod local]
+  val close :
+    'a @ [< 'm] ->
+    ('b @ 'n -> 'a @ [> 'm]) @
+      [> close('m) mod portable | close('n) | local once]
+end
+
+[%%expect{|
+>> Fatal error: Line 2, characters 22-24: mode variables and mode bounds are not yet supported
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+module type Mixed_mode_annotations = sig
+  val f : 'a @ portable many 'm contended 'n [< 'o] -> unit
+end
+
+[%%expect{|
+>> Fatal error: Line 2, characters 29-31: mode variables and mode bounds are not yet supported
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* kitchen sink, with new @ syntax *)
@@ -944,23 +975,28 @@ val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
 let z, punned = 4, 5
 let x_must_be_even _ = assert false
 exception Odd
+type 'a t = T of 'a
 
 let x = (~x:1, ~y:2)
 let x = ((~x:1, ~y:2) [@test.attr])
 let _ = ( ~x: 5, 2, ~z, ~(punned:int))
 let (x : (x:int * y:int)) = (~x:1, ~y:2)
 let (x : ((x:int * y:int) [@test.attr])) = (~x:1, ~y:2)
+let ~x:(T x), T y = ~x:(T 5), T 10
 
 [%%expect{|
 val z : int = 4
 val punned : int = 5
 val x_must_be_even : 'a -> 'b = <fun>
 exception Odd
+type 'a t = T of 'a
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : int = 5
+val y : int = 10
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
@@ -1236,7 +1272,7 @@ result: 7.000000
 val f : float# -> float# = <fun>
 larger match result: 3.000000
 - : unit = ()
-val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+val f : int64_u -> [> `Five | `Four | `Other ] = <fun>
 |}]
 
 let x =
@@ -1255,7 +1291,7 @@ test_int64 "result" (f #7L);;
 
 [%%expect{|
 val x : unit = ()
-val f : int64# -> int64# = <fun>
+val f : int64_u -> int64_u = <fun>
 result: 7
 - : unit = ()
 |}]
@@ -1459,7 +1495,7 @@ module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 (* small numbers *)
 
 type t1 = float32
-type t2 = float32#
+type t2 = float32_u
 type t3 = int8
 type t4 = int8#
 type t5 = int16
@@ -1474,13 +1510,13 @@ let z () = #42S
 
 [%%expect{|
 type t1 = float32
-type t2 = float32#
+type t2 = float32_u
 type t3 = int8
 type t4 = int8#
 type t5 = int16
 type t6 = int16#
 val x : float32 = 3.1400001s
-val x : unit -> float32# = <fun>
+val x : unit -> float32_u = <fun>
 val y : int8 = 42s
 val y : unit -> int8# = <fun>
 val z : int16 = 42S
@@ -1829,4 +1865,130 @@ module type S = sig
 end
 [%%expect{|
 module type S = sig val poly_ f : 'a -> 'b end
+|}]
+
+(*************************************************)
+(* Attributes on constrained function parameters *)
+
+let f ((x : int) [@test.attr]) = x
+[%%expect{|
+val f : int -> int = <fun>
+|}]
+
+let f ~l:((x : int) [@test.attr]) = x
+[%%expect{|
+val f : l:int -> int = <fun>
+|}]
+
+let f ?l:((x : int option) [@test.attr]) () = x
+[%%expect{|
+val f : ?l:int -> unit -> int option = <fun>
+|}]
+
+let f ?l:((x : int) [@test.attr] = 0) () = x
+[%%expect{|
+val f : ?l:int -> unit -> int = <fun>
+|}]
+
+let f ((x : int) [@test.attr] @ local) = x
+[%%expect{|
+val f : int @ local -> int = <fun>
+|}]
+
+let f ~l:((x : int) [@test.attr] @ local) = x
+[%%expect{|
+val f : l:int @ local -> int = <fun>
+|}]
+
+(********************************)
+(* exclave_ sequence precedence *)
+
+let no_parens () = exclave_ (); ()
+[%%expect{|
+val no_parens : unit -> unit @ local = <fun>
+|}]
+let right_parens () = exclave_ ((); ())
+[%%expect{|
+val right_parens : unit -> unit @ local = <fun>
+|}]
+let left_parens () = (exclave_ ()); ()
+[%%expect{|
+Line 1, characters 21-34:
+1 | let left_parens () = (exclave_ ()); ()
+                         ^^^^^^^^^^^^^
+Error: Exclave expression should only be in tail position of the current region.
+|}]
+
+(*********************)
+(* Address patterns *)
+
+type addr_variant = K of u addr | L of u addr_imm
+[%%expect{|
+type addr_variant = K of u addr | L of u addr_imm
+|}]
+
+let f = function
+  | K addr_ (A foo) -> foo
+  | K addr_ (B _ | C _ | D) -> ()
+  | L _ -> ()
+[%%expect{|
+val f : addr_variant -> unit = <fun>
+|}]
+
+let f (addr_ x) = x
+[%%expect{|
+val f : 'a addr -> 'a = <fun>
+|}]
+
+let f (addr_ (addr_ x)) = x
+[%%expect{|
+val f : 'a addr addr -> 'a = <fun>
+|}]
+
+let f (addr_ x : int addr) = x
+[%%expect{|
+val f : int addr -> int = <fun>
+|}]
+
+let f (addr_ x : string addr @ local) = x
+[%%expect{|
+val f : string addr @ local -> string @ local = <fun>
+|}]
+
+let f a = let addr_ x = a in x
+[%%expect{|
+val f : 'a addr -> 'a = <fun>
+|}]
+
+let f = function
+  | L addr_imm_ (A foo) -> foo
+  | L addr_imm_ (B _ | C _ | D) -> ()
+  | K _ -> ()
+[%%expect{|
+val f : addr_variant -> unit = <fun>
+|}]
+
+let f (addr_imm_ x) = x
+[%%expect{|
+val f : 'a addr_imm -> 'a = <fun>
+|}]
+
+let f (addr_imm_ (addr_imm_ x)) = x
+[%%expect{|
+val f : 'a addr_imm addr_imm -> 'a = <fun>
+|}]
+
+let f (addr_imm_ x : int addr_imm) = x
+[%%expect{|
+val f : int addr_imm -> int = <fun>
+|}]
+
+let f (addr_imm_ x : string addr_imm @ local) = x
+[%%expect{|
+val f : string addr_imm @ local -> string @ local = <fun>
+|}]
+
+let f a = let addr_imm_ x = a in x
+[%%expect{|
+val f : 'a addr_imm -> 'a = <fun>
 |}]

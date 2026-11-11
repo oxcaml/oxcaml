@@ -27,11 +27,10 @@ let needs_dwarf_five () =
   | Four -> Misc.fatal_error "Attribute not supported for DWARF-4"
   | Five -> ()
 
-let create_entry_pc address_label =
-  let spec = AS.create Entry_pc Addr in
-  AV.create spec
-    (V.code_address_from_label ~comment:"entry PC value" address_label)
-
+(* Note that there are deliberately no [DW_AT_entry_pc] helpers: entry points
+   are always at the start of our functions, which is the default consumers
+   assume (from [DW_AT_low_pc]), so emitting the attribute would only cost
+   space. *)
 let create_low_pc address_label =
   let spec = AS.create Low_pc Addr in
   AV.create spec
@@ -45,54 +44,33 @@ let create_low_pc_with_offset address_label ~offset_in_bytes =
 
 let create_high_pc_offset ~low_pc ~low_pc_offset_in_bytes ~high_pc
     ~high_pc_offset_in_bytes =
-  assert (Targetint.size = 64);
-  let spec = AS.create High_pc Data8 in
+  (* Function sizes always fit in 32 bits (also below); the assembler checks for
+     overflow. *)
+  let spec = AS.create High_pc Data4 in
   AV.create spec
-    (V.distance_between_labels_64_bit_with_offsets ~upper:high_pc
+    (V.distance_between_labels_32_bit_with_offsets ~upper:high_pc
        ~upper_offset:high_pc_offset_in_bytes ~lower:low_pc
        ~lower_offset:low_pc_offset_in_bytes ~comment:"high PC value as offset"
        ())
 
 let create_high_pc ~low_pc high_pc =
-  match Dwarf_arch_sizes.size_addr with
-  | 4 ->
-    (* CR mshinwell: Shouldn't these be of form [Addr]? *)
-    let spec = AS.create High_pc Data4 in
-    AV.create spec
-      (V.distance_between_label_and_symbol_32_bit ~comment:"high PC value"
-         ~upper:high_pc ~lower:low_pc ())
-  | 8 ->
-    let spec = AS.create High_pc Data8 in
-    AV.create spec
-      (V.distance_between_label_and_symbol_64_bit ~comment:"high PC value"
-         ~upper:high_pc ~lower:low_pc ())
-  | _ ->
-    Misc.fatal_errorf "Unknown [Dwarf_arch_sizes.size_addr] = %d"
-      Dwarf_arch_sizes.size_addr
-
-let create_entry_pc_from_symbol symbol =
-  let spec = AS.create Entry_pc Addr in
-  AV.create spec (V.code_address_from_symbol ~comment:"entry PC value" symbol)
+  let spec = AS.create High_pc Data4 in
+  AV.create spec
+    (V.distance_between_label_and_symbol_32_bit_with_offset
+       ~comment:"high PC value" ~upper:high_pc ~offset_upper:Targetint.zero
+       ~lower:low_pc ())
 
 let create_low_pc_from_symbol symbol =
   let spec = AS.create Low_pc Addr in
   AV.create spec (V.code_address_from_symbol ~comment:"low PC value" symbol)
 
 let create_high_pc_from_symbol ~low_pc high_pc =
-  match Dwarf_arch_sizes.size_addr with
-  | 4 ->
-    let spec = AS.create High_pc Data4 in
-    AV.create spec
-      (V.distance_between_symbols_32_bit ~comment:"high PC value" ~upper:high_pc
-         ~lower:low_pc ())
-  | 8 ->
-    let spec = AS.create High_pc Data8 in
-    AV.create spec
-      (V.distance_between_symbols_64_bit ~comment:"high PC value" ~upper:high_pc
-         ~lower:low_pc ())
-  | _ ->
-    Misc.fatal_errorf "Unknown [Dwarf_arch_sizes.size_addr] = %d"
-      Dwarf_arch_sizes.size_addr
+  (* Code sizes always fit in 32 bits, as above; the assembler checks for
+     overflow. *)
+  let spec = AS.create High_pc Data4 in
+  AV.create spec
+    (V.distance_between_symbols_32_bit ~comment:"high PC value" ~upper:high_pc
+       ~lower:low_pc ())
 
 let create_producer producer_name =
   let spec = AS.create Producer Strp in
@@ -302,18 +280,20 @@ let create_type_from_reference ~proto_die_reference:label =
   AV.create spec
     (V.offset_into_debug_info ~comment:"reference to type DIE" label)
 
-(* CR-soon mshinwell: remove "_exn" prefix. *)
 let create_byte_size_exn ~byte_size =
-  let spec = AS.create Byte_size Data8 in
-  AV.create spec (V.int64 ~comment:"byte size" (Int64.of_int byte_size))
+  let spec = AS.create Byte_size Udata in
+  AV.create spec
+    (V.uleb128 ~comment:"byte size" (Uint64.of_nonnegative_int_exn byte_size))
 
 let create_bit_size bit_size =
   let spec = AS.create Bit_size Data1 in
   AV.create spec (V.int8 ~comment:"bit size" bit_size)
 
 let create_data_member_location_offset ~byte_offset =
-  let spec = AS.create Data_member_location Data8 in
-  AV.create spec (V.int64 ~comment:"data member location" byte_offset)
+  let spec = AS.create Data_member_location Udata in
+  AV.create spec
+    (V.uleb128 ~comment:"data member location"
+       (Uint64.of_nonnegative_int64_exn byte_offset))
 
 let create_data_member_location_description loc_desc =
   let spec = AS.create Data_member_location Exprloc in
@@ -328,8 +308,10 @@ let create_linkage_name ~linkage_name =
   AV.create spec (V.indirect_string ~comment:"linkage name" linkage_name)
 
 let create_const_value ~value =
-  let spec = AS.create Const_value Data8 in
-  AV.create spec (V.int64 value)
+  (* [Sdata] rather than [Udata] since e.g. polymorphic variant constructor
+     hashes can be negative. *)
+  let spec = AS.create Const_value Sdata in
+  AV.create spec (V.sleb128 value)
 
 let create_const_value_from_symbol ~symbol =
   match Targetint.size with
@@ -342,8 +324,9 @@ let create_const_value_from_symbol ~symbol =
   | size -> Misc.fatal_errorf "Unknown Targetint.size %d" size
 
 let create_discr_value ~value =
-  let spec = AS.create Discr_value Data8 in
-  AV.create spec (V.int64 value)
+  (* [Sdata] as for [create_const_value] above. *)
+  let spec = AS.create Discr_value Sdata in
+  AV.create spec (V.sleb128 value)
 
 let create_addr_base label =
   let spec = AS.create Addr_base Sec_offset_addrptr in
@@ -393,16 +376,17 @@ let create_declaration () =
     (V.flag_true ~comment:"incomplete / non-defining declaration" ())
 
 let create_byte_stride ~bytes =
-  let spec = AS.create Byte_stride Data8 in
-  AV.create spec (V.int64 bytes)
+  let spec = AS.create Byte_stride Udata in
+  AV.create spec
+    (V.uleb128 ~comment:"byte stride" (Uint64.of_nonnegative_int64_exn bytes))
 
 let create_count loc_desc =
   let spec = AS.create Count Exprloc in
   AV.create spec (V.single_location_description loc_desc)
 
 let create_count_const i =
-  let spec = AS.create Count Data8 in
-  AV.create spec (V.int64 i)
+  let spec = AS.create Count Udata in
+  AV.create spec (V.uleb128 (Uint64.of_nonnegative_int64_exn i))
 
 let create_ocaml_compiler_version version =
   let spec = AS.create (Ocaml_specific Compiler_version) Strp in
@@ -437,5 +421,5 @@ let create_ocaml_cmt_file_digest digest =
   AV.create spec (V.indirect_string ~comment:".cmt file digest" hex)
 
 let create_ocaml_offset_record_from_pointer ~value =
-  let spec = AS.create (Ocaml_specific Offset_record_from_pointer) Data8 in
-  AV.create spec (V.int64 value)
+  let spec = AS.create (Ocaml_specific Offset_record_from_pointer) Sdata in
+  AV.create spec (V.sleb128 value)

@@ -61,16 +61,22 @@ end
 
 val generic_level: int
         (* level of polymorphic variables; = Ident.highest_scope *)
+val subject_level: int
+        (* level of the subject of moregen; = generic_level - 1*)
 val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
 
-val with_new_pool: level:int -> (unit -> 'a) -> 'a * transient_expr list
-        (* [with_new_pool ~level f] executes [f] and returns the nodes
-           that were created at level [level] and above *)
+val with_new_pool:
+  level:int -> (unit -> 'a)
+  -> 'a * transient_expr list * Jkind_types.Sort.t list
+        (* [with_new_pool ~level f] executes [f] and returns the type and sort
+           nodes that were created at level [level] and above *)
 val add_to_pool: level:int -> transient_expr -> unit
         (* Add a type node to the pool associated to the level (which should
            be the level of the type node).
            Do nothing if [level = generic_level] or [level = lowest_level]. *)
+val add_to_sort_pool: level:int -> Jkind_types.Sort.t -> unit
+        (* Like [add_to_pool], but adds a sort to the pool. *)
 
 val newty3: level:int -> scope:int -> type_desc -> type_expr
         (* Create a type with a fresh id *)
@@ -93,6 +99,8 @@ val new_quote_eval_ty: type_expr -> type_expr
         (* Quote-eval a type expression *)
 val new_box_ty: type_expr -> type_expr
         (* Box a type expression *)
+
+val new_sort_var: level:int -> Jkind_types.Sort.var
 
 (**** Types ****)
 
@@ -157,15 +165,20 @@ val set_static_row_name: type_declaration -> Path.t -> unit
 
 (**** Utilities for type traversal ****)
 
-val iter_type_expr: (type_expr -> unit) -> type_expr -> unit
+val iter_type_expr:
+  (type_expr -> unit) -> (Mode.With_locality.lr -> unit) ->
+  type_expr -> unit
         (* Iteration on types *)
-val fold_type_expr: ('a -> type_expr -> 'a) -> 'a -> type_expr -> 'a
+val fold_type_expr:
+  ('a -> type_expr -> 'a) -> ('a -> Mode.With_locality.lr -> 'a) ->
+  'a -> type_expr -> 'a
 val iter_row: (type_expr -> unit) -> row_desc -> unit
         (* Iteration on types in a row *)
 val fold_row: ('a -> type_expr -> 'a) -> 'a -> row_desc -> 'a
 val iter_abbrev: (type_expr -> unit) -> abbrev_memo -> unit
         (* Iteration on types in an abbreviation list *)
-val iter_type_expr_kind: (type_expr -> unit) -> (type_decl_kind -> unit)
+val iter_type_expr_kind: (type_expr -> unit) ->
+  (type_decl_kind -> unit)
 
 val iter_type_expr_cstr_args: (type_expr -> unit) ->
   (constructor_arguments -> unit)
@@ -200,6 +213,8 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
+    it_mode_expr: Mode.With_locality.lr -> unit;
+    it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
 type type_iterators_full = (type_expr -> unit) type_iterators
@@ -216,7 +231,8 @@ val type_iterators_without_type_expr: type_iterators_without_type_expr
 (**** Utilities for copying ****)
 
 val copy_type_desc:
-    ?keep_names:bool -> (type_expr -> type_expr) -> type_desc -> type_desc
+    ?keep_names:bool -> (type_expr -> type_expr) ->
+    (Mode.With_locality.lr -> Mode.With_locality.lr) -> type_desc -> type_desc
         (* Copy on types *)
 val copy_row:
     (type_expr -> type_expr) ->
@@ -235,6 +251,26 @@ module For_copy : sig
 
   val redirect_desc: copy_scope -> type_expr -> type_desc -> unit
         (* Temporarily change a type description *)
+
+  val mode_instantiate :
+    copy_scope -> current_level:int ->
+    Mode.With_locality.lr -> Mode.With_locality.lr
+        (* Instantiates a generic mode variable to level [current_level] *)
+
+  val mode_copy_generic :
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
+        (* Copies the generic parts of a mode variable
+           without changing its level *)
+
+  val mode_copy_for_saving :
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
+        (* Deeply copies a mode variable without changing its level, giving
+           the copies negative (persistent) ids, for storing in a cmi file. *)
+
+  val mode_copy_for_restoring :
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
+        (* Deeply copies a mode variable without changing its level.
+           Asserts that the original has negative ids. *)
 
   val with_scope: (copy_scope -> 'a) -> 'a
         (* [with_scope f] calls [f] and restores saved type descriptions
@@ -364,17 +400,10 @@ module Jkind0 : sig
     val set_crossing : Crossing.t -> t -> t
     val set_externality : Externality.t -> t -> t
 
-    (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max]
-        within [bounds] *)
-    val set_max_in_set : t -> Jkind_axis.Axis_set.t -> t
-
     (** [set_min_in_set bounds axes] sets all the axes in [axes] to their [min]
         within [bounds] *)
     val set_min_in_set : t -> Jkind_axis.Axis_set.t -> t
 
-    (** [is_max_within_set bounds axes] returns whether or not all the axes in
-        [axes] are [max] within [bounds] *)
-    val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
     val is_max : t -> bool
 
     val min : t
@@ -387,8 +416,10 @@ module Jkind0 : sig
     val of_axis_lattice : Axis_lattice.t -> t
     val meet : t -> t -> t
 
-    val relevant_axes_of_modality :
-      modality:Mode.Modality.Const.t -> Jkind_axis.Axis_set.t
+    val mask_of_modality : modality:Mode.Modality.Const.t -> Axis_lattice.t
+
+    (** [apply_mask bounds mask] takes the meet of [bounds] and [mask]. *)
+    val apply_mask : t -> Axis_lattice.t -> t
 
     val debug_print : Format.formatter -> t -> unit
   end
@@ -576,6 +607,12 @@ module Jkind0 : sig
       (** The jkind of block indices with mode crossing. *)
       val kind_of_idx : t
 
+      (** The jkind of mutable addresses ([addr]) with mode crossing. *)
+      val kind_of_addr : t
+
+      (** The jkind of immutable addresses ([addr_imm]) with mode crossing. *)
+      val kind_of_addr_imm : t
+
       (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
       val vec128 : t
 
@@ -616,7 +653,7 @@ module Jkind0 : sig
     module Sub_failure_reason : sig
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
-        | Layout_disagreement
+        | Layout_disagreement of Jkind_types.Sort.error
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
@@ -681,8 +718,6 @@ module Jkind0 : sig
     val map_type_expr :
       (type_expr -> type_expr) -> ('l * 'r) jkind -> ('l * 'r) jkind
 
-    val instance : jkind_lr -> jkind_lr
-
     val has_with_bounds : jkind_l -> bool
 
     module Builtin : sig
@@ -712,11 +747,6 @@ module Jkind0 : sig
         ('l * disallowed) jkind
       val immediate_or_null :
         why:Jkind_intf.History.immediate_or_null_creation_reason -> 'd jkind
-      val product :
-        why:Jkind_intf.History.product_creation_reason ->
-        (type_expr * Mode.Modality.Const.t) list ->
-        Jkind_types.Sort.t Jkind_types.Layout.t list ->
-        jkind_l
       val product_of_any :
         why:Jkind_intf.History.product_creation_reason ->
         int ->
@@ -733,17 +763,14 @@ module Jkind0 : sig
 
     val for_boxed_record : label_declaration list -> jkind_l
 
-    val for_boxed_record_with_updates :
-      (label_declaration * type_expr * Jkind_types.Sort.Const.t option) list ->
-      jkind_l
-
     (* Shared type-level implementation of Steps B1-B4 from
        Note [With-bounds for GADTs].  Callers choose the projection target via
        [projected_params]: declaration parameters for boxed GADTs, or the
-       already-instantiated head arguments for unboxed GADTs. *)
+       already-instantiated head arguments for unboxed GADTs.
+       [cstr_res = None] returns an empty substitution. *)
     val gadt_payload_subst :
       projected_params:Types.type_expr list ->
-      res_args:Types.type_expr list ->
+      cstr_res:Types.type_expr option ->
       payload_tys:Types.type_expr list ->
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       (Types.type_expr * Types.type_expr) list
@@ -757,6 +784,7 @@ module Jkind0 : sig
         Types.type_expr list ->
         Types.type_expr) ->
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
+      cstr_layouts:Types.cstr_layout array ->
       Types.constructor_declaration list ->
       Types.jkind_l
 

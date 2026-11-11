@@ -174,13 +174,31 @@ let%expect_test "of_string" =
   [%expect {| Failure("float_of_string") |}];
   let x = "0x1.1 p-1" in
   print' (fun () -> float_of_string x);
-  [%expect {| Failure("float_of_string") |}]
+  [%expect {| Failure("float_of_string") |}];
+  let x = " -0x1.1" in
+  print' (fun () -> float_of_string x);
+  [%expect {| -1.062500 |}];
+  let x = " +0x1.1" in
+  print' (fun () -> float_of_string x);
+  [%expect {| 1.062500 |}];
+  let x = " -inf" in
+  print' (fun () -> float_of_string x);
+  [%expect {| -inf |}];
+  let x = " +inf" in
+  print' (fun () -> float_of_string x);
+  [%expect {| inf |}];
+  let x = " nan" in
+  print' (fun () -> float_of_string x);
+  [%expect {| nan |}]
 
 let%expect_test "of_string" =
   let x = "3.14" in
   print' (fun () -> float_of_string x);
   [%expect {| 3.140000 |}];
   let x = " 3.14" in
+  print' (fun () -> float_of_string x);
+  [%expect {| 3.140000 |}];
+  let x = "\t3.14" in
   print' (fun () -> float_of_string x);
   [%expect {| 3.140000 |}];
   let x = "3. 14" in
@@ -192,3 +210,170 @@ let%expect_test "of_string" =
   let x = "3.14 " in
   print' (fun () -> float_of_string x);
   [%expect {| Failure("float_of_string") |}]
+
+(* [caml_parse_float] used to trap on "nin" (the nan/inf detection read
+   past the end of the string) and to accept JavaScript binary/octal
+   literals like "0b101"/"0o17"; native raises [Failure]. *)
+let%expect_test "float_of_string rejects bad input" =
+  let p s = print' (fun () -> float_of_string s) in
+  p "nin";
+  [%expect {| Failure("float_of_string") |}];
+  p "nif";
+  [%expect {| Failure("float_of_string") |}];
+  p "ina";
+  [%expect {| Failure("float_of_string") |}];
+  p "0b101";
+  [%expect {| Failure("float_of_string") |}];
+  p "0o17";
+  [%expect {| Failure("float_of_string") |}];
+  p "1d0";
+  [%expect {| Failure("float_of_string") |}];
+  p "";
+  [%expect {| Failure("float_of_string") |}];
+  (* Valid values must still parse. *)
+  p "1.5";
+  [%expect {| 1.500000 |}];
+  p "1e3";
+  [%expect {| 1000.000000 |}];
+  p ".5";
+  [%expect {| 0.500000 |}];
+  p "1_000.5";
+  [%expect {| 1000.500000 |}];
+  p "nan";
+  [%expect {| nan |}];
+  p "-inf";
+  [%expect {| -inf |}];
+  p "0x1p4";
+  [%expect {| 16.000000 |}]
+
+let%expect_test "floatarray ops keep tag 254" =
+  let a = Float.Array.make 3 1.5 in
+  let p label fa = Printf.printf "%s=%d\n" label (Obj.tag (Obj.repr fa)) in
+  p "make" a;
+  p "sub" (Float.Array.sub a 0 2);
+  p "append" (Float.Array.append a a);
+  p "concat" (Float.Array.concat [ a; a ]);
+  [%expect {|
+    make=254
+    sub=254
+    append=254
+    concat=254
+    |}]
+
+let%expect_test "Array.make negative length" =
+  let n = Sys.opaque_identity (-1) in
+  (try
+     let a = Array.make n 0 in
+     Printf.printf "len=%d\n" (Array.length a)
+   with Invalid_argument m -> print_endline m);
+  [%expect {| Array.make |}]
+
+(* hash.c has a dedicated Double_array_tag case (elements mixed
+   directly, no header word) and skips Abstract_tag blocks. *)
+let%expect_test "Hashtbl.hash of float arrays" =
+  let p (x : Obj.t) = Printf.printf "%08x\n" (Hashtbl.hash x) in
+  p (Obj.repr [| 1.5 |]);
+  p (Obj.repr [| 1.5; 2.5 |]);
+  (* A long float array exercises the per-element budget (only the first
+     elements are mixed before [num] runs out). Build it with
+     [create_float] so the runtime representation is a flat float array
+     (Double_array_tag) on every OCaml version: [Array.init]'s result is
+     only unboxed by some stdlib versions, leaving the array generic and
+     the hash version-dependent. *)
+  let long = Array.create_float 20 in
+  for i = 0 to Array.length long - 1 do
+    long.(i) <- float_of_int i
+  done;
+  p (Obj.repr long);
+  p (Obj.repr [| nan |]);
+  p (Obj.repr [| -0. |]);
+  p (Obj.repr (1, [| 1.5 |], 2));
+  p (Obj.new_block 251 3);
+  [%expect
+    {|
+    30d3d2e3
+    07e28e3a
+    1ab69813
+    3228858d
+    0f478b8c
+    3498f980
+    00000000
+    |}]
+
+(* [ldexp] must round once: scaling in several steps can round twice
+   on the way into the subnormal range. *)
+let%expect_test "ldexp into subnormals" =
+  let p x = Printf.printf "%h\n" x in
+  p (ldexp (1. +. epsilon_float) (-1075));
+  p (ldexp 1. (-1074));
+  p (ldexp max_float (-2098));
+  p (ldexp 1. (-1075));
+  p (ldexp 1. 1024);
+  [%expect
+    {|
+    0x0.0000000000001p-1022
+    0x0.0000000000001p-1022
+    0x0.0000000000001p-1022
+    0x0p+0
+    infinity
+    |}]
+
+(* Hex float literals must be parsed exactly: scaling the mantissa
+   with a single multiplication underflows for exponents below -1074
+   and double-rounds mantissas wider than 53 bits. *)
+let%expect_test "hex float literals" =
+  let p s =
+    match float_of_string s with
+    | x -> Printf.printf "%h\n" x
+    | exception Failure _ -> print_endline "failure"
+  in
+  p "0x1.123456789abcdp-1023";
+  p "0x10p-1078";
+  p "0x1.00000000000008p0";
+  p "0x1.000000000000080000000000001p0";
+  p "0x.8p1";
+  p "0x8.p0";
+  p "0x1.fffffffffffff8p1023";
+  p "0x1.fffffffffffff7p1023";
+  p "-0x0p0";
+  p "0xp1";
+  p "0x1p";
+  [%expect
+    {|
+    0x0.891a2b3c4d5e6p-1022
+    0x0.0000000000001p-1022
+    0x1p+0
+    0x1.0000000000001p+0
+    0x1p+0
+    0x1p+3
+    infinity
+    0x1.fffffffffffffp+1023
+    -0x0p+0
+    failure
+    failure
+    |}]
+
+(* A hex-float exponent that overflows the accumulator must saturate to
+   infinity / 0, not wrap around modulo 2^32. "0x1p12884901890" used to
+   return 4.0 on the Wasm runtime (the exponent wrapped to 2). *)
+let%expect_test "hex float exponent overflow" =
+  let p s =
+    match float_of_string s with
+    | x -> Printf.printf "%h\n" x
+    | exception Failure _ -> print_endline "failure"
+  in
+  p "0x1p12884901890";
+  p "0x1p-12884901890";
+  p "0x1p99999999999";
+  p "0x1p-99999999999";
+  p "0x1p1024";
+  p "0x1p-1075";
+  [%expect
+    {|
+    infinity
+    0x0p+0
+    infinity
+    0x0p+0
+    infinity
+    0x0p+0
+    |}]

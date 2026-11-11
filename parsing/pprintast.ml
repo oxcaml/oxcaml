@@ -430,8 +430,38 @@ let string_loc ppf x = fprintf ppf "%s" x.txt
 let string_quot f x = pp f "`%a" ident_of_name x
 
 (* new mode and modality syntax *)
-let mode f { txt = Mode s; _ } =
-  pp_print_string f s
+let mode_consts f consts =
+  pp_print_list ~pp_sep:(fun f () -> pp f " ") string_loc f consts
+
+let mode_bound_var f { pbound_morph; pbound_var; pbound_mod } =
+  (match pbound_morph with
+   | None -> pp f "'%s" pbound_var.txt
+   | Some m -> pp f "%s('%s)" m.txt pbound_var.txt);
+  match pbound_mod with
+  | [] -> ()
+  | _ :: _ -> pp f " mod %a" mode_consts pbound_mod
+
+let mode_bound_elem f = function
+  | Pbound_var v -> mode_bound_var f v
+  | Pbound_const cs -> mode_consts f cs
+
+let mode_bound sep f elems =
+  pp_print_list ~pp_sep:(fun f () -> pp f "%s" sep) mode_bound_elem f elems
+
+let mode f { txt; _ } =
+  match txt with
+  | Pmode s -> pp_print_string f s
+  | Pmode_var v -> pp f "'%s" v
+  | Pmode_bounded { pmode_upper = []; pmode_lower = [] } ->
+      pp f "[]"
+  | Pmode_bounded { pmode_upper; pmode_lower = [] } ->
+      pp f "[< %a]" (mode_bound " & ") pmode_upper
+  | Pmode_bounded { pmode_upper = []; pmode_lower } ->
+      pp f "[> %a]" (mode_bound " | ") pmode_lower
+  | Pmode_bounded { pmode_upper; pmode_lower } ->
+      pp f "[< %a > %a]"
+        (mode_bound " & ") pmode_upper
+        (mode_bound " | ") pmode_lower
 
 let modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") mode f m
@@ -796,7 +826,7 @@ and tuple_pattern_component ctxt (f:Format.formatter) (label, x) : unit =
   | Some lbl, Some simple_name when String.equal simple_name lbl ->
     pp f "~%s" lbl
   (* Labeled component general case *)
-  | Some lbl, _ -> pp f "~%s:%a" lbl (pattern1 ctxt) x
+  | Some lbl, _ -> pp f "~%s:%a" lbl (simple_pattern ctxt) x
   (* Unlabeled component *)
   | None, _ -> pattern1 ctxt f x
 
@@ -848,6 +878,9 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_variant (l,None) ->  pp f "`%a" ident_of_name l
     | Ppat_constraint (p, ct, _) ->
         pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) (Option.get ct)
+    | Ppat_addr (mut, p) ->
+        let kw = match mut with Mutable -> "addr_" | Immutable -> "addr_imm_" in
+        pp f "@[<2>(%s@;%a)@]" kw (simple_pattern ctxt) p
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
     | Ppat_exception p ->
@@ -886,8 +919,18 @@ and record_pattern ctxt f ~unboxed l closed =
 
 (** for special treatment of modes in labeled expressions *)
 and pattern2 ctxt f p =
-  match p.ppat_desc with
-  | Ppat_constraint(p, ct, m) ->
+  match p.ppat_desc, p.ppat_attributes with
+  | Ppat_constraint (inner, cty, modes), (_ :: _ as attrs) ->
+    let p_without_modes =
+      { p with ppat_desc = Ppat_constraint (inner, cty, []);
+               ppat_attributes = [] }
+    in
+    pp f "@[<2>(%a)%a%a@]" (pattern2 ctxt) p_without_modes
+      (attributes ctxt) attrs optional_at_modes modes
+  | _, (_ :: _ as attrs) ->
+    pp f "@[<2>(%a)%a@]" (pattern2 ctxt) {p with ppat_attributes=[]}
+      (attributes ctxt) attrs
+  | Ppat_constraint(p, ct, m), [] ->
     begin match ct with
     | Some ct ->
         pp f "@[<2>%a@;:@;%a@]"
@@ -898,14 +941,14 @@ and pattern2 ctxt f p =
         (simple_pattern ctxt) p
         optional_at_modes m
     end
-  | _ -> pattern1 ctxt f p
+  | _, [] -> pattern1 ctxt f p
 
 (** for special treatment of modes in labeled expressions *)
 and simple_pattern1 ctxt f p =
-  match p.ppat_desc with
-  | Ppat_constraint _ ->
+  match p.ppat_desc, p.ppat_attributes with
+  | Ppat_constraint _, [] | _, _ :: _ ->
       pp f "(%a)" (pattern2 ctxt) p
-  | _ -> simple_pattern ctxt f p
+  | _, [] -> simple_pattern ctxt f p
 
 and label_exp ctxt f (l,opt,p) =
   match l with
@@ -1074,7 +1117,10 @@ and expression ctxt f x =
     | Pexp_apply
       ({ pexp_desc = Pexp_extension({txt = "extension.exclave"}, PStr []) },
        [Nolabel, sbody]) ->
-        pp f "@[<2>exclave_ %a@]" (expression ctxt) sbody
+        if ctxt.semi then
+          paren true (expression reset_ctxt) f x
+        else
+          pp f "@[<2>exclave_ %a@]" (expression ctxt) sbody
     | Pexp_apply (e, l) ->
         begin if not (sugar_expr ctxt f x) then
             match view_fixity_of_exp e with
@@ -1778,6 +1824,7 @@ and module_expr ctxt f x =
     | Pmod_unpack e ->
         pp f "(val@ %a)" (expression ctxt) e
     | Pmod_extension e -> extension ctxt f e
+    | Pmod_hole -> pp f "_"
     | Pmod_instance i ->
         pp f "(%a [@jane.non_erasable.instances])"(instance ctxt) i
 

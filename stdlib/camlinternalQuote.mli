@@ -26,6 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Stdlib
 (* CR metaprogramming aivaskovic: This file has not been code reviewed *)
 
 type 'a lam
@@ -358,6 +359,8 @@ module Pat : sig
   val array : t list -> t
 
   val or_ : t -> t -> t
+
+  val addr : t -> bool -> t
 
   val lazy_ : t -> t
 

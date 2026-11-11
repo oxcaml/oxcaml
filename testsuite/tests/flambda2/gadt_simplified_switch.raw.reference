@@ -31,11 +31,8 @@
      | 0 -> k1 ($camlGadt_simplified_switch__immstring_0)
      | 1 -> k1 ($camlGadt_simplified_switch__immstring_1)
  in
- let extract_int = closure extract_int_0 @extract_int &toplevel.alloc_region
- in
- let extract_string =
-   closure extract_string_1 @extract_string &toplevel.alloc_region
- in
+ let extract_int = closure extract_int_0 @extract_int &toplevel in
+ let extract_string = closure extract_string_1 @extract_string &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (extract_int, extract_string) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

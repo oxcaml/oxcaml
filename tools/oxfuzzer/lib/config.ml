@@ -1,0 +1,198 @@
+(* CR-someday xclerc: Make sure all constants, including probabilities, are
+   inside Config. *)
+let max_function_count = 10
+
+let fun_min_param_count = 0
+
+let fun_max_param_count = 5
+
+let max_block_depth = 4
+
+let max_loop_stride = 8
+
+let max_loop_offset = 16
+
+let toplevel_var_count = 5
+
+let max_array_dimensions = 3
+
+let max_array_axis_size = 10
+
+let max_array_elements = 256
+
+let max_record_types = 3
+
+let max_record_fields = 4
+
+let max_exception_count = 3
+
+let max_handler_count = 2
+
+let max_try_count = 8
+
+let max_variant_types = 3
+
+let max_variant_constructors = 4
+
+let max_constructor_args = 3
+
+let max_match_count = 8
+
+let max_unboxed_tuple_arity = 4
+
+let max_unboxed_tuple_depth = 2
+
+let max_probability = 10_000
+
+(* Probabilities out of [max_probability], conditional on reaching each
+   choice. *)
+let record_probability = 2_500
+
+let variant_probability = 2_500
+
+let or_null_probability = 2_500
+
+let unboxed_tuple_probability = 2_500
+
+let match_in_match_probability = 5_000
+
+let assert_false_probability = 1
+
+let nested_record_probability = 1_500
+
+let mutable_binding_probability = 7_500
+
+let mutable_field_probability = 5_000
+
+let array_probability = 2_500
+
+let array_literal_probability = 5_000
+
+let bounded_index_probability = 7_500
+
+let opaque_initializer_probability = 5_000
+
+let opaque_leaf_probability = 500
+
+let opaque_loop_bound_probability = 5_000
+
+let exception_payload_probability = 5_000
+
+let payload_binding_probability = 7_500
+
+let catch_all_probability = 2_500
+
+let raise_notrace_probability = 5_000
+
+let callee_raises_probability = 5_000
+
+type assertion_mode =
+  | Disabled
+  | Unreachable_only
+  | May_raise
+
+module Swarm = struct
+  type t =
+    { floats : bool;
+      unboxed_numbers : bool;
+      arrays : bool;
+      multidimensional_arrays : bool;
+      boxed_records : bool;
+      unboxed_records : bool;
+      unboxed_tuples : bool;
+      variants : bool;
+      or_null : bool;
+      matches : bool;
+      assertions : assertion_mode;
+      record_updates : bool;
+      record_representation_conversions : bool;
+      mutable_bindings : bool;
+      mutable_record_fields : bool;
+      array_writes : bool;
+      function_calls : bool;
+      always_inline : bool;
+      never_inline : bool;
+      conditionals : bool;
+      bounded_loops : bool;
+      bitwise_operations : bool;
+      opaque_initializers : bool;
+      opaque_leaves : bool;
+      opaque_loop_bounds : bool;
+      exceptions : bool
+    }
+
+  let create random_state =
+    { floats = Random.State.bool random_state;
+      unboxed_numbers = Random.State.bool random_state;
+      arrays = Random.State.bool random_state;
+      multidimensional_arrays = Random.State.bool random_state;
+      boxed_records = Random.State.bool random_state;
+      unboxed_records = Random.State.bool random_state;
+      unboxed_tuples = Random.State.bool random_state;
+      variants = Random.State.bool random_state;
+      or_null = Random.State.bool random_state;
+      matches = Random.State.bool random_state;
+      assertions =
+        (match Random.State.int random_state 3 with
+        | 0 -> Disabled
+        | 1 -> Unreachable_only
+        | _ -> May_raise);
+      record_updates = Random.State.bool random_state;
+      record_representation_conversions = Random.State.bool random_state;
+      mutable_bindings = Random.State.bool random_state;
+      mutable_record_fields = Random.State.bool random_state;
+      array_writes = Random.State.bool random_state;
+      function_calls = Random.State.bool random_state;
+      always_inline = Random.State.bool random_state;
+      never_inline = Random.State.bool random_state;
+      conditionals = Random.State.bool random_state;
+      bounded_loops = Random.State.bool random_state;
+      bitwise_operations = Random.State.bool random_state;
+      opaque_initializers = Random.State.bool random_state;
+      opaque_leaves = Random.State.bool random_state;
+      opaque_loop_bounds = Random.State.bool random_state;
+      exceptions = Random.State.bool random_state
+    }
+
+  let to_string t =
+    [ "floats", t.floats;
+      "unboxed_numbers", t.unboxed_numbers;
+      "arrays", t.arrays;
+      "multidimensional_arrays", t.multidimensional_arrays;
+      "boxed_records", t.boxed_records;
+      "unboxed_records", t.unboxed_records;
+      "unboxed_tuples", t.unboxed_tuples;
+      "variants", t.variants;
+      "or_null", t.or_null;
+      "matches", t.matches;
+      "record_updates", t.record_updates;
+      "record_representation_conversions", t.record_representation_conversions;
+      "mutable_bindings", t.mutable_bindings;
+      "mutable_record_fields", t.mutable_record_fields;
+      "array_writes", t.array_writes;
+      "function_calls", t.function_calls;
+      "always_inline", t.always_inline;
+      "never_inline", t.never_inline;
+      "conditionals", t.conditionals;
+      "bounded_loops", t.bounded_loops;
+      "bitwise_operations", t.bitwise_operations;
+      "opaque_initializers", t.opaque_initializers;
+      "opaque_leaves", t.opaque_leaves;
+      "opaque_loop_bounds", t.opaque_loop_bounds;
+      "exceptions", t.exceptions ]
+    |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
+    |> List.cons
+         (Format.sprintf "  assertions = %s"
+            (match t.assertions with
+            | Disabled -> "disabled"
+            | Unreachable_only -> "unreachable_only"
+            | May_raise -> "may_raise"))
+    |> String.concat "\n"
+
+  let number_types t =
+    List.filter
+      (fun (ty : Ir.NumberTy.t) ->
+        (t.floats || not (Ir.NumberTy.is_floating_point ty))
+        && (t.unboxed_numbers || not ty.unboxed))
+      Ir.NumberTy.all
+end

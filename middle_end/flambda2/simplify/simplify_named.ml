@@ -29,7 +29,7 @@ let create_lifted_constant (dacc, lifted_constants)
        projections when lifting -- and [static_const] has already been
        lifted. *)
     let lifted_constant =
-      LC.create_block_like symbol static_const (DA.denv dacc)
+      LC.create_block_like symbol static_const (DA.typing_env dacc)
         ~symbol_projections:Variable.Map.empty typ
     in
     let dacc =
@@ -53,7 +53,7 @@ let create_lifted_constant (dacc, lifted_constants)
         closure_symbols
     in
     let lifted_constant =
-      LC.create_set_of_closures (DA.denv dacc)
+      LC.create_set_of_closures (DA.typing_env dacc)
         ~closure_symbols_with_types
           (* Same comment as above re. [symbol_projections]. *)
         ~symbol_projections:Variable.Map.empty static_const
@@ -87,7 +87,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     in
     ok
       (Simplify_named_result.create dacc
-         (Expr_builder.Keep_binding
+         (Keep_binding
             { let_bound = bound_pattern;
               simplified_defining_expr = defining_expr;
               original_defining_expr = Some named
@@ -115,7 +115,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
       in
       ok
         (Simplify_named_result.create dacc
-           (Expr_builder.Keep_binding
+           (Keep_binding
               { let_bound = bound_pattern;
                 simplified_defining_expr =
                   Simplified_named.create ~machine_width defining_expr;
@@ -151,7 +151,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
           then
             ok
               (Simplify_named_result.create dacc
-                 (Expr_builder.Keep_binding
+                 (Keep_binding
                     { let_bound = bound_pattern;
                       simplified_defining_expr = simplified_named;
                       original_defining_expr = Some named
@@ -176,7 +176,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
             let result =
               Or_invalid.map defining_expr ~f:(fun defining_expr ->
                   Simplify_named_result.create dacc
-                    (Expr_builder.Keep_binding
+                    (Keep_binding
                        { let_bound = bound_pattern;
                          simplified_defining_expr = defining_expr;
                          original_defining_expr = Some named
@@ -243,7 +243,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     in
     ok
       (Simplify_named_result.create dacc
-         (Expr_builder.Keep_binding
+         (Keep_binding
             { let_bound = bound_pattern;
               simplified_defining_expr = defining_expr;
               original_defining_expr = Some named
@@ -274,7 +274,7 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
     | Prim (original_prim, _) ->
       if
         List.exists
-          (fun (binding : Expr_builder.binding_to_place) ->
+          (fun (binding : Simplified_named.binding_to_place) ->
             match binding with
             | Keep_binding
                 { simplified_defining_expr =

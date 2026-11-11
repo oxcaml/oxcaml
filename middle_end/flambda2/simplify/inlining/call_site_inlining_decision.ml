@@ -42,8 +42,8 @@ module UE = Upwards_env
 
 module FT = Flambda2_types.Function_type
 
-let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
-    =
+let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~rebuild_expr
+    ~return_arity =
   let dacc = DA.prepare_for_speculative_inlining dacc in
   (* CR-someday poechsel: [Inlining_transforms.inline] is preparing the body for
      inlining. Right know it may be called twice (once there and once in
@@ -67,61 +67,59 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
       (Flow.Acc.init_toplevel ~dummy_toplevel_cont Bound_parameters.empty)
       dacc
   in
+  let expr, dacc =
+    simplify_expr dacc expr ~down_to_up:(fun dacc expr -> expr, dacc)
+  in
   let _, uacc =
-    simplify_expr dacc expr ~down_to_up:(fun dacc ~rebuild ->
-        let exn_continuation = Apply.exn_continuation apply in
-        let dacc =
-          DA.map_flow_acc dacc
-            ~f:(Flow.Acc.exit_continuation dummy_toplevel_cont)
-        in
-        let data_flow = DA.flow_acc dacc in
-        (* The dataflow analysis *)
-        let function_return_cont =
-          match Apply.continuation apply with
-          | Never_returns -> Continuation.create ()
-          | Return cont -> cont
-        in
-        (* When doing the speculative analysis, in order to not blow up, the
-           data_flow analysis is only done on the speculatively inlined body;
-           however the reachable code_ids part of the data flow analysis is only
-           correct at toplevel when all information about the code_age relation
-           and used_value slots is available (for the whole compilation unit).
-           Thus we here provide empty/dummy values for the used_value_slots and
-           code_age_relation, and ignore the reachable_code_id part of the
-           data_flow analysis. *)
-        let flow_result =
-          Flow.Analysis.analyze data_flow ~speculative:true
-            ~print_name:"speculative" ~code_age_relation:Code_age_relation.empty
-            ~used_value_slots:Unknown
-            ~code_ids_to_never_delete:Code_id.Set.empty
-            ~specialization_map:(DA.specialization_map dacc)
-            ~return_continuation:function_return_cont
-            ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
-            ~machine_width:(DE.machine_width (DA.denv dacc))
-        in
-        let uenv =
-          (* Note that we don't need to do anything special if the exception
-             continuation takes extra arguments, since we are only simplifying
-             the body of the function in question, not substituting it into an
-             existing context. *)
-          let machine_width = DE.machine_width (DA.denv dacc) in
-          UE.add_function_return_or_exn_continuation
-            (UE.create (DA.are_rebuilding_terms dacc) ~machine_width)
-            (Exn_continuation.exn_handler exn_continuation)
-            (Flambda_arity.create_singletons
-               [Flambda_kind.With_subkind.any_value])
-        in
-        let uenv =
-          match Apply.continuation apply with
-          | Never_returns -> uenv
-          | Return return_continuation ->
-            UE.add_function_return_or_exn_continuation uenv return_continuation
-              return_arity
-        in
-        let uacc =
-          UA.create ~flow_result ~compute_slot_offsets:false uenv dacc
-        in
-        rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
+    let exn_continuation = Apply.exn_continuation apply in
+    let dacc =
+      DA.map_flow_acc dacc ~f:(Flow.Acc.exit_continuation dummy_toplevel_cont)
+    in
+    let data_flow = DA.flow_acc dacc in
+    (* The dataflow analysis *)
+    let function_return_cont =
+      match Apply.continuation apply with
+      | Never_returns -> Continuation.create ()
+      | Return cont -> cont
+    in
+    (* When doing the speculative analysis, in order to not blow up, the
+       data_flow analysis is only done on the speculatively inlined body;
+       however the reachable code_ids part of the data flow analysis is only
+       correct at toplevel when all information about the code_age relation and
+       used_value slots is available (for the whole compilation unit). Thus we
+       here provide empty/dummy values for the used_value_slots and
+       code_age_relation, and ignore the reachable_code_id part of the data_flow
+       analysis. *)
+    let flow_result =
+      Flow.Analysis.analyze data_flow ~speculative:true
+        ~print_name:"speculative" ~code_age_relation:Code_age_relation.empty
+        ~used_value_slots:Unknown ~code_ids_to_never_delete:Code_id.Set.empty
+        ~specialization_map:(DA.specialization_map dacc)
+        ~return_continuation:function_return_cont
+        ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
+    in
+    let uenv =
+      (* Note that we don't need to do anything special if the exception
+         continuation takes extra arguments, since we are only simplifying the
+         body of the function in question, not substituting it into an existing
+         context. *)
+      let machine_width = DE.machine_width (DA.denv dacc) in
+      UE.add_function_return_or_exn_continuation ~is_cold:false
+        (UE.create (DA.are_rebuilding_terms dacc) ~machine_width)
+        (Exn_continuation.exn_handler exn_continuation)
+        (Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value])
+    in
+    let uenv =
+      match Apply.continuation apply with
+      | Never_returns -> uenv
+      | Return return_continuation ->
+        UE.add_function_return_or_exn_continuation ~is_cold:false uenv
+          return_continuation
+          (Flambda_arity.unarize_t return_arity)
+    in
+    let uacc = UA.create ~flow_result ~compute_slot_offsets:false uenv dacc in
+    rebuild_expr expr uacc ~after_rebuild:(fun expr uacc -> expr, uacc)
   in
   let cost_metrics_of_lifted_constants =
     if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
@@ -218,7 +216,7 @@ let inlining_does_decrease_code_size ~code_metadata cost_metrics =
   not (Code_size.( <= ) original_code_size inlined_code_size)
 
 let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
-    ~return_arity : Call_site_inlining_decision_type.t =
+    ~rebuild_expr ~return_arity : Call_site_inlining_decision_type.t =
   let code_present () =
     let code_or_metadata =
       DE.find_code_exn (DA.denv dacc) (Code_metadata.code_id code_metadata)
@@ -269,7 +267,8 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         | Missing_code | Definition_says_not_to_inline | In_a_stub
         | Doing_speculative_inlining | Unrolling_depth_exceeded
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
-        | Never_inlined_attribute | Attribute_always
+        | Never_inlined_attribute
+        | Forward_inlined_attribute_but_nothing_to_forward | Attribute_always
         | Replay_history_says_must_inline _ | Begin_unrolling _
         | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
           ->
@@ -286,8 +285,8 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         then Missing_code
         else
           let cost_metrics =
-            speculative_inlining ~apply dacc ~simplify_expr ~return_arity
-              ~function_type
+            speculative_inlining ~apply dacc ~simplify_expr ~rebuild_expr
+              ~return_arity ~function_type
           in
           let inlining_args =
             Inlining_arguments.combine
@@ -316,8 +315,8 @@ let get_rec_info dacc ~function_type =
   | Need_meet -> Rec_info_expr.unknown
   | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
 
-let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
-    Call_site_inlining_decision_type.t =
+let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
+    ~return_arity : Call_site_inlining_decision_type.t =
   let must_inline = DE.must_inline (DA.denv dacc) in
   let fail_if_must_inline () =
     if must_inline
@@ -336,6 +335,8 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
   let inlined = Apply.inlined apply in
   match inlined with
   | Never_inlined -> do_not_inline Never_inlined_attribute
+  | Forward_inlined ->
+    do_not_inline Forward_inlined_attribute_but_nothing_to_forward
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
     match
       DE.find_code_metadata_exn (DA.denv dacc) (FT.code_id function_type)
@@ -398,7 +399,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
         else
           let policy =
             match inlined with
-            | Never_inlined -> assert false
+            | Never_inlined | Forward_inlined -> assert false
             | Default_inlined -> `Heuristic
             | Unroll (to_, _) -> `Unroll to_
             | Always_inlined _ | Hint_inlined -> (
@@ -443,7 +444,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
                     (Code_metadata.code_id code_metadata)
             else
               might_inline dacc ~apply ~code_metadata ~function_type
-                ~simplify_expr ~return_arity
+                ~simplify_expr ~rebuild_expr ~return_arity
           | `Unroll unroll_to ->
             if Simplify_rec_info_expr.can_unroll dacc rec_info
             then
@@ -454,8 +455,10 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
             else do_not_inline Unrolling_depth_exceeded
           | `Always -> inline_if_code_present Attribute_always)))
 
-let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
-    Call_site_inlining_decision_type.t =
-  if !Clflags.jsir
+let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
+    ~return_arity : Call_site_inlining_decision_type.t =
+  if Clflags.target_is_jsir ()
   then Jsir_inlining_disabled
-  else make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity
+  else
+    make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
+      ~return_arity

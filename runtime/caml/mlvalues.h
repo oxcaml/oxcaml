@@ -20,6 +20,8 @@
 #include "misc.h"
 #include "camlatomic.h"
 #include "tsan.h"
+#include <stdint.h>
+#include <limits.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -555,6 +557,7 @@ CAMLextern value caml_hash_variant(char const * tag);
 #define String_tag 252
 #define String_val(x) ((const char *) Bp_val(x))
 #define Bytes_val(x) ((unsigned char *) Bp_val(x))
+/* Reserved bits are always zero in string headers. */
 CAMLextern mlsize_t caml_string_length (value);   /* size in bytes */
 CAMLextern int caml_string_is_c_safe (value);
   /* true if string contains no '\0' null characters */
@@ -760,7 +763,8 @@ CAMLextern value caml_set_oo_id(value obj);
 #define Assert_mixed_block_layout_v3 _Static_assert(0, "")
 #define Assert_mixed_block_layout_v4 _Static_assert(0, "")
 #define Assert_mixed_block_layout_v5 _Static_assert(0, "")
-#define Assert_mixed_block_layout_v6 _Static_assert(1, "")
+#define Assert_mixed_block_layout_v6 _Static_assert(0, "")
+#define Assert_mixed_block_layout_v7 _Static_assert(1, "")
 
 /* Header for out-of-heap blocks. */
 

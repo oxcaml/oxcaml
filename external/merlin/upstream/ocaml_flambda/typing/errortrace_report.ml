@@ -106,7 +106,8 @@ let rec filter_trace = function
 let may_prepare_expansion compact (Errortrace.{ty; expanded} as ty_exp) =
   match Types.get_desc expanded with
     Tvariant _ | Tobject _ when compact ->
-      Variable_names.reserve ty; Errortrace.{ty; expanded = ty}
+      Variable_names.reserve ty;
+      Errortrace.{ty; expanded = ty}
   | _ -> prepare_expansion ty_exp
 
 let print_path p =
@@ -235,10 +236,16 @@ let explain_escape pre = function
           pp_doc pre
           (Style.as_inline_code type_expr_with_reserved_names) u
       )
-  | Errortrace.Constructor p -> Some(
+  | Errortrace.Constructor (k, p) ->
+    let what =
+      match k with
+      | Type -> "type"
+      | Kind -> "kind"
+    in
+    Some(
       doc_printf
-        "%a@,@[The type constructor@;<1 2>%a@ would escape its scope@]"
-        pp_doc pre pp_path p
+        "%a@,@[The %s constructor@;<1 2>%a@ would escape its scope@]"
+        pp_doc pre what pp_path p
     )
   | Errortrace.Module_type p -> Some(
       doc_printf
@@ -415,9 +422,35 @@ let explanation (type variety) intro prev env
     Some (doc_printf "@ because their kinds are different.\
                       @ @[<v>%t@;%t@]"
             (fmt_history "the first" k1) (fmt_history "the second" k2))
+  | Errortrace.Mode_mismatch _ -> None
+  | Errortrace.Weaken_sort { pat; subj } ->
+    add_type_to_preparation pat;
+    add_type_to_preparation subj;
+    Some (doc_printf "@ The type %a is layout polymorphic, \
+                      @ but %a is not layout polymorphic."
+            (Style.as_inline_code prepared_type_expr) subj
+            (Style.as_inline_code prepared_type_expr) pat)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)
+
+let split_mode_mismatch : type variety.
+  (_, variety) Errortrace.t -> Format_doc.doc option * (_, variety) Errortrace.t
+  = fun tr ->
+  match List.rev tr with
+  | Errortrace.Mode_mismatch (pos, e) :: rev_tr ->
+    let {left; right} : Mode_intf.print_error =
+      Mode.With_locality.print_error (Location.none, Unknown) e
+    in
+    let left ppf = ignore (left ppf) in
+    let right ppf = ignore (right ppf) in
+    let pos = match pos with Argument -> "argument" | Return -> "return" in
+    let doc =
+      doc_printf "@,@[<hov>The %s mode was expected to be %t but is %t@]"
+        pos right left
+    in
+    Some doc, List.rev rev_tr
+  | _ -> None, tr
 
 let warn_on_missing_def env ppf t =
   match Types.get_desc t with
@@ -466,6 +499,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
   reset ();
   (* We want to substitute in the opposite order from [Eqtype] *)
   Variable_names.add_subst (List.map (fun (ty1,ty2) -> ty2,ty1) subst);
+  let mode_mismatch, tr = split_mode_mismatch tr in
   let tr =
     prepare_trace
       (fun ty_exp ->
@@ -500,12 +534,13 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
        in
        fprintf ppf
         "@[<v>\
-          @[%a%a@]%a%a\
+          @[%a%a@]%a%a%a\
          @]"
         pp_doc head_error
         pp_doc ty_expect_explanation
         (trace false (incompatibility_phrase trace_format)) tr
-        (pp_print_option pp_doc) mis;
+        (pp_print_option pp_doc) mis
+        (pp_print_option pp_doc) mode_mismatch;
       if env <> Env.empty && not jkind_error
        (* the jkinds mechanism has its own way of reporting missing cmis
           CR jkinds: streamline these *)

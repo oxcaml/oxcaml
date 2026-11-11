@@ -21,7 +21,7 @@ let run s =
   let has_portable_annotation = ref false in
   let modes iterator (modes : _ Typedtree.modes) =
     List.iter
-      (fun (mode : Mode.Alloc.atom Location.loc) ->
+      (fun (mode : Mode.With_locality.atom Location.loc) ->
         match mode.txt with
         | Atom (Comonadic Portability, Portable) ->
           has_portable_annotation := true

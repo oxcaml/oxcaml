@@ -156,9 +156,6 @@ val cms_magic_number: string
 val cmj_magic_number: string
 (** Magic number for Js_of_ocaml IR files *)
 
-val cmja_magic_number: string
-(** Magic number for Js_of_ocaml IR archive files *)
-
 val linear_magic_number: string
 (** Magic number for Linear internal representation files *)
 
@@ -212,6 +209,10 @@ val asm: string
 
 val asm_cfi_supported: bool
 (** Whether assembler understands CFI directives *)
+
+val asm_file0_supported: bool
+(** Whether the assembler accepts the DWARF-5 [.file 0] and [.loc 0]
+    directives, which define the line table's primary source file entry *)
 
 val asm_size_type_directives: bool
 (** Whether the [.size] and [.type] assembler directives can be used
@@ -345,10 +346,6 @@ val poll_insertion : bool
 val ar_supports_response_files: bool
 (** Whether ar supports @FILE arguments. *)
 
-val runtime5 : bool
-(** Always [true], Previously:[false] when using the
-    OCaml 4.14 runtime. *)
-
 val no_stack_checks : bool
 (** [true] if stack checks are disabled. *)
 
@@ -379,6 +376,9 @@ val merlin : bool
 
 val has_pclmul : bool
 (* Whether the compiler was configured on a machine with PCLMUL *)
+
+val has_aes : bool
+(* Whether the compiler was configured on a machine with AES *)
 
 val has_popcnt : bool
 (* Whether the compiler was configured on a machine with POPCNT *)
@@ -415,6 +415,21 @@ val has_f16c : bool
 
 val has_fma : bool
 (* Whether the compiler was configured on a machine with FMA *)
+
+val has_avx512f : bool
+(* Whether the compiler was configured on a machine with AVX512F *)
+
+val has_avx512dq : bool
+(* Whether the compiler was configured on a machine with AVX512DQ *)
+
+val has_avx512cd : bool
+(* Whether the compiler was configured on a machine with AVX512CD *)
+
+val has_avx512bw : bool
+(* Whether the compiler was configured on a machine with AVX512BW *)
+
+val has_avx512vl : bool
+(* Whether the compiler was configured on a machine with AVX512VL *)
 
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)

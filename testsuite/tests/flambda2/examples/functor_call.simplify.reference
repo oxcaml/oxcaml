@@ -8,8 +8,7 @@ let code inline(always) loopify(never) size(5) newer_version_of(test_2)
   let int_greaterthan = %tag_imm (prim) in
   cont k (int_greaterthan)
 in
-let $camlFunctor_call__test_4 = closure test_2_1 @test &toplevel.alloc_region
-in
+let $camlFunctor_call__test_4 = closure test_2_1 @test &toplevel in
 let $camlFunctor_call__Pmakeblock_5 = Block 0 ($camlFunctor_call__test_4) in
 let code loopify(done) size(16) newer_version_of(foo_1_1)
       foo_1 (x : imm tagged)
@@ -27,7 +26,7 @@ let code loopify(done) size(16) newer_version_of(foo_1_1)
            cont `self` (int_add))
 in
 let $camlFunctor_call__foo_6 =
-  closure foo_1 @foo &toplevel.alloc_region
+  closure foo_1 @foo &toplevel
   with { X = $camlFunctor_call__Pmakeblock_5 }
 in
 let $camlFunctor_call =

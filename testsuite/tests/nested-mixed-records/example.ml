@@ -5,9 +5,9 @@
 
 (* Example from the pull request (#3687). *)
 
-type sub = #{ a : int32#; b : string; c : float#; }
+type sub = #{ a : int32_u; b : string; c : float#; }
 
-type sub' = #{ d : char; e : int64#; f : int; }
+type sub' = #{ d : char; e : int64_u; f : int; }
 
 type record = { x : sub; y : sub'; }
 
@@ -18,7 +18,7 @@ let g r =
   let y = r.y in
   y.#f
 
-external box_int32 : int32# -> (int32[@local_opt]) = "%box_int32"
+external box_int32 : int32_u -> (int32[@local_opt]) = "%box_int32"
 external box_float : float# -> (float[@local_opt]) = "%box_float"
 
 let () =

@@ -28,6 +28,9 @@ type iterator = {
   attribute: iterator -> attribute -> unit;
   attributes: iterator -> attribute list -> unit;
   modes : iterator -> modes -> unit;
+  mode : iterator -> mode Location.loc -> unit;
+  mode_bound : iterator -> mode_bound -> unit;
+  mode_bound_var : iterator -> mode_bound_var -> unit;
   modalities : iterator -> modalities -> unit;
   binding_op: iterator -> binding_op -> unit;
   case: iterator -> case -> unit;
@@ -390,6 +393,7 @@ module M = struct
         sub.modes sub mm
     | Pmod_unpack e -> sub.expr sub e
     | Pmod_extension x -> sub.extension sub x
+    | Pmod_hole -> ()
     | Pmod_instance _ -> ()
         (* CR lmaurer: Implement this. Might want to change the [instance] type
            to have Ids with locations in them rather than just raw strings. *)
@@ -627,6 +631,7 @@ module P = struct
     | Ppat_constraint (p, t, m) ->
         sub.pat sub p; Option.iter (sub.typ sub) t; sub.modes sub m;
     | Ppat_type s -> iter_loc_lid sub s
+    | Ppat_addr (_mut, p) -> sub.pat sub p
     | Ppat_lazy p -> sub.pat sub p
     | Ppat_unpack s -> iter_loc sub s
     | Ppat_effect (p1,p2) -> sub.pat sub p1; sub.pat sub p2
@@ -867,7 +872,30 @@ let default_iterator =
 
     (* Location inside a mode expression needs to be traversed. *)
     modes = (fun this m ->
-      List.iter (iter_loc this) m
+      List.iter (this.mode this) m
+    );
+
+    mode = (fun this { txt; loc } ->
+      (match txt with
+       | Pmode _ | Pmode_var _ -> ()
+       | Pmode_bounded { pmode_upper; pmode_lower } ->
+         this.mode_bound this pmode_upper;
+         this.mode_bound this pmode_lower);
+      this.location this loc
+    );
+
+    mode_bound = (fun this elems ->
+      List.iter
+        (function
+          | Pbound_var v -> this.mode_bound_var this v
+          | Pbound_const cs -> List.iter (iter_loc this) cs)
+        elems
+    );
+
+    mode_bound_var = (fun this { pbound_morph; pbound_var; pbound_mod } ->
+      Option.iter (iter_loc this) pbound_morph;
+      iter_loc this pbound_var;
+      List.iter (iter_loc this) pbound_mod
     );
 
     modalities = (fun this m ->

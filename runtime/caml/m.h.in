@@ -103,6 +103,8 @@
 
 #undef HAS_PCLMUL
 
+#undef HAS_AES
+
 #undef HAS_SSE3
 
 #undef HAS_SSSE3
@@ -118,6 +120,16 @@
 #undef HAS_AVX
 
 #undef HAS_AVX2
+
+#undef HAS_AVX512F
+
+#undef HAS_AVX512DQ
+
+#undef HAS_AVX512CD
+
+#undef HAS_AVX512BW
+
+#undef HAS_AVX512VL
 
 #undef WITH_NONEXECSTACK_NOTE
 

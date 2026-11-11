@@ -107,3 +107,17 @@ end)
 let () =
   Printf.printf "%i / %i / %i \n%!" X.x X.y a;
   Printf.printf "%s\n%!" (Printexc.to_string XXX)
+
+module Mod = struct
+  exception Foo
+
+  include struct exception Bar end
+
+  open struct exception Baz end
+  exception Baz = Baz
+end
+
+let () =
+  print_endline (Printexc.to_string Mod.Foo);
+  print_endline (Printexc.to_string Mod.Bar);
+  print_endline (Printexc.to_string Mod.Baz)

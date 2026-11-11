@@ -40,20 +40,25 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
       (RE.print (UA.are_rebuilding_terms uacc))
       handler;
   let bindings_outermost_first =
-    ListLabels.map2 params args ~f:(fun param arg ->
-        let let_bound =
-          let param_var, param_uid = BP.var_and_uid param in
-          Bound_var.create param_var param_uid Name_mode.normal
-          |> Bound_pattern.singleton
-        in
+    ListLabels.map2 params args
+      ~f:(fun param arg : Simplified_named.binding_to_place ->
+        let param_var, param_uid = BP.var_and_uid param in
         let named = Named.create_simple arg in
-        let machine_width = UE.machine_width (UA.uenv uacc) in
-        Expr_builder.Keep_binding
-          { let_bound;
-            simplified_defining_expr =
-              Simplified_named.create ~machine_width named;
-            original_defining_expr = Some named
-          })
+        (* Get rid of useless [let x = x] bindings from dataflow. *)
+        if Simple.equal arg (Simple.var param_var)
+        then Delete_binding { original_defining_expr = Some named }
+        else
+          let let_bound =
+            Bound_var.create param_var param_uid Name_mode.normal
+            |> Bound_pattern.singleton
+          in
+          let machine_width = UE.machine_width (UA.uenv uacc) in
+          Keep_binding
+            { let_bound;
+              simplified_defining_expr =
+                Simplified_named.create ~machine_width named;
+              original_defining_expr = Some named
+            })
   in
   let expr, uacc =
     let uacc =
@@ -64,7 +69,7 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
   in
   expr, UA.cost_metrics uacc, UA.name_occurrences uacc
 
-let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
+let rebuild_apply_cont ~args ~rewrite_id apply_cont uacc ~after_rebuild =
   let uenv = UA.uenv uacc in
   let cont, apply_cont =
     let cont = AC.continuation apply_cont in
@@ -75,6 +80,10 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
     | exception Not_found -> cont, apply_cont
     | specialized -> specialized, AC.with_continuation apply_cont specialized
   in
+  (* Get temperature information from the original apply cont before applying
+     shortcuts, so that we don't lose it when following a shortcut from a cold
+     to a hot continuation. *)
+  let is_cold = UE.is_cold_continuation (UA.uenv uacc) cont in
   let apply_cont = AC.update_args apply_cont ~args in
   let rewrite = UE.find_apply_cont_rewrite uenv cont in
   let create_apply_cont ~apply_cont_to_expr =
@@ -132,6 +141,7 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
          (branches can be moved by the backend, their runtime depends on the
          branch predictor...). Underestimating the number of removed branches is
          fine. *)
+      let handler = if is_cold then RE.mark_as_cold handler else handler in
       inline_linearly_used_continuation uacc ~params ~handler
         ~free_names_of_handler ~cost_metrics_of_handler apply_cont
     | Invalid { arity = _ } ->
@@ -143,7 +153,21 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
         Name_occurrences.empty )
     | Non_inlinable_zero_arity _ | Non_inlinable_non_zero_arity _
     | Toplevel_or_function_return_or_exn_continuation _ ->
-      ( RE.create_apply_cont apply_cont,
+      (* Update temperature from the actual continuation after taking shortcuts,
+         as we could have a shortcut from a hot to a cold continuation.
+
+         CR-someday bclement: we can sometimes lose temperature information if
+         we merge a [k1] (hot) -> [k2] (cold) -> [k3] (hot) shortcut chain: this
+         should be replaced by a cold (rebuilt) apply_cont to [k3], but we'll
+         currently create a hot one because we don't store temperature
+         information in the shortcuts themselves. This seems rare enough not to
+         worry about too much. *)
+      let is_cold =
+        is_cold
+        || UE.is_cold_continuation (UA.uenv uacc)
+             (Apply_cont.continuation apply_cont)
+      in
+      ( RE.create_apply_cont ~is_cold apply_cont,
         Cost_metrics.from_size (Code_size.apply_cont apply_cont),
         Apply_cont.free_names apply_cont )
   in
@@ -172,4 +196,4 @@ let simplify_apply_cont dacc apply_cont ~down_to_up =
   let dbg = AC.debuginfo apply_cont in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
   let apply_cont = AC.with_debuginfo apply_cont ~dbg in
-  down_to_up dacc ~rebuild:(rebuild_apply_cont apply_cont ~args ~rewrite_id)
+  down_to_up dacc (SE.simplified_apply_cont apply_cont ~args ~rewrite_id)

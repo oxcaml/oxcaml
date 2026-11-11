@@ -159,40 +159,50 @@ type t : value non_pointer
 
 type t : void non_pointer
 [%%expect{|
-Line 1, characters 9-25:
+Line 1, characters 14-25:
 1 | type t : void non_pointer
-             ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "void".
+                  ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "void".
 
 type t : void
 |}]
 
 type t : void non_pointer non_null
 [%%expect{|
-Line 1, characters 9-34:
+Line 1, characters 14-25:
 1 | type t : void non_pointer non_null
-             ^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer non_null" have no effect on the kind "void".
+                  ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "void".
+
+Line 1, characters 26-34:
+1 | type t : void non_pointer non_null
+                              ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "void".
 
 type t : void
 |}]
 
 type t : void non_pointer maybe_separable
 [%%expect{|
-Line 1, characters 9-41:
+Line 1, characters 14-25:
 1 | type t : void non_pointer maybe_separable
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_separable" have no effect on the kind "void".
+                  ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "void".
+
+Line 1, characters 26-41:
+1 | type t : void non_pointer maybe_separable
+                              ^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "maybe_separable" has no effect on the kind "void".
 
 type t : void
 |}]
 
 type t : void non_pointer & value non_pointer non_pointer mod global with int
 [%%expect{|
-Line 1, characters 9-25:
+Line 1, characters 14-25:
 1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
-             ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "void".
+                  ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "void".
 
 Line 1, characters 46-57:
 1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
@@ -208,10 +218,10 @@ type t : void mod global & value non_pointer mod global
 
 type t : (value & value) non_pointer
 [%%expect{|
-Line 1, characters 9-36:
+Line 1, characters 25-36:
 1 | type t : (value & value) non_pointer
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+                             ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "value & value".
 
 type t : value & value
 |}]

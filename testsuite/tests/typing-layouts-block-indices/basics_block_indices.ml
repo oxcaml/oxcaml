@@ -431,14 +431,14 @@ type b = #(a * a * a * a * a * a * a * a) (* 2^6 bytes *)
 type c = #(b * b * b * b * b * b * b * b) (* 2^9 *)
 type d = #(c * c * c * c * c * c * c * c) (* 2^12 *)
 
-type si = { s : string; i : int64# }
+type si = { s : string; i : int64_u }
 type r = { d : d; si : si# }
 [%%expect{|
 type a = float#
 type b = #(a * a * a * a * a * a * a * a)
 type c = #(b * b * b * b * b * b * b * b)
 type d = #(c * c * c * c * c * c * c * c)
-type si = { s : string; i : int64#; }
+type si = { s : string; i : int64_u; }
 type r = { d : d; si : si#; }
 |}]
 
@@ -477,11 +477,11 @@ Error: This block index cannot be created because it refers to values
 
 (* CR layouts v8: these should be allowed once we reorder array elements *)
 
-type r = #{ a : int64#; b : int }
+type r = #{ a : int64_u; b : int }
 let bad_idx () : (_, r) idx_mut =
   Idx_mut.unsafe_create_into_array 0
 [%%expect{|
-type r = #{ a : int64#; b : int; }
+type r = #{ a : int64_u; b : int; }
 Line 3, characters 2-36:
 3 |   Idx_mut.unsafe_create_into_array 0
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -489,11 +489,11 @@ Error: Block indices into arrays of unboxed products containing a
        non-value before a value are not yet supported.
 |}]
 
-type r = { ii : #( int * int64#) ; i : int }
+type r = { ii : #( int * int64_u) ; i : int }
 let bad_idx () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
 [%%expect{|
-type r = { ii : #(int * int64#); i : int; }
+type r = { ii : #(int * int64_u); i : int; }
 Line 3, characters 12-46:
 3 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -502,11 +502,11 @@ Error: Block indices into arrays of unboxed products containing a
 |}]
 
 (* Note that this does work, though, as no reordering is needed *)
-type r = #{ a : int; b : int64# }
+type r = #{ a : int; b : int64_u }
 let idx_into_r_array () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#a)
 [%%expect{|
-type r = #{ a : int; b : int64#; }
+type r = #{ a : int; b : int64_u; }
 val idx_into_r_array : unit -> (r array, int) idx_mut = <fun>
 |}]
 
@@ -624,17 +624,24 @@ let g t = Idx_atomic.set t idx_atomic_i 42
 val g : atomic -> unit = <fun>
 |}]
 
+(* Can declare idx_atomic with a non-value element type *)
+type 'a nonvalue_elt_type = ('a, float#) idx_atomic
+[%%expect{|
+type 'a nonvalue_elt_type = ('a, float#) idx_atomic
+|}]
+
 (* Cannot access an element whose layout is not value *)
 let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
 [%%expect{|
-Line 1, characters 27-33:
+Line 1, characters 66-69:
 1 | let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
-                               ^^^^^^
-Error: This type "float#" should be an instance of type "('a : value_or_null)"
+                                                                      ^^^
+Error: The value "idx" has type "('a, float#) idx_atomic"
+       but an expression was expected of type
+         "('a, 'b) Stdlib_stable.Idx_atomic.t" = "('a, 'b) idx_atomic"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because the 2nd type argument of idx_atomic has layout value_or_null.
+       But the layout of float# must be a value layout.
 |}]
 
 (* Cannot access an atomic field non-atomically *)
@@ -675,11 +682,11 @@ val snd : (outer, int) idx_atomic = <abstr>
 |}]
 
 (* Block indices to mixed record *)
-type t = { x: int64#; mutable y: string [@atomic]; z: int64# }
+type t = { x: int64_u; mutable y: string [@atomic]; z: int64_u }
 
 let mixed_idx_atomic = (.y)
 [%%expect{|
-type t = { x : int64#; mutable y : string [@atomic]; z : int64#; }
+type t = { x : int64_u; mutable y : string [@atomic]; z : int64_u; }
 val mixed_idx_atomic : (t, string) idx_atomic = <abstr>
 |}]
 
@@ -817,7 +824,7 @@ Line 1, characters 13-30:
 1 | let bad () = (.mut_not_global)
                  ^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be global, but this is not.
+       mutable elements must be global, but this is local.
 |}]
 
 let bad () = (.mut_not_many)
@@ -826,7 +833,7 @@ Line 1, characters 13-28:
 1 | let bad () = (.mut_not_many)
                  ^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be many, but this is not.
+       mutable elements must be many, but this is once.
 |}]
 
 let bad () = (.mut_not_unyielding)
@@ -835,7 +842,7 @@ Line 1, characters 13-34:
 1 | let bad () = (.mut_not_unyielding)
                  ^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be unyielding, but this is not.
+       mutable elements must be unyielding, but this is yielding.
 |}]
 
 let bad () = (.mut.#contended)
@@ -911,6 +918,89 @@ val ok :
 let ok () = (.mut.#mut_not_global.#item)
 [%%expect{|
 val ok : unit -> ('a box# mut_not_global# box_mut, 'a) idx_mut = <fun>
+|}]
+
+(* Mutable block indices can be made into stored unboxed records,
+   regardless of their mutability. *)
+type mut = #{ mutable i : int; j : int }
+type mut_ref = { mutable m : mut }
+let idx_to_mutable_field = (.m.#i)
+let idx_to_immutable_field = (.m.#j)
+[%%expect{|
+type mut = #{ mutable i : int; j : int; }
+type mut_ref = { mutable m : mut; }
+val idx_to_mutable_field : (mut_ref, int) idx_mut = <abstr>
+val idx_to_immutable_field : (mut_ref, int) idx_mut = <abstr>
+|}]
+
+(* Through an immutable boxed field, the index can't point to a [mutable]
+   unboxed label because of its implied modalities. *)
+type mut_box = { m : mut }
+let idx_bad = (.m.#i)
+[%%expect{|
+type mut_box = { m : mut; }
+Line 2, characters 14-21:
+2 | let idx_bad = (.m.#i)
+                  ^^^^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* Same for implicit unboxed records *)
+type mut_implicit = { mutable mi : int; mj : int }
+type mut_implicit_ref = { mutable m : mut_implicit# }
+let idx_to_mutable_field = (.m.#mi)
+let idx_to_immutable_field = (.m.#mj)
+[%%expect{|
+type mut_implicit = { mutable mi : int; mj : int; }
+type mut_implicit_ref = { mutable m : mut_implicit#; }
+val idx_to_mutable_field : (mut_implicit_ref, int) idx_mut = <abstr>
+val idx_to_immutable_field : (mut_implicit_ref, int) idx_mut = <abstr>
+|}]
+
+type mut_implicit_box = { m : mut_implicit# }
+let idx_bad = (.m.#mi)
+[%%expect{|
+type mut_implicit_box = { m : mut_implicit#; }
+Line 2, characters 14-22:
+2 | let idx_bad = (.m.#mi)
+                  ^^^^^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* A mutable index can write to an immutable field of a stored unboxed record,
+   even though the unboxed record is covariant in that field. This is sound
+   because the boxed record containing it is invariant. *)
+type +'a is_covariant = #{ mutable x : int; y : 'a }
+type 'a is_covariant_mut_box = { mutable inner : 'a is_covariant }
+type base = < base : int >
+type derived = < base : int; derived : int >
+let base : base = object method base = 42 end
+let derived : derived = object method base = 42 method derived = 42 end
+let wrap_derived : derived is_covariant_mut_box =
+  { inner = #{ x = 42; y = derived } }
+[%%expect{|
+type 'a is_covariant = #{ mutable x : int; y : 'a; }
+type 'a is_covariant_mut_box = { mutable inner : 'a is_covariant; }
+type base = < base : int >
+type derived = < base : int; derived : int >
+val base : base = <obj>
+val derived : derived = <obj>
+val wrap_derived : derived is_covariant_mut_box =
+  {inner = #{x = 42; y = <obj>}}
+|}]
+
+let () =
+  Idx_mut.set (wrap_derived :> base is_covariant_mut_box) (.inner.#y) base
+let bad = (wrap_derived.inner.#y)#derived
+[%%expect{|
+Line 2, characters 14-57:
+2 |   Idx_mut.set (wrap_derived :> base is_covariant_mut_box) (.inner.#y) base
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "derived is_covariant_mut_box" is not a subtype of
+         "base is_covariant_mut_box"
+       The second object type has no method "derived"
 |}]
 
 (******************************************************)
@@ -1048,14 +1138,46 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
 (*******************)
 (* Private records *)
 
-type t = private { i : int }
-let bad () = (.i)
+type t = private { i : int; mutable j : int }
+let ok () = (.i)
 [%%expect{|
-type t = private { i : int; }
-Line 2, characters 15-16:
-2 | let bad () = (.i)
+type t = private { i : int; mutable j : int; }
+val ok : unit -> (t, int) idx_imm = <fun>
+|}]
+
+let bad () = (.j)
+[%%expect{|
+Line 1, characters 15-16:
+1 | let bad () = (.j)
                    ^
-Error: Block indices do not support private records.
+Error: Block indices do not support private types in mutable positions.
+|}]
+
+(* Private unboxed records further down the path *)
+module Private_u : sig
+  type t = private #{ a : int; b : int }
+end = struct
+  type t = #{ a : int; b : int }
+end
+type has_private_u = { mutable pu : Private_u.t }
+let ok () = (.pu.#Private_u.a)
+[%%expect{|
+module Private_u : sig type t = private #{ a : int; b : int; } end
+type has_private_u = { mutable pu : Private_u.t; }
+val ok : unit -> (has_private_u, int) idx_mut = <fun>
+|}]
+
+type has_private_u_imm = { ipu : Private_u.t }
+let ok () = (.ipu.#Private_u.a)
+[%%expect{|
+type has_private_u_imm = { ipu : Private_u.t; }
+val ok : unit -> (has_private_u_imm, int) idx_imm = <fun>
+|}]
+
+let ok () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#Private_u.a)
+[%%expect{|
+val ok : unit -> (Private_u.t array, int) idx_mut = <fun>
 |}]
 
 (****************)

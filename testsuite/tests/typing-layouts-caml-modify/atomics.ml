@@ -35,6 +35,51 @@
 
 open Stdlib_stable
 
+type ('a : value_or_null, 'b : value_or_null) ptr_atomic =
+  #('a * ('a, 'b) idx_atomic)
+
+external set :
+  ('a : value_or_null) ('b : value_or_null).
+  (('a, 'b) ptr_atomic[@local_opt]) -> 'b -> unit = "%unsafe_atomic_set_ptr"
+
+external exchange :
+  ('a : value_or_null) ('b : value_or_null).
+  (('a, 'b) ptr_atomic[@local_opt]) -> 'b -> 'b = "%unsafe_atomic_exchange_ptr"
+
+external compare_and_set :
+  ('a : value_or_null) ('b : value_or_null).
+  (('a, 'b) ptr_atomic[@local_opt]) -> 'b -> 'b -> bool
+  = "%unsafe_atomic_cas_ptr"
+
+external compare_exchange :
+  ('a : value_or_null) ('b : value_or_null).
+  (('a, 'b) ptr_atomic[@local_opt]) -> 'b -> 'b -> 'b
+  = "%unsafe_atomic_compare_exchange_ptr"
+
+external fetch_and_add :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> int
+  = "%unsafe_atomic_fetch_add_ptr"
+
+external add :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_add_ptr"
+
+external sub :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_sub_ptr"
+
+external logand :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_land_ptr"
+
+external logor :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_lor_ptr"
+
+external logxor :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_lxor_ptr"
+
 (* CR-someday mslater: this should also work on arm once atomics are builtins *)
 
 (* This test verifies that immediate atomics do not call runtime wrapper functions
@@ -309,7 +354,7 @@ end
 
 (* Patomic_set_mixed_field skips runtime call for immediates. *)
 module Set_field_mixed = struct
-  type t = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+  type t = { f : int64_u; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
 
   let () =
     let t = { f = #42L; imm = 1; ptr = "two"} in
@@ -343,7 +388,7 @@ end
 
 (* Idx_atomic.set on mixed field skips runtime call for immediates. *)
 module Set_idx_atomic_mixed = struct
-  type t = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+  type t = { f : int64_u; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
 
   let () =
     let t = { f = #42L; imm = 1; ptr = "two"} in
@@ -355,6 +400,38 @@ module Set_idx_atomic_mixed = struct
     test_atomic_exchange_field ~expected:1 (fun () ->
       let idx = (.ptr) in
       Idx_atomic.set t idx "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
+
+(* Atomic ptr set skips runtime call for immediates. *)
+module Set_ptr_atomic = struct
+  type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let () =
+    let t = { imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      set #(t, (.imm)) 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      set #(t, (.ptr)) "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
+
+(* Atomic ptr set on mixed field skips runtime call for immediates. *)
+module Set_ptr_atomic_mixed = struct
+  type t = { f : int64_u; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let () =
+    let t = { f = #42L; imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      set #(t, (.imm)) 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      set #(t, (.ptr)) "four";
       ignore (Sys.opaque_identity t)
     )
 end
@@ -401,6 +478,52 @@ module Rmw_idx_atomic_imm = struct
     );
     test_atomic_lxor_field ~expected:0 (fun () ->
       Idx_atomic.logxor t idx 1;
+      ignore (Sys.opaque_identity t)
+    )
+end
+
+(* Atomic ptr read-modify-write operations skip runtime calls for
+   immediates. *)
+module Rmw_ptr_atomic_imm = struct
+  type t = { mutable imm: int [@atomic] }
+
+  let () =
+    let t = { imm = 1 } in
+    let p = #(t, (.imm)) in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      ignore (exchange p 2);
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_cas_field ~expected:0 (fun () ->
+      ignore (compare_and_set p 2 3);
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_compare_exchange_field ~expected:0 (fun () ->
+      ignore (compare_exchange p 3 4);
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_fetch_add_field ~expected:0 (fun () ->
+      ignore (fetch_and_add p 1);
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_add_field ~expected:0 (fun () ->
+      add p 1;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_sub_field ~expected:0 (fun () ->
+      sub p 1;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_land_field ~expected:0 (fun () ->
+      logand p 1;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_lor_field ~expected:0 (fun () ->
+      logor p 1;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_lxor_field ~expected:0 (fun () ->
+      logxor p 1;
       ignore (Sys.opaque_identity t)
     )
 end
@@ -515,6 +638,44 @@ module Atomic_idx_locality = struct
     )
 end
 
+module Atomic_ptr_locality = struct
+  type 'a t = { mutable contents : 'a [@atomic] }
+
+  (* atomic in global record *)
+  let () =
+    let (t @ global) = { contents = "foo" } in
+    let p = #(t, (.contents)) in
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      set p "bar"
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ignore (exchange p "bar")
+    );
+    test_atomic_compare_exchange_field ~expected:1 (fun () ->
+      ignore (compare_exchange p "foo" "bar")
+    );
+    test_atomic_cas_field ~expected:1 (fun () ->
+      ignore (compare_and_set p "foo" "bar")
+    )
+
+  (* atomic in local record *)
+  let () =
+    let (t @ local) = { contents = "foo" } in
+    let p = #(t, (.contents)) in
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      set p "bar"
+    );
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      ignore (exchange p "bar")
+    );
+    test_atomic_compare_exchange_field_local ~expected:1 (fun () ->
+      ignore (compare_exchange p "foo" "bar")
+    );
+    test_atomic_cas_field_local ~expected:1 (fun () ->
+      ignore (compare_and_set p "foo" "bar")
+    )
+end
+
 module Atomic_field_locality = struct
   (* atomic in global record *)
   let () =
@@ -547,4 +708,118 @@ module Atomic_field_locality = struct
     test_atomic_cas_field_local ~expected:1 (fun () ->
       ignore (atomic_compare_and_set_field t 0 "foo" "bar")
     )
+end
+
+module Ext_ptr_atomic = struct
+  module Int64_u = struct
+    external to_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
+    external of_int64 : (int64[@local_opt]) -> int64_u = "%unbox_int64"
+    let[@inline always] add x y = of_int64 (Int64.add (to_int64 x) (to_int64 y))
+  end
+
+  external addr_of_value : ('a : value_or_null). 'a @ local -> int64_u
+    = "" "caml_native_pointer_of_value"
+
+  external ext_load : ('a : value_or_null). int64_u -> 'a
+    = "%unsafe_atomic_load_ext_ptr"
+  external ext_set : ('a : value_or_null). int64_u -> 'a -> unit
+    = "%unsafe_atomic_set_ext_ptr"
+  external ext_exchange : ('a : value_or_null). int64_u -> 'a -> 'a
+    = "%unsafe_atomic_exchange_ext_ptr"
+  external ext_compare_and_set :
+    ('a : value_or_null). int64_u -> 'a -> 'a -> bool
+    = "%unsafe_atomic_cas_ext_ptr"
+  external ext_compare_exchange :
+    ('a : value_or_null). int64_u -> 'a -> 'a -> 'a
+    = "%unsafe_atomic_compare_exchange_ext_ptr"
+  external ext_fetch_and_add : int64_u -> int -> int
+    = "%unsafe_atomic_fetch_add_ext_ptr"
+  external ext_add : int64_u -> int -> unit = "%unsafe_atomic_add_ext_ptr"
+  external ext_sub : int64_u -> int -> unit = "%unsafe_atomic_sub_ext_ptr"
+  external ext_logand : int64_u -> int -> unit = "%unsafe_atomic_land_ext_ptr"
+  external ext_logor : int64_u -> int -> unit = "%unsafe_atomic_lor_ext_ptr"
+  external ext_logxor : int64_u -> int -> unit = "%unsafe_atomic_lxor_ext_ptr"
+
+  type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let imm_addr t = addr_of_value t
+  let ptr_addr t = Int64_u.add (addr_of_value t) #8L
+
+  (* Immediate operations skip runtime calls. *)
+  let () =
+    let t = { imm = 1; ptr = "two" } in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      ext_set (imm_addr t) 3;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 3);
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      assert (ext_exchange (imm_addr t) 4 = 3);
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 4);
+    test_atomic_cas_field ~expected:0 (fun () ->
+      assert (ext_compare_and_set (imm_addr t) 4 5);
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 5);
+    test_atomic_compare_exchange_field ~expected:0 (fun () ->
+      assert (ext_compare_exchange (imm_addr t) 5 6 = 5);
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 6);
+    test_atomic_fetch_add_field ~expected:0 (fun () ->
+      assert (ext_fetch_and_add (imm_addr t) 1 = 6);
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 7);
+    test_atomic_add_field ~expected:0 (fun () ->
+      ext_add (imm_addr t) 1;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 8);
+    test_atomic_sub_field ~expected:0 (fun () ->
+      ext_sub (imm_addr t) 2;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 6);
+    test_atomic_land_field ~expected:0 (fun () ->
+      ext_logand (imm_addr t) 0b100;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 4);
+    test_atomic_lor_field ~expected:0 (fun () ->
+      ext_logor (imm_addr t) 0b011;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 7);
+    test_atomic_lxor_field ~expected:0 (fun () ->
+      ext_logxor (imm_addr t) 0b101;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 2)
+
+  (* Pointer operations call the runtime functions, with a null base. *)
+  let () =
+    let t = { imm = 1; ptr = "two" } in
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ext_set (ptr_addr t) "three";
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.ptr = "three");
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ignore (ext_exchange (ptr_addr t) "four");
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.ptr = "four");
+    test_atomic_cas_field ~expected:1 (fun () ->
+      assert (ext_compare_and_set (ptr_addr t) t.ptr "five");
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.ptr = "five");
+    test_atomic_compare_exchange_field ~expected:1 (fun () ->
+      ignore (ext_compare_exchange (ptr_addr t) t.ptr "six");
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.ptr = "six")
 end

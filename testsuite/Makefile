@@ -115,11 +115,23 @@ ifeq "$(lib_unix)" "true"
 endif
 endif
 
+# RUNPARAM should be set by the user to pass extra OCAMLRUNPARAM
+# components to the test programs that ocamltest runs (the compilers
+# and other tools are unaffected), e.g.
+#   make one TEST=tests/foo/bar.ml RUNPARAM=v=0x400
+RUNPARAM ?=
+ifeq "$(RUNPARAM)" ""
+  OCAMLTEST_RUNPARAM_FLAG =
+else
+  OCAMLTEST_RUNPARAM_FLAG = -run-ocamlrunparam '$(RUNPARAM)'
+endif
+
 OCAMLTESTFLAGS = \
   -timeout $(TIMEOUT) \
   $(OCAMLTEST_PROMOTE_FLAG) \
   $(OCAMLTEST_KEEP_TEST_DIR_ON_SUCCESS_FLAG) \
-  $(OCAMLTEST_SHOW_TIMINGS_FLAG)
+  $(OCAMLTEST_SHOW_TIMINGS_FLAG) \
+  $(OCAMLTEST_RUNPARAM_FLAG)
 
 # Make sure USE_RUNTIME is defined
 USE_RUNTIME ?=
@@ -238,9 +250,10 @@ parallel-%:
 	 || (echo "Your 'parallel' tool seems incompatible with GNU parallel.";\
 	     echo "This target requires GNU parallel.";\
 	     exit 1)
-	@for dir in tests/$**; do echo $$dir; done \
+	@$(ocamltest) $(or $(addprefix -find-tests ,$(sort $(wildcard tests/$**))),\
+	    $(error No test directory matches 'tests/$**')) \
 	 | parallel --gnu --no-notice --keep-order $(J_ARGUMENT) \
-	     "$(MAKE) --no-print-directory exec-one DIR={} 2>&1" \
+	     "$(MAKE) --no-print-directory exec-test-file TEST={} 2>&1" \
 	 | tee $(TESTLOG)
 	@$(MAKE) report
 
@@ -269,9 +282,9 @@ list-parallel: lib tools
 	 || (echo "Your 'parallel' tool seems incompatible with GNU parallel.";\
 	     echo "This target requires GNU parallel.";\
 	     exit 1)
-	@cat $(FILE) \
+	@$(ocamltest) $(addprefix -find-tests ,$(shell cat $(FILE))) \
 	 | parallel --gnu --no-notice --keep-order \
-	   "$(MAKE) $(NO_PRINT) exec-one DIR={} 2>&1" \
+	   "$(MAKE) $(NO_PRINT) exec-test-file TEST={} 2>&1" \
 	 | tee $(TESTLOG)
 	@$(MAKE) report
 
@@ -323,6 +336,14 @@ exec-ocamltest:
 	     $(ocamltest) $(OCAMLTESTFLAGS) "$(DIR)/$$testfile" || \
 	   echo " ... testing '$$testfile' => unexpected error"; \
 	done) || echo directory "$(DIR)" >>$(failstamp)
+
+.PHONY: exec-test-file
+exec-test-file: test_dir = $(patsubst %/,%,$(dir $(TEST)))
+exec-test-file:
+	@echo "Running tests from '$(test_dir)' ..."
+	@TERM=dumb OCAMLTESTDIR=$(BASEDIR_HOST)/$(test_dir)/_ocamltest \
+	   $(ocamltest) $(OCAMLTESTFLAGS) $(TEST) || \
+	 echo " ... testing '$(notdir $(TEST))' => unexpected error"
 
 .PHONY: clean-one
 clean-one:

@@ -1,0 +1,5 @@
+(tests
+ (names test float32_lib float32_hash)
+ (build_if %{ocaml-config:ox})
+ (libraries ocaml.stdlib_stable)
+ (modes byte js wasm))

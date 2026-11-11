@@ -13,8 +13,8 @@ let is_control_flow = function
   | J _ | JMP _ | CALL _ | RET | HLT | UD2 -> true
   | LEAVE | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _
   | ADD _ | SUB _ | IMUL _ | MUL _ | IDIV _ | DIV _ | AND _ | OR _ | XOR _
-  | SAL _ | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO
-  | SET _ | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _
+  | SAL _ | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | NOT _ | CDQ
+  | CQO | SET _ | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _
   | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _
   | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE
   | MFENCE | SIMD _ | ADC _ | SBB _ ->
@@ -23,7 +23,11 @@ let is_control_flow = function
 let is_hard_barrier = function
   | Directive d -> (
     match d with
-    | New_label _ | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ -> true
+    | New_label (Label label, _) ->
+      not (Asm_targets.Asm_label.is_dwarf_only_label label)
+    | New_label (Symbol _, _)
+    | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ ->
+      true
     | Align _ | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
     | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _
     | Comment _ | Const _ | Direct_assignment _ | File _ | Global _
@@ -106,6 +110,7 @@ let writes_to_reg64 target = function
   | INC dst
   | DEC dst
   | NEG dst
+  | NOT dst
   | BSWAP dst
   | SET (_, dst)
   | IMUL (_, Some dst)
@@ -176,7 +181,8 @@ let reads_from_reg64 target = function
   | BSR (src, dst)
   | CMOV (_, src, dst) ->
     arg_contains_reg64 target src || arg_contains_reg64 target dst
-  | INC dst | DEC dst | NEG dst | BSWAP dst -> arg_contains_reg64 target dst
+  | INC dst | DEC dst | NEG dst | NOT dst | BSWAP dst ->
+    arg_contains_reg64 target dst
   | IMUL (op1, Some op2)
   | XCHG (op1, op2)
   | LOCK_XADD (op1, op2)
@@ -262,7 +268,7 @@ let flags_never_observed start_cell =
         (* Instructions that don't touch the flags. *)
         | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ
         | CQO | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | RDTSC
-        | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE ->
+        | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE | NOT _ ->
           loop (DLL.next cell)))
   in
   loop (DLL.next start_cell)
@@ -275,7 +281,7 @@ let maybe_writes_flags = function
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
   | SET _ | CMOV _ | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE
-  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE ->
+  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE | NOT _ ->
     false
   | J _ | JMP _ | CALL _ | RET | HLT | UD2 ->
     (* These are all control flow operations, there is no point in assuming

@@ -17,7 +17,6 @@
 
 /* Stack backtrace for uncaught exceptions */
 
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,7 +31,6 @@
 
 #include "caml/mlvalues.h"
 #include "caml/alloc.h"
-#include "caml/custom.h"
 #include "caml/io.h"
 #include "caml/instruct.h"
 #include "caml/intext.h"
@@ -41,9 +39,7 @@
 #include "caml/memory.h"
 #include "caml/startup.h"
 #include "caml/fiber.h"
-#include "caml/sys.h"
 #include "caml/backtrace.h"
-#include "caml/fail.h"
 #include "caml/backtrace_prim.h"
 #include "caml/debugger.h"
 
@@ -423,7 +419,8 @@ CAMLprim value caml_get_continuation_callstack (value cont, value max_frames)
   struct stack_info *stack;
   value *sp;
 
-  stack = Ptr_val(caml_continuation_use(cont));
+  stack = Ptr_val(caml_continuation_take_noexc(cont));
+  if (stack == NULL) caml_raise_continuation_already_resumed();
   {
     CAMLnoalloc; /* GC must not see the stack outside the cont */
     sp = stack->sp;

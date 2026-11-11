@@ -55,9 +55,6 @@ type unit_infos =
                                   (* All compilation units in the
                                      .cmx file (i.e. [ui_unit] and
                                      any produced via [Asmpackager]) *)
-    ui_arg_descr: Lambda.arg_descr option;
-                                  (* If this is an argument unit, the
-                                     parameter it implements *)
     ui_imports_cmi: Import_info.t list;
                                   (* Interfaces imported *)
     ui_imports_cmx: Import_info.t list;
@@ -75,17 +72,20 @@ type unit_infos =
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
-    ui_static_data: Slambdaeval.CU_data.raw;
-                                  (* Compile-time (comptime) value of the unit's
-                                     main module block, as produced by
-                                     [Slambda.eval]. *)
+    ui_static_data: Slambda.CU_data.raw;
+                                  (* Compile-time data of the unit's main module
+                                     block, as produced by [Slambda.eval]. *)
+    ui_lto_info:
+      Flambda2_reaper.Lto_info.t File_sections.Idx.t option;
+                                  (* Section containing LTO information
+                                     (see [Flambda2_reaper.Lto_info]),
+                                     present iff compiled with -lto-support *)
     ui_file_sections: File_sections.t;
   }
 
 type unit_infos_raw =
   { uir_unit: Compilation_unit.t;
     uir_defines: Compilation_unit.t list;
-    uir_arg_descr: Lambda.arg_descr option;
     uir_imports_cmi: Import_info.t array;
     uir_imports_cmx: Import_info.t array;
     uir_quoted_cmi: Compilation_unit.Name.t array;
@@ -100,7 +100,9 @@ type unit_infos_raw =
                                       relative to byte immediately after
                                       this record *)
     uir_external_symbols: string array;
-    uir_static_data: Slambdaeval.CU_data.raw;
+    uir_static_data: Slambda.CU_data.raw;
+    uir_lto_info:
+      Flambda2_reaper.Lto_info.t File_sections.Idx.t option;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 

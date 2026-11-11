@@ -86,7 +86,8 @@ module Printtyp = struct
         if mark ty0 then
           let open Types in
           let ty' = Ctype.full_expand ~may_forget_scope:true env ty0 in
-          if get_desc ty' == get_desc ty0 then Btype.iter_type_expr (iter d) ty0
+          if get_desc ty' == get_desc ty0 then
+            Btype.iter_type_expr (iter d) (Fun.const ()) ty0
           else begin
             let desc =
               match get_desc ty' with
@@ -95,7 +96,8 @@ module Printtyp = struct
               | desc -> desc
             in
             Types.Transient_expr.(set_desc (repr ty0) desc);
-            if d > 0 then Btype.iter_type_expr (iter (pred d)) ty0
+            if d > 0 then
+              Btype.iter_type_expr (iter (pred d)) (Fun.const ()) ty0
           end
       in
       iter
@@ -281,7 +283,9 @@ exception Fallback
 let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
     =
   let print_expr expression =
+    let recovery_errors = ref [] in
     let str, _sg, _shape, _ =
+      Typing_recovery.catch_errors recovery_errors @@ fun () ->
       Env.with_cmis @@ fun () ->
       Typemod.type_toplevel_phrase env []
         (* This parameter is the list of toplevel definitions that are
@@ -291,13 +295,19 @@ let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
         [ Ast_helper.Str.eval expression ]
     in
     let open Typedtree in
-    match str.str_items with
-    | [ { str_desc = Tstr_eval (exp, _, _); _ } ] ->
+    let first_error =
+      List.find_opt (List.rev !recovery_errors) ~f:(function
+        | Typing_recovery.Warning _ -> false
+        | _ -> true)
+    in
+    match (str.str_items, first_error) with
+    | [ { str_desc = Tstr_eval (exp, _, _); _ } ], None ->
       print_type_with_decl ~verbosity env ppf exp.exp_type
-    | _ -> failwith "unhandled expression"
+    | _, Some exn -> raise exn
+    | _, None -> failwith "unhandled expression"
   in
   Printtyp.wrap_printing_env env ~verbosity @@ fun () ->
-  Msupport.uncatch_errors @@ fun () ->
+  Typing_recovery.uncatch_errors @@ fun () ->
   match parse_expr ?keywords @@ protect expr with
   | exception exn ->
     print_exn ppf exn;

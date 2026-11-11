@@ -26,6 +26,7 @@ val emit :
   debug_ranges_table:Debug_ranges_table.t ->
   address_table:Address_table.t ->
   location_list_table:Location_list_table.t ->
+  range_list_table:Range_list_table.t ->
   binary_backend_available:bool ->
   unit
 

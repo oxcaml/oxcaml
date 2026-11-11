@@ -14,7 +14,7 @@ end
 
 module Mixed_record = struct
   (* the value field comes first, so flambda2 reordering is a noop *)
-  type t = { mutable atomic : int [@atomic]; mutable nonatomic : int64# }
+  type t = { mutable atomic : int [@atomic]; mutable nonatomic : int64_u }
 
   let () =
     Printf.printf "== Mixed record (no reordering) ==\n";
@@ -33,7 +33,7 @@ end
 
 module Mixed_record_reorder = struct
   (* flambda2 will reorder so [atomic] comes before [nonatomic] *)
-  type t = { mutable nonatomic : int64#; mutable atomic : int [@atomic] }
+  type t = { mutable nonatomic : int64_u; mutable atomic : int [@atomic] }
 
   let () =
     Printf.printf "== Mixed record (reordering) ==\n";
@@ -52,7 +52,7 @@ end
 
 module Mixed_inline_record = struct
   (* use an inline record *)
-  type t = A of { mutable atomic : int [@atomic]; mutable nonatomic : int64# }
+  type t = A of { mutable atomic : int [@atomic]; mutable nonatomic : int64_u }
 
   let () =
     Printf.printf "== Mixed inline record (no reordering) ==\n";
@@ -70,7 +70,7 @@ module Mixed_inline_record = struct
 end
 
 module Mixed_inline_record_reorder = struct
-  type t = A of { mutable nonatomic : int64#; mutable atomic : int [@atomic] }
+  type t = A of { mutable nonatomic : int64_u; mutable atomic : int [@atomic] }
 
   let () =
     Printf.printf "== Mixed inline record (reordering) ==\n";
@@ -89,7 +89,7 @@ end
 
 module Mixed_record_nonimmediate = struct
   (* atomic field is not an immediate *)
-  type t = { mutable atomic : string [@atomic]; mutable nonatomic : int64# }
+  type t = { mutable atomic : string [@atomic]; mutable nonatomic : int64_u }
 
   let () =
     Printf.printf "== Mixed record with non-immediate (no reordering) ==\n";
@@ -107,7 +107,7 @@ module Mixed_record_nonimmediate = struct
 end
 
 module Mixed_record_nonimmediate_reorder = struct
-  type t = { mutable nonatomic : int64#; mutable atomic : string [@atomic]; }
+  type t = { mutable nonatomic : int64_u; mutable atomic : string [@atomic]; }
 
   let () =
     Printf.printf "== Mixed record with non-immediate (reordering) ==\n";
@@ -128,7 +128,7 @@ module Mixed_record_sandwich = struct
   (* a non-value field sandwiched between two atomic value fields *)
   type t =
     { mutable atomic1 : int [@atomic];
-      mutable nonatomic : int64#;
+      mutable nonatomic : int64_u;
       mutable atomic2 : string [@atomic]
     }
 

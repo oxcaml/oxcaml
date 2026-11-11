@@ -37,6 +37,10 @@ end
 module Float32 = struct
   external of_int : int -> float32 = "%float32ofint"
 
+  external of_int64 : int64 -> float32 = "%float32_of_int64"
+
+  external of_nativeint : nativeint -> float32 = "%float32_of_nativeint"
+
   external to_int : float32 -> int = "%intoffloat32"
 
   external of_float : float -> float32 = "%float32offloat"
@@ -283,7 +287,17 @@ let () =
       let via_f64 =
         Int32.float_of_bits (Int32.bits_of_float (Float.of_int i))
       in
-      eqf via_f32 via_f64)
+      eqf via_f32 via_f64);
+  (* One above the midpoint between adjacent float32 values at 2^54. *)
+  let midpoint = Int64.add (Int64.shift_left 1L 54) (Int64.shift_left 1L 30) in
+  let input = Sys.opaque_identity (Int64.add midpoint 1L) in
+  let expected = 0x1.000002p+54 in
+  eqf (Float32.to_float (Float32.of_int64 input)) expected;
+  if Sys.word_size = 64
+  then
+    eqf
+      (Float32.to_float (Float32.of_nativeint (Int64.to_nativeint input)))
+      expected
 
 let () =
   (* Arithmetic *)

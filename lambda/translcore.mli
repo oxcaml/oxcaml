@@ -56,7 +56,7 @@ type error =
   | Unboxed_vector_or_mask_in_array_comprehension
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
-  | Block_index_gap_overflow_possible
+  | Mixed_record_atomic_loc of Longident.t
 
 exception Error of Location.t * error
 

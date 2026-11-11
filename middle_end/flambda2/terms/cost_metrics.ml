@@ -26,7 +26,7 @@ type t =
 
 type code_characteristics =
   { cost_metrics : t;
-    params_arity : int
+    function_slot_size : int
   }
 
 let zero = { size = Code_size.zero; removed = Removed_operations.zero }
@@ -59,8 +59,9 @@ let ( + ) a b =
 (*
  * A set of closures introduces implicitly an alloc whose size (as in OCaml 4.11)
  * is:
- *   total number of value slots + sum of s(arity) for each closure
- * where s(a) = if a = 1 then 2 else 3
+ *   total number of value slots + sum of (function_slot_size + 1) - 1 for each
+ * closure where the "+ 1" is for the size of the infix header, and "- 1" to
+ * exclude the header of the set of closures. 
  *)
 let set_of_closures ~find_code_characteristics set_of_closures =
   let func_decls = Set_of_closures.function_decls set_of_closures in
@@ -76,16 +77,16 @@ let set_of_closures ~find_code_characteristics set_of_closures =
         | Deleted { function_slot_size; _ } ->
           metrics, Stdlib.( + ) num_words function_slot_size
         | Code_id { code_id; only_full_applications = _ } ->
-          let { cost_metrics; params_arity } =
+          let { cost_metrics; function_slot_size } =
             find_code_characteristics code_id
           in
+          (* We need to include the size of the infix headers *)
           ( metrics + cost_metrics,
-            (* CR poechsel: valid until OCaml 4.12, as for named_size *)
-            Stdlib.( + ) num_words (if params_arity <= 1 then 2 else 3) ))
+            Stdlib.( + ) num_words (Stdlib.( + ) function_slot_size 1) ))
       funs (zero, num_clos_vars)
   in
   let alloc_size =
-    Code_size.( + ) Code_size.alloc_size (Code_size.of_int num_words)
+    Code_size.( + ) Code_size.alloc_size (Code_size.of_int (num_words - 1))
   in
   cost_metrics + from_size alloc_size
 

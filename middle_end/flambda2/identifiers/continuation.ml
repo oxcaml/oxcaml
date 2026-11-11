@@ -18,11 +18,25 @@ module Id = Table_by_int_id.Id
 
 let continuation_flags = 0
 
-let next_stamp =
-  let next_stamp = ref 0 in
-  fun () ->
-    incr next_stamp;
-    !next_stamp
+let previous_stamp = ref 0
+
+let next_stamp () =
+  incr previous_stamp;
+  !previous_stamp
+
+type stamp_state = int
+
+let export_stamp_state () = !previous_stamp
+
+let restore_stamp_state state =
+  if !previous_stamp = 0
+  then previous_stamp := state
+  else
+    Misc.fatal_errorf
+      "Restoring continuation stamp state would overwrite modified value %d"
+      !previous_stamp
+
+let merge_stamp_state state1 state2 = Int.max state1 state2
 
 module Sort = struct
   type t =
@@ -62,18 +76,14 @@ module Data = struct
 
   let flags = continuation_flags
 
-  let [@ocamlformat "disable"] print ppf
-      { compilation_unit; name; name_stamp; sort; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(name_stamp@ %d)@]@ \
-        @[<hov 1>(sort@ %a)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      name_stamp
-      Sort.print sort
+  let print ppf { compilation_unit; name; name_stamp; sort } =
+    let open! Misc.Sexp in
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        s "name" name;
+        d "name_stamp" name_stamp;
+        a "sort" sort Sort.print ]
 
   let hash { compilation_unit; name = _; name_stamp; sort = _ } =
     Hashtbl.hash (Compilation_unit.hash compilation_unit, name_stamp)
@@ -177,3 +187,9 @@ let export conts =
 
 let import importer t =
   Table.add !grand_table_of_continuations (Table.import importer t)
+
+let import_and_rename importer t =
+  let { Data.name; sort; name_stamp = _; compilation_unit = _ } =
+    Table.import importer t
+  in
+  create ~sort ~name ()

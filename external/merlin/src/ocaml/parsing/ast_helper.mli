@@ -152,6 +152,7 @@ module Pat:
     val constraint_: ?loc:loc -> ?attrs:attrs -> pattern -> core_type option
                      -> mode with_loc list -> pattern
     val type_: ?loc:loc -> ?attrs:attrs -> lid -> pattern
+    val addr: ?loc:loc -> ?attrs:attrs -> mutable_flag -> pattern -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
     val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> pattern
     val open_: ?loc:loc -> ?attrs:attrs  -> lid -> pattern -> pattern
@@ -345,8 +346,8 @@ module Mod:
       module_expr -> module_expr
     val unpack: ?loc:loc -> ?attrs:attrs -> expression -> module_expr
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> module_expr
-    val instance: ?loc:loc -> ?attrs:attrs -> module_instance -> module_expr
     val hole: ?loc:loc -> ?attrs:attrs -> unit -> module_expr
+    val instance: ?loc:loc -> ?attrs:attrs -> module_instance -> module_expr
   end
 
 (** Signature items *)
@@ -600,4 +601,3 @@ type let_bindings =
 
 val no_label : arg_label
 val extract_str_payload : payload -> (string * Location.t) option
-val hole_txt : string

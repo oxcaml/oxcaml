@@ -40,7 +40,7 @@ module type Code_metadata_accessors_result_type = sig
      equal to the number of (complex) parameters. *)
   val first_complex_local_param : 'a t -> First_complex_local_param.t
 
-  val result_arity : 'a t -> [`Unarized] Flambda_arity.t
+  val result_arity : 'a t -> [`Complex] Flambda_arity.t
 
   val result_types : 'a t -> Result_types.t Or_unknown_or_bottom.t
 
@@ -72,6 +72,8 @@ module type Code_metadata_accessors_result_type = sig
 
   val dbg : 'a t -> Debuginfo.t
 
+  val fdo_entry_annotation : 'a t -> Fdo_annotation.t
+
   val is_tupled : 'a t -> bool
 
   val is_my_closure_used : 'a t -> bool
@@ -98,7 +100,7 @@ type 'a create_type =
   params_arity:[`Complex] Flambda_arity.t ->
   param_modes:Alloc_mode.For_types.t list ->
   first_complex_local_param:First_complex_local_param.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
+  result_arity:[`Complex] Flambda_arity.t ->
   result_types:Result_types.t Or_unknown_or_bottom.t ->
   result_mode:Lambda.return_mode ->
   stub:bool ->
@@ -114,6 +116,7 @@ type 'a create_type =
   cost_metrics:Cost_metrics.t ->
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
+  fdo_entry_annotation:Fdo_annotation.t ->
   is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
@@ -134,7 +137,7 @@ val with_cost_metrics : Cost_metrics.t -> t -> t
 
 val with_is_my_closure_used : bool -> t -> t
 
-val with_result_arity : [`Unarized] Flambda_arity.t -> t -> t
+val with_result_arity : [`Complex] Flambda_arity.t -> t -> t
 
 val with_params_arity : [`Complex] Flambda_arity.t -> t -> t
 
@@ -147,6 +150,8 @@ val with_is_tupled : bool -> t -> t
 val with_result_types : Result_types.t Or_unknown_or_bottom.t -> t -> t
 
 val with_inlining_decision : Function_decl_inlining_decision_type.t -> t -> t
+
+val with_fdo_entry_annotation : Fdo_annotation.t -> t -> t
 
 val print : Format.formatter -> t -> unit
 

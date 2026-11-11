@@ -18,8 +18,11 @@
 
 /* PIC mode support based on contribution by Paul Stravers (see PR#4795) */
 
+#define CAML_INTERNALS
+
 #include "caml/m.h"
 #include "caml/asm.h"
+#include "caml/asm_offsets.h"
 
 #if defined(SYS_macosx)
 
@@ -124,44 +127,27 @@ G(name):
 #define IF_DEBUG(...)
 #endif
 
-/* struct stack_info */
-#define Stack_sp                 0
-#define Stack_exception          8
-#define Stack_handler            16
-#define Stack_id                 48
-#define Stack_local_sp           64
-#define Stack_local_top          72
-#define Stack_local_limit        80
+#define Stack_sp                 Stack_sp_offset
+#define Stack_exception          Stack_exception_offset
+#define Stack_handler            Stack_handler_offset
+#define Stack_handler_from_cont  Stack_handler_from_cont_offset
+#define Stack_id                 Stack_id_offset
+#define Stack_local_sp           Stack_local_sp_offset
+#define Stack_local_top          Stack_local_top_offset
+#define Stack_local_limit        Stack_local_limit_offset
+#define Stack_tls_state          Stack_tls_state_offset
+#define Stack_idled_from_high    Stack_idled_from_high_offset
+#define Handler_value            Handler_value_offset
+#define Handler_exception        Handler_exception_offset
+#define Handler_effect           Handler_effect_offset
+#define Handler_parent           Handler_parent_offset
+#define Cstack_stack             Cstack_stack_offset
+#define Cstack_sp                Cstack_sp_offset
+#define Cstack_prev              Cstack_prev_offset
+#define Cstack_async_exn_handler Cstack_async_exn_handler_offset
 
-/* struct stack_handler */
-#define Handler_value(REG)       0(REG)
-#define Handler_exception(REG)   8(REG)
-#define Handler_effect(REG)     16(REG)
-#define Handler_parent          32
-
-/* struct dynamic_cache_s */
-
-/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
-#define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
-#define Dynamic_binding_size     (2*8) /* dyn, val */
-#define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
-
-/* struct c_stack_link */
 #if defined(SYS_mingw64) || defined (SYS_cygwin)
-#define Cstack_stack             32
-#define Cstack_sp                40
-#define Cstack_prev              48
-#define Cstack_async_exn_handler 56
-#define SIZEOF_C_STACK_LINK      64
 #error "Asynchronous exceptions support for Windows isn't finished"
-#else
-#define Cstack_stack              0
-#define Cstack_sp                 8
-#define Cstack_prev              16
-#define Cstack_async_exn_handler 24
-/* 8 bytes are left empty to ensure the stack is 16-aligned */
-#define SIZEOF_C_STACK_LINK      40
 #endif
 
 /* Continuation values
@@ -315,6 +301,18 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(
         movq    $0, (Dynamic_cache + 5*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
         movq    $0, (Dynamic_cache + 6*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
         movq    $0, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)(reg)
+
+/* See [caml_tls_update_cache]: set (Caml_state->tls_state) to the nearest TLS.
+   Must occur after switching stacks. Clobbers reg_stk and reg_tmp. */
+
+#define UPDATE_TLS_CACHE(reg_stk, reg_tmp)          \
+9:      movq    Stack_tls_state(reg_stk), reg_tmp;  \
+        testq   reg_tmp, reg_tmp;                   \
+        jnz     8f;                                 \
+        movq    Stack_handler(reg_stk), reg_stk;    \
+        movq    Handler_parent(reg_stk), reg_stk;   \
+        jmp     9b;                                 \
+8:      movq    reg_tmp, Caml_state(tls_state)
 
 /* When ThreadSanitizer instrumentation is enabled, the code must call
    the C functions __tsan_func_entry and __tsan_func_exit to signal
@@ -803,8 +801,11 @@ CFI_STARTPROC
            for the code here to be reached via a segfault from C, but
            in practice this seems most unlikely.  The current situation will
            suffice as this patch is only a temporary measure in any case. */
+        movq    %r15, Caml_state(young_ptr)
         SWITCH_OCAML_TO_C
-        CHECK_STACK_ALIGNMENT; jmp GCALL(caml_raise_stack_overflow)
+    /* Enter the C function, using [call] to ensure stack alignment. This
+       call never returns. */
+        C_call  (GCALL(caml_raise_stack_overflow))
 CFI_ENDPROC
 END_FUNCTION(caml_raise_stack_overflow_nat)
 
@@ -909,13 +910,20 @@ LBL(caml_c_call):
     /* Load ocaml stack and restore global variables */
         SWITCH_C_TO_OCAML
 #ifdef WITH_THREAD_SANITIZER
-    /* Save non-callee-saved registers %rax and %xmm0 before C call */
+    /* Save return value registers. Since the called function could be
+       anything, it may have returned its result (if any) in %rax:%rdx
+       and/or %xmm0:%xmm1 (%rdx and %xmm1 for unboxed product returns). */
         pushq   %rax; CFI_ADJUST(8);
-        subq    $16, %rsp; CFI_ADJUST(16);
-        movupd   %xmm0, (%rsp)
+        pushq   %rdx; CFI_ADJUST(8);
+        subq    $32, %rsp; CFI_ADJUST(32);
+        movupd  %xmm0, (%rsp)
+        movupd  %xmm1, 16(%rsp)
         TSAN_EXIT_FUNCTION
+    /* Restore return value registers */
         movupd  (%rsp), %xmm0
-        addq    $16, %rsp; CFI_ADJUST(-16);
+        movupd  16(%rsp), %xmm1
+        addq    $32, %rsp; CFI_ADJUST(-32);
+        popq    %rdx; CFI_ADJUST(-8);
         popq    %rax; CFI_ADJUST(-8);
 #endif
         LEAVE_FUNCTION
@@ -1393,6 +1401,14 @@ LBL(do_perform):
      /* We have to null the Handler_parent after the switch because the
         Handler_parent is needed to unwind the stack for backtraces */
         movq    $0, Handler_parent(%r11) /* Set parent of performer to NULL */
+     /* If the departing stack owned the TLS state, recompute the cache.
+        Note each [caml_perform] only exits a single fiber, so we will find
+        the owner while reperforming (if needed). */
+        cmpq    $0, Stack_tls_state(%rsi)
+        je      6f
+        movq    %r10, %rcx
+        UPDATE_TLS_CACHE(%rcx, %rdx)
+6:
         movq    Handler_effect(%r11), %rsi  /* %rsi := effect handler */
         FLUSH_DYNAMIC_CACHE(%r11)
 LBL(caml_perform_enter):
@@ -1417,6 +1433,9 @@ LBL(112):
         jz      LBL(113)
         movq    Caml_state(current_stack), %rsi
         SWITCH_OCAML_STACKS
+    /* Recompute the cached TLS state. */
+        movq    %r10, %rcx
+        UPDATE_TLS_CACHE(%rcx, %rdx)
     /* No parent stack. If this is a preemption effect (wosize of the
        continuation is 3, meaning we have a gc_regs present) then just continue
        execution. Otherwise, raise Effect.Unhandled. */
@@ -1460,7 +1479,7 @@ LBL(preemption_unhandled):
 LBL(113):
         ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0)
-        LEA_VAR(caml_raise_continuation_already_resumed, %rax)
+        LEA_VAR(caml_raise_resume_failure, %rax)
         jmp     LBL(caml_c_call)
 CFI_ENDPROC
 END_FUNCTION(caml_perform)
@@ -1470,8 +1489,38 @@ CFI_STARTPROC
     /*  %rax: effect to reperform
         %rbx: continuation
         %rdi: last_fiber */
-        movq    Caml_state(current_stack), %rsi  /* %rsi := old stack */
-        movq    (Stack_handler-1)(%rdi), %r10
+
+     /* An already-consumed continuation (NULL stack) is left for the
+        unhandled path to report. */
+        movq    Cont_fiber(%rbx), %r10
+        subq    $1, %r10             /* %r10 := Ptr_val(fiber) */
+        testq   %r10, %r10
+        jz      1f
+
+     /* If a minor collection idled the continuation's stacks during this
+        perform (moving them), %rdi is stale: wake the stacks in place
+        and reload the last fiber from the continuation. */
+        cmpq    $0, Stack_idled_from_high(%r10)
+        je      1f
+
+        movq    %rbx, C_ARG_1
+        SWITCH_OCAML_TO_C
+    /* Save %rax (the effect) across the C call. Reserve 16 bytes to
+       keep %rsp 16-byte aligned. */
+        subq    $16, %rsp; CFI_ADJUST(16)
+        movq    %rax, 0(%rsp)
+        C_call  (GCALL(caml_cont_wake_stacks))
+    /* %r10 := zero if the stacks could not be woken, in which case the
+       last fiber is still stale and must not be used. */
+        movq    %rax, %r10
+        movq    0(%rsp), %rax
+        addq    $16, %rsp; CFI_ADJUST(-16)
+        SWITCH_C_TO_OCAML
+        testq   %r10, %r10
+        jz      LBL(113)                 /* could not wake: raise */
+        movq    Cont_last_fiber(%rbx), %rdi
+1:      movq    Caml_state(current_stack), %rsi  /* %rsi := old stack */
+        movq    Stack_handler_from_cont(%rdi), %r10
         movq    %rsi, Handler_parent(%r10)       /* Append to last_fiber */
         leaq    1(%rsi), %rdi  /* %rdi (last_fiber) := Val_ptr(old stack) */
      /* Need to update the oldest saved frame pointer here as the execution of
@@ -1562,7 +1611,7 @@ END_FUNCTION(caml_preempt)
    through to the caller's tail. Shared by caml_continue / caml_discontinue /
    caml_discontinue_with_backtrace. */
 #define DO_RESUME_SWITCH \
-        movq   Cont_last_fiber(%rax),  %r13 ; /* %r13 := last_fiber */ \
+        movq   %rax, %r13 ;             /* %r13 := the continuation */ \
         WOSIZE_BLOCK_VAL(%rax, %rcx) ; \
         cmpq   $3, %rcx ;                    /* Wosize_hd(%rax) == 3 ? */ \
         je     1f ; \
@@ -1572,12 +1621,14 @@ END_FUNCTION(caml_preempt)
         CFI_ADJUST(8) ;                          /* for either push */ \
 2:      movq   %rax, C_ARG_1 ; \
         SWITCH_OCAML_TO_C ; \
+        /* use cont before looking at last_fiber, in case it's idled */ \
         C_call (GCALL(caml_continuation_use_noexc)) ; /* %rax := stack */ \
         SWITCH_C_TO_OCAML ; \
         leaq    -1(%rax), %r10 ;  /* %r10 (new stack) = Ptr_val(%rax) */ \
     /* check if stack null, then already used */ \
         testq   %r10, %r10 ; \
         jz      LBL(continuation_already_resumed) ; \
+        movq   Cont_last_fiber(%r13),  %r13 ; /* %r13 := last_fiber */ \
         RESUME_SWITCH_TSAN ; \
     /* Record fiber id */ \
         cmpb    $0, G(caml_cpu_ptwrite)(%rip) ; \
@@ -1585,7 +1636,7 @@ END_FUNCTION(caml_preempt)
         ptwriteq Stack_id(%r10) ; \
     /* Add current stack to the last fiber */ \
 1:      popq    %rdx; CFI_ADJUST(-8) ; \
-        movq    (Stack_handler-1)(%r13), %rdi ; \
+        movq    Stack_handler_from_cont(%r13), %rdi ; \
         movq    Caml_state(current_stack), %rsi ; \
         movq    %rsi, Handler_parent(%rdi) ; \
     /* Need to update the oldest saved frame pointer here as the current \
@@ -1594,6 +1645,9 @@ END_FUNCTION(caml_preempt)
         UPDATE_BASE_POINTER(%rdi) ; \
         SWITCH_OCAML_STACKS ; \
         FLUSH_DYNAMIC_CACHE(%r13) ; \
+    /* Recompute the cached TLS state. */ \
+        movq    %r10, %r13 ; \
+        UPDATE_TLS_CACHE(%r13, %rcx) ; \
         testq   %rdx, %rdx ;               /* Do we have a gc_regs? */ \
         jnz     LBL(resume_preemption)
 
@@ -1624,10 +1678,15 @@ LBL(resume_preemption): /* %rdx -> gc_regs */
 LBL(caml_continue_preempted):
         jmp     LBL(restore_regs_and_ret)
 LBL(continuation_already_resumed):
+    /* Drop the gc_regs slot pushed by DO_RESUME_SWITCH, so that the
+       caller's return address is on top of the stack again if it is
+       scanned during the raise. */
+        addq    $8, %rsp
+        CFI_ADJUST(-8)
         ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller in the TSan
                                   backtrace */
-        LEA_VAR(caml_raise_continuation_already_resumed, %rax)
+        LEA_VAR(caml_raise_resume_failure, %rax)
         jmp LBL(caml_c_call)
 CFI_ENDPROC
 END_FUNCTION(caml_continue)
@@ -1719,6 +1778,12 @@ CFI_STARTPROC
     /* Switch to the new stack */
         movq    %r11, %rsp
         FLUSH_DYNAMIC_CACHE(%r11)
+    /* If the new fiber is preemptible, cache its TLS state. */
+        movq    Stack_tls_state(%rax), %r10
+        testq   %r10, %r10
+        jz      6f
+        movq    %r10, Caml_state(tls_state)
+6:
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
         .cfi_escape DW_CFA_def_cfa_expression, 3+3+2, \
@@ -1759,6 +1824,12 @@ LBL(frame_runstack):
         movq    Stack_local_limit(%r10), %r11
         movq    %r11, Caml_state(local_limit)
         FLUSH_DYNAMIC_CACHE(%r11)
+    /* If the dying fiber owned the TLS state, recompute the cache. */
+        cmpq    $0, Stack_tls_state(C_ARG_1)
+        je      6f
+        movq    %r10, %r11
+        UPDATE_TLS_CACHE(%r11, %rcx)
+6:
     /* free old stack by switching directly to c_stack; is a no-alloc call */
         movq    Stack_sp(%r10), %r13 /* saved across C call */
         CFI_RESTORE_STATE
@@ -1871,6 +1942,7 @@ G(caml_absf32_mask):
 
         NONEXECSTACK_NOTE
 
+#ifndef SYS_macosx
 /* Record effect machinery branch offsets for magic trace */
 .pushsection .note.ocaml_eff,"?",%note
 .balign 4
@@ -1894,3 +1966,4 @@ LBL(ocaml_eff_desc):
 LBL(ocaml_eff_desc_end):
         .balign 4
 .popsection
+#endif

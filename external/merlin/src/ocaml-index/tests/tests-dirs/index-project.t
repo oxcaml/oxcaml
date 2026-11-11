@@ -153,6 +153,8 @@
   - root dir: none
   
 
+  $ ocaml-index aggregate -o project.uideps main.uideps foo.uideps bar.uideps
+
 Jane Street Merlin uses cms files instead of cmt files. Verify that the results using
 cms files are consistent with using cmt files:
 

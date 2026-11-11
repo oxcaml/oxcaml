@@ -16,8 +16,7 @@ let code inline(never) loopify(never) size(8) newer_version_of(index_0)
   let Popaque = %opaque (Pmakearray) in
   cont k (Popaque)
 in
-let $camlArrays_compatibility__index_3 =
-  closure index_0_1 @index &toplevel.alloc_region
+let $camlArrays_compatibility__index_3 = closure index_0_1 @index &toplevel
 in
 let code inline(always) loopify(never) size(60) newer_version_of(convert_fast_1)
       convert_fast_1_1 (offset : imm tagged, index : imm array)
@@ -56,7 +55,7 @@ let code inline(always) loopify(never) size(60) newer_version_of(convert_fast_1)
       cont k (Pmakeblock)
 in
 let $camlArrays_compatibility__convert_fast_4 =
-  closure convert_fast_1_1 @convert_fast &toplevel.alloc_region
+  closure convert_fast_1_1 @convert_fast &toplevel
 in
 let $camlArrays_compatibility__Pmakeblock_5 =
   Block 0 ($camlArrays_compatibility__empty_array_0,
@@ -110,8 +109,7 @@ let code loopify(never) size(75) newer_version_of(f_2)
            let Pmakeblock = %block.[`0`].my_alloc_region (line, col) in
            cont k (Pmakeblock))
 in
-let $camlArrays_compatibility__f_6 = closure f_2_1 @f &toplevel.alloc_region
-in
+let $camlArrays_compatibility__f_6 = closure f_2_1 @f &toplevel in
 let $camlArrays_compatibility =
   Block 0 ($camlArrays_compatibility__Pmakeblock_5,
            $camlArrays_compatibility__f_6)

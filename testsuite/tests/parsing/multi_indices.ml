@@ -21,7 +21,7 @@ val ( .%{;..}<- ) :
 
 let (.%{;..}) = A.get;;
 val ( .%{;..} ) :
-  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a =
+  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ read -> int array -> 'a =
   <fun>
 |}]
 
@@ -59,7 +59,7 @@ val ( .?(;..)<- ) :
 
 let (.?(;..)) = A.get;;
 val ( .?(;..) ) :
-  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a =
+  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ read -> int array -> 'a =
   <fun>
 |}]
 
@@ -149,15 +149,15 @@ module M =
 module M :
   sig
     val ( .%?(;..) ) :
-      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ read -> int array -> 'a
     val ( .%?(;..)<- ) :
       'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit
     val ( .%![;..] ) :
-      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ read -> int array -> 'a
     val ( .%![;..]<- ) :
       'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit
     val ( .%%{;..} ) :
-      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ read -> int array -> 'a
     val ( .%%{;..}<- ) :
       'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit
   end

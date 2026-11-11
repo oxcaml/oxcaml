@@ -27,6 +27,7 @@ type t =
   | Max_inlining_depth_exceeded
   | Recursion_depth_exceeded
   | Never_inlined_attribute
+  | Forward_inlined_attribute_but_nothing_to_forward
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;

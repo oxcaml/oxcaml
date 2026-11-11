@@ -99,7 +99,7 @@ type node =
   | Module_binding_name of module_binding
   | Module_declaration_name of module_declaration
   | Module_type_declaration_name of module_type_declaration
-  | Mode of Mode.Alloc.atom Location.loc
+  | Mode of Mode.With_locality.atom Location.loc
   | Modality of Mode.Modality.atom Location.loc
   | Jkind_annotation of Parsetree.jkind_annotation
   | Jkind_declaration of jkind_declaration
