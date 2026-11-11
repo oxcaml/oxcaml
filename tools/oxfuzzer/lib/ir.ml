@@ -539,7 +539,7 @@ module Expr = struct
           result_name : Name.t;
           max_length : int
         }
-    | Assert_false
+    | Assert_false of int
     | Let of
         { name : Name.t;
           expr : t;
@@ -683,8 +683,28 @@ module Expr = struct
                (apply
                   (qualified_ident "String" "sub")
                   [result; int 0; int max_length])))
-    | Assert_false ->
-      Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None)
+    | Assert_false id ->
+      (* Keep an actual assertion in the tested program, but report an IR site
+         ID rather than a source location, which differs between languages. *)
+      (* [raise] returns a value layout. A trailing literal [assert false]
+         keeps the whole expression non-returning at every layout. *)
+      Ast_helper.Exp.sequence
+        (Ast_helper.Exp.try_
+           (Ast_helper.Exp.assert_
+              (Ast_helper.Exp.construct (lid "false") None))
+           [ Ast_helper.Exp.case
+               (Ast_helper.Pat.construct (lid "Assert_failure")
+                  (Some ([], Ast_helper.Pat.any ())))
+               (apply (ident "raise")
+                  [ Ast_helper.Exp.construct (lid "Assert_failure")
+                      (Some
+                         (Ast_helper.Exp.tuple
+                            [ ( None,
+                                Ast_helper.Exp.constant
+                                  (Ast_helper.Const.string "oxfuzzer") );
+                              None, int id;
+                              None, int 0 ])) ]) ])
+        (Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None))
     | Let { name; expr; body } ->
       bind name (to_code expr) (fun _ -> to_code body)
     | If { condition; if_true; if_false } ->
