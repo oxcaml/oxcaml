@@ -1,6 +1,28 @@
 # About
 oxfuzzer generates random OxCaml programs, compiles and runs them under different compiler configurations, and reports compilation failures, execution failures, and output mismatches.
 
+# Evaluation order
+
+For generated programs, oxfuzzer assumes right-to-left evaluation of operands
+whose order OCaml leaves unspecified: function and operator arguments, tuple
+components, constructor payloads, record-construction fields, and array
+elements. Observable differences caused by a compiler departing from this order
+are treated as failures. This is a fuzzer assumption, not a guarantee of the
+OCaml language.
+
+Record updates are different: the tested compilers evaluate the base record
+before replacement field expressions. These expressions are also left unbound.
+
+Language-defined sequencing is unchanged: sequential let-bindings and statements
+run in order, `&&` and `||` evaluate their left operand first and short-circuit,
+and conditionals evaluate only the selected branch after their condition.
+
+Operands are left unbound, including in `May_raise` mode, so differences in
+mutation or exception order remain observable. Bindings are retained where
+needed for single evaluation or sharing, such as integer division/remainder
+operands, comparison results, concatenation results, and array initializers.
+When such bindings sequence multiple operands, they follow right-to-left order.
+
 # How to use
 To use you first need to build OxCaml (more in the repostitory's root README), which will also automatically build oxfuzzer. To run the script you need to have a Python version 3.11 or higher.
 
