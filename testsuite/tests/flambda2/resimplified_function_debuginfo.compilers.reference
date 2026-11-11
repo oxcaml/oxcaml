@@ -1,0 +1,155 @@
+(data global "camlResimplified_function_debuginfo__gc_roots": int 0)
+(data
+ int 3840
+ global "camlResimplified_function_debuginfo":
+ addr G:"camlResimplified_function_debuginfo__side_1"
+ addr G:"camlResimplified_function_debuginfo__Make_2"
+ addr G:"camlResimplified_function_debuginfo__Pmakeblock_6")
+(data
+ int 1792
+ global "camlResimplified_function_debuginfo__Pmakeblock_6":
+ addr G:"camlResimplified_function_debuginfo__count_5")
+(data
+ int 4087
+ global "camlResimplified_function_debuginfo__count_5":
+ addr G:"camlResimplified_function_debuginfo__count_2_10_code"
+ int 108086391056891909
+ addr G:"camlResimplified_function_debuginfo__Pmakeblock_4")
+(data
+ int 2816
+ global "camlResimplified_function_debuginfo__Pmakeblock_4":
+ int 7
+ addr G:"camlResimplified_function_debuginfo__step_3")
+(data
+ int 4087
+ global "camlResimplified_function_debuginfo__step_3":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlResimplified_function_debuginfo__step_4_9_code")
+(data
+ int 3063
+ global "camlResimplified_function_debuginfo__Make_2":
+ addr G:"camlResimplified_function_debuginfo__Make_1_6_code"
+ int 108086391056891909)
+(data
+ int 3063
+ global "camlResimplified_function_debuginfo__side_1":
+ addr G:"camlResimplified_function_debuginfo__side_0_5_code"
+ int 108086391056891909)
+(function{resimplified_function_debuginfo.ml:18,24-33}
+ camlResimplified_function_debuginfo__side_0_5_code (x/0: int) : int
+ (+ x/0 2) )
+
+(function{resimplified_function_debuginfo.ml:26,12-258}
+ camlResimplified_function_debuginfo__Make_1_6_code (C/0: val) : val
+ (let
+   *set_of_closures*/0
+     (alloc{resimplified_function_debuginfo.ml:27,27-220} 3319
+       G:"camlResimplified_function_debuginfo__count_2_7_code"
+       108086391056891909 C/0)
+   (alloc{resimplified_function_debuginfo.ml:26,27-258} 1024
+     *set_of_closures*/0)) )
+
+(function{resimplified_function_debuginfo.ml:27,27-220}
+ camlResimplified_function_debuginfo__count_2_7_code
+     (n/0: int my_closure/0: val) : int
+ (let
+   (region/0 (beginregion)
+    r/0 (alloc{resimplified_function_debuginfo.ml:28,12-17} 1024 1))
+   (catch
+     (if (<=s 1 n/0)
+       (let for_stop_naked/0 (>>s n/0 1)
+         (catch rec (exit 11 0) with(11 for_counter_naked/0: int)
+           (let
+             (param/0
+                (app{resimplified_function_debuginfo.ml:30,6-16}
+                  G:"caml_apply2" r/0 (+ (<< for_counter_naked/0 1) 1)
+                  (load val (+a (load val (+a my_closure/0 16)) 8)) int)
+              for_next_naked/0 (+ for_counter_naked/0 1))
+             (if (<=s for_next_naked/0 for_stop_naked/0)
+               (exit 11 for_next_naked/0) (exit 10)))))
+       (exit 10))
+   with(10)
+     (let
+       (*set_of_closures*/1
+          (alloc_local{resimplified_function_debuginfo.ml:33,29-70} 5111
+            G:"camlResimplified_function_debuginfo__inner_3_8_code"
+            108086391056891911 (load_mut val r/0)
+            (load val (+a my_closure/0 16)))
+        apply_result/0
+          (app{resimplified_function_debuginfo.ml:34,14-27}
+            G:"camlResimplified_function_debuginfo__inner_3_8_code" (+ n/0 2)
+            *set_of_closures*/1 int)
+        apply_result/1
+          (app{resimplified_function_debuginfo.ml:34,4-11}
+            G:"camlResimplified_function_debuginfo__inner_3_8_code" n/0
+            *set_of_closures*/1 int)
+        int_add/0 (+ (+ apply_result/1 apply_result/0) -1)
+        unit/0 (seq (endregion region/0) 1))
+       int_add/0))) )
+
+(function{resimplified_function_debuginfo.ml:38,11-90;resimplified_function_debuginfo.ml:27,27-220}
+ camlResimplified_function_debuginfo__count_2_10_code (n/1: int) : int
+ (let region/1 (beginregion)
+   (catch
+     (if (<=s 1 n/1)
+       (let for_stop_naked/1 (>>s n/1 1)
+         (catch rec (exit 13 0 1) with(13 for_counter_naked/1: int
+           r_0/0: int)
+           (let
+             (int_add/1 (+ r_0/0 (<< for_counter_naked/1 1))
+              for_next_naked/1 (+ for_counter_naked/1 1))
+             (if (<=s for_next_naked/1 for_stop_naked/1)
+               (exit 13 for_next_naked/1 int_add/1) (exit 12 int_add/1)))))
+       (exit 12 1))
+   with(12 r_0/1: int)
+     (let
+       (*set_of_closures*/2
+          (alloc_local{resimplified_function_debuginfo.ml:33,29-70} 5111
+            L:"camlResimplified_function_debuginfo__inner_3_11_code"
+            108086391056891911 r_0/1
+            G:"camlResimplified_function_debuginfo__Pmakeblock_4")
+        apply_result/2
+          (app{resimplified_function_debuginfo.ml:34,14-27}
+            L:"camlResimplified_function_debuginfo__inner_3_11_code"
+            (+ n/1 2) *set_of_closures*/2 int)
+        apply_result/3
+          (app{resimplified_function_debuginfo.ml:34,4-11}
+            L:"camlResimplified_function_debuginfo__inner_3_11_code" n/1
+            *set_of_closures*/2 int)
+        int_add/2 (+ (+ apply_result/3 apply_result/2) -1)
+        unit/1 (seq (endregion region/1) 1))
+       int_add/2))) )
+
+(function{resimplified_function_debuginfo.ml:33,29-70}
+ camlResimplified_function_debuginfo__inner_3_8_code
+     (a/0: int my_closure/1: val) : int
+ (if
+   (<s a/0
+     (+
+       (+ (load val (load val (+a my_closure/1 24)))
+         (load val (+a my_closure/1 16)))
+       -1))
+   (app{resimplified_function_debuginfo.ml:33,57-63}
+     G:"camlResimplified_function_debuginfo__side_0_5_code" a/0 int)
+   a/0) )
+
+(function{resimplified_function_debuginfo.ml:33,29-70}
+ camlResimplified_function_debuginfo__inner_3_11_code
+     (a/1: int my_closure/2: val) : int
+ (if (<s a/1 (+ (load val (+a my_closure/2 16)) 6))
+   (app{resimplified_function_debuginfo.ml:33,57-63}
+     G:"camlResimplified_function_debuginfo__side_0_5_code" a/1 int)
+   a/1) )
+
+(function{resimplified_function_debuginfo.ml:41,27-44}
+ camlResimplified_function_debuginfo__step_4_9_code (r/1: val i/0: int) : int
+ (let Psetfield/0 (seq (store int r/1 (+ (+ (load_mut val r/1) i/0) -1)) 1)
+   1) )
+
+(function no_cse reduce_code_size linscan
+ camlResimplified_function_debuginfo__entry () : val
+ (catch (exit 9 G:"camlResimplified_function_debuginfo") with(9 *ret*/0: val)
+   1) )
+
+(data)

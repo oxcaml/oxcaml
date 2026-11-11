@@ -377,8 +377,10 @@ type simplify_function_result =
     should_resimplify : bool
   }
 
-let simplify_function0 context ~outer_dacc function_slot_opt code_id code
-    ~closure_bound_names_inside_function =
+(* [resimplifying] is set when [code] is the result of a previous run in the
+   same [context]. *)
+let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
+    code_id code ~closure_bound_names_inside_function =
   let original_outer_dacc = outer_dacc in
   let denv_prior_to_sets = C.dacc_prior_to_sets context |> DA.denv in
   let inlining_arguments_from_denv =
@@ -507,7 +509,11 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
        closures, not the code, but at the moment To_cmm looks at the debuginfo
        of the code to compute the debuginfo of the set of closures
        allocation. *)
-    let dbg = DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code) in
+    let dbg =
+      if resimplifying
+      then Code.dbg code
+      else DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code)
+    in
     let cold = Code.cold code || body_is_cold in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
@@ -591,8 +597,9 @@ let simplify_function context ~outer_dacc function_slot code_id
            || C.stub_can_be_simplified (DA.denv outer_dacc) ->
       let rec run ~outer_dacc ~code count =
         let { code_id; code = new_code; outer_dacc; should_resimplify } =
-          simplify_function0 context ~outer_dacc (Some function_slot) code_id
-            code ~closure_bound_names_inside_function
+          simplify_function0 context ~outer_dacc ~resimplifying:(count > 0)
+            (Some function_slot) code_id code
+            ~closure_bound_names_inside_function
         in
         match new_code with
         | None -> code_id, outer_dacc
@@ -1220,8 +1227,8 @@ let simplify_static_stub_function dacc code ~all_code ~simplify_function_body =
     Function_slot.Map.empty
   in
   let { code_id = _; code; outer_dacc; should_resimplify = _ } =
-    simplify_function0 context ~outer_dacc:dacc None (Code.code_id code) code
-      ~closure_bound_names_inside_function
+    simplify_function0 context ~outer_dacc:dacc ~resimplifying:false None
+      (Code.code_id code) code ~closure_bound_names_inside_function
   in
   let code =
     match code with
