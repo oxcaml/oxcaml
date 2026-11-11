@@ -72,8 +72,8 @@ Triggering of a minor collection during memprof young sampling.
 *)
 | EV_C_MINOR_PROMOTED
 (**
-Total words promoted from the minor heap to the major in the last minor
-collection.
+Total {b bytes} promoted from the minor heap to the major in the last
+minor collection.
 @since 5.0
 *)
 | EV_C_MINOR_ALLOCATED
@@ -181,6 +181,24 @@ because its continuation was promoted (value: bytes copied).
 An idle stack was woken: copied onto a fresh guarded stack for
 resumption (value: bytes copied).
 @since 5.4 *)
+| EV_C_MAJOR_SLICE_SWEEP_WORK
+(**
+Words of sweeping work performed in the major slice that just ended.
+@since 5.5 *)
+| EV_C_MAJOR_SLICE_MARK_WORK
+(**
+Words of marking work performed in the major slice that just ended.
+@since 5.5 *)
+| EV_C_MAJOR_SLICE_EPHE_MARK_WORK
+(**
+Words of ephemeron marking work performed in the major slice that just
+ended.
+@since 5.5 *)
+| EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK
+(**
+Words of ephemeron sweeping work performed in the major slice that just
+ended.
+@since 5.5 *)
 
 (** The type for span events emitted by the runtime. *)
 type runtime_phase =

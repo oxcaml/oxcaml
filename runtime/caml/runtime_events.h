@@ -163,6 +163,10 @@ typedef enum {
     EV_C_STACK_FREED,
     EV_C_STACK_IDLED,
     EV_C_STACK_WOKEN,
+    EV_C_MAJOR_SLICE_SWEEP_WORK,
+    EV_C_MAJOR_SLICE_MARK_WORK,
+    EV_C_MAJOR_SLICE_EPHE_MARK_WORK,
+    EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK,
 } ev_runtime_counter;
 
 typedef enum {
