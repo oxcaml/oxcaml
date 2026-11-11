@@ -226,6 +226,7 @@ let oper_result_type = function
   | Cdls_get -> typ_val
   | Ctls_get -> typ_val
   | Cdomain_index -> typ_int
+  | Cthread_self_id -> typ_int
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
@@ -691,7 +692,7 @@ module Stack_offset_and_exn = struct
         | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
         | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
         | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Poll | Pause | Alloc _ )
+        | Domain_index | Thread_self_id | Poll | Pause | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
