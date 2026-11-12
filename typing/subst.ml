@@ -103,8 +103,6 @@ module Values : sig
       looked up in [second]. *)
   val compose : t -> Path.t Path.Map.t -> t -> t
 
-  (* Not used yet: no substitution looks up a value path. Should be considered
-     unreviewed and untested. *)
   val path : modules:Path.t Path.Map.t -> t -> Path.t -> Path.t
   [@@warning "-32"]
 end = struct
