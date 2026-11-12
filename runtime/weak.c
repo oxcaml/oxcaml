@@ -441,8 +441,10 @@ static value ephe_get_field_copy (value e, mlsize_t offset)
     /* This allocation could provoke a GC, which could change the
        * header or size of val (e.g. in a finalizer). So we go around
        * the loop to read val again. */
-    copy = caml_alloc_with_reserved (Wosize_val(val), Tag_val(val),
-                                     Reserved_val(val));
+    header_t hd = Hd_val(val);
+    layout_t layout = Has_layout_word_hd(hd) ? (layout_t)Field(val, 0) : 0;
+    copy = caml_alloc_with_layout (Wosize_hd(hd), Tag_hd(hd),
+                                   Reserved_hd(hd), layout);
     val = Val_unit;
   }
 

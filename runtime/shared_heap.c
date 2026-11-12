@@ -1583,10 +1583,12 @@ Caml_noinline static void compact_update_masked_block(value v, header_t hd)
 {
   caml_block_scan bs;
   mlsize_t i;
-  /* In format 11 the layout word is itself updated (it is word 0),
-     while the iterator goes on reading the layout block through the
-     old pointer: the layout block may have moved, but its evacuated
-     copy is still intact. */
+  if (Format_hd(hd) == HEADER_FORMAT_EXTERNAL) {
+    /* The layout block may have been evacuated, which leaves a
+       forwarding pointer in place of its first scan word. Update the
+       layout word before the scan reads the layout block through it. */
+    compact_update_value_at(&Field(v, 0));
+  }
   caml_block_scan_init(&bs, v, hd);
   while (caml_block_scan_next(&bs, &i))
     compact_update_value_at(&Field(v, i));

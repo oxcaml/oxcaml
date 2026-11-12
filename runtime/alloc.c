@@ -29,18 +29,43 @@
 #include "caml/mlvalues.h"
 #include "caml/scan_mask.h"
 
-/* Initialize the scannable words of the new block [v], so that the
-   GC can scan it. As an optimization, unscannable words are left
-   uninitialized. */
-static void block_init_scannable(value v)
+#ifdef DEBUG
+/* Whether [layout] will do as the layout word of a new block with
+   reserved bits [reserved]. */
+static bool layout_ok(reserved_t reserved, layout_t layout)
+{
+  switch (Format_hd(Hd_reserved(reserved))) {
+  case HEADER_FORMAT_LEGACY:
+  case HEADER_FORMAT_INLINE:
+    return layout == 0;
+  case HEADER_FORMAT_EXTENDED:
+    return true;
+  default: /* HEADER_FORMAT_EXTERNAL */
+    /* A layout block, static or in the major heap. */
+    return Is_block((value)layout) && !Is_young((value)layout)
+           && Tag_val((value)layout) == Abstract_tag;
+  }
+}
+#endif
+
+/* Initialize the new block [v], so that the GC can scan it: store
+   [layout] as its layout word, if its header format has one, and set
+   its scannable words to unit. As an optimization, unscannable words
+   are left uninitialized. */
+static void block_init_scannable(value v, layout_t layout)
 {
   header_t hd = Hd_val(v);
   if (Has_scan_mask_hd(hd)) {
-    /* A block with a layout word would need it stored before this. */
-    CAMLassert(Format_hd(hd) == HEADER_FORMAT_INLINE);
+    mlsize_t first = 0; /* the first word to set to unit */
     caml_block_scan bs;
     mlsize_t i;
+    if (Has_layout_word_hd(hd)) {
+      /* The scan reads the layout word, so store that first. */
+      Field(v, 0) = (value)layout;
+      first = 1;
+    }
     caml_block_scan_init(&bs, v, hd);
+    caml_block_scan_skip_to(&bs, first);
     while (caml_block_scan_next(&bs, &i))
       Field(v, i) = Val_unit;
   } else {
@@ -50,13 +75,46 @@ static void block_init_scannable(value v)
   }
 }
 
-CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
-                                           reserved_t reserved)
+/* [caml_alloc_with_layout] for a block whose layout word [layout]
+   points to a layout block. That may be in the major heap, where a
+   GC during the allocation could move it, so it is kept as a root. */
+Caml_noinline static value alloc_with_layout_block(mlsize_t wosize,
+                                                   tag_t tag,
+                                                   reserved_t reserved,
+                                                   layout_t layout)
+{
+  CAMLparam0 ();
+  CAMLlocal1 (layout_block);
+  value result;
+
+  layout_block = (value)layout;
+  CAMLassert (wosize > 0);
+  CAMLassert (Scannable_tag(tag));
+  if (wosize <= Max_young_wosize) {
+    Caml_check_caml_state();
+    Alloc_small_with_reserved (result, wosize, tag, Alloc_small_enter_GC,
+                               reserved);
+    block_init_scannable(result, (layout_t)layout_block);
+  } else {
+    result = caml_alloc_shr_reserved(wosize, tag, reserved);
+    block_init_scannable(result, (layout_t)layout_block);
+    result = caml_check_urgent_gc(result);
+  }
+  CAMLreturn (result);
+}
+
+/* [layout] is the block's layout word, for the header formats which
+   have one, and zero otherwise. */
+CAMLexport value caml_alloc_with_layout (mlsize_t wosize, tag_t tag,
+                                         reserved_t reserved, layout_t layout)
 {
   value result;
 
   CAMLassert (tag < Num_tags);
   CAMLassert (tag != Infix_tag);
+  CAMLassert (layout_ok(reserved, layout));
+  if (Format_hd(Hd_reserved(reserved)) == HEADER_FORMAT_EXTERNAL)
+    return alloc_with_layout_block(wosize, tag, reserved, layout);
   if (wosize <= Max_young_wosize){
     if (wosize == 0){
       result = Atom (tag);
@@ -64,14 +122,20 @@ CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
       Caml_check_caml_state();
       Alloc_small_with_reserved (result, wosize, tag, Alloc_small_enter_GC,
                                  reserved);
-      if (Scannable_tag(tag)) block_init_scannable(result);
+      if (Scannable_tag(tag)) block_init_scannable(result, layout);
     }
   } else {
     result = caml_alloc_shr_reserved (wosize, tag, reserved);
-    if (Scannable_tag(tag)) block_init_scannable(result);
+    if (Scannable_tag(tag)) block_init_scannable(result, layout);
     result = caml_check_urgent_gc (result);
   }
   return result;
+}
+
+CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
+                                           reserved_t reserved)
+{
+  return caml_alloc_with_layout (wosize, tag, reserved, 0);
 }
 
 CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag) {
@@ -87,15 +151,30 @@ CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag) {
 
 #ifdef NATIVE_CODE
 
-value caml_alloc_shr_reserved_check_gc (mlsize_t wosize, tag_t tag,
-                                        reserved_t reserved)
+/* [layout] is as for [caml_alloc_with_layout]. */
+CAMLexport value caml_alloc_shr_layout_check_gc(mlsize_t wosize, tag_t tag,
+                                                reserved_t reserved,
+                                                layout_t layout)
 {
   CAMLassert (tag < Num_tags);
   CAMLassert (tag != Infix_tag);
-  caml_check_urgent_gc (Val_unit);
-  value result = caml_alloc_shr_reserved (wosize, tag, reserved);
-  if (Scannable_tag(tag)) block_init_scannable(result);
+  CAMLassert (layout_ok(reserved, layout));
+  if (Format_hd(Hd_reserved(reserved)) == HEADER_FORMAT_EXTERNAL) {
+    /* The layout block may be in the major heap, where this GC could
+       move it on automatic compaction. */
+    layout = (layout_t)caml_check_urgent_gc((value)layout);
+  } else {
+    caml_check_urgent_gc(Val_unit);
+  }
+  value result = caml_alloc_shr_reserved(wosize, tag, reserved);
+  if (Scannable_tag(tag)) block_init_scannable(result, layout);
   return result;
+}
+
+value caml_alloc_shr_reserved_check_gc (mlsize_t wosize, tag_t tag,
+                                        reserved_t reserved)
+{
+  return caml_alloc_shr_layout_check_gc (wosize, tag, reserved, 0);
 }
 
 CAMLexport value caml_alloc_shr_check_gc (mlsize_t wosize, tag_t tag)

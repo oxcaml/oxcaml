@@ -67,6 +67,7 @@ static int ref_inline(uintnat mask, uintnat repeat, mlsize_t i)
 }
 
 #define SLOTS 32          /* batches alive at once */
+#define SCRATCH SLOTS     /* a further slot, for [gc_masked_alloc] */
 #define BATCH 4           /* blocks in a batch */
 #define MAX_WOSIZE 4096
 #define MAX_LAYOUT 12     /* scan words in a layout block */
@@ -89,14 +90,14 @@ static struct expect {
   unsigned char kind[MAX_WOSIZE];
   uintnat word[MAX_WOSIZE]; /* RAW, IMMEDIATE, STATIC: the word;
                                CHILD: its tag; EARLIER: its index */
-} expect[SLOTS][BATCH];
+} expect[SLOTS + 1][BATCH];
 
-static int batch_len[SLOTS];
+static int batch_len[SLOTS + 1];
 
 /* Layout blocks for format 11: a header, then scan words. They are
    outside the heap, and never freed or reused: the collector may
    still scan a block after the test has dropped it. */
-static uintnat *layout[SLOTS][BATCH];
+static uintnat *layout[SLOTS + 1][BATCH];
 
 /* Half the blocks are also global roots, so that the collector comes
    to some directly and to others through the tuple that holds them:
@@ -323,6 +324,99 @@ value gc_masked_build(value seed, value slot)
 }
 
 static char message[200];
+
+/* Allocate a block of a random shape with each of the allocators
+   which take a layout word, and check that it comes back with the
+   layout word in place and every scannable word set to unit. Half
+   the layout blocks are in the major heap, where a GC during the
+   allocation may move them. If [heap_layout] is true, every block
+   has one of those, allocated after enough garbage of the same size
+   that a compaction will move it. */
+value gc_masked_alloc(value seed, value heap_layout)
+{
+  struct expect *e = &expect[SCRATCH][0];
+  const char *what = "header";
+  mlsize_t i = 0;
+  rng = (uint64_t)Long_val(seed) * UINT64_C(0x9E3779B97F4A7C15) + 2;
+  do {
+    shape(SCRATCH, 0);
+  } while (Bool_val(heap_layout) && e->format != HEADER_FORMAT_EXTERNAL);
+  const uintnat *scan_words = &layout[SCRATCH][0][1];
+  for (int pass = 0; pass < 2; pass++) {
+    layout_t layout_word = 0;
+    mlsize_t n = 0; /* scan words in the layout block */
+    if (e->format == HEADER_FORMAT_EXTENDED) {
+      layout_word = e->word[0];
+    } else if (e->format == HEADER_FORMAT_EXTERNAL) {
+      n = Wosize_hd(layout[SCRATCH][0][0]);
+      if (Bool_val(heap_layout) || (rnd() & 1)) {
+        if (Bool_val(heap_layout)) {
+          for (int g = 0; g < 3000; g++)
+            caml_alloc_shr(n, Abstract_tag);
+        }
+        value heap_block = caml_alloc_shr(n, Abstract_tag);
+        for (mlsize_t j = 0; j < n; j++)
+          Field(heap_block, j) = (value)scan_words[j];
+        layout_word = (layout_t)heap_block;
+      } else {
+        layout_word = (layout_t)scan_words;
+      }
+    }
+    value v =
+      pass == 0
+      ? caml_alloc_with_layout(e->wosize, e->tag, e->reserved, layout_word)
+      : caml_alloc_shr_layout_check_gc(e->wosize, e->tag, e->reserved,
+                                       layout_word);
+    i = 0;
+    what = "header";
+    if (Wosize_val(v) != e->wosize || Tag_val(v) != e->tag
+        || Reserved_val(v) != e->reserved) goto fail;
+    if (e->format == HEADER_FORMAT_EXTENDED) {
+      what = "layout word not stored";
+      if ((layout_t)Field(v, 0) != layout_word) goto fail;
+    } else if (e->format == HEADER_FORMAT_EXTERNAL) {
+      /* The layout block may have moved: compare its contents. */
+      value stored = Field(v, 0);
+      what = "layout block not stored";
+      if (!Is_block(stored) || Is_young(stored)
+          || Tag_val(stored) != Abstract_tag || Wosize_val(stored) != n)
+        goto fail;
+      for (mlsize_t j = 0; j < n; j++)
+        if ((uintnat)Field(stored, j) != scan_words[j]) goto fail;
+    }
+    for (i = e->format == HEADER_FORMAT_INLINE ? 0 : 1; i < e->wosize; i++) {
+      what = "scannable word not initialized";
+      if (e->kind[i] != RAW && Field(v, i) != Val_unit) goto fail;
+    }
+  }
+  return Val_unit;
+ fail:
+  snprintf(message, sizeof message,
+           "alloc: %s: format %d, wosize %lu, word %lu",
+           what, e->format, (unsigned long)e->wosize, (unsigned long)i);
+  caml_failwith(message);
+}
+
+/* Check that [copy] is a shallow copy of block [index] of the batch
+   held by [holder]. */
+value gc_masked_check_copy(value holder, value index, value copy)
+{
+  value v = Field(holder, Int_val(index));
+  mlsize_t i = 0;
+  const char *what = "not a new block";
+  if (copy == v) goto fail;
+  what = "header";
+  if (Wosize_val(copy) != Wosize_val(v) || Tag_val(copy) != Tag_val(v)
+      || Reserved_val(copy) != Reserved_val(v)) goto fail;
+  what = "word differs";
+  for (i = 0; i < Wosize_val(v); i++)
+    if (Field(copy, i) != Field(v, i)) goto fail;
+  return Val_unit;
+ fail:
+  snprintf(message, sizeof message, "copy: %s: wosize %lu, word %lu",
+           what, (unsigned long)Wosize_val(v), (unsigned long)i);
+  caml_failwith(message);
+}
 
 /* Check the batch in slot [slot], held by [holder], after any amount
    of garbage collection. */
