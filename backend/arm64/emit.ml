@@ -1806,7 +1806,7 @@ let emit_instr env i =
     (* CR mslater: restore after the arm DSL is merged *)
     Misc.fatal_error "arm64: got int128 op"
   | Lop (Intop Ipopcnt) ->
-    if !Arch.feat_cssc
+    if Arch.Extension.enabled CSSC
     then A.ins2 CNT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
     else (
       A.ins2 FMOV_gp_to_fp_64 reg_d7 (H.reg_x i.arg.(0));
@@ -1816,7 +1816,7 @@ let emit_instr env i =
   | Lop (Intop Ictz) ->
     (* [ctz Rd, Rn] is optionally supported from Armv8.7, but rbit and clz are
        supported in all ARMv8 CPUs. *)
-    if !Arch.feat_cssc
+    if Arch.Extension.enabled CSSC
     then A.ins2 CTZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
     else (
       A.ins2 RBIT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0));
@@ -2351,6 +2351,8 @@ let begin_assembly _unix =
       Buffer.add_string asm_line_buffer "\n";
       Emitaux.emit_buffer asm_line_buffer);
   D.file ~file_num:None ~file_name:"";
+  Arch.Extension.enabled_extensions ()
+  |> List.iter (fun ext -> D.arch_extension (Arch.Extension.assembler_name ext));
   (* PR#7037 *)
   let data_begin = Cmm_helpers.make_symbol "data_begin" in
   let data_begin_sym = S.create_global data_begin in

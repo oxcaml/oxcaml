@@ -914,6 +914,14 @@ AC_ARG_WITH([zstd],
   [],
   [with_zstd='no'])
 
+AC_ARG_WITH([arm64-extensions],
+  [AS_HELP_STRING([--with-arm64-extensions=none|native|LIST],
+    [arm64 extensions that compiled code uses by default: none (the
+     default), those of the build machine, or a comma-separated list
+     (cssc)])],
+  [],
+  [with_arm64_extensions=none])
+
 AS_IF([test x"$enable_unix_lib" = "xno"],
   [AS_IF([test x"$enable_ocamldebug" = "xyes"],
     [AC_MSG_ERROR([ocamldebug requires the unix library])],
@@ -3538,6 +3546,36 @@ int main(void) {
   }
 }
 ]])], AC_DEFINE([HAS_AVX512VL]) has_avx512vl=yes, [])
+
+# Optional arm64 extensions are off unless requested, since the build machine
+# need not match the machines the compiled code runs on.
+has_cssc=no
+AC_SUBST([has_cssc])
+AS_CASE([$with_arm64_extensions],
+  [none|no], [],
+  [AS_IF([test x"$arch" != "xarm64"],
+    [AC_MSG_ERROR([--with-arm64-extensions is only supported on arm64])])
+   AS_CASE([$with_arm64_extensions],
+     [native],
+       [arm64_extensions=''
+        AC_MSG_CHECKING([whether the build machine supports CSSC])
+        AC_RUN_IFELSE([AC_LANG_PROGRAM([], [[
+          long r;
+          __asm__ __volatile__(".arch_extension cssc\n\tcnt %0, %1"
+                               : "=r" (r) : "r" (1L));
+          return r != 1;
+        ]])],
+          [AC_MSG_RESULT([yes])
+           arm64_extensions="$arm64_extensions cssc"],
+          [AC_MSG_RESULT([no])],
+          [AC_MSG_ERROR([--with-arm64-extensions=native needs to run \
+programs on the build machine])])],
+     [arm64_extensions=`echo "$with_arm64_extensions" | tr ',' ' '`])
+   for arm64_extension in $arm64_extensions; do
+     AS_CASE([$arm64_extension],
+       [cssc], [has_cssc=yes],
+       [AC_MSG_ERROR([unknown arm64 extension: $arm64_extension])])
+   done])
 
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"

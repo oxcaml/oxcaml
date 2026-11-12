@@ -431,6 +431,9 @@ val has_avx512bw : bool
 val has_avx512vl : bool
 (* Whether the compiler was configured on a machine with AVX512VL *)
 
+val has_cssc : bool
+(* Whether the compiler was configured to assume the arm64 CSSC extension *)
+
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)
 

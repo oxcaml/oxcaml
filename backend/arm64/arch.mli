@@ -19,7 +19,21 @@
 
 val macosx : bool
 val is_asan_enabled : bool ref
-val feat_cssc : bool ref
+
+(** Optional architecture extensions that compiled code may use. Each one
+    defaults to [Config.has_*] and can be toggled with [-f<name>] and
+    [-fno-<name>]. *)
+module Extension : sig
+  type t = CSSC
+
+  val enabled : t -> bool
+
+  val enabled_extensions : unit -> t list
+
+  (** The name the assembler uses in [.arch_extension]. *)
+  val assembler_name : t -> string
+end
+
 val trap_notes : bool ref
 (* Machine-specific command-line options *)
 
