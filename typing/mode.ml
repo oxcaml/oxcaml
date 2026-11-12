@@ -6396,6 +6396,8 @@ module Comonadic_with (Areality : Areality) = struct
 
   let meet_const_with ax c m = meet_const (C.max_with Obj.obj ax c) m
 
+  let imply_const_with ax c m = imply_const (C.max_with Obj.obj ax c) m
+
   let zap_to_legacy_force ?commit m : Const.t =
     let areality = proj Areality m |> Areality.zap_to_legacy_force ?commit in
     let linearity = proj Linearity m |> Linearity.zap_to_legacy_force ?commit in
@@ -7357,6 +7359,11 @@ module Mode_with (Areality : Areality) = struct
   let meet_const_with ax c { monadic; comonadic } =
     let monadic = Monadic.disallow_right monadic in
     let comonadic = Comonadic.meet_const_with ax c comonadic in
+    { comonadic; monadic }
+
+  let imply_const_with ax c { monadic; comonadic } =
+    let monadic = Monadic.disallow_left monadic in
+    let comonadic = Comonadic.imply_const_with ax c comonadic in
     { comonadic; monadic }
 
   let join l =

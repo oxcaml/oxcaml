@@ -129,7 +129,7 @@ val foo : (int -> <[int]> expr @ local) -> <[int]> expr @ local once = <fun>
 
 let foo (f : (_ -> _ @ once) @ global) = <[ fun () -> $(f 42) + 1 ]>
 [%%expect{|
-val foo : (int -> <[int]> expr @ once) -> <[unit -> int]> expr @ once = <fun>
+val foo : (int -> <[int]> expr @ once) -> <[unit -> int]> expr = <fun>
 |}];;
 
 (** Quotes and exclaves **)
@@ -142,9 +142,7 @@ Line 3, characters 42-48:
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is used inside the quoted expression at line 3, characters 28-51
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+         which is expected to be "local" to the parent region or "global".
 |}];;
 fun (f : _ -> _ @ local) -> exclave_ <[ fun () -> $(f ()) ]>
 [%%expect{|
@@ -466,7 +464,7 @@ fun (e @ local) -> <[ fun () -> $e ]>
    so this should be [many] even though it captures [e @ once]. *)
 fun (e @ once) -> <[ fun () -> $e ]>
 [%%expect{|
-- : 'a expr @ once -> <[unit -> $('a)]> expr @ once = <fun>
+- : 'a expr @ once -> <[unit -> $('a)]> expr = <fun>
 |}];;
 
 fun (e @ unique) -> <[ fun () -> $e ]>
@@ -489,32 +487,13 @@ fun (e @ uncontended) -> <[ fun () -> $e ]>
 - : 'a expr -> <[unit -> $('a)]> expr = <fun>
 |}];;
 
-(* CR quoted-modes jbachurski: This should be accepted. *)
 module M : sig
   val quote_thunk : 'a expr @ once -> <[unit -> $'a]> expr
 end = struct
   let quote_thunk (e @ once) = <[ fun () -> $e ]>
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let quote_thunk (e @ once) = <[ fun () -> $e ]>
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val quote_thunk : 'a expr @ once -> <[unit -> $('a)]> expr @ once
-         end
-       is not included in
-         sig val quote_thunk : 'a expr @ once -> <[unit -> $('a)]> expr end
-       Values do not match:
-         val quote_thunk : 'a expr @ once -> <[unit -> $('a)]> expr @ once
-       is not included in
-         val quote_thunk : 'a expr @ once -> <[unit -> $('a)]> expr
-       The type "'a expr @ once -> <[unit -> $('a)]> expr @ once"
-       is not compatible with the type
-         "'a expr @ once -> <[unit -> $('a)]> expr"
-       The return mode was expected to be "many" but is "once"
+module M : sig val quote_thunk : 'a expr @ once -> <[unit -> $('a)]> expr end
 |}];;
 
 (** Splices with inner closure captures of quotes **)
