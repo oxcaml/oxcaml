@@ -281,23 +281,39 @@ end
 
 module Exn = struct
   type t =
-    { id : int;
-      payload : Ty.t option
-    }
+    | Division_by_zero
+    | Generated of
+        { id : int;
+          payload : Ty.t option
+        }
 
-  let equal left right = Int.equal left.id right.id
+  let equal left right =
+    match left, right with
+    | Division_by_zero, Division_by_zero -> true
+    | Generated left, Generated right -> Int.equal left.id right.id
+    | Division_by_zero, Generated _ | Generated _, Division_by_zero -> false
 
-  let name { id; _ } = Format.sprintf "Exn_%d" id
+  let name = function
+    | Division_by_zero -> "Division_by_zero"
+    | Generated { id; _ } -> Format.sprintf "Exn_%d" id
 
-  let to_code t =
-    let args =
-      match t.payload with
-      | None -> []
-      | Some ty -> [Ast_helper.Type.constructor_arg (Ty.to_code ty)]
-    in
-    Ast_helper.Str.exception_
-      (Ast_helper.Te.mk_exception
-         (Ast_helper.Te.decl ~args:(Parsetree.Pcstr_tuple args) (loc (name t))))
+  let payload = function
+    | Division_by_zero -> None
+    | Generated { payload; _ } -> payload
+
+  let to_code = function
+    | Division_by_zero -> None
+    | Generated { payload; _ } as t ->
+      let args =
+        match payload with
+        | None -> []
+        | Some ty -> [Ast_helper.Type.constructor_arg (Ty.to_code ty)]
+      in
+      Some
+        (Ast_helper.Str.exception_
+           (Ast_helper.Te.mk_exception
+              (Ast_helper.Te.decl ~args:(Parsetree.Pcstr_tuple args)
+                 (loc (name t)))))
 end
 
 module Handler = struct
@@ -317,7 +333,7 @@ module Handler = struct
     | Catch_all -> Ast_helper.Pat.any ()
     | Exn { exn; payload } ->
       let payload =
-        match exn.payload, payload with
+        match Exn.payload exn, payload with
         | None, None -> None
         | Some _, None -> Some ([], Ast_helper.Pat.any ())
         | Some ty, Some (binding : Binding.t) ->
@@ -648,7 +664,7 @@ module Expr = struct
 
   and raise_to_code { exn; payload; notrace } =
     let payload =
-      match exn.payload, payload with
+      match Exn.payload exn, payload with
       | None, None -> None
       | Some _, Some payload -> Some (to_code payload)
       | Some _, None | None, Some _ ->
