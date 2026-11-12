@@ -11,7 +11,7 @@
  (modes js wasm))
 
 (tests
- (names marshal_regressions)
+ (names marshal_regressions int_and)
  (modes wasm))
 
 (tests
@@ -66,8 +66,24 @@
   (flags :standard)))
 
 (tests
+ (names bigarray_dim)
+ (modes js wasm)
+ ; Bigarray accesses are specialized when the type analysis knows the kind
+ ; and layout of the bigarray
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags :standard --opt 2)))
+
+(tests
  (names string_interning)
  (modes wasm))
+
+(tests
+ (names portable_int_js)
+ (modes wasm)
+ (enabled_if
+  (= %{profile} with-portable-int))
+ (libraries js_of_ocaml))
 
 ; The programs compiled here run Wasm code and rely on Node's module
 ; resolution (`require`, `require.main`). QuickJS provides neither, so these

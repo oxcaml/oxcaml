@@ -63,9 +63,9 @@ end = struct
   let zero_pos = { Lexing.pos_fname = ""; pos_lnum = 1; pos_cnum = 0; pos_bol = 0 }
 
   let print_error (loc, e) =
-    let f = Loc.filename loc in
-    let loc = Printf.sprintf "%s:%d:%d" f (Loc.line loc) (Loc.column loc) in
-    Printf.eprintf "Lexer error: %s: %s\n" loc (Flow_lexer.Parse_error.to_string e)
+    let pi = Parse_info.t_of_pos (Loc.p1 loc) in
+    let msg = "lexer error: " ^ Flow_lexer.Parse_error.to_string e in
+    Printf.eprintf "%s\n" (Parse_info.Diagnostic.with_excerpt pi msg)
 
   let create ?(report_error = print_error) l =
     { l; env = Flow_lexer.Lex_env.create l; report_error }

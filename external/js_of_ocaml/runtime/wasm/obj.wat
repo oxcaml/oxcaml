@@ -24,8 +24,11 @@
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
       (import "portableint" "is_ocaml_portable_int"
          (func $is_ocaml_portable_int (param (ref eq)) (result i32)))
+      (import "portableint" "phys_eq"
+         (func $phys_eq (param (ref eq)) (param (ref eq)) (result i32)))
    ))
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
+   (import "fail" "caml_raise_out_of_memory" (func $caml_raise_out_of_memory))
    (import "custom" "caml_is_custom"
       (func $caml_is_custom (param (ref eq)) (result i32)))
    (import "custom" "caml_dup_custom"
@@ -96,7 +99,7 @@
             (field $func (ref $function_2))
             (field $closure (mut (ref null $cps_closure))))))
 
-   (global $forcing_tag i32 (i32.const 244))
+   (global $forcing_tag (export "forcing_tag") i32 (i32.const 244))
    (global $cont_tag (export "cont_tag") i32 (i32.const 245))
    (global $lazy_tag (export "lazy_tag") i32 (i32.const 246))
    (global $closure_tag i32 (i32.const 247))
@@ -117,6 +120,15 @@
          (local.set $n (call $portable_int_val (local.get $v)))
          (if (i64.gt_u (local.get $n) (i64.const 0xfffffffe))
             (then (local.set $n (i64.const 0xfffffffe))))
+         (i32.wrap_i64 (local.get $n)))
+
+      ;; The size of a block to allocate: as native, fail with Out_of_memory
+      ;; beyond [Max_wosize] rather than trapping
+      (func $block_size (param $v (ref eq)) (result i32)
+         (local $n i64)
+         (local.set $n (call $portable_int_val (local.get $v)))
+         (if (i64.gt_u (local.get $n) (i64.const 0xfffffff))
+            (then (call $caml_raise_out_of_memory)))
          (i32.wrap_i64 (local.get $n)))
    ))
 
@@ -150,7 +162,7 @@
       (array.new $block (ref.i31 (i32.const 0))
                  (@if $portable-int
                  (@then
-                    (i32.add (call $array_index_or_size (local.get $size))
+                    (i32.add (call $block_size (local.get $size))
                              (i32.const 1)))
                  (@else
                  (i32.add (i31.get_u (ref.cast (ref i31) (local.get $size)))
@@ -162,7 +174,7 @@
       (@if $portable-int
       (@then
          (array.new $float_array (f64.const 0)
-            (call $array_index_or_size (local.get $size))))
+            (call $block_size (local.get $size))))
       (@else
       (array.new $float_array (f64.const 0)
          (i31.get_u (ref.cast (ref i31) (local.get $size)))))
@@ -173,7 +185,7 @@
       (array.new $block (ref.i31 (i32.const 0))
                  (@if $portable-int
                  (@then
-                    (i32.add (call $array_index_or_size (local.get $size))
+                    (i32.add (call $block_size (local.get $size))
                              (i32.const 1)))
                  (@else
                  (i32.add (i31.get_u (ref.cast (ref i31) (local.get $size)))
@@ -332,7 +344,7 @@
       ;; TODO: fail for values that are not represented as an array
       (@if $portable-int
       (@then
-         (local.set $n (call $array_index_or_size (local.get $size))))
+         (local.set $n (call $block_size (local.get $size))))
       (@else
       (local.set $n (i31.get_s (ref.cast (ref i31) (local.get $size))))
       ))
@@ -449,8 +461,16 @@
          (i32.add (i31.get_u (ref.cast (ref i31) (local.get $vi))) (i32.const 1)))
       ))
       (if (result (ref eq))
+          ;; Large integers are boxed: compare them by value
+          (@if $portable-int
+          (@then
+             (call $phys_eq
+                (array.get $block (local.get $b) (local.get $i))
+                (local.get $old)))
+          (@else
           (ref.eq
             (array.get $block (local.get $b) (local.get $i)) (local.get $old))
+          ))
          (then
             (array.set $block (local.get $b) (local.get $i) (local.get $new))
             (ref.i31 (i32.const 1)))

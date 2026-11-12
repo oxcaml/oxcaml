@@ -1,5 +1,4 @@
 module type S = sig
-
   type t
 
   val equal : t -> t -> bool
@@ -18,7 +17,7 @@ module type S = sig
 
   val to_int32 : t -> int32
 
-  val to_int64: t -> int64
+  val to_int64 : t -> int64
 
   (* of *)
 
@@ -74,6 +73,12 @@ module type S = sig
 
   val abs : t -> t
 
+  val leading_zeros : t -> int
+
+  val trailing_zeros : t -> int
+
+  val popcount : t -> int
+
   (* constant *)
 
   val min_int : unit -> t
@@ -115,21 +120,24 @@ end
 
 module type Arg = sig
   val name : string
+
   val allowed_sizes : int array
 end
 
 module Make (Arg : Arg) : S = struct
-
   type t = Int64.t
 
   let num_bits_ = ref 0
 
   let set_num_bits x =
-    if Array.exists ((=) x) Arg.allowed_sizes
+    if Array.exists (( = ) x) Arg.allowed_sizes
     then num_bits_ := x
-  else failwith (Printf.sprintf "%s.num_bits %d unsupported" Arg.name x)
+    else failwith (Printf.sprintf "%s.num_bits %d unsupported" Arg.name x)
 
-  let num_bits () = !num_bits_
+  let num_bits () =
+    match !num_bits_ with
+    | 0 -> failwith (Printf.sprintf "%s.num_bits: size not set" Arg.name)
+    | x -> x
 
   type offset = Offset of int [@@ocaml.unboxed]
 
@@ -170,7 +178,9 @@ module Make (Arg : Arg) : S = struct
   let to_int64 x = x
 
   let to_int_exn x =
-    if Sys.int_size >= 32 || (Int64.of_int Int.min_int <= x && x <= Int64.of_int Int.max_int)
+    if
+      Sys.int_size >= num_bits ()
+      || (Int64.of_int Int.min_int <= x && x <= Int64.of_int Int.max_int)
     then Int64.to_int x
     else failwith "to_int_exn"
 
@@ -209,8 +219,9 @@ module Make (Arg : Arg) : S = struct
   let shift_op f x y =
     let offset = offset () in
     let mask =
-      if num_bits () > 32
-      (* Limit the shift offset to [0, 63], this works for both 63 and 64
+      if
+        num_bits () > 32
+        (* Limit the shift offset to [0, 63], this works for both 63 and 64
         bit integers *)
       then 0x3f
       (* Limit the shift offset to [0, 31], this works for both 31 and 32
@@ -227,6 +238,18 @@ module Make (Arg : Arg) : S = struct
 
   let is_zero x = equal x 0L
 
+  (* Bit counting over [num_bits] bits. As in the OCaml runtime, the
+     low tag bit keeps [leading_zeros] from counting past [num_bits]. *)
+
+  let leading_zeros x =
+    let (Offset offset as o) = offset () in
+    Stdlib.Int64.leading_zeros
+      (Int64.logor (wrap o x) (Int64.of_int ((1 lsl offset) - 1)))
+
+  let trailing_zeros x = if is_zero x then num_bits () else Stdlib.Int64.trailing_zeros x
+
+  let popcount x = Stdlib.Int64.popcount (wrap (offset ()) x)
+
   let of_int_exn (x : int) =
     let offset = offset () in
     if
@@ -240,14 +263,13 @@ module Make (Arg : Arg) : S = struct
     let offset = offset () in
     if min_int_ offset <= x && x <= max_int_ offset then x else failwith "of_int32_exn"
 
-
   let of_int64_exn (x : int64) =
     let offset = offset () in
     if min_int_ offset <= x && x <= max_int_ offset then x else failwith "of_int64_exn"
 
-  let of_int32_truncate x= wrap_modulo (Int64.of_int32 x)
+  let of_int32_truncate x = wrap_modulo (Int64.of_int32 x)
 
-  let of_int64_truncate x= wrap_modulo x
+  let of_int64_truncate x = wrap_modulo x
 
   let of_string_exn x =
     try
@@ -262,49 +284,56 @@ module Make (Arg : Arg) : S = struct
     then Some (wrap_modulo (Int64.of_float x))
     else None
 
+  (* The truncated value is printed with the width of its representation
+     on the target *)
+  let to_hex_truncated to_int64 x =
+    let i = to_int64 x in
+    if num_bits () <= 32
+    then Printf.sprintf "%lx" (Int64.to_int32 i)
+    else Printf.sprintf "%Lx" i
+
   let of_int_warning_on_overflow i =
     Stdlib.Int64.convert_warning_on_overflow
       "integer"
-      ~num_bits:(num_bits ())
       ~to_int64:(fun i -> wrap_modulo (Int64.of_int i))
       ~of_int64:Int64.to_int
       ~equal:Int.equal
       ~to_dec:(Printf.sprintf "%d")
       ~to_hex:(Printf.sprintf "%x")
+      ~to_hex_truncated:(to_hex_truncated Int64.of_int)
       i
 
   let of_int32_warning_on_overflow n =
     Stdlib.Int64.convert_warning_on_overflow
       "int32"
-      ~num_bits:(num_bits ())
       ~to_int64:(fun i -> wrap_modulo (Int64.of_int32 i))
       ~of_int64:Int64.to_int32
       ~equal:Int32.equal
       ~to_dec:(Printf.sprintf "%ld")
       ~to_hex:(Printf.sprintf "%lx")
+      ~to_hex_truncated:(to_hex_truncated Int64.of_int32)
       n
 
   let of_int64_warning_on_overflow n =
     Stdlib.Int64.convert_warning_on_overflow
       "int64"
-      ~num_bits:(num_bits ())
-      ~to_int64:(fun i -> wrap_modulo  i)
+      ~to_int64:(fun i -> wrap_modulo i)
       ~of_int64:Fun.id
       ~equal:Int64.equal
       ~to_dec:(Printf.sprintf "%Ld")
       ~to_hex:(Printf.sprintf "%Lx")
+      ~to_hex_truncated:(to_hex_truncated Fun.id)
       n
-
 
   let of_nativeint_warning_on_overflow n =
     Stdlib.Int64.convert_warning_on_overflow
       "native integer"
-      ~num_bits:(num_bits ())
       ~to_int64:(fun i -> wrap_modulo (Int64.of_nativeint i))
       ~of_int64:Int64.to_nativeint
       ~equal:Nativeint.equal
       ~to_dec:(Printf.sprintf "%nd")
       ~to_hex:(Printf.sprintf "%nx")
+      ~to_hex_truncated:(to_hex_truncated Int64.of_nativeint)
       n
 
   external ( < ) : int64 -> int64 -> bool = "%lessthan"
