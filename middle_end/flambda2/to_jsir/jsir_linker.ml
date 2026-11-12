@@ -29,6 +29,25 @@
 open! Jsoo_imports.Import
 module Symbol_table = Jsir.Linkage_name.Hashtbl
 
+type error =
+  | No_compilation_units
+  | Multiple_definition of
+      { symbol : Jsir.Linkage_name.t;
+        first_unit : string;
+        second_unit : string
+      }
+  | Undefined_symbol of
+      { symbol : Jsir.Linkage_name.t;
+        unit_ : string
+      }
+  | Symbol_defined_later of
+      { symbol : Jsir.Linkage_name.t;
+        unit_ : string;
+        exporter : string
+      }
+
+exception Error of error
+
 (* A unit whose variables and block addresses have been renumbered so as not to
    clash with those of the other units. *)
 type unit_ =
@@ -147,10 +166,9 @@ let exporters (units : unit_ list) =
   let add_export (unit_ : unit_) (symbol, _) =
     match Symbol_table.find_opt exporters symbol with
     | Some first_unit ->
-      Misc.fatal_errorf
-        "Jsir_linker.link: the symbol %s is defined by both %s and %s"
-        (Jsir.Linkage_name.to_string symbol)
-        first_unit unit_.name
+      raise
+        (Error
+           (Multiple_definition { symbol; first_unit; second_unit = unit_.name }))
     | None -> Symbol_table.add exporters symbol unit_.name
   in
   List.iter
@@ -159,18 +177,11 @@ let exporters (units : unit_ list) =
   exporters
 
 let unresolved_import ~exporters (unit_ : unit_) symbol =
-  let name = Jsir.Linkage_name.to_string symbol in
   match Symbol_table.find_opt exporters symbol with
-  | None ->
-    Misc.fatal_errorf
-      "Jsir_linker.link: %s refers to the symbol %s, which no linked \
-       compilation unit defines"
-      unit_.name name
+  | None -> raise (Error (Undefined_symbol { symbol; unit_ = unit_.name }))
   | Some exporter ->
-    Misc.fatal_errorf
-      "Jsir_linker.link: %s refers to the symbol %s of %s, which is linked \
-       after it"
-      unit_.name name exporter
+    raise
+      (Error (Symbol_defined_later { symbol; unit_ = unit_.name; exporter }))
 
 (* Resolve the imports of a unit against the exports of the units before it.
    [available] holds the variables of the symbols that the units seen so far
@@ -197,8 +208,6 @@ let resolve_imports ~exporters (units : unit_ list) =
     Jsir.Var.Map.empty units
 
 let link ~register_globals (files : Jsir.jsir_file list) =
-  if List.compare_length_with files 0 = 0
-  then Misc.fatal_error "Jsir_linker.link: no compilation units to link";
   let units, var_count, addr_count =
     List.fold_left
       (fun (units, first_var, first_addr) file ->
@@ -244,9 +253,38 @@ let link ~register_globals (files : Jsir.jsir_file list) =
       in
       merge blocks next_units
   in
-  let blocks = merge Jsir.Addr.Map.empty units in
-  let program : Jsir.program =
-    { start = (List.hd units).start; blocks; free_pc = addr_count }
+  let start =
+    match units with
+    | first :: _ -> first.start
+    | [] -> raise (Error No_compilation_units)
   in
+  let blocks = merge Jsir.Addr.Map.empty units in
+  let program : Jsir.program = { start; blocks; free_pc = addr_count } in
   Jsir.Var.set_last (var_count - 1);
   Jsir_subst.Excluding_Binders.program (Jsir_subst.from_map subst) program
+
+let report_error_doc ppf = function
+  | No_compilation_units ->
+    Format_doc.fprintf ppf "No compilation units to link"
+  | Multiple_definition { symbol; first_unit; second_unit } ->
+    Format_doc.fprintf ppf
+      "@[<hov>The symbol %s is defined by both@ %s and %s@]"
+      (Jsir.Linkage_name.to_string symbol)
+      first_unit second_unit
+  | Undefined_symbol { symbol; unit_ } ->
+    Format_doc.fprintf ppf
+      "@[<hov>%s refers to the symbol %s,@ which no linked compilation unit \
+       defines@]"
+      unit_
+      (Jsir.Linkage_name.to_string symbol)
+  | Symbol_defined_later { symbol; unit_; exporter } ->
+    Format_doc.fprintf ppf
+      "@[<hov>%s refers to the symbol %s of %s,@ which is linked after it@]"
+      unit_
+      (Jsir.Linkage_name.to_string symbol)
+      exporter
+
+let () =
+  Location.register_error_of_exn (function
+    | Error err -> Some (Location.error_of_printer_file report_error_doc err)
+    | _ -> None)
