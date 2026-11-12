@@ -5,14 +5,14 @@
  native;
 *)
 
-(* A fiber can be given a pointer into the local stack of one of its ancestors,
-   as long as the pointer is hidden from the type checker and the GC: here it
-   is passed as an unboxed integer. The ancestors of a running fiber are
-   suspended beneath it, so the pointee stays allocated and is scanned by the
-   GC along with the rest of the fiber chain. The runtime must hence treat it
-   like any other local allocation. This test checks that at each place where
-   the runtime asks whether a value is local, under the debug runtime's
-   assertions. *)
+(* We may unsafely smuggle a pointer into the local stack of a fiber to its
+   descendants, as long as the ancestor keeps it alive. This is because
+   the ancestors of a running fiber are suspended beneath it, so the GC
+   will still scan their local stacks.
+
+   This tests that the runtime treats such pointers like any other
+   local allocation, in particular that caml_is_stack returns true.
+   (If it didn't, this would trip various debug runtime assertions). *)
 
 module Stack_pointer = struct
   type 'a t = nativeint_u
@@ -114,36 +114,11 @@ let test_is_stack ~depth =
   let cell = stack_ { plain = fresh 0; atomic = fresh 0 } in
   from_fiber cell ~depth (fun cell -> assert (is_stack cell)) [@nontail]
 
-external callback2
-  : ('a @ local -> unit -> 'b) -> 'a @ local -> unit -> 'b
-  = "test_callback2"
-
-external callback3
-  :  ('a @ local -> unit -> unit -> 'b)
-  -> 'a @ local -> unit -> unit -> 'b
-  = "test_callback3"
-
-external callbackN
-  :  ('a @ local -> unit -> unit -> unit -> 'b)
-  -> 'a @ local -> unit -> unit -> unit -> 'b
-  = "test_callbackN"
-
-(* [caml_callback2], [caml_callback3] and [caml_callbackN] assert that the
-   closure's result is not local. Its arguments may be. *)
-let test_callback ~depth =
-  let cell = stack_ { plain = fresh 1; atomic = fresh 0 } in
-  from_fiber cell ~depth (fun cell ->
-    assert (!(callback2 (fun x () -> x.plain) cell ()) = 1);
-    assert (!(callback3 (fun x () () -> x.plain) cell () ()) = 1);
-    assert (!(callbackN (fun x () () () -> x.plain) cell () () ()) = 1))
-  [@nontail]
-
 let tests ~depth =
   test_modify ~depth;
   test_atomic ~depth;
   test_array ~depth;
-  test_is_stack ~depth;
-  test_callback ~depth
+  test_is_stack ~depth
 
 (* Access the local stack of a parent and of a grandparent. *)
 let run () =

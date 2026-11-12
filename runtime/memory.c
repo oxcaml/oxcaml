@@ -562,15 +562,16 @@ CAMLexport int caml_is_stack (value v)
   if (!Is_block(v)) return 0;
   if (Color_hd(Hd_val(v)) != NOT_MARKABLE) return 0;
 
-  /* [v] may be allocated on the local stack of the current fiber or of any of
+  // We elide a call to caml_refresh_locals here for speed, since we never
+  // read the local sp.
+
+  /* [v] may be allocated on the local stack of the current fiber or any of
      its ancestors. The ancestors are suspended beneath the current fiber, so
-     their local stacks are live and are scanned by the GC along with the
-     current one (see [caml_scan_stack]). */
+     their local stacks are live and scanned by the GC. */
   for (struct stack_info* stack = Caml_state->current_stack;
        stack != NULL;
        stack = Stack_parent(stack)) {
-    // We elide a call to caml_refresh_locals here for speed, since we never
-    // read the local sp.
+
     struct caml_local_arenas* loc = stack->local_arenas;
     if (loc == NULL) continue;
 

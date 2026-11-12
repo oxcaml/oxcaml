@@ -194,7 +194,7 @@ CAMLalloc(caml_stat_free, 1) CAMLreturns_nonnull()
 CAMLextern wchar_t* caml_stat_wcsconcat(int n, ...);
 #endif
 
-/* Whether a value is allocated on the local stack of the current fiber or of
+/* Whether a value is allocated on the local stack of the current fiber or
    one of its ancestors. */
 CAMLextern int caml_is_stack(value);
 
