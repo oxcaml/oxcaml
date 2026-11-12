@@ -44,3 +44,6 @@ val ocamlc_opt : compiler
 val ocamlopt_byte : compiler
 
 val ocamlopt_opt : compiler
+
+(** ocamlopt.opt -target js_of_ocaml *)
+val ocamlopt_jsir : compiler

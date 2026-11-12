@@ -125,6 +125,15 @@ distclean: clean
 $(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
 
+# Whether make test also runs the testsuite under JSIR (ocamlopt -target
+# js_of_ocaml), which needs js_of_ocaml (see jsoo-build) and node. A nix shell
+# built with withJsoo=true sets OXCAML_WITH_JSIR=true.
+with_jsir ?= $(if $(filter true,$(OXCAML_WITH_JSIR)),true,false)
+
+ifeq ($(with_jsir),true)
+WITH_JSOO = 1
+endif
+
 include Makefile.common-ox
 
 .PHONY: ci
@@ -427,6 +436,14 @@ jsoo-test: install $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
 	  env -u OCAMLRUNPARAM \
 	  $(dune) build $(ws_main) --promote-install-files=false \
 	  @@$(ast_dependent_libs_root)/jsoo-test
+
+ifeq ($(with_jsir),true)
+install_for_test: jsoo-install-shipped
+endif
+
+.PHONY: test-without-jsir
+test-without-jsir:
+	$(MAKE) test with_jsir=false
 
 .PHONY: fmt
 fmt: $(dune_config_targets)

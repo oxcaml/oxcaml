@@ -213,6 +213,7 @@ let run_cmd
 
 let run
     ~full_environment
+    ?interpreter
     (log_message : string)
     (redirect_output : bool)
     (can_skip : bool)
@@ -230,7 +231,11 @@ let run
     let arguments = match args_variable with
       | None -> ""
       | Some variable -> Environments.safe_lookup variable env in
-    let commandline = [program; arguments] in
+    let commandline =
+      match interpreter with
+      | None -> [program; arguments]
+      | Some interpreter -> [interpreter; program; arguments]
+    in
     let what = log_message ^ " " ^ program ^ " " ^
     begin if arguments="" then "without any argument"
     else "with arguments " ^ arguments
@@ -266,7 +271,7 @@ let run_cmd = run_cmd ~full_environment:false
 (* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
    here, for this action only, rather than in the initial environment:
    the compilers and other tools run without them. *)
-let run_program log env =
+let run_program' interpreter log env =
   let env =
     if Options.run_ocamlrunparam = "" then env
     else begin
@@ -280,12 +285,17 @@ let run_program log env =
   in
   run
     ~full_environment:false
+    ?interpreter
     "Running program"
     true
     false
     Builtin_variables.program
     (Some Builtin_variables.arguments)
     log env
+
+let run_program = run_program' None
+
+let run_program_with ~interpreter = run_program' (Some interpreter)
 
 let run_script log env =
   let response_file = Filename.temp_file "ocamltest-" ".response" in

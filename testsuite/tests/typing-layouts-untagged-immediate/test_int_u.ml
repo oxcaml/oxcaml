@@ -2,6 +2,11 @@
    include stdlib_stable;
    include stdlib_upstream_compatible;
    flags = "-extension-universe beta";
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"

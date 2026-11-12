@@ -1,6 +1,11 @@
 (* TEST
  include ocamlcommon;
  flags = "-I ${ocamlsrcdir}/parsing";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 (* Change these two variables to change which extension is being tested *)
