@@ -326,8 +326,10 @@ void caml_unregister_frametable(void *table);
 typedef struct caml_frametable_list {
   intnat* frametable;
   /* For a -frametable-sections header: whether this is the one table
-     whose (shared) pieces section is entered into the hashtable */
+     whose (shared) pieces section has been entered into the hashtable */
   bool owns_pieces;
+  /* If so, the next registered table that owns a pieces section */
+  struct caml_frametable_list *next_owner;
   struct caml_frametable_list *next;
 } caml_frametable_list;
 
