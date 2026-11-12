@@ -1299,10 +1299,9 @@ static void verify_format(value v, header_t hd)
     /* Some word is unscannable: otherwise this would be format 00.
        (A zero mask is bytecode's faux mixed block sentinel.) */
     CAMLassert(Scan_mask_hd(hd) != 0);
-    /* A block longer than the mask needs a repeat.
-       TODO: also assert that there is no repeat when the mask covers
-       the block, once the encoders are canonical. */
-    CAMLassert(wosize <= HEADER_SCAN_MASK_BITS || Repeat_hd(hd) != 0);
+    /* A block longer than the mask needs a repeat, and no other
+       block has one. */
+    CAMLassert((wosize <= HEADER_SCAN_MASK_BITS) == (Repeat_hd(hd) == 0));
     /* Mask bits beyond the end of the block are one. */
     if (wosize < HEADER_SCAN_MASK_BITS) {
       CAMLassert((Scan_mask_hd(hd) | Low_bits_mask(wosize))

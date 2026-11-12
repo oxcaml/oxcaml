@@ -272,18 +272,12 @@ uses them yet.
 
 #define Is_mixed_block_reserved(res) (((reserved_t)(res)) > 0)
 
-/* Native code versions of mixed block macros.
+/* Mixed blocks.
 
-   A mixed block's reserved field uses the inline (01) format: the
-   16-bit scan mask (bit i = word i, 1 = unscannable) with repeat 1,
-   so words past the mask repeat its last bit. The compiler still lays
-   mixed blocks out as a scannable prefix followed by a flat suffix,
-   so every mask has the shape 0^p 1^(16-p) and the prefix decode
-   below is exact.
-
-   The scannable size of a block is how many fields are values as opposed
-   to flat floats/ints/etc. This is different than the (normal) size of a
-   block for mixed blocks.
+   A mixed block's reserved field uses the inline (01) format: a
+   16-bit scan mask (bit i = word i, 1 = unscannable), with a repeat
+   of 1 if the block is longer than the mask, so that its remaining
+   words repeat the mask's last bit.
 
    The runtime has several functions that traverse over the structure of
    an OCaml value. (e.g. polymorphic comparison, GC marking/sweeping)
@@ -291,83 +285,41 @@ uses them yet.
    properties:
    - it's known that the input can never be a mixed block,
    - it raises an exception on mixed blocks, or
-   - it uses the scannable size (not the normal size) to figure out which
-   fields to recursively descend into.
+   - it uses the block's scan mask (see scan_mask.h) to find the fields
+   to recursively descend into.
 
    Otherwise, the traversal could attempt to recursively descend into
    a flat field, which could segfault (or worse).
 */
 
-#define Scannable_wosize_val_native(val) (Scannable_wosize_hd (Hd_val (val)))
-
-/* The reserved field for a mixed block with [sz] scannable words then
-   a flat suffix reaching the end of the block. Must match
+/* The reserved field for a mixed block of [wosize] words: [sz]
+   scannable words, then a flat suffix reaching the end of the block.
+   Only a block longer than the mask has a repeat (of the mask's last
+   bit, for the rest of the suffix). Must match
    [Mixed_block_support.make_header] in cmm_helpers.ml exactly:
    weak.c and obj.c CAMLassert equality of independently produced
    reserved fields. */
 Caml_inline reserved_t
-Reserved_mixed_block_scannable_wosize_native(mlsize_t sz)
+Reserved_mixed_block_scannable_wosize_native(mlsize_t sz, mlsize_t wosize)
 {
   uintnat mask_all = Low_bits_mask(HEADER_SCAN_MASK_BITS);
+  uintnat repeat = wosize > HEADER_SCAN_MASK_BITS ? 1 : 0;
   CAMLassert(sz < HEADER_SCAN_MASK_BITS);
   return (reserved_t)
     (((uintnat)HEADER_FORMAT_INLINE
       << (HEADER_FORMAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
-     | ((uintnat)1 << (HEADER_REPEAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
+     | (repeat << (HEADER_REPEAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
      | (mask_all & ~Low_bits_mask(sz)));
 }
 
-/* The number of leading scannable words: the position of the first
-   set mask bit. Exact while every mask is prefix-shaped. */
-Caml_inline mlsize_t Scannable_wosize_reserved_native(reserved_t res,
-                                                      mlsize_t sz) {
-  if (!Is_mixed_block_reserved(res)) return sz;
-  uintnat mask = Low_bits_of(res, HEADER_SCAN_MASK_BITS);
-  if (mask == 0) return sz; /* includes the bytecode faux sentinel */
-  mlsize_t prefix = caml_ctz(mask);
-  return prefix < sz ? prefix : sz;
-}
-
-Caml_inline mlsize_t Scannable_wosize_hd_native(header_t hd) {
-  return Scannable_wosize_reserved_native(Reserved_hd(hd),
-                                          Allocated_wosize_hd(hd));
-}
-
-/* Bytecode versions of mixed block macros.
-
-   Bytecode always uses the size of the block as the scannable size. That's
-   because bytecode doesn't represent mixed records as mixed blocks. They're
-   "faux mixed blocks", which are regular blocks with a sentinel value set
-   in the header bits.
-*/
-
-#define Scannable_wosize_hd_byte(hd)  (Allocated_wosize_hd (hd))
-#define Scannable_wosize_val_byte(val) (Allocated_wosize_hd (Hd_val (val)))
-Caml_inline mlsize_t Scannable_wosize_reserved_byte(reserved_t res,
-                                                    mlsize_t size) {
-  (void)res;
-  return size;
-}
-
-/* Users should specify whether they want to use the bytecode or native
-   versions of these macros. Internally to the runtime, the NATIVE_CODE
-   macro lets us make that determination, so we can define suffixless
-   versions of the mixed block macros.
-*/
-#ifdef CAML_INTERNALS
-#ifdef NATIVE_CODE
-#define Scannable_wosize_reserved(r, s) Scannable_wosize_reserved_native(r, s)
-#define Scannable_wosize_hd(hd)         Scannable_wosize_hd_native(hd)
-#define Scannable_wosize_val(val)       Scannable_wosize_val_native(val)
-#else
+/* Bytecode doesn't represent mixed records as mixed blocks. They're
+   "faux mixed blocks": regular blocks, scanned in full, with this
+   sentinel in the header's reserved bits. */
+#if defined(CAML_INTERNALS) && !defined(NATIVE_CODE)
 #define Faux_mixed_block_sentinel                                       \
   ((reserved_t)HEADER_FORMAT_INLINE                                     \
    << (HEADER_FORMAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
-#define Scannable_wosize_reserved(r, s) Scannable_wosize_reserved_byte(r, s)
-#define Scannable_wosize_hd(hd)         Scannable_wosize_hd_byte(hd)
-#define Scannable_wosize_val(val)       Scannable_wosize_val_byte(val)
-#endif // NATIVE_CODE
-#endif // CAML_INTERNALS
+#endif
 
 /* Color values are pre-shifted */
 

@@ -206,15 +206,16 @@ type t =
 module Mixed_block_support : sig
   val assert_mixed_block_support : unit -> unit
 
-  val make_header : Nativeint.t -> scannable_prefix:int -> Nativeint.t
+  val make_header :
+    Nativeint.t -> scannable_prefix:int -> wosize:int -> Nativeint.t
 end = struct
   let required_reserved_header_bits = Header_bits.reserved_bits
 
   let required_addr_size_bits = 64
 
-  (* The prefix must end within the header's inline scan mask; larger
-     prefixes return with the layout-word formats. typedecl.ml enforces
-     this limit with a proper error.  *)
+  (* The prefix must end within the header's inline scan mask; larger prefixes
+     return with the layout-word formats. typedecl.ml enforces this limit with a
+     proper error. *)
   let max_scannable_prefix = Header_bits.scan_mask_bits - 1
 
   let max_header =
@@ -243,7 +244,7 @@ end = struct
 
   let assert_mixed_block_support () = Lazy.force assert_mixed_block_support
 
-  let make_header header ~scannable_prefix =
+  let make_header header ~scannable_prefix ~wosize =
     assert_mixed_block_support ();
     if scannable_prefix > max_scannable_prefix
     then
@@ -254,18 +255,19 @@ end = struct
       Misc.fatal_errorf
         "Header too big for the mixed block encoding to be added (%nd > %nd)"
         header max_header;
-    (* The inline (01) format: 16-bit scan mask (bit i = word i,
-       1 = unscannable) with repeat 1. Must match
-       [Reserved_mixed_block_scannable_wosize_native] in mlvalues.h
-       exactly. *)
+    (* The inline (01) format: 16-bit scan mask (bit i = word i, 1 =
+       unscannable). Only a block longer than the mask has a repeat (of the
+       mask's last bit, for the rest of the flat suffix). Must match
+       [Reserved_mixed_block_scannable_wosize_native] in mlvalues.h exactly. *)
+    let repeat = if wosize > Header_bits.scan_mask_bits then 1 else 0 in
     let mask =
       ((1 lsl Header_bits.scan_mask_bits) - 1)
       land lnot ((1 lsl scannable_prefix) - 1)
     in
     let reserved =
-      (Header_bits.format_inline
-      lsl (Header_bits.format_shift - Header_bits.scan_mask_shift))
-      lor (1 lsl (Header_bits.repeat_shift - Header_bits.scan_mask_shift))
+      Header_bits.format_inline
+      lsl (Header_bits.format_shift - Header_bits.scan_mask_shift)
+      lor (repeat lsl (Header_bits.repeat_shift - Header_bits.scan_mask_shift))
       lor mask
     in
     Nativeint.add
@@ -285,7 +287,7 @@ let block_header ?(block_kind = Regular_block) tag sz =
   match block_kind with
   | Regular_block -> hdr
   | Mixed_block { scannable_prefix } ->
-    Mixed_block_support.make_header hdr ~scannable_prefix
+    Mixed_block_support.make_header hdr ~scannable_prefix ~wosize:sz
 
 (* Static data corresponding to "value"s must be marked black in case we are in
    no-naked-pointers mode. See [caml_darken] and the code below that emits
