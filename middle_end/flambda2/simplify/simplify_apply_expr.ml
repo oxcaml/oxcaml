@@ -95,15 +95,17 @@ let loopify_decision_for_call dacc apply =
         then DE.loopify_state denv
         else Loopify_state.do_not_loopify)
 
-(* The terms of [expr] are built from the simplified [apply], whose debuginfo is
-   already in the current inlining context. *)
+(* For terms built from the simplified [apply], whose debuginfo is already in
+   the current inlining context. *)
+let dacc_for_terms_built_from_apply dacc =
+  DA.map_denv dacc ~f:DE.clear_inlined_debuginfo
+
 let simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up =
-  simplify_expr
-    (DA.map_denv dacc ~f:DE.clear_inlined_debuginfo)
-    expr ~down_to_up
+  simplify_expr (dacc_for_terms_built_from_apply dacc) expr ~down_to_up
 
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
-  Simplify_apply_cont_expr.simplify_apply_cont dacc
+  Simplify_apply_cont_expr.simplify_apply_cont
+    (dacc_for_terms_built_from_apply dacc)
     (Apply_cont_expr.create self_cont ~args:(Apply.args apply)
        ~dbg:(Apply.dbg apply))
     ~down_to_up
