@@ -142,7 +142,10 @@ let%expect_test ("compare and swap of a large integer" [@when int_size_64]) =
   Printf.printf "%b %d\n" swapped !r;
   [%expect {| true 7 |}]
 
-let%expect_test ("allocations beyond Max_wosize" [@when int_size_64]) =
+(* The native OxCaml runtime aborts ("Fatal error: Out of memory") rather than
+   raising [Out_of_memory] *)
+let%expect_test
+    ("allocations beyond Max_wosize" [@when int_size_64 && not (native && oxcaml)]) =
   let size = Sys.opaque_identity (1 lsl 40) in
   (try Printf.printf "allocated %d\n" (Obj.size (Obj.new_block 0 size))
    with Out_of_memory -> print_endline "Out_of_memory");
