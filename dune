@@ -493,7 +493,7 @@
 ; In bytecode, caml_zstd_initialize lives in libcamlrun; but is not included in
 ; libasmrun for native code so that all executables linked by ocamlopt only link
 ; with libzstd if they actually use compressed marshalling. ocamlcommon.cmxa
-; must include -cclib -lcomprmarsh, which provides this primitive native mode.
+; must include -cclib -lcomprmarsh, which provides this primitive in native mode.
 ; That's needed in _both_ the default and main contexts.
 ; We have to include compression_c_libraries because libcomprmarsh.a comes from
 ; the system compiler, and will need libzstd if the system compiler was built
