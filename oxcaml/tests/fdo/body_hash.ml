@@ -54,3 +54,6 @@ let[@inline never] change_arm x = if x > 0 then apply next x else x
 
 (* A raise, which changes how the counts relate *)
 let[@inline never] change_raise x = if x > 0 then raise Exit else x
+
+(* The number of arguments: an over-application is several calls *)
+let[@inline never] change_arity x = apply next x
