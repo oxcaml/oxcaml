@@ -204,3 +204,12 @@ let[@inline never] unknown k = make k
 let[@inline never] scale = fun (x [@unboxable]) -> x *. 2.
 
 let[@inline never] scaled x = scale (x +. 1.)
+
+(* The wrapper of a function with an optional argument is a stub too, but its
+   calls (here, of [default] and of the main function) keep their own counters
+   where it is inlined. *)
+let[@inline never] default () = side 7
+
+let[@inline never] optional ?(x = default ()) y = x + side y
+
+let[@inline never] call_optional y = optional y
