@@ -119,10 +119,11 @@ let rec remove_consecutive_events (body : Jsir.instr list) : Jsir.instr list =
     :: body ->
     instr :: remove_consecutive_events body
 
-let registers_symbol (instr : Jsir.instr) =
+let registers_symbol ~register_globals (instr : Jsir.instr) =
   match instr with
   | Let (_, Prim (Extern (prim, _), _)) ->
     String.equal prim "caml_register_symbol"
+    || ((not register_globals) && String.equal prim "caml_register_global")
   | Let
       ( _,
         ( Prim
@@ -195,7 +196,7 @@ let resolve_imports ~exporters (units : unit_ list) =
     (resolve_imports' ~exporters ~available:(Symbol_table.create 1024))
     Jsir.Var.Map.empty units
 
-let link (files : Jsir.jsir_file list) =
+let link ~register_globals (files : Jsir.jsir_file list) =
   if List.compare_length_with files 0 = 0
   then Misc.fatal_error "Jsir_linker.link: no compilation units to link";
   let units, var_count, addr_count =
@@ -214,7 +215,7 @@ let link (files : Jsir.jsir_file list) =
     match instr with
     | Let (v, _) when Jsir.Var.Map.mem v subst -> false
     | Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _ | Event _ ->
-      not (registers_symbol instr)
+      not (registers_symbol ~register_globals instr)
   in
   let rec merge blocks (units : unit_ list) =
     match units with

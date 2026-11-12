@@ -72,6 +72,7 @@ The JSIR linker renumbers the variables and block addresses of each unit so that
 
 The JSIR of a unit refers to the symbols of other units through the runtime's symbol table: a unit binds `caml_get_symbol` (or `caml_get_global`, for a module block) to a fresh variable at the start of its entry block, and registers its own symbols with `caml_register_symbol` (`caml_register_global` for its module block) where they are defined.
 JSIR files record these variables (`symbol_imports` and `symbol_exports` in [`Code.jsir_file`](../../../external/js_of_ocaml/compiler/lib/code.mli)), and the linker substitutes the importing unit's variable with the exporting unit's, deleting the `caml_get_symbol` binding.
+The `caml_register_global` calls are deleted too unless `-linkall` is given (as `js_of_ocaml` does for bytecode executables), so that `js_of_ocaml` can remove the fields of module blocks that are not used.
 
 A unit whose toplevel code never exits normally (it always raises) makes the units after it unreachable, and the linker leaves them out.
 
