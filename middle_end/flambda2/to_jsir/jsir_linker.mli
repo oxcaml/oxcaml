@@ -52,4 +52,23 @@ open! Jsoo_imports.Import
     Units after one whose toplevel code never exits normally are left out, as
     they cannot run. *)
 
+type error =
+  | No_compilation_units
+  | Multiple_definition of
+      { symbol : Jsir.Linkage_name.t;
+        first_unit : string;
+        second_unit : string
+      }
+  | Undefined_symbol of
+      { symbol : Jsir.Linkage_name.t;
+        unit_ : string
+      }
+  | Symbol_defined_later of
+      { symbol : Jsir.Linkage_name.t;
+        unit_ : string;
+        exporter : string
+      }
+
+exception Error of error
+
 val link : register_globals:bool -> Jsir.jsir_file list -> Jsir.program
