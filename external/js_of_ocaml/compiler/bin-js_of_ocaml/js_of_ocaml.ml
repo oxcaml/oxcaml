@@ -66,6 +66,7 @@ let () =
            ; Build_runtime.command
            ; Print_runtime.command
            ; Check_runtime.command
+           ; Split.command
            ; Compile.command
            ])
     with

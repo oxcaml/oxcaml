@@ -1,6 +1,11 @@
 # dev
 
 ## Features/Changes
+* Compiler: new `js_of_ocaml split` and `wasm_of_ocaml split` commands,
+  which compile a program into eager code and deferred roots that can each be
+  loaded later, at most once, against one shared runtime. Compilation units
+  are assigned to partitions from their `.cmo` metadata; with
+  `--strategy late`, the whole program is optimized before being split
 * Compiler: with `--effects={cps,double-translation}`, specialize calls to
   known functions using the global flow analysis before the CPS transformation
   (#2456)

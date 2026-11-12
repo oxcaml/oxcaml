@@ -6,6 +6,9 @@
  (libraries
   js_of_ocaml-compiler
   js_of_ocaml-compiler.runtime-files
-  oxcaml_private_yojson)
+  jsoo_cmdline
+  oxcaml_private_cmdliner
+  oxcaml_private_yojson
+  unix)
  (flags
-  (:standard -open Oxcaml_private_yojson)))
+  (:standard -open Oxcaml_private_cmdliner -open Oxcaml_private_yojson)))

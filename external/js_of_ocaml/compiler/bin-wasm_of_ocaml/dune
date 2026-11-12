@@ -8,6 +8,7 @@
   oxcaml_private_cmdliner
   compiler-libs.common
   js_of_ocaml-compiler.runtime-files
+  jsoo_static_partition
   oxcaml_private_yojson
   unix
   (select
