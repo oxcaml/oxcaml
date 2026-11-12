@@ -42,5 +42,8 @@ meta.txt     seed, time and the run-level metadata (see run_metadata)
     compile.{status,stdout,stderr}
     run.{status,stdout,stderr} (appears if the program was run)
 ```
+Each failure is written to a hidden `.<seed>.<random>/` directory and renamed
+into place when complete, so a failure's directory is never partial. A leftover
+hidden directory is from a run that was killed while saving.
 
 Learn more with `python oxfuzzer.py -h`.

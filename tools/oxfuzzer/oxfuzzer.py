@@ -596,6 +596,8 @@ def reproduction_script(
 #   <config>/    one directory per configuration containing run.sh (a
 #                standalone reproducer), compile.{status,stdout,stderr} and,
 #                if the program was run, run.{status,stdout,stderr}
+# The directory is written under a temporary name and renamed into place, so
+# that a run killed while saving does not leave a partial failure directory.
 def save_failure(
     output_dir: Path,
     run_info: str,
@@ -607,25 +609,32 @@ def save_failure(
     toolchain: Toolchain,
 ) -> None:
     failure_dir = output_dir / str(seed)
-    failure_dir.mkdir(parents=True, exist_ok=True)
-    (failure_dir / "program.ml").write_bytes(program)
-    (failure_dir / "reason.txt").write_text(reason + "\n")
-    (failure_dir / "meta.txt").write_text(failure_metadata(seed, run_info))
+    # Dot-prefixed, so that a leftover is not taken for a failure.
+    staging_dir = Path(tempfile.mkdtemp(prefix=f".{seed}.", dir=output_dir))
+    staging_dir.chmod(0o755)
+    (staging_dir / "program.ml").write_bytes(program)
+    (staging_dir / "reason.txt").write_text(reason + "\n")
+    (staging_dir / "meta.txt").write_text(failure_metadata(seed, run_info))
     for result in results:
-        directory = failure_dir / result.configuration.name
-        directory.mkdir(exist_ok=True)
+        directory = staging_dir / result.configuration.name
+        directory.mkdir()
         script = directory / "run.sh"
         script.write_text(
             reproduction_script(
-                result.configuration, seed, toolchain=toolchain, directory=directory
+                result.configuration,
+                seed,
+                toolchain=toolchain,
+                directory=failure_dir / result.configuration.name,
             )
         )
         script.chmod(0o755)
         write_command_result(directory, "compile", result.compilation)
         if result.execution is not None:
             write_command_result(directory, "run", result.execution)
+    # Replace a failure saved by an earlier run into the same output directory.
+    shutil.rmtree(failure_dir, ignore_errors=True)
+    staging_dir.rename(failure_dir)
     print(f"\nseed {seed}: {reason}", file=sys.stderr)
-    print(f"saved failure to {failure_dir}", file=sys.stderr)
 
 
 # A case passes when every configuration compiles and runs successfully and
