@@ -157,3 +157,14 @@ let entry_annotation t ~specialization_map code_id entry_annotation =
 
 (* CR-someday yusumez: The counters preserved in the unit toplevel outside of
    continuation handlers are dropped, as it has no region. *)
+
+(* CR-someday yusumez: Simplifying a copy again doesn't rename the counters of
+   the sets of closures in its body, which the previous run renamed. But a
+   function of such a set that the previous run kept as the original's code (for
+   lack of improvements) can be improved by this run: its new code then has the
+   original's counters, so their counts are merged with the original's. *)
+
+(* CR-someday yusumez: The body of a call inlined at an application with no
+   counter (e.g. the second application of a split over-application) gets no
+   inlining context, so its counts are merged with those of the callee's
+   out-of-line code. *)

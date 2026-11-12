@@ -703,7 +703,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
              applications adds the context of that application on top: the
              backtrace shows the frames of where the closure was built, with the
              inlined frames they share twice, and the counter has the shared
-             inlining context twice. *)
+             inlining context twice. The application of the wrapper has no
+             counter left of its own: it only appears in that context. *)
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
