@@ -138,19 +138,22 @@ let entry_annotation t ~specialization_map code_id entry_annotation =
        (Fdo_annotation.With_body_hash.annotation entry_annotation)
        (counters_into t ~specialization_map (Function_entry code_id)))
 
-(* The counters Simplify loses or miscounts:
-
-   CR yusumez: The arms of a collapsed switch all get the count of the whole
+(* CR yusumez: The arms of a collapsed switch all get the count of the whole
    switch, which is incorrect if the branches weren't actually identical and
-   e.g. turned into a table lookup.
+   e.g. turned into a table lookup. *)
 
-   CR yusumez: Back edges into a loop header are rebuilt before the header's own
+(* CR yusumez: Back edges into a loop header are rebuilt before the header's own
    switch, so if that switch collapses when rebuilt, its arms' counters miss
    them and only reach the edges entering the loop.
 
-   CR-someday yusumez: A region entered by an exception (a handler) has no edge
-   for its preserved counters. We'd need to have annotations on exceptional
-   edges for that.
+   These counters could be passed around separately and patched when we
+   translate out of Flambda, but that involves too much work to handle this
+   specific case for now. We should see if this is worth it, or figure out a
+   better solution. *)
 
-   CR-someday yusumez: The counters preserved in the unit toplevel outside of
+(* CR-someday yusumez: A region entered by an exception (a handler) has no edge
+   for its preserved counters. We'd need to have annotations on exceptional
+   edges for that. *)
+
+(* CR-someday yusumez: The counters preserved in the unit toplevel outside of
    continuation handlers are dropped, as it has no region. *)
