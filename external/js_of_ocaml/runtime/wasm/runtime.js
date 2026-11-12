@@ -1049,6 +1049,12 @@
       }
       Object.assign(imports.OCaml, instance.exports);
       await make_promising(initialize)();
+      if (chunk.exported_unit !== undefined) {
+        const exported = instance.exports[chunk.exported_unit];
+        if (!(exported instanceof WebAssembly.Global))
+          throw new Error(`Missing static Wasm module export: ${chunk.exported_unit}`);
+        return exported.value;
+      }
     });
     staticLoads.set(key, promise);
     return promise;

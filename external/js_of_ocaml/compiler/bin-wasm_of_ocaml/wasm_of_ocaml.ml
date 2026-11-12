@@ -66,6 +66,7 @@ let () =
            ; Preprocess.command_alias
            ; Link_wasm.command
            ; Split.command
+           ; Package.command
            ])
     with
     | Ok (`Ok () | `Help | `Version) ->
