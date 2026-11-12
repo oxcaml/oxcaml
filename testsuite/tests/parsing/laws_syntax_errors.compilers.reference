@@ -1,0 +1,53 @@
+Line 7, characters 6-10:
+7 | let ( ===> ) a b = not a || b;;
+          ^^^^
+Error: Syntax error: operator expected.
+Line 5, characters 40-44:
+5 | law_? nested (a : bool) (b : bool) : (a ===> b);;
+                                            ^^^^
+Error: Syntax error: ) expected
+Line 5, characters 37-38:
+5 | law_? nested (a : bool) (b : bool) : (a ===> b);;
+                                         ^
+  This ( might be unmatched
+Line 4, characters 41-42:
+4 | law_? seq (n : int) (a : bool) : ignore n; a ===> a;;
+                                             ^
+Error: Syntax error
+Line 4, characters 6-7:
+4 | law_? : true;;
+          ^
+Error: Syntax error
+Line 2, characters 6-9:
+2 | law_? Foo : true;;
+          ^^^
+Error: Syntax error
+Line 4, characters 10-14:
+4 | law_? foo true;;
+              ^^^^
+Error: Syntax error
+Line 2, characters 19-21:
+2 | law_? foo : a ===> ;;
+                       ^^
+Error: Syntax error
+Line 4, characters 12-13:
+4 | law_? foo (x, y) : true;;
+                ^
+Error: Syntax error
+Line 2, characters 10-11:
+2 | law_? foo ~x : true;;
+              ^
+Error: Syntax error
+Line 2, characters 10-11:
+2 | law_? foo _ : true;;
+              ^
+Error: Syntax error
+Line 4, characters 4-9:
+4 | law_?foo: true;;
+        ^^^^^
+Error: Syntax error
+Line 2, characters 5-10:
+2 | law_ ?foo: true;;
+         ^^^^^
+Error: Syntax error
+
