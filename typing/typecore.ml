@@ -1694,23 +1694,14 @@ and mode_splice : With_regionality.l =
   With_regionality.disallow_right
     mode_in_quotes
 
-(** Lower bound for the mode of a quoted expression that
-    might have side-effects. *)
-let mode_computation_quoted : With_regionality.l =
-  let open Mode_hint in
+(** Lower bound for the mode of a quoted value. *)
+let mode_value_quote : With_regionality.l =
+    With_regionality.(of_const Const.min)
+
+(** Lower bound for the mode of a quoted computation. *)
+let mode_computation_quote : With_regionality.l =
   { With_regionality.Const.min with linearity = Once }
   |> With_regionality.of_const ~hint_comonadic:Quoted_computation
-
-(** The [expected_mode] of a quoted expression value when it is spliced. *)
-let mode_spliced =
-  let open Mode_hint in
-  let hint_monadic = Spliced Monadic
-  and hint_comonadic = Spliced Comonadic in
-  let mode =
-    With_regionality.Const.max
-    |> With_regionality.of_const ~hint_monadic ~hint_comonadic
-  in
-  mode_default mode
 
 let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
@@ -9642,7 +9633,6 @@ and type_expect_
       let check_modes =
         not (Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes)
       in
-      let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
       let expr_ty = Predef.type_expr (newgenty (Tquote ty)) in
       with_explanation (fun () ->
@@ -9656,15 +9646,19 @@ and type_expect_
         then mode_quoted
         else mode_default With_regionality.max
       in
-      let quote_env = Env.enter_quote env in
+      let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let quote_env =
         if check_modes
-        then Env.add_closure_lock (loc, Quote) expected_comonadic_mode quote_env
-        else quote_env
+        then Env.add_quote_lock ~loc expected_comonadic_mode env
+        else Env.enter_quote env
       in
       let arg = type_expect quote_env mode_quoted exp (mk_expected ty) in
-      if maybe_computation arg then
-        submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
+      let mode_quote =
+        if maybe_computation arg
+        then mode_computation_quote
+        else mode_value_quote
+      in
+      submode ~loc ~env mode_quote expected_mode;
       re {
         exp_desc = Texp_quote arg;
         exp_loc = loc; exp_extra = [];
@@ -9679,14 +9673,16 @@ and type_expect_
          we need to assume the splice is at legacy.
          Otherwise, if we are delaying checking modes until program generation
          (with magic_staged_modes), and we do not constrain the mode. *)
-      let magic_staged_modes =
-        Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
+      let check_modes =
+        not (Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes)
       in
-      if not magic_staged_modes then
+      let mode = With_regionality.newvar (Ctype.get_current_level ()) in
+      if check_modes then (
         submode ~loc ~env ~reason:Other mode_splice expected_mode;
+        Env.splice_closure_mode mode.comonadic env);
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_expr (newgenty (Tquote ty_expected)) in
-      let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
+      let arg = type_expect new_env (mode_default mode) exp (mk_expected ty) in
       re {
         exp_desc = Texp_splice arg;
         exp_loc = loc; exp_extra = [];

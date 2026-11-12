@@ -4737,6 +4737,7 @@ module Report = struct
       Some (print_article_noun Consonant "functor parameter")
     | Lazy -> Some (print_article_noun Consonant "lazy expression")
     | Quote -> Some (print_article_noun Consonant "quoted expression")
+    | Splice -> Some (print_article_noun Consonant "splice")
     | Expression -> Some (print_article_noun Vowel "expression")
     | Effect_match ->
       Some (print_article_noun Consonant "pattern match with effect cases")
@@ -4897,6 +4898,8 @@ module Report = struct
             Fmt.dprintf "contains %t%a defined as %t"
               (print_structure_item ~capitalize:false x)
               maybe_modality moda print_pp
+          | Quote ->
+            Fmt.dprintf "is a quoted expression that contains %t" print_pp
         in
         pr, contained)
 
@@ -4929,6 +4932,10 @@ module Report = struct
       Fmt.dprintf "is %t%a in the structure at %a"
         (print_structure_item ~capitalize:false x)
         maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Quote ->
+      Fmt.dprintf "is part of the quoted expression at %a"
         (Location.Doc.loc ~capitalize_first:false)
         container
 
