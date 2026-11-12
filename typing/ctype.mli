@@ -210,17 +210,15 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       in_counterexample : bool;
       (* true iff checking counter examples *)
-      mutable env_locality_mode : Mode.Locality.r option;
-      (** [Some m] if the pattern is under [let poly_], where [m] is the
-         allocation mode of the captured environment *)
+      is_lpoly : bool;
+      (* true iff the pattern is under let poly_ *)
     }
   val make:
-    ?env_locality_mode:Mode.Locality.r
+    ?is_lpoly:bool
     -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_locality_mode : t -> Mode.Locality.r option -> unit
 end
 
 type existential_treatment =
@@ -306,6 +304,33 @@ val curry_mode_const :
 val curry_mode :
   (allowed * 'r) With_locality.Comonadic.t -> With_locality.lr ->
   With_locality.Comonadic.l
+
+(** The curry mode implied by the arguments seen so far in a function type:
+    a constant until a generic mode variable is encountered, then the join
+    of the modes closed over ([curry_mode]). A hidden curry mode is a
+    variable whose lower bound is the implied curry mode, unconstrained
+    otherwise. Its areality is bounded below by the constant upper bounds
+    of the areality of the arguments: a closure is as local as the
+    arguments it may close over. *)
+module Curry_mode : sig
+  type t =
+    | Const of With_locality.Const.t
+    | Variable of
+        { comonadic : With_locality.Comonadic.l;
+          areality : Locality.Const.t }
+
+  val add_const_arg : t -> With_locality.Const.t -> t
+
+  (** Always yields a variable accumulator. [upper_areality] is the constant
+      upper bound of the areality of the argument. *)
+  val add_arg : t -> With_locality.lr -> upper_areality:Locality.Const.t -> t
+
+  (** Returns a mode constrained by a [Curry_mode.t] [c].
+      If [c] is a constant, [mode] returns the mode [c].
+      If [c] is a comonadic mode variable, [mode] returns a freshly
+      allocated mode at level [level], where [c.comonadic < mode]. *)
+  val mode : level:int -> t -> With_locality.lr
+end
 
 val apply:
         ?use_current_level:bool ->
@@ -410,10 +435,14 @@ val filter_method: Env.t -> string -> type_expr -> type_expr
 val occur_in: Env.t -> type_expr -> type_expr -> bool
 val moregeneral: self_check:bool -> Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
-  type_expr -> type_expr -> Jkind_types.Sort.Const.t option list
-        (* Check if the first type scheme is more general than the second.
+  type_expr -> Subst.t -> type_expr -> type_expr Lazy.t ->
+  Jkind_types.Sort.Const.t option list
+        (* [moregeneral ~self_check _ _ sv1 sv2 t1 s t2 (lazy s(t2))] checks
+           whether the type scheme [t1] is more general than [s(t2)].
+           The lazy [s(t2)] is forced only if the check needs it, so a caller
+           that also needs [s(t2)] can share the substitution by forcing it.
            The two [Sort.var list] arguments are the layout-polymorphic sort
-           variables of the pattern and subject respectively.
+           variables of the pattern [sv1] and subject [sv2] respectively.
            Returns, for each pattern sort variable (in order), the sort it was
            constrained to during the check, or [None] if unconstrained. Sorts
            in the result may contain subject sort variables. *)
@@ -684,7 +713,9 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
    types and [Tpoly]s *)
 type unwrapped_type_expr =
   { ty : type_expr
-  ; modality : Mode.Modality.Const.t
+  ; wrapping : Jkind.Unboxed_field_transformation.t
+    (* The transformation from the extracted type's kind to the wrapped type's
+       jkind, used for rewrapping. *)
   ; or_null : unwrapped_or_null option;
     (* We store the declaration and arguments rather than a bool to avoid
        re-writing the with-bounds of [or_null], and to be more robust for the

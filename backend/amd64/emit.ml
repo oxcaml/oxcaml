@@ -1893,28 +1893,33 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   assert (res_used = Array.length instr.res);
   (* Gathers require that all args are distinct registers. *)
-  match[@warning "-4"] simd.id with
-  | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
-  | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
-  | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
+  if
+    String.starts_with ~prefix:"vpgather" simd.mnemonic
+    || String.starts_with ~prefix:"vgather" simd.mnemonic
+  then
     let module Set = Reg.UsingLocEquality.Set in
     let set = Array.fold_right Set.add instr.arg Set.empty in
     assert (Set.cardinal set = Array.length instr.arg)
-  | _ -> ()
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
+  | Some R128 -> arg_as_xmm (arg instr i)
+  | Some R256 -> arg_as_ymm (arg instr i)
+  | Some R512 -> arg_as_zmm (arg instr i)
+  | Some R64 | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> res instr i
+  | Some R128 -> arg_as_xmm (res instr i)
+  | Some R256 -> arg_as_ymm (res instr i)
+  | Some R512 -> arg_as_zmm (res instr i)
+  | Some R64 | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -1968,7 +1973,10 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
             let n = num_args_addressing mode in
             let typ = to_addr_width arg.loc in
             let address = addressing mode typ instr idx in
-            emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
+            (* We do not sanitize masked loads and stores, which only access the
+               unmasked elements. *)
+            if not (Simd.instr_expects_mask simd)
+            then emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
             idx + n, address :: args
           | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
       (0, []) simd.args
@@ -2042,11 +2050,11 @@ let emit_simd ?mode (op : Simd.operation) instr =
       emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestz | Vptestz_X | Vptestz_Y ->
+    | Ptestz | Vptestz_X | Vptestz_Y | Kflag Zf ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestc | Vptestc_X | Vptestc_Y ->
+    | Ptestc | Vptestc_X | Vptestc_Y | Kflag Cf ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
@@ -2218,7 +2226,23 @@ let emit_instr ~first ~last ~fallthrough i =
     else (
       add_used_symbol func.sym_name;
       emit_jump func)
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; ty_args; _ }) ->
+    (* Fuse each fat-pointer argument, adding its offset register into its base
+       register, as part of emitting the call itself, so no GC safepoint can
+       separate the addition from the call. *)
+    let (_ : int) =
+      List.fold_left
+        (fun k (ty_arg : Cmm.exttype) ->
+          match ty_arg with
+          | XFat_pointer ->
+            I.add (arg i (k + 1)) (arg i k);
+            k + 2
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 ->
+            k + 1
+          | XDummy_int | XDummy_float -> k)
+        0 ty_args
+    in
     add_used_symbol func;
     if stack_ofs > 0
     then (
@@ -2702,6 +2726,8 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Dls_get -> I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
   | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
+  | Lop Thread_self_id ->
+    I.mov (domain_field Domainstate.Domain_thread_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
   | Llabel_for_jump_target label ->

@@ -482,6 +482,7 @@ type primitive =
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   (* Poll for runtime actions. May run pending actions such as signal
      handlers, finalizers, memprof callbacks, etc, as well as GCs and
      GC slices, so should not be moved or optimised away. *)
@@ -513,6 +514,9 @@ and extern_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Raw_pointer
+  (** A fat-pointer argument (unboxed pair of a [value] base and a [bits64]
+      byte offset), passed to C as a single raw pointer: base + offset. *)
 
 and external_call_description =
   (extern_repr, extern_repr) Primitive.description_gen
@@ -634,7 +638,7 @@ and layout =
   | Punboxed_product of layout list
     (** Invariant: the layout list has length >= 2 *)
   | Pbottom
-  | Psplicevar of Slambdaident.t
+  | Psplicevar of Layout_ident.t
 
 and block_shape =
   | All_value
@@ -661,7 +665,7 @@ and 'a mixed_block_element =
   | Void
   | Product of 'a mixed_block_element array
     (** Invariant: the mixed_block_element array has length >= 2 *)
-  | Splice_variable of Slambdaident.t
+  | Splice_variable of Layout_ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -1072,7 +1076,7 @@ type lambda =
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
   | Lkindinstantiate of lkindinstantiate
   (* [Ltemplate] should only exist in the tlambda stage. *)
-  | Ltemplate of ltemplate
+  | Ltemplate of lfunction
   (* [Linstantiate] should only exist in the tlambda stage. *)
   | Linstantiate of lambda_apply
 
@@ -1104,11 +1108,8 @@ and lfunction = private
   }
 
 and lkindtemplate =
-  { ktmpl_params: Slambdaident.t list;
+  { ktmpl_params: Layout_ident.t list;
     ktmpl_body: lfunction;
-    ktmpl_env: (lambda * layout) Ident.Map.t;
-    ktmpl_env_mode: locality_mode;
-    ktmpl_loc: scoped_location;
   }
 
 and lkindinstantiate =
@@ -1117,11 +1118,6 @@ and lkindinstantiate =
     kinst_result_layout: layout;
     kinst_mode: return_mode;
     kinst_loc: scoped_location;
-  }
-
-and ltemplate =
-  { tmpl_func: lfunction;
-    tmpl_env: (lambda * layout) Ident.Map.t;
   }
 
 and lambda_while =
@@ -1483,17 +1479,6 @@ val map : (lambda -> lambda) -> lambda -> lambda
 val map_lfunction : (lambda -> lambda) -> lfunction -> lfunction
   (** Apply the given transformation on the function's body *)
 
-val extract_free_var_env :
-  layout_of_ident:(Ident.t -> layout option) ->
-  lfunction ->
-  lfunction * (lambda * layout) Ident.Map.t
-(** [extract_free_var_env ~layout_of_ident lfun] computes an environment for the
-    provided function by renaming the free variables of [lfun] to fresh idents,
-    and returning the freshened function together with the mapping from new
-    idents to (lambda that evaluates to) the old idents.
-    Free variables for which [layout_of_ident] returns [None] are not
-    freshened. *)
-
 val shallow_map  :
   tail:(lambda -> lambda) ->
   non_tail:(lambda -> lambda) ->
@@ -1644,7 +1629,9 @@ val count_initializers_array_kind : array_kind -> int
 val ignorable_product_element_kind_involves_int :
   ignorable_product_element_kind -> bool
 
-(** This function currently assumes a 64-bit target. *)
+(** This function currently assumes a 64-bit target. When targeting JSIR,
+    every unarised element counts as 8 bytes (in particular, arrays are not
+    packed). *)
 val array_element_size_in_bytes : array_kind -> int
 
 (** Construction helpers *)
@@ -1687,5 +1674,5 @@ val static_cast
   -> loc:scoped_location
   -> lambda
 
-val fatal_error_unevaluated_splice_var : Slambdaident.t -> 'a
+val fatal_error_unevaluated_splice_var : Layout_ident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a

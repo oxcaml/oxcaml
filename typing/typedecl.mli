@@ -125,7 +125,8 @@ val compute_block_shape :
     Env.t -> type_expr list ->
     [ `Not_mixed | `Mixed of mixed_product_shape | `Undetermined ]
 
-type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
+type native_repr_kind =
+  Unboxed | Untagged | Unpacked | Unsafe_unextended | Fat_ptr
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
@@ -181,7 +182,7 @@ type error =
   | Duplicate_constructor of string
   | Too_many_constructors
   | Duplicate_label of string
-  | Unboxed_mutable_label
+  | Unboxed_atomic_label
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -213,7 +214,7 @@ type error =
   | Elide_void_on_non_void
   | Elide_void_in_return_position
   | All_external_arguments_elided
-  | Cannot_unbox_or_untag_type of native_repr_kind
+  | Bad_native_repr_attr of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
   | Jkind_mismatch_of_path of Env.t * Path.t * Ikind.subjkind_error
@@ -225,7 +226,6 @@ type error =
       ; typ : type_expr
       ; err : Jkind.Violation.t
       }
-  | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error

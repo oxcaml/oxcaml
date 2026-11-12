@@ -14,12 +14,9 @@ let () =
       | "mach_checks", ".mli"
       | "relocation_table", ".mli"
       | "symbol_entry", ".mli"
-      | "symbol_utils", ".mli"
-      | "optmaindriver", ".cmx" ->
+      | "symbol_utils", ".mli" ->
         None
       | "zero_alloc_checker", ".mli" -> Some "mach_checks"
-      | "cSE", (".cmi" | ".cmt" | ".cmx") -> Some "CSE"
-      | "cSEgen", (".cmi" | ".cmt" | ".cmti" | ".cmx") -> Some "CSEgen"
       | ( "allowance" | "cmt2annot" | "compression" | "debug" | "diffing"
         | "diffing_with_keys" | "errortrace" | "file_sections" | "global_module"
         | "import_info" | "includemod_errorprinter"
@@ -34,14 +31,9 @@ let () =
         None
       | _, _ -> Some prefix
     in
-    let tgt_dir_prefix =
-      if String.starts_with ~prefix:"external/" path
-      then ""
-      else "compiler-libs/"
-    in
     match tgt_prefix_opt with
     | None -> ()
     | Some tgt_prefix ->
-      Printf.printf "(%s as %s%s%s)\n" path tgt_dir_prefix tgt_prefix extension
+      Printf.printf "(%s as compiler-libs/%s%s)\n" path tgt_prefix extension
   done;
   print_endline ")"

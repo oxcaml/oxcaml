@@ -948,7 +948,7 @@ let rec choice ctx t =
     | Pwith_stack | Pwith_stack_preemptible
     | Pperform | Pcontinue | Pdiscontinue
     | Pdiscontinue_with_backtrace | Preperform
-    | Pdls_get | Ptls_get | Pdomain_index
+    | Pdls_get | Ptls_get | Pdomain_index | Pthread_self_id
 
     (* we don't handle atomic primitives *)
     | Patomic_exchange_field _ | Patomic_compare_exchange_field _

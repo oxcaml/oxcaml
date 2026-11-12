@@ -126,38 +126,29 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
 
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
-   layouts in the typedtree (see [Sort] comment in [jkind_intf.ml]).
-
-   This function also may mutate [ty] to constrain its jkind (see below);
-   this is yet another reason why this function could use some attention.
-   Internal ticket 5093 (which references the former name, [type_sort]). *)
-(* CR layouts v3.0: have a better error message
-   for nullable jkinds.*)
-let type_representable_layout ~why env loc ty =
+   layouts in the typedtree (see [Sort] comment in [jkind_intf.ml]). *)
+let get_representable_layout_opt env ty =
   let jkind = Ctype.type_jkind env ty in
-  let layout =
-    match Jkind.get_layout_defaulting_to_scannable env jkind with
-    | Some layout -> layout
-    | None ->
-      Misc.fatal_error
-        "Typeopt.type_representable_layout: unexpected missing layout (1)"
-  in
-  if layout_is_representable layout then
-    layout
-  else
-    (* Surprisingly, it is possible to reach this branch; for example, when
-       translating [f] in the following example:
+  match Jkind.get_layout_defaulting_to_scannable env jkind with
+  | Some layout when layout_is_representable layout -> Some layout
+  | Some _ | None -> None
 
-       external foo : ('a : any mod separable). 'a array -> int = "%identity"
-       let f x = foo x
-
-       See also (3) in [Note regarding jkind checks on external declarations].
+(* This function also may mutate [ty] to constrain its jkind to be representable
+   which makes it different from the helper above. See internal ticket 5093
+   (which references the former name, [type_sort]). *)
+(* CR layouts v3.0: have a better error message for nullable jkinds.*)
+let type_layout_and_make_representable ~why env loc ty =
+  match get_representable_layout_opt env ty with
+  | Some layout -> layout
+  | None ->
+    (* When [ty]'s kind is abstract, we end up here. Additionally, it is
+       possible to reach this branch for external array primitives. See
+       (3) in [Note regarding jkind checks on external declarations] as well
+       as the [array_element_representability.ml] test.
 
        In this case (at least for now), we want to constrain [ty]'s jkind to
        be representable, which is achieved by [type_sort]. Recomputing the jkind
        will then yield one with the new, representable (defaulted) layout. *)
-    (* We postpone calling [type_sort] until this branch to make the common case
-       faster, even though it means that [type_jkind] must be called twice. *)
     (match Ctype.type_sort ~why ~allow_mutation:true env ty with
     | Ok _sort ->
       let jkind = Ctype.type_jkind env ty in
@@ -166,13 +157,13 @@ let type_representable_layout ~why env loc ty =
         | Some layout -> layout
         | None ->
           Misc.fatal_error
-            "Typeopt.type_representable_layout: unexpected missing layout (2)"
+            "Typeopt.type_layout_and_make_representable: \
+             unexpected missing layout"
       in
       (match Jkind_types.Layout.Const.get_sort layout with
       | None -> Misc.fatal_error
                    "called type_sort but didn't get a representable layout"
       | Some _ -> layout)
-    (* CR layouts: It seems as if this is unreachable (see ticket above). *)
     | Error err -> raise (Error (loc, Not_a_sort (env, ty, err))))
 
 (* [classification]s are used for two things: things in arrays, and things in
@@ -363,10 +354,9 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Genvar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
-let array_kind_of_elt env loc ty =
-  let ty = match scrape_ty env ty with Some ty -> ty | None -> ty in
-  let elt_layout = type_representable_layout ~why:Array_element env loc ty in
-  let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
+let array_kind_of_representable_elt env loc elt_ty elt_layout =
+  let elt_ty_for_error = elt_ty in (* report the un-scraped ty in errors *)
+  let ty = match scrape_ty env elt_ty with Some ty -> ty | None -> elt_ty in
   let classify_product ty sorts =
     if Ctype.is_always_gc_ignorable env ty then
       Pgcignorableproductarray (ignorable_product_array_kind loc sorts)
@@ -399,6 +389,11 @@ let array_kind_of_elt env loc ty =
   | Product c -> c
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
+
+(* Potentially mutates [elt_ty] it to make it representable. *)
+let array_kind_of_elt env loc elt_ty =
+  array_kind_of_representable_elt env loc elt_ty
+    (type_layout_and_make_representable ~why:Array_element env loc elt_ty)
 
 let array_type_kind ~elt_ty env loc ty =
   match scrape_poly env ty with
@@ -691,8 +686,19 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
   | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
           || Path.same p Predef.path_iarray) ->
-    let ak = array_type_kind ~elt_ty:(Some arg) env loc ty in
-    num_nodes_visited, non_nullable (Parrayval ak)
+    (* We don't eagerly check for representability here (e.g. we allow abstract
+       kinds), and instead fall back when we don't know. Any functions that
+       create/access/etc array elements instead enforce representability. *)
+    let raw_kind =
+      match get_representable_layout_opt env arg with
+      | Some layout ->
+        (* Representable elements that can't be stored in arrays (such as
+           mixed products) are still rejected here. Such arrays can never be
+           constructed, so this only rejects unusable code. *)
+        Parrayval (array_kind_of_representable_elt env loc arg layout)
+      | None -> Pgenval
+    in
+    num_nodes_visited, non_nullable raw_kind
   | Tconstr(p, args, _) -> begin
       (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
          with with-kinds, [decl.type_jkind] will mention variables bound
@@ -1249,10 +1255,10 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
                      Language_extension.(is_at_least SIMD Stable) ->
     Lambda.layout_unboxed_vector Unboxed_vec256
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
-                     Language_extension.(is_at_least SIMD Beta) ->
+                     Language_extension.(is_at_least SIMD Stable) ->
     Lambda.layout_unboxed_vector Unboxed_vec512
   | Base Mask when Language_extension.(is_at_least Layouts Stable) &&
-                   Language_extension.(is_at_least SIMD Beta) ->
+                   Language_extension.(is_at_least SIMD Stable) ->
     Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.layout_void
@@ -1272,7 +1278,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
+  | Genvar var -> Psplicevar (Layout_ident.of_sort_var var)
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1299,39 +1305,6 @@ let layout env loc sort ty =
       | Univar _ -> assert false
       | Genvar _ -> assert false
     )
-
-let layout_of_ident env ident =
-  let path = Path.Pident ident in
-  match Env.find_value path env with
-  | value_desc ->
-    let { val_type; val_kind; val_loc; _ } =
-      Subst.Lazy.force_value_description value_desc
-    in
-    begin match val_kind with
-    | Val_reg sort | Val_mut (_, sort) ->
-      let const_sort = Jkind.Sort.default_for_transl_and_get sort in
-      let layout = layout env val_loc const_sort val_type in
-      Some layout
-    | Val_prim _ -> None
-    | Val_ivar _ | Val_self _ | Val_anc _ ->
-      Some layout_any_value
-    end
-  | exception Not_found ->
-    match Env.find_module path env with
-    | _ -> Some layout_module
-    | exception Not_found ->
-      match Env.find_ident_constructor ident env with
-      | { cstr_tag = Extension _ } -> Some layout_extensible_variant_constructor
-      | _ | exception Not_found ->
-        match Env.find_class path env with
-        | _ -> Some Lambda.layout_class
-        | exception Not_found ->
-            (match Translobj.layout_of_ident ident with
-            | Some _ as layout -> layout
-            | None ->
-              Misc.fatal_errorf "Failed to find value_desc for %a"
-                Ident.print ident)
-
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)

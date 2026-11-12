@@ -335,6 +335,51 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 <[function | lazy (x) as l -> Stdlib.Lazy.force l]>
 |}];;
 
+<[ fun (addr_ x) -> x ]>;;
+[%%expect {|
+- : <[$('a) addr -> $('a)]> expr = <[fun (addr_ (x)) -> x]>
+|}];;
+
+<[ fun (addr_imm_ x) -> x ]>;;
+[%%expect {|
+- : <[$('a) addr_imm -> $('a)]> expr = <[fun (addr_imm_ (x)) -> x]>
+|}];;
+
+<[ fun (addr_ (addr_imm_ x)) -> x ]>;;
+[%%expect {|
+- : <[$('a) addr_imm addr -> $('a)]> expr =
+<[fun (addr_ (addr_imm_ (x))) -> x]>
+|}];;
+
+<[ fun (addr_imm_ (addr_ x)) -> x ]>;;
+[%%expect {|
+- : <[$('a) addr addr_imm -> $('a)]> expr =
+<[fun (addr_imm_ (addr_ (x))) -> x]>
+|}];;
+
+<[ function | addr_ (Some x) -> x | addr_ None -> 0 ]>;;
+[%%expect {|
+- : <[int option addr -> int]> expr =
+<[function | addr_ (Some (x)) -> x | addr_ (None) -> 0]>
+|}];;
+
+<[ function | addr_imm_ (Some x) -> x | addr_imm_ None -> 0 ]>;;
+[%%expect {|
+- : <[int option addr_imm -> int]> expr =
+<[function | addr_imm_ (Some (x)) -> x | addr_imm_ (None) -> 0]>
+|}];;
+
+<[ fun a -> let addr_ x = a in x ]>;;
+[%%expect {|
+- : <[$('a) addr -> $('a)]> expr = <[fun a -> let addr_ (x) = a in x]>
+|}];;
+
+<[ fun a -> let addr_imm_ x = a in x ]>;;
+[%%expect {|
+- : <[$('a) addr_imm -> $('a)]> expr = <[fun a -> let addr_imm_ (x) = a in x
+]>
+|}];;
+
 <[ fun f x d -> match f x with | res -> res | exception e -> d ]>;;
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) -> $('b) -> $('b)]> expr =
@@ -1425,6 +1470,12 @@ Error: Annotating types with kinds
 <[ fun x -> exclave_ (x : _  @ local)]>
 [%%expect {|
 - : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _ @ local)]>
+|}];;
+
+<[ (assert false : bytes -> (bytes -> bytes @ local) @ local) ]>
+[%%expect {|
+- : <[bytes -> (bytes -> bytes @ local) @ local]> expr =
+<[(assert false : bytes -> (bytes -> (bytes) @ local) @ local)]>
 |}];;
 
 (* Function definitions -- without type annotation *)

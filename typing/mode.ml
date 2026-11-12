@@ -4784,8 +4784,9 @@ module Report = struct
 
   let print_mutable_part ppf = function
     | Record_field s ->
-      Fmt.fprintf ppf "mutable field %a" Misc.Style.inline_code s
-    | Array_elements -> Fmt.fprintf ppf "array elements"
+      Fmt.fprintf ppf "its mutable field %a" Misc.Style.inline_code s
+    | Array_elements -> Fmt.fprintf ppf "its array elements"
+    | Address_contents -> Fmt.fprintf ppf "the value it points to"
 
   let print_always_dynamic = function
     | Application -> Fmt.dprintf "function applications"
@@ -4834,10 +4835,6 @@ module Report = struct
         "is projected (at %a) from a float record (and thus allocated)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
-    | Lpoly_captured_environment ->
-      Fmt.dprintf "is defined by a layout-polymorphic expression (at %a)"
-        (Location.Doc.loc ~capitalize_first:false)
-        loc
     | Captured_by_partial_application ->
       Fmt.dprintf "has a partial application capturing a value"
 
@@ -4854,9 +4851,6 @@ module Report = struct
          allocation)"
     | Float_projection ->
       Fmt.dprintf "is a float-record projection (and thus an allocation)"
-    | Lpoly_captured_environment ->
-      (* currently not testable *)
-      Fmt.dprintf "is a layout-polymorphic expression"
     | Captured_by_partial_application ->
       Fmt.dprintf "is captured by a partial application"
 
@@ -4893,6 +4887,9 @@ module Report = struct
           | Array moda ->
             Fmt.dprintf "is an array that contains%a %t" maybe_modality moda
               print_pp
+          | Address moda ->
+            Fmt.dprintf "is an address that points to%a %t" maybe_modality moda
+              print_pp
           | Constructor (s, moda) ->
             Fmt.dprintf "contains (via constructor %a)%a %t"
               Misc.Style.inline_code s maybe_modality moda print_pp
@@ -4917,6 +4914,10 @@ module Report = struct
         container
     | Array moda ->
       Fmt.dprintf "is an element%a of the array at %a" maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Address moda ->
+      Fmt.dprintf "is the value%a at the address at %a" maybe_modality moda
         (Location.Doc.loc ~capitalize_first:false)
         container
     | Constructor (s, moda) ->
@@ -4970,10 +4971,9 @@ module Report = struct
       Fmt.pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
       Fmt.pp_print_string ppf "it is an argument in a tail call"
-    | Mutable_read m ->
-      Fmt.fprintf ppf "its %a is being read" print_mutable_part m
+    | Mutable_read m -> Fmt.fprintf ppf "%a is being read" print_mutable_part m
     | Mutable_write m ->
-      Fmt.fprintf ppf "its %a is being written" print_mutable_part m
+      Fmt.fprintf ppf "%a is being written" print_mutable_part m
     | Lazy_forced -> (
       match pp_desc with
       | Lazy ->
@@ -5442,11 +5442,67 @@ module Error = struct
     Location.error_of_printer ~loc print ()
 end
 
-exception Submode_error_simple_context of Hint.pinpoint * Error.packed
+module rec Typing_recovery_functions : sig
+  type t =
+    { log_and_raise : 'a. exn -> 'a;
+      register_recoverable : (exn -> bool) -> unit
+    }
+
+  val get : unit -> t
+
+  val set : t -> unit
+end = struct
+  type t =
+    { log_and_raise : 'a. exn -> 'a;
+      register_recoverable : (exn -> bool) -> unit
+    }
+
+  let f =
+    ref
+      { log_and_raise =
+          (fun _ ->
+            failwith
+              "This value should be filled in with \
+               Typing_recovery.log_and_raise");
+        register_recoverable =
+          (fun _ ->
+            failwith
+              "This value should be filled in with \
+               Typing_recovery.register_recoverable")
+      }
+
+  let get () = !f
+
+  let set t =
+    f := t;
+    Submode_error_simple_context.register ()
+end
+
+and Submode_error_simple_context : sig
+  type exn += private In_context of Hint.pinpoint * Error.packed
+
+  val log_and_raise : Hint.pinpoint -> Error.packed -> 'a
+
+  val register : unit -> unit
+end = struct
+  type exn += In_context of Hint.pinpoint * Error.packed
+
+  let log_and_raise hint err =
+    (Typing_recovery_functions.get ()).log_and_raise (In_context (hint, err))
+
+  let register () =
+    (* We can't call this immediately upon startup because we need to wait for
+       the ref in [Typing_recovery_functions] to get filled. Instead, we make
+       [Typing_recovery_functions.set] call this, so that we register once it is
+       filled. *)
+    (Typing_recovery_functions.get ()).register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
 
 let () =
   Location.register_error_of_exn (function
-    | Submode_error_simple_context (pp, err) ->
+    | Submode_error_simple_context.In_context (pp, err) ->
       Some (Error.print_packed_simple_context pp err)
     | _ -> None)
 
@@ -5584,7 +5640,7 @@ module Comonadic_gen (Obj : Obj) = struct
   let submode_err pp a b =
     match submode ~pp a b with
     | Ok () -> ()
-    | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error e -> Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let print_error pp err = Error.print_all pp obj err
 
@@ -5634,7 +5690,8 @@ module Comonadic_gen (Obj : Obj) = struct
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
-    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error (_, e) ->
+      Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
@@ -5789,7 +5846,7 @@ module Monadic_gen (Obj : Obj) = struct
   let submode_err pp a b =
     match submode ~pp a b with
     | Ok () -> ()
-    | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error e -> Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let generic_level = S.generic_level
 
@@ -5843,7 +5900,8 @@ module Monadic_gen (Obj : Obj) = struct
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
-    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error (_, e) ->
+      Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
@@ -5922,6 +5980,10 @@ module Monadic_gen (Obj : Obj) = struct
     let get_floor m = S.get_ceil obj m
 
     let get_ceil m = S.get_floor obj m
+
+    let get_loose_floor m = S.get_loose_ceil obj m
+
+    let get_loose_ceil m = S.get_loose_floor obj m
 
     let check_const m =
       let floor = get_floor m in
@@ -6370,14 +6432,14 @@ module Comonadic_with (Areality : Areality) = struct
     | Ok () -> ()
     | Error e ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
     | Error (_, e) ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
@@ -6528,14 +6590,14 @@ module Monadic = struct
     | Ok () -> ()
     | Error e ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
     | Error (_, e) ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
@@ -7647,6 +7709,14 @@ module Mode_with (Areality : Areality) = struct
       let monadic = Monadic.Guts.get_ceil monadic in
       let comonadic = Comonadic.Guts.get_ceil comonadic in
       merge { monadic; comonadic }
+
+    let sub_loose m1 m2 =
+      Comonadic.Const.le
+        (Comonadic.Guts.get_loose_ceil m1.comonadic)
+        (Comonadic.Guts.get_loose_floor m2.comonadic)
+      && Monadic.Const.le
+           (Monadic.Guts.get_loose_ceil m1.monadic)
+           (Monadic.Guts.get_loose_floor m2.monadic)
 
     let in_bounds c { monadic; comonadic } =
       let c = split c in

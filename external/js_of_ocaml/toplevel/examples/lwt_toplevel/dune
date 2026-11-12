@@ -38,7 +38,11 @@
 (executable
  (name toplevel)
  (modules toplevel)
- (libraries lwt_toplevel_lib js_of_ocaml js_of_ocaml-toplevel)
+ (libraries
+  lwt_toplevel_lib
+  js_of_ocaml
+  js_of_ocaml-toplevel
+  js_of_ocaml-compiler.dynlink)
  (modes byte js)
  ;; Embedding the cmis as JS string literals overflows OCaml's 16 MB
  ;; max_string_length on 32-bit. OCaml >= 5.1 compresses cmis on disk so
