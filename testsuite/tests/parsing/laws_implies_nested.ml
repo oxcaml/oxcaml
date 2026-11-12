@@ -8,4 +8,4 @@
 (* [===>] only separates the clauses of a law: it cannot appear inside an
    expression. *)
 
-law? nested (a : bool) (b : bool) : (a ===> b)
+law_? nested (a : bool) (b : bool) : (a ===> b)

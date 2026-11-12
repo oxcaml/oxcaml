@@ -24,12 +24,12 @@ let roundtrip source =
 val roundtrip : string -> unit = <fun>
 |}]
 
-let () = roundtrip "law? trivial : true"
+let () = roundtrip "law_? trivial : true"
 [%%expect {|
 |}]
 
 let () = roundtrip {|
-  law? assoc (x : int) (y : int) (z : int) :
+  law_? assoc (x : int) (y : int) (z : int) :
     x >= 0 ===> y >= 0 ===> x + (y + z) = (x + y) + z
 |}
 [%%expect {|
@@ -39,22 +39,22 @@ let () = roundtrip {|
 
 let () = roundtrip {|
   module M = struct
-    law? in_module : true
-    module N = struct law? in_nested_module : true end
-    module type T = sig law? in_nested_module_type : true end
+    law_? in_module : true
+    module N = struct law_? in_nested_module : true end
+    module type T = sig law_? in_nested_module_type : true end
   end
-  module F (X : sig law? in_functor_parameter : true end) = struct
-    law? in_functor_body : true
+  module F (X : sig law_? in_functor_parameter : true end) = struct
+    law_? in_functor_body : true
   end
   module type FT = functor (X : sig end) -> sig
-    law? in_functor_result : true
+    law_? in_functor_result : true
   end
-  module G (X : sig end) : sig law? in_result_constraint : true end = struct
-    law? in_result_constraint : true
+  module G (X : sig end) : sig law_? in_result_constraint : true end = struct
+    law_? in_result_constraint : true
   end
-  module type FC = sig law? in_first_class_module : true end
+  module type FC = sig law_? in_first_class_module : true end
   let first_class = (module M : FC)
-  include (struct law? in_included_structure : true end)
+  include (struct law_? in_included_structure : true end)
 |}
 [%%expect {|
 |}]
@@ -62,12 +62,12 @@ let () = roundtrip {|
 (* Parameters with and without type annotations. *)
 
 let () = roundtrip {|
-  law? mixed x (y : int) z (t : 'a list) : x + y = z && t = []
-  law? one_param (x : int) : x = x
-  law? unannotated x y z : x + y + z = z + y + x
-  law? polymorphic (xs : 'a list) (f : 'a -> 'b) :
+  law_? mixed x (y : int) z (t : 'a list) : x + y = z && t = []
+  law_? one_param (x : int) : x = x
+  law_? unannotated x y z : x + y + z = z + y + x
+  law_? polymorphic (xs : 'a list) (f : 'a -> 'b) :
     List.length (List.map f xs) = List.length xs
-  law? complex_types
+  law_? complex_types
     (p : int * string) (f : int -> int -> int) (o : int option)
     (r : < m : int >) (v : [ `A | `B of int ]) (t : (int, string) Hashtbl.t) :
     true
@@ -78,8 +78,8 @@ let () = roundtrip {|
 (* Any number of assumptions. *)
 
 let () = roundtrip {|
-  law? one (x : int) : x > 0 ===> x <> 0
-  law? three (x : int) (y : int) (z : int) :
+  law_? one (x : int) : x > 0 ===> x <> 0
+  law_? three (x : int) (y : int) (z : int) :
     x > 0 ===> y > 0 ===> z > 0 ===> x * y * z > 0
 |}
 [%%expect {|
@@ -88,9 +88,9 @@ let () = roundtrip {|
 (* Attributes on laws and on parameter types. *)
 
 let () = roundtrip {|
-  law? attributed : true [@@attr]
-  law? several_attributes (x : int) : x = x [@@attr1] [@@attr2 payload]
-  law? attributed_param_type (x : int [@attr]) : true
+  law_? attributed : true [@@attr]
+  law_? several_attributes (x : int) : x = x [@@attr1] [@@attr2 payload]
+  law_? attributed_param_type (x : int [@attr]) : true
 |}
 [%%expect {|
 |}]
@@ -101,7 +101,7 @@ let () = roundtrip {|
    same. *)
 
 let () = roundtrip {|
-  law? clauses (a : bool) (n : int) :
+  law_? clauses (a : bool) (n : int) :
     (let b = a in b) ===> (if a then n else 0) >= 0 ===>
     (match n with 0 -> true | _ -> a) ===> (ignore n; a) ===>
     (fun b -> b) a ===> (try a with _ -> false)

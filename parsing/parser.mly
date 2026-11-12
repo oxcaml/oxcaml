@@ -1066,7 +1066,7 @@ let maybe_pmod_constraint mode expr =
 %token KIND                   "kind_"
 %token KIND_OF                "kind_of_"
 %token <string> LABEL         "~label:" (* just an example *)
-%token LAWQUESTION            "law?"
+%token LAW                    "law_"
 %token LAZY                   "lazy"
 %token LBRACE                 "{"
 %token LBRACELESS             "{<"
@@ -4238,11 +4238,11 @@ jkind_decl:
     }
 ;
 
-(* Laws: [law? name p1 ... pn : A1 ===> ... ===> Ak ===> C], where each
+(* Laws: [law_? name p1 ... pn : A1 ===> ... ===> Ak ===> C], where each
    parameter is [x] or [(x : T)] *)
 
 law_declaration:
-  LAWQUESTION
+  LAW QUESTION
   attrs1 = attributes
   plaw_name = mkrhs(LIDENT)
   plaw_params = law_param*

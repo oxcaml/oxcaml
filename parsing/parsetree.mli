@@ -940,7 +940,7 @@ and law_declaration =
     plaw_attributes : attributes;
     plaw_loc : Location.t
   }
-  (** [law? name p1 ... pn : A1 ===> ... ===> Ak ===> C], where each
+  (** [law_? name p1 ... pn : A1 ===> ... ===> Ak ===> C], where each
       parameter [pi] is [x] or [(x : T)] *)
 
 
@@ -1206,7 +1206,7 @@ and signature_item_desc =
   | Psig_attribute of attribute  (** [[\@\@\@id]] *)
   | Psig_extension of extension * attributes  (** [[%%id]] *)
   | Psig_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
-  | Psig_law of law_declaration (** [law? name x (y : T) : A ===> C] *)
+  | Psig_law of law_declaration (** [law_? name x (y : T) : A ===> C] *)
 
 and module_declaration =
     {
@@ -1382,7 +1382,7 @@ and structure_item_desc =
   | Pstr_attribute of attribute  (** [[\@\@\@id]] *)
   | Pstr_extension of extension * attributes  (** [[%%id]] *)
   | Pstr_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
-  | Pstr_law of law_declaration (** [law? name x (y : T) : A ===> C] *)
+  | Pstr_law of law_declaration (** [law_? name x (y : T) : A ===> C] *)
 
 and value_constraint =
   | Pvc_constraint of {

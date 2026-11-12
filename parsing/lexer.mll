@@ -79,6 +79,7 @@ let all_keywords =
     "initializer", INITIALIZER, v1_0;
     "kind_", KIND, oxcaml;
     "kind_of_", KIND_OF, oxcaml;
+    "law_", LAW, oxcaml;
     "layout_", LAYOUT, oxcaml;
     "lazy", LAZY, v1_6;
     "let", LET, always;
@@ -719,7 +720,6 @@ rule token = parse
         check_label_name ~raw_escape:(escape<>"") lexbuf name;
         OPTLABEL name
       }
-  | "law?" { LAWQUESTION }
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)

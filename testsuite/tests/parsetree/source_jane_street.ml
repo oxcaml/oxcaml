@@ -1924,29 +1924,29 @@ Error: Exclave expression should only be in tail position of the current region.
 
 (* Laws are parsed but not type checked yet. *)
 
-law? length_nonneg (xs : 'a list) : List.length xs >= 0
+law_? length_nonneg (xs : 'a list) : List.length xs >= 0
 [%%expect{|
-Line 1, characters 0-55:
-1 | law? length_nonneg (xs : 'a list) : List.length xs >= 0
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-56:
+1 | law_? length_nonneg (xs : 'a list) : List.length xs >= 0
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Laws are not supported yet.
 |}]
 
-law? sum_pos x (y : int) : x > 0 ===> y > 0 ===> x + y > 0
+law_? sum_pos x (y : int) : x > 0 ===> y > 0 ===> x + y > 0
 [%%expect{|
-Line 1, characters 0-58:
-1 | law? sum_pos x (y : int) : x > 0 ===> y > 0 ===> x + y > 0
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-59:
+1 | law_? sum_pos x (y : int) : x > 0 ===> y > 0 ===> x + y > 0
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Laws are not supported yet.
 |}]
 
 module type S = sig
   val f : int -> int
-  law? f_id (x : int) : x >= 0 ===> f x = x [@@test.attr]
+  law_? f_id (x : int) : x >= 0 ===> f x = x [@@test.attr]
 end
 [%%expect{|
-Line 3, characters 2-57:
-3 |   law? f_id (x : int) : x >= 0 ===> f x = x [@@test.attr]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 3, characters 2-58:
+3 |   law_? f_id (x : int) : x >= 0 ===> f x = x [@@test.attr]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Laws are not supported yet.
 |}]

@@ -969,7 +969,7 @@ and extension_constructor_kind = Parsetree.extension_constructor_kind =
       plaw_attributes : attributes;
       plaw_loc : location
     }
-  (** [law? name p1 ... pn : A1 ===> ... ===> Ak ===> C] *)
+  (** [law_? name p1 ... pn : A1 ===> ... ===> Ak ===> C] *)
 
 (** {1 Class language} *)
 (** {2 Type expressions for the class language} *)
@@ -1208,7 +1208,7 @@ and signature_item_desc = Parsetree.signature_item_desc =
   | Psig_jkind of jkind_declaration
       (** [kind_abbrev_ name = k] *)
   | Psig_law of law_declaration
-      (** [law? name x (y : T) : A ===> C] *)
+      (** [law_? name x (y : T) : A ===> C] *)
 
 and module_declaration = Parsetree.module_declaration = {
   pmd_name : string option loc;
@@ -1367,7 +1367,7 @@ and structure_item_desc = Parsetree.structure_item_desc =
   | Pstr_jkind of jkind_declaration
       (** [kind_abbrev_ name = k] *)
   | Pstr_law of law_declaration
-      (** [law? name x (y : T) : A ===> C] *)
+      (** [law_? name x (y : T) : A ===> C] *)
 
 and value_binding = Parsetree.value_binding = {
   pvb_is_poly: bool; (** [let poly_ ] *)
