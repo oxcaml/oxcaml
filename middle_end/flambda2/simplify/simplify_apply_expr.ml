@@ -705,11 +705,10 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                  is already in the current inlining context: using it here would
                  add that context again. *)
               Debuginfo.none
-              (* The counter of the partial application, for when the wrapper is
-                 not inlined. When it is, the call takes the counter of the
-                 application of the wrapper instead, as for the debuginfo. *)
-              ~callsite_counter:(Apply.callsite_counter apply)
-              ~inlined
+              (* As for the debuginfo: when the wrapper is inlined, the call
+                 takes the counter of the application of the wrapper (see
+                 [Fdo_downwards_env.stub_callsite_counter]). *)
+              ~callsite_counter:None ~inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
               ~relative_history:Inlining_history.Relative.empty
@@ -878,6 +877,12 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
        allocation of the partial set of closures. *)
     let expr = SE.notify_removed ~operation:Removed_operations.call expr in
     down_to_up dacc expr
+  in
+  (* The call is replaced by the allocation of the wrapper, which runs as often:
+     its counter is preserved. *)
+  let dacc =
+    DA.preserve_fdo_counters dacc
+      (Fdo_annotation.of_list (Option.to_list (Apply.callsite_counter apply)))
   in
   simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
@@ -1356,14 +1361,12 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
         ~callsite_counter:
-          (match
-             Apply.call_kind apply, DE.fdo_stub_callsite_counter (DA.denv dacc)
-           with
-          | (Function _ | Method _), Some stub_counter -> Some stub_counter
-          | (Function _ | Method _), None | (C_call _ | Effect _), _ ->
-            Option.map
-              (DE.inline_fdo_counter (DA.denv dacc))
-              (Apply.callsite_counter apply))
+          (match Apply.callsite_counter apply, Apply.call_kind apply with
+          | Some counter, _ ->
+            Some (DE.inline_fdo_counter (DA.denv dacc) counter)
+          | None, (Function _ | Method _) ->
+            DE.fdo_stub_callsite_counter (DA.denv dacc)
+          | None, (C_call _ | Effect _) -> None)
         ~inlined ~inlining_state ~probe:(Apply.probe apply)
         ~position:(Apply.position apply)
         ~relative_history:

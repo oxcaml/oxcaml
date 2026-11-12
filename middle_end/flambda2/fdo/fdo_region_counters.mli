@@ -31,7 +31,8 @@
 
     * The entry counters of the callee of an inlined call
 
-    * The counter of a self tail call turned into a jump
+    * The counter of a self tail call turned into a jump, or of a partial
+    application turned into the allocation of a wrapper
 
     * The counters of the arms of a switch that collapses into a single jump.
 

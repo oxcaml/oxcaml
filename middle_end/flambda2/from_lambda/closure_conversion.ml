@@ -1934,14 +1934,6 @@ let close_exact_or_unknown_apply acc env
        callsite_counter
      } :
       IR.apply) callee_approx ~replace_region : Expr_with_acc.t =
-  (if Flambda_features.fdo_counters () && Flambda_features.check_invariants ()
-   then
-     match kind, callsite_counter with
-     | (Function | Method _), None ->
-       Misc.fatal_errorf "Application of %a without an FDO counter:@ %a"
-         Ident.print func Debuginfo.print_compact
-         (Debuginfo.from_location loc)
-     | (Function | Method _), Some _ -> ());
   let callee = find_simple_from_id env func in
   let mode =
     let current_region, current_ghost_region =
@@ -3759,9 +3751,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     else Some (Ident.create_local "my_ghost_region")
   in
   let fbody acc env =
-    (* The call to the callee keeps the counter of the source partial
-       application [apply], as in
-       [Simplify_apply_expr.simplify_direct_partial_application]. *)
+    (* CR yusumez: The counter of the partial application [apply] is lost here.
+       Simplify preserves it in the code the partial application was in (see
+       [Simplify_apply_expr.simplify_direct_partial_application]). *)
     close_exact_or_unknown_apply acc env
       { apply with
         kind = Function;
@@ -3774,6 +3766,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
            is inlined, it gets the debuginfo of that application, as in
            [Simplify_apply_expr.simplify_direct_partial_application]. *)
         loc = Loc_unknown;
+        callsite_counter = None;
         mode = result_mode;
         return_arity = result_arity;
         region = my_region;
@@ -4030,6 +4023,16 @@ type call_args_split =
       }
 
 let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
+  (* Only the applications from Lambda must have a counter: those built here
+     (e.g. in partial application wrappers) may not. *)
+  (if Flambda_features.fdo_counters () && Flambda_features.check_invariants ()
+   then
+     match apply.kind, apply.callsite_counter with
+     | (Function | Method _), None ->
+       Misc.fatal_errorf "Application of %a without an FDO counter:@ %a"
+         Ident.print apply.func Debuginfo.print_compact
+         (Debuginfo.from_location apply.loc)
+     | (Function | Method _), Some _ -> ());
   let callee = find_simple_from_id env apply.func in
   let approx = find_value_approximation_through_symbol acc env callee in
   let code_info =

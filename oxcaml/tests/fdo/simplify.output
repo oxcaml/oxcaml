@@ -1,4 +1,9 @@
 simplify.simplify.fl:
+  entry: "Simplify.optional(stub)":0 body_hash:e9b40646
+  branch: "Simplify.optional(stub)":0:e9b40646:0:branch(1)
+  branch: "Simplify.optional(stub)":0:e9b40646:0:branch(2)
+  call: "Simplify.optional(stub)":0:e9b40646:1:call
+  call: "Simplify.optional(stub)":0:e9b40646:2:call
   entry: "Simplify.side":0 body_hash:00000000
   entry: "Simplify.choose":0 body_hash:6fcbb642
   branch: "Simplify.choose":0:6fcbb642:0:branch(1)
@@ -49,12 +54,11 @@ simplify.simplify.fl:
   entry: "Simplify.apply_partial":0 body_hash:07355c9b
   call: "Simplify.apply_partial":0:07355c9b:0:call
   call: "Simplify.apply_partial":0:07355c9b:1:call
-  entry: "Simplify.partial_inlined":0 "Simplify.apply_partial":0 <- "Simplify.partial_inlined":0:e97a0351:0:call body_hash:e97a0351
+  entry: "Simplify.partial_inlined":0 "Simplify.apply_partial":0 <- "Simplify.partial_inlined":0:e97a0351:0:call "Simplify.apply_partial":0:07355c9b:0:call <- "Simplify.partial_inlined":0:e97a0351:0:call body_hash:e97a0351
   call: "Simplify.apply_partial":0:07355c9b:1:call <- "Simplify.partial_inlined":0:e97a0351:0:call
   entry: "Simplify.make_partial":0 body_hash:3371523c
   call: "Simplify.make_partial":0:3371523c:0:call
-  call: "Simplify.make_partial":0:3371523c:0:call <- "Simplify.partial_escaping":0:e97a0351:0:call
-  entry: "Simplify.partial_escaping":0 "Simplify.make_partial":0 <- "Simplify.partial_escaping":0:e97a0351:0:call body_hash:e97a0351
+  entry: "Simplify.partial_escaping":0 "Simplify.make_partial":0 <- "Simplify.partial_escaping":0:e97a0351:0:call "Simplify.make_partial":0:3371523c:0:call <- "Simplify.partial_escaping":0:e97a0351:0:call body_hash:e97a0351
   entry: "Simplify.curried.(fun)@y,int_add,x":0 body_hash:00000000
   entry: "Simplify.curried":0 body_hash:00000000
   entry: "Simplify.apply2":0 body_hash:e97a0351
@@ -176,3 +180,10 @@ simplify.simplify.fl:
   entry: "Simplify.scale":0 body_hash:00000000
   entry: "Simplify.scaled":0 body_hash:3371523c
   call: "Simplify.scaled":0:3371523c:0:call
+  entry: "Simplify.default":0 body_hash:3371523c
+  call: "Simplify.default":0:3371523c:0:call
+  entry: "Simplify.optional":0 body_hash:a9e8777b
+  call: "Simplify.optional":0:a9e8777b:0:call
+  entry: "Simplify.call_optional":0 "Simplify.optional(stub)":0 <- "Simplify.call_optional":0:e97a0351:0:call "Simplify.optional(stub)":0:e9b40646:0:branch(2) <- "Simplify.call_optional":0:e97a0351:0:call body_hash:e97a0351
+  call: "Simplify.optional(stub)":0:e9b40646:1:call <- "Simplify.call_optional":0:e97a0351:0:call
+  call: "Simplify.optional(stub)":0:e9b40646:2:call <- "Simplify.call_optional":0:e97a0351:0:call
