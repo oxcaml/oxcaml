@@ -54,7 +54,7 @@ apply ccall noalloc
                let prim = %int_comp.eq (tag, 250) in
                (switch prim
                   | 0 -> k2
-                  | 1 -> k3
+                  | 1 likelihood(cold) -> k3
                   where k3 =
                     invalid
                   where k2 =

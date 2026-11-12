@@ -60,3 +60,11 @@ val join_point : t list -> t
     dispatches to the given branches, e.g. a node of the decision tree compiled
     from a switch. *)
 val fork_point : t list -> t
+
+(** The scale at which the likelihood annotations of the arms of a switch are
+    printed. *)
+val likelihood_printing_scale : t list -> Likelihood.printing_scale
+
+(** The annotations of an arm of a switch, at the scale of its arms. Each part
+    is preceded by a space. *)
+val print : Likelihood.printing_scale -> Format.formatter -> t -> unit
