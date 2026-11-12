@@ -1148,7 +1148,9 @@ static void pool_finalise(struct caml_heap_state* local, pool** plist,
 
     while (p + wh <= end) {
       header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
-      if (hd != 0) {
+      if (POOL_BLOCK_FREE_HD(hd)) {
+        p += Wosize_hd(hd); /* skip the rest of this free run */
+      } else {
         CAMLassert(Whsize_hd(hd) <= wh);
         maybe_finalise((value*) p, hd);
         atomic_store_relaxed((atomic_uintnat*)p, 0);
