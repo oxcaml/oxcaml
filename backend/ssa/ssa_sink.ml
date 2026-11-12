@@ -35,18 +35,28 @@ open Ssa_reducer
     operation are live across the call anyway. Functions with irreducible
     control flow are left untouched.
 
+    Recognized heap allocations move with their complete initialization. The
+    group is placed before its inputs, ignoring uses internal to the group. All
+    members retain their original order. An allocation may not acquire an
+    external [Addr] input or move to a block with a live [Addr] at entry. It
+    also may not cross region operations, pointer reinterpretations, or an
+    unrecognized allocation: the latter could still be under initialization at
+    the new GC point. Removing allocations must also leave safe positions for
+    any prologue or back-edge polls inserted later. Local allocations are not
+    moved.
+
     Debugger markers ([Name_for_debugger]) are not considered uses: they follow
     the values they name, and are dropped in the rare case where these values
     end up in unrelated blocks. *)
 
 module Cse = Cfg_cse.Cse_generic (CSE)
 
-(* How an operation may be sunk, if at all: anywhere its arguments are
-   available, or additionally not past an [End_region], which may free the
-   memory a load reads, or invalidate a local allocation that is an argument. *)
+(* The additional restrictions on a move, beyond dominance and profitability.
+   Heap allocations also need a safe GC point at their new position. *)
 type sinkable =
   | Can_cross_end_region
   | Blocked_by_end_region
+  | Heap_allocation
 
 let has_gc_root_arg (op : finished Instruction.op_data) : bool =
   Array.exists
@@ -61,9 +71,9 @@ let sinkable (instr : finished Instruction.op_data) : sinkable option =
   match op with
   | Move | Spill | Reload | Opaque | Poll -> None
   | Alloc _ ->
-    (* CR-someday xclerc: sink allocations as well. Their initializing stores
-       would have to move along, local allocations are tied to their region, and
-       the zero-alloc checker, which runs later, would see the change. *)
+    (* CR-someday xclerc: sink local allocations as well, accounting for their
+       region lifetimes. Recognized heap allocations are handled as groups
+       below. *)
     None
   | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
   | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
@@ -108,6 +118,18 @@ let iter_terminator_values (f : finished Value.t -> unit)
   | Invalid { message = _; args; continuation = _ } ->
     Array.iter f args
 
+(* GC safety must include the operand lifetimes introduced by branch fusion.
+   Placement decisions still use the SSA operands, including the comparison
+   result, so that the comparison itself is placed before its uses. *)
+let iter_lowered_terminator_values f (terminator : finished Terminator.t) =
+  match terminator with
+  | Switch { index; targets } when Array.length targets = 2 -> (
+    match Cfg_of_ssa.fused_branch_args index with
+    | Some args -> Array.iter f args
+    | None -> f index)
+  | Continue _ | Switch _ | Call _ | Invalid _ ->
+    iter_terminator_values f terminator
+
 (* Where a value is used: by an operation, whose block may change as it is sunk,
    or by the terminator of a block. *)
 type use =
@@ -117,6 +139,149 @@ type use =
 type decision =
   | Sink of finished Block.t
   | Drop
+
+type allocation_group =
+  { construction : Ssa_allocation.t;
+    last : finished Instruction.Id.t
+  }
+
+let group_members group =
+  group.construction.allocation :: group.construction.initialization
+
+let collect_allocations (graph : finished Ssa.graph) =
+  let allocations = Instruction.Id.Tbl.create 16 in
+  List.iter
+    (fun block ->
+      Ssa_allocation.find_in_block block
+      |> List.iter (fun (construction : Ssa_allocation.t) ->
+          let last =
+            List.fold_left
+              (fun _ (op : finished Instruction.op_data) -> op.id)
+              construction.allocation.id construction.initialization
+          in
+          let group = { construction; last } in
+          List.iter
+            (fun (op : finished Instruction.op_data) ->
+              Instruction.Id.Tbl.replace allocations op.id group)
+            (group_members group)))
+    (Ssa.blocks graph);
+  allocations
+
+let is_allocation_barrier allocations (op : finished Instruction.op_data) =
+  match op.op with
+  | Begin_region | End_region | Reinterpret_cast (Int_of_value | Value_of_int)
+    ->
+    true
+  | Alloc _ -> Option.is_none (Instruction.Id.Tbl.find_opt allocations op.id)
+  | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+  | Const_mask _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
+  | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+  | Reinterpret_cast
+      ( V128_of_vec _ | V256_of_vec _ | V512_of_vec _ | Float32_of_float
+      | Float32_of_int32 | Float_of_float32 | Float_of_int64 | Int64_of_float
+      | Int32_of_float32 | Mask_of_int64 | Int64_of_mask )
+  | Static_cast _ | Probe_is_enabled _ | Opaque | Specific _
+  | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause ->
+    false
+
+(* Inserting a heap allocation must not make an existing derived pointer live
+   across a GC point. Walk backwards from the original Addr uses to their
+   definitions. Definitions in one block share the same stopping point; block
+   parameters, unlike instruction results, are also live at that block's entry.
+   This is conservative when a definition will itself move later in the pass. *)
+let live_addr_at_entry ~homes (graph : finished Ssa.graph) =
+  let live = Block.Tbl.create 16 in
+  let users = Block.Tbl.create 16 in
+  let add_use block (value : finished Value.t) =
+    if Cmm.equal_machtype_component (Value.typ value) Addr
+    then begin
+      let def_block =
+        match value with
+        | Res (op, _) -> Instruction.Id.Tbl.find homes op.id
+        | Block_param (block, _) ->
+          Block.Tbl.replace live block ();
+          block
+      in
+      let other_users =
+        Option.value
+          (Block.Tbl.find_opt users def_block)
+          ~default:Block.Set.empty
+      in
+      Block.Tbl.replace users def_block (Block.Set.add block other_users)
+    end
+  in
+  List.iter
+    (fun block ->
+      Array.iter
+        (fun (instr : finished Instruction.t) ->
+          match instr with
+          | Op op -> Array.iter (add_use block) op.args
+          | Push_trap _ | Pop_trap _ -> ())
+        (Block.body block);
+      iter_lowered_terminator_values (add_use block) (Block.terminator block))
+    (Ssa.blocks graph);
+  Block.Tbl.iter
+    (fun def_block users ->
+      let visited = Block.Tbl.create 16 in
+      let rec mark block =
+        if
+          (not (Block.equal block def_block))
+          && not (Block.Tbl.mem visited block)
+        then begin
+          Block.Tbl.replace visited block ();
+          Block.Tbl.replace live block ();
+          List.iter mark (Block.predecessors block)
+        end
+      in
+      Block.Set.iter mark users)
+    users;
+  live
+
+(* Removing an allocation may reinstate a prologue poll or introduce a poll on a
+   loop back edge. Without tracking the naked Ints of pointer casts, do not move
+   allocations in functions containing them. For loop motion, also require
+   complete constructions throughout the function, no region barriers, no
+   exceptional back edges, and no Addr at a possible back-edge poll (including
+   terminator arguments). These checks deliberately use the input graph and are
+   conservative. *)
+let allocation_polling_safety ~allocation_barriers ~live_addr_at_entry graph =
+  let pointer_casts = ref false in
+  let loop_safe = ref (Block.Tbl.length allocation_barriers = 0) in
+  List.iter
+    (fun block ->
+      Array.iter
+        (fun (instr : finished Instruction.t) ->
+          match[@warning "-fragile-match"] instr with
+          | Op { op = Reinterpret_cast (Int_of_value | Value_of_int); _ } ->
+            pointer_casts := true
+          | _ -> ())
+        (Block.body block);
+      (* [Cfg_polling] can only split normal edges to insert a poll. *)
+      (match Block.exn_successor block with
+      | Some handler when Block.dominates handler block -> loop_safe := false
+      | Some _ | None -> ());
+      let has_back_edge = ref false in
+      List.iter
+        (fun successor ->
+          if Block.dominates successor block
+          then begin
+            has_back_edge := true;
+            if Block.Tbl.mem live_addr_at_entry successor
+            then loop_safe := false
+          end)
+        (Block.all_successors block);
+      if !has_back_edge
+      then
+        iter_lowered_terminator_values
+          (fun value ->
+            if Cmm.equal_machtype_component (Value.typ value) Addr
+            then loop_safe := false)
+          (Block.terminator block))
+    (Ssa.blocks graph);
+  ( (not !pointer_casts)
+    && not (Block.Tbl.mem live_addr_at_entry (Ssa.entry graph)),
+    !loop_safe )
 
 (* The state shared by the phases of the analysis. *)
 type t =
@@ -128,6 +293,12 @@ type t =
         (* The uses of the results of each operation; markers are not uses. *)
     ends_region : unit Block.Tbl.t;
         (* The blocks whose body contains an [End_region]. *)
+    allocations : (finished, allocation_group) Instruction.Id.Tbl.t;
+        (* Every member of a construction maps to the same group. *)
+    allocation_barriers : unit Block.Tbl.t;
+    live_addr_at_entry : unit Block.Tbl.t;
+    can_move_allocations : bool;
+    can_move_loop_allocations : bool;
     markers : (finished Block.t * finished Instruction.op_data) list;
         (* The [Name_for_debugger] markers, with their blocks. *)
     decisions : (finished, decision) Instruction.Id.Tbl.t
@@ -135,12 +306,13 @@ type t =
            id. *)
   }
 
-(* The pass over the graph that collects [homes], [uses], [ends_region] and
-   [markers]. *)
+(* Collect instruction uses, construction groups, and movement barriers. *)
 let create ~loops (graph : finished Ssa.graph) : t =
   let homes = Instruction.Id.Tbl.create 256 in
   let uses = Instruction.Id.Tbl.create 256 in
   let ends_region = Block.Tbl.create 16 in
+  let allocations = collect_allocations graph in
+  let allocation_barriers = Block.Tbl.create 16 in
   let markers = ref [] in
   let add_use (value : finished Value.t) use =
     match value with
@@ -152,6 +324,8 @@ let create ~loops (graph : finished Ssa.graph) : t =
     | Block_param _ -> ()
   in
   let record_op block (op : finished Instruction.op_data) =
+    if is_allocation_barrier allocations op
+    then Block.Tbl.replace allocation_barriers block ();
     Instruction.Id.Tbl.replace homes op.id block;
     Array.iter (fun arg -> add_use arg (Op_use op)) op.args
   in
@@ -188,11 +362,20 @@ let create ~loops (graph : finished Ssa.graph) : t =
         (fun value -> add_use value (Terminator_use block))
         (Block.terminator block))
     (Ssa.blocks graph);
+  let live_addr_at_entry = live_addr_at_entry ~homes graph in
+  let can_move_allocations, can_move_loop_allocations =
+    allocation_polling_safety ~allocation_barriers ~live_addr_at_entry graph
+  in
   { loops;
     post_dominators = Ssa_post_dominators.compute graph;
     homes;
     uses;
     ends_region;
+    allocations;
+    allocation_barriers;
+    live_addr_at_entry;
+    can_move_allocations;
+    can_move_loop_allocations;
     markers = !markers;
     decisions = Instruction.Id.Tbl.create 16
   }
@@ -213,13 +396,10 @@ let value_block t (value : finished Value.t) : finished Block.t =
   | Res (op, _) -> placement t op
   | Block_param (block, _) -> block
 
-(* Whether an [End_region] may execute on a path from the end of [def_block] to
-   the start of [target], which [def_block] strictly dominates: whether a block
-   other than [def_block] on such a path contains one. Every path to [target]
-   goes through [def_block], so these blocks are dominated by [def_block]: the
-   search over the predecessors of [target] stops at [def_block] and at the
-   blocks it does not dominate. *)
-let crosses_end_region t ~def_block ~target : bool =
+(* Whether a barrier may execute between the end of [def_block] and the start of
+   [target]. Every path to [target] goes through [def_block], so the search
+   stops at [def_block] and at blocks it does not dominate. *)
+let crosses_barrier barriers ~def_block ~target : bool =
   let visited = Block.Tbl.create 16 in
   let rec from block =
     (not (Block.equal block def_block))
@@ -227,7 +407,7 @@ let crosses_end_region t ~def_block ~target : bool =
     && (not (Block.Tbl.mem visited block))
     && begin
       Block.Tbl.replace visited block ();
-      Block.Tbl.mem t.ends_region block
+      Block.Tbl.mem barriers block
       || List.exists from (Block.predecessors block)
     end
   in
@@ -247,7 +427,10 @@ let is_allowed t ~def_block ~sinkable candidate : bool =
   match sinkable with
   | Can_cross_end_region -> true
   | Blocked_by_end_region ->
-    not (crosses_end_region t ~def_block ~target:candidate)
+    not (crosses_barrier t.ends_region ~def_block ~target:candidate)
+  | Heap_allocation ->
+    (not (Block.Tbl.mem t.live_addr_at_entry candidate))
+    && not (crosses_barrier t.allocation_barriers ~def_block ~target:candidate)
 
 (* The deepest allowed block on the dominator tree path from [candidate] up to,
    and excluding, [def_block]. *)
@@ -260,8 +443,8 @@ let rec choose_target t ~def_block ~sinkable candidate : finished Block.t option
   else
     choose_target t ~def_block ~sinkable (Block.immediate_dominator candidate)
 
-(* Decide where the operation [op] of [block] goes, if it is not left in
-   place. *)
+(* Find a destination dominating the uses at their already-decided positions.
+   An empty use list is left to dead-code elimination, not sinking. *)
 (* CR-someday xclerc: an instruction is never duplicated, so an operation whose
    uses are in sibling branches only sinks down to their common dominator. A
    copy in each of these branches would remove the operation from the paths
@@ -269,19 +452,65 @@ let rec choose_target t ~def_block ~sinkable candidate : finished Block.t option
    when this pays off are not clear yet. The same question arises for spill
    moves, which can likewise be placed once at a common dominator or duplicated
    into the branches that need them. *)
-let sink_operation t ~block ~sinkable (op : finished Instruction.op_data) : unit
-    =
-  match Instruction.Id.Tbl.find_opt t.uses op.id with
-  | None | Some [] -> ()
-  | Some (use :: other_uses) ->
+let target_for_uses t ~block ~sinkable uses =
+  match uses with
+  | [] -> None
+  | use :: other_uses ->
     let common_dominator =
       List.fold_left
         (fun acc use -> Block.common_dominator acc (use_block t use))
         (use_block t use) other_uses
     in
     choose_target t ~def_block:block ~sinkable common_dominator
+
+let uses_of t (op : finished Instruction.op_data) =
+  Option.value (Instruction.Id.Tbl.find_opt t.uses op.id) ~default:[]
+
+let sink_operation t ~block ~sinkable (op : finished Instruction.op_data) =
+  target_for_uses t ~block ~sinkable (uses_of t op)
+  |> Option.iter (fun target ->
+      Instruction.Id.Tbl.replace t.decisions op.id (Sink target))
+
+let sink_allocation t ~block group =
+  let is_member (op : finished Instruction.op_data) =
+    match Instruction.Id.Tbl.find_opt t.allocations op.id with
+    | None -> false
+    | Some other ->
+      Instruction.Id.equal group.construction.allocation.id
+        other.construction.allocation.id
+  in
+  let is_external_addr (value : finished Value.t) =
+    Cmm.equal_machtype_component (Value.typ value) Addr
+    &&
+    match value with
+    | Res (op, _) -> not (is_member op)
+    | Block_param _ -> true
+  in
+  let members = group_members group in
+  if
+    t.can_move_allocations
+    && (match Ssa_loops.innermost_loop t.loops block with
+      | None -> true
+      | Some _ -> t.can_move_loop_allocations)
+    && not
+         (List.exists
+            (fun (op : finished Instruction.op_data) ->
+              Array.exists is_external_addr op.args)
+            members)
+  then begin
+    let uses =
+      List.concat_map (uses_of t) members
+      |> List.filter (function
+        | Op_use op -> not (is_member op)
+        | Terminator_use _ -> true)
+    in
+    target_for_uses t ~block ~sinkable:Heap_allocation uses
     |> Option.iter (fun target ->
-        Instruction.Id.Tbl.replace t.decisions op.id (Sink target))
+        List.iter
+          (fun (op : finished Instruction.op_data) ->
+            Instruction.Id.Tbl.replace t.decisions op.id (Sink target))
+          members)
+  end
 
 (* Every block comes after its dominators in [blocks], so in the reverse order,
    the uses of an operation are visited before the operation. *)
@@ -296,24 +525,34 @@ let sink_operations t (blocks : finished Block.t list) : unit =
       (* Whether an [End_region] follows the current instruction in [block]: an
          operation blocked by [End_region] cannot then leave the block. *)
       let end_region_below = ref false in
+      let allocation_barrier_below = ref false in
       for i = Array.length body - 1 downto 0 do
-        match[@warning "-fragile-match"] body.(i) with
-        | Op
-            { id = _;
-              op = End_region;
-              typ = _;
-              args = _;
-              dbg = _;
-              usage_count = _;
-              name = _
-            } ->
-          end_region_below := true
-        | Op op when not (has_addr_arg op) -> (
-          match sinkable op with
-          | None -> ()
-          | Some Blocked_by_end_region when !end_region_below -> ()
-          | Some sinkable -> sink_operation t ~block ~sinkable op)
-        | Op _ | Push_trap _ | Pop_trap _ -> ()
+        match body.(i) with
+        | Op op -> (
+          (match[@warning "-fragile-match"] op.op with
+          | End_region -> end_region_below := true
+          | _ -> ());
+          if is_allocation_barrier t.allocations op
+          then allocation_barrier_below := true;
+          match Instruction.Id.Tbl.find_opt t.allocations op.id with
+          | Some group ->
+            (* Decide at the last initializer, before visiting any field
+               computations interleaved with the group's members. *)
+            if
+              Instruction.Id.equal op.id group.last
+              && not !allocation_barrier_below
+            then sink_allocation t ~block group
+          | None -> (
+            if not (has_addr_arg op)
+            then
+              match sinkable op with
+              | None -> ()
+              | Some Blocked_by_end_region when !end_region_below -> ()
+              | Some
+                  (( Can_cross_end_region | Blocked_by_end_region
+                   | Heap_allocation ) as sinkable) ->
+                sink_operation t ~block ~sinkable op))
+        | Push_trap _ | Pop_trap _ -> ()
       done)
     (List.rev blocks)
 

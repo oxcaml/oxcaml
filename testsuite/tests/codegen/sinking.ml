@@ -315,3 +315,88 @@ let () =
   done
 [%%expect {|
 |}]
+
+(* The allocation, header, and both fields move into the branch together. *)
+let allocate_in_branch x b =
+  let p = (x, x + 1) in
+  if b then Sys.opaque_identity p else (0, 0)
+[%%expect_asm X86_64{|
+allocate_in_branch:
+  cmpq  $1, %rbx
+  jne   .L0
+  movq  <hidden PC-relative offset>(%rip), %rax
+  ret
+.L0:
+  subq  $8, %rsp
+  subq  $24, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L1:
+  leaq  8(%r15), %rbx
+  movq  $2048, -8(%rbx)
+  movq  %rax, (%rbx)
+  addq  $2, %rax
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
+  addq  $8, %rsp
+  ret
+|}]
+
+(* Delay construction, but preserve the values read before the mutation. *)
+let snapshot_before_mutation r b =
+  let p = (!r, !r + 1) in
+  r := 42;
+  if b then Sys.opaque_identity p else (0, 0)
+[%%expect_asm X86_64{|
+snapshot_before_mutation:
+  movq  (%rax), %rdi
+  movq  $85, (%rax)
+  cmpq  $1, %rbx
+  jne   .L0
+  movq  <hidden PC-relative offset>(%rip), %rax
+  ret
+.L0:
+  subq  $8, %rsp
+  subq  $24, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L1:
+  leaq  8(%r15), %rax
+  movq  $2048, -8(%rax)
+  movq  %rdi, (%rax)
+  leaq  2(%rdi), %rbx
+  movq  %rbx, 8(%rax)
+  addq  $8, %rsp
+  ret
+|}]
+
+(* After sinking, [x], rather than [pair], must be a root across the call. *)
+let[@inline never] allocation_across_gc x b =
+  let pair = (x, x) in
+  Gc.minor ();
+  if b then Some (Sys.opaque_identity pair) else None
+[%%expect {|
+val allocation_across_gc : 'a -> bool -> ('a * 'a) option = <fun>
+|}]
+
+let () =
+  for i = 1 to 100 do
+    let x = [i; i + 1] in
+    match allocation_across_gc x true with
+    | Some (a, b) when a == x && b == x -> ()
+    | Some _ | None -> failwith "allocation initializer corrupted"
+  done;
+  let r = ref 7 in
+  assert (snapshot_before_mutation r true = (7, 8));
+  assert (!r = 42)
+[%%expect {|
+|}]
+
+(* The zero-alloc checker sees allocation only on the exceptional path. *)
+let[@zero_alloc] allocate_only_on_exception message b =
+  let exn = Failure message in
+  if b then raise (Sys.opaque_identity exn)
+[%%expect {|
+val allocate_only_on_exception : string -> bool -> unit [@@zero_alloc] =
+  <fun>
+|}]

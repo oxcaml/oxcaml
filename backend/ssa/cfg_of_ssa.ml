@@ -183,6 +183,10 @@ let fuse_comparison (cond : value) ~true_label ~false_label :
     Some (Cfg.Parity_test { ifso = false_label; ifnot = true_label }, args)
   | _ -> None
 
+let fused_branch_args cond =
+  fuse_comparison cond ~true_label:Label.none ~false_label:Label.none
+  |> Option.map snd
+
 let truncate arr n = if Array.length arr > n then Array.sub arr 0 n else arr
 
 let emit_op body op dbg rs rd : Cfg.basic Cfg.instruction =
@@ -586,10 +590,7 @@ let collect_fused_comparisons env =
     (fun (block : block) ->
       match Block.terminator block with
       | Switch { index; targets } when Array.length targets = 2 -> (
-        if
-          Option.is_some
-            (fuse_comparison index ~true_label:Label.none
-               ~false_label:Label.none)
+        if Option.is_some (fused_branch_args index)
         then
           match index with
           | Res ({ id; _ }, _) ->
