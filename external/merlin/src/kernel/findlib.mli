@@ -1,5 +1,6 @@
 (** Findlib package lookups, performed by running the [ocamlfind] executable
-    found on [PATH]. Successful [ocamlfind] invocations are memoized. *)
+    found on [PATH]. Successful [ocamlfind] invocations are memoized per [dir],
+    the directory of the .merlin file being read. *)
 
 module Config : sig
   (** Which findlib installation to query. *)
@@ -27,17 +28,20 @@ module Package : sig
     }
 end
 
-(** [query config packages] returns the direct and indirect dependencies of
-    [packages] (including [packages] themselves), deepest dependency first.
+(** [query ~dir ~config packages] returns the direct and indirect dependencies
+    of [packages] (including [packages] themselves), deepest dependency first.
     [ocamlfind] is not run when [packages] is empty. *)
-val query : config:Config.t -> string list -> Package.t list result
+val query :
+  dir:string -> config:Config.t -> string list -> Package.t list result
 
 (** [None] when the package is not installed. *)
-val package_directory : config:Config.t -> string -> string option result
+val package_directory :
+  dir:string -> config:Config.t -> string -> string option result
 
 (** The directory of the OCaml standard library, as reported by
     [ocamlfind printconf stdlib]. *)
-val ocaml_stdlib : config:Config.t -> string result
+val ocaml_stdlib : dir:string -> config:Config.t -> string result
 
 (** Resolves findlib's path notations, like [+] and [@]. *)
-val resolve_path : config:Config.t -> base:string -> string -> string result
+val resolve_path :
+  dir:string -> config:Config.t -> base:string -> string -> string result
