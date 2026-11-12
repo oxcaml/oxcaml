@@ -469,7 +469,10 @@ let%expect_test "generic get/set check the number of indices" =
     set 3: Invalid_argument
     |}]
 
-let%expect_test ("sub-arrays and dimensions beyond 32 bits" [@when int_size_64]) =
+(* In native code, whether a 1 TB bigarray can be allocated depends on the
+   platform *)
+let%expect_test
+    ("sub-arrays and dimensions beyond 32 bits" [@when int_size_64 && not native]) =
   let a = Bigarray.Array1.create Bigarray.char Bigarray.c_layout 10 in
   (try
      ignore (Bigarray.Array1.sub a (Sys.opaque_identity 0x7fffffff) 1);
