@@ -62,6 +62,10 @@ extern "C" {
 typedef intnat value;
 typedef uintnat header_t;
 typedef header_t reserved_t;
+/* A block's layout word, in the header formats which have one: a scan
+   word, or a pointer to a layout block. Not a [value]: a scan word
+   need not look like one. */
+typedef uintnat layout_t;
 typedef uintnat mlsize_t;
 typedef unsigned int tag_t;             /* Actually, an unsigned char */
 typedef uintnat color_t;
@@ -261,6 +265,10 @@ uses them yet.
    a layout word or a layout block), so that some of its words may be
    unscannable. Rare at present; revisit the hint when it isn't. */
 #define Has_scan_mask_hd(hd) CAMLunlikely(Reserved_hd(hd) != 0)
+
+/* Whether the block with header [hd] starts with a layout word
+   (formats 10 and 11). */
+#define Has_layout_word_hd(hd) (Format_hd(hd) >= HEADER_FORMAT_EXTENDED)
 
 #define Layout_repeat(w) ((uintnat)(w) >> LAYOUT_WORD_REPEAT_SHIFT)
 #define Layout_scan_mask(w) Low_bits_of(w, LAYOUT_WORD_MASK_BITS)

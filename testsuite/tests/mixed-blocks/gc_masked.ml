@@ -13,6 +13,8 @@
 
 external build : int -> int -> Obj.t = "gc_masked_build"
 external check : Obj.t -> int -> unit = "gc_masked_check"
+external alloc : int -> bool -> unit = "gc_masked_alloc"
+external check_copy : Obj.t -> int -> Obj.t -> unit = "gc_masked_check_copy"
 
 let slots = 32 (* SLOTS in the stubs *)
 let live : Obj.t option array = Array.make slots None
@@ -25,6 +27,39 @@ let check_slot seed s =
        Printf.printf "seed %d, slot %d: %s\n" seed s m; exit 1)
 
 let check_all seed = for s = 0 to slots - 1 do check_slot seed s done
+
+let alloc_checked ?(heap_layout = false) seed =
+  try alloc seed heap_layout with Failure m ->
+    Printf.printf "seed %d: %s\n" seed m; exit 1
+
+(* Allocate blocks with layout blocks in the major heap while another
+   domain compacts it, so that some allocations are interrupted by a
+   compaction which moves their layout block. *)
+let alloc_during_compactions () =
+  let stop = Atomic.make false in
+  let compactor =
+    Domain.spawn (fun () ->
+        for _ = 1 to 150 do Gc.compact () done;
+        Atomic.set stop true)
+  in
+  let seed = ref 0 in
+  while not (Atomic.get stop) do
+    incr seed;
+    alloc_checked ~heap_layout:true !seed
+  done;
+  Domain.join compactor
+
+(* Copy the first block of batch [b] through a weak array. *)
+let weak : Obj.t Weak.t = Weak.create 1
+
+let copy_block seed b =
+  Weak.set weak 0 (Some (Obj.field b 0));
+  (match Weak.get_copy weak 0 with
+   | Some c ->
+     (try check_copy b 0 c with Failure m ->
+        Printf.printf "seed %d: %s\n" seed m; exit 1)
+   | None -> Printf.printf "seed %d: no copy\n" seed; exit 1);
+  Weak.set weak 0 None
 
 (* Fill the major heap's recently freed small blocks with new ones, so
    that anything the collector wrongly freed is seen to have changed. *)
@@ -58,6 +93,8 @@ let () =
     live.(s) <- Some b;
     Gc.minor ();
     check_slot seed s;
+    alloc_checked seed;
+    if seed mod 5 = 0 then copy_block seed b;
     if seed mod 3 = 0 then ignore (Gc.major_slice 0 : int);
     if seed mod 97 = 0 then begin
       Gc.full_major (); churn (); check_all seed
@@ -70,5 +107,7 @@ let () =
   churn ();
   check_all n;
   deep 100_000;
+  check_all n;
+  alloc_during_compactions ();
   check_all n;
   print_endline "OK"
