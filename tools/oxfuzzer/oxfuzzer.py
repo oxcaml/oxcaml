@@ -458,6 +458,47 @@ def end_status_line() -> None:
         log()
 
 
+class GitHubLog:
+    """What oxfuzzer's log does differently under GitHub Actions, through the
+    workflow commands that GitHub reads from a step's output. Elsewhere the
+    groups do nothing and a failure is printed as a plain line."""
+
+    def __init__(self) -> None:
+        self.enabled = os.environ.get("GITHUB_ACTIONS") == "true"
+        self.group: str | None = None
+
+    # The lines printed between open_group and close_group are collapsed
+    # under the title. Groups do not nest.
+    def open_group(self, title: str) -> None:
+        if not self.enabled or self.group == title:
+            return
+        self.close_group()
+        log(f"::group::{title}")
+        self.group = title
+
+    def close_group(self) -> None:
+        if self.group is not None:
+            log("::endgroup::")
+            self.group = None
+
+    # Reports a saved failure. Under GitHub Actions it is an error
+    # annotation, which GitHub also lists on the page of the run (the first
+    # ten of a step: the others are only in the log), and the failures are
+    # folded into a group, since there can be many.
+    def failure(self, message: str) -> None:
+        if not self.enabled:
+            log(message)
+            return
+        self.open_group("oxfuzzer: failures")
+        # The characters that a workflow command's message has to escape.
+        escaped = message.replace("%", "%25").replace("\r", "%0D")
+        escaped = escaped.replace("\n", "%0A")
+        log(f"::error title=oxfuzzer failure::{escaped}")
+
+
+GITHUB_LOG = GitHubLog()
+
+
 @dataclass
 class Stats:
     """Statistics of a fuzzer's run. Describes how many programs passed, were
@@ -508,6 +549,7 @@ class Stats:
             log(f"\r{self.summary()}", end="")
 
     def final_report(self) -> None:
+        GITHUB_LOG.close_group()
         end_status_line()
         if not stderr_is_tty():
             self.print_line()
@@ -697,7 +739,7 @@ def save_failure(
     shutil.rmtree(failure_dir, ignore_errors=True)
     staging_dir.rename(failure_dir)
     end_status_line()
-    log(f"seed {seed}: {reason}")
+    GITHUB_LOG.failure(f"seed {seed}: {reason}")
     return SavedFailure(failure_dir.name, reason)
 
 
@@ -1244,7 +1286,8 @@ self-check or a toolchain that cannot be run.""",
         type=Path,
         default=None,
         metavar="PATH",
-        help="write a Markdown summary of the run to PATH when it ends",
+        help="write a Markdown summary of the run to PATH when it ends "
+        "(under GitHub Actions it is also appended to the step summary)",
     )
     args = parser.parse_args()
     if args.jobs < 0:
@@ -1278,7 +1321,8 @@ self-check or a toolchain that cannot be run.""",
     stats = Stats()
 
     def summarize(outcome: str, details: str | None = None) -> None:
-        if args.summary_file is None:
+        step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if args.summary_file is None and not step_summary:
             return
         text = summary_markdown(
             outcome,
@@ -1287,7 +1331,16 @@ self-check or a toolchain that cannot be run.""",
             base_seed=base_seed,
             details=details,
         )
-        write_summary(args.summary_file, text)
+        if args.summary_file is not None:
+            write_summary(args.summary_file, text)
+        if step_summary:
+            # GitHub Actions shows what a step appends to this file on the
+            # page of the run.
+            try:
+                with open(step_summary, "a", encoding="utf-8") as file:
+                    file.write(text)
+            except OSError as error:
+                log(f"oxfuzzer: cannot write the step summary: {error}")
 
     # The first line of the message heads the summary and the rest goes in a
     # block under it.
@@ -1312,6 +1365,7 @@ self-check or a toolchain that cannot be run.""",
         shutdown.check()
         revision = revision_line(toolchain)
         shutdown.check()
+        GITHUB_LOG.open_group("oxfuzzer: settings")
         log(f"seed: {base_seed}")
         limits.print_summary()
         log(
@@ -1331,6 +1385,7 @@ self-check or a toolchain that cannot be run.""",
             shutdown.check()
         run_info = run_metadata(base_seed, toolchain, revision)
         shutdown.check()
+        GITHUB_LOG.close_group()
 
         with tempfile.TemporaryDirectory(prefix="oxfuzzer-") as run_dir:
 
@@ -1363,6 +1418,7 @@ self-check or a toolchain that cannot be run.""",
         finished_because = shutdown.finish_reason
     except Fatal as fatal:
         summarize_error("Fatal error", str(fatal))
+        GITHUB_LOG.close_group()
         log(f"oxfuzzer: {fatal}")
         raise SystemExit(1)
     except Exception as error:
@@ -1374,4 +1430,9 @@ self-check or a toolchain that cannot be run.""",
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    finally:
+        # Before the traceback of a crash is printed, so that it is not folded
+        # into a group.
+        GITHUB_LOG.close_group()

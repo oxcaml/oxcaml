@@ -55,6 +55,12 @@ completed per hour of fuzzing), the wall time, the base seed and the saved
 failures. It has no top-level heading. After such an error the exit status is
 1.
 
+Under GitHub Actions, oxfuzzer also appends that summary to the step summary
+(the file `$GITHUB_STEP_SUMMARY` names), with or without `--summary-file`, and
+reports each saved failure as an error annotation, which GitHub lists on the
+page of the run (the first ten of a step). In the log it folds its settings and
+the failures into groups, so that the final lines stand out.
+
 By default the compilers, stdlib, runtime and `oxfuzzer.exe` are taken from the
 `_build` directory of the repository containing `oxfuzzer.py`. Use
 `--build-dir DIR` to point at the `_build` directory of another checkout, or
