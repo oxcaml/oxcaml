@@ -696,19 +696,19 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             @ Bound_parameters.simples remaining_params
           in
           let inlined = Inlined_attribute.forward_inlined () in
+          (* CR yusumez: [dbg] is already in the current inlining context.
+             Inlining the wrapper at one of its applications adds the context of
+             that application on top: the backtrace shows the frames of where
+             the closure was built, with the inlined frames they share twice. *)
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
               ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
-              (* The terms of the wrapper's body stand for the application of
-                 the wrapper, whose debuginfo they get when it is inlined. [dbg]
-                 is already in the current inlining context: using it here would
-                 add that context again. *)
-              Debuginfo.none
-              (* As for the debuginfo: when the wrapper is inlined, the call
-                 takes the counter of the application of the wrapper (see
-                 [Fdo_downwards_env.stub_callsite_counter]). *)
-              ~callsite_counter:None ~inlined
+              dbg
+              (* This is the call to the callee made by the source partial
+                 application, so it carries that application's counter. *)
+              ~callsite_counter:(Apply.callsite_counter apply)
+              ~inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
               ~relative_history:Inlining_history.Relative.empty
@@ -744,7 +744,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                 let expr =
                   Let.create
                     (Bound_pattern.singleton arg)
-                    (Named.create_prim prim Debuginfo.none)
+                    (Named.create_prim prim dbg)
                     ~body:expr ~free_names_of_body:Unknown
                   |> Expr.create_let
                 in
