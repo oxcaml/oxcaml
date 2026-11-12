@@ -214,7 +214,9 @@ class CommandResult:
 def kill_process_group(process: asyncio.subprocess.Process) -> None:
     try:
         os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
+        # The group is gone. macOS reports a group whose only member is a
+        # zombie, exited but not yet waited for, as a permission error.
         pass
 
 
