@@ -209,6 +209,7 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Laws_not_supported
   | Unrepresentable_include of Env.unrepresentable_item
   | Unrepresentable_open of Env.unrepresentable_item
   | Unrepresentable_argument of
