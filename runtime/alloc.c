@@ -107,7 +107,7 @@ CAMLexport value caml_alloc_mixed_shr_check_gc (mlsize_t wosize, tag_t tag,
                                                 mlsize_t scannable_prefix_len)
 {
   reserved_t reserved =
-    Reserved_mixed_block_scannable_wosize_native(scannable_prefix_len);
+    Reserved_mixed_block_scannable_wosize_native(scannable_prefix_len, wosize);
   return caml_alloc_shr_reserved_check_gc(wosize, tag, reserved);
 }
 #endif

@@ -516,12 +516,12 @@ CAMLprim value caml_makearray_dynamic_non_scannable_unboxed_product(
   }
 
   int tag = 0;
+
+  size = non_unarized_length * num_components;
   // These arrays are always mixed blocks without packing.
   // This currently differs from e.g. int32_u array, which is allocated as a
   // custom block, and is packed.
-  int reserved = Reserved_mixed_block_scannable_wosize_native(0);
-
-  size = non_unarized_length * num_components;
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0, size);
   if (size == 0) {
     res = Atom(0);
   } else if (num_components < 1) {
@@ -679,7 +679,8 @@ static value caml_make_##TYPE##_vect0(value len, int local)                    \
                TYPE_UPPERCASE##_array_one_tag - (rem - 1);                     \
                                                                                \
   /* Mixed block with no scannable fields */                                   \
-  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);       \
+  reserved_t reserved =                                                        \
+    Reserved_mixed_block_scannable_wosize_native(0, num_fields);               \
                                                                                \
   if (local)                                                                   \
     return caml_alloc_local_reserved(num_fields, tag, reserved);               \
@@ -749,7 +750,8 @@ static value caml_make_unboxed_int64_vect0(value len, int local)
   }
 
   /* Mixed block with no scannable fields */
-  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+  reserved_t reserved =
+    Reserved_mixed_block_scannable_wosize_native(0, num_elements);
 
   if (local)
     return caml_alloc_local_reserved(num_elements, Unboxed_int64_array_tag, reserved);
@@ -786,7 +788,8 @@ static value caml_make_unboxed_nativeint_vect0(value len, int local)
   }
 
   /* Mixed block with no scannable fields */
-  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+  reserved_t reserved =
+    Reserved_mixed_block_scannable_wosize_native(0, num_elements);
 
   if (local)
     return caml_alloc_local_reserved(num_elements, Unboxed_nativeint_array_tag, reserved);
@@ -823,7 +826,8 @@ static value caml_make_untagged_int_vect0(value len, int local)
   }
 
   /* Mixed block with no scannable fields */
-  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+  reserved_t reserved =
+    Reserved_mixed_block_scannable_wosize_native(0, num_elements);
 
   if (local)
     return caml_alloc_local_reserved(num_elements, Untagged_int_array_tag, reserved);
