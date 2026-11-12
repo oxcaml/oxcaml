@@ -183,7 +183,7 @@ let write_marshaled ~magic_number ~filename value =
       output_string oc magic_number;
       output_value oc value)
 
-let read_marshaled ~magic_number ~filename =
+let read_jsir_files ~filename : Jsoo_imports.Code.jsir_file list =
   if not (Sys.file_exists filename)
   then raise (Error (Jsir_file_not_found filename));
   let ic = open_in_bin filename in
@@ -191,24 +191,20 @@ let read_marshaled ~magic_number ~filename =
     ~always:(fun () -> close_in ic)
     (fun () ->
       let magic =
-        try really_input_string ic (String.length magic_number)
+        try really_input_string ic (String.length Config.cmj_magic_number)
         with End_of_file -> ""
       in
-      if not (String.equal magic magic_number)
-      then raise (Linkenv.Error (Not_an_object_file filename));
-      input_value ic)
+      if String.equal magic Config.cmj_magic_number
+      then [(input_value ic : Jsoo_imports.Code.jsir_file)]
+      else if String.equal magic jsir_archive_magic_number
+      then (input_value ic : Jsoo_imports.Code.jsir_file list)
+      else raise (Linkenv.Error (Not_an_object_file filename)))
 
 let write_jsir_file ~filename (file : Jsoo_imports.Code.jsir_file) =
   write_marshaled ~magic_number:Config.cmj_magic_number ~filename file
 
-let read_jsir_file ~filename : Jsoo_imports.Code.jsir_file =
-  read_marshaled ~magic_number:Config.cmj_magic_number ~filename
-
 let write_jsir_archive ~filename (files : Jsoo_imports.Code.jsir_file list) =
   write_marshaled ~magic_number:jsir_archive_magic_number ~filename files
-
-let read_jsir_archive ~filename : Jsoo_imports.Code.jsir_file list =
-  read_marshaled ~magic_number:jsir_archive_magic_number ~filename
 
 (* In wasm_of_ocaml, linking an executable creates a directory that we should
    clean up after. *)
@@ -323,7 +319,7 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
     let create_archive archive_name objfiles =
       if link_jsir
       then
-        List.map (fun filename -> read_jsir_file ~filename) objfiles
+        List.concat_map (fun filename -> read_jsir_files ~filename) objfiles
         |> write_jsir_archive ~filename:archive_name
       else
         run ~target "link" ~phase:Archive
@@ -357,22 +353,22 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
       (* The JSIR of the units to link: those of the object files, and the
          required members of the archives. *)
       let files = Hashtbl.create 64 in
+      (* The object file or archive that should have the JSIR of each unit. *)
+      let object_files = Hashtbl.create 64 in
       List.iter
         (fun ({ path; units } : Linkenv.objfile_to_link) ->
           let units =
             List.map Compilation_unit.full_path_as_string units
             |> Misc.Stdlib.String.Set.of_list
           in
-          let members =
-            if Filename.check_suffix path ext_lib
-            then read_jsir_archive ~filename:path
-            else [read_jsir_file ~filename:path]
-          in
+          Misc.Stdlib.String.Set.iter
+            (fun unit -> Hashtbl.replace object_files unit path)
+            units;
           List.iter
             (fun (file : Jsoo_imports.Code.jsir_file) ->
               if Misc.Stdlib.String.Set.mem file.exported_compilation_unit units
               then Hashtbl.replace files file.exported_compilation_unit file)
-            members)
+            (read_jsir_files ~filename:path))
         objfiles;
       (* In initialisation order. *)
       let files =
@@ -382,12 +378,11 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
             match Hashtbl.find_opt files compilation_unit with
             | Some file -> file
             | None ->
+              (* [file_name] is the [.cmx-js] or [.cmxa-js] of the unit, for a
+                 unit that no object file was given for. *)
               let object_file =
-                Filename.remove_extension file_name
-                ^
-                if Filename.check_suffix file_name ext_flambda_lib
-                then ext_lib
-                else ext_obj
+                Hashtbl.find_opt object_files compilation_unit
+                |> Option.value ~default:file_name
               in
               raise
                 (Error
