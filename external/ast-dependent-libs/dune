@@ -47,6 +47,7 @@
  (name jsoo-test)
  (deps
   (alias_rec js_of_ocaml/compiler/tests-compiler/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-static-partition/runtest)
   (alias_rec js_of_ocaml/compiler/lib-runtime-files/tests/runtest)
   (alias_rec js_of_ocaml/compiler/tests-ppx-expect-light/runtest)
   (alias_rec js_of_ocaml/compiler/tests-ppx-expect-light/runtest-js)
