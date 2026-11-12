@@ -26,7 +26,7 @@ type context =
   ; string_globals : Code.Var.t String.Hashtbl.t
   ; mutable constant_globals : constant_global Code.Var.Map.t
   ; mutable other_fields : Wasm_ast.module_field list
-  ; mutable imports : (Code.Var.t * Wasm_ast.import_desc) StringMap.t StringMap.t
+  ; mutable imports : (Code.Var.t * Wasm_ast.import_desc) list StringMap.t StringMap.t
   ; type_names : Code.Var.t String.Hashtbl.t
   ; types : Wasm_ast.type_field Code.Var.Hashtbl.t
   ; mutable closure_envs : Code.Var.t Code.Var.Map.t
@@ -36,6 +36,7 @@ type context =
   ; mutable cps_apply_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable curry_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable cps_curry_funs : Code.Var.t Stdlib.IntMap.t
+  ; mutable pair_curry_funs : (Code.Var.t * Code.Var.t) Stdlib.IntMap.t
   ; mutable dummy_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable cps_dummy_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable init_code : Wasm_ast.instruction list
@@ -45,6 +46,13 @@ type context =
   ; value_type : Wasm_ast.value_type
   ; mutable unit_name : string option
   ; mutable no_tail_call : unit Code.Var.Hashtbl.t
+  ; mutable wasm_opt : bool
+        (** Whether wasm-opt will optimize the generated code (see
+            [Binaryen.optimizes]): the optimizations which only redo
+            what it does are then skipped *)
+  ; functions_without_env : unit Code.Var.Hashtbl.t
+        (** Functions which take no environment parameter: their closure
+            is a constant, and they are only called directly *)
   }
 
 val make_context : value_type:Wasm_ast.value_type -> context
@@ -158,6 +166,8 @@ module Arith64 : sig
 
   val ult_i32 : expression -> expression -> expression
 
+  val ule_i32 : expression -> expression -> expression
+
   val uge_i32 : expression -> expression -> expression
 
   val to_i32 : expression -> expression
@@ -175,8 +185,6 @@ val tee : ?typ:Wasm_ast.value_type -> Wasm_ast.var -> expression -> expression
 
 val store :
   ?always:bool -> ?typ:Wasm_ast.value_type -> Wasm_ast.var -> expression -> unit t
-
-val assign : Wasm_ast.var -> expression -> unit t
 
 val drop : expression -> unit t
 
@@ -199,6 +207,8 @@ val try_expr :
 val add_var : ?typ:Wasm_ast.value_type -> Wasm_ast.var -> Wasm_ast.var t
 
 val define_var : Wasm_ast.var -> expression -> unit t
+
+val get_constant : Wasm_ast.var -> Wasm_ast.expression option t
 
 val is_small_constant : Wasm_ast.expression -> bool t
 
@@ -259,10 +269,13 @@ val need_apply_fun : cps:bool -> arity:int -> Code.Var.t t
 
 val need_curry_fun : cps:bool -> arity:int -> Code.Var.t t
 
+val need_pair_curry_fun : arity:int -> (Code.Var.t * Code.Var.t) t
+
 val need_dummy_fun : cps:bool -> arity:int -> Code.Var.t t
 
 val function_body :
      context:context
+  -> return_exn:bool
   -> param_names:Code.Var.t list
   -> body:unit t
   -> (Wasm_ast.var * Wasm_ast.value_type) list * Wasm_ast.instruction list

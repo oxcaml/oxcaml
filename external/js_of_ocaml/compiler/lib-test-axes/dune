@@ -1,0 +1,5 @@
+(library
+ (name jsoo_test_axes)
+ (foreign_stubs
+  (language c)
+  (names jsoo_test_axes_stubs)))

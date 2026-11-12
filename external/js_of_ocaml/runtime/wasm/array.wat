@@ -16,7 +16,7 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "int_val_32_exn"
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
@@ -29,6 +29,7 @@
    ))
    (import "fail" "caml_invalid_argument"
       (func $caml_invalid_argument (param (ref eq))))
+   (import "fail" "caml_raise_out_of_memory" (func $caml_raise_out_of_memory))
 
    (type $block (array (mut (ref eq))))
    (type $bytes (array (mut i8)))
@@ -40,11 +41,33 @@
    (@string $Array_fill "Array.fill")
 
    (@string $Array_make "Array.make")
+   (@string $Array_concat "Array.concat")
+   (@string $Float_Array_create "Float.Array.create")
+
+   ;; As in OCaml, arrays have at most Max_wosize elements, and float
+   ;; arrays half as many (Sys.max_array_length and
+   ;; Sys.max_floatarray_length). Every function which creates an array of
+   ;; arbitrary length checks this bound, so that the compiler can rely on
+   ;; it.
+   (global $max_array_length i32 (i32.const 0xfffffff))
+   (global $max_float_array_length i32 (i32.const 0x7ffffff))
+
+   (func $check_concat_length (param $len i32) (param $max i32)
+      (if (i32.gt_u (local.get $len) (local.get $max))
+         (then (call $caml_invalid_argument (global.get $Array_concat)))))
+
+   (func (export "caml_check_array_length") (param $len i32)
+      (if (i32.gt_u (local.get $len) (global.get $max_array_length))
+         (then (call $caml_raise_out_of_memory))))
+
+   (func (export "caml_check_float_array_length") (param $len i32)
+      (if (i32.gt_u (local.get $len) (global.get $max_float_array_length))
+         (then (call $caml_raise_out_of_memory))))
 
    (global $empty_array (ref eq)
       (array.new_fixed $block 1 (ref.i31 (i32.const 0))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func $nonneg_int_val_exn
          (param $v (ref eq)) (param $msg (ref eq)) (result i32)
@@ -60,12 +83,12 @@
       (param $n (ref eq)) (param $v (ref eq)) (result (ref eq))
       (local $sz i32) (local $b (ref $block)) (local $f f64)
       (local $fv (ref $float))
-      (@if $portable-int
+      (@if $portable_int
       (@then (local.set $sz (call $size_val (local.get $n))))
       (@else
       (local.set $sz (i31.get_s (ref.cast (ref i31) (local.get $n))))
       ))
-      (if (i32.ge_u (local.get $sz) (i32.const 0xfffffff))
+      (if (i32.gt_u (local.get $sz) (global.get $max_array_length))
          (then (call $caml_invalid_argument (global.get $Array_make))))
       (if (i32.eqz (local.get $sz)) (then (return (global.get $empty_array))))
       (drop (block $not_float (result (ref eq))
@@ -76,7 +99,7 @@
          ;; A float init builds an unboxed float array, which has the tighter
          ;; size limit of the dedicated floatarray primitives, not the generic
          ;; one checked above.
-         (if (i32.ge_u (local.get $sz) (i32.const 0x7ffffff))
+         (if (i32.gt_u (local.get $sz) (global.get $max_float_array_length))
             (then (call $caml_invalid_argument (global.get $Array_make))))
          (return (array.new $float_array (local.get $f) (local.get $sz)))))
       (local.set $b
@@ -92,12 +115,12 @@
          (export "caml_uniform_array_make_local")
       (param $n (ref eq)) (param $v (ref eq)) (result (ref eq))
       (local $sz i32) (local $b (ref $block))
-      (@if $portable-int
+      (@if $portable_int
       (@then (local.set $sz (call $size_val (local.get $n))))
       (@else
       (local.set $sz (i31.get_s (ref.cast (ref i31) (local.get $n))))
       ))
-      (if (i32.ge_u (local.get $sz) (i32.const 0xfffffff))
+      (if (i32.gt_u (local.get $sz) (global.get $max_array_length))
          (then (call $caml_invalid_argument (global.get $Array_make))))
       (if (i32.eqz (local.get $sz)) (then (return (global.get $empty_array))))
       (local.set $b
@@ -110,12 +133,12 @@
          (export "caml_floatarray_make_unboxed_local")
       (param $n (ref eq)) (param $v (ref eq)) (result (ref eq))
       (local $sz i32) (local $f f64)
-      (@if $portable-int
+      (@if $portable_int
       (@then (local.set $sz (call $size_val (local.get $n))))
       (@else
       (local.set $sz (i31.get_s (ref.cast (ref i31) (local.get $n))))
       ))
-      (if (i32.ge_u (local.get $sz) (i32.const 0x7ffffff))
+      (if (i32.gt_u (local.get $sz) (global.get $max_float_array_length))
          (then (call $caml_invalid_argument (global.get $Array_make))))
       (if (i32.eqz (local.get $sz)) (then (return (global.get $empty_array))))
       (local.set $f
@@ -128,13 +151,13 @@
       (export "caml_array_create_float") (export "caml_floatarray_create_local")
       (param $n (ref eq)) (result (ref eq))
       (local $sz i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then (local.set $sz (call $size_val (local.get $n))))
       (@else
       (local.set $sz (i31.get_s (ref.cast (ref i31) (local.get $n))))
       ))
-      (if (i32.ge_u (local.get $sz) (i32.const 0x7ffffff))
-         (then (call $caml_invalid_argument (global.get $Array_make))))
+      (if (i32.gt_u (local.get $sz) (global.get $max_float_array_length))
+         (then (call $caml_invalid_argument (global.get $Float_Array_create))))
       (if (i32.eqz (local.get $sz)) (then (return (global.get $empty_array))))
       (array.new $float_array (f64.const 0) (local.get $sz)))
 
@@ -165,21 +188,21 @@
 
    (func (export "caml_floatarray_unsafe_get")
       (param $a (ref eq)) (param $i (ref eq)) (result (ref eq))
-      (struct.new $float
-         (@if $portable-int
-         (@then
+      (@if $portable_int
+      (@then
+         (struct.new $float
             ;; Unsafe accessors truncate, as they do natively.
+               (array.get $float_array (ref.cast (ref $float_array) (local.get $a))
+                  (call $portable_int_val_32 (local.get $i)))))
+      (@else
+         (struct.new $float
             (array.get $float_array (ref.cast (ref $float_array) (local.get $a))
-               (call $portable_int_val_32 (local.get $i))))
-         (@else
-         (array.get $float_array (ref.cast (ref $float_array) (local.get $a))
-            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
-         ))
+               (i31.get_s (ref.cast (ref i31) (local.get $i))))))))
 
    (func (export "caml_floatarray_unsafe_set")
       (param $a (ref eq)) (param $i (ref eq)) (param $v (ref eq))
       (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          ;; Unsafe accessors truncate, as they do natively.
          (array.set $float_array (ref.cast (ref $float_array) (local.get $a))
@@ -199,7 +222,7 @@
       (result (ref eq))
       (local $a1 (ref $block)) (local $a2 (ref $block)) (local $len i32)
       (local $fa1 (ref $float_array)) (local $fa2 (ref $float_array))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len (call $nonneg_int_val_exn (local.get $vlen)
                             (global.get $Array_sub))))
@@ -214,7 +237,7 @@
                            (i32.add (local.get $len) (i32.const 1))))
          (array.set $block (local.get $a2) (i32.const 0)
             (array.get $block (local.get $a1) (i32.const 0)))
-         (@if $portable-int
+         (@if $portable_int
          (@then
             (array.copy $block $block
                (local.get $a2) (i32.const 1) (local.get $a1)
@@ -232,7 +255,7 @@
          (return (local.get $a2))))
       (local.set $fa1 (ref.cast (ref $float_array) (local.get $a)))
       (local.set $fa2 (array.new $float_array (f64.const 0) (local.get $len)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.copy $float_array $float_array
             (local.get $fa2) (i32.const 0) (local.get $fa1)
@@ -251,7 +274,7 @@
       (result (ref eq))
       (local $len i32)
       (local $fa1 (ref $float_array)) (local $fa2 (ref $float_array))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len (call $nonneg_int_val_exn (local.get $vlen)
                             (global.get $Array_sub))))
@@ -261,7 +284,7 @@
       (if (i32.eqz (local.get $len)) (then (return (global.get $empty_array))))
       (local.set $fa1 (ref.cast (ref $float_array) (local.get $a)))
       (local.set $fa2 (array.new $float_array (f64.const 0) (local.get $len)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.copy $float_array $float_array
             (local.get $fa2) (i32.const 0) (local.get $fa1)
@@ -303,6 +326,9 @@
                   (local.get $va2)))
             (local.set $l1 (array.len (local.get $a1)))
             (local.set $l2 (array.len (local.get $a2)))
+            (call $check_concat_length
+               (i32.sub (i32.add (local.get $l1) (local.get $l2)) (i32.const 2))
+               (global.get $max_array_length))
             (local.set $a
                (array.new $block (ref.i31 (i32.const 0))
                   (i32.sub (i32.add (local.get $l1) (local.get $l2))
@@ -323,6 +349,9 @@
                (local.get $va2)))
          (local.set $l1 (array.len (local.get $fa1)))
          (local.set $l2 (array.len (local.get $fa2)))
+         (call $check_concat_length
+            (i32.add (local.get $l1) (local.get $l2))
+            (global.get $max_float_array_length))
          (local.set $fa
             (array.new $float_array (f64.const 0)
                (i32.add (local.get $l1) (local.get $l2))))
@@ -347,6 +376,9 @@
                (local.get $va2)))
          (local.set $l1 (array.len (local.get $fa1)))
          (local.set $l2 (array.len (local.get $fa2)))
+         (call $check_concat_length
+            (i32.add (local.get $l1) (local.get $l2))
+            (global.get $max_float_array_length))
          (local.set $fa
             (array.new $float_array (f64.const 0)
                (i32.add (local.get $l1) (local.get $l2))))
@@ -388,6 +420,10 @@
                    (i32.add (local.get $len)
                       (array.len (ref.cast (ref $float_array) (local.get $v)))))
                 (local.set $isfloat (i32.const 1)))
+             ;; Checked at each step, so that the sum does not overflow
+             (call $check_concat_length (local.get $len)
+                (select (global.get $max_float_array_length)
+                   (global.get $max_array_length) (local.get $isfloat)))
              (local.set $l (array.get $block (local.get $b) (i32.const 2)))
              (br $compute_length))))
       (if (result (ref eq)) (local.get $isfloat)
@@ -458,9 +494,12 @@
                   (local.set $len
                      (i32.add (local.get $len)
                         (array.len
-                           (ref.cast (ref $float_array) (local.get $v)))))))
+                           (ref.cast (ref $float_array) (local.get $v)))))
+                  (call $check_concat_length (local.get $len)
+                     (global.get $max_float_array_length))))
             (local.set $l (array.get $block (local.get $b) (i32.const 2)))
             (br $compute_length))))
+      (if (i32.eqz (local.get $len)) (then (return (global.get $empty_array))))
       (local.set $fa
          (array.new $float_array (f64.const 0) (local.get $len)))
       (local.set $l (local.get $vl))
@@ -504,6 +543,8 @@
                   (i32.sub
                      (array.len (ref.cast (ref $block) (local.get $v)))
                      (i32.const 1))))
+            (call $check_concat_length (local.get $len)
+               (global.get $max_array_length))
             (local.set $l (array.get $block (local.get $b) (i32.const 2)))
             (br $compute_length))))
       (local.set $a
@@ -536,14 +577,14 @@
       (param $vlen (ref eq))
       (result (ref eq))
       (local $len i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len (call $int_val_32_exn (local.get $vlen)
                             (global.get $Array_blit))))
       (@else
       (local.set $len (i31.get_s (ref.cast (ref i31) (local.get $vlen))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (local.get $len)
             (then
@@ -573,14 +614,14 @@
       (param $vlen (ref eq))
       (result (ref eq))
       (local $len i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len (call $int_val_32_exn (local.get $vlen)
                             (global.get $Array_blit))))
       (@else
       (local.set $len (i31.get_s (ref.cast (ref i31) (local.get $vlen))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (local.get $len)
             (then
@@ -626,17 +667,19 @@
       (local $len i32)
       (local $pos i32)
 
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len  (call $nonneg_int_val_exn (local.get $vlen) (global.get $Array_fill))))
       (@else
       (local.set $len (i31.get_u (ref.cast (ref i31) (local.get $vlen))))
       ))
-      (local.set $pos
-         (@if $portable-int
-         (@then (call $nonneg_int_val_exn (local.get $i) (global.get $Array_fill)))
-         (@else (i31.get_u (ref.cast (ref i31) (local.get $i))))
-         ))
+      (@if $portable_int
+      (@then
+         (local.set $pos
+            (call $nonneg_int_val_exn (local.get $i) (global.get $Array_fill))))
+      (@else
+         (local.set $pos
+            (i31.get_u (ref.cast (ref i31) (local.get $i))))))
          (if $done (local.get $len)
             (then
                (drop (block $not_block (result (ref eq))
@@ -658,14 +701,14 @@
       (param $a (ref eq)) (param $i (ref eq)) (param $vlen (ref eq))
       (param $v (ref eq)) (result (ref eq))
       (local $len i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len (call $nonneg_int_val_exn (local.get $vlen)
                             (global.get $Array_fill))))
       (@else
       (local.set $len (i31.get_u (ref.cast (ref i31) (local.get $vlen))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (local.get $len)
             (then

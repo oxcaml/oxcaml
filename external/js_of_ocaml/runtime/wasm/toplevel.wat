@@ -16,7 +16,7 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "int_val_32_exn"
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
@@ -33,18 +33,20 @@
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
    (import "string" "caml_string_concat"
       (func $caml_string_concat (param (ref eq) (ref eq)) (result (ref eq))))
-   (import "jslib" "wrap" (func $wrap (param anyref) (result (ref eq))))
-   (import "jslib" "unwrap" (func $unwrap (param (ref eq)) (result anyref)))
+   (import "jslib" "value_of_js"
+      (func $value_of_js (param externref) (result (ref eq))))
+   (import "jslib" "js_of_value"
+      (func $js_of_value (param (ref eq)) (result externref)))
    (import "jslib" "caml_jsstring_of_string"
       (func $caml_jsstring_of_string (param (ref eq)) (result (ref eq))))
    (import "jslib" "caml_string_of_jsstring"
       (func $caml_string_of_jsstring (param (ref eq)) (result (ref eq))))
    (import "bindings" "get_ocaml_unit_list"
-      (func $get_ocaml_unit_list (result anyref)))
+      (func $get_ocaml_unit_list (result externref)))
    (import "bindings" "get_prim_list"
-      (func $get_prim_list (result anyref)))
+      (func $get_prim_list (result externref)))
    (import "bindings" "get_crcs"
-      (func $get_crcs (result anyref)))
+      (func $get_crcs (result externref)))
    (import "bigarray" "caml_ba_to_typed_array"
       (func $caml_ba_to_typed_array (param (ref eq)) (result (ref eq))))
    (import "bigarray" "caml_string_of_uint8_array"
@@ -67,16 +69,18 @@
       (local $new_len i32)
       (local $old (ref $block))
       (local $new (ref $block))
-      (local.set $new_len
-         (i32.add
-            (@if $portable-int
-            (@then
+      (@if $portable_int
+      (@then
+         (local.set $new_len
+            (i32.add
                (call $int_val_32_exn (local.get $len)
-                  (global.get $realloc_global)))
-            (@else
-            (i31.get_u (ref.cast (ref i31) (local.get $len)))
-            ))
-            (i32.const 2)))
+                     (global.get $realloc_global))
+               (i32.const 2))))
+      (@else
+         (local.set $new_len
+            (i32.add
+               (i31.get_u (ref.cast (ref i31) (local.get $len)))
+               (i32.const 2)))))
       (if (i32.gt_u (local.get $new_len)
                      (array.len (global.get $caml_global_data)))
          (then

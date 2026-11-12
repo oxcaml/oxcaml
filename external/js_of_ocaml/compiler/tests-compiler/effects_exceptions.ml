@@ -59,18 +59,17 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
   [%expect
     {|
     function exceptions(s, cont){
-     try{var _c_ = runtime.caml_int_of_string(s), n = _c_;}
+     try{var n = runtime.caml_int_of_string(s);}
      catch(exn$0){
       var exn = caml_wrap_exception(exn$0);
       if(exn[1] !== Stdlib[7]){
-       _c_ = caml_pop_trap();
-       var exn$2 = caml_maybe_attach_backtrace(exn, 0);
+       var _c_ = caml_pop_trap(), exn$2 = caml_maybe_attach_backtrace(exn, 0);
        return _c_(exn$2);
       }
       n = 0;
      }
      try{
-      if(caml_string_equal(s, cst$0))
+      if(caml_string_equal(s, cst))
        throw caml_maybe_attach_backtrace(Stdlib[8], 1);
       var m = 7;
      }
@@ -137,7 +136,7 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
      function _a_(s){
       return caml_trampoline_cps_call3(Stdlib[28], s, cst_aaa, cont);
      }
-     caml_push_trap(function(exn){return _a_(cst$1);});
+     caml_push_trap(function(exn){return _a_(cst);});
      return caml_trampoline_cps_call2
              (g, 0, function(_b_){caml_pop_trap(); return _a_(_b_);});
     }

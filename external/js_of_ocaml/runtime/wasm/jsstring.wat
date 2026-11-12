@@ -41,15 +41,15 @@
          (param externref) (result (ref $bytes))))
 
    (import "bindings" "hash_string"
-      (func $hash_string (param i32) (param anyref) (result i32)))
+      (func $hash_string (param i32) (param externref) (result i32)))
    (import "bindings" "read_string"
-      (func $read_string (param i32) (result anyref)))
+      (func $read_string (param i32) (result externref)))
    (import "bindings" "read_string_stream"
-      (func $read_string_stream (param i32) (param i32) (result anyref)))
+      (func $read_string_stream (param i32) (param i32) (result externref)))
    (import "bindings" "write_string"
-      (func $write_string (param anyref) (result i32)))
+      (func $write_string (param externref) (result i32)))
    (import "bindings" "append_string"
-      (func $append_string (param anyref) (param anyref) (result anyref)))
+      (func $append_string (param externref) (param externref) (result externref)))
 
    ;; Scratch buffer for string conversion.  We share the single linear memory
    ;; owned by c-impl.wasm (see runtime/wasm/dune): that module keeps all of its
@@ -67,6 +67,9 @@
    (global $string_builtins_available (mut i32) (i32.const 0))
 
    (global $utf16_buffer_size i32 (i32.const 1024))
+   ;; Longer strings are converted faster into JavaScript strings by the
+   ;; JavaScript TextDecoder than by fromCharCodeArray (V8, JavaScriptCore)
+   (global $from_char_code_array_max_length i32 (i32.const 512))
    (global $buffer (mut (ref $wstring))
       (array.new $wstring (i32.const 0) (i32.const 0)))
 
@@ -104,34 +107,38 @@
                         (global.get $utf16_buffer_size))))))))
 
    (func (export "jsstring_compare")
-      (param $s anyref) (param $s' anyref) (result i32)
+      (param $s externref) (param $s' externref) (result i32)
       ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
       ;; tail call cross
       (return
-         (call $compare_strings
-            (extern.convert_any (local.get $s))
-            (extern.convert_any (local.get $s')))))
+         (call $compare_strings (local.get $s) (local.get $s'))))
 
-   (func (export "jsstring_test") (param $s anyref) (result i32)
-      (return (call $is_string (extern.convert_any (local.get $s)))))
+   (func (export "jsstring_test") (param $s externref) (result i32)
+      (return (call $is_string (local.get $s))))
 
    (export "jsstring_hash" (func $hash_string))
 
-   (func $jsstring_of_subbytes (export "jsstring_of_subbytes")
-      (export "jsstring_of_substring") ;; compatibility with zarith stubs
+   (func (export "jsstring_of_substring") ;; compatibility with zarith stubs
       (param $s (ref $bytes)) (param $pos i32) (param $len i32)
       (result anyref)
+      (any.convert_extern
+         (call $jsstring_of_subbytes
+            (local.get $s) (local.get $pos) (local.get $len))))
+
+   (func $jsstring_of_subbytes (export "jsstring_of_subbytes")
+      (param $s (ref $bytes)) (param $pos i32) (param $len i32)
+      (result externref)
       (local $i i32) (local $c i32)
       (if (global.get $text_converters_available)
          (then
             (return
-               (any.convert_extern
-                  (call $decodeStringFromUTF8Array (local.get $s)
-                     (local.get $pos)
-                     (i32.add (local.get $pos) (local.get $len)))))))
+               (call $decodeStringFromUTF8Array (local.get $s)
+                  (local.get $pos)
+                  (i32.add (local.get $pos) (local.get $len))))))
       (if $continue
          (i32.and (global.get $string_builtins_available)
-            (i32.le_u (local.get $len) (global.get $utf16_buffer_size)))
+            (i32.le_u (local.get $len)
+               (global.get $from_char_code_array_max_length)))
          (then
             (loop $loop
                (if (i32.lt_u (local.get $i) (local.get $len))
@@ -146,24 +153,22 @@
                      (local.set $i (i32.add (local.get $i) (i32.const 1)))
                      (br $loop))))
             (return
-               (any.convert_extern
-                  (call $fromCharCodeArray (global.get $buffer)
-                     (i32.const 0) (local.get $len))))))
+               (call $fromCharCodeArray (global.get $buffer)
+                  (i32.const 0) (local.get $len)))))
       (return_call $jsstring_of_subbytes_fallback
          (local.get $s) (local.get $pos) (local.get $len)))
 
-   (func (export "jsstring_of_bytes") (param $s (ref $bytes)) (result anyref)
+   (func (export "jsstring_of_bytes") (param $s (ref $bytes)) (result externref)
       (return_call $jsstring_of_subbytes
          (local.get $s) (i32.const 0) (array.len (local.get $s))))
 
-   (func (export "bytes_of_jsstring") (param $s anyref) (result (ref $bytes))
+   (func (export "bytes_of_jsstring") (param $s externref) (result (ref $bytes))
       (if (global.get $text_converters_available)
          (then
             ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
             ;; tail call cross
             (return
-               (call $encodeStringToUTF8Array
-                  (extern.convert_any (local.get $s))))))
+               (call $encodeStringToUTF8Array (local.get $s)))))
       (return_call $string_of_jsstring_fallback (local.get $s)))
 
    ;; Fallback implementation of string conversion functions
@@ -184,8 +189,8 @@
 
    (func $jsstring_of_subbytes_fallback
       (param $s (ref $bytes)) (param $pos i32) (param $len i32)
-      (result anyref)
-      (local $s' anyref)
+      (result externref)
+      (local $s' externref)
       (local $continued i32)
       (if (i32.le_u (local.get $len) (global.get $buffer_size))
          (then
@@ -233,7 +238,7 @@
       (struct (field $s (ref $bytes)) (field $next (ref null $stack))))
    (global $stack (mut (ref null $stack)) (ref.null $stack))
 
-   (func $string_of_jsstring_fallback (param $s anyref) (result (ref $bytes))
+   (func $string_of_jsstring_fallback (param $s externref) (result (ref $bytes))
       (local $ofs i32) (local $len i32)
       (local $s' (ref $bytes)) (local $s'' (ref $bytes))
       (local $item (ref $stack))

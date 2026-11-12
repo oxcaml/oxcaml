@@ -50,21 +50,21 @@ let%expect_test "inline small function exposing more tc" =
   [%expect
     {|
     function f(g, x){
-     var variant = x[1];
-     if(106380200 <= variant) return x;
-     var v = x[2], x$0 = caml_call1(g, v), variant$0 = x$0[1];
-     if(106380200 <= variant$0) return x$0;
-     var v$0 = x$0[2];
-     return v$0;
+     var variant$0 = x[1];
+     if(106380200 <= variant$0) return x;
+     var v$0 = x[2], x$0 = caml_call1(g, v$0), variant = x$0[1];
+     if(106380200 <= variant) return x$0;
+     var v = x$0[2];
+     return v;
     }
     //end
     not found
     |}]
 
-(* When inline_recursively inlines a function passed as argument,
-   the actual argument is still referenced in block arguments.
-   Without forced duplication, the closure's params would conflict
-   with the intermediate block's params. *)
+(* When inline_recursively inlines a function passed as argument, the
+   actual argument must no longer be passed to the now unused
+   parameter. Otherwise, the closure stays alive while its body has
+   been moved, and its parameters are defined twice. *)
 let%expect_test "inline_recursively must duplicate closure" =
   let program =
     compile_and_parse
@@ -97,6 +97,8 @@ let%expect_test "function inlined both as an argument and directly" =
       List.iter (fun x -> print_int (Option.get x)) [ apply_some 0; apply_some 1; call_some 2 ]
   |}
    with Failure e -> print_endline e);
+  print_endline
+    (Str.global_replace (Str.regexp "[^ ]*js_of_ocaml\\.exe") "%{JSOO}" [%expect.output]);
   [%expect {| 012 |}]
 
 let%expect_test "inlining nested continuations keeps the code size linear" =

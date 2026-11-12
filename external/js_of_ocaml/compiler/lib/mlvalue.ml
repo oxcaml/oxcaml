@@ -24,6 +24,8 @@ let zero = J.ENum (J.Num.of_targetint Targetint.zero)
 
 let one = J.ENum (J.Num.of_targetint Targetint.one)
 
+let int n = J.ENum (J.Num.of_targetint (Targetint.of_int_exn n))
+
 (* JavaScript engines recognize the pattern 'typeof x==="number"'; if the string is
    shared, less efficient code is generated. *)
 let type_of_is_number binop e =
@@ -33,21 +35,74 @@ let is_block e = type_of_is_number J.NotEqEq e
 
 let is_immediate e = type_of_is_number J.EqEqEq e
 
-module Block = struct
-  let make ~tag ~args =
-    let tag_elt = J.Element (J.ENum (J.Num.of_targetint (Targetint.of_int_exn tag))) in
-    J.EArr (tag_elt :: args)
+(* Introcaml: the reserved header bits of a block (its descriptor) are
+   stored in the header word, above the tag, so that blocks remain plain
+   arrays: [x[0] = tag | (bits << 8)]. With the 22 bits reserved by
+   Introcaml, the header fits in 30 bits: it stays non-negative under
+   bitwise operators, and a small integer in JavaScript engines. *)
+let tag_bits = 8
 
-  let tag e = J.EAccess (e, ANormal, zero)
+let reserved_bits = 22
+
+let tag_mask = (1 lsl tag_bits) - 1
+
+let reserved_mask = (1 lsl reserved_bits) - 1
+
+let header ~tag ~desc =
+  int
+    (if Config.Flag.introspection ()
+     then tag lor ((Code.Block_desc.to_int desc land reserved_mask) lsl tag_bits)
+     else tag)
+
+module Block = struct
+  let make ~tag ~desc ~args = J.EArr (J.Element (header ~tag ~desc) :: args)
+
+  let reserved_bits = reserved_bits
+
+  let shifted_reserved bits =
+    J.EBin (J.Lsl, J.EBin (J.Band, bits, int reserved_mask), int tag_bits)
+
+  let header ~tag ~reserved =
+    if Config.Flag.introspection ()
+    then J.EBin (J.Bor, tag, shifted_reserved reserved)
+    else tag
+
+  let max_header () =
+    int
+      (if Config.Flag.introspection ()
+       then (1 lsl (tag_bits + reserved_bits)) - 1
+       else tag_mask)
+
+  let tag e =
+    let hd = J.EAccess (e, ANormal, zero) in
+    if Config.Flag.introspection () then J.EBin (J.Band, hd, int tag_mask) else hd
+
+  let set_tag e tag =
+    let hd = J.EAccess (e, ANormal, zero) in
+    if Config.Flag.introspection ()
+    then
+      let reserved = J.EBin (J.Band, hd, int (lnot tag_mask)) in
+      J.EBin (J.Eq, hd, J.EBin (J.Bor, reserved, tag))
+    else J.EBin (J.Eq, hd, tag)
+
+  let reserved e = J.EBin (J.Lsr, J.EAccess (e, ANormal, zero), int tag_bits)
+
+  let set_reserved e bits =
+    let hd = J.EAccess (e, ANormal, zero) in
+    let tag = J.EBin (J.Band, hd, int tag_mask) in
+    J.EBin
+      ( J.Eq
+      , hd
+      , match bits with
+        | J.ENum n when Targetint.is_zero (J.Num.to_targetint n) -> tag
+        | _ -> J.EBin (J.Bor, tag, shifted_reserved bits) )
 
   (* Like [tag], but evaluates to [undefined] instead of throwing when [e] is
      not an object. Used by OxCaml for type tests on values that are not known
      to be OCaml blocks *)
   let tag_nullish e = J.EAccess (e, ANullish, zero)
 
-  let field e idx =
-    let adjusted = J.ENum (J.Num.of_targetint (Targetint.of_int_exn (idx + 1))) in
-    J.EAccess (e, ANormal, adjusted)
+  let field e idx = J.EAccess (e, ANormal, int (idx + 1))
 end
 
 module Array = struct

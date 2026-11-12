@@ -16,11 +16,21 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
+val link_input :
+     ?load_source_map:(string -> Source_map.Standard.t)
+  -> Binaryen.link_input
+  -> Wasm_link.input
+(** Linker input for a module in binary format. Its source map, if any, is
+    loaded with [load_source_map]; it is ignored when this function is
+    not provided. *)
+
+val link : inputs:Wasm_link.input list -> output_file:string -> unit
+(** Link the input modules (in binary format), keeping all their code *)
+
 val build :
      allowed_imports:string list option
-  -> link_options:string list
   -> opt_options:string list
-  -> variables:(string * Wat_preprocess.value) list
-  -> inputs:Wat_preprocess.input list
+  -> variables:(string * Wax_link.value) list
+  -> inputs:Wax_link.input list
   -> output_file:string
   -> unit

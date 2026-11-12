@@ -22,7 +22,14 @@
 ;; JS implementation's use of doubles.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
+   (@then
+      (type $digits (array (mut i64)))
+      (type $ocaml_large_int (struct (field i64))))
+   (@else
+   (type $digits (array (mut i32)))
+   ))
+   (@if $portable_int
    (@then
       (import "portableint" "int_val_32_exn"
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
@@ -33,7 +40,7 @@
       (func $caml_deserialize_int_4 (param (ref eq)) (result i32)))
    (import "hash" "caml_hash_mix_int"
       (func $caml_hash_mix_int (param i32) (param i32) (result i32)))
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "nativeint" "caml_copy_nativeint"
          (func $caml_copy_nativeint (param i64) (result (ref eq))))
@@ -70,13 +77,6 @@
          (field $dup (ref null $dup))))
    (type $custom (sub (struct (field (ref $custom_operations)))))
 
-   (@if $portable-int
-   (@then
-      (type $digits (array (mut i64)))
-      (type $ocaml_large_int (struct (field i64))))
-   (@else
-   (type $digits (array (mut i32)))
-   ))
    (type $nat
       (sub final $custom
          (struct (field (ref $custom_operations)) (field $dat (ref $digits)))))
@@ -98,13 +98,13 @@
       (struct.get $nat $dat (ref.cast (ref $nat) (local.get $v))))
 
    (func $int (param $v (ref eq)) (result i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then (call $int_val_32_exn (local.get $v) (global.get $nat_arg)))
       (@else
       (i31.get_s (ref.cast (ref i31) (local.get $v))))
       ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func $int_val (param $v (ref eq)) (result i64)
          (if (ref.test (ref i31) (local.get $v))
@@ -119,8 +119,8 @@
          (local.set $l
             (i64.shr_s (i64.shl (local.get $l) (i64.const 1)) (i64.const 1)))
          (if (result (ref eq))
-             (i64.lt_u (i64.add (local.get $l) (i64.const 0x40000000))
-                (i64.const 0x80000000))
+             (i64.le_u (i64.add (local.get $l) (i64.const 0x40000000))
+                (i64.const 0x7fffffff))
             (then (ref.i31 (i32.wrap_i64 (local.get $l))))
             (else (struct.new $ocaml_large_int (local.get $l)))))
       (func $alloc_nat (param $len i32) (param $fill i64) (result (ref $nat))
@@ -137,7 +137,7 @@
       (return_call $alloc_nat (i32.const 1) (local.get $v)))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func $num_digits
          (param $d (ref $digits)) (param $ofs i32) (param $len i32) (result i32)
@@ -173,7 +173,7 @@
       (i32.const 1)) ;; 0 counts as 1 digit
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; Divide the double-digit number nh:nl by d, returning the quotient
       ;; and the remainder. Requires d != 0 and nh < d (so that the quotient
@@ -319,7 +319,7 @@
 
    ;; Custom operations
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func $caml_hash_nat (param $v (ref eq)) (result i32)
          (local $d (ref $digits)) (local $len i32) (local $h i32) (local $i i32)
@@ -439,8 +439,12 @@
                   (array.get $digits (local.get $d) (local.get $i)))
                (local.set $i (i32.add (local.get $i) (i32.const 1)))
                (br $loop))))
+      ;; 64-bit platforms use 64-bit digits, serialized as two 32-bit
+      ;; words: they pad an odd number of words with a zero word
       (i32.mul (local.get $len) (i32.const 4))
-      (i32.mul (local.get $len) (i32.const 8)))
+      (i32.mul
+         (i32.add (local.get $len) (i32.and (local.get $len) (i32.const 1)))
+         (i32.const 4)))
 
    (func $deserialize_nat (param $s (ref eq)) (result (ref eq)) (result i32)
       (local $dat (ref $digits)) (local $len i32) (local $i i32)
@@ -462,7 +466,7 @@
    (func (export "initialize_nat") (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "create_nat") (param $size (ref eq)) (result (ref eq))
          (return_call $alloc_nat (call $int (local.get $size))
@@ -475,7 +479,7 @@
    (func (export "length_nat") (param $nat (ref eq)) (result (ref eq))
       (ref.i31 (array.len (call $get_data (local.get $nat)))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "set_to_zero_nat")
          (param $nat (ref eq)) (param $ofs (ref eq)) (param $len (ref eq))
@@ -521,7 +525,7 @@
          (call $int (local.get $len)))
       (ref.i31 (i32.const 0)))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "set_digit_nat")
          (param $nat (ref eq)) (param $ofs (ref eq)) (param $digit (ref eq))
@@ -554,7 +558,7 @@
    (func (export "set_digit_nat_native")
       (param $nat (ref eq)) (param $ofs (ref eq)) (param $digit (ref eq))
       (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $digits (call $get_data (local.get $nat))
             (call $int (local.get $ofs))
@@ -567,7 +571,7 @@
 
    (func (export "nth_digit_nat_native")
       (param $nat (ref eq)) (param $ofs (ref eq)) (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (return_call $caml_copy_nativeint
             (array.get $digits (call $get_data (local.get $nat))
@@ -585,7 +589,7 @@
          (call $num_digits (call $get_data (local.get $nat))
             (call $int (local.get $ofs)) (call $int (local.get $len)))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "num_leading_zero_bits_in_digit")
          (param $nat (ref eq)) (param $ofs (ref eq)) (result (ref eq))
@@ -674,7 +678,7 @@
             (i32.const 1))))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; d[ofs..ofs+len-1] += carry (a 0/1 value); returns the carry out.
       ;; Mirrors [bng_generic_add_carry].
@@ -731,7 +735,7 @@
          (call $incr (call $get_data (local.get $nat)) (call $int (local.get $ofs))
             (call $int (local.get $len)) (call $int (local.get $carry)))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; d1[o1..o1+l1-1] += d2[o2..o2+l2-1] + carry; returns the carry out.
       ;; Requires l1 >= l2. Mirrors [bng_generic_add].
@@ -806,7 +810,7 @@
             (call $int (local.get $ofs2)) (call $int (local.get $len2))
             (call $int (local.get $carry)))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "complement_nat")
          (param $nat (ref eq)) (param $ofs (ref eq)) (param $len (ref eq))
@@ -848,7 +852,7 @@
       (ref.i31 (i32.const 0)))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; d[ofs..ofs+len-1] -= 1 - carry_in; [carry_in] and the result follow
       ;; the OCaml convention (1 means no borrow). Mirrors
@@ -905,7 +909,7 @@
          (call $decr (call $get_data (local.get $nat)) (call $int (local.get $ofs))
             (call $int (local.get $len)) (call $int (local.get $carry)))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; d1[o1..o1+l1-1] -= d2[o2..o2+l2-1] + 1 - carry_in; [carry_in] and
       ;; the result follow the OCaml convention (1 means no borrow).
@@ -984,7 +988,7 @@
             (call $int (local.get $ofs2)) (call $int (local.get $len2))
             (call $int (local.get $carry)))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; d1[o1..o1+l1-1] += d2[o2..o2+l2-1] * d3[o3]; returns the carry out,
       ;; which is a full digit when l1 = l2 and 0 or 1 when l1 > l2.
@@ -1154,7 +1158,7 @@
       (i32.wrap_i64 (local.get $carry)))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "mult_digit_nat")
          (param $nat1 (ref eq)) (param $ofs1 (ref eq)) (param $len1 (ref eq))
@@ -1180,7 +1184,7 @@
             (call $get_data (local.get $nat3)) (call $int (local.get $ofs3)))))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; d1[o1..o1+l1-1] += d2[o2..o2+l2-1] * d3[o3..o3+l3-1]; returns the
       ;; carry out. Requires l1 >= l2 + l3. Mirrors [bng_generic_mult_add].
@@ -1225,7 +1229,7 @@
       (local.get $carry))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "mult_nat")
          (param $nat1 (ref eq)) (param $ofs1 (ref eq)) (param $len1 (ref eq))
@@ -1255,7 +1259,7 @@
             (call $int (local.get $len3)))))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "square_nat")
          (param $nat1 (ref eq)) (param $ofs1 (ref eq)) (param $len1 (ref eq))
@@ -1306,7 +1310,7 @@
       (ref.i31 (local.get $carry)))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func $shift_left
          (param $d1 (ref $digits)) (param $o1 i32) (param $l1 i32)
@@ -1368,7 +1372,7 @@
          (call $int (local.get $ofs2)) (call $int (local.get $nbits)))
       (ref.i31 (i32.const 0)))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func $shift_right
          (param $d1 (ref $digits)) (param $o1 i32) (param $l1 i32)
@@ -1432,7 +1436,7 @@
          (call $int (local.get $ofs2)) (call $int (local.get $nbits)))
       (ref.i31 (i32.const 0)))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func $compare
          (param $d1 (ref $digits)) (param $o1 i32) (param $l1 i32)
@@ -1499,7 +1503,7 @@
             (call $int (local.get $len1)) (call $get_data (local.get $nat2))
             (call $int (local.get $ofs2)) (call $int (local.get $len2)))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "compare_digits_nat")
          (param $nat1 (ref eq)) (param $ofs1 (ref eq))
@@ -1525,13 +1529,13 @@
          (array.get $digits (call $get_data (local.get $nat1)) (call $int (local.get $ofs1))))
       (local.set $y
          (array.get $digits (call $get_data (local.get $nat2)) (call $int (local.get $ofs2))))
-      ;; signed comparison, matching the JS runtime
+      ;; Digits are unsigned
       (ref.i31
-         (i32.sub (i32.gt_s (local.get $x) (local.get $y))
-                  (i32.lt_s (local.get $x) (local.get $y)))))
+         (i32.sub (i32.gt_u (local.get $x) (local.get $y))
+                  (i32.lt_u (local.get $x) (local.get $y)))))
    ))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "land_digit_nat")
          (param $nat1 (ref eq)) (param $ofs1 (ref eq))
@@ -1608,7 +1612,7 @@
    ))
 
    ;; natq[ofsq..] := natq / nat2[ofs2], natr[ofsr] := remainder
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; Mirrors [bng_div_rem_digit] with the semantics of the native
       ;; hardware-division implementations (bng_amd64.c, bng_arm64.c): the
@@ -1697,7 +1701,7 @@
          (call $get_data (local.get $nat2)) (call $int (local.get $ofs2)))
       (ref.i31 (i32.const 0)))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       ;; nat1[ofs1+len2..ofs1+len1-1] := nat1 / nat2,
       ;; nat1[ofs1..ofs1+len2-1] := nat1 modulo nat2.

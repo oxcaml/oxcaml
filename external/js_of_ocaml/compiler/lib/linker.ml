@@ -143,7 +143,7 @@ module Check = struct
     let freename = StringSet.remove Global_constant.global_object freename in
     let freename =
       if has_flags
-      then StringSet.(diff freename (of_list [ "FLAG"; "CONFIG"; "BUILD_CONFIG" ]))
+      then StringSet.(diff freename (of_list Macro.link_time_names))
       else freename
     in
     if StringSet.mem Global_constant.old_global_object freename
@@ -265,17 +265,14 @@ module Fragment = struct
     let program, _ =
       try Parse_js.parse' `Script lex
       with Parse_js.Parsing_error pi ->
-        let name =
-          match pi with
-          | { Parse_info.src = Some x; _ } | { Parse_info.name = Some x; _ } -> x
-          | _ -> "??"
-        in
+        let name = Option.value ~default:"??" (Parse_info.file pi) in
+        (* The location can be in another file than the one being loaded *)
         error
-          "cannot parse file %S (orig:%S from l:%d, c:%d)@."
-          filename
-          name
-          pi.Parse_info.line
-          pi.Parse_info.col
+          "%s%s"
+          (if String.equal name filename
+           then ""
+           else Printf.sprintf "cannot parse file %S:\n" filename)
+          (Parse_info.Diagnostic.with_excerpt pi "syntax error")
     in
     let res =
       List.map program ~f:(fun (annot, code) ->
@@ -764,7 +761,7 @@ let link ?(check_missing = true) program (state : state) =
               ~sep:"\n"
               (List.map path ~f:(fun id ->
                    let nm, loc = Int.Hashtbl.find provided_rev id in
-                   Printf.sprintf "-> %s:%s" nm (Parse_info.to_string loc)))
+                   Printf.sprintf "-> %s:%s" nm (Parse_info.Diagnostic.to_string loc)))
           in
           Warning.warn
             `Deprecated_primitive
@@ -792,6 +789,19 @@ let all state =
         let name, _ = Int.Hashtbl.find provided_rev id in
         name :: acc
       with Not_found -> acc)
+    state.ids
+    []
+
+let user_aliases state =
+  IntSet.fold
+    (fun id acc ->
+      match Int.Hashtbl.find_opt provided_rev id with
+      | None -> acc
+      | Some (name, _) -> (
+          match String.Hashtbl.find_opt provided name with
+          | Some p when p.id = id && Option.is_none (Builtins.find p.filename) ->
+              StringSet.fold (fun alias acc -> (alias, name) :: acc) p.aliases acc
+          | Some _ | None -> acc))
     state.ids
     []
 

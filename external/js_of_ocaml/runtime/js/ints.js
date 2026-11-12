@@ -96,12 +96,10 @@ function caml_parse_digit(c) {
   return -1;
 }
 
-//Provides: caml_int_of_string (const)
+//Provides: caml_parse_int32 (const)
 //Requires: caml_ml_string_length, caml_string_unsafe_get
 //Requires: caml_parse_sign_and_base, caml_parse_digit, caml_failwith
-//Alias: caml_int32_of_string
-//Alias: caml_nativeint_of_string
-function caml_int_of_string(s) {
+function caml_parse_int32(err_msg, s) {
   var r = caml_parse_sign_and_base(s);
   var i = r[0],
     sign = r[1],
@@ -111,7 +109,7 @@ function caml_int_of_string(s) {
   var threshold = -1 >>> 0;
   var c = i < len ? caml_string_unsafe_get(s, i) : 0;
   var d = caml_parse_digit(c);
-  if (d < 0 || d >= base) caml_failwith("int_of_string");
+  if (d < 0 || d >= base) caml_failwith(err_msg);
   var res = d;
   for (i++; i < len; i++) {
     c = caml_string_unsafe_get(s, i);
@@ -119,17 +117,35 @@ function caml_int_of_string(s) {
     d = caml_parse_digit(c);
     if (d < 0 || d >= base) break;
     res = base * res + d;
-    if (res > threshold) caml_failwith("int_of_string");
+    if (res > threshold) caml_failwith(err_msg);
   }
-  if (i !== len) caml_failwith("int_of_string");
+  if (i !== len) caml_failwith(err_msg);
   // For base different from 10, we expect an unsigned representation,
   // hence any value of 'res' (less than 'threshold') is acceptable.
   // But we have to convert the result back to a signed integer.
   res = sign * res;
   if (signedness && (res | 0) !== res)
     /* Signed representation expected, allow -2^(nbits-1) to 2^(nbits-1) - 1 */
-    caml_failwith("int_of_string");
+    caml_failwith(err_msg);
   return res | 0;
+}
+
+//Provides: caml_int_of_string (const)
+//Requires: caml_parse_int32
+function caml_int_of_string(s) {
+  return caml_parse_int32("int_of_string", s);
+}
+
+//Provides: caml_int32_of_string (const)
+//Requires: caml_parse_int32
+function caml_int32_of_string(s) {
+  return caml_parse_int32("Int32.of_string", s);
+}
+
+//Provides: caml_nativeint_of_string (const)
+//Requires: caml_parse_int32
+function caml_nativeint_of_string(s) {
+  return caml_parse_int32("Nativeint.of_string", s);
 }
 
 //Provides: caml_parse_small_int
@@ -240,6 +256,27 @@ function caml_int_unsigned_mod(x, y) {
 //Provides: caml_bswap16 const
 function caml_bswap16(x) {
   return ((x & 0x00ff) << 8) | ((x & 0xff00) >> 8);
+}
+
+//Provides: caml_int_clz const
+//Version: >= 5.6
+function caml_int_clz(x) {
+  return Math.clz32(x);
+}
+
+//Provides: caml_int_ctz const
+//Version: >= 5.6
+function caml_int_ctz(x) {
+  return x === 0 ? 32 : 31 - Math.clz32(x & -x);
+}
+
+//Provides: caml_int_popcount const
+//Version: >= 5.6
+function caml_int_popcount(x) {
+  x = x - ((x >>> 1) & 0x55555555);
+  x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+  x = (x + (x >>> 4)) & 0x0f0f0f0f;
+  return Math.imul(x, 0x01010101) >>> 24;
 }
 
 //Provides: caml_int32_bswap const

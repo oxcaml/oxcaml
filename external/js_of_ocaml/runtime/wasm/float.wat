@@ -40,21 +40,22 @@
 (@else
    (import "bindings" "format_float"
       (func $format_float
-         (param i32) (param i32) (param i32) (param f64) (result anyref)))
+         (param i32) (param i32) (param i32) (param f64) (result externref)))
    (import "bindings" "identity"
-      (func $parse_float (param anyref) (result f64)))
+      (func $parse_float (param externref) (result f64)))
    (import "Math" "exp" (func $exp (param f64) (result f64)))
 ))
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
+   (import "fail" "caml_raise_out_of_memory" (func $caml_raise_out_of_memory))
    (import "fail" "caml_invalid_argument"
       (func $caml_invalid_argument (param (ref eq))))
    (import "ints" "lowercase_hex_table"
       (global $lowercase_hex_table (ref $chars)))
    (import "jsstring" "jsstring_of_bytes"
-      (func $jsstring_of_bytes (param (ref $bytes)) (result anyref)))
+      (func $jsstring_of_bytes (param (ref $bytes)) (result externref)))
    (import "jsstring" "bytes_of_jsstring"
-      (func $bytes_of_jsstring (param anyref) (result (ref $bytes))))
-   (@if $portable-int
+      (func $bytes_of_jsstring (param externref) (result (ref $bytes))))
+   (@if $portable_int
    (@then
       (import "portableint" "int_val_32_sat"
          (func $int_val_32_sat (param (ref eq)) (result i32)))
@@ -85,8 +86,12 @@
       (local $i i32) (local $j i32) (local $d i32) (local $txt (ref $chars))
       (local $len i32) (local $s (ref $bytes))
       (local $unit i64) (local $half i64) (local $mask i64) (local $frac i64)
-      (@if $portable-int
-      (@then (local.set $prec (call $int_val_32_sat (local.get $vprec))))
+      (@if $portable_int
+      (@then
+         (local.set $prec (call $int_val_32_sat (local.get $vprec)))
+         ;; As native, a string that large cannot be allocated
+         (if (i32.gt_s (local.get $prec) (i32.const 0xfffffff))
+            (then (call $caml_raise_out_of_memory))))
       (@else
       (local.set $prec (i31.get_s (ref.cast (ref i31) (local.get $vprec))))
       ))
@@ -133,8 +138,7 @@
                   (local.set $m
                      (i64.or (local.get $m)
                              (i64.shl (i64.const 1) (i64.const 52))))))
-            (if (i32.and (i32.ge_s (local.get $prec) (i32.const 0))
-                         (i32.lt_s (local.get $prec) (i32.const 13)))
+            (if (i32.lt_u (local.get $prec) (i32.const 13))
                (then
                   (local.set $unit
                      (i64.shl (i64.const 1)
@@ -261,8 +265,8 @@
                         (i32.eq (local.get $i) (local.get $len)))
                      (local.set $c
                         (array.get_u $bytes (local.get $s) (local.get $i)))
-                     (if (i32.and (i32.ge_u (local.get $c) (@char "0"))
-                                  (i32.le_u (local.get $c) (@char "9")))
+                     (if (i32.lt_u (i32.sub (local.get $c) (@char "0"))
+                                   (i32.const 10))
                         (then
                            (local.set $precision
                               (i32.add
@@ -343,7 +347,7 @@
       (local $exp i32) (local $m i64)
       (local $i i32) (local $len i32) (local $c i32)
       (local $s (ref $bytes)) (local $txt (ref $chars))
-      (local $num anyref)
+      (local $num externref)
       (local.set $f (struct.get $float 0 (ref.cast (ref $float) (local.get $arg))))
       (local.set $b (i64.reinterpret_f64 (local.get $f)))
       (call $parse_format (ref.cast (ref $bytes) (local.get $vfmt)))
@@ -407,8 +411,8 @@
             (local.set $len (array.len (local.get $s)))
             (loop $uppercase
                (local.set $c (array.get_u $bytes (local.get $s) (local.get $i)))
-               (if (i32.and (i32.ge_u (local.get $c) (@char "a"))
-                            (i32.le_u (local.get $c) (@char "z")))
+               (if (i32.lt_u (i32.sub (local.get $c) (@char "a"))
+                             (i32.const 26))
                   (then
                      (array.set $bytes (local.get $s) (local.get $i)
                         (i32.sub (local.get $c) (i32.const 32)))))
@@ -468,8 +472,8 @@
                         (block $overflow
                            (loop $parse_exponent
                               (br_if $error
-                                 (i32.or (i32.lt_u (local.get $c) (@char "0"))
-                                    (i32.gt_u (local.get $c) (@char "9"))))
+                                 (i32.ge_u (i32.sub (local.get $c) (@char "0"))
+                                           (i32.const 10)))
                               (local.set $d
                                  (i32.sub (local.get $c) (@char "0")))
                               (local.set $exp
@@ -510,16 +514,16 @@
                               (return (f64.const 0)))
                            (else
                               (return (f64.const inf))))))
-                  (if (i32.and (i32.ge_u (local.get $c) (@char "0"))
-                               (i32.le_u (local.get $c) (@char "9")))
+                  (if (i32.lt_u (i32.sub (local.get $c) (@char "0"))
+                                (i32.const 10))
                      (then
                         (local.set $d (i32.sub (local.get $c) (@char "0"))))
-                  (else (if (i32.and (i32.ge_u (local.get $c) (@char "a"))
-                                     (i32.le_u (local.get $c) (@char "f")))
+                  (else (if (i32.lt_u (i32.sub (local.get $c) (@char "a"))
+                                      (i32.const 6))
                      (then
                         (local.set $d (i32.sub (local.get $c) (i32.const 87))))
-                  (else (if (i32.and (i32.ge_u (local.get $c) (@char "A"))
-                                     (i32.le_u (local.get $c) (@char "F")))
+                  (else (if (i32.lt_u (i32.sub (local.get $c) (@char "A"))
+                                      (i32.const 6))
                      (then
                         (local.set $d (i32.sub (local.get $c) (i32.const 55))))
                      (else
@@ -571,7 +575,7 @@
       (local $c i32)
       (local.set $c (array.get_u $bytes (local.get $s) (local.get $i)))
       (i32.or (i32.eq (local.get $c) (@char " "))
-         (i32.le_u (i32.sub (local.get $c) (i32.const 9)) (i32.const 4))))
+         (i32.lt_u (i32.sub (local.get $c) (i32.const 9)) (i32.const 5))))
 
    (func $caml_parse_float (export "caml_parse_float")
       (param $err_msg (ref eq)) (param $v (ref eq)) (result (ref eq))
@@ -779,9 +783,8 @@
                   (br_if $error
                      (i32.eqz
                         (i32.or
-                           (i32.and
-                              (i32.ge_u (local.get $c) (@char "0"))
-                              (i32.le_u (local.get $c) (@char "9")))
+                           (i32.lt_u (i32.sub (local.get $c) (@char "0"))
+                                     (i32.const 10))
                            (i32.or
                               (i32.eq (local.get $c) (@char "."))
                               (i32.or

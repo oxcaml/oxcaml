@@ -1,7 +1,7 @@
 (executable
  (name node_wrapper)
  (link_deps
-  (env_var WASM_ENGINE))
+  (env_var JSOO_ENGINE))
  (modules node_wrapper node_wrapper_per_engine)
  (libraries unix))
 
@@ -11,7 +11,7 @@
   (with-stdout-to
    %{target}
    (progn
-    (run echo "let engine = \"%{env:WASM_ENGINE=node}\"")
+    (run echo "let engine = \"%{env:JSOO_ENGINE=node}\"")
     (run echo "let profile = \"%{profile}\"")))))
 
 (executable

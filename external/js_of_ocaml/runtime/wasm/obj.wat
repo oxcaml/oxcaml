@@ -16,7 +16,7 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "portable_int_val"
          (func $portable_int_val (param (ref eq)) (result i64)))
@@ -24,8 +24,15 @@
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
       (import "portableint" "is_ocaml_portable_int"
          (func $is_ocaml_portable_int (param (ref eq)) (result i32)))
+      (import "portableint" "phys_eq"
+         (func $phys_eq (param (ref eq)) (param (ref eq)) (result i32)))
    ))
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
+   (import "array" "caml_check_array_length"
+      (func $caml_check_array_length (param i32)))
+   (import "array" "caml_check_float_array_length"
+      (func $caml_check_float_array_length (param i32)))
+   (import "fail" "caml_raise_out_of_memory" (func $caml_raise_out_of_memory))
    (import "custom" "caml_is_custom"
       (func $caml_is_custom (param (ref eq)) (result i32)))
    (import "custom" "caml_dup_custom"
@@ -46,9 +53,27 @@
    (type $closure (sub (struct (field $func (ref $function_1)))))
    (type $closure_last_arg (sub $closure (struct (field $func (ref $function_1)))))
    (type $function_2 (func (param (ref eq) (ref eq) (ref eq)) (result (ref eq))))
+(@if (not (= $effects "double-translation"))
+(@then
    (type $cps_closure (sub (struct (field $func (ref $function_2)))))
    (type $cps_closure_last_arg
       (sub $cps_closure (struct (field $func (ref $function_2)))))
+)
+(@else
+   ;; With double translation, the closure of a function with a CPS version is
+   ;; a direct-style closure extended with the code pointers of the CPS
+   ;; version (see Gc_target.Type.code_pointer_fields in the compiler). Since
+   ;; Wasm types are structural, $cps_closure would otherwise be the same type
+   ;; as $closure_2; it is made a subtype of $closure_last_arg to keep the two
+   ;; apart. This does not mean it has a single argument left: as in direct
+   ;; style, that is what $cps_closure_last_arg denotes.
+   (type $cps_closure
+      (sub $closure_last_arg
+         (struct (field $func (ref $function_1)) (field $cps_func (ref $function_2)))))
+   (type $cps_closure_last_arg
+      (sub $cps_closure
+         (struct (field $func (ref $function_1)) (field $cps_func (ref $function_2)))))
+))
 
    (type $int_array (array (mut i32)))
 
@@ -90,13 +115,26 @@
          (struct (field $func (ref $function_1)) (field $direct (ref $function_4))
             (field $closure (mut (ref null $closure_4))))))
 
+   ;; Only used when functions are compiled in CPS: with double translation,
+   ;; recursive values are initialised with direct-style dummy closures.
+(@if (not (= $effects "double-translation"))
+(@then
    (type $cps_dummy_closure
       (sub final $cps_closure_last_arg
          (struct
             (field $func (ref $function_2))
             (field $closure (mut (ref null $cps_closure))))))
+)
+(@else
+   (type $cps_dummy_closure
+      (sub final $cps_closure_last_arg
+         (struct
+            (field $func (ref $function_1))
+            (field $cps_func (ref $function_2))
+            (field $closure (mut (ref null $cps_closure))))))
+))
 
-   (global $forcing_tag i32 (i32.const 244))
+   (global $forcing_tag (export "forcing_tag") i32 (i32.const 244))
    (global $cont_tag (export "cont_tag") i32 (i32.const 245))
    (global $lazy_tag (export "lazy_tag") i32 (i32.const 246))
    (global $closure_tag i32 (i32.const 247))
@@ -110,13 +148,22 @@
 
    (@string $obj_meth "CamlinternalOO.method")
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func $array_index_or_size (param $v (ref eq)) (result i32)
          (local $n i64)
          (local.set $n (call $portable_int_val (local.get $v)))
          (if (i64.gt_u (local.get $n) (i64.const 0xfffffffe))
             (then (local.set $n (i64.const 0xfffffffe))))
+         (i32.wrap_i64 (local.get $n)))
+
+      ;; The size of a block to allocate: as native, fail with Out_of_memory
+      ;; beyond [Max_wosize] rather than trapping
+      (func $block_size (param $v (ref eq)) (result i32)
+         (local $n i64)
+         (local.set $n (call $portable_int_val (local.get $v)))
+         (if (i64.gt_u (local.get $n) (i64.const 0xfffffff))
+            (then (call $caml_raise_out_of_memory)))
          (i32.wrap_i64 (local.get $n)))
    ))
 
@@ -141,44 +188,51 @@
       (i32.or (ref.test (ref $closure) (local.get $v))
               (ref.test (ref $cps_closure) (local.get $v))))
 
+   ;; Whether applying one more argument to this closure completes the call.
+   ;; With double translation, $cps_closure is a subtype of $closure_last_arg,
+   ;; so the CPS hierarchy must be tested first.
    (func (export "caml_is_last_arg")
       (param $v (ref eq)) (result i32)
-      (i32.or (ref.test (ref $closure_last_arg) (local.get $v))
-              (ref.test (ref $cps_closure_last_arg) (local.get $v))))
+      (if (result i32) (ref.test (ref $cps_closure) (local.get $v))
+         (then (ref.test (ref $cps_closure_last_arg) (local.get $v)))
+         (else (ref.test (ref $closure_last_arg) (local.get $v)))))
 
    (func (export "caml_alloc_dummy") (param $size (ref eq)) (result (ref eq))
+      (local $sz i32)
+      (@if $portable_int
+      (@then (local.set $sz (call $block_size (local.get $size))))
+      (@else
+      (local.set $sz (i31.get_u (ref.cast (ref i31) (local.get $size))))
+      ))
+      (call $caml_check_array_length (local.get $sz))
       (array.new $block (ref.i31 (i32.const 0))
-                 (@if $portable-int
-                 (@then
-                    (i32.add (call $array_index_or_size (local.get $size))
-                             (i32.const 1)))
-                 (@else
-                 (i32.add (i31.get_u (ref.cast (ref i31) (local.get $size)))
-                          (i32.const 1))))
-                 ))
+                 (i32.add (local.get $sz) (i32.const 1))))
 
    (func (export "caml_alloc_dummy_float")
       (param $size (ref eq)) (result (ref eq))
-      (@if $portable-int
-      (@then
-         (array.new $float_array (f64.const 0)
-            (call $array_index_or_size (local.get $size))))
+      (local $sz i32)
+      (@if $portable_int
+      (@then (local.set $sz (call $block_size (local.get $size))))
       (@else
-      (array.new $float_array (f64.const 0)
-         (i31.get_u (ref.cast (ref i31) (local.get $size)))))
+      (local.set $sz (i31.get_u (ref.cast (ref i31) (local.get $size))))
       ))
+      (call $caml_check_float_array_length (local.get $sz))
+      (if (i32.eqz (local.get $sz))
+         (then
+            (return (array.new_fixed $block 1 (ref.i31 (i32.const 0))))))
+      (array.new $float_array (f64.const 0) (local.get $sz)))
 
    (func (export "caml_alloc_dummy_mixed")
       (param $size (ref eq)) (param (ref eq)) (result (ref eq))
+      (local $sz i32)
+      (@if $portable_int
+      (@then (local.set $sz (call $block_size (local.get $size))))
+      (@else
+      (local.set $sz (i31.get_u (ref.cast (ref i31) (local.get $size))))
+      ))
+      (call $caml_check_array_length (local.get $sz))
       (array.new $block (ref.i31 (i32.const 0))
-                 (@if $portable-int
-                 (@then
-                    (i32.add (call $array_index_or_size (local.get $size))
-                             (i32.const 1)))
-                 (@else
-                 (i32.add (i31.get_u (ref.cast (ref i31) (local.get $size)))
-                          (i32.const 1))))
-                 ))
+                 (i32.add (local.get $sz) (i32.const 1))))
 
    (func $caml_update_dummy (export "caml_update_dummy")
       (param $dummy (ref eq)) (param $newval (ref eq)) (result (ref eq))
@@ -232,7 +286,7 @@
       (drop (block $not_cps_closure (result (ref eq))
          (local.set $ccps
             (br_on_cast_fail $not_cps_closure (ref eq) (ref $cps_dummy_closure) (local.get $dummy)))
-         (struct.set $cps_dummy_closure 1 (local.get $ccps)
+         (struct.set $cps_dummy_closure $closure (local.get $ccps)
             (ref.cast (ref $cps_closure) (local.get $newval)))
          (return (ref.i31 (i32.const 0)))))
       (unreachable))
@@ -270,7 +324,7 @@
       (if (ref.eq (local.get $v) (global.get $null_value))
          (then (return (global.get $null_value))))
       ;; Handle immediate integers
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (call $is_ocaml_portable_int (local.get $v))
             (then (return (local.get $v)))))
@@ -330,26 +384,29 @@
       (local $res (ref $block))
       (local $n i32)
       ;; TODO: fail for values that are not represented as an array
-      (@if $portable-int
+      (@if $portable_int
       (@then
-         (local.set $n (call $array_index_or_size (local.get $size))))
+         (local.set $n (call $block_size (local.get $size))))
       (@else
       (local.set $n (i31.get_s (ref.cast (ref i31) (local.get $size))))
       ))
       ;; Float arrays have a dedicated representation; a generic block
       ;; would trap on the first float-array primitive.
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (i64.eq (call $portable_int_val (local.get $tg))
                      (i64.extend_i32_u (global.get $double_array_tag)))
             (then
+               (call $caml_check_float_array_length (local.get $n))
                (return (array.new $float_array (f64.const 0) (local.get $n))))))
       (@else
       (if (i32.eq (i31.get_s (ref.cast (ref i31) (local.get $tg)))
                   (global.get $double_array_tag))
          (then
+            (call $caml_check_float_array_length (local.get $n))
             (return (array.new $float_array (f64.const 0) (local.get $n)))))
       ))
+      (call $caml_check_array_length (local.get $n))
       (local.set $res
          (array.new $block
             (ref.i31 (i32.const 0))
@@ -361,7 +418,7 @@
       (param $v (ref eq)) (result (ref eq))
       (if (ref.eq (local.get $v) (global.get $null_value))
          (then (return (ref.i31 (i32.const 1010)))))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (call $is_ocaml_portable_int (local.get $v))
             (then (return (ref.i31 (i32.const 1000))))))
@@ -440,7 +497,7 @@
       (local $b (ref $block))
       (local $i i32)
       (local.set $b (ref.cast (ref $block) (local.get $v)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $i
             (i32.add (call $array_index_or_size (local.get $vi)) (i32.const 1))))
@@ -448,21 +505,35 @@
       (local.set $i
          (i32.add (i31.get_u (ref.cast (ref i31) (local.get $vi))) (i32.const 1)))
       ))
-      (if (result (ref eq))
-          (ref.eq
-            (array.get $block (local.get $b) (local.get $i)) (local.get $old))
-         (then
-            (array.set $block (local.get $b) (local.get $i) (local.get $new))
-            (ref.i31 (i32.const 1)))
-         (else
-            (ref.i31 (i32.const 0)))))
+      (@if $portable_int
+      (@then
+         (if (result (ref eq))
+             ;; Large integers are boxed: compare them by value
+             (call $phys_eq
+                   (array.get $block (local.get $b) (local.get $i))
+                   (local.get $old))
+            (then
+               (array.set $block (local.get $b) (local.get $i) (local.get $new))
+               (ref.i31 (i32.const 1)))
+            (else
+               (ref.i31 (i32.const 0)))))
+      (@else
+         (if (result (ref eq))
+             ;; Large integers are boxed: compare them by value
+             (ref.eq
+               (array.get $block (local.get $b) (local.get $i)) (local.get $old))
+            (then
+               (array.set $block (local.get $b) (local.get $i) (local.get $new))
+               (ref.i31 (i32.const 1)))
+            (else
+               (ref.i31 (i32.const 0)))))))
 
    (func (export "caml_obj_is_shared") (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 1)))
 
    (func (export "caml_obj_raw_field")
       (param $o (ref eq)) (param $i (ref eq)) (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (ref.test (ref $block) (local.get $o))
             (then
@@ -485,7 +556,7 @@
    (func (export "caml_obj_set_raw_field")
       (param $o (ref eq)) (param $i (ref eq)) (param $v (ref eq))
       (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (ref.test (ref $block) (local.get $o))
             (then
@@ -553,7 +624,7 @@
          (ref.cast (ref $block)
             (array.get $block
                (ref.cast (ref $block) (local.get $obj)) (i32.const 1))))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $cacheid (call $int_val_32_exn (local.get $vcacheid)
                                 (global.get $obj_meth))))
@@ -571,7 +642,7 @@
                      (array.get $block
                         (local.get $meths)
                         (i32.sub (local.get $ofs) (i32.const 1))))))))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $tg (call $int_val_32_exn (local.get $vtag)
                            (global.get $obj_meth))))
@@ -627,7 +698,7 @@
          (ref.cast (ref $block)
             (array.get $block
                (ref.cast (ref $block) (local.get $obj)) (i32.const 1))))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $tg (call $int_val_32_exn (local.get $vtag)
                            (global.get $obj_meth))))
@@ -747,10 +818,13 @@
 
 (@if $introspect
 (@then
-   ;; Approximation: return a new reference for each call
+   ;; A reference cell holding the (empty) list of block descriptors
+   (global $block_descs (ref eq)
+      (array.new_fixed $block 2 (ref.i31 (i32.const 0)) (ref.i31 (i32.const 0))))
+
    (func (export "caml_compiler_block_descs")
       (param (ref eq)) (result (ref eq))
-      (array.new_fixed $block 1 (ref.i31 (i32.const 0))))
+      (global.get $block_descs))
 
    (func (export "caml_obj_reserved_bits") (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))

@@ -133,4 +133,8 @@ let block ~env ~res ~tag ~mut ~fields :
     | Immutable_unique -> Immutable
   in
   let fields, res = simples ~env ~res fields in
-  Block (tag, Array.of_list fields, NotArray, mutability), env, res
+  let block : Jsir.expr =
+    Block
+      (tag, Array.of_list fields, NotArray, mutability, Jsir.Block_desc.none)
+  in
+  block, env, res

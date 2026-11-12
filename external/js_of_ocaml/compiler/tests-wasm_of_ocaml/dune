@@ -7,12 +7,52 @@
   (flags :standard --disable optcall --no-inline)))
 
 (tests
- (names fun_eq open_append)
+ (names fun_eq open_append exn_wrapper)
  (modes js wasm))
 
 (tests
- (names marshal_regressions)
+ (names sys_const)
+ (modes js wasm)
+ (js_of_ocaml
+  (flags :standard --disable staticeval)
+  (link_flags :standard --disable staticeval))
+ (wasm_of_ocaml
+  (flags :standard --disable staticeval)
+  (link_flags :standard --disable staticeval)))
+
+(tests
+ (names constant_array)
+ (modes js wasm)
+ (wasm_of_ocaml
+  (flags :standard --opt 2)))
+
+(tests
+ (names marshal_regressions int_and)
  (modes wasm))
+
+(tests
+ (names globalize_assign)
+ (modes wasm)
+ ; With -g, ocamlc does not turn the reference into a mutable variable
+ (flags
+  (:standard \ -g))
+ (ocamlc_flags ())
+ (wasm_of_ocaml
+  (flags :standard -w no-missing-debug-event)))
+
+(tests
+ (names assign)
+ (modes js wasm)
+ ; With -g, ocamlc does not turn the references into mutable variables
+ (flags
+  (:standard \ -g))
+ (ocamlc_flags ())
+ (js_of_ocaml
+  (flags :standard -w no-missing-debug-event)
+  (link_flags :standard -w no-missing-debug-event))
+ (wasm_of_ocaml
+  (flags :standard -w no-missing-debug-event)
+  (link_flags :standard -w no-missing-debug-event)))
 
 (tests
  (names split_toplevel split_toplevel_switch)
@@ -52,9 +92,6 @@
   (compilation_mode whole_program)
   (flags :standard)))
 
-(cram
- (applies_to split_toplevel_pieces)
- (deps split_toplevel.ml split_toplevel_switch.ml))
 (tests
  (names bigarray_generic)
  (modes wasm)
@@ -66,8 +103,66 @@
   (flags :standard)))
 
 (tests
+ (names bigarray_dim)
+ (modes js wasm)
+ ; Bigarray accesses are specialized when the type analysis knows the kind
+ ; and layout of the bigarray
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags :standard --opt 2)))
+
+(tests
  (names string_interning)
  (modes wasm))
+
+(tests
+ (names handler_shortcut)
+ (modes js wasm)
+ ; Without -g, ocamlc turns local references into mutable variables,
+ ; which exercises Assign instructions
+ (ocamlc_flags ())
+ ; Source maps are enabled in dev mode, where they warn about the missing
+ ; debug information. (Passing --no-source-map instead would fail in
+ ; release mode, where dune passes it already and the option cannot be
+ ; repeated.)
+ (js_of_ocaml
+  (flags :standard -w no-missing-debug-event)
+  (link_flags :standard -w no-missing-debug-event))
+ (wasm_of_ocaml
+  (flags :standard -w no-missing-debug-event)
+  (link_flags :standard -w no-missing-debug-event)))
+
+(tests
+ (names local_sink_exn)
+ (modes js wasm)
+ ; The bug only shows up without debug information
+ (ocamlc_flags ())
+ ; Source maps are enabled in dev mode, where they warn about the missing
+ ; debug information. (Passing --no-source-map instead would fail in
+ ; release mode, where dune passes it already and the option cannot be
+ ; repeated.)
+ (js_of_ocaml
+  (flags :standard -w no-missing-debug-event)
+  (link_flags :standard -w no-missing-debug-event))
+ (wasm_of_ocaml
+  (flags :standard -w no-missing-debug-event)
+  (link_flags :standard -w no-missing-debug-event)))
+
+(tests
+ (names clone_higher_order)
+ (modes wasm)
+ ; Higher-order functions are only cloned at -O2 and -O3, when the global
+ ; flow analysis is precise.
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags :standard --opt 2)))
+
+(tests
+ (names portable_int_js)
+ (modes wasm)
+ (enabled_if
+  (= %{profile} with-portable-int))
+ (libraries js_of_ocaml))
 
 ; The programs compiled here run Wasm code and rely on Node's module
 ; resolution (`require`, `require.main`). QuickJS provides neither, so these
@@ -77,3 +172,35 @@
  (deps %{bin:wasm_of_ocaml})
  (enabled_if
   (<> %{profile} quickjs)))
+
+(cram
+ (applies_to open_recursion)
+ ; The bytecode only carries the type checker's hints from OCaml 5.6
+ (enabled_if
+  (>= %{ocaml_version} 5.6)))
+
+(cram
+ (applies_to split_toplevel_pieces)
+ (deps split_toplevel.ml split_toplevel_switch.ml))
+
+(tests
+ (names js_bool js_float_args js_int_args js_string_cache)
+ (modes js wasm)
+ (libraries js_of_ocaml)
+ ; The js_of_ocaml library is not compatible with WASI
+ (build_if
+  (<> %{env:JSOO_TEST_ENGINE=node} wasi))
+ ; Without -g, ocamlc turns the reference into a mutable variable
+ (flags
+  (:standard \ -g))
+ (ocamlc_flags ())
+ (js_of_ocaml
+  (flags :standard -w no-missing-debug-event)
+  (link_flags :standard -w no-missing-debug-event))
+ (wasm_of_ocaml
+  (flags :standard -w no-missing-debug-event)
+  (link_flags :standard -w no-missing-debug-event)))
+
+(cram
+ (applies_to globalize_js_float)
+ (deps globalize_js_float.ml))

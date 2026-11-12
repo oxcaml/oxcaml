@@ -18,17 +18,25 @@
 
 open Stdlib
 
-let build ~allowed_imports ~link_options ~opt_options ~variables ~inputs ~output_file =
+let link_input ?load_source_map { Binaryen.module_name; file; source_map_file } =
+  { Wasm_link.module_name
+  ; file
+  ; code = None
+  ; opt_source_map =
+      (match load_source_map, source_map_file with
+      | Some load, Some source_map_file -> Some (load source_map_file)
+      | _ -> None)
+  }
+
+let link ~inputs ~output_file =
+  let (_ : Wasm_link.output) = Wasm_link.f inputs ~output_file in
+  ()
+
+let build ~allowed_imports ~opt_options ~variables ~inputs ~output_file =
   Fs.with_intermediate_file (Filename.temp_file "runtime-merged" ".wasm")
   @@ fun merge_file ->
-  (Wat_preprocess.with_preprocessed_files ~variables ~inputs
-  @@ fun inputs ->
-  Binaryen.link
-    ~options:link_options
-    ~opt_output_sourcemap:None
-    ~inputs
-    ~output_file:merge_file
-    ());
+  (Wax_link.with_preprocessed_files ~variables ~inputs
+  @@ fun inputs -> link ~inputs:(List.map ~f:link_input inputs) ~output_file:merge_file);
   Binaryen.optimize
     ~profile:Profile.O1
     ~options:opt_options

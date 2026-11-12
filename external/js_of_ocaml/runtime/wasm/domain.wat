@@ -27,7 +27,7 @@
    (type $block (array (mut (ref eq))))
    (type $bytes (array (mut i8)))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "portable_int_val"
          (func $portable_int_val (param (ref eq)) (result i64)))
@@ -37,26 +37,30 @@
          (func $phys_eq (param (ref eq)) (param (ref eq)) (result i32)))
    ))
 
-
    (func (export "caml_atomic_cas")
       (param $ref (ref eq)) (param $o (ref eq)) (param $n (ref eq))
       (result (ref eq))
       (local $b (ref $block))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
-      (if (result (ref eq))
-         (@if $portable-int
-         (@then
+      (@if $portable_int
+      (@then
+         (if (result (ref eq))
             (call $phys_eq (array.get $block (local.get $b) (i32.const 1))
-               (local.get $o)))
-         (@else
-         (ref.eq (array.get $block (local.get $b) (i32.const 1))
-                 (local.get $o))
-         ))
-         (then
-            (array.set $block (local.get $b) (i32.const 1) (local.get $n))
-            (ref.i31 (i32.const 1)))
-         (else
-            (ref.i31 (i32.const 0)))))
+                  (local.get $o))
+            (then
+               (array.set $block (local.get $b) (i32.const 1) (local.get $n))
+               (ref.i31 (i32.const 1)))
+            (else
+               (ref.i31 (i32.const 0)))))
+      (@else
+         (if (result (ref eq))
+            (ref.eq (array.get $block (local.get $b) (i32.const 1))
+                    (local.get $o))
+            (then
+               (array.set $block (local.get $b) (i32.const 1) (local.get $n))
+               (ref.i31 (i32.const 1)))
+            (else
+               (ref.i31 (i32.const 0)))))))
 
    (func (export "caml_atomic_cas_field")
       (param $ref (ref eq)) (param $i (ref eq)) (param $o (ref eq))
@@ -69,20 +73,25 @@
          (i32.add (i31.get_u (ref.cast (ref i31) (local.get $i))) (i32.const 1)))
          ;; lint-ignore-end manual-portability-handling-unsafe
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
-      (if (result (ref eq))
-         (@if $portable-int
-         (@then
+      (@if $portable_int
+      (@then
+         (if (result (ref eq))
             (call $phys_eq (array.get $block (local.get $b) (local.get $j))
-               (local.get $o)))
-         (@else
-         (ref.eq (array.get $block (local.get $b) (local.get $j))
-                 (local.get $o))
-         ))
-         (then
-            (array.set $block (local.get $b) (local.get $j) (local.get $n))
-            (ref.i31 (i32.const 1)))
-         (else
-            (ref.i31 (i32.const 0)))))
+                  (local.get $o))
+            (then
+               (array.set $block (local.get $b) (local.get $j) (local.get $n))
+               (ref.i31 (i32.const 1)))
+            (else
+               (ref.i31 (i32.const 0)))))
+      (@else
+         (if (result (ref eq))
+            (ref.eq (array.get $block (local.get $b) (local.get $j))
+                    (local.get $o))
+            (then
+               (array.set $block (local.get $b) (local.get $j) (local.get $n))
+               (ref.i31 (i32.const 1)))
+            (else
+               (ref.i31 (i32.const 0)))))))
 
    (func (export "caml_atomic_compare_exchange")
       (param $ref (ref eq)) (param $o (ref eq)) (param $n (ref eq))
@@ -91,17 +100,23 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
-      (if (result (ref eq))
-         (@if $portable-int
-         (@then (call $phys_eq (local.get $old) (local.get $o)))
-         (@else
-         (ref.eq (local.get $old) (local.get $o))
-         ))
-         (then
-            (array.set $block (local.get $b) (i32.const 1) (local.get $n))
-            (local.get $old))
-         (else
-            (local.get $old))))
+      (@if $portable_int
+      (@then
+         (if (result (ref eq))
+            (call $phys_eq (local.get $old) (local.get $o))
+            (then
+               (array.set $block (local.get $b) (i32.const 1) (local.get $n))
+               (local.get $old))
+            (else
+               (local.get $old))))
+      (@else
+         (if (result (ref eq))
+            (ref.eq (local.get $old) (local.get $o))
+            (then
+               (array.set $block (local.get $b) (i32.const 1) (local.get $n))
+               (local.get $old))
+            (else
+               (local.get $old))))))
 
    (func (export "caml_atomic_load") (param $b (ref eq)) (result (ref eq))
       (array.get $block (ref.cast (ref $block) (local.get $b)) (i32.const 1)))
@@ -120,7 +135,7 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (i32.const 1)
             (call $val_portable_int
@@ -147,7 +162,7 @@
          ;; lint-ignore-end manual-portability-handling-unsafe
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (local.get $j)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (local.get $j)
             (call $val_portable_int
@@ -167,7 +182,7 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (i32.const 1)
             (call $val_portable_int
@@ -187,7 +202,7 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (i32.const 1)
             (call $val_portable_int
@@ -207,7 +222,7 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (i32.const 1)
             (call $val_portable_int
@@ -227,7 +242,7 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (i32.const 1)
             (call $val_portable_int
@@ -247,7 +262,7 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (i32.const 1)
             (call $val_portable_int
@@ -447,7 +462,7 @@
             (i32.const 1)))
          ;; lint-ignore-end manual-portability-handling-unsafe
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (local.get $idx)
             (call $val_portable_int
@@ -475,7 +490,7 @@
             (i32.const 1)))
          ;; lint-ignore-end manual-portability-handling-unsafe
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (local.get $idx)
             (call $val_portable_int
@@ -503,7 +518,7 @@
             (i32.const 1)))
          ;; lint-ignore-end manual-portability-handling-unsafe
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (local.get $idx)
             (call $val_portable_int
@@ -531,7 +546,7 @@
             (i32.const 1)))
          ;; lint-ignore-end manual-portability-handling-unsafe
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (local.get $idx)
             (call $val_portable_int
@@ -559,7 +574,7 @@
             (i32.const 1)))
          ;; lint-ignore-end manual-portability-handling-unsafe
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (array.set $block (local.get $b) (local.get $idx)
             (call $val_portable_int
@@ -587,7 +602,7 @@
             (i32.const 1)))
          ;; lint-ignore-end manual-portability-handling-unsafe
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (if (call $phys_eq (local.get $old) (local.get $o))
             (then

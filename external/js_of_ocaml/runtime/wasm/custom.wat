@@ -27,7 +27,7 @@
    (import "string" "caml_bytes_equal"
       (func $caml_bytes_equal
          (param (ref eq)) (param (ref eq)) (result (ref eq))))
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "bool_val"
          (func $bool_val (param (ref eq)) (result i32)))
@@ -121,7 +121,7 @@
       (block $not_found
          (local.set $l (br_on_null $not_found (global.get $custom_operations)))
          (loop $loop
-            (@if $portable-int
+            (@if $portable_int
             (@then
                (if (call $bool_val
                   (call $caml_bytes_equal (local.get $id)

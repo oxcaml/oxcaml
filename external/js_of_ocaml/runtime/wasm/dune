@@ -29,15 +29,15 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=jspi
-   --disable=portable-int
    --disable=wasi
+   --disable=portable_int
    --allowed-imports=bindings,Math,js,wasm:js-string,wasm:text-encoder,wasm:text-decoder
    %{target}
    c:c-impl.wasm
    %{read-lines:args})))
 
 (rule
- (target runtime-jspi-portable-int.wasm)
+ (target runtime-jspi-portable_int.wasm)
  (deps
   binaryen-version-check
   args
@@ -49,8 +49,8 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=jspi
-   --enable=portable-int
    --disable=wasi
+   --enable=portable_int
    --allowed-imports=bindings,Math,js,wasm:js-string,wasm:text-encoder,wasm:text-decoder
    %{target}
    c:c-impl.wasm
@@ -69,8 +69,28 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=cps
-   --disable=portable-int
    --disable=wasi
+   --disable=portable_int
+   --allowed-imports=bindings,Math,js,wasm:js-string,wasm:text-encoder,wasm:text-decoder
+   %{target}
+   c:c-impl.wasm
+   %{read-lines:args})))
+
+(rule
+ (target runtime-double-translation.wasm)
+ (deps
+  binaryen-version-check
+  args
+  c-impl.wasm
+  (glob_files *.wat))
+ (action
+  (run
+   ../../compiler/bin-wasm_of_ocaml/wasmoo_link_wasm.exe
+   --binaryen=-g
+   --binaryen-opt=-O3
+   --set=effects=double-translation
+   --disable=wasi
+   --disable=portable_int
    --allowed-imports=bindings,Math,js,wasm:js-string,wasm:text-encoder,wasm:text-decoder
    %{target}
    c:c-impl.wasm
@@ -88,8 +108,8 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=disabled
-   --disable=portable-int
    --enable=wasi
+   --disable=portable_int
    --allowed-imports=wasi_snapshot_preview1,OCaml
    %{target}
    libc:libc.wasm
@@ -107,8 +127,26 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=cps
-   --disable=portable-int
    --enable=wasi
+   --disable=portable_int
+   %{target}
+   libc:libc.wasm
+   %{read-lines:args})))
+
+(rule
+ (target runtime-double-translation-wasi.wasm)
+ (deps
+  args
+  (glob_files *.wat)
+  libc.wasm)
+ (action
+  (run
+   ../../compiler/bin-wasm_of_ocaml/wasmoo_link_wasm.exe
+   --binaryen=-g
+   --binaryen-opt=-O3
+   --set=effects=double-translation
+   --enable=wasi
+   --disable=portable_int
    %{target}
    libc:libc.wasm
    %{read-lines:args})))

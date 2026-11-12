@@ -16,7 +16,7 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "int_val_32_exn"
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
@@ -32,7 +32,8 @@
 
    (import "jslib" "caml_jsstring_of_string"
       (func $caml_jsstring_of_string (param (ref eq)) (result (ref eq))))
-   (import "jslib" "unwrap" (func $unwrap (param (ref eq)) (result anyref)))
+   (import "jslib" "js_of_value"
+      (func $js_of_value (param (ref eq)) (result externref)))
    (import "obj" "caml_callback_1"
       (func $caml_callback_1
          (param (ref eq)) (param (ref eq)) (result (ref eq))))
@@ -55,7 +56,7 @@
 (@else
    (import "fail" "javascript_exception"
       (tag $javascript_exception (param externref)))
-   (import "bindings" "write" (func $write (param i32) (param anyref)))
+   (import "bindings" "write" (func $write (param i32) (param externref)))
    (import "bindings" "exit" (func $exit (param i32)))
 ))
 
@@ -80,7 +81,7 @@
 
    (@string $predef_prefix "predef:")
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (@string $global_index "Global index out of range")
    ))
@@ -98,7 +99,7 @@
          (array.new $bytes (i32.const 0) (i32.add (local.get $len) (i32.const 7))))
       (array.copy $bytes $bytes
          (local.get $key) (i32.const 0)
-         (ref.cast (ref $bytes) (global.get $predef_prefix)) (i32.const 0) (i32.const 7))
+         (global.get $predef_prefix) (i32.const 0) (i32.const 7))
       (array.copy $bytes $bytes
          (local.get $key) (i32.const 7)
          (local.get $name) (i32.const 0)
@@ -114,7 +115,7 @@
             (local.set $a
                (br_on_cast_fail $tail (ref null $assoc) (ref $assoc)
                   (local.get $l)))
-            (@if $portable-int
+            (@if $portable_int
             (@then
                (if (call $bool_val (call $caml_string_equal (local.get $s) (struct.get $assoc 0 (local.get $a))))
                   (then
@@ -203,7 +204,7 @@
       (block $done
          (local.set $a (br_on_null $done (local.get $r)))
          ;; Head of the bucket matches: drop it.
-         (@if $portable-int
+         (@if $portable_int
          (@then
             (if (call $bool_val (call $caml_string_equal (local.get $name) (struct.get $assoc 0 (local.get $a))))
                (then
@@ -228,7 +229,7 @@
          (loop $loop
             (local.set $cur
                (br_on_null $done (struct.get $assoc 2 (local.get $a))))
-            (@if $portable-int
+            (@if $portable_int
             (@then
                (if (call $bool_val (call $caml_string_equal (local.get $name) (struct.get $assoc 0 (local.get $cur))))
                   (then
@@ -436,7 +437,7 @@
       (param $v (ref eq)) (param $idx (ref eq)) (result (ref eq))
       (local $i i32)
       ;; caml_global_data is a $block: index 0 is the tag, data starts at 1
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $i
             (i32.add (call $int_val_32_exn (local.get $idx) (global.get $global_index)) (i32.const 1))))
@@ -576,7 +577,7 @@
 )
 (@else
                (call $write (i32.const 2)
-                  (call $unwrap
+                  (call $js_of_value
                      (call $caml_jsstring_of_string (local.get $msg))))
 ))
             )
@@ -584,4 +585,6 @@
 
    (func (export "caml_with_async_exns") (param $f (ref eq)) (result (ref eq))
       (return_call $caml_callback_1 (local.get $f) (ref.i31 (i32.const 0))))
+
+   (global (export "caml_exception") (mut (ref eq)) (ref.i31 (i32.const 0)))
 )

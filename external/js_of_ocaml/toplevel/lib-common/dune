@@ -10,4 +10,4 @@
   compiler-libs.bytecomp
   compiler-libs.toplevel)
  (preprocess
-  (pps ppx_optcomp_light)))
+  (pps ppx_devtools-optcomp)))

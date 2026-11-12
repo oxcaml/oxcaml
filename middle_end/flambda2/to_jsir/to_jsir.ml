@@ -207,8 +207,10 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
           let res =
             To_jsir_result.add_instr_exn res (Let (null, Constant Null_))
           in
-          To_jsir_result.add_instr_exn res
-            (Let (var, Block (0, [| null |], NotArray, Maybe_mutable))))
+          let block : Jsir.expr =
+            Block (0, [| null |], NotArray, Maybe_mutable, Jsir.Block_desc.none)
+          in
+          To_jsir_result.add_instr_exn res (Let (var, block)))
         res extra_args_boxed
     in
     extra_args_boxed, res
@@ -433,7 +435,7 @@ and apply_expr ~env ~res e =
           let f = Jsir.Var.fresh () in
           let res =
             To_jsir_result.add_instr_exn res
-              (Let (f, Prim (Array_get, [Pv methods; Pv field])))
+              (Let (f, Prim (Array_get Non_float, [Pv methods; Pv field])))
           in
           res, f
         | Cached ->
@@ -550,7 +552,9 @@ and apply_cont0 ~env ~res apply_cont =
           (* We box these back into a regular tuple - we will unbox this at the
              application site. *)
           let args = Array.of_list args in
-          let block : Jsir.expr = Block (0, args, NotArray, Immutable) in
+          let block : Jsir.expr =
+            Block (0, args, NotArray, Immutable, Jsir.Block_desc.none)
+          in
           let arg = Jsir.Var.fresh () in
           arg, To_jsir_result.add_instr_exn res (Let (arg, block))
       in

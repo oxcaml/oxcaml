@@ -241,7 +241,7 @@ function caml_maybe_attach_backtrace(exn, force) {
 //Requires: caml_global_data
 function caml_exn_with_js_backtrace(exn, force) {
   //never reraise for constant exn
-  if (!exn.js_error || force || exn[0] === 248)
+  if (!exn.js_error || force || TAG(exn) === 248)
     exn.js_error = new globalThis.Error("Js exception containing backtrace");
   return exn;
 }
@@ -288,8 +288,10 @@ function caml_js_from_array(a) {
   return a.slice(1);
 }
 //Provides: caml_js_to_array mutable (shallow)
+//Requires: caml_check_array_length
 function caml_js_to_array(a) {
   var len = a.length;
+  caml_check_array_length(len);
   var b = new Array(len + 1);
   b[0] = 0;
   for (var i = 0; i < len; i++) b[i + 1] = a[i];

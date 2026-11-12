@@ -19,6 +19,16 @@
 
 open! Stdlib
 
+(****)
+
+let oxcaml = true [@@if oxcaml]
+
+let oxcaml = false [@@if not oxcaml]
+
+let introspect = true [@@if introspect]
+
+let introspect = false [@@if not introspect]
+
 module Flag = struct
   let optims = ref []
 
@@ -73,6 +83,8 @@ module Flag = struct
 
   let inline = o ~name:"inline" ~default:true
 
+  let clone_higher_order = o ~name:"clone-higher-order" ~default:true
+
   let effects = o ~name:"effects" ~default:false
 
   let oxcaml_use_unyielding_debuginfo_for_effect_cps =
@@ -96,6 +108,8 @@ module Flag = struct
 
   let safe_string = o ~name:"safestring" ~default:true
 
+  let introspection = o ~name:"introspection" ~default:introspect
+
   let use_js_string = o ~name:"use-js-string" ~default:false
 
   let check_magic = o ~name:"check-magic-number" ~default:true
@@ -105,6 +119,12 @@ module Flag = struct
   let constant_sinking = o ~name:"constant-sinking" ~default:true
 
   let var_coalescing = o ~name:"var-coalescing" ~default:true
+
+  let wasm_var_coalescing = o ~name:"wasm-var-coalescing" ~default:true
+
+  let wasm_local_sink = o ~name:"wasm-local-sink" ~default:true
+
+  let wasm_cast_reuse = o ~name:"wasm-cast-reuse" ~default:true
 
   let header = o ~name:"header" ~default:true
 
@@ -118,9 +138,9 @@ module Flag = struct
 
   let wasi = o ~name:"wasi" ~default:false
 
-  let portable_int = o ~name:"portable-int" ~default:false
-
   let split_toplevel = o ~name:"split-toplevel" ~default:true
+
+  let portable_int = o ~name:"portable-int" ~default:false
 end
 
 module Param = struct
@@ -170,10 +190,12 @@ module Param = struct
 
   let all () = List.map !params ~f:(fun (n, (_, d, valid)) -> n, d, valid)
 
-  (* V8 "optimize" switches with less than 128 case.
-     60 seams to perform well. *)
+  (* Large switches are split into a binary tree of smaller switches.
+     Current engines compile dense switches to jump tables, so splitting
+     does not help, except on QuickJS, which tests the cases one after the
+     other (see compiler/perf-notes/switch/README.md). *)
   let switch_max_case =
-    p ~name:"switch_size" ~desc:"set the maximum number of case in a switch" (int 60)
+    p ~name:"switch_size" ~desc:"set the maximum number of case in a switch" (int 256)
 
   let inlining_limit =
     p ~name:"inlining-limit" ~desc:"set the size limit for inlining" (int 150)
@@ -190,16 +212,28 @@ module Param = struct
       ~desc:"set the maximum depth of generated literal JavaScript values"
       (int 10)
 
-  let merge_node_max =
+  let labelled_block_max_depth =
     (* Above this many sibling merge-node branch targets, emit a flat
        selector-driven dispatch loop instead of a tower of nested labelled
        blocks, to bound the statement-nesting depth of generated functions
        (deep nesting overflows some JS engine parsers, e.g. SpiderMonkey). *)
     p
-      ~name:"merge_node_max"
+      ~name:"label_depth"
       ~desc:
         "set the maximum number of nested labelled blocks before switching to a flat \
          dispatch loop"
+      (int 10)
+
+  let break_sinking_max_depth =
+    (* Each break sunk out of a labelled block nests what follows it one
+       level deeper, so this bounds the nesting depth introduced by sinking
+       (deep nesting overflows some JS engine parsers). Setting it to 0
+       disables break sinking. *)
+    p
+      ~name:"break_sink_depth"
+      ~desc:
+        "set the maximum number of breaks sunk out of a labelled block, each adding one \
+         level of nesting (0 disables break sinking)"
       (int 10)
 
   let toplevel_split_size =
@@ -230,6 +264,14 @@ module Param = struct
       ~desc:"Set tailcall optimisation"
       (enum [ "trampoline", TcTrampoline (* default *); "none", TcNone ])
 
+  let clone_higher_order_budget =
+    p
+      ~name:"clone-budget"
+      ~desc:
+        "set the maximal number of instructions added by cloning a higher-order function \
+         for the functions it is passed"
+      (int 300)
+
   let lambda_lifting_threshold =
     (* When we reach this depth, we start looking for functions to be lifted *)
     p
@@ -254,15 +296,21 @@ let target () =
   | `None -> failwith "target was not set"
   | (`JavaScript | `Wasm) as t -> t
 
-let set_target (t : [ `JavaScript | `Wasm ])  =
+let set_target (t : [ `JavaScript | `Wasm ]) =
   (match t, Flag.portable_int () with
-  | `JavaScript, false -> Targetint.set_num_bits 32; Targetnativeint.set_num_bits 32
-  | `JavaScript, true-> failwith "Portable int representation is incompatible with JavaScript"
-  | `Wasm, false -> Targetint.set_num_bits 31; Targetnativeint.set_num_bits 32
+  | `JavaScript, false ->
+      Targetint.set_num_bits 32;
+      Targetnativeint.set_num_bits 32
+  | `JavaScript, true ->
+      failwith "Portable int representation is incompatible with JavaScript"
+  | `Wasm, false ->
+      Targetint.set_num_bits 31;
+      Targetnativeint.set_num_bits 32
   | `Wasm, true when Flag.wasi () ->
-      failwith "Portable int representation is currently incompatible with wasi";
+      failwith "Portable int representation is currently incompatible with wasi"
   | `Wasm, true ->
-      Targetint.set_num_bits 63; Targetnativeint.set_num_bits 64);
+      Targetint.set_num_bits 63;
+      Targetnativeint.set_num_bits 64);
   target_ := (t :> [ `JavaScript | `Wasm | `None ])
 
 type effects_backend =
@@ -282,13 +330,3 @@ let effects () =
 
 let set_effects_backend (backend : effects_backend) =
   effects_ := (backend :> [ `None | effects_backend ])
-
-(****)
-
-let oxcaml = true [@@if oxcaml]
-
-let oxcaml = false [@@if not oxcaml]
-
-let introspect = true [@@if introspect]
-
-let introspect = false [@@if not introspect]

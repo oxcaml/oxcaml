@@ -48,27 +48,24 @@ module Integer = struct
     | Small_unnormalized
 
   let max_i31s = lazy (Targetint.to_int64 (Lazy.force Targetint.max_i31s))
+
   let min_i31s = lazy (Targetint.to_int64 (Lazy.force Targetint.min_i31s))
 
   let join r r' =
     match r, r' with
     | Ref, Ref -> Ref
-    | Ref, (Small_normalized | Small_unnormalized) | (Small_normalized | Small_unnormalized), Ref
+    | Ref, (Small_normalized | Small_unnormalized)
+    | (Small_normalized | Small_unnormalized), Ref
       when Config.Flag.portable_int () -> Large_normalized
     | Large_unnormalized, _ | _, Large_unnormalized -> Large_unnormalized
     | Large_normalized, _ | _, Large_normalized -> Large_normalized
     | Small_unnormalized, _ | _, Small_unnormalized -> Small_unnormalized
-    | Small_normalized, _| _, Small_normalized  -> Small_normalized
+    | Small_normalized, _ | _, Small_normalized -> Small_normalized
 
   let kind_of_targetint i =
-    if Config.Flag.portable_int ()
-    then (
-      let n = Targetint.to_int64 i in
-      if Int64.(n >= (Lazy.force min_i31s) && n <= (Lazy.force max_i31s))
-      then Small_normalized
-      else Large_normalized)
+    if Config.Flag.portable_int () && not (Targetint.is_within_i31s i)
+    then Large_normalized
     else Small_normalized
-
 end
 
 type boxed_number =
@@ -264,7 +261,8 @@ let update_deps st { blocks; _ } =
     (fun _ block ->
       List.iter block.body ~f:(fun i ->
           match i with
-          | Let (x, Block (_, lst, _, _)) -> Array.iter ~f:(fun y -> add_dep st x y) lst
+          | Let (x, Block (_, lst, _, _, _)) ->
+              Array.iter ~f:(fun y -> add_dep st x y) lst
           | Let
               ( x
               , Prim
@@ -272,6 +270,13 @@ let update_deps st { blocks; _ } =
                       ( ( "%int_and"
                         | "%int_or"
                         | "%int_xor"
+                        | "%int_add"
+                        | "%int_sub"
+                        | "%int_mul"
+                        | "%direct_int_mul"
+                        | "%int_neg"
+                        | "%int_div"
+                        | "%direct_int_div"
                         | "caml_ba_get_1"
                         | "caml_ba_get_2"
                         | "caml_ba_get_3"
@@ -344,7 +349,7 @@ let rec constant_type (c : constant) =
   | NativeInt _ -> Number (Nativeint, Unboxed)
   | Float _ -> Number (Float, Unboxed)
   | Float32 _ -> Number (Float32, Unboxed)
-  | Tuple (_, a, _) -> Tuple (Array.map ~f:(fun c' -> Domain.box (constant_type c')) a)
+  | Tuple (_, a, _, _) -> Tuple (Array.map ~f:(fun c' -> Domain.box (constant_type c')) a)
   | Null_ -> Null
   | _ -> Top
 
@@ -359,9 +364,9 @@ let bigarray_element_type (kind : Optimization_hint.Bigarray.kind) =
   | Float32_t -> Number (Float32, Unboxed)
   | Int8_signed | Int8_unsigned | Int16_signed | Int16_unsigned -> Int Small_normalized
   | Int ->
-    if Config.Flag.portable_int ()
-    then Int Large_unnormalized
-    else Int Small_unnormalized
+      if Config.Flag.portable_int ()
+      then Int Large_unnormalized
+      else Int Small_unnormalized
   | Int32 -> Number (Int32, Unboxed)
   | Int64 -> Number (Int64, Unboxed)
   | Nativeint -> Number (Nativeint, Unboxed)
@@ -377,13 +382,80 @@ let primitive_types = String.Hashtbl.create 16
 
 let prim_type ~st ~approx prim hint args =
   match prim with
-  | "%int_and" when Config.Flag.portable_int () -> Int Large_unnormalized
+  | ("%int_and" | "%int_or" | "%int_xor") when Config.Flag.portable_int () -> (
+      (* Bitwise operations preserve sign-extension, from 31 or from 63 bits *)
+      let small t =
+        match t with
+        | Bot | Int Small_normalized -> true
+        | _ -> false
+      in
+      let normalized t =
+        match t with
+        | Bot | Int (Ref | Small_normalized | Large_normalized) -> true
+        | _ -> false
+      in
+      (* [x land c] is in [\[0, c\]] when [c] is non-negative *)
+      let small_non_negative_constant p =
+        match
+          match p with
+          | Pc c -> Some c
+          | Pv y -> (
+              match st.global_flow_state.defs.(Var.idx y) with
+              | Expr (Constant c) -> Some c
+              | Phi _ | Expr _ -> None)
+        with
+        | Some (Int c) -> Targetint.(c >= zero) && Targetint.is_within_i31s c
+        | _ -> false
+      in
+      match args, List.map ~f:(fun x -> arg_type ~approx x) args with
+      | [ x; y ], [ t; t' ] ->
+          if
+            (small t && small t')
+            || String.equal prim "%int_and"
+               && (small_non_negative_constant x || small_non_negative_constant y)
+          then Int Small_normalized
+          else if normalized t && normalized t'
+          then Int Large_normalized
+          else Int Large_unnormalized
+      | _ -> Int Large_unnormalized)
+  | "%int_add"
+  | "%int_sub"
+  | "%int_mul"
+  | "%direct_int_mul"
+  | "%int_neg"
+  | "%int_div"
+  | "%direct_int_div"
+    when Config.Flag.portable_int () ->
+      (* These operations cannot overflow 63 bits when applied to 31-bit
+         integers. For a division, it is enough for the dividend to be a
+         31-bit integer. *)
+      let small t =
+        match t with
+        | Bot | Int (Small_normalized | Small_unnormalized) -> true
+        | _ -> false
+      in
+      let types = List.map ~f:(fun x -> arg_type ~approx x) args in
+      if
+        match prim, types with
+        | ("%int_div" | "%direct_int_div"), t :: _ -> small t
+        | _ -> List.for_all ~f:small types
+      then Int Large_normalized
+      else Int Large_unnormalized
   | "%int_and" -> (
-      match List.map ~f:(fun x -> arg_type ~approx x) args with
-      | [ (Bot | Int (Ref | Small_normalized)); _ ] | [ _; (Bot | Int (Ref | Small_normalized)) ] ->
-          Int Small_normalized
-      | _ -> Int Small_unnormalized)
-  | "%int_or" | "%int_xor" when Config.Flag.portable_int () -> Int Large_unnormalized
+      (* A non-negative operand clears the bits above the 31 low bits; a
+         negative one, such as [-1], keeps them *)
+      let non_negative_constant a =
+        match a with
+        | Pc (Int c) -> Targetint.(compare c zero) >= 0
+        | Pc _ | Pv _ -> false
+      in
+      if List.exists ~f:non_negative_constant args
+      then Int Small_normalized
+      else
+        match List.map ~f:(fun x -> arg_type ~approx x) args with
+        | [ (Bot | Int (Ref | Small_normalized)); (Bot | Int (Ref | Small_normalized)) ]
+          -> Int Small_normalized
+        | _ -> Int Small_unnormalized)
   | "%int_or" | "%int_xor" -> (
       match List.map ~f:(fun x -> arg_type ~approx x) args with
       | [ (Bot | Int (Ref | Small_normalized)); (Bot | Int (Ref | Small_normalized)) ] ->
@@ -437,7 +509,7 @@ let propagate st approx x : Domain.t =
       match e with
       | Constant c -> constant_type c
       | Closure _ -> Top
-      | Block (_, lst, _, _) ->
+      | Block (_, lst, _, _, _) ->
           Tuple
             (Array.mapi
                ~f:(fun i y ->
@@ -448,6 +520,7 @@ let propagate st approx x : Domain.t =
                      Domain.limit (Domain.box (Var.Tbl.get approx y)))
                lst)
       | Field (_, _, Float) -> Number (Float, Unboxed)
+      | Field (_, _, Immediate) | Prim (Array_get Immediate, _) -> Int Ref
       | Field (y, n, Non_float) -> (
           match Var.Tbl.get approx y with
           | Tuple t -> if n < Array.length t then t.(n) else Bot
@@ -457,33 +530,20 @@ let propagate st approx x : Domain.t =
           ( Extern
               (("caml_check_bound" | "caml_check_bound_float" | "caml_check_bound_gen"), _)
           , [ Pv y; _ ] ) -> Var.Tbl.get approx y
-      | Prim ((Array_get | Extern ("caml_array_unsafe_get", _)), [ Pv y; _ ]) -> (
-          match Var.Tbl.get st.global_flow_info.info_approximation y with
-          | Values { known; others } ->
-              Domain.join_set
-                ~others
-                (fun z ->
-                  match st.global_flow_state.defs.(Var.idx z) with
-                  | Expr (Block (_, lst, _, _)) ->
-                      let m =
-                        match st.global_flow_state.mutable_fields.(Var.idx z) with
-                        | No_field -> false
-                        | Some_fields _ | All_fields -> true
-                      in
-                      if m
-                      then Top
-                      else
-                        Domain.box
-                          (Array.fold_left
-                             ~f:(fun acc t -> Domain.join (Var.Tbl.get approx t) acc)
-                             ~init:Domain.bot
-                             lst)
-                  | Expr (Closure _) -> Bot
-                  | Phi _ | Expr _ -> assert false)
-                known
-          | Top -> Top)
-      | Prim (Array_get, _) -> Top
-      | Prim ((Vectlength _ | Not | IsInt | Eq | Neq | Lt | Le | Ult), _) ->
+      | Prim ((Array_get _ | Extern ("caml_array_unsafe_get", _)), [ Pv y; _ ]) -> (
+          (* A constant block can be read as an array: the compiler
+             passes the method names of a class to CamlinternalOO as
+             constant blocks. The global flow analysis does not track
+             constants (their approximation is empty), but their type is
+             part of the type of [y]. *)
+          match Var.Tbl.get approx y with
+          | Tuple t ->
+              Domain.box
+                (Array.fold_left ~f:(fun acc t -> Domain.join t acc) ~init:Domain.bot t)
+          | Bot -> Domain.bot
+          | _ -> Top)
+      | Prim (Array_get _, _) -> Top
+      | Prim ((Vectlength _ | Not | IsInt _ | Eq _ | Neq _ | Lt | Le | Ult), _) ->
           Int Small_normalized
       | Prim (Extern (prim, hint), args) -> prim_type ~st ~approx prim hint args
       | Special _ -> Top
@@ -493,7 +553,14 @@ let propagate st approx x : Domain.t =
               Domain.join_set
                 ~others
                 (fun g ->
+                  let g, cont =
+                    Global_flow.called_version st.global_flow_info ~call:x g
+                  in
                   match st.global_flow_state.defs.(Var.idx g) with
+                  | Expr (Closure _) when cont ->
+                      (* Double translation: the result is passed to a
+                         continuation *)
+                      Top
                   | Expr (Closure (params, _, _))
                     when List.length args = List.length params ->
                       let res =
@@ -610,9 +677,9 @@ let box_numbers p st types =
       | Number (_, Unboxed) | Top -> (
           match st.global_flow_state.defs.(Var.idx y) with
           | Expr (Apply { f; _ }) -> (
-              match Global_flow.get_unique_closure st.global_flow_info f with
-              | None -> ()
-              | Some (g, _) ->
+              match Global_flow.get_unique_closure st.global_flow_info ~call:y f with
+              | None | Some (_, _, true) -> ()
+              | Some (g, _, false) ->
                   if can_unbox_return_value st.fun_info g
                   then
                     let s = Var.Map.find g st.global_flow_info.info_return_vals in
@@ -631,15 +698,17 @@ let box_numbers p st types =
           List.iter
             ~f:(fun i ->
               match i with
-              | Let (_, e) -> (
+              | Let (x, e) -> (
                   match e with
                   | Apply { f; args; _ } ->
                       if
-                        match Global_flow.get_unique_closure st.global_flow_info f with
+                        match
+                          Global_flow.get_unique_closure st.global_flow_info ~call:x f
+                        with
                         | None -> true
-                        | Some (g, _) -> not (can_unbox_parameters st.fun_info g)
+                        | Some (g, _, _) -> not (can_unbox_parameters st.fun_info g)
                       then List.iter ~f:box args
-                  | Block (tag, lst, _, _) -> if tag <> 254 then Array.iter ~f:box lst
+                  | Block (tag, lst, _, _, _) -> if tag <> 254 then Array.iter ~f:box lst
                   | Prim (Extern (s, _), args) ->
                       if
                         not
@@ -654,16 +723,24 @@ let box_numbers p st types =
                             | Pv y -> box y
                             | Pc _ -> ())
                           args
-                  | Prim ((Eq | Neq), args) ->
+                  | Prim ((Eq { int_only = false } | Neq { int_only = false }), args) ->
+                      (* Physical comparison: the arguments must not be boxed
+                         at the comparison, which would allocate fresh boxes *)
                       List.iter
                         ~f:(fun a ->
                           match a with
                           | Pv y -> box y
                           | Pc _ -> ())
                         args
-                  | Prim ((Vectlength _ | Array_get | Not | IsInt | Lt | Le | Ult), _)
+                  | Prim
+                      ( ( Vectlength _ | Array_get _ | Not | IsInt _
+                        | Eq { int_only = true }
+                        | Neq { int_only = true }
+                        | Lt | Le | Ult )
+                      , _ )
                   | Field _ | Closure _ | Constant _ | Special _ -> ())
-              | Set_field (_, _, Non_float, y) | Array_set (_, _, y) -> box y
+              | Set_field (_, _, (Non_float | Immediate), y) | Array_set (_, _, y) ->
+                  box y
               | Assign _ | Offset_ref _ | Set_field (_, _, Float, _) | Event _ -> ())
             b.body;
           match b.branch with

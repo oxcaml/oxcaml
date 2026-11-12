@@ -48,7 +48,7 @@
 //Version: >= 5.2
 //If: oxcaml
 function caml_get_idx_bytecode(base, idx) {
-  switch (idx[0]) {
+  switch (TAG(idx)) {
     case 0: {
       var depth = idx.length - 1;
       var res = base;
@@ -83,7 +83,7 @@ function caml_get_idx_bytecode(base, idx) {
 //Version: >= 5.2
 //If: oxcaml
 function caml_set_idx_bytecode(base, idx, v) {
-  switch (idx[0]) {
+  switch (TAG(idx)) {
     case 0: {
       var depth = idx.length - 1;
       // An empty index refers to an unboxed product that has been flattened

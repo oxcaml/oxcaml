@@ -6,6 +6,10 @@
    (flags
     (:include ci.flags)
     (:standard)))
+  (wasm_of_ocaml
+   (flags
+    (:include ci.flags)
+    (:standard)))
   (binaries
    (tools/node_wrapper.exe as node)
    (tools/node_wrapper.exe as node.exe)))
@@ -18,6 +22,7 @@
   (wasm_of_ocaml
    (compilation_mode separate)
    (flags
+    (:include ci.flags)
     (:standard --effects cps)))
   (binaries
    (tools/node_wrapper.exe as node)
@@ -31,8 +36,9 @@
    (build_runtime_flags
     (:standard --effects double-translation)))
   (wasm_of_ocaml
-   ;; Double transaction is not supported in wasm
-   (enabled_if false))
+   (compilation_mode separate)
+   (flags
+    (:standard --effects double-translation)))
   (binaries
    (tools/node_wrapper.exe as node)
    (tools/node_wrapper.exe as node.exe)))
@@ -43,13 +49,26 @@
   (wasm_of_ocaml
    (compilation_mode separate)
    (flags
+    (:include ci.flags)
     (:standard --effects native)))
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe)))
+ (with-portable-int
+  (js_of_ocaml
+   ;; Portable ints are not supported in js
+   (enabled_if false))
+  (wasm_of_ocaml
+   (compilation_mode separate)
+   (flags
+    (:standard --effects jspi --enable portable-int)))
   (binaries
    (tools/node_wrapper.exe as node)
    (tools/node_wrapper.exe as node.exe)))
  (wasi
   (wasm_of_ocaml
    (flags
+    (:include ci.flags)
     (:standard --pretty --enable wasi))
    ; Wasmtime is slow on large binaries, so use whole program compilation
    (compilation_mode whole_program))
@@ -65,6 +84,7 @@
   (wasm_of_ocaml
    (compilation_mode separate)
    (flags
+    (:include ci.flags)
     (:standard --effects native --enable wasi)))
   (binaries
    (tools/node_wrapper.exe as node)

@@ -16,7 +16,7 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "int_val_32_exn"
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
@@ -158,51 +158,50 @@
          (local.get $hashlen))
       (local.get $output))
 
-   (@string $blake2_create "Digest.BLAKE2.create")
-   (@string $blake2_update "Digest.BLAKE2.update")
-   (@string $blake2_final "Digest.BLAKE2.final")
-   (@string $blake2_string "Digest.BLAKE2.string")
+   (@string $Digest_BLAKE2_create "Digest.BLAKE2.create")
+   (@string $Digest_BLAKE2_update "Digest.BLAKE2.update")
+   (@string $Digest_BLAKE2_final "Digest.BLAKE2.final")
+   (@string $Digest_BLAKE2_string "Digest.BLAKE2.string")
 
    (func (export "caml_blake2_create")
       (param $hashlen (ref eq)) (param $key (ref eq)) (result (ref eq))
-      (call $do_create
-         (@if $portable-int
-         (@then
+      (@if $portable_int
+      (@then
+         (call $do_create
             (call $int_val_32_exn (local.get $hashlen)
-               (global.get $blake2_create)))
-         (@else
-         (i31.get_u (ref.cast (ref i31) (local.get $hashlen)))
-         ))
-         (ref.cast (ref $bytes) (local.get $key))))
+                  (global.get $Digest_BLAKE2_create))
+            (ref.cast (ref $bytes) (local.get $key))))
+      (@else
+         (call $do_create
+            (i31.get_u (ref.cast (ref i31) (local.get $hashlen)))
+            (ref.cast (ref $bytes) (local.get $key))))))
 
    (func (export "caml_blake2_update")
       (param $ctx (ref eq)) (param $buf (ref eq)) (param $ofs (ref eq))
       (param $len (ref eq)) (result (ref eq))
-      (call $do_update
-         (ref.cast (ref $bytes) (local.get $ctx))
-         (ref.cast (ref $bytes) (local.get $buf))
-         (@if $portable-int
-         (@then
-            (call $int_val_32_exn (local.get $ofs) (global.get $blake2_update)))
-         (@else
-         (i31.get_u (ref.cast (ref i31) (local.get $ofs)))
-         ))
-         (@if $portable-int
-         (@then
-            (call $int_val_32_exn (local.get $len) (global.get $blake2_update)))
-         (@else
-         (i31.get_u (ref.cast (ref i31) (local.get $len))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $do_update
+            (ref.cast (ref $bytes) (local.get $ctx))
+            (ref.cast (ref $bytes) (local.get $buf))
+            (call $int_val_32_exn (local.get $ofs) (global.get $Digest_BLAKE2_update))
+            (call $int_val_32_exn (local.get $len) (global.get $Digest_BLAKE2_update))))
+      (@else
+         (call $do_update
+            (ref.cast (ref $bytes) (local.get $ctx))
+            (ref.cast (ref $bytes) (local.get $buf))
+            (i31.get_u (ref.cast (ref i31) (local.get $ofs)))
+            (i31.get_u (ref.cast (ref i31) (local.get $len))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_blake2_final")
       (param $ctx (ref eq)) (param $hashlen (ref eq)) (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (call $do_final
             (ref.cast (ref $bytes) (local.get $ctx))
             (call $int_val_32_exn (local.get $hashlen)
-               (global.get $blake2_final))))
+               (global.get $Digest_BLAKE2_final))))
       (@else
       (call $do_final
          (ref.cast (ref $bytes) (local.get $ctx))
@@ -214,11 +213,11 @@
       (param $ofs (ref eq)) (param $len (ref eq)) (result (ref eq))
       (local $state (ref $bytes))
       (local $hl i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $hl
             (call $int_val_32_exn (local.get $hashlen)
-               (global.get $blake2_string))))
+               (global.get $Digest_BLAKE2_string))))
       (@else
       (local.set $hl
          (i31.get_u (ref.cast (ref i31) (local.get $hashlen))))
@@ -227,21 +226,19 @@
          (call $do_create
             (local.get $hl)
             (ref.cast (ref $bytes) (local.get $key))))
-      (call $do_update
-         (local.get $state)
-         (ref.cast (ref $bytes) (local.get $buf))
-         (@if $portable-int
-         (@then
-            (call $int_val_32_exn (local.get $ofs) (global.get $blake2_string)))
-         (@else
-         (i31.get_u (ref.cast (ref i31) (local.get $ofs)))
-         ))
-         (@if $portable-int
-         (@then
-            (call $int_val_32_exn (local.get $len) (global.get $blake2_string)))
-         (@else
-         (i31.get_u (ref.cast (ref i31) (local.get $len))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $do_update
+            (local.get $state)
+            (ref.cast (ref $bytes) (local.get $buf))
+            (call $int_val_32_exn (local.get $ofs) (global.get $Digest_BLAKE2_string))
+            (call $int_val_32_exn (local.get $len) (global.get $Digest_BLAKE2_string))))
+      (@else
+         (call $do_update
+            (local.get $state)
+            (ref.cast (ref $bytes) (local.get $buf))
+            (i31.get_u (ref.cast (ref i31) (local.get $ofs)))
+            (i31.get_u (ref.cast (ref i31) (local.get $len))))))
       (call $do_final (local.get $state) (local.get $hl)))
 ))
 )

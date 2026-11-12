@@ -189,7 +189,9 @@ let check_tag ~env ~res x ~tag =
   let tag_var, env, res =
     use_prim0 ~env ~res (Extern ("%direct_obj_tag_nullish", None)) [x]
   in
-  let expr : Jsir.expr = Prim (Eq, [Pv tag_var; int_const tag]) in
+  let expr : Jsir.expr =
+    Prim (Eq { int_only = false }, [Pv tag_var; int_const tag])
+  in
   let var = Jsir.Var.fresh () in
   Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
@@ -257,10 +259,10 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Duplicate_block _ | Duplicate_array _ | Obj_dup _ ->
     use_prim' (Extern ("caml_obj_dup", None))
-  | Is_int _ -> use_prim' IsInt
+  | Is_int _ -> use_prim' (IsInt { variant_only = false })
   | Is_null ->
     let x, res = prim_arg ~env ~res x in
-    use_prim ~env ~res Eq [x; Pc Null_]
+    use_prim ~env ~res (Eq { int_only = false }) [x; Pc Null_]
   | Get_tag ->
     let var, env, res = get_tag ~env ~res x in
     Some var, env, res
@@ -469,7 +471,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
         | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks ) ) ->
-      use_prim' Array_get
+      use_prim' (Array_get Non_float)
     | (Naked_vec128s | Naked_vec256s | Naked_vec512s), _
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
       (* No SIMD *)
@@ -505,7 +507,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
        ignore the parameters. *)
     use_prim' (Extern ("caml_ba_get_raw_unsafe", None))
   | Phys_equal comparison ->
-    let prim : Jsir.prim = match comparison with Eq -> Eq | Neq -> Neq in
+    let prim : Jsir.prim =
+      match comparison with
+      | Eq -> Eq { int_only = false }
+      | Neq -> Neq { int_only = false }
+    in
     use_prim' prim
   | Int_arith (kind, op) -> (
     let op_name =
@@ -581,7 +587,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Naked_int32 | Naked_nativeint ->
           (* Sign extension preserves both signed and unsigned ordering, so
              smallints can be compared directly *)
-          Eq, Neq, Lt, Ult, Le
+          Eq { int_only = false }, Neq { int_only = false }, Lt, Ult, Le
         | Naked_int64 ->
           ( Extern ("caml_equal", None),
             Extern ("caml_notequal", None),
@@ -688,7 +694,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   | Read_offset _ ->
     let base, env, res = checked_block_index_base ~env ~res x in
     let index, env, res = field_index_of_byte_offset ~env ~res y in
-    use_prim ~env ~res Array_get [Pv base; Pv index]
+    use_prim ~env ~res (Array_get Non_float) [Pv base; Pv index]
 
 let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   let use_prim' prim = use_prim' ~env ~res prim [x; y; z] in
@@ -828,10 +834,10 @@ let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
     in
     let xs, res = To_jsir_shared.simples ~env ~res xs in
     let var = Jsir.Var.fresh () in
-    ( Some var,
-      env,
-      To_jsir_result.add_instr_exn res
-        (Let (var, Block (tag, Array.of_list xs, Array, mutability))) )
+    let block : Jsir.expr =
+      Block (tag, Array.of_list xs, Array, mutability, Jsir.Block_desc.none)
+    in
+    Some var, env, To_jsir_result.add_instr_exn res (Let (var, block))
 
 let primitive ~env ~res (prim : Flambda_primitive.t) =
   try

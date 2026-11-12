@@ -25,7 +25,8 @@ jobs:
       OXCAML_OPAM_REPO_REF: d89747aa6e7b9f44d6cc844dca5b5e7c8a90716f
 
     strategy:
-      fail-fast: false
+      # On pull requests, free the runners as soon as a job fails
+      fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
         include:
           - backend: js
@@ -73,7 +74,7 @@ jobs:
       - name: Set-up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.backend == 'wasm' && 'v26.0.0-v8-canary20260216631fb6e5ef' || 'latest' }}
+          node-version: ${{ matrix.backend == 'wasm' && 'v26.0.0-v8-canary20260216631fb6e5ef' || '26' }}
 
       - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v3
@@ -105,9 +106,7 @@ jobs:
           opam pin add opam-core -n 2.5.1+ox
           opam pin add gen_js_api -n 1.1.2+ox
           opam pin add zarith -n 1.14+ox
-          # The solver would otherwise settle on sedlex 3.3+ox, which
-          # predates the Latin1 patterns ppx_css relies on
-          opam pin add sedlex -n 3.6+ox
+          js_of_ocaml/tools/ci_pin_sedlex_oxcaml.sh
 
       # Add some packages to the opam invariant;
       # opam makes wrong choices otherwise

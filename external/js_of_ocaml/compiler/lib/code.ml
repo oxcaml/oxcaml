@@ -175,43 +175,53 @@ end = struct
             set_raw v' name gen
       with Not_found -> ()
 
-    let set v ?(generated = false) nm_orig =
+    let sanitized = String.Hashtbl.create 100
+
+    let sanitize nm_orig =
       let len = String.length nm_orig in
-      if len > 0
+      let buf = Buffer.create (String.length nm_orig) in
+      let idx = ref 0 in
+      while !idx < len && not (Char.is_letter nm_orig.[!idx]) do
+        incr idx
+      done;
+      let pending = ref false in
+      if !idx >= len
       then (
-        let buf = Buffer.create (String.length nm_orig) in
-        let idx = ref 0 in
-        while !idx < len && not (Char.is_letter nm_orig.[!idx]) do
-          incr idx
-        done;
-        let pending = ref false in
-        if !idx >= len
+        pending := true;
+        idx := 0);
+      for i = !idx to len - 1 do
+        if Char.is_letter nm_orig.[i] || Char.is_digit nm_orig.[i]
         then (
-          pending := true;
-          idx := 0);
-        for i = !idx to len - 1 do
-          if Char.is_letter nm_orig.[i] || Char.is_digit nm_orig.[i]
-          then (
-            if !pending then Buffer.add_char buf '_';
-            Buffer.add_char buf nm_orig.[i];
-            pending := false)
-          else pending := true
-        done;
-        let str = Buffer.contents buf in
+          if !pending then Buffer.add_char buf '_';
+          Buffer.add_char buf nm_orig.[i];
+          pending := false)
+        else pending := true
+      done;
+      let str = Buffer.contents buf in
+      let str =
+        match str, nm_orig with
+        | "", ">>=" -> "symbol_bind"
+        | "", ">>|" -> "symbol_map"
+        | "", "^" -> "symbol_concat"
+        | "", _ -> "symbol"
+        | str, _ -> if is_reserved str then str ^ "$" else str
+      in
+      (* protect against large names *)
+      let max_len = 30 in
+      if String.length str > max_len then String.sub str ~pos:0 ~len:max_len else str
+
+    let set v ?(generated = false) nm_orig =
+      if String.length nm_orig > 0
+      then
         let str =
-          match str, nm_orig with
-          | "", ">>=" -> "symbol_bind"
-          | "", ">>|" -> "symbol_map"
-          | "", "^" -> "symbol_concat"
-          | "", _ -> "symbol"
-          | str, _ -> if is_reserved str then str ^ "$" else str
+          match String.Hashtbl.find_opt sanitized nm_orig with
+          | Some str -> str
+          | None ->
+              let str = sanitize nm_orig in
+              String.Hashtbl.add sanitized nm_orig str;
+              str
         in
-        (* protect against large names *)
-        let max_len = 30 in
-        let str =
-          if String.length str > max_len then String.sub str ~pos:0 ~len:max_len else str
-        in
-        set_raw v str generated)
+        set_raw v str generated
 
     let get v = Int.Hashtbl.find_opt names v
 
@@ -314,14 +324,19 @@ end
 
 type cont = Addr.t * Var.t list
 
+type field_type =
+  | Non_float
+  | Immediate
+  | Float
+
 type prim =
   | Vectlength of Optimization_hint.array_kind
-  | Array_get
+  | Array_get of field_type
   | Extern of string * Optimization_hint.ccall option
   | Not
-  | IsInt
-  | Eq
-  | Neq
+  | IsInt of { variant_only : bool }
+  | Eq of { int_only : bool }
+  | Neq of { int_only : bool }
   | Lt
   | Le
   | Ult
@@ -330,6 +345,22 @@ type array_or_not =
   | Array
   | NotArray
   | Unknown
+
+module Block_desc = struct
+  type t = int
+
+  let none = 0
+
+  let is_none d = d = 0
+
+  let of_int d = d
+
+  let to_int d = d
+
+  let equal (a : t) b = a = b
+
+  let print f d = Format.fprintf f "%x" d
+end
 
 module Native_string = struct
   type t =
@@ -352,22 +383,53 @@ type constant =
   | NativeString of Native_string.t
   | Float of Int64.t
   | Float32 of Int64.t
-  | Float_array of Int64.t array
+  | Float_array of Int64.t array * Block_desc.t
   | Int of Targetint.t
   | Int32 of Int32.t
   | Int64 of Int64.t
   | NativeInt of Targetnativeint.t
-  | Tuple of int * constant array * array_or_not
+  | Tuple of int * constant array * array_or_not * Block_desc.t
   | Null_
 
 module Constant = struct
   type t = constant
 
+  let rec equal a b =
+    match a, b with
+    | String a, String b -> String.equal a b
+    | NativeString a, NativeString b -> Native_string.equal a b
+    | Float a, Float b | Float32 a, Float32 b | Int64 a, Int64 b -> Int64.equal a b
+    | Float_array (a, da), Float_array (b, db) ->
+        Block_desc.equal da db && Array.equal Int64.equal a b
+    | Int a, Int b -> Targetint.equal a b
+    | Int32 a, Int32 b -> Int32.equal a b
+    | NativeInt a, NativeInt b -> Targetnativeint.equal a b
+    | Tuple (ta, a, ka, da), Tuple (tb, b, kb, db) ->
+        ta = tb
+        && Block_desc.equal da db
+        && (match ka, kb with
+          | Array, Array | NotArray, NotArray | Unknown, Unknown -> true
+          | (Array | NotArray | Unknown), _ -> false)
+        && Array.equal equal a b
+    | Null_, Null_ -> true
+    | ( ( String _
+        | NativeString _
+        | Float _
+        | Float32 _
+        | Float_array _
+        | Int _
+        | Int32 _
+        | Int64 _
+        | NativeInt _
+        | Tuple _
+        | Null_ )
+      , _ ) -> false
+
   let rec ocaml_equal a b =
     match a, b with
     | String a, String b -> Some (String.equal a b)
     | NativeString a, NativeString b -> Some (Native_string.equal a b)
-    | Tuple (ta, a, _), Tuple (tb, b, _) ->
+    | Tuple (ta, a, _, _), Tuple (tb, b, _, _) ->
         if ta <> tb || Array.length a <> Array.length b
         then Some false
         else
@@ -383,7 +445,7 @@ module Constant = struct
     | Int32 a, Int32 b -> Some (Int32.equal a b)
     | Int64 a, Int64 b -> Some (Int64.equal a b)
     | NativeInt a, NativeInt b -> Some (Targetnativeint.equal a b)
-    | Float_array a, Float_array b ->
+    | Float_array (a, _), Float_array (b, _) ->
         Some
           (Array.equal
              (fun f g -> Float.ieee_equal (Int64.float_of_bits f) (Int64.float_of_bits g))
@@ -397,8 +459,8 @@ module Constant = struct
     | String _, NativeString _ | NativeString _, String _ -> None
     | Int _, Float _ | Float _, Int _ -> None
     | Int _, Float32 _ | Float32 _, Int _ -> None
-    | Tuple ((0 | 254), _, _), Float_array _ -> None
-    | Float_array _, Tuple ((0 | 254), _, _) -> None
+    | Tuple ((0 | 254), _, _, _), Float_array _ -> None
+    | Float_array _, Tuple ((0 | 254), _, _, _) -> None
     | ( Tuple _
       , ( String _
         | NativeString _
@@ -448,13 +510,13 @@ module Constant = struct
         | Tuple _
         | Float_array _ ) ) -> Some false
     | ( Float _
-      , (Float32 _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _))
-      ) -> Some false
+      , ( Float32 _ | String _ | NativeString _ | Float_array _ | Int64 _
+        | Tuple (_, _, _, _) ) ) -> Some false
     | ( Float32 _
-      , (Float _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _))
-      ) -> Some false
+      , ( Float _ | String _ | NativeString _ | Float_array _ | Int64 _
+        | Tuple (_, _, _, _) ) ) -> Some false
     | ( (Int _ | Int32 _ | NativeInt _)
-      , (String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ) ->
+      , (String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _, _)) ) ->
         Some false
     | Null_, _ | _, Null_ -> Some false
     (* Note: the following cases should not occur when compiling to Javascript *)
@@ -480,10 +542,6 @@ type mutability =
   | Immutable
   | Maybe_mutable
 
-type field_type =
-  | Non_float
-  | Float
-
 type yielding_kind =
   | Unyielding
   | May_yield
@@ -496,7 +554,7 @@ type expr =
       ; exact : bool
       ; yielding : yielding_kind
       }
-  | Block of int * Var.t array * array_or_not * mutability
+  | Block of int * Var.t array * array_or_not * mutability * Block_desc.t
   | Field of Var.t * int * field_type
   | Closure of
       Var.t list * cont * (Optimization_hint.closure_hint option * Parse_info.t option)
@@ -591,7 +649,8 @@ module Print = struct
     | NativeString (Utf (Utf8 s)) -> Format.fprintf f "%Sj" s
     | Float fl -> Format.fprintf f "%.12g" (Int64.float_of_bits fl)
     | Float32 fl -> Format.fprintf f "%.9g" (Int64.float_of_bits fl)
-    | Float_array a ->
+    | Float_array (a, desc) ->
+        if not (Block_desc.is_none desc) then Format.fprintf f "#%a" Block_desc.print desc;
         Format.fprintf f "[|";
         for i = 0 to Array.length a - 1 do
           if i > 0 then Format.fprintf f ", ";
@@ -601,9 +660,10 @@ module Print = struct
     | Int i -> Format.fprintf f "%s" (Targetint.to_string i)
     | Int32 i -> Format.fprintf f "%ldl" i
     | Int64 i -> Format.fprintf f "%LdL" i
-    | NativeInt i -> Format.fprintf f "%s" (Targetnativeint.to_string i)
-    | Tuple (tag, a, _) -> (
+    | NativeInt i -> Format.fprintf f "%sn" (Targetnativeint.to_string i)
+    | Tuple (tag, a, _, desc) -> (
         Format.fprintf f "<%d>" tag;
+        if not (Block_desc.is_none desc) then Format.fprintf f "#%a" Block_desc.print desc;
         match Array.length a with
         | 0 -> ()
         | 1 ->
@@ -660,7 +720,8 @@ module Print = struct
           x
           Optimization_hint.print
           (Optimization_hint.Hint_arraylength k)
-    | Array_get, [ x; y ] -> Format.fprintf f "%a[%a]" arg x arg y
+    | Array_get Immediate, [ x; y ] -> Format.fprintf f "INT{%a[%a]}" arg x arg y
+    | Array_get _, [ x; y ] -> Format.fprintf f "%a[%a]" arg x arg y
     | Extern (s, h), [ x; y ] -> (
         try Format.fprintf f "%a %s %a%a" arg x (binop s) arg y hint h
         with Not_found -> Format.fprintf f "\"%s\"(%a)%a" s (list arg) l hint h)
@@ -669,9 +730,9 @@ module Print = struct
         with Not_found -> Format.fprintf f "\"%s\"(%a) %a" s (list arg) l hint h)
     | Extern (s, h), _ -> Format.fprintf f "\"%s\"(%a) %a" s (list arg) l hint h
     | Not, [ x ] -> Format.fprintf f "!%a" arg x
-    | IsInt, [ x ] -> Format.fprintf f "is_int(%a)" arg x
-    | Eq, [ x; y ] -> Format.fprintf f "%a === %a" arg x arg y
-    | Neq, [ x; y ] -> Format.fprintf f "!(%a === %a)" arg x arg y
+    | IsInt _, [ x ] -> Format.fprintf f "is_int(%a)" arg x
+    | Eq _, [ x; y ] -> Format.fprintf f "%a === %a" arg x arg y
+    | Neq _, [ x; y ] -> Format.fprintf f "!(%a === %a)" arg x arg y
     | Lt, [ x; y ] -> Format.fprintf f "%a < %a" arg x arg y
     | Le, [ x; y ] -> Format.fprintf f "%a <= %a" arg x arg y
     | Ult, [ x; y ] -> Format.fprintf f "%a <= %a" arg x arg y
@@ -695,7 +756,7 @@ module Print = struct
            | Unyielding | Unknown -> "")
           var_list
           args
-    | Block (t, a, _, mut) ->
+    | Block (t, a, _, mut, desc) ->
         Format.fprintf
           f
           "%s{tag=%d"
@@ -703,11 +764,14 @@ module Print = struct
           | Immutable -> "imm"
           | Maybe_mutable -> "")
           t;
+        if not (Block_desc.is_none desc)
+        then Format.fprintf f "; desc=%a" Block_desc.print desc;
         for i = 0 to Array.length a - 1 do
           Format.fprintf f "; %d = %a" i Var.print a.(i)
         done;
         Format.fprintf f "}"
     | Field (x, i, Non_float) -> Format.fprintf f "%a[%d]" Var.print x i
+    | Field (x, i, Immediate) -> Format.fprintf f "INT{%a[%d]}" Var.print x i
     | Field (x, i, Float) -> Format.fprintf f "FLOAT{%a[%d]}" Var.print x i
     | Closure (l, c, (hint, _)) -> (
         Format.fprintf f "fun(%a){%a}" var_list l cont c;
@@ -724,12 +788,14 @@ module Print = struct
     | Assign (x, y) -> Format.fprintf f "(assign) %a = %a" Var.print x Var.print y
     | Set_field (x, i, Non_float, y) ->
         Format.fprintf f "%a[%d] = %a" Var.print x i Var.print y
+    | Set_field (x, i, Immediate, y) ->
+        Format.fprintf f "INT{%a[%d]} = %a" Var.print x i Var.print y
     | Set_field (x, i, Float, y) ->
         Format.fprintf f "FLOAT{%a[%d]} = %a" Var.print x i Var.print y
     | Offset_ref (x, i) -> Format.fprintf f "%a[0] += %d" Var.print x i
     | Array_set (x, y, z) ->
         Format.fprintf f "%a[%a] = %a" Var.print x Var.print y Var.print z
-    | Event loc -> Format.fprintf f "event %s" (Parse_info.to_string loc)
+    | Event loc -> Format.fprintf f "event %s" (Parse_info.Debug.to_string loc)
 
   let last f l =
     match l with
@@ -923,6 +989,19 @@ let rec preorder_traverse' { fold } f pc visited blocks acc =
 
 let preorder_traverse fold f pc blocks acc =
   snd (preorder_traverse' fold f pc Addr.Set.empty blocks acc)
+
+let raises_outside_handlers blocks pc =
+  traverse
+    { fold = fold_children_skip_try_body }
+    (fun pc b ->
+      b
+      ||
+      match (Addr.Map.find pc blocks).branch with
+      | Raise _ -> true
+      | _ -> false)
+    pc
+    blocks
+    false
 
 let fold_closures_innermost_first { start; blocks; _ } f accu =
   let rec visit blocks pc f accu =
@@ -1121,6 +1200,143 @@ let used_blocks p =
 
 let check_defs = true
 
+(* The variables read by a block, not including the ones read by the
+   closures it defines *)
+let iter_block_reads f block =
+  let cont (_, args) = List.iter ~f args in
+  List.iter block.body ~f:(fun i ->
+      match i with
+      | Let (_, e) -> (
+          match e with
+          | Apply { f = g; args; _ } ->
+              f g;
+              List.iter ~f args
+          | Block (_, a, _, _, _) -> Array.iter ~f a
+          | Field (x, _, _) -> f x
+          | Closure (_, c, _) -> cont c
+          | Constant _ | Special _ -> ()
+          | Prim (_, l) ->
+              List.iter l ~f:(fun a ->
+                  match a with
+                  | Pv x -> f x
+                  | Pc _ -> ()))
+      | Assign (_, y) -> f y
+      | Set_field (x, _, _, y) ->
+          f x;
+          f y
+      | Offset_ref (x, _) -> f x
+      | Array_set (x, y, z) ->
+          f x;
+          f y;
+          f z
+      | Event _ -> ());
+  match block.branch with
+  | Return x | Raise (x, _) -> f x
+  | Stop -> ()
+  | Branch c | Poptrap c -> cont c
+  | Cond (x, c1, c2) ->
+      f x;
+      cont c1;
+      cont c2
+  | Switch (x, a) ->
+      f x;
+      Array.iter ~f:cont a
+  | Pushtrap (c1, _, c2) ->
+      cont c1;
+      cont c2
+
+(* A variable [x] assigned by [Assign (x, y)] is a parameter of a block [pc]
+   ending with [Pushtrap]: it holds the value of a mutable variable in the
+   exception handler. Its only reads are in the arguments of the handler
+   continuation of [pc], which are evaluated in the handler, and in the
+   blocks reachable from the handler without going through [pc] again,
+   including the closures they define, but not from the body of the [try].
+   It is not assigned there. So, [Assign (x, y)] can be considered as
+   passing [y] as an argument to [x], and the facts known about [x] where it
+   is read remain valid until it is bound again. When the exception handler
+   is removed, these assignments can be removed as well. *)
+let check_assigned_variables blocks =
+  let assigns =
+    Addr.Map.fold
+      (fun pc block acc ->
+        List.fold_left block.body ~init:acc ~f:(fun acc i ->
+            match i with
+            | Assign (x, _) ->
+                Var.Map.update
+                  x
+                  (fun s ->
+                    Some (Addr.Set.add pc (Option.value ~default:Addr.Set.empty s)))
+                  acc
+            | Let _ | Set_field _ | Offset_ref _ | Array_set _ | Event _ -> acc))
+      blocks
+      Var.Map.empty
+  in
+  if not (Var.Map.is_empty assigns)
+  then (
+    let reads =
+      Addr.Map.fold
+        (fun pc block acc ->
+          let acc = ref acc in
+          let add x =
+            if Var.Map.mem x assigns
+            then
+              acc :=
+                Var.Map.update
+                  x
+                  (fun s ->
+                    Some (Addr.Set.add pc (Option.value ~default:Addr.Set.empty s)))
+                  !acc
+          in
+          (match block.branch with
+          | Pushtrap (cont, x, (handler_pc, args)) ->
+              iter_block_reads
+                add
+                { block with branch = Pushtrap (cont, x, (handler_pc, [])) };
+              List.iter args ~f:(fun y ->
+                  if not (List.mem ~eq:Var.equal y block.params) then add y)
+          | Return _ | Raise _ | Stop | Branch _ | Cond _ | Switch _ | Poptrap _ ->
+              iter_block_reads add block);
+          !acc)
+        blocks
+        Var.Map.empty
+    in
+    let bound = ref Var.Set.empty in
+    Addr.Map.iter
+      (fun pc block ->
+        match block.branch with
+        | Pushtrap ((body_pc, _), _, (handler_pc, _)) ->
+            let params = List.filter ~f:(fun x -> Var.Map.mem x assigns) block.params in
+            if not (List.is_empty params)
+            then
+              let rec visit pc' visited =
+                if pc' = pc || Addr.Set.mem pc' visited
+                then visited
+                else
+                  let visited = Addr.Set.add pc' visited in
+                  let visited =
+                    List.fold_left
+                      (Addr.Map.find pc' blocks).body
+                      ~init:visited
+                      ~f:(fun visited i ->
+                        match i with
+                        | Let (_, Closure (_, (pc'', _), _)) -> visit pc'' visited
+                        | _ -> visited)
+                  in
+                  fold_children blocks pc' visit visited
+              in
+              let handler = visit handler_pc Addr.Set.empty in
+              let body = visit body_pc Addr.Set.empty in
+              List.iter params ~f:(fun x ->
+                  assert (not (Var.Set.mem x !bound));
+                  bound := Var.Set.add x !bound;
+                  (match Var.Map.find_opt x reads with
+                  | Some s -> assert (Addr.Set.subset s (Addr.Set.diff handler body))
+                  | None -> ());
+                  assert (Addr.Set.disjoint (Var.Map.find x assigns) handler))
+        | Return _ | Raise _ | Stop | Branch _ | Cond _ | Switch _ | Poptrap _ -> ())
+      blocks;
+    Var.Map.iter (fun x _ -> assert (Var.Set.mem x !bound)) assigns)
+
 let invariant ({ blocks; start; _ } as p) =
   if with_invariant ()
   then (
@@ -1138,7 +1354,7 @@ let invariant ({ blocks; start; _ } as p) =
     in
     let check_expr = function
       | Apply _ -> ()
-      | Block (_, _, _, _) -> ()
+      | Block (_, _, _, _, _) -> ()
       | Field (_, _, _) -> ()
       | Closure (l, cont, _) ->
           List.iter l ~f:define;
@@ -1188,4 +1404,5 @@ let invariant ({ blocks; start; _ } as p) =
         List.iter block.body ~f:check_instr;
         check_events block.body;
         check_last block.branch)
-      blocks)
+      blocks;
+    check_assigned_variables blocks)

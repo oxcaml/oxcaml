@@ -85,6 +85,15 @@ let specialize_js_once_after p =
   if debug () then Format.eprintf "Specialize js once...@.";
   Specialize_js.f_once_after p
 
+let clone_higher_order (profile : Profile.t) p =
+  (* This is only useful when the global flow analysis keeps track of
+     function parameters, which it does not in fast mode (at -O1) *)
+  match Config.target (), profile with
+  | `Wasm, (O2 | O3) when Config.Flag.clone_higher_order () ->
+      if debug () then Format.eprintf "Clone higher-order functions...@.";
+      Clone_higher_order.f p
+  | `Wasm, _ | `JavaScript, _ -> p
+
 let specialize (p, info) =
   let p = specialize_1 (p, info) in
   let p = specialize_js (p, info) in
@@ -122,6 +131,12 @@ let collects_shapes ~shapes (p : Code.program) =
                   match name with
                   | Byte s | Utf (Utf8 s) -> s
                 in
+                shapes := StringMap.add name block !shapes
+            | Code.Let
+                ( _
+                , Prim (Extern ("caml_register_global", _), [ Pv block; Pc (String name) ])
+                ) ->
+                (* Wasm *)
                 shapes := StringMap.add name block !shapes
             | _ -> ()))
       p.blocks;
@@ -435,6 +450,15 @@ let link' ~export_runtime ~standalone ~link (js : Javascript.statement_list) :
               List.map all ~f:(fun name ->
                   let name = Utf8_string.of_string_exn name in
                   Property (PNI name, EVar (ident name)))
+              (* Separately compiled units are compiled without the runtime
+                 files given to [build-runtime], so they refer to the
+                 primitives defined in these files by the name used in the
+                 OCaml code, which can be an alias. The builtin aliases
+                 are resolved at compile time. *)
+              @ List.map (Linker.user_aliases linkinfos) ~f:(fun (alias, name) ->
+                  Property
+                    ( PNI (Utf8_string.of_string_exn alias)
+                    , EVar (ident (Utf8_string.of_string_exn name)) ))
             in
             (if standalone
              then
@@ -731,12 +755,14 @@ let optimize ~shapes ~profile ~keep_flow_data p =
       | O2 -> o2
       | O3 -> o3)
     +> specialize_js_once_after
+    +> clone_higher_order profile
     +> effects_and_exact_calls ~keep_flow_data ~deadcode_sentinel ~shapes profile
     +> map_fst5
          (match Config.target (), Config.effects () with
          | `JavaScript, (`Disabled | `Double_translation) -> Generate_closure.f
-         | `JavaScript, `Cps | `Wasm, (`Disabled | `Jspi | `Cps | `Native) -> Fun.id
-         | `JavaScript, (`Jspi | `Native) | `Wasm, `Double_translation -> assert false)
+         | `JavaScript, `Cps
+         | `Wasm, (`Disabled | `Jspi | `Cps | `Double_translation | `Native) -> Fun.id
+         | `JavaScript, (`Jspi | `Native) -> assert false)
     +> map_fst5 deadcode'
   in
   if times () then Format.eprintf "Start Optimizing...@.";
@@ -755,7 +781,15 @@ let optimize_for_wasm ~shapes ~profile p =
   ( optimized_code
   , match global_flow_data with
     | Some data -> data
-    | None -> Global_flow.f ~fast:false optimized_code.program )
+    | None ->
+        let cps_calls =
+          (* With double translation, CPS calls may call functions without
+             CPS version (see [Global_flow.called_version]) *)
+          match Config.effects () with
+          | `Double_translation -> optimized_code.in_cps
+          | `Disabled | `Cps | `Jspi | `Native -> Code.Var.Set.empty
+        in
+        Global_flow.f ~cps_calls ~fast:false optimized_code.program )
 
 let full ~standalone ~wrap_with_fun ~shapes ~profile ~link ~source_map ~formatter p =
   let optimized_code, _ = optimize ~shapes ~profile ~keep_flow_data:false p in

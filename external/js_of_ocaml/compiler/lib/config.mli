@@ -36,6 +36,8 @@ module Flag : sig
 
   val inline : unit -> bool
 
+  val clone_higher_order : unit -> bool
+
   val share_constant : unit -> bool
 
   val staticeval : unit -> bool
@@ -57,6 +59,12 @@ module Flag : sig
 
   val var_coalescing : unit -> bool
 
+  val wasm_var_coalescing : unit -> bool
+
+  val wasm_local_sink : unit -> bool
+
+  val wasm_cast_reuse : unit -> bool
+
   val debugger : unit -> bool
 
   val pretty : unit -> bool
@@ -72,6 +80,11 @@ module Flag : sig
   val inline_callgen : unit -> bool
 
   val safe_string : unit -> bool
+
+  val introspection : unit -> bool
+  (** Introcaml: attach their descriptor to allocated blocks and embed the
+      block descriptors, so that [Introspect] can print values. Only enabled
+      by default when the compiler supports introspection. *)
 
   val use_js_string : unit -> bool
 
@@ -112,7 +125,9 @@ module Param : sig
 
   val constant_max_depth : unit -> int
 
-  val merge_node_max : unit -> int
+  val labelled_block_max_depth : unit -> int
+
+  val break_sinking_max_depth : unit -> int
 
   val toplevel_split_size : unit -> int
 
@@ -122,6 +137,8 @@ module Param : sig
 
   (* | TcWhile *)
   val tailcall_optim : unit -> tc
+
+  val clone_higher_order_budget : unit -> int
 
   val lambda_lifting_threshold : unit -> int
 
@@ -137,6 +154,8 @@ end
 val target : unit -> [ `JavaScript | `Wasm ]
 
 val set_target : [ `JavaScript | `Wasm ] -> unit
+(** Also sets the size of integers, which depends on the [portable-int] flag:
+    call it once the flags are set. *)
 
 type effects_backend =
   [ `Disabled

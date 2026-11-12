@@ -26,7 +26,7 @@
   (language c)
   (names float32_stubs))
  (preprocess
-  (pps ppx_optcomp_light oxcaml_private_sedlex_ppx)))
+  (pps ppx_devtools-optcomp oxcaml_private_sedlex_ppx)))
 
 (ocamllex annot_lexer)
 

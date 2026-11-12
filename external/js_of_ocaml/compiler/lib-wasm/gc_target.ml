@@ -22,8 +22,22 @@ open Code_generation
 
 type expression = Wasm_ast.expression Code_generation.t
 
+(* With double translation, functions are compiled in direct style, and the
+   functions that may be involved in the handling of effects also get a CPS
+   version. The closure of such a function is a direct-style closure extended
+   with the code pointers of the CPS version (see [Type.code_pointer_fields]):
+   its type is a subtype of the direct-style closure type, so direct-style
+   calls are unchanged, and a CPS call can test whether the function has a
+   CPS version (see [Memory.cps_call_or_direct]). *)
+let double_translation () =
+  match Config.effects () with
+  | `Double_translation -> true
+  | `Disabled | `Cps | `Jspi | `Native -> false
+
 module Type = struct
   let value = W.Ref { nullable = false; typ = Eq }
+
+  let value_or_exn = W.Ref { nullable = true; typ = Eq }
 
   let block_type =
     register_type "block" (fun () ->
@@ -64,7 +78,7 @@ module Type = struct
           ; final = true
           ; typ =
               W.Struct
-                [ { mut = false; typ = Value (Ref { nullable = true; typ = Any }) } ]
+                [ { mut = false; typ = Value (Ref { nullable = true; typ = Extern }) } ]
           })
 
   let compare_type =
@@ -93,7 +107,12 @@ module Type = struct
                 [ { mut = false; typ = Value I32 }; { mut = false; typ = Value I32 } ]
           })
 
- let large_int_type =
+  (* With [--enable portable-int], OCaml integers are 63 bits. Those that
+     fit in 31 bits are always represented as an [i31], the others are
+     boxed in a [$ocaml_large_int] struct. The code generator and the
+     runtime rely on this canonical representation (e.g. to test whether an
+     integer is zero, or for physical equality). *)
+  let large_int_type =
     register_type "ocaml_large_int" (fun () ->
         return
           { supertype = None
@@ -234,27 +253,71 @@ module Type = struct
     register_type (Printf.sprintf "function_%d" n) (fun () ->
         return { supertype = None; final = true; typ = W.Func (func_type n) })
 
-  let closure_common_fields ~cps =
-    let* fun_ty = function_type ~cps 1 in
-    return
-      [ { W.mut = false; typ = W.Value (Ref { nullable = false; typ = Type fun_ty }) } ]
+  let ref_field ty =
+    { W.mut = false; typ = W.Value (Ref { nullable = false; typ = Type ty }) }
 
-  let closure_type_1 ~cps =
+  (* The code pointers of a closure of the given arity: the code pointer used
+     when the function is applied to a single argument (partial application,
+     unless the arity is 1), and, when the arity is larger than 1, the code
+     pointer used when all arguments are provided at once. With double
+     translation, a closure with a CPS version is a direct-style closure
+     extended with the code pointers of its CPS version (see
+     [double_translation]). *)
+  let code_pointer_fields ~cps arity =
+    let fields ~cps =
+      match arity with
+      | 0 ->
+          let* fun_ty = function_type ~cps 0 in
+          return [ ref_field fun_ty ]
+      | 1 ->
+          let* fun_ty = function_type ~cps 1 in
+          return [ ref_field fun_ty ]
+      | _ ->
+          let* fun_ty = function_type ~cps 1 in
+          let* fun_ty' = function_type ~cps arity in
+          return [ ref_field fun_ty; ref_field fun_ty' ]
+    in
+    if cps && double_translation ()
+    then
+      let* l = fields ~cps:false in
+      let* l' = fields ~cps:true in
+      return (l @ l')
+    else fields ~cps
+
+  (* Wasm types are structural, but a type's identity includes its
+     supertype. With double translation, the closure type of a function of
+     arity 1 with a CPS version (code pointers of types [function_1] and
+     [function_2]) has the same fields as the closure type of arity 2: it is
+     made a subtype of [closure_last_arg] (which is itself only distinguished
+     from [closure] by its supertype) rather than of [closure], so that the
+     two are distinct and can be told apart at CPS call points. This is just
+     a way of getting a distinct type: it does not mean that such a closure
+     has a single argument left. That information is carried by
+     [cps_closure_last_arg], a subtype of [cps_closure], the same way
+     [closure_last_arg] is a subtype of [closure] in direct style. *)
+  let rec closure_type_1 ~cps =
     register_type
       (if cps then "cps_closure" else "closure")
       (fun () ->
-        let* fields = closure_common_fields ~cps in
-        return { supertype = None; final = false; typ = W.Struct fields })
+        let* fields = code_pointer_fields ~cps 1 in
+        let* supertype =
+          if cps && double_translation ()
+          then
+            let* ty = closure_last_arg_type ~cps:false in
+            return (Some ty)
+          else return None
+        in
+        return { supertype; final = false; typ = W.Struct fields })
 
-  let closure_last_arg_type ~cps =
+  and closure_last_arg_type ~cps =
     register_type
       (if cps then "cps_closure_last_arg" else "closure_last_arg")
       (fun () ->
         let* cl_typ = closure_type_1 ~cps in
-        let* fields = closure_common_fields ~cps in
+        let* fields = code_pointer_fields ~cps 1 in
         return { supertype = Some cl_typ; final = false; typ = W.Struct fields })
 
-  let closure_type ~usage ~cps arity =
+  let rec closure_type ~usage ~cps arity =
     if arity = 1
     then
       match usage with
@@ -265,37 +328,28 @@ module Type = struct
       register_type
         (if cps then "cps_closure_0" else "closure_0")
         (fun () ->
-          let* fun_ty' = function_type ~cps arity in
-          return
-            { supertype = None
-            ; final = false
-            ; typ =
-                W.Struct
-                  [ { mut = false
-                    ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                    }
-                  ]
-            })
+          let* fields = code_pointer_fields ~cps arity in
+          let* supertype =
+            if cps && double_translation ()
+            then
+              let* ty = closure_type ~usage ~cps:false arity in
+              return (Some ty)
+            else return None
+          in
+          return { supertype; final = false; typ = W.Struct fields })
     else
       register_type
         (if cps
          then Printf.sprintf "cps_closure_%d" arity
          else Printf.sprintf "closure_%d" arity)
         (fun () ->
-          let* cl_typ = closure_type_1 ~cps in
-          let* common = closure_common_fields ~cps in
-          let* fun_ty' = function_type ~cps arity in
-          return
-            { supertype = Some cl_typ
-            ; final = false
-            ; typ =
-                W.Struct
-                  (common
-                  @ [ { mut = false
-                      ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                      }
-                    ])
-            })
+          let* cl_typ =
+            if cps && double_translation ()
+            then closure_type ~usage:`Access ~cps:false arity
+            else closure_type_1 ~cps
+          in
+          let* fields = code_pointer_fields ~cps arity in
+          return { supertype = Some cl_typ; final = false; typ = W.Struct fields })
 
   let empty_closure_type () =
     register_type "empty_closure" (fun () ->
@@ -329,28 +383,11 @@ module Type = struct
             { supertype = None; final = true; typ = W.Struct (make_env_type env_type) }
         else
           let* cl_typ = closure_type ~usage:`Alloc ~cps arity in
-          let* common = closure_common_fields ~cps in
-          let* fun_ty' = function_type ~cps arity in
+          let* code_pointers = code_pointer_fields ~cps arity in
           return
             { supertype = Some cl_typ
             ; final = true
-            ; typ =
-                W.Struct
-                  ((if arity = 1
-                    then common
-                    else if arity = 0
-                    then
-                      [ { mut = false
-                        ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                        }
-                      ]
-                    else
-                      common
-                      @ [ { mut = false
-                          ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                          }
-                        ])
-                  @ make_env_type env_type)
+            ; typ = W.Struct (code_pointers @ make_env_type env_type)
             })
 
   let rec_env_type ~function_count ~env_type_id ~env_type =
@@ -396,21 +433,13 @@ module Type = struct
             }
         else
           let* cl_typ = closure_type ~usage:`Alloc ~cps arity in
-          let* common = closure_common_fields ~cps in
-          let* fun_ty' = function_type ~cps arity in
+          let* code_pointers = code_pointer_fields ~cps arity in
           return
             { supertype = Some cl_typ
             ; final = true
             ; typ =
                 W.Struct
-                  ((if arity = 1
-                    then common
-                    else
-                      common
-                      @ [ { mut = false
-                          ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                          }
-                        ])
+                  (code_pointers
                   @ [ { W.mut = false
                       ; typ = W.Value (Ref { nullable = false; typ = Type env_ty })
                       }
@@ -424,7 +453,7 @@ module Type = struct
        else Printf.sprintf "curry_%d_%d" arity m)
       (fun () ->
         let* cl_typ = closure_type ~usage:(if m = 2 then `Alloc else `Access) ~cps 1 in
-        let* common = closure_common_fields ~cps in
+        let* common = code_pointer_fields ~cps 1 in
         let* cl_ty =
           if m = arity
           then closure_type ~usage:`Alloc ~cps arity
@@ -451,21 +480,13 @@ module Type = struct
       (fun () ->
         let* cl_typ = closure_type ~cps ~usage:`Alloc arity in
         let* cl_typ' = closure_type ~cps ~usage:`Access arity in
-        let* common = closure_common_fields ~cps in
-        let* fun_ty' = function_type ~cps arity in
+        let* code_pointers = code_pointer_fields ~cps arity in
         return
           { supertype = Some cl_typ
           ; final = true
           ; typ =
               W.Struct
-                ((if arity = 1
-                  then common
-                  else
-                    common
-                    @ [ { mut = false
-                        ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                        }
-                      ])
+                (code_pointers
                 @ [ { W.mut = true
                     ; typ = W.Value (Ref { nullable = true; typ = Type cl_typ' })
                     }
@@ -567,9 +588,9 @@ module Value = struct
     let* y = y in
     let* f =
       register_import
-        ~name:"caml_js_strict_equals"
+        ~name:"caml_js_strict_equals_i32"
         ~import_module:"env"
-        (Fun { params = [ Type.value; Type.value ]; result = [ Type.value ] })
+        (Fun { params = [ Type.value; Type.value ]; result = [ I32 ] })
     in
     return (W.Call (f, [ x; y ]))
 
@@ -629,19 +650,41 @@ module Value = struct
     let yv = Code.Var.fresh () in
     let* js = Type.js_type in
     let n =
-      if_expr
-        I32
-        (* We mimic an "and" on the two conditions, but in a way that is nicer to the
-           binaryen optimizer. *)
-        (if_expr
-           I32
-           (ref_test (ref js) (load xv))
-           (ref_test (ref js) (load yv))
-           (Arith.const 0l))
-        (caml_js_strict_equals (load xv) (load yv)
-        >>| (fun e -> W.RefCast ({ nullable = false; typ = I31 }, e))
-        >>| fun e -> W.I31Get (S, e))
-        (ref_eq (load xv) (load yv))
+      let* cx = ref_test (ref js) (load xv) in
+      let* cy = ref_test (ref js) (load yv) in
+      let is_false e =
+        match e with
+        | W.Const (I32 0l) -> true
+        | _ -> false
+      in
+      if is_false cx || is_false cy
+      then ref_eq (load xv) (load yv)
+      else
+        (* Omit the tests which are statically known to succeed *)
+        let conds =
+          List.filter
+            ~f:(fun c ->
+              match c with
+              | W.Const _ -> false
+              | _ -> true)
+            [ cx; cy ]
+        in
+        if List.is_empty conds
+        then caml_js_strict_equals (load xv) (load yv)
+        else
+          block_expr
+            { params = []; result = [ I32 ] }
+            (let* () =
+               List.fold_right
+                 conds
+                 ~init:
+                   (let* e = caml_js_strict_equals (load xv) (load yv) in
+                    instr (Br (List.length conds, Some e)))
+                 ~f:(fun c body ->
+                   if_ { params = []; result = [] } (return c) body (return ()))
+             in
+             let* e = ref_eq (load xv) (load yv) in
+             instr (Push e))
     in
     seq
       (let* () = store xv x in
@@ -697,40 +740,49 @@ module Value64 = struct
     let* e = i in
     match e with
     | W.Const (I64 n) ->
-        if Int64.compare n (Lazy.force Typing.Integer.min_i31s) >= 0
-           && Int64.compare n (Lazy.force Typing.Integer.max_i31s) <= 0
+        if
+          Int64.compare n (Lazy.force Typing.Integer.min_i31s) >= 0
+          && Int64.compare n (Lazy.force Typing.Integer.max_i31s) <= 0
         then return (W.RefI31 (Const (I32 (Int64.to_int32 n))))
         else
           let* ty = Type.large_int_type in
           return (W.StructNew (ty, [ Const (I64 n) ]))
     | _ ->
-        let* ty = Type.large_int_type in
         let v = Code.Var.fresh () in
         seq
           (store ~typ:I64 v (return e))
           (if_expr
              Type.value
-             (* Branch-free range check:
-                [v in [min_i31s, max_i31s]  <=>  (v - min_i31s) <u (max_i31s - min_i31s + 1)]
+             (* Single range check:
+                [v in [-2^30, 2^30 - 1]  <=>  (v + 2^30) <=u 2^31 - 1]
 
-                Note: [<u] is "unsigned less than", this handles out-of-range negatives:
-                If [v < min_i31s], then [v + 2^30] is still negative:
-                - If the check was signed then the comparison would return true
-                  and we wouldn't catch the larger int.
-                - With the unsigned check, the negative reinterprets as a big u64
-                  number and fails the check as we expect. *)
-             (Arith64.ult_i32
-                (Arith64.( + ) (load v) (
-                   Arith64.const (Int64.neg (Lazy.force Typing.Integer.min_i31s))))
-                (Arith64.const Int64.(add (sub (Lazy.force Typing.Integer.max_i31s) (Lazy.force Typing.Integer.min_i31s)) 1L)))
+                The comparison is unsigned: if [v < -2^30], then [v + 2^30]
+                is negative, hence a large unsigned number. The bound is
+                [2^31 - 1] rather than the equivalent [<u 2^31], since on x64
+                [2^31] does not fit in an immediate operand. *)
+             (Arith64.ule_i32
+                (Arith64.( + )
+                   (load v)
+                   (Arith64.const (Int64.neg (Lazy.force Typing.Integer.min_i31s))))
+                (Arith64.const 0x7fffffffL))
              (load v >>| fun e -> W.RefI31 (I32WrapI64 e))
-             (load v >>| fun e -> W.StructNew (ty, [ e ])))
+             (* The allocation of a large integer is rare, and its machine
+                code is large: it is performed by a runtime function *)
+             (let* e = load v in
+              let* f =
+                register_import
+                  ~name:"box_large_int"
+                  ~import_module:"env"
+                  (Fun { params = [ I64 ]; result = [ Type.value ] })
+              in
+              return (W.Call (f, [ e ]))))
 
   let int_val i =
     let* e = i in
     match e with
-    | W.RefI31 (Const (I32 n)) -> return (W.Const (I64 (Int64.of_int32 n)))
-    | W.RefI31 e' -> return (W.I64ExtendI32 (S, e'))
+    | W.RefI31 (Const (I32 n)) ->
+        return (W.Const (I64 (Int64.of_int32 Int32.(shift_right (shift_left n 1) 1))))
+    | W.RefI31 _ -> return (W.I64ExtendI32 (S, I31Get (S, e)))
     | _ ->
         let* ty = Type.large_int_type in
         let v = Code.Var.fresh () in
@@ -741,15 +793,14 @@ module Value64 = struct
              (load v >>| fun e -> W.RefTest ({ nullable = false; typ = I31 }, e))
              (load v
              >>| fun e ->
-             W.I64ExtendI32 (S, I31Get (S, RefCast ({ nullable = false; typ = I31 }, e))))
+             W.I64ExtendI32 (S, I31Get (S, RefCast ({ nullable = false; typ = I31 }, e)))
+             )
              (load v
              >>| fun e ->
              W.StructGet (None, ty, 0, RefCast ({ nullable = false; typ = Type ty }, e))))
 
-  (* We can assume that 0 is gonna be an i31 as we canonicalize i31-fitting values in an unboxed int *)
-  let check_is_not_zero i =
-    let* i = i in
-    return (W.UnOp (I32 Eqz, RefEq (i, W.RefI31 (Const (I32 0l)))))
+  (* Zero fits in 31 bits, so it is always represented as an [i31] *)
+  let check_is_not_zero = Value.check_is_not_zero
 
   let check_is_int i =
     let* i = i in
@@ -760,69 +811,22 @@ module Value64 = struct
          , RefTest ({ nullable = false; typ = I31 }, i)
          , RefTest ({ nullable = false; typ = Type ty }, i) ))
 
-
   let not i = Arith64.eqz_i32 i
 
   let lt = Arith64.( < )
 
   let le = Arith64.( <= )
 
-  let ref_eq i i' =
-    let* i = i in
-    let* i' = i' in
-    return (W.RefEq (i, i'))
-
-  let ref ty = { W.nullable = false; typ = Type ty }
-
-  let ref_test (typ : W.ref_type) e =
-    let* e = e in
-    match e with
-    | W.RefI31 _ -> (
-        match typ.typ with
-        | W.I31 | Eq | Any -> return (W.Const (I32 1l))
-        | Struct | Array | Type _ | None_ | Func | Extern -> return (W.Const (I32 0l)))
-    | GlobalGet nm -> (
-        let* init = get_global nm in
-        match init with
-        | Some (W.ArrayNewFixed (t, _) | W.StructNew (t, _)) ->
-            let* b = heap_type_sub (Type t) typ.typ in
-            if b then return (W.Const (I32 1l)) else return (W.Const (I32 0l))
-        | _ -> return (W.RefTest (typ, e)))
-    | _ -> return (W.RefTest (typ, e))
-
-  let caml_js_strict_equals x y =
-    let* x = x in
-    let* y = y in
-    let* f =
-      register_import
-        ~name:"caml_js_strict_equals"
-        ~import_module:"env"
-        (Fun { params = [ Type.value; Type.value ]; result = [ Type.value ] })
-    in
-    return (W.Call (f, [ x; y ]))
-
-  let map f x =
-    let* x = x in
-    return (f x)
-
-  let ( >>| ) x f = map f x
-
   let ref_test_both ~ty a b =
     (* We mimic an "and" on the two conditions, but in a way that is nicer to the
        binaryen optimizer. *)
-    (if_expr
-       I32
-       (ref_test (ref ty) (load a))
-       (ref_test (ref ty) (load b))
-       (Arith.const 0l))
-  ;;
+    if_expr I32 (ref_test (ref ty) (load a)) (ref_test (ref ty) (load b)) (Arith.const 0l)
 
   let phys_eq_unboxing_i64_refs xv yv =
     let* ty = Type.large_int_type in
     let large e =
       let* e = e in
-      return
-        (W.StructGet (None, ty, 0, RefCast ({ nullable = false; typ = Type ty }, e)))
+      return (W.StructGet (None, ty, 0, RefCast ({ nullable = false; typ = Type ty }, e)))
     in
     if_expr
       I32
@@ -842,8 +846,7 @@ module Value64 = struct
       if_expr
         I32
         (ref_test_both ~ty:js xv yv)
-        (caml_js_strict_equals (load xv) (load yv)
-        >>| (fun e -> W.I31Get (S, RefCast ({ nullable = false; typ = I31 }, e))))
+        (caml_js_strict_equals (load xv) (load yv))
         (phys_eq_unboxing_i64_refs xv yv)
     in
     seq
@@ -862,7 +865,6 @@ module Value64 = struct
       (phys_eq_unboxing_i64_refs xv yv)
 
   let phys_neq x y = Arith.eqz (phys_eq x y)
-
 
   let ult = Arith64.ult
 
@@ -1120,13 +1122,19 @@ module Memory = struct
 
   let set_field e idx e' = wasm_array_set e (Arith.const (Int32.of_int (idx + 1))) e'
 
-  let env_start ~no_code_pointer arity =
+  (* Index of the first field of the environment of a closure, that is, the
+     number of code pointers it holds (see [Type.code_pointer_fields]) *)
+  let env_start ~cps ~no_code_pointer arity =
     if no_code_pointer
     then 0
     else
-      match arity with
-      | 0 | 1 -> 1
-      | _ -> 2
+      let n =
+        match arity with
+        | 0 | 1 -> 1
+        | _ -> 2
+      in
+      (* The code pointers of both versions *)
+      if cps && double_translation () then 2 * n else n
 
   let load_function_pointer ~cps ~arity ?(skip_cast = false) closure =
     let arity = if cps then arity - 1 else arity in
@@ -1134,7 +1142,7 @@ module Memory = struct
     let* fun_ty = Type.function_type ~cps arity in
     let casted_closure = if skip_cast then closure else wasm_cast ty closure in
     let* e =
-      wasm_struct_get ty casted_closure (env_start ~no_code_pointer:false arity - 1)
+      wasm_struct_get ty casted_closure (env_start ~cps ~no_code_pointer:false arity - 1)
     in
     return (fun_ty, e)
 
@@ -1148,7 +1156,7 @@ module Memory = struct
         (wasm_struct_get
            ty
            (wasm_cast ty closure)
-           (env_start ~no_code_pointer:false arity))
+           (env_start ~cps ~no_code_pointer:false arity))
     in
     return (cl_typ, e)
 
@@ -1172,6 +1180,68 @@ module Memory = struct
             instr (W.Return (Some e))))
     in
     if_mismatch
+
+  let call_continuation k res =
+    let* k_ty, k_funct = load_function_pointer ~cps:false ~arity:1 k in
+    let* k = k in
+    let* res = res in
+    return (W.Call_ref (k_ty, k_funct, [ res; k ]))
+
+  (* With double translation, a CPS call to a function which is not known
+     statically. If the function has a CPS version (its closure is a
+     [cps_closure], see [Type.code_pointer_fields]), this version is called.
+     Otherwise, the function cannot perform an effect: its direct-style
+     version is called, and the result is passed to the continuation (the
+     last argument). This is also what happens for partial applications of
+     functions with a CPS version: the resulting closure has a CPS version
+     as well (see [Curry]). Both calls are in tail position and are turned
+     into tail calls (see [Tail_call]). So the result of this expression is
+     never actually produced: it can only be used when the result of the
+     call is immediately returned, which is always the case for CPS calls.
+     The call must be exact, unless there is a single argument (besides the
+     continuation). *)
+  let cps_call_or_direct ~arity f args =
+    assert (double_translation ());
+    let n = arity - 1 in
+    let k = List.nth args n in
+    let direct_args = List.filteri ~f:(fun i _ -> i < n) args in
+    let* pair_ty = Type.closure_type ~usage:`Access ~cps:true n in
+    block_expr
+      { params = []; result = [ Type.value ] }
+      (let* () =
+         drop
+           (block_expr
+              { params = []; result = [ Type.value ] }
+              (let p = Code.Var.fresh_n "f" in
+               let* closure =
+                 tee
+                   ~typ:(W.Ref { nullable = false; typ = Type pair_ty })
+                   p
+                   (let* f = load f in
+                    return
+                      (W.Br_on_cast_fail
+                         ( 0
+                         , { nullable = false; typ = Eq }
+                         , { nullable = false; typ = Type pair_ty }
+                         , f )))
+               in
+               let* ty, funct =
+                 load_function_pointer ~cps:true ~arity ~skip_cast:true (load p)
+               in
+               let* args = expression_list Fun.id args in
+               instr (W.Return (Some (W.Call_ref (ty, funct, args @ [ closure ]))))))
+       in
+       (* The function has no CPS version. Unless the function is applied
+          to a single argument, the call is exact, so the function has the
+          right arity. *)
+       let res =
+         let* ty, funct = load_function_pointer ~cps:false ~arity:n (load f) in
+         let* args = expression_list Fun.id direct_args in
+         let* closure = load f in
+         return (W.Call_ref (ty, funct, args @ [ closure ]))
+       in
+       let* e = call_continuation k res in
+       instr (W.Return (Some e)))
 
   let make_float32 e =
     let* custom_operations = Type.custom_operations_type in
@@ -1216,7 +1286,7 @@ module Memory = struct
     let* custom_operations = Type.custom_operations_type in
     let* int64_ops =
       register_import
-         ~name:
+        ~name:
           (match kind with
           | `Int64 -> "int64_ops"
           | `Nativeint -> "nativeint_ops")
@@ -1240,13 +1310,12 @@ module Memory = struct
 
   let unbox_nativeint e =
     if Config.Flag.portable_int ()
-    then (
+    then
       let* ty = Type.int64_type in
-      wasm_struct_get ty (wasm_cast ty e) 1)
-    else (
-    let* ty = Type.int32_type in
-    wasm_struct_get ty (wasm_cast ty e) 1
-    )
+      wasm_struct_get ty (wasm_cast ty e) 1
+    else
+      let* ty = Type.int32_type in
+      wasm_struct_get ty (wasm_cast ty e) 1
 end
 
 module Constant = struct
@@ -1276,10 +1345,10 @@ module Constant = struct
   let rec translate_rec c =
     match c with
     | Code.Int i when Config.Flag.portable_int () && not (Targetint.is_within_i31s i) ->
-      let* ty = Type.large_int_type in
-      return (Const, (W.StructNew (ty, [ Const (I64 (Targetint.to_int64 i)) ])))
+        let* ty = Type.large_int_type in
+        return (Const, W.StructNew (ty, [ Const (I64 (Targetint.to_int64 i)) ]))
     | Int i -> return (Const, W.RefI31 (Const (I32 (Targetint.to_int32 i))))
-    | Tuple (tag, a, _) ->
+    | Tuple (tag, a, _, _) ->
         let* ty = Type.block_type in
         let* l =
           Array.fold_left
@@ -1341,8 +1410,7 @@ module Constant = struct
             (Global { mut = false; typ = Ref { nullable = false; typ = Extern } })
         in
         let* ty = Type.js_type in
-        return
-          (Const_named ("str_" ^ s), W.StructNew (ty, [ AnyConvertExtern (GlobalGet x) ]))
+        return (Const_named ("str_" ^ s), W.StructNew (ty, [ GlobalGet x ]))
     | String s ->
         let* ty = Type.string_type in
         (* Equal string constants are interned.
@@ -1394,7 +1462,7 @@ module Constant = struct
     | Float32 f ->
         let* e = Memory.make_float32 (return (W.Const (F32 (Int64.float_of_bits f)))) in
         return (Const, e)
-    | Float_array l ->
+    | Float_array (l, _) ->
         let l = Array.to_list l in
         let* ty = Type.float_array_type in
         (*ZZZ Boxed array? *)
@@ -1410,13 +1478,20 @@ module Constant = struct
         return (Const, e)
     | NativeInt i ->
         if Config.Flag.portable_int ()
-        then (
-          let* e = Memory.make_int64 ~kind:`Nativeint (return (W.Const (I64 (Targetnativeint.to_int64 i)))) in
-          return (Const, e))
-        else  (
-        let* e = Memory.make_int32 ~kind:`Nativeint (return (W.Const (I32 (Targetnativeint.to_int32 i)))) in
-        return (Const, e)
-        )
+        then
+          let* e =
+            Memory.make_int64
+              ~kind:`Nativeint
+              (return (W.Const (I64 (Targetnativeint.to_int64 i))))
+          in
+          return (Const, e)
+        else
+          let* e =
+            Memory.make_int32
+              ~kind:`Nativeint
+              (return (W.Const (I32 (Targetnativeint.to_int32 i))))
+          in
+          return (Const, e)
     | Null_ ->
         let* var =
           register_import ~name:"null" (Global { mut = false; typ = Type.value })
@@ -1425,17 +1500,19 @@ module Constant = struct
 
   let translate ~unboxed c =
     match c with
-    | Code.Int i ->
-      (match Typing.Integer.kind_of_targetint i with
-      | Small_normalized | Small_unnormalized | Ref -> return (W.Const (I32 (Targetint.to_int32 i)))
-      | Large_normalized | Large_unnormalized -> return (W.Const (I64 (Targetint.to_int64 i))))
+    | Code.Int i -> (
+        match Typing.Integer.kind_of_targetint i with
+        | Small_normalized | Small_unnormalized | Ref ->
+            return (W.Const (I32 (Targetint.to_int32 i)))
+        | Large_normalized | Large_unnormalized ->
+            return (W.Const (I64 (Targetint.to_int64 i))))
     | Float f when unboxed -> return (W.Const (F64 (Int64.float_of_bits f)))
     | ((Float32 f) [@if oxcaml]) when unboxed ->
         return (W.Const (F32 (Int64.float_of_bits f)))
     | Int64 i when unboxed -> return (W.Const (I64 i))
     | Int32 i when unboxed -> return (W.Const (I32 i))
     | NativeInt i when unboxed && Config.Flag.portable_int () ->
-      return (W.Const (I64 (Targetnativeint.to_int64 i)))
+        return (W.Const (I64 (Targetnativeint.to_int64 i)))
     | NativeInt i when unboxed -> return (W.Const (I32 (Targetnativeint.to_int32 i)))
     | _ -> (
         let* const, c = translate_rec c in
@@ -1473,7 +1550,11 @@ module Closure = struct
     | [ (g, _) ] -> Code.Var.equal f g
     | _ :: r -> is_last_fun r f
 
-  let translate ~context ~closures ~cps ~no_code_pointer f =
+  (* [cps_version] is the CPS version of [f], with double translation (see
+     [double_translation]); the closure then holds the code pointers of both
+     versions (unless [no_code_pointer], which then holds for both versions,
+     see [Call_graph_analysis]), and is shared by them. *)
+  let translate ~context ~closures ~cps ?cps_version ~no_code_pointer f =
     let info = Code.Var.Map.find f closures in
     let free_variables = get_free_variables ~context info in
     assert (
@@ -1481,31 +1562,53 @@ module Closure = struct
         (List.exists
            ~f:(fun x -> Code.Var.Set.mem x context.globalized_variables)
            free_variables));
+    let pair = Option.is_some cps_version in
+    (* Layout of the closure, see [Type.code_pointer_fields] *)
+    let cps_layout = cps || pair in
     let _, arity = List.find ~f:(fun (f', _) -> Code.Var.equal f f') info.functions in
     let arity = if cps then arity - 1 else arity in
-    let* curry_fun =
-      if arity > 1 && not no_code_pointer then need_curry_fun ~cps ~arity else return f
+    let* code_pointers =
+      if no_code_pointer
+      then return []
+      else
+        match cps_version with
+        | None ->
+            let* curry_fun = if arity > 1 then need_curry_fun ~cps ~arity else return f in
+            return
+              (match arity with
+              | 0 | 1 -> [ W.RefFunc f ]
+              | _ -> [ RefFunc curry_fun; RefFunc f ])
+        | Some g ->
+            assert (double_translation () && not cps);
+            let* curry_fun, cps_curry_fun =
+              if arity > 1 then need_pair_curry_fun ~arity else return (f, g)
+            in
+            return
+              (match arity with
+              | 0 | 1 -> [ W.RefFunc f; RefFunc g ]
+              | _ -> [ RefFunc curry_fun; RefFunc f; RefFunc cps_curry_fun; RefFunc g ])
     in
     if List.is_empty free_variables
     then
+      let* () =
+        (* The function ignores its environment. When it is only called
+           directly, the environment parameter is omitted, unless
+           wasm-opt runs: its dead argument elimination removes it. *)
+        if no_code_pointer && not context.wasm_opt
+        then Code.Var.Hashtbl.replace context.functions_without_env f ();
+        return ()
+      in
       let* typ =
         if no_code_pointer
         then Type.empty_closure_type ()
-        else Type.closure_type ~usage:`Alloc ~cps arity
+        else Type.closure_type ~usage:`Alloc ~cps:cps_layout arity
       in
       let name = Code.Var.fork f in
       let* () =
         register_global
           name
           { mut = false; typ = Type.value }
-          (W.StructNew
-             ( typ
-             , if no_code_pointer
-               then []
-               else
-                 match arity with
-                 | 0 | 1 -> [ W.RefFunc f ]
-                 | _ -> [ RefFunc curry_fun; RefFunc f ] ))
+          (W.StructNew (typ, code_pointers))
       in
       return (W.GlobalGet name)
     else
@@ -1521,18 +1624,11 @@ module Closure = struct
       match info.Closure_conversion.functions with
       | [] -> assert false
       | [ _ ] ->
-          let* typ = Type.env_type ~cps ~arity ~no_code_pointer ~env_type_id ~env_type in
+          let* typ =
+            Type.env_type ~cps:cps_layout ~arity ~no_code_pointer ~env_type_id ~env_type
+          in
           let* l = expression_list load free_variables in
-          return
-            (W.StructNew
-               ( typ
-               , (if no_code_pointer
-                  then []
-                  else
-                    match arity with
-                    | 0 | 1 -> [ W.RefFunc f ]
-                    | _ -> [ RefFunc curry_fun; RefFunc f ])
-                 @ l ))
+          return (W.StructNew (typ, code_pointers @ l))
       | (g, _) :: _ as functions ->
           let function_count = List.length functions in
           let* env_typ = Type.rec_env_type ~function_count ~env_type_id ~env_type in
@@ -1558,7 +1654,7 @@ module Closure = struct
           in
           let* typ =
             Type.rec_closure_type
-              ~cps
+              ~cps:cps_layout
               ~arity
               ~no_code_pointer
               ~function_count
@@ -1567,16 +1663,7 @@ module Closure = struct
           in
           let res =
             let* env = env in
-            return
-              (W.StructNew
-                 ( typ
-                 , (if no_code_pointer
-                    then []
-                    else
-                      match arity with
-                      | 0 | 1 -> [ W.RefFunc f ]
-                      | _ -> [ RefFunc curry_fun; RefFunc f ])
-                   @ [ env ] ))
+            return (W.StructNew (typ, code_pointers @ [ env ]))
           in
           if is_last_fun functions f
           then
@@ -1596,23 +1683,35 @@ module Closure = struct
               (load f)
           else res
 
-  let bind_environment ~context ~closures ~cps ~no_code_pointer f =
+  (* [pair] indicates that [f] is the direct-style version of a function with
+     a CPS version, so its closure holds the code pointers of both versions,
+     unless [no_code_pointer] (see [translate]). *)
+  let bind_environment ~context ~closures ~cps ?(pair = false) ~no_code_pointer f =
     let info = Code.Var.Map.find f closures in
     let free_variables = get_free_variables ~context info in
     if List.is_empty free_variables
     then
       (* The closures are all constants and the environment is empty. *)
-      let* _ = add_var (Code.Var.fresh ()) in
-      return ()
+      if Code.Var.Hashtbl.mem context.functions_without_env f
+      then return ()
+      else
+        let* _ = add_var (Code.Var.fresh ()) in
+        return ()
     else
+      let cps_layout = cps || pair in
       let env_type_id = Option.value ~default:(-1) info.id in
       let _, arity = List.find ~f:(fun (f', _) -> Code.Var.equal f f') info.functions in
       let arity = if cps then arity - 1 else arity in
-      let offset = Memory.env_start ~no_code_pointer arity in
+      let offset = Memory.env_start ~cps:cps_layout ~no_code_pointer arity in
       match info.Closure_conversion.functions with
       | [ _ ] ->
           let* typ =
-            Type.env_type ~cps ~arity ~no_code_pointer ~env_type_id ~env_type:[]
+            Type.env_type
+              ~cps:cps_layout
+              ~arity
+              ~no_code_pointer
+              ~env_type_id
+              ~env_type:[]
           in
           let* _ = add_var f in
           let env = Code.Var.fresh_n "env" in
@@ -1634,7 +1733,7 @@ module Closure = struct
           let function_count = List.length functions in
           let* typ =
             Type.rec_closure_type
-              ~cps
+              ~cps:cps_layout
               ~arity
               ~no_code_pointer
               ~function_count
@@ -1659,7 +1758,9 @@ module Closure = struct
                ~init:(0, return ())
                (List.map ~f:fst functions @ free_variables))
 
-  let curry_allocate ~cps ~arity m ~f ~closure ~arg =
+  (* [cps_f] is the CPS version of [f], for the partial application of a
+     function with a CPS version (double translation) *)
+  let curry_allocate ?cps_f ~cps ~arity m ~f ~closure ~arg =
     let* ty = Type.curry_type ~cps arity m in
     let* cl_ty =
       if m = arity
@@ -1668,7 +1769,14 @@ module Closure = struct
     in
     let* closure = Memory.wasm_cast cl_ty (load closure) in
     let* arg = load arg in
-    return (W.StructNew (ty, [ W.RefFunc f; closure; arg ]))
+    let code_pointers =
+      match cps_f with
+      | None -> [ W.RefFunc f ]
+      | Some g ->
+          assert (cps && double_translation ());
+          [ W.RefFunc f; RefFunc g ]
+    in
+    return (W.StructNew (ty, code_pointers @ [ closure; arg ]))
 
   let curry_load ~cps ~arity m closure =
     let m = m + 1 in
@@ -1679,7 +1787,7 @@ module Closure = struct
       else Type.curry_type ~cps arity (m + 1)
     in
     let cast e = if m = 2 then Memory.wasm_cast ty e else e in
-    let offset = Memory.env_start ~no_code_pointer:false 1 in
+    let offset = Memory.env_start ~cps ~no_code_pointer:false 1 in
     return
       ( Memory.wasm_struct_get ty (cast (load closure)) (offset + 1)
       , Memory.wasm_struct_get ty (cast (load closure)) offset
@@ -1784,6 +1892,11 @@ module Bigarray = struct
       ~ty:Type.int_array_type
       (Memory.wasm_struct_get ty (Memory.wasm_cast ty a) 3)
       (Arith.const (Int32.of_int n))
+
+  let num_dims a =
+    let* ty = Type.bigarray_type in
+    let* a = Memory.wasm_cast ty a in
+    return (W.StructGet (Some U, ty, 4, a))
 
   let little_endian () =
     if Config.Flag.wasi ()
@@ -2026,43 +2139,94 @@ module Bigarray = struct
       Value.unit
 end
 
-module JavaScript = struct
-  let anyref = W.Ref { nullable = true; typ = Any }
+type js_arg =
+  [ `Value of expression
+  | `F64 of expression
+  | `I32 of expression
+  ]
 
-  let invoke_fragment name args =
+module JavaScript = struct
+  let externref = W.Ref { nullable = true; typ = Extern }
+
+  (* Call a JavaScript function imported from [import_module]. Unboxed floats
+     and untagged integers are passed as [f64] and [i32], and the result is
+     returned as a [f64] or an [i32] when it is used as an unboxed float or an
+     untagged integer: the JavaScript engine then performs the conversion. *)
+  let call ?(result = `Value) ~import_module name (args : js_arg list) =
     let* f =
-      let* unit = unit_name in
       register_import
         (* TODO: remove [~allow_tail_call:false] once a long term fix is released in Safari 27 *)
         ~allow_tail_call:false
-        ~import_module:
-          (match unit with
-          | None -> "fragments"
-          | Some unit -> unit ^ ".fragments")
+        ~import_module
         ~name
-        (Fun { params = List.map ~f:(fun _ -> anyref) args; result = [ anyref ] })
-    in
-    let* wrap =
-      register_import ~name:"wrap" (Fun { params = [ anyref ]; result = [ Type.value ] })
-    in
-    let* unwrap =
-      register_import
-        ~name:"unwrap"
-        (Fun { params = [ Type.value ]; result = [ anyref ] })
+        (Fun
+           { params =
+               List.map
+                 ~f:(fun (a : js_arg) ->
+                   match a with
+                   | `Value _ -> externref
+                   | `F64 _ -> W.F64
+                   | `I32 _ -> W.I32)
+                 args
+           ; result =
+               [ (match result with
+                 | `Value -> externref
+                 | `F64 -> F64
+                 | `I32 -> I32)
+               ]
+           })
     in
     let* args =
       expression_list
-        (fun e ->
-          let* e = e in
-          return (W.Call (unwrap, [ e ])))
+        (fun (a : js_arg) ->
+          match a with
+          | `Value e ->
+              let* unwrap =
+                register_import
+                  ~name:"js_of_value"
+                  (Fun { params = [ Type.value ]; result = [ externref ] })
+              in
+              let* e = e in
+              return (W.Call (unwrap, [ e ]))
+          | `F64 e | `I32 e -> e)
         args
     in
-    return (W.Call (wrap, [ Call (f, args) ]))
+    match result with
+    | `F64 | `I32 -> return (W.Call (f, args))
+    | `Value ->
+        let* wrap =
+          register_import
+            ~name:"value_of_js"
+            (Fun { params = [ externref ]; result = [ Type.value ] })
+        in
+        return (W.Call (wrap, [ Call (f, args) ]))
+
+  let invoke_fragment ?result name args =
+    let* unit = unit_name in
+    call
+      ?result
+      ~import_module:
+        (match unit with
+        | None -> "fragments"
+        | Some unit -> unit ^ ".fragments")
+      name
+      args
+
+  let identity ?result arg = call ?result ~import_module:"bindings" "identity" [ arg ]
+
+  let from_float e = identity (`F64 e)
+
+  let to_float e = identity ~result:`F64 (`Value e)
+
+  (* The conversion to [i32] is the same as for [caml_js_to_bool] *)
+  let to_bool e = identity ~result:`I32 (`Value e)
 end
 
-let internal_primitives =
+let internal_primitives, js_primitives =
   let l = ref [] in
+  let js = ref [] in
   let register name ?(kind = `Mutator) f = l := (name, kind, f) :: !l in
+  let register_js name ?(kind = `Mutator) f = js := (name, kind, f) :: !js in
   let module J = Javascript in
   let call_prim ~transl_prim_arg name args =
     let arity = List.length args in
@@ -2090,11 +2254,9 @@ let internal_primitives =
             with Parse_js.Parsing_error pi ->
               failwith
                 (Printf.sprintf
-                   "Parse error in argument of %s %S at position %d:%d"
-                   prim_name
-                   str
-                   pi.Parse_info.line
-                   pi.Parse_info.col))
+                   "%s: cannot parse the JavaScript expression %S"
+                   (Parse_info.Diagnostic.to_string pi)
+                   str))
         | [ Pv _ ] ->
             let eval name code =
               let* () =
@@ -2104,7 +2266,7 @@ let internal_primitives =
               in
               JavaScript.invoke_fragment
                 name
-                [ call_prim ~transl_prim_arg "caml_jsstring_of_string" l ]
+                [ `Value (call_prim ~transl_prim_arg "caml_jsstring_of_string" l) ]
             in
             if expr
             then eval "eval_expr" {|(x)=>eval?.('"use strict";('+x+')')|}
@@ -2116,7 +2278,7 @@ let internal_primitives =
     ~f:(register_js_code ~expr:true)
     [ "caml_js_expr", `Mutator; "caml_pure_js_expr", `Pure; "caml_js_var", `Mutable ];
   register_js_code ~expr:false ("caml_js_eval_string", `Mutator);
-  register "%caml_js_opt_call" (fun transl_prim_arg l ->
+  register_js "%caml_js_opt_call" (fun _ transl_js_arg result l ->
       let arity = List.length l - 2 in
       let name = Printf.sprintf "call_%d" arity in
       let* () =
@@ -2145,9 +2307,9 @@ let internal_primitives =
               , true
               , AUnknown ))
       in
-      let l = List.map ~f:transl_prim_arg l in
-      JavaScript.invoke_fragment name l);
-  register "%caml_js_opt_fun_call" (fun transl_prim_arg l ->
+      let l = List.map ~f:transl_js_arg l in
+      JavaScript.invoke_fragment ~result name l);
+  register_js "%caml_js_opt_fun_call" (fun _ transl_js_arg result l ->
       let arity = List.length l - 1 in
       let name = Printf.sprintf "fun_call_%d" arity in
       let* () =
@@ -2173,9 +2335,9 @@ let internal_primitives =
               , true
               , AUnknown ))
       in
-      let l = List.map ~f:transl_prim_arg l in
-      JavaScript.invoke_fragment name l);
-  register "%caml_js_opt_meth_call" (fun transl_prim_arg l ->
+      let l = List.map ~f:transl_js_arg l in
+      JavaScript.invoke_fragment ~result name l);
+  register_js "%caml_js_opt_meth_call" (fun _ transl_js_arg result l ->
       match l with
       | o :: Code.Pc (NativeString (Utf meth)) :: args ->
           let arity = List.length args in
@@ -2206,11 +2368,11 @@ let internal_primitives =
                   , true
                   , AUnknown ))
           in
-          let o = transl_prim_arg o in
-          let args = List.map ~f:transl_prim_arg args in
-          JavaScript.invoke_fragment name (o :: args)
+          let o = transl_js_arg o in
+          let args = List.map ~f:transl_js_arg args in
+          JavaScript.invoke_fragment ~result name (o :: args)
       | _ -> assert false);
-  register "%caml_js_opt_new" (fun transl_prim_arg l ->
+  register_js "%caml_js_opt_new" (fun _ transl_js_arg result l ->
       let arity = List.length l - 1 in
       let name = Printf.sprintf "new_%d" arity in
       let* () =
@@ -2239,9 +2401,9 @@ let internal_primitives =
               , true
               , AUnknown ))
       in
-      let l = List.map ~f:transl_prim_arg l in
-      JavaScript.invoke_fragment name l);
-  register "caml_js_get" (fun transl_prim_arg l ->
+      let l = List.map ~f:transl_js_arg l in
+      JavaScript.invoke_fragment ~result name l);
+  register_js "caml_js_get" (fun transl_prim_arg _ result l ->
       match l with
       | [ x; Code.Pc (NativeString (Utf prop)) ] when J.is_ident' prop ->
           let name =
@@ -2259,10 +2421,15 @@ let internal_primitives =
                   , true
                   , AUnknown ))
           in
-          JavaScript.invoke_fragment name [ transl_prim_arg x ]
-      | [ _; _ ] -> call_prim ~transl_prim_arg "caml_js_get" l
+          JavaScript.invoke_fragment ~result name [ `Value (transl_prim_arg x) ]
+      | [ _; _ ] -> (
+          let e = call_prim ~transl_prim_arg "caml_js_get" l in
+          match result with
+          | `Value -> e
+          | `F64 -> JavaScript.to_float e
+          | `I32 -> JavaScript.to_bool e)
       | _ -> assert false);
-  register "caml_js_set" (fun transl_prim_arg l ->
+  register_js "caml_js_set" (fun transl_prim_arg transl_js_arg _ l ->
       match l with
       | [ x; Code.Pc (NativeString (Utf prop)); y ] when J.is_ident' prop ->
           let name =
@@ -2287,12 +2454,12 @@ let internal_primitives =
                   , true
                   , AUnknown ))
           in
-          let l = List.map ~f:transl_prim_arg [ x; y ] in
+          let l = List.map ~f:transl_js_arg [ x; y ] in
           JavaScript.invoke_fragment name l
       | [ _; _; _ ] -> call_prim ~transl_prim_arg "caml_js_set" l
       | _ -> assert false);
   let counter = ref (-1) in
-  register "%caml_js_opt_object" (fun transl_prim_arg l ->
+  register_js "%caml_js_opt_object" (fun _ transl_js_arg result l ->
       let rec split kl vl l =
         match l with
         | [] -> List.rev kl, List.rev vl
@@ -2331,8 +2498,8 @@ let internal_primitives =
               , true
               , AUnknown ))
       in
-      let l = List.map ~f:transl_prim_arg vl in
-      JavaScript.invoke_fragment name l);
+      let l = List.map ~f:transl_js_arg vl in
+      JavaScript.invoke_fragment ~result name l);
   register "caml_jsoo_runtime_value" (fun _ l ->
       match l with
       | [ Pc (String name) ] when J.is_ident name ->
@@ -2340,27 +2507,22 @@ let internal_primitives =
             register_import
               ~import_module:"js"
               ~name
-              (Global { mut = false; typ = JavaScript.anyref })
+              (Global { mut = false; typ = JavaScript.externref })
           in
-          let* wrap =
+          let* value_of_js =
             register_import
-              ~name:"wrap"
-              (Fun { params = [ JavaScript.anyref ]; result = [ Type.value ] })
+              ~name:"value_of_js"
+              (Fun { params = [ JavaScript.externref ]; result = [ Type.value ] })
           in
-          return (W.Call (wrap, [ GlobalGet x ]))
+          return (W.Call (value_of_js, [ GlobalGet x ]))
       | _ -> failwith "Jsoo_runtime.Js.runtime_value expects a string literal.");
-  !l
+  !l, !js
 
 let externref = W.Ref { nullable = true; typ = Extern }
 
 let handle_exceptions ~result_typ ~fall_through ~context body x exn_handler =
   let* js_tag = register_import ~name:"javascript_exception" (Tag externref) in
   let* ocaml_tag = register_import ~name:"ocaml_exception" (Tag Type.value) in
-  let* f =
-    register_import
-      ~name:"caml_wrap_exception"
-      (Fun { params = [ externref ]; result = [ Type.value ] })
-  in
   block
     { params = []; result = result_typ }
     (let* () =
@@ -2381,6 +2543,11 @@ let handle_exceptions ~result_typ ~fall_through ~context body x exn_handler =
                in
                instr (W.Push e)
              else
+               let* f =
+                 register_import
+                   ~name:"caml_wrap_exception"
+                   (Fun { params = [ externref ]; result = [ Type.value ] })
+               in
                let* exn =
                  block_expr
                    { params = []; result = [ externref ] }
@@ -2400,7 +2567,26 @@ let handle_exceptions ~result_typ ~fall_through ~context body x exn_handler =
      let* () = no_event in
      exn_handler ~result_typ ~fall_through ~context)
 
-let post_process_function_body = Initialize_locals.f
+let post_process_function_body ~profile ~param_names ~param_types ~locals body =
+  match Binaryen.optimizes profile with
+  | false ->
+      (* When [wasm-opt] does not run (at [--opt 1], both for .cmo/.cma
+         and for executables), our own passes are the only ones tightening
+         the body. [Local_sink] runs first: shortening live ranges and
+         dropping [local.set]s simplifies the input to [Var_coalescing].
+         [Cast_reuse] runs before [Var_coalescing], so that the locals it
+         introduces get coalesced. *)
+      let pass flag f (locals, body) = if flag () then f ~locals body else locals, body in
+      let locals, body =
+        (locals, body)
+        |> pass Config.Flag.wasm_local_sink Local_sink.f
+        |> pass Config.Flag.wasm_cast_reuse Cast_reuse.f
+        |> pass
+             Config.Flag.wasm_var_coalescing
+             (Var_coalescing.f ~param_names ~param_types)
+      in
+      Initialize_locals.f ~param_names ~locals body
+  | true -> Initialize_locals.f ~param_names ~locals body
 
 let entry_point ~toplevel_fun =
   let code =

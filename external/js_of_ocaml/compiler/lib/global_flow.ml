@@ -74,7 +74,7 @@ type mutable_fields =
   | All_fields
 
 type state =
-  { vars : Var.ISet.t (* Set of all veriables considered *)
+  { vars : Var.ISet.t (* Set of all variables considered *)
   ; deps : Var.t list Var.Tbl.t (* Dependency between variables *)
   ; defs : def array (* Definition of each variable *)
   ; variable_may_escape : escape_status array
@@ -96,6 +96,13 @@ type state =
            This is to avoid repeated computations *)
   ; function_call_sites : Var.t list Var.Hashtbl.t
         (* Known call sites of each functions *)
+  ; cps_versions : Var.t Var.Hashtbl.t
+        (* Double translation: CPS version of functions with two versions,
+           which share their closure (see [Effects.rewrite_direct_block]) *)
+  ; cps_closures : (Var.t * Var.t) Var.Hashtbl.t
+        (* Double translation: the two versions of the function bound to a
+           variable by [caml_cps_closure] *)
+  ; cps_calls : Var.Set.t (* Variables bound to the result of a CPS call *)
   ; fast : bool
   }
 
@@ -133,6 +140,21 @@ let add_param_def st x =
   if st.fast
   then st.defs.(idx) <- Phi { known = Var.Set.empty; others = true; unit = false }
 
+(* The version of function [g] which is called at call site [call], and
+   whether the last argument of the call is a continuation which is passed
+   the result of the call rather than passed to the function. With double
+   translation, a function with two versions is represented by its
+   direct-style version, and a CPS call calls its CPS version. A CPS call to
+   a function without CPS version calls it in direct style and passes the
+   result to the continuation. *)
+let called_version ~cps_calls ~cps_versions ~call g =
+  if Var.Set.mem call cps_calls
+  then
+    match Var.Hashtbl.find_opt cps_versions g with
+    | Some c -> c, false
+    | None -> g, true
+  else g, false
+
 let rec arg_deps st ?ignore params args =
   match params, args with
   | x :: params, y :: args ->
@@ -168,7 +190,7 @@ let field_possibly_mutable st x n =
 let expr_deps blocks st x e =
   match e with
   | Constant _
-  | Prim ((Vectlength _ | Not | IsInt | Eq | Neq | Lt | Le | Ult), _)
+  | Prim ((Vectlength _ | Not | IsInt _ | Eq _ | Neq _ | Lt | Le | Ult), _)
   | Block _ -> ()
   | Special _ -> ()
   | Prim
@@ -179,17 +201,23 @@ let expr_deps blocks st x e =
               | "caml_array_unsafe_get"
               | "caml_floatarray_unsafe_get" )
             , _ )
-        | Array_get )
+        | Array_get _ )
       , l ) ->
-      (* The analysis knowns about these primitives, and will compute
+      (* The analysis knows about these primitives, and will compute
          an approximation of the value they return based on an
          approximation of their arguments *)
       (if st.fast
        then
-         match l with
-         | Pv x :: _ -> do_escape st Escape x
-         | Pc _ :: _ -> ()
-         | [] -> assert false);
+         match e with
+         | Prim
+             ( ( Array_get _
+               | Extern (("caml_array_unsafe_get" | "caml_floatarray_unsafe_get"), _) )
+             , Pv x :: _ ) ->
+             (* In fast mode, the contents of arrays are not tracked. The
+                bound checking primitives return their array argument, so
+                there is no need to make it escape. *)
+             do_escape st Escape x
+         | _ -> ());
       List.iter
         ~f:(fun a ->
           match a with
@@ -219,15 +247,15 @@ let expr_deps blocks st x e =
             | Pv v, `Const -> do_escape st Escape_constant v
             | Pv v, `Shallow_const -> (
                 match st.defs.(Var.idx v) with
-                | Expr (Block (_, a, _, _)) ->
+                | Expr (Block (_, a, _, _, _)) ->
                     Array.iter a ~f:(fun x -> do_escape st Escape x)
                 | _ -> do_escape st Escape v)
             | Pv v, `Object_literal -> (
                 match st.defs.(Var.idx v) with
-                | Expr (Block (_, a, _, _)) ->
+                | Expr (Block (_, a, _, _, _)) ->
                     Array.iter a ~f:(fun x ->
                         match st.defs.(Var.idx x) with
-                        | Expr (Block (_, [| _k; v |], _, _)) -> do_escape st Escape v
+                        | Expr (Block (_, [| _k; v |], _, _, _)) -> do_escape st Escape v
                         | _ -> do_escape st Escape x)
                 | _ -> do_escape st Escape v)
             | Pv v, `Mutable -> do_escape st Escape v);
@@ -240,7 +268,8 @@ let expr_deps blocks st x e =
          dependencies right now. This speeds up the analysis
          significantly. *)
       match st.defs.(Var.idx f) with
-      | Expr (Closure (params, _, _)) when List.compare_lengths args params = 0 ->
+      | Expr (Closure (params, _, _))
+        when List.compare_lengths args params = 0 && not (Var.Set.mem x st.cps_calls) ->
           VarPairTbl.add st.applied_functions (x, f) ();
           add_to_list st.function_call_sites f x;
           if st.fast
@@ -266,6 +295,12 @@ let program_deps st { start; blocks; _ } =
     (fun _ block ->
       List.iter block.body ~f:(fun i ->
           match i with
+          | Let (x, Prim (Extern ("caml_cps_closure", _), [ Pv d; Pv c ])) ->
+              (* Double translation: the closure of both versions of a
+                 function, represented by its direct-style version *)
+              Var.Hashtbl.replace st.cps_versions d c;
+              Var.Hashtbl.replace st.cps_closures x (d, c);
+              add_assign_def st x d
           | Let (x, e) ->
               add_expr_def st x e;
               expr_deps blocks st x e
@@ -322,7 +357,7 @@ let program_deps st { start; blocks; _ } =
 
 (* For each variable, we keep track of which values, function or
    block, it may contain. Other kinds of values are not relevant and
-   just ignored. We loose a lot of information when going to [Top]
+   just ignored. We lose a lot of information when going to [Top]
    since we have to assume that all functions might escape. So, having
    possibly unknown values does not move us to [Top]; we use a flag
    for that instead. *)
@@ -363,7 +398,7 @@ module Domain = struct
     then (
       st.may_escape.(idx) <- s;
       match st.defs.(idx) with
-      | Expr (Block (_, a, _, mut)) -> (
+      | Expr (Block (_, a, _, mut, _)) -> (
           Array.iter ~f:(fun y -> variable_escape ~update ~st ~approx s y) a;
           match s, mut with
           | Escape, Maybe_mutable ->
@@ -374,14 +409,17 @@ module Domain = struct
           List.iter
             ~f:(fun y ->
               (match st.defs.(Var.idx y) with
-              | Phi { known; _ } ->
-                  st.defs.(Var.idx y) <- Phi { known; others = true; unit = false }
+              | Phi p -> st.defs.(Var.idx y) <- Phi { p with others = true }
               | Expr _ -> assert false);
               update ~children:false y)
             params;
           Var.Set.iter
             (fun y -> variable_escape ~update ~st ~approx s y)
-            (Var.Map.find x st.return_values)
+            (Var.Map.find x st.return_values);
+          (* The CPS version shares the closure *)
+          Option.iter
+            ~f:(fun c -> value_escape ~update ~st ~approx s c)
+            (Var.Hashtbl.find_opt st.cps_versions x)
       | _ -> ())
 
   and variable_escape ~update ~st ~approx s x =
@@ -420,7 +458,7 @@ module Domain = struct
         Var.Set.iter
           (fun x ->
             match st.defs.(Var.idx x) with
-            | Expr (Block (_, _, _, Maybe_mutable)) -> (
+            | Expr (Block (_, _, _, Maybe_mutable, _)) -> (
                 match st.mutable_fields.(Var.idx x), mutable_fields with
                 | _, No_field -> ()
                 | No_field, _ ->
@@ -435,7 +473,7 @@ module Domain = struct
                     st.mutable_fields.(Var.idx x) <- All_fields;
                     update ~children:true x
                 | All_fields, _ -> ())
-            | Expr (Block (_, _, _, Immutable)) | Expr (Closure _) -> ()
+            | Expr (Block (_, _, _, Immutable, _)) | Expr (Closure _) -> ()
             | Phi _ | Expr _ -> assert false)
           known
 end
@@ -461,7 +499,7 @@ let propagate st ~update approx x =
                 ~approx
                 (fun z ->
                   match st.defs.(Var.idx z) with
-                  | Expr (Block (t, a, _, _))
+                  | Expr (Block (t, a, _, _, _))
                     when n < Array.length a
                          &&
                          match tags with
@@ -487,7 +525,7 @@ let propagate st ~update approx x =
               (("caml_check_bound" | "caml_check_bound_float" | "caml_check_bound_gen"), _)
           , [ Pv y; _ ] ) -> Var.Tbl.get approx y
       | Prim
-          ( ( Array_get
+          ( ( Array_get _
             | Extern (("caml_array_unsafe_get" | "caml_floatarray_unsafe_get"), _) )
           , [ Pv y; _ ] ) -> (
           if st.fast
@@ -502,7 +540,7 @@ let propagate st ~update approx x =
                   ~others
                   (fun z ->
                     match st.defs.(Var.idx z) with
-                    | Expr (Block (_, lst, _, _)) ->
+                    | Expr (Block (_, lst, _, _, _)) ->
                         let m =
                           match st.mutable_fields.(Var.idx z) with
                           | No_field -> false
@@ -522,8 +560,8 @@ let propagate st ~update approx x =
                     | Phi _ | Expr _ -> assert false)
                   known
             | Top -> Top)
-      | Prim (Array_get, _) -> Domain.others
-      | Prim ((Vectlength _ | Not | IsInt | Eq | Neq | Lt | Le | Ult), _) ->
+      | Prim (Array_get _, _) -> Domain.others
+      | Prim ((Vectlength _ | Not | IsInt _ | Eq _ | Neq _ | Lt | Le | Ult), _) ->
           (* The result of these primitive is neither a function nor a
              block *)
           Domain.bot
@@ -542,10 +580,25 @@ let propagate st ~update approx x =
                 ~st
                 ~approx
                 ~others
-                (fun g ->
+                (fun g0 ->
+                  let g, cont =
+                    called_version
+                      ~cps_calls:st.cps_calls
+                      ~cps_versions:st.cps_versions
+                      ~call:x
+                      g0
+                  in
+                  let direct_args, k =
+                    if cont
+                    then
+                      match List.split_last args with
+                      | Some (l, k) -> l, Some k
+                      | None -> assert false
+                    else args, None
+                  in
                   match st.defs.(Var.idx g) with
                   | Expr (Closure (params, _, _))
-                    when List.compare_lengths args params = 0 ->
+                    when List.compare_lengths direct_args params = 0 -> (
                       if not (VarPairTbl.mem st.applied_functions (x, g))
                       then (
                         VarPairTbl.add st.applied_functions (x, g) ();
@@ -562,19 +615,31 @@ let propagate st ~update approx x =
                               add_assign_def st p a;
                               update ~children:false p)
                             params
-                            args);
-                      Domain.join_set
-                        ~update
-                        ~st
-                        ~approx
-                        (fun y -> Var.Tbl.get approx y)
-                        (Var.Map.find g st.return_values)
+                            direct_args);
+                      match k with
+                      | None ->
+                          Domain.join_set
+                            ~update
+                            ~st
+                            ~approx
+                            (fun y -> Var.Tbl.get approx y)
+                            (Var.Map.find g st.return_values)
+                      | Some k ->
+                          (* The result is passed to the continuation, which
+                             is not tracked *)
+                          Domain.variable_escape ~update ~st ~approx Escape k;
+                          Var.Set.iter
+                            (fun y -> Domain.variable_escape ~update ~st ~approx Escape y)
+                            (Var.Map.find g st.return_values);
+                          Domain.others)
                   | Expr (Closure (_, _, _)) ->
-                      (* The function is partially applied or over applied *)
+                      (* The function is partially applied or over applied.
+                         With double translation, both versions escape
+                         (see [Domain.value_escape]). *)
                       List.iter
                         ~f:(fun y -> Domain.variable_escape ~update ~st ~approx Escape y)
                         args;
-                      Domain.variable_escape ~update ~st ~approx Escape g;
+                      Domain.variable_escape ~update ~st ~approx Escape g0;
                       Domain.others
                   | Expr (Block _) -> Domain.bot
                   | Phi _ | Expr _ -> assert false)
@@ -589,11 +654,11 @@ let propagate st ~update approx x =
   let res = propagate st ~update approx x in
   match res with
   | Values { known; _ } when Var.Set.compare_cardinal_with known 200 >= 0 ->
-      (* When the set of possible values get to large, we give up and
+      (* When the set of possible values gets too large, we give up and
          just forget about it. This is crucial to make the analysis
-         terminates in a reasonable amount of time. This happens when
+         terminate in a reasonable amount of time. This happens when
          our analysis is very imprecise (for instance, with
-         [List.map]), so we may not loose too much by doing that. *)
+         [List.map]), so we may not lose too much by doing that. *)
       if debug () then Format.eprintf "TOP %a@." Var.print x;
       Domain.approx_escape ~update ~st ~approx Escape res;
       Top
@@ -609,6 +674,27 @@ let propagate st ~update approx x =
 
 module G = Dgraph.Make_Imperative (Var) (Var.ISet) (Var.Tbl)
 module Solver = G.Solver (Domain)
+
+let print_escape_status f s =
+  Format.pp_print_string
+    f
+    (match s with
+    | Escape -> "Y"
+    | Escape_constant -> "y"
+    | No -> "n")
+
+let print_mutable_fields f s =
+  match s with
+  | No_field -> Format.fprintf f "no"
+  | Some_fields s ->
+      Format.fprintf
+        f
+        "{%a}"
+        (Format.pp_print_list
+           ~pp_sep:(fun f () -> Format.fprintf f ", ")
+           Format.pp_print_int)
+        (IntSet.elements s)
+  | All_fields -> Format.fprintf f "yes"
 
 let print_approx st f a =
   match a with
@@ -670,9 +756,12 @@ type info =
   ; info_may_escape : Var.ISet.t
   ; info_variable_may_escape : escape_status array
   ; info_return_vals : Var.Set.t Var.Map.t
+  ; info_cps_versions : Var.t Var.Hashtbl.t
+  ; info_cps_closures : (Var.t * Var.t) Var.Hashtbl.t
+  ; info_cps_calls : Var.Set.t
   }
 
-let f ~fast p =
+let f ?(cps_calls = Var.Set.empty) ~fast p =
   let t = Timer.make () in
   let t1 = Timer.make () in
   let rets = return_values p in
@@ -702,6 +791,9 @@ let f ~fast p =
     ; applied_functions = VarPairTbl.create 16
     ; fast
     ; function_call_sites = Var.Hashtbl.create 128
+    ; cps_versions = Var.Hashtbl.create 16
+    ; cps_closures = Var.Hashtbl.create 16
+    ; cps_calls
     }
   in
   program_deps st p;
@@ -718,45 +810,23 @@ let f ~fast p =
         let s = Var.Tbl.get approximation x in
         if not (Domain.equal s Domain.bot)
         then
-          Format.eprintf
-            "%a: %a@."
-            Var.print
-            x
-            (fun f a ->
-              match a with
-              | Top -> Format.fprintf f "top"
-              | Values _ ->
-                  let print_mutable_fields f s =
-                    match s with
-                    | No_field -> Format.fprintf f "no"
-                    | Some_fields s ->
-                        Format.fprintf
-                          f
-                          "{%a}"
-                          (Format.pp_print_list
-                             ~pp_sep:(fun f () -> Format.fprintf f ", ")
-                             (fun f i -> Format.fprintf f "%d" i))
-                          (IntSet.elements s)
-                    | All_fields -> Format.fprintf f "yes"
-                  in
-                  Format.fprintf
-                    f
-                    "%a mut:%a vmut:%a vesc:%s esc:%s"
-                    (print_approx st)
-                    a
-                    print_mutable_fields
-                    st.mutable_fields.(Var.idx x)
-                    print_mutable_fields
-                    st.variable_mutable_fields.(Var.idx x)
-                    (match st.variable_may_escape.(Var.idx x) with
-                    | Escape -> "Y"
-                    | Escape_constant -> "y"
-                    | No -> "n")
-                    (match st.may_escape.(Var.idx x) with
-                    | Escape -> "Y"
-                    | Escape_constant -> "y"
-                    | No -> "n"))
-            s)
+          match s with
+          | Top -> Format.eprintf "%a: top@." Var.print x
+          | Values _ ->
+              Format.eprintf
+                "%a: %a mut:%a vmut:%a vesc:%a esc:%a@."
+                Var.print
+                x
+                (print_approx st)
+                s
+                print_mutable_fields
+                st.mutable_fields.(Var.idx x)
+                print_mutable_fields
+                st.variable_mutable_fields.(Var.idx x)
+                print_escape_status
+                st.variable_may_escape.(Var.idx x)
+                print_escape_status
+                st.may_escape.(Var.idx x))
       vars;
   let info_variable_may_escape = variable_may_escape in
   let info_may_escape = Var.ISet.empty () in
@@ -772,10 +842,20 @@ let f ~fast p =
     ; info_variable_may_escape
     ; info_may_escape
     ; info_return_vals = rets
+    ; info_cps_versions = st.cps_versions
+    ; info_cps_closures = st.cps_closures
+    ; info_cps_calls = cps_calls
     } )
 
+let get_approx info x =
+  (* Later passes (lambda lifting, specialization) can introduce new
+     variables, which are unknown to the analysis *)
+  if Var.idx x < Var.Tbl.length info.info_approximation
+  then Var.Tbl.get info.info_approximation x
+  else Top
+
 let exact_call info f n =
-  match Var.Tbl.get info.info_approximation f with
+  match get_approx info f with
   | Top | Values { others = true; _ } -> false
   | Values { known; others = false } ->
       Var.Set.for_all
@@ -786,37 +866,47 @@ let exact_call info f n =
           | Expr _ | Phi _ -> assert false)
         known
 
-let get_unique_closure info f =
-  (* The specialize pass can create knew functions *)
-  if Var.idx f >= Var.Tbl.length info.info_approximation
-  then None
-  else
-    match Var.Tbl.get info.info_approximation f with
-    | Top | Values { others = true; _ } -> None
-    | Values { known; others = false } -> (
-        match
-          Var.Set.fold
-            (fun g acc ->
-              match info.info_defs.(Var.idx g) with
-              | Expr (Closure (params, _, _)) -> (
-                  match acc with
-                  | None -> Some (Some (g, params))
-                  | Some (Some _) -> Some None
-                  | Some None -> acc)
-              | Expr (Block _) -> acc
-              | Expr _ | Phi _ -> assert false)
-            known
-            None
-        with
-        | None -> None
-        | Some kind -> kind)
+let called_version info ~call g =
+  called_version
+    ~cps_calls:info.info_cps_calls
+    ~cps_versions:info.info_cps_versions
+    ~call
+    g
+
+let get_unique_closure info ~call f =
+  match get_approx info f with
+  | Top | Values { others = true; _ } -> None
+  | Values { known; others = false } -> (
+      match
+        Var.Set.fold
+          (fun g acc ->
+            match info.info_defs.(Var.idx g) with
+            | Expr (Closure (params, _, _)) -> (
+                match acc with
+                | None -> Some (Some (g, params))
+                | Some (Some _) -> Some None
+                | Some None -> acc)
+            | Expr (Block _) -> acc
+            | Expr _ | Phi _ -> assert false)
+          known
+          None
+      with
+      | None | Some None -> None
+      | Some (Some (g, params)) -> (
+          let g', cont = called_version info ~call g in
+          if Var.equal g g'
+          then Some (g, params, cont)
+          else
+            match info.info_defs.(Var.idx g') with
+            | Expr (Closure (params, _, _)) -> Some (g', params, cont)
+            | _ -> assert false))
 
 let update_def info x expr =
   let idx = Code.Var.idx x in
   info.info_defs.(idx) <- Expr expr
 
 let function_arity info f =
-  match Var.Tbl.get info.info_approximation f with
+  match get_approx info f with
   | Top | Values { others = true; _ } -> None
   | Values { known; others = false } -> (
       match
