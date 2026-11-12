@@ -596,13 +596,32 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
               Random.State.int_in_range st.random_state ~min ~max
               |> Int64.of_int)
         in
+        let extrema =
+          Gen.create (fun () ->
+              let min, max =
+                match (base : NumberTy.Base.t) with
+                | Int -> Int64.of_int min_int, Int64.of_int max_int
+                | Nativeint ->
+                  ( Int64.of_nativeint Nativeint.min_int,
+                    Int64.of_nativeint Nativeint.max_int )
+                | Int64 -> Int64.min_int, Int64.max_int
+                | Int32 ->
+                  Int64.of_int32 Int32.min_int, Int64.of_int32 Int32.max_int
+                | Int16 -> -32768L, 32767L
+                | Int8 -> -128L, 127L
+                | Float | Float32 ->
+                  Misc.fatal_errorf "gen_const_int: expected an integral type"
+              in
+              if Random.State.bool st.random_state then min else max)
+        in
         let bits =
           Gen.run_exn
             (Gen.weighted st.random_state
                [ 5, small ~min:(-1) ~max:1;
                  5, small ~min:(-10) ~max:10;
+                 5, extrema;
                  10, Gen.create (fun () -> Random.State.bits64 st.random_state)
-                 (* CR-soon xclerc: Add max_int and min_int. *) ])
+               ])
         in
         Expr.Const (Number.of_integral_bits base bits))
   in
