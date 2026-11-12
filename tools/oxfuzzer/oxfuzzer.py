@@ -195,7 +195,6 @@ RUN_TIMEOUT_SEC = 10.0
 GENERATE_TIMEOUT_SEC = 1.0
 MAX_PROGRAM_BYTES = 1024 * 1024
 
-RATE_SMOOTHING = 0.01
 PROGRESS_INTERVAL_SEC = 30.0
 
 
@@ -417,26 +416,21 @@ class Stats:
     discarded: int = 0
     failed: int = 0
     generation_timeouts: int = 0
-    last_completion: float | None = None
-    smoothed_interval: float | None = None
+    # When fuzz started and ended, as time.monotonic() values. The self-check
+    # comes before.
+    fuzzing_start: float | None = None
+    fuzzing_end: float | None = None
     last_report: float | None = None
 
-    def record_completion(self) -> None:
-        now = time.monotonic()
-        if self.last_completion is not None:
-            interval = now - self.last_completion
-            if self.smoothed_interval is None:
-                self.smoothed_interval = interval
-            else:
-                self.smoothed_interval += RATE_SMOOTHING * (
-                    interval - self.smoothed_interval
-                )
-        self.last_completion = now
-
+    # Completed cases over the time spent fuzzing so far.
     def cases_per_hour(self) -> float | None:
-        if not self.smoothed_interval:
+        completed = self.passed + self.discarded + self.failed
+        if self.fuzzing_start is None or not completed:
             return None
-        return 3600 / self.smoothed_interval
+        end = time.monotonic() if self.fuzzing_end is None else self.fuzzing_end
+        if end <= self.fuzzing_start:
+            return None
+        return 3600 * completed / (end - self.fuzzing_start)
 
     def summary(self) -> str:
         rate = self.cases_per_hour()
@@ -453,7 +447,6 @@ class Stats:
     # On a terminal the status is a single line updated in place. Otherwise
     # a timestamped line is printed at most every PROGRESS_INTERVAL_SEC seconds.
     def report(self) -> None:
-        self.record_completion()
         if sys.stderr.isatty():
             print(f"\r{self.summary()}", end="", file=sys.stderr, flush=True)
             return
@@ -898,9 +891,13 @@ async def fuzz(
                 return
             await run_case(toolchain, run_dir, seed, stats, output_dir, run_info, slots)
 
-    async with asyncio.TaskGroup() as group:
-        for _ in range(jobs):
-            group.create_task(iteration_worker())
+    stats.fuzzing_start = time.monotonic()
+    try:
+        async with asyncio.TaskGroup() as group:
+            for _ in range(jobs):
+                group.create_task(iteration_worker())
+    finally:
+        stats.fuzzing_end = time.monotonic()
     return finished_because
 
 
