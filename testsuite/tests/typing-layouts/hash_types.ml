@@ -297,7 +297,7 @@ Line 2, characters 0-25:
     ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
-       but it is injective invariant.
+       but it is invariant.
 |}]
 
 type -'a t_bad_contra = 'a r#
@@ -307,7 +307,7 @@ Line 1, characters 0-29:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be contravariant,
-       but it is injective invariant.
+       but it is invariant.
 |}]
 
 type !'a t_inv = 'a r#
@@ -1418,7 +1418,7 @@ Line 1, characters 0-24:
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
-       but it is injective invariant.
+       but it is invariant.
 |}]
 
 (* [iarray#] is covariant in its parameter, like [iarray] (unlike [array#]). *)

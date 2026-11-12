@@ -3308,7 +3308,7 @@ let tree_of_type_decl id decl =
     let mk_param ty (ot_variance, ot_injectivity, ot_rec) =
       let jkind = param_jkind ty in
       type_param ot_variance ot_injectivity ot_rec
-        jkind (tree_of_typexp ~base:With_locality.Const.legacy Type ty)       
+        jkind (tree_of_typexp ~base:With_locality.Const.legacy Type ty)
     in
     (Ident.name id,
      List.map2 mk_param params vari)

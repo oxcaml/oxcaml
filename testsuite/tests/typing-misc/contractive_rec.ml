@@ -310,20 +310,20 @@ Error: This alias is bound to type "'a non_contractive_container" = "'a * int"
 
 (* Recursive types created via unification during inference *)
 let infer_recursive (make : 'a container -> 'a) f x =
-  f x; f (make x);;
+  f (make x); f x;;
 [%%expect{|
 val infer_recursive :
   (('a container as 'a) container -> 'a) -> ('a -> 'b) -> 'a -> 'b = <fun>
 |}]
 
 let bad_infer_recursive (make : 'a non_contractive_container -> 'a) f x =
-  f x; f (make x);;
+  f (make x); f x;;
 [%%expect{|
-Line 2, characters 9-17:
-2 |   f x; f (make x);;
-             ^^^^^^^^
-Error: This expression has type "'a" but an expression was expected of type
-         "'a non_contractive_container" = "'a * int"
+Line 2, characters 16-17:
+2 |   f (make x); f x;;
+                    ^
+Error: The value "x" has type "'a non_contractive_container" = "'a * int"
+       but an expression was expected of type "'a"
        The type variable "'a" occurs inside "'a non_contractive_container"
 |}]
 
@@ -339,7 +339,7 @@ let gadt_recursive (type a) (Refl : (a, a boxed) eq) (x : a) : a boxed = x;;
 let gadt_iterated3 (type a) (Refl : (a, a boxed) eq) (x : a) : a boxed boxed boxed = x;;
 [%%expect{|
 type ('a, 'b) eq = Refl : ('a, 'a) eq
-type ('a [@rec]) boxed
+type ('a [@rec]) boxed = Box of 'a
 val gadt_recursive : ('a, 'a boxed) eq -> 'a -> 'a boxed = <fun>
 val gadt_iterated3 : ('a, 'a boxed) eq -> 'a -> 'a boxed boxed boxed = <fun>
 |}]
