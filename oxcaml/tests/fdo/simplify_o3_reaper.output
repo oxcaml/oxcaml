@@ -50,11 +50,12 @@ o3_reaper/simplify.reaper.fl:
   entry: "Simplify.apply_partial":0 body_hash:07355c9b
   call: "Simplify.apply_partial":0:07355c9b:0:call
   call: "Simplify.apply_partial":0:07355c9b:1:call
-  entry: "Simplify.partial_inlined":0 "Simplify.apply_partial":0 <- "Simplify.partial_inlined":0:e97a0351:0:call "Simplify.apply_partial":0:07355c9b:0:call <- "Simplify.partial_inlined":0:e97a0351:0:call body_hash:e97a0351
-  call: "Simplify.apply_partial":0:07355c9b:1:call <- "Simplify.partial_inlined":0:e97a0351:0:call
+  entry: "Simplify.partial_inlined":0 "Simplify.apply_partial":0 <- "Simplify.partial_inlined":0:e97a0351:0:call body_hash:e97a0351
+  call: "Simplify.apply_partial":0:07355c9b:0:call <- "Simplify.partial_inlined":0:e97a0351:0:call <- "Simplify.apply_partial":0:07355c9b:1:call <- "Simplify.partial_inlined":0:e97a0351:0:call
   entry: "Simplify.make_partial":0 body_hash:3371523c
   call: "Simplify.make_partial":0:3371523c:0:call
-  entry: "Simplify.partial_escaping":0 "Simplify.make_partial":0 <- "Simplify.partial_escaping":0:e97a0351:0:call "Simplify.make_partial":0:3371523c:0:call <- "Simplify.partial_escaping":0:e97a0351:0:call body_hash:e97a0351
+  call: "Simplify.make_partial":0:3371523c:0:call <- "Simplify.partial_escaping":0:e97a0351:0:call
+  entry: "Simplify.partial_escaping":0 "Simplify.make_partial":0 <- "Simplify.partial_escaping":0:e97a0351:0:call body_hash:e97a0351
   entry: "Simplify.curried.(fun)@y,int_add,x":0 body_hash:00000000
   entry: "Simplify.curried":0 body_hash:00000000
   entry: "Simplify.apply2":0 body_hash:e97a0351
