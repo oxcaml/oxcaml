@@ -480,7 +480,13 @@ class Stats:
 def command_output(command: Sequence[str], *, cwd: Path | None = None) -> str | None:
     try:
         completed = subprocess.run(
-            command, cwd=cwd, capture_output=True, text=True, timeout=30
+            command,
+            check=False,
+            cwd=cwd,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -544,7 +550,9 @@ def status_text(result: CommandResult) -> str:
 
 
 def write_command_result(directory: Path, prefix: str, result: CommandResult) -> None:
-    (directory / f"{prefix}.status").write_text(status_text(result) + "\n")
+    (directory / f"{prefix}.status").write_text(
+        status_text(result) + "\n", encoding="utf-8"
+    )
     (directory / f"{prefix}.stdout").write_bytes(result.stdout)
     (directory / f"{prefix}.stderr").write_bytes(result.stderr)
 
@@ -615,8 +623,10 @@ def save_failure(
     staging_dir = Path(tempfile.mkdtemp(prefix=f".{seed}.", dir=output_dir))
     staging_dir.chmod(0o755)
     (staging_dir / "program.ml").write_bytes(program)
-    (staging_dir / "reason.txt").write_text(reason + "\n")
-    (staging_dir / "meta.txt").write_text(failure_metadata(seed, run_info))
+    (staging_dir / "reason.txt").write_text(reason + "\n", encoding="utf-8")
+    (staging_dir / "meta.txt").write_text(
+        failure_metadata(seed, run_info), encoding="utf-8"
+    )
     for result in results:
         directory = staging_dir / result.configuration.name
         directory.mkdir()
@@ -627,7 +637,8 @@ def save_failure(
                 seed,
                 toolchain=toolchain,
                 directory=failure_dir / result.configuration.name,
-            )
+            ),
+            encoding="utf-8",
         )
         script.chmod(0o755)
         write_command_result(directory, "compile", result.compilation)
