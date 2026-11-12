@@ -47,12 +47,12 @@ val with_copy_context_of : t -> from:t -> t
 (** Also clears {!stub_callsite_counter}. *)
 val clear_copy_context : t -> t
 
-(** In the body of an inlined stub, the counter of the call it was inlined at
-    (already in context). The calls of the stub with no counter of their own
-    stand for that call, e.g. the call of an unboxed function wrapper to the
-    main function, or of a partial application wrapper to the function. Other
-    calls, e.g. in the default arguments of an optional argument wrapper, keep
-    their own counters. *)
+(** If we are in the body of an inlined stub, this returns the counter of the
+    call it was inlined at. The calls of the stub with no counter of their own
+    stand for that call (e.g. the call of an unboxed function wrapper to the
+    main function). Other calls keep their own counters (e.g. in the default
+    arguments of an optional argument wrapper, or the call of a partial
+    application wrapper, which has the counter of the partial application). *)
 val stub_callsite_counter : t -> Fdo_counter.t option
 
 (** The FDO counters of the code of a function of a set of closures met where

@@ -704,10 +704,12 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           (* The full application also receives the remaining parameters, which
              may be yielding even if the partial application itself cannot
              yield. *)
-          (* CR yusumez: [dbg] is already in the current inlining context.
-             Inlining the wrapper at one of its applications adds the context of
-             that application on top: the backtrace shows the frames of where
-             the closure was built, with the inlined frames they share twice. *)
+          (* CR yusumez: [dbg] and the counter of [apply] are already in the
+             current inlining context. Inlining the wrapper at one of its
+             applications adds the context of that application on top: the
+             backtrace shows the frames of where the closure was built, with the
+             inlined frames they share twice, and the counter has the shared
+             inlining context twice. *)
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
