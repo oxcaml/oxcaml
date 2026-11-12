@@ -812,3 +812,8 @@ let isomorphic_specific_operation op1 op2 =
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->
     false
+
+let is_immediate_initializing_store op ~addressing =
+  match[@warning "-fragile-match"] op with
+  | Istore_int (_, addr, false) -> equal_addressing_mode addr addressing
+  | _ -> false
