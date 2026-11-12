@@ -1,0 +1,13 @@
+File "static_mli_dynamic_value.ml", line 1:
+Error: The implementation static_mli_dynamic_value.ml
+       does not match the interface static_mli_dynamic_value.cmi: 
+       Values do not match:
+         val x : int @@ dynamic (* in a structure at static *)
+       is not included in
+         val x : int (* in a structure at static *)
+       The first is dynamic because function applications are always dynamic.
+       However, the second is static.
+       File "static_mli_dynamic_value.mli", line 7, characters 0-11:
+         Expected declaration
+       File "static_mli_dynamic_value.ml", line 16, characters 4-5:
+         Actual declaration

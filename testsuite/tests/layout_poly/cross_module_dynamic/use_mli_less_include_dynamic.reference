@@ -1,0 +1,6 @@
+File "use_mli_less_include_dynamic.ml", line 29, characters 8-34:
+29 | let _ = Mli_less_include_dynamic.f 1
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The value Mli_less_include_dynamic.f is dynamic
+       but is expected to be static
+         because it is layout-polymorphic and being instantiated here.
