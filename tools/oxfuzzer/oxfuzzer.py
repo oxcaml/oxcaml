@@ -181,7 +181,7 @@ class Toolchain:
                 if self.installed
                 else "From the repository root, run:\n  make compiler"
             )
-            raise SystemExit(f"""oxfuzzer: some dependencies are missing.
+            raise Fatal(f"""some dependencies are missing.
 
 Missing files:
 {formatted}
@@ -196,6 +196,11 @@ GENERATE_TIMEOUT_SEC = 1.0
 MAX_PROGRAM_BYTES = 1024 * 1024
 
 PROGRESS_INTERVAL_SEC = 30.0
+
+
+class Fatal(Exception):
+    """An error that ends the run, such as a failed self-check. The message is
+    printed on exit, after "oxfuzzer: "."""
 
 
 @dataclass(frozen=True)
@@ -304,14 +309,20 @@ async def compile(
     executable: Path,
 ) -> CommandResult:
     command = compile_command(configuration, source=source, executable=executable)
-    return await run_command(
-        command[0],
-        command[1:],
-        cwd=source.parent,
-        env={"OCAMLLIB": str(configuration.ocamllib)},
-        timeout_sec=COMPILE_TIMEOUT_SEC,
-        output_prefix=source.parent / "compile",
-    )
+    try:
+        return await run_command(
+            command[0],
+            command[1:],
+            cwd=source.parent,
+            env={"OCAMLLIB": str(configuration.ocamllib)},
+            timeout_sec=COMPILE_TIMEOUT_SEC,
+            output_prefix=source.parent / "compile",
+        )
+    except OSError as error:
+        # The compiler could not be started. That is a problem with the
+        # toolchain (say, it was removed) and not with the case, and every
+        # later case would hit it too.
+        raise Fatal(f"cannot run the {configuration.name} compiler: {error}") from None
 
 
 async def run(executable: Path) -> CommandResult:
@@ -384,12 +395,16 @@ async def run_configurations(
 # Returns None if generation timed out.
 async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes | None:
     work_dir.mkdir(parents=True, exist_ok=True)
-    result = await run_command(
-        str(toolchain.oxfuzzer),
-        ["-seed", str(seed)],
-        timeout_sec=GENERATE_TIMEOUT_SEC,
-        output_prefix=work_dir / "generate",
-    )
+    try:
+        result = await run_command(
+            str(toolchain.oxfuzzer),
+            ["-seed", str(seed)],
+            timeout_sec=GENERATE_TIMEOUT_SEC,
+            output_prefix=work_dir / "generate",
+        )
+    except OSError as error:
+        # As for a compiler that cannot be started (see compile).
+        raise Fatal(f"cannot run the generator: {error}") from None
     stderr = result.stderr.decode(errors="replace")
     if result.timed_out:
         return None
@@ -399,8 +414,9 @@ async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes 
 
     # Generation failing is a fatal error.
     if result.returncode != 0:
-        raise SystemExit(
-            f"generation exited with code {result.returncode}. seed: {seed}.\n"
+        raise Fatal(
+            f"generation failed for seed {seed} "
+            f"(status: {status_text(result)}).\n"
             f"{stderr}"
         )
 
@@ -787,9 +803,8 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
         SELF_CHECK_SEED, toolchain=toolchain, work_dir=run_dir / "self-check"
     )
     if program is None:
-        raise SystemExit(
-            f"oxfuzzer: self-check failed: generation timed out for seed "
-            f"{SELF_CHECK_SEED}."
+        raise Fatal(
+            f"self-check failed: generation timed out for seed {SELF_CHECK_SEED}."
         )
     results = await run_configurations(
         toolchain,
@@ -801,16 +816,16 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
     for result in results:
         name = result.configuration.name
         if not result.compilation.ok:
-            raise SystemExit(
-                f"oxfuzzer: self-check failed: {name} did not compile the program "
+            raise Fatal(
+                f"self-check failed: {name} did not compile the program "
                 f"generated from seed {SELF_CHECK_SEED} "
                 f"({status_text(result.compilation)}).\n"
                 + result.compilation.stderr.decode(errors="replace")
             )
         assert result.execution is not None
         if not result.execution.ok:
-            raise SystemExit(
-                f"oxfuzzer: self-check failed: {name} did not run the program "
+            raise Fatal(
+                f"self-check failed: {name} did not run the program "
                 f"generated from seed {SELF_CHECK_SEED} "
                 f"({status_text(result.execution)}).\n"
                 + result.execution.stderr.decode(errors="replace")
@@ -1009,6 +1024,11 @@ async def fuzz(
         async with asyncio.TaskGroup() as group:
             for _ in range(jobs):
                 group.create_task(iteration_worker())
+    except ExceptionGroup as errors:
+        fatal = errors.subgroup(Fatal)
+        if fatal is None:
+            raise
+        raise fatal.exceptions[0] from None
     finally:
         stats.fuzzing_end = time.monotonic()
     return finished_because
@@ -1020,6 +1040,21 @@ def available_cpus() -> int:
     if hasattr(os, "sched_getaffinity"):
         return len(os.sched_getaffinity(0))
     return os.cpu_count() or 1
+
+
+# Creates the output directory if needed and checks that failures can be saved
+# in it, so that a directory that cannot be written ends the run before any
+# fuzzing rather than when the first failure is saved.
+def prepare_output_dir(output_dir: Path) -> None:
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryFile(dir=output_dir):
+            pass
+    except OSError as error:
+        raise Fatal(
+            f"cannot write to the output directory {output_dir}: "
+            f"{error.strerror or error}"
+        ) from None
 
 
 async def main() -> None:
@@ -1049,7 +1084,8 @@ immediately; further SIGTERMs and SIGHUPs are ignored. A SIGHUP that is ignored
 when oxfuzzer starts, as under nohup, stays ignored.
 
 Exit status is 1 if any case failed, 0 otherwise, including when stopped by a
-signal.""",
+signal. It is also 1 after an error that ends the run, such as a failed
+self-check or a toolchain that cannot be run.""",
         epilog="Before first use, run `make compiler` from the repository root.",
     )
     parser.add_argument(
@@ -1167,7 +1203,7 @@ signal.""",
             f"{toolchain.root}"
         )
         log(revision)
-        args.output.mkdir(parents=True, exist_ok=True)
+        prepare_output_dir(args.output)
         if not toolchain.installed:
             toolchain_dir = Path(
                 tempfile.mkdtemp(prefix="toolchain-", dir=args.output.resolve())
@@ -1209,6 +1245,9 @@ signal.""",
                 finished_because = shutdown.finish_reason
     except Interrupted:
         finished_because = shutdown.finish_reason
+    except Fatal as fatal:
+        log(f"oxfuzzer: {fatal}")
+        raise SystemExit(1)
     finish(finished_because)
 
 
