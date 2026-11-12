@@ -571,11 +571,13 @@ def reproduction_script(
     )
     # CR-soon xclerc: We should also capture OCAMLPARAM and OCAMLRUNPARAM,
     # which are inherited by compilation and execution by default, but may differ
-    # in the shell, which executes ./run.sh.
+    # in the shell, which executes run.bash.
+    # No #! line, and the file is not named *.sh: some download filters reject
+    # an archive of failures that contains either.
     return "\n".join(
         [
-            "#!/usr/bin/env bash",
             f"# oxfuzzer: configuration {configuration.name}, seed {seed}.",
+            "# Run with: bash run.bash",
             "set -eu",
             'cd "$(dirname "$0")"',
             f"export OCAMLLIB={shlex.quote(str(configuration.ocamllib))}",
@@ -593,7 +595,7 @@ def reproduction_script(
 #   program.ml   the generated program
 #   reason.txt   why the case failed
 #   meta.txt     seed, time and the run-level metadata (see run_metadata)
-#   <config>/    one directory per configuration containing run.sh (a
+#   <config>/    one directory per configuration containing run.bash (a
 #                standalone reproducer), compile.{status,stdout,stderr} and,
 #                if the program was run, run.{status,stdout,stderr}
 # The directory is written under a temporary name and renamed into place, so
@@ -618,7 +620,7 @@ def save_failure(
     for result in results:
         directory = staging_dir / result.configuration.name
         directory.mkdir()
-        script = directory / "run.sh"
+        script = directory / "run.bash"
         script.write_text(
             reproduction_script(
                 result.configuration,

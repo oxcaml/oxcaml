@@ -38,7 +38,7 @@ program.ml   the generated program
 reason.txt   why the case failed
 meta.txt     seed, time and the run-level metadata (see run_metadata)
 <config>/    one directory per configuration
-    run.sh (a standalone reproducer)
+    run.bash (a standalone reproducer: `bash run.bash`)
     compile.{status,stdout,stderr}
     run.{status,stdout,stderr} (appears if the program was run)
 ```
