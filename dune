@@ -484,12 +484,18 @@
  (action
   (write-file %{target} "")))
 
-; C libraries needed to resolve [caml_zstd_initialize] when linking
-; ocamlcommon.cmxa. -lcomprmarsh is always needed, along with the context's
-; compression libraries. Note that ocamlcommon.cmxa built with the system
-; compiler needs this even though OxCaml doesn't at present use compression
-; because the executable links with the _system_'s libcomprmarsh.a which will
-; need -lzstd if the system compiler was configured with compressed marshalling.
+; In bytecode, caml_zstd_initialize lives in libcamlrun; but is not included in
+; libasmrun for native code so that all executables linked by ocamlopt only link
+; with libzstd if they actually use compressed marshalling. ocamlcommon.cmxa
+; must include -cclib -lcomprmarsh, which provides this primitive native mode.
+; That's needed in _both_ the default and main contexts.
+; We have to include compression_c_libraries because libcomprmarsh.a comes from
+; the system compiler, and will need libzstd if the system compiler was built
+; with compressed marshalling enabled. When building the final compiler in the
+; main context, ocamlopt refers to the boot ocamlopt, which doesn't at present
+; support compressed marshalling. i.e. _build/default/boot_ocamlopt.exe will be
+; linked against libzstd, if the system compiler is;
+; _build/main/oxcaml_main_native.exe is never linked against libzstd.
 (rule
  (targets comprmarsh_flags.sexp)
  (action
