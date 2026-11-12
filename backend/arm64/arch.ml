@@ -25,8 +25,44 @@ let macosx = String.equal Config.system "macosx"
 
 let is_asan_enabled = ref false
 
-(* CR gyorsh: refactor to use [Arch.Extension] like amd64 *)
-let feat_cssc = ref false
+module Extension = struct
+  type t = CSSC
+
+  let all = [CSSC]
+
+  let name = function
+    | CSSC -> "CSSC"
+
+  let description = function
+    | CSSC -> "Common Short Sequence Compression"
+
+  let assembler_name = function
+    | CSSC -> "cssc"
+
+  let cssc = ref Config.has_cssc
+
+  let flag = function
+    | CSSC -> cssc
+
+  let enabled t = !(flag t)
+
+  let enabled_extensions () = List.filter enabled all
+
+  let command_line_options =
+    let option t =
+      let flag_name = String.lowercase_ascii (name t) in
+      let default b = if b then " (default)" else "" in
+      [ "-f" ^ flag_name,
+        Arg.Set (flag t),
+        Printf.sprintf " Enable %s (%s) instructions%s"
+          (name t) (description t) (default (enabled t));
+        "-fno-" ^ flag_name,
+        Arg.Clear (flag t),
+        Printf.sprintf " Disable %s (%s) instructions%s"
+          (name t) (description t) (default (not (enabled t))) ]
+    in
+    List.concat_map option all
+end
 
 (* Emit elf notes with trap handling information. *)
 let trap_notes = ref true
@@ -38,12 +74,7 @@ let command_line_options = [
     Arg.Clear is_asan_enabled,
     " Disable AddressSanitizer. This is only meaningful if the compiler was \
      built with AddressSanitizer support enabled."
-  ;
-
-  "-fcssc",
-    Arg.Set feat_cssc,
-    " Enable the Common Short Sequence Compression (CSSC) instructions."
-]
+] @ Extension.command_line_options
 
 (* Addressing modes *)
 

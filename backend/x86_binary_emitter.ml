@@ -1706,6 +1706,7 @@ let assemble_line b loc ins =
     | Directive (D.File _) -> ()
     | Directive (D.Loc _) -> ()
     | Directive (D.Private_extern _) -> assert false
+    | Directive (D.Arch_extension _) -> assert false
     | Directive (D.Indirect_symbol _) -> assert false
     | Directive (D.Type (D.Label lbl, kind)) ->
       (get_symbol b (Asm_label.encode lbl)).sy_type <- Some kind
