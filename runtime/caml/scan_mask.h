@@ -177,6 +177,37 @@ Caml_inline bool caml_block_scan_next(caml_block_scan* s, mlsize_t* i_p)
   return false;
 }
 
+/* Skip the words before block index [i], so that the next word
+   yielded is the first scannable word at [i] or later. Does nothing
+   if the iterator is already there. Takes constant time. */
+Caml_inline void caml_block_scan_skip_to(caml_block_scan* s, mlsize_t i)
+{
+  if (i <= s->pos) return;
+  while (i - s->pos >= s->left) {
+    /* [i] is beyond this window. */
+    s->pos += s->left;
+    if (s->more != s->more_end) {
+      /* Step over whole scan words, but not the last, which has the
+         repeat. */
+      mlsize_t words = (i - s->pos) / LAYOUT_WORD_MASK_BITS;
+      mlsize_t spare = s->more_end - s->more - 1;
+      if (words > spare) words = spare;
+      s->more += words;
+      s->pos += words * LAYOUT_WORD_MASK_BITS;
+      caml_block_scan_reload(s);
+    } else {
+      /* Only the repeat pattern remains. Step over whole refills,
+         which preserves phase. */
+      caml_block_scan_reload(s);
+      s->pos += (i - s->pos) - (i - s->pos) % s->refill_len;
+    }
+  }
+  uint32_t skip = i - s->pos;
+  s->window = (uintnat)((intnat)s->window >> skip);
+  s->left -= skip;
+  s->pos = i;
+}
+
 #endif /* ARCH_SIXTYFOUR */
 #endif /* CAML_INTERNALS */
 
