@@ -510,6 +510,18 @@ def source_revision(directory: Path) -> str:
     return "unknown"
 
 
+# The line that reports the revision of a run, in the log and in meta.txt. A
+# build directory is inside the checkout it was built from. An installation
+# does not record the revision it was built from, so for one this reports the
+# checkout that contains this script, under another label: in CI that is the
+# commit being fuzzed, but elsewhere the installation may come from another.
+def revision_line(toolchain: Toolchain) -> str:
+    if toolchain.installed:
+        return f"oxfuzzer.py revision: {source_revision(REPOSITORY_ROOT)}"
+    return f"source revision: {source_revision(toolchain.root)}"
+
+
+# [revision] is the result of revision_line.
 def run_metadata(base_seed: str, toolchain: Toolchain, revision: str) -> str:
     lines = [
         f"command: {shlex.join(sys.argv)}",
@@ -517,7 +529,7 @@ def run_metadata(base_seed: str, toolchain: Toolchain, revision: str) -> str:
         f"host: {platform.node()}",
         f"platform: {platform.platform()}",
         f"python: {sys.version.split()[0]}",
-        f"source revision: {revision}",
+        revision,
         f"toolchain: {toolchain.root}{' (installed)' if toolchain.installed else ''}",
         f"ocamlopt version: {command_output([str(toolchain.ocamlopt), '-version']) or 'unknown'}",
         f"ocamlc version: {command_output([str(toolchain.ocamlc), '-version']) or 'unknown'}",
@@ -1009,7 +1021,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     else:
         toolchain = Toolchain((args.build_dir or REPOSITORY_ROOT / "_build").resolve())
     toolchain.check_dependencies()
-    revision = source_revision(toolchain.root)
+    revision = revision_line(toolchain)
     base_seed = (
         args.seed
         if args.seed is not None
@@ -1022,7 +1034,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         f"{toolchain.root}",
         file=sys.stderr,
     )
-    print(f"revision: {revision}", file=sys.stderr)
+    print(revision, file=sys.stderr)
     args.output.mkdir(parents=True, exist_ok=True)
     if not toolchain.installed:
         toolchain_dir = Path(
