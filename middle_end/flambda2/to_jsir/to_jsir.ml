@@ -433,7 +433,7 @@ and apply_expr ~env ~res e =
           let f = Jsir.Var.fresh () in
           let res =
             To_jsir_result.add_instr_exn res
-              (Let (f, Prim (Array_get, [Pv methods; Pv field])))
+              (Let (f, Prim (Array_get Non_float, [Pv methods; Pv field])))
           in
           res, f
         | Cached ->
