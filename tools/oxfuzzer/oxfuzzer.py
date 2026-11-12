@@ -7,6 +7,7 @@ if sys.version_info < (3, 11):
 
 import asyncio
 import argparse
+import datetime
 import errno
 import hashlib
 import itertools
@@ -14,6 +15,7 @@ import os
 from pathlib import Path
 import platform
 import random
+import re
 import shlex
 import shutil
 import signal
@@ -200,7 +202,8 @@ PROGRESS_INTERVAL_SEC = 30.0
 
 class Fatal(Exception):
     """An error that ends the run, such as a failed self-check. The message is
-    printed on exit, after "oxfuzzer: "."""
+    printed on exit, after "oxfuzzer: ", and its first line heads the
+    summary."""
 
 
 @dataclass(frozen=True)
@@ -423,9 +426,15 @@ async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes 
     return result.stdout
 
 
+@dataclass(frozen=True)
+class SavedFailure:
+    directory: str  # Relative to the output directory.
+    reason: str
+
+
 # All of oxfuzzer's own output goes to stderr through this function. A run
 # must outlive its stderr (a closed terminal, a pipe whose reader has exited):
-# its results are the saved failures and the exit status. So once
+# its results are the saved failures, the summary and the exit status. So once
 # a write fails, nothing more is written. sys.stderr is then None, which is
 # also what Python sets it to when stderr is closed at startup (as after
 # `2>&-`), and which Python itself allows for: in particular it then skips the
@@ -450,13 +459,17 @@ class Stats:
 
     passed: int = 0
     discarded: int = 0
-    failed: int = 0
+    failures: list[SavedFailure] = field(default_factory=list)
     generation_timeouts: int = 0
     # When fuzz started and ended, as time.monotonic() values. The self-check
     # comes before.
     fuzzing_start: float | None = None
     fuzzing_end: float | None = None
     last_report: float | None = None
+
+    @property
+    def failed(self) -> int:
+        return len(self.failures)
 
     # Completed cases over the time spent fuzzing so far.
     def cases_per_hour(self) -> float | None:
@@ -468,12 +481,14 @@ class Stats:
             return None
         return 3600 * completed / (end - self.fuzzing_start)
 
-    def summary(self) -> str:
+    def rate_text(self) -> str:
         rate = self.cases_per_hour()
-        rate_text = "--" if rate is None else f"{rate:,.0f}"
+        return "--" if rate is None else f"{rate:,.0f}"
+
+    def summary(self) -> str:
         return (
             f"{self.passed} passed, {self.discarded} discarded, "
-            f"{self.failed} failed, {rate_text} cases/h"
+            f"{self.failed} failed, {self.rate_text()} cases/h"
         )
 
     def print_line(self) -> None:
@@ -637,7 +652,7 @@ def reproduction_script(
 
 
 # Save everything needed to reproduce and diagnose a failing case under
-# <output_dir>/<seed>/:
+# <output_dir>/<seed>/ and return that directory:
 #   program.ml   the generated program
 #   reason.txt   why the case failed
 #   meta.txt     seed, time and the run-level metadata (see run_metadata)
@@ -655,7 +670,7 @@ def save_failure(
     reason: str,
     *,
     toolchain: Toolchain,
-) -> None:
+) -> SavedFailure:
     failure_dir = output_dir / str(seed)
     # Dot-prefixed, so that a leftover is not taken for a failure.
     staging_dir = Path(tempfile.mkdtemp(prefix=f".{seed}.", dir=output_dir))
@@ -686,6 +701,7 @@ def save_failure(
     shutil.rmtree(failure_dir, ignore_errors=True)
     staging_dir.rename(failure_dir)
     log(f"\nseed {seed}: {reason}")
+    return SavedFailure(failure_dir.name, reason)
 
 
 # A case passes when every configuration compiles and runs successfully and
@@ -703,16 +719,17 @@ def check_case(
     toolchain: Toolchain,
 ) -> None:
     def fail(reason: str) -> None:
-        save_failure(
-            output_dir,
-            run_info,
-            seed,
-            program,
-            results,
-            reason,
-            toolchain=toolchain,
+        stats.failures.append(
+            save_failure(
+                output_dir,
+                run_info,
+                seed,
+                program,
+                results,
+                reason,
+                toolchain=toolchain,
+            )
         )
-        stats.failed += 1
         stats.report()
 
     failed = [r for r in results if not r.compilation.ok]
@@ -1042,6 +1059,66 @@ def available_cpus() -> int:
     return os.cpu_count() or 1
 
 
+SUMMARY_DETAIL_LINES = 40
+
+
+def markdown_code_block(text: str) -> str:
+    lines = text.rstrip().splitlines()
+    if len(lines) > SUMMARY_DETAIL_LINES:
+        omitted = len(lines) - SUMMARY_DETAIL_LINES
+        lines = [*lines[:SUMMARY_DETAIL_LINES], f"[{omitted} more lines]"]
+    body = "\n".join(lines)
+    longest_run = max((len(run) for run in re.findall("`+", body)), default=0)
+    fence = "`" * max(3, longest_run + 1)
+    return f"{fence}text\n{body}\n{fence}"
+
+
+# A Markdown summary of the run for --summary-file, e.g. for a GitHub step
+# summary. It has no top-level heading, so that the caller can add its own.
+def summary_markdown(
+    outcome: str,
+    stats: Stats,
+    *,
+    wall_time_sec: float,
+    base_seed: str,
+    details: str | None = None,
+) -> str:
+    wall_time = datetime.timedelta(seconds=round(wall_time_sec))
+    lines = [
+        f"**{outcome}**",
+        "",
+        "| Passed | Discarded | Failed | Cases/h | Wall time |",
+        "| ---: | ---: | ---: | ---: | ---: |",
+        (
+            f"| {stats.passed} | {stats.discarded} | {stats.failed} "
+            f"| {stats.rate_text()} | {wall_time} |"
+        ),
+        "",
+        # In a block of its own, as a seed can be any string.
+        "Base seed:",
+        "",
+        markdown_code_block(base_seed),
+    ]
+    if details:
+        lines += ["", markdown_code_block(details)]
+    if stats.failures:
+        lines += ["", "Saved failures:", ""]
+        lines += [
+            f"- `{failure.directory}`: {failure.reason}" for failure in stats.failures
+        ]
+    return "\n".join(lines) + "\n"
+
+
+def write_summary(path: Path, text: str) -> None:
+    # Write and rename, so that readers never see a partial summary.
+    staging = path.with_name(f".{path.name}.tmp")
+    try:
+        staging.write_text(text, encoding="utf-8")
+        staging.replace(path)
+    except OSError as error:
+        log(f"oxfuzzer: cannot write summary file: {error}")
+
+
 # Creates the output directory if needed and checks that failures can be saved
 # in it, so that a directory that cannot be written ends the run before any
 # fuzzing rather than when the first failure is saved.
@@ -1055,6 +1132,15 @@ def prepare_output_dir(output_dir: Path) -> None:
             f"cannot write to the output directory {output_dir}: "
             f"{error.strerror or error}"
         ) from None
+
+
+# Says what an unexpected exception is, for the summary. A TaskGroup wraps the
+# exceptions of its tasks in a group whose own message does not say what they
+# are, so this describes the first of them.
+def describe_error(error: BaseException) -> str:
+    while isinstance(error, BaseExceptionGroup):
+        error = error.exceptions[0]
+    return f"{type(error).__name__}: {error}"
 
 
 async def main() -> None:
@@ -1152,6 +1238,13 @@ self-check or a toolchain that cannot be run.""",
         help="use the OxCaml installed in DIR (by `make install` or "
         "`nix build .#oxcaml`) in place, instead of a build directory",
     )
+    parser.add_argument(
+        "--summary-file",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="write a Markdown summary of the run to PATH when it ends",
+    )
     args = parser.parse_args()
     if args.jobs < 0:
         parser.error("--jobs must not be negative")
@@ -1183,12 +1276,34 @@ self-check or a toolchain that cannot be run.""",
     )
     stats = Stats()
 
+    def summarize(outcome: str, details: str | None = None) -> None:
+        if args.summary_file is None:
+            return
+        text = summary_markdown(
+            outcome,
+            stats,
+            wall_time_sec=time.monotonic() - limits.start,
+            base_seed=base_seed,
+            details=details,
+        )
+        write_summary(args.summary_file, text)
+
+    # The first line of the message heads the summary and the rest goes in a
+    # block under it.
+    def summarize_error(kind: str, message: str) -> None:
+        first_line, _, details = message.partition("\n")
+        summarize(f"{kind}: {first_line}", details.lstrip("\n") or None)
+
     def finish(finished_because: FinishReason) -> None:
+        # The summary first: it matters more than the last lines of the log if
+        # the run is killed while it finishes.
+        summarize(f"Finished: {finished_because.value}")
         stats.final_report()
         log(f"oxfuzzer: finished: {finished_because.value}")
         if stats.failed:
             raise SystemExit(1)
 
+    # Every way out of this block writes the summary.
     try:
         # A signal during startup stops the run once the step in progress is
         # done (see ShutdownSignals).
@@ -1246,8 +1361,14 @@ self-check or a toolchain that cannot be run.""",
     except Interrupted:
         finished_because = shutdown.finish_reason
     except Fatal as fatal:
+        summarize_error("Fatal error", str(fatal))
         log(f"oxfuzzer: {fatal}")
         raise SystemExit(1)
+    except Exception as error:
+        # Not an error that oxfuzzer expects. Python prints its traceback and
+        # exits with a non-zero status.
+        summarize_error("Internal error", describe_error(error))
+        raise
     finish(finished_because)
 
 

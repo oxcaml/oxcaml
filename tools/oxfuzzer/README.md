@@ -39,7 +39,17 @@ leaves it ignored and keeps running when the terminal is closed.
 
 oxfuzzer also keeps running when it can no longer write to stderr, say because
 the terminal is gone or the program it is piped into has exited: it stops
-printing, and still saves failures and sets its exit status.
+printing, and still saves failures, writes the summary and sets its exit
+status.
+
+Use `--summary-file PATH` to have oxfuzzer write a short Markdown summary to
+PATH when the run ends, whether it finished, was stopped by a signal, or ended
+with an error (such as a failed self-check, a toolchain that cannot be run, an
+output directory that cannot be written, or an unexpected error in oxfuzzer
+itself): why it ended, the passed/discarded/failed counts, the rate (cases
+completed per hour of fuzzing), the wall time, the base seed and the saved
+failures. It has no top-level heading. After such an error the exit status is
+1.
 
 By default the compilers, stdlib, runtime and `oxfuzzer.exe` are taken from the
 `_build` directory of the repository containing `oxfuzzer.py`. Use
