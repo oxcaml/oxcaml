@@ -34,18 +34,23 @@
     * The counter of a self tail call turned into a jump, or of a partial
     application turned into the allocation of a wrapper
 
-    * The counters of the arms of a switch that collapses into a single jump.
+    * The counters of the arms of a switch that collapses into a single jump
+    (e.g. a table lookup).
 
     A [Region.t] is a stretch of straight-line control flow: a function body or
     a continuation handler, up to its terminator. The counters described above
     are preserved by attaching them to the edges into its [Region.t], which
-    execute exactly as often.
+    execute exactly as often, except for the arms of a collapsed switch: each of
+    them gets the count of the whole switch.
 
     The counters are recorded during the downward traversal and when rebuilding.
     They are read when rebuilding a switch arm, before its target can change,
     and for the function entry when the whole body has been rebuilt. An arm
     therefore misses the counters recorded after it was rebuilt (see
     [Expr_builder.preserve_fdo_counters_of_collapsed_switch]). *)
+
+(* CR yusumez: The arms of a collapsed switch all get the count of the whole
+   switch, which only their sum has: each of them is overestimated. *)
 
 module Region : sig
   type t =

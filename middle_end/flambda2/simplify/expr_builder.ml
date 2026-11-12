@@ -474,7 +474,8 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms ~fdo_region =
   else
     let change_to_apply_cont action =
       (* The arms' edges become a single jump, which runs every time: their
-         counters are preserved in the region (see [Fdo_region_counters]). *)
+         counters are preserved in the region (imprecisely, see
+         [Fdo_region_counters]). *)
       let uacc =
         preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
       in
