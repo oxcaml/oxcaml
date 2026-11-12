@@ -3,6 +3,9 @@
 
 (library
  (name jsoo_static_partition)
- (libraries js_of_ocaml-compiler oxcaml_private_yojson)
+ (libraries
+  js_of_ocaml-compiler
+  js_of_ocaml-compiler.runtime-files
+  oxcaml_private_yojson)
  (flags
   (:standard -open Oxcaml_private_yojson)))
