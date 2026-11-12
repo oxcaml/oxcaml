@@ -22,7 +22,7 @@ import time
 from dataclasses import dataclass, field
 import enum
 import math
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 import tempfile
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -825,6 +825,30 @@ class Limits:
         return None
 
 
+CASE_SEED_BITS = 62
+
+
+# The seeds of a run's cases, in order, without end.
+def case_seeds(base_seed: str) -> Iterator[int]:
+    # A base seed that is a case seed (a number below 2^62) is the first case,
+    # so that `--seed N --iterations 1` runs case N again, such as a saved
+    # failure's. The length is checked first because int() rejects very long
+    # strings.
+    limit = 1 << CASE_SEED_BITS
+    if (
+        base_seed.isascii()
+        and base_seed.isdecimal()
+        and len(base_seed) <= len(str(limit))
+        and int(base_seed) < limit
+    ):
+        yield int(base_seed)
+    # Python seeds with all of a string, so any string is a seed, and it gives
+    # the same sequence of case seeds on every platform.
+    rng = random.Random(base_seed)
+    while True:
+        yield rng.getrandbits(CASE_SEED_BITS)
+
+
 async def fuzz(
     *,
     toolchain: Toolchain,
@@ -836,13 +860,7 @@ async def fuzz(
     run_info: str,
     stats: Stats,
 ) -> FinishReason:
-    # Python seeds with all of a string, so any string is a seed, and it gives
-    # the same sequence of case seeds on every platform.
-    rng = random.Random(base_seed)
-    seed_indices = (
-        itertools.count() if limits.iterations is None else range(limits.iterations)
-    )
-    pending = (rng.getrandbits(62) for _ in seed_indices)
+    pending = itertools.islice(case_seeds(base_seed), limits.iterations)
     slots = asyncio.Semaphore(jobs)
 
     finished_because = FinishReason.ITERATIONS
@@ -933,8 +951,9 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     parser.add_argument(
         "--seed",
         default=None,
-        help="seed for the sequence of case seeds: any string "
-        "(default: random, printed)",
+        help="seed for the sequence of case seeds: any string. A case's seed "
+        "(a number below 2^62) runs that case first, so with --iterations 1 it "
+        "runs a saved failure's case again (default: random, printed)",
     )
     toolchain_group = parser.add_mutually_exclusive_group()
     toolchain_group.add_argument(

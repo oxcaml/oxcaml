@@ -46,4 +46,10 @@ Each failure is written to a hidden `.<seed>.<random>/` directory and renamed
 into place when complete, so a failure's directory is never partial. A leftover
 hidden directory is from a run that was killed while saving.
 
+To run the case of a saved failure again, say with another compiler, pass its
+seed (the name of its directory) as `--seed`, with `--iterations 1`. A `--seed`
+that is a number below 2^62 is the seed of the first case. The cases after it,
+and all the cases of any other `--seed`, come from a random generator seeded
+with the `--seed` string.
+
 Learn more with `python oxfuzzer.py -h`.
