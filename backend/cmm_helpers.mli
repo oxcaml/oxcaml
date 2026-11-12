@@ -109,6 +109,11 @@ val black_block_header : int -> int -> nativeint
 val black_mixed_block_header :
   int -> int -> scannable_prefix_len:int -> nativeint
 
+(** The scan words of the layout block for a block whose user word [i] is
+    unscannable iff [unscannable.(i)], in the canonical form which the runtime
+    requires. *)
+val mixed_block_layout_words : unscannable:bool array -> nativeint list
+
 val black_closure_header : int -> nativeint
 
 (** Infix header at the given offset *)
@@ -796,6 +801,11 @@ val cdefine_symbol : symbol -> data_item list
     for the block. [cont] must already contain the fields of the block (and may
     contain additional data items afterwards). *)
 val emit_block : symbol -> nativeint -> data_item list -> data_item list
+
+(** [emit_layout_block symb words cont] prepends to [cont] a static layout block
+    with the given scan words (see [mixed_block_layout_words]). *)
+val emit_layout_block :
+  symbol -> nativeint list -> data_item list -> data_item list
 
 (** Emit specific kinds of constant blocks as data items *)
 val emit_float32_constant : symbol -> float -> data_item list -> data_item list

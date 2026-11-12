@@ -208,6 +208,8 @@ module Mixed_block_support : sig
 
   val make_header :
     Nativeint.t -> scannable_prefix:int -> wosize:int -> Nativeint.t
+
+  val layout_words : unscannable:bool array -> Nativeint.t list
 end = struct
   let required_reserved_header_bits = Header_bits.reserved_bits
 
@@ -275,7 +277,63 @@ end = struct
          (Nativeint.of_int reserved)
          Header_bits.scan_mask_shift)
       header
+
+  (* The scan words of a layout block, for a block whose user word [i] is
+     unscannable iff [unscannable.(i)]. Each scan word has a mask for the next
+     [Header_bits.layout_word_mask_bits] user words (1 = unscannable); the last
+     may also have a repeat, the number of its final mask bits which describe,
+     tiled, the user words beyond the masks. The result is the canonical form
+     which the runtime checks: as few scan words as possible; a repeat only if
+     the masks don't reach the end of the block; and ones in any mask bits
+     beyond the end of the block. *)
+  let layout_words ~unscannable =
+    let len = Array.length unscannable in
+    let bits = Header_bits.layout_word_mask_bits in
+    let scan_word j ~repeat =
+      let mask =
+        Seq.fold_left
+          (fun mask b ->
+            let i = (j * bits) + b in
+            if i >= len || unscannable.(i)
+            then Nativeint.logor mask (Nativeint.shift_left 1n b)
+            else mask)
+          0n (Seq.init bits Fun.id)
+      in
+      Nativeint.logor mask
+        (Nativeint.shift_left (Nativeint.of_int repeat)
+           Header_bits.layout_word_repeat_shift)
+    in
+    (* [k] scan words can be followed by a repeat of [n] iff every word beyond
+       their masks is the same as the word [n] before it: that is, iff the masks
+       reach past the last word which differs from the word [n] before it. So
+       one backward scan gives the fewest scan words for that repeat, and the
+       whole encoding takes time linear in the size of the block. *)
+    let words_for_repeat n =
+      let rec last_difference i =
+        if i < n
+        then -1
+        else if Bool.equal unscannable.(i) unscannable.(i - n)
+        then last_difference (i - 1)
+        else i
+      in
+      max 1 ((last_difference (len - 1) / bits) + 1)
+    in
+    let k, n =
+      List.init Header_bits.layout_word_repeat_max (fun i ->
+          let n = i + 1 in
+          words_for_repeat n, n)
+      |> List.fold_left
+           (fun ((best_k, _) as best) ((k, _) as candidate) ->
+             if k < best_k then candidate else best)
+           (max_int, 0)
+    in
+    let exact = ((len - 1) / bits) + 1 in
+    if k < exact
+    then List.init k (fun j -> scan_word j ~repeat:(if j = k - 1 then n else 0))
+    else List.init exact (fun j -> scan_word j ~repeat:0)
 end
+
+let mixed_block_layout_words = Mixed_block_support.layout_words
 
 (* CR mshinwell: update to use NOT_MARKABLE terminology *)
 let block_header ?(block_kind = Regular_block) tag sz =
@@ -4696,6 +4754,11 @@ let emit_block symb white_header cont =
      no-naked-pointers mode. See [caml_darken]. *)
   let black_header = Nativeint.logor white_header caml_black in
   (Cint black_header :: cdefine_symbol symb) @ cont
+
+let emit_layout_block symb words cont =
+  emit_block symb
+    (block_header Obj.abstract_tag (List.length words))
+    (List.map (fun word -> Cint word) words @ cont)
 
 let emit_string_constant_fields s cont =
   let n = size_int - 1 - (String.length s mod size_int) in

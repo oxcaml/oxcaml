@@ -392,6 +392,25 @@ let invalid res ~message =
   let cmm_symbol = To_cmm_result.symbol res message_sym in
   Cmm.Cinvalid { message; symbol = cmm_symbol }, res
 
+let layout_block res ~words =
+  let layout_sym, res =
+    match To_cmm_result.layout_block_symbol res ~words with
+    | None ->
+      let layout_sym =
+        Symbol.manufacture (Current_unit.get_cu_exn ()) "layout"
+      in
+      let res =
+        Cmm_helpers.emit_layout_block
+          (To_cmm_result.symbol res layout_sym)
+          words []
+        |> To_cmm_result.add_archive_data_items res
+      in
+      let res = To_cmm_result.add_layout_block_symbol res layout_sym ~words in
+      layout_sym, res
+    | Some layout_sym -> layout_sym, res
+  in
+  To_cmm_result.symbol res layout_sym, res
+
 module Update_kind = struct
   type kind =
     | Pointer
