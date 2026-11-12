@@ -150,10 +150,9 @@ let block_like ~env ~res symbol (const : Static_const.t) =
         (List.length values)
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:(fun float ->
-        Numeric_types.Float32_by_bit_pattern.to_bits float |> Int64.of_int32)
-      ~bits_to_constant:(fun bits -> Float32 bits)
-      ~bits_to_array:(fun bits -> Float_array bits)
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.float32_to_jsir_const
+      ~bits_to_array:(fun bits ->
+        Tuple (tag, Array.map To_jsir_shared.float32_to_jsir_const bits, Array))
   | Immutable_value_array values ->
     simple_block_or_array ~env ~res ~symbol ~tag:Tag.zero ~mut:Immutable
       ~array_or_not:Array values
