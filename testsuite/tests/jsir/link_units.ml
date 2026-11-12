@@ -11,6 +11,9 @@
  }{
    ocamlopt_flags = "-link-jsir -g";
    jsir;
+ }{
+   ocamlopt_flags = "-link-jsir -linkall";
+   jsir;
  }
 *)
 
