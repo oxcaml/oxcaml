@@ -3765,10 +3765,6 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         continuation = return_continuation;
         exn_continuation;
         inlined = Lambda.forward_inlined_attribute ();
-        (* The call stands for the application of the wrapper: when the wrapper
-           is inlined, it gets the debuginfo of that application, as in
-           [Simplify_apply_expr.simplify_direct_partial_application]. *)
-        loc = Loc_unknown;
         mode = result_mode;
         return_arity = result_arity;
         region = my_region;
