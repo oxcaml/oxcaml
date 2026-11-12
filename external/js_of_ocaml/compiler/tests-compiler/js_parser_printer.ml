@@ -958,8 +958,8 @@ let%expect_test ("invalid ident" [@when target_engine <> "quickjs"]) =
 |};
   [%expect
     {|
-    Lexer error: fake:2:8: Illegal Unicode escape
-    Lexer error: fake:3:8: Unexpected "\\u{1F42B}" (🐫) is not a valid identifier
+    fake:2:9: lexer error: Illegal Unicode escape
+    fake:3:9: lexer error: Unexpected "\\u{1F42B}" (🐫) is not a valid identifier
     cannot parse l:3:8@.
     |}]
 
@@ -992,7 +992,8 @@ let%expect_test ("multiline string" [@when target_engine <> "quickjs"]) =
      3: 4:"\n    ",
      4: 5:;,
      5: 4:42, 0:;,
-    Lexer error: fake:3:5: Unexpected token ILLEGAL |}];
+    fake:3:6: lexer error: Unexpected token ILLEGAL
+    |}];
   parse_print_token (clean {|
     42;
     "\
@@ -1017,8 +1018,9 @@ let%expect_test ("multiline string" [@when target_engine <> "quickjs"]) =
      3: 4:"\n\n    ",
      5: 5:;,
      6: 4:42, 0:;,
-    Lexer error: fake:3:5: Unexpected token ILLEGAL
-    Lexer error: fake:4:0: Unexpected token ILLEGAL |}];
+    fake:3:6: lexer error: Unexpected token ILLEGAL
+    fake:4:1: lexer error: Unexpected token ILLEGAL
+    |}];
   [%expect {||}]
 
 let%expect_test "multiline comments" =
@@ -1387,3 +1389,160 @@ let%expect_test "in operator in conditional then-branch needs no parentheses" =
     x=/*<<fake:1:11>>*/c?z="a"in
     b:d;;);
     |}]
+
+let check kind src =
+  let lex = Parse_js.Lexer.of_string ~filename:"fake" src in
+  match Parse_js.parse kind lex with
+  | p ->
+      Config.Flag.disable "debuginfo";
+      let buffer = Buffer.create 17 in
+      let pp = Pretty_print.to_buffer buffer in
+      Pretty_print.set_compact pp true;
+      let _ = Js_output.program pp p in
+      print_endline (Buffer.contents buffer)
+  | exception Parse_js.Parsing_error pi ->
+      Printf.printf
+        "cannot parse js (from l:%d, c:%d)\n"
+        pi.Parse_info.line
+        pi.Parse_info.col
+
+let%expect_test "parenthesized optional chains" =
+  (* Parentheses delimit an optional chain: when [a] is null,
+     [(a?.b).c] raises an exception whereas [a?.b.c] is undefined. *)
+  check `Script "(a?.b).c; a?.b.c";
+  [%expect {| (a?.b).c;a?.b.c; |}];
+  check `Script "(a?.b)(); (a?.[0])[1]; (a?.b.c).d; (a.b?.()).e; ((a?.b)).c";
+  [%expect {| (a?.b)();(a?.[0])[1];(a?.b.c).d;(a.b?.()).e;(a?.b).c; |}];
+  (* These are syntax errors without the parentheses *)
+  check `Script "(a?.b)`t`";
+  [%expect {| (a?.b)`t`; |}];
+  check `Script "new (a?.b)(); new (a?.b)";
+  [%expect {| new(a?.b)();new(a?.b); |}];
+  (* No difference in these cases *)
+  check `Script "(a?.b)?.c; x = (a?.b) + 1; (x, a?.b).c; (a?.b || c).d";
+  [%expect {| a?.b?.c;x=a?.b+1;(x,a?.b).c;(a?.b||c).d; |}]
+
+let%expect_test "accesses built on top of an optional chain" =
+  (* An access of kind [ANormal] is not part of the optional chain of its
+     object: a pass building one gets the parentheses *)
+  let open Javascript in
+  let ident s = ident (Utf8_string.of_string_exn s) in
+  let name s = Utf8_string.of_string_exn s in
+  let chain = EDot (EVar (ident "a"), ANullish, name "b") in
+  let print e =
+    Config.Flag.disable "debuginfo";
+    let buffer = Buffer.create 17 in
+    let pp = Pretty_print.to_buffer buffer in
+    Pretty_print.set_compact pp true;
+    let _ = Js_output.program pp [ Expression_statement e, N ] in
+    print_endline (Buffer.contents buffer)
+  in
+  print (dot chain (name "c"));
+  [%expect {| (a?.b).c; |}];
+  print (call chain [] N);
+  [%expect {| (a?.b)(); |}];
+  print (EDot (chain, AChain, name "c"));
+  [%expect {| a?.b.c; |}];
+  print (EDot (dot chain (name "c"), ANormal, name "d"));
+  [%expect {| (a?.b).c.d; |}];
+  print (ENew (chain, Some [], N));
+  [%expect {| new(a?.b)(); |}]
+
+let%expect_test "template literals and optional chains" =
+  (* A tagged template cannot be part of an optional chain *)
+  check `Script "a?.b`t`";
+  [%expect {| cannot parse js (from l:1, c:4) |}];
+  check `Script "a?.b.c`t`";
+  [%expect {| cannot parse js (from l:1, c:6) |}];
+  check `Script "a?.(1)`t`";
+  [%expect {| cannot parse js (from l:1, c:6) |}];
+  check `Script "a?.`t`";
+  [%expect {| cannot parse js (from l:1, c:3) |}];
+  (* This is fine outside of the chain *)
+  check `Script "(a?.b)`t`; a`t`?.b; a.b`t`";
+  [%expect {| (a?.b)`t`;a`t`?.b;a.b`t`; |}]
+
+let print_syntax_error ?filename ?(write = true) s =
+  let file =
+    match filename with
+    | Some f -> f
+    | None -> Filename.temp_file "jsoo_syntax_error" ".js"
+  in
+  if write
+  then (
+    let oc = open_out_bin file in
+    output_string oc s;
+    close_out oc);
+  (match Parse_js.parse `Script (Parse_js.Lexer.of_string ~filename:file s) with
+  | _ -> print_endline "no error"
+  | exception Parse_js.Parsing_error pi ->
+      let msg = Parse_info.Diagnostic.with_excerpt pi "syntax error" in
+      let msg =
+        if Option.is_none filename && String.starts_with ~prefix:file msg
+        then
+          "FILE"
+          ^ String.sub
+              msg
+              ~pos:(String.length file)
+              ~len:(String.length msg - String.length file)
+        else msg
+      in
+      print_endline msg);
+  if write then Sys.remove file
+
+let%expect_test "syntax error messages" =
+  print_syntax_error "var x = 1;\nfunction f(a, b {\n  return a;\n}\n";
+  [%expect
+    {|
+    FILE:2:17: syntax error
+    2 | function f(a, b {
+      |                 ^
+    |}];
+  (* Tabs are kept to stay aligned *)
+  print_syntax_error "\t\tvar = 1;";
+  [%expect {|
+    FILE:1:7: syntax error
+    1 | 		var = 1;
+      | 		    ^
+    |}];
+  (* Columns count code points *)
+  print_syntax_error "var s = \"\xc3\xa9\xe2\x82\xac\"; var = 1;";
+  [%expect
+    {|
+    FILE:1:19: syntax error
+    1 | var s = "é€"; var = 1;
+      |                   ^
+    |}];
+  (* Line terminators other than '\n' *)
+  print_syntax_error "// a\xe2\x80\xa8b\nvar a;\r\nvar b;\rvar = 1;";
+  [%expect {|
+    FILE:5:5: syntax error
+    5 | var = 1;
+      |     ^
+    |}];
+  (* Only a window around the column of a long line is printed *)
+  print_syntax_error
+    (String.concat
+       ~sep:""
+       (List.init ~len:30 ~f:(fun i -> Printf.sprintf "var a%d=%d;" i i))
+    ^ "var = 1;"
+    ^ String.concat
+        ~sep:""
+        (List.init ~len:30 ~f:(fun i -> Printf.sprintf "var b%d=%d;" i i)));
+  [%expect
+    {|
+    FILE:1:315: syntax error
+    1 | ...5;var a26=26;var a27=27;var a28=28;var a29=29;var = 1;var b0=0;var b1=1;var b2=2;var b3=3;var b4=4;v...
+      |                                                      ^
+    |}];
+  (* No excerpt when the file cannot be read *)
+  print_syntax_error ~filename:"does-not-exist.js" ~write:false "var = 1;";
+  [%expect {| does-not-exist.js:1:5: syntax error |}];
+  print_syntax_error ~filename:Filename.current_dir_name ~write:false "var = 1;";
+  [%expect {| .:1:5: syntax error |}];
+  (* No file *)
+  (match Parse_js.parse `Script (Parse_js.Lexer.of_string "var = 1;") with
+  | _ -> print_endline "no error"
+  | exception Parse_js.Parsing_error pi ->
+      print_endline (Parse_info.Diagnostic.with_excerpt pi "syntax error"));
+  [%expect {| line 1, column 5: syntax error |}]

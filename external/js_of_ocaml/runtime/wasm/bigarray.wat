@@ -41,9 +41,7 @@
       (import "portableint" "val_portable_int"
          (func $val_portable_int (param i64) (result (ref eq))))
       (import "portableint" "checked_portable_int_val_32"
-         (func $caml_ba_index_val (param (ref eq)) (result i32)))
-      (import "nativeint" "Nativeint_val"
-         (func $Nativeint_val (param (ref eq)) (result i64))))
+         (func $caml_ba_index_val (param (ref eq)) (result i32))))
    (@else
    (import "nativeint" "caml_copy_nativeint"
       (func $caml_copy_nativeint (param i32) (result (ref eq))))
@@ -710,6 +708,59 @@
 
    (@if $portable-int
    (@then
+      ;; A bigarray dimension. Dimensions are stored as i32, so larger ones
+      ;; cannot be allocated.
+      (func $ba_dim_val (param $v (ref eq)) (param $negative (ref eq))
+         (result i32)
+         (local $d i64)
+         (local.set $d (call $portable_int_val (local.get $v)))
+         (if (i64.lt_s (local.get $d) (i64.const 0))
+            (then (call $caml_invalid_argument (local.get $negative))))
+         (if (i64.gt_s (local.get $d) (i64.const 0x7fffffff))
+            (then (call $caml_raise_out_of_memory)))
+         (i32.wrap_i64 (local.get $d)))
+
+      ;; As the native runtime, use 32-bit elements when all values fit, so
+      ;; that the data can be read back by 32-bit runtimes
+      (func $serialize_longarray
+         (param $s (ref eq)) (param $view (ref extern)) (param $n i32)
+         (local $i i32) (local $len i32) (local $l i64)
+         (local.set $len (i32.shl (local.get $n) (i32.const 3)))
+         (block $overflow
+            (loop $loop
+               (if (i32.lt_u (local.get $i) (local.get $len))
+                  (then
+                     (local.set $l
+                        (call $dv_get_i64 (local.get $view) (local.get $i)
+                           (global.get $littleEndian)))
+                     (br_if $overflow
+                        (i64.ne (local.get $l)
+                           (i64.extend_i32_s (i32.wrap_i64 (local.get $l)))))
+                     (local.set $i (i32.add (local.get $i) (i32.const 8)))
+                     (br $loop))))
+            (call $caml_serialize_int_1 (local.get $s) (i32.const 0))
+            (local.set $i (i32.const 0))
+            (loop $loop
+               (if (i32.lt_u (local.get $i) (local.get $len))
+                  (then
+                     (call $caml_serialize_int_4 (local.get $s)
+                        (i32.wrap_i64
+                           (call $dv_get_i64 (local.get $view) (local.get $i)
+                              (global.get $littleEndian))))
+                     (local.set $i (i32.add (local.get $i) (i32.const 8)))
+                     (br $loop))))
+            (return))
+         (call $caml_serialize_int_1 (local.get $s) (i32.const 1))
+         (local.set $i (i32.const 0))
+         (loop $loop
+            (if (i32.lt_u (local.get $i) (local.get $len))
+               (then
+                  (call $caml_serialize_int_8 (local.get $s)
+                     (call $dv_get_i64 (local.get $view) (local.get $i)
+                        (global.get $littleEndian)))
+                  (local.set $i (i32.add (local.get $i) (i32.const 8)))
+                  (br $loop)))))
+
       (func $caml_ba_fill_i64 (param $ba (ref $bigarray)) (param $l i64)
          (local $view (ref extern)) (local $i i32) (local $len i32)
          (local.set $view (struct.get $bigarray $ba_view (local.get $ba)))
@@ -823,9 +874,11 @@
                                $int32 $int64 $intnat $intnat
                                $complex32 $complex64 $int8 $float16
                         (struct.get_u $bigarray $ba_kind (local.get $b))))
-                  ;; int and nativeint: 64-bit elements, hashed like
-                  ;; caml_hash_mix_intnat so that small values hash as on
-                  ;; 32-bit targets
+                  ;; int and nativeint: 64-bit elements hashed as the native
+                  ;; runtime does with caml_hash_mix_intnat, which folds the
+                  ;; high bits so that small values hash like 32-bit ones.
+                  ;; As in the native runtime, at most 64 elements are
+                  ;; hashed, as for int32 bigarrays.
                   (local.set $len (i32.shl (local.get $len) (i32.const 3)))
                   (if (i32.gt_u (local.get $len) (i32.const 512))
                      (then (local.set $len (i32.const 512))))
@@ -842,10 +895,8 @@
                                  (i32.wrap_i64
                                     (i64.xor
                                        (i64.xor
-                                          (i64.shr_s (local.get $l)
-                                             (i64.const 32))
-                                          (i64.shr_s (local.get $l)
-                                             (i64.const 63)))
+                                          (i64.shr_s (local.get $l) (i64.const 32))
+                                          (i64.shr_s (local.get $l) (i64.const 63)))
                                        (local.get $l)))))
                            (local.set $i (i32.add (local.get $i) (i32.const 8)))
                            (br $loop))))
@@ -1099,35 +1150,9 @@
            (br $done))
            (@if $portable-int
            (@then
-             ;; nativeint
-             (if (i32.eq (struct.get_u $bigarray $ba_kind (local.get $b))
-                    (i32.const 9))
-                (then
-                   (call $caml_serialize_int_1 (local.get $s) (i32.const 1))
-                   (local.set $len (i32.shl (local.get $len) (i32.const 3)))
-                   (loop $loop
-                      (if (i32.lt_u (local.get $i) (local.get $len))
-                         (then
-                            (call $caml_serialize_int_8 (local.get $s)
-                               (call $dv_get_i64 (local.get $view) (local.get $i)
-                                  (global.get $littleEndian)))
-                            (local.set $i (i32.add (local.get $i) (i32.const 8)))
-                            (br $loop))))
-                   (br $done)))))
-          ;; int
-          (@if $portable-int
-           (@then
-             ;; int: portable
-             (call $caml_serialize_int_1 (local.get $s) (i32.const 1))
-             (local.set $len (i32.shl (local.get $len) (i32.const 3)))
-             (loop $loop
-                (if (i32.lt_u (local.get $i) (local.get $len))
-                   (then
-                      (call $caml_serialize_int_8 (local.get $s)
-                         (call $dv_get_i64 (local.get $view) (local.get $i)
-                            (global.get $littleEndian)))
-                      (local.set $i (i32.add (local.get $i) (i32.const 8)))
-                      (br $loop))))
+             ;; int and nativeint
+             (call $serialize_longarray
+                (local.get $s) (local.get $view) (local.get $len))
              (br $done)))
           ;; int
           (call $caml_serialize_int_1 (local.get $s) (i32.const 0)))
@@ -1275,37 +1300,9 @@
                     (local.set $i (i32.add (local.get $i) (i32.const 8)))
                     (br $loop))))
            (br $done))
-           (@if $portable-int
-           (@then
-             ;; nativeint
-             (if (i32.eq (struct.get_u $bigarray $ba_kind (local.get $b))
-                    (i32.const 9))
-                (then
-                   (local.set $len (i32.shl (local.get $len) (i32.const 3)))
-                   (if (call $caml_deserialize_uint_1 (local.get $s))
-                      (then
-                         (loop $loop
-                            (if (i32.lt_u (local.get $i) (local.get $len))
-                               (then
-                                  (call $dv_set_i64 (local.get $ba_view) (local.get $i)
-                                     (call $caml_deserialize_int_8 (local.get $s))
-                                     (global.get $littleEndian))
-                                  (local.set $i (i32.add (local.get $i) (i32.const 8)))
-                                  (br $loop)))))
-                      (else
-                         (loop $loop
-                            (if (i32.lt_u (local.get $i) (local.get $len))
-                               (then
-                                  (call $dv_set_i64 (local.get $ba_view) (local.get $i)
-                                     (i64.extend_i32_s
-                                        (call $caml_deserialize_int_4 (local.get $s)))
-                                     (global.get $littleEndian))
-                                  (local.set $i (i32.add (local.get $i) (i32.const 8)))
-                                  (br $loop))))))
-                   (br $done)))))
           (@if $portable-int
           (@then
-            ;; int: portable
+            ;; int and nativeint
             (local.set $len (i32.shl (local.get $len) (i32.const 3)))
             (if (call $caml_deserialize_uint_1 (local.get $s))
                (then
@@ -1446,9 +1443,10 @@
                (local.set $n
                   (@if $portable-int
                   (@then
-                     (call $caml_ba_index_val
+                     (call $ba_dim_val
                         (array.get $block (local.get $vdim)
-                           (i32.add (local.get $i) (i32.const 1)))))
+                           (i32.add (local.get $i) (i32.const 1)))
+                        (global.get $ba_create_negative_dim)))
                   (@else
                   (i31.get_s
                      (ref.cast (ref i31)
@@ -1695,10 +1693,19 @@
              (block $complex32
               (block $complex64
                (block $float16
+                ;; Nativeints are 64 bits in portable-int mode
+                (@if $portable-int
+                (@then
+                (br_table $float32 $float64 $int8 $int8 $int16 $int16
+                          $int32 $int64 $int $int64
+                          $complex32 $complex64 $int8 $float16
+                   (struct.get_u $bigarray $ba_kind (local.get $ba))))
+                (@else
                 (br_table $float32 $float64 $int8 $int8 $int16 $int16
                           $int32 $int64 $int $int32
                           $complex32 $complex64 $int8 $float16
                    (struct.get_u $bigarray $ba_kind (local.get $ba))))
+                ))
                ;; float16
                (call $dv_set_i16
                  (local.get $view) (i32.shl (local.get $i) (i32.const 1))
@@ -1731,27 +1738,11 @@
                    (array.get $float_array (local.get $b) (i32.const 1)))
                 (global.get $littleEndian))
              (return))
-            ;; int32 / nativeint
-            (@if $portable-int
-            (@then
-               (if (i32.eq (struct.get_u $bigarray $ba_kind (local.get $ba))
-                      (i32.const 9)) ;; nativeint: 64-bit elements
-                  (then
-                     (call $dv_set_i64
-                        (local.get $view) (i32.shl (local.get $i) (i32.const 3))
-                        (call $Nativeint_val (local.get $v))
-                        (global.get $littleEndian)))
-                  (else
-                     (call $dv_set_i32
-                        (local.get $view) (i32.shl (local.get $i) (i32.const 2))
-                        (call $Int32_val (local.get $v))
-                        (global.get $littleEndian)))))
-            (@else
+            ;; int32 / nativeint (without portable ints)
             (call $dv_set_i32
                (local.get $view) (i32.shl (local.get $i) (i32.const 2))
                (call $Int32_val (local.get $v))
                (global.get $littleEndian))
-            ))
             (return))
            ;; int
            (@if $portable-int
@@ -1767,7 +1758,7 @@
               (global.get $littleEndian))
             ))
            (return))
-          ;; int64
+          ;; int64 / nativeint (with portable ints; boxed as an int64)
           (call $dv_set_i64
              (local.get $view) (i32.shl (local.get $i) (i32.const 3))
              (call $Int64_val (local.get $v))
@@ -2607,9 +2598,13 @@
       (if (i32.or
              (i32.or (i32.lt_s (local.get $ofs) (i32.const 0))
                 (i32.lt_s (local.get $len) (i32.const 0)))
-             (i32.gt_s (i32.add (local.get $ofs) (local.get $len))
-                (array.get $int_array (local.get $dim)
-                   (local.get $changed_dim))))
+             ;; In 64 bits, as the sum may overflow
+             (i64.gt_s
+                (i64.add (i64.extend_i32_s (local.get $ofs))
+                   (i64.extend_i32_s (local.get $len)))
+                (i64.extend_i32_s
+                   (array.get $int_array (local.get $dim)
+                      (local.get $changed_dim)))))
          (then (call $caml_invalid_argument (global.get $bad_subarray))))
       (local.set $ba_dim
          (array.new $int_array (i32.const 0) (local.get $ba_num_dims)))
@@ -2654,9 +2649,17 @@
           (block $complex32
            (block $complex64
             (block $float16
+             ;; Nativeints are 64 bits in portable-int mode
+             (@if $portable-int
+             (@then
+             (br_table $float $float $int $int $int $int $int32 $int64 $int
+               $int64 $complex32 $complex64 $int $float16
+               (struct.get_u $bigarray $ba_kind (local.get $ba))))
+             (@else
              (br_table $float $float $int $int $int $int $int32 $int64 $int
                $int32 $complex32 $complex64 $int $float16
                (struct.get_u $bigarray $ba_kind (local.get $ba))))
+             ))
              ;; float16
              (call $ta_fill_int (local.get $dat)
                 (call $double_to_float16
@@ -2708,7 +2711,7 @@
                     (local.set $i (i32.add (local.get $i) (i32.const 8)))
                     (br $loop))))
            (return (ref.i31 (i32.const 0))))
-          ;; int64
+          ;; int64 / nativeint (with portable ints; boxed as an int64)
           (local.set $view (struct.get $bigarray $ba_view (local.get $ba)))
           (local.set $len
              (i32.shl (call $caml_ba_num_elts (local.get $ba)) (i32.const 3)))
@@ -2722,20 +2725,8 @@
                    (local.set $i (i32.add (local.get $i) (i32.const 8)))
                    (br $loop))))
           (return (ref.i31 (i32.const 0))))
-         ;; int32
-         (@if $portable-int
-         (@then
-            (if (i32.eq (struct.get_u $bigarray $ba_kind (local.get $ba))
-                   (i32.const 9))
-               (then
-                  (call $caml_ba_fill_i64 (local.get $ba)
-                     (call $Nativeint_val (local.get $v))))
-               (else
-                  (call $ta_fill_int (local.get $dat)
-                     (call $Int32_val (local.get $v))))))
-         (@else
+         ;; int32 / nativeint (without portable ints)
          (call $ta_fill_int (local.get $dat) (call $Int32_val (local.get $v)))
-         ))
          (return (ref.i31 (i32.const 0))))
         ;; int
         (@if $portable-int
@@ -2814,9 +2805,10 @@
                (local.set $d
                   (@if $portable-int
                   (@then
-                     (call $caml_ba_index_val
+                     (call $ba_dim_val
                         (array.get $block (local.get $vdim)
-                           (i32.add (local.get $i) (i32.const 1)))))
+                           (i32.add (local.get $i) (i32.const 1)))
+                        (global.get $negative_dim)))
                   (@else
                   (i31.get_s
                      (ref.cast (ref i31)

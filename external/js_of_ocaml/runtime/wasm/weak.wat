@@ -27,10 +27,13 @@
          (func $portable_int_val (param (ref eq)) (result i64)))
       (import "portableint" "checked_portable_int_val_32"
          (func $size_val (param (ref eq)) (result i32)))
+      (import "portableint" "is_ocaml_portable_int"
+         (func $is_ocaml_portable_int (param (ref eq)) (result i32)))
    ))
 
 (@if $wasi
 (@then
+
    (func $wrap (param $v (ref eq)) (result (ref eq))
       (local.get $v))
    (func $unwrap (param $v (ref eq)) (result (ref eq))
@@ -58,6 +61,12 @@
    (type $bytes (array (mut i8)))
    (type $float_array (array (mut f64)))
    (type $js (struct (field $js anyref)))
+
+   ;; Integers are stored directly, rather than as weak references
+   (func $is_int (param $v (ref eq)) (result i32)
+      (@if $portable-int
+      (@then (call $is_ocaml_portable_int (local.get $v)))
+      (@else (ref.test (ref i31) (local.get $v)))))
 
    ;; A weak array is a an abstract value composed of possibly some
    ;; data and an array of keys.
@@ -131,7 +140,7 @@
                      (local.set $i (i32.add (local.get $i) (i32.const 1)))
                      (br_if $loop
                         (ref.eq (local.get $v) (global.get $caml_ephe_none)))
-                     (br_if $loop (ref.test (ref i31) (local.get $v)))
+                     (br_if $loop (call $is_int (local.get $v)))
                      (local.set $v
                         (br_on_null $released
                            (call $weak_deref (call $unwrap (local.get $v)))))
@@ -160,6 +169,8 @@
             (global.get $caml_ephe_none)))
       (ref.i31 (i32.const 0)))
 
+(@if (< $ocaml_version (5 6 0))
+(@then
    (func (export "caml_ephe_get_data_copy")
       (param $x (ref eq)) (result (ref eq))
       (local $r (ref eq)) (local $v (ref eq))
@@ -183,6 +194,10 @@
                      (call $caml_obj_dup (local.get $v))))))
          (ref.i31 (i32.const 0))))
       (local.get $r))
+)
+(@else
+   (export "caml_ephe_get_data_copy" (func $caml_ephe_get_data))
+))
 
    (func $caml_ephe_set_data (export "caml_ephe_set_data")
       (param $vx (ref eq)) (param $dat (ref eq)) (result (ref eq))
@@ -203,7 +218,7 @@
                   (array.get $block (local.get $x) (local.get $i)))
                (br_if $loop
                   (ref.eq (local.get $v) (global.get $caml_ephe_none)))
-               (br_if $loop (ref.test (ref i31) (local.get $v)))
+               (br_if $loop (call $is_int (local.get $v)))
                (block $released
                   (local.set $v
                      (br_on_null $released
@@ -268,7 +283,7 @@
          (block $no_value
             (br_if $no_value
                (ref.eq (local.get $v) (global.get $caml_ephe_none)))
-            (br_if $value (ref.test (ref i31) (local.get $v)))
+            (br_if $value (call $is_int (local.get $v)))
             (block $released
                (local.set $v
                   (br_on_null $released
@@ -281,6 +296,8 @@
          (return (ref.i31 (i32.const 0))))
       (array.new_fixed $block 2 (ref.i31 (i32.const 0)) (local.get $v)))
 
+(@if (< $ocaml_version (5 6 0))
+(@then
    (export "caml_weak_get_copy" (func $caml_ephe_get_key_copy))
    (func $caml_ephe_get_key_copy (export "caml_ephe_get_key_copy")
       (param $x (ref eq)) (param $i (ref eq)) (result (ref eq))
@@ -305,6 +322,11 @@
                      (call $caml_obj_dup (local.get $v))))))
          (ref.i31 (i32.const 0))))
       (local.get $r))
+)
+(@else
+   (export "caml_weak_get_copy" (func $caml_ephe_get_key))
+   (export "caml_ephe_get_key_copy" (func $caml_ephe_get_key))
+))
 
    (export "caml_weak_check" (func $caml_ephe_check_key))
    (func $caml_ephe_check_key (export "caml_ephe_check_key")
@@ -328,7 +350,7 @@
          (block $no_value
             (br_if $no_value
                (ref.eq (local.get $v) (global.get $caml_ephe_none)))
-            (br_if $value (ref.test (ref i31) (local.get $v)))
+            (br_if $value (call $is_int (local.get $v)))
             (br_if $value
                (i32.eqz
                   (ref.is_null
@@ -358,7 +380,7 @@
             (global.get $caml_ephe_key_offset)))
       ))
       (local.set $d (ref.i31 (i32.const 0)))
-      (if (ref.test (ref i31) (local.get $v))
+      (if (call $is_int (local.get $v))
          (then
             (if (ref.test (ref $js)
                    (array.get $block (local.get $x) (local.get $i)))

@@ -219,7 +219,7 @@
       (@if $portable-int
       (@then (local.set $num (call $int_val_32_sat (local.get $count))))
       (@else
-      (local.set $num (i31.get_u (ref.cast (ref i31) (local.get $count))))
+      (local.set $num (i31.get_s (ref.cast (ref i31) (local.get $count))))
       ))
       (@if $portable-int
       (@then (local.set $h (call $portable_int_val_32 (local.get $seed))))
@@ -232,13 +232,13 @@
       (local.set $wr (i32.const 1))
       (loop $loop
          (if (i32.and (i32.lt_u (local.get $rd) (local.get $wr))
-                      (i32.gt_u (local.get $num) (i32.const 0)))
+                      (i32.gt_s (local.get $num) (i32.const 0)))
             (then
                (local.set $v
                   (array.get $block (global.get $caml_hash_queue)
                      (local.get $rd)))
                (local.set $rd (i32.add (local.get $rd) (i32.const 1)))
-               (block $again
+               (loop $again
                   (drop (block $not_int (result (ref eq))
                      (local.set $iv
                         (br_on_cast_fail $not_int (ref eq) (ref i31)
@@ -330,6 +330,8 @@
                                        (array.get $block
                                           (local.get $bv) (i32.const 2))))))
                                  ;; lint-ignore-end manual-portability-handling-unsafe
+                           (local.set $num
+                              (i32.sub (local.get $num) (i32.const 1)))
                            (br $loop)))
                      ;; abstract tag: block contents unknown, do nothing
                      (br_if $loop

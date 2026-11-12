@@ -97,6 +97,8 @@ let%expect_test "function inlined both as an argument and directly" =
       List.iter (fun x -> print_int (Option.get x)) [ apply_some 0; apply_some 1; call_some 2 ]
   |}
    with Failure e -> print_endline e);
+  print_endline
+    (Str.global_replace (Str.regexp "[^ ]*js_of_ocaml\\.exe") "%{JSOO}" [%expect.output]);
   [%expect {| 012 |}]
 
 let%expect_test "inlining nested continuations keeps the code size linear" =

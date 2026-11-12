@@ -119,8 +119,8 @@
          (local.set $l
             (i64.shr_s (i64.shl (local.get $l) (i64.const 1)) (i64.const 1)))
          (if (result (ref eq))
-             (i64.lt_u (i64.add (local.get $l) (i64.const 0x40000000))
-                (i64.const 0x80000000))
+             (i64.le_u (i64.add (local.get $l) (i64.const 0x40000000))
+                (i64.const 0x7fffffff))
             (then (ref.i31 (i32.wrap_i64 (local.get $l))))
             (else (struct.new $ocaml_large_int (local.get $l)))))
       (func $alloc_nat (param $len i32) (param $fill i64) (result (ref $nat))
@@ -439,8 +439,12 @@
                   (array.get $digits (local.get $d) (local.get $i)))
                (local.set $i (i32.add (local.get $i) (i32.const 1)))
                (br $loop))))
+      ;; 64-bit platforms use 64-bit digits, serialized as two 32-bit
+      ;; words: they pad an odd number of words with a zero word
       (i32.mul (local.get $len) (i32.const 4))
-      (i32.mul (local.get $len) (i32.const 8)))
+      (i32.mul
+         (i32.add (local.get $len) (i32.and (local.get $len) (i32.const 1)))
+         (i32.const 4)))
 
    (func $deserialize_nat (param $s (ref eq)) (result (ref eq)) (result i32)
       (local $dat (ref $digits)) (local $len i32) (local $i i32)
@@ -1525,10 +1529,10 @@
          (array.get $digits (call $get_data (local.get $nat1)) (call $int (local.get $ofs1))))
       (local.set $y
          (array.get $digits (call $get_data (local.get $nat2)) (call $int (local.get $ofs2))))
-      ;; signed comparison, matching the JS runtime
+      ;; Digits are unsigned
       (ref.i31
-         (i32.sub (i32.gt_s (local.get $x) (local.get $y))
-                  (i32.lt_s (local.get $x) (local.get $y)))))
+         (i32.sub (i32.gt_u (local.get $x) (local.get $y))
+                  (i32.lt_u (local.get $x) (local.get $y)))))
    ))
 
    (@if $portable-int
