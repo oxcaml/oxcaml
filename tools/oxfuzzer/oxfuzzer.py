@@ -197,8 +197,6 @@ RUN_TIMEOUT_SEC = 10.0
 GENERATE_TIMEOUT_SEC = 1.0
 MAX_PROGRAM_BYTES = 1024 * 1024
 
-PROGRESS_INTERVAL_SEC = 30.0
-
 
 class Fatal(Exception):
     """An error that ends the run, such as a failed self-check. The message is
@@ -452,6 +450,14 @@ def stderr_is_tty() -> bool:
     return sys.stderr is not None and sys.stderr.isatty()
 
 
+# On a terminal the status is a single line updated in place (see
+# Stats.report). This ends that line, so that what is printed next starts on a
+# line of its own.
+def end_status_line() -> None:
+    if stderr_is_tty():
+        log()
+
+
 @dataclass
 class Stats:
     """Statistics of a fuzzer's run. Describes how many programs passed, were
@@ -465,7 +471,6 @@ class Stats:
     # comes before.
     fuzzing_start: float | None = None
     fuzzing_end: float | None = None
-    last_report: float | None = None
 
     @property
     def failed(self) -> int:
@@ -495,25 +500,16 @@ class Stats:
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         log(f"{timestamp} {self.summary()}")
 
-    # On a terminal the status is a single line updated in place. Otherwise
-    # a timestamped line is printed at most every PROGRESS_INTERVAL_SEC seconds.
+    # On a terminal the status is a single line updated in place. Elsewhere
+    # nothing is printed while cases pass: a log shows the saved failures as
+    # they are found and the totals at the end.
     def report(self) -> None:
         if stderr_is_tty():
             log(f"\r{self.summary()}", end="")
-            return
-        now = time.monotonic()
-        if (
-            self.last_report is not None
-            and now - self.last_report < PROGRESS_INTERVAL_SEC
-        ):
-            return
-        self.last_report = now
-        self.print_line()
 
     def final_report(self) -> None:
-        if stderr_is_tty():
-            log()
-        else:
+        end_status_line()
+        if not stderr_is_tty():
             self.print_line()
         log(f"oxfuzzer: {self.generation_timeouts} generations timed out")
 
@@ -700,7 +696,8 @@ def save_failure(
     # Replace a failure saved by an earlier run into the same output directory.
     shutil.rmtree(failure_dir, ignore_errors=True)
     staging_dir.rename(failure_dir)
-    log(f"\nseed {seed}: {reason}")
+    end_status_line()
+    log(f"seed {seed}: {reason}")
     return SavedFailure(failure_dir.name, reason)
 
 
@@ -942,11 +939,15 @@ class ShutdownSignals:
         if sys.stderr is None:
             return
         message = (
-            f"\noxfuzzer: {self.received.name} received, stopping "
+            f"oxfuzzer: {self.received.name} received, stopping "
             f"(press Ctrl-C again to exit immediately)\n"
         )
         try:
-            os.write(sys.stderr.fileno(), message.encode())
+            fd = sys.stderr.fileno()
+            if os.isatty(fd):
+                # End the status line (see end_status_line).
+                message = "\n" + message
+            os.write(fd, message.encode())
         except (OSError, ValueError):
             pass
 

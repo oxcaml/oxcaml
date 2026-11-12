@@ -25,6 +25,10 @@ from startup. As with `--max-failures`, in-flight cases finish, so the run may
 last longer than M minutes. When the run ends, oxfuzzer prints which limit
 stopped it.
 
+On a terminal, oxfuzzer shows the counts and the rate in a status line that it
+updates in place. Otherwise, as in a log, it prints a line for each failure it
+saves and the totals when the run ends, and nothing while cases pass.
+
 SIGINT (Ctrl-C), SIGTERM or SIGHUP (the terminal was closed) also stops the
 run, but cases in flight are killed rather than allowed to finish. Killed cases
 are dropped: they are neither counted nor saved. The run then finishes as if a
