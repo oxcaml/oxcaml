@@ -307,9 +307,17 @@ and condition handlers (cond : L.lambda) =
   | None -> (
     match cond with
     | Lprim (prim, args, _loc) -> condition_primitive handlers prim args ~cond
-    | Lifthenelse (a, b, c, _layout) ->
-      H.node ~tag:Tag.nested_if
-        [condition handlers a; condition handlers b; condition handlers c]
+    | Lifthenelse (a, b, c, _layout) -> (
+      (* As in [switch_for_if_then_else]: [if a then b else false] is [a && b]
+         and [if a then true else b] is [a || b]. *)
+      match bool_constant b, bool_constant c with
+      | _, Some false ->
+        H.node ~tag:Tag.and_ [condition handlers a; condition handlers b]
+      | Some true, _ ->
+        H.node ~tag:Tag.or_ [condition handlers a; condition handlers c]
+      | (None | Some false), (None | Some true) ->
+        H.node ~tag:Tag.nested_if
+          [condition handlers a; condition handlers b; condition handlers c])
     | Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Llet _
     | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lstaticcatch _ | Ltrywith _ | Lsequence _ | Lwhile _ | Lfor _ | Lassign _
