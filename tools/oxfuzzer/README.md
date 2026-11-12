@@ -25,6 +25,18 @@ from startup. As with `--max-failures`, in-flight cases finish, so the run may
 last longer than M minutes. When the run ends, oxfuzzer prints which limit
 stopped it.
 
+SIGINT (Ctrl-C), SIGTERM or SIGHUP (the terminal was closed) also stops the
+run, but cases in flight are killed rather than allowed to finish. Killed cases
+are dropped: they are neither counted nor saved. The run then finishes as if a
+limit had been reached: oxfuzzer prints the final statistics and `oxfuzzer:
+finished: interrupted (SIGINT)` (or `SIGTERM`, or `SIGHUP`), and exits with
+status 1 if any case failed and 0 otherwise. A signal during startup takes
+effect once the startup step in progress (such as snapshotting the build
+directory) is done. While oxfuzzer is stopping, a second SIGINT kills it
+immediately (use it if shutdown gets stuck); further SIGTERMs and SIGHUPs are
+ignored. Under `nohup`, which starts a program with SIGHUP ignored, oxfuzzer
+leaves it ignored and keeps running when the terminal is closed.
+
 By default the compilers, stdlib, runtime and `oxfuzzer.exe` are taken from the
 `_build` directory of the repository containing `oxfuzzer.py`. Use
 `--build-dir DIR` to point at the `_build` directory of another checkout, or

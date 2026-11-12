@@ -804,6 +804,100 @@ class FinishReason(enum.Enum):
     ITERATIONS = "all iterations done"
     TIME_LIMIT = "time limit reached"
     MAX_FAILURES = "failure limit reached"
+    SIGINT = "interrupted (SIGINT)"
+    SIGTERM = "interrupted (SIGTERM)"
+    SIGHUP = "interrupted (SIGHUP)"
+
+
+# The first of these signals stops the run: startup is cut short, or cases in
+# flight are killed and dropped (neither counted nor saved), and the run
+# finishes as if a limit had been reached. While oxfuzzer is stopping, SIGINT
+# kills it immediately (so a second Ctrl-C forces a stuck shutdown) and further
+# SIGTERMs and SIGHUPs are ignored (so a supervisor's repeated SIGTERMs don't
+# cut the shutdown short). SIGHUP is what closing the terminal sends: dying of
+# it would leave the cases running, as they are in sessions of their own.
+SHUTDOWN_SIGNALS = {
+    signal.SIGINT: FinishReason.SIGINT,
+    signal.SIGTERM: FinishReason.SIGTERM,
+    signal.SIGHUP: FinishReason.SIGHUP,
+}
+
+
+class Interrupted(Exception):
+    """Raised between startup steps once a shutdown signal has arrived."""
+
+
+class ShutdownSignals:
+    """Handles SHUTDOWN_SIGNALS from its creation on, replacing asyncio.run's
+    SIGINT handler (which would cancel the main task and raise
+    KeyboardInterrupt).
+
+    The handlers are installed with signal.signal, so they run in the middle of
+    whatever the main thread is doing. They therefore only record the first
+    signal and, once cancel_on_signal has been called, ask the event loop to
+    cancel the task given. The loop does that between task steps, so never in
+    the middle of check_case or save_failure. Startup is synchronous and comes
+    before cancel_on_signal: there, check raises Interrupted once a signal has
+    been recorded. So the startup step in progress finishes (each is quick or
+    bounded by a timeout) and the remaining steps are skipped, rather than an
+    exception being raised in the middle of arbitrary code."""
+
+    def __init__(self) -> None:
+        self.received: signal.Signals | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._task: asyncio.Task[FinishReason] | None = None
+        for signum in SHUTDOWN_SIGNALS:
+            # A SIGHUP that is ignored stays ignored, so that oxfuzzer keeps
+            # running under nohup.
+            if signum == signal.SIGHUP and signal.getsignal(signum) == signal.SIG_IGN:
+                continue
+            signal.signal(signum, self._on_signal)
+
+    @property
+    def finish_reason(self) -> FinishReason:
+        assert self.received is not None
+        return SHUTDOWN_SIGNALS[self.received]
+
+    def check(self) -> None:
+        if self.received is not None:
+            raise Interrupted
+
+    # Makes the first signal cancel task, which must not have started yet.
+    def cancel_on_signal(self, task: asyncio.Task[FinishReason]) -> None:
+        # The task last, as the handler takes it to mean that the loop is set.
+        self._loop = asyncio.get_running_loop()
+        self._task = task
+        # After that assignment, so that no signal is lost: the handler only
+        # recorded a signal that arrived before it, and cancels the task
+        # itself for one that arrives after it. For one in between, both
+        # cancel the task, which is harmless: as the task has not started,
+        # this cancellation ends it before the loop gets to the handler's.
+        if self.received is not None:
+            task.cancel()
+
+    def _on_signal(self, signum: int, _frame: object) -> None:
+        if self.received is not None:
+            # A repeated SIGTERM or SIGHUP; SIGINT no longer reaches here.
+            return
+        self.received = signal.Signals(signum)
+        # Only SIGINT escalates: a second Ctrl-C forces a stuck shutdown.
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        # Not task.cancel() here: see the class comment. call_soon_threadsafe
+        # also wakes the loop up. Once the task is done there is nothing to
+        # cancel, and the loop may be closed.
+        if self._loop is not None and self._task is not None and not self._task.done():
+            self._loop.call_soon_threadsafe(self._task.cancel)
+        # Last, so that nothing above depends on it, and with os.write: this
+        # may interrupt a print to stderr, which must not be re-entered, and a
+        # failed write (say, to a closed terminal) is ignored.
+        message = (
+            f"\noxfuzzer: {self.received.name} received, stopping "
+            f"(press Ctrl-C again to exit immediately)\n"
+        )
+        try:
+            os.write(sys.stderr.fileno(), message.encode())
+        except (OSError, ValueError):
+            pass
 
 
 @dataclass(frozen=True)
@@ -910,6 +1004,8 @@ def available_cpus() -> int:
 
 
 async def main() -> None:
+    # First, so that a signal from here on stops the run cleanly.
+    shutdown = ShutdownSignals()
     parser = argparse.ArgumentParser(
         prog="oxfuzzer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -926,7 +1022,15 @@ generation or execution times out or generated source exceeds
 {MAX_PROGRAM_BYTES} bytes. Failures are saved under
 <output>/<generator_seed>/. Discarded cases are not saved.
 
-Exit status is 1 if any case failed, 0 otherwise.""",
+SIGINT, SIGTERM or SIGHUP stops fuzzing like a limit, except that cases in
+flight are killed and dropped (neither counted nor saved). During startup, it
+takes effect when the step in progress (such as snapshotting the build
+directory) is done. While oxfuzzer is stopping, a second SIGINT kills it
+immediately; further SIGTERMs and SIGHUPs are ignored. A SIGHUP that is ignored
+when oxfuzzer starts, as under nohup, stays ignored.
+
+Exit status is 1 if any case failed, 0 otherwise, including when stopped by a
+signal.""",
         epilog="Before first use, run `make compiler` from the repository root.",
     )
     parser.add_argument(
@@ -1017,63 +1121,77 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         toolchain = Toolchain(args.install_dir.resolve(), installed=True)
     else:
         toolchain = Toolchain((args.build_dir or REPOSITORY_ROOT / "_build").resolve())
-    toolchain.check_dependencies()
-    revision = revision_line(toolchain)
     base_seed = (
         args.seed
         if args.seed is not None
         else str(random.SystemRandom().getrandbits(62))
     )
-    print(f"seed: {base_seed}", file=sys.stderr)
-    limits.print_summary()
-    print(
-        f"{'install' if toolchain.installed else 'build'} directory: "
-        f"{toolchain.root}",
-        file=sys.stderr,
-    )
-    print(revision, file=sys.stderr)
-    args.output.mkdir(parents=True, exist_ok=True)
-    if not toolchain.installed:
-        toolchain_dir = Path(
-            tempfile.mkdtemp(prefix="toolchain-", dir=args.output.resolve())
-        )
-        # CR-someday xclerc: Clean up the snapshot after finishing fuzzing if
-        # no failures were saved.
-        toolchain = toolchain.snapshot(toolchain_dir)
-        print(f"toolchain: {toolchain_dir}", file=sys.stderr)
-    run_info = run_metadata(base_seed, toolchain, revision)
     stats = Stats()
 
-    # Cancel task on SIGTERM (SIGINT already installed by default by asyncio.run).
-    main_task = asyncio.current_task()
-    assert main_task is not None
-    asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, main_task.cancel)
+    def finish(finished_because: FinishReason) -> None:
+        stats.final_report()
+        print(f"oxfuzzer: finished: {finished_because.value}", file=sys.stderr)
+        if stats.failed:
+            raise SystemExit(1)
 
-    with tempfile.TemporaryDirectory(prefix="oxfuzzer-") as run_dir:
-        try:
-            await self_check(Path(run_dir), toolchain)
-            finished_because = await fuzz(
-                toolchain=toolchain,
-                run_dir=Path(run_dir),
-                limits=limits,
-                jobs=args.jobs or available_cpus(),
-                # CR-soon xclerc: We should instead create a temporary
-                # directory inside of args.output, so that there are no
-                # collisions on rerunning a command with the same output
-                # directory.
-                output_dir=args.output,
-                base_seed=base_seed,
-                run_info=run_info,
-                stats=stats,
+    try:
+        # A signal during startup stops the run once the step in progress is
+        # done (see ShutdownSignals).
+        toolchain.check_dependencies()
+        shutdown.check()
+        revision = revision_line(toolchain)
+        shutdown.check()
+        print(f"seed: {base_seed}", file=sys.stderr)
+        limits.print_summary()
+        print(
+            f"{'install' if toolchain.installed else 'build'} directory: "
+            f"{toolchain.root}",
+            file=sys.stderr,
+        )
+        print(revision, file=sys.stderr)
+        args.output.mkdir(parents=True, exist_ok=True)
+        if not toolchain.installed:
+            toolchain_dir = Path(
+                tempfile.mkdtemp(prefix="toolchain-", dir=args.output.resolve())
             )
-        except asyncio.CancelledError:
-            stats.final_report()
-            print("oxfuzzer: interrupted", file=sys.stderr)
-            raise SystemExit(130)
-    stats.final_report()
-    print(f"oxfuzzer: finished: {finished_because.value}", file=sys.stderr)
-    if stats.failed:
-        raise SystemExit(1)
+            # CR-someday xclerc: Clean up the snapshot after finishing fuzzing
+            # if no failures were saved.
+            toolchain = toolchain.snapshot(toolchain_dir)
+            print(f"toolchain: {toolchain_dir}", file=sys.stderr)
+            shutdown.check()
+        run_info = run_metadata(base_seed, toolchain, revision)
+        shutdown.check()
+
+        with tempfile.TemporaryDirectory(prefix="oxfuzzer-") as run_dir:
+
+            async def self_check_and_fuzz() -> FinishReason:
+                await self_check(Path(run_dir), toolchain)
+                return await fuzz(
+                    toolchain=toolchain,
+                    run_dir=Path(run_dir),
+                    limits=limits,
+                    jobs=args.jobs or available_cpus(),
+                    # CR-soon xclerc: We should instead create a temporary
+                    # directory inside of args.output, so that there are no
+                    # collisions on rerunning a command with the same output
+                    # directory.
+                    output_dir=args.output,
+                    base_seed=base_seed,
+                    run_info=run_info,
+                    stats=stats,
+                )
+
+            work = asyncio.create_task(self_check_and_fuzz())
+            shutdown.cancel_on_signal(work)
+            try:
+                finished_because = await work
+            except asyncio.CancelledError:
+                if shutdown.received is None:
+                    raise
+                finished_because = shutdown.finish_reason
+    except Interrupted:
+        finished_because = shutdown.finish_reason
+    finish(finished_because)
 
 
 if __name__ == "__main__":
