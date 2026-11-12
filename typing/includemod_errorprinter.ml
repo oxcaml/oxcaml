@@ -1369,7 +1369,7 @@ let register () =
   Location.register_error_of_exn
     (function
       | Includemod.Error err -> Some (report_error_doc err)
-      | Includemod.Apply_error {loc; env; app_name; mty_f; args} ->
+      | Includemod.Apply_error.In_context {loc; env; app_name; mty_f; args} ->
           Some (Printtyp.wrap_printing_env env ~error:true (fun () ->
               report_apply_error_doc ~loc env (app_name, mty_f, args))
             )
