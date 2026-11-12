@@ -5,10 +5,16 @@
      native with dump-reaper;
      check-fexpr-dump;
    }{
+     jsir;
+   }{
      flags += " -X reaper-lambda-lifting=1";
-     fexpr_reference_suffix = "lambda-lifting.reference";
-     native with dump-reaper;
-     check-fexpr-dump;
+     {
+       fexpr_reference_suffix = "lambda-lifting.reference";
+       native with dump-reaper;
+       check-fexpr-dump;
+     }{
+       jsir;
+     }
    }
  *)
 

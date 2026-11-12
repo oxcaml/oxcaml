@@ -37,7 +37,8 @@ type exn_handler =
 type code_id =
   { addr : Jsir.Addr.t;
     params : Jsir.Var.t list;
-    closure : Jsir.Var.t
+    closure : Jsir.Var.t;
+    closure_bound_with_code : bool
   }
 
 type t =
@@ -125,8 +126,12 @@ let add_symbol t ~res symbol jvar =
   let t = add_symbol_without_registering t symbol jvar in
   t, register_symbol' ~res symbol jvar
 
-let add_code_id t code_id ~addr ~params ~closure =
-  let code_ids = Code_id.Map.add code_id { addr; params; closure } t.code_ids in
+let add_code_id t code_id ~addr ~params ~closure ~closure_bound_with_code =
+  let code_ids =
+    Code_id.Map.add code_id
+      { addr; params; closure; closure_bound_with_code }
+      t.code_ids
+  in
   { t with code_ids }
 
 let add_function_slot t fslot jvar =
@@ -214,7 +219,12 @@ let register_symbol_exn t ~res symbol =
      want to load external symbols *)
   register_symbol' ~res symbol (Symbol.Map.find symbol t.symbols)
 
-let get_code_id_exn t code_id = Code_id.Map.find code_id t.code_ids
+let get_code_id_exn t code_id =
+  match Code_id.Map.find_opt code_id t.code_ids with
+  | Some code_id -> code_id
+  | None ->
+    Misc.fatal_errorf "Code ID %a not found in the environment" Code_id.print
+      code_id
 
 let get_function_slot t fslot =
   Function_slot.Map.find_opt fslot t.function_slots

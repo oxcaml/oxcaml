@@ -38,9 +38,10 @@ val block_like :
   Static_const.t ->
   To_jsir_env.t * To_jsir_result.t
 
-(** Prepare a static block of code to be translated: create a new block and
-    parameter variables and add them to the environment, and also add any value
-    or function slots that are used into the environment. *)
+(** Prepare a static block of code to be translated: reserve its address and
+    parameter variables, and add them and any used value or function slots to
+    the environment. If the code does not depend on its closure, also bind its
+    shared closure in the enclosing block. *)
 val prepare_code :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
