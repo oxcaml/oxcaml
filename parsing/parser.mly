@@ -1048,7 +1048,7 @@ let maybe_pmod_constraint mode expr =
 %token HASHFALSE              "#false"
 %token HASHTRUE               "#true"
 %token IF                     "if"
-%token IMPLIES                "===>"
+%token IMPLIES                "implies_"
 %token IN                     "in"
 %token INCLUDE                "include"
 %token <string> INFIXOP0      "!="   (* just an example *)
@@ -4242,8 +4242,8 @@ jkind_decl:
     }
 ;
 
-(* Laws: [law_? name p1 ... pn : A1 ===> ... ===> Ak ===> C], where each
-   parameter is [x] or [(x : T)] *)
+(* Laws: [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C],
+   where each parameter is [x] or [(x : T)] *)
 
 law_declaration:
   LAW QUESTION
@@ -4270,7 +4270,7 @@ law_param:
       { (name, Some ty) }
 ;
 
-(* [===>] is not an operator: it only separates the clauses of a law. *)
+(* [implies_] only separates the clauses of a law. *)
 law_body:
   | e = expr
       { ([], e) }

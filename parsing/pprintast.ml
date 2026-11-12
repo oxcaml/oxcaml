@@ -1599,7 +1599,7 @@ and law_def ctxt f ld =
     | Some ty -> pp f "@;(%a :@ %a)" ident_of_name name.txt (core_type ctxt) ty
   in
   let clause = law_clause ctxt in
-  let assumption f e = pp f "%a ===>@ " clause e in
+  let assumption f e = pp f "%a implies_@ " clause e in
   pp f "@[<2>law_?@ %a%a :@ %a%a@]%a"
     ident_of_name ld.plaw_name.txt
     (list law_param ~sep:"") ld.plaw_params

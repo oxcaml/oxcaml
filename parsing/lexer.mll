@@ -75,6 +75,7 @@ let all_keywords =
     "functor", FUNCTOR, always;
     "global_", GLOBAL, oxcaml;
     "if", IF, always;
+    "implies_", IMPLIES, oxcaml;
     "in", IN, always;
     "include", INCLUDE, always;
     "inherit", INHERIT, v1_0;
@@ -911,7 +912,6 @@ rule token = parse
     }
   | "<-" { LESSMINUS }
   | "="  { EQUAL }
-  | "===>" { IMPLIES }
   | "["  { LBRACKET }
   | "[|" { LBRACKETBAR }
   | "[:" { LBRACKETCOLON }

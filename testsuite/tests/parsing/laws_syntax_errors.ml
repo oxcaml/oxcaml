@@ -2,18 +2,14 @@
  toplevel;
 *)
 
-(* [===>] is reserved for laws. *)
-
-let ( ===> ) a b = not a || b;;
-
-(* [===>] only separates the clauses of a law: it cannot appear inside an
+(* [implies_] only separates the clauses of a law: it cannot appear inside an
    expression. *)
 
-law_? nested (a : bool) (b : bool) : (a ===> b);;
+law_? nested (a : bool) (b : bool) : (a implies_ b);;
 
 (* Clauses are [expr]s, not sequences. *)
 
-law_? seq (n : int) (a : bool) : ignore n; a ===> a;;
+law_? seq (n : int) (a : bool) : ignore n; a implies_ a;;
 
 (* The name of a law is a lowercase identifier and cannot be omitted. *)
 
@@ -25,7 +21,7 @@ law_? Foo : true;;
 
 law_? foo true;;
 
-law_? foo : a ===> ;;
+law_? foo : a implies_ ;;
 
 (* Parameters are variables, optionally with a type annotation. *)
 

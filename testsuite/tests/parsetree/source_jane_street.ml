@@ -1932,22 +1932,22 @@ Line 1, characters 0-56:
 Error: Laws are not supported yet.
 |}]
 
-law_? sum_pos x (y : int) : x > 0 ===> y > 0 ===> x + y > 0
+law_? sum_pos x (y : int) : x > 0 implies_ y > 0 implies_ x + y > 0
 [%%expect{|
-Line 1, characters 0-59:
-1 | law_? sum_pos x (y : int) : x > 0 ===> y > 0 ===> x + y > 0
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-67:
+1 | law_? sum_pos x (y : int) : x > 0 implies_ y > 0 implies_ x + y > 0
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Laws are not supported yet.
 |}]
 
 module type S = sig
   val f : int -> int
-  law_? f_id (x : int) : x >= 0 ===> f x = x [@@test.attr]
+  law_? f_id (x : int) : x >= 0 implies_ f x = x [@@test.attr]
 end
 [%%expect{|
-Line 3, characters 2-58:
-3 |   law_? f_id (x : int) : x >= 0 ===> f x = x [@@test.attr]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 3, characters 2-62:
+3 |   law_? f_id (x : int) : x >= 0 implies_ f x = x [@@test.attr]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Laws are not supported yet.
 |}]
 
@@ -2005,13 +2005,13 @@ Error: Laws are not supported yet.
 
 (* Any number of assumptions. *)
 
-law_? one (x : int) : x > 0 ===> x <> 0
+law_? one (x : int) : x > 0 implies_ x <> 0
 law_? three (x : int) (y : int) (z : int) :
-  x > 0 ===> y > 0 ===> z > 0 ===> x * y * z > 0
+  x > 0 implies_ y > 0 implies_ z > 0 implies_ x * y * z > 0
 [%%expect{|
-Line 1, characters 0-39:
-1 | law_? one (x : int) : x > 0 ===> x <> 0
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-43:
+1 | law_? one (x : int) : x > 0 implies_ x <> 0
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Laws are not supported yet.
 |}]
 
@@ -2033,15 +2033,15 @@ Error: Laws are not supported yet.
    same. *)
 
 law_? clauses (a : bool) (n : int) :
-  (let b = a in b) ===> (if a then n else 0) >= 0 ===>
-  (match n with 0 -> true | _ -> a) ===> (ignore n; a) ===>
-  (fun b -> b) a ===> (try a with _ -> false)
+  (let b = a in b) implies_ (if a then n else 0) >= 0 implies_
+  (match n with 0 -> true | _ -> a) implies_ (ignore n; a) implies_
+  (fun b -> b) a implies_ (try a with _ -> false)
 [%%expect{|
-Lines 1-4, characters 0-45:
+Lines 1-4, characters 0-49:
 1 | law_? clauses (a : bool) (n : int) :
-2 |   (let b = a in b) ===> (if a then n else 0) >= 0 ===>
-3 |   (match n with 0 -> true | _ -> a) ===> (ignore n; a) ===>
-4 |   (fun b -> b) a ===> (try a with _ -> false)
+2 |   (let b = a in b) implies_ (if a then n else 0) >= 0 implies_
+3 |   (match n with 0 -> true | _ -> a) implies_ (ignore n; a) implies_
+4 |   (fun b -> b) a implies_ (try a with _ -> false)
 Error: Laws are not supported yet.
 |}]
 
