@@ -127,10 +127,16 @@
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
    ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
+ ; FIXME dallsopp: comprmarsh_flags.sexp contains -cclib flags which are for
+ ;                 ocamlcommon.cmxa only. Dune doesn't at the moment provide the
+ ;                 ability for library flags to be native-only, so instead these
+ ;                 are included with every invocation of ocamlopt, relying
+ ;                 instead on the fact the compiler ignores them for anything
+ ;                 other than linking.
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (library_flags
-  (:include comprmarsh_flags.sexp))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   (:include comprmarsh_flags.sexp)))
  (preprocess
   (per_module
    ((action
