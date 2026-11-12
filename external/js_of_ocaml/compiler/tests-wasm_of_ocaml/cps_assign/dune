@@ -7,11 +7,11 @@
  (with-native-effects)
  (with-portable-int)
  (wasi-with-native-effects)
+ ; Downstream: the OxCaml build already passes [--effects cps] to
+ ; wasm_of_ocaml in its main context (see Makefile.common-ox), and the option
+ ; cannot be repeated.
  (_
   (js_of_ocaml
-   (flags
-    (:standard --effects cps)))
-  (wasm_of_ocaml
    (flags
     (:standard --effects cps)))))
 
