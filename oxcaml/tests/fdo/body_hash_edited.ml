@@ -20,7 +20,7 @@ let[@inline never] keep_attributes x = apply next x
 
 let[@inline never] keep_closure_body n = apply (fun x -> (x * n) + 1) n
 
-let[@inline never] keep_arguments x = apply2 next x 1
+let[@inline never] keep_arguments x = apply next (x * 2)
 
 let[@inline never] keep_and x = if x > 0 then apply is_pos x else false
 
@@ -38,3 +38,5 @@ let[@inline never] change_array_kind (a : string array) b = blit a 0 b 0 1
 let[@inline never] change_arm x = if x > 0 then x else apply next x
 
 let[@inline never] change_raise x = if x > 0 then x + 1 else x
+
+let[@inline never] change_arity x = apply2 next x 1
