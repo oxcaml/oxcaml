@@ -151,9 +151,9 @@ let entry_annotation t ~specialization_map code_id entry_annotation =
    specific case for now. We should see if this is worth it, or figure out a
    better solution. *)
 
-(* CR-someday yusumez: A region entered by an exception (a handler) has no edge
-   for its preserved counters. We'd need to have annotations on exceptional
-   edges for that. *)
+(* CR yusumez: A region entered by an exception (a handler) has no edge for its
+   preserved counters. We'd need to have annotations on exceptional edges for
+   that. *)
 
 (* CR-someday yusumez: The counters preserved in the unit toplevel outside of
    continuation handlers are dropped, as it has no region. *)
