@@ -138,15 +138,20 @@ end
 
 module Exn : sig
   type t =
-    { id : int;
-      payload : Ty.t option  (** Must be a value type (boxed). *)
-    }
+    | Division_by_zero
+    | Generated of
+        { id : int;
+          payload : Ty.t option  (** Must be a value type (boxed). *)
+        }
 
   val equal : t -> t -> bool
 
   val name : t -> string
 
-  val to_code : t -> Parsetree.structure_item
+  val payload : t -> Ty.t option
+
+  (** Built-in exceptions need no declaration. *)
+  val to_code : t -> Parsetree.structure_item option
 end
 
 module Handler : sig
