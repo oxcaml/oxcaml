@@ -85,6 +85,7 @@
 ; Body hashes ([Fdo_body_hash]). body_hash_edited.ml changes:
 ; - the [keep_*] functions in ways that must keep their hashes;
 ; - the [change_*] functions in ways that must change them.
+; Functions with the same hash in both must have the same counters.
 
 (rule
  (targets body_hash.output.corrected)
@@ -115,11 +116,17 @@
     body_hash_edited.ml)
    (with-stdout-to
     body_hash.output.corrected
-    (run
-     ./fdo_annotations.exe
-     compare-entries
-     body_hash.raw.fl
-     body_hash.edited.raw.fl)))))
+    (progn
+     (run
+      ./fdo_annotations.exe
+      compare-entries
+      body_hash.raw.fl
+      body_hash.edited.raw.fl)
+     (run
+      ./fdo_annotations.exe
+      compare-counters
+      body_hash.raw.fl
+      body_hash.edited.raw.fl))))))
 
 (rule
  (alias runtest)
@@ -128,3 +135,35 @@
  (deps body_hash.output body_hash.output.corrected)
  (action
   (diff body_hash.output body_hash.output.corrected)))
+
+; The counters attached by [Fdo_instrumentation] during the translation from
+; Lambda: edges of switches, interior and module-level calls, in nested
+; functions, functors and local modules.
+
+(rule
+ (targets instrumentation.output.corrected)
+ (deps instrumentation.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    raw
+    -color
+    never
+    instrumentation.ml)
+   (with-stdout-to
+    instrumentation.output.corrected
+    (run ./fdo_annotations.exe list instrumentation.raw.fl)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps instrumentation.output instrumentation.output.corrected)
+ (action
+  (diff instrumentation.output instrumentation.output.corrected)))

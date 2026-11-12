@@ -1,0 +1,72 @@
+instrumentation.raw.fl:
+  entry: "Instrumentation.f":0 body_hash:00000000
+  entry: "Instrumentation.branches":0 body_hash:6fcbb642
+  branch: "Instrumentation.branches":0:6fcbb642:0:branch(1)
+  branch: "Instrumentation.branches":0:6fcbb642:0:branch(2)
+  call: "Instrumentation.branches":0:6fcbb642:1:call
+  entry: "Instrumentation.bounds_checked":0 body_hash:00000000
+  entry: "Instrumentation.matches":0 body_hash:3ae9a290
+  branch: "Instrumentation.matches":0:3ae9a290:0:branch(1)
+  branch: "Instrumentation.matches":0:3ae9a290:0:branch(2)
+  branch: "Instrumentation.matches":0:3ae9a290:1:branch(1)
+  branch: "Instrumentation.matches":0:3ae9a290:1:branch(2)
+  call: "Instrumentation.matches":0:3ae9a290:2:call
+  call: "Instrumentation.matches":0:3ae9a290:3:call
+  entry: "Instrumentation.variants":0 body_hash:70da295e
+  branch: "Instrumentation.variants":0:70da295e:0:branch(1)
+  branch: "Instrumentation.variants":0:70da295e:0:branch(2)
+  branch: "Instrumentation.variants":0:70da295e:0:branch(3)
+  branch: "Instrumentation.variants":0:70da295e:0:branch(4)
+  branch: "Instrumentation.variants":0:70da295e:0:branch(5)
+  branch: "Instrumentation.variants":0:70da295e:0:branch(6)
+  call: "Instrumentation.variants":0:70da295e:1:call
+  call: "Instrumentation.variants":0:70da295e:2:call
+  entry: "Instrumentation.defaults":0 body_hash:ac67784e
+  branch: "Instrumentation.defaults":0:ac67784e:0:branch(0)
+  branch: "Instrumentation.defaults":0:ac67784e:0:branch(1)
+  branch: "Instrumentation.defaults":0:ac67784e:0:branch(0)
+  branch: "Instrumentation.defaults":0:ac67784e:0:branch(4)
+  call: "Instrumentation.defaults":0:ac67784e:1:call
+  call: "Instrumentation.defaults":0:ac67784e:2:call
+  entry: "Instrumentation.single_constant":0 body_hash:b23f8aee
+  branch: "Instrumentation.single_constant":0:b23f8aee:0:branch(1)
+  branch: "Instrumentation.single_constant":0:b23f8aee:0:branch(2)
+  branch: "Instrumentation.single_constant":0:b23f8aee:0:branch(3)
+  call: "Instrumentation.single_constant":0:b23f8aee:1:call
+  call: "Instrumentation.single_constant":0:b23f8aee:2:call
+  entry: "Instrumentation.all_constants_to_default":0 body_hash:fbaa0236
+  branch: "Instrumentation.all_constants_to_default":0:fbaa0236:0:branch(0)
+  branch: "Instrumentation.all_constants_to_default":0:fbaa0236:0:branch(0)
+  branch: "Instrumentation.all_constants_to_default":0:fbaa0236:0:branch(4)
+  call: "Instrumentation.all_constants_to_default":0:fbaa0236:1:call
+  entry: "Instrumentation.apply":0 body_hash:3371523c
+  call: "Instrumentation.apply":0:3371523c:0:call
+  entry: "Instrumentation.nested.g":0 body_hash:6fcbb642
+  branch: "Instrumentation.nested.g":0:6fcbb642:0:branch(1)
+  branch: "Instrumentation.nested.g":0:6fcbb642:0:branch(2)
+  call: "Instrumentation.nested.g":0:6fcbb642:1:call
+  entry: "Instrumentation.nested.(fun)@z,g":0 body_hash:063b8036
+  call: "Instrumentation.nested.(fun)@z,g":0:063b8036:1:call
+  call: "Instrumentation.nested.(fun)@z,g":0:063b8036:0:call
+  entry: "Instrumentation.nested":0 body_hash:4772748b
+  call: "Instrumentation.nested":0:4772748b:0:call
+  entry: "Instrumentation.add":0 body_hash:00000000
+  call: "Instrumentation.partial":0:3371523c:0:call
+  entry: "Instrumentation.partial":0 body_hash:3371523c
+  entry: "Instrumentation.over":0 body_hash:60bf6920
+  call: "Instrumentation.over":0:60bf6920:0:call
+  entry: "Instrumentation.F":0 body_hash:c5866f6e
+  call: "Instrumentation.F":0:c5866f6e:0:call
+  call: "Instrumentation.F":0:module("Instrumentation.F":0):0:call
+  entry: "Instrumentation.local":0 body_hash:036dcc88
+  call: "Instrumentation.local":0:module("Instrumentation.local.L":0):0:call
+  call: "Instrumentation.local":0:036dcc88:0:call
+  call: "Instrumentation":0:dfb81a8d:0:call
+  call: "Instrumentation":0:dfb81a8d:1:call
+  call: "Instrumentation":0:dfb81a8d:2:call
+  call: "Instrumentation":0:dfb81a8d:3:call
+  call: "Instrumentation":0:module("Instrumentation.M":0):0:call
+  call: "Instrumentation":0:module("Instrumentation.N":0):1:call
+  call: "Instrumentation":0:module("Instrumentation.N":0):0:call
+  call: "Instrumentation":0:dfb81a8d:4:call
+  call: "Instrumentation":0:dfb81a8d:5:call
