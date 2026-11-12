@@ -155,7 +155,7 @@ end
 module Ty = struct
   type t =
     | Number of NumberTy.t
-    | Array of NumberTy.t * int list
+    | Array of t * int list
     | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
@@ -187,8 +187,7 @@ module Ty = struct
   let rec equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
-    | Array (l, ls), Array (r, rs) ->
-      NumberTy.equal l r && List.equal Int.equal ls rs
+    | Array (l, ls), Array (r, rs) -> equal l r && List.equal Int.equal ls rs
     | Unboxed_tuple l, Unboxed_tuple r -> List.equal equal l r
     | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
     | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
@@ -213,10 +212,10 @@ module Ty = struct
 
   let rec to_code = function
     | Number nty -> NumberTy.to_code nty
-    | Array (nty, dimensions) ->
+    | Array (element_ty, dimensions) ->
       List.fold_left
         (fun ty _ -> Ast_helper.Typ.constr (lid "array") [ty])
-        (NumberTy.to_code nty) dimensions
+        (to_code element_ty) dimensions
     | Unboxed_tuple components ->
       Ast_helper.Typ.unboxed_tuple
         (List.map (fun ty -> None, to_code ty) components)
@@ -466,6 +465,7 @@ module Expr = struct
      mitigate, we should make [t] private and add smart constructors. *)
   type t =
     | Const of Number.t
+    | Bool_const of bool
     | Assert_false
     | Let of
         { name : Name.t;
@@ -593,6 +593,7 @@ module Expr = struct
 
   let rec to_code : t -> Parsetree.expression = function
     | Const n -> Number.to_code n
+    | Bool_const b -> Ast_helper.Exp.construct (lid (Bool.to_string b)) None
     | Assert_false ->
       Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None)
     | Let { name; expr; body } ->

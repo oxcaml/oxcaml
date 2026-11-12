@@ -66,6 +66,8 @@ let mutable_field_probability = 5_000
 
 let array_probability = 2_500
 
+let bool_probability = 2_000
+
 let array_literal_probability = 5_000
 
 let bounded_index_probability = 7_500
