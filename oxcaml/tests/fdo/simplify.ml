@@ -56,7 +56,8 @@ let[@inline never] absorbed c y =
 (* In a loop, the edges into the header are the entry and the back edge. The
    back edge is rebuilt before the header's switch is folded (into a table
    lookup, or into a single jump when all its arms do the same), so only the
-   entry gets the counters of the arms. *)
+   entry gets the counters of the arms (see the end of
+   fdo_region_counters.ml). *)
 let[@inline never] loop_table n v =
   let rec go i acc =
     let t = match v with A -> 1 | B -> 5 | C -> 2 | D -> 8 in
