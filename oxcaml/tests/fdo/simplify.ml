@@ -71,10 +71,10 @@ let[@inline never] loop_same n v =
   in
   go 0 0
 
-(* A partial application in an inlined body becomes the allocation of a
-   wrapper, which keeps its counter on the edge into the code it is in. The
-   call of the wrapper takes the counter of the application of the wrapper where
-   the wrapper is inlined, and has none where it is not. *)
+(* A partial application in an inlined body becomes a wrapper, whose call keeps
+   the counter of the partial application. Where the wrapper is inlined, that
+   counter gets the context of the application of the wrapper as well (see the
+   CR in [Simplify_apply_expr.simplify_direct_partial_application]). *)
 let[@inline never] add3 a b c = a + b + c
 
 let[@inline always] apply_partial k x =
