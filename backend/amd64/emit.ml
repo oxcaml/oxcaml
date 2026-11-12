@@ -679,6 +679,7 @@ let emit_call_gc gc =
 type local_realloc_call =
   { lr_lbl : L.t;
     lr_return_lbl : L.t;
+    lr_res : X86_ast.arg;
     lr_dbg : Debuginfo.t;
     lr_save_simd : Regs.Save_simd_regs.t
   }
@@ -689,6 +690,9 @@ let emit_local_realloc lr =
   D.define_label lr.lr_lbl;
   emit_debug_info lr.lr_dbg;
   emit_call (global_gc_sym "caml_call_local_realloc" ~simd:lr.lr_save_simd);
+  (* A PLT stub may clobber the result before the runtime saves registers. The
+     runtime preserves local_sp, so reload the allocation offset. *)
+  I.mov (domain_field Domainstate.Domain_local_sp) lr.lr_res;
   I.jmp (emit_asm_label_arg lr.lr_return_lbl)
 
 (* Record calls to caml_ml_array_bound_error and caml_ml_array_align_error. In
@@ -2411,6 +2415,7 @@ let emit_instr ~first ~last ~fallthrough i =
       := { lr_lbl = lbl_call;
            lr_dbg = i.dbg;
            lr_return_lbl = lbl_after_alloc;
+           lr_res = r;
            lr_save_simd = must_save_simd_regs i.live
          }
          :: !local_realloc_sites
