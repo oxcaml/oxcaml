@@ -174,19 +174,22 @@ static bool has_pieces(intnat *tbl)
   return tbl[0] == FRAMETABLE_SECTIONS_TAG;
 }
 
-enum header_field { PIECES_START, PIECES_STOP, COUNTS_START, COUNTS_STOP };
-
-/* The address that a -frametable-sections header field points to */
-static const unsigned char *header_rel(intnat *tbl, enum header_field field)
+/* [tbl] must have pieces */
+static const caml_frametable_sections_header *pieces_header(intnat *tbl)
 {
-  const unsigned char *p =
-    (const unsigned char *)(tbl + 1) + field * sizeof(int32_t);
-  return p + caml_read_unaligned_int32(p);
+  CAMLassert(has_pieces(tbl));
+  return (const caml_frametable_sections_header *)tbl;
+}
+
+/* The address that a header's [_rel] field points to */
+static const unsigned char *rel_target(const int32_t *field)
+{
+  return (const unsigned char *)field + *field;
 }
 
 static const unsigned char *pieces_start(intnat *tbl)
 {
-  return header_rel(tbl, PIECES_START);
+  return rel_target(&pieces_header(tbl)->pieces_start_rel);
 }
 
 /* Whether [cell]'s descriptors are its own to enter into the hashtable. The
@@ -206,7 +209,7 @@ static void frametable_iter_start(frametable_iter *it,
   it->has_pieces = has_pieces(tbl);
   if (it->has_pieces) {
     it->next = pieces_start(tbl);
-    it->end_of_pieces = header_rel(tbl, PIECES_STOP);
+    it->end_of_pieces = rel_target(&pieces_header(tbl)->pieces_stop_rel);
   } else {
     it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
     it->next = (const unsigned char *)(tbl + 1);
@@ -260,8 +263,9 @@ static intnat count_descriptors(caml_frametable_list *list) {
     if (!owns_descriptors(cur)) continue;
     intnat *tbl = cur->frametable;
     if (has_pieces(tbl)) {
-      const intnat *count = (const intnat *)header_rel(tbl, COUNTS_START);
-      const intnat *end = (const intnat *)header_rel(tbl, COUNTS_STOP);
+      const caml_frametable_sections_header *h = pieces_header(tbl);
+      const intnat *count = (const intnat *)rel_target(&h->counts_start_rel);
+      const intnat *end = (const intnat *)rel_target(&h->counts_stop_rel);
       for (; count < end; count++) num_descr += *count;
     } else {
       num_descr += (intnat)caml_read_unaligned_uintnat(tbl);

@@ -63,13 +63,8 @@
  *
  * A unit's frametable is normally a native-word descriptor count
  * followed by the descriptors. A unit compiled with
- * -frametable-sections instead has a header:
- *
- *   intnat  tag               = FRAMETABLE_SECTIONS_TAG
- *   int32   pieces_start_rel  offset from this field to the pieces section
- *   int32   pieces_stop_rel   offset from this field to its end
- *   int32   counts_start_rel  offset from this field to the counts section
- *   int32   counts_stop_rel   offset from this field to its end
+ * -frametable-sections instead has a header, a
+ * [caml_frametable_sections_header] (see below).
  *
  * Each function's descriptors form a "piece" in a section linked to
  * the function's code (SHF_LINK_ORDER), so the linker keeps the piece
@@ -175,6 +170,16 @@ typedef unsigned char frame_descr;
 
 /* A count is never negative */
 #define FRAMETABLE_SECTIONS_TAG ((intnat)-1)
+
+/* The frametable of a unit compiled with -frametable-sections. Each [_rel]
+   field holds the offset from the field itself to its target. */
+typedef struct {
+  intnat tag;               /* FRAMETABLE_SECTIONS_TAG */
+  int32_t pieces_start_rel; /* the pieces section */
+  int32_t pieces_stop_rel;  /* its end */
+  int32_t counts_start_rel; /* the counts section */
+  int32_t counts_stop_rel;  /* its end */
+} caml_frametable_sections_header;
 
 /* The eight most common GC-root registers. The compiler
  * (frame_hot_regs in backend/<arch>/arch.ml) and the runtime must
