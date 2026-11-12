@@ -203,6 +203,43 @@
  (action
   (diff simplify.output simplify.output.corrected)))
 
+; The same at -O3 with the reaper, after the reaper (in a directory of its own,
+; so that the module keeps its name).
+
+(rule
+ (targets simplify_o3_reaper.output.corrected)
+ (deps simplify.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run mkdir -p o3_reaper)
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -O3
+    -flambda2-reaper
+    -fdo-counters
+    -dflambda-heavy-invariants
+    -dfexpr-annot-after
+    reaper
+    -color
+    never
+    -o
+    o3_reaper/simplify.cmx
+    simplify.ml)
+   (with-stdout-to
+    simplify_o3_reaper.output.corrected
+    (run ./fdo_annotations.exe list o3_reaper/simplify.reaper.fl)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps simplify_o3_reaper.output simplify_o3_reaper.output.corrected)
+ (action
+  (diff simplify_o3_reaper.output simplify_o3_reaper.output.corrected)))
+
 ; Continuation specialization, which needs match-in-match.
 
 (rule
