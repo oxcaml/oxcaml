@@ -3784,18 +3784,18 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       as mty_functor ->
       let mm_param = with_locality_as_regionality mm_param in
       let mm_res = with_locality_as_regionality mm_res in
-      let apply_error () =
+      let apply_error () : Includemod.Apply_error.t =
         let args = List.map simplify_app_summary args in
         let mty_f = md_f.mod_type in
         let app_name = match sfunct.pmod_desc with
           | Pmod_ident l -> Includemod.Named_leftmost_functor l.txt
           | _ -> Includemod.Anonymous_functor
         in
-        Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args}
+        { loc=apply_loc;env;app_name;mty_f;args }
       in
       begin match app_view with
       | { arg = None; loc = app_loc; attributes = app_attributes; _ } ->
-          Typing_recovery.log_or_raise (apply_error ());
+          Includemod.Apply_error.log_or_raise (apply_error ());
           { mod_desc =
               Tmod_apply_unit
                 (funct,
@@ -3815,7 +3815,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
               arg.mod_type mty_param
               ~modes:(Specific (arg.mod_mode, mm_param))
         with Includemod.Error _ ->
-          Typing_recovery.log_or_raise (apply_error ());
+          Includemod.Apply_error.log_or_raise (apply_error ());
           Tcoerce_none
       in
       let mty_appl =
@@ -3921,8 +3921,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         | Pmod_ident l -> Includemod.Named_leftmost_functor l.txt
         | _ -> Includemod.Anonymous_functor
       in
-      Typing_recovery.log_and_raise
-        (Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args})
+      Includemod.Apply_error.log_and_raise
+        { loc=apply_loc;env;app_name;mty_f;args }
 
 and type_open_decl ?used_slot ?toplevel ~funct_body names env sod =
   Builtin_attributes.warning_scope sod.popen_attributes
