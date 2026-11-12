@@ -102,13 +102,10 @@ let transl_type_extension ~scopes env rootpath tyext body =
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
   | Module_mixed (shape, _) ->
-    let mpb = Mixed_product_bytes.count (Product shape) in
-    (* All-value/void shapes compile to uniform blocks, so the scannable
-       prefix length limit doesn't apply. *)
-    if not (Mixed_product_bytes.all_value mpb)
+    (* Shapes containing splices are checked after static evaluation *)
+    if not (Lambda.mixed_block_shape_has_splices shape)
     then
-      Typedecl.assert_mixed_product_support loc Module
-        ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb);
+      Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
     Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a coercion *)
@@ -697,12 +694,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
       ~body
   in
   match staticity with
-  | Static ->
-    let tmpl_func, tmpl_env =
-      Lambda.extract_free_var_env lfun
-        ~layout_of_ident:(Typeopt.layout_of_ident mexp.mod_env)
-    in
-    Ltemplate { tmpl_func; tmpl_env }
+  | Static -> Ltemplate lfun
   | Dynamic -> Lfunction lfun
 
 (* Compile a module expression *)
@@ -825,7 +817,7 @@ and transl_structure ~scopes loc
       (* This debugging event provides information regarding the structure
          items. It is ignored by the OCaml debugger but is used by
          Js_of_ocaml to preserve variable names. *)
-      (if !Clflags.debug && not !Clflags.native_code then
+      (if !Clflags.debug && not (Clflags.target_is_native ()) then
          Levent(body,
                 {lev_loc = loc;
                  lev_kind = Lev_pseudo;
@@ -962,7 +954,8 @@ and transl_structure ~scopes loc
           Value_rec_compiler.compile_letrec class_bindings body, repr
       | Tstr_include incl ->
           let ids_with_sorts =
-            bound_value_identifiers_and_sorts incl.incl_type
+            List.combine (bound_value_identifiers incl.incl_type)
+              (Array.to_list incl.incl_repr)
           in
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
@@ -995,7 +988,8 @@ and transl_structure ~scopes loc
           let let_kind, modl =
             match incl.incl_kind with
             | Tincl_structure ->
-                pure_module modl, transl_module ~scopes Tcoerce_none None modl
+                pure_module modl, transl_module ~scopes Tcoerce_none
+                  rootpath modl
             | Tincl_functor { input_coercion; input_repr; yielding } ->
                 Strict, transl_include_functor ~generative:false modl
                           input_coercion scopes loc ~input_repr ~yielding
@@ -1017,7 +1011,8 @@ and transl_structure ~scopes loc
               transl_structure ~scopes loc fields cc rootpath final_env rem
           | _ ->
               let ids_with_sorts =
-                bound_value_identifiers_and_sorts od.open_bound_items
+                List.combine (bound_value_identifiers od.open_bound_items)
+                  (Array.to_list od.open_items_repr)
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
@@ -1045,7 +1040,8 @@ and transl_structure ~scopes loc
                 rebind_idents 0 fields ids_with_sorts
               in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
-                   transl_module ~scopes Tcoerce_none None od.open_expr, body),
+                   transl_module ~scopes Tcoerce_none rootpath od.open_expr,
+                   body),
               repr
           end
       | Tstr_modtype _
@@ -1062,19 +1058,18 @@ and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
     Translattribute.get_inlined_attribute_on_module modl
   in
   let modl = transl_module ~scopes Tcoerce_none None modl in
-  let params = if generative then [params;[]] else [params] in
-  let params = List.map (fun coercion ->
+  let arg =
     Lprim(block_of_module_representation ~loc:(to_location loc) input_repr,
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
-            coercion,
-          loc))
-    params
+            params,
+          loc)
   in
+  let args = if generative then [arg; lambda_unit] else [arg] in
   Lapply {
     ap_loc = loc;
     ap_func = modl;
-    ap_args = params;
+    ap_args = args;
     ap_result_layout = Lambda.layout_module;
     ap_region_close=Rc_normal;
     ap_mode = not_alloc_stack;
@@ -1132,6 +1127,8 @@ let add_arg_block_to_module_representation = function
         Array.append shape_for_read
           [| mixed_block_element_with_locality_mode_for_module |] )
 
+(* The argument block is appended after the primary block's fields; must agree
+   with [Typemod.arg_signature] and [main_repr_of_argument_unit]. *)
 let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
   let primary_block_id_duid = Lambda.debug_uid_none in
@@ -1145,7 +1142,6 @@ let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
   in
   let size = module_representation_field_count primary_repr in
   let all_fields = List.init size get_field @ [Lvar arg_block_id] in
-  let arg_block_field = size in
   let new_repr = add_arg_block_to_module_representation primary_repr in
   Llet(Strict, layout_module, primary_block_id,
        primary_block_id_duid, primary_block_lam,
@@ -1154,8 +1150,7 @@ let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
             Lprim(block_of_module_representation ~loc new_repr,
                   all_fields,
                   Loc_unknown))),
-  new_repr,
-  Some arg_block_field
+  new_repr
 
 let add_runtime_parameters lam params =
   let params =
@@ -1174,15 +1169,29 @@ let add_runtime_parameters lam params =
        function call and actually substitutes. *)
     Always_inline
   in
-  lfunction
-    ~params
-    ~kind:(Curried { nlocal = 0 })
-    ~return:layout_module
-    ~attr:{ default_function_attribute with is_a_functor = true; inline }
-    ~loc:Loc_unknown
-    ~body:lam
-    ~mode:alloc_heap
-    ~ret_mode:not_alloc_stack
+  let attr = { default_function_attribute with is_a_functor = true; inline } in
+  (* A unit can have more runtime parameters than [Lambda.max_arity], so split
+     them into a curried chain of functions. [transl_instance] still passes all
+     the arguments at once, as an over-application. *)
+  let chunks = Misc.Stdlib.List.chunks_of (Lambda.max_arity ()) params in
+  let lam, _return =
+    List.fold_right
+      (fun params (body, return) ->
+        let lam =
+          lfunction
+            ~params
+            ~kind:(Curried { nlocal = 0 })
+            ~return
+            ~attr
+            ~loc:Loc_unknown
+            ~body
+            ~mode:alloc_heap
+            ~ret_mode:not_alloc_stack
+        in
+        lam, layout_functor)
+      chunks (lam, layout_module)
+  in
+  lam
 
 let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
   let path = global_path module_id in
@@ -1190,7 +1199,7 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
     transl_struct ~scopes (of_location ~scopes loc) [] cc path str
   in
   match cc2 with
-  | None -> lam, repr, None
+  | None -> lam, repr
   | Some cc2 ->
     add_arg_block_to_module_block ~loc lam repr cc2
 
@@ -1220,13 +1229,9 @@ let transl_implementation compilation_unit impl ~loc =
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
-  let body, (repr, arg_block_idx) =
+  let body, repr =
     Translobj.transl_label_init (fun () ->
-      let body, repr, arg_block_idx =
-        transl_implementation_module ~loc ~scopes compilation_unit
-          impl
-      in
-      body, (repr, arg_block_idx))
+      transl_implementation_module ~loc ~scopes compilation_unit impl)
   in
   let body, main_module_block_format =
     match has_parameters () with
@@ -1263,7 +1268,6 @@ let transl_implementation compilation_unit impl ~loc =
   in
   { compilation_unit;
     main_module_block_format;
-    arg_block_idx;
     required_globals = required_globals ~flambda:true body;
     code = body }
 
@@ -1285,7 +1289,7 @@ let toplevel_name id =
   with Not_found -> Ident.name id
 
 let toploop_getvalue id =
-  if !Clflags.native_code then
+  if Clflags.target_is_native () then
     (* [toploop_getvalue] and [toploop_setvalue] are only used by bytecode, so
        we can hardcode the module representations passed to [mod_field] as
        [Module_value_only]. *)
@@ -1310,7 +1314,7 @@ let toploop_getvalue id =
   }
 
 let toploop_setvalue id lam =
-  if !Clflags.native_code then
+  if Clflags.target_is_native () then
     (* See comment under [toploop_getvalue] *)
     fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
@@ -1535,7 +1539,6 @@ let transl_runtime_arg arg =
 
 let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_repr
-      ~arg_block_idx
     : Lambda.program =
   let base_compilation_unit, _args =
     Compilation_unit.split_instance_exn compilation_unit
@@ -1576,56 +1579,67 @@ let transl_instance_impl
     code;
     main_module_block_format;
     required_globals;
-    arg_block_idx;
   }
 
-let transl_instance instance_unit ~runtime_args ~main_module_block_repr
-      ~arg_block_idx =
+let transl_instance instance_unit ~runtime_args ~main_module_block_repr =
   assert (Compilation_unit.is_instance instance_unit);
   if (runtime_args = []) then
     Misc.fatal_error "Trying to instantiate but passing no arguments";
   transl_instance_impl instance_unit ~runtime_args
-    ~main_module_block_repr ~arg_block_idx
+    ~main_module_block_repr
 
-let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
-  let impl, _params, _sig =
-    Env.find_import ~chain:[]
-      (Compilation_unit.Name.of_head_of_global_name (Global_module.to_name gm))
+let main_repr_of_argument_unit (swg : Signature_with_global_bindings.t) =
+  let sign, _ = swg.sign in
+  Subst.Lazy.force_signature_once sign
+  |> Subst.Lazy.expect_fixed_representation
+  |> transl_module_representation
+  |> add_arg_block_to_module_representation
+
+let cu_of_impl ~chain (gm : Global_module.t) : Compilation_unit.t =
+  let { Persistent_env.imp_impl; _ } =
+    Env.find_import ~chain (Compilation_unit.Name.of_head_of_global gm)
   in
-  match impl with
+  match imp_impl with
   | Some cu -> cu
   | None ->
       Misc.fatal_errorf_doc
         "cu_of_impl: %a has no implementation (parameter module)"
         Global_module.print gm
 
-(* [gm] must have been compiled with [-as-argument-for].
+(* [gm] must have been compiled with [-as-argument-for param].
 
-   CR-someday zqian: the fatal error below is reachable with stale
+   CR-someday zqian: the fatal errors below are reachable with stale
    [.cmo]/[.cmx] artifacts, because they are read without consistency
    checks; such checks should be added. *)
-let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
-      main_block =
-  let fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
-  let arg_block_idx =
-    match (arg_descr : Lambda.arg_descr option) with
-    | Some { arg_block_idx; _ } -> arg_block_idx
-    | None ->
+let project_arg_block ~chain ~(param : Global_module.t)
+      ~(gm : Global_module.t) main_block =
+  let { Persistent_env.imp_arg_signature; imp_raw_sign; _ } =
+    Env.find_import ~chain (Compilation_unit.Name.of_head_of_global gm)
+  in
+  match imp_arg_signature with
+  | Some { arg_block_idx; arg_param } ->
+      if not
+           (Global_module.Name.equal (Global_module.to_name param)
+              (Global_module.Name.of_parameter_name arg_param))
+      then
         Misc.fatal_errorf_doc
-          "project_arg_block: %a was not compiled with -as-argument-for"
+          "project_arg_block: %a was compiled with -as-argument-for %a, \
+           not %a"
           Global_module.print gm
-  in
-  let main_repr =
-    match (fmt : main_module_block_format) with
-    | Mb_struct { mb_repr } -> mb_repr
-    | Mb_instantiating_functor { mb_returned_repr; _ } -> mb_returned_repr
-  in
-  Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
+          Global_module.Parameter_name.print arg_param
+          Global_module.print param;
+      let main_repr = main_repr_of_argument_unit imp_raw_sign in
+      Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
+  | None ->
+      Misc.fatal_errorf_doc
+        "project_arg_block: %a was not compiled with -as-argument-for"
+        Global_module.print gm
 
 (** All three of [transl_maybe_local_instance], [transl_local_instance],
     and [bind_local_instance] take [gm], [module_map], and [rev_bindings]:
     - [gm] is a global module name that we need lambda code for.
-    - [module_map] maps from incomplete global module names to local idents.
+    - [module_map] maps from incomplete global module names to local idents
+      and the compilation units implementing them.
     - [rev_bindings] binds each of the local idents to a local instantiation
       of the incomplete global module.
 
@@ -1651,7 +1665,7 @@ let rec transl_maybe_local_instance ~(gm : Global_module.t) ~chain
 and transl_local_instance ~(gm : Global_module.t) ~chain
     ~find_impl_by_name ~param_map ~module_map ~rev_bindings =
   match Global_module.Map.find_opt gm module_map with
-  | Some id -> (Lvar id, module_map, rev_bindings)
+  | Some (id, _cu) -> (Lvar id, module_map, rev_bindings)
   | None ->
       bind_local_instance ~gm ~chain ~find_impl_by_name ~param_map ~module_map
         ~rev_bindings
@@ -1661,11 +1675,11 @@ and transl_local_instance ~(gm : Global_module.t) ~chain
     at the top level or nested). *)
 and bind_local_instance ~(gm : Global_module.t) ~chain
     ~find_impl_by_name ~param_map ~module_map ~rev_bindings =
-  let cu = cu_of_impl gm in
-  let ui_format, _arg_descr = find_impl_by_name ~chain cu in
+  let cu = cu_of_impl ~chain gm in
+  let ui_format = find_impl_by_name ~chain cu in
   let chain = gm :: chain in
   let new_id = Ident.create_local (Global_module.to_string gm) in
-  let module_map = Global_module.Map.add gm new_id module_map in
+  let module_map = Global_module.Map.add gm (new_id, cu) module_map in
   let runtime_params =
     match ui_format with
     | Mb_struct _ ->
@@ -1718,8 +1732,8 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
                  ~find_impl_by_name ~param_map ~module_map ~rev_bindings
              in
              let arg_block =
-               project_arg_block ~find_impl_by_name ~chain
-                 ~gm:arg_value main_block
+               project_arg_block ~chain ~param:global ~gm:arg_value
+                 main_block
              in
              ((module_map, rev_bindings), arg_block)
          | None ->
@@ -1834,8 +1848,8 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
   in
   let required_globals =
     Global_module.Map.fold
-      (fun gm _id set -> Compilation_unit.Set.add (cu_of_impl gm) set)
-      module_map Compilation_unit.Set.empty
+      (fun _gm (_id, cu) set -> Compilation_unit.Set.add cu set)
+      module_map (scan_used_globals body)
   in
   let unit_ident = Ident.create_local "*unit*" in
   let func_params =
@@ -1891,19 +1905,28 @@ let transl_functorization compilation_unit
     transl_functorization_make ~params ~modules ~find_impl_by_name
   in
   let intf_func = transl_functorization_intf ~params in
+  let fields = [intf_func; make_func] in
   let code =
     apply_coercion Loc_unknown Strict coercion
       (Lprim
          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-           [intf_func; make_func],
+           fields,
            Loc_unknown ))
   in
-  let main_module_block_format =
-    Mb_struct { mb_repr = Module_value_only { field_count = 2 } }
+  (* CR-someday zqian: rewrite [module_block_size] to do this *)
+  let mb_repr =
+    match (coercion : Typedtree.module_coercion) with
+    | Tcoerce_none -> Module_value_only { field_count = List.length fields }
+    | Tcoerce_structure { output_repr; _ } ->
+        transl_module_representation output_repr
+    | Tcoerce_functor _ | Tcoerce_primitive _ | Tcoerce_alias _
+    | Tcoerce_kindtemplate _ | Tcoerce_invalid ->
+        Misc.fatal_error
+          "transl_functorization: unexpected compilation-unit coercion"
   in
+  let main_module_block_format = Mb_struct { mb_repr } in
   { compilation_unit;
     main_module_block_format;
-    arg_block_idx = None;
     required_globals;
     code
   }

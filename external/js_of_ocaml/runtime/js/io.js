@@ -27,7 +27,7 @@ var caml_sys_fds = new Array(3);
 function caml_sys_close(fd) {
   var x = caml_sys_fds[fd];
   if (x) {
-    x.file.close();
+    x.file.close(false);
     delete caml_sys_fds[fd];
   }
   return 0;
@@ -43,18 +43,13 @@ function MlChanid(id) {
 //Requires: MlFakeFd_out
 //Requires: resolve_fs_device
 //Requires: fs_node_supported
+//Requires: fs_quickjs_supported
 //Requires: caml_sys_fds
 //Requires: caml_sys_open_for_node
-//Requires: MlChanid
+//Requires: caml_sys_open_for_quickjs
 function caml_sys_open_internal(file, idx) {
-  var chanid;
-  if (idx === undefined) {
-    idx = caml_sys_fds.length;
-    chanid = new MlChanid(idx);
-  } else if (caml_sys_fds[idx]) {
-    chanid = caml_sys_fds[idx].chanid;
-  } else chanid = new MlChanid(idx);
-  caml_sys_fds[idx] = { file: file, chanid: chanid };
+  if (idx === undefined) idx = caml_sys_fds.length;
+  caml_sys_fds[idx] = { file: file };
   return idx | 0;
 }
 function caml_sys_open(name, flags, perms) {
@@ -68,8 +63,10 @@ function caml_sys_open(name, flags, perms) {
         f.wronly = 1;
         break;
       case 2:
+        // Open_append implies write access (O_WRONLY | O_APPEND in the
+        // C runtime)
         f.append = 1;
-        f.writeonly = 1;
+        f.wronly = 1;
         break;
       case 3:
         f.create = 1;
@@ -98,21 +95,23 @@ function caml_sys_open(name, flags, perms) {
 }
 (function () {
   var is_node = fs_node_supported();
+  var is_qjs = !is_node && fs_quickjs_supported();
+  var buffered = is_node || is_qjs ? 1 : 2;
   function file(fd, flags) {
-    if (is_node) {
-      return caml_sys_open_for_node(fd, flags);
-    } else return new MlFakeFd_out(fd, flags);
+    if (is_node) return caml_sys_open_for_node(fd, flags);
+    if (is_qjs) return caml_sys_open_for_quickjs(fd, flags);
+    return new MlFakeFd_out(fd, flags);
   }
   caml_sys_open_internal(
     file(0, { rdonly: 1, altname: "/dev/stdin", isCharacterDevice: true }),
     0,
   );
   caml_sys_open_internal(
-    file(1, { buffered: is_node ? 1 : 2, wronly: 1, isCharacterDevice: true }),
+    file(1, { buffered: buffered, wronly: 1, isCharacterDevice: true }),
     1,
   );
   caml_sys_open_internal(
-    file(2, { buffered: is_node ? 1 : 2, wronly: 1, isCharacterDevice: true }),
+    file(2, { buffered: buffered, wronly: 1, isCharacterDevice: true }),
     2,
   );
 })();
@@ -126,6 +125,11 @@ function caml_ml_set_channel_name(chanid, name) {
   chan.name = name;
   return 0;
 }
+
+//Provides: caml_ml_std_channel_id
+// The channels created by the stdlib at startup for fds 0, 1 and 2
+// (the runtime itself writes through them, e.g. the parser trace)
+var caml_ml_std_channel_id = [];
 
 //Provides: caml_ml_channels
 //Requires: MlChanid
@@ -194,24 +198,29 @@ function caml_ml_out_channels_list() {
 //Requires: caml_ml_channels, caml_sys_fds
 //Requires: caml_raise_sys_error
 //Requires: caml_sys_open
+//Requires: caml_io_buffer_size
+//Requires: MlChanid, caml_ml_std_channel_id
 function caml_ml_open_descriptor_out(fd) {
   var fd_desc = caml_sys_fds[fd];
   if (fd_desc === undefined)
     caml_raise_sys_error("fd " + fd + " doesn't exist");
   var file = fd_desc.file;
-  var chanid = fd_desc.chanid;
+  // each call allocates a fresh channel, like the C runtime
+  var chanid = new MlChanid(fd);
   var buffered = file.flags.buffered !== undefined ? file.flags.buffered : 1;
   var channel = {
     file: file,
-    offset: file.offset,
+    offset: file.pos(),
     fd: fd,
     opened: true,
     out: true,
     buffer_curr: 0,
-    buffer: new Uint8Array(65536),
+    buffer: new Uint8Array(caml_io_buffer_size),
     buffered: buffered,
   };
   caml_ml_channels.set(chanid, channel);
+  if (fd <= 2 && !caml_ml_std_channel_id[fd])
+    caml_ml_std_channel_id[fd] = chanid;
   return chanid;
 }
 
@@ -219,39 +228,44 @@ function caml_ml_open_descriptor_out(fd) {
 //Requires: caml_ml_channels, caml_sys_fds
 //Requires: caml_raise_sys_error
 //Requires: caml_sys_open
+//Requires: caml_io_buffer_size
+//Requires: MlChanid, caml_ml_std_channel_id
 function caml_ml_open_descriptor_in(fd) {
   var fd_desc = caml_sys_fds[fd];
   if (fd_desc === undefined)
     caml_raise_sys_error("fd " + fd + " doesn't exist");
   var file = fd_desc.file;
-  var chanid = fd_desc.chanid;
+  // each call allocates a fresh channel, like the C runtime
+  var chanid = new MlChanid(fd);
   var refill = null;
   var channel = {
     file: file,
-    offset: file.offset,
+    offset: file.pos(),
     fd: fd,
     opened: true,
     out: false,
     buffer_curr: 0,
     buffer_max: 0,
-    buffer: new Uint8Array(65536),
+    buffer: new Uint8Array(caml_io_buffer_size),
     refill: refill,
   };
   caml_ml_channels.set(chanid, channel);
+  if (fd <= 2 && !caml_ml_std_channel_id[fd])
+    caml_ml_std_channel_id[fd] = chanid;
   return chanid;
 }
 
 //Provides: caml_ml_open_descriptor_in_with_flags
 //Requires: caml_ml_open_descriptor_in
 //Version: >= 5.1
-function caml_ml_open_descriptor_in_with_flags(fd, flags) {
+function caml_ml_open_descriptor_in_with_flags(fd, _flags) {
   return caml_ml_open_descriptor_in(fd);
 }
 
 //Provides: caml_ml_open_descriptor_out_with_flags
 //Requires: caml_ml_open_descriptor_out
 //Version: >= 5.1
-function caml_ml_open_descriptor_out_with_flags(fd, flags) {
+function caml_ml_open_descriptor_out_with_flags(fd, _flags) {
   return caml_ml_open_descriptor_out(fd);
 }
 
@@ -273,11 +287,11 @@ function caml_ml_set_binary_mode(chanid, mode) {
 }
 
 //Provides: caml_ml_is_binary_mode
-//Requires: caml_ml_channel_get
 //Version: >= 5.2
-function caml_ml_is_binary_mode(chanid) {
-  var chan = caml_ml_channel_get(chanid);
-  return chan.file.flags.binary;
+function caml_ml_is_binary_mode(_chanid) {
+  // Like the C runtime on Unix, which always reports binary mode
+  // (set_binary_mode is a no-op there).
+  return 1;
 }
 
 //Input from in_channel
@@ -358,6 +372,7 @@ function caml_refill(chan) {
       chan.buffer,
       chan.buffer_max,
       chan.buffer.length - chan.buffer_max,
+      false,
     );
     chan.offset += nread;
     chan.buffer_max += nread;
@@ -465,10 +480,8 @@ function caml_ml_input_char(chanid) {
 }
 
 //Provides: caml_ml_input_int
-//Requires: caml_raise_end_of_file
-//Requires: caml_ml_input_char, caml_ml_channel_get
+//Requires: caml_ml_input_char
 function caml_ml_input_int(chanid) {
-  var chan = caml_ml_channel_get(chanid);
   var res = 0;
   for (var i = 0; i < 4; i++) {
     res = ((res << 8) + caml_ml_input_char(chanid)) | 0;
@@ -556,11 +569,11 @@ function caml_ml_input_scan_line(chanid) {
 }
 
 //Provides: caml_ml_flush
-//Requires: caml_raise_sys_error, caml_ml_channel_get
+//Requires: caml_ml_channel_get
 //Requires: caml_sub_uint8_array_to_jsbytes
 function caml_ml_flush(chanid) {
   var chan = caml_ml_channel_get(chanid);
-  if (!chan.opened) caml_raise_sys_error("Cannot flush a closed channel");
+  if (!chan.opened) return 0;
   if (!chan.buffer || chan.buffer_curr === 0) return 0;
   if (chan.output) {
     chan.output(
@@ -568,7 +581,7 @@ function caml_ml_flush(chanid) {
     );
   } else {
     for (var pos = 0; pos < chan.buffer_curr; ) {
-      pos += chan.file.write(chan.buffer, pos, chan.buffer_curr - pos);
+      pos += chan.file.write(chan.buffer, pos, chan.buffer_curr - pos, false);
     }
   }
   chan.offset += chan.buffer_curr;

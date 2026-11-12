@@ -27,15 +27,15 @@ let print_int16u s f = print_int16 s (to_int16 f)
 
 (* Various combinations of arguments int16, int16 [@unboxed], and
    int16# *)
-external lognot_UtoU : int16# -> int16# =
+external lognot_UtoU : (int16#[@unsafe_unextended]) -> int16# =
   "lognot_bytecode" "lognot_UtoU"
 external lognot_BtoU : int16 -> int16# =
   "lognot_bytecode" "lognot_BtoU"
-external lognot_UtoB : int16# -> int16 =
+external lognot_UtoB : (int16#[@unsafe_unextended]) -> int16 =
   "lognot_bytecode" "lognot_UtoB"
 external lognot_BUtoU : (int16[@unboxed]) -> int16# =
   "lognot_bytecode" "lognot_UtoU"
-external lognot_UtoBU : int16# -> (int16[@unboxed]) =
+external lognot_UtoBU : (int16#[@unsafe_unextended]) -> (int16[@unboxed]) =
   "lognot_bytecode" "lognot_UtoU"
 
 let () =
@@ -60,8 +60,8 @@ let () =
 
 (* If there are more than 5 args, you get an array in bytecode *)
 external sum_7 :
-  int16# -> int16 -> int16# -> int16 ->
-  int16# -> int16 -> int16# -> int16# =
+  (int16#[@unsafe_unextended]) -> int16 -> (int16#[@unsafe_unextended]) -> int16 ->
+  (int16#[@unsafe_unextended]) -> int16 -> (int16#[@unsafe_unextended]) -> int16# =
   "sum_7_bytecode" "sum_7_UBUBUBUtoU"
 
 let _ =

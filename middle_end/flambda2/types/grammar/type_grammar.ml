@@ -292,11 +292,7 @@ and row_like_for_blocks =
 and row_like_for_closures =
   { known_closures :
       (Set_of_closures_contents.t, unit, closures_entry) row_like_case
-      Function_slot.Map.t;
-    (* CR pchambart: this field is always Bottom, we should remove it *)
-    other_closures :
-      (Set_of_closures_contents.t, unit, closures_entry) row_like_case
-      Or_bottom.t
+      Function_slot.Map.t
   }
 
 and closures_entry =
@@ -552,13 +548,11 @@ and free_names_head_of_kind_value_non_null ~follow_value_slots head =
       fields
 
 and free_names_inverse_relations0 ~follow_value_slots:_ inverse_relations =
-  Relation.Map.fold
-    (fun _ names free_names ->
-      Name.Set.fold
-        (fun name free_names ->
-          Name_occurrences.add_name free_names name Name_mode.in_types)
-        names free_names)
-    inverse_relations Name_occurrences.empty
+  Name_occurrences.free_names_map ~fold:Relation.Map.fold
+    ~add_key:(fun free_names _relation -> free_names)
+    ~free_names_value:(fun names ->
+      Name_occurrences.create_names names Name_mode.in_types)
+    inverse_relations
 
 and free_names_head_of_kind_naked_immediate0 ~follow_value_slots head =
   free_names_inverse_relations0 ~follow_value_slots (inverse_relations head)
@@ -643,12 +637,10 @@ and free_names_row_like_for_blocks ~follow_value_slots
     ~free_names_maps_to:free_names_int_indexed_product ~follow_value_slots
     ~known:known_tags ~other:other_tags ~fold_known
 
-and free_names_row_like_for_closures ~follow_value_slots
-    { known_closures; other_closures } =
+and free_names_row_like_for_closures ~follow_value_slots { known_closures } =
   free_names_row_like ~free_names_lattice:Set_of_closures_contents.free_names
     ~free_names_maps_to:free_names_closures_entry ~follow_value_slots
-    ~known:known_closures ~other:other_closures
-    ~fold_known:Function_slot.Map.fold
+    ~known:known_closures ~other:Bottom ~fold_known:Function_slot.Map.fold
 
 and free_names_closures_entry ~follow_value_slots
     { function_types; closure_types; value_slot_types } =
@@ -708,13 +700,9 @@ and free_names_function_type ~follow_value_slots
       code_id Name_mode.normal
 
 and free_names_env_extension ~follow_value_slots { equations } =
-  Name.Map.fold
-    (fun name t acc ->
-      let acc =
-        Name_occurrences.union acc (free_names0 ~follow_value_slots t)
-      in
-      Name_occurrences.add_name acc name Name_mode.in_types)
-    equations Name_occurrences.empty
+  Name_occurrences.free_names_name_map
+    (free_names0 ~follow_value_slots)
+    equations Name_mode.in_types
 
 and free_names_variant_extensions ~follow_value_slots
     (extensions : variant_extensions) =
@@ -976,19 +964,7 @@ and apply_renaming_head_of_kind_value_non_null head renaming =
         }
 
 and apply_renaming_inverse_relations inverse_relations renaming =
-  Relation.Map.map_sharing
-    (fun names ->
-      let changed = ref false in
-      let names' =
-        Name.Set.fold
-          (fun name names ->
-            let name' = Renaming.apply_name renaming name in
-            if name' != name then changed := true;
-            Name.Set.add name' names)
-          names Name.Set.empty
-      in
-      if !changed then names' else names)
-    inverse_relations
+  Relation.Map.map_sharing (Renaming.apply_name_set renaming) inverse_relations
 
 and apply_renaming_head_of_kind_naked_immediate head renaming =
   let inverse_relations = inverse_relations head in
@@ -1108,16 +1084,18 @@ and apply_renaming_row_like_for_blocks
   | Some (known_tags, other_tags) -> { known_tags; other_tags; alloc_mode }
 
 and apply_renaming_row_like_for_closures
-    ({ known_closures; other_closures } as row_like_for_closures) renaming =
+    ({ known_closures } as row_like_for_closures) renaming =
   match
     apply_renaming_row_like
       ~apply_renaming_lattice:Set_of_closures_contents.apply_renaming
       ~apply_renaming_maps_to:apply_renaming_closures_entry
-      ~known:known_closures ~other:other_closures
+      ~known:known_closures ~other:Bottom
       ~map_known:Function_slot.Map.map_sharing renaming
   with
   | None -> row_like_for_closures
-  | Some (known_closures, other_closures) -> { known_closures; other_closures }
+  | Some (_, Ok _) ->
+    Misc.fatal_error "Unexpected non-homogenous renaming of row-like"
+  | Some (known_closures, Bottom) -> { known_closures }
 
 and apply_renaming_closures_entry
     ({ function_types; closure_types; value_slot_types } as closures_entry)
@@ -1186,17 +1164,8 @@ and apply_renaming_function_type ({ code_id; rec_info } as function_type)
   else { code_id = code_id'; rec_info = rec_info' }
 
 and apply_renaming_env_extension ({ equations } as env_extension) renaming =
-  let changed = ref false in
-  let equations' =
-    Name.Map.fold
-      (fun name ty acc ->
-        let ty' = apply_renaming ty renaming in
-        let name' = Renaming.apply_name renaming name in
-        if not (ty == ty' && name == name') then changed := true;
-        Name.Map.add name' ty' acc)
-      equations Name.Map.empty
-  in
-  if !changed then { equations = equations' } else env_extension
+  let equations' = Renaming.apply_name_map apply_renaming renaming equations in
+  if equations == equations' then env_extension else { equations = equations' }
 
 and apply_renaming_variant_extensions extensions renaming =
   match extensions with
@@ -1516,8 +1485,7 @@ and print_row_like_for_blocks ppf { known_tags; other_tags; alloc_mode } =
     ~print_known_map ~is_empty_map_known:Tag.Map.is_empty ~known:known_tags
     ~other:other_tags alloc_mode ppf
 
-and print_row_like_for_closures alloc_mode ppf
-    { known_closures; other_closures } =
+and print_row_like_for_closures alloc_mode ppf { known_closures } =
   let print_index ppf { domain; shape = _ } =
     match domain with
     | Known index ->
@@ -1530,7 +1498,7 @@ and print_row_like_for_closures alloc_mode ppf
   print_row_like ~print_index ~print_maps_to:print_closures_entry
     ~print_known_map:Function_slot.Map.print
     ~is_empty_map_known:Function_slot.Map.is_empty ~known:known_closures
-    ~other:other_closures alloc_mode ppf
+    ~other:Bottom alloc_mode ppf
 
 and print_closures_entry ppf { function_types; closure_types; value_slot_types }
     =
@@ -1685,12 +1653,10 @@ and ids_for_export_head_of_kind_value_non_null head =
       (ids_for_export length) fields
 
 and ids_for_export_inverse_relations inverse_relations =
-  Relation.Map.fold
-    (fun _ names ids_for_export ->
-      Name.Set.fold
-        (fun name ids_for_export -> Ids_for_export.add_name ids_for_export name)
-        names ids_for_export)
-    inverse_relations Ids_for_export.empty
+  Ids_for_export.ids_for_export_map ~fold:Relation.Map.fold
+    ~add_ids_key:(fun ids _relation -> ids)
+    ~ids_for_export_value:Ids_for_export.ids_for_export_name_set
+    inverse_relations
 
 and ids_for_export_head_of_kind_naked_immediate head =
   ids_for_export_inverse_relations (inverse_relations head)
@@ -1765,10 +1731,9 @@ and ids_for_export_row_like_for_blocks
     ~ids_for_export_maps_to:ids_for_export_int_indexed_product ~known:known_tags
     ~other:other_tags ~fold_known
 
-and ids_for_export_row_like_for_closures { known_closures; other_closures } =
+and ids_for_export_row_like_for_closures { known_closures } =
   ids_for_export_row_like ~ids_for_export_maps_to:ids_for_export_closures_entry
-    ~known:known_closures ~other:other_closures
-    ~fold_known:Function_slot.Map.fold
+    ~known:known_closures ~other:Bottom ~fold_known:Function_slot.Map.fold
 
 and ids_for_export_closures_entry
     { function_types; closure_types; value_slot_types } =
@@ -1809,10 +1774,7 @@ and ids_for_export_function_type { code_id; rec_info } =
     (ids_for_export rec_info)
 
 and ids_for_export_env_extension { equations } =
-  Name.Map.fold
-    (fun name t ids ->
-      Ids_for_export.add_name (Ids_for_export.union ids (ids_for_export t)) name)
-    equations Ids_for_export.empty
+  Ids_for_export.ids_for_export_name_map ids_for_export equations
 
 and ids_for_export_variant_extensions ext =
   match ext with
@@ -2082,16 +2044,20 @@ and apply_coercion_row_like :
   then Bottom
   else Ok (known, other)
 
-and apply_coercion_row_like_for_closures { known_closures; other_closures }
-    coercion : row_like_for_closures Or_bottom.t =
+and apply_coercion_row_like_for_closures { known_closures } coercion :
+    row_like_for_closures Or_bottom.t =
   let<+ known, other =
     apply_coercion_row_like
       ~apply_coercion_maps_to:apply_coercion_closures_entry
-      ~known:known_closures ~other:other_closures
+      ~known:known_closures ~other:Bottom
       ~is_empty_map_known:Function_slot.Map.is_empty
       ~filter_map_known:Function_slot.Map.filter_map coercion
   in
-  { known_closures = known; other_closures = other }
+  (match other with
+  | Or_bottom.Bottom -> ()
+  | Or_bottom.Ok _ ->
+    Misc.fatal_error "Unexpected non-homogenous apply_coercion for row-like");
+  { known_closures = known }
 
 and apply_coercion_closures_entry row_tag
     { function_types; closure_types; value_slot_types } coercion : _ Or_bottom.t
@@ -2723,8 +2689,8 @@ and remove_unused_value_slots_and_shortcut_aliases_row_like_for_blocks
   | Some (known_tags, other_tags) -> { known_tags; other_tags; alloc_mode }
 
 and remove_unused_value_slots_and_shortcut_aliases_row_like_for_closures
-    ({ known_closures; other_closures } as row_like_for_closures)
-    ~used_value_slots ~canonicalise =
+    ({ known_closures } as row_like_for_closures) ~used_value_slots
+    ~canonicalise =
   match
     remove_unused_value_slots_and_shortcut_aliases_row_like
       ~remove_unused_value_slots_and_shortcut_aliases_lattice:(fun
@@ -2733,11 +2699,14 @@ and remove_unused_value_slots_and_shortcut_aliases_row_like_for_closures
           ~used_value_slots)
       ~remove_unused_value_slots_and_shortcut_aliases_maps_to:
         remove_unused_value_slots_and_shortcut_aliases_closures_entry
-      ~known:known_closures ~other:other_closures
+      ~known:known_closures ~other:Bottom
       ~map_known:Function_slot.Map.map_sharing ~used_value_slots ~canonicalise
   with
   | None -> row_like_for_closures
-  | Some (known_closures, other_closures) -> { known_closures; other_closures }
+  | Some (_, Ok _) ->
+    Misc.fatal_error
+      "Unexpected non-homogenous remove_unused_value_slots for row-like"
+  | Some (known_closures, Bottom) -> { known_closures }
 
 and remove_unused_value_slots_and_shortcut_aliases_closures_entry
     { function_types; closure_types; value_slot_types } ~used_value_slots
@@ -3468,7 +3437,7 @@ and project_row_like_for_blocks ~to_project ~expand
   else { known_tags = known_tags'; other_tags = other_tags'; alloc_mode }
 
 and project_row_like_for_closures ~to_project ~expand
-    ({ known_closures; other_closures } as closures) =
+    ({ known_closures } as closures) =
   let known_closures' =
     Function_slot.Map.map_sharing
       (fun ({ index; maps_to; env_extension } as case) ->
@@ -3481,21 +3450,9 @@ and project_row_like_for_closures ~to_project ~expand
         else { index; env_extension = env_extension'; maps_to = maps_to' })
       known_closures
   in
-  let other_closures' : _ Or_bottom.t =
-    match other_closures with
-    | Bottom -> Bottom
-    | Ok { index; maps_to; env_extension } ->
-      let env_extension' =
-        project_env_extension ~to_project ~expand env_extension
-      in
-      let maps_to' = project_closures_entry ~to_project ~expand maps_to in
-      if env_extension == env_extension' && maps_to == maps_to'
-      then other_closures
-      else Ok { index; env_extension = env_extension'; maps_to = maps_to' }
-  in
-  if known_closures == known_closures' && other_closures == other_closures'
+  if known_closures == known_closures'
   then closures
-  else { known_closures = known_closures'; other_closures = other_closures' }
+  else { known_closures = known_closures' }
 
 and project_closures_entry ~to_project ~expand
     ({ function_types; closure_types; value_slot_types } as closures_entry) =
@@ -3887,17 +3844,16 @@ module Row_like_for_blocks = struct
       alloc_mode =
     let known_tags =
       Tag.Map.map
-        (fun (shape, field_tys) ->
-          check_field_tys ~shape ~field_tys;
-          let maps_to = Array.of_list field_tys in
-          let size =
-            Target_ocaml_int.of_int machine_width (List.length field_tys)
-          in
-          Or_unknown.Known
-            { maps_to;
-              index = { domain = Known size; shape };
-              env_extension = { equations = Name.Map.empty }
-            })
+        (Or_unknown.map ~f:(fun (shape, field_tys) ->
+             check_field_tys ~shape ~field_tys;
+             let maps_to = Array.of_list field_tys in
+             let size =
+               Target_ocaml_int.of_int machine_width (List.length field_tys)
+             in
+             { maps_to;
+               index = { domain = Known size; shape };
+               env_extension = { equations = Name.Map.empty }
+             }))
         shape_and_field_tys_by_tag
     in
     { known_tags; other_tags = Bottom; alloc_mode }
@@ -3982,7 +3938,7 @@ module Row_like_for_closures = struct
           env_extension = { equations = Name.Map.empty }
         }
     in
-    { known_closures; other_closures = Bottom }
+    { known_closures }
 
   let create_at_least (function_slot : Function_slot.t)
       (contents : Set_of_closures_contents.t) (closures_entry : closures_entry)
@@ -3994,40 +3950,35 @@ module Row_like_for_closures = struct
           env_extension = { equations = Name.Map.empty }
         }
     in
-    { known_closures; other_closures = Bottom }
+    { known_closures }
 
-  let create_raw ~known_closures ~other_closures =
+  let create_raw ~known_closures =
     (* CR-someday mshinwell: add invariant check? *)
-    { known_closures; other_closures }
+    { known_closures }
 
   type get_single_tag_result =
     | No_singleton
     | Exact_closure of Function_slot.t * closures_entry
     | Incomplete_closure of Function_slot.t * closures_entry
 
-  let get_single_tag { known_closures; other_closures } : get_single_tag_result
-      =
-    match other_closures with
-    | Ok _ -> No_singleton
-    | Bottom -> (
-      match Function_slot.Map.get_singleton known_closures with
-      | None -> No_singleton
-      | Some (tag, { maps_to; index; env_extension = _ }) -> (
-        (* If this is a singleton all the information from the env_extension is
-           already part of the environment *)
-        match index.domain with
-        | At_least index ->
-          if Function_slot.Set.mem tag (Set_of_closures_contents.closures index)
-          then Incomplete_closure (tag, maps_to)
-          else No_singleton
-        | Known index ->
-          if Function_slot.Set.mem tag (Set_of_closures_contents.closures index)
-          then Exact_closure (tag, maps_to)
-          else
-            Misc.fatal_errorf
-              "Function slot %a not bound in Known closure type with contents \
-               %a"
-              Function_slot.print tag Set_of_closures_contents.print index))
+  let get_single_tag { known_closures } : get_single_tag_result =
+    match Function_slot.Map.get_singleton known_closures with
+    | None -> No_singleton
+    | Some (tag, { maps_to; index; env_extension = _ }) -> (
+      (* If this is a singleton all the information from the env_extension is
+         already part of the environment *)
+      match index.domain with
+      | At_least index ->
+        if Function_slot.Set.mem tag (Set_of_closures_contents.closures index)
+        then Incomplete_closure (tag, maps_to)
+        else No_singleton
+      | Known index ->
+        if Function_slot.Set.mem tag (Set_of_closures_contents.closures index)
+        then Exact_closure (tag, maps_to)
+        else
+          Misc.fatal_errorf
+            "Function slot %a not bound in Known closure type with contents %a"
+            Function_slot.print tag Set_of_closures_contents.print index)
 
   let get_closure t function_slot : _ Or_unknown.t =
     match get_single_tag t with

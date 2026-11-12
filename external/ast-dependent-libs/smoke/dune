@@ -1,0 +1,23 @@
+; Uses only what the compiler package ships.
+
+(executable
+ (name main)
+ (modules main)
+ (modes js wasm)
+ (libraries js_of_ocaml)
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+(rule
+ (targets main_jsir.js main_jsir.cmi main_jsir.cmjx main_jsir.cmjo)
+ (deps main_jsir.ml)
+ (action
+  (run %{ocamlopt} -target js_of_ocaml -o main_jsir.js %{deps})))
+
+(rule
+ (alias runtest)
+ (action
+  (progn
+   (run node %{dep:main.bc.js})
+   (run node %{dep:main.bc.wasm.js})
+   (run node %{dep:main_jsir.js}))))

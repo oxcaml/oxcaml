@@ -139,10 +139,40 @@ val find_hash_type: Path.t -> t -> type_declaration
 val find_implicit_jkind: string -> t -> jkind_lr option
 (* Find the implicit jkind for a type variable name. *)
 
+(* A value in a signature whose type is not representable. *)
+type unrepresentable_item =
+  { item : Ident.t;
+    item_desc : Subst.Lazy.value_description;
+    item_type : type_expr;
+    violation : Jkind.Violation.t }
+
+(* The sort of a signature item, computing it in [env] if the item's
+   declaration doesn't record one. [None] for items with no runtime
+   representation. *)
+val sort_of_signature_item:
+  why:Jkind_intf.History.concrete_creation_reason -> t ->
+  Subst.Lazy.signature_item ->
+  (Jkind_types.Sort.t option, unrepresentable_item) result
+
+(* The sorts of the runtime items of a signature, as computed by
+   [sort_of_signature_item]. *)
+val sorts_of_signature_items:
+  why:Jkind_intf.History.concrete_creation_reason -> t ->
+  Subst.Lazy.signature_item list ->
+  (module_representation, unrepresentable_item) result
+
+type address_head =
+  | AHunit of Compilation_unit.t
+  | AHlocal of Ident.t
+
+val address_head : address -> address_head
+
 val find_value_address: Path.t -> t -> address
 val find_module_address: Path.t -> t -> address
 val find_class_address: Path.t -> t -> address
 val find_constructor_address: Path.t -> t -> address
+
+val find_module_address_head : Location.t -> Path.t -> t -> address_head
 
 val shape_of_path:
   namespace:Shape.Sig_component_kind.t -> t -> Path.t -> Shape.t
@@ -177,7 +207,7 @@ val normalize_instance_names_in_module_path: Path.t -> Path.t
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
 val add_required_global: Path.t -> t -> unit
-val add_required_global_for_quote: Path.t -> t -> unit
+val add_required_global_for_quote: Location.t -> Path.t -> t -> unit
 
 (* Return the set of interfaces referenced by quotes *)
 val quoted_intfs: unit -> Compilation_unit.Name.Set.t
@@ -291,6 +321,14 @@ type lookup_error =
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | Unbound_in_stage of
       none_in_quotations_context * Longident.t * Location.t * stage * stage
+  | Module_projection_unrepresentable of
+      {
+        unrep_loc : Location.t;
+        unrep_id : Ident.t;
+        unrep_ty : type_expr;
+        unrep_env : t;
+        violation : Jkind.Violation.t
+      }
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -349,6 +387,10 @@ val lookup_jkind :
 val lookup_module_path:
   ?use:bool -> loc:Location.t -> load:bool -> Longident.t -> t ->
     Path.t * mode_with_locks
+(* Raises a lookup error if the module at [path] is projected out of a module
+   that is not representable. *)
+val check_module_path_representable:
+  loc:Location.t -> Path.t -> t -> unit
 val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
 val lookup_module_instance_path:
@@ -633,7 +675,8 @@ a loop) *)
 val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
   Mode.With_regionality.Comonadic.Const.t -> t -> t
 
-val add_region_lock : t -> t
+(* CR-soon zqian: [region] should be mandatory. *)
+val add_region_lock : ?region:Mode.Hint.region -> t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quote : t -> t
@@ -682,11 +725,7 @@ val save_signature_with_imports:
 
 (** See [Persistent_env.find_import]. *)
 val find_import:
-  chain:Compilation_unit.Name.t list ->
-  Compilation_unit.Name.t ->
-  Compilation_unit.t option
-  * Global_module.Parameter_name.t list
-  * Signature_with_global_bindings.t
+  chain:Global_module.t list -> Compilation_unit.Name.t -> Persistent_env.import
 
 (* Register a module as a parameter to this unit. *)
 val register_parameter: Global_module.Parameter_name.t -> unit
@@ -721,11 +760,6 @@ val register_import_as_opaque: Compilation_unit.Name.t -> unit
    -as-parameter *)
 val is_parameter_unit: Global_module.Name.t -> bool
 
-(* [implemented_parameter md] is the argument given to -as-argument-for when
-   [md] was compiled *)
-val implemented_parameter:
-  Global_module.Name.t -> Global_module.Parameter_name.t option
-
 (* [is_imported_parameter md] is true if [md] has been imported and is a
    parameter to this module *)
 val is_imported_parameter: Global_module.Name.t -> bool
@@ -753,12 +787,17 @@ type error =
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
   | Cmi_not_found of
       { modname : Compilation_unit.Name.t;
-        chain : Compilation_unit.Name.t list;
+        chain : Global_module.t list;
             (** Dependency chain leading to [modname], in reversed order
                 (most-recent loader first). *)
       }
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
+
+  val log_or_raise : error -> unit
+  val log_and_raise : error -> 'a
+end
 
 val in_signature: bool -> t -> t
 
@@ -787,6 +826,14 @@ val add_delayed_check_forward: ((unit -> unit) -> unit) ref
 (* Forward declaration to break mutual recursion with Mtype. *)
 val scrape_alias:
     (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref
+(* Forward declaration to break mutual recursion with Ctype. *)
+val type_sort :
+  (why:Jkind_intf.History.concrete_creation_reason ->
+  allow_mutation:bool ->
+  t ->
+  type_expr ->
+  (Jkind_types.Sort.t, Jkind.Violation.t) result)
+  ref
 (* Forward declaration to break mutual recursion with Ctype. *)
 val same_constr: (t -> type_expr -> type_expr -> bool) ref
 (* Forward declaration to break mutual recursion with Ctype. *)
@@ -845,12 +892,6 @@ val fold_cltypes:
 val check_value_name: string -> Location.t -> unit
 
 val print_address : Format.formatter -> address -> unit
-
-type address_head =
-  | AHunit of Compilation_unit.t
-  | AHlocal of Ident.t
-
-val address_head : address -> address_head
 
 val print_stage : Format_doc.formatter -> stage -> unit
 

@@ -1,4 +1,3 @@
-# 2 "sys.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -251,6 +250,10 @@ val max_unboxed_vec128_array_length : int
 
 val max_unboxed_vec256_array_length : int
 (** Maximum length of an unboxed 256-bit simd vector array.
+    Only supported in 64-bit native code. *)
+
+val max_unboxed_vec512_array_length : int
+(** Maximum length of an unboxed 512-bit simd vector array.
     Only supported in 64-bit native code. *)
 
 external runtime_variant : unit -> string = "caml_runtime_variant"

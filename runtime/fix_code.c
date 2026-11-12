@@ -26,10 +26,8 @@
 #endif
 
 #include "caml/codefrag.h"
-#include "caml/debugger.h"
 #include "caml/fix_code.h"
 #include "caml/instruct.h"
-#include "caml/intext.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"

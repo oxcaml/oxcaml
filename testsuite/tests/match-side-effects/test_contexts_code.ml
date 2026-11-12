@@ -34,13 +34,14 @@ let example_1 () =
 (let
   (example_1/0 =
      (function {nlocal = 0} param/0[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
+       : (consts ()) (non_consts ([1: value<int>] [0: value<int>]))
        (region
          (let
            (input/0 =
               (makelocalmutable 0 (value<int>,value<
                                                (consts ())
-                                                (non_consts ([1: ?] [0: ?]))>)
+                                                (non_consts ([1: value<int>]
+                                                [0: value<int>]))>)
                 1 [0: 1]))
            (if (field_int 0 input/0)
              (let (*match*/0 =o? (field_mut 1 input/0))
@@ -89,14 +90,15 @@ let example_2 () =
 (let
   (example_2/0 =
      (function {nlocal = 0} param/1[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
+       : (consts ()) (non_consts ([1: value<int>] [0: value<int>]))
        (region
          (let
            (input/1 =[value<(consts ()) (non_consts ([0: value<int>, *]))>]
               (makelocalblock 0 (value<int>,*) 1
                 (makelocalmutable 0 (value<
-                                      (consts ()) (non_consts ([1: ?]
-                                       [0: ?]))>)
+                                      (consts ())
+                                       (non_consts ([1: value<int>]
+                                       [0: value<int>]))>)
                   [0: 1])))
            (if (field_int 0 input/1)
              (let (*match*/2 =o? (field_mut 0 (field_imm 1 input/1)))
@@ -147,23 +149,24 @@ let example_3 () =
 (let
   (example_3/0 =
      (function {nlocal = 0} param/2[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
+       : (consts ()) (non_consts ([1: value<int>] [0: value<int>]))
        (region
          (let
            (input/2 =mut[value<
                           (consts ())
                            (non_consts ([0: value<int>,
                                          value<
-                                          (consts ()) (non_consts ([1: ?]
-                                           [0: ?]))>]))>]
+                                          (consts ())
+                                           (non_consts ([1: value<int>]
+                                           [0: value<int>]))>]))>]
               [0: 1 [0: 1]]
             *match*/4 =o? *input/2)
-           (if (field_imm 0 *match*/4)
-             (switch* (field_imm 1 *match*/4)
+           (if (mixedfield 0  (?,?) *match*/4)
+             (switch* (mixedfield 1  (?,?) *match*/4)
               case tag 0:
                (if (seq (assign input/2 [0: 1 [1: 3]]) 0) [1: 3]
                  (makeblock 0 (value<int>)
-                   (field_imm 0 (field_imm 1 *match*/4))))
+                   (field_imm 0 (mixedfield 1  (?,?) *match*/4))))
               case tag 1: [1: 2])
              [1: 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_3" example_3/0))

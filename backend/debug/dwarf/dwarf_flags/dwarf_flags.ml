@@ -93,7 +93,7 @@ let use_g3 () =
   current_debug_settings := g3
 
 let use_g () =
-  if !Clflags.native_code
+  if Clflags.target_is_native ()
   then use_g1 ()
   else current_debug_settings := bytecode_g
 

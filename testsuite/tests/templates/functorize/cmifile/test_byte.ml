@@ -8,12 +8,19 @@
        annotations ([.cmti]/[.cmsi]) and the [.cmo] target the
        implementation ones ([.cmt]/[.cms]).
     2. Negative: a [-cmi-file] declaring [Make] as a plain structure
-       fails the inclusion check against the inferred functor. *)
+       fails the inclusion check against the inferred functor.
+    3. A valid [-cmi-file] declaring a narrower signature than the
+       inferred one (only [Make], exposing only [Basic]): the coerced
+       module block has fewer fields than the inferred [Intf; Make]
+       pair. *)
 
  readonly_files = "\
    main_functorize.ml test_functorize.reference \
    bundle_bad.mli \
    bad_cmi_file_struct.reference \
+   bundle_narrow.mli \
+   main_narrow.ml \
+   test_narrow.reference \
    bundle.cmi.objinfo.reference \
    bundle.cms.objinfo_byte.reference \
  ";
@@ -23,7 +30,7 @@
  set OCAMLPARAM = "";
 
  script = "mkdir p basic util p_int \
-                 bundle_cmifile bundle_bad";
+                 bundle_cmifile bundle_bad bundle_narrow";
  script;
 
  src = "${test_source_directory}/../p.mli \
@@ -51,6 +58,10 @@
 
  src = "bundle_bad.mli";
  dst = "bundle_bad/";
+ copy;
+
+ src = "bundle_narrow.mli";
+ dst = "bundle_narrow/";
  copy;
 
  set flg_base = "-w -53";
@@ -202,5 +213,50 @@
 
    compiler_reference = "bad_cmi_file_struct.reference";
    check-ocamlc.byte-output;
+ }{
+   (* (3) A valid [-cmi-file] may declare a narrower signature than the
+      inferred one (here: only [Make], with its result spelled out and
+      exposing only [Basic] of the two bundled modules).  The coerced
+      module block then has one field instead of the inferred
+      [Intf; Make] pair; the declared main module block format must
+      match it. *)
+
+   flags = "";
+   module = "bundle_narrow/bundle_narrow.mli";
+   ocamlc.byte;
+
+   flags = "$flg -functorize -I p -I basic -I util \
+     -cmi-file bundle_narrow/bundle_narrow.cmi Basic Util";
+   module = "";
+   program = "bundle_narrow/bundle_narrow.cmo";
+   all_modules = "";
+   ocamlc.byte;
+
+   flags = "$flg -I bundle_narrow -I p -I p_int -I basic";
+   module = "main_narrow.ml";
+   ocamlc.byte;
+
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_narrow.bc";
+   all_modules = "\
+     basic/basic__.cmo \
+     util/util__.cmo \
+     basic/basic.cmo \
+     util/util.cmo \
+     p_int/p_int__.cmo \
+     p_int/p_int.cmo \
+     bundle_narrow/bundle_narrow.cmo \
+     main_narrow.cmo \
+   ";
+   ocamlc.byte;
+
+   stdout = "test_narrow.output";
+   stderr = "test_narrow.output";
+   output = "test_narrow.output";
+   run;
+
+   reference = "test_narrow.reference";
+   check-program-output;
  }
 *)

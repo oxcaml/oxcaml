@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
+let dump_ssa = ref false                (* -dssa *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
@@ -41,7 +42,13 @@ let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
 let cfg_eliminate_dead_trap_handlers = ref true
-                                       (* -cfg-eliminate-dead-trap-handlers *)
+(* -cfg-eliminate-dead-trap-handlers *)
+
+let cfg_eliminate_dead_code_validate = ref false
+(* -cfg-eliminate-dead-code-validate *)
+
+let cfg_dominators_validate = ref false  (* -cfg-dominators-validate *)
+let cfg_liveness_validate = ref false  (* -cfg-liveness-validate *)
 
 let cfg_prologue_validate = ref true     (* -[no-]cfg-prologue-validate *)
 let cfg_prologue_shrink_wrap = ref true     (* -[no-]cfg-prologue-shrink-wrap *)
@@ -59,8 +66,10 @@ let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)
 let cfg_value_propagation_flow = ref false
                                         (* -[no]-cfg-value-propagation-flow *)
+
+let cfg_copy_propagation = ref false    (* -[no]-cfg-copy-propagation *)
+
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
-let basic_block_sections = ref false    (* -basic-block-sections *)
 (* -module-entry-functions-section *)
 let module_entry_functions_section = ref false
 
@@ -139,6 +148,12 @@ let branch_relaxation_max_displacement =
 
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
+let use_ssa = ref false                      (* -use-ssa *)
+
+let ssa_simplify = ref true                 (* -ssa-simplify *)
+
+let ssa_validate = ref true                 (* -ssa-validate *)
+
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
@@ -178,6 +193,8 @@ let llvm_path = ref None (* -llvm-path *)
 
 let llvm_flags = ref "" (* -llvm-flags *)
 
+let fdo_counters = ref false (* -fdo-counters *)
+
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
   let reaper_debug_flags = ref [] (* -reaper-debug-flags *)
@@ -197,6 +214,7 @@ module Flambda2 = struct
     let reaper_unbox = true
     let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
+    let lto_support = false
     let simplify_stubs =
       (* CR pchambart: should be changed to true after proper testing *)
       false
@@ -220,6 +238,7 @@ module Flambda2 = struct
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    lto_support : bool;
     simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
@@ -242,6 +261,7 @@ module Flambda2 = struct
     reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
+    lto_support = Default.lto_support;
     simplify_stubs = Default.simplify_stubs;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
@@ -292,6 +312,7 @@ module Flambda2 = struct
   let reaper_unbox = ref Default
   let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
+  let lto_support = ref Default
   let match_in_match = ref Default
   let simplify_stubs = ref Default
 

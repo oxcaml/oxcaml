@@ -146,6 +146,7 @@
                           Label_disambiguation
                             Unambiguous
                       Texp_construct \"()\"
+                      Constructor_uniform_value
                       []
                   <case>
                     pattern (test.ml[5,58+4]..test.ml[5,58+5])
@@ -159,9 +160,9 @@
                         []
                         None
                     expression (test.ml[5,58+9]..test.ml[5,58+10])
-                      attribute \"merlin.incorrect\"
+                      attribute \"ocaml.incorrect\"
                         []
-                      attribute \"merlin.saved-parts\"
+                      attribute \"ocaml.saved-parts\"
                         [
                           structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                             Pstr_eval
@@ -177,13 +178,13 @@
                     pattern (test.ml[6,69+4]..test.ml[6,69+5])
                       Tpat_value
                       pattern (test.ml[6,69+4]..test.ml[6,69+5])
-                        attribute \"merlin.incorrect\"
+                        attribute \"ocaml.incorrect\"
                           []
                         Tpat_any
                     expression (test.ml[6,69+9]..test.ml[6,69+12])
-                      attribute \"merlin.incorrect\"
+                      attribute \"ocaml.incorrect\"
                         []
-                      attribute \"merlin.saved-parts\"
+                      attribute \"ocaml.saved-parts\"
                         [
                           structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                             Pstr_eval
@@ -293,7 +294,7 @@
               Nolabel
               Param_pat
                 pattern (test2.ml[2,15+7]..test2.ml[2,15+8])
-                  attribute \"merlin.incorrect\"
+                  attribute \"ocaml.incorrect\"
                     []
                   extra (test2.ml[2,15+6]..test2.ml[2,15+13])
                     Tpat_extra_constraint
@@ -309,9 +310,9 @@
             ]
             Tfunction_body
               expression (test2.ml[2,15+22]..test2.ml[2,15+24])
-                attribute \"merlin.incorrect\"
+                attribute \"ocaml.incorrect\"
                   []
-                attribute \"merlin.saved-parts\"
+                attribute \"ocaml.saved-parts\"
                   [
                     structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                       Pstr_eval
@@ -682,9 +683,11 @@ make sure we also handle that correctly in structures:
               Label: None
                 expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+25])
                   Texp_constant Const_int 3
+              value
               Label: None
                 expression (test_ct.ml[3,20+27]..test_ct.ml[3,20+28])
                   Texp_constant Const_int 4
+              value
             ]
       ]
     structure_item (test_ct.ml[5,50+0]..test_ct.ml[5,50+27])
@@ -733,9 +736,11 @@ make sure we also handle that correctly in structures:
               Label: None
                 expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+24])
                   Texp_constant Const_int 3
+              value
               Label: None
                 expression (test_ct.ml[5,50+26]..test_ct.ml[5,50+27])
                   Texp_constant Const_int 4
+              value
             ]
       ]
   ]

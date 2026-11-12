@@ -65,16 +65,17 @@ module Dune_manifests_reader : sig
       val root_override : string option ref
     end
 
-    module Load_root_relative : sig
-      type t
-
-      val of_string : string -> t
-    end
-
     module Cwd_relative : sig
       type t
 
       val to_string : t -> string
+    end
+
+    module Load_root_relative : sig
+      type t
+
+      val of_string : string -> t
+      val to_cwd_relative : t -> Cwd_relative.t
     end
   end
 
@@ -84,7 +85,7 @@ module Dune_manifests_reader : sig
 
   val read_manifest
     :  t
-    -> f:(filename:string -> location:Path.Cwd_relative.t ->
+    -> f:(basename:string -> location:Path.Cwd_relative.t ->
           cmx_guaranteed:bool -> unit)
     -> on_manifest:(Path.Load_root_relative.t -> unit)
     -> manifest_path:Path.Load_root_relative.t
@@ -190,7 +191,7 @@ end = struct
   module Entry = struct
     type t =
       | File of
-          { filename : string
+          { basename : string
           ; location : Path.Load_root_relative.t
           ; cmx_guaranteed : bool
           }
@@ -199,15 +200,15 @@ end = struct
 
   let parse_line ~buffer line =
     match split_and_unescape ~buffer line with
-    | [ "file"; filename; location ] ->
+    | [ "file"; basename; location ] ->
       let location = Path.Load_root_relative.of_string location in
-      Some (Entry.File { filename; location; cmx_guaranteed = false })
-    | [ "file_x"; filename; location ] ->
+      Some (Entry.File { basename; location; cmx_guaranteed = false })
+    | [ "file_x"; basename; location ] ->
       let location = Path.Load_root_relative.of_string location in
-      Some (Entry.File { filename; location; cmx_guaranteed = true })
+      Some (Entry.File { basename; location; cmx_guaranteed = true })
     | [ "manifest"; _; location ] ->
-      (* [filename] is included in "manifest" entry only for human
-         readability, so we discard them here. *)
+      (* The name is included in "manifest" entry only for human
+         readability, so we discard it here. *)
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.Manifest location)
     | [] -> None
@@ -220,9 +221,9 @@ end = struct
       iter_lines manifest_path ~f:(fun line ->
         match parse_line ~buffer line with
         | None -> ()
-        | Some (Entry.File { filename; location; cmx_guaranteed }) ->
+        | Some (Entry.File { basename; location; cmx_guaranteed }) ->
           visit t location ~f:(fun location ->
-            f ~filename ~location ~cmx_guaranteed)
+            f ~basename ~location ~cmx_guaranteed)
         | Some (Manifest manifest_path) -> on_manifest manifest_path))
   ;;
 end
@@ -480,8 +481,7 @@ let init_manifests () =
       !manifests_reader
       ~manifest_path
       ~on_manifest:load_visible_manifest
-      ~f:(fun ~filename ~location ~cmx_guaranteed ->
-          let basename = Filename.basename filename in
+      ~f:(fun ~basename ~location ~cmx_guaranteed ->
           visible_basenames := basename :: !visible_basenames;
           Path_cache.prepend_add_single
             ~hidden:false
@@ -521,8 +521,7 @@ let load_one_pending_manifest ~uncap fn =
       ~manifest_path
       ~on_manifest:(fun manifest_path ->
         Queue.add manifest_path !pending_hidden_manifests)
-      ~f:(fun ~filename ~location ~cmx_guaranteed:_ ->
-        let basename = Filename.basename filename in
+      ~f:(fun ~basename ~location ~cmx_guaranteed:_ ->
         let location =
           Dune_manifests_reader.Path.Cwd_relative.to_string location in
         if Option.is_none !found && basename_matches ~uncap fn basename
@@ -538,12 +537,16 @@ let rec find_in_pending_manifests ~uncap fn =
 let find_loading_manifests fn =
   match Path_cache.find fn with
   | result -> result
-  | exception Not_found -> find_in_pending_manifests ~uncap:false fn
+  | exception Not_found ->
+    Profile.record_call ~accumulate:true "find_in_pending_manifests" (fun () ->
+      find_in_pending_manifests ~uncap:false fn)
 
 let find_uncap_loading_manifests fn_uncap =
   match Path_cache.find_uncap ~fn_already_uncapped:fn_uncap with
   | result -> result
-  | exception Not_found -> find_in_pending_manifests ~uncap:true fn_uncap
+  | exception Not_found ->
+    Profile.record_call ~accumulate:true "find_in_pending_manifests" (fun () ->
+      find_in_pending_manifests ~uncap:true fn_uncap)
 
 (* CR-soon zqian: the whole load path (directories and manifests) is re-read
    from disk and the cache rebuilt on every [init], even though the flags they
@@ -560,6 +563,18 @@ let init ~auto_include ~visible ~hidden =
   hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
   Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
     List.iter Path_cache.prepend_add !hidden_dirs);
+  Profile.record_call ~accumulate:true "load_hidden_files" (fun () ->
+    List.iter
+      (fun ({ basename; actual_path; cmx_guaranteed }
+             : Clflags.hidden_include_file) ->
+        let actual_path =
+          Dune_manifests_reader.Path.Load_root_relative.of_string actual_path
+          |> Dune_manifests_reader.Path.Load_root_relative.to_cwd_relative
+          |> Dune_manifests_reader.Path.Cwd_relative.to_string
+        in
+        Path_cache.prepend_add_single ~hidden:true ~cmx_guaranteed
+          basename actual_path)
+      !Clflags.hidden_include_files);
   Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
     List.iter Path_cache.prepend_add !visible_dirs);
   init_manifests ();

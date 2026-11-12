@@ -9,9 +9,9 @@ let code loopify(never) size(34) newer_version_of(f_0)
      | 0 -> k3
      | 1 -> k4)
     where k4 =
-      let Pfield = %block_load.[`1`] (y) in
-      let Pfield_1 = %block_load.[`0`] (y) in
-      let int_add = %int_barith.add (Pfield_1, Pfield) in
+      let Pmixedfield = %block_load.[`1`] (y) in
+      let Pmixedfield_1 = %block_load.[`0`] (y) in
+      let int_add = %int_barith.add (Pmixedfield_1, Pmixedfield) in
       let Popaque = %opaque (int_add) in
       cont k2 (y)
     where k3 =

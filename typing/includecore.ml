@@ -36,6 +36,7 @@ type primitive_mismatch =
   | Native_name
   | Result_repr
   | Argument_repr of int
+  | Elided_args
   | Layout_poly_attr
 
 type value_mismatch =
@@ -100,6 +101,7 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
 let check_modes env ~crossing ~static ~item ?typ = function
   | All -> Ok ()
   | Specific ((m0, c), m1) ->
+      let crossing = crossing () in
       let m0 =
         match c with
         | None -> m0 |> Mode.With_regionality.disallow_right
@@ -124,8 +126,12 @@ let native_repr_args nra1 nra2 =
     | [], [] -> None
     | [], _ :: _ -> assert false
     | _ :: _, [] -> assert false
+    | (_, Primitive.Elided_void) :: _, (_, Primitive.Native_repr _) :: _
+    | (_, Primitive.Native_repr _) :: _, (_, Primitive.Elided_void) :: _ ->
+      Some Elided_args
     | (_, nr1) :: nra1, (_, nr2) :: nra2 ->
-      if not (Primitive.equal_native_repr nr1 nr2) then Some (Argument_repr i)
+      if not (Primitive.equal_native_repr_or_elided nr1 nr2)
+      then Some (Argument_repr i)
       else loop (i+1) nra1 nra2
   in
   loop 1 nra1 nra2
@@ -134,7 +140,7 @@ let primitive_descriptions pd1 pd2 =
   let open Primitive in
   if not (String.equal pd1.prim_name pd2.prim_name) then
     Some Name
-  else if not (Int.equal pd1.prim_arity pd2.prim_arity) then
+  else if not (Int.equal pd1.prim_type_arity pd2.prim_type_arity) then
     Some Arity
   else if (not pd1.prim_alloc) && pd2.prim_alloc then
     Some (No_alloc First)
@@ -182,9 +188,11 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
 
-let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
+let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly
+    ty1 subst ty2 subst_ty2 =
   let tc_args =
-    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 ty2
+    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly
+      ty1 subst ty2 subst_ty2
   in
   (* We can set uninstantiated variables (given by [None]) to anything,
      including the variable at the same position.
@@ -219,7 +227,8 @@ let value_descriptions_zero_alloc
   let vd1_zero_alloc, prim_coercion_zero_alloc_check =
     match vd1.val_kind, Zero_alloc.get vd2.val_zero_alloc with
     | Val_prim p, Check check ->
-      ( Zero_alloc.create_const (Check { check with arity = p.prim_arity }),
+      ( Zero_alloc.create_const
+          (Check { check with arity = p.prim_type_arity }),
         Some check )
     | ( (Val_reg _ | Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _ |
          Val_anc _),
@@ -244,10 +253,11 @@ let uid_is_from_current_unit uid =
       (Compilation_unit.full_path_as_string (Unit_info.modname current_unit))
   | None, _ | _, None -> false
 
-(* [static] is [true] if the [module_coercion] requires a [static] argument *)
+(* [static] is [true] if the [module_coercion] requires a [static] argument.
+   [subst_ty2] must be [lazy] of [vd2.val_type] with [subst2] applied. *)
 let value_descriptions_without_modes ~loc env name ~self_check
     (vd1 : Types.value_description)
-    (vd2 : Types.value_description)
+    subst2 (vd2 : Types.value_description) subst_ty2
     : module_coercion * static:bool =
   Builtin_attributes.check_alerts_inclusion
     ~def:vd1.val_loc
@@ -255,12 +265,18 @@ let value_descriptions_without_modes ~loc env name ~self_check
     loc
     vd1.val_attributes vd2.val_attributes
     name;
+  (* [vd2] does not need [subst2] applied to it, as [Subst.value_description]
+     only makes relevant changes (writing [val_zero_alloc] or renumbering sort
+     variables) when [Prepare_for_saving] or [Saving] / [Loading] respectively.
+     These are only needed when interacting with .cmi files, not here *)
   let prim_coercion_zero_alloc_check = value_descriptions_zero_alloc vd1 vd2 in
   let val_lpoly1 = Lpoly.get_exn vd1.val_lpoly in
   let val_lpoly2 = Lpoly.get_exn vd2.val_lpoly in
   match vd1.val_kind with
   | Val_prim p1 -> begin
      assert (List.is_empty val_lpoly1);
+     (* As above, only the type of [vd2] needs [subst2] applied *)
+     let vd2 = { vd2 with val_type = Lazy.force subst_ty2 } in
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
@@ -278,8 +294,8 @@ let value_descriptions_without_modes ~loc env name ~self_check
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
-             match moregeneral_lpoly ~self_check env
-                 val_lpoly1 val_lpoly2 ty1 ty2 with
+             match moregeneral_lpoly ~self_check env val_lpoly1 val_lpoly2
+                 ty1 Subst.identity ty2 (Lazy.from_val ty2) with
              | None -> ()
              | Some _ ->
               Misc.fatal_errorf
@@ -302,8 +318,8 @@ let value_descriptions_without_modes ~loc env name ~self_check
         in
         let tc =
           try
-            moregeneral_lpoly ~self_check env
-              val_lpoly1 val_lpoly2 ty1 vd2.val_type
+            moregeneral_lpoly ~self_check env val_lpoly1 val_lpoly2
+              ty1 Subst.identity vd2.val_type subst_ty2
             |> Option.value ~default:{ tc_params = []; tc_args = [] }
           with Ctype.Moregen err -> raise (Dont_match (Type err))
         in
@@ -323,19 +339,18 @@ let value_descriptions_without_modes ~loc env name ~self_check
            pc_poly_sort = sort1;
            pc_yielding =
              Ctype.prim_params_yielding env vd2.Types.val_type
-               ~arity:p1.prim_arity;
+               ~arity:p1.prim_type_arity;
            pc_zero_alloc_check = prim_coercion_zero_alloc_check;
            pc_kindtemplate = tc;
            pc_env = env;
            pc_loc;
           }
         in
-        Tcoerce_primitive pc,
-        ~static:(kindtemplate_coercion_instantiates tc)
+        Tcoerce_primitive pc, ~static:(kindtemplate_coercion_instantiates tc)
      end
   | _ ->
-     match moregeneral_lpoly ~self_check env
-             val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
+     match moregeneral_lpoly ~self_check env val_lpoly1 val_lpoly2
+             vd1.val_type subst2 vd2.val_type subst_ty2 with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | tc -> begin
        match vd2.val_kind with
@@ -348,12 +363,18 @@ let value_descriptions_without_modes ~loc env name ~self_check
           | None -> Tcoerce_none, ~static:false
      end
 
-let value_descriptions ~loc env name ~mmodes ~self_check vd1 vd2 =
+let value_descriptions ~loc env name ~mmodes ~self_check vd1 subst2 vd2 =
+  (* Lazy so that the substitution is done at most once, and only if moregen
+     or the crossing computation needs it. *)
+  let subst_ty2 = lazy (Subst.type_expr subst2 vd2.val_type) in
   let cc, ~static =
-    value_descriptions_without_modes ~loc env name ~self_check vd1 vd2
+    value_descriptions_without_modes ~loc env name ~self_check
+      vd1 subst2 vd2 subst_ty2
   in
   let () =
-    let crossing = Ctype.crossing_of_ty env vd2.val_type in
+    (* The crossing must be computed on a type whose paths make sense in
+       [env], so [vd2]'s type must be substituted to do so. *)
+    let crossing () = Ctype.crossing_of_ty env (Lazy.force subst_ty2) in
     let modalities = vd1.val_modalities, vd2.val_modalities in
     let modes =
       match child_modes_with_modalities name ~modalities mmodes with
@@ -369,7 +390,7 @@ let value_descriptions ~loc env name ~mmodes ~self_check vd1 vd2 =
   cc
 
 let check_modes env ?(crossing = Crossing.max) ~item ?typ =
-  check_modes env ~crossing ~static:false ~item ?typ
+  check_modes env ~crossing:(fun () -> crossing) ~static:false ~item ?typ
 
 (* Inclusion between manifest types (particularly for private row types) *)
 
@@ -568,6 +589,8 @@ let report_primitive_mismatch first second ppf err =
   | Argument_repr n ->
       pr "The two primitives' %d%s arguments have different representations"
         n (Misc.ordinal_suffix n)
+  | Elided_args ->
+      pr "The two primitives elide different arguments"
   | Layout_poly_attr ->
       pr "The two primitives have different [@@layout_poly] attributes"
 
@@ -1928,6 +1951,6 @@ let jkind_declarations ~loc env name
   | _, None -> None
   | None, Some _ -> Some Manifest_missing
   | Some k1, Some k2 ->
-    if Jkind.Const.equal env k1 k2
-    then None
-    else Some Manifest_mismatch
+    match Jkind.Const.equal env k1 k2 with
+    | Ok () -> None
+    | Error _ -> Some Manifest_mismatch

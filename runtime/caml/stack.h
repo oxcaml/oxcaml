@@ -20,6 +20,9 @@
 
 #ifdef CAML_INTERNALS
 
+#include "mlvalues.h"
+#include "config.h"
+
 /* Macros to access OCaml stacks */
 
 /* An OCaml stack is composed of one or several "chunks", each chunk

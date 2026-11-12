@@ -16,34 +16,24 @@
 
 (** Contents of middle-end-specific portion of .cmx files when using Flambda. *)
 
-type table_data =
-  { symbols : Symbol.importer;
-    variables : Variable.importer;
-    simples : Simple.importer;
-    consts : Reg_width_const.importer;
-    code_ids : Code_id.importer;
-    continuations : Continuation.importer
-  }
-
 type t0 =
   { original_compilation_unit : Compilation_unit.t;
     final_typing_env : Flambda2_types.Typing_env.Serializable.t;
     all_code : Exported_code.raw;
     exported_offsets : Exported_offsets.t;
     used_value_slots : Value_slot.Set.t;
-    table_data : table_data
+    table_data : Ids_for_export.Table_data.t
   }
 
-type raw = File_sections.Idx.t
+type raw = t0 list File_sections.Idx.t
 
 type t = t0 list * File_sections.t
 
 let from_raw ~sections raw =
-  let t : t0 list = Obj.obj (File_sections.get sections raw) in
+  let t = File_sections.get sections raw in
   t, sections
 
-let to_raw ~sections (t : t0 list) =
-  File_sections.Builder.add sections (Obj.repr t)
+let to_raw ~sections t = File_sections.Builder.add sections t
 
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     ~sections =
@@ -51,23 +41,11 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     Flambda2_types.Typing_env.Serializable.ids_for_export final_typing_env
   in
   let all_code_exported_ids = Exported_code.ids_for_export all_code in
-  let exported_ids =
-    Ids_for_export.union typing_env_exported_ids all_code_exported_ids
-  in
-  let symbols = Symbol.export exported_ids.symbols in
-  let variables = Variable.export exported_ids.variables in
-  let simples = Simple.export exported_ids.simples in
-  let consts = Reg_width_const.export exported_ids.consts in
-  let code_ids = Code_id.export exported_ids.code_ids in
-  let continuations = Continuation.export exported_ids.continuations in
   let table_data =
-    { symbols; variables; simples; consts; code_ids; continuations }
+    Ids_for_export.Table_data.create
+      (Ids_for_export.union typing_env_exported_ids all_code_exported_ids)
   in
-  let all_code =
-    Exported_code.to_raw
-      ~add_section:(File_sections.Builder.add sections)
-      all_code
-  in
+  let all_code = Exported_code.to_raw ~sections all_code in
   let t =
     [ { original_compilation_unit = Current_unit.get_cu_exn ();
         final_typing_env;
@@ -80,18 +58,11 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   to_raw ~sections t
 
 let import_typing_env_and_code0 ~sections t =
-  let symbols = t.table_data.symbols in
-  let variables = t.table_data.variables in
-  let simples = t.table_data.simples in
-  let consts = t.table_data.consts in
-  let code_ids = t.table_data.code_ids in
-  let continuations = t.table_data.continuations in
-  let used_value_slots = t.used_value_slots in
-  let original_compilation_unit = t.original_compilation_unit in
   let renaming =
     Profile.record_call ~accumulate:true "create_import_map" (fun () ->
-        Renaming.create_import_map ~symbols ~variables ~simples ~consts
-          ~code_ids ~continuations ~used_value_slots ~original_compilation_unit)
+        Ids_for_export.Table_data.create_import_map t.table_data
+          ~used_value_slots:t.used_value_slots
+          ~original_compilation_unit:t.original_compilation_unit)
   in
   let typing_env =
     Profile.record_call ~accumulate:true "typing_env_apply_renaming" (fun () ->
@@ -104,7 +75,7 @@ let import_typing_env_and_code0 ~sections t =
   in
   let all_code =
     Profile.record_call ~accumulate:true "exported_code_apply_renaming"
-      (fun () -> Exported_code.apply_renaming code_ids renaming all_code)
+      (fun () -> Exported_code.apply_renaming renaming all_code)
   in
   typing_env, all_code
 

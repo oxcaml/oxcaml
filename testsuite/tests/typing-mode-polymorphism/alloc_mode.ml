@@ -24,8 +24,9 @@ let foo r x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/0 x/0)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
 val foo :
-  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
-  <fun>
+  'a myref @ [< global corrupted write] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  unit @ 'm = <fun>
 |}]
 
 let foo (r @ local) x = r.i <- x
@@ -36,8 +37,9 @@ let foo (r @ local) x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/1 x/1)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
 val foo :
-  'a myref @ [< write > local] ->
-  'a @ [< global many read_write] -> unit @ 'm = <fun>
+  'a myref @ [< corrupted write > local] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  unit @ 'm = <fun>
 |}]
 
 (* Can be [setfield_ptr] *)
@@ -46,8 +48,9 @@ let foo (r @ global) x = r.i <- x
 (let (foo/2 = (function {nlocal = 0} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
 val foo :
-  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
-  <fun>
+  'a myref @ [< global corrupted write] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  unit @ 'm = <fun>
 |}]
 
 let foo () =
@@ -86,7 +89,8 @@ Warning 26 [unused-var]: unused variable "r".
              (setfield_ptr(maybe-stack) 0 r/6 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/4))
 
-val foo : unit @ 'n -> string myref @ [< write] -> unit @ 'm = <fun>
+val foo : unit @ 'n -> string myref @ [< corrupted write] -> unit @ 'm =
+  <fun>
 |}]
 
 let foo () =
@@ -161,7 +165,8 @@ let foo () =
      (function {nlocal = 1} param/5[L][value<int>] : stack
        (apply[L] fst_local/0 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/7))
-val foo : unit @ 'n -> 'a @ 'm -> int @ [> local] = <fun>
+val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local dynamic] =
+  <fun>
 |}]
 
 
@@ -257,7 +262,8 @@ let rec forward =
           (makeblock 0 g/0)))
       (apply (field_imm 1 (global Toploop!)) "forward" forward/0))))
 val forward :
-  int @ [< many read_write > dynamic] -> int @ [< global > dynamic] = <fun>
+  int @ [< many uncontended read_write > dynamic] ->
+  int @ [< global > dynamic] = <fun>
 |}]
 
 (* Same wrapper, but closing over the yielding [y]: all calls must be
@@ -293,7 +299,8 @@ let forward_yielding (y @ yielding) =
     forward_yielding/0))
 val forward_yielding :
   'a @ [< global many > yielding] ->
-  int @ [< many read_write > dynamic] -> int @ [< global > dynamic] = <fun>
+  int @ [< many uncontended read_write > dynamic] ->
+  int @ [< global > dynamic] = <fun>
 |}]
 
 (* A first-class primitive's synthesized application ([Id_prim]) uses its

@@ -1,7 +1,6 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
- flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -55,7 +54,7 @@ Line 2, characters 0-37:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
        The layout of bad is value & value
-         because of the definition of pair at line 1, characters 0-41.
+         because it is an unboxed record.
        But the layout of bad must be a value layout
          because of the definition of pair at line 1, characters 0-41.
 |}]

@@ -439,20 +439,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of { layout : layout }
-  | Patomic_set_ptr of { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -496,6 +482,7 @@ type primitive =
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   (* Poll for runtime actions. May run pending actions such as signal
      handlers, finalizers, memprof callbacks, etc, as well as GCs and
      GC slices, so should not be moved or optimised away. *)
@@ -510,17 +497,29 @@ type primitive =
      offset and behave as if the base were null. *)
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
-    compiled away. *)
+    compiled away.
+
+    [Unpacked_product] (from [@unpacked]) and a [Same_as_ocaml_repr] product
+    differ only in native-code calling convention: the former's components
+    are passed as separate C arguments, and the latter is passed as the
+    corresponding C struct. *)
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
+  | Unpacked_product of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Raw_pointer
+  (** A fat-pointer argument (unboxed pair of a [value] base and a [bits64]
+      byte offset), passed to C as a single raw pointer: base + offset. *)
 
-and external_call_description = extern_repr Primitive.description_gen
+and external_call_description =
+  (extern_repr, extern_repr) Primitive.description_gen
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -628,8 +627,6 @@ and value_kind_non_null =
   | Pboxedvectorval of boxed_vector
   | Pboxedmaskval
 
-(* Because we check for and error on void in the translation to lambda, we don't
-   need a constructor for it here. *)
 and layout =
   | Ptop
   | Pvalue of value_kind
@@ -637,9 +634,11 @@ and layout =
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_mask
+  | Pvoid
   | Punboxed_product of layout list
+    (** Invariant: the layout list has length >= 2 *)
   | Pbottom
-  | Psplicevar of Slambdaident.t
+  | Psplicevar of Layout_ident.t
 
 and block_shape =
   | All_value
@@ -663,8 +662,10 @@ and 'a mixed_block_element =
   | Mask
   | Word
   | Untagged_immediate
+  | Void
   | Product of 'a mixed_block_element array
-  | Splice_variable of Slambdaident.t
+    (** Invariant: the mixed_block_element array has length >= 2 *)
+  | Splice_variable of Layout_ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -697,6 +698,7 @@ and variant_representation =
 and constructor_shape =
   | Constructor_shape_uniform of value_kind list
   | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -869,6 +871,7 @@ type zero_alloc_attribute =
                   This definition may not be applicable to new properties. *)
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;
@@ -1009,17 +1012,16 @@ type pop_region =
   Compilation looks like: {[
     typedtree
     ---transl--> tlambda
-    --fracture-> slambda
     ----eval---> rawlambda
     ---simplif-> lambda
   ]}
-  where [tlambda], [slambda], [rawlambda], and [lambda] are all represented
-  using this type.
+  where [tlambda], [rawlambda], and [lambda] are all represented using this
+  type.
 
   Most constructors are valid at all stages, the constructors that aren't
   document this. The only other difference is that [layout] can contain
-  variables before eval ([tlambda] and [slambda]) and not after eval
-  ([rawlambda] and [lambda]).
+  variables before eval ([tlambda]) and not after eval ([rawlambda] and
+  [lambda]).
 *)
 type lambda =
     Lvar of Ident.t
@@ -1069,51 +1071,14 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  (* [Lsplice] should only exist in the slambda stage. *)
-  | Lsplice of scoped_location * slambda
   (* [Lkindtemplate] should only exist in the tlambda stage. *)
   | Lkindtemplate of lkindtemplate
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
   | Lkindinstantiate of lkindinstantiate
   (* [Ltemplate] should only exist in the tlambda stage. *)
-  | Ltemplate of ltemplate
+  | Ltemplate of lfunction
   (* [Linstantiate] should only exist in the tlambda stage. *)
   | Linstantiate of lambda_apply
-
-and slambda =
-  | SLlayout of layout
-  | SLglobal of Compilation_unit.t
-  | SLvar of Slambdaident.t
-  | SLmissing
-  | SLrecord of slambda list
-  | SLfield of slambda * int
-  | SLhalves of slambda_halves
-  | SLproj_comptime of slambda
-    (** Project out the compiletime half of a [slambda_halves] *)
-  | SLtemplate of slambda_function
-  | SLinstantiate of slambda_apply
-  | SLlet of slambda_let
-
-and slambda_halves =
-  { sval_comptime: slambda;
-    sval_runtime: lambda
-  }
-
-and slambda_function =
-  { sfun_params: Slambdaident.t array;
-    sfun_body: slambda
-  }
-
-and slambda_apply =
-  { sapp_func: slambda;
-    sapp_args: slambda array
-  }
-
-and slambda_let =
-  { slet_name: Slambdaident.t;
-    slet_value: slambda;
-    slet_body: slambda
-  }
 
 and rec_binding = {
   id : Ident.t;
@@ -1143,11 +1108,8 @@ and lfunction = private
   }
 
 and lkindtemplate =
-  { ktmpl_params: Slambdaident.t list;
+  { ktmpl_params: Layout_ident.t list;
     ktmpl_body: lfunction;
-    ktmpl_env: (lambda * layout) Ident.Map.t;
-    ktmpl_env_mode: locality_mode;
-    ktmpl_loc: scoped_location;
   }
 
 and lkindinstantiate =
@@ -1156,11 +1118,6 @@ and lkindinstantiate =
     kinst_result_layout: layout;
     kinst_mode: return_mode;
     kinst_loc: scoped_location;
-  }
-
-and ltemplate =
-  { tmpl_func: lfunction;
-    tmpl_env: (lambda * layout) Ident.Map.t;
   }
 
 and lambda_while =
@@ -1270,15 +1227,6 @@ val main_module_representation :
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;         (* Index of argument block (see
-                                           [arg_descr]). If
-                                           [main_module_block_format] is
-                                           [Mb_struct], this is an index into
-                                           the main module block of the
-                                           compilation unit. For
-                                           [Mb_instantiating_functor], this is
-                                           an index into the module returned by
-                                           the instantiating functor. *)
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
@@ -1296,27 +1244,6 @@ type program =
      Initialize_symbol(module_name, 0,
        [getfield 0; ...; getfield (main_module_block_size mbf - 1)])
 *)
-
-(* Info for a compilation unit that implements a parameter (that is, was
-   compiled with [-as-argument-for]). Note that if the CU is itself
-   parameterised, this information (in particular [arg_block_idx]) describes
-   instances rather than the base CU gs. *)
-type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-                                        (* The parameter implemented (the [P] in
-                                           [-as-argument-for P]) *)
-    arg_block_idx: int;                 (* The index within the main module
-                                           block of the _argument block_. If
-                                           this compilation unit is used as an
-                                           argument when instantiating,
-                                           [-instantiate] will pass the argument
-                                           block to the instantiating functor
-                                           (see [main_module_block_format]). The
-                                           argument block's signature is exactly
-                                           that of the parameter, which is in
-                                           general a supertype of this
-                                           compilation unit's signature. *)
-  }
 
 (* Sharing key *)
 val make_key: lambda -> lambda option
@@ -1336,6 +1263,7 @@ val split_vectors : bool
 val layout_unit : layout
 val layout_bool : layout
 val layout_unboxed_unit : layout
+val layout_void : layout
 val layout_int : layout
 val layout_array : array_kind -> layout
 val layout_block : layout
@@ -1359,16 +1287,8 @@ val layout_tupled_vector : boxed_vector -> layout
 val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
-(* A layout that is Pgenval because it is the field of a tuple *)
-val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
-(* A layout that is Pgenval because it is the field of a block being considered
-   for the tmc transformation
-*)
-val layout_tmc_field : layout
-(* A layout that is Pgenval because it is an optional argument *)
-val layout_optional_arg : layout
 val layout_value_field : layout
 val layout_predef_value : layout
 val layout_lazy : layout
@@ -1381,7 +1301,7 @@ val layout_instance_var : layout
 val layout_method : layout
 val layout_initializer : layout
 val layout_array_comprehension_element : layout
-val layout_list_element : layout
+val layout_list_comprehension_element : layout
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
 val layout_block_idx : layout
@@ -1435,8 +1355,8 @@ val iter_head_constructor: (lambda -> unit) -> lambda -> unit
     expression.
 
     Callers should note that you will need to handle stage specific
-    constructors ([Lsplice], etc) depending on what stage you are calling this
-    from.
+    constructors ([Lkindtemplate], etc) depending on what stage you are
+    calling this from.
 *)
 
 val shallow_iter:
@@ -1447,8 +1367,8 @@ val shallow_iter:
     sub-terms which are in tail position or not.
 
     Callers should note that you will need to handle stage specific
-    constructors ([Lsplice], etc) depending on what stage you are calling this
-    from.
+    constructors ([Lkindtemplate], etc) depending on what stage you are
+    calling this from.
 *)
 
 val transl_prim: string -> string -> lambda
@@ -1493,12 +1413,27 @@ val is_uniform_block_shape : block_shape -> bool
    non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
+(** In bytecode, a block whose only field is an unboxed product, like
+    [{ p : #(int * int) }], stores the fields of that product directly, just
+    like [{ x : int; y : int }]. This maintains the invariant that values of
+    the same layout (here, [(value & value) box]) be represented the same.
+
+    [singleton_product_shape_for_bytecode shape] returns [Some elements] if
+    [shape] is such a block, where [elements] is the shape of its flattened
+    fields, and [None] otherwise. *)
+val singleton_product_shape_for_bytecode :
+  'a mixed_block_element array -> 'a mixed_block_element array option
+
 val mixed_block_shape_has_splices : 'a mixed_block_element array -> bool
 
 val mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> mixed_block_shape
   -> 'a mixed_block_element array
+
+(* Translate a representable layout, turning generalized sorts into splices.
+   Rejects [Any] and [Univar]. *)
+val transl_layout : Jkind_types.Layout.Const.t -> unit mixed_block_element
 
 val transl_module_representation :
   Types.module_representation -> module_representation
@@ -1543,17 +1478,6 @@ val map : (lambda -> lambda) -> lambda -> lambda
 
 val map_lfunction : (lambda -> lambda) -> lfunction -> lfunction
   (** Apply the given transformation on the function's body *)
-
-val extract_free_var_env :
-  layout_of_ident:(Ident.t -> layout option) ->
-  lfunction ->
-  lfunction * (lambda * layout) Ident.Map.t
-(** [extract_free_var_env ~layout_of_ident lfun] computes an environment for the
-    provided function by renaming the free variables of [lfun] to fresh idents,
-    and returning the freshened function together with the mapping from new
-    idents to (lambda that evaluates to) the old idents.
-    Free variables for which [layout_of_ident] returns [None] are not
-    freshened. *)
 
 val shallow_map  :
   tail:(lambda -> lambda) ->
@@ -1646,6 +1570,8 @@ val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> 'a mixed_block_element
 
+val layout_of_mixed_block_element : _ mixed_block_element -> layout
+
 (** Returns the element at the given path in a mixed block shape.
     The path is a list of field indices for navigating into nested products. *)
 val project_from_mixed_block_shape
@@ -1703,7 +1629,9 @@ val count_initializers_array_kind : array_kind -> int
 val ignorable_product_element_kind_involves_int :
   ignorable_product_element_kind -> bool
 
-(** This function currently assumes a 64-bit target. *)
+(** This function currently assumes a 64-bit target. When targeting JSIR,
+    every unarised element counts as 8 bytes (in particular, arrays are not
+    packed). *)
 val array_element_size_in_bytes : array_kind -> int
 
 (** Construction helpers *)
@@ -1746,5 +1674,5 @@ val static_cast
   -> loc:scoped_location
   -> lambda
 
-val fatal_error_unevaluated_splice_var : Slambdaident.t -> 'a
+val fatal_error_unevaluated_splice_var : Layout_ident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a

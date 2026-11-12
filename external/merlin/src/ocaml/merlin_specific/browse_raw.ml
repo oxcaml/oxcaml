@@ -391,10 +391,11 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> id_fold
   | Tpat_alias { pattern = p; _ }
   | Tpat_variant (_, Some p, _)
+  | Tpat_addr (_, _, p)
   | Tpat_lazy p
   | Tpat_exception p -> of_pattern p
   | Tpat_value p -> of_pattern (p :> value general_pattern)
-  | Tpat_tuple ps -> list_fold (fun (_lbl, p) -> of_pattern p) ps
+  | Tpat_tuple ps -> list_fold (fun (_lbl, p, _sort) -> of_pattern p) ps
   | Tpat_unboxed_tuple ps -> list_fold (fun (_lbl, p, _sort) -> of_pattern p) ps
   | Tpat_construct (_, _, _, ps, t) ->
     list_fold (fun (_, p) -> of_pattern p) ps
@@ -453,7 +454,7 @@ let rec of_expression_desc loc = function
     of_expression e ** list_fold of_case cs ** list_fold of_case effs
   | Texp_try (e, cs, effs) ->
     of_expression e ** list_fold of_case cs ** list_fold of_case effs
-  | Texp_tuple (es, _) -> list_fold (fun (_lbl, e) -> of_expression e) es
+  | Texp_tuple (es, _) -> list_fold (fun (_lbl, e, _sort) -> of_expression e) es
   | Texp_unboxed_tuple es ->
     list_fold (fun (_lbl, e, _sort) -> of_expression e) es
   | Texp_construct (_, _, _, es, _) ->
@@ -545,7 +546,7 @@ let rec of_expression_desc loc = function
        the patterns patN when they are tuples themselves. *)
     let rec flatten_patterns ~size acc pat =
       match pat.pat_desc with
-      | Tpat_tuple [ (None, tuple); (None, pat) ] when size > 0 ->
+      | Tpat_tuple [ (None, tuple, _); (None, pat, _) ] when size > 0 ->
         flatten_patterns ~size:(size - 1) (pat :: acc) tuple
       | _ -> List.rev (pat :: acc)
     in
@@ -764,10 +765,10 @@ let of_attribute (attr : attribute) =
   let name = attr.attr_name.txt in
   (* There are a number of attributes that start with "merlin." that either modify Merlin
      behavior (ex: merlin.loc, merlin.hide, merlin.focus) or deal with the type-checker's
-     error recovery (ex: merlin.incorrect). Including these attributes in the browse tree
+     error recovery (ex: ocaml.incorrect). Including these attributes in the browse tree
      causes Merlin to sometimes choose an incorrect node. These attributes are also
      uninteresting - in practice they don't appear in user-written code. *)
-  match String.is_prefixed name ~by:"merlin." with
+  match String.is_prefixed name ~by:"merlin." || name = "ocaml.incorrect" with
   | true -> id_fold
   | false -> app (Attribute attr)
 
@@ -782,7 +783,8 @@ let of_node node =
       let name = Ident.name id in
       let sort =
         match vd.Types.val_kind with
-        | Types.Val_reg sort | Types.Val_mut (_, sort) -> sort
+        | Types.Val_reg (Representable sort) | Types.Val_mut (_, sort) -> sort
+        | Types.Val_reg Unrepresentable
         | Types.Val_prim _
         | Types.Val_ivar _
         | Types.Val_self _

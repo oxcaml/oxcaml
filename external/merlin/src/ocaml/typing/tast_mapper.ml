@@ -358,7 +358,8 @@ let pat
     | Tpat_var { id; name; uid; sort; mode } ->
       Tpat_var { id; name = map_loc sub name; uid; sort; mode }
     | Tpat_tuple l ->
-        Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
+        Tpat_tuple
+          (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
     | Tpat_unboxed_tuple l ->
       Tpat_unboxed_tuple
         (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
@@ -387,9 +388,9 @@ let pat
         Tpat_alias { pattern = sub.pat sub pattern; id;
                      name = map_loc sub name; uid;
                      sort; mode; type_expr }
-    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_locality_mode } ->
-        Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
-                          lpoly; env_locality_mode }
+    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly } ->
+        Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode; lpoly }
+    | Tpat_addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, sub.pat sub p)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -582,7 +583,8 @@ let expr sub x =
     | Texp_unboxed_unit -> Texp_unboxed_unit
     | Texp_unboxed_bool b -> Texp_unboxed_bool b
     | Texp_tuple (list, am) ->
-        Texp_tuple (List.map (fun (label, e) -> label, sub.expr sub e) list, am)
+        Texp_tuple
+          (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list, am)
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)

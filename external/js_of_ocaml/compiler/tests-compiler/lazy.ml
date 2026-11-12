@@ -17,7 +17,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open Util
+open! Util
+
+(* The expected generated code here matches OCaml >= 5. *)
+[@@@if ocaml_version >= (5, 0, 0)]
 
 let%expect_test "static eval of string get" =
   let program =
@@ -35,15 +38,15 @@ let%expect_test "static eval of string get" =
     {|
     function do_the_lazy_rec(n){
      if(0 === n) return 0;
-     var _c_ = do_the_lazy_rec(n - 1 | 0), _a_ = runtime.caml_obj_tag(lz);
+     var _b_ = do_the_lazy_rec(n - 1 | 0), _a_ = runtime.caml_obj_tag(lz);
      a:
      if(250 === _a_)
-      var _b_ = lz[1];
+      _a_ = lz[1];
      else{
-      if(246 !== _a_ && 244 !== _a_){var _b_ = lz; break a;}
-      var _b_ = caml_call1(CamlinternalLazy[2], lz);
+      if(246 !== _a_ && 244 !== _a_){_a_ = lz; break a;}
+      _a_ = caml_call1(CamlinternalLazy[2], lz);
      }
-     return [0, _b_, _c_];
+     return [0, _a_, _b_];
     }
     //end
     |}]

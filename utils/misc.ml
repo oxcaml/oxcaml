@@ -122,6 +122,9 @@ module Stdlib = struct
       | [] -> true
       | _ :: _ -> false
 
+    let count p l =
+      List.fold_left (fun n x -> if p x then n + 1 else n) 0 l
+
     let rec compare cmp l1 l2 =
       match l1, l2 with
       | [], [] -> 0
@@ -163,6 +166,11 @@ module Stdlib = struct
       | [], [], [] -> ()
       | a :: as_, b :: bs, c :: cs -> f a b c; iter3 f as_ bs cs
       | _ -> invalid_arg "iter3"
+
+    let rec split3 = function
+      | [] -> ([], [], [])
+      | (x,y,z)::l ->
+        let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
 
     let concat_map2 f l1 l2 =
       let rec aux f acc = function
@@ -224,6 +232,22 @@ module Stdlib = struct
           | Ok x -> aux xs (i + 1) (x :: acc)
       in
       aux l 0 []
+
+    let rec fold_left_result f acc = function
+      | [] -> Ok acc
+      | x :: xs ->
+        match f acc x with
+        | Ok acc -> fold_left_result f acc xs
+        | Error e -> Error e
+
+    let rec fold_left2_result ~unequal_lengths f acc xs ys =
+      match xs, ys with
+      | [], [] -> Ok acc
+      | [], _ :: _ | _ :: _, [] -> Error unequal_lengths
+      | x :: xs, y :: ys ->
+        match f acc x y with
+        | Ok acc -> fold_left2_result ~unequal_lengths f acc xs ys
+        | Error e -> Error e
 
     let split_at n l =
       let rec aux n acc l =
@@ -470,6 +494,10 @@ module Stdlib = struct
           dst_pos := !dst_pos + len
         done;
         dst
+
+      let filteri (f : int -> 'a -> bool) (array : 'a array) =
+        (* CR ttebbi: This could be more efficient. *)
+        array |> Array.to_list |> List.filteri f |> Array.of_list
   end
 
   module String = struct
@@ -844,13 +872,17 @@ module Utf8_lexeme = struct
       | Some(Lower u') -> u'
       | _ -> u
 
+  let is_ascii s = String.for_all (fun c -> Char.code c < 128) s
+
   let capitalize s =
+    if is_ascii s then Ok (String.capitalize_ascii s) else
     let first = ref true in
     normalize_generic ~keep_ascii:false
       (fun u -> if !first then (first := false; uchar_uppercase u) else u)
       s
 
   let uncapitalize s =
+    if is_ascii s then Ok (String.uncapitalize_ascii s) else
     let first = ref true in
     normalize_generic ~keep_ascii:false
       (fun u -> if !first then (first := false; uchar_lowercase u) else u)
@@ -2234,89 +2266,6 @@ let remove_double_underscores s =
   loop 0;
   Buffer.contents buf
 
-module Json = struct
-
-  (* [escape_unicode] is based on [Bytes.unsafe_escape], which is used
-     for the format specifier [%S]. It is adjusted to output unicode escape
-     chacarcters \u00HH instead of the usual OCaml character literals \DDD.
-     Adds quotes around the input string. *)
-  let escape_unicode str =
-    let s = Bytes.of_string str in
-    let n = ref 2 in (* for the quotes *)
-    for i = 0 to Bytes.length s - 1 do
-      n := !n +
-        (match Bytes.unsafe_get s i with
-        | '\"' | '\\' | '\n' | '\t' | '\r' | '\b' -> 2
-        | ' ' .. '~' -> 1
-        | _ -> 6)
-    done;
-    begin
-      let s' = Bytes.create !n in
-      Bytes.unsafe_set s' 0 '\"';
-      n := 1;
-      for i = 0 to Bytes.length s - 1 do
-        begin match Bytes.unsafe_get s i with
-        | ('\"' | '\\') as c ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n c
-        | '\n' ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'n'
-        | '\t' ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 't'
-        | '\r' ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'r'
-        | '\b' ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'b'
-        | (' ' .. '~') as c -> Bytes.unsafe_set s' !n c
-        | c ->
-            let a = Char.code c in
-            let hex_char n =
-              if n < 10 then Char.chr (48 + n)  (* '0'-'9' *)
-              else Char.chr (55 + n)            (* 'A'-'F' *)
-            in
-            Bytes.unsafe_set s' !n '\\';
-            incr n;
-            Bytes.unsafe_set s' !n 'u';
-            incr n;
-            Bytes.unsafe_set s' !n '0';
-            incr n;
-            Bytes.unsafe_set s' !n '0';
-            incr n;
-            Bytes.unsafe_set s' !n (hex_char (a / 16));
-            incr n;
-            Bytes.unsafe_set s' !n (hex_char (a mod 16));
-        end;
-        incr n
-      done;
-      Bytes.unsafe_set s' !n '\"';
-      String.of_bytes s'
-    end
-
-
-  let field name value = Printf.sprintf "%s: %s" (escape_unicode name) value
-
-  let string value = escape_unicode value
-
-  let int value = string_of_int value
-
-  (* Use %.17g instead of string_of_float to avoid invalid JSON output.
-     [string_of_float] can produce "1." for whole numbers, which is not valid
-     JSON. %.17g provides full double precision and produces valid JSON
-     numbers. *)
-  let float value = Printf.sprintf "%.17g" value
-
-  let object_ fields =
-    let field_strings = String.concat ",\n" fields in
-    Printf.sprintf "{\n%s\n}" field_strings
-
-  let array items =
-    let item_strings = String.concat ",\n" items in
-    Printf.sprintf "[\n%s\n]" item_strings
-
-  let null = "null"
-
-  let option f = function None -> null | Some v -> f v
-end
-
 module Nonempty_list = struct
   type nonrec 'a t = ( :: ) of 'a * 'a list
 
@@ -2456,6 +2405,87 @@ module Colours = struct
     if debug_push_and_pop then output ppf "\u{2191}"
 
   let none ppf = push ppf
+
+  let wrap directive pp ppf x =
+    Format.fprintf ppf "%t%a%t" directive pp x pop
+end
+
+module Sexp = struct
+
+  type field =
+    | Bool : Colours.directive option * string * bool -> field
+    | Int : Colours.directive option * string * int -> field
+    | String : Colours.directive option * string * string -> field
+    | Float : Colours.directive option * string * float -> field
+    | Fmt : Colours.directive option * (Format.formatter -> unit) -> field
+    | Print :
+        Colours.directive option *
+        string * (Format.formatter -> 'a -> unit) * 'a -> field
+    | Option :
+        Colours.directive option *
+        string * (Format.formatter -> 'a -> unit) * 'a option -> field
+
+  let d ?colour s i = Int (colour, s, i)
+  let b ?colour s b = Bool (colour, s, b)
+  let f ?colour s f = Float (colour, s, f)
+  let s ?colour s1 s2 = String (colour, s1, s2)
+  let a ?colour s x pp = Print (colour, s, pp, x)
+  let o ?colour s x pp = Option (colour, s, pp, x)
+  let fmt ?colour format = Format.kdprintf (fun f -> Fmt (colour, f)) format
+
+  let spacer ppf first =
+    if !first then first := false else Format.pp_print_space ppf ()
+
+  let print_field ~first ppf field =
+    let fprintf colour ppf fmt =
+      match colour with
+      | None ->
+        Format.fprintf ppf "%a@[<hov 1>" spacer first;
+        Format.kfprintf (fun ppf -> Format.fprintf ppf "@]") ppf fmt
+      | Some colour ->
+        Format.fprintf ppf "%a@[<hov 1>%t" spacer first colour;
+        Format.kfprintf
+          (fun ppf -> Format.fprintf ppf "%t@]" Colours.pop) ppf fmt
+    in
+    match field with
+    | String (colour, name, s) ->
+      fprintf colour ppf "(%s@ %s)" name s
+    | Bool (colour, name, b) ->
+      fprintf colour ppf "(%s@ %b)" name b
+    | Int (colour, name, i) ->
+      fprintf colour ppf "(%s@ %d)" name i
+    | Float (colour, name, f) ->
+      fprintf colour ppf "(%s@ %f)" name f
+    | Fmt (colour, t) ->
+      fprintf colour ppf "%t" t
+    | Print (colour, name, pp, x) ->
+      fprintf colour ppf "(%s@ @[<hov>%a@])" name pp x
+    | Option (colour, name, pp, opt) -> (
+        match opt with
+        | None -> ()
+        | Some x ->
+          fprintf colour ppf "(%s@ %a)" name pp x
+      )
+
+  let print ppf (l : field list) =
+    let[@local] default () =
+      let first = ref true in
+      Format.fprintf ppf "@[<hov 1>(";
+      List.iter (print_field ~first ppf) l;
+      Format.fprintf ppf ")@]"
+    in
+    match l with
+    | [field] ->
+        begin match field with
+        | (String _ | Bool _ | Int _ | Float _ | Print _) ->
+          (* avoid double parenthesis when there is a single field
+             (except for Fmt fields which don't have parentheses) *)
+           print_field ~first:(ref true) ppf field
+          | (Fmt _| Option _) ->
+           default ()
+        end
+    | _ -> default ()
+
 end
 
 module Or_null = struct

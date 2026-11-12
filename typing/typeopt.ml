@@ -64,11 +64,9 @@ let scrape_ty env ty =
       begin match get_desc ty with
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
-          | Some _ -> begin
-            match (Ctype.get_unboxed_type_approximation env ty) with
-            | { ty; or_null = None; modality = _ } ->
-              Some ty
-            | _ -> Some ty end
+          | Some _ ->
+            (* Keep any [or_null], to preserve the nullability of [ty] *)
+            Some (Ctype.unwrap_until_or_null env ty)
           | None -> Some ty
           | exception Not_found -> None
           end
@@ -123,42 +121,34 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
   | Product sorts ->
     List.for_all layout_is_representable sorts
   | Addressable layout -> layout_is_representable layout
+  | Box _ -> true
 
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
-   layouts in the typedtree (see [Sort] comment in [jkind_intf.ml]).
-
-   This function also may mutate [ty] to constrain its jkind (see below);
-   this is yet another reason why this function could use some attention.
-   Internal ticket 5093 (which references the former name, [type_sort]). *)
-(* CR layouts v3.0: have a better error message
-   for nullable jkinds.*)
-let type_representable_layout ~why env loc ty =
+   layouts in the typedtree (see [Sort] comment in [jkind_intf.ml]). *)
+let get_representable_layout_opt env ty =
   let jkind = Ctype.type_jkind env ty in
-  let layout =
-    match Jkind.get_layout_defaulting_to_scannable env jkind with
-    | Some layout -> layout
-    | None ->
-      Misc.fatal_error
-        "Typeopt.type_representable_layout: unexpected missing layout (1)"
-  in
-  if layout_is_representable layout then
-    layout
-  else
-    (* Surprisingly, it is possible to reach this branch; for example, when
-       translating [f] in the following example:
+  match Jkind.get_layout_defaulting_to_scannable env jkind with
+  | Some layout when layout_is_representable layout -> Some layout
+  | Some _ | None -> None
 
-       external foo : ('a : any mod separable). 'a array -> int = "%identity"
-       let f x = foo x
-
-       See also (3) in [Note regarding jkind checks on external declarations].
+(* This function also may mutate [ty] to constrain its jkind to be representable
+   which makes it different from the helper above. See internal ticket 5093
+   (which references the former name, [type_sort]). *)
+(* CR layouts v3.0: have a better error message for nullable jkinds.*)
+let type_layout_and_make_representable ~why env loc ty =
+  match get_representable_layout_opt env ty with
+  | Some layout -> layout
+  | None ->
+    (* When [ty]'s kind is abstract, we end up here. Additionally, it is
+       possible to reach this branch for external array primitives. See
+       (3) in [Note regarding jkind checks on external declarations] as well
+       as the [array_element_representability.ml] test.
 
        In this case (at least for now), we want to constrain [ty]'s jkind to
        be representable, which is achieved by [type_sort]. Recomputing the jkind
        will then yield one with the new, representable (defaulted) layout. *)
-    (* We postpone calling [type_sort] until this branch to make the common case
-       faster, even though it means that [type_jkind] must be called twice. *)
-    (match Ctype.type_sort ~why ~fixed:false env ty with
+    (match Ctype.type_sort ~why ~allow_mutation:true env ty with
     | Ok _sort ->
       let jkind = Ctype.type_jkind env ty in
       let layout =
@@ -166,13 +156,13 @@ let type_representable_layout ~why env loc ty =
         | Some layout -> layout
         | None ->
           Misc.fatal_error
-            "Typeopt.type_representable_layout: unexpected missing layout (2)"
+            "Typeopt.type_layout_and_make_representable: \
+             unexpected missing layout"
       in
       (match Jkind_types.Layout.Const.get_sort layout with
       | None -> Misc.fatal_error
                    "called type_sort but didn't get a representable layout"
       | Some _ -> layout)
-    (* CR layouts: It seems as if this is unreachable (see ticket above). *)
     | Error err -> raise (Error (loc, Not_a_sort (env, ty, err))))
 
 (* [classification]s are used for two things: things in arrays, and things in
@@ -200,7 +190,7 @@ let rec classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
   | Addressable layout -> classify ~classify_product env ty layout
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
-  | Base (Scannable, _sa) -> begin
+  | Base (Scannable, _) | Box _ -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
      these calls. *)
   match scrape_ty env ty with
@@ -308,7 +298,7 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
   match layout with
   | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
                                with non-representable layout"
-  | Base (Scannable, { separability; _ }) ->
+  | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) ->
       let open Jkind_axis.Separability in
       if le separability (upper_bound_if_is_always_gc_ignorable ())
         then Pint_scannable else Paddr_scannable
@@ -343,7 +333,7 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
                                with non-representable layout"
   (* Scannable axes are irrelevant, since we already know we can ignore *)
-  | Base (Scannable, _sa) -> Pint_ignorable
+  | Base (Scannable, _) | Box _ -> Pint_ignorable
   | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64
   | Base (Float32, _) -> Punboxedfloat_ignorable Unboxed_float32
   | Base (Bits8, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
@@ -363,10 +353,9 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Genvar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
-let array_kind_of_elt env loc ty =
-  let ty = match scrape_ty env ty with Some ty -> ty | None -> ty in
-  let elt_layout = type_representable_layout ~why:Array_element env loc ty in
-  let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
+let array_kind_of_representable_elt env loc elt_ty elt_layout =
+  let elt_ty_for_error = elt_ty in (* report the un-scraped ty in errors *)
+  let ty = match scrape_ty env elt_ty with Some ty -> ty | None -> elt_ty in
   let classify_product ty sorts =
     if Ctype.is_always_gc_ignorable env ty then
       Pgcignorableproductarray (ignorable_product_array_kind loc sorts)
@@ -399,6 +388,11 @@ let array_kind_of_elt env loc ty =
   | Product c -> c
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
+
+(* Potentially mutates [elt_ty] it to make it representable. *)
+let array_kind_of_elt env loc elt_ty =
+  array_kind_of_representable_elt env loc elt_ty
+    (type_layout_and_make_representable ~why:Array_element env loc elt_ty)
 
 let array_type_kind ~elt_ty env loc ty =
   match scrape_poly env ty with
@@ -507,7 +501,7 @@ let value_kind_of_scannable_jkind env jkind =
     Jkind.get_externality_upper_bound ~context env jkind
   in
   let rec of_layout : Jkind.Layout.Const.t -> _ = function
-    | Base (Scannable, { separability; _ }) -> (
+    | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) -> (
       (* use the better of the two [immediate_or_pointer]s *)
       match pointerness_of_separability separability,
             pointerness_of_scannable_with_externality externality_upper_bound
@@ -726,8 +720,19 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
   | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
           || Path.same p Predef.path_iarray) ->
-    let ak = array_type_kind ~elt_ty:(Some arg) env loc ty in
-    num_nodes_visited, non_nullable (Parrayval ak)
+    (* We don't eagerly check for representability here (e.g. we allow abstract
+       kinds), and instead fall back when we don't know. Any functions that
+       create/access/etc array elements instead enforce representability. *)
+    let raw_kind =
+      match get_representable_layout_opt env arg with
+      | Some layout ->
+        (* Representable elements that can't be stored in arrays (such as
+           mixed products) are still rejected here. Such arrays can never be
+           constructed, so this only rejects unusable code. *)
+        Parrayval (array_kind_of_representable_elt env loc arg layout)
+      | None -> Pgenval
+    in
+    num_nodes_visited, non_nullable raw_kind
   | Tconstr(p, args, _) -> begin
       (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
          with with-kinds, [decl.type_jkind] will mention variables bound
@@ -796,20 +801,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
         ~default:(num_nodes_visited, non_nullable Pgenval) (fun () ->
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         let depth = depth + 1 in
-        let num_nodes_visited, fields =
-          List.fold_left_map (fun num_nodes_visited (_, field) ->
-            let num_nodes_visited = num_nodes_visited + 1 in
-            (* CR layouts v5 - this is fine because voids are not allowed in
-               tuples.  When they are, we'll need to make sure that elements
-               are values before recurring.
-            *)
-            value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
-            num_nodes_visited labeled_fields
-        in
-        num_nodes_visited,
-        non_nullable
-          (Pvariant { consts = [];
-                      non_consts = [0, Constructor_shape_uniform fields] }))
+        value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited
+          labeled_fields)
   | Tvariant row ->
     num_nodes_visited,
     if Btype.tvariant_not_immediate row
@@ -823,9 +816,11 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     num_nodes_visited,
     add_nullability_from_ty env scty Pgenval
 
-and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-      (field : unit Lambda.mixed_block_element) ty
-  : int * unit Lambda.mixed_block_element =
+and value_kind_mixed_block_field
+  : 'a. Env.t -> loc:Location.t -> visited:Numbers.Int.Set.t -> depth:int
+    -> num_nodes_visited:int -> 'a Lambda.mixed_block_element
+    -> type_expr option -> int * 'a Lambda.mixed_block_element =
+  fun env ~loc ~visited ~depth ~num_nodes_visited field ty ->
   match field with
   | Value original_kind ->
     begin match ty with
@@ -851,7 +846,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
-  | Product [||] -> num_nodes_visited, field
+  | Void -> num_nodes_visited, field
   | Product fs ->
     let unknown () = Array.init (Array.length fs) (fun _ -> None) in
     let types =
@@ -878,7 +873,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           | { type_kind =
                 Type_variant _ | Type_record _ | Type_abstract _ | Type_open;
               _ } ->
-            (* We don't need to handle  records/variants here,
+            (* We don't need to handle records/variants here,
                because [scrape_ty] looks though them. *)
             unknown ()
           end
@@ -899,7 +894,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
-  | ( Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | ( Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
     | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
     | Splice_variable _ ) as field ->
     num_nodes_visited, field
@@ -985,10 +980,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) fields)
+          | Constructor_undetermined ->
+              num_nodes_visited, Lambda.Constructor_shape_undetermined
           | Constructor_immediate_all_void ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected immediate constructor"
-          | Constructor_undetermined | Constructor_variable _ ->
+          | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
@@ -1009,10 +1006,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) labels)
+          | Constructor_undetermined ->
+              num_nodes_visited, Lambda.Constructor_shape_undetermined
           | Constructor_immediate_all_void ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected immediate constructor"
-          | Constructor_undetermined | Constructor_variable _ ->
+          | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
@@ -1045,7 +1044,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                        Typedecl.update_constructor_representation
                          env loc cd_args ~is_extension_constructor:false
                      in
-                     Result.to_option repr, { constructor with cd_args })
+                     let shape =
+                       match repr with
+                       | Ok shape -> shape
+                       | Error _ -> Types.Constructor_undetermined
+                     in
+                     Some shape, { constructor with cd_args })
               in
               match cstr_shape_opt with
               | None -> None
@@ -1089,6 +1093,20 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
 and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (labels : Types.label_declaration list)
       (rep : Types.record_representation) =
+  let of_shape num_nodes_visited fields =
+    let tag =
+      match rep with
+      | Record_inlined (Ordinary {runtime_tag}, _, _) -> runtime_tag
+      | Record_float | Record_ufloat -> Obj.double_array_tag
+      | Record_boxed | Record_mixed _ | Record_undetermined
+      | Record_inlined (Extension _, _, _) -> 0
+      | Record_unboxed | Record_dummy _ | Record_variable _
+      | Record_inlined (Null, _, _) ->
+          Misc.fatal_error "Typeopt: unexpected record representation"
+    in
+    num_nodes_visited,
+    non_nullable (Pvariant { consts = []; non_consts = [tag, fields] })
+  in
   let recompute make_rep =
     match
       List.map (fun (label : Types.label_declaration) ->
@@ -1101,7 +1119,8 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
     | labels ->
         let types = List.map (fun label -> label.Types.ld_type) labels in
         match Typedecl.compute_block_shape env types with
-        | `Undetermined -> num_nodes_visited, non_nullable Pgenval
+        | `Undetermined ->
+            of_shape num_nodes_visited Lambda.Constructor_shape_undetermined
         | (`Not_mixed | `Mixed _) as shape ->
             value_kind_immutable_record env ~loc ~visited ~depth
               ~num_nodes_visited ~params ~args labels (make_rep shape)
@@ -1180,26 +1199,33 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
           value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
             ~shape (List.map (fun t -> Some t) types)
       in
-      let non_consts =
-        match rep with
-        | Record_inlined (Ordinary {runtime_tag}, _, _) ->
-          [runtime_tag, fields]
-        | Record_float | Record_ufloat ->
-          [ Obj.double_array_tag, fields ]
-        | Record_boxed ->
-          [0, fields]
-        | Record_inlined (Extension _, _, _) ->
-          [0, fields]
-        | Record_mixed _ ->
-          [0, fields]
-        | Record_unboxed -> assert false
-        | Record_inlined (Null, _, _) -> assert false
-        | Record_dummy _ -> assert false
-        | Record_undetermined | Record_variable _ -> assert false
-      in
-      (num_nodes_visited,
-       non_nullable (Pvariant { consts = []; non_consts }))
+      of_shape num_nodes_visited fields
     end
+
+and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
+  let types = List.map snd elements in
+  let tuple_kind constructor_shape =
+    non_nullable (Pvariant { consts = []; non_consts = [0, constructor_shape] })
+  in
+  match Typedecl.compute_block_shape env types with
+  | `Undetermined ->
+    (* Some element's layout is unknown (e.g. [any]), so we can't know whether
+       the tuple is mixed, but it is still a block with tag 0. *)
+    num_nodes_visited, tuple_kind Constructor_shape_undetermined
+  | `Not_mixed ->
+    let num_nodes_visited, fields =
+      List.fold_left_map (fun num_nodes_visited field ->
+        let num_nodes_visited = num_nodes_visited + 1 in
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
+        num_nodes_visited types
+    in
+    num_nodes_visited, tuple_kind (Constructor_shape_uniform fields)
+  | `Mixed shape ->
+    let num_nodes_visited, constructor_shape =
+      value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+        ~shape (List.map Option.some types)
+    in
+    num_nodes_visited, tuple_kind constructor_shape
 
 let value_kind env loc ty =
   try
@@ -1217,156 +1243,6 @@ let assert_mixed_product_support_for_lambda_shape loc kind shape =
   if not (Mixed_product_bytes.all_value counts) then
     Typedecl.assert_mixed_product_support loc kind
       ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
-
-let transl_instantiated_shape env loc sorts_and_types kind =
-  let consts =
-    Array.map
-      (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
-      sorts_and_types
-  in
-  let all_scannable =
-    let rec is_scannable : Jkind.Sort.Const.t -> bool = function
-      | Base Scannable -> true
-      | Addressable const -> is_scannable const
-      | Base _ | Product _ | Univar _ | Genvar _ -> false
-    in
-    Array.for_all is_scannable consts
-  in
-  let shape =
-    if all_scannable then `Not_mixed
-    else
-      let rec element (layout : Jkind_types.Layout.Const.t)
-          : unit Lambda.mixed_block_element =
-        match layout with
-        | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
-        | Product layouts ->
-            Product (Array.of_list (List.map element layouts))
-        | Addressable layout -> element layout
-        | Base (base, axes) ->
-            Typedecl.Element_repr.classify_base base axes
-            |> Typedecl.Element_repr.to_shape_element
-            |> Lambda.transl_mixed_product_element
-        | Any _ | Univar _ ->
-            Misc.fatal_error
-              "Typeopt.transl_instantiated_shape: unrepresentable layout"
-      in
-      let shape =
-        Array.map (fun (_sort, ty) ->
-          match Jkind.get_layout env (Ctype.type_jkind env ty) with
-          | Some layout -> element layout
-          | None ->
-              Misc.fatal_error
-                "Typeopt.transl_instantiated_shape: missing layout")
-          sorts_and_types
-      in
-      (* Shapes containing splices are checked after static evaluation *)
-      if not (Lambda.mixed_block_shape_has_splices shape) then
-        assert_mixed_product_support_for_lambda_shape loc kind shape;
-      `Mixed shape
-  in
-  shape, consts
-
-let transl_instantiated_constructor env loc sorts_and_types kind
-    : Lambda.constructor_representation =
-  match transl_instantiated_shape env loc sorts_and_types kind with
-  | `Not_mixed, _ -> Constructor_uniform_value
-  | `Mixed shape, _ -> Constructor_mixed shape
-
-let transl_constructor_representation env loc
-    (shape : Types.constructor_representation)
-    : Lambda.constructor_representation =
-  match shape with
-  | Constructor_uniform_value -> Constructor_uniform_value
-  | Constructor_mixed shape ->
-      Constructor_mixed (Lambda.transl_mixed_product_shape shape)
-  | Constructor_immediate_all_void -> Constructor_immediate_all_void
-  | Constructor_variable sorts_and_types ->
-      transl_instantiated_constructor env loc sorts_and_types Cstr_tuple
-  | Constructor_undetermined ->
-      Misc.fatal_error
-        "Typeopt.transl_constructor_representation: representation was \
-         not instantiated"
-
-let transl_variant_representation : Types.variant_representation
-    -> Lambda.variant_representation = function
-  | Variant_unboxed -> Variant_unboxed
-  | Variant_boxed _ -> Variant_boxed
-  | Variant_extensible -> Variant_extensible
-  | Variant_with_null -> Variant_with_null
-
-let transl_record_representation_and_sorts env loc
-    (repres : Types.record_representation)
-    : Lambda.record_representation
-      * variable_sorts:Jkind.Sort.Const.t array option =
-  match repres with
-  | Record_variable sorts_and_types ->
-      let shape, consts =
-        transl_instantiated_shape env loc sorts_and_types Record
-      in
-      let repres : Lambda.record_representation =
-       match shape with
-       | `Not_mixed -> Record_boxed
-       | `Mixed shape -> Record_mixed shape
-      in
-      repres, ~variable_sorts:(Some consts)
-  | Record_inlined (tag, Constructor_variable sorts_and_types,
-                    vrep) ->
-      let shape, consts =
-        transl_instantiated_shape env loc sorts_and_types Cstr_record
-      in
-      let shape : Lambda.constructor_representation =
-        match shape with
-        | `Not_mixed -> Constructor_uniform_value
-        | `Mixed shape -> Constructor_mixed shape
-      in
-      Record_inlined (tag, shape, transl_variant_representation vrep),
-      ~variable_sorts:(Some consts)
-  | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
-      Misc.fatal_error
-        "Typeopt.transl_record_representation: representation was not \
-         instantiated"
-  | Record_dummy _ ->
-      Misc.fatal_error
-        "Typeopt.transl_record_representation: dummy representation"
-  | Record_inlined (tag, shape, vrep) ->
-      Record_inlined
-        (tag, transl_constructor_representation env loc shape,
-         transl_variant_representation vrep), ~variable_sorts:None
-  | Record_unboxed -> Record_unboxed, ~variable_sorts:None
-  | Record_boxed -> Record_boxed, ~variable_sorts:None
-  | Record_float -> Record_float, ~variable_sorts:None
-  | Record_ufloat -> Record_ufloat, ~variable_sorts:None
-  | Record_mixed shape ->
-      Record_mixed (Lambda.transl_mixed_product_shape shape),
-      ~variable_sorts:None
-
-let transl_record_representation env loc repres =
-  let repres, ~variable_sorts:_ =
-    transl_record_representation_and_sorts env loc repres
-  in
-  repres
-
-let label_sort_for_representation (label : Data_types.label_description)
-      (repres : Lambda.record_representation) ~record_sort ~variable_sorts =
-  match repres with
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
-  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
-  | Record_inlined
-      (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
-    begin match variable_sorts with
-    | Some sorts -> sorts.(label.lbl_pos)
-    | None ->
-      begin match label.lbl_sort with
-      | Some sort -> sort
-      | None ->
-        Misc.fatal_errorf
-          "no sort for label %s despite finalized representation"
-          label.lbl_name
-      end
-    end
-  | Record_inlined (_, Constructor_immediate_all_void, _) ->
-    Misc.fatal_error
-      "label_sort_for_representation: unexpected immediate representation"
 
 let refine_mixed_block_element env loc ty mbe =
   try
@@ -1413,13 +1289,13 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
                      Language_extension.(is_at_least SIMD Stable) ->
     Lambda.layout_unboxed_vector Unboxed_vec256
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
-                     Language_extension.(is_at_least SIMD Beta) ->
+                     Language_extension.(is_at_least SIMD Stable) ->
     Lambda.layout_unboxed_vector Unboxed_vec512
   | Base Mask when Language_extension.(is_at_least Layouts Stable) &&
-                   Language_extension.(is_at_least SIMD Beta) ->
+                   Language_extension.(is_at_least SIMD Stable) ->
     Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.Punboxed_product []
+    Lambda.layout_void
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
@@ -1436,7 +1312,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
+  | Genvar var -> Psplicevar (Layout_ident.of_sort_var var)
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1463,39 +1339,6 @@ let layout env loc sort ty =
       | Univar _ -> assert false
       | Genvar _ -> assert false
     )
-
-let layout_of_ident env ident =
-  let path = Path.Pident ident in
-  match Env.find_value path env with
-  | value_desc ->
-    let { val_type; val_kind; val_loc; _ } =
-      Subst.Lazy.force_value_description value_desc
-    in
-    begin match val_kind with
-    | Val_reg sort | Val_mut (_, sort) ->
-      let const_sort = Jkind.Sort.default_for_transl_and_get sort in
-      let layout = layout env val_loc const_sort val_type in
-      Some layout
-    | Val_prim _ -> None
-    | Val_ivar _ | Val_self _ | Val_anc _ ->
-      Some layout_any_value
-    end
-  | exception Not_found ->
-    match Env.find_module path env with
-    | _ -> Some layout_module
-    | exception Not_found ->
-      match Env.find_ident_constructor ident env with
-      | { cstr_tag = Extension _ } -> Some layout_extensible_variant_constructor
-      | _ | exception Not_found ->
-        match Env.find_class path env with
-        | _ -> Some Lambda.layout_class
-        | exception Not_found ->
-            (match Translobj.layout_of_ident ident with
-            | Some _ as layout -> layout
-            | None ->
-              Misc.fatal_errorf "Failed to find value_desc for %a"
-                Ident.print ident)
-
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)

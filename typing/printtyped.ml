@@ -286,6 +286,19 @@ let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product_variable _ ->
     line i ppf "Record_unboxed_product_variable\n"
 
+let constructor_representation i ppf = let open Types in function
+  | Constructor_uniform_value ->
+    line i ppf "Constructor_uniform_value\n"
+  | Constructor_mixed shape ->
+    line i ppf "Constructor_mixed\n";
+    array (i+1) mixed_block_element ppf shape
+  | Constructor_immediate_all_void ->
+    line i ppf "Constructor_immediate_all_void\n"
+  | Constructor_undetermined ->
+    line i ppf "Constructor_undetermined\n"
+  | Constructor_variable _ ->
+    line i ppf "Constructor_variable\n"
+
 let attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.Parsetree.attr_name.txt;
   Printast.payload i ppf a.Parsetree.attr_payload
@@ -325,6 +338,12 @@ let modes_with_locality_opt i ppf ms =
       (Format_doc.compat Mode.With_locality.Const.Option.print) m
   in
   modes ~pr:print_modes_with_locality_opt i ppf ms
+
+let modes_with_locality_lr i ppf ms =
+  let print_with_locality_lr i ppf m =
+    line i ppf "%a\n" (Format_doc.compat (Mode.With_locality.print ())) m
+  in
+  modes ~pr:print_with_locality_lr i ppf ms
 
 let locality_modes_var i ppf ms =
   let print_locality_modes_var i ppf m =
@@ -371,9 +390,10 @@ let val_description_modal_info i ppf = function
   | Valmi_str_primitive ms -> modes_with_locality_opt i ppf ms
 
 let zero_alloc_assume i ppf : Zero_alloc.assume -> unit = function
-    { strict; never_returns_normally; never_raises; arity; loc = _ } ->
-    line i ppf "assume_zero_alloc arity=%d%s%s%s\n"
+    { strict; never_returns_normally; never_raises; arity; partial; loc = _ } ->
+    line i ppf "assume_zero_alloc arity=%d%s%s%s%s\n"
       arity
+      (if partial then " partial" else "")
       (if strict then " strict" else "")
       (if never_returns_normally then " never_returns_normally" else "")
       (if never_raises then " never_raises" else "")
@@ -390,9 +410,9 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_arrow\n";
       arg_label i ppf l;
       core_type i ppf ct1;
-      modes_with_locality i ppf m1;
+      modes_with_locality_lr i ppf m1;
       core_type i ppf ct2;
-      modes_with_locality i ppf m2;
+      modes_with_locality_lr i ppf m2;
   | Ttyp_tuple l ->
       line i ppf "Ttyp_tuple\n";
       list i labeled_core_type ppf l;
@@ -518,7 +538,7 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_unboxed_bool b -> line i ppf "Tpat_unboxed_bool %a\n" fmt_bool b;
   | Tpat_tuple (l) ->
       line i ppf "Tpat_tuple\n";
-      list i labeled_pattern ppf l;
+      list i labeled_pattern_with_sorts ppf l;
   | Tpat_unboxed_tuple (l) ->
       line i ppf "Tpat_unboxed_tuple\n";
       list i labeled_pattern_with_sorts ppf l;
@@ -547,6 +567,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_array %a\n" fmt_mutable_mode_flag am;
       line i ppf "%a\n" fmt_sort arg_sort;
       list i pattern ppf l;
+  | Tpat_addr (mut, arg_sort, p) ->
+      line i ppf "Tpat_addr %a\n" fmt_mutable_mode_flag mut;
+      line i ppf "%a\n" fmt_sort arg_sort;
+      pattern i ppf p;
   | Tpat_lazy p ->
       line i ppf "Tpat_lazy\n";
       pattern i ppf p;
@@ -564,11 +588,6 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_fun_layout \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m
-
-and labeled_pattern : type k . _ -> _ -> string option * k general_pattern -> unit =
-  fun i ppf (label, x) ->
-    tuple_component_label i ppf label;
-    pattern i ppf x
 
 and labeled_pattern_with_sorts :
   type k . _ -> _ -> string option * k general_pattern * Jkind.sort -> unit =
@@ -745,12 +764,13 @@ and expression i ppf x =
   | Texp_tuple (l, am) ->
       line i ppf "Texp_tuple\n";
       locality_mode_r i ppf am;
-      list i labeled_expression ppf l;
+      list i labeled_sorted_expression ppf l;
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
-  | Texp_construct (li, _, _, eo, am) ->
+  | Texp_construct (li, _, repres, eo, am) ->
       line i ppf "Texp_construct %a\n" fmt_longident li;
+      constructor_representation i ppf repres;
       locality_mode_option i ppf am;
       list i expression ppf (List.map snd eo);
   | Texp_variant (l, eo) ->
@@ -1522,10 +1542,6 @@ and label_x_apply_arg i ppf (l, e) =
   line i ppf "<arg>\n";
   arg_label (i+1) ppf l;
   (match e with Omitted _ -> () | Arg (e, _) -> expression (i+1) ppf e)
-
-and labeled_expression i ppf (l, e) =
-  tuple_component_label i ppf l;
-  expression (i+1) ppf e;
 
 and labeled_sorted_expression i ppf (l, e, s) =
   tuple_component_label i ppf l;

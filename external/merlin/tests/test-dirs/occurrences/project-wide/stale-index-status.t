@@ -35,6 +35,5 @@ out-of-sync:
   $ $MERLIN single occurrences -scope project -identifier-at 1:28 \
   > -index-file project.ocaml-index \
   > -log-file - -log-section occurrences \
-  > -filename main.ml < main.ml 2>&1 | grep "out-of-sync"
-  File $TESTCASE_ROOT/lib.ml might be out-of-sync.
-  Occurrences may be incomplete: some source files are out-of-sync with the index: lib.ml
+  > -filename main.ml < main.ml 2>&1 | grep "Occurrences status"
+  Occurrences status: out-of-sync (source files: [lib.ml], indices: [])

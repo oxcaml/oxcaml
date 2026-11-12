@@ -6,9 +6,11 @@
 (* Sort-polymorphic value declarations in module types *)
 module type S = sig
   val foo : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+  val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
 end
 [%%expect{|
-module type S = sig val poly_ foo : 'a -> 'b end
+module type S =
+  sig val poly_ foo : 'a -> 'b val poly_ bar : 'a * 'b -> unit end
 |}]
 
 module type S = sig
@@ -32,17 +34,18 @@ module type S =
 
 (* the layout variables are rigid and cannot be constrained *)
 module type T = sig
-  val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
+  type ('a : value) t
+  val bar : layout_ x y. ('a : x) ('b : y). 'a t * 'b t -> unit
 end
 [%%expect{|
-Line 2, characters 45-47:
-2 |   val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
-                                                 ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is the abstract kind x
+Line 3, characters 44-46:
+3 |   val bar : layout_ x y. ('a : x) ('b : y). 'a t * 'b t -> unit
+                                                ^^
+Error: This type "('a : x)" should be an instance of type "('b : value)"
+       The layout of 'a is the abstract kind x
          because of the annotation on the universal variable 'a.
-       But the layout of "'a" must overlap with value_or_null
-         because it's the type of a tuple element.
+       But the layout of 'a must overlap with value
+         because of the definition of t at line 2, characters 2-21.
 |}]
 
 (* implementation has more variables than the interface *)
@@ -597,13 +600,16 @@ module type S =
   sig val poly_ baz7 : 'a 'b. 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c) end
 |}]
 
+type ('a : value) value_list = 'a list
+
 (* "'c is a value and not layout-polymorphic" *)
 module type S = sig
-  val poly_ baz8 : 'a -> 'b -> 'c list -> #('a * 'b * 'c)
+  val poly_ baz8 : 'a -> 'b -> 'c value_list -> #('a * 'b * 'c)
 end
 [%%expect {|
+type 'a value_list = 'a list
 module type S =
-  sig val poly_ baz8 : 'c. 'a -> 'b -> 'c list -> #('a * 'b * 'c) end
+  sig val poly_ baz8 : 'c. 'a -> 'b -> 'c value_list -> #('a * 'b * 'c) end
 |}]
 
 (* The shorthand omits the layout binders, so it is only used when the layout

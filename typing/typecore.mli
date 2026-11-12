@@ -184,6 +184,7 @@ val type_option_none:
         Env.t -> type_expr -> Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
 val generalize_structure_exp: Typedtree.expression -> unit
+val lower_nongen: Location.t -> Env.t -> int -> module_type -> unit
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 
@@ -262,6 +263,19 @@ type existential_binding =
 
 type mode_mismatch_kind = Parameter | Return
 
+(** Different ways of pointing into a block *)
+type block_path_kind =
+  | Block_index
+
+(** Why a block path can't point through a type *)
+type block_path_bad_type_reason =
+  | Flatten_floats_record  (** [[@@flatten_floats]] *)
+  | Float_record
+  | Float_array_record  (** [[@@represent_as_float_array]] *)
+  | Unboxed_record  (** [[@@unboxed]] *)
+  | Inlined_record
+  | Private_declaration
+
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Label_mismatch of
@@ -298,7 +312,7 @@ type error =
   | Not_an_object of type_expr * type_forcing_context option
   | Non_value_object of Jkind.Violation.t * type_forcing_context option
   | Non_value_let_rec of Jkind.Violation.t * type_expr
-  | Undefined_method of type_expr * string * string list option
+  | Undefined_method of Typedtree.expression * string * string list option
   | Undefined_self_method of string * string list
   | Virtual_class of Longident.t
   | Private_type of type_expr
@@ -385,10 +399,12 @@ type error =
       Data_types.record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_access_bad_record of string
-  | Block_index_modality_mismatch of
-      { mut : bool; err : Mode.Modality.equate_error }
-  | Mutable_block_index_polymorphic_field of Longident.t
+  | Block_path_bad_type of block_path_kind * block_path_bad_type_reason
+  | Block_path_modality_mismatch of
+      { kind : block_path_kind; mutability : Types.mutability;
+        err : Mode.Modality.equate_error }
+  | Block_path_polymorphic_field of
+      block_path_kind * Longident.t
   | Submode_failed of Mode.With_regionality.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.With_locality.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -414,6 +430,7 @@ type error =
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
+  | Optional_arg_default_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Always_heap_allocation of always_heap_allocation
@@ -427,8 +444,16 @@ type error =
   | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
   | Useless_lpoly
+  | Non_generalizable_escape of
+      { var : type_expr; mty: Types.module_type; kind : Path.t }
 
-exception Error of Location.t * Env.t * error
+module Error : sig
+  type exn += private In_context of Location.t * Env.t * error
+
+  val log_or_raise : Location.t -> Env.t -> error -> unit
+  val log_and_raise : Location.t -> Env.t -> error -> 'a
+end
+
 exception Error_forward of Location.error
 
 val report_error: loc:Location.t -> Env.t -> error -> Location.error

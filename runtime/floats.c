@@ -24,7 +24,6 @@
 #define _GNU_SOURCE
 
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
@@ -36,8 +35,6 @@
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
 #include "caml/misc.h"
-#include "caml/reverse.h"
-#include "caml/fiber.h"
 
 #if defined(HAS_LOCALE) || defined(__MINGW32__)
 

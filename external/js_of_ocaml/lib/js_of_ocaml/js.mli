@@ -25,6 +25,13 @@
     objects.
 *)
 
+(* Setup for the checked examples in this file (not rendered by odoc): the
+   examples below read as if written inside this module, i.e. with [open Js].
+{@ocaml prelude[
+open Js_of_ocaml.Js
+let id = string "my-id"
+]} *)
+
 (** {2 Dealing with [null] and [undefined] values.} *)
 
 type +'a opt
@@ -128,7 +135,7 @@ type 'a writeonly_prop = < set : 'a -> unit > gen_prop
 type 'a prop = < get : 'a ; set : 'a -> unit > gen_prop
 (** Type of read/write properties:
       a Javascript object
-        [<p : t Js.writeonly_prop> Js.t]
+        [<p : t Js.prop> Js.t]
       has a read/write property [p] of type [t]. *)
 
 type 'a optdef_prop = < get : 'a optdef ; set : 'a -> unit > gen_prop
@@ -245,6 +252,8 @@ and js_string = object
 
   method charCodeAt : int -> number t meth
 
+  method codePointAt : int -> number t optdef meth
+
   (* This may return NaN... *)
   method concat : js_string t -> js_string t meth
 
@@ -316,6 +325,8 @@ and regExp = object
   method toString : js_string t meth
 
   method source : js_string t readonly_prop
+
+  method flags : js_string t readonly_prop
 
   method global : bool t readonly_prop
 
@@ -533,10 +544,6 @@ class type date = object
 
   method setUTCDate : int -> number_t meth
 
-  method setDay : int -> number_t meth
-
-  method setUTCDay : int -> number_t meth
-
   method setHours : int -> number_t meth
 
   method setUTCHours : int -> number_t meth
@@ -569,30 +576,30 @@ val date_fromTimeValue : (number_t -> date t) constr
       [Date] object initialized with the time value [t]. *)
 
 val date_month : (int -> int -> date t) constr
-(** Constructor of [Date] objects: [new%js date_fromTimeValue y m]
+(** Constructor of [Date] objects: [new%js date_month y m]
       returns a [Date] object corresponding to year [y] and month [m]. *)
 
 val date_day : (int -> int -> int -> date t) constr
-(** Constructor of [Date] objects: [new%js date_fromTimeValue y m d]
+(** Constructor of [Date] objects: [new%js date_day y m d]
       returns a [Date] object corresponding to year [y], month [m] and
       day [d]. *)
 
 val date_hour : (int -> int -> int -> int -> date t) constr
-(** Constructor of [Date] objects: [new%js date_fromTimeValue y m d h]
+(** Constructor of [Date] objects: [new%js date_hour y m d h]
       returns a [Date] object corresponding to year [y] to hour [h]. *)
 
 val date_min : (int -> int -> int -> int -> int -> date t) constr
-(** Constructor of [Date] objects: [new%js date_fromTimeValue y m d h m']
+(** Constructor of [Date] objects: [new%js date_min y m d h m']
       returns a [Date] object corresponding to year [y] to minute [m']. *)
 
 val date_sec : (int -> int -> int -> int -> int -> int -> date t) constr
 (** Constructor of [Date] objects:
-      [new%js date_fromTimeValue y m d h m' s]
+      [new%js date_sec y m d h m' s]
       returns a [Date] object corresponding to year [y] to second [s]. *)
 
 val date_ms : (int -> int -> int -> int -> int -> int -> int -> date t) constr
 (** Constructor of [Date] objects:
-      [new%js date_fromTimeValue y m d h m' s ms]
+      [new%js date_ms y m d h m' s ms]
       returns a [Date] object corresponding to year [y]
       to millisecond [ms]. *)
 
@@ -716,16 +723,16 @@ module Js_error : sig
   val raise_ : t -> 'a
 
   val attach_js_backtrace : exn -> force:bool -> exn
-  (** Attach a JavasScript error to an OCaml exception.  if [force = false] and a
-    JavasScript error is already attached, it will do nothing. This function is useful to
+  (** Attach a JavaScript error to an OCaml exception.  if [force = false] and a
+    JavaScript error is already attached, it will do nothing. This function is useful to
     store and retrieve information about JavaScript stack traces.
 
-    Attaching JavasScript errors will happen automatically when compiling with
+    Attaching JavaScript errors will happen automatically when compiling with
     [--enable with-js-error]. *)
 
   val of_exn : exn -> t option
   (** Extract a JavaScript error attached to an OCaml exception, if any.  This is useful to
-      inspect an eventual stack strace, especially when sourcemap is enabled. *)
+      inspect an eventual stack trace, especially when sourcemap is enabled. *)
 
   exception Exn of t
   (** The [Error] exception wrap javascript exceptions when caught by OCaml code.
@@ -778,8 +785,12 @@ val unescape : js_string t -> js_string t
 val isNaN : 'a -> bool
 
 val parseInt : js_string t -> int
+(** Parse a string as an integer. Raises [Failure "parseInt"] if the
+      string does not start with a number. *)
 
 val parseFloat : js_string t -> number_t
+(** Parse a string as a floating-point number. Raises
+      [Failure "parseFloat"] if the string does not start with a number. *)
 
 (** {2 Conversion functions between Javascript and OCaml types} *)
 
@@ -825,14 +836,14 @@ external float_of_number : number t -> float = "caml_js_to_float"
 (** Conversion of Javascript number objects to OCaml floats. *)
 
 external int32 : int32 -> number_t = "caml_js_from_int32"
-(** Conversion of OCaml floats to Javascript numbers. *)
+(** Conversion of OCaml 32-bit integers to Javascript numbers. *)
 
 external to_int32 : number_t -> int32 = "caml_js_to_int32"
 (** Conversion of Javascript numbers to OCaml 32-bits. The given
     floating-point number is truncated to an integer. *)
 
 external nativeint : nativeint -> number_t = "caml_js_from_nativeint"
-(** Conversion of OCaml 32-bits integers to Javascript numbers. *)
+(** Conversion of OCaml native integers to Javascript numbers. *)
 
 external to_nativeint : number_t -> nativeint = "caml_js_to_nativeint"
 (** Conversion of Javascript numbers to OCaml native integers. The
@@ -851,7 +862,7 @@ val coerce_opt : 'a Opt.t -> ('a -> 'b Opt.t) -> ('a -> 'b) -> 'b
       If [v] is [null] or the coercion returns [null], function [f] is
       called.
       Typical usage is the following:
-      {[Js.coerce_opt (Dom_html.document##getElementById id)
+      {@ocaml[Js.coerce_opt (Dom_html.document##getElementById id)
       Dom_html.CoerceTo.div (fun _ -> assert false)]} *)
 
 (** {2 Type checking operators.} *)
@@ -879,7 +890,7 @@ val export : string -> 'a -> unit
 
 val export_all : 'a t -> unit
 (** [export_all obj] export every key of [obj] object.
-{[
+{@ocaml[
 export_all
   object%js
     method add x y = x +. y
@@ -966,6 +977,11 @@ module Unsafe : sig
   external pure_js_expr : string -> 'a = "caml_pure_js_expr"
   (** [pure_js_expr str] behaves like [pure_expr (fun () -> js_expr str)]. *)
 
+  external runtime_value : string -> 'a = "caml_jsoo_runtime_value"
+  (** [runtime_value "FOO"] returns the JavaScript value FOO provided
+      by the JavaScript runtime (with '//Provides: FOO'). The string
+      argument must be a string literal. *)
+
   val global : < .. > t
   (** Javascript global object *)
 
@@ -1030,18 +1046,18 @@ val raise_js_error : error t -> 'a
 
 val exn_with_js_backtrace : exn -> force:bool -> exn
 [@@ocaml.deprecated "[since 4.0] Use [Js_error.raise_] instead."]
-(** Attach a JavasScript error to an OCaml exception.  if [force = false] and a
-    JavasScript error is already attached, it will do nothing. This function is useful to
+(** Attach a JavaScript error to an OCaml exception.  if [force = false] and a
+    JavaScript error is already attached, it will do nothing. This function is useful to
     store and retrieve information about JavaScript stack traces.
 
-    Attaching JavasScript errors will happen automatically when compiling with
+    Attaching JavaScript errors will happen automatically when compiling with
     [--enable with-js-error].
 *)
 
 val js_error_of_exn : exn -> error t opt
 [@@ocaml.deprecated "[since 4.0] Use [Js_error.of_exn] instead."]
 (** Extract a JavaScript error attached to an OCaml exception, if any.  This is useful to
-    inspect an eventual stack strace, especially when sourcemap is enabled. *)
+    inspect an eventual stack trace, especially when sourcemap is enabled. *)
 
 exception Error of error t [@ocaml.deprecated "[since 4.0] Use [Js_error.Exn] instead."]
 (** The [Error] exception wrap javascript exceptions when caught by OCaml code.

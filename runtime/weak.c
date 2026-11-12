@@ -22,7 +22,6 @@
 #include <string.h>
 
 #include "caml/alloc.h"
-#include "caml/domain.h"
 #include "caml/fail.h"
 #include "caml/major_gc.h"
 #include "caml/memory.h"

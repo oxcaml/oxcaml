@@ -23,6 +23,8 @@
 
    These macros are here, rather than misc.h, to discourage the potential future
    use of flexible array members! */
+#include <stdint.h>
+#include "misc.h"
 #ifdef __cplusplus
   #if defined(__clang__)
     #define CAML_flexible_array_member_start \
@@ -105,6 +107,10 @@ enum caml_ba_managed {
 
 enum caml_ba_subarray {
   CAML_BA_SUBARRAY = 0x800     /* Data is shared with another bigarray */
+};
+
+enum caml_ba_allocation {
+  CAML_BA_STACK = 0x1000      /* Descriptor is allocated on the local stack */
 };
 
 struct caml_ba_proxy {

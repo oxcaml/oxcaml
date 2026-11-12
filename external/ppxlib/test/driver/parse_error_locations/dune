@@ -1,0 +1,7 @@
+(executable
+ (name identity_standalone)
+ (libraries ppxlib))
+
+(cram
+ (package ppxlib)
+ (deps identity_standalone.exe))

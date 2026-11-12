@@ -17,7 +17,6 @@
 #include "caml/runtime_events.h"
 #include "caml/alloc.h"
 #include "caml/callback.h"
-#include "caml/custom.h"
 #include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
@@ -27,8 +26,6 @@
 
 #include <fcntl.h>
 #include <stdatomic.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -562,6 +559,7 @@ static void write_to_ring(ev_category category, ev_message_type type,
   }
 
   /* First we check if a write would take us over the head */
+  int head_advanced = 0;
   while ((ring_tail + length_with_header_ts + padding_required) - ring_head >=
          ring_size_words) {
     /* The write would over-write some old bit of data. Need to advance the
@@ -572,6 +570,17 @@ static void write_to_ring(ev_category category, ev_message_type type,
 
     // advance the ring head
     atomic_store_release(&domain_ring_header->ring_head, ring_head);
+    head_advanced = 1;
+  }
+
+  if (head_advanced) {
+    /* The head advance must become visible before the stores that overwrite
+       the slots it released. atomic_store_release orders accesses before the
+       store, not after it, so without this fence a consumer can observe the
+       overwriting stores while the old ring_head is still visible. It then
+       reads overwritten data and cannot tell, because the head it re-reads
+       says the slot was never released. */
+    atomic_thread_fence(memory_order_release);
   }
 
   if (padding_required > 0) {

@@ -1874,3 +1874,32 @@ module MPR7761 = struct
     let () = printf "PR#7661-E=Ok\n%!"
   end
 end
+
+(* oxcaml/oxcaml#7450, was giving wrong result 3 for [B] and [b = 0] *)
+module Unboxed_record_compat = struct
+  type t = A | B
+  type u = #{ a : int; b : int }
+
+  let f x y =
+    match #(x, y) with
+    | #(A, #{ a = 1; b = _ }) -> 1
+    | #(_, #{ a = 2; b = 0 }) -> 2
+    | #(B, #{ a = 2; b = _ }) -> 3
+    | #(_, _) -> 4
+
+  (* The same, but for implicit unboxed records *)
+  type r = { c : int; d : int }
+
+  let g x y =
+    match #(x, #{ c = y.c; d = y.d }) with
+    | #(A, #{ c = 1; d = _ }) -> 1
+    | #(_, #{ c = 2; d = 0 }) -> 2
+    | #(B, #{ c = 2; d = _ }) -> 3
+    | #(_, _) -> 4
+
+  let () =
+    printf "f B #{a=2; b=0} -> %d\n" (f B #{ a = 2; b = 0 });
+    printf "f B #{a=2; b=1} -> %d\n" (f B #{ a = 2; b = 1 });
+    printf "g B {c=2; d=0} -> %d\n" (g B { c = 2; d = 0 });
+    printf "g B {c=2; d=1} -> %d\n" (g B { c = 2; d = 1 })
+end

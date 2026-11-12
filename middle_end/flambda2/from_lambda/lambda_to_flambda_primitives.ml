@@ -126,8 +126,9 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
        products of values into individual value fields. *)
     let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
       match elem with
-      | L.Value vk ->
+      | Value vk ->
         K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
+      | Void -> acc
       | Product elts -> Array.fold_left collect_value_fields acc elts
       | Float_boxed ()
       | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
@@ -139,8 +140,8 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
     if num_fields <> fields_length
     then
       Misc.fatal_errorf
-        "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
-         fields"
+        "Flambda_arity.convert_block_shape: num_fields is %d yet the shape has \
+         %d fields"
         num_fields fields_length;
     fields
 
@@ -1114,7 +1115,8 @@ let multiple_word_array_access_validity_condition array ~machine_width
    load/store functions below *)
 
 let array_vector_access_validity_condition array ~machine_width
-    ~(vec_kind : Vector_types.Kind.t) (array_kind : P.Array_kind.t) index =
+    ~(vec_kind : Vector_types.Kind.t) (array_kind : P.Array_kind.t) ~index_kind
+    index =
   let size_of_element =
     match array_kind with
     | Naked_vec128s -> 16
@@ -1142,21 +1144,20 @@ let array_vector_access_validity_condition array ~machine_width
     (size_of_access + (size_of_element - 1)) / size_of_element
   in
   multiple_word_array_access_validity_condition array ~machine_width
-    (Array_kind array_kind) Ptagged_int_index
-    ~num_consecutive_elements_being_accessed ~index
+    (Array_kind array_kind) index_kind ~num_consecutive_elements_being_accessed
+    ~index
 
-let check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-    ~vec_kind primitive : H.expr_primitive =
+let check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+    ~index ~vec_kind primitive : H.expr_primitive =
   checked_access ~primitive
     ~conditions:
       [ array_vector_access_validity_condition ~machine_width ~vec_kind array
-          array_kind index ]
+          array_kind ~index_kind index ]
     ~dbg
 
 let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
     ~current_alloc_region ~current_region ~(vec_kind : Vector_types.Kind.t)
     array_kind array ~index_kind index =
-  let index = convert_index_to_tagged_int ~index ~index_kind in
   let load_kind, box =
     match vec_kind with
     | Vec128 -> P.Array_load_kind.Naked_vec128s, box_vec128
@@ -1164,6 +1165,7 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
     | Vec512 -> P.Array_load_kind.Naked_vec512s, box_vec512
   in
   let primitive =
+    let index = convert_index_to_tagged_int ~index ~index_kind in
     H.Binary (Array_load (array_kind, load_kind, Mutable), array, index)
   in
   let primitive =
@@ -1174,13 +1176,12 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed
   if unsafe
   then primitive
   else
-    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-      ~vec_kind primitive
+    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+      ~index ~vec_kind primitive
 
 let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
     ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index
     new_value =
-  let index = convert_index_to_tagged_int ~index ~index_kind in
   let set_kind, unbox =
     match vec_kind with
     | Vec128 -> P.Array_set_kind.Naked_vec128s, unbox_vec128
@@ -1189,13 +1190,14 @@ let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
   in
   let new_value = if boxed then unbox new_value else new_value in
   let primitive =
+    let index = convert_index_to_tagged_int ~index ~index_kind in
     H.Ternary (Array_set (array_kind, set_kind), array, index, new_value)
   in
   if unsafe
   then primitive
   else
-    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
-      ~vec_kind primitive
+    check_array_vector_access ~dbg ~machine_width ~array array_kind ~index_kind
+      ~index ~vec_kind primitive
 
 (* Bigarray accesses *)
 let bigarray_box_or_tag_raw_value_to_read kind alloc_mode =
@@ -1781,9 +1783,9 @@ let block_index_access_offsets_and_kinds ~machine_width layout idx =
       let add x y = H.Binary (Int_arith (Naked_int64, Add), Prim x, y) in
       let offset_from_offset : H.simple_or_prim =
         match mbe with
-        | Product _ ->
+        | Void | Product _ ->
           (* Products not produced by [L.mixed_block_element_leaves] *)
-          Misc.fatal_errorf "Unexpected product in block index access: %a"
+          Misc.fatal_errorf "Unexpected void/product in block index access: %a"
             Printlambda.layout layout
         (* Values are (values to left) beyond the offset *)
         | Value _ ->
@@ -1843,6 +1845,9 @@ let idx_atomic_offset_and_field_kind ~machine_width primitive dbg layout ~idx =
   let field_kind = P.Block_access_field_kind.from_kind full_kind in
   H.Prim offset, field_kind
 
+let null_base : H.simple_or_prim =
+  H.Simple (Simple.const Reg_width_const.const_null)
+
 let convert_pget_indirect ~machine_width ~dbg primitive layout
     (mut : Asttypes.mutable_flag) ~ptr ~idx : H.expr_primitive list =
   needs_64_bit_target primitive dbg;
@@ -1889,12 +1894,7 @@ let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
     Mixed_block_shape.of_mixed_block_elements shape
       ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
   in
-  let field_index =
-    match Mixed_block_shape.lookup_path_producing_new_indexes shape [index] with
-    | [index] -> index
-    | _ ->
-      Misc.fatal_errorf "%s: expected exactly one flattened index" prim_name
-  in
+  let field_index = Mixed_block_shape.lookup_singleton_field shape index in
   let field_kind =
     match (Mixed_block_shape.flattened_reordered_shape shape).(field_index) with
     | Value vk -> H.block_access_field_kind_of_value_kind vk
@@ -1906,6 +1906,121 @@ let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
   let imm = Target_ocaml_int.of_int machine_width field_index in
   check_non_negative_imm imm prim_name;
   imm, field_kind
+
+(* CR box: the current state of the world is a little sad. We either box small
+   numbers as tagged immediates and break representation invariants for
+   singleton unboxed records, or box them as tag-0 blocks and break numeric
+   layout invariants / optimizations. We uniformly pick the latter, in the
+   absence of addressability to tell us which decision to make.
+
+   Once we can box things as tagged immediates, the return type of this function
+   must change. *)
+let block_shape_for_boxing ~prim_name (layout : L.layout) : L.mixed_block_shape
+    =
+  match layout with
+  | Pvoid -> [||]
+  | Punboxed_product layouts ->
+    Array.of_list (List.map L.mixed_block_element_of_layout layouts)
+  (* We can't use [Box_number], since it is immutable and can be optimized as
+     such, but [Punboxed_vector] here really could correspond to a singleton
+     unboxed record whose boxed version is mutable. This can unsoundly expose
+     the immutable optimizations. *)
+  | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask ->
+    [| L.mixed_block_element_of_layout layout |]
+  | Ptop ->
+    Misc.fatal_errorf "block_shape_for_boxing: %s: Ptop layout" prim_name
+  | Pbottom ->
+    Misc.fatal_errorf "block_shape_for_boxing: %s: Pbottom layout" prim_name
+  | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+
+let convert_block_creation ~machine_width ~prim_name tag (shape : L.block_shape)
+    mutability mode (args : H.simple_or_prim list) : H.expr_primitive list =
+  match L.mixed_block_of_block_shape shape with
+  | None ->
+    let shape =
+      convert_block_shape ~machine_width shape ~num_fields:(List.length args)
+    in
+    [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
+  | Some shape ->
+    (* Mixed block *)
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+        shape
+    in
+    let flattened_reordered_shape =
+      Mixed_block_shape.flattened_reordered_shape shape
+    in
+    if List.length args <> Array.length flattened_reordered_shape
+    then
+      Misc.fatal_errorf
+        "%s (mixed): number of arguments (%d) is not consistent with shape \
+         length (%d)"
+        prim_name (List.length args)
+        (Array.length flattened_reordered_shape);
+    let args =
+      let new_indexes_to_old_indexes =
+        Mixed_block_shape.new_indexes_to_old_indexes shape
+      in
+      let args = Array.of_list args in
+      Array.init (Array.length args) (fun new_index ->
+          args.(new_indexes_to_old_indexes.(new_index)))
+      |> Array.to_list
+    in
+    let args =
+      List.mapi
+        (fun new_index arg ->
+          match flattened_reordered_shape.(new_index) with
+          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+          | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+            arg
+          | Float_boxed _ -> unbox_float arg)
+        args
+    in
+    let kind_shape =
+      match K.Scannable_block_shape.from_mixed_block_shape shape with
+      | Mixed_record kind_shape -> kind_shape
+      | Value_only ->
+        Misc.fatal_errorf
+          "%s: mixed_block_of_block_shape returned Some but \
+           from_mixed_block_shape returned Value_only"
+          prim_name
+    in
+    [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
+
+let convert_block_unboxing ~machine_width tag (shape : L.mixed_block_shape) mut
+    (arg : H.simple_or_prim) : H.expr_primitive list =
+  let num_elements = Array.length shape in
+  let shape =
+    Mixed_block_shape.of_mixed_block_elements
+      ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+      shape
+  in
+  let flattened_reordered_shape =
+    Mixed_block_shape.flattened_reordered_shape shape
+  in
+  let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
+  let tag = Or_unknown.Known tag in
+  let size =
+    Or_unknown.Known
+      (Target_ocaml_int.of_int machine_width
+         (Array.length flattened_reordered_shape))
+  in
+  let all_indices =
+    List.init num_elements (fun i ->
+        Mixed_block_shape.lookup_path_producing_new_indexes shape [i])
+    |> List.concat
+  in
+  List.map
+    (fun index : H.expr_primitive ->
+      let field = Target_ocaml_int.of_int machine_width index in
+      let kind =
+        H.block_access_kind_of_mixed_field_element ~kind_shape ~tag ~size
+          flattened_reordered_shape.(index)
+      in
+      Unary (Block_load { kind; mut; field }, arg))
+    all_indices
 
 (* Primitive conversion *)
 let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
@@ -1921,7 +2036,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ -> (
+  | Pmakeblock (tag, mutability, shape, mode), _ ->
     let args = List.flatten args in
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
@@ -1936,57 +2051,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       then Mutability.Immutable
       else Mutability.from_lambda mutability
     in
-    match L.mixed_block_of_block_shape shape with
-    | None ->
-      let shape =
-        convert_block_shape ~machine_width shape ~num_fields:(List.length args)
-      in
-      [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
-    | Some shape ->
-      (* Mixed block *)
-      let shape =
-        Mixed_block_shape.of_mixed_block_elements
-          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          shape
-      in
-      let args =
-        let new_indexes_to_old_indexes =
-          Mixed_block_shape.new_indexes_to_old_indexes shape
-        in
-        let args = Array.of_list args in
-        Array.init (Array.length args) (fun new_index ->
-            args.(new_indexes_to_old_indexes.(new_index)))
-        |> Array.to_list
-      in
-      let flattened_reordered_shape =
-        Mixed_block_shape.flattened_reordered_shape shape
-      in
-      if List.length args <> Array.length flattened_reordered_shape
-      then
-        Misc.fatal_errorf
-          "Pmakeblock (mixed): number of arguments (%d) is not consistent with \
-           shape length (%d)"
-          (List.length args)
-          (Array.length flattened_reordered_shape);
-      let args =
-        List.mapi
-          (fun new_index arg ->
-            match flattened_reordered_shape.(new_index) with
-            | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
-              arg
-            | Float_boxed _ -> unbox_float arg)
-          args
-      in
-      let kind_shape =
-        match K.Scannable_block_shape.from_mixed_block_shape shape with
-        | Mixed_record kind_shape -> kind_shape
-        | Value_only ->
-          Misc.fatal_error
-            "Pmakeblock: mixed_block_of_block_shape returned Some but \
-             from_mixed_block_shape returned Value_only"
-      in
-      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
+    convert_block_creation ~machine_width ~prim_name:"Pmakeblock" tag shape
+      mutability mode args
   | Pmakelazyblock lazy_tag, [[arg]] ->
     [Unary (Make_lazy { lazy_tag; alloc_region = current_alloc_region }, arg)]
   | Pmake_unboxed_product layouts, _ ->
@@ -2030,10 +2096,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
     let num_bytes = L.array_element_size_in_bytes array_kind in
-    [ Simple
-        (Simple.const_int
-           (Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
-              num_bytes)) ]
+    [Simple (Simple.const_int (Target_ocaml_int.of_int machine_width num_bytes))]
   | Pmake_idx_field pos, [] ->
     needs_64_bit_target prim dbg;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
@@ -2258,14 +2321,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined
           (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed)
         when Mixed_product_bytes.shape_is_all_value shape ->
+        let length = MPB.count (Product shape) |> MPB.value_prefix_len in
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
-            length = Target_ocaml_int.of_int machine_width num_fields
+            length = Target_ocaml_int.of_int machine_width length
           }
       | Record_mixed shape when Mixed_product_bytes.shape_is_all_value shape ->
+        let length = MPB.count (Product shape) |> MPB.value_prefix_len in
         Values
           { tag = Tag.Scannable.zero;
-            length = Target_ocaml_int.of_int machine_width num_fields
+            length = Target_ocaml_int.of_int machine_width length
           }
       | Record_inlined (_, Constructor_mixed _, _) | Record_mixed _ -> Mixed
       | Record_inlined
@@ -2332,6 +2397,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Pred ->
           Binary
             (Int_arith (width, Sub), arg, Simple (const ~machine_width width 1))
+        | Not -> Unary (Int_arith (width, Not), arg)
       in
       [to_expr (maybe_wrap (Prim result))]
     | Floating (outer, op) ->
@@ -2993,13 +3059,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           block,
           new_ref_value ) ]
   | Pctconst const, _ -> (
-    match !Clflags.jsir with
-    | true ->
+    if Clflags.target_is_jsir ()
+    then
       Misc.fatal_errorf
         "Saw %a in JSIR mode, but it should've been simplified away in \
          [Lambda_to_lambda_transforms]:@ %a"
         Printlambda.primitive prim Debuginfo.print_compact dbg
-    | false -> (
+    else
       match const with
       | Big_endian -> [Simple (Simple.const_bool machine_width big_endian)]
       | Word_size ->
@@ -3038,7 +3104,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [ Simple
             (Simple.const_bool machine_width
                (String.equal Config.architecture "arm64")) ]
-      | Backend_type -> [Simple (Simple.const_zero machine_width)]))
+      | Backend_type -> [Simple (Simple.const_zero machine_width)])
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)
@@ -3486,121 +3552,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
     [Ternary (Atomic_int_arith (Byte_offset, Xor), ptr, offset, i)]
-  | Patomic_load_ptr { layout }, [[ptr; idx]] ->
-    let offset, field_kind =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
-    in
-    [Binary (Atomic_load (Byte_offset, field_kind), ptr, offset)]
-  | Patomic_set_ptr { layout; mode }, [[ptr; idx]; [new_value]] ->
-    let offset, field_kind =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
-    in
-    [ Ternary
-        ( Atomic_set
-            ( Byte_offset,
-              field_kind,
-              Alloc_mode.For_assignments.from_lambda mode ),
-          ptr,
-          offset,
-          new_value ) ]
-  | Patomic_exchange_ptr { layout; mode }, [[ptr; idx]; [new_value]] ->
-    let offset, field_kind =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
-    in
-    [ Ternary
-        ( Atomic_exchange
-            ( Byte_offset,
-              field_kind,
-              Alloc_mode.For_assignments.from_lambda mode ),
-          ptr,
-          offset,
-          new_value ) ]
-  | ( Patomic_compare_exchange_ptr { layout; mode },
-      [[ptr; idx]; [comparison_value]; [new_value]] ) ->
-    let offset, field_kind =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
-    in
-    [ Quaternary
-        ( Atomic_compare_exchange
-            { offset_units = Byte_offset;
-              atomic_kind = field_kind;
-              args_kind = field_kind;
-              mode = Alloc_mode.For_assignments.from_lambda mode
-            },
-          ptr,
-          offset,
-          comparison_value,
-          new_value ) ]
-  | ( Patomic_compare_set_ptr { layout; mode },
-      [[ptr; idx]; [old_value]; [new_value]] ) ->
-    let offset, field_kind =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
-    in
-    [ Quaternary
-        ( Atomic_compare_and_set
-            ( Byte_offset,
-              field_kind,
-              Alloc_mode.For_assignments.from_lambda mode ),
-          ptr,
-          offset,
-          old_value,
-          new_value ) ]
-  | Patomic_fetch_add_ptr, [[ptr; idx]; [i]] ->
-    let offset, _ =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
-    in
-    [Ternary (Atomic_int_arith (Byte_offset, Fetch_add), ptr, offset, i)]
-  | Patomic_add_ptr, [[ptr; idx]; [i]] ->
-    let offset, _ =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
-    in
-    [Ternary (Atomic_int_arith (Byte_offset, Add), ptr, offset, i)]
-  | Patomic_sub_ptr, [[ptr; idx]; [i]] ->
-    let offset, _ =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
-    in
-    [Ternary (Atomic_int_arith (Byte_offset, Sub), ptr, offset, i)]
-  | Patomic_land_ptr, [[ptr; idx]; [i]] ->
-    let offset, _ =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
-    in
-    [Ternary (Atomic_int_arith (Byte_offset, And), ptr, offset, i)]
-  | Patomic_lor_ptr, [[ptr; idx]; [i]] ->
-    let offset, _ =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
-    in
-    [Ternary (Atomic_int_arith (Byte_offset, Or), ptr, offset, i)]
-  | Patomic_lxor_ptr, [[ptr; idx]; [i]] ->
-    let offset, _ =
-      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
-    in
-    [Ternary (Atomic_int_arith (Byte_offset, Xor), ptr, offset, i)]
-  (* unary ptr-accepting atomic primitives *)
-  | Patomic_load_ptr _, [([] | _ :: [] | _ :: _ :: _ :: _)] ->
-    Misc.fatal_errorf
-      "Closure_convertion.convert_primitive: Expected unboxed product of \
-       length 2 as first arg to ptr primitive %a (%a)"
-      Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  (* binary ptr-accepting atomic primitives *)
-  | ( ( Patomic_set_ptr _ | Patomic_exchange_ptr _ | Patomic_fetch_add_ptr
-      | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr
-      | Patomic_lxor_ptr ),
-      _ :: [([] | _ :: [] | _ :: _ :: _ :: _)] ) ->
-    Misc.fatal_errorf
-      "Closure_convertion.convert_primitive: Expected unboxed product of \
-       length 2 as first arg to ptr primitive %a (%a)"
-      Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  (* ternary ptr-accepting atomic primitives *)
-  | ( (Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _),
-      _ :: _ :: [([] | _ :: [] | _ :: _ :: _ :: _)] ) ->
-    Misc.fatal_errorf
-      "Closure_convertion.convert_primitive: Expected unboxed product of \
-       length 2 as first arg to ptr primitive %a (%a)"
-      Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pcpu_relax, _ -> [Nullary Cpu_relax]
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ptls_get, _ -> [Nullary Tls_get]
   | Pdomain_index, _ -> [Nullary Domain_index]
+  | Pthread_self_id, _ -> [Nullary Thread_self_id]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
     if not (Target_system.is_64_bit ())
@@ -3646,13 +3602,36 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        length 2 as first arg to ptr primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pget_ext_ptr (layout, mut), [[idx]] ->
-    let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr:null_base
       ~idx
   | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
-    let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
+  | Pbox (layout, mode), [args] ->
+    let mode =
+      Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+        ~current_region
+    in
+    let shape : L.block_shape =
+      Shape (block_shape_for_boxing ~prim_name:"Pbox" layout)
+    in
+    (* A boxed all-void product must be [Immutable] for the middle-end *)
+    (* CR box: we default to [Mutable], but we should consider storing
+       mutability information in the primitive and refining it from the type to
+       get better code generation. For now, we don't, and instead choose to be
+       entirely layout directed. *)
+    let mutability =
+      if List.is_empty args then Mutability.Immutable else Mutability.Mutable
+    in
+    convert_block_creation ~machine_width ~prim_name:"Pbox" Tag.Scannable.zero
+      shape mutability mode args
+  | Punbox layout, [[arg]] ->
+    let shape = block_shape_for_boxing ~prim_name:"Punbox" layout in
+    (* CR box: always [Mutable], see [Pbox] above. In this case, we may actually
+       want to store a list of mutabilities to determine which fields should be
+       read (im)mutably. *)
+    let mut = Mutability.Mutable in
+    convert_block_unboxing ~machine_width Tag.Scannable.zero shape mut arg
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3679,7 +3658,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ | Pbox _ | Punbox _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \
@@ -3719,10 +3698,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_load_field _ | Patomic_set_mixed_field _ | Ppoke _
       | Pphys_equal _
       | Pscalar (Binary _)
-      | Patomic_load_idx _ | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _
-      | Patomic_set_ptr _ | Patomic_exchange_ptr _ | Patomic_fetch_add_ptr
-      | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr
-      | Patomic_lxor_ptr ),
+      | Patomic_load_idx _ | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
@@ -3760,8 +3736,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_sub_field | Patomic_land_field | Patomic_lxor_field
       | Patomic_lor_field | Patomic_exchange_idx _ | Patomic_fetch_add_idx
       | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx | Patomic_lxor_idx
-      | Patomic_lor_idx | Patomic_set_idx _ | Pset_idx _
-      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _ ),
+      | Patomic_lor_idx | Patomic_set_idx _ | Pset_idx _ ),
       ( []
       | [_]
       | [_; _]

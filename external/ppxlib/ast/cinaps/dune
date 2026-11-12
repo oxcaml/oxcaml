@@ -1,0 +1,3 @@
+(library
+ (name ast_cinaps_helpers)
+ (libraries stdppx supported_version astlib_cinaps_helpers))

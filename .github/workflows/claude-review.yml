@@ -1,5 +1,5 @@
-# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source
-# code repo. If you want this functionality, ask for help from a subset of:
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
 # @jvanburen @glittershark @mshinwell
 #
 # (This workflow complies: repository contents are read-only. Claude cannot
@@ -67,7 +67,7 @@ jobs:
             # persist-credentials to false once that issue is resolved.
 
       - name: Run Claude Review
-        uses: anthropics/claude-code-action@6b082c41935b4c8a3b8b0ef85ba4ba4d9eeb8975 # v1.0.189
+        uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1.0.240
         with:
           # Workload Identity Federation identifiers, not credentials (see the
           # WIF section in .github/claude-code-security.md).

@@ -28,3 +28,5 @@
 
 module Jsir = Code
 module Parse_info = Parse_info
+module Targetint = Targetint
+module Targetnativeint = Targetnativeint

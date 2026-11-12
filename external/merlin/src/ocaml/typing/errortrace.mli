@@ -36,9 +36,11 @@ type 'a diff = { got: 'a; expected: 'a }
 (** [map_diff f {expected;got}] is [{expected=f expected; got=f got}] *)
 val map_diff: ('a -> 'b) -> 'a diff -> 'b diff
 
+type escape_constructor_kind = Type | Kind
+
 (** Scope escape related errors *)
 type 'a escape_kind =
-  | Constructor of Path.t
+  | Constructor of escape_constructor_kind * Path.t
   | Univ of type_expr
   (* The type_expr argument of [Univ] is always a [Tunivar _],
      we keep a [type_expr] to track renaming in {!Printtyp} *)
@@ -110,20 +112,20 @@ type ('a, 'variety) elt =
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
   | Mode_mismatch :
       arrow_position * Mode.With_locality.error -> ('a, comparison) elt
+  | Weaken_sort : { pat: type_expr; subj: type_expr } -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
 type 'variety trace = (type_expr,     'variety) t
 type 'variety error = (expanded_type, 'variety) t
 
-(** merlin specific *)
-val map_types :
-  (type_expr -> type_expr) ->
-  (expanded_type, 'variety) t -> (expanded_type, 'variety) t
-
 val map_elt : ('a -> 'b) -> ('a, 'variety) elt -> ('b, 'variety) elt
 
 val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
+
+val map_types :
+  (type_expr -> type_expr) ->
+  (expanded_type, 'variety) t -> (expanded_type, 'variety) t
 
 val incompatible_fields :
   name:string -> got:type_expr -> expected:type_expr -> (type_expr, _) elt
@@ -190,6 +192,5 @@ module Subtype : sig
 
   val map : ('a -> 'b) -> 'a t -> 'b t
 
-  (** merlin specific *)
   val map_types : (type_expr -> type_expr) -> expanded_type t -> expanded_type t
 end

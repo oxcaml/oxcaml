@@ -19,12 +19,10 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h> /* for _wchdir and _wgetcwd */
@@ -53,15 +51,14 @@
 #include "caml/debugger.h"
 #include "caml/runtime_events.h"
 #include "caml/fail.h"
+#include "caml/fiber.h"
 #include "caml/gc_ctrl.h"
 #include "caml/major_gc.h"
 #include "caml/io.h"
 #include "caml/mlvalues.h"
 #include "caml/osdeps.h"
 #include "caml/signals.h"
-#include "caml/fiber.h"
 #include "caml/sys.h"
-#include "caml/startup.h"
 #include "caml/callback.h"
 #include "caml/startup_aux.h"
 #include "caml/major_gc.h"
@@ -136,6 +133,7 @@ static void report_stats(void)
 {
   if ((atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_STATS) != 0) {
     caml_report_gc_stats();
+    caml_stack_stats_print();
     /* TODO: add other (non-GC) stats reporting here */
   }
 }

@@ -16,14 +16,21 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
+(@if (not $wasi)
+(@then
    (import "wasm:js-string" "compare"
       (func $compare_strings (param externref externref) (result i32)))
    (import "wasm:js-string" "test"
       (func $is_string (param externref) (result i32)))
+   (import "wasm:js-string" "length"
+      (func $string_length (param externref) (result i32)))
    (import "wasm:js-string" "fromCharCodeArray"
       (func $fromCharCodeArray
          (param (ref null $wstring)) (param i32) (param i32)
          (result (ref extern))))
+   (import "wasm:js-string" "intoCharCodeArray"
+      (func $intoCharCodeArray
+         (param externref (ref null $wstring) i32) (result i32)))
 
    (import "wasm:text-decoder" "decodeStringFromUTF8Array"
       (func $decodeStringFromUTF8Array
@@ -44,13 +51,22 @@
    (import "bindings" "append_string"
       (func $append_string (param anyref) (param anyref) (result anyref)))
 
+   ;; Scratch buffer for string conversion.  We share the single linear memory
+   ;; owned by c-impl.wasm (see runtime/wasm/dune): that module keeps all of its
+   ;; own data above the first 64 KiB page, which we use here from offset 0.
+   ;; Re-exported as "caml_buffer" for the JS runtime (runtime.js), together
+   ;; with the size of the page we own: everything above belongs to the C code,
+   ;; which may also grow the memory.
+   (import "c" "memory" (memory 1))
+   (export "caml_buffer" (memory 0))
+
    (type $bytes (array (mut i8)))
    (type $wstring (array (mut i16)))
 
    (global $text_converters_available (mut i32) (i32.const 0))
    (global $string_builtins_available (mut i32) (i32.const 0))
 
-   (global $utf16_buffer_size i32 (i32.const 32768))
+   (global $utf16_buffer_size i32 (i32.const 1024))
    (global $buffer (mut (ref $wstring))
       (array.new $wstring (i32.const 0) (i32.const 0)))
 
@@ -89,12 +105,15 @@
 
    (func (export "jsstring_compare")
       (param $s anyref) (param $s' anyref) (result i32)
-      (return_call $compare_strings
-         (extern.convert_any (local.get $s))
-         (extern.convert_any (local.get $s'))))
+      ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+      ;; tail call cross
+      (return
+         (call $compare_strings
+            (extern.convert_any (local.get $s))
+            (extern.convert_any (local.get $s')))))
 
    (func (export "jsstring_test") (param $s anyref) (result i32)
-      (return_call $is_string (extern.convert_any (local.get $s))))
+      (return (call $is_string (extern.convert_any (local.get $s)))))
 
    (export "jsstring_hash" (func $hash_string))
 
@@ -118,7 +137,7 @@
                (if (i32.lt_u (local.get $i) (local.get $len))
                   (then
                      (local.set $c
-                        (array.get $bytes (local.get $s)
+                        (array.get_u $bytes (local.get $s)
                            (i32.add (local.get $pos) (local.get $i))))
                      (br_if $continue
                         (i32.ge_u (local.get $c) (i32.const 128)))
@@ -140,15 +159,16 @@
    (func (export "bytes_of_jsstring") (param $s anyref) (result (ref $bytes))
       (if (global.get $text_converters_available)
          (then
-            (return_call $encodeStringToUTF8Array
-               (extern.convert_any (local.get $s)))))
+            ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+            ;; tail call cross
+            (return
+               (call $encodeStringToUTF8Array
+                  (extern.convert_any (local.get $s))))))
       (return_call $string_of_jsstring_fallback (local.get $s)))
 
    ;; Fallback implementation of string conversion functions
 
-   (memory (export "caml_buffer") 1)
-
-   (global $buffer_size i32 (i32.const 65536))
+   (global $buffer_size (export "caml_buffer_size") i32 (i32.const 65536))
 
    (func $write_to_buffer
       (param $s (ref $bytes)) (param $pos i32) (param $len i32)
@@ -171,7 +191,10 @@
          (then
             (call $write_to_buffer
                (local.get $s) (local.get $pos) (local.get $len))
-            (return_call $read_string (local.get $len))))
+
+            ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+            ;; tail call cross
+            (return (call $read_string (local.get $len)))))
       (call $write_to_buffer
          (local.get $s) (local.get $pos) (global.get $buffer_size))
       (local.set $s'
@@ -257,4 +280,5 @@
       (local.set $s (array.new $bytes (i32.const 0) (local.get $len)))
       (call $read_from_buffer (local.get $s) (i32.const 0) (local.get $len))
       (global.set $stack (struct.new $stack (local.get $s) (global.get $stack))))
+))
 )

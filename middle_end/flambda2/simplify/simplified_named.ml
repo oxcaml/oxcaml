@@ -90,3 +90,11 @@ let update_cost_metrics cost_metrics t = { t with cost_metrics }
 type 'a or_rewritten =
   | Simplified of 'a
   | Rewritten of (body:Flambda.Expr.t -> Flambda.Expr.t)
+
+type binding_to_place =
+  | Keep_binding of
+      { let_bound : Bound_pattern.t;
+        simplified_defining_expr : t;
+        original_defining_expr : Named.t option
+      }
+  | Delete_binding of { original_defining_expr : Named.t option }

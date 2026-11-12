@@ -38,6 +38,8 @@ let scale_of_chunk : Cmm.memory_chunk -> int = function
 let is_offset chunk n =
   Validated_mem_offset.is_valid ~scale:(scale_of_chunk chunk) ~offset:n
 
+let is_symbol_offset chunk n = n mod scale_of_chunk chunk = 0
+
 let is_logical_immediate_int n =
   Arm64_ast.Logical_immediates.is_logical_immediate (Nativeint.of_int n)
 
@@ -75,7 +77,7 @@ let is_immediate (op : Operation.integer_operation) n :
   | Iadd | Isub -> Is_immediate (n <= 0xFFF_FFF && n >= -0xFFF_FFF)
   | Iand | Ior | Ixor -> Is_immediate (is_logical_immediate_int n)
   | Icomp _ -> Is_immediate (int_is_immediate n)
-  | Imul | Imulh _ | Idiv _ | Imod _ | Ilsl | Ilsr | Iasr | Iclz | Ictz
+  | Imul | Imulh _ | Idiv _ | Imod _ | Ilsl | Ilsr | Iasr | Inot | Iclz | Ictz
   | Ipopcnt ->
     Use_default
 
@@ -115,7 +117,7 @@ let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match[@ocaml.warning "-fragile-match"] expr with
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
-    when use_direct_addressing s ->
+    when use_direct_addressing s && is_symbol_offset chunk n ->
     Ibased (asm_symbol_of_cmm s, n), Ctuple []
   | Cop ((Caddv | Cadda), [arg; Cconst_int (n, _)], _) when is_offset chunk n ->
     validated_offset chunk n, arg
@@ -246,12 +248,12 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
         coeffects = _
       }
   | Capply _ | Calloc _ | Cstore _ | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-  | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Ccsel _
-  | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Cabsf _
-  | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
-  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion
-  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
-  | Cpause ->
+  | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr
+  | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
+  | Cabsf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
+  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
+  | Cthread_self_id | Cpoll | Cpause ->
     Use_default
 
 let select_operation
@@ -279,15 +281,21 @@ let is_offset_out_of_range byte_offset :
 
 let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  let ty_arg_is_small_int =
+  (* On macOS, 8- and 16-bit integers passed on the stack occupy only their own
+     size, where the AAPCS64 would round them up to 8 bytes. The store must
+     therefore write only the argument's own bytes: a wider store would clobber
+     the neighbouring packed arguments. *)
+  if not (macosx && is_stack_slot dst)
+  then Use_default
+  else
     match ty_arg with
-    | XInt32 | XInt16 | XInt8 -> true
-    | XInt | XInt64 | XFloat32 | XFloat | XVec128 -> false
+    | XInt8 -> Rewritten (Op (Specific Imove8), src, dst)
+    | XInt16 -> Rewritten (Op (Specific Imove16), src, dst)
+    | XInt32 -> Rewritten (Op (Specific Imove32), src, dst)
+    | XInt | XInt64 | XFloat32 | XFloat | XVec128 | XDummy_int | XDummy_float
+    | XFat_pointer ->
+      Use_default
     | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
-  in
-  if macosx && ty_arg_is_small_int && is_stack_slot dst
-  then Rewritten (Op (Specific Imove32), src, dst)
-  else Use_default
 
 exception Use_default_exn
 
@@ -298,14 +306,14 @@ let pseudoregs_for_operation op arg res =
   | Opaque -> res, res
   | Specific
       ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
-      | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
-      | Ifar_stackcheck _
+      | Imulsubf | Inegmulsubf | Isqrtf | Imove8 | Imove16 | Imove32
+      | Ifar_alloc _ | Ifar_stackcheck _
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
   | Move | Spill | Reload | Pause | Begin_region | End_region | Dls_get
-  | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
-  | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+  | Tls_get | Domain_index | Thread_self_id | Poll | Const_int _
+  | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+  | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Intop _ | Int128op _
   | Intop_imm (_, _)
@@ -335,3 +343,10 @@ let insert_op_debug env sub_cfg op dbg rs rd :
   if !Clflags.llvm_backend
   then Use_default
   else insert_op_debug' env sub_cfg op dbg rs rd
+
+let pseudoregs_for_operation op rs rd :
+    Cfg_selectgen_target_intf.pseudoregs_for_operation_result =
+  try
+    let rsrc, rdst = pseudoregs_for_operation op rs rd in
+    Constrained (rsrc, rdst)
+  with Use_default_exn -> Use_default_regs

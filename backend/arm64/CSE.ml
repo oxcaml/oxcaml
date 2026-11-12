@@ -46,6 +46,8 @@ let class_of_operation (op : Operation.t)
       | Inegmulsubf
       | Isqrtf
       | Ibswap _
+      | Imove8
+      | Imove16
       | Imove32
       | Isignext _ -> Op_pure
       | Isimd op -> of_simd_class (Simd.class_of_operation op)
@@ -63,6 +65,7 @@ let class_of_operation (op : Operation.t)
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
+  | Thread_self_id
     -> Use_default
 
 let is_cheap_operation (op : Operation.t)
@@ -80,4 +83,5 @@ let is_cheap_operation (op : Operation.t)
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
+  | Thread_self_id
     -> Cheap false

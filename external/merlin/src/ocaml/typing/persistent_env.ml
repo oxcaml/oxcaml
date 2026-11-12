@@ -62,6 +62,7 @@ type error =
         value: Global_module.Name.t;
       }
 
+(* These errors are location-less and will be logged and re-raised in Env *)
 exception Error of error
 let error err = raise (Error err)
 
@@ -103,7 +104,7 @@ type global_name_info = {
 type import = {
   imp_is_param : bool;
   imp_params : Global_module.Parameter_name.t list;
-  imp_arg_for : Global_module.Parameter_name.t option;
+  imp_arg_signature : Types.arg_signature option;
   imp_impl : CU.t option; (* None iff import is a parameter *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
@@ -111,13 +112,18 @@ type import = {
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
+  imp_cmi_name : CU.Name.t;
+  (* Physically the [cmi_name] of the [cmi_infos] this import was read from;
+     Merlin compares it with [==] against the [Cmi_cache] entry. *)
 }
 
-(* If a .cmi file is missing (or invalid), we
-   store it as Missing in the cache. *)
+(* If a .cmi file is missing (or failed to load), we store it as Missing in the
+   cache. We use Invalid when a .cmi is present, readable, but is inconsistent.
+   *)
 type import_info =
   | Missing of { hidden_were_allowed : bool }
   | Found of import
+  | Invalid of import
 
 (* Data relating to a global name (possibly with arguments) but not necessarily
    a value in scope. For example, if we've encountered a module only by seeing
@@ -216,7 +222,7 @@ let clear_missing {imports; _} =
     Hashtbl.fold
       (fun name r acc -> match r with
        | Missing _ -> name :: acc
-       | Found _ -> acc)
+       | Found _ | Invalid _ -> acc)
       imports []
   in
   List.iter (Hashtbl.remove imports) missing_entries
@@ -238,13 +244,8 @@ let register_import_as_opaque {imported_opaque_units; _} s =
 let find_import_info_in_cache {imports; _} import =
   match Hashtbl.find imports import with
   | exception Not_found -> None
-  | Missing _ -> None
+  | Missing _ | Invalid _ -> None
   | Found imp -> Some imp
-
-let find_name_info_in_cache {persistent_names; _} name =
-  match Hashtbl.find persistent_names name with
-  | exception Not_found -> None
-  | pn -> Some pn
 
 let find_info_in_cache {persistent_structures; _} name =
   match Hashtbl.find persistent_structures name with
@@ -262,8 +263,8 @@ let register_parameter ({param_imports; _} as penv) modname =
       ()
   | Some imp ->
       if not imp.imp_is_param then
-        raise (Error (Not_compiled_as_parameter
-                        (Global_module.Name.of_parameter_name modname)))
+        error (Not_compiled_as_parameter
+                 (Global_module.Name.of_parameter_name modname))
   end;
   param_imports := Param_set.add modname !param_imports
 
@@ -275,8 +276,11 @@ let import_crcs penv ~source crcs =
     match info with
     | None -> ()
     | Some (kind, crc) ->
-        add_import penv name;
-        Consistbl.check crc_units name kind crc source
+        match Consistbl.find crc_units name with
+        | Some (_, known_crc) when Digest.equal known_crc crc -> ()
+        | _ ->
+          add_import penv name;
+          Consistbl.check crc_units name kind crc source
   in Array.iter import_crc crcs
 
 let check_consistency penv imp =
@@ -390,6 +394,44 @@ let acknowledge_import penv ~check modname pers_sig =
   let crcs = cmi.cmi_crcs in
   let flags = cmi.cmi_flags in
   let sign = Signature_with_global_bindings.read_from_cmi cmi in
+  let is_param =
+    match kind with
+    | Normal _ -> false
+    | Parameter -> true
+  in
+  let arg_signature, impl =
+    match kind with
+    | Normal { cmi_arg_signature; cmi_impl } ->
+        cmi_arg_signature, Some cmi_impl
+    | Parameter -> None, None
+  in
+  let uid =
+    (* Awkwardly, we need to make sure the uid includes the pack prefix, which
+       is only stored in the [cmi_impl], which only exists for the kind
+       [Normal]. (There can be no pack prefix for a parameter, so it's not like
+       we're missing information, but it is awkward.) *)
+    (* CR-someday lmaurer: Just store the pack prefix separately like we used
+       to. Then we wouldn't need [cmi_impl] at all. *)
+    match kind with
+    | Normal { cmi_impl; _ } -> Shape.Uid.of_compilation_unit_id cmi_impl
+    | Parameter -> Shape.Uid.of_compilation_unit_name modname
+  in
+  let {imports; _} = penv in
+  let import =
+    { imp_is_param = is_param;
+      imp_params = params;
+      imp_arg_signature = arg_signature;
+      imp_impl = impl;
+      imp_raw_sign = sign;
+      imp_filename = filename;
+      imp_uid = uid;
+      imp_visibility = visibility;
+      imp_crcs = crcs;
+      imp_flags = flags;
+      imp_cmi_name = found_name;
+    }
+  in
+  begin try
   if not (CU.Name.equal modname found_name) then
     error (Illegal_renaming(modname, found_name, filename));
   List.iter
@@ -410,49 +452,20 @@ let acknowledge_import penv ~check modname pers_sig =
         error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
   | _, _ -> ()
   end;
-  let is_param =
-    match kind with
-    | Normal _ -> false
-    | Parameter -> true
-  in
-  let arg_for, impl =
-    match kind with
-    | Normal { cmi_arg_for; cmi_impl } -> cmi_arg_for, Some cmi_impl
-    | Parameter -> None, None
-  in
-  let uid =
-    (* Awkwardly, we need to make sure the uid includes the pack prefix, which
-       is only stored in the [cmi_impl], which only exists for the kind
-       [Normal]. (There can be no pack prefix for a parameter, so it's not like
-       we're missing information, but it is awkward.) *)
-    (* CR-someday lmaurer: Just store the pack prefix separately like we used
-       to. Then we wouldn't need [cmi_impl] at all. *)
-    match kind with
-    | Normal { cmi_impl; _ } -> Shape.Uid.of_compilation_unit_id cmi_impl
-    | Parameter -> Shape.Uid.of_compilation_unit_name modname
-  in
-  let {imports; _} = penv in
-  let import =
-    { imp_is_param = is_param;
-      imp_params = params;
-      imp_arg_for = arg_for;
-      imp_impl = impl;
-      imp_raw_sign = sign;
-      imp_filename = filename;
-      imp_uid = uid;
-      imp_visibility = visibility;
-      imp_crcs = crcs;
-      imp_flags = flags;
-    }
-  in
-  if check then check_consistency penv import;
+  if check then check_consistency penv import
+  with Error _ as exn ->
+    (* Merlin needs to know that a module was found even if it is invalid to
+       properly invalidate the cache. *)
+    Hashtbl.replace imports modname (Invalid import);
+    raise exn
+  end;
   Hashtbl.add imports modname (Found import);
   import
 
 let read_import penv ~check modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
   add_import penv modname;
-  let cmi = read_cmi_lazy filename in
+  let cmi = Cmi_cache.read filename in
   let pers_sig =
     { Persistent_signature.filename; cmi;
       visibility = Visible { cmx_guaranteed = false } }
@@ -471,7 +484,7 @@ let find_import ~allow_hidden penv ~check modname =
   | Found imp -> check_visibility ~allow_hidden imp; imp
   | Missing { hidden_were_allowed = true } -> raise Not_found
   | Missing { hidden_were_allowed = false }
-  | exception Not_found ->
+  | Invalid _ | exception Not_found ->
       match can_load_cmis penv with
       | Cannot_load_cmis _ -> raise Not_found
       | Can_load_cmis ->
@@ -656,13 +669,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
         (fun (param, value) ->
             (* Argument with no parameter: fine only if allowed by flag *)
             if not allow_excess_args then
-              raise
-                (Error (Imported_module_has_no_such_parameter {
-                          imported = CU.Name.of_head_of_global_name modname;
-                          valid_parameters = params;
-                          parameter = param;
-                          value = value |> Global_module.to_name;
-                        })))
+              error (Imported_module_has_no_such_parameter {
+                  imported = CU.Name.of_head_of_global_name modname;
+                  valid_parameters = params;
+                  parameter = param;
+                  value = value |> Global_module.to_name;
+                }))
       ~both:
         (fun expected_type (_arg_name, arg_value_global) ->
             let arg_value = arg_value_global |> Global_module.to_name in
@@ -671,21 +683,21 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
                 ~allow_excess_args
             in
             let actual_type =
-              match pn.pn_import.imp_arg_for with
+              match pn.pn_import.imp_arg_signature with
               | None ->
                   error (Not_compiled_as_argument
                            { param = expected_type; value = arg_value;
                              filename = pn.pn_import.imp_filename })
-              | Some ty -> ty
+              | Some { Types.arg_param; _ } -> arg_param
             in
             if not (Global_module.Parameter_name.equal expected_type actual_type)
             then begin
-              raise (Error (Argument_type_mismatch {
+              error (Argument_type_mismatch {
                   value = arg_value;
                   filename = pn.pn_import.imp_filename;
                   expected = expected_type;
                   actual = actual_type;
-                }))
+                })
             end)
   end;
   (* Form the name without any arguments at all, then substitute in all the
@@ -1048,7 +1060,7 @@ let read penv modname a =
   read_pers_struct penv true modname a
 
 let read_cmi_file penv filename =
-  let cmi = read_cmi_lazy filename in
+  let cmi = Cmi_cache.read filename in
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
   add_import penv unit_name;
@@ -1139,8 +1151,7 @@ let loaded_transitive_dependencies penv intfs =
   !names
 
 let find_import penv modname =
-  let import = find_import ~allow_hidden:true penv ~check:true modname in
-  import.imp_impl, import.imp_params, import.imp_raw_sign
+  find_import ~allow_hidden:true penv ~check:true modname
 
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls
@@ -1191,11 +1202,6 @@ let looked_up {persistent_structures; _} modname =
 
 let is_imported_opaque {imported_opaque_units; _} s =
   CU.Name.Set.mem s !imported_opaque_units
-
-let implemented_parameter penv modname =
-  match find_name_info_in_cache penv modname with
-  | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
-  | None -> None
 
 let make_cmi penv modname kind sign alerts =
   let flags =
@@ -1397,11 +1403,13 @@ let with_cmis penv f x =
           [R (penv.can_load_cmis, Can_load_cmis)]
           (fun () -> f x))
 
-let forall ~found ~missing t =
+let forall ~found ~invalid ~missing t =
   Std.Hashtbl.forall t.imports (fun name -> function
       | Missing _ -> missing name
       | Found import ->
-        found name import.imp_filename name
+        found name import.imp_filename import.imp_cmi_name
+      | Invalid import ->
+        invalid name import.imp_filename import.imp_cmi_name
     )
 
 let report_error = Format_doc.compat report_error_doc

@@ -26,6 +26,8 @@
 #include "gc_stats.h"
 #include "major_gc.h"
 #include "sizeclasses.h"
+#include "domain_state.h"
+#include "mlvalues.h"
 
 CAMLextern atomic_uintnat caml_compactions_count;
 

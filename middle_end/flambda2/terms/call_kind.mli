@@ -26,6 +26,8 @@ module Function_call : sig
         (** If a [Code_id.Set.t] is provided, only the provided functions (or a
             simplified version thereof) can be called, but we don't statically
             know which. *)
+
+  val indirect_known_arity : code_ids:Code_id.Set.t Or_unknown.t -> t
 end
 
 module Method_kind : sig
@@ -133,7 +135,11 @@ type t = private
       { needs_caml_c_call : bool;
         is_c_builtin : bool;
         effects : Effects.t;
-        coeffects : Coeffects.t
+        coeffects : Coeffects.t;
+        fat_ptr_arg_starts : int list
+            (** Indices into unarized argument list at which fat-pointer pairs
+                (base, byte offset) begin; each pair is passed to C as a single
+                raw pointer (base + offset), computed at the call site. *)
       }
   | Effect of Effect.t
 
@@ -155,6 +161,7 @@ val c_call :
   is_c_builtin:bool ->
   effects:Effects.t ->
   coeffects:Coeffects.t ->
+  fat_ptr_arg_starts:int list ->
   t
 
 val effect_ : Effect.t -> t

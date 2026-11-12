@@ -147,7 +147,7 @@ and rewrite_body
         Var.Set.fold (fun x m -> Var.Map.add x (Var.fork x) m) free_vars Var.Map.empty
       in
       let program = Subst.Excluding_Binders.cont (Subst.from_map s) pc' program in
-      let f' = try Var.Map.find f s with Not_found -> Var.fork f in
+      let f' = Var.Map.find_opt f s |> Option.value ~default:(Var.fork f) in
       let s = Var.Map.bindings (Var.Map.remove f s) in
       let f'' = Var.fork f in
       if debug ()
@@ -166,7 +166,7 @@ and rewrite_body
       in
       (* Add to returned list of lifter functions definitions *)
       let functions =
-        Let (f'', Closure (List.map s ~f:snd, (pc'', []), None)) :: functions
+        Let (f'', Closure (List.map s ~f:snd, (pc'', []), (None, None))) :: functions
       in
       let lifters = Var.Map.add f f' lifters in
       rewrite_body
@@ -177,7 +177,12 @@ and rewrite_body
         ~var_depth
         ~acc_instr:
           (* Replace closure with application of the lifter function *)
-          (Let (f, Apply { f = f''; args = List.map ~f:fst s; exact = true }) :: acc_instr)
+          (Let
+             ( f
+             , Apply
+                 { f = f''; args = List.map ~f:fst s; exact = true;
+                   yielding = Unknown } )
+          :: acc_instr)
         ~depth
         rem
   | Let (cname, Closure (params, (pc', args), cloc)) :: rem ->
@@ -238,7 +243,7 @@ and rewrite_body
             in
             let f's =
               List.map current_contiguous ~f:(fun (f, _, _, _, _) ->
-                  Var.(try Map.find f s with Not_found -> fork f))
+                  Var.(Map.find_opt f s |> Option.value ~default:(fork f)))
             in
             let s =
               List.fold_left
@@ -280,7 +285,7 @@ and rewrite_body
               }
             in
             let functions =
-              Let (f_tuple, Closure (List.map s ~f:snd, (pc_tuple, []), None))
+              Let (f_tuple, Closure (List.map s ~f:snd, (pc_tuple, []), (None, None)))
               :: functions
             in
             let lifters =
@@ -298,7 +303,14 @@ and rewrite_body
             in
             ( (program, functions, lifters)
             , rev_decl
-              @ Let (tuple, Apply { f = f_tuple; args = List.map ~f:fst s; exact = true })
+              @ Let
+                  ( tuple
+                  , Apply
+                      { f = f_tuple
+                      ; args = List.map ~f:fst s
+                      ; exact = true
+                      ; yielding = Unknown
+                      } )
                 :: acc_instr )
         | _ :: _ ->
             (* No need to lift the accumulated closures: just keep their definitions

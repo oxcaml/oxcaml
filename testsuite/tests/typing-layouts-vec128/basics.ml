@@ -85,95 +85,43 @@ end
 Exception: Assert_failure ("", 4, 12).
 |}];;
 
-(*************************************)
-(* Test 4: No putting them in tuples *)
+(**********************************)
+(* Test 4: Putting them in tuples *)
 
 let f4_1 (x : t_vec128) = x, false;;
 [%%expect{|
-Line 1, characters 26-27:
-1 | let f4_1 (x : t_vec128) = x, false;;
-                              ^
-Error: The value "x" has type "t_vec128" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_vec128 is vec128
-         because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a value layout
-         because it's the type of a tuple element.
+val f4_1 : t_vec128 -> t_vec128 * bool = <fun>
 |}];;
 
 let f4_2 (x : 'a t_vec128_id) = x, false;;
 [%%expect{|
-Line 1, characters 32-33:
-1 | let f4_2 (x : 'a t_vec128_id) = x, false;;
-                                    ^
-Error: The value "x" has type "'a t_vec128_id" = "('a : vec128)"
-       but an expression was expected of type "('b : value_or_null)"
-       The layout of 'a t_vec128_id is vec128
-         because of the definition of t_vec128_id at line 2, characters 0-35.
-       But the layout of 'a t_vec128_id must be a value layout
-         because it's the type of a tuple element.
+val f4_2 : ('a : vec128). 'a t_vec128_id -> 'a t_vec128_id * bool = <fun>
 |}];;
 
 let f4_3 (x : int64x2#) = x, false;;
 [%%expect{|
-Line 1, characters 26-27:
-1 | let f4_3 (x : int64x2#) = x, false;;
-                              ^
-Error: The value "x" has type "int64x2#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of int64x2# is vec128
-         because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a value layout
-         because it's the type of a tuple element.
+val f4_3 : int64x2# -> int64x2# * bool = <fun>
 |}];;
 
 type t4_4 = t_vec128 * string;;
 [%%expect{|
-Line 1, characters 12-20:
-1 | type t4_4 = t_vec128 * string;;
-                ^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_vec128" is vec128
-         because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of "t_vec128" must be a value layout
-         because it's the type of a tuple element.
+type t4_4 = t_vec128 * string
 |}];;
 
 type t4_5 = int * int64x2#;;
 [%%expect{|
-Line 1, characters 18-26:
-1 | type t4_5 = int * int64x2#;;
-                      ^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "int64x2#" is vec128
-         because it is the unboxed version of the primitive type int64x2.
-       But the layout of "int64x2#" must be a value layout
-         because it's the type of a tuple element.
+type t4_5 = int * int64x2#
 |}];;
 
 type ('a : vec128) t4_6 = 'a * 'a
 [%%expect{|
-Line 1, characters 26-28:
-1 | type ('a : vec128) t4_6 = 'a * 'a
-                              ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is vec128
-         because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : vec128) t4_6 = 'a * 'a
 |}];;
 
 (* check for layout propagation *)
 type ('a : vec128, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
 [%%expect{|
-Line 1, characters 45-47:
-1 | type ('a : vec128, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
-                                                 ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is vec128
-         because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : vec128, 'b) t4_7 = 'a -> 'a * 'a constraint 'b = 'a
 |}]
 
 (****************************************************)

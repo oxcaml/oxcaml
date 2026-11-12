@@ -22,7 +22,7 @@
 
 type simplify_result = private
   { free_names : Name_occurrences.t;
-    final_typing_env : Typing_env.t option;
+    final_typing_env : Typing_env.t;
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t;
     unit : Flambda_unit.t

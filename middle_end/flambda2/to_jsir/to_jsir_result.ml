@@ -77,9 +77,16 @@ let add_instr_exn t instr =
   { t with current_blocks = top_current_block :: rest_current_blocks }
 
 let maybe_add_debuginfo_exn t dbg ~pos =
-  match Parse_info.t_of_debuginfo dbg ~pos with
-  | None -> t
-  | Some parse_info -> add_instr_exn t (Event parse_info)
+  if Debuginfo.is_none dbg
+  then t
+  else
+    let loc = Debuginfo.to_location dbg in
+    let parse_info =
+      match pos with
+      | `Start -> Parse_info.t_of_pos loc.loc_start
+      | `End -> Parse_info.t_of_pos loc.loc_end
+    in
+    add_instr_exn t (Event parse_info)
 
 let with_debuginfo_exn t dbg ~f =
   let t = maybe_add_debuginfo_exn t dbg ~pos:`Start in
@@ -137,7 +144,9 @@ let invalid_switch_block t =
     let t, addr = new_block t ~params:[] in
     let t =
       add_instr_exn t
-        (Let (Jsir.Var.fresh (), Prim (Extern "caml_invalid_switch_arm", [])))
+        (Let
+           ( Jsir.Var.fresh (),
+             Prim (Extern ("caml_invalid_switch_arm", None), []) ))
     in
     let t = end_block_with_last_exn t Stop in
     { t with invalid_switch_block = Some addr }, addr
@@ -150,7 +159,7 @@ let get_public_method t ~obj ~field =
       (Let
          ( f,
            Prim
-             ( Extern "caml_get_public_method",
+             ( Extern ("caml_get_public_method", None),
                [ Pv obj;
                  Pv field;
                  Pc (Int (Targetint.of_int_exn method_cache_id)) ] ) ))
@@ -208,7 +217,8 @@ let to_program_exn
     | Some var ->
       let entry_block = Jsir.Addr.Map.find Jsir.Addr.zero complete_blocks in
       let body : Jsir.instr list =
-        Let (var, Prim (Extern "caml_get_global_data", [])) :: entry_block.body
+        Let (var, Prim (Extern ("caml_get_global_data", None), []))
+        :: entry_block.body
       in
       Jsir.Addr.Map.add Jsir.Addr.zero { entry_block with body } complete_blocks
   in

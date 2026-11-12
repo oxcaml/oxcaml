@@ -273,36 +273,13 @@ and 'k pattern_desc =
       mode: Mode.With_regionality.l;
       (** the mode of the layout function body *)
       lpoly: Types.Lpoly.t;
-      (** The sort variables abstracted over by this compile-time function, and
-      the allocation mode of the captured environment. [pending] during
-      type-checking; guaranteed [determined] of a non-empty list of generic sort
-      variables after [type_let] returns. *)
-      env_locality_mode: locality_mode_r;
-      (** The allocation mode of the environment captured by the layout
-      function.
-
-      Imagine we defined [let poly_ f = .. x ..] in a structure [M], where [.. x
-      ..] is some expression (not necessarily a function) that refers to [x]. It
-      translates to runtime:
-
-      [let f__float = fun env -> let {x; ..} = env in .. x ..
-       let f_env = {x = x; ..}]
-
-      where [f__float] is the instantiated function and [f_env] is the captured
-      environment (containing the example variable [x]) and is passed to
-      [f__float]. Only [f_env] is stored within the structure [M]; [f__float]
-      is a top-level symbol.
-
-      Observe the following constraint:
-      - For comonadic axes, [f_env <= M] and [x <= f_env].
-      - The monadic axes of [f_env] don't matter. In particular, note that
-        nothing closes over [f_env]. Also note that we don't perform on [f_env]
-        operations warranted by monadic modes such as [unique] or [uncontended].
-        *)
+      (** The sort variables abstracted over by this compile-time function.
+      [pending] during type-checking; guaranteed [determined] of a non-empty
+      list of generic sort variables after [type_let] returns. *)
     } -> value pattern_desc
         (** [let poly_ f = exp] creates a compile-time function [f] abstracted
-        over the layouts in [lpoly], and returns [exp] at [ret_sort] and
-        [ret_mode]. Note that [exp] is not necessarily a function. *)
+        over the layouts in [lpoly], and returns [exp] at [sort] and [mode].
+        Note that [exp] is necessarily a function. *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
@@ -310,10 +287,11 @@ and 'k pattern_desc =
   | Tpat_unboxed_bool : bool -> value pattern_desc
         (** #false, #true *)
   | Tpat_tuple :
-      (string option * value general_pattern) list -> value pattern_desc
-        (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
-            (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
-            Any mix, e.g. (L1:P1, P2)      [(Some L1,P1); ...; (None,P2)])
+      (string option * value general_pattern * Jkind.sort) list ->
+          value pattern_desc
+        (** (P1, ..., Pn)               [(None,P1,s1); ...; (None,Pn,sn)])
+            (L1:P1, ... Ln:Pn)          [(Some L1,P1,s1); ...; (Some Ln,Pn,sn)])
+            Any mix, e.g. (L1:P1, P2)   [(Some L1,P1,s1); ...; (None,P2,s2)])
 
             Invariant: n >= 2
          *)
@@ -376,6 +354,11 @@ and 'k pattern_desc =
       value pattern_desc
         (** [| P1; ...; Pn |]    (flag = Mutable)
             [: P1; ...; Pn :]    (flag = Immutable) *)
+  | Tpat_addr :
+      Types.mutability * Jkind.sort * value general_pattern ->
+      value pattern_desc
+        (** addr_ P        (flag = Mutable)
+            addr_imm_ P    (flag = Immutable) *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)
@@ -579,14 +562,15 @@ and expression_desc =
         (** #() *)
   | Texp_unboxed_bool of bool
         (** #false, #true *)
-  | Texp_tuple of (string option * expression) list * locality_mode_r
+  | Texp_tuple of
+      (string option * expression * Jkind.sort) list * locality_mode_r
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]
-                when [el] is [(None, E1);...;(None, En)],
+                when [el] is [(None, E1, s1);...;(None, En, sn)],
             - [(L1:E1, ..., Ln:En)]
-                when [el] is [(Some L1, E1);...;(Some Ln, En)],
+                when [el] is [(Some L1, E1, s1);...;(Some Ln, En, sn)],
             - Any mix, e.g. [(L1: E1, E2)]
-                when [el] is [(Some L1, E1); (None, E2)]
+                when [el] is [(Some L1, E1, s1); (None, E2, s2)]
           *)
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
         (** [Texp_unboxed_tuple(el)] represents
@@ -1291,21 +1275,17 @@ and open_description = (Path.t * Longident.t loc) open_infos
 
 and open_declaration = module_expr open_infos
 
-and include_kind =
+and 'repr include_kind =
   | Tincl_structure
   | Tincl_functor of
       { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
+      ; input_repr : 'repr
       ; yielding : Mode.Yielding.l
       }
       (* S1 -> S2 *)
-      (* Since [Types.module_representation = Jkind.sort array], this could've
-         been [of { inputs : (Ident.t * module_coercion * Jkind.sort) list }],
-         but the way [input_coercion] and [input_repr] are used makes keeping
-         them separate more natural. *)
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
+      ; input_repr : 'repr
       ; yielding : Mode.Yielding.l
       }
       (* S1 -> () -> S2 *)
@@ -1316,19 +1296,20 @@ and include_kind =
          (and no runtime application), so the field is a conservative
          [Yielding.max]. *)
 
-and 'a include_infos =
+and ('a, 'repr) include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
-     incl_repr: Types.module_representation;
+     incl_repr: 'repr;
      incl_loc: Location.t;
-     incl_kind: include_kind;
+     incl_kind: 'repr include_kind;
      incl_attributes: attribute list;
     }
 
-and include_description = module_type include_infos
+and include_description = (module_type, unit) include_infos
 
-and include_declaration = module_expr include_infos
+and include_declaration =
+  (module_expr, Types.module_representation) include_infos
 
 and with_constraint =
     Twith_type of type_declaration
@@ -1352,8 +1333,8 @@ and core_type =
 
 and core_type_desc =
   | Ttyp_var of string option * Parsetree.jkind_annotation option
-  | Ttyp_arrow of arg_label * core_type * Mode.With_locality.Const.t modes *
-                  core_type * Mode.With_locality.Const.t modes
+  | Ttyp_arrow of arg_label * core_type * Mode.With_locality.lr modes *
+                  core_type * Mode.With_locality.lr modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list

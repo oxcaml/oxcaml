@@ -106,7 +106,8 @@ let rec filter_trace = function
 let may_prepare_expansion compact (Errortrace.{ty; expanded} as ty_exp) =
   match Types.get_desc expanded with
     Tvariant _ | Tobject _ when compact ->
-      Variable_names.reserve ty; Errortrace.{ty; expanded = ty}
+      Variable_names.reserve ty;
+      Errortrace.{ty; expanded = ty}
   | _ -> prepare_expansion ty_exp
 
 let print_path p =
@@ -235,10 +236,16 @@ let explain_escape pre = function
           pp_doc pre
           (Style.as_inline_code type_expr_with_reserved_names) u
       )
-  | Errortrace.Constructor p -> Some(
+  | Errortrace.Constructor (k, p) ->
+    let what =
+      match k with
+      | Type -> "type"
+      | Kind -> "kind"
+    in
+    Some(
       doc_printf
-        "%a@,@[The type constructor@;<1 2>%a@ would escape its scope@]"
-        pp_doc pre pp_path p
+        "%a@,@[The %s constructor@;<1 2>%a@ would escape its scope@]"
+        pp_doc pre what pp_path p
     )
   | Errortrace.Module_type p -> Some(
       doc_printf
@@ -416,6 +423,13 @@ let explanation (type variety) intro prev env
                       @ @[<v>%t@;%t@]"
             (fmt_history "the first" k1) (fmt_history "the second" k2))
   | Errortrace.Mode_mismatch _ -> None
+  | Errortrace.Weaken_sort { pat; subj } ->
+    add_type_to_preparation pat;
+    add_type_to_preparation subj;
+    Some (doc_printf "@ The type %a is layout polymorphic, \
+                      @ but %a is not layout polymorphic."
+            (Style.as_inline_code prepared_type_expr) subj
+            (Style.as_inline_code prepared_type_expr) pat)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)

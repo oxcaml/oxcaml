@@ -75,12 +75,26 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
+type hidden_include_file =
+  { basename : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+let parse_hidden_include_file ~cmx_guaranteed entry =
+  match String.split_on_char ':' entry with
+  | [ basename; actual_path ] ->
+    Ok { basename; actual_path; cmx_guaranteed }
+  | _ -> Error ("Expected '<basename>:<actual_path>', got: " ^ entry)
+
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
+and hidden_include_files = (* -H-file, -Hx-file *)
+  ref ([] : hidden_include_file list)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
@@ -168,6 +182,7 @@ and recursive_types = ref false         (* -rectypes *)
 and strict_sequence = ref false         (* -strict-sequence *)
 and strict_formats = ref true           (* -strict-formats *)
 and applicative_functors = ref true     (* -no-app-funct *)
+and typing_recovery = ref false         (* -typing-recovery *)
 and make_runtime = ref false            (* -make-runtime *)
 and c_compiler = ref (None: string option) (* -cc *)
 and no_auto_link = ref false            (* -noautolink *)
@@ -190,7 +205,6 @@ let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)
 and dump_shape = ref false              (* -dshape *)
 and dump_tlambda = ref false            (* -dtlambda *)
-and dump_slambda = ref false            (* -dslambda *)
 and dump_matchcomp = ref false          (* -dmatchcomp *)
 and dump_rawlambda = ref false          (* -drawlambda *)
 and dump_lambda = ref false             (* -dlambda *)
@@ -207,6 +221,9 @@ and dump_instr = ref false              (* -dinstr *)
 and keep_camlprimc_file = ref false     (* -dcamlprimc *)
 
 let keyword_edition: string option ref = ref None
+
+let syntax_quotations = ref Config.syntax_quotations
+                                        (* -[no-]syntax-quotations *)
 
 let keep_asm_file = ref false           (* -S *)
 let optimize_for_speed = ref true       (* -compact *)
@@ -239,8 +256,51 @@ let set_profile_granularity v =
   | Some granularity -> profile_granularity := granularity
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
-let native_code = ref false             (* set to true under ocamlopt *)
-let jsir = ref false                    (* set to true under ocamlj *)
+module Target = struct
+  type t =
+    | Bytecode
+    | Native
+    | Js_of_ocaml
+end
+
+let target = ref Target.Bytecode
+
+let set_target t = target := t
+
+let[@inline] target_is_native () =
+  match !target with
+  | Native -> true
+  | Bytecode | Js_of_ocaml -> false
+
+let[@inline] target_is_jsir () =
+  match !target with
+  | Js_of_ocaml -> true
+  | Bytecode | Native -> false
+
+module Jsoo_phase = struct
+  type t = All | Compile | Archive | Runtime | Link
+
+  let all = [All; Compile; Archive; Runtime; Link]
+
+  let flag = function
+    | All -> "-jsoo-opt"
+    | Compile -> "-jsoo-opt-compile"
+    | Archive -> "-jsoo-opt-archive"
+    | Runtime -> "-jsoo-opt-runtime"
+    | Link -> "-jsoo-opt-link"
+end
+
+let jsoo_opts =                         (* -jsoo-opt, -jsoo-opt-<phase> *)
+  let all = ref ([] : string list) in
+  let compile = ref [] and archive = ref [] in
+  let runtime = ref [] and link = ref [] in
+  fun (phase : Jsoo_phase.t) ->
+    match phase with
+    | All -> all
+    | Compile -> compile
+    | Archive -> archive
+    | Runtime -> runtime
+    | Link -> link
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
@@ -675,7 +735,7 @@ module Compiler_ir = struct
 end
 
 let is_flambda2 () =
-  Config.flambda2 && (!native_code || !jsir)
+  Config.flambda2 && (target_is_native () || target_is_jsir ())
 
 module Opt_flag_handler = struct
   type t = {
@@ -1017,8 +1077,8 @@ module Dump_option = struct
     let guard descr cond =
       if cond then pass
       else fail descr in
-    let check_bytecode = guard "bytecode" (not !native_code) in
-    let check_native = guard "native" !native_code in
+    let check_bytecode = guard "bytecode" (not (target_is_native ())) in
+    let check_native = guard "native" (target_is_native ()) in
     let check_middle_end = function
       | Flambda -> guard "flambda" Config.flambda
       | Closure -> guard "closure" (not Config.flambda)
@@ -1056,24 +1116,28 @@ let parse_keyword_edition s =
 module String = Misc.Stdlib.String
 
 let arg_spec = ref []
-let arg_names = ref String.Map.empty
+let arg_names = String.Tbl.create 1024
 
 let reset_arguments () =
   arg_spec := [];
-  arg_names := String.Map.empty
+  String.Tbl.reset arg_names
 
 let add_arguments loc args =
-  List.iter (function (arg_name, _, _) as arg ->
-    try
-      let loc2 = String.Map.find arg_name !arg_names in
-      Printf.eprintf
-        "Warning: compiler argument %s is already defined:\n" arg_name;
-      Printf.eprintf "   First definition: %s\n" loc2;
-      Printf.eprintf "   New definition: %s\n" loc;
-    with Not_found ->
-      arg_spec := !arg_spec @ [ arg ];
-      arg_names := String.Map.add arg_name loc !arg_names
-  ) args
+  let added_rev =
+    List.fold_left (fun added_rev ((arg_name, _, _) as arg) ->
+      match String.Tbl.find_opt arg_names arg_name with
+      | Some loc2 ->
+        Printf.eprintf
+          "Warning: compiler argument %s is already defined:\n" arg_name;
+        Printf.eprintf "   First definition: %s\n" loc2;
+        Printf.eprintf "   New definition: %s\n" loc;
+        added_rev
+      | None ->
+        String.Tbl.add arg_names arg_name loc;
+        arg :: added_rev
+    ) [] args
+  in
+  arg_spec := !arg_spec @ List.rev added_rev
 
 let create_usage_msg program =
   Printf.sprintf "Usage: %s <options> <files>\n\

@@ -56,6 +56,14 @@ module type Sort = sig
   (** A sort variable that can be unified during type-checking. *)
   type var
 
+  type level_error =
+    | Rigid
+    | Escape of Path.t
+
+  type error =
+    | Incompatible
+    | Level of level_error
+
   module Const : sig
     (* Note [Addressable kinds]
        ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -116,6 +124,10 @@ module type Sort = sig
         layout-poly any-fields *)
     val is_concrete : t -> bool
 
+    (** True if the sort is [scannable], possibly under [Addressable]. Products
+        (even of scannables), univars, and genvars are not scannable. *)
+    val is_scannable : t -> bool
+
     val is_surely_addressable : t -> bool
 
     val addressable : t -> t
@@ -165,8 +177,6 @@ module type Sort = sig
 
     val for_lazy_body : t
 
-    val for_tuple_element : t
-
     val for_variant_arg : t
 
     val for_boxed_record : t
@@ -175,7 +185,7 @@ module type Sort = sig
 
     val for_array_comprehension_element : t
 
-    val for_list_element : t
+    val for_list_comprehension_element : t
 
     (** These are sorts for the types of ocaml expressions that we expect will
         always be "value". These names are used in the translation to lambda to
@@ -206,6 +216,8 @@ module type Sort = sig
     val for_effect : t
 
     val for_continuation : t
+
+    val for_primitive : t
 
     (** Wrap [t] in [Some], reusing a pre-allocated [Some] block when [t] is a
         base sort. Use this when constructing [_sort : Const.t option] fields
@@ -259,7 +271,7 @@ module type Sort = sig
 
   val of_var : var -> t
 
-  val equate : allow_mutation:bool -> t -> t -> bool
+  val equate : allow_mutation:bool -> t -> t -> (unit, error) result
 
   val format : Format_doc.formatter -> t -> unit
 
@@ -287,12 +299,10 @@ module type Sort = sig
 
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
-  type change
-
-  val undo_change : change -> unit
+  module Change : With_backtracking.Change.S
 
   (** Create a new sort variable with the given level. *)
-  val new_var : level:int -> var
+  val proto_new_var : level:int -> var
 
   (** Create a generic sort variable. *)
   val new_genvar : unit -> var
@@ -338,6 +348,12 @@ module type Sort = sig
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit
 
+  val update_level : int -> t -> (unit, level_error) result
+
+  val get_level : t -> int
+
+  val iter_var : f:(var -> unit) -> t -> unit
+
   module Debug_printers : sig
     val base : Format.formatter -> base -> unit
 
@@ -350,7 +366,6 @@ end
 module History = struct
   (* For sort variables that are topmost on the jkind lattice. *)
   type concrete_creation_reason =
-    | Merlin
     | Match
     | Extension_constructor_declaration of int
     | Extension_label_declaration of Ident.t
@@ -371,14 +386,20 @@ module History = struct
     | Statement
     | Optional_arg_default
     | Layout_poly_in_external
-    | Unboxed_tuple_element
-    | Peek_or_poke
+    | Tuple_element
     | Array_element
     | Idx_element
+    | Address_contents
     | Field_in_indexed_record
     | Structure_item
     | Signature_item
     | Layout_poly
+    | Typing_recovery
+    | Module_projection
+    | Module_coercion
+    | Module_inclusion
+    | Module_open
+    | Module_argument
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -419,7 +440,6 @@ module History = struct
      related to objects here. *)
   type value_or_null_creation_reason =
     | Primitive of Ident.t
-    | Tuple_element
     | Separability_check
     | Polymorphic_variant_field
     | V1_safety_check
@@ -435,6 +455,7 @@ module History = struct
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
+    | List_comprehension_element
     | Idx_base
 
   type value_creation_reason =

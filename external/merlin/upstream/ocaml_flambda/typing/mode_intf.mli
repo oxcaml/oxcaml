@@ -293,7 +293,7 @@ type 'd neg_hint_morph = 'd neg Mode_hint.morph constraint 'd = _ * _
 type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 
 module type Total = sig
-  (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
+  (** A lattice is a total order iff for any [a] [b], [a <= b] or [b <= a].
 
       If it's also finite, then the ordering can be represented as a monotone
       injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
@@ -1070,6 +1070,11 @@ module type S = sig
           [solver_intf.mli] for cautions. *)
       val get_ceil : ('l * allowed) t -> Const.t
 
+      (** [sub_loose m1 m2] checks that the loose upper bound of [m1] is below
+          the loose lower bound of [m2]. This is a sound but incomplete
+          approximation of [submode m1 m2] that neither zaps nor allocates. *)
+      val sub_loose : ('l1 * 'r1) t -> ('l2 * 'r2) t -> bool
+
       (** Checks that a constant is within the precise bounds of a mode. see
           notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val in_bounds : Const.t -> (allowed * allowed) t -> bool
@@ -1099,6 +1104,14 @@ module type S = sig
   module Const : sig
     val with_locality_as_regionality :
       With_locality.Const.t -> With_regionality.Const.t
+
+    val value_to_alloc_r2l : With_regionality.Const.t -> With_locality.Const.t
+
+    val apply_implications :
+      With_locality.Const.Option.t -> With_locality.Const.Option.t
+
+    val erase_implications :
+      With_locality.Const.t -> With_locality.Const.Option.t
 
     module Axis : sig
       val with_locality_as_regionality :
@@ -1233,6 +1246,10 @@ module type S = sig
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
+
+      (** Apply a modality on a constant *)
+      val apply_const :
+        t -> With_regionality.Const.t -> With_regionality.Const.t
 
       (** [set a t] overwrites an axis of [t] to be [a]. *)
       val set : 'a Axis.t -> 'a -> t -> t
@@ -1515,5 +1532,16 @@ module type S = sig
 
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Fmt.formatter -> t -> unit
+  end
+
+  module Typing_recovery_functions : sig
+    type t =
+      { log_and_raise : 'a. exn -> 'a;
+        register_recoverable : (exn -> bool) -> unit
+      }
+
+    (** [Typing_recovery] should call this function to pass implementations of
+        the functions in [t]. This circumvents a circular dependency issue. *)
+    val set : t -> unit
   end
 end

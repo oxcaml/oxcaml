@@ -130,7 +130,8 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
       in
       let dacc =
         let denv = DA.denv dacc in
-        LC.create_block_like symbol static_const denv ~symbol_projections ty
+        LC.create_block_like symbol static_const (DE.typing_env denv)
+          ~symbol_projections ty
         |> LCS.singleton
         |> DA.add_to_lifted_constant_accumulator dacc ~also_add_to_env:()
       in

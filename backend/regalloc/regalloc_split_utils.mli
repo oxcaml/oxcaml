@@ -1,10 +1,10 @@
 [@@@ocaml.warning "+a-30-40-41-42"]
 
-val split_live_ranges : bool Lazy.t
+val split_live_ranges : bool Regalloc_utils.Param.t
 
-val split_more_destruction_points : bool Lazy.t
+val split_more_destruction_points : bool Regalloc_utils.Param.t
 
-val split_around_loops : bool Lazy.t
+val split_around_loops : bool Regalloc_utils.Param.t
 
 val indent : unit -> unit
 

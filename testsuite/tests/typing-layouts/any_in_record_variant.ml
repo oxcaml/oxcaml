@@ -263,7 +263,7 @@ type ebox = E : ('a : any). { v : 'a; k : int; } -> ebox
 
 let b = E { v = 5; k = 1 }
 [%%expect{|
-val b : ebox = E {v = <poly>; k = 1}
+val b : ebox = <abstr>
 |}]
 
 let k = match b with E { k; _ } -> k

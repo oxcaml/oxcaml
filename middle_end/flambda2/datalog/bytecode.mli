@@ -34,6 +34,20 @@ val create_output : unit -> 'a output_ref
 
 val get_and_clear_output : 'a output_ref -> 'a Or_null.t
 
+type stats_ref
+
+val create_stats : unit -> stats_ref
+
+type stats =
+  { total_time : float;
+    num_outputs : int;
+    num_iterations : int
+  }
+
+val print_stats : Format.formatter -> stats -> unit
+
+val get_and_clear_stats : stats_ref -> stats
+
 type bindings_ref
 
 type bindings
@@ -59,13 +73,22 @@ module Make (Iterator : Leapfrog.Iterator) : sig
   val for_in :
     (_, 'k, _) Column.id with_name ->
     'k Iterator.t list with_names ->
-    ('k Or_null_receiver.t -> assembler) ->
+    ('k Or_null_receiver.t with_name -> assembler) ->
     assembler
 
-  (** [break n] breaks out of the [n] innermost loops (created with [for_in]).
+  (** [exists cond body] evaluates [cond] and if it runs its [accept] argument,
+      [body] is executed once, then execution continues after the whole [exists]
+      block.
 
-      {b Note}: [break 0] is a no-op. *)
-  val break : int -> assembler
+      In pseudo-assembly syntax, this is implemented as:
+
+      {[
+        cond ~accept:[body; goto after]; after: ...
+      ]} *)
+  val exists : (accept:assembler -> assembler) -> assembler -> assembler
+
+  (** [nop] is a no-op and does nothing. *)
+  val nop : assembler
 
   (** [if_in key iterators body] executes body if [key] is in the intersection
       of the [iterators]. *)
@@ -76,7 +99,7 @@ module Make (Iterator : Leapfrog.Iterator) : sig
     assembler
 
   val if_not_in :
-    ('t, 'k, _) Trie.is_trie ->
+    ('t, 'k, _) Column.hlist ->
     't Or_null_receiver.t with_name ->
     'k Or_null_receiver.hlist with_names ->
     assembler ->
@@ -97,18 +120,30 @@ module Make (Iterator : Leapfrog.Iterator) : sig
     assembler ->
     assembler
 
+  val if_let :
+    string ->
+    ('k Constant.hlist -> 'v Or_null.t) with_name ->
+    'k Or_null_receiver.hlist with_names ->
+    ('v Or_null_receiver.t with_name -> assembler) ->
+    assembler
+
   val call_with_bindings :
     (bindings_ref -> 'b Constant.hlist -> unit) with_name ->
     'b Or_null_receiver.hlist with_names ->
     assembler
 
   val union :
-    'v Table.result_repr ->
-    ('t, 'k, 'v) Column.hlist ->
+    ('t, 'k, 's) Column.hlist ->
     't output_ref with_name ->
     'k Or_null_receiver.hlist with_names ->
-    'v Or_null_receiver.t with_name ->
+    's Or_null_receiver.t with_name ->
+    ('s, _, 'v) Column.hlist ->
+    'v Table.result_repr ->
     assembler
+
+  val with_timer : stats:stats_ref -> assembler -> assembler
+
+  val increase_count : stats:stats_ref -> assembler
 
   val ( ++ ) : assembler -> assembler -> assembler
 

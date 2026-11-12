@@ -45,6 +45,7 @@ let mk_no_ocamlcfg f =
   ("-no-ocamlcfg", Arg.Unit f, " Do not use ocamlcfg (deprecated, does nothing)")
 
 let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
+let mk_dssa f = ("-dssa", Arg.Unit f, " (undocumented)")
 
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
@@ -177,6 +178,28 @@ let mk_no_cfg_eliminate_dead_trap_handlers f =
     Arg.Unit f,
     " Do not eliminate dead trap handlers" )
 
+let mk_cfg_eliminate_dead_code_validate f =
+  ( "-cfg-eliminate-dead-code-validate",
+    Arg.Unit f,
+    " Validate the eliminate dead code pass" )
+
+let mk_no_cfg_eliminate_dead_code_validate f =
+  ( "-no-cfg-eliminate-dead-code-validate",
+    Arg.Unit f,
+    " Do not validate the eliminate dead code pass" )
+
+let mk_cfg_dominators_validate f =
+  ("-cfg-dominators-validate", Arg.Unit f, " Validate CFG dominators")
+
+let mk_no_cfg_dominators_validate f =
+  ("-no-cfg-dominators-validate", Arg.Unit f, " Do not validate CFG dominators")
+
+let mk_cfg_liveness_validate f =
+  ("-cfg-liveness-validate", Arg.Unit f, " Validate CFG liveness")
+
+let mk_no_cfg_liveness_validate f =
+  ("-no-cfg-liveness-validate", Arg.Unit f, " Do not validate CFG liveness")
+
 let mk_cfg_prologue_validate f =
   ("-cfg-prologue-validate", Arg.Unit f, " Validate prologues added to CFG")
 
@@ -255,6 +278,16 @@ let mk_no_cfg_value_propagation_flow f =
     Arg.Unit f,
     " Do not propagate values across block to simplify CFG" )
 
+let mk_cfg_copy_propagation f =
+  ( "-cfg-copy-propagation",
+    Arg.Unit f,
+    " Enables copy propagation before register allocation" )
+
+let mk_no_cfg_copy_propagation f =
+  ( "-no-cfg-copy-propagation",
+    Arg.Unit f,
+    " Disables copy propagation before register allocation" )
+
 let mk_experimental_optimizations f =
   ( "-experimental-optimizations",
     Arg.Unit f,
@@ -267,21 +300,6 @@ let mk_reorder_blocks_random f =
     Printf.sprintf
       "<seed> Randomly reorder basic blocks in every function, using the \
        provided seed (intended for testing, off by default)." )
-
-let mk_basic_block_sections f =
-  if Config.function_sections then
-    ( "-basic-block-sections",
-      Arg.Unit f,
-      " Emit each basic block in a separate section if target supports it. \
-       Requires -ocamlcfg." )
-  else
-    let err () =
-      raise
-        (Arg.Bad
-           "OCaml has been configured without support for -function-sections \
-            which is required for -basic-block-sections")
-    in
-    ("-basic-block-sections", Arg.Unit err, " (option not available)")
 
 let mk_module_entry_functions_section f =
   if Config.function_sections then
@@ -424,6 +442,28 @@ let mk_caml_apply_inline_fast_path f =
     Arg.Unit f,
     " Inline the fast path of caml_applyN" )
 
+let mk_use_ssa f =
+  ("-use-ssa", Arg.Unit f, " Use SSA intermediate representation (EXPERIMENTAL)")
+
+let mk_no_use_ssa f =
+  ("-no-use-ssa", Arg.Unit f, " Disable SSA intermediate representation")
+
+let mk_ssa_simplify f =
+  ( "-ssa-simplify",
+    Arg.Unit f,
+    " Run the SSA simplification pass (EXPERIMENTAL)" )
+
+let mk_no_ssa_simplify f =
+  ("-no-ssa-simplify", Arg.Unit f, " Disable the SSA simplification pass")
+
+let mk_ssa_validate f =
+  ( "-ssa-validate",
+    Arg.Unit f,
+    " Validate the SSA pipeline by comparing against the legacy CFG" )
+
+let mk_no_ssa_validate f =
+  ("-no-ssa-validate", Arg.Unit f, " Disable SSA pipeline validation")
+
 let mk_dump_inlining_paths f =
   ( "-dump-inlining-paths",
     Arg.Unit f,
@@ -550,6 +590,12 @@ let mk_llvm_flags f =
   ( "-llvm-flags",
     Arg.String f,
     " Extra flags to pass to LLVM (like -march or -mtune)" )
+
+let mk_fdo_counters f =
+  ( "-fdo-counters",
+    Arg.Unit f,
+    " Attach FDO counters to function entries, branches, and call sites (no \
+     counters are attached in classic mode)" )
 
 module Flambda2 = Oxcaml_flags.Flambda2
 
@@ -752,6 +798,22 @@ let mk_no_reaper_change_calling_conventions f =
       " Prevent the reaper from changing the calling conventions of \
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
+
+let mk_lto_support f =
+  ( "-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Store data the Reaper's link time optimisation data in the .cmx file, \
+       for use by -reaper-solve and -reaper-rebuild.%s (Flambda2 only)"
+      (format_default Flambda2.Default.lto_support) )
+
+let mk_no_lto_support f =
+  ( "-no-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not store the Reaper's link time optimisation data in the .cmx \
+       file.%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.lto_support) )
 
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",
@@ -1294,6 +1356,42 @@ let mk_cached_generic_functions_path f =
     "<file>  Set the path of the cached generic functions (default to \
      cached-generic-functions.o)" )
 
+let mk_target f =
+  ( "-target",
+    (* We leave out [-target native] even though we could support it, as
+       we are hoping to use this flag for cross-compilation triplets, and
+       we don't want anyone to rely on this behaviour before that is in
+       place. *)
+    Arg.Symbol ([ "js_of_ocaml" ], fun _ -> f Clflags.Target.Js_of_ocaml),
+    " Compile to JavaScript instead of native code" )
+
+let mk_jsoo_opt f =
+  let doc (phase : Clflags.Jsoo_phase.t) =
+    match phase with
+    | All -> "<opt>  Pass option <opt> to every js_of_ocaml invocation"
+    | Compile ->
+        "<opt>  Pass option <opt> to js_of_ocaml when compiling a unit \
+         (js_of_ocaml compile)"
+    | Archive ->
+        "<opt>  Pass option <opt> to js_of_ocaml when creating an archive with \
+         -a (js_of_ocaml link -a)"
+    | Runtime ->
+        "<opt>  Pass option <opt> to js_of_ocaml when building the runtime of \
+         an executable (js_of_ocaml build-runtime)"
+    | Link ->
+        "<opt>  Pass option <opt> to js_of_ocaml when linking an executable \
+         (js_of_ocaml link)"
+  in
+  List.map
+    (fun phase ->
+      ( Clflags.Jsoo_phase.flag phase,
+        Arg.String (f phase),
+        doc phase ^ " (with -target js_of_ocaml)" ))
+    Clflags.Jsoo_phase.all
+
+let mk_djsir f =
+  ("-djsir", Arg.Unit f, " Print the Js_of_ocaml IR (with -target js_of_ocaml)")
+
 let mk_x f = ("-X", Arg.String f, "(undocumented)")
 
 let set_long_frames_threshold n =
@@ -1328,6 +1426,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
+  val dssa : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
@@ -1352,6 +1451,12 @@ module type Oxcaml_options = sig
   val cfg_stack_checks_threshold : int -> unit
   val cfg_eliminate_dead_trap_handlers : unit -> unit
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
+  val cfg_eliminate_dead_code_validate : unit -> unit
+  val no_cfg_eliminate_dead_code_validate : unit -> unit
+  val cfg_dominators_validate : unit -> unit
+  val no_cfg_dominators_validate : unit -> unit
+  val cfg_liveness_validate : unit -> unit
+  val no_cfg_liveness_validate : unit -> unit
   val cfg_prologue_validate : unit -> unit
   val no_cfg_prologue_validate : unit -> unit
   val cfg_prologue_shrink_wrap : unit -> unit
@@ -1369,9 +1474,10 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val cfg_copy_propagation : unit -> unit
+  val no_cfg_copy_propagation : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
-  val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
@@ -1397,6 +1503,12 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
+  val use_ssa : unit -> unit
+  val no_use_ssa : unit -> unit
+  val ssa_simplify : unit -> unit
+  val no_ssa_simplify : unit -> unit
+  val ssa_validate : unit -> unit
+  val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
@@ -1417,6 +1529,7 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+  val fdo_counters : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val reaper_debug_flags : string -> unit
@@ -1444,6 +1557,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val lto_support : unit -> unit
+  val no_lto_support : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
@@ -1505,6 +1620,9 @@ module type Oxcaml_options = sig
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
+  val target : Clflags.Target.t -> unit
+  val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
+  val djsir : unit -> unit
   val x : string -> unit
 end
 
@@ -1522,6 +1640,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ocamlcfg F.ocamlcfg;
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
+      mk_dssa F.dssa;
       mk_dcfg_invariants F.dcfg_invariants;
       mk_regalloc F.regalloc;
       mk_regalloc_linscan_threshold F.regalloc_linscan_threshold;
@@ -1551,6 +1670,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_eliminate_dead_trap_handlers F.cfg_eliminate_dead_trap_handlers;
       mk_no_cfg_eliminate_dead_trap_handlers
         F.no_cfg_eliminate_dead_trap_handlers;
+      mk_cfg_eliminate_dead_code_validate F.cfg_eliminate_dead_code_validate;
+      mk_no_cfg_eliminate_dead_code_validate
+        F.no_cfg_eliminate_dead_code_validate;
+      mk_cfg_dominators_validate F.cfg_dominators_validate;
+      mk_no_cfg_dominators_validate F.no_cfg_dominators_validate;
+      mk_cfg_liveness_validate F.cfg_liveness_validate;
+      mk_no_cfg_liveness_validate F.no_cfg_liveness_validate;
       mk_cfg_prologue_validate F.cfg_prologue_validate;
       mk_no_cfg_prologue_validate F.no_cfg_prologue_validate;
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
@@ -1568,9 +1694,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
+      mk_cfg_copy_propagation F.cfg_copy_propagation;
+      mk_no_cfg_copy_propagation F.no_cfg_copy_propagation;
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
-      mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
       mk_dasm_comments F.dasm_comments;
       mk_dno_asm_comments F.dno_asm_comments;
@@ -1598,6 +1725,12 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dbranch_relaxation_max_displacement
         F.dbranch_relaxation_max_displacement;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
+      mk_use_ssa F.use_ssa;
+      mk_no_use_ssa F.no_use_ssa;
+      mk_ssa_simplify F.ssa_simplify;
+      mk_no_ssa_simplify F.no_ssa_simplify;
+      mk_ssa_validate F.ssa_validate;
+      mk_no_ssa_validate F.no_ssa_validate;
       mk_internal_assembler F.internal_assembler;
       mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
@@ -1620,6 +1753,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
       mk_llvm_flags F.llvm_flags;
+      mk_fdo_counters F.fdo_counters;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_reaper_debug_flags F.reaper_debug_flags;
@@ -1653,6 +1787,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
+      mk_lto_support F.lto_support;
+      mk_no_lto_support F.no_lto_support;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
@@ -1736,8 +1872,11 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dreaper F.dreaper;
       mk_use_cached_generic_functions F.use_cached_generic_functions;
       mk_cached_generic_functions_path F.cached_generic_functions_path;
+      mk_target F.target;
+      mk_djsir F.djsir;
       mk_x F.x;
     ]
+    @ mk_jsoo_opt F.jsoo_opt
 end
 
 let set_dissector_partition_size f =
@@ -1863,6 +2002,7 @@ module Oxcaml_options_impl = struct
   let ocamlcfg () = ()
   let no_ocamlcfg () = ()
   let dcfg = set' Oxcaml_flags.dump_cfg
+  let dssa = set' Oxcaml_flags.dump_ssa
   let dcfg_invariants = set' Oxcaml_flags.cfg_invariants
   let regalloc x = Oxcaml_flags.regalloc := x
 
@@ -1913,6 +2053,16 @@ module Oxcaml_options_impl = struct
   let no_cfg_eliminate_dead_trap_handlers =
     clear' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
 
+  let cfg_eliminate_dead_code_validate =
+    set' Oxcaml_flags.cfg_eliminate_dead_code_validate
+
+  let no_cfg_eliminate_dead_code_validate =
+    clear' Oxcaml_flags.cfg_eliminate_dead_code_validate
+
+  let cfg_dominators_validate = set' Oxcaml_flags.cfg_dominators_validate
+  let no_cfg_dominators_validate = clear' Oxcaml_flags.cfg_dominators_validate
+  let cfg_liveness_validate = set' Oxcaml_flags.cfg_liveness_validate
+  let no_cfg_liveness_validate = clear' Oxcaml_flags.cfg_liveness_validate
   let cfg_prologue_validate = set' Oxcaml_flags.cfg_prologue_validate
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
   let cfg_prologue_shrink_wrap = set' Oxcaml_flags.cfg_prologue_shrink_wrap
@@ -1937,24 +2087,11 @@ module Oxcaml_options_impl = struct
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
 
-  (* Bundle of experimental codegen optimizations enabled by
-     [-experimental-optimizations]. *)
-  let experimental_optimizations () =
-    cfg_prologue_shrink_wrap ();
-    cfg_prologue_validate ();
-    x86_peephole_optimize ();
-    regalloc_param "SPLIT_AROUND_LOOPS:on";
-    regalloc_param "AFFINITY:on";
-    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
-    regalloc_param "IRC_INTERF_THRESHOLD:4096";
-    cfg_merge_blocks ();
-    cfg_eliminate_dead_trap_handlers ();
-    cfg_value_propagation_flow ()
+  let cfg_copy_propagation = set' Oxcaml_flags.cfg_copy_propagation
+  let no_cfg_copy_propagation = clear' Oxcaml_flags.cfg_copy_propagation
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
-
-  let basic_block_sections () = set' Oxcaml_flags.basic_block_sections ()
 
   let module_entry_functions_section () =
     set' Oxcaml_flags.module_entry_functions_section ()
@@ -2044,6 +2181,12 @@ module Oxcaml_options_impl = struct
   let caml_apply_inline_fast_path =
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
+  let use_ssa = set' Oxcaml_flags.use_ssa
+  let no_use_ssa = clear' Oxcaml_flags.use_ssa
+  let ssa_simplify = set' Oxcaml_flags.ssa_simplify
+  let no_ssa_simplify = clear' Oxcaml_flags.ssa_simplify
+  let ssa_validate = set' Oxcaml_flags.ssa_validate
+  let no_ssa_validate = clear' Oxcaml_flags.ssa_validate
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
@@ -2069,6 +2212,7 @@ module Oxcaml_options_impl = struct
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
+  let fdo_counters = set' Oxcaml_flags.fdo_counters
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
 
@@ -2152,6 +2296,8 @@ module Oxcaml_options_impl = struct
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
 
+  let lto_support = set Flambda2.lto_support
+  let no_lto_support = clear Flambda2.lto_support
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
   let stubs_forward_inlining = set' Clflags.stubs_forward_inlining
@@ -2322,7 +2468,25 @@ module Oxcaml_options_impl = struct
   let cached_generic_functions_path file =
     Oxcaml_flags.cached_generic_functions_path := file
 
+  let target = Clflags.set_target
+  let jsoo_opt = Compenv.add_first_jsoo_opt
+  let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
+
+  (* Bundle of experimental codegen optimizations enabled by
+     [-experimental-optimizations]. *)
+  let experimental_optimizations () =
+    cfg_prologue_shrink_wrap ();
+    cfg_prologue_validate ();
+    x86_peephole_optimize ();
+    regalloc_param "SPLIT_AROUND_LOOPS:on";
+    regalloc_param "AFFINITY:on";
+    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
+    regalloc_param "IRC_INTERF_THRESHOLD:4096";
+    cfg_merge_blocks ();
+    cfg_eliminate_dead_trap_handlers ();
+    cfg_value_propagation_flow ();
+    use_ssa ()
 end
 
 module type Debugging_options = sig
@@ -2420,7 +2584,7 @@ module Debugging_options_impl = struct
 end
 
 module Extra_params = struct
-  let read_param ppf _position name v =
+  let read_param ppf position name v =
     let set option =
       let b = Compenv.check_bool ppf name v in
       option := Oxcaml_flags.Set b;
@@ -2463,6 +2627,9 @@ module Extra_params = struct
       true
     in
     match name with
+    | "use-ssa" -> set' Oxcaml_flags.use_ssa
+    | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
+    | "ssa-validate" -> set' Oxcaml_flags.ssa_validate
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings
@@ -2503,6 +2670,10 @@ module Extra_params = struct
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
+    | "cfg-eliminate-dead-code-validate" ->
+        set' Oxcaml_flags.cfg_eliminate_dead_code_validate
+    | "cfg-dominators-validate" -> set' Oxcaml_flags.cfg_dominators_validate
+    | "cfg-liveness-validate" -> set' Oxcaml_flags.cfg_liveness_validate
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
@@ -2513,6 +2684,7 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_value_propagation_float
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
+    | "cfg-copy-propagation" -> set' Oxcaml_flags.cfg_copy_propagation
     | "experimental-optimizations" ->
         if Compenv.check_bool ppf name v then
           Oxcaml_options_impl.experimental_optimizations ();
@@ -2530,7 +2702,6 @@ module Extra_params = struct
         true
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
-    | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
     | "module-entry-functions-section" ->
         set' Oxcaml_flags.module_entry_functions_section
     | "heap-reduction-threshold" ->
@@ -2628,6 +2799,7 @@ module Extra_params = struct
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
+    | "fdo-counters" -> set' Oxcaml_flags.fdo_counters
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "reaper-debug-flags" ->
         Oxcaml_flags.Flambda2.reaper_debug_flags :=
@@ -2772,6 +2944,19 @@ module Extra_params = struct
     | "cached-generic-functions-path" ->
         Oxcaml_flags.cached_generic_functions_path := v;
         true
+    | "target" -> (
+        match v with
+        | "js_of_ocaml" ->
+            (match position with
+            | Compenv.Before_args -> Clflags.set_target Js_of_ocaml
+            | Compenv.Before_compile _ | Compenv.Before_link ->
+                (* The backend has been chosen by then. *)
+                Compenv.fatal
+                  "OCAMLPARAM: target must be given before the _ separator");
+            true
+        | _ ->
+            Printf.ksprintf Compenv.fatal
+              "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml)" v)
     | "reaper" -> set Flambda2.enable_reaper
     | "reaper-preserve-direct-calls" ->
         (match String.lowercase_ascii v with
@@ -2794,6 +2979,7 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "lto-support" -> set Flambda2.lto_support
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
     | "stubs-forward-inlining" -> set' Clflags.stubs_forward_inlining
     | "dissector" -> set' Clflags.dissector
@@ -2876,5 +3062,8 @@ module Default = struct
     include Main_args.Default.Opttopmain
     include Oxcaml_options_impl
     include Debugging_options_impl
+
+    let target (_ : Clflags.Target.t) =
+      Compenv.fatal "-target is not supported by ocamlnat"
   end
 end
