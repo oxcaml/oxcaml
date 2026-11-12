@@ -79,17 +79,18 @@ static int ref_inline(uintnat mask, uintnat repeat, mlsize_t i)
 
 static char message[100];
 
-/* Run the iterator over block [v] and compare its classification of
-   every word with [unscannable]. */
-static void check(value v, const char *format,
-                  const unsigned char *unscannable)
+/* Run the iterator over block [v] from word [from], and compare its
+   classification of every word from there on with [unscannable]. */
+static void check_from(value v, const char *format,
+                       const unsigned char *unscannable, mlsize_t from)
 {
   header_t hd = Hd_val(v);
   mlsize_t wosize = Wosize_hd(hd);
-  mlsize_t expected = 0; /* the next word not yet accounted for */
+  mlsize_t expected = from; /* the next word not yet accounted for */
   mlsize_t i;
   caml_block_scan bs;
   caml_block_scan_init(&bs, v, hd);
+  if (from > 0) caml_block_scan_skip_to(&bs, from);
   while (caml_block_scan_next(&bs, &i)) {
     if (i < expected || i >= wosize) goto fail;
     for (; expected < i; expected++)
@@ -102,9 +103,20 @@ static void check(value v, const char *format,
   return;
  fail:
   snprintf(message, sizeof message,
-           "scan_mask_test: format %s, wosize %lu, word %lu",
-           format, (unsigned long)wosize, (unsigned long)expected);
+           "scan_mask_test: format %s, wosize %lu, from %lu, word %lu",
+           format, (unsigned long)wosize, (unsigned long)from,
+           (unsigned long)expected);
   caml_failwith(message);
+}
+
+/* Check block [v] from the start, and from a few random words. */
+static void check(value v, const char *format,
+                  const unsigned char *unscannable)
+{
+  mlsize_t wosize = Wosize_val(v);
+  check_from(v, format, unscannable, 0);
+  for (int k = 0; k < 3; k++)
+    check_from(v, format, unscannable, rnd() % (wosize + 1));
 }
 
 value scan_mask_test(value unit)
