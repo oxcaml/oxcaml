@@ -106,6 +106,14 @@ index c6d09fb..61b1e5b 100644
  ;;
 
  let%expect_test "to_string_hum" =
+@@ -226,5 +231,5 @@
+   print_endline (Float.to_string_hum (-1.25) ~decimals:1);
+-  [%expect {| -1.3 |}];
++  [%expect {| -1.2 |}];
+   print_endline (Float.to_string_hum 1.25 ~decimals:1);
+-  [%expect {| 1.3 |}]
++  [%expect {| 1.2 |}]
+ ;;
 |bignum}
     )
   ; ( "bin_prot"
@@ -184,6 +192,69 @@ index b145cb3..e5fc412 100644
     )
   ; ( "zarith_stubs_js"
     , {zs|
+diff --git a/runtime.wat b/runtime.wat
+index 1234567..89abcde 100644
+--- a/runtime.wat
++++ b/runtime.wat
+@@ -302,20 +302,18 @@
+       (call $caml_serialize_int_4 (local.get $s) (local.get $nb))
+       (call $serialize (ref.func $caml_serialize_int_1) (local.get $s)
+          (local.get $z))
+-      (tuple.make 2
+-          (i32.add (i32.const 4) (local.get $nb))
+-          (i32.and (i32.const -8) (i32.add (i32.const 15) (local.get $nb)))))
++      (i32.add (i32.const 4) (local.get $nb))
++      (i32.and (i32.const -8) (i32.add (i32.const 15) (local.get $nb))))
+
+    (func $ml_z_custom_deserialize
+       (param $s (ref eq)) (result (ref eq)) (result i32)
+       (local $neg i32) (local $nb i32)
+       (local.set $neg (call $caml_deserialize_uint_1 (local.get $s)))
+       (local.set $nb (call $caml_deserialize_int_4 (local.get $s)))
+-      (tuple.make 2
+-         (call $wrap_bigint
+-            (call $deserialize (ref.func $caml_deserialize_uint_1) (local.get $s)
+-               (local.get $neg) (local.get $nb)))
+-         (i32.add (i32.const 4) (local.get $nb))))
++      (call $wrap_bigint
++         (call $deserialize (ref.func $caml_deserialize_uint_1) (local.get $s)
++            (local.get $neg) (local.get $nb)))
++      (i32.add (i32.const 4) (local.get $nb)))
+
+    (func (export "ml_z_cdiv")
+       (param $z1 (ref eq)) (param $z2 (ref eq)) (result (ref eq))
+@@ -446,8 +444,8 @@
+       (local.set $x (call $Int32_val (local.get $d)))
+       (local.set $res (ref.i31 (local.get $x)))
+       (if (i32.eq (local.get $x) (i31.get_s (local.get $res)))
+-         (then (return (local.get $res)))
+-         (else (return_call $wrap_bigint (call $of_int32 (local.get $x))))))
++         (then (return (local.get $res))))
++      (return_call $wrap_bigint (call $of_int32 (local.get $x))))
+
+    (func (export "ml_z_of_nativeint")
+       (param $d (ref eq)) (result (ref eq))
+@@ -455,8 +453,8 @@
+       (local.set $x (call $Nativeint_val (local.get $d)))
+       (local.set $res (ref.i31 (local.get $x)))
+       (if (i32.eq (local.get $x) (i31.get_s (local.get $res)))
+-         (then (return (local.get $res)))
+-         (else (return_call $wrap_bigint (call $of_int32 (local.get $x))))))
++         (then (return (local.get $res))))
++      (return_call $wrap_bigint (call $of_int32 (local.get $x))))
+
+    (func (export "ml_z_of_int64")
+       (param $z (ref eq)) (result (ref eq))
+@@ -662,7 +660,8 @@
+             (ref.i31
+                (i32.sub (i32.gt_s (local.get $x) (i32.const 0))
+                   (i32.lt_s (local.get $x) (i32.const 0)))))))
+-      (select (ref.i31 (i32.const 1)) (ref.i31 (i32.const -1))
++      (select (result (ref i31))
++         (ref.i31 (i32.const 1)) (ref.i31 (i32.const -1))
+          (call $positive (call $unwrap_bigint (local.get $z)))))
+
+    (func (export "ml_z_gcd")
 diff --git a/test/bitwise.ml b/test/bitwise.ml
 index 5fd0ddc..4833923 100644
 --- a/test/bitwise.ml
@@ -252,6 +323,29 @@ index 059d011..b40264e 100644
  module Zarith_version = Zarith_version
 |zs}
     )
+  ; ( "ocaml_intrinsics_kernel"
+    , {oik|
+diff --git a/src/runtime.wat b/src/runtime.wat
+index 1234567..89abcde 100644
+--- a/src/runtime.wat
++++ b/src/runtime.wat
+@@ -7,3 +7,3 @@
+       (result (ref eq))
+-      (select (local.get $true) (local.get $false)
++      (select (result (ref eq)) (local.get $true) (local.get $false)
+          (i31.get_s (ref.cast (ref i31) (local.get $cond)))))
+@@ -12,3 +12,3 @@
+       (param $x (ref eq)) (param $y (ref eq)) (result (ref eq))
+-      (select (local.get $x) (local.get $y)
++      (select (result (ref eq)) (local.get $x) (local.get $y)
+          (f64.lt (call $Double_val (local.get $x))
+@@ -18,3 +18,3 @@
+       (param $x (ref eq)) (param $y (ref eq)) (result (ref eq))
+-      (select (local.get $x) (local.get $y)
++      (select (result (ref eq)) (local.get $x) (local.get $y)
+          (f64.gt (call $Double_val (local.get $x))
+|oik}
+    )
   ; ( "ppx_css"
     , {|
 diff --git a/standalone/css_inliner.ml b/standalone/css_inliner.ml
@@ -276,5 +370,22 @@ diff --git a/standalone/css_inliner.ml b/standalone/css_inliner.ml
 
  let command =
 |}
+    )
+  ; ( "bonsai_web_components"
+    , (* %.0f now rounds ties to even, as in C: 4.5 prints as 4 *)
+      {bwc|
+diff --git a/not_connected_warning_box/test/bonsai_web_ui_not_connected_warning_box_test.ml b/not_connected_warning_box/test/bonsai_web_ui_not_connected_warning_box_test.ml
+--- a/not_connected_warning_box/test/bonsai_web_ui_not_connected_warning_box_test.ml
++++ b/not_connected_warning_box/test/bonsai_web_ui_not_connected_warning_box_test.ml
+@@ -45,7 +45,7 @@
+     <div>
+       <div> Warning! </div>
+       <div>
+-        You've been disconnected from the server for 5s. There is no need to refresh the page, since the web client will reconnect automatically when the server becomes available again.
++        You've been disconnected from the server for 4s. There is no need to refresh the page, since the web client will reconnect automatically when the server becomes available again.
+       </div>
+     </div>
+     |}];
+|bwc}
     )
   ]

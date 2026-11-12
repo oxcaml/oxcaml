@@ -42,21 +42,29 @@ A branch escaping the outlined code (typically to the exception
 handler wrapping the whole toplevel, or to a merge node) is
 supported when it carries no value: the outlined function then
 returns an integer code indicating how it exited, and the call site
-performs the corresponding branch. The locals live at the branch
-target must then hold the same values in both functions, which is
-only guaranteed when they have not been written before the branch
-(see [instruction]). A [return] is handled the same way (the
+performs the corresponding branch. This includes the [br_on_null]
+following a call to a function signaling exceptions by returning
+null: in the outlined function, it branches to a block wrapping the
+whole body, after which the function returns the code. The locals
+live at the branch target must then hold the same values in both
+functions, which is only guaranteed when they have not been written
+before the branch (see [branch_without_value]). A [return] is
+handled the same way (the
 toplevel function always returns unit). Exceptions propagate through
 the call to the outlined function; this is fine since an exception
 handler can only read locals defined before the corresponding [try]
-block, and such locals are live at the start of the outlined code
-if they are read by the handler.
+block. These locals may be assigned in the body of the [try] (see
+[Code.check_assigned_variables]), but they are considered live
+throughout the body ([exn_live]), so no cut happens while they hold
+a value the handler may read.
 *)
 
 open! Stdlib
 module W = Wasm_ast
 
 let debug = Debug.find "split"
+
+let times = Debug.find "times"
 
 (****)
 
@@ -154,25 +162,28 @@ and count_instructions counts l = List.iter ~f:(fun i -> count_instruction count
 
 (* How a piece of code may exit, besides falling through: by
    branching to an enclosing label, given by its depth relative to
-   the code, or by returning from the toplevel function. *)
+   the code, or by returning a constant from the toplevel function. *)
 type exit =
   | Br_exit of int
-  | Return_exit
+  | Return_exit of W.expression
 
 let exit_equal e e' =
   match e, e' with
   | Br_exit i, Br_exit j -> i = j
-  | Return_exit, Return_exit -> true
-  | Br_exit _, Return_exit | Return_exit, Br_exit _ -> false
+  | Return_exit v, Return_exit v' -> Poly.equal v v'
+  | Br_exit _, Return_exit _ | Return_exit _, Br_exit _ -> false
 
-(* The value returned by the toplevel function *)
-let unit_value = W.RefI31 (Const (I32 0l))
+(* Constant values (such as unit) can be returned from the call site
+   of an outlined function *)
+let rec is_constant e =
+  match e with
+  | W.Const _ | RefNull _ -> true
+  | RefI31 e -> is_constant e
+  | _ -> false
 
 let add_exit e l = if List.exists ~f:(fun e' -> exit_equal e e') l then l else e :: l
 
 let union_exits l l' = List.fold_left ~f:(fun l e -> add_exit e l) ~init:l l'
-
-let add_label lbl l = if List.mem lbl ~eq:Int.equal l then l else lbl :: l
 
 (* A function outlined from the toplevel function. Its body is
    mutable so that the location in effect at the start of the
@@ -197,20 +208,22 @@ let set_start_location loc f =
    - its size;
    - the ways it may exit that can be emulated by an outlined
      function returning a code;
-   - the enclosing labels (relative depth) targeted by branches
-     that cannot be emulated (branches carrying a value, multi-way
-     branches, exception catches);
+   - the outermost enclosing label (relative depth, [-1] if none)
+     targeted by a branch that cannot be emulated (branches carrying
+     a value, multi-way branches, exception catches): the code cannot
+     be outlined while this label encloses it;
    - whether it may exit in some other way we do not support:
-     return of a value other than unit, tail calls, [rethrow], and
+     return of a non-constant value, tail calls, [rethrow], and
      [pop] (which reads an exception value from the stack);
    - the location of its last [Event];
    - the functions outlined from it which are not preceded by an
-     [Event] in the code: they must start with the location in
-     effect at the start of the code, which is not known yet. *)
+     [Event] in the code, in no particular order: they must start
+     with the location in effect at the start of the code, which is
+     not known yet. *)
 type info =
   { weight : int
   ; exits : exit list
-  ; blocked : int list
+  ; blocked : int
   ; unsupported : bool
   ; last_event : Parse_info.t option
   ; pending : outlined list
@@ -219,7 +232,7 @@ type info =
 let empty =
   { weight = 0
   ; exits = []
-  ; blocked = []
+  ; blocked = -1
   ; unsupported = false
   ; last_event = None
   ; pending = []
@@ -233,7 +246,7 @@ let unsupported = { leaf with unsupported = true }
 let merge i i' =
   { weight = i.weight + i'.weight
   ; exits = union_exits i.exits i'.exits
-  ; blocked = List.fold_left ~f:(fun l lbl -> add_label lbl l) ~init:i.blocked i'.blocked
+  ; blocked = max i.blocked i'.blocked
   ; unsupported = i.unsupported || i'.unsupported
   ; last_event =
       (match i'.last_event with
@@ -241,7 +254,7 @@ let merge i i' =
       | None -> i.last_event)
   ; pending =
       (match i.last_event with
-      | None -> i.pending @ i'.pending
+      | None -> List.rev_append i'.pending i.pending
       | Some _ ->
           List.iter ~f:(fun f -> set_start_location i.last_event f) i'.pending;
           i.pending)
@@ -259,9 +272,9 @@ let shift i =
           match e with
           | Br_exit 0 -> None
           | Br_exit d -> Some (Br_exit (d - 1))
-          | Return_exit -> Some e)
+          | Return_exit _ -> Some e)
         i.exits
-  ; blocked = List.filter_map ~f:(fun d -> if d = 0 then None else Some (d - 1)) i.blocked
+  ; blocked = max (-1) (i.blocked - 1)
   }
 
 (* The instruction leaves nothing on the stack. *)
@@ -306,6 +319,10 @@ type collector =
   ; exit_codes : exit list option
         (* When set, escaping branches are rewritten; code n
            corresponds to element n - 1 *)
+  ; mutable null_exits : exit list
+        (* Exits of the escaping [br_on_null]: the outlined body is
+           wrapped in one block per exit, element n being the n-th
+           innermost block *)
   }
 
 let exit_code c e =
@@ -319,6 +336,17 @@ let exit_code c e =
   | None -> assert false
 
 let escapes c depth i = Option.is_some c.exit_codes && i >= depth
+
+(* Index of the block wrapping the outlined body for exit [e] *)
+let null_exit_index c e =
+  let rec find l i =
+    match l with
+    | [] ->
+        c.null_exits <- c.null_exits @ [ e ];
+        i
+    | e' :: rem -> if exit_equal e e' then i else find rem (i + 1)
+  in
+  find c.null_exits 0
 
 let rec collect_expression c depth e =
   match e with
@@ -347,8 +375,10 @@ let rec collect_expression c depth e =
       assert (not (escapes c depth i));
       Br_on_cast_fail (i, ty, ty', collect_expression c depth e')
   | Br_on_null (i, e') ->
-      assert (not (escapes c depth i));
-      Br_on_null (i, collect_expression c depth e')
+      let e' = collect_expression c depth e' in
+      if escapes c depth i
+      then Br_on_null (depth + null_exit_index c (Br_exit (i - depth)), e')
+      else Br_on_null (i, e')
   | ExternConvertAny e' -> ExternConvertAny (collect_expression c depth e')
   | AnyConvertExtern e' -> AnyConvertExtern (collect_expression c depth e')
   | BinOp (op, e', e'') ->
@@ -413,8 +443,8 @@ and collect_instruction c depth i =
       Br_table (collect_expression c depth e, l, i)
   | Throw (t, e) -> Throw (t, collect_expression c depth e)
   | Return (Some e) when Option.is_some c.exit_codes ->
-      assert (Poly.equal e unit_value);
-      Return (Some (exit_code c Return_exit))
+      assert (is_constant e);
+      Return (Some (exit_code c (Return_exit e)))
   | Return (Some e) -> Return (Some (collect_expression c depth e))
   | Push e -> Push (collect_expression c depth e)
   | Loop (ty, l) -> Loop (ty, collect_instructions c (depth + 1) l)
@@ -466,7 +496,10 @@ type state =
   }
 
 type env =
-  { labels : Code.Var.Set.t list (* Locals live when branching to the enclosing labels *)
+  { labels : Code.Var.Set.t IntMap.t
+        (* Locals live when branching to the enclosing labels, indexed
+           by nesting depth (0 is the function body) *)
+  ; depth : int (* Nesting depth of the current point *)
   ; exn_live : Code.Var.Set.t
         (* Locals live when an exception is raised: they are live when
            reaching the enclosing exception handlers *)
@@ -474,9 +507,11 @@ type env =
         (* Writes seen at the end of the outermost enclosing loop *)
   }
 
-let label env i = List.nth env.labels i
+let label env i = IntMap.find (env.depth - i) env.labels
 
-let push_label env live = { env with labels = live :: env.labels }
+let push_label env live =
+  let depth = env.depth + 1 in
+  { env with labels = IntMap.add depth live env.labels; depth }
 
 let seen_count seen x = Option.value (Code.Var.Map.find_opt x seen) ~default:0
 
@@ -509,7 +544,9 @@ let terminates i =
    known ([None] if it is inherited from the enclosing code). *)
 let outline st ~start body info =
   let exits = info.exits in
-  let c = { locals = Code.Var.Hashtbl.create 16; exit_codes = Some exits } in
+  let c =
+    { locals = Code.Var.Hashtbl.create 16; exit_codes = Some exits; null_exits = [] }
+  in
   (* Attribute the call site to the location at the start of the
      run *)
   let leading_event =
@@ -519,17 +556,22 @@ let outline st ~start body info =
   in
   (* If the run always exits before its end, the call site must not
      fall through either (the stack may not be well-typed there). *)
-  let epilogue =
-    match List.rev body with
-    | i :: _ when terminates i -> [ W.Unreachable ]
-    | _ -> []
-  in
+  let epilogue = if List.exists ~f:terminates body then [ W.Unreachable ] else [] in
   let body = collect_instructions c 0 body in
   let f = Code.Var.fork st.name in
   let result, body =
-    match exits with
-    | [] -> [], body
-    | _ -> [ (W.I32 : W.value_type) ], body @ [ W.Push (Const (I32 0l)) ]
+    match exits, c.null_exits with
+    | [], _ -> [], body
+    | _, [] -> [ (W.I32 : W.value_type) ], body @ [ W.Push (Const (I32 0l)) ]
+    | _, null_exits ->
+        ( [ W.I32 ]
+        , List.fold_left
+            ~f:(fun body e ->
+              [ W.Block ({ params = []; result = [] }, body)
+              ; Return (Some (exit_code c e))
+              ])
+            ~init:(body @ [ W.Return (Some (Const (I32 0l))) ])
+            null_exits )
   in
   let fn =
     { fname = f; result; flocals = local_declarations st c.locals; fbody = body }
@@ -538,8 +580,7 @@ let outline st ~start body info =
   let exit_instr e code =
     match e with
     | Br_exit d -> W.Br_if (d, code)
-    | Return_exit ->
-        If ({ params = []; result = [] }, code, [ Return (Some unit_value) ], [])
+    | Return_exit v -> If ({ params = []; result = [] }, code, [ Return (Some v) ], [])
   in
   let call_site =
     match exits with
@@ -585,6 +626,21 @@ let outline st ~start body info =
     ; pending = fn :: info.pending
     } )
 
+(* When a branch escapes an outlined function, the function returns
+   an exit code and the caller performs the branch. The locals live
+   at the branch target are then those of the caller, which are not
+   updated by the outlined function. So the branch can only be
+   emulated this way if these locals have not been written before
+   the branch (they then hold their default value in both
+   functions). Inside a loop, a write anywhere in the loop may be
+   executed before the branch. Otherwise, the branch blocks
+   outlining. [seen] are the writes seen after the branch. *)
+let branch_without_value st env seen lbl i =
+  let seen = Option.value env.loop_seen ~default:seen in
+  if Code.Var.Set.exists (fun x -> written_before st seen x) (label env lbl)
+  then { i with blocked = max lbl i.blocked }
+  else { i with exits = add_exit (Br_exit lbl) i.exits }
+
 let rec expression st env e live =
   let unary f e' =
     let live, e', i = expression st env e' live in
@@ -596,9 +652,9 @@ let rec expression st env e live =
     live, f e1 e2, node (merge i1 i2)
   in
   (* A branch carrying a value *)
-  let branch lbl f e' =
+  let branch_with_value lbl f e' =
     let live, e', i = expression st env e' (Code.Var.Set.union live (label env lbl)) in
-    live, f e', node { i with blocked = add_label lbl i.blocked }
+    live, f e', node { i with blocked = max lbl i.blocked }
   in
   match e with
   | W.Const _ | GlobalGet _ | RefFunc _ | RefNull _ -> live, e, leaf
@@ -622,10 +678,14 @@ let rec expression st env e live =
   | ExternConvertAny e' -> unary (fun e' -> W.ExternConvertAny e') e'
   | AnyConvertExtern e' -> unary (fun e' -> W.AnyConvertExtern e') e'
   | Br_on_cast (lbl, ty, ty', e') ->
-      branch lbl (fun e' -> W.Br_on_cast (lbl, ty, ty', e')) e'
+      branch_with_value lbl (fun e' -> W.Br_on_cast (lbl, ty, ty', e')) e'
   | Br_on_cast_fail (lbl, ty, ty', e') ->
-      branch lbl (fun e' -> W.Br_on_cast_fail (lbl, ty, ty', e')) e'
-  | Br_on_null (lbl, e') -> branch lbl (fun e' -> W.Br_on_null (lbl, e')) e'
+      branch_with_value lbl (fun e' -> W.Br_on_cast_fail (lbl, ty, ty', e')) e'
+  | Br_on_null (lbl, e') ->
+      (* The branch takes place after evaluating [e'] *)
+      let seen = st.seen_writes in
+      let live, e', i = expression st env e' (Code.Var.Set.union live (label env lbl)) in
+      live, Br_on_null (lbl, e'), node (branch_without_value st env seen lbl i)
   | BinOp (op, e1, e2) -> binary (fun e1 e2 -> W.BinOp (op, e1, e2)) e1 e2
   | ArrayNew (ty, e1, e2) -> binary (fun e1 e2 -> W.ArrayNew (ty, e1, e2)) e1 e2
   | ArrayNewData (ty, d, e1, e2) ->
@@ -655,9 +715,7 @@ let rec expression st env e live =
           ~init:env.exn_live
           catches
       in
-      let live, l, i =
-        instructions st { env with labels = live :: env.labels; exn_live } l live
-      in
+      let live, l, i = instructions st { (push_label env live) with exn_live } l live in
       (* The catch labels are relative to the outside of the [try]
          block, and carry a value. *)
       let i = shift i in
@@ -665,7 +723,7 @@ let rec expression st env e live =
         { i with
           blocked =
             List.fold_left
-              ~f:(fun blocked (_, lbl, _) -> add_label lbl blocked)
+              ~f:(fun blocked (_, lbl, _) -> max lbl blocked)
               ~init:i.blocked
               catches
         }
@@ -691,21 +749,8 @@ and expressions st env l live =
     ~init:(live, [], empty)
 
 and instruction st env i live =
-  (* When a branch escapes an outlined function, the function returns
-     an exit code and the caller performs the branch. The locals live
-     at the branch target are then those of the caller, which are not
-     updated by the outlined function. So the branch can only be
-     emulated this way if these locals have not been written before
-     the branch (they then hold their default value in both
-     functions). Inside a loop, a write anywhere in the loop may be
-     executed before the branch. Otherwise, the branch blocks
-     outlining. *)
-  let seen = Option.value env.loop_seen ~default:st.seen_writes in
-  let branch lbl i =
-    if Code.Var.Set.exists (fun x -> written_before st seen x) (label env lbl)
-    then { i with blocked = add_label lbl i.blocked }
-    else { i with exits = add_exit (Br_exit lbl) i.exits }
-  in
+  let seen = st.seen_writes in
+  let branch lbl i = branch_without_value st env seen lbl i in
   let unary f e =
     let live, e, i = expression st env e live in
     live, f e, node i
@@ -725,7 +770,7 @@ and instruction st env i live =
     | Br (lbl, None) -> label env lbl, i, branch lbl leaf
     | Br (lbl, Some e) ->
         let live, e, i = expression st env e (label env lbl) in
-        live, Br (lbl, Some e), node { i with blocked = add_label lbl i.blocked }
+        live, Br (lbl, Some e), node { i with blocked = max lbl i.blocked }
     | Br_if (lbl, e) ->
         let live, e, i = expression st env e (Code.Var.Set.union live (label env lbl)) in
         live, Br_if (lbl, e), node (branch lbl i)
@@ -742,13 +787,9 @@ and instruction st env i live =
         in
         ( live
         , Br_table (e, l, lbl)
-        , node
-            { i with
-              blocked =
-                List.fold_left ~f:(fun l lbl -> add_label lbl l) ~init:i.blocked (lbl :: l)
-            } )
-    | Return (Some e) when Poly.equal e unit_value ->
-        Code.Var.Set.empty, i, { leaf with weight = 2; exits = [ Return_exit ] }
+        , node { i with blocked = List.fold_left ~f:max ~init:(max lbl i.blocked) l } )
+    | Return (Some e) when is_constant e ->
+        Code.Var.Set.empty, i, { leaf with weight = 2; exits = [ Return_exit e ] }
     | Return (Some e) ->
         let live, e, i = expression st env e Code.Var.Set.empty in
         live, Return (Some e), node { i with unsupported = true }
@@ -866,14 +907,14 @@ and split st items cut_end =
      outlined. *)
   let threshold = Config.Param.toplevel_split_size () in
   let outlinable i info =
-    is_stack_neutral i && List.is_empty info.blocked && not info.unsupported
+    is_stack_neutral i && info.blocked < 0 && not info.unsupported
   in
   (* [acc] contains the output instructions, reversed; [pending] the
      current run, reversed, together with its accumulated info;
      [pending_ok] indicates whether the run started at a cut point
      and only contains outlinable instructions, in which case it is a
      candidate for outlining. *)
-  let flush acc pending = List.rev_append (List.rev pending) acc in
+  let flush acc pending = pending @ acc in
   let outline_pending acc pending pending_info start =
     let l, info = outline st ~start (List.rev pending) pending_info in
     List.rev_append l acc, info
@@ -938,6 +979,7 @@ and split st items cut_end =
 (****)
 
 let f ~name ~locals body =
+  let t = Timer.make () in
   let total_writes = Code.Var.Hashtbl.create 256 in
   count_instructions total_writes body;
   let local_types = Code.Var.Hashtbl.create 256 in
@@ -951,7 +993,13 @@ let f ~name ~locals body =
     ; functions = []
     }
   in
-  let env = { labels = []; exn_live = Code.Var.Set.empty; loop_seen = None } in
+  let env =
+    { labels = IntMap.singleton 0 Code.Var.Set.empty
+    ; depth = 0
+    ; exn_live = Code.Var.Set.empty
+    ; loop_seen = None
+    }
+  in
   let _, body, info = instructions st env body Code.Var.Set.empty in
   (* All the writes have been seen by the traversal *)
   assert (
@@ -965,8 +1013,9 @@ let f ~name ~locals body =
       "Toplevel function split into %d pieces (residual size: %d)@."
       (List.length st.functions)
       info.weight;
+  if times () then Format.eprintf "  split toplevel: %a@." Timer.print t;
   (* Only keep the locals still used in the residual function. *)
-  let c = { locals = Code.Var.Hashtbl.create 256; exit_codes = None } in
+  let c = { locals = Code.Var.Hashtbl.create 256; exit_codes = None; null_exits = [] } in
   let body = collect_instructions c 0 body in
   ( local_declarations st c.locals
   , body

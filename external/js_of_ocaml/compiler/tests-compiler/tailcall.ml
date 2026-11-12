@@ -64,7 +64,7 @@ let%expect_test _ =
      var _b_ = even(1);
      if(odd(1) === _b_)
       throw caml_maybe_attach_backtrace([0, Assert_failure, _a_], 1);
-     try{odd(5000); _b_ = log_success(0); return _b_;}
+     try{odd(5000); return log_success(0);}
      catch(exn){return caml_call1(log_failure, cst_too_much_recursion);}
     }
     //end
@@ -96,17 +96,17 @@ let%expect_test _ =
     {|
     function fun1(_b_){
      function odd$0(x){
-      return 0 === x ? 0 : caml_trampoline_return(even$0, [0, x - 1 | 0]);
+      return 0 === x ? 0 : caml_trampoline_return(even$0, [x - 1 | 0]);
      }
      function odd(x){return caml_trampoline(odd$0(x));}
      function even$0(x){
-      return 0 === x ? 1 : caml_trampoline_return(odd$0, [0, x - 1 | 0]);
+      return 0 === x ? 1 : caml_trampoline_return(odd$0, [x - 1 | 0]);
      }
      function even(x){return caml_trampoline(even$0(x));}
      var _b_ = even(1);
      if(odd(1) === _b_)
       throw caml_maybe_attach_backtrace([0, Assert_failure, _a_], 1);
-     try{odd(5000); _b_ = log_success(0); return _b_;}
+     try{odd(5000); return log_success(0);}
      catch(exn){return caml_call1(log_failure, cst_too_much_recursion);}
     }
     //end
@@ -177,3 +177,27 @@ let rec grow (iters : int) (n : t) : t =
     }
     //end
     |}]
+
+let%expect_test "tc_depth=0" =
+  let prog =
+    {|
+    let rec even n = if n = 0 then true else odd (n - 1)
+    and odd n = if n = 0 then false else even (n - 1)
+    let () = Printf.printf "%b %b %b\n" (even 10) (odd 7) (even 100_001)
+    |}
+  in
+  Util.compile_and_run ~flags:[ "--set"; "tc_depth=0" ] prog;
+  [%expect {| true true false |}]
+
+let%expect_test "--disable optcall" =
+  (* Tail calls between mutually recursive functions are trampolined even
+     when they are not marked as exact *)
+  let prog =
+    {|
+    let rec even n = if n = 0 then true else odd (n - 1)
+    and odd n = if n = 0 then false else even (n - 1)
+    let () = Printf.printf "%b %b %b\n" (even 10) (odd 7) (even 100_001)
+    |}
+  in
+  Util.compile_and_run ~flags:[ "--disable"; "optcall" ] prog;
+  [%expect {| true true false |}]

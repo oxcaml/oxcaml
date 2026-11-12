@@ -22,6 +22,9 @@ make tests
 # Run WebAssembly tests
 make tests-wasm
 
+# Run WebAssembly tests with 63-bit integers (--enable portable-int)
+make tests-wasm-portable-int
+
 # Format OCaml code
 make fmt
 
@@ -82,7 +85,7 @@ opam install odoc yojson ocp-indent graphics higlo
 **Requirements:**
 - OCaml 4.13 to 5.5
 - Dune 3.19+
-- For wasm_of_ocaml: Binaryen 119+
+- For wasm_of_ocaml: Binaryen 120+
 
 ## Code Style
 
@@ -127,7 +130,7 @@ Test directories:
 
 ## Key Compiler Flags
 
-- `--effects={disabled,cps,double-translation}` - Effect handler support (JS); wasm accepts `{disabled,cps,jspi}`
+- `--effects={disabled,cps,double-translation}` - Effect handler support (JS); wasm accepts `{disabled,cps,double-translation,jspi,native}`
 - `--target-env={isomorphic,browser,nodejs}` - Runtime target (default `isomorphic`)
 - `--source-map` / `--debug-info` / `--pretty` - Debug-friendly output
 - `--opt {1,2,3}` - Optimization profile (default 1; 3 iterates to fix-point)

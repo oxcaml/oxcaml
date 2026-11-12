@@ -120,9 +120,13 @@ end = struct
           | '-' -> false, after_e + 1
           | _ -> false, after_e
         in
-        (* Skip leading zeros but keep at least one digit. *)
+        (* Skip leading zeros but keep at least one digit, and a zero
+           followed by a numeric separator: [1e0_1] must not become [1e_1]. *)
         let rec first_nonzero i =
-          if i < len - 1 && Char.equal (String.get s i) '0'
+          if
+            i < len - 1
+            && Char.equal (String.get s i) '0'
+            && Char.is_digit (String.get s (i + 1))
           then first_nonzero (i + 1)
           else i
         in
@@ -374,9 +378,15 @@ and template_part =
   | TStr of Utf8_string.t
   | TExp of expression
 
+(* An optional chain is an access [?.] followed by other accesses: when
+   [a] is null or undefined, the whole chain [a?.b.c] is undefined. The
+   chain does not extend through parentheses: [(a?.b).c] raises an
+   exception. Both are [EDot (EDot (a, ANullish, b), _, c)], with the kind
+   of the outer access telling them apart. *)
 and access_kind =
-  | ANormal
-  | ANullish
+  | ANormal (* [a.b]: not part of an optional chain *)
+  | ANullish (* [a?.b] *)
+  | AChain (* [.c] in [a?.b.c]: part of the optional chain of its object *)
 
 (****)
 
@@ -550,6 +560,7 @@ and withClause = (Utf8_string.t * Utf8_string.t) list
 and import_default = ident
 
 and import_kind =
+  | Source of ident
   | DeferNamespace of ident
   | Namespace of import_default option * ident
   (* import * as name from "fname" *)
@@ -638,6 +649,18 @@ module IdentMap = Map.Make (struct
 
   let compare = compare_ident
 end)
+
+let rec is_optional_chain e =
+  match e with
+  | ECall (e, kind, _, _)
+  | EAccess (e, kind, _)
+  | EDot (e, kind, _)
+  | EDotPrivate (e, kind, _) -> (
+      match kind with
+      | ANullish -> true
+      | AChain -> is_optional_chain e
+      | ANormal -> false)
+  | _ -> false
 
 let dot e l = EDot (e, ANormal, l)
 

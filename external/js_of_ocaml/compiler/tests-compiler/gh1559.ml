@@ -54,7 +54,7 @@ module _ : sig end = struct
       | 1 -> if Stdlib.Int.equal nesting 0 then nesting else this_will_be_undefined ()
       | _ -> handle_state (Thing 0)
     in
-    print_endline (Int.to_string (handle_state init))
+    print_endline (string_of_int (handle_state init))
   ;;
 
   let _ : _ thing = No
@@ -95,11 +95,7 @@ let () = my_ref := 2
          let t$1 = t$0;
          var
           this_will_be_undefined =
-            function(_a_){
-             a:
-             {if(t$1 && 1 === t$1[1]){_a_ = 1; break a;} _a_ = 0;}
-             return _a_ ? 1 : 2;
-            };
+            function(_a_){_a_ = t$1 && 1 === t$1[1] ? 1 : 0; return _a_ ? 1 : 2;};
          if(t$0) var i = t$0[1], match = i; else match = - 1;
          if(0 === match) return this_will_be_undefined(0);
          if(1 === match){
@@ -111,7 +107,7 @@ let () = my_ref := 2
          t$0 = t;
         }
        }
-       var _a_ = handle_state([0, 1]), _a_ = caml_call1(Stdlib_Int[22], _a_);
+       var _a_ = handle_state([0, 1]), _a_ = caml_call1(Stdlib[33], _a_);
        caml_call1(Stdlib[46], _a_);
        var my_ref = [0, 1];
        my_ref[1] = 2;
@@ -160,7 +156,7 @@ module _ : sig end = struct
           g () + g ()
       | _ -> handle_state (Thing 0)
     in
-    print_endline (Int.to_string (handle_state init))
+    print_endline (string_of_int (handle_state init))
   ;;
 
   let _ : _ thing = No
@@ -204,11 +200,7 @@ let () = my_ref := 2
           let t$1 = t$0;
           var
            this_will_be_undefined =
-             function(_a_){
-              a:
-              {if(t$1 && 1 === t$1[1]){_a_ = 1; break a;} _a_ = 0;}
-              return _a_ ? 1 : 2;
-             };
+             function(_a_){_a_ = t$1 && 1 === t$1[1] ? 1 : 0; return _a_ ? 1 : 2;};
           if(t$0) var i = t$0[1], _a_ = i; else _a_ = - 1;
           if(0 === _a_) break;
           if(1 === _a_) break a;
@@ -229,7 +221,7 @@ let () = my_ref := 2
         var _a_ = g$0(0);
         return g$0(0) + _a_ | 0;
        }
-       var _a_ = handle_state([0, 1]), _a_ = caml_call1(Stdlib_Int[22], _a_);
+       var _a_ = handle_state([0, 1]), _a_ = caml_call1(Stdlib[33], _a_);
        caml_call1(Stdlib[46], _a_);
        var my_ref = [0, 1];
        my_ref[1] = 2;

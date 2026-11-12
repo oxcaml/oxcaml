@@ -45,7 +45,7 @@ Import these functions to access or allocate integers:
 v}
 
 The width of a native integer depends on the runtime flavor: [i32] by
-default, [i64] with portable integers ([$portable-int]). To read a
+default, [i64] with portable integers ([$portable_int]). To read a
 native integer without depending on the flavor, use
 [boxed_nativeint_to_i64], which sign-extends to [i64] when needed:
 
@@ -58,9 +58,9 @@ v}
 
 {v
 (import "env" "Nativeint_val"
-   (func $Nativeint_val (param (ref eq)) (result i32))) ;; i64 with $portable-int
+   (func $Nativeint_val (param (ref eq)) (result i32))) ;; i64 with $portable_int
 (import "env" "caml_copy_nativeint"
-   (func $caml_copy_nativeint (param i32) (result (ref eq)))) ;; i64 with $portable-int
+   (func $caml_copy_nativeint (param i32) (result (ref eq)))) ;; i64 with $portable_int
 v}
 
 {1:preprocessor Preprocessor}

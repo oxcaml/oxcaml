@@ -29,7 +29,7 @@
    (import "float" "caml_format_float"
       (func $caml_format_float
          (param (ref eq)) (param (ref eq)) (result (ref eq))))
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "bool_val"
          (func $bool_val (param (ref eq)) (result i32)))
@@ -717,7 +717,7 @@
    (func (export "caml_set_parser_trace") (param $v (ref eq)) (result (ref eq))
       (local $oldflag i32)
       (local.set $oldflag (global.get $caml_parser_trace))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (global.set $caml_parser_trace
             (call $bool_val (local.get $v))))

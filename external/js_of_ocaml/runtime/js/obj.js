@@ -58,7 +58,7 @@ function caml_update_dummy_lazy(dummy, newval) {
       break;
     default:
       dummy[1] = newval;
-      dummy[0] = 250;
+      SET_TAG(dummy, 250);
       break;
   }
   return 0;
@@ -90,7 +90,7 @@ function caml_obj_uniquely_reachable_words(_x) {
 //Requires: caml_is_ml_bytes, caml_is_ml_string
 function caml_obj_tag(x) {
   if (x === null) return 1010;
-  else if (Array.isArray(x) && x[0] === x[0] >>> 0) return x[0];
+  else if (Array.isArray(x) && x[0] === x[0] >>> 0) return TAG(x);
   else if (caml_is_ml_bytes(x)) return 252;
   else if (caml_is_ml_string(x)) return 252;
   else if (x instanceof Function || typeof x === "function") return 247;
@@ -101,12 +101,15 @@ function caml_obj_tag(x) {
 //Provides: caml_obj_set_tag (mutable, const)
 //Version: < 5.0
 function caml_obj_set_tag(x, tag) {
-  x[0] = tag;
+  SET_TAG(x, tag);
   return 0;
 }
 //Provides: caml_obj_block const (const,const)
+//Requires: caml_check_array_length, caml_check_float_array_length
 function caml_obj_block(tag, size) {
   // TODO: fail for value that are not represented as an array
+  if (tag === 254) caml_check_float_array_length(size);
+  else caml_check_array_length(size);
   var o = new Array(size + 1);
   o[0] = tag;
   for (var i = 1; i <= size; i++) o[i] = 0;
@@ -125,7 +128,13 @@ function caml_obj_with_tag(tag, x) {
 //Provides: caml_obj_dup mutable (mutable)
 function caml_obj_dup(x) {
   if (x === null) return null;
-  return typeof x === "number" ? x : x.slice();
+  if (typeof x === "number") return x;
+  var r = x.slice();
+  // A fresh block carries no descriptor, as in the native runtime
+  // (see caml_obj_get_reserved). Blocks have no reserved bits without
+  // introspection, and the extra write slows down [Array.copy].
+  if (FLAG("introspection") && Array.isArray(r)) SET_RESERVED(r, 0);
+  return r;
 }
 
 //Provides: caml_obj_truncate (mutable, const)
@@ -140,7 +149,7 @@ function caml_obj_truncate(x, s) {
 //Provides: caml_obj_make_forward
 //Version: < 5.0
 function caml_obj_make_forward(b, v) {
-  b[0] = 250;
+  SET_TAG(b, 250);
   b[1] = v;
   return 0;
 }
@@ -253,8 +262,8 @@ function caml_obj_add_offset(_v, _offset) {
 //Provides: caml_obj_update_tag
 //Version: >= 5.0
 function caml_obj_update_tag(b, o, n) {
-  if (b[0] === o) {
-    b[0] = n;
+  if (TAG(b) === o) {
+    SET_TAG(b, n);
     return 1;
   }
   return 0;
@@ -343,35 +352,67 @@ function caml_int_as_pointer(i) {
 
 //Provides: caml_compiler_block_descs_ref
 //If: introspect
-var caml_compiler_block_descs_ref = [0];
+var caml_compiler_block_descs_ref = [0, 0];
 
 //Provides: caml_compiler_block_descs
-//If: introspect
 //Requires: caml_compiler_block_descs_ref
+//If: introspect
 function caml_compiler_block_descs(_unit) {
   return caml_compiler_block_descs_ref;
 }
 
+//Provides: caml_register_block_descs
+//Requires: caml_compiler_block_descs_ref
+//If: introspect
+// Prepend the descriptors of a program or a compilation unit to the list
+// [Introspect.Desc.compiler_descriptors ()] watches: it registers the new
+// prefix, up to the list it has already seen.
+function caml_register_block_descs(descs) {
+  var elts = [];
+  for (var l = descs; l !== 0; l = l[2]) elts.push(l[1]);
+  var res = caml_compiler_block_descs_ref[1];
+  for (var i = elts.length - 1; i >= 0; i--) res = [0, elts[i], res];
+  caml_compiler_block_descs_ref[1] = res;
+  return 0;
+}
+
 //Provides: caml_obj_reserved_bits
 //If: introspect
+// Must match [Config.reserved_header_bits] of the compiler that produced
+// the bytecode: descriptor indices are hashes truncated to that many bits.
 function caml_obj_reserved_bits(_unit) {
-  return 0;
+  return RESERVED_BITS();
 }
 
 //Provides: caml_obj_get_reserved
 //If: introspect
-function caml_obj_get_reserved(_obj) {
+// The reserved header bits of a block (its descriptor index) are stored in
+// the header word, above the tag (see [Mlvalue.Block] in the compiler).
+// Blocks allocated by the runtime have none.
+function caml_obj_get_reserved(obj) {
+  if (Array.isArray(obj) && obj[0] === obj[0] >>> 0) return RESERVED(obj);
   return 0;
 }
 
 //Provides: caml_obj_set_reserved
 //If: introspect
-function caml_obj_set_reserved(_obj, _bits) {
-  return 0;
+// Without introspection, tags are read without masking the reserved bits
+function caml_obj_set_reserved(obj, bits) {
+  if (
+    !FLAG("introspection") ||
+    !Array.isArray(obj) ||
+    obj.length < 2 ||
+    obj[0] !== obj[0] >>> 0
+  )
+    return 0;
+  SET_RESERVED(obj, bits);
+  return 1;
 }
 
 //Provides: caml_read_bdsc_section
 //If: introspect
+// The descriptors of the program are registered with
+// [caml_register_block_descs] instead.
 function caml_read_bdsc_section(_unit) {
   return 0;
 }

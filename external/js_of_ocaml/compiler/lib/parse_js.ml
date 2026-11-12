@@ -55,7 +55,7 @@ end = struct
   type t =
     { l : Sedlexing.lexbuf
     ; report_error : error -> unit
-    ; mutable env : Flow_lexer.Lex_env.t
+    ; env : Flow_lexer.Lex_env.t
     }
 
   let dummy_pos = { Lexing.pos_fname = ""; pos_lnum = 0; pos_cnum = 0; pos_bol = 0 }
@@ -63,9 +63,9 @@ end = struct
   let zero_pos = { Lexing.pos_fname = ""; pos_lnum = 1; pos_cnum = 0; pos_bol = 0 }
 
   let print_error (loc, e) =
-    let f = Loc.filename loc in
-    let loc = Printf.sprintf "%s:%d:%d" f (Loc.line loc) (Loc.column loc) in
-    Printf.eprintf "Lexer error: %s: %s\n" loc (Flow_lexer.Parse_error.to_string e)
+    let pi = Parse_info.t_of_pos (Loc.p1 loc) in
+    let msg = "lexer error: " ^ Flow_lexer.Parse_error.to_string e in
+    Printf.eprintf "%s\n" (Parse_info.Diagnostic.with_excerpt pi msg)
 
   let create ?(report_error = print_error) l =
     { l; env = Flow_lexer.Lex_env.create l; report_error }
@@ -91,29 +91,23 @@ end = struct
 
   let curr_pos lexbuf = Sedlexing.lexing_position_curr lexbuf.l
 
-  let report_errors t res =
-    match Flow_lexer.Lex_result.errors res with
+  let report_errors t =
+    match Flow_lexer.Lex_env.take_errors t.env with
     | [] -> ()
     | l -> List.iter l ~f:t.report_error
 
   let token (t : t) =
-    let env, res = Flow_lexer.lex t.env in
-    t.env <- env;
-    let tok = Flow_lexer.Lex_result.token res in
-    let loc = Flow_lexer.Lex_result.loc res in
-    report_errors t res;
-    tok, loc
+    let res = Flow_lexer.lex t.env in
+    report_errors t;
+    res
 
   let rollback t = Sedlexing.rollback t.l
 
   let lex_as_regexp (t : t) =
     Sedlexing.rollback t.l;
-    let env, res = Flow_lexer.regexp t.env in
-    t.env <- env;
-    let tok = Flow_lexer.Lex_result.token res in
-    let loc = Flow_lexer.Lex_result.loc res in
-    report_errors t res;
-    tok, loc
+    let res = Flow_lexer.regexp t.env in
+    report_errors t;
+    res
 end
 
 exception Parsing_error of Parse_info.t
@@ -580,7 +574,7 @@ let recover error_checkpoint previous_checkpoint =
         | _ -> checkpoint
       else checkpoint
 
-let parse_aux the_parser yield_await_state (lexbuf : Lexer.t) =
+let parse_aux_exn the_parser yield_await_state (lexbuf : Lexer.t) =
   let init = the_parser (Lexer.curr_pos lexbuf) in
   let rec loop_error checkpoint =
     match State.checkpoint checkpoint with
@@ -649,6 +643,10 @@ let parse_aux the_parser yield_await_state (lexbuf : Lexer.t) =
           ~f:(fun tok -> Printf.eprintf "%s " (Js_token.to_string_extra tok));
       if debug () then Printf.eprintf "\n";
       raise (Parsing_error (Parse_info.t_of_pos p))
+
+let parse_aux the_parser yield_await_state lexbuf =
+  try parse_aux_exn the_parser yield_await_state lexbuf
+  with Js_token.Syntax_error pos -> raise (Parsing_error (Parse_info.t_of_pos pos))
 
 let fail_early =
   object (m)

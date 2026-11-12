@@ -31,9 +31,10 @@ type def =
 module Domain : sig
   (** Liveness of a variable [x], forming a lattice structure. *)
   type t = private
-    | Top  (** [x] is live and not a block. *)
+    | Top  (** [x] is live and may be used in any way. *)
     | Live of t IntMap.t
-        (** [x] is a live block with a (non-empty) set of live fields. *)
+        (** [x] is a live block, of which only the given fields are used
+            (possibly none, see [live_block]). *)
     | Dead  (** [x] is dead. *)
 
   val equal : t -> t -> bool
@@ -54,6 +55,8 @@ end = struct
     | Dead
 
   let rec equal l1 l2 =
+    phys_equal l1 l2
+    ||
     match l1, l2 with
     | Top, Top | Dead, Dead -> true
     | Live f1, Live f2 -> IntMap.equal equal f1 f2
@@ -92,9 +95,22 @@ end = struct
   let rec join l1 l2 =
     match l1, l2 with
     | _, Top | Top, _ -> Top
-    | Live f1, Live f2 -> Live (IntMap.union (fun _ l1 l2 -> Some (join l1 l2)) f1 f2)
-    | Dead, Live f | Live f, Dead -> Live f
-    | Dead, Dead -> Dead
+    | Live f1, Live f2 ->
+        (* Return [l1] itself when [l2] adds nothing: this avoids
+           allocations and makes the solver's equality test cheap *)
+        let f =
+          IntMap.fold
+            (fun i l f ->
+              match IntMap.find_opt i f with
+              | None -> IntMap.add i l f
+              | Some l' ->
+                  let l'' = join l' l in
+                  if phys_equal l'' l' then f else IntMap.add i l'' f)
+            f2
+            f1
+        in
+        if phys_equal f f1 then l1 else Live f
+    | Dead, l | l, Dead -> l
 end
 
 let iter_with_scope prog f =
@@ -133,21 +149,28 @@ let variable_may_escape x (global_info : Global_flow.info) =
 
 (** Type of variable usage. *)
 type usage_kind =
-  | Compute  (** variable y is used to compute x *)
+  | Compute  (** variable [y] is used to compute [x] *)
   | Propagate of
       { scope : Var.t list
       ; src : Var.t
-      }  (** values of y propagate to x when the scope is live *)
-  | Scope  (** variable x is defined in function y *)
+      }
+      (** values of [y] propagate to [src] when all the functions in [scope] are live *)
+  | Scope  (** variable [y] has some initial liveness in the body of function [x] *)
 
-(** Compute the adjacency list for the dependency graph of given program. An edge between
-    variables [x] and [y] is marked [Compute] if [x] is used in the definition of [y]. It is marked
-    as [Propagate] if [x] is applied as a closure or block argument the parameter [y].
+(** Compute the adjacency list for the dependency graph of given program. An
+    edge from [x] to [y] means that the liveness of [y] depends on the
+    liveness of [x]; it is labelled with a [usage_kind]. [Compute] edges are
+    stored in the first table, the other edges in the second one. A
+    [Propagate] edge is also added from each of the variables of its scope.
 
     We use information from global flow to try to add edges between function calls and their return values
     at known call sites. *)
 let usages prog (global_info : Global_flow.info) scoped_live_vars :
-    (usage_kind * Var.Set.t) list Var.Tbl.t =
+    Var.t list Var.Tbl.t * (usage_kind * Var.Set.t) list Var.Tbl.t =
+  (* [Compute] edges are by far the most common, so we store them
+     separately, more compactly *)
+  let compute = Var.Tbl.make () [] in
+  let add_compute x y = Var.Tbl.set compute x (y :: Var.Tbl.get compute x) in
   let uses = Var.Tbl.make () [] in
   let add_uses kind x vars =
     let p = kind, vars in
@@ -194,12 +217,12 @@ let usages prog (global_info : Global_flow.info) scoped_live_vars :
                         args)
                 | _ -> ())
               known);
-        add_use Compute x f;
+        add_compute x f;
         List.iter
-          ~f:(fun a -> if variable_may_escape a global_info then add_use Compute x a)
+          ~f:(fun a -> if variable_may_escape a global_info then add_compute x a)
           args
-    | Block (_, vars, _, _) -> Array.iter ~f:(add_use Compute x) vars
-    | Field (z, _, _) -> add_use Compute x z
+    | Block (_, vars, _, _, _) -> Array.iter ~f:(add_compute x) vars
+    | Field (z, _, _) -> add_compute x z
     | Constant _ -> ()
     | Special _ -> ()
     | Closure (_, cont, _) -> add_cont_deps cont
@@ -207,7 +230,7 @@ let usages prog (global_info : Global_flow.info) scoped_live_vars :
         List.iter
           ~f:(fun arg ->
             match arg with
-            | Pv v -> add_use Compute x v
+            | Pv v -> add_compute x v
             | Pc _ -> ())
           args
   in
@@ -246,7 +269,7 @@ let usages prog (global_info : Global_flow.info) scoped_live_vars :
       | None -> ()
       | Some h -> Var.Hashtbl.iter (fun x _ -> add_use Scope scope x) h)
     scoped_live_vars;
-  uses
+  compute, uses
 
 (** Return the set of variables used in a given expression *)
 let expr_vars e =
@@ -255,7 +278,7 @@ let expr_vars e =
   | Apply { f; args; _ } ->
       let vars = Var.Set.add f vars in
       List.fold_left ~f:(fun acc x -> Var.Set.add x acc) ~init:vars args
-  | Block (_, params, _, _) ->
+  | Block (_, params, _, _, _) ->
       Array.fold_left ~f:(fun acc x -> Var.Set.add x acc) ~init:vars params
   | Field (z, _, _) -> Var.Set.add z vars
   | Prim (_, args) ->
@@ -275,7 +298,7 @@ let expr_vars e =
 
     A variable [x] is marked as [Top] if
     + It is used in an impure expression (as defined by [Pure_fun.pure_expr]);
-    + It is used in a conditonal/switch;
+    + It is used in a conditional/switch;
     + It is raised by an exception;
     + It is used in another stateful instruction (like setting a block or array field);
     + Or, it is returned or applied to a function and the global flow analysis marked it as escaping.
@@ -324,7 +347,7 @@ let liveness prog pure_funs (global_info : Global_flow.info) =
               List.iter
                 ~f:(fun x -> if variable_may_escape x global_info then add_top scope x)
                 args
-          | Block (_, _, _, _)
+          | Block (_, _, _, _, _)
           | Field (_, _, _)
           | Closure (_, _, _)
           | Constant _
@@ -362,7 +385,7 @@ let variables deps =
   vars
 
 (** Propagate liveness of the usages of a variable [x] to [x]. The liveness of [x] is
-    defined by joining its current liveness and the contribution of each vairable [y]
+    defined by joining its current liveness and the contribution of each variable [y]
     that uses [x]. *)
 let propagate defs scoped_live_vars ~state ~dep:y ~target:x ~action:usage_kind =
   (* Variable [y] uses [x] either in its definition ([Compute]) or as a closure/block parameter
@@ -377,7 +400,7 @@ let propagate defs scoped_live_vars ~state ~dep:y ~target:x ~action:usage_kind =
       (* If y is a live block, then x is the join of liveness fields that are x *)
       | Live fields as l -> (
           match Var.Tbl.get defs y with
-          | Expr (Block (_, vars, _, _)) ->
+          | Expr (Block (_, vars, _, _, _)) ->
               let live = ref Domain.bot in
               Array.iteri
                 ~f:(fun i v ->
@@ -389,13 +412,13 @@ let propagate defs scoped_live_vars ~state ~dep:y ~target:x ~action:usage_kind =
                 vars;
               !live
           | Expr (Field (_, i, _)) -> Domain.live_field i l
-          | Expr (Prim (IsInt, _)) -> Domain.live_block
+          | Expr (Prim (IsInt _, _)) -> Domain.live_block
           | _ -> Domain.top)
       (* If y is top and y is a field access, x depends only on that field *)
       | Top -> (
           match Var.Tbl.get defs y with
           | Expr (Field (_, i, _)) -> Domain.live_field i Domain.top
-          | Expr (Prim (IsInt, _)) -> Domain.live_block
+          | Expr (Prim (IsInt _, _)) -> Domain.live_block
           | _ -> Domain.top))
   (* If x is used as an argument for parameter y, then contribution is liveness of y *)
   | Propagate { scope; src } ->
@@ -421,11 +444,12 @@ module Solver =
     end)
     (Domain)
 
-let solver vars uses defs live_vars scoped_live_vars =
+let solver vars (compute, uses) defs live_vars scoped_live_vars =
   let g =
     { Solver.domain = vars
     ; iter_children =
         (fun f x ->
+          List.iter ~f:(fun y -> f y Compute) (Var.Tbl.get compute x);
           List.iter
             ~f:(fun (usage_kind, vars) -> Var.Set.iter (fun y -> f y usage_kind) vars)
             (Var.Tbl.get uses x))
@@ -434,7 +458,7 @@ let solver vars uses defs live_vars scoped_live_vars =
   Solver.f ~state:live_vars g (propagate defs scoped_live_vars)
 
 (** Replace each instance of a dead variable with a sentinel value.
-  Blocks that end in dead variables are compacted to the first live entry.
+  Blocks that end in dead variables are compacted to the last live entry.
   Dead variables are replaced when
     + They appear in a dead field of a block; or
     + They are returned; or
@@ -458,7 +482,7 @@ let zero prog pure_funs sentinel live_table =
     match instr with
     | Let (x, e) -> (
         match e with
-        | Block (start, vars, is_array, mut) -> (
+        | Block (start, vars, is_array, mut, desc) -> (
             match Var.Tbl.get live_table x with
             | Live fields ->
                 let vars =
@@ -467,7 +491,7 @@ let zero prog pure_funs sentinel live_table =
                     vars
                   |> compact_vars
                 in
-                let e = Block (start, vars, is_array, mut) in
+                let e = Block (start, vars, is_array, mut, desc) in
                 Let (x, e)
             | _ -> instr)
         | Apply ap ->
@@ -494,9 +518,9 @@ let zero prog pure_funs sentinel live_table =
                and effects passes.  If the (tail)call is dead, it will
                be eliminated later by the deadcode pass, don't make it live again by
                returning its result. *)
-            match List.last body with
+            match Code.last_instr body with
             | Some (Let (x', (Apply _ as e))) ->
-                Code.Var.equal x x' && (is_live x' || not (Pure_fun.pure_expr pure_funs e))
+                Code.Var.equal x x' && not (Pure_fun.pure_expr pure_funs e)
             | Some _ | None -> false
           in
           if live_tc then Return x else Return (zero_var x)
@@ -524,11 +548,14 @@ module Print = struct
     | Top -> "top"
     | Dead -> "dead"
 
-  let print_uses uses =
+  let print_uses (compute, uses) =
     Format.eprintf "Usages:\n";
     Var.Tbl.iter
       (fun v ds ->
         Format.eprintf "%a: { " Var.print v;
+        List.iter
+          ~f:(fun d -> Format.eprintf "(%a, C) " Var.print d)
+          (Var.Tbl.get compute v);
         List.iter
           ~f:(fun (k, s) ->
             Var.Set.iter
@@ -558,7 +585,7 @@ module Print = struct
       live_table
 end
 
-(** Add a sentinel variable declaration to the IR. The fresh variable is assigned to `undefined`. *)
+(** Add a sentinel variable declaration to the IR. The fresh variable is bound to the integer 0. *)
 let add_sentinel p sentinel =
   let instr = Let (sentinel, Constant (Int Targetint.zero)) in
   Code.prepend p [ instr ]
@@ -580,7 +607,7 @@ let f pure_funs p ~deadcode_sentinel global_info =
   (* Compute usages *)
   let uses = usages p global_info scoped_live_vars in
   (* Propagate liveness to dependencies *)
-  let vars = variables uses in
+  let vars = variables (snd uses) in
   solver vars uses defs live_table scoped_live_vars;
   (* Print debug info *)
   if debug ()

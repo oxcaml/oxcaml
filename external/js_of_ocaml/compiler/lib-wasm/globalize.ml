@@ -38,6 +38,11 @@ type st =
   ; globals : Code.Var.Set.t
   ; closures : Closure_conversion.closure Code.Var.Map.t
   ; constants : Code.Var.Set.t
+  ; in_loop : bool
+  ; pairs : Code.Var.t Code.Var.Map.t
+        (* Double translation: the variable bound to the shared closure of a
+           function with two versions maps to the direct-style version
+           (see [Closure_conversion.cps_pair]) *)
   }
 
 let threshold = 1000
@@ -60,7 +65,10 @@ and globalize_closure st x =
           if Code.Var.Map.mem x st.visited_variables then globalize st x else st)
         ~init:st
         free_variables
-  | exception Not_found -> st
+  | exception Not_found -> (
+      match Code.Var.Map.find_opt x st.pairs with
+      | Some d -> globalize_closure st d
+      | None -> st)
 
 let use x st =
   match Code.Var.Map.find x st.visited_variables with
@@ -68,21 +76,28 @@ let use x st =
   | exception Not_found -> st
 
 let declare x st =
-  { st with visited_variables = Code.Var.Map.add x st.pos st.visited_variables }
+  (* Variables defined in a loop are not globalized, since they can
+     take several values. We still look at the uses in loops. *)
+  if st.in_loop
+  then st
+  else { st with visited_variables = Code.Var.Map.add x st.pos st.visited_variables }
 
 let traverse_expression x e st =
   match e with
   | Code.Apply { f; args; _ } ->
       st |> use f |> fun st -> List.fold_left ~f:(fun st x -> use x st) ~init:st args
-  | Block (_, a, _, _) -> Array.fold_right ~f:use a ~init:st
+  | Block (_, a, _, _, _) -> Array.fold_right ~f:use a ~init:st
   | Field (x, _, _) -> st |> use x
   | Closure _ ->
       List.fold_left
         ~f:(fun st x -> use x st)
         ~init:st
         (Code.Var.Map.find x st.closures).Closure_conversion.free_variables
-  | Constant _ -> { st with constants = Code.Var.Set.add x st.constants }
+  | Constant _ ->
+      if st.in_loop then st else { st with constants = Code.Var.Set.add x st.constants }
   | Special _ -> st
+  | Prim (Extern ("caml_cps_closure", _), [ Pv d; Pv c ]) ->
+      { st with pairs = Code.Var.Map.add x d st.pairs } |> use d |> use c
   | Prim (_, args) ->
       List.fold_left
         ~f:(fun st a ->
@@ -113,8 +128,9 @@ let traverse_branch st (b : Code.last) =
   | Switch (x, a) -> Array.fold_left ~f:traverse_cont ~init:(use x st) a
   | Pushtrap (cont, x, cont') -> traverse_cont (traverse_cont (declare x st) cont) cont'
 
-let traverse_block p st pc =
+let traverse_block p in_loop st pc =
   let b = Code.Addr.Map.find pc p.Code.blocks in
+  let st = { st with in_loop = Code.Addr.Map.mem pc in_loop } in
   let st = List.fold_left ~f:(fun st x -> declare x st) ~init:st b.Code.params in
   let st =
     List.fold_left ~f:(fun st i -> traverse_instruction st i) ~init:st b.Code.body
@@ -125,7 +141,7 @@ let available x st = Code.Var.Set.mem x st.globals || Code.Var.Set.mem x st.cons
 
 let propagate_instruction st i =
   match i with
-  | Code.Let (x, Block (_, a, _, _)) when not (Code.Var.Set.mem x st.globals) ->
+  | Code.Let (x, Block (_, a, _, _, _)) when not (Code.Var.Set.mem x st.globals) ->
       (* Globalize a block when most of its fields are available
          (global or constant). Available fields go into the global's
          initializer; the rest are patched via [array.set] in the
@@ -144,6 +160,10 @@ let propagate_instruction st i =
           then globalize st x
           else st
       | exception Not_found -> st)
+  | Code.Let (x, Prim (Extern ("caml_cps_closure", _), [ Pv d; _ ]))
+    when (not (Code.Var.Set.mem x st.globals)) && available d st ->
+      (* Alias of the closure [d] *)
+      globalize st x
   | _ -> st
 
 let propagate_block p st pc =
@@ -155,14 +175,15 @@ let f p g closures =
   let in_loop = Freevars.find_loops_in_closure p p.Code.start in
   let st =
     List.fold_left
-      ~f:(fun st pc ->
-        if Code.Addr.Map.mem pc in_loop then st else traverse_block p st pc)
+      ~f:(fun st pc -> traverse_block p in_loop st pc)
       ~init:
         { pos = 0
         ; visited_variables = Code.Var.Map.empty
         ; globals = Code.Var.Set.empty
         ; closures
         ; constants = Code.Var.Set.empty
+        ; in_loop = false
+        ; pairs = Code.Var.Map.empty
         }
       l
   in

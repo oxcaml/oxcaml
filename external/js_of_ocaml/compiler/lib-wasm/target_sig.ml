@@ -19,6 +19,10 @@
 module type S = sig
   type expression = Code_generation.expression
 
+  val double_translation : unit -> bool
+  (** Whether some functions have both a direct-style and a CPS version (see
+      [Gc_target.double_translation]) *)
+
   module Memory : sig
     val allocate :
          ?safepoint_friendly_array_init:bool
@@ -49,6 +53,18 @@ module type S = sig
       -> (typ:Wasm_ast.value_type option -> expression -> expression)
       -> unit Code_generation.t
       -> unit Code_generation.t
+
+    val call_continuation : expression -> expression -> expression
+    (** [call_continuation k res] applies the continuation [k] to [res] *)
+
+    val cps_call_or_direct : arity:int -> Code.Var.t -> expression list -> expression
+    (** With double translation, CPS call to a function which is not known
+        statically: if the function has no CPS version, its direct-style
+        version is called and the result is passed to the continuation (the
+        last argument). The calls are tail calls, so this can only be used
+        when the result of the call is immediately returned. The call must
+        be exact, unless there is a single argument besides the
+        continuation. *)
 
     val tag : expression -> expression
 
@@ -105,6 +121,8 @@ module type S = sig
 
   module Type : sig
     val value : Wasm_ast.value_type
+
+    val value_or_exn : Wasm_ast.value_type
 
     val func_type : int -> Wasm_ast.func_type
 
@@ -230,20 +248,28 @@ module type S = sig
          context:Code_generation.context
       -> closures:Closure_conversion.closure Code.Var.Map.t
       -> cps:bool
+      -> ?cps_version:Code.Var.t
       -> no_code_pointer:bool
       -> Code.Var.t
       -> expression
+    (** [cps_version] is the CPS version of the function (double translation):
+        the closure then holds the code pointers of both versions, unless
+        [no_code_pointer] *)
 
     val bind_environment :
          context:Code_generation.context
       -> closures:Closure_conversion.closure Code.Var.Map.t
       -> cps:bool
+      -> ?pair:bool
       -> no_code_pointer:bool
       -> Code.Var.t
       -> unit Code_generation.t
+    (** [pair] indicates that the function is the direct-style version of a
+        function with a CPS version (double translation) *)
 
     val curry_allocate :
-         cps:bool
+         ?cps_f:Code.Var.t
+      -> cps:bool
       -> arity:int
       -> int
       -> f:Code.Var.t
@@ -312,6 +338,12 @@ module type S = sig
   end
 
   module Bigarray : sig
+    val dimension : int -> expression -> expression
+    (** The [n]-th dimension of a bigarray, as an [i32] *)
+
+    val num_dims : expression -> expression
+    (** The number of dimensions of a bigarray, as an [i32] *)
+
     val get :
          bound_error_index:int
       -> unsafe:bool
@@ -332,11 +364,43 @@ module type S = sig
       -> expression
   end
 
+  module JavaScript : sig
+    val from_float : expression -> expression
+    (** Convert an unboxed float into a JavaScript number *)
+
+    val to_float : expression -> expression
+    (** Convert a JavaScript value into an unboxed float *)
+
+    val to_bool : expression -> expression
+    (** Convert a JavaScript boolean into an untagged integer *)
+  end
+
+  type js_arg =
+    [ `Value of expression
+    | `F64 of expression  (** An unboxed float passed as a JavaScript number *)
+    | `I32 of expression  (** An untagged integer passed as a JavaScript number *)
+    ]
+
   val internal_primitives :
     (string
     * Primitive.kind
     * ((Code.prim_arg -> expression) -> Code.prim_arg list -> expression))
     list
+
+  val js_primitives :
+    (string
+    * Primitive.kind
+    * (   (Code.prim_arg -> expression)
+       -> (Code.prim_arg -> js_arg)
+       -> [ `Value | `F64 | `I32 ]
+          (* Whether the result is expected as an unboxed float, for a JavaScript
+               value converted with [caml_js_to_float], or as an untagged
+               integer, for a JavaScript value converted with
+               [caml_js_to_bool] *)
+       -> Code.prim_arg list
+       -> expression))
+    list
+  (** The primitives calling JavaScript code *)
 
   val handle_exceptions :
        result_typ:Wasm_ast.value_type list
@@ -354,7 +418,9 @@ module type S = sig
     -> unit Code_generation.t
 
   val post_process_function_body :
-       param_names:Wasm_ast.var list
+       profile:Profile.t
+    -> param_names:Wasm_ast.var list
+    -> param_types:Wasm_ast.value_type list
     -> locals:(Wasm_ast.var * Wasm_ast.value_type) list
     -> Wasm_ast.instruction list
     -> (Wasm_ast.var * Wasm_ast.value_type) list * Wasm_ast.instruction list

@@ -25,9 +25,9 @@ function caml_compare_val_tag(a) {
     return 252; // string_tag
   else if (caml_is_ml_string(a))
     return 1252; // ocaml string (if different from bytes)
-  else if (Array.isArray(a) && a[0] === a[0] >>> 0 && a[0] <= 255) {
+  else if (Array.isArray(a) && a[0] === a[0] >>> 0 && a[0] <= MAX_HEADER()) {
     // Look like an ocaml block
-    var tag = a[0] | 0;
+    var tag = TAG(a);
     // ignore double_array_tag because we cannot accurately set
     // this tag when we create an array of float.
     return tag === 254 ? 0 : tag;
@@ -290,10 +290,14 @@ function caml_int_compare(a, b) {
   return 1;
 }
 
+// The fast paths on numbers also hold for floats: JavaScript's
+// comparisons agree with OCaml's on NaN (only inequality holds).
+
 // May raise
 //Provides: caml_equal (const, const)
 //Requires: caml_compare_val
 function caml_equal(x, y) {
+  if (typeof x === "number" && typeof y === "number") return +(x === y);
   return +(caml_compare_val(x, y, false) === 0);
 }
 
@@ -301,6 +305,7 @@ function caml_equal(x, y) {
 //Provides: caml_notequal (const, const)
 //Requires: caml_compare_val
 function caml_notequal(x, y) {
+  if (typeof x === "number" && typeof y === "number") return +(x !== y);
   return +(caml_compare_val(x, y, false) !== 0);
 }
 
@@ -308,6 +313,7 @@ function caml_notequal(x, y) {
 //Provides: caml_greaterequal (const, const)
 //Requires: caml_compare_val
 function caml_greaterequal(x, y) {
+  if (typeof x === "number" && typeof y === "number") return +(x >= y);
   return +(caml_compare_val(x, y, false) >= 0);
 }
 
@@ -315,6 +321,7 @@ function caml_greaterequal(x, y) {
 //Provides: caml_greaterthan (const, const)
 //Requires: caml_compare_val
 function caml_greaterthan(x, y) {
+  if (typeof x === "number" && typeof y === "number") return +(x > y);
   return +(caml_compare_val(x, y, false) > 0);
 }
 
@@ -322,6 +329,7 @@ function caml_greaterthan(x, y) {
 //Provides: caml_lessequal (const, const)
 //Requires: caml_compare_val
 function caml_lessequal(x, y) {
+  if (typeof x === "number" && typeof y === "number") return +(x <= y);
   return +(caml_compare_val(x, y, false) <= 0);
 }
 
@@ -329,5 +337,6 @@ function caml_lessequal(x, y) {
 //Provides: caml_lessthan (const, const)
 //Requires: caml_compare_val
 function caml_lessthan(x, y) {
+  if (typeof x === "number" && typeof y === "number") return +(x < y);
   return +(caml_compare_val(x, y, false) < 0);
 }

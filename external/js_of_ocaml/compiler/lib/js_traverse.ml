@@ -350,6 +350,9 @@ class map : mapper =
     method import ({ from; kind; withClause } as x) =
       let kind' =
         match kind with
+        | Source i ->
+            let i' = m#ident i in
+            if phys_equal i' i then kind else Source i'
         | DeferNamespace i ->
             let i' = m#ident i in
             if phys_equal i' i then kind else DeferNamespace i'
@@ -885,7 +888,7 @@ class iter : iterator =
 
     method import { from = _; kind; withClause = _ } =
       match kind with
-      | DeferNamespace i -> m#ident i
+      | Source i | DeferNamespace i -> m#ident i
       | Namespace (iopt, i) ->
           Option.iter ~f:m#ident iopt;
           m#ident i
@@ -1434,7 +1437,7 @@ class free =
           Option.iter f ~f:(fun f -> m#block f)
       | Import ({ from = _; kind; withClause = _ }, _) ->
           (match kind with
-          | DeferNamespace i -> m#def_local i
+          | Source i | DeferNamespace i -> m#def_local i
           | Namespace (iopt, i) ->
               Option.iter ~f:m#def_local iopt;
               m#def_local i
@@ -1542,7 +1545,7 @@ let declared scope params body =
              List.iter l' ~f:(fun (_, s) -> m#statements s))
        | _, Import ({ kind; from = _; withClause = _ }, _loc) -> (
            match kind with
-           | DeferNamespace i -> decl_var i
+           | Source i | DeferNamespace i -> decl_var i
            | Namespace (iopt, i) ->
                Option.iter ~f:decl_var iopt;
                decl_var i
@@ -2020,6 +2023,14 @@ class compact_vardecl =
       body
   end
 
+(* Statements scoped to their enclosing block, which cannot be the body of
+   an [if] or a loop *)
+let is_declaration (s, _) =
+  match s with
+  | Variable_statement ((Let | Const | Using | AwaitUsing), _)
+  | Function_declaration _ | Class_declaration _ -> true
+  | _ -> false
+
 (* - Group variable_statement together *)
 (* - Remove unnecessary block *)
 class clean =
@@ -2067,18 +2078,24 @@ class clean =
       let s = super#statement s in
       let b = function
         | Block [], loc -> Empty_statement, loc
-        | Block [ x ], _ -> x
+        | Block [ x ], _ when not (is_declaration x) -> x
         | b -> b
       in
       let bopt = function
         | Some (Block [], _) -> None
-        | Some (Block [ x ], _) -> Some x
+        | Some (Block [ x ], _) when not (is_declaration x) -> Some x
         | Some (Empty_statement, _) -> None
         | Some b -> Some b
         | None -> None
       in
       match s with
-      | If_statement (if', then', else') -> If_statement (if', b then', bopt else')
+      | If_statement (if', then', else') -> (
+          match b then', bopt else' with
+          (* Branches can become empty once the assignments [x = x] are removed *)
+          | (Empty_statement, _), None -> Expression_statement if'
+          | (Empty_statement, _), Some else' ->
+              If_statement (Js_simpl.enot if', else', None)
+          | then', else' -> If_statement (if', then', else'))
       | Do_while_statement (do', while') -> Do_while_statement (b do', while')
       | While_statement (cond, st) -> While_statement (cond, b st)
       | For_statement (p1, p2, p3, st) -> For_statement (p1, p2, p3, b st)
@@ -2221,29 +2238,15 @@ class simpl =
         | Band -> BandEq
         | Bxor -> BxorEq
         | Bor -> BorEq
-        | Or -> OrEq
-        | And -> AndEq
         | Exp -> ExpEq
-        | Coalesce -> CoalesceEq
         | _ -> assert false
       in
       let has_assign_op op =
         match op with
-        | Mul
-        | Div
-        | Mod
-        | Plus
-        | Minus
-        | Lsl
-        | Asr
-        | Lsr
-        | Band
-        | Bxor
-        | Bor
-        | Or
-        | And
-        | Exp
-        | Coalesce -> true
+        | Mul | Div | Mod | Plus | Minus | Lsl | Asr | Lsr | Band | Bxor | Bor | Exp ->
+            true
+        (* The logical assignments [||=], [&&=] and [??=] are not used: they
+           are ES2021, while the generated code targets ES2020 *)
         | _ -> false
       in
       let is_commutative_op op =
@@ -2256,6 +2259,14 @@ class simpl =
         | _ -> false
       in
       match e with
+      (* b ? e : b --> b && e *)
+      | ECond (EVar x, e1, EVar y) when ident_equal x y -> EBin (And, EVar x, e1)
+      (* b ? b : e --> b || e *)
+      | ECond (EVar x, EVar y, e2) when ident_equal x y -> EBin (Or, EVar x, e2)
+      (* !c ? a : b --> c ? b : a *)
+      | ECond (EUn (Not, c), e1, e2) -> ECond (c, e2, e1)
+      | EUn (Not, (EBin ((EqEqEq | NotEqEq | EqEq | NotEq), _, _) as e)) ->
+          Js_simpl.enot e
       | EBin (Plus, e1, e2) -> (
           match e1, e2 with
           | _, ENum n when Num.is_neg n -> EBin (Minus, e1, ENum (Num.neg n))
@@ -2313,7 +2324,7 @@ class simpl =
       in
       let s = m#with_in_var_sequence false super#statement s in
       match s with
-      | Block [ x ] -> fst x
+      | Block [ x ] when not (is_declaration x) -> fst x
       | _ -> s
 
     (* Idents mentioned in the live code of the enclosing [var] scopes,
@@ -2394,6 +2405,15 @@ class simpl =
               , Some (Expression_statement (EBin (Eq, v2, e2)), _) )
             when expression_equal v1 v2 ->
               (Expression_statement (EBin (Eq, v1, ECond (cond, e1, e2))), loc) :: acc
+          (* if (e1) return e2; return e3 --> return e1 ? e2 : e3 *)
+          | Return_statement (Some e, rloc) ->
+              let rec fold acc e rloc loc =
+                match acc with
+                | (If_statement (cond, (Return_statement (Some e1, _), _), None), if_loc)
+                  :: acc -> fold acc (ECond (cond, e1, e)) rloc if_loc
+                | _ -> (Return_statement (Some e, rloc), loc) :: acc
+              in
+              fold acc e rloc loc
           (* The following optimizations cause the generated JS to compress less.
              (* if (e1) e2 else e3 --> e1 ? e2 : e3 *)
              | If_statement

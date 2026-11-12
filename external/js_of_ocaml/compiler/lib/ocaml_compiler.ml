@@ -34,14 +34,14 @@ end = struct
     | Const_base (Const_int32 i) -> Int32 i
     | Const_base (Const_int64 i) -> Int64 i
     | Const_base (Const_nativeint i) ->
-        NativeInt (Int32.of_nativeint_warning_on_overflow i)
+        NativeInt (Targetnativeint.of_nativeint_warning_on_overflow i)
     | Const_immstring s -> String s
     | Const_float_array sl ->
         let l = List.map ~f:(fun f -> Int64.bits_of_float (float_of_string f)) sl in
-        Float_array (Array.of_list l)
+        Float_array (Array.of_list l, Code.Block_desc.none)
     | Const_block (tag, l) ->
         let l = Array.of_list (List.map l ~f:of_const) in
-        Tuple (tag, l, Unknown)
+        Tuple (tag, l, Unknown, Code.Block_desc.none)
 end
 [@@if ocaml_version < (5, 1, 0)]
 
@@ -347,8 +347,15 @@ module Compilation_unit_descr = struct
 end
 [@@if oxcaml]
 
+let cmo_block_descs (t : Compilation_unit_descr.t) = Some (Obj.repr t.cu_block_descs)
+[@@if introspect]
+
+let cmo_block_descs (_ : Compilation_unit_descr.t) = None [@@if not introspect]
+
 module Cmo_format = struct
   type t = Cmo_format.compilation_unit
+
+  let block_descs = cmo_block_descs
 
   let name (t : t) = Global_name.Compunit t.cu_name [@@if ocaml_version < (5, 2, 0)]
 
@@ -425,6 +432,8 @@ module Cmo_format = struct
   let hints_pos _ = 0
 
   let hints_size _ = 0
+
+  let block_descs = cmo_block_descs
 end
 [@@if oxcaml]
 
@@ -435,6 +444,7 @@ module Hint = struct
       Optimization_hint.ccall option =
     match h with
     | Hint_unsafe -> Some Hint_unsafe
+    | Hint_immediate_result -> Some Hint_immediate_result
     | Hint_int kind ->
         Some
           (Hint_int
@@ -534,9 +544,9 @@ module Hint = struct
     | Hint_closures l -> Some (Hint_closures (List.map ~f:import_closure_hint l))
     | Hint_ccall hint ->
         Option.map ~f:(fun h -> Optimization_hint.Hint_ccall h) (import_ccall hint)
-    | Hint_physical_comparison ->
-        (* No corresponding optimization in js_of_ocaml yet; ignore the hint. *)
-        None
+    | Hint_int_equality_test -> Some Hint_int_equality_test
+    | Hint_immediate -> Some Hint_immediate
+    | Hint_variant -> Some Hint_variant
 end
 [@@if ocaml_version >= (5, 6, 0)]
 

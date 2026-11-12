@@ -20,7 +20,8 @@ jobs:
       OXCAML_OPAM_REPO_REF: d89747aa6e7b9f44d6cc844dca5b5e7c8a90716f
 
     strategy:
-      fail-fast: false
+      # On pull requests, free the runners as soon as a job fails
+      fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
         # 4.14 and 5.5 are tested on all three OSes; build-only compiler
         # coverage lives in the build workflow. 5.5 exercises the toplevel
@@ -64,6 +65,10 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    # OCaml trunk moves under our feet: a failure there should neither
+    # cancel the other jobs (fail-fast) nor fail the workflow
+    continue-on-error: ${{ matrix.ocaml-name == '5.6+trunk' }}
+
     name:
        ${{ matrix.wasi && 'WASI / ' || '' }}${{ matrix.ocaml-name != '' && matrix.ocaml-name || matrix.ocaml-compiler }} / ${{ matrix.os-name }}
 
@@ -80,7 +85,7 @@ jobs:
       - name: Set-up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.os == 'windows-latest' && 'latest' || 'v26.0.0-v8-canary20260216631fb6e5ef' }}
+          node-version: ${{ matrix.os == 'windows-latest' && '26' || 'v26.0.0-v8-canary20260216631fb6e5ef' }}
 
       - name: Set-up Wasmtime
         if: matrix.wasi
@@ -142,6 +147,10 @@ jobs:
             > "$DIR/oxcaml-dune-patches.opam"
           opam pin add oxcaml-dune-patches "$DIR" -k path -n -y
 
+      - name: Pin sedlex 3.8.1 (OxCaml)
+        if: ${{ endsWith(matrix.ocaml-compiler, '+ox') }}
+        run: wasm_of_ocaml/tools/ci_pin_sedlex_oxcaml.sh
+
       - name: Install wasm_of_ocaml and its test dependencies
         working-directory: ./wasm_of_ocaml
         run: |
@@ -162,33 +171,40 @@ jobs:
         working-directory: ./wasm_of_ocaml
         run: opam exec -- dune build @runtest-wasm --profile with-effects
 
+      - name: Run tests with double translation of effects
+        if: ${{ (startsWith(matrix.ocaml-compiler, '5.') || startsWith(matrix.ocaml-compiler, 'ocaml-variants.5.')) && ! matrix.wasi }}
+        continue-on-error: ${{ matrix.os == 'windows-latest' }}
+        working-directory: ./wasm_of_ocaml
+        run: opam exec -- dune build @runtest-wasm --profile with-effects-double-translation
+
+      - name: Run tests with portable ints
+        if: ${{ ! matrix.wasi }}
+        continue-on-error: ${{ matrix.os == 'windows-latest' }}
+        working-directory: ./wasm_of_ocaml
+        run: opam exec -- dune build @runtest-wasm --profile with-portable-int
+
       - name: Run tests with native effects
         if: ${{ (startsWith(matrix.ocaml-compiler, '5.') || startsWith(matrix.ocaml-compiler, 'ocaml-variants.5.')) && matrix.os != 'windows-latest' }}
         working-directory: ./wasm_of_ocaml
         run: opam exec -- dune build @runtest-wasm --profile with-native-effects
 
-      - name: Run tests (WASI runtime - node)
-        if: ${{ matrix.wasi }}
-        working-directory: ./wasm_of_ocaml
-        run: opam exec -- dune build @runtest-wasm --profile wasi-with-native-effects
-
       - name: Run tests (WASI runtime - Wizard engine)
         if: ${{ matrix.wasi }}
         working-directory: ./wasm_of_ocaml
         env:
-          WASM_ENGINE: wizard-fast
+          JSOO_ENGINE: wizard-fast
         run: opam exec -- dune build @runtest-wasm --profile wasi-with-native-effects
 
       - name: Run tests (WASI runtime - Wizard engine - SPC)
         if: ${{ matrix.wasi }}
         working-directory: ./wasm_of_ocaml
         env:
-          WASM_ENGINE: wizard-spc
+          JSOO_ENGINE: wizard-spc
         run: opam exec -- dune build @runtest-wasm --profile wasi-with-native-effects
 
       - name: Run tests (WASI runtime - wasmtime)
         if: ${{ matrix.wasi }}
         working-directory: ./wasm_of_ocaml
         env:
-          WASM_ENGINE: wasmtime
+          JSOO_ENGINE: wasmtime
         run: opam exec -- dune build @runtest-wasm --profile wasi

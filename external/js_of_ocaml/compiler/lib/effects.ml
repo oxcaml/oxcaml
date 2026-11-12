@@ -44,105 +44,6 @@ let double_translate () =
   | `Cps -> false
   | `Double_translation -> true
 
-let get_edges g src = Addr.Hashtbl.find_opt g src |> Option.value ~default:Addr.Set.empty
-
-let add_edge g src dst = Addr.Hashtbl.replace g src (Addr.Set.add dst (get_edges g src))
-
-let reverse_graph g =
-  let g' = Addr.Hashtbl.create 16 in
-  Addr.Hashtbl.iter
-    (fun child parents -> Addr.Set.iter (fun parent -> add_edge g' parent child) parents)
-    g;
-  g'
-
-type control_flow_graph =
-  { succs : Addr.Set.t Addr.Hashtbl.t
-  ; preds : Addr.Set.t Addr.Hashtbl.t
-  ; reverse_post_order : Addr.t list
-  ; block_order : int Addr.Hashtbl.t
-  }
-
-let build_graph blocks pc =
-  let succs = Addr.Hashtbl.create 16 in
-  let l = ref [] in
-  let visited = Addr.Hashtbl.create 16 in
-  let rec traverse pc =
-    if not (Addr.Hashtbl.mem visited pc)
-    then (
-      Addr.Hashtbl.add visited pc ();
-      let successors = Code.fold_children blocks pc Addr.Set.add Addr.Set.empty in
-      Addr.Hashtbl.add succs pc successors;
-      Addr.Set.iter traverse successors;
-      l := pc :: !l)
-  in
-  traverse pc;
-  let block_order = Addr.Hashtbl.create 16 in
-  List.iteri !l ~f:(fun i pc -> Addr.Hashtbl.add block_order pc i);
-  let preds = reverse_graph succs in
-  { succs; preds; reverse_post_order = !l; block_order }
-
-let dominator_tree g =
-  (* A Simple, Fast Dominance Algorithm
-     Keith D. Cooper, Timothy J. Harvey, and Ken Kennedy *)
-  let dom = Addr.Hashtbl.create 16 in
-  let rec inter pc pc' =
-    (* Compute closest common ancestor *)
-    if pc = pc'
-    then pc
-    else if Addr.Hashtbl.find g.block_order pc < Addr.Hashtbl.find g.block_order pc'
-    then inter pc (Addr.Hashtbl.find dom pc')
-    else inter (Addr.Hashtbl.find dom pc) pc'
-  in
-  List.iter g.reverse_post_order ~f:(fun pc ->
-      let l = Addr.Hashtbl.find g.succs pc in
-      Addr.Set.iter
-        (fun pc' ->
-          let d =
-            match Addr.Hashtbl.find_opt dom pc' with
-            | Some d -> inter pc d
-            | None -> pc
-          in
-          Addr.Hashtbl.replace dom pc' d)
-        l);
-  (* Check we have reached a fixed point (reducible graph) *)
-  List.iter g.reverse_post_order ~f:(fun pc ->
-      let l = Addr.Hashtbl.find g.succs pc in
-      Addr.Set.iter
-        (fun pc' ->
-          let d = Addr.Hashtbl.find dom pc' in
-          assert (inter pc d = d))
-        l);
-  dom
-
-(* pc has at least two forward edges moving into it *)
-let is_merge_node g pc =
-  let s = Addr.Hashtbl.find g.preds pc in
-  let o = Addr.Hashtbl.find g.block_order pc in
-  let n =
-    Addr.Set.fold
-      (fun pc' n -> if Addr.Hashtbl.find g.block_order pc' < o then n + 1 else n)
-      s
-      0
-  in
-  n > 1
-
-let dominance_frontier g idom =
-  let frontiers = Addr.Hashtbl.create 16 in
-  Addr.Hashtbl.iter
-    (fun pc preds ->
-      if Addr.Set.compare_cardinal_with preds 1 > 0
-      then
-        let dom = Addr.Hashtbl.find idom pc in
-        let rec loop runner =
-          if runner <> dom
-          then (
-            add_edge frontiers runner pc;
-            loop (Addr.Hashtbl.find idom runner))
-        in
-        Addr.Set.iter loop preds)
-    g.preds;
-  frontiers
-
 (* Split a block, separating the last instruction from the preceding
    ones, ignoring events *)
 let block_split_last xs =
@@ -173,7 +74,7 @@ let effect_primitive_or_application = function
           , _ )
       , _ )
   | Apply _ -> true
-  | Block (_, _, _, _)
+  | Block (_, _, _, _, _)
   | Field (_, _, _)
   | Closure (_, _, _)
   | Constant _
@@ -187,7 +88,7 @@ exception handlers. And we keep track of the exception handler
 associated to each Poptrap, and possibly Raise.
 *)
 let compute_needed_transformations ~cfg ~idom ~cps_needed ~blocks ~start =
-  let frontiers = dominance_frontier cfg idom in
+  let frontiers = Structure.dominance_frontier cfg idom in
   let transformation_needed = ref Addr.Set.empty in
   let matching_exn_handler = Addr.Hashtbl.create 16 in
   let is_continuation = Addr.Hashtbl.create 16 in
@@ -197,7 +98,7 @@ let compute_needed_transformations ~cfg ~idom ~cps_needed ~blocks ~start =
     if not (Addr.Set.mem pc !transformation_needed)
     then (
       transformation_needed := Addr.Set.add pc !transformation_needed;
-      Addr.Set.iter mark_needed (get_edges frontiers pc))
+      Addr.Set.iter mark_needed (Structure.get_edges frontiers pc))
   in
   let mark_continuation pc x =
     if not (Addr.Hashtbl.mem is_continuation pc)
@@ -205,7 +106,7 @@ let compute_needed_transformations ~cfg ~idom ~cps_needed ~blocks ~start =
       Addr.Hashtbl.add
         is_continuation
         pc
-        (if Addr.Set.mem pc (get_edges frontiers pc) then `Loop else `Param x)
+        (if Addr.Set.mem pc (Structure.get_edges frontiers pc) then `Loop else `Param x)
   in
   let rec traverse visited ~englobing_exn_handlers pc =
     if Addr.Set.mem pc visited
@@ -293,7 +194,7 @@ type st =
   { mutable new_blocks : Code.block Addr.Map.t
   ; mutable free_pc : Code.Addr.t
   ; blocks : Code.block Addr.Map.t
-  ; cfg : control_flow_graph
+  ; cfg : Structure.t
   ; jc : jump_closures
   ; closure_info : (Var.t list * (Addr.t * Var.t list)) Addr.Hashtbl.t
         (* Associates a function's address with its CPS parameters and CPS continuation *)
@@ -301,7 +202,6 @@ type st =
   ; blocks_to_transform : Addr.Set.t
   ; is_continuation : [ `Param of Var.t | `Loop ] Addr.Hashtbl.t
   ; matching_exn_handler : Addr.t Addr.Hashtbl.t
-  ; block_order : int Addr.Hashtbl.t
   ; live_vars : Deadcode.variable_uses
   ; flow_info : Global_flow.info
   ; trampolined_calls : trampolined_calls ref (* Call sites that require trampolining *)
@@ -333,6 +233,15 @@ let cps_cont_of_direct ~st (pc, args) = mk_cps_pc_of_direct ~st pc, args
 
 let closure_of_pc ~st pc = Addr.Map.find pc st.jc.closure_of_jump
 
+(* The parameters of a block ending with [Pushtrap] can be assigned in the
+   body of the [try] (see [Code.invariant]). So such a block keeps its
+   parameters: the closure corresponding to the block binds fresh variables
+   instead and jumps to the block. *)
+let keeps_params block =
+  match block with
+  | { branch = Pushtrap _; params = _ :: _; _ } -> true
+  | _ -> false
+
 let allocate_closure ~st ~params ~body ~branch =
   if debug ()
   then Format.eprintf "@[<v>allocate_closure ~branch:(%a)@]%@." Code.Print.last branch;
@@ -363,9 +272,7 @@ let cps_branch ~st ~src (pc, args) =
       in
       (* We check the stack depth only for backward edges (so, at
          least once per loop iteration) *)
-      let check =
-        Addr.Hashtbl.find st.block_order src >= Addr.Hashtbl.find st.block_order pc
-      in
+      let check = Structure.is_backward st.cfg src pc in
       tail_call
         ~st
         ~instrs
@@ -408,7 +315,12 @@ let allocate_continuation ~st ~alloc_jump_closures ~split_closures src_pc x dire
       | _ -> false)
     &&
     match Addr.Hashtbl.find st.is_continuation direct_pc with
-    | `Param _ -> true
+    | `Param _ ->
+        (* [x] is not bound in the continuation, so it should not be used
+           there directly. This happens when [x] is used in the body of a
+           [try] whose handler uses the parameter instead (see [ASSIGN] in
+           [Parse_bytecode]). *)
+        List.is_empty args || st.live_vars.(Var.idx x) = 1
     | `Loop -> List.compare_length_with args ~len:st.live_vars.(Var.idx x) = 0
   then alloc_jump_closures, closure_of_pc ~st direct_pc
   else
@@ -420,14 +332,15 @@ let allocate_continuation ~st ~alloc_jump_closures ~split_closures src_pc x dire
          of the exception handler. *)
       if not split_closures
       then alloc_jump_closures, []
-      else if is_merge_node st.cfg direct_pc
+      else if Structure.is_merge_node st.cfg direct_pc
       then [], alloc_jump_closures
       else
+        let direct_closure = Addr.Map.find_opt direct_pc st.jc.closure_of_jump in
         List.partition
           ~f:(fun i ->
-            match i with
-            | Let (_, Closure (_, (pc'', []), _)) ->
-                pc'' = mk_cps_pc_of_direct ~st direct_pc
+            match i, direct_closure with
+            | Let (f, Closure _), Some g -> Var.equal f g
+            | Let (_, Closure _), None -> false
             | _ -> assert false)
           alloc_jump_closures
     in
@@ -558,13 +471,7 @@ let rewrite_instr ~st (instr : instr) : instr =
     ->
       if double_translate ()
       then
-        let exact =
-          (* If this function is unknown to the global flow analysis, then it was
-           introduced by the lambda lifting and we don't have exactness info any more. *)
-          exact
-          || Var.idx f < Var.Tbl.length st.flow_info.info_approximation
-             && Global_flow.exact_call st.flow_info f (List.length args)
-        in
+        let exact = exact || Global_flow.exact_call st.flow_info f (List.length args) in
         Let (x, Apply { f; args; exact; yielding })
       else (
         (* At the moment, we turn into CPS any function not called with
@@ -578,12 +485,6 @@ let rewrite_instr ~st (instr : instr) : instr =
       assert false
   | _ -> instr
 
-let call_exact flow_info (f : Var.t) nargs : bool =
-  (* If [f] is unknown to the global flow analysis, then it was introduced by
-     the lambda lifting and we don't have exactness about it. *)
-  Var.idx f < Var.Tbl.length flow_info.Global_flow.info_approximation
-  && Global_flow.exact_call flow_info f nargs
-
 let cps_instr ~st (instr : instr) : instr list =
   match instr with
   | Let (x, Prim (Extern ("caml_assume_no_perform", _), [ Pv f ]))
@@ -595,7 +496,7 @@ let cps_instr ~st (instr : instr) : instr list =
       ; Let
           ( x
           , Apply
-              { exact = call_exact st.flow_info f 1
+              { exact = Global_flow.exact_call st.flow_info f 1
               ; f
               ; args = [ unit ]
               ; yielding = Unknown
@@ -640,7 +541,23 @@ let cps_block ~st ~k ~orig_pc block =
               else jump_block.params
             in
             let cps_jump_pc = mk_cps_pc_of_direct ~st jump_pc in
-            Let (cname, Closure (params, (cps_jump_pc, []), (None, None))))
+            let jump_block = Addr.Map.find jump_pc st.blocks in
+            if keeps_params jump_block
+            then
+              let params = List.map ~f:Var.fork params in
+              let entry =
+                add_block
+                  st
+                  { params = []
+                  ; body =
+                      (match jump_block.body with
+                      | (Event _ as i) :: _ -> [ i ]
+                      | _ -> [])
+                  ; branch = Branch (cps_jump_pc, params)
+                  }
+              in
+              Let (cname, Closure (params, (entry, []), (None, None)))
+            else Let (cname, Closure (params, (cps_jump_pc, []), (None, None))))
     | exception Not_found -> []
   in
 
@@ -692,7 +609,9 @@ let cps_block ~st ~k ~orig_pc block =
               yielding = _ } when Var.Set.mem x st.cps_needed ->
         Some
           (fun ~k ->
-            let exact = exact || call_exact st.flow_info f (List.length args) in
+            let exact =
+              exact || Global_flow.exact_call st.flow_info f (List.length args)
+            in
             tail_call ~st ~exact ~in_cps:true ~check:true ~f (args @ [ k ]))
     | Prim (Extern ("%continue", _), [ Pv stack; Pv value; tail ]) ->
         (* Resume the stack and return [value] at the perform site: this
@@ -748,7 +667,7 @@ let cps_block ~st ~k ~orig_pc block =
                         (Extern ("caml_resume_stack", None), [ Pv stack; Pv stack; Pv k ])
                     )
                 ]
-              ~exact:(call_exact st.flow_info f 1)
+              ~exact:(Global_flow.exact_call st.flow_info f 1)
               ~in_cps:true
               ~check:true
               ~f
@@ -800,7 +719,10 @@ let cps_block ~st ~k ~orig_pc block =
         body @ last_instrs, last
   in
 
-  { params = (if Addr.Set.mem orig_pc st.blocks_to_transform then [] else block.params)
+  { params =
+      (if Addr.Set.mem orig_pc st.blocks_to_transform && not (keeps_params block)
+       then []
+       else block.params)
   ; body
   ; branch = last
   }
@@ -821,6 +743,9 @@ let rewrite_direct_block ~st ~cps_needed ~closure_info ~pc block =
           let direct_c = Var.fork x in
           let cps_c = Var.fork x in
           let cps_params, cps_cont = Addr.Hashtbl.find closure_info pc in
+          (* The Wasm backend needs to know which closures use the CPS
+             calling convention *)
+          st.in_cps := Var.Set.add cps_c !(st.in_cps);
           [ Let (direct_c, Closure (params, cont, cloc))
           ; Let (cps_c, Closure (cps_params, cps_cont, (None, None)))
           ; Let (x, Prim (Extern ("caml_cps_closure", None), [ Pv direct_c; Pv cps_c ]))
@@ -860,7 +785,7 @@ let rewrite_direct_block ~st ~cps_needed ~closure_info ~pc block =
           (* We just need to call [f] in direct style. *)
           let unit = Var.fresh_n "unit" in
           let unit_val = Int Targetint.zero in
-          let exact = call_exact st.flow_info f 1 in
+          let exact = Global_flow.exact_call st.flow_info f 1 in
           [ Let (unit, Constant unit_val)
           ; Let (x, Apply { exact; f; args = [ unit ]; yielding = Unknown })
           ]
@@ -914,8 +839,8 @@ let cps_transform ~live_vars ~flow_info ~cps_needed p =
               { params = []; body = []; branch = Branch (start, args) }
               blocks )
         in
-        let cfg = build_graph blocks' start' in
-        let idom = dominator_tree cfg in
+        let cfg = Structure.control_flow_graph blocks' start' in
+        let idom = Structure.immediate_dominators cfg in
         let should_compute_needed_transformations =
           match name_opt with
           | Some name -> Var.Set.mem name cps_needed
@@ -956,7 +881,6 @@ let cps_transform ~live_vars ~flow_info ~cps_needed p =
           ; blocks_to_transform
           ; is_continuation
           ; matching_exn_handler
-          ; block_order = cfg.block_order
           ; flow_info
           ; live_vars
           ; trampolined_calls
@@ -1123,7 +1047,7 @@ let cps_transform ~live_vars ~flow_info ~cps_needed p =
 let current_loop_header frontiers in_loop pc =
   (* We remain in a loop while the loop header is in the dominance frontier.
      We enter a loop when the block is in its dominance frontier. *)
-  let frontier = get_edges frontiers pc in
+  let frontier = Structure.get_edges frontiers pc in
   match in_loop with
   | Some header when Addr.Set.mem header frontier -> in_loop
   | _ -> if Addr.Set.mem pc frontier then Some pc else None
@@ -1181,9 +1105,9 @@ let rewrite_toplevel_instr (p, cps_needed, accu) instr =
    using repeatedly [caml_cps_trampoline] can be costly. *)
 let rewrite_toplevel ~cps_needed p =
   let { start; blocks; _ } = p in
-  let cfg = build_graph blocks start in
-  let idom = dominator_tree cfg in
-  let frontiers = dominance_frontier cfg idom in
+  let cfg = Structure.control_flow_graph blocks start in
+  let idom = Structure.immediate_dominators cfg in
+  let frontiers = Structure.dominance_frontier cfg idom in
   let rec traverse visited (p : Code.program) cps_needed in_loop pc =
     if Addr.Set.mem pc visited
     then visited, p, cps_needed
@@ -1289,6 +1213,9 @@ let f ~flow_info ~live_vars p =
   let p = split_blocks ~cps_needed p in
   let p, trampolined_calls, in_cps = cps_transform ~live_vars ~flow_info ~cps_needed p in
   if Debug.find "times" () then Format.eprintf "  effects: %a@." Timer.print t;
+  (* The CPS transformation can move the reads and assignments of a variable
+     to other closures *)
+  let p = Box_assigned.f p in
   Code.invariant p;
   if debug ()
   then (

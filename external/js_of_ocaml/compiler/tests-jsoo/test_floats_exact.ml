@@ -40,8 +40,7 @@ let p (fmt : _ format) x = print_endline (Printf.sprintf fmt x)
 let%expect_test "%g of values >= 1e21" =
   p "%.25g" 1e21;
   p "%.30g" 1.2345678e22;
-  [%expect
-    {|
+  [%expect {|
     1000000000000000000000
     12345678000000000327680
     |}]

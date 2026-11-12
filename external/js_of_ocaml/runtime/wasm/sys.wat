@@ -16,7 +16,7 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "bool_val"
          (func $bool_val (param (ref eq)) (result i32)))
@@ -60,8 +60,10 @@
    (import "bindings" "ta_get_i32"
       (func $ta_get_i32 (param (ref extern)) (param i32) (result i32)))
    (import "bindings" "random_seed" (func $random_seed (result (ref extern))))
-   (import "jslib" "unwrap" (func $unwrap (param (ref eq)) (result anyref)))
-   (import "jslib" "wrap" (func $wrap (param anyref) (result (ref eq))))
+   (import "jslib" "js_of_value"
+      (func $js_of_value (param (ref eq)) (result externref)))
+   (import "jslib" "value_of_js"
+      (func $value_of_js (param externref) (result (ref eq))))
    (import "jslib" "caml_jsstring_of_string"
       (func $caml_jsstring_of_string (param (ref eq)) (result (ref eq))))
    (import "jslib" "caml_string_of_jsstring"
@@ -76,13 +78,13 @@
    (import "bindings" "on_arm64" (global $on_arm64 i32))
    (import "bindings" "isatty"
       (func $isatty (param (ref eq)) (result (ref eq))))
-   (import "bindings" "system" (func $system (param anyref) (result (ref eq))))
-   (import "bindings" "getenv" (func $getenv (param anyref) (result anyref)))
+   (import "bindings" "system" (func $system (param externref) (result (ref eq))))
+   (import "bindings" "getenv" (func $getenv (param externref) (result externref)))
    (import "bindings" "time" (func $time (result f64)))
    (import "fail" "javascript_exception"
       (tag $javascript_exception (param externref)))
    (import "jsstring" "jsstring_test"
-      (func $jsstring_test (param anyref) (result i32)))
+      (func $jsstring_test (param externref) (result i32)))
    (import "bindings" "exit" (func $exit (param i32)))
 ))
    (import "io" "caml_channel_descriptor"
@@ -90,7 +92,7 @@
    (import "string" "caml_string_equal"
       (func $caml_string_equal
          (param (ref eq)) (param (ref eq)) (result (ref eq))))
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "portable_int_val_32"
          (func $portable_int_val_32 (param (ref eq)) (result i32)))
@@ -104,7 +106,7 @@
 
    (func (export "caml_sys_exit") (export "unix_exit") (export "caml_unix_exit")
       (param $code (ref eq)) (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then (call $exit (call $portable_int_val_32 (local.get $code))))
       (@else
       (call $exit (i31.get_s (ref.cast (ref i31) (local.get $code))))
@@ -244,13 +246,14 @@
 (@else
    (func $sys_getenv
       (param $name (ref eq)) (result eqref)
-      (local $res anyref)
+      (local $res externref)
       (local.set $res
          (call $getenv
-            (call $unwrap (call $caml_jsstring_of_string (local.get $name)))))
+            (call $js_of_value
+               (call $caml_jsstring_of_string (local.get $name)))))
       (if (i32.eqz (call $jsstring_test (local.get $res)))
          (then (return (ref.null eq))))
-      (return_call $caml_string_of_jsstring (call $wrap (local.get $res))))
+      (return_call $caml_string_of_jsstring (call $value_of_js (local.get $res))))
 ))
 
    (func $caml_getenv (param $name (ref eq)) (result eqref)
@@ -398,7 +401,8 @@
          (do
             (return
                (call $system
-                  (call $unwrap (call $caml_jsstring_of_string (local.get $cmd))))))
+                  (call $js_of_value
+                     (call $caml_jsstring_of_string (local.get $cmd))))))
          (catch $javascript_exception
             (call $caml_handle_sys_error)))
       (return (ref.i31 (i32.const 0))))
@@ -459,13 +463,28 @@
       (local.get $a))
 ))
 
-   (func (export "caml_sys_const_bigendian")
+   ;; These constants are usually computed statically (see [Eval]), but
+   ;; are needed when compiling with --disable staticeval
+
+   (func (export "caml_sys_const_big_endian")
+      (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+
+   (@string $wasm_of_ocaml "wasm_of_ocaml")
+
+   (func (export "caml_sys_const_backend_type")
+      (param (ref eq)) (result (ref eq))
+      ;; Other "wasm_of_ocaml"
+      (array.new_fixed $block 2 (ref.i31 (i32.const 0))
+         (global.get $wasm_of_ocaml)))
+
+   (func (export "caml_sys_const_naked_pointers_checked")
       (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_sys_const_word_size")
       (param (ref eq)) (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (ref.i31 (i32.const 64)))
       (@else
@@ -474,7 +493,7 @@
 
    (func (export "caml_sys_const_int_size")
       (param (ref eq)) (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (ref.i31 (i32.const 63)))
       (@else
@@ -576,7 +595,7 @@
 
    (func (export "caml_ml_enable_runtime_warnings")
       (param $v (ref eq)) (result (ref eq))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (global.set $caml_runtime_warnings
             (call $bool_val (local.get $v))))
@@ -629,7 +648,7 @@
       (call $caml_raise_sys_error
          (call $caml_string_of_jsstring
             (call $caml_js_meth_call
-               (call $wrap (any.convert_extern (local.get $exn)))
+               (call $value_of_js (local.get $exn))
                (global.get $toString)
                (array.new_fixed $block 1 (ref.i31 (i32.const 0)))))))
 ))

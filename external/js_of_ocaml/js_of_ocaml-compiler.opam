@@ -16,11 +16,12 @@ depends: [
   "ocaml" {>= "5.4" & < "5.7"}
   "js_of_ocaml-runtime" {= version}
   "num" {with-test}
-  "out-channel-redirect" {with-test}
+  "ppx_devtools-optcomp"
+  "ppx_devtools-expect" {with-test}
   "ppxlib" {>= "0.33"}
   "re" {with-test}
   "cmdliner" {>= "2.0"}
-  "sedlex" {>= "3.3"}
+  "sedlex" {>= "3.8.1"}
   "qcheck" {with-test}
   "menhir" {>= "20180523"}
   "menhirLib"
@@ -56,4 +57,10 @@ build: [
               "_build/install/default/bin/jsoo_minify" {os-family != "windows"}
               "_build/install/default/bin/jsoo_minify.exe:jsoo_minify" {os-family = "windows"}
               "_build/cmdliner-install"]
+]
+
+# ppx_devtools is not released yet (ocsigen/js_of_ocaml#2551).
+pin-depends: [
+  ["ppx_devtools-optcomp.dev" "git+https://github.com/ocsigen/ppx_devtools.git#f62719d5087fa8d7f2bd0616c1fa91fd660eb27e"]
+  ["ppx_devtools-expect.dev" "git+https://github.com/ocsigen/ppx_devtools.git#f62719d5087fa8d7f2bd0616c1fa91fd660eb27e"]
 ]

@@ -54,7 +54,7 @@ let check_js_file fname =
   let p =
     try Parse_js.parse `Script (Parse_js.Lexer.of_string ~filename:fname c)
     with Parse_js.Parsing_error pi ->
-      failwith (Printf.sprintf "cannot parse file %S (l:%d, c:%d)@." fname pi.line pi.col)
+      failwith (Parse_info.Diagnostic.with_excerpt pi "syntax error")
   in
   let freenames = free_variable p in
   let freenames = StringSet.diff freenames Reserved.keyword in
@@ -78,12 +78,13 @@ let check_js_file fname =
 let default_flags = []
 
 let interesting_runtimes =
-  [ [ "effects", `S "jspi"; "wasi", `B false; "portable-int", `B false  ]
-  ; [ "effects", `S "jspi"; "wasi", `B false; "portable-int", `B true  ]
-  ; [ "effects", `S "cps"; "wasi", `B false; "portable-int", `B false ]
-  ; [ "effects", `S "disabled"; "wasi", `B true; "portable-int", `B false ]
-  ; [ "effects", `S "cps"; "wasi", `B true; "portable-int", `B false ]
-  ;
+  [ [ "effects", `S "jspi"; "wasi", `B false; "portable_int", `B false ]
+  ; [ "effects", `S "jspi"; "wasi", `B false; "portable_int", `B true ]
+  ; [ "effects", `S "cps"; "wasi", `B false; "portable_int", `B false ]
+  ; [ "effects", `S "double-translation"; "wasi", `B false; "portable_int", `B false ]
+  ; [ "effects", `S "disabled"; "wasi", `B true; "portable_int", `B false ]
+  ; [ "effects", `S "cps"; "wasi", `B true; "portable_int", `B false ]
+  ; [ "effects", `S "double-translation"; "wasi", `B true; "portable_int", `B false ]
   ]
 
 let defaults = [ "effects", "disabled" ]
@@ -117,13 +118,12 @@ let print_flags f flags =
            k
            (fun f v ->
              match v with
-             | `S s -> Format.fprintf f "Wat_preprocess.String \"%s\"" s
-             | `B b ->
-                 Format.fprintf f "Wat_preprocess.Bool %s" (if b then "true" else "false"))
+             | `S s -> Format.fprintf f "Wax_link.String \"%s\"" s
+             | `B b -> Format.fprintf f "Wax_link.Bool %s" (if b then "true" else "false"))
            v))
     flags
 
-let () =
+let main () =
   let () = set_binary_mode_out stdout true in
   let ( js_launcher
       , deps
@@ -200,3 +200,11 @@ let () =
          | Some file ->
              Format.fprintf f "%a,@;%S;@;" print_flags flags (Fs.read_file file)))
     (List.mapi interesting_runtimes ~f:(fun i flags -> i = 0, flags))
+
+(* Report errors the way the compiler does, rather than as an uncaught
+   exception, which escapes the message *)
+let () =
+  try main ()
+  with Failure s ->
+    Format.eprintf "%s: Error: %s@." Sys.argv.(0) s;
+    exit 1

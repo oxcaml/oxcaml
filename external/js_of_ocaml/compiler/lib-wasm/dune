@@ -2,7 +2,11 @@
  (name wasm_of_ocaml_compiler)
  (public_name wasm_of_ocaml-compiler)
  (synopsis "Wasm_of_ocaml compiler library")
- (libraries js_of_ocaml_compiler oxcaml_private_sedlex oxcaml_private_yojson)
+ (libraries
+  js_of_ocaml_compiler
+  oxcaml_private_sedlex
+  oxcaml_private_yojson
+  wax-lib)
  (flags
   (:standard
    -w
@@ -15,4 +19,4 @@
    -open
    Oxcaml_private_yojson))
  (preprocess
-  (pps ppx_optcomp_light oxcaml_private_sedlex_ppx)))
+  (pps ppx_devtools-optcomp oxcaml_private_sedlex_ppx)))

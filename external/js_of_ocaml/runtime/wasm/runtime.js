@@ -81,6 +81,17 @@
   // normalize paths on registration and before each lookup.
   const virtual_path = on_windows ? (p) => p.replaceAll("\\", "/") : (p) => p;
 
+  // Windows console device names (CON, CONIN$, CONOUT$). Node resolves a
+  // relative path against the current directory and prefixes it with \\?\,
+  // which turns off the recognition of device names, so they must reach it
+  // as \\.\CONIN$.
+  const console_name = on_windows
+    ? (p) => {
+        const m = /^(?:[\\/]{2}[.?][\\/])?(CON|CONIN\$|CONOUT\$)$/i.exec(p);
+        return m ? `\\\\.\\${m[1].toUpperCase()}` : p;
+      }
+    : (p) => p;
+
   function register_virtual_file(name, content) {
     name = virtual_path(name);
     virtual_files.set(name, content);
@@ -276,7 +287,7 @@
     return caml_alloc_stat(
       large,
       s.dev,
-      s.ino | 0,
+      s.ino,
       kind,
       s.mode & 0o7777,
       s.nlink,
@@ -321,7 +332,15 @@
       // ZZZ not supported in Safari yet
       new WebAssembly.Tag({ parameters: ["externref"], results: [] }),
     identity: (x) => x,
-    from_bool: (x) => !!x,
+    number_as_int: (x) =>
+      typeof x === "number" &&
+      Number.isInteger(x) &&
+      x >= -(2 ** 62) &&
+      x < 2 ** 62
+        ? x
+        : Number.NaN,
+    true: true,
+    false: false,
     get: (x, y) => x[y],
     set: (x, y, z) => (x[y] = z),
     delete: (x, y) => delete x[y],
@@ -651,7 +670,7 @@
         return fd;
       }
       return fs.openSync(
-        p,
+        console_name(p),
         open_flags.reduce((f, v, i) => (flags & (1 << i) ? f | v : f), 0),
         perm,
       );
@@ -767,6 +786,18 @@
       if (virtual_files.has(vp) || virtual_dirs.has(vp)) return 1;
       return fs ? +fs.existsSync(p) : 0;
     },
+    filepath_exists: (p) => {
+      const vp = virtual_path(p);
+      if (virtual_files.has(vp) || virtual_dirs.has(vp)) return 1;
+      if (!fs) return 0;
+      try {
+        fs.statSync(p);
+        return 1;
+      } catch (e) {
+        if (e.code === "ENOENT" || e.code === "ENOTDIR") return 0;
+        throw e;
+      }
+    },
     is_directory: (p) => {
       const vp = virtual_path(p);
       if (virtual_dirs.has(vp)) return 1;
@@ -826,6 +857,14 @@
       return v === undefined ? null : v;
     },
     map_set: (m, x, v) => m.set(x, v),
+    map_get_or_set: (m, x, v) => {
+      var r = m.get(x);
+      if (r === undefined) {
+        m.set(x, v);
+        return null;
+      }
+      return r;
+    },
     map_delete: (m, x) => m.delete(x),
     hash_string,
     log: (x) => console.log(x),
@@ -895,6 +934,44 @@
     length: (s) => s.length,
     intoCharCodeArray: () => 0,
   };
+  // Counters of the representation conversions executed by code compiled
+  // with [--debug count-conversions] (per kind, imported from module
+  // "conversions") or [--debug count-conversion-sites] (also per site,
+  // imported from module "conversion-sites"), created on demand. The nonzero
+  // ones are printed on exit, the busiest sites only.
+  function make_counters(counters) {
+    return new globalThis.Proxy(
+      {},
+      {
+        get(_, name) {
+          if (!Object.hasOwn(counters, name))
+            counters[name] = new globalThis.WebAssembly.Global(
+              { value: "i64", mutable: true },
+              0n,
+            );
+          return counters[name];
+        },
+      },
+    );
+  }
+  const conversion_counters = {};
+  const site_counters = {};
+  if (isNode)
+    globalThis.process.on("exit", () => {
+      const counts = Object.entries(conversion_counters)
+        .filter(([_, g]) => g.value !== 0n)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([name, g]) => `${name}=${g.value}`);
+      if (counts.length) fs.writeSync(2, `conversions: ${counts.join(" ")}\n`);
+      const sites = Object.entries(site_counters)
+        .filter(([_, g]) => g.value !== 0n)
+        .sort(([_a, a], [_b, b]) =>
+          b.value > a.value ? 1 : b.value < a.value ? -1 : 0,
+        )
+        .slice(0, 40);
+      for (const [name, g] of sites)
+        fs.writeSync(2, `${String(g.value).padStart(14)} ${name}\n`);
+    });
   const imports = Object.assign(
     {
       Math: math,
@@ -912,6 +989,8 @@
         },
       ),
       env: {},
+      conversions: make_counters(conversion_counters),
+      "conversion-sites": make_counters(site_counters),
     },
     generated,
   );

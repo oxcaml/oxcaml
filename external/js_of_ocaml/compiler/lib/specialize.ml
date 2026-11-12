@@ -171,7 +171,7 @@ end = struct
     | Constant _ -> e
     | Apply { f; args; exact; yielding } ->
         Apply { f = s f; args = List.map args ~f:s; exact; yielding }
-    | Block (n, a, k, mut) -> Block (n, Array.map a ~f:s, k, mut)
+    | Block (n, a, k, mut, d) -> Block (n, Array.map a ~f:s, k, mut, d)
     | Field (x, n, typ) -> Field (s x, n, typ)
     | Closure (l, pc, loc) -> Closure (l, subst_cont s pc, loc)
     | Special _ -> e
@@ -251,9 +251,9 @@ end
 
 module SBT = Hashtbl.Make (Simple_block)
 
-(* Optimization can merge targets while retaining distinct phi arguments. *)
-let equal (pc, args) (pc', args') =
-  pc = pc' && List.equal ~eq:Var.equal args args'
+(* Continuations to the same block can carry different arguments if this
+   pass runs after other optimizations, so compare both. *)
+let equal (pc, args) (pc', args') = pc = pc' && List.equal ~eq:Var.equal args args'
 
 type switch_to_cond =
   [ `All_equals
@@ -294,7 +294,13 @@ let optimize_switch_to_cond block x l (opt : switch_to_cond) =
       let c = Var.fresh () in
       { block with
         body =
-          block.body @ [ Let (c, Prim (Eq, [ Pc (Int (Targetint.of_int_exn i)); Pv x ])) ]
+          block.body
+          @ [ Let
+                ( c
+                , Prim
+                    (Eq { int_only = true }, [ Pc (Int (Targetint.of_int_exn i)); Pv x ])
+                )
+            ]
       ; branch = Cond (c, l.(i), l.((i + 1) mod Array.length l))
       }
   | `Splitted i ->

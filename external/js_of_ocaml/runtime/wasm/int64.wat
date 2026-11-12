@@ -102,7 +102,7 @@
    (func $int64_dup (param $v (ref eq)) (result (ref eq))
       ;; Under [portable-int] this is also [Nativeint]'s [dup], so the ops
       ;; must come from the source value rather than [$int64_ops].
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (struct.new $int64
             (struct.get $int64 0 (ref.cast (ref $int64) (local.get $v)))
@@ -161,7 +161,7 @@
       (local $res i64) (local $threshold i64)
       (local.set $len (array.len (local.get $s)))
       (if (i32.ge_s (local.get $i) (local.get $len))
-        (then (call $caml_failwith (local.get $errmsg))))
+        (then (call $caml_failwith (local.get $errmsg)) (unreachable)))
       (local.set $threshold
          (i64.div_u (i64.const -1) (i64.extend_i32_u (local.get $base))))
       (local.set $d
@@ -346,7 +346,7 @@
       (call $caml_failwith (global.get $unsupported))
       (ref.i31 (i32.const 0)))
 
-   (@if $portable-int
+   (@if $portable_int
       (@then
          (export "caml_portability_int64_cmp" (func $int64_cmp))
          (export "caml_portability_int64_hash" (func $int64_hash))

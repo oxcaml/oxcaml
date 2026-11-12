@@ -170,10 +170,7 @@ let ()  = M.myfun M.x
               tl = _a_[2],
               x2 = _a_[1],
               x1 = l[1],
-              s =
-                0 < caml_int_compare(x1, x2)
-                 ? [0, x2, [0, x1, 0]]
-                 : [0, x1, [0, x2, 0]];
+              s = x2 < x1 ? [0, x2, [0, x1, 0]] : [0, x1, [0, x2, 0]];
              return [0, s, tl];
             }
            }
@@ -189,18 +186,18 @@ let ()  = M.myfun M.x
               x2$0 = _a_[1],
               x1$0 = l[1],
               s$0 =
-                0 < caml_int_compare(x1$0, x2$0)
-                 ? 0
-                   < caml_int_compare(x1$0, x3)
-                   ? 0
-                     < caml_int_compare(x2$0, x3)
+                x2$0 < x1$0
+                 ? x3
+                   < x1$0
+                   ? x3
+                     < x2$0
                      ? [0, x3, [0, x2$0, [0, x1$0, 0]]]
                      : [0, x2$0, [0, x3, [0, x1$0, 0]]]
                    : [0, x2$0, [0, x1$0, [0, x3, 0]]]
-                 : 0
-                   < caml_int_compare(x2$0, x3)
-                   ? 0
-                     < caml_int_compare(x1$0, x3)
+                 : x3
+                   < x2$0
+                   ? x3
+                     < x1$0
                      ? [0, x3, [0, x1$0, [0, x2$0, 0]]]
                      : [0, x1$0, [0, x3, [0, x2$0, 0]]]
                    : [0, x1$0, [0, x2$0, [0, x3, 0]]];
@@ -224,7 +221,7 @@ let ()  = M.myfun M.x
            if(l1){
             if(l2){
              var t2 = l2[2], h2 = l2[1], t1 = l1[2], h1 = l1[1];
-             if(0 < caml_int_compare(h1, h2)){
+             if(h2 < h1){
               var accu$0 = [0, h1, accu];
               l1 = t1;
               accu = accu$0;
@@ -252,10 +249,7 @@ let ()  = M.myfun M.x
               tl = _a_[2],
               x2 = _a_[1],
               x1 = l[1],
-              s =
-                0 < caml_int_compare(x1, x2)
-                 ? [0, x1, [0, x2, 0]]
-                 : [0, x2, [0, x1, 0]];
+              s = x2 < x1 ? [0, x1, [0, x2, 0]] : [0, x2, [0, x1, 0]];
              return [0, s, tl];
             }
            }
@@ -271,19 +265,19 @@ let ()  = M.myfun M.x
               x2$0 = _a_[1],
               x1$0 = l[1],
               s$0 =
-                0 < caml_int_compare(x1$0, x2$0)
-                 ? 0
-                   < caml_int_compare(x2$0, x3)
+                x2$0 < x1$0
+                 ? x3
+                   < x2$0
                    ? [0, x1$0, [0, x2$0, [0, x3, 0]]]
-                   : 0
-                     < caml_int_compare(x1$0, x3)
+                   : x3
+                     < x1$0
                      ? [0, x1$0, [0, x3, [0, x2$0, 0]]]
                      : [0, x3, [0, x1$0, [0, x2$0, 0]]]
-                 : 0
-                   < caml_int_compare(x1$0, x3)
+                 : x3
+                   < x1$0
                    ? [0, x2$0, [0, x1$0, [0, x3, 0]]]
-                   : 0
-                     < caml_int_compare(x2$0, x3)
+                   : x3
+                     < x2$0
                      ? [0, x2$0, [0, x3, [0, x1$0, 0]]]
                      : [0, x3, [0, x2$0, [0, x1$0, 0]]];
              return [0, s$0, tl$1];
@@ -306,7 +300,7 @@ let ()  = M.myfun M.x
            if(l1){
             if(l2){
              var t2 = l2[2], h2 = l2[1], t1 = l1[2], h1 = l1[1];
-             if(0 < caml_int_compare(h1, h2)){
+             if(h2 < h1){
               var accu$0 = [0, h2, accu];
               l2 = t2;
               accu = accu$0;
@@ -377,24 +371,24 @@ let ()  = M.run ()
       var
        odd =
          function(n){
-          if(2 < n >>> 0) return 1 - (1 - even$0(n - 1 | 0));
+          if(2 < n >>> 0) return 1 - ! even$0(n - 1 | 0);
           switch(n){
             case 0:
              return 0;
             case 1:
-             return 1 - (1 - even$0(0));
-            default: return 1 - (1 - even$0(1));
+             return 1 - ! even$0(0);
+            default: return 1 - ! even$0(1);
           }
          },
        even =
          function(n){
-          if(2 < n >>> 0) return 1 - (1 - odd$0(n - 1 | 0));
+          if(2 < n >>> 0) return 1 - ! odd$0(n - 1 | 0);
           switch(n){
             case 0:
              return 1;
             case 1:
-             return 1 - (1 - odd$0(0));
-            default: return 1 - (1 - odd$0(1));
+             return 1 - ! odd$0(0);
+            default: return 1 - ! odd$0(1);
           }
          };
       let odd$0 = odd, even$0 = even;
@@ -476,7 +470,7 @@ let ()  = M.run ()
       var
        odd =
          function(n){
-          if(2 < n >>> 0) return 1 - (1 - even$0(n - 1 | 0));
+          if(2 < n >>> 0) return 1 - ! even$0(n - 1 | 0);
           switch(n){
             case 0:
              var
@@ -485,13 +479,13 @@ let ()  = M.run ()
              f(0);
              return 0;
             case 1:
-             return 1 - (1 - even$0(0));
-            default: return 1 - (1 - even$0(1));
+             return 1 - ! even$0(0);
+            default: return 1 - ! even$0(1);
           }
          },
        even =
          function(n){
-          if(2 < n >>> 0) return 1 - (1 - odd$0(n - 1 | 0));
+          if(2 < n >>> 0) return 1 - ! odd$0(n - 1 | 0);
           switch(n){
             case 0:
              var
@@ -500,8 +494,8 @@ let ()  = M.run ()
              f(0);
              return 1;
             case 1:
-             return 1 - (1 - odd$0(0));
-            default: return 1 - (1 - odd$0(1));
+             return 1 - ! odd$0(0);
+            default: return 1 - ! odd$0(1);
           }
          };
       let odd$0 = odd, even$0 = even;

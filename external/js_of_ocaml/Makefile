@@ -7,10 +7,23 @@ tests:
 tests-wasm:
 	WASM_OF_OCAML=true dune build @runtest-wasm
 
+# Run the WebAssembly test suite with 63-bit integers (--enable portable-int)
+tests-wasm-portable-int:
+	WASM_OF_OCAML=true dune build @runtest-wasm --profile with-portable-int
+
 # Run the JS test suite using QuickJS-NG (`qjs`) in place of `node`.
 # Override the engine binary with JSOO_QUICKJS_BIN if `qjs` is not on PATH.
 tests-quickjs:
 	dune build @runtest @runtest-js --profile=quickjs
+
+# Run the test suites using bun in place of node (bun must be on PATH).
+tests-bun:
+	JSOO_ENGINE=bun dune build @runtest @runtest-js
+
+# bun (JavaScriptCore) exposes the JSPI API but does not actually switch
+# stacks, so the default (JSPI) effects mode cannot run there; use CPS effects.
+tests-bun-wasm:
+	JSOO_ENGINE=bun WASM_OF_OCAML=true dune build @runtest-wasm --profile with-effects
 
 # Validates the Babel downleveling recipe documented in
 # manual/browser-compat.wiki. Requires `npm install` at the repo root
@@ -30,8 +43,12 @@ test runtest runtests: tests
 # manual/*.mld and the API into _build/default/_doc/_html/; @doc-manual builds the
 # examples into _build/default/manual/files/. The themed ocsigen.org site is then
 # produced by `wodoc build` (see doc/README.md), which the CI runs and deploys.
+# Dune does not copy the images of the manual next to the odoc pages, so we do it
+# here to make _build/default/_doc/_html/js_of_ocaml/ viewable as is.
 doc:
 	dune build @doc @doc-manual
+	mkdir -p _build/default/_doc/_html/js_of_ocaml/files
+	cp -r manual/files/performances _build/default/_doc/_html/js_of_ocaml/files/
 
 promote:
 	dune promote
@@ -52,4 +69,4 @@ clean:
 bench:
 	$(MAKE) -C benchmarks bench
 
-.PHONY: all tests tests-wasm tests-quickjs test runtest runtests doc clean bench
+.PHONY: all tests tests-wasm tests-wasm-portable-int tests-quickjs tests-bun tests-bun-wasm test runtest runtests doc clean bench

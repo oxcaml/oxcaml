@@ -121,14 +121,23 @@ end
 
 type cont = Addr.t * Var.t list
 
+type field_type =
+  | Non_float
+  | Immediate  (** A field known to contain an immediate value *)
+  | Float
+
 type prim =
   | Vectlength of Optimization_hint.array_kind
-  | Array_get
+  | Array_get of field_type  (** [Non_float] or [Immediate], never [Float] *)
   | Extern of string * Optimization_hint.ccall option
   | Not
-  | IsInt
-  | Eq
-  | Neq
+  | IsInt of { variant_only : bool }
+      (** [variant_only]: the argument is a value of a variant type, whose
+          immediates are constant constructors *)
+  | Eq of { int_only : bool }
+      (** [int_only]: both arguments are integers (an integer equality test
+          rather than a physical comparison) *)
+  | Neq of { int_only : bool }
   | Lt
   | Le
   | Ult
@@ -137,6 +146,26 @@ type array_or_not =
   | Array
   | NotArray
   | Unknown
+
+(** Introspection metadata attached to a block: the reserved header bits
+    Introcaml associates to the block's descriptor (see [Introspect.Desc]). *)
+module Block_desc : sig
+  type t
+
+  val none : t
+  (** The block has no descriptor. *)
+
+  val is_none : t -> bool
+
+  val of_int : int -> t
+  (** From the reserved header bits, [0] meaning {!none}. *)
+
+  val to_int : t -> int
+
+  val equal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
 
 module Native_string : sig
   type t = private
@@ -155,16 +184,19 @@ type constant =
   | NativeString of Native_string.t
   | Float of Int64.t
   | Float32 of Int64.t
-  | Float_array of Int64.t array
+  | Float_array of Int64.t array * Block_desc.t
   | Int of Targetint.t
   | Int32 of Int32.t  (** Only produced when compiling to WebAssembly. *)
   | Int64 of Int64.t
   | NativeInt of Targetnativeint.t
-  | Tuple of int * constant array * array_or_not
+  | Tuple of int * constant array * array_or_not * Block_desc.t
   | Null_
 
 module Constant : sig
   type t = constant
+
+  val equal : t -> t -> bool
+  (** Structural equality; floats are compared bitwise *)
 
   val ocaml_equal : t -> t -> bool option
   (** Guaranteed equality in terms of OCaml [(=)]: if [constant_equal a b =
@@ -190,10 +222,6 @@ type mutability =
   | Immutable
   | Maybe_mutable
 
-type field_type =
-  | Non_float
-  | Float
-
 type yielding_kind =
   | Unyielding
   | May_yield
@@ -215,7 +243,7 @@ type expr =
            [Unknown] is used for calls emitted by passes that run after
            [Partial_cps_analysis], which fails if it encounters [Unknown]. *)
       }
-  | Block of int * Var.t array * array_or_not * mutability
+  | Block of int * Var.t array * array_or_not * mutability * Block_desc.t
   | Field of Var.t * int * field_type
   | Closure of
       Var.t list * cont * (Optimization_hint.closure_hint option * Parse_info.t option)
@@ -355,6 +383,10 @@ val traverse :
 
 val preorder_traverse :
   fold_blocs_poly -> (Addr.t -> 'c -> 'c) -> Addr.t -> block Addr.Map.t -> 'c -> 'c
+
+val raises_outside_handlers : block Addr.Map.t -> Addr.t -> bool
+(** Whether the code starting at [pc] (typically, a function body) may
+    execute a [Raise] outside of the body of an exception handler *)
 
 val last_instr : instr list -> instr option
 (** Last instruction of a block body, ignoring events *)

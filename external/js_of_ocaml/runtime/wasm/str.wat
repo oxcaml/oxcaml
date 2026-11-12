@@ -19,7 +19,7 @@
    (import "fail" "caml_invalid_argument"
       (func $caml_invalid_argument (param (ref eq))))
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "int_val_32_exn"
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
@@ -491,14 +491,20 @@
              (then
                 (local.set $j (i32.shl (local.get $i) (i32.const 1)))
                 (if (i32.or
-                       (i32.lt_s
+                       (i32.or
+                          (i32.lt_s
+                             (array.get $int_array (local.get $group_start)
+                                (local.get $i))
+                             (i32.const 0))
+                          (i32.lt_s
+                             (array.get $int_array (local.get $group_end)
+                                (local.get $i))
+                             (i32.const 0)))
+                       (i32.gt_s
                           (array.get $int_array (local.get $group_start)
                              (local.get $i))
-                          (i32.const 0))
-                       (i32.lt_s
                           (array.get $int_array (local.get $group_end)
-                             (local.get $i))
-                          (i32.const 0)))
+                             (local.get $i))))
                    (then
                       (array.set $block (local.get $res)
                          (i32.add (local.get $j) (i32.const 1))
@@ -523,17 +529,32 @@
       ;; reject
       (ref.i31 (i32.const 0)))
 
+   (func $get_startchars (param $vre (ref eq)) (result (ref null $bytes))
+      ;; table of the characters a match can start with, if any
+      (local $re (ref $block)) (local $i i32)
+      (local.set $re (ref.cast (ref $block) (local.get $vre)))
+      (local.set $i
+         (i31.get_s
+            (ref.cast (ref i31) (array.get $block (local.get $re) (i32.const 6)))))
+      (if (i32.lt_s (local.get $i) (i32.const 0))
+         (then (return (ref.null none))))
+      (ref.cast (ref $bytes)
+         (array.get $block
+            (ref.cast (ref $block)
+               (array.get $block (local.get $re) (i32.const 2)))
+            (i32.add (local.get $i) (i32.const 1)))))
+
    (@string $search_forward "Str.search_forward")
 
    (func (export "re_search_forward")
       (param $re (ref eq)) (param $vs (ref eq)) (param $vpos (ref eq))
       (result (ref eq))
-      ;; ZZZ startchars
       (local $s (ref $bytes))
       (local $pos i32) (local $len i32)
       (local $res (ref eq))
+      (local $startchars (ref null $bytes))
       (local.set $s (ref.cast (ref $bytes) (local.get $vs)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos (call $int_val_32_exn (local.get $vpos)
                             (global.get $search_forward))))
@@ -543,7 +564,20 @@
       (local.set $len (array.len (local.get $s)))
       (if (i32.gt_u (local.get $pos) (local.get $len))
          (then (call $caml_invalid_argument (global.get $search_forward))))
+      (local.set $startchars (call $get_startchars (local.get $re)))
       (loop $loop
+         (if (i32.eqz (ref.is_null (local.get $startchars)))
+            (then
+               (block $skipped
+                  (loop $skip
+                     (br_if $skipped
+                        (i32.ge_u (local.get $pos) (local.get $len)))
+                     (br_if $skipped
+                        (array.get_u $bytes (local.get $startchars)
+                           (array.get_u $bytes (local.get $s)
+                              (local.get $pos))))
+                     (local.set $pos (i32.add (local.get $pos) (i32.const 1)))
+                     (br $skip)))))
          (local.set $res
             (call $re_match
                (local.get $re) (local.get $s) (local.get $pos) (i32.const 0)))
@@ -559,12 +593,12 @@
    (func (export "re_search_backward")
       (param $re (ref eq)) (param $vs (ref eq)) (param $vpos (ref eq))
       (result (ref eq))
-      ;; ZZZ startchars
       (local $s (ref $bytes))
       (local $pos i32) (local $len i32)
       (local $res (ref eq))
+      (local $startchars (ref null $bytes))
       (local.set $s (ref.cast (ref $bytes) (local.get $vs)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos (call $int_val_32_exn (local.get $vpos)
                             (global.get $search_backward))))
@@ -575,7 +609,25 @@
       (if (i32.gt_u (local.get $pos) (local.get $len))
          (then
             (call $caml_invalid_argument (global.get $search_backward))))
+      (local.set $startchars (call $get_startchars (local.get $re)))
       (loop $loop
+         (if (i32.eqz (ref.is_null (local.get $startchars)))
+            (then
+               (block $skipped
+                  (loop $skip
+                     (br_if $skipped
+                        (i32.le_s (local.get $pos) (i32.const 0)))
+                     ;; a regexp with a startchars table needs at least one
+                     ;; character to match, so no match starts at the end
+                     ;; of the string
+                     (if (i32.lt_u (local.get $pos) (local.get $len))
+                        (then
+                           (br_if $skipped
+                              (array.get_u $bytes (local.get $startchars)
+                                 (array.get_u $bytes (local.get $s)
+                                    (local.get $pos))))))
+                     (local.set $pos (i32.sub (local.get $pos) (i32.const 1)))
+                     (br $skip)))))
          (local.set $res
             (call $re_match
                (local.get $re) (local.get $s) (local.get $pos) (i32.const 0)))
@@ -591,12 +643,11 @@
    (func (export "re_string_match")
       (param $re (ref eq)) (param $vs (ref eq)) (param $vpos (ref eq))
       (result (ref eq))
-      ;; ZZZ startchars
       (local $s (ref $bytes))
       (local $pos i32) (local $len i32)
       (local $res (ref eq))
       (local.set $s (ref.cast (ref $bytes) (local.get $vs)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos (call $int_val_32_exn (local.get $vpos)
                             (global.get $string_match))))
@@ -619,12 +670,11 @@
    (func (export "re_partial_match")
       (param $re (ref eq)) (param $vs (ref eq)) (param $vpos (ref eq))
       (result (ref eq))
-      ;; ZZZ startchars
       (local $s (ref $bytes))
       (local $pos i32) (local $len i32)
       (local $res (ref eq))
       (local.set $s (ref.cast (ref $bytes) (local.get $vs)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos (call $int_val_32_exn (local.get $vpos)
                             (global.get $string_partial_match))))
@@ -686,7 +736,9 @@
                (local.set $c (i32.shl (local.get $c) (i32.const 1)))
                (if (i32.ge_u (i32.add (local.get $c) (i32.const 1))
                       (array.len (local.get $groups)))
-                  (then (call $caml_failwith (global.get $unmatched_group))))
+                  (then
+                     (call $caml_failwith (global.get $unmatched_group))
+                     (unreachable)))
                (local.set $start
                   ;; [Str]'s own program data; see above.
                   ;; lint-ignore-start manual-portability-handling-unsafe
@@ -745,7 +797,9 @@
                (local.set $c (i32.shl (local.get $c) (i32.const 1)))
                (if (i32.ge_u (i32.add (local.get $c) (i32.const 1))
                       (array.len (local.get $groups)))
-                  (then (call $caml_failwith (global.get $unmatched_group))))
+                  (then
+                     (call $caml_failwith (global.get $unmatched_group))
+                     (unreachable)))
                (local.set $start
                   ;; [Str]'s own program data; see above.
                   ;; lint-ignore-start manual-portability-handling-unsafe

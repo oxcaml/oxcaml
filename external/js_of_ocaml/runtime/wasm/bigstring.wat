@@ -16,15 +16,17 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "int_val_32_exn"
          (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
       (import "portableint" "portable_int_val_31"
          (func $portable_int_val_31 (param (ref eq)) (result i32)))
    ))
-   (import "jslib" "wrap" (func $wrap (param anyref) (result (ref eq))))
-   (import "jslib" "unwrap" (func $unwrap (param (ref eq)) (result anyref)))
+   (import "jslib" "value_of_js"
+      (func $value_of_js (param externref) (result (ref eq))))
+   (import "jslib" "js_of_value"
+      (func $js_of_value (param (ref eq)) (result externref)))
    (import "jslib" "caml_js_get"
       (func $caml_js_get (param (ref eq)) (param (ref eq)) (result (ref eq))))
    (import "bigarray" "caml_ba_to_typed_array"
@@ -64,7 +66,7 @@
 )
 (@else
    (import "bindings" "ta_create"
-      (func $ta_create (param i32) (param anyref) (result anyref)))
+      (func $ta_create (param i32) (param externref) (result externref)))
    (import "bindings" "dv_get_i32"
       (func $dv_get_i32_unaligned (param externref i32 i32) (result i32)))
    (import "bindings" "dv_get_ui8"
@@ -77,7 +79,7 @@
    (import "bindings" "ta_set"
       (func $ta_set (param (ref extern)) (param (ref extern)) (param i32)))
    (import "bindings" "ta_bytes"
-      (func $ta_bytes (param anyref) (result anyref)))
+      (func $ta_bytes (param externref) (result externref)))
 ))
    (import "hash" "caml_hash_mix_int"
       (func $caml_hash_mix_int (param i32) (param i32) (result i32)))
@@ -85,7 +87,7 @@
    (type $bytes (array (mut i8)))
 
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "val_int_32"
          (func $val_int_32 (param i32) (result (ref eq))))
@@ -151,12 +153,12 @@
 
    (func (export "bigstring_of_array_buffer") (param $v (ref eq)) (result (ref eq))
        (return_call $caml_ba_char_of_typed_array
-          (call $wrap
-             (call $ta_create (i32.const 12) (call $unwrap (local.get $v))))))
+          (call $value_of_js
+             (call $ta_create (i32.const 12) (call $js_of_value (local.get $v))))))
 
    (func (export "bigstring_of_typed_array") (param $v (ref eq)) (result (ref eq))
        (return_call $caml_ba_char_of_typed_array
-          (call $wrap (call $ta_bytes (call $unwrap (local.get $v))))))
+          (call $value_of_js (call $ta_bytes (call $js_of_value (local.get $v))))))
 ))
 
    (func (export "caml_bigstring_memset")
@@ -175,7 +177,7 @@
       (local $v1 (ref extern)) (local $v2 (ref extern))
       (local $w1 i32) (local $w2 i32) (local $xored i32)
       (local.set $v1 (call $caml_ba_get_view (local.get $s1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos1
             (call $int_val_32_exn (local.get $vpos1) (global.get $bigstring_pos))))
@@ -183,14 +185,14 @@
       (local.set $pos1 (i31.get_s (ref.cast (ref i31) (local.get $vpos1))))
       ))
       (local.set $v2 (call $caml_ba_get_view (local.get $s2)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos2
             (call $int_val_32_exn (local.get $vpos2) (global.get $bigstring_pos))))
       (@else
       (local.set $pos2 (i31.get_s (ref.cast (ref i31) (local.get $vpos2))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len
             (call $int_val_32_exn (local.get $vlen) (global.get $bigstring_len))))
@@ -281,7 +283,7 @@
       (local $s2 (ref $bytes))
       (local $w1 i32) (local $w2 i32) (local $xored i32) (local $j i32)
       (local.set $v1 (call $caml_ba_get_view (local.get $s1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos1
             (call $int_val_32_exn (local.get $vpos1) (global.get $bigstring_pos))))
@@ -289,14 +291,14 @@
       (local.set $pos1 (i31.get_s (ref.cast (ref i31) (local.get $vpos1))))
       ))
       (local.set $s2 (ref.cast (ref $bytes) (local.get $vs2)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos2
             (call $int_val_32_exn (local.get $vpos2) (global.get $bigstring_pos))))
       (@else
       (local.set $pos2 (i31.get_s (ref.cast (ref i31) (local.get $vpos2))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len
             (call $int_val_32_exn (local.get $vlen) (global.get $bigstring_len))))
@@ -399,7 +401,7 @@
       (local $pos i32) (local $len i32) (local $c i32)
       (local $v (ref extern))
       (local $mask i32) (local $word i32) (local $xored i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $c (call $portable_int_val_31 (local.get $vc)))
          (local.set $pos
@@ -462,7 +464,7 @@
       (local $pos i32) (local $len i32) (local $c i32) (local $cur i32)
       (local $v (ref extern))
       (local $mask i32) (local $word i32) (local $xored i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $c (call $portable_int_val_31 (local.get $vc)))
          (local.set $pos
@@ -544,21 +546,21 @@
 
       (local.set $v1 (call $caml_ba_get_view (local.get $vs1)))
       (local.set $v2 (call $caml_ba_get_view (local.get $vs2)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos1
             (call $int_val_32_exn (local.get $vpos1) (global.get $bigstring_pos))))
       (@else
       (local.set $pos1 (i31.get_s (ref.cast (ref i31) (local.get $vpos1))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos2
             (call $int_val_32_exn (local.get $vpos2) (global.get $bigstring_pos))))
       (@else
       (local.set $pos2 (i31.get_s (ref.cast (ref i31) (local.get $vpos2))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len
             (call $int_val_32_exn (local.get $vlen) (global.get $bigstring_len))))
@@ -671,7 +673,7 @@
       (local $s1 (ref $bytes))
       (local $d2 (ref extern))
       (local.set $s1 (ref.cast (ref $bytes) (local.get $str1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos1
             (call $int_val_32_exn (local.get $vpos1) (global.get $bigstring_pos))))
@@ -679,14 +681,14 @@
       (local.set $pos1 (i31.get_s (ref.cast (ref i31) (local.get $vpos1))))
       ))
       (local.set $d2 (call $caml_ba_get_view (local.get $ba2)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos2
             (call $int_val_32_exn (local.get $vpos2) (global.get $bigstring_pos))))
       (@else
       (local.set $pos2 (i31.get_s (ref.cast (ref i31) (local.get $vpos2))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len
             (call $int_val_32_exn (local.get $vlen) (global.get $bigstring_len))))
@@ -707,7 +709,7 @@
       (local $d1 (ref extern))
       (local $s2 (ref $bytes))
       (local.set $d1 (call $caml_ba_get_view (local.get $ba1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos1
             (call $int_val_32_exn (local.get $vpos1) (global.get $bigstring_pos))))
@@ -715,14 +717,14 @@
       (local.set $pos1 (i31.get_s (ref.cast (ref i31) (local.get $vpos1))))
       ))
       (local.set $s2 (ref.cast (ref $bytes) (local.get $str2)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos2
             (call $int_val_32_exn (local.get $vpos2) (global.get $bigstring_pos))))
       (@else
       (local.set $pos2 (i31.get_s (ref.cast (ref i31) (local.get $vpos2))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len
             (call $int_val_32_exn (local.get $vlen) (global.get $bigstring_len))))
@@ -743,7 +745,7 @@
       (local $d1 (ref extern))
       (local $d2 (ref extern))
       (local.set $d1 (call $caml_ba_get_data (local.get $ba1)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos1
             (call $int_val_32_exn (local.get $vpos1) (global.get $bigstring_pos))))
@@ -751,14 +753,14 @@
       (local.set $pos1 (i31.get_s (ref.cast (ref i31) (local.get $vpos1))))
       ))
       (local.set $d2 (call $caml_ba_get_data (local.get $ba2)))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $pos2
             (call $int_val_32_exn (local.get $vpos2) (global.get $bigstring_pos))))
       (@else
       (local.set $pos2 (i31.get_s (ref.cast (ref i31) (local.get $vpos2))))
       ))
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $len
             (call $int_val_32_exn (local.get $vlen) (global.get $bigstring_len))))

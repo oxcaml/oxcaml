@@ -43,7 +43,7 @@ type context =
   ; string_globals : Var.t String.Hashtbl.t
   ; mutable constant_globals : constant_global Var.Map.t
   ; mutable other_fields : W.module_field list
-  ; mutable imports : (Var.t * Wasm_ast.import_desc) StringMap.t StringMap.t
+  ; mutable imports : (Var.t * Wasm_ast.import_desc) list StringMap.t StringMap.t
   ; type_names : Var.t String.Hashtbl.t
   ; types : Wasm_ast.type_field Var.Hashtbl.t
   ; mutable closure_envs : Var.t Var.Map.t
@@ -53,6 +53,9 @@ type context =
   ; mutable cps_apply_funs : Var.t IntMap.t
   ; mutable curry_funs : Var.t IntMap.t
   ; mutable cps_curry_funs : Var.t IntMap.t
+  ; mutable pair_curry_funs : (Var.t * Var.t) IntMap.t
+        (** Double translation: curry functions for the functions with a CPS
+            version (direct-style and CPS versions) *)
   ; mutable dummy_funs : Var.t IntMap.t
   ; mutable cps_dummy_funs : Var.t IntMap.t
   ; mutable init_code : W.instruction list
@@ -61,6 +64,13 @@ type context =
   ; value_type : W.value_type
   ; mutable unit_name : string option
   ; mutable no_tail_call : unit Var.Hashtbl.t
+  ; mutable wasm_opt : bool
+        (** Whether wasm-opt will optimize the generated code (see
+            [Binaryen.optimizes]): the optimizations which only redo
+            what it does are then skipped *)
+  ; functions_without_env : unit Var.Hashtbl.t
+        (** Functions which take no environment parameter: their closure
+            is a constant, and they are only called directly *)
   }
 
 let make_context ~value_type =
@@ -78,6 +88,7 @@ let make_context ~value_type =
   ; cps_apply_funs = IntMap.empty
   ; curry_funs = IntMap.empty
   ; cps_curry_funs = IntMap.empty
+  ; pair_curry_funs = IntMap.empty
   ; dummy_funs = IntMap.empty
   ; cps_dummy_funs = IntMap.empty
   ; init_code = []
@@ -86,6 +97,8 @@ let make_context ~value_type =
   ; value_type
   ; unit_name = None
   ; no_tail_call = Var.Hashtbl.create 16
+  ; wasm_opt = false
+  ; functions_without_env = Var.Hashtbl.create 128
   }
 
 type var =
@@ -248,26 +261,24 @@ let register_import ?(allow_tail_call = true) ?(import_module = "env") ~name typ
         "caml_nat_dynlink_dummy_function"
     | _ -> name
   in
+  (* The same name can be imported with several types *)
+  let imports =
+    Option.value
+      ~default:StringMap.empty
+      (StringMap.find_opt import_module st.context.imports)
+  in
+  let l = Option.value ~default:[] (StringMap.find_opt name imports) in
   let x =
-    try
-      let x, typ' =
-        StringMap.find name (StringMap.find import_module st.context.imports)
-      in
-      (*ZZZ error message*)
-      assert (Poly.equal typ typ');
-      x
-    with Not_found ->
-      let x = Var.fresh_n name in
-      st.context.imports <-
-        StringMap.update
-          import_module
-          (fun m ->
-            Some
-              (match m with
-              | None -> StringMap.singleton name (x, typ)
-              | Some m -> StringMap.add name (x, typ) m))
-          st.context.imports;
-      x
+    match List.find_opt ~f:(fun (_, typ') -> Poly.equal typ typ') l with
+    | Some (x, _) -> x
+    | None ->
+        let x = Var.fresh_n name in
+        st.context.imports <-
+          StringMap.add
+            import_module
+            (StringMap.add name ((x, typ) :: l) imports)
+            st.context.imports;
+        x
   in
   if not allow_tail_call then Var.Hashtbl.replace st.context.no_tail_call x ();
   x, st
@@ -401,7 +412,16 @@ module Arith = struct
 
   let ( asr ) = binary (Shr S)
 
-  let ( land ) = binary And
+  let ( land ) e e' =
+    let* e = e in
+    let* e' = e' in
+    return
+      (match e, e' with
+      (* [i31.get_s] and [i31.get_u] only differ by the top bit. V8
+         implements [i31.get_u] with a single logical shift. *)
+      | W.I31Get (S, e1), W.Const (I32 0x7fffffffl)
+      | W.Const (I32 0x7fffffffl), W.I31Get (S, e1) -> W.I31Get (U, e1)
+      | _ -> W.BinOp (I32 And, e, e'))
 
   let ( lor ) = binary Or
 
@@ -429,7 +449,7 @@ module Arith = struct
     | W.I31Get (S, n') -> return n'
     | _ -> return (W.RefI31 n)
 
-  let wrap31 n = Targetint.(of_int32_truncate n |> to_int32)
+  let wrap31 n = Int32.(shift_right (shift_left n 1) 1)
 
   let of_int31 n =
     let* n = n in
@@ -565,6 +585,11 @@ module Arith64 = struct
     let* e = e in
     let* e' = e' in
     return (W.BinOp (I64 (Lt U), e, e'))
+
+  let ule_i32 e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 (Le U), e, e'))
 
   let uge_i32 e e' =
     let* e = e in
@@ -850,13 +875,6 @@ let rec store ?(always = false) ?typ x e =
           let* i = add_var ?typ x in
           instr (LocalSet (i, e))
 
-let assign x e =
-  let* x = var x in
-  let* e = e in
-  match x with
-  | Local (_, x, _) -> instr (W.LocalSet (x, e))
-  | Expr _ -> assert false
-
 let seq l e =
   let* instrs = blk l in
   let* e = e in
@@ -941,6 +959,19 @@ let need_curry_fun ~cps ~arity st =
            x)
   , st )
 
+let need_pair_curry_fun ~arity st =
+  let ctx = st.context in
+  ( (match IntMap.find_opt arity ctx.pair_curry_funs with
+    | Some x -> x
+    | None ->
+        let x =
+          ( Var.fresh_n (Printf.sprintf "pair_curry_%d" arity)
+          , Var.fresh_n (Printf.sprintf "cps_pair_curry_%d" arity) )
+        in
+        ctx.pair_curry_funs <- IntMap.add arity x ctx.pair_curry_funs;
+        x)
+  , st )
+
 let need_dummy_fun ~cps ~arity st =
   let ctx = st.context in
   ( (if cps
@@ -960,7 +991,7 @@ let need_dummy_fun ~cps ~arity st =
            x)
   , st )
 
-let function_body ~context ~param_names ~body =
+let function_body ~context ~return_exn ~param_names ~body =
   let st = { var_count = 0; vars = Var.Map.empty; instrs = []; context } in
   let (), st = body st in
   let local_count, body = st.var_count, List.rev st.instrs in
@@ -972,7 +1003,7 @@ let function_body ~context ~param_names ~body =
       | Local (i, x, typ) -> local_types.(i) <- x, typ
       | Expr _ -> ())
     st.vars;
-  let body = Tail_call.f ~no_tail_call:context.no_tail_call body in
+  let body = Tail_call.f ~return_exn ~no_tail_call:context.no_tail_call body in
   let param_count = List.length param_names in
   let locals =
     local_types

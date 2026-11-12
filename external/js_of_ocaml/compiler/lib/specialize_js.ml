@@ -110,13 +110,13 @@ let specialize_instr opt_count ~target info i =
       try
         let a =
           match the_def_of info a with
-          | Some (Block (_, a, _, _)) -> a
+          | Some (Block (_, a, _, _, _)) -> a
           | _ -> raise Exit
         in
         let a =
           Array.map a ~f:(fun x ->
               match the_def_of info (Pv x) with
-              | Some (Block (_, [| k; v |], _, _)) ->
+              | Some (Block (_, [| k; v |], _, _, _)) ->
                   let k =
                     match the_string_of info (Pv k) with
                     | Some s when String.is_valid_utf_8 s ->
@@ -124,7 +124,7 @@ let specialize_instr opt_count ~target info i =
                     | Some _ | None -> raise Exit
                   in
                   [ k; Pv v ]
-              | Some (Constant (Tuple (0, [| String k; v |], (NotArray | Unknown))))
+              | Some (Constant (Tuple (0, [| String k; v |], (NotArray | Unknown), _)))
                 when String.is_valid_utf_8 k ->
                   [ Pc (NativeString (Native_string.of_string k)); Pc v ]
               | Some _ | None -> raise Exit)
@@ -377,7 +377,7 @@ let specialize_instrs ~target opt_count info l =
                        | "caml_array_get_float"
                        | "caml_floatarray_get"
                        | "caml_array_get_addr" ) as prim)
-                    , _ )
+                    , hint )
                 , [ Pv y; z ] ) ) ->
             let idx =
               match the_int info z with
@@ -393,7 +393,11 @@ let specialize_instrs ~target opt_count info l =
                 | "caml_array_get" -> Extern ("caml_array_unsafe_get", None)
                 | "caml_array_get_float" | "caml_floatarray_get" ->
                     Extern ("caml_floatarray_unsafe_get", None)
-                | "caml_array_get_addr" -> Array_get
+                | "caml_array_get_addr" -> (
+                    match hint with
+                    | Some Hint_immediate_result -> Array_get Immediate
+                    | Some (Hint_unsafe | Hint_int _ | Hint_bigarray _ | Hint_primitive _)
+                    | None -> Array_get Non_float)
                 | _ -> assert false
               in
               Let (x, Prim (prim, [ Pv y; z ]))

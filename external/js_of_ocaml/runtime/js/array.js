@@ -17,6 +17,37 @@
 
 ///////////// Array
 
+// As in OCaml, arrays have at most Max_wosize elements, and float arrays
+// half as many (Sys.max_array_length and Sys.max_floatarray_length).
+// Every function which creates an array of arbitrary length checks this
+// bound.
+
+//Provides: caml_max_array_length const
+var caml_max_array_length = 0x1fffffff;
+
+//Provides: caml_max_float_array_length const
+var caml_max_float_array_length = 0xfffffff;
+
+//Provides: caml_check_array_length
+//Requires: caml_max_array_length, caml_raise_out_of_memory
+function caml_check_array_length(len) {
+  if (len >>> 0 > caml_max_array_length) caml_raise_out_of_memory();
+}
+
+//Provides: caml_check_float_array_length
+//Requires: caml_max_float_array_length, caml_raise_out_of_memory
+function caml_check_float_array_length(len) {
+  if (len >>> 0 > caml_max_float_array_length) caml_raise_out_of_memory();
+}
+
+//Provides: caml_check_concat_length
+//Requires: caml_max_array_length, caml_max_float_array_length
+//Requires: caml_invalid_argument
+function caml_check_concat_length(len, isfloat) {
+  if (len > (isfloat ? caml_max_float_array_length : caml_max_array_length))
+    caml_invalid_argument("Array.concat");
+}
+
 //Provides: caml_array_sub mutator
 //Alias: caml_array_sub_local
 function caml_array_sub(a, i, len) {
@@ -32,6 +63,7 @@ function caml_array_sub(a, i, len) {
 //Requires: caml_array_sub
 //Version: >= 5.3
 function caml_floatarray_sub(a, i, len) {
+  if (len === 0) return [0];
   var r = caml_array_sub(a, i, len);
   r[0] = 254;
   return r;
@@ -61,11 +93,13 @@ function caml_uniform_array_sub_local(a, i, len) {
 }
 
 //Provides: caml_array_append mutable
+//Requires: caml_check_concat_length
 //Alias: caml_array_append_local
 function caml_array_append(a1, a2) {
   var l1 = a1.length,
     l2 = a2.length;
   var l = l1 + l2 - 1;
+  caml_check_concat_length(l - 1, TAG(a1) === 254 || TAG(a2) === 254);
   var a = new Array(l);
   a[0] = 0;
   var i = 1,
@@ -80,7 +114,7 @@ function caml_array_append(a1, a2) {
 //Version: >= 5.3
 function caml_floatarray_append(a1, a2) {
   var r = caml_array_append(a1, a2);
-  r[0] = 254;
+  if (r.length > 1) r[0] = 254;
   return r;
 }
 
@@ -108,8 +142,17 @@ function caml_uniform_array_append_local(a1, a2) {
 }
 
 //Provides: caml_array_concat mutable
+//Requires: caml_check_concat_length
 //Alias: caml_array_concat_local
 function caml_array_concat(l) {
+  var len = 0,
+    isfloat = false;
+  for (var l0 = l; l0 !== 0; l0 = l0[2]) {
+    var b = l0[1];
+    len += b.length - 1;
+    if (TAG(b) === 254) isfloat = true;
+  }
+  caml_check_concat_length(len, isfloat);
   var a = [0];
   while (l !== 0) {
     var b = l[1];
@@ -124,7 +167,7 @@ function caml_array_concat(l) {
 //Version: >= 5.4
 function caml_floatarray_concat(l) {
   var r = caml_array_concat(l);
-  r[0] = 254;
+  if (r.length > 1) r[0] = 254;
   return r;
 }
 
@@ -137,8 +180,12 @@ function caml_floatarray_concat_local(l) {
 }
 
 //Provides: caml_uniform_array_concat mutable
+//Requires: caml_check_concat_length
 //Version: >= 5.4
 function caml_uniform_array_concat(l) {
+  var len = 0;
+  for (var l0 = l; l0 !== 0; l0 = l0[2]) len += l0[1].length - 1;
+  caml_check_concat_length(len, false);
   var a = [0];
   while (l !== 0) {
     var b = l[1];
@@ -240,9 +287,9 @@ function caml_check_bound(array, index) {
 }
 
 //Provides: caml_array_make mutator (const, mutable)
-//Requires: caml_invalid_argument
+//Requires: caml_invalid_argument, caml_max_array_length
 function caml_array_make(len, init) {
-  if (len >>> 0 >= ((0x7fffffff / 4) | 0)) caml_invalid_argument("Array.make");
+  if (len >>> 0 > caml_max_array_length) caml_invalid_argument("Array.make");
   var len = (len + 1) | 0;
   var b = new Array(len);
   b[0] = 0;
@@ -257,49 +304,53 @@ function caml_make_vect(len, init) {
 }
 
 //Provides: caml_make_float_vect mutator (const)
-//Requires: caml_array_bound_error
+//Requires: caml_invalid_argument, caml_max_float_array_length
 function caml_make_float_vect(len) {
-  if (len >>> 0 >= ((0x7fffffff / 8) | 0)) caml_array_bound_error();
+  if (len >>> 0 > caml_max_float_array_length)
+    caml_invalid_argument("Float.Array.create");
   var len = (len + 1) | 0;
   var b = new Array(len);
-  b[0] = 254;
+  b[0] = len > 1 ? 254 : 0;
   for (var i = 1; i < len; i++) b[i] = 0;
   return b;
 }
 
 //Provides: caml_array_create_float mutator (const)
-//Requires: caml_array_bound_error
+//Requires: caml_invalid_argument, caml_max_float_array_length
 //Version: >= 5.3
 function caml_array_create_float(len) {
-  if (len >>> 0 >= ((0x7fffffff / 8) | 0)) caml_array_bound_error();
+  if (len >>> 0 > caml_max_float_array_length)
+    caml_invalid_argument("Float.Array.create");
   var len = (len + 1) | 0;
   var b = new Array(len);
-  b[0] = 254;
+  b[0] = len > 1 ? 254 : 0;
   for (var i = 1; i < len; i++) b[i] = 0;
   return b;
 }
 
 //Provides: caml_array_create_float mutator (const)
-//Requires: caml_array_bound_error
+//Requires: caml_invalid_argument, caml_max_float_array_length
 //Version: >= 5.2, < 5.3
 //If: oxcaml
 function caml_array_create_float(len) {
-  if (len >>> 0 >= ((0x7fffffff / 8) | 0)) caml_array_bound_error();
+  if (len >>> 0 > caml_max_float_array_length)
+    caml_invalid_argument("Float.Array.create");
   var len = (len + 1) | 0;
   var b = new Array(len);
-  b[0] = 254;
+  b[0] = len > 1 ? 254 : 0;
   for (var i = 1; i < len; i++) b[i] = 0;
   return b;
 }
 
 //Provides: caml_floatarray_create mutator (const)
-//Requires: caml_array_bound_error
+//Requires: caml_invalid_argument, caml_max_float_array_length
 //Alias: caml_floatarray_create_local
 function caml_floatarray_create(len) {
-  if (len >>> 0 >= ((0x7fffffff / 8) | 0)) caml_array_bound_error();
+  if (len >>> 0 > caml_max_float_array_length)
+    caml_invalid_argument("Float.Array.create");
   var len = (len + 1) | 0;
   var b = new Array(len);
-  b[0] = 254;
+  b[0] = len > 1 ? 254 : 0;
   for (var i = 1; i < len; i++) b[i] = 0;
   return b;
 }
@@ -341,13 +392,14 @@ function caml_make_unboxed_int64_vect_bytecode(len) {
 }
 
 //Provides: caml_floatarray_make mutator (const)
-//Requires: caml_array_bound_error
+//Requires: caml_invalid_argument, caml_max_float_array_length
 //Version: >= 5.3
 function caml_floatarray_make(len, init) {
-  if (len >>> 0 >= ((0x7fffffff / 8) | 0)) caml_array_bound_error();
+  if (len >>> 0 > caml_max_float_array_length)
+    caml_invalid_argument("Array.make");
   var len = (len + 1) | 0;
   var b = new Array(len);
-  b[0] = 254;
+  b[0] = len > 1 ? 254 : 0;
   for (var i = 1; i < len; i++) b[i] = init;
   return b;
 }

@@ -21,7 +21,7 @@
       (func $caml_invalid_argument (param (ref eq))))
    (import "fail" "caml_raise_zero_divide" (func $caml_raise_zero_divide))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "int64" "caml_int64_format"
          (func $caml_int64_format (param (ref eq)) (param (ref eq)) (result (ref eq))))
@@ -39,7 +39,7 @@
 
    (type $bytes (array (mut i8)))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "caml_format_int")
          (param $v (ref eq)) (param $n (ref eq)) (result (ref eq))
@@ -121,14 +121,11 @@
       (local.get $base))
 
    (func $parse_digit (export "parse_digit") (param $c i32) (result i32)
-      (if (i32.and (i32.ge_u (local.get $c) (@char "0"))
-                   (i32.le_u (local.get $c) (@char "9")))
+      (if (i32.lt_u (i32.sub (local.get $c) (@char "0")) (i32.const 10))
          (then (return (i32.sub (local.get $c) (@char "0")))))
-      (if (i32.and (i32.ge_u (local.get $c) (@char "A"))
-                   (i32.le_u (local.get $c) (@char "Z")))
+      (if (i32.lt_u (i32.sub (local.get $c) (@char "A")) (i32.const 26))
          (then (return (i32.sub (local.get $c) (i32.const 55)))))
-      (if (i32.and (i32.ge_u (local.get $c) (@char "a"))
-                   (i32.le_u (local.get $c) (@char "z")))
+      (if (i32.lt_u (i32.sub (local.get $c) (@char "a")) (i32.const 26))
          (then (return (i32.sub (local.get $c) (i32.const 87)))))
       (return (i32.const -1)))
 
@@ -150,7 +147,7 @@
       (local.set $i)
       (local.set $threshold (i32.div_u (i32.const -1) (local.get $base)))
       (if (i32.ge_s (local.get $i) (local.get $len))
-         (then (call $caml_failwith (local.get $errmsg))))
+         (then (call $caml_failwith (local.get $errmsg)) (unreachable)))
       (local.set $d
          (call $parse_digit (array.get_u $bytes (local.get $s) (local.get $i))))
       (if (i32.ge_u (local.get $d) (local.get $base))
@@ -197,7 +194,7 @@
 
    (@string $INT_ERRMSG "int_of_string")
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (func (export "caml_int_of_string")
          (param $v (ref eq)) (result (ref eq))
@@ -266,7 +263,7 @@
 
    (func (export "caml_bswap16") (param $vx (ref eq)) (result (ref eq))
       (local $x i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
          (local.set $x (i32.wrap_i64 (call $portable_int_val (local.get $vx)))))
       (@else
@@ -283,7 +280,7 @@
       (local $y i64)
       (local $x32 i32)
       (local $y32 i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
         (local.set $x (call $portable_int_val (local.get 0)))
         (local.set $x (i64.shr_u (i64.shl (local.get $x) (i64.const 1)) (i64.const 1)))
@@ -302,7 +299,7 @@
       (local $y i64)
       (local $x32 i32)
       (local $y32 i32)
-      (@if $portable-int
+      (@if $portable_int
       (@then
         (local.set $x (call $portable_int_val (local.get 0)))
         (local.set $x (i64.shr_u (i64.shl (local.get $x) (i64.const 1)) (i64.const 1)))

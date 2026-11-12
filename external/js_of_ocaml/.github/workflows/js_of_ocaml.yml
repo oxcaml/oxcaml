@@ -19,7 +19,8 @@ jobs:
       OXCAML_OPAM_REPO_REF: d89747aa6e7b9f44d6cc844dca5b5e7c8a90716f
 
     strategy:
-      fail-fast: false
+      # On pull requests, free the runners as soon as a job fails
+      fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
         # 4.14 and 5.5 are tested on all three OSes; build-only compiler
         # coverage lives in the build workflow.
@@ -61,6 +62,10 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    # OCaml trunk moves under our feet: a failure there should neither
+    # cancel the other jobs (fail-fast) nor fail the workflow
+    continue-on-error: ${{ matrix.ocaml-name == '5.6+trunk' }}
+
     name:
        ${{ matrix.ocaml-name != '' && matrix.ocaml-name || matrix.ocaml-compiler}} / ${{ matrix.os-name }} / Tests${{ (startsWith(matrix.ocaml-compiler, '5.') || startsWith(matrix.ocaml-compiler, 'ocaml-variants.5.')) && ' / Effects' || ''}}${{ (matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.5') && ' / Docs' || ''}}
 
@@ -89,7 +94,7 @@ jobs:
       - name: Set-up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: latest
+          node-version: 26
 
       - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v3
@@ -120,6 +125,10 @@ jobs:
         uses: Aandreba/setup-binaryen@v1.0.0
         with:
           token: ${{ github.token }}
+
+      - name: Pin sedlex 3.8.1 (OxCaml)
+        if: ${{ endsWith(matrix.ocaml-compiler, '+ox') }}
+        run: tools/ci_pin_sedlex_oxcaml.sh
 
       - run: opam install . --deps-only --with-test
         # Install the test dependencies

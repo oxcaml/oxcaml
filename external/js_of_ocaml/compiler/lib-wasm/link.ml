@@ -511,11 +511,13 @@ let report_missing_primitives missing =
   then
     Warning.warn
       `Missing_primitive
-      "There are some missing Wasm primitives\n\
-       Dummy implementations (raising an exception) will be provided.\n\
-       Missing primitives:\n\
+      "There are some missing Wasm primitives@\n\
+       Dummy implementations (raising an exception) will be provided.@\n\
+       Missing primitives:@\n\
        %a"
-      (Format.pp_print_list Format.pp_print_string)
+      (Format.pp_print_list
+         ~pp_sep:(fun _ () -> ())
+         (fun f nm -> Format.fprintf f "  %s@\n" nm))
       missing
 
 let build_runtime_arguments
@@ -644,8 +646,7 @@ let build_runtime_arguments
     match Config.effects () with
     | `Jspi -> ("enable_jspi", Javascript.EBool true) :: props
     | `Native -> ("native_effects", Javascript.EBool true) :: props
-    | `Disabled | `Cps -> props
-    | `Double_translation -> assert false
+    | `Disabled | `Cps | `Double_translation -> props
   in
   let props =
     if List.is_empty embedded_files
@@ -1185,7 +1186,7 @@ let make_library ~linkall ~output_file ~enable_source_maps ~files =
       ~output_file:tmp_wasm_file
   in
   Zip.add_file z ~name:"code.wasm" ~file:tmp_wasm_file;
-  if enable_source_maps then add_source_map files z output_sourcemap;
+  if enable_source_maps then add_source_map files z output_sourcemap.source_map;
   Zip.close_out z
 
 let link ~output_file ~linkall ~mklib ~enable_source_maps ~embedded_files ~files =

@@ -38,7 +38,7 @@ let common_options () =
     ; "--enable-bulk-memory"
     ; "--enable-nontrapping-float-to-int"
     ; "--enable-strings"
-    ; "--enable-multimemory" (* To keep wasm-merge happy *)
+    ; "--enable-multimemory"
     ]
   in
   let l =
@@ -61,71 +61,9 @@ type link_input =
   ; source_map_file : string option
   }
 
-let link ?options ~inputs ~opt_output_sourcemap ~output_file () =
-  command
-    ("wasm-merge"
-    :: (common_options ()
-       @ Option.value ~default:[] options
-       @ List.flatten
-           (List.map
-              ~f:(fun { file; module_name; source_map_file } ->
-                Filename.quote file
-                :: module_name
-                ::
-                (match source_map_file with
-                | None -> []
-                | Some file -> [ "--input-source-map"; Filename.quote file ]))
-              inputs)
-       @ [ "-o"; Filename.quote output_file ]
-       @ opt_flag "--output-source-map" opt_output_sourcemap))
-
-let generate_dependencies ~dependencies primitives =
-  Yojson.Basic.to_string
-    (`List
-       (StringSet.fold
-          (fun nm s ->
-            `Assoc
-              [ "name", `String ("js:" ^ nm)
-              ; "import", `List [ `String "js"; `String nm ]
-              ]
-            :: s)
-          primitives
-          (Yojson.Basic.Util.to_list (Yojson.Basic.from_string dependencies))))
-
-let filter_unused_primitives primitives usage_file =
-  let ch = open_in_bin usage_file in
-  let s = ref primitives in
-  (try
-     while true do
-       let l = input_line ch in
-       match String.drop_prefix ~prefix:"unused: js:" l with
-       | Some nm -> s := StringSet.remove (String.trim nm) !s
-       | None -> ()
-     done
-   with End_of_file -> ());
-  !s
-
-let dead_code_elimination
-    ~dependencies
-    ~opt_input_sourcemap
-    ~input_file
-    ~opt_output_sourcemap
-    ~output_file =
-  Fs.with_intermediate_file (Filename.temp_file "deps" ".json")
-  @@ fun deps_file ->
-  Fs.with_intermediate_file (Filename.temp_file "usage" ".txt")
-  @@ fun usage_file ->
-  let primitives = Linker.list_all () in
-  Fs.write_file ~name:deps_file ~contents:(generate_dependencies ~dependencies primitives);
-  command
-    ("wasm-metadce"
-    :: (common_options ()
-       @ [ "--graph-file"; Filename.quote deps_file; Filename.quote input_file ]
-       @ opt_flag "--input-source-map" opt_input_sourcemap
-       @ [ "-o"; Filename.quote output_file ]
-       @ opt_flag "--output-source-map" opt_output_sourcemap
-       @ [ ">"; Filename.quote usage_file ]));
-  filter_unused_primitives primitives usage_file
+let optimizes : Profile.t -> bool = function
+  | O1 -> false
+  | O2 | O3 -> true
 
 let optimization_options : Profile.t -> _ = function
   | O1 -> [ "-O2"; "--skip-pass=inlining-optimizing"; "--traps-never-happen" ]
@@ -135,22 +73,24 @@ let optimization_options : Profile.t -> _ = function
 let optimize
     ~profile
     ?options
+    ?(reorder_functions = false)
     ~opt_input_sourcemap
     ~input_file
     ~opt_output_sourcemap
     ~output_file
     () =
   command
-    (* [--emit-exnref] is needed even though [Wasm_output] and
-       [Wat_output] now emit [try_table] directly when targeting WASI:
-       the runtime [.wat] files still use the legacy [try]/[catch] syntax,
-       and this flag converts them to [try_table] so the whole output is
+    (* [Wasm_output] and [Wat_output] emit [try_table] directly when
+       targeting WASI, and so does Wax when assembling the runtime files;
+       [--emit-exnref] converts any remaining legacy [try]/[catch] (from
+       runtime modules provided in binary form) so the whole output is
        uniformly in the new form. *)
     (("wasm-opt" :: (if Config.Flag.wasi () then [ "--emit-exnref" ] else []))
     @ common_options ()
     @ (match options with
       | Some o -> o
       | None -> optimization_options profile)
+    @ (if reorder_functions then [ "--reorder-functions" ] else [])
     @ [ Filename.quote input_file; "-o"; Filename.quote output_file ]
     @ opt_flag "--input-source-map" opt_input_sourcemap
     @ opt_flag "--output-source-map" opt_output_sourcemap)

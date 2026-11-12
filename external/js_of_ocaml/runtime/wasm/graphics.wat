@@ -16,7 +16,7 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "portableint" "portable_int_val_32"
          (func $portable_int_val_32 (param (ref eq)) (result i32)))
@@ -31,22 +31,24 @@
       (func $caml_raise_with_arg (param (ref eq)) (param (ref eq))))
    (import "stdlib" "caml_named_value"
       (func $caml_named_value (param (ref eq)) (result (ref null eq))))
-   (import "jslib" "wrap" (func $wrap (param anyref) (result (ref eq))))
-   (import "jslib" "unwrap" (func $unwrap (param (ref eq)) (result anyref)))
+   (import "jslib" "value_of_js"
+      (func $value_of_js (param externref) (result (ref eq))))
+   (import "jslib" "js_of_value"
+      (func $js_of_value (param (ref eq)) (result externref)))
    (import "jslib" "caml_jsstring_of_string"
       (func $caml_jsstring_of_string (param (ref eq)) (result (ref eq))))
    (import "bindings" "identity"
-      (func $from_int32 (param i32) (result anyref)))
+      (func $from_int32 (param i32) (result externref)))
    (import "bindings" "new_array"
       (func $new_array (param i32) (result (ref extern))))
    (import "bindings" "array_set"
-      (func $array_set (param (ref extern)) (param i32) (param anyref)))
+      (func $array_set (param (ref extern)) (param i32) (param externref)))
 
    ;; JS helper imports
    (import "js" "gr_state_for_wasm"
-      (func $gr_state (result anyref)))
+      (func $gr_state (result externref)))
    (import "js" "gr_open_for_wasm"
-      (func $gr_open (param anyref) (result i32)))
+      (func $gr_open (param externref) (result i32)))
    (import "js" "gr_close_for_wasm" (func $gr_close))
    (import "js" "gr_clear_for_wasm" (func $gr_clear))
    (import "js" "gr_size_x_for_wasm" (func $gr_size_x (result i32)))
@@ -72,43 +74,43 @@
    (import "js" "gr_resize_window_for_wasm"
       (func $gr_resize_window (param i32 i32)))
    (import "js" "gr_draw_char_for_wasm" (func $gr_draw_char (param i32)))
-   (import "js" "gr_draw_str_for_wasm" (func $gr_draw_str (param anyref)))
-   (import "js" "gr_set_font_for_wasm" (func $gr_set_font (param anyref)))
+   (import "js" "gr_draw_str_for_wasm" (func $gr_draw_str (param externref)))
+   (import "js" "gr_set_font_for_wasm" (func $gr_set_font (param externref)))
    (import "js" "gr_set_text_size_for_wasm"
       (func $gr_set_text_size (param i32)))
    (import "js" "gr_set_window_title_for_wasm"
-      (func $gr_set_window_title (param anyref)))
+      (func $gr_set_window_title (param externref)))
    (import "js" "gr_text_size_w_for_wasm"
-      (func $gr_text_size_w (param anyref) (result i32)))
+      (func $gr_text_size_w (param externref) (result i32)))
    (import "js" "gr_text_size_h_for_wasm"
       (func $gr_text_size_h (result i32)))
    (import "js" "gr_fill_poly_for_wasm"
-      (func $gr_fill_poly (param anyref i32)))
+      (func $gr_fill_poly (param externref i32)))
    (import "js" "gr_create_image_for_wasm"
-      (func $gr_create_image (param i32 i32) (result anyref)))
+      (func $gr_create_image (param i32 i32) (result externref)))
    (import "js" "gr_draw_image_for_wasm"
-      (func $gr_draw_image (param anyref i32 i32)))
+      (func $gr_draw_image (param externref i32 i32)))
    (import "js" "gr_blit_image_for_wasm"
-      (func $gr_blit_image (param anyref i32 i32)))
+      (func $gr_blit_image (param externref i32 i32)))
    (import "js" "gr_make_image_for_wasm"
-      (func $gr_make_image (param anyref i32 i32) (result anyref)))
+      (func $gr_make_image (param externref i32 i32) (result externref)))
    (import "js" "gr_dump_image_width_for_wasm"
-      (func $gr_dump_image_width (param anyref) (result i32)))
+      (func $gr_dump_image_width (param externref) (result i32)))
    (import "js" "gr_dump_image_height_for_wasm"
-      (func $gr_dump_image_height (param anyref) (result i32)))
+      (func $gr_dump_image_height (param externref) (result i32)))
    (import "js" "gr_dump_image_pixel_for_wasm"
-      (func $gr_dump_image_pixel (param anyref i32 i32) (result i32)))
+      (func $gr_dump_image_pixel (param externref i32 i32) (result i32)))
    (import "js" "gr_state_set_for_wasm"
-      (func $gr_state_set (param anyref)))
+      (func $gr_state_set (param externref)))
    (import "js" "gr_state_create_for_wasm"
-      (func $gr_state_create (param anyref i32 i32) (result anyref)))
+      (func $gr_state_create (param externref i32 i32) (result externref)))
    (import "js" "gr_doc_of_state_for_wasm"
-      (func $gr_doc_of_state (param anyref) (result anyref)))
+      (func $gr_doc_of_state (param externref) (result externref)))
 
    ;; Types
    (type $block (array (mut (ref eq))))
    (type $bytes (array (mut i8)))
-   (type $js (struct (field $js anyref)))
+   (type $js (struct (field $js externref)))
 
    ;; String constants
    (@string $graphic_failure "Graphics.Graphic_failure")
@@ -140,7 +142,7 @@
    (func (export "caml_gr_open_graph")
       (param $s (ref eq)) (result (ref eq))
       (if (call $gr_open
-             (call $unwrap (call $caml_jsstring_of_string (local.get $s))))
+             (call $js_of_value (call $caml_jsstring_of_string (local.get $s))))
          (then (call $caml_failwith (global.get $open_failed))))
       (ref.i31 (i32.const 0)))
 
@@ -183,130 +185,108 @@
    (func (export "caml_gr_set_color")
       (param $c (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_set_color
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $c)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $c))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_set_color
+            (call $portable_int_val_32 (local.get $c))))
+      (@else
+         (call $gr_set_color
+            (i31.get_s (ref.cast (ref i31) (local.get $c))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_plot")
       (param $x (ref eq)) (param $y (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_plot
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_plot
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))))
+      (@else
+         (call $gr_plot
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_point_color")
       (param $x (ref eq)) (param $y (ref eq)) (result (ref eq))
       (call $check_state)
-      (ref.i31
-         (call $gr_point_color
-            (@if $portable-int
-            (@then (call $portable_int_val_32 (local.get $x)))
-            (@else
-            (i31.get_s (ref.cast (ref i31) (local.get $x)))
-            ))
-            (@if $portable-int
-            (@then (call $portable_int_val_32 (local.get $y)))
-            (@else
-            (i31.get_s (ref.cast (ref i31) (local.get $y))))))
-            ))
+      (@if $portable_int
+      (@then
+         (ref.i31
+            (call $gr_point_color
+               (call $portable_int_val_32 (local.get $x))
+               (call $portable_int_val_32 (local.get $y)))))
+      (@else
+         (ref.i31
+            (call $gr_point_color
+               (i31.get_s (ref.cast (ref i31) (local.get $x)))
+               (i31.get_s (ref.cast (ref i31) (local.get $y))))))))
 
    (func (export "caml_gr_moveto")
       (param $x (ref eq)) (param $y (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_moveto
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_moveto
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))))
+      (@else
+         (call $gr_moveto
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_lineto")
       (param $x (ref eq)) (param $y (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_lineto
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_lineto
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))))
+      (@else
+         (call $gr_lineto
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_draw_rect")
       (param $x (ref eq)) (param $y (ref eq)) (param $w (ref eq)) (param $h (ref eq))
       (result (ref eq))
       (call $check_state)
-      (call $gr_draw_rect
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $w)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $w)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $h)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $h))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_draw_rect
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))
+            (call $portable_int_val_32 (local.get $w))
+            (call $portable_int_val_32 (local.get $h))))
+      (@else
+         (call $gr_draw_rect
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y)))
+            (i31.get_s (ref.cast (ref i31) (local.get $w)))
+            (i31.get_s (ref.cast (ref i31) (local.get $h))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_fill_rect")
       (param $x (ref eq)) (param $y (ref eq)) (param $w (ref eq)) (param $h (ref eq))
       (result (ref eq))
       (call $check_state)
-      (call $gr_fill_rect
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $w)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $w)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $h)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $h))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_fill_rect
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))
+            (call $portable_int_val_32 (local.get $w))
+            (call $portable_int_val_32 (local.get $h))))
+      (@else
+         (call $gr_fill_rect
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y)))
+            (i31.get_s (ref.cast (ref i31) (local.get $w)))
+            (i31.get_s (ref.cast (ref i31) (local.get $h))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_draw_arc")
@@ -314,37 +294,23 @@
       (param $ry (ref eq)) (param $a1 (ref eq)) (param $a2 (ref eq))
       (result (ref eq))
       (call $check_state)
-      (call $gr_draw_arc
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $rx)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $rx)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $ry)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $ry)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $a1)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $a1)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $a2)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $a2))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_draw_arc
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))
+            (call $portable_int_val_32 (local.get $rx))
+            (call $portable_int_val_32 (local.get $ry))
+            (call $portable_int_val_32 (local.get $a1))
+            (call $portable_int_val_32 (local.get $a2))))
+      (@else
+         (call $gr_draw_arc
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y)))
+            (i31.get_s (ref.cast (ref i31) (local.get $rx)))
+            (i31.get_s (ref.cast (ref i31) (local.get $ry)))
+            (i31.get_s (ref.cast (ref i31) (local.get $a1)))
+            (i31.get_s (ref.cast (ref i31) (local.get $a2))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_fill_arc")
@@ -352,64 +318,49 @@
       (param $ry (ref eq)) (param $a1 (ref eq)) (param $a2 (ref eq))
       (result (ref eq))
       (call $check_state)
-      (call $gr_fill_arc
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $rx)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $rx)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $ry)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $ry)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $a1)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $a1)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $a2)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $a2))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_fill_arc
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))
+            (call $portable_int_val_32 (local.get $rx))
+            (call $portable_int_val_32 (local.get $ry))
+            (call $portable_int_val_32 (local.get $a1))
+            (call $portable_int_val_32 (local.get $a2))))
+      (@else
+         (call $gr_fill_arc
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y)))
+            (i31.get_s (ref.cast (ref i31) (local.get $rx)))
+            (i31.get_s (ref.cast (ref i31) (local.get $ry)))
+            (i31.get_s (ref.cast (ref i31) (local.get $a1)))
+            (i31.get_s (ref.cast (ref i31) (local.get $a2))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_set_line_width")
       (param $w (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_set_line_width
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $w)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $w))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_set_line_width
+            (call $portable_int_val_32 (local.get $w))))
+      (@else
+         (call $gr_set_line_width
+            (i31.get_s (ref.cast (ref i31) (local.get $w))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_resize_window")
       (param $w (ref eq)) (param $h (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_resize_window
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $w)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $w)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $h)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $h))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_resize_window
+            (call $portable_int_val_32 (local.get $w))
+            (call $portable_int_val_32 (local.get $h))))
+      (@else
+         (call $gr_resize_window
+            (i31.get_s (ref.cast (ref i31) (local.get $w)))
+            (i31.get_s (ref.cast (ref i31) (local.get $h))))))
       (ref.i31 (i32.const 0)))
 
    ;; --- Text / String operations ---
@@ -417,44 +368,46 @@
    (func (export "caml_gr_draw_char")
       (param $c (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_draw_char
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $c)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $c))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_draw_char
+            (call $portable_int_val_32 (local.get $c))))
+      (@else
+         (call $gr_draw_char
+            (i31.get_s (ref.cast (ref i31) (local.get $c))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_draw_string")
       (param $s (ref eq)) (result (ref eq))
       (call $check_state)
       (call $gr_draw_str
-         (call $unwrap (call $caml_jsstring_of_string (local.get $s))))
+         (call $js_of_value (call $caml_jsstring_of_string (local.get $s))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_set_font")
       (param $s (ref eq)) (result (ref eq))
       (call $check_state)
       (call $gr_set_font
-         (call $unwrap (call $caml_jsstring_of_string (local.get $s))))
+         (call $js_of_value (call $caml_jsstring_of_string (local.get $s))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_set_text_size")
       (param $s (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_set_text_size
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $s)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $s))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_set_text_size
+            (call $portable_int_val_32 (local.get $s))))
+      (@else
+         (call $gr_set_text_size
+            (i31.get_s (ref.cast (ref i31) (local.get $s))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_set_window_title")
       (param $s (ref eq)) (result (ref eq))
       (call $check_state)
       (call $gr_set_window_title
-         (call $unwrap (call $caml_jsstring_of_string (local.get $s))))
+         (call $js_of_value (call $caml_jsstring_of_string (local.get $s))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_text_size")
@@ -464,7 +417,7 @@
          (ref.i31 (i32.const 0))
          (ref.i31
             (call $gr_text_size_w
-               (call $unwrap (call $caml_jsstring_of_string (local.get $s)))))
+               (call $js_of_value (call $caml_jsstring_of_string (local.get $s)))))
          (ref.i31 (call $gr_text_size_h))))
 
    ;; --- Polygon ---
@@ -488,33 +441,37 @@
                   (ref.cast (ref $block)
                      (array.get $block (local.get $a)
                         (i32.add (local.get $i) (i32.const 1)))))
-               (call $array_set (local.get $flat)
-                  (i32.mul (local.get $i) (i32.const 2))
-                  (call $from_int32
-                     (@if $portable-int
-                     (@then
+               (@if $portable_int
+               (@then
+                  (call $array_set (local.get $flat)
+                     (i32.mul (local.get $i) (i32.const 2))
+                     (call $from_int32
                         (call $portable_int_val_32
-                           (array.get $block (local.get $p) (i32.const 1))))
-                     (@else
-                     (i31.get_s (ref.cast (ref i31)
-                        (array.get $block (local.get $p) (i32.const 1))))))
-                     ))
-               (call $array_set (local.get $flat)
-                  (i32.add (i32.mul (local.get $i) (i32.const 2))
-                     (i32.const 1))
-                  (call $from_int32
-                     (@if $portable-int
-                     (@then
+                              (array.get $block (local.get $p) (i32.const 1))))))
+               (@else
+                  (call $array_set (local.get $flat)
+                     (i32.mul (local.get $i) (i32.const 2))
+                     (call $from_int32
+                        (i31.get_s (ref.cast (ref i31)
+                           (array.get $block (local.get $p) (i32.const 1))))))))
+               (@if $portable_int
+               (@then
+                  (call $array_set (local.get $flat)
+                     (i32.add (i32.mul (local.get $i) (i32.const 2))
+                        (i32.const 1))
+                     (call $from_int32
                         (call $portable_int_val_32
-                           (array.get $block (local.get $p) (i32.const 2))))
-                     (@else
-                     (i31.get_s (ref.cast (ref i31)
-                        (array.get $block (local.get $p) (i32.const 2))))))
-                     ))
+                              (array.get $block (local.get $p) (i32.const 2))))))
+               (@else
+                  (call $array_set (local.get $flat)
+                     (i32.add (i32.mul (local.get $i) (i32.const 2))
+                        (i32.const 1))
+                     (call $from_int32
+                        (i31.get_s (ref.cast (ref i31)
+                           (array.get $block (local.get $p) (i32.const 2))))))))
                (local.set $i (i32.add (local.get $i) (i32.const 1)))
                (br $loop))))
-      (call $gr_fill_poly
-         (any.convert_extern (local.get $flat)) (local.get $n))
+      (call $gr_fill_poly (local.get $flat) (local.get $n))
       (ref.i31 (i32.const 0)))
 
    ;; --- Image operations ---
@@ -522,51 +479,48 @@
    (func (export "caml_gr_create_image")
       (param $w (ref eq)) (param $h (ref eq)) (result (ref eq))
       (call $check_state)
-      (struct.new $js
-         (call $gr_create_image
-            (@if $portable-int
-            (@then (call $portable_int_val_32 (local.get $w)))
-            (@else
-            (i31.get_s (ref.cast (ref i31) (local.get $w)))
-            ))
-            (@if $portable-int
-            (@then (call $portable_int_val_32 (local.get $h)))
-            (@else
-            (i31.get_s (ref.cast (ref i31) (local.get $h))))))
-            ))
+      (@if $portable_int
+      (@then
+         (struct.new $js
+            (call $gr_create_image
+               (call $portable_int_val_32 (local.get $w))
+               (call $portable_int_val_32 (local.get $h)))))
+      (@else
+         (struct.new $js
+            (call $gr_create_image
+               (i31.get_s (ref.cast (ref i31) (local.get $w)))
+               (i31.get_s (ref.cast (ref i31) (local.get $h))))))))
 
    (func (export "caml_gr_draw_image")
       (param $im (ref eq)) (param $x (ref eq)) (param $y (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_draw_image
-         (call $unwrap (local.get $im))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_draw_image
+            (call $js_of_value (local.get $im))
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))))
+      (@else
+         (call $gr_draw_image
+            (call $js_of_value (local.get $im))
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_blit_image")
       (param $im (ref eq)) (param $x (ref eq)) (param $y (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $gr_blit_image
-         (call $unwrap (local.get $im))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $x)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $x)))
-         ))
-         (@if $portable-int
-         (@then (call $portable_int_val_32 (local.get $y)))
-         (@else
-         (i31.get_s (ref.cast (ref i31) (local.get $y))))
-         ))
+      (@if $portable_int
+      (@then
+         (call $gr_blit_image
+            (call $js_of_value (local.get $im))
+            (call $portable_int_val_32 (local.get $x))
+            (call $portable_int_val_32 (local.get $y))))
+      (@else
+         (call $gr_blit_image
+            (call $js_of_value (local.get $im))
+            (i31.get_s (ref.cast (ref i31) (local.get $x)))
+            (i31.get_s (ref.cast (ref i31) (local.get $y))))))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_make_image")
@@ -598,19 +552,20 @@
                (loop $inner
                   (if (i32.lt_u (local.get $j) (local.get $w))
                      (then
-                        (call $array_set (local.get $flat) (local.get $idx)
-                           (call $from_int32
-                              (@if $portable-int
-                              (@then
+                        (@if $portable_int
+                        (@then
+                           (call $array_set (local.get $flat) (local.get $idx)
+                              (call $from_int32
                                  (call $portable_int_val_32 (array.get $block (local.get $row)
+                                          (i32.add (local.get $j)
+                                             (i32.const 1)))))))
+                        (@else
+                           (call $array_set (local.get $flat) (local.get $idx)
+                              (call $from_int32
+                                 (i31.get_s (ref.cast (ref i31)
+                                    (array.get $block (local.get $row)
                                        (i32.add (local.get $j)
-                                          (i32.const 1)))))
-                              (@else
-                              (i31.get_s (ref.cast (ref i31)
-                                 (array.get $block (local.get $row)
-                                    (i32.add (local.get $j)
-                                       (i32.const 1)))))))
-                              ))
+                                          (i32.const 1)))))))))
                         (local.set $idx
                            (i32.add (local.get $idx) (i32.const 1)))
                         (local.set $j
@@ -620,17 +575,17 @@
                (br $outer))))
       (struct.new $js
          (call $gr_make_image
-            (any.convert_extern (local.get $flat))
+            (local.get $flat)
             (local.get $w) (local.get $h))))
 
    (func (export "caml_gr_dump_image")
       (param $im (ref eq)) (result (ref eq))
-      (local $js_im anyref)
+      (local $js_im externref)
       (local $w i32) (local $h i32)
       (local $result (ref $block))
       (local $row (ref $block))
       (local $i i32) (local $j i32)
-      (local.set $js_im (call $unwrap (local.get $im)))
+      (local.set $js_im (call $js_of_value (local.get $im)))
       (local.set $w (call $gr_dump_image_width (local.get $js_im)))
       (local.set $h (call $gr_dump_image_height (local.get $js_im)))
       (local.set $result
@@ -668,32 +623,32 @@
    (func (export "caml_gr_state_get")
       (param (ref eq)) (result (ref eq))
       (call $check_state)
-      (call $wrap (call $gr_state)))
+      (call $value_of_js (call $gr_state)))
 
    (func (export "caml_gr_state_set")
       (param $s (ref eq)) (result (ref eq))
-      (call $gr_state_set (call $unwrap (local.get $s)))
+      (call $gr_state_set (call $js_of_value (local.get $s)))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_gr_state_create")
       (param $s (ref eq)) (param $w (ref eq)) (param $h (ref eq)) (result (ref eq))
-      (call $wrap
-         (call $gr_state_create
-            (call $unwrap (local.get $s))
-            (@if $portable-int
-            (@then (call $portable_int_val_32 (local.get $w)))
-            (@else
-            (i31.get_s (ref.cast (ref i31) (local.get $w)))
-            ))
-            (@if $portable-int
-            (@then (call $portable_int_val_32 (local.get $h)))
-            (@else
-            (i31.get_s (ref.cast (ref i31) (local.get $h))))))
-            ))
+      (@if $portable_int
+      (@then
+         (call $value_of_js
+            (call $gr_state_create
+               (call $js_of_value (local.get $s))
+               (call $portable_int_val_32 (local.get $w))
+               (call $portable_int_val_32 (local.get $h)))))
+      (@else
+         (call $value_of_js
+            (call $gr_state_create
+               (call $js_of_value (local.get $s))
+               (i31.get_s (ref.cast (ref i31) (local.get $w)))
+               (i31.get_s (ref.cast (ref i31) (local.get $h))))))))
 
    (func (export "caml_gr_doc_of_state")
       (param $s (ref eq)) (result (ref eq))
-      (call $wrap (call $gr_doc_of_state (call $unwrap (local.get $s)))))
+      (call $value_of_js (call $gr_doc_of_state (call $js_of_value (local.get $s)))))
 
    ;; --- Stubs returning unit ---
 

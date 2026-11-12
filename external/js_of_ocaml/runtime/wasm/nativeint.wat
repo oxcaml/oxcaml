@@ -25,7 +25,7 @@
       (func $caml_deserialize_uint_1 (param (ref eq)) (result i32)))
    (import "marshal" "caml_deserialize_int_4"
       (func $caml_deserialize_int_4 (param (ref eq)) (result i32)))
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (import "ints" "parse_sign_and_base"
          (func $parse_sign_and_base
@@ -107,7 +107,7 @@
    (type $int32
       (sub final $custom (struct (field (ref $custom_operations)) (field i32))))
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (type $int64
          (sub final $custom (struct (field (ref $custom_operations)) (field i64))))
@@ -198,26 +198,26 @@
    ))
 
    (func (export "boxed_nativeint_to_i64") (param $v (ref eq)) (result i64)
-      (@if $portable-int
+      (@if $portable_int
       (@then (call $Int64_val (local.get $v)))
       (@else (i64.extend_i32_s (call $Int32_val (local.get $v))))))
 
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (@string $ill_formed "input_value: ill-formed native integer")
 
       (func $nativeint_deserialize
          (param $s (ref eq)) (result (ref eq)) (result i32)
-         (local $tag i32) (local $l i64)
-         (local.set $tag (call $caml_deserialize_uint_1 (local.get $s)))
-         (if (i32.eq (local.get $tag) (i32.const 1))
+         (local $code i32) (local $l i64)
+         (local.set $code (call $caml_deserialize_uint_1 (local.get $s)))
+         (if (i32.eq (local.get $code) (i32.const 1))
             (then
                (local.set $l
                   (i64.extend_i32_s
                      (call $caml_deserialize_int_4 (local.get $s)))))
             (else
-               (if (i32.eq (local.get $tag) (i32.const 2))
+               (if (i32.eq (local.get $code) (i32.const 2))
                   (then
                      (local.set $l
                         (call $caml_deserialize_int_8 (local.get $s))))
@@ -264,7 +264,7 @@
 
    (@string $NATIVEINT_ERRMSG "Nativeint.of_string")
 
-   (@if $portable-int
+   (@if $portable_int
    (@then
       (export "caml_nativeint_format" (func $caml_int64_format)))
    (@else

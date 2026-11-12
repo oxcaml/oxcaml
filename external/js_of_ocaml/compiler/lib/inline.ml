@@ -192,6 +192,7 @@ type info =
   ; closure_count : int cache
   ; init_code : int cache
   ; returns_a_block : bool cache
+  ; open_recursion : bool cache
   ; interesting_params : (Var.t * int) list cache
   }
 
@@ -382,6 +383,50 @@ let interesting_parameters ~context info =
           blocks
           [])
 
+(* Does the function call a field of one of its parameters, passing
+   this parameter as an argument ([sub.expr sub e])? This is a form of
+   recursion (open recursion through a record of closures, as in
+   [Ast_mapper]) that the call graph does not show: inlining such a
+   function where the parameter is known can expose a call to the
+   function itself. *)
+let open_recursion ~context info =
+  cache ~info info.open_recursion
+  @@ fun pc ->
+  let blocks = context.p.blocks in
+  let fields =
+    Code.traverse
+      { fold = fold_children }
+      (fun pc acc ->
+        List.fold_left
+          ~f:(fun acc i ->
+            match i with
+            | Let (x, Field (y, _, _)) when List.mem ~eq:Var.equal y info.params ->
+                Var.Map.add x y acc
+            | _ -> acc)
+          ~init:acc
+          (Addr.Map.find pc blocks).body)
+      pc
+      blocks
+      Var.Map.empty
+  in
+  (not (Var.Map.is_empty fields))
+  && Code.traverse
+       { fold = fold_children }
+       (fun pc acc ->
+         acc
+         || List.exists
+              ~f:(fun i ->
+                match i with
+                | Let (_, Apply { f; args; _ }) -> (
+                    match Var.Map.find_opt f fields with
+                    | Some y -> List.mem ~eq:Var.equal y args
+                    | None -> false)
+                | _ -> false)
+              (Addr.Map.find pc blocks).body)
+       pc
+       blocks
+       false
+
 (*
    We are very aggressive at optimizing functor-like code, even if
    this might duplicate quite a lot of code, since this is likely to
@@ -395,6 +440,7 @@ let functor_like ~context info =
     | `JavaScript, (O1 | O2) -> false
     | `JavaScript, O3 -> body_size ~context info <= 15)
   && (not info.recursive)
+  && (not (open_recursion ~context info))
   &&
   match info.closure_hint with
   | Some { is_a_functor = true; _ } -> true
@@ -588,7 +634,7 @@ let rewrite_closure blocks cont_pc clos_pc =
     blocks
     blocks
 
-let rewrite_inlined_function p rem branch x params cont args =
+let rewrite_inlined_function p rem branch x params cont args ~inlined =
   let blocks, cont_pc, free_pc =
     match rem, branch with
     | [], Return y when Var.equal x y ->
@@ -611,7 +657,19 @@ let rewrite_inlined_function p rem branch x params cont args =
   let blocks =
     Addr.Map.add fresh_addr { params; body = []; branch = Branch cont } blocks
   in
-  [], (Branch (fresh_addr, args), { p with blocks; free_pc })
+  let body, args =
+    if Var.Set.is_empty inlined
+    then [], args
+    else
+      (* The only use of these parameters was a call which has been
+         inlined. We do not pass the actual argument anymore, so that
+         its occurrence count remains accurate. *)
+      let dummy = Var.fresh () in
+      ( [ Let (dummy, Constant (Int Targetint.zero)) ]
+      , List.map2 params args ~f:(fun param arg ->
+            if Var.Set.mem param inlined then dummy else arg) )
+  in
+  body, (Branch (fresh_addr, args), { p with blocks; free_pc })
 
 let rec inline_recursively ~context ~info p params (pc, _) args =
   let relevant_args = relevant_arguments ~context info args in
@@ -628,42 +686,43 @@ let rec inline_recursively ~context ~info p params (pc, _) args =
           else m)
         ~init:Var.Map.empty
     in
-    Code.traverse
-      { fold = Code.fold_children }
-      (fun pc (p, inlined) ->
-        let block = Addr.Map.find pc p.blocks in
-        let body, (branch, p), inlined =
-          List.fold_right
-            ~f:(fun i (rem, state, inlined) ->
-              match i with
-              | Let (x, Apply { f; args; _ }) when Var.Map.mem f subst ->
-                  (* The [exact] field might not be accurate since it
-                     considers all possible values of [f], before the
-                     current function is inlined, not just the one
-                     called after inlining. We have checked in
-                     [relevant_arguments] that the call was exact.
-                     We have also checked that it made sense to inline
-                     this call. In particular, this function is
-                     applied only once. *)
-                  let f' = Var.Map.find f subst in
-                  let body, state =
-                    inline_function ~context ~force_duplicate:true i x f' args rem state
-                  in
-                  let inlined =
-                    (* The body is empty when the call is inlined *)
-                    if List.is_empty body then Var.Set.add f inlined else inlined
-                  in
-                  body, state, inlined
-              | _ -> i :: rem, state, inlined)
-            ~init:([], (block.branch, p), inlined)
-            block.body
-        in
-        { p with blocks = Addr.Map.add pc { block with body; branch } p.blocks }, inlined)
-      pc
-      p.blocks
-      (p, Var.Set.empty)
+    let inlined = ref Var.Set.empty in
+    let p =
+      Code.traverse
+        { fold = Code.fold_children }
+        (fun pc p ->
+          let block = Addr.Map.find pc p.blocks in
+          let body, (branch, p) =
+            List.fold_right
+              ~f:(fun i (rem, state) ->
+                match i with
+                | Let (x, Apply { f = param; args; _ }) when Var.Map.mem param subst -> (
+                    (* The [exact] field might not be accurate since it
+                       considers all possible values of [f], before the
+                       current function is inlined, not just the one
+                       called after inlining. We have checked in
+                       [relevant_arguments] that the call was exact.
+                       We have also checked that it made sense to inline
+                       this call. In particular, this function is
+                       applied only once. *)
+                    let f = Var.Map.find param subst in
+                    match inline_function ~context x f args rem state with
+                    | Some res ->
+                        inlined := Var.Set.add param !inlined;
+                        res
+                    | None -> i :: rem, state)
+                | _ -> i :: rem, state)
+              ~init:([], (block.branch, p))
+              block.body
+          in
+          { p with blocks = Addr.Map.add pc { block with body; branch } p.blocks })
+        pc
+        p.blocks
+        p
+    in
+    p, !inlined
 
-and inline_function ~context ~force_duplicate i x f args rem state =
+and inline_function ~context x f args rem state =
   let info = Var.Map.find f context.env in
   let { params; cont; _ } = info in
   trace_inlining ~context info x args;
@@ -674,7 +733,7 @@ and inline_function ~context ~force_duplicate i x f args rem state =
     if closure_count ~context info > 0 then context.has_closures := lazy true;
     context.live_vars.(Var.idx f) <- context.live_vars.(Var.idx f) - 1;
     let p, params, cont =
-      if force_duplicate || context.live_vars.(Var.idx f) > 0
+      if context.live_vars.(Var.idx f) > 0
       then
         let p, _f, params, cont =
           Duplicate.closure p ~f ~params ~cont context.live_vars
@@ -688,23 +747,18 @@ and inline_function ~context ~force_duplicate i x f args rem state =
       else p, params, cont
     in
     let p, inlined = inline_recursively ~context ~info p params cont args in
-    (* Drop the parameters whose only use was inlined, so that the
-       functions passed to them are no longer referenced *)
-    let params, args =
-      List.split
-        (List.filter (List.combine params args) ~f:(fun (param, _) ->
-             not (Var.Set.mem param inlined)))
-    in
-    rewrite_inlined_function p rem branch x params cont args)
-  else i :: rem, state
+    Some (rewrite_inlined_function p rem branch x params cont args ~inlined))
+  else None
 
 let inline_in_block ~context pc block p =
   let body, (branch, p) =
     List.fold_right
       ~f:(fun i (rem, state) ->
         match i with
-        | Let (x, Apply { f; args; exact = true; _ }) when Var.Map.mem f context.env ->
-            inline_function ~context ~force_duplicate:false i x f args rem state
+        | Let (x, Apply { f; args; exact = true; _ }) when Var.Map.mem f context.env -> (
+            match inline_function ~context x f args rem state with
+            | Some res -> res
+            | None -> i :: rem, state)
         | _ -> i :: rem, state)
       ~init:([], (block.branch, p))
       block.body
@@ -773,6 +827,7 @@ let inline ~profile ~inline_count p ~live_vars =
                ; closure_count = ref None
                ; init_code = ref None
                ; returns_a_block = ref None
+               ; open_recursion = ref None
                ; interesting_params = ref None
                }
                context.env

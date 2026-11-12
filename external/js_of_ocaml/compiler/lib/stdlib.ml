@@ -195,20 +195,15 @@ end
 
 let ( @ ) = List.append
 
-let warn_overflow name ~to_dec ~to_hex i ~truncated_hex ~truncated_dec =
+let warn_overflow name ~to_dec ~to_hex ?(to_hex_truncated = to_hex) i truncated =
   Warning.warn
     `Integer_overflow
     "%s 0x%s (%s) truncated to 0x%s (%s); the generated code might be incorrect.@."
     name
     (to_hex i)
     (to_dec i)
-    truncated_hex
-    truncated_dec
-
-let truncated_int64_to_hex ~num_bits i =
-  if num_bits <= 32
-  then Printf.sprintf "%lx" (Int64.to_int32 i)
-  else Printf.sprintf "%Lx" i
+    (to_hex_truncated truncated)
+    (to_dec truncated)
 
 module Int32 = struct
   include Int32
@@ -225,29 +220,71 @@ module Int32 = struct
 
   external ( >= ) : int32 -> int32 -> bool = "%greaterequal"
 
-  let convert_warning_on_overflow name ~to_int32 ~of_int32 ~equal ~to_dec ~to_hex x =
-    let i32 = to_int32 x in
-    let x' = of_int32 i32 in
-    if not (equal x' x)
-    then
-      warn_overflow
-        name
-        ~to_dec
-        ~to_hex
-        x
-        ~truncated_hex:(Printf.sprintf "%lx" i32)
-        ~truncated_dec:(Int32.to_string i32);
-    i32
+  (* Bit counting functions, from the OCaml 5.5 standard library *)
 
-  let of_nativeint_warning_on_overflow n =
-    convert_warning_on_overflow
-      "native integer"
-      ~to_int32:Nativeint.to_int32
-      ~of_int32:Nativeint.of_int32
-      ~equal:Nativeint.equal
-      ~to_dec:(Printf.sprintf "%nd")
-      ~to_hex:(Printf.sprintf "%nx")
-      n
+  (* Number of leading zeros.  Hacker's Delight (2 ed.), algorithm 5.12 *)
+  let leading_zeros x =
+    let x = ref x and n = ref 32 in
+    let y = shift_right_logical !x 16 in
+    if y <> 0l
+    then (
+      n := !n - 16;
+      x := y);
+    let y = shift_right_logical !x 8 in
+    if y <> 0l
+    then (
+      n := !n - 8;
+      x := y);
+    let y = shift_right_logical !x 4 in
+    if y <> 0l
+    then (
+      n := !n - 4;
+      x := y);
+    let y = shift_right_logical !x 2 in
+    if y <> 0l
+    then (
+      n := !n - 2;
+      x := y);
+    let y = shift_right_logical !x 1 in
+    if y <> 0l then !n - 2 else !n - to_int !x
+
+  (* Number of trailing zeros.  Hacker's Delight (2 ed.), algorithm 5.21 *)
+  let trailing_zeros x =
+    if x = 0l
+    then 32
+    else
+      let x = ref x and n = ref 31 in
+      let y = shift_left !x 16 in
+      if y <> 0l
+      then (
+        n := !n - 16;
+        x := y);
+      let y = shift_left !x 8 in
+      if y <> 0l
+      then (
+        n := !n - 8;
+        x := y);
+      let y = shift_left !x 4 in
+      if y <> 0l
+      then (
+        n := !n - 4;
+        x := y);
+      let y = shift_left !x 2 in
+      if y <> 0l
+      then (
+        n := !n - 2;
+        x := y);
+      let y = shift_left !x 1 in
+      if y <> 0l then !n - 1 else !n
+
+  (* Population count.  Hacker's Delight (2 ed.), algorithm 5.2 *)
+  let popcount x =
+    let x = sub x (logand (shift_right_logical x 1) 0x5555_5555l) in
+    let x = add (logand x 0x3333_3333l) (logand (shift_right_logical x 2) 0x3333_3333l) in
+    let x = logand (add x (shift_right_logical x 4)) 0x0F0F_0F0Fl in
+    let x = add x (shift_right_logical x 8) in
+    let x = add x (shift_right_logical x 16) in
+    to_int x land 0x3F
 end
 
 module Int64 = struct
@@ -266,30 +303,34 @@ module Int64 = struct
   external ( >= ) : int64 -> int64 -> bool = "%greaterequal"
 
   let convert_warning_on_overflow
-      name ~num_bits ~to_int64 ~of_int64 ~equal ~to_dec ~to_hex x =
+      name
+      ~to_int64
+      ~of_int64
+      ~equal
+      ~to_dec
+      ~to_hex
+      ?to_hex_truncated
+      x =
     let i64 = to_int64 x in
     let x' = of_int64 i64 in
-    if not (equal x' x)
-    then
-      warn_overflow
-        name
-        ~to_dec
-        ~to_hex
-        x
-        ~truncated_hex:(truncated_int64_to_hex ~num_bits i64)
-        ~truncated_dec:(Int64.to_string i64);
+    if not (equal x' x) then warn_overflow name ~to_dec ~to_hex ?to_hex_truncated x x';
     i64
 
-  let of_nativeint_warning_on_overflow n =
-    convert_warning_on_overflow
-      "native integer"
-      ~num_bits:64
-      ~to_int64:Int64.of_nativeint
-      ~of_int64:Int64.to_nativeint
-      ~equal:Nativeint.equal
-      ~to_dec:(Printf.sprintf "%nd")
-      ~to_hex:(Printf.sprintf "%nx")
-      n
+  let high x = to_int32 (shift_right_logical x 32)
+
+  let leading_zeros x =
+    let h = high x in
+    if Int32.equal h 0l
+    then 32 + Int32.leading_zeros (to_int32 x)
+    else Int32.leading_zeros h
+
+  let trailing_zeros x =
+    let l = to_int32 x in
+    if Int32.equal l 0l
+    then 32 + Int32.trailing_zeros (high x)
+    else Int32.trailing_zeros l
+
+  let popcount x = Int32.popcount (to_int32 x) + Int32.popcount (high x)
 end
 
 module Option = struct
@@ -1126,6 +1167,18 @@ module Array = struct
         incr i
       done;
       !i = len_a
+
+  (* Reverse the [len] elements of [a] starting at [pos] *)
+  let reverse_sub_in_place a ~pos ~len =
+    let i = ref pos in
+    let j = ref (pos + len - 1) in
+    while !i < !j do
+      let t = a.(!i) in
+      a.(!i) <- a.(!j);
+      a.(!j) <- t;
+      incr i;
+      decr j
+    done
 end
 
 module Filename = struct
