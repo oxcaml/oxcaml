@@ -93,7 +93,7 @@ jobs:
         if: always()
         run: |
           shopt -s nullglob
-          failures=(_oxfuzzer/seed-*)
+          failures=(_oxfuzzer/[0-9]*)
           {
             echo "## oxfuzzer on $GITHUB_SHA"
             echo
@@ -115,5 +115,5 @@ jobs:
           name: oxfuzzer-failures-${{ github.sha }}-${{ github.run_id }}
           path: |
             oxfuzzer.log
-            _oxfuzzer/seed-*
+            _oxfuzzer/[0-9]*
           if-no-files-found: ignore

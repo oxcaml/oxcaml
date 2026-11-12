@@ -589,7 +589,7 @@ def reproduction_script(
 
 
 # Save everything needed to reproduce and diagnose a failing case under
-# <output_dir>/seed-<seed>/:
+# <output_dir>/<seed>/:
 #   program.ml   the generated program
 #   reason.txt   why the case failed
 #   meta.txt     seed, time and the run-level metadata (see run_metadata)
@@ -606,7 +606,7 @@ def save_failure(
     *,
     toolchain: Toolchain,
 ) -> None:
-    failure_dir = output_dir / f"seed-{seed}"
+    failure_dir = output_dir / str(seed)
     failure_dir.mkdir(parents=True, exist_ok=True)
     (failure_dir / "program.ml").write_bytes(program)
     (failure_dir / "reason.txt").write_text(reason + "\n")
@@ -875,7 +875,7 @@ A case fails if compilation fails in any configuration, a program exits with a
 non-zero status, or the configurations disagree. A case is discarded if
 generation or execution times out or generated source exceeds
 {MAX_PROGRAM_BYTES} bytes. Failures are saved under
-<output>/seed-<generator_seed>/. Discarded cases are not saved.
+<output>/<generator_seed>/. Discarded cases are not saved.
 
 Exit status is 1 if any case failed, 0 otherwise.""",
         epilog="Before first use, run `make compiler` from the repository root.",

@@ -32,7 +32,7 @@ By default the compilers, stdlib, runtime and `oxfuzzer.exe` are taken from the
 `make install` or `nix build .#oxcaml`. A build directory is snapshotted into the
 output directory before fuzzing, while an installation is used in place.
 
-Failures will be saved in `output_directory/seed-<seed>/` with the following structure:
+Failures will be saved in `output_directory/<seed>/` with the following structure:
 ```
 program.ml   the generated program
 reason.txt   why the case failed
