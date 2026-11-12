@@ -933,7 +933,6 @@ let ocaml_ignored_parametrized_flags =
     "-debug-long-frames-threshold";
     "-flambda2-expert-max-function-simplify-run";
     "-llvm-flags";
-    "-reaper-preserve-direct-calls";
     "-save-ir-after";
     "-X";
     "-dissector-max-linker-parallelism";
