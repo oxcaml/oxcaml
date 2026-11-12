@@ -37,6 +37,10 @@ immediately (use it if shutdown gets stuck); further SIGTERMs and SIGHUPs are
 ignored. Under `nohup`, which starts a program with SIGHUP ignored, oxfuzzer
 leaves it ignored and keeps running when the terminal is closed.
 
+oxfuzzer also keeps running when it can no longer write to stderr, say because
+the terminal is gone or the program it is piped into has exited: it stops
+printing, and still saves failures and sets its exit status.
+
 By default the compilers, stdlib, runtime and `oxfuzzer.exe` are taken from the
 `_build` directory of the repository containing `oxfuzzer.py`. Use
 `--build-dir DIR` to point at the `_build` directory of another checkout, or

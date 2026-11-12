@@ -407,6 +407,26 @@ async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes 
     return result.stdout
 
 
+# All of oxfuzzer's own output goes to stderr through this function. A run
+# must outlive its stderr (a closed terminal, a pipe whose reader has exited):
+# its results are the saved failures and the exit status. So once
+# a write fails, nothing more is written. sys.stderr is then None, which is
+# also what Python sets it to when stderr is closed at startup (as after
+# `2>&-`), and which Python itself allows for: in particular it then skips the
+# flush on exit, whose failure would turn the exit status into 120.
+def log(*values: object, end: str = "\n") -> None:
+    if sys.stderr is None:
+        return
+    try:
+        print(*values, end=end, file=sys.stderr, flush=True)
+    except (OSError, ValueError):
+        sys.stderr = None
+
+
+def stderr_is_tty() -> bool:
+    return sys.stderr is not None and sys.stderr.isatty()
+
+
 @dataclass
 class Stats:
     """Statistics of a fuzzer's run. Describes how many programs passed, were
@@ -442,13 +462,13 @@ class Stats:
 
     def print_line(self) -> None:
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        print(f"{timestamp} {self.summary()}", file=sys.stderr, flush=True)
+        log(f"{timestamp} {self.summary()}")
 
     # On a terminal the status is a single line updated in place. Otherwise
     # a timestamped line is printed at most every PROGRESS_INTERVAL_SEC seconds.
     def report(self) -> None:
-        if sys.stderr.isatty():
-            print(f"\r{self.summary()}", end="", file=sys.stderr, flush=True)
+        if stderr_is_tty():
+            log(f"\r{self.summary()}", end="")
             return
         now = time.monotonic()
         if (
@@ -460,14 +480,11 @@ class Stats:
         self.print_line()
 
     def final_report(self) -> None:
-        if sys.stderr.isatty():
-            print(file=sys.stderr)
+        if stderr_is_tty():
+            log()
         else:
             self.print_line()
-        print(
-            f"oxfuzzer: {self.generation_timeouts} generations timed out",
-            file=sys.stderr,
-        )
+        log(f"oxfuzzer: {self.generation_timeouts} generations timed out")
 
 
 def command_output(command: Sequence[str], *, cwd: Path | None = None) -> str | None:
@@ -652,7 +669,7 @@ def save_failure(
     # Replace a failure saved by an earlier run into the same output directory.
     shutil.rmtree(failure_dir, ignore_errors=True)
     staging_dir.rename(failure_dir)
-    print(f"\nseed {seed}: {reason}", file=sys.stderr)
+    log(f"\nseed {seed}: {reason}")
 
 
 # A case passes when every configuration compiles and runs successfully and
@@ -890,6 +907,8 @@ class ShutdownSignals:
         # Last, so that nothing above depends on it, and with os.write: this
         # may interrupt a print to stderr, which must not be re-entered, and a
         # failed write (say, to a closed terminal) is ignored.
+        if sys.stderr is None:
+            return
         message = (
             f"\noxfuzzer: {self.received.name} received, stopping "
             f"(press Ctrl-C again to exit immediately)\n"
@@ -919,11 +938,11 @@ class Limits:
 
     def print_summary(self) -> None:
         if self.iterations is not None:
-            print(f"iterations: {self.iterations}", file=sys.stderr)
+            log(f"iterations: {self.iterations}")
         if self.max_failures is not None:
-            print(f"max failures: {self.max_failures}", file=sys.stderr)
+            log(f"max failures: {self.max_failures}")
         if self.time_limit_minutes is not None:
-            print(f"time limit: {self.time_limit_minutes} minutes", file=sys.stderr)
+            log(f"time limit: {self.time_limit_minutes} minutes")
 
     # The iteration limit is enforced outside this function by the number of
     # seeds generated.
@@ -1130,7 +1149,7 @@ signal.""",
 
     def finish(finished_because: FinishReason) -> None:
         stats.final_report()
-        print(f"oxfuzzer: finished: {finished_because.value}", file=sys.stderr)
+        log(f"oxfuzzer: finished: {finished_because.value}")
         if stats.failed:
             raise SystemExit(1)
 
@@ -1141,14 +1160,13 @@ signal.""",
         shutdown.check()
         revision = revision_line(toolchain)
         shutdown.check()
-        print(f"seed: {base_seed}", file=sys.stderr)
+        log(f"seed: {base_seed}")
         limits.print_summary()
-        print(
+        log(
             f"{'install' if toolchain.installed else 'build'} directory: "
-            f"{toolchain.root}",
-            file=sys.stderr,
+            f"{toolchain.root}"
         )
-        print(revision, file=sys.stderr)
+        log(revision)
         args.output.mkdir(parents=True, exist_ok=True)
         if not toolchain.installed:
             toolchain_dir = Path(
@@ -1157,7 +1175,7 @@ signal.""",
             # CR-someday xclerc: Clean up the snapshot after finishing fuzzing
             # if no failures were saved.
             toolchain = toolchain.snapshot(toolchain_dir)
-            print(f"toolchain: {toolchain_dir}", file=sys.stderr)
+            log(f"toolchain: {toolchain_dir}")
             shutdown.check()
         run_info = run_metadata(base_seed, toolchain, revision)
         shutdown.check()
