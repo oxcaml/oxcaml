@@ -4016,7 +4016,7 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
           Code_metadata.result_mode metadata )
     | Unknown _ -> None
     | Value_symbol _ | Value_const _ | Block_approximation _ ->
-      if Flambda_features.check_invariants ()
+      if Flambda_features.kind_checks ()
       then
         Misc.fatal_errorf
           "Unexpected approximation for callee %a in [Closure_conversion], \
