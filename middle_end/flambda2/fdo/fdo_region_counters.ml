@@ -128,9 +128,6 @@ let counters_into t ~specialization_map region =
   in
   visit region Visit.empty
 
-(* CR-someday yusumez: A region entered by an exception (a handler) has no edge
-   for its preserved counters. We'd need to have annotations on exceptional
-   edges for that. *)
 let counters_into_handler t ~specialization_map cont ~use_id =
   counters_into t ~specialization_map
     (Use.handler { cont; use_id } ~specialization_map)
@@ -140,3 +137,20 @@ let entry_annotation t ~specialization_map code_id entry_annotation =
     (Fdo_annotation.combine
        (Fdo_annotation.With_body_hash.annotation entry_annotation)
        (counters_into t ~specialization_map (Function_entry code_id)))
+
+(* The counters Simplify loses or miscounts:
+
+   CR yusumez: The arms of a collapsed switch all get the count of the whole
+   switch, which is incorrect if the branches weren't actually identical and
+   e.g. turned into a table lookup.
+
+   CR yusumez: Back edges into a loop header are rebuilt before the header's own
+   switch, so if that switch collapses when rebuilt, its arms' counters miss
+   them and only reach the edges entering the loop.
+
+   CR-someday yusumez: A region entered by an exception (a handler) has no edge
+   for its preserved counters. We'd need to have annotations on exceptional
+   edges for that.
+
+   CR-someday yusumez: The counters preserved in the unit toplevel outside of
+   continuation handlers are dropped, as it has no region. *)
