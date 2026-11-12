@@ -94,8 +94,8 @@ type emit_frame_actions =
    needs this, having no relocations that can target the mergeable section).
    Under [-frametable-sections], the descriptors go in [Frametable_piece]s
    instead, with an empty piece and a [Frametable_count] linked to the (encoded)
-   [code_begin] symbol. The [efa_label_rel] and [efa_def_label] actions must
-   then tag labels with the current section. *)
+   [code_begin] symbol. The [efa_label_rel] action must then tag labels with the
+   current section. *)
 val emit_frames :
   debug_strings_section:Asm_targets.Asm_section.t ->
   code_begin:string ->

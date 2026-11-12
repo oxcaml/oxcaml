@@ -74,13 +74,14 @@ type t =
       (** A custom section with explicit details, for target-specific sections
           not covered by the other variants. *)
 
-(** The name of [Frametable_piece] sections *)
-val frametable_pieces_section_name : string
-
-(** The name of [Frametable_count] sections *)
-val frametable_counts_section_name : string
-
 val to_string : t -> string
+
+(** The symbols that the linker defines at the start and end of the output
+    section into which it merges all the sections with this one's name (ELF
+    only). The name must be a C identifier. *)
+val start_symbol : t -> Asm_symbol.t
+
+val stop_symbol : t -> Asm_symbol.t
 
 val of_names : string list -> t option
 
