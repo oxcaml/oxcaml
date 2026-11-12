@@ -164,13 +164,11 @@ class Toolchain:
     def check_dependencies(self) -> None:
         missing = [
             path
-            for path in [self.oxfuzzer, self.ocamlc, self.ocamlopt]
+            for path in [self.oxfuzzer, self.ocamlc, self.ocamlopt, self.ocamlrun]
             if not path.is_file() or not os.access(path, os.X_OK)
         ]
         if not self.ocamllib.is_dir():
             missing.append(self.ocamllib)
-        if not os.access(self.ocamlrun, os.X_OK):
-            missing.append(self.ocamlrun)
 
         for library in LIBRARIES:
             if not self.library_dir(library).is_dir():
