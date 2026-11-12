@@ -782,7 +782,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
               ~dbg
-              ~fdo_entry_annotation:Fdo_annotation.empty
+              ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
                 (* The eta-expanded function doesn't exist in the source, so
                    shouldn't have counters. *)
               ~is_tupled:false
