@@ -524,7 +524,7 @@ end = struct
       Typing_recovery.monitor body ~with_:(fun e ->
           Option.map (fun err -> freeze_error (loc, env, err)) (with_ e))
     else
-      Scheduler.Monitor.try_ body ~with_:(fun e ->
+      Typing_scheduler.Monitor.try_ body ~with_:(fun e ->
           match with_ e with
           | Some err -> In_context (loc, env, err)
           | None -> e)

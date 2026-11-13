@@ -125,7 +125,7 @@ val newvar: ?name:string -> jkind_lr -> type_expr
 
 (** The scheduler on which filling a [Tivar] during unification
     enqueues the ivar's handlers. Unification never runs it. *)
-val scheduler: unit -> Scheduler.t
+val scheduler: unit -> Typing_scheduler.t
 
 (** Runs the scheduler and defaults the ivars in the initial pool, as no
     scope will. Does nothing inside a generalization scope, whose exit

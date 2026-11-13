@@ -4434,7 +4434,7 @@ let type_toplevel_phrase env sig_acc s =
   (str, sg, to_remove_from_sg, shape, env)
 
 let type_toplevel_phrase env sig_acc s =
-  Scheduler.Monitor.root (fun () -> type_toplevel_phrase env sig_acc s)
+  Typing_scheduler.Monitor.root (fun () -> type_toplevel_phrase env sig_acc s)
 
 let type_module_alias env smod =
   type_module_maybe_hold_locks ~alias:true ~hold_locks:true ~strengthen:true
@@ -5001,7 +5001,7 @@ let type_implementation target modulename initial_env ast =
       )
 
 let type_implementation target modulename initial_env ast =
-  Scheduler.Monitor.root (fun () ->
+  Typing_scheduler.Monitor.root (fun () ->
     type_implementation target modulename initial_env ast)
 
 let save_signature target modname tsg initial_env cmi =
@@ -5067,7 +5067,7 @@ let type_interface target modulename env ast =
   sg
 
 let type_interface target modulename env ast =
-  Scheduler.Monitor.root (fun () -> type_interface target modulename env ast)
+  Typing_scheduler.Monitor.root (fun () -> type_interface target modulename env ast)
 
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)

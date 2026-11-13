@@ -161,7 +161,7 @@ and type_desc =
   | Tivar of
       { name : string option;
         jkind : jkind_lr;
-        ivar : type_shape Ivar.t
+        ivar : type_shape Typing_ivar.t
       }
   | Tarrow of arrow_desc * type_expr * type_expr * commutable
   | Ttuple of (string option * type_expr) list
@@ -1241,8 +1241,8 @@ type change =
   | Cmodes : Mode.changes -> change
   | Csort : Jkind_types.Sort.Change.t -> change
   | Czero_alloc : Zero_alloc.Change.t -> change
-  | Cscheduler : Scheduler.Change.t -> change
-  | Civar : Ivar.Change.t -> change
+  | Cscheduler : Typing_scheduler.Change.t -> change
+  | Civar : Typing_ivar.Change.t -> change
   | Cldd : Ldd.Change.t -> change
 
 type changes =
@@ -1261,8 +1261,8 @@ let () =
   Mode.set_append_changes (fun changes -> log_change (Cmodes !changes));
   Jkind_types.Sort.set_log (fun change -> log_change (Csort change));
   Zero_alloc.set_log (fun change -> log_change (Czero_alloc change));
-  Scheduler.set_log (fun change -> log_change (Cscheduler change));
-  Ivar.set_log (fun change -> log_change (Civar change));
+  Typing_scheduler.set_log (fun change -> log_change (Cscheduler change));
+  Typing_ivar.set_log (fun change -> log_change (Civar change));
   Ldd.set_log (fun change -> log_change (Cldd change))
 
 (* constructor and accessors for [field_kind] *)
@@ -1732,8 +1732,8 @@ let undo_change = function
   | Cmodes c          -> Mode.undo_changes c
   | Csort change -> Jkind_types.Sort.Change.undo change
   | Czero_alloc c -> Zero_alloc.Change.undo c
-  | Cscheduler c -> Scheduler.Change.undo c
-  | Civar c -> Ivar.Change.undo c
+  | Cscheduler c -> Typing_scheduler.Change.undo c
+  | Civar c -> Typing_ivar.Change.undo c
   | Cldd c -> Ldd.Change.undo c
 
 type snapshot = changes ref * With_backtracking.Snapshot.t
