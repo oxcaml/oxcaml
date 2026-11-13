@@ -1,5 +1,15 @@
 open Import
 
+let raise_location_error ~loc fmt =
+  Stdlib.Format.kdprintf
+    (fun pp_msg ->
+      match Location_check_doc.url with
+      | None -> Location.raise_errorf ~loc "%t" pp_msg
+      | Some url ->
+          Location.raise_errorf ~loc "%t@.For more information see: %s" pp_msg
+            url)
+    fmt
+
 module Non_intersecting_ranges : sig
   type t
 
@@ -30,7 +40,7 @@ end = struct
         else if compare_pos x_loc.loc_start node_loc.loc_end >= 0 then
           x :: insert xs node
         else
-          raise_errorf ~loc:node_loc
+          raise_location_error ~loc:node_loc
             "invalid output from ppx, %s overlaps with %s at location:@.%a"
             node_name x_name Location.print x_loc
 
@@ -183,7 +193,7 @@ let do_check ~node_name node_loc childrens_locs siblings_locs =
     let child_name, child_loc =
       Non_intersecting_ranges.find_outside node_loc childrens_locs
     in
-    Location.raise_errorf ~loc:node_loc
+    raise_location_error ~loc:node_loc
       "invalid output from ppx:@ this %s is built from a%s whose location is \
        outside of this node's.@.Child %s found at:@ %a"
       node_name
