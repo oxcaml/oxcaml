@@ -4983,16 +4983,15 @@ and mcomp_type_decl type_pairs env t1 t2 p1 p2 tl1 tl2 =
   try
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
+    (* The jkinds of the declarations don't tell us that an [or_null] type
+       can't be a [non_null] abstract type, so check for that too. *)
     let check_jkinds () =
       if not (Jkind.may_have_intersection env
                 decl.type_jkind decl'.type_jkind)
-      then raise Incompatible
-    in
-    (* [check_jkinds] compares the jkinds of the declarations, which doesn't
-       notice that an [or_null] type can't be a [non_null] abstract type. *)
-    let check_not_or_null ty ~ty_decl ~abstract_decl =
-      if is_or_null_type_but_jkind_is_non_null env ty
-           ~ty_jkind:ty_decl.type_jkind abstract_decl.type_jkind
+         || is_or_null_type_but_jkind_is_non_null env t1
+              ~ty_jkind:decl.type_jkind decl'.type_jkind
+         || is_or_null_type_but_jkind_is_non_null env t2
+              ~ty_jkind:decl'.type_jkind decl.type_jkind
       then raise Incompatible
     in
     if compatible_paths p1 p2 then begin
@@ -5028,12 +5027,8 @@ and mcomp_type_decl type_pairs env t1 t2 p1 p2 tl1 tl2 =
       | Type_open, Type_open ->
           mcomp_list type_pairs env tl1 tl2
       | Type_abstract _, Type_abstract _ -> check_jkinds ()
-      | Type_abstract _, _ when not (non_aliasable p1 decl)->
-          check_jkinds ();
-          check_not_or_null t2 ~ty_decl:decl' ~abstract_decl:decl
-      | _, Type_abstract _ when not (non_aliasable p2 decl') ->
-          check_jkinds ();
-          check_not_or_null t1 ~ty_decl:decl ~abstract_decl:decl'
+      | Type_abstract _, _ when not (non_aliasable p1 decl)-> check_jkinds ()
+      | _, Type_abstract _ when not (non_aliasable p2 decl') -> check_jkinds ()
       | _ -> raise Incompatible
   with Not_found -> ()
 
