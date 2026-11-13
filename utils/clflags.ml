@@ -352,6 +352,7 @@ module Jsoo_effects = struct
 end
 
 let link_jsir = ref false               (* -link-jsir *)
+let jsir_inlined_frames = ref false     (* -jsir-inlined-frames *)
 
 let jsoo_effects_flag = ref (None : Jsoo_effects.t option) (* -jsoo-effects *)
 
