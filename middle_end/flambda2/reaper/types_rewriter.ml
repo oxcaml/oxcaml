@@ -1289,11 +1289,13 @@ end
 
 module TypesRewrite = Flambda2_types.Rewriter.Make (Rewriter)
 
-let rewrite_typing_env context ~unit_symbol:_ typing_env =
+let rewrite_typing_env context ~unit_symbol:_ ~template_keys typing_env =
   if Lazy.force debug_types
   then Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
   let symbol_metadata sym =
-    if not (Current_unit.is_current (Symbol.compilation_unit sym))
+    if
+      (not (Current_unit.is_current (Symbol.compilation_unit sym)))
+      || Symbol.Set.mem sym template_keys
     then context, Many_sources_any_usage
     else
       let sym = Code_id_or_name.symbol sym in

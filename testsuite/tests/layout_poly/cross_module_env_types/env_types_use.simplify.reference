@@ -1,0 +1,179 @@
+let code inline(never) loopify(never) size(5)
+      `Env_types_lib/top/0_value_or_null` (`closure` : val, x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val * val =
+  apply direct(f_2 &my_alloc_region)
+    ($Env_types_lib.camlEnv_types_lib__f_1 : _ -> imm tagged) (1) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      cont k (apply_result, x)
+in
+let code inline(never) loopify(never) size(13)
+      `Env_types_lib/h/2_value_or_null` (`closure` : val, x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val * val * val =
+  let Pmixedfield = %block_load.[`0`] (`closure`) in
+  let Pfield = %block_load.[`0`] (Pmixedfield) in
+  (let Pmixedfield_1 = %block_load.`imm`.[`3`] (`closure`) in
+   let Pmixedfield_2 = %block_load.[`2`] (`closure`) in
+   apply direct(g_1 &my_alloc_region)
+     (Pmixedfield_2 : _ -> imm tagged) (Pmixedfield_1) -> k3 * k1)
+    where k3 (apply_result : imm tagged) =
+      apply direct(f_2 &my_alloc_region)
+        ($Env_types_lib.camlEnv_types_lib__f_1 : _ -> imm tagged)
+          (apply_result)
+          -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      cont k (apply_result, x, Pfield)
+in
+let code use_top_2 deleted in
+let code use_h1_3 deleted in
+let code use_h2_4 deleted in
+let $camlEnv_types_use__immstring_0 = " " in
+let code print_ints_5 deleted in
+let code inline(never) loopify(never) size(4) newer_version_of(use_top_2)
+      use_top_2_1 (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val * val =
+  apply direct(`Env_types_lib/top/0_value_or_null` &my_alloc_region)
+     ($Env_types_lib.camlEnv_types_lib__template_env_2, x) -> k * k1
+in
+let $camlEnv_types_use__use_top_1 = closure use_top_2_1 @use_top &toplevel in
+let code inline(never) loopify(never) size(4) newer_version_of(use_h1_3)
+      use_h1_3_1 (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val * val * val =
+  apply direct(`Env_types_lib/h/2_value_or_null` &my_alloc_region)
+     ($Env_types_lib.camlEnv_types_lib__template_env_6, x) -> k * k1
+in
+let $camlEnv_types_use__use_h1_2 = closure use_h1_3_1 @use_h1 &toplevel in
+let code inline(never) loopify(never) size(4) newer_version_of(use_h2_4)
+      use_h2_4_1 (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val * val * val =
+  apply direct(`Env_types_lib/h/2_value_or_null` &my_alloc_region)
+     ($Env_types_lib.camlEnv_types_lib__template_env_10, x) -> k * k1
+in
+let $camlEnv_types_use__use_h2_3 = closure use_h2_4_1 @use_h2 &toplevel in
+let code inline(never) loopify(never) size(48) newer_version_of(print_ints_5)
+      print_ints_5_1
+        (ints : [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(map_16 &my_alloc_region)
+    ($Stdlib__List.camlStdlib__List__map_16_36
+     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      ($Stdlib__Int.camlStdlib__Int__to_string_6_7, ints)
+      -> k3 * k1
+    where k3 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      apply direct(concat_8 &my_alloc_region)
+        ($Stdlib__String.camlStdlib__String__concat_8_19 : _ -> val)
+          ($camlEnv_types_use__immstring_0, apply_result)
+          -> k2 * k1
+    where k2 (apply_result : val) =
+      let stdout =
+        %project_value_slot.[print_endline].[stdout]
+          ($Stdlib.camlStdlib__print_endline_47_98)
+      in
+      let prim = %string_length (apply_result) in
+      let Pstringlength = %tag_imm (prim) in
+      (apply ccall inlining_state(depth(20))
+         ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+           (stdout, apply_result, 0, Pstringlength)
+           -> k3 * k1
+         where k3 (param) =
+           cont k2
+         where k2 =
+           (apply ccall inlining_state(depth(10))
+              ($`*extern*`.caml_ml_output_char : val * val -> val)
+                (stdout, 10)
+                -> k3 * k1
+              where k3 (param) =
+                cont k2
+              where k2 =
+                apply ccall inlining_state(depth(10))
+                  ($`*extern*`.caml_ml_flush : val -> val) (stdout) -> k * k1))
+in
+let $camlEnv_types_use__print_ints_4 =
+  closure print_ints_5_1 @print_ints &toplevel
+in
+apply direct(use_top_2_1 &toplevel)
+  ($camlEnv_types_use__use_top_1 : _ -> val * val) (5) -> k1 * error
+  where k1 (`*match*_unboxed0`, `*match*_unboxed1`) =
+    ((let $camlEnv_types_use__Pmakeblock_5 = Block 0 (`*match*_unboxed1`, 0)
+      in
+      let $camlEnv_types_use__Pmakeblock_6 =
+        Block 0 (`*match*_unboxed0`, $camlEnv_types_use__Pmakeblock_5)
+      in
+      apply direct(print_ints_5_1 &toplevel)
+        ($camlEnv_types_use__print_ints_4 : _ -> imm tagged)
+          ($camlEnv_types_use__Pmakeblock_6)
+          -> k2 * error
+        where k2 (param : imm tagged) =
+          cont k1)
+       where k1 =
+         (apply direct(use_h1_3_1 &toplevel)
+            ($camlEnv_types_use__use_h1_2 : _ -> val * val * val)
+              (7)
+              -> k1 * error
+            where k1
+                    (`*match*_unboxed0_1`,
+                     `*match*_unboxed1_1`,
+                     `*match*_unboxed2`) =
+              ((let $camlEnv_types_use__Pmakeblock_7 =
+                  Block 0 (`*match*_unboxed2`, 0)
+                in
+                let $camlEnv_types_use__Pmakeblock_8 =
+                  Block 0 (`*match*_unboxed1_1`,
+                           $camlEnv_types_use__Pmakeblock_7)
+                in
+                let $camlEnv_types_use__Pmakeblock_9 =
+                  Block 0 (`*match*_unboxed0_1`,
+                           $camlEnv_types_use__Pmakeblock_8)
+                in
+                apply direct(print_ints_5_1 &toplevel)
+                  ($camlEnv_types_use__print_ints_4 : _ -> imm tagged)
+                    ($camlEnv_types_use__Pmakeblock_9)
+                    -> k2 * error
+                  where k2 (param : imm tagged) =
+                    cont k1)
+                 where k1 =
+                   (apply direct(use_h2_4_1 &toplevel)
+                      ($camlEnv_types_use__use_h2_3 : _ -> val * val * val)
+                        (8)
+                        -> k1 * error
+                      where k1
+                              (`*match*_unboxed0_2`,
+                               `*match*_unboxed1_2`,
+                               `*match*_unboxed2_1`) =
+                        let $camlEnv_types_use__Pmakeblock_10 =
+                          Block 0 (`*match*_unboxed2_1`, 0)
+                        in
+                        let $camlEnv_types_use__Pmakeblock_11 =
+                          Block 0 (`*match*_unboxed1_2`,
+                                   $camlEnv_types_use__Pmakeblock_10)
+                        in
+                        let $camlEnv_types_use__Pmakeblock_12 =
+                          Block 0 (`*match*_unboxed0_2`,
+                                   $camlEnv_types_use__Pmakeblock_11)
+                        in
+                        (apply direct(print_ints_5_1 &toplevel)
+                           ($camlEnv_types_use__print_ints_4
+                            : _ -> imm tagged)
+                             ($camlEnv_types_use__Pmakeblock_12)
+                             -> k1 * error
+                           where k1 (param : imm tagged) =
+                             cont k)))))
+  where k =
+    let $camlEnv_types_use =
+      Block 0 ($camlEnv_types_use__use_top_1,
+               $camlEnv_types_use__use_h1_2,
+               $camlEnv_types_use__use_h2_3,
+               $camlEnv_types_use__print_ints_4)
+    in
+    cont done ($camlEnv_types_use)

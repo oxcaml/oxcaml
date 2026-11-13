@@ -16,8 +16,14 @@
 (** What the rebuild needs to know about the solved analysis. *)
 type 'f solution
 
+(** [template_keys] name the current unit's templates: they have no value, but
+    the typing environment defines them (see [Flambda_primitive.Template_env]).
+*)
 val solve :
-  'f Traverse.Problem.t -> analysis_scope:Analysis_scope.t -> 'f solution
+  'f Traverse.Problem.t ->
+  analysis_scope:Analysis_scope.t ->
+  template_keys:Symbol.Set.t ->
+  'f solution
 
 val get_unboxed_fields :
   'f solution -> Code_id_or_name.t -> Unboxing_analysis.unboxed option

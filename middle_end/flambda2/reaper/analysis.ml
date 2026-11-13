@@ -107,7 +107,7 @@ let rewrite_kind_with_subkind (type f)
   | Without_types -> fun _ -> Types_rewriter.erase_subkind
 
 let solve (type f) (problem : f Traverse.Problem.t)
-    ~(analysis_scope : Analysis_scope.t) =
+    ~(analysis_scope : Analysis_scope.t) ~template_keys =
   let { Traverse.Problem.deps;
         delayed_deps;
         code_deps;
@@ -158,7 +158,7 @@ let solve (type f) (problem : f Traverse.Problem.t)
         With_types unit_symbol ) ->
       With_types
         (Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol
-           final_typing_env)
+           ~template_keys final_typing_env)
   in
   { analysis_scope;
     has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
