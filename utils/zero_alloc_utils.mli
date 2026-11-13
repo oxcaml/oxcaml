@@ -55,7 +55,7 @@ module Components : sig
 
   val map : f:(Tag.t -> 'a -> 'b) -> 'a t -> 'b t
 
-  val map2 : f:(Tag.t -> 'a -> 'a -> 'b) -> 'a t -> 'a t -> 'b t
+  val map2 : f:(Tag.t -> 'a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
 
   val lessequal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
