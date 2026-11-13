@@ -1,6 +1,6 @@
 <ppx-context>
 tool_name: "ocamlc"
-open_args: [Open("List")]
+open_args: [Open_cmi_x("myppx.cmi") Open_cmi("myppx.cmi") Open("List")]
 for_package: "None"
 use_debug: false
 use_threads: true

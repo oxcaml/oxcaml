@@ -78,7 +78,10 @@ let _ = add_directive "quit" (Directive_none dir_quit)
 let dir_directory s =
   let d = expand_directory Config.standard_library s in
   Dll.add_path [d];
-  let dir = Load_path.Dir.create (Visible { cmx_guaranteed = false }) d in
+  let dir =
+    Load_path.Dir.create
+      { visibility = Visible; cmx_guaranteed = false } d
+  in
   Load_path.prepend_dir dir;
   toplevel_env :=
     Stdlib.String.Set.fold

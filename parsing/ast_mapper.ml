@@ -1180,7 +1180,10 @@ module PpxContext = struct
   let make_open_arg (arg : Clflags.open_arg) =
     match arg with
     | Open s -> Exp.construct (lid "Open") (Some (make_string s))
-    | Open_cmi s -> Exp.construct (lid "Open_cmi") (Some (make_string s))
+    | Open_cmi { path; cmx_guaranteed = false } ->
+        Exp.construct (lid "Open_cmi") (Some (make_string path))
+    | Open_cmi { path; cmx_guaranteed = true } ->
+        Exp.construct (lid "Open_cmi_x") (Some (make_string path))
 
   let get_cookies () =
     lid "cookies",
@@ -1197,9 +1200,9 @@ module PpxContext = struct
 
   let make ~tool_name () =
     let Load_path.{ visible; hidden } = Load_path.get_paths () in
-    let visible_load_dir_pairs dirs =
+    let load_dir_pairs dirs =
       List.map
-        (fun (e : Clflags.visible_include) -> (e.path, e.cmx_guaranteed))
+        (fun (e : Clflags.include_dir) -> (e.path, e.cmx_guaranteed))
         dirs
     in
     let fields =
@@ -1208,14 +1211,16 @@ module PpxContext = struct
         lid "include_dirs",
           make_list
             (make_pair make_string make_bool)
-            (visible_load_dir_pairs !Clflags.include_dirs);
+            (load_dir_pairs !Clflags.include_dirs);
         lid "hidden_include_dirs",
-          make_list make_string (!Clflags.hidden_include_dirs);
+          make_list
+            (make_pair make_string make_bool)
+            (load_dir_pairs !Clflags.hidden_include_dirs);
         lid "load_path",
           make_pair
             (make_list (make_pair make_string make_bool))
-            (make_list make_string)
-            (visible_load_dir_pairs visible, hidden);
+            (make_list (make_pair make_string make_bool))
+            (load_dir_pairs visible, load_dir_pairs hidden);
         lid "open_args",
           make_list make_open_arg !Clflags.open_args;
         lid "for_package",  make_option make_string !Clflags.for_package;
@@ -1290,20 +1295,27 @@ module PpxContext = struct
         | { pexp_desc =
               Pexp_construct
                 ({ txt = Longident.Lident "Open_cmi" }, Some exp) } ->
-            Clflags.Open_cmi (get_string exp)
+            Clflags.Open_cmi { path = get_string exp; cmx_guaranteed = false }
+        | { pexp_desc =
+              Pexp_construct
+                ({ txt = Longident.Lident "Open_cmi_x" }, Some exp) } ->
+            Clflags.Open_cmi { path = get_string exp; cmx_guaranteed = true }
         | _ -> raise_errorf "Internal error: invalid [@@@ocaml.ppx.context \
                              { %s }] open_arg syntax" name
+      in
+      let get_load_dirs payload =
+        List.map
+          (fun (path, cmx_guaranteed) : Clflags.include_dir ->
+             { path; cmx_guaranteed })
+          (get_list (get_pair get_string get_bool) payload)
       in
       match name with
       | "tool_name" ->
           tool_name_ref := get_string payload
       | "include_dirs" ->
-          Clflags.include_dirs :=
-            List.map
-              (fun (path, cmx_guaranteed) -> { Clflags.path; cmx_guaranteed })
-              (get_list (get_pair get_string get_bool) payload)
+          Clflags.include_dirs := get_load_dirs payload
       | "hidden_include_dirs" ->
-          Clflags.hidden_include_dirs := get_list get_string payload
+          Clflags.hidden_include_dirs := get_load_dirs payload
       | "load_path" ->
           (* Duplicates Compmisc.auto_include, since we can't reference Compmisc
              from this module. *)
@@ -1314,18 +1326,7 @@ module PpxContext = struct
               let alert = Location.auto_include_alert in
               Load_path.auto_include_otherlibs alert find_in_dir fn
           in
-          let visible, hidden =
-            get_pair
-              (get_list (get_pair get_string get_bool))
-              (get_list get_string)
-              payload
-          in
-          let visible =
-            List.map
-              (fun (path, cmx_guaranteed) : Clflags.visible_include ->
-                 { path; cmx_guaranteed })
-              visible
-          in
+          let visible, hidden = get_pair get_load_dirs get_load_dirs payload in
           Load_path.init ~auto_include ~visible ~hidden
       | "open_args" ->
           Clflags.open_args := get_list get_open_arg payload
