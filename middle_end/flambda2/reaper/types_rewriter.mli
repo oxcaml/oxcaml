@@ -36,8 +36,14 @@ val prepare_rewrite_context :
   (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list ->
   rewrite_context
 
+(** [template_keys] are symbols with no value, whose types are those of the
+    environments of the current unit's templates, which escape. *)
 val rewrite_typing_env :
-  rewrite_context -> unit_symbol:Symbol.t -> typing_env -> typing_env
+  rewrite_context ->
+  unit_symbol:Symbol.t ->
+  template_keys:Symbol.Set.t ->
+  typing_env ->
+  typing_env
 
 val rewrite_result_types :
   rewrite_context ->

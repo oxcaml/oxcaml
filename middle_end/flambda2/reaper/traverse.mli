@@ -61,8 +61,11 @@ module Skeleton : sig
   val apply_renaming : t -> Renaming.t -> t
 end
 
+(** [template_keys] name the unit's templates: they have no value, but
+    [final_typing_env] defines them (see [Flambda_primitive.Template_env]). *)
 val run :
   Flambda_unit.t ->
   final_typing_env:('f, typing_env) With_types.t ->
   free_names:Name_occurrences.t ->
+  template_keys:Symbol.Set.t ->
   'f Problem.t * Skeleton.t

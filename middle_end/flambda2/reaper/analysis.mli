@@ -22,8 +22,14 @@ module Solution : sig
   val apply_renaming : [`Without_types] t -> Renaming.t -> [`Without_types] t
 end
 
+(** [template_keys] name the current unit's templates: they have no value, but
+    the typing environment defines them (see [Flambda_primitive.Template_env]).
+*)
 val solve :
-  'f Traverse.Problem.t -> analysis_scope:Analysis_scope.t -> 'f Solution.t
+  'f Traverse.Problem.t ->
+  analysis_scope:Analysis_scope.t ->
+  template_keys:Symbol.Set.t ->
+  'f Solution.t
 
 val get_unboxed_fields :
   'f Solution.t -> Code_id_or_name.t -> Unboxing_analysis.unboxed option

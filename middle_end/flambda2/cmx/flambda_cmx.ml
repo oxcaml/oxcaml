@@ -103,7 +103,7 @@ let create_loader ~get_module_info =
 
 let get_imported_code loader () = loader.imported_code
 
-let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
+let compute_reachable_names_and_code ~roots ~free_names_of_name code =
   let rec fixpoint names_to_add names_already_added =
     if Name_occurrences.is_empty names_to_add
     then names_already_added
@@ -171,15 +171,12 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
       in
       fixpoint from_names_and_code_ids names_already_added
   in
-  let init_names =
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal
-  in
-  fixpoint init_names Name_occurrences.empty
+  fixpoint roots Name_occurrences.empty
 
-let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-    ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code =
+let prepare_cmx ~roots create_typing_env ~free_names_of_name ~used_value_slots
+    ~canonicalise ~exported_offsets ~sections all_code =
   let reachable_names =
-    compute_reachable_names_and_code ~module_symbol ~free_names_of_name all_code
+    compute_reachable_names_and_code ~roots ~free_names_of_name all_code
   in
   let all_code =
     (* CR mshinwell: do we need to remove unused function slot bindings from the
@@ -223,8 +220,15 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   in
   reachable_names, Some cmx
 
-let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
-    ~exported_offsets ~sections all_code =
+let template_roots ~module_symbol ~template_keys =
+  Symbol.Set.fold
+    (fun template_key roots ->
+      Name_occurrences.add_symbol roots template_key Name_mode.normal)
+    template_keys
+    (Name_occurrences.singleton_symbol module_symbol Name_mode.normal)
+
+let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~template_keys
+    ~used_value_slots ~exported_offsets ~sections all_code =
   if Flambda_features.opaque ()
   then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
   else
@@ -237,8 +241,10 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
     let free_names_of_name name =
       Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
-    prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code
+    prepare_cmx
+      ~roots:(template_roots ~module_symbol ~template_keys)
+      create_typing_env ~free_names_of_name ~used_value_slots ~canonicalise
+      ~exported_offsets ~sections all_code
 
 let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     ~exported_offsets ~used_value_slots ~sections all_code =
@@ -263,7 +269,8 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
           (Value_approximation.free_names
              ~code_free_names:Code_or_metadata.free_names approx)
     in
-    prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots
+    prepare_cmx
+      ~roots:(Name_occurrences.singleton_symbol module_symbol Name_mode.normal)
+      create_typing_env ~free_names_of_name ~used_value_slots
       ~canonicalise:(fun id -> id)
       ~exported_offsets ~sections all_code
