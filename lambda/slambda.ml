@@ -534,7 +534,7 @@ end
     compilation units clashing with local ones. *)
 let freshen_closure { Types.clo_template; clo_runtime_env; clo_env } =
   (* This doesn't freshen the layout idents because they won't appear in the
-     evaluated lambda and the closure carries it's own environment so they can't
+     evaluated lambda and the closure carries its own environment so they can't
      clash with ones from outside this context. *)
   let clo_env, rename = Env.freshen_idents clo_env in
   let clo_template : Types.template =
