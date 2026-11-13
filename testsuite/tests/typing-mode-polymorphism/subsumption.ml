@@ -357,6 +357,31 @@ Error: Signature mismatch:
        The argument mode was expected to be "portable" but is "nonportable"
 |}]
 
+(* Subsumption errors that are about types should not print any modes *)
+module Fail_type_mismatch : module type of Base = struct
+  let f x = (x, x)
+end
+[%%expect{|
+Lines 1-3, characters 50-3:
+1 | ..................................................struct
+2 |   let f x = (x, x)
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val f : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased]
+         end
+       is not included in
+         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+       Values do not match:
+         val f : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased]
+       is not included in
+         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The type "'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased]"
+       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
+       Type "'a * 'a" is not compatible with type "'a"
+|}]
+
 module Producer = struct
   let f x y = y
 end
