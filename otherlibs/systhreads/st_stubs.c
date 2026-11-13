@@ -420,7 +420,7 @@ static void caml_thread_leave_blocking_section(void)
 /* Create and setup a new thread info block.
    This block has no associated thread descriptor and
    is not inserted in the list of threads. */
-static caml_thread_t caml_thread_new_info(caml_thread_t parent)
+static caml_thread_t caml_thread_new_info(void)
 {
   caml_thread_t th = NULL;
   caml_domain_state *domain_state = Caml_state;
@@ -527,7 +527,7 @@ static value caml_thread_new_descriptor(value id, value clos)
 /* Allocate a thread info block and add it to the list of threads */
 static caml_thread_t thread_alloc_and_add(void)
 {
-  caml_thread_t th = caml_thread_new_info(Active_thread);
+  caml_thread_t th = caml_thread_new_info();
 
   if (th == NULL) return NULL;
 
