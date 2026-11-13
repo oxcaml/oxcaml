@@ -3547,8 +3547,8 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_AVX512VL]) has_avx512vl=yes, [])
 
-# Optional arm64 extensions are off unless requested, since the build machine
-# need not match the machines the compiled code runs on.
+# Optional arm64 extensions are off by default unless requested, since the
+# build machine need not match the machines the compiled code runs on.
 has_cssc=no
 has_lrcpc2=no
 has_lse=no
