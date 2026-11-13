@@ -799,3 +799,59 @@ let with_float =
 [%%expect {|
 val with_float : float = 42.5
 |}]
+
+(** Objects **)
+
+let _ =
+  let poly_ f x = ignore (object end); x in
+  f 1
+[%%expect{|
+>> Fatal error: let poly_ definitions must be functions
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Instantiations at different layouts must not share a class cache. *)
+let _ =
+  let r () =
+    let poly_ f x k = (object method m h = k (h ()) end)#m (fun () -> x) in
+    ignore (f #2.5 (fun _ -> 0));
+    f 42 (fun n -> n)
+  in
+  r ()
+[%%expect{|
+- : int = 69988912930932
+|}, Principal{|
+- : int = 69858513754228
+|}]
+
+(* Cached classes receive captured variables through an environment, where
+   slambda cannot see static values, so classes capturing them are not
+   cached. *)
+let _ =
+  let r () =
+    let poly_ id y = y in
+    (object method v = id 3 end)#v
+  in
+  r ()
+[%%expect{|
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* This includes the parts of a class outside of its object structure. *)
+let _ =
+  let r () =
+    let poly_ id y = y in
+    let module M = struct
+      class c (k : int) = let v = id k in object method v = v end
+    end in
+    (new M.c 4)#v
+  in
+  r ()
+[%%expect{|
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
+|}]
