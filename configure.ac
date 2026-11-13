@@ -3595,19 +3595,40 @@ programs on the build machine])])
            arm64_extensions="$arm64_extensions lse"],
           [AC_MSG_RESULT([no])])],
      [arm64_extensions=`echo "$with_arm64_extensions" | tr ',' ' '`])
+   arm64_march='-march=armv8-a'
    for arm64_extension in $arm64_extensions; do
      AS_CASE([$arm64_extension],
        [cssc],
          [OCAML_AS_HAS_ARM64_EXTENSION([CSSC], [.arch_extension cssc],
-           [cnt x0, x1], [has_cssc=yes])],
+           [cnt x0, x1],
+           [has_cssc=yes
+            AC_DEFINE([HAS_CSSC])
+            arm64_march="$arm64_march+cssc"])],
        [lrcpc2],
          [OCAML_AS_HAS_ARM64_EXTENSION([LRCPC2], [.arch armv8.4-a],
-           [ldapur x0, @<:@x1, 8@:>@], [has_lrcpc2=yes])],
+           [ldapur x0, @<:@x1, 8@:>@],
+           [has_lrcpc2=yes
+            AC_DEFINE([HAS_LRCPC2])
+            # Only GCC 15 and later accept +rcpc2, and clang does not.
+            arm64_march="$arm64_march+rcpc"])],
        [lse],
          [OCAML_AS_HAS_ARM64_EXTENSION([LSE], [.arch_extension lse],
-           [ldaddal x0, x1, @<:@x2@:>@], [has_lse=yes])],
+           [ldaddal x0, x1, @<:@x2@:>@],
+           [has_lse=yes
+            AC_DEFINE([HAS_LSE])
+            arm64_march="$arm64_march+lse"])],
        [AC_MSG_ERROR([unknown arm64 extension: $arm64_extension])])
-   done])
+   done
+   # Build the runtime for the same extensions, so the C compiler may use them.
+   # Not on macOS, where -march would replace a default baseline (apple-m1)
+   # that is already above armv8-a.
+   AS_IF([test x"$system" != "xmacosx"],
+     [saved_CFLAGS="$CFLAGS"
+      CFLAGS="$CFLAGS $arm64_march"
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])], [],
+        [AC_MSG_ERROR([$CC does not accept $arm64_march])])
+      CFLAGS="$saved_CFLAGS"
+      internal_cflags="$internal_cflags $arm64_march"])])
 
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
