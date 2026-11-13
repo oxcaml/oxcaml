@@ -66,8 +66,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let apply f = fun x -> f x
 [%%expect{|
 val apply :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm] -> 'b @ [< 'n & global]) @ [< global] ->
+  'a @ [< 'm] -> 'b @ [> 'n | dynamic] = <fun>
 |}]
 
 let foo (x @ unique) (y @ aliased) =
@@ -100,9 +100,9 @@ Error: This value is "nonportable" but is expected to be "portable".
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-  'c @ [< 'o] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+  ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+  'c @ [< 'o] -> 'b @ [> 'n | dynamic] = <fun>
 |}]
 
 (* mode polymorphism propagates through composition *)
@@ -181,12 +181,12 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many] ->
-  'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
+  ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global many] ->
+  'a list @ [< 'm > dynamic] -> 'b list @ [< global > 'n | dynamic] = <fun>
 |}, Principal{|
 val map :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many > aliased] ->
-  'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
+  ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global many > aliased] ->
+  'a list @ [< 'm > dynamic] -> 'b list @ [< global > 'n | dynamic] = <fun>
 |}]
 
 let foo (y @ portable) =

@@ -25,7 +25,7 @@ let apply (type a) (w : a arr) (g : a) =
   | F -> g 3
 [%%expect{|
 type _ arr = F : (int -> int) arr
-val apply : 'a arr @ 'n -> 'a @ 'm -> int @ [> dynamic] = <fun>
+val apply : 'a arr @ 'm -> 'a @ 'n -> int @ [> dynamic] = <fun>
 |}, Principal{|
 type _ arr = F : (int -> int) arr
 Line 5, characters 9-12:
@@ -41,9 +41,9 @@ let pin (w : 'x arr) (g : 'x) =
   | F -> g
 [%%expect{|
 val pin :
-  (int -> int) arr @ 'n ->
-  (int -> int) @ [< 'm mod aliased contended immutable] ->
-  (int -> int) @ [> 'm] = <fun>
+  (int -> int) arr @ 'm ->
+  (int -> int) @ [< 'n mod aliased contended immutable] ->
+  (int -> int) @ [> 'n] = <fun>
 |}, Principal{|
 val pin :
   (int -> int) arr @ [< global] ->
