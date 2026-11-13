@@ -1,0 +1,65 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+#
+# Enforces that a PR is squash-merged iff it does not bring in git-subtree
+# history (so that subtree history is preserved on main). See
+# tools/ci/check-subtree-merge-policy.sh for how both are detected.
+#
+# The merge queue is configured to squash, so in practice this rejects subtree
+# PRs from the queue; they must be landed by a maintainer who can bypass the
+# queue, with history preserved. On pull_request it only warns.
+#
+# This relies on every queue entry passing its own merge_group run, i.e. the
+# ruleset's "Only merge non-failing pull requests" (grouping strategy
+# ALLGREEN), since only the PR named in the merge group ref is checked.
+name: subtree merge policy
+on:
+  pull_request:
+  merge_group:
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  check:
+    name: subtree merge policy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the OxCaml repo (commit graph only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          filter: tree:0
+          sparse-checkout: tools/ci/check-subtree-merge-policy.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Check (pull request)
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: tools/ci/check-subtree-merge-policy.sh "$BASE_SHA" "$PR_HEAD_SHA"
+
+      - name: Check (merge queue)
+        if: ${{ github.event_name == 'merge_group' }}
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          # e.g. refs/heads/gh-readonly-queue/main/pr-1234-<sha>, where <sha>
+          # is the commit this entry is built on, not the PR head.
+          GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          if [[ ! $GROUP_HEAD_REF =~ /pr-([0-9]+)-[0-9a-f]{40}$ ]]; then
+            echo "::error::Can't parse merge group ref: $GROUP_HEAD_REF"
+            exit 1
+          fi
+          pr=${BASH_REMATCH[1]}
+          # Pushing to a queued PR removes it from the queue, so this is the
+          # head that was queued.
+          git fetch --no-tags --filter=tree:0 origin "refs/pull/$pr/head"
+          tools/ci/check-subtree-merge-policy.sh \
+            "$BASE_SHA" FETCH_HEAD "$GROUP_HEAD_SHA"
