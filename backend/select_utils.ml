@@ -653,7 +653,8 @@ module Stack_offset_and_exn = struct
         InstructionId.format term.id
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ | Prim _ ->
+    | Tailcall_func _ | Call_no_return _ | External_call_no_return _ | Invalid _
+    | Call _ | Prim _ ->
       stack_offset, traps
 
   let rec process_basic :
@@ -815,6 +816,20 @@ let insert_move_args env sub_cfg arg loc stacksize =
   if stacksize <> 0
   then insert env sub_cfg (make_stack_offset stacksize) [||] [||];
   insert_moves env sub_cfg arg loc
+
+let call_arg_locations (call : Cfg.func_call_operation) args =
+  let rarg =
+    match call with
+    | Indirect _ -> Array.sub args 1 (Array.length args - 1)
+    | Direct _ -> args
+  in
+  let loc_arg, stack_ofs = Proc.loc_arguments (Reg.typv rarg) in
+  rarg, loc_arg, stack_ofs
+
+let call_arg_for_terminator (call : Cfg.func_call_operation) args loc_arg =
+  match call with
+  | Indirect _ -> Array.append [| args.(0) |] loc_arg
+  | Direct _ -> loc_arg
 
 let result_needs_mask_of_int64 (src : Reg.t) (dst : Reg.t) =
   (* The C ABI passes masks in GPRs. *)
