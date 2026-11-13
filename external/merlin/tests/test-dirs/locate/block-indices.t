@@ -57,3 +57,14 @@ Locating a label uses its type-directed disambiguation:
 
   $ locate 10:15
   {"line":4,"col":13}
+
+Locating a label still works when the index doesn't have the expected type:
+
+  $ cat > test.ml << EOF
+  > type r1 = { a : int }
+  > type r2 = { a : string }
+  > let i : (r2, int) idx_imm = (.a)
+  > EOF
+
+  $ locate 3:30
+  {"line":2,"col":12}

@@ -711,7 +711,7 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
       let prefix, _is_label = Longident.(keep_suffix @@ parse prefix) in
       complete_prefix ?get_doc ?target_type ?kinds ~keywords ~prefix ~is_label
         buffer (env, node) branch
-    | Record_field (parent, lbl, _, _) ->
+    | Record_field (parent, lbl, record_form, _) ->
       let prefix, _is_label = Longident.(keep_suffix @@ parse prefix) in
       let snap = Btype.snapshot () in
       let is_label =
@@ -729,7 +729,14 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
           with
           | ty, Typedecl (p, _, decl) ->
             begin try
-              let lbls = Datarepr.labels_of_type p decl in
+              let labels_of_type (type rep)
+                  (record_form : rep Data_types.record_form) :
+                  (Ident.t * rep Data_types.gen_label_description) list =
+                match record_form with
+                | Legacy -> Datarepr.labels_of_type p decl
+                | Unboxed_product -> Datarepr.unboxed_labels_of_type p decl
+              in
+              let lbls = labels_of_type record_form in
               let labels =
                 List.map lbls ~f:(fun (_, lbl) ->
                     try

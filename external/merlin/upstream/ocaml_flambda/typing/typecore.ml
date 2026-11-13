@@ -2444,6 +2444,31 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
       ~old_repres:representative_label.lbl_repres
       (lbls_and_ty_args |> Array.to_list)
 
+(* A label to use in place of one that failed to type, for error recovery. *)
+let make_fake_label (type rep) (record_form : rep record_form) ~why ~lbl_mut
+    ~lbl_res ~loc : rep gen_label_description =
+  let arg_kind, _ =
+    Jkind.of_new_sort_var ~why ~level:(Ctype.get_current_level ())
+  in
+  {
+    lbl_name = "";
+    lbl_res;
+    lbl_arg = newvar arg_kind;
+    lbl_mut;
+    lbl_modalities = Mode.Modality.Const.id;
+    lbl_pos = 0;
+    lbl_all = [||];
+    lbl_repres =
+      (match record_form with
+      | Legacy -> Record_boxed
+      | Unboxed_product -> Record_unboxed_product);
+    lbl_private = Public;
+    lbl_loc = loc;
+    lbl_attributes = [];
+    lbl_uid = Uid.internal_not_actually_unique;
+    lbl_sort = None;
+  }
+
 (* Constraint solving during typing of patterns *)
 
 let solve_Ppat_alias ~mode env pat =
@@ -8598,6 +8623,10 @@ and type_expect_
     in
     let expected_base_ty = expected_base_ty ty_expected in
     let principal = is_principal ty_expected in
+    let recovery_errors = Typing_recovery.monitor_errors () in
+    let has_recovery_errors () =
+      !Clflags.typing_recovery && !recovery_errors
+    in
     let { ba; base_ty; el_ty } =
       with_local_level_generalize_structure_if_principal
         ~before_generalize:generalize_structure_type_block_access_result
@@ -8652,14 +8681,20 @@ and type_expect_
       | Mutable { atomic = Atomic; mode = _ } ->
         Predef.type_idx_atomic base_ty el_ty
     in
-    with_explanation (fun () ->
-      unify_exp_types loc env ty (generic_instance ty_expected));
-    re {
-      exp_desc = Texp_idx (ba, uas);
-      exp_loc = loc; exp_extra = [];
-      exp_type = instance ty_expected;
-      exp_attributes = sexp.pexp_attributes;
-      exp_env = env }
+    let exp =
+      re {
+        exp_desc = Texp_idx (ba, uas);
+        exp_loc = loc; exp_extra = [];
+        exp_type = ty;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
+    in
+    (* If we recovered from an error while typing the index, this unification is
+       likely to fail in a noisy way, so we skip it. *)
+    if not (has_recovery_errors ()) then
+      with_explanation (fun () ->
+        unify_exp ~sexp env exp (generic_instance ty_expected));
+    re { exp with exp_type = instance ty_expected }
   | Pexp_ifthenelse(scond, sifso, sifnot) ->
       check_dynamic (loc, Expression) Branching expected_mode;
       let cond =
@@ -9714,15 +9749,24 @@ and type_block_access env expected_base_ty principal
         Some(p0, p, principal)
       | _ -> None
     in
-    let labels =
-      Env.lookup_all_labels ~record_form:Legacy ~loc:lid.loc Projection
-        lid.txt env
-    in
-    let label, _ambiguity =
-      wrap_disambiguate "This block index is expected to have base"
-        (mk_expected expected_base_ty)
-        (label_disambiguate Legacy Projection lid env expected_record_type)
-        labels
+    let label =
+      try
+        let labels =
+          Env.lookup_all_labels ~record_form:Legacy ~loc:lid.loc Projection
+            lid.txt env
+        in
+        let label, _ambiguity =
+          wrap_disambiguate "This block index is expected to have base"
+            (mk_expected expected_base_ty)
+            (label_disambiguate Legacy Projection lid env expected_record_type)
+            labels
+        in
+        label
+      with exn when !Clflags.typing_recovery
+                 && Typing_recovery.is_recoverable exn ->
+        Typing_recovery.erroneous_type_register expected_base_ty;
+        make_fake_label Legacy ~why:Idx_element ~lbl_mut:Immutable
+          ~lbl_res:expected_base_ty ~loc:lid.loc
     in
     let mut = is_mutable label.lbl_mut in
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
@@ -9761,16 +9805,25 @@ and type_unboxed_access env loc el_ty ua =
         Some(p0, p, is_principal el_ty)
       | _ -> None
     in
-    let labels =
-      Env.lookup_all_labels ~record_form:Unboxed_product ~loc:lid.loc
-        Projection lid.txt env
-    in
-    let label, _ambiguity =
-      wrap_disambiguate "This unboxed access is expected to have base"
-        (mk_expected el_ty)
-        (label_disambiguate Unboxed_product Projection lid env
-            expected_record_type)
-        labels
+    let label =
+      try
+        let labels =
+          Env.lookup_all_labels ~record_form:Unboxed_product ~loc:lid.loc
+            Projection lid.txt env
+        in
+        let label, _ambiguity =
+          wrap_disambiguate "This unboxed access is expected to have base"
+            (mk_expected el_ty)
+            (label_disambiguate Unboxed_product Projection lid env
+                expected_record_type)
+            labels
+        in
+        label
+      with exn when !Clflags.typing_recovery
+                 && Typing_recovery.is_recoverable exn ->
+        Typing_recovery.erroneous_type_register el_ty;
+        make_fake_label Unboxed_product ~why:Idx_element ~lbl_mut:Immutable
+          ~lbl_res:el_ty ~loc:lid.loc
     in
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     begin
@@ -10674,35 +10727,14 @@ and type_label_access
   with exn when !Clflags.typing_recovery
              && Typing_recovery.is_recoverable exn ->
     Typing_recovery.erroneous_type_register ty_exp;
-    let arg_kind, _ =
-      Jkind.of_new_sort_var ~why:Record_projection
-        ~level:(Ctype.get_current_level ())
-    in
-    let make_fake_label (type rep) (record_form : rep record_form)
-      : rep gen_label_description =
-      {
-        lbl_name = "";
-        lbl_res = ty_exp;
-        lbl_arg = newvar arg_kind;
-        lbl_mut =
-          Mutable { mode = Mode.With_regionality.Comonadic.legacy;
-                    atomic = Nonatomic };
-        lbl_modalities = Mode.Modality.Const.id;
-        lbl_pos = 0;
-        lbl_all = [||];
-        lbl_repres =
-          (match record_form with
-          | Legacy -> Record_boxed
-          | Unboxed_product -> Record_unboxed_product);
-        lbl_private = Public;
-        lbl_loc = lid.loc;
-        lbl_attributes = [];
-        lbl_uid = Uid.internal_not_actually_unique;
-        lbl_sort = None;
-      }
+    let label =
+      make_fake_label record_form ~why:Record_projection
+        ~lbl_mut:(Mutable { mode = Mode.With_regionality.Comonadic.legacy;
+                            atomic = Nonatomic })
+        ~lbl_res:ty_exp ~loc:lid.loc
     in
     (record, record_sort, Mode.With_regionality.disallow_right mode,
-     make_fake_label record_form, expected_type, Unambiguous)
+     label, expected_type, Unambiguous)
 
 and solve_Pexp_field
   : 'rep . label_usage:_ -> _ -> _ -> _ -> _ -> 'rep record_form -> _ ->
