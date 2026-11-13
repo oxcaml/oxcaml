@@ -31,6 +31,14 @@ let incompatibility_phrase (type variety) : variety trace_format -> string =
   | Equality    -> "is not equal to type"
   | Moregen     -> "is not compatible with type"
 
+type print_modes = { pattern : bool; subject : bool }
+
+let print_modes (type variety) ~has_mode_mismatch :
+    variety trace_format -> print_modes =
+  function
+  | Unification | Equality -> { pattern = true; subject = true }
+  | Moregen -> { pattern = has_mode_mismatch; subject = true }
+
 (* Print a unification error *)
 open Out_type
 open Format_doc
@@ -39,8 +47,14 @@ module Style = Misc.Style
 
 type 'a diff = 'a Out_type.diff = Same of 'a | Diff of 'a * 'a
 
-let trees_of_trace mode =
-  List.map (Errortrace.map_diff (trees_of_type_expansion mode))
+let map_diff ~print_modes f Errortrace.{got; expected} =
+  let apply b x = if b then f x else with_modes false (fun () -> f x) in
+  let got = apply print_modes.pattern got in
+  let expected = apply print_modes.subject expected in
+  Errortrace.{got; expected}
+
+let trees_of_trace ?(print_modes = { pattern = true; subject = true }) mode =
+  List.map (map_diff ~print_modes (trees_of_type_expansion mode))
 
 let rec trace fst txt ppf = function
   | {Errortrace.got; expected} :: rem ->
@@ -472,16 +486,17 @@ let warn_on_missing_def env ppf t =
       end
   | _ -> ()
 
-let prepare_expansion_head empty_tr = function
+let prepare_expansion_head ~print_modes empty_tr = function
   | Errortrace.Diff d ->
-      Some (Errortrace.map_diff (may_prepare_expansion empty_tr) d)
+      Some (map_diff ~print_modes (may_prepare_expansion empty_tr) d)
   | _ -> None
 
-let head_error_printer ~var_jkinds mode txt_got txt_but = function
+let head_error_printer ~print_modes ~var_jkinds mode txt_got txt_but =
+  function
   | None -> Format_doc.Doc.empty
   | Some d ->
       let d =
-        Errortrace.map_diff (trees_of_type_expansion' ~var_jkinds mode) d
+        map_diff ~print_modes (trees_of_type_expansion' ~var_jkinds mode) d
       in
       doc_printf "%a@;<1 2>%a@ %a@;<1 2>%a"
         pp_doc txt_got pp_type_expansion d.Errortrace.got
@@ -500,6 +515,10 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
   (* We want to substitute in the opposite order from [Eqtype] *)
   Variable_names.add_subst (List.map (fun (ty1,ty2) -> ty2,ty1) subst);
   let mode_mismatch, tr = split_mode_mismatch tr in
+  let print_modes =
+    print_modes ~has_mode_mismatch:(Option.is_some mode_mismatch)
+      trace_format
+  in
   let tr =
     prepare_trace
       (fun ty_exp ->
@@ -518,15 +537,19 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
   | (elt :: tr) as full_trace ->
       with_labels (not !Clflags.classic) (fun () ->
       let tr, last = filter_trace tr in
-      let head = prepare_expansion_head (tr=[] && last=None) elt in
-      let tr = List.map (Errortrace.map_diff prepare_expansion) tr in
-      let last = Option.map (Errortrace.map_diff prepare_expansion) last in
-      let head_error =
-        head_error_printer ~var_jkinds:jkind_error mode txt1 txt2 head
+      let head =
+        prepare_expansion_head ~print_modes (tr=[] && last=None) elt
       in
-      let tr = trees_of_trace mode tr in
+      let tr = List.map (map_diff ~print_modes prepare_expansion) tr in
+      let last = Option.map (map_diff ~print_modes prepare_expansion) last in
+      let head_error =
+        head_error_printer ~print_modes ~var_jkinds:jkind_error mode txt1 txt2
+          head
+      in
+      let tr = trees_of_trace ~print_modes mode tr in
       let last =
-        Option.map (Errortrace.map_diff (trees_of_type_expansion mode)) last in
+        Option.map (map_diff ~print_modes (trees_of_type_expansion mode)) last
+      in
       let mis = mismatch txt1 env full_trace in
       let tr = match mis, last with
         | None, Some elt -> tr @ [elt]
