@@ -19,6 +19,21 @@
 
 #ifdef CAML_INTERNALS
 CAMLextern void caml_detect_cpu_features(void);
+
+#ifdef __aarch64__
+/* Whether the CPU supports FEAT_LSE. Set by [caml_detect_cpu_features];
+   false before that has run. */
+CAMLextern bool caml_cpu_lse;
+
+Caml_inline bool caml_cpu_has_lse(void)
+{
+#ifdef HAS_LSE
+  return true;
+#else
+  return caml_cpu_lse;
 #endif
+}
+#endif /* __aarch64__ */
+#endif /* CAML_INTERNALS */
 
 #endif /* CAML_CPU_H */

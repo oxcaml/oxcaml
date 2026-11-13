@@ -121,6 +121,12 @@
 
 #undef HAS_AVX2
 
+#undef HAS_CSSC
+
+#undef HAS_LRCPC2
+
+#undef HAS_LSE
+
 #undef HAS_AVX512F
 
 #undef HAS_AVX512DQ
