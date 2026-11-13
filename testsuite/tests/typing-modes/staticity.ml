@@ -919,6 +919,16 @@ Line 3, characters 21-22:
 Error: This value is "dynamic" but is expected to be "static".
 |}]
 
+(* For-loop indices are dynamic *)
+let f () =
+  for i = 0 to 0 do
+    let _ @ static = i in
+    ()
+  done
+[%%expect{|
+val f : unit -> unit = <fun>
+|}]
+
 (* Unpacked first class modules must be dynamic *)
 module type S = sig val y : int end
 let unpack_static (p : (module S)) =
