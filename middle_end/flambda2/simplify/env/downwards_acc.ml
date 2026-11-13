@@ -19,6 +19,23 @@ module DE = Downwards_env
 module LCS = Lifted_constant_state
 module TE = Flambda2_types.Typing_env
 
+type templates =
+  { env_types :
+      Flambda2_types.Typing_env_extension.With_extra_variables.t Symbol.Map.t;
+    awaiting_instantiation_code : Code.t Code_id.Map.t
+  }
+
+let [@ocamlformat "disable"] print_templates ppf
+    { env_types; awaiting_instantiation_code } =
+  Format.fprintf ppf "@[<hov 1>(\
+      @[<hov 1>(env_types@ %a)@]@ \
+      @[<hov 1>(awaiting_instantiation_code@ %a)@]\
+      )@]"
+    (Symbol.Map.print
+       Flambda2_types.Typing_env_extension.With_extra_variables.print)
+    env_types
+    Code_id.Set.print (Code_id.Map.keys awaiting_instantiation_code)
+
 type t =
   { denv : DE.t;
     continuation_uses_env : CUE.t;
@@ -39,7 +56,8 @@ type t =
     continuations_to_specialize : Continuation.Set.t;
     (* CR gbury: we could try and encode the set of continuations to specialize
        into the map below as the keys of the map *)
-    specialization_map : Continuation.t Continuation_callsite_map.t
+    specialization_map : Continuation.t Continuation_callsite_map.t;
+    templates : templates
   }
 
 let print_lifted_cont ppf (denv, original_handlers) =
@@ -52,7 +70,7 @@ let [@ocamlformat "disable"] print ppf
         lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
-        continuations_to_specialize; specialization_map; } =
+        continuations_to_specialize; specialization_map; templates } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(denv@ %a)@]@ \
       @[<hov 1>(continuation_uses_env@ %a)@]@ \
@@ -70,7 +88,8 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(lifted_continuations@ %a)@]@ \
       @[<hov 1>(continuation_lifting_budget %d)@]@ \
       @[<hov 1>(continuations_to_specialize %a)@]@ \
-      @[<hov 1>(specialization_map %a)@]\
+      @[<hov 1>(specialization_map %a)@]@ \
+      @[<hov 1>(templates %a)@]\
       )@]"
     DE.print denv
     CUE.print continuation_uses_env
@@ -90,6 +109,7 @@ let [@ocamlformat "disable"] print ppf
     continuation_lifting_budget
     Continuation.Set.print continuations_to_specialize
     (Continuation.Map.print (Apply_cont_rewrite_id.Map.print Continuation.print)) specialization_map
+    print_templates templates
 
 let create denv slot_offsets continuation_uses_env =
   { denv;
@@ -108,7 +128,11 @@ let create denv slot_offsets continuation_uses_env =
     lifted_continuations = [];
     continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ();
     continuations_to_specialize = Continuation.Set.empty;
-    specialization_map = Continuation.Map.empty
+    specialization_map = Continuation.Map.empty;
+    templates =
+      { env_types = Symbol.Map.empty;
+        awaiting_instantiation_code = Code_id.Map.empty
+      }
   }
 
 let denv t = t.denv
@@ -220,6 +244,59 @@ let all_continuations_used t =
   CUE.all_continuations_used t.continuation_uses_env
 
 let with_used_value_slots t ~used_value_slots = { t with used_value_slots }
+
+let templates t = t.templates
+
+let with_templates t ~templates = { t with templates }
+
+let map_templates t ~f = { t with templates = f t.templates }
+
+let add_instantiation_code t code =
+  map_templates t ~f:(fun templates ->
+      { templates with
+        awaiting_instantiation_code =
+          Code_id.Map.add (Code.code_id code) code
+            templates.awaiting_instantiation_code
+      })
+
+let instantiations_awaiting_simplification t =
+  Code_id.Map.keys t.templates.awaiting_instantiation_code
+
+let awaiting_instantiation_code t code_id =
+  match
+    Code_id.Map.find_opt code_id t.templates.awaiting_instantiation_code
+  with
+  | Some code -> code
+  | None ->
+    Misc.fatal_errorf
+      "%a is not the code of an instantiation of a template that is waiting \
+       for its definition"
+      Code_id.print code_id
+
+let instantiation_simplified t code_id =
+  map_templates t ~f:(fun templates ->
+      { templates with
+        awaiting_instantiation_code =
+          Code_id.Map.remove code_id templates.awaiting_instantiation_code
+      })
+
+let define_template t template_key env_type =
+  if Symbol.Map.mem template_key t.templates.env_types
+  then
+    Misc.fatal_errorf
+      "The definition of template %a was simplified more than once" Symbol.print
+      template_key;
+  map_templates t ~f:(fun templates ->
+      { templates with
+        env_types = Symbol.Map.add template_key env_type templates.env_types
+      })
+
+let template_env_types t = t.templates.env_types
+
+let templates_defined_since t earlier =
+  (* Templates are only ever added. *)
+  Symbol.Map.cardinal t.templates.env_types
+  > Symbol.Map.cardinal earlier.templates.env_types
 
 let add_code_ids_to_remember t code_ids =
   if DE.at_unit_toplevel t.denv

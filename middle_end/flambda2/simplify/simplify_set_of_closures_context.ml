@@ -24,7 +24,8 @@ type t =
       Bound_name.t Function_slot.Map.t list;
     old_to_new_code_ids_all_sets : Code_id.t Code_id.Map.t;
     previously_free_depth_variables : Variable.Set.t;
-    single_set_of_size_one : bool
+    single_set_of_size_one : bool;
+    template_env_type : T.Typing_env_extension.With_extra_variables.t option
   }
 
 let function_decl_type ?new_code_id ~rec_info old_code_id =
@@ -32,7 +33,7 @@ let function_decl_type ?new_code_id ~rec_info old_code_id =
   Or_unknown.Known (T.Function_type.create code_id ~rec_info)
 
 let create_for_code_without_closure0 dacc ~all_code ~simplify_function_body
-    ~is_stub =
+    ~is_stub ~template_env_type =
   let dacc_inside_functions =
     DA.map_denv dacc ~f:(fun denv ->
         (* CR pchambart: We are not entering a set of closure, this function
@@ -47,7 +48,13 @@ let create_for_code_without_closure0 dacc ~all_code ~simplify_function_body
              One place where this was seen was code generated for labelled /
              optional argument application when there are a lot of
              parameters. *)
-          if is_stub then DE.enter_stub_function denv else denv
+          if is_stub
+          then DE.enter_stub_function denv
+          else
+            (* The definition of a template, where the code of its
+               instantiations is simplified, can be in a stub (for example in
+               the default value of an optional argument). *)
+            DE.leave_stub_function denv
         in
         Code_id.Map.fold
           (fun code_id code denv -> DE.define_code denv ~code_id ~code)
@@ -59,16 +66,20 @@ let create_for_code_without_closure0 dacc ~all_code ~simplify_function_body
     closure_bound_names_inside_functions_all_sets = [];
     old_to_new_code_ids_all_sets = Code_id.Map.empty;
     previously_free_depth_variables = Variable.Set.empty;
-    single_set_of_size_one = false
+    single_set_of_size_one = false;
+    template_env_type
   }
 
 let create_for_static_stub dacc ~all_code ~simplify_function_body =
   create_for_code_without_closure0 dacc ~all_code ~simplify_function_body
-    ~is_stub:true
+    ~is_stub:true ~template_env_type:None
 
-let create_for_code_without_closure dacc ~all_code ~simplify_function_body =
+let create_for_code_without_closure dacc ~all_code ~simplify_function_body
+    ~template_env_type =
   create_for_code_without_closure0 dacc ~all_code ~simplify_function_body
-    ~is_stub:false
+    ~is_stub:false ~template_env_type
+
+let template_env_type t = t.template_env_type
 
 let simplify_function_body t = t.simplify_function_body
 
@@ -384,5 +395,6 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     old_to_new_code_ids_all_sets;
     simplify_function_body;
     previously_free_depth_variables;
-    single_set_of_size_one
+    single_set_of_size_one;
+    template_env_type = None
   }

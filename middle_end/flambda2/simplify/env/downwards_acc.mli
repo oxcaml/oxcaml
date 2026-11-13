@@ -92,6 +92,40 @@ val used_value_slots : t -> Name_occurrences.t
 
 val with_used_value_slots : t -> used_value_slots:Name_occurrences.t -> t
 
+(** What Simplify knows about this unit's templates and their instantiations
+    (see [Flambda_primitive.Template_env]). *)
+type templates
+
+val templates : t -> templates
+
+val with_templates : t -> templates:templates -> t
+
+(** The unsimplified code of one of this unit's instantiations of one of its
+    templates, which is simplified at the template's definition. *)
+val add_instantiation_code : t -> Code.t -> t
+
+val instantiations_awaiting_simplification : t -> Code_id.Set.t
+
+val awaiting_instantiation_code : t -> Code_id.t -> Code.t
+
+val instantiation_simplified : t -> Code_id.t -> t
+
+(** Record the type of a template's environments, at its definition. Each
+    definition must only be simplified once, so Simplify must not copy one
+    before simplifying it. *)
+val define_template :
+  t ->
+  Symbol.t ->
+  Flambda2_types.Typing_env_extension.With_extra_variables.t ->
+  t
+
+val template_env_types :
+  t -> Flambda2_types.Typing_env_extension.With_extra_variables.t Symbol.Map.t
+
+(** Whether any template was defined since [earlier], an accumulator from
+    earlier in the same traversal. *)
+val templates_defined_since : t -> t -> bool
+
 val add_code_ids_to_remember : t -> Code_id.Set.t -> t
 
 val code_ids_to_remember : t -> Code_id.Set.t

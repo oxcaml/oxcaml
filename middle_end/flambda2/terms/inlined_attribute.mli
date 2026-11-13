@@ -22,6 +22,7 @@ module Use_info : sig
     | Unused_because_of_call_site_decision
     | Unused_because_function_unknown
     | Jsir_inlining_disabled
+    | Template_definition_not_simplified
 
   val explanation : t -> string option
 end

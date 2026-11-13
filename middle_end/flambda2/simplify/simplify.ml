@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Flambda.Import
 open! Simplify_import
 
 type simplify_result =
@@ -23,6 +24,73 @@ type simplify_result =
     slot_offsets : Slot_offsets.t;
     unit : Flambda_unit.t
   }
+
+(* The code of an instantiation of a template is simplified at the template's
+   definition. If the definition was never reached, because it is in dead code,
+   the code can still be referenced (for example by the code of another
+   instantiation), but is never called: an instantiation only ever receives
+   environments created by the definition. *)
+let bind_code_of_unreached_instantiations dacc body name_occurrences all_code =
+  let code_ids =
+    Code_id.Set.inter
+      (DA.instantiations_awaiting_simplification dacc)
+      (NO.code_ids name_occurrences)
+  in
+  if Code_id.Set.is_empty code_ids
+  then body, name_occurrences, all_code
+  else
+    let unreachable_code code_id =
+      let code = DA.awaiting_instantiation_code dacc code_id in
+      let params_and_body =
+        Function_params_and_body.pattern_match (Code.params_and_body code)
+          ~f:(fun
+              ~return_continuation
+              ~exn_continuation
+              params
+              ~body:_
+              ~my_closure
+              ~is_my_closure_used:_
+              ~my_alloc_mode
+              ~my_depth
+              ~free_names_of_body:_
+            ->
+            Function_params_and_body.create ~return_continuation
+              ~exn_continuation params
+              ~body:
+                (Expr.create_invalid
+                   (Message
+                      "The definition of this instantiation's template is \
+                       never reached"))
+              ~free_names_of_body:(Known NO.empty) ~my_closure ~my_alloc_mode
+              ~my_depth)
+      in
+      Code.with_params_and_body ~params_and_body
+        ~free_names_of_params_and_body:NO.empty ~cost_metrics:Cost_metrics.zero
+        code
+    in
+    let code = Code_id.Map.of_set unreachable_code code_ids in
+    let body =
+      Let.create
+        (Bound_pattern.static
+           (Bound_static.create
+              (List.map Bound_static.Pattern.code
+                 (Code_id.Set.elements code_ids))))
+        (Named.create_static_consts
+           (Static_const_group.create
+              (List.map Static_const_or_code.create_code (Code_id.Map.data code))))
+        ~body ~free_names_of_body:(Known name_occurrences)
+      |> Expr.create_let
+    in
+    let name_occurrences =
+      Code_id.Set.fold
+        (fun code_id name_occurrences ->
+          NO.remove_code_id_or_symbol name_occurrences
+            ~code_id_or_symbol:(Code_id_or_symbol.create_code_id code_id))
+        code_ids name_occurrences
+    in
+    ( body,
+      name_occurrences,
+      Exported_code.add_code ~keep_code:(fun _ -> true) code all_code )
 
 let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let return_continuation = FU.return_continuation unit in
@@ -57,6 +125,10 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
                term:@ %a"
               Variable.print var Expr.print body)
         ~symbol:(fun _symbol -> ()));
+  let body, name_occurrences, all_code =
+    bind_code_of_unreached_instantiations (UA.creation_dacc uacc) body
+      name_occurrences (UA.all_code uacc)
+  in
   if not (LCS.is_empty (UA.lifted_constants uacc))
   then
     Misc.fatal_errorf "Lifted constants accumulator should be empty:@ %a"
@@ -75,10 +147,9 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
         module_symbol
   in
   let all_code =
-    Exported_code.merge (UA.all_code uacc)
+    Exported_code.merge all_code
       (Exported_code.mark_as_imported (get_imported_code ()))
   in
-  let name_occurrences = UA.name_occurrences uacc in
   let slot_offsets =
     match UA.slot_offsets uacc with
     | Unknown ->

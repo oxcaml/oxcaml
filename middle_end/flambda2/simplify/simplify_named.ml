@@ -73,7 +73,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
   in
   let invalid = Simplified_named.Simplified Or_invalid.Invalid in
   let machine_width = DE.machine_width (DA.denv dacc) in
-  match named with
+  match[@warning "-fragile-match"] named with
   | Simple simple ->
     let bound_var = Bound_pattern.must_be_singleton bound_pattern in
     let min_name_mode = Bound_var.name_mode bound_var in
@@ -92,6 +92,10 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
               simplified_defining_expr = defining_expr;
               original_defining_expr = Some named
             }))
+  | Prim (Unary (Template_env { template_key; instantiations }, arg), _dbg) ->
+    ok
+      (Simplify_template_env.simplify_template_env dacc bound_pattern named
+         ~template_key ~instantiations ~arg ~simplify_function_body)
   | Prim (prim, dbg) -> (
     if not (Name_mode.is_normal (Bound_pattern.name_mode bound_pattern))
     then

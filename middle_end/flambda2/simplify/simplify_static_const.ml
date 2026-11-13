@@ -418,13 +418,25 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
             dacc )
         in
         match Code.template_key code with
+        | Some template_key
+          when Current_unit.is_current (Symbol.compilation_unit template_key) ->
+          (* The code of an instantiation of one of this unit's templates is
+             simplified, and bound, at the template's definition (see
+             [Simplify_template_env]), where the type of its environments is
+             known. Until then, calls to it see the unsimplified code (see
+             [Call_site_inlining_decision.copies_template_definition]). *)
+          let dacc =
+            DA.map_denv dacc ~f:(fun denv -> DE.define_code denv ~code_id ~code)
+          in
+          bound_static, static_consts, DA.add_instantiation_code dacc code
         | Some _ ->
-          (* The code of an instantiation of a template has no closure to wait
-             for. *)
+          (* The type of the environments of another unit's template is already
+             known, and there is no closure to wait for. *)
           define_code
             (simplify_in_place (fun dacc code ->
                  Simplify_set_of_closures.simplify_code_without_closure dacc
-                   code ~all_code ~simplify_function_body))
+                   code ~all_code ~simplify_function_body
+                   ~template_env_type:None))
         | None ->
           if
             Code.stub code

@@ -638,6 +638,12 @@ let set_do_not_rebuild_terms_and_disable_inlining t disable_inlining_reason =
     disable_inlining = Disable_inlining disable_inlining_reason
   }
 
+let leave_stub_function t =
+  match t.disable_inlining with
+  | Disable_inlining Stub ->
+    { t with disable_inlining = Do_not_disable_inlining }
+  | Disable_inlining Speculative_inlining | Do_not_disable_inlining -> t
+
 let set_disable_inlining t reason =
   { t with disable_inlining = Disable_inlining reason }
 

@@ -1204,6 +1204,13 @@ and specialize_continuation_if_needed ~simplify_expr dacc
         (* only a single use, the continuation is already specialized *)
         k dacc data
       | uses ->
+        if DA.templates_defined_since dacc data.dacc_after_body
+        then
+          (* See [Specialization_cost.Contains_template_definition]. *)
+          Misc.fatal_errorf
+            "Continuation %a is being specialised, but its handler defines a \
+             template"
+            Continuation.print cont;
         (* We need to save a few values from the dacc, because the
            specialization can reset the dacc to the one after the traversal of
            the body. For most values in the dacc, this is not a problem since
@@ -1875,7 +1882,12 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     DE.map_specialization_cost
       ~f:
         (Specialization_cost.add_continuations data.handlers
-           ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers))
+           ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers)
+           ~define_templates:
+             (lazy
+               ((not can_be_lifted)
+               && Template_definitions.in_handlers denv_before_body
+                    data.handlers)))
       (DE.add_lifting_cost lifting_cost
          (DE.define_continuations denv_for_body bound_continuations
             ~can_be_lifted))

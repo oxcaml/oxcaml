@@ -38,12 +38,20 @@ val create_for_static_stub :
   t
 
 (** For code that has no closure, such as the code of the instantiations of
-    templates. Unlike in stubs, inlining is allowed. *)
+    templates. Unlike in stubs, inlining is allowed. For the code of an
+    instantiation of one of this unit's templates, [template_env_type] is the
+    type of the template's environments, which the code takes as its first
+    parameter, as an equation on the template's key (see
+    [Code_metadata.template_key]). *)
 val create_for_code_without_closure :
   DA.t ->
   all_code:Code.t Code_id.Map.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
+  template_env_type:T.Typing_env_extension.With_extra_variables.t option ->
   t
+
+val template_env_type :
+  t -> T.Typing_env_extension.With_extra_variables.t option
 
 val dacc_inside_functions : t -> DA.t
 
