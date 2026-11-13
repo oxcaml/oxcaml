@@ -936,6 +936,18 @@ and jkind_declaration =
   }
   (** [kind_ name] or [kind_ name = k] *)
 
+and law_declaration =
+  {
+    plaw_name : string loc;
+    plaw_params : (string loc * core_type option) list;
+    plaw_assumptions : expression list;
+    plaw_conclusion : expression;
+    plaw_attributes : attributes;
+    plaw_loc : Location.t
+  }
+  (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C], where
+      each parameter [pi] is [x] or [(x : T)] *)
+
 
 (** {1 Class language} *)
 (** {2 Type expressions for the class language} *)
@@ -1199,6 +1211,7 @@ and signature_item_desc =
   | Psig_attribute of attribute  (** [[\@\@\@id]] *)
   | Psig_extension of extension * attributes  (** [[%%id]] *)
   | Psig_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
+  | Psig_law of law_declaration (** [law_? name x (y : T) : A implies_ C] *)
 
 and module_declaration =
     {
@@ -1374,6 +1387,7 @@ and structure_item_desc =
   | Pstr_attribute of attribute  (** [[\@\@\@id]] *)
   | Pstr_extension of extension * attributes  (** [[%%id]] *)
   | Pstr_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
+  | Pstr_law of law_declaration (** [law_? name x (y : T) : A implies_ C] *)
 
 and value_constraint =
   | Pvc_constraint of {
