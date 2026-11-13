@@ -960,6 +960,11 @@ let primitive ppf = function
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
   | Pobj_dup -> fprintf ppf "obj_dup"
   | Pobj_magic _ -> fprintf ppf "obj_magic"
+  | Ptemplate_env { template; shape; mode } ->
+      fprintf ppf "make%stemplate_env[%a]%a"
+        (locality_mode_if_local mode)
+        (Format_doc.compat Template_id.print) template
+        block_shape (Shape shape)
   | Punbox_unit -> fprintf ppf "unbox_unit"
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
@@ -1199,6 +1204,7 @@ let name_of_primitive = function
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
   | Pobj_magic _ -> "Pobj_magic"
+  | Ptemplate_env _ -> "Ptemplate_env"
   | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
@@ -1411,6 +1417,9 @@ let rec lam ppf = function
         apply_probe ap.ap_probe
   | Lfunction lfun ->
       lfunction ppf lfun
+  | Lcode {code_template; code_fun} ->
+      fprintf ppf "@[<2>(code[%a]@ %a)@]"
+        (Format_doc.compat Template_id.print) code_template lfunction code_fun
   | Llet _ | Lmutlet _ as expr ->
       let let_kind = begin function
         | Llet(str,_,_,_,_,_) ->
