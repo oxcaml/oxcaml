@@ -460,10 +460,6 @@ type operation =
                callee might be a re-optimized versions of one these callees. *)
         returns : bool; (* [true] is the conservative default. *)
         callsite_counter : Fdo_counter.t option
-            (* The FDO counter of the call site (see [Fdo_counter]). Calls that
-               are alternatives to each other, e.g. the direct and [caml_apply]
-                               calls of an indirect call, share it. *)
-
       }
   | Cextcall of
       { func : string;
@@ -660,8 +656,6 @@ type fundecl =
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
     fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
-        (** The FDO counters of the function's entry edge, with its body hash
-            (see [Code_metadata.fdo_entry_annotation]). *)
     fun_ret_type : machtype
   }
 
