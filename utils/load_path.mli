@@ -60,13 +60,15 @@ val no_auto_include : auto_include_callback
     as normal. *)
 
 val init :
-  auto_include:auto_include_callback ->
-  visible:Clflags.include_dir list ->
-  hidden:Clflags.include_dir list -> unit
-(** [init ~visible ~hidden] is the same as
-    [reset ();
-     List.iter add_dir (List.rev hidden);
-     List.iter add_dir (List.rev visible)] *)
+  auto_include:auto_include_callback
+  -> visible:Clflags.include_dir list
+  (** Visible include directories, from highest to lowest priority. *)
+  -> hidden:Clflags.include_dir list
+  (** Hidden include directories, from highest to lowest priority. *)
+  -> unit
+(** Clears load path and repopulates it using provided include directories
+    and build-system command-line flags (-I-manifest/-H-manifest/-H(x)-file).
+    Additionally updates auto-include callback. *)
 
 val auto_include_otherlibs :
   (string -> unit) -> auto_include_callback
