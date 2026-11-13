@@ -53,4 +53,5 @@ val simplify_code_where_bound :
   Code.t ->
   all_code:Code.t Code_id.Map.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
+  template_env_type:T.Typing_env_extension.With_extra_variables.t option ->
   Rebuilt_static_const.t * Downwards_acc.t

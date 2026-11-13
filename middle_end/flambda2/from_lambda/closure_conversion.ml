@@ -1299,7 +1299,8 @@ let close_effect_primitive acc env ~dbg exn_continuation
        (%d args)"
       Printlambda.primitive prim (List.length args)
 
-(* The symbol naming [template] in Flambda, if it belongs to a unit. *)
+(* The key naming [template] in Flambda (see [Flambda_primitive.Template_env]),
+   if it belongs to a unit. *)
 let template_key template =
   match Template_id.owner template with
   | Some owner ->
@@ -1310,6 +1311,23 @@ let template_key template =
          (Linkage_name.of_string
             (Printf.sprintf "template#%d" (Template_id.stamp template))))
   | None -> None
+
+let close_template_env acc env template ~block dbg
+    (k : Acc.t -> Named.t list -> Expr_with_acc.t) : Expr_with_acc.t =
+  let acc = Acc.define_template acc template in
+  match template_key template with
+  | None ->
+    (* Without a unit to own the template, there is nothing to do. *)
+    k acc [Named.create_simple block]
+  | Some _ when Flambda_features.classic_mode () ->
+    (* Simplify won't run. *)
+    k acc [Named.create_simple block]
+  | Some template_key ->
+    let instantiations = Env.lcode_code_ids_of_template env template in
+    k acc
+      [ Named.create_prim
+          (Unary (Template_env { template_key; instantiations }, block))
+          dbg ]
 
 let close_primitive acc env ~let_bound_ids_with_kinds named
     (prim : Lambda.primitive) ~args loc
@@ -1531,6 +1549,11 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
       exn_continuation ~current_region:(get_region_ident region)
       ~current_ghost_region:(get_region_ident ghost_region)
       ~current_alloc_region:(fst (Env.find_var env alloc_region))
+      k
+  | Template_env { template; block; loc } ->
+    close_template_env acc env template
+      ~block:(find_simple_from_id env block)
+      (Debuginfo.from_location loc)
       k
 
 type simplified_block_load =
@@ -3570,7 +3593,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
 
 let declare_lcodes acc env lcodes =
   List.fold_left
-    (fun (acc, env) (lcode, _template, decl) ->
+    (fun (acc, env) (lcode, template, decl) ->
       let code_id =
         Code_id.create ~name:(Ident.name lcode) ~slot_stamp:None
           ~debug:(Debuginfo.from_location (Function_decl.loc decl))
@@ -3581,7 +3604,7 @@ let declare_lcodes acc env lcodes =
           (Lcode_approximation
              { code_id; code = metadata_only_code decl ~code_id })
       in
-      acc, Env.declare_lcode env lcode ~code_id)
+      acc, Env.declare_lcode env lcode ~template ~code_id)
     (acc, env) lcodes
 
 let close_lcode acc env ~lcode ~template decl =
@@ -3622,6 +3645,9 @@ let close_lcode acc env ~lcode ~template decl =
 let close_lcodes acc env lcodes =
   List.fold_left
     (fun acc (lcode, template, decl) ->
+      (* Simplify will simplify the code of an instantiation of one of the
+         unit's templates at the template's definition, using the type of its
+         environments. *)
       close_lcode acc env ~lcode ~template decl)
     acc lcodes
 

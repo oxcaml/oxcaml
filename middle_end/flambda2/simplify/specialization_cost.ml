@@ -18,6 +18,7 @@ type reason =
   | At_toplevel
   | Contains_static_consts
   | Contains_set_of_closures
+  | Contains_template_definition
 
 type cost =
   { primitives : (Bound_var.t * Flambda_primitive.t) list;
@@ -38,6 +39,8 @@ let [@ocamlformat "disable"] print_reason ppf reason =
     Format.fprintf ppf "contains_static_consts"
   | Contains_set_of_closures ->
     Format.fprintf ppf "contains_set_of_closures"
+  | Contains_template_definition ->
+    Format.fprintf ppf "contains_template_definition"
 
 let [@ocamlformat "disable"] print_prim ppf (bound_var, prim) =
   Format.fprintf ppf "@[<hov 1>(%a %a)@]"
@@ -79,6 +82,9 @@ let add_set_of_closures _soc _t =
 let add_lifted_set_of_closures _soc _t =
   Cannot_specialize { reason = Contains_set_of_closures }
 
+let add_template_definition _t =
+  Cannot_specialize { reason = Contains_template_definition }
+
 let add_prim bound_var prim t =
   update_cost t ~f:(fun ({ primitives; _ } as cost) ->
       (* CR gbury: we might want to limit the number of primitives we store, so
@@ -87,13 +93,17 @@ let add_prim bound_var prim t =
       let primitives = (bound_var, prim) :: primitives in
       { cost with primitives })
 
-let add_continuations ~can_be_lifted handlers t =
-  if can_be_lifted
-  then t
-  else
-    update_cost t ~f:(fun ({ non_lifted_continuations; _ } as cost) ->
-        let non_lifted_continuations = handlers :: non_lifted_continuations in
-        { cost with non_lifted_continuations })
+let add_continuations ~can_be_lifted ~define_templates handlers t =
+  match t with
+  | Cannot_specialize _ -> t
+  | Can_specialize _ when Lazy.force define_templates ->
+    add_template_definition t
+  | Can_specialize _ when can_be_lifted -> t
+  | Can_specialize cost ->
+    Can_specialize
+      { cost with
+        non_lifted_continuations = handlers :: cost.non_lifted_continuations
+      }
 
 (* Computing cost and benefits *)
 

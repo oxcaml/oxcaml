@@ -26,6 +26,47 @@ open! Simplify_import
 
 module C = Simplify_set_of_closures_context
 
+(* The code of an instantiation of a template only ever receives environments
+   created by the template's definition, so its environment parameter has their
+   type (see [Flambda_primitive.Template_env]), when that is known: the type of
+   the environments of one of this unit's templates is given by [context], since
+   the code is simplified at the template's definition. *)
+let assume_template_env_type context code_metadata params denv =
+  match Code_metadata.template_key code_metadata with
+  | None -> denv
+  | Some template_key -> (
+    let typing_env = DE.typing_env denv in
+    let typing_env =
+      Option.map
+        (fun env_type ->
+          (* [template_key] has no value: it is only defined here, to read the
+             type. *)
+          TE.add_env_extension_with_extra_variables
+            (TE.add_symbol_definition typing_env template_key)
+            env_type)
+        (C.template_env_type context)
+    in
+    match typing_env, Bound_parameters.to_list params with
+    | None, _ -> denv
+    | Some _, [] ->
+      Misc.fatal_errorf "Code %a of a template instantiation has no parameters"
+        Code_id.print
+        (Code_metadata.code_id code_metadata)
+    | Some typing_env, env :: _ ->
+      let env = BP.var env in
+      let env_ty =
+        TE.find typing_env (Name.symbol template_key) (Some K.value)
+      in
+      (* Restating the type erases its variables again, giving each environment
+         its own copies, so that different environments don't look like they
+         share their contents. *)
+      let env_extension =
+        T.make_suitable_for_environment typing_env
+          (All_variables_except (Variable.Set.singleton env))
+          [Name.var env, env_ty]
+      in
+      DE.extend_typing_environment denv env_extension)
+
 let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     ~my_depth function_slot_opt ~closure_bound_names_inside_function
     ~inlining_arguments ~absolute_history code_id ~return_continuation
@@ -35,6 +76,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   let denv =
     DE.add_parameters_with_unknown_types ~extra:false ~alloc_modes
       (DA.denv dacc) params
+    |> assume_template_env_type context code_metadata params
     |> DE.set_inlining_arguments inlining_arguments
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
@@ -124,6 +166,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   let used_value_slots = DA.used_value_slots outer_dacc in
   let shareable_constants = DA.shareable_constants outer_dacc in
   let slot_offsets = DA.slot_offsets outer_dacc in
+  let templates = DA.templates outer_dacc in
   (* CR vlaviron: maybe DA could be restructured so that it can keep track of
      the global values going around the loop here, so we don't forget to add one
      of these lines below... *)
@@ -134,6 +177,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   |> DA.with_used_value_slots ~used_value_slots
   |> DA.with_shareable_constants ~shareable_constants
   |> DA.with_slot_offsets ~slot_offsets
+  |> DA.with_templates ~templates
   |> DA.reset_continuation_lifting_budget
 
 let extract_accumulators_from_function outer_dacc ~dacc_after_body
@@ -159,6 +203,7 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     UA.shareable_constants uacc_after_upwards_traversal
   in
   let slot_offsets = DA.slot_offsets dacc_after_body in
+  let templates = DA.templates dacc_after_body in
   let code_age_relation =
     TE.code_age_relation (DA.typing_env dacc_after_body)
   in
@@ -171,6 +216,7 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     |> DA.with_used_value_slots ~used_value_slots
     |> DA.with_shareable_constants ~shareable_constants
     |> DA.with_slot_offsets ~slot_offsets
+    |> DA.with_templates ~templates
     |> DA.with_code_age_relation ~code_age_relation
   in
   outer_dacc, lifted_consts_this_function
@@ -1196,10 +1242,12 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
     all_sets_of_closures_and_symbols
     closure_bound_names_inside_functions_all_sets value_slots_and_types_all_sets
 
-let simplify_code_where_bound dacc code ~all_code ~simplify_function_body =
+let simplify_code_where_bound dacc code ~all_code ~simplify_function_body
+    ~template_env_type =
+  let dacc, prior_lifted_constants = DA.get_and_clear_lifted_constants dacc in
   let context =
     C.create_for_code_where_bound dacc ~all_code ~simplify_function_body
-      ~is_stub:(Code.stub code)
+      ~is_stub:(Code.stub code) ~template_env_type
   in
   let closure_bound_names_inside_function =
     (* Unused, the type of the value slot is going to be unknown *)
@@ -1214,4 +1262,4 @@ let simplify_code_where_bound dacc code ~all_code ~simplify_function_body =
     | None -> assert false
     | Some (_, code_constant) -> code_constant
   in
-  code, outer_dacc
+  code, DA.add_to_lifted_constant_accumulator outer_dacc prior_lifted_constants
