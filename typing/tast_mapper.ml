@@ -883,9 +883,10 @@ let open_declaration sub od =
 
 let module_coercion sub = function
   | Tcoerce_none -> Tcoerce_none
-  | Tcoerce_functor (c1,c2,yielding) ->
+  | Tcoerce_functor (c1,c2,yielding,staticity) ->
       Tcoerce_functor
-        (sub.module_coercion sub c1, sub.module_coercion sub c2, yielding)
+        (sub.module_coercion sub c1, sub.module_coercion sub c2, yielding,
+          staticity)
   | Tcoerce_alias (env, p, c1) ->
       Tcoerce_alias (sub.env sub env, p, sub.module_coercion sub c1)
   | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
