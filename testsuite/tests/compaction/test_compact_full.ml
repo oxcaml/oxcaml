@@ -1,4 +1,9 @@
 (* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 let () =

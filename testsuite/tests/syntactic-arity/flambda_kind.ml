@@ -1,6 +1,10 @@
 (* TEST
    flambda2;
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
 *)
 
 (* This is a regression test, see PR #2471 in oxcaml/oxcaml *)

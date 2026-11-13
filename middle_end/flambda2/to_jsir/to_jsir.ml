@@ -362,13 +362,34 @@ and apply_expr ~env ~res e =
       apply_fn ~res ~f ~args ~exact:false
     | None, Function { function_call = Direct code_id } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
-      let ({ closure; addr = _; params = _ } : To_jsir_env.code_id) =
+      let ({ closure; addr = _; params = _; closure_bound_with_code = _ }
+            : To_jsir_env.code_id) =
         To_jsir_env.get_code_id_exn env code_id
       in
       apply_fn ~res ~f:closure ~args ~exact:false
     | None, Effect effect_ ->
       if List.length args <> 0
       then Misc.fatal_error "Found non-empty argument list for effects";
+      (* A continuation is the block [{ stack; last_fiber }], but JSOO's effect
+         primitives take the two parts separately. *)
+      let use_continuation ~res cont =
+        let open Jsir in
+        let cont, res = To_jsir_shared.simple ~env ~res cont in
+        let last = Var.fresh () in
+        let res =
+          To_jsir_result.add_instr_exn res
+            (Let (last, Field (cont, 1, Non_float)))
+        in
+        let stack = Var.fresh () in
+        let res =
+          To_jsir_result.add_instr_exn res
+            (Let
+               ( stack,
+                 Prim (Extern ("caml_continuation_use_noexc", None), [Pv cont])
+               ))
+        in
+        stack, last, res
+      in
       let prim_name, args, res =
         let open Jsir in
         match effect_ with
@@ -386,8 +407,7 @@ and apply_expr ~env ~res e =
           let effc, res = To_jsir_shared.simple ~env ~res effc in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
-          let unit = Pc (Int Targetint.zero) in
-          "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg; unit], res
+          "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg], res
         | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
           let valuec, res = To_jsir_shared.simple ~env ~res valuec in
           let exnc, res = To_jsir_shared.simple ~env ~res exnc in
@@ -395,23 +415,22 @@ and apply_expr ~env ~res e =
           let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
-          let unit = Pc (Int Targetint.zero) in
           ( "%with_stack_preemptible",
-            [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg; unit],
+            [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg],
             res )
         | Continue { cont; value } ->
-          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let stack, last, res = use_continuation ~res cont in
           let value, res = To_jsir_shared.simple ~env ~res value in
-          "%continue", [Pv cont; Pv value], res
+          "%continue", [Pv stack; Pv value; Pv last], res
         | Discontinue { cont; exn } ->
-          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let stack, last, res = use_continuation ~res cont in
           let exn, res = To_jsir_shared.simple ~env ~res exn in
-          "%discontinue", [Pv cont; Pv exn], res
+          "%discontinue", [Pv stack; Pv exn; Pv last], res
         | Discontinue_with_backtrace { cont; exn; bt } ->
-          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let stack, last, res = use_continuation ~res cont in
           let exn, res = To_jsir_shared.simple ~env ~res exn in
           let bt, res = To_jsir_shared.simple ~env ~res bt in
-          "%discontinue_with_backtrace", [Pv cont; Pv exn; Pv bt], res
+          "%discontinue_with_backtrace", [Pv stack; Pv exn; Pv bt; Pv last], res
       in
       let prim : Jsir.expr = Prim (Extern (prim_name, None), args) in
       let var = Jsir.Var.fresh () in
@@ -502,6 +521,13 @@ and apply_cont0 ~env ~res apply_cont =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
   let continuation = Apply_cont.continuation apply_cont in
+  (* Continuations might not always have the correct sort, as Flambda doesn't
+     use it very much. Checking against the environment should be much more
+     robust, and guards us against Flambda bugs. (It's also what [To_cmm]
+     does.) *)
+  let is_return_continuation =
+    Continuation.equal continuation (To_jsir_env.return_continuation env)
+  in
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | (Toplevel_return | Define_root_symbol) as sort ->
@@ -537,7 +563,7 @@ and apply_cont0 ~env ~res apply_cont =
                    ] ) ))
       in
       Stop, res
-    | Return ->
+    | (Return | Normal_or_exn) when is_return_continuation ->
       let arg, res =
         match args with
         | [arg] -> arg, res
@@ -555,6 +581,11 @@ and apply_cont0 ~env ~res apply_cont =
           arg, To_jsir_result.add_instr_exn res (Let (arg, block))
       in
       Return arg, res
+    | Return ->
+      Misc.fatal_errorf
+        "Apply_cont to %a, which has sort [Return] but is not the return \
+         continuation of the function being translated"
+        Continuation.print continuation
     | Normal_or_exn -> (
       match raise_kind_and_exn_handler with
       | None ->

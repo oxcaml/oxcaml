@@ -1,6 +1,10 @@
 (* TEST
    flambda2;
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
 *)
 
 (* Example from the pull request (#3687). *)

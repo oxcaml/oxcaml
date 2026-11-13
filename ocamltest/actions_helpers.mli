@@ -54,6 +54,10 @@ val run_cmd :
 
 val run_program : Actions.code
 
+(** Like [run_program], but runs the program through [interpreter]
+    (e.g. node for JavaScript programs) *)
+val run_program_with : interpreter:string -> Actions.code
+
 val run_script : Actions.code
 
 val run_hook : string -> Actions.code

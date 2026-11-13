@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
 
 (* Indexing a bigarray with byte-sized elements by an int obtained by
    truncating a nativeint (or an int64) whose bit 63 is set used to read from
