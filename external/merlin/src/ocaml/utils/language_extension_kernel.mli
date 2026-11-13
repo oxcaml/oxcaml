@@ -33,6 +33,7 @@ type _ t =
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t
+  | Rec_type_parameters : unit t
 
 (** Print and parse language extensions; parsing is case-insensitive *)
 val to_string : _ t -> string

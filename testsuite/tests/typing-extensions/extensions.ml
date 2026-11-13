@@ -545,7 +545,7 @@ Line 1, characters 0-31:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
-       but it is injective contravariant.
+       but it is contravariant.
 |}]
 
 type _ foo += C : ('a -> int) -> 'a foo
@@ -556,7 +556,7 @@ Line 1, characters 0-39:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
-       but it is injective contravariant.
+       but it is contravariant.
 |}]
 
 type 'a bar = ..
