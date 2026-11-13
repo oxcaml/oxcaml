@@ -36,7 +36,7 @@ val reset : t -> unit
 (** [merge_checks t ~into] modifies [into] by adding information from [t]. *)
 val merge : t -> into:t -> unit
 
-(** [get_value t fun_name] returns None if [fun_name] is not associated with any
+(** [get t fun_name] returns None if [fun_name] is not associated with any
     value. *)
 val get : t -> string -> Encoded.Components.t option
 
