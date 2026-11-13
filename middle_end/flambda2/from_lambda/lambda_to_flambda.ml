@@ -665,17 +665,35 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             Option.map Env.Region_stack_element.ghost_region current_region
           in
           let alloc_region = Env.current_alloc_region env in
-          CC.close_let acc ccenv ids_with_kinds (is_user_visible env id)
-            (Prim
-               { prim;
-                 args;
-                 loc;
-                 exn_continuation;
-                 region;
-                 ghost_region;
-                 alloc_region
-               })
-            ~body)
+          let prim_named prim : IR.named =
+            Prim
+              { prim;
+                args;
+                loc;
+                exn_continuation;
+                region;
+                ghost_region;
+                alloc_region
+              }
+          in
+          match[@ocaml.warning "-fragile-match"] prim with
+          | Ptemplate_env { template; shape; mode } ->
+            (* Allocating the environment as an ordinary block lets closure
+               conversion lift it and record its approximation. *)
+            let block = Ident.create_local "template_env" in
+            CC.close_let acc ccenv
+              [ ( block,
+                  Flambda_debug_uid.none,
+                  Flambda_kind.With_subkind.any_value ) ]
+              Not_user_visible
+              (prim_named (Pmakeblock (0, Immutable, Shape shape, mode)))
+              ~body:(fun acc ccenv ->
+                CC.close_let acc ccenv ids_with_kinds (is_user_visible env id)
+                  (Template_env { template; block; loc })
+                  ~body)
+          | _ ->
+            CC.close_let acc ccenv ids_with_kinds (is_user_visible env id)
+              (prim_named prim) ~body)
         k_exn
     | Transformed lam ->
       cps acc env ccenv (L.Llet (let_kind, layout, id, duid, lam, body)) k k_exn

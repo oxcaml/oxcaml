@@ -1237,6 +1237,10 @@ type unary_primitive =
       { lazy_tag : Lazy_block_tag.t;
         alloc_region : Variable.t
       }
+  | Template_env of
+      { template_key : Symbol.t;
+        instantiations : Code_id.t list
+      }
 
 (* Here and below, operations that are genuine projections shouldn't be eligible
    for CSE, since we deal with projections through types. *)
@@ -1270,7 +1274,9 @@ let unary_primitive_eligible_for_cse p ~arg =
     Simple.is_var arg
   | Project_function_slot _ | Project_value_slot _ -> false
   | Is_boxed_float | Is_flat_float_array -> true
-  | End_region _ | End_try_region _ | Obj_dup _ | Peek _ | Make_lazy _ -> false
+  | End_region _ | End_try_region _ | Obj_dup _ | Peek _ | Make_lazy _
+  | Template_env _ ->
+    false
 
 let compare_unary_primitive p1 p2 =
   let unary_primitive_numbering p =
@@ -1306,6 +1312,7 @@ let compare_unary_primitive p1 p2 =
     | Peek _ -> 28
     | Make_lazy _ -> 29
     | Reinterpret_boxed_vector -> 30
+    | Template_env _ -> 31
   in
   match p1, p2 with
   | ( Block_load { kind = kind1; mut = mut1; field = field1 },
@@ -1404,6 +1411,14 @@ let compare_unary_primitive p1 p2 =
       Make_lazy { lazy_tag = lazy_tag2; alloc_region = alloc_region2 } ) ->
     let c = Lazy_block_tag.compare lazy_tag1 lazy_tag2 in
     if c <> 0 then c else Variable.compare alloc_region1 alloc_region2
+  | ( Template_env
+        { template_key = template_key1; instantiations = instantiations1 },
+      Template_env
+        { template_key = template_key2; instantiations = instantiations2 } ) ->
+    let c = Symbol.compare template_key1 template_key2 in
+    if c <> 0
+    then c
+    else List.compare Code_id.compare instantiations1 instantiations2
   | ( ( Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _
       | Is_null | Get_tag | String_length _ | Int_as_pointer _
       | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
@@ -1412,7 +1427,7 @@ let compare_unary_primitive p1 p2 =
       | Untag_immediate | Tag_immediate | Project_function_slot _
       | Project_value_slot _ | Is_boxed_float | Is_flat_float_array
       | End_region _ | End_try_region _ | Obj_dup _ | Get_header | Peek _
-      | Make_lazy _ ),
+      | Make_lazy _ | Template_env _ ),
       _ ) ->
     Stdlib.compare (unary_primitive_numbering p1) (unary_primitive_numbering p2)
 
@@ -1486,6 +1501,12 @@ let print_unary_primitive ppf p =
   | Make_lazy { lazy_tag; alloc_region } ->
     fprintf ppf "@[<hov 1>(Make_lazy@ (lazy_tag %a)@ (alloc_region %a))@]"
       Lazy_block_tag.print lazy_tag Variable.print alloc_region
+  | Template_env { template_key; instantiations } ->
+    fprintf ppf
+      "@[<hov 1>(Template_env@ (template_key %a)@ (instantiations %a))@]"
+      Symbol.print template_key
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space Code_id.print)
+      instantiations
 
 let arg_kind_of_unary_primitive p =
   match p with
@@ -1522,6 +1543,7 @@ let arg_kind_of_unary_primitive p =
   | Get_header -> K.value
   | Peek _ -> K.naked_nativeint
   | Make_lazy _ -> K.value
+  | Template_env _ -> K.value
 
 let result_kind_of_unary_primitive p : result_kind =
   match p with
@@ -1561,6 +1583,7 @@ let result_kind_of_unary_primitive p : result_kind =
   | Get_header -> Singleton K.naked_nativeint
   | Peek kind -> Singleton (K.Standard_int_or_float.to_kind kind)
   | Make_lazy _ -> Singleton K.value
+  | Template_env _ -> Singleton K.value
 
 let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
   match p with
@@ -1685,6 +1708,8 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
       No_coeffects,
       Strict,
       Can't_move_before_any_branch )
+  | Template_env _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
 
 let unary_classify_for_printing p =
   match p with
@@ -1703,6 +1728,7 @@ let unary_classify_for_printing p =
   | Get_header -> Neither
   | Peek _ -> Neither
   | Make_lazy _ -> Constructive
+  | Template_env _ -> Neither
 
 let free_names_unary_primitive p =
   match p with
@@ -1731,6 +1757,12 @@ let free_names_unary_primitive p =
   | End_try_region _ | Get_header
   | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
     Name_occurrences.empty
+  | Template_env { template_key = _; instantiations } ->
+    (* [template_key] has no value: it only names the template. *)
+    List.fold_left
+      (fun free_names code_id ->
+        Name_occurrences.add_code_id free_names code_id Name_mode.normal)
+      Name_occurrences.empty instantiations
 
 let apply_renaming_unary_primitive p renaming =
   match p with
@@ -1771,6 +1803,18 @@ let apply_renaming_unary_primitive p renaming =
     if alloc_region == alloc_region'
     then p
     else Make_lazy { alloc_region = alloc_region'; lazy_tag }
+  | Template_env { template_key; instantiations } ->
+    let template_key' = Renaming.apply_symbol renaming template_key in
+    let instantiations' =
+      Misc.Stdlib.List.map_sharing
+        (Renaming.apply_code_id renaming)
+        instantiations
+    in
+    if template_key == template_key' && instantiations == instantiations'
+    then p
+    else
+      Template_env
+        { template_key = template_key'; instantiations = instantiations' }
   | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
   | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
@@ -1790,6 +1834,10 @@ let ids_for_export_unary_primitive p =
   | Obj_dup { alloc_region }
   | Make_lazy { alloc_region; _ } ->
     Ids_for_export.singleton_variable alloc_region
+  | Template_env { template_key; instantiations } ->
+    List.fold_left Ids_for_export.add_code_id
+      (Ids_for_export.singleton_symbol template_key)
+      instantiations
   | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
   | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _

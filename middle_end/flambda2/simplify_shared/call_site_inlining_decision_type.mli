@@ -46,6 +46,7 @@ type t =
         is_a_functor : bool
       }
   | Jsir_inlining_disabled
+  | Template_definition_not_simplified
 
 val print : Format.formatter -> t -> unit
 

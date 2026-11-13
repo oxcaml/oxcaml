@@ -1076,5 +1076,7 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | Get_header -> simplify_get_header ~original_prim
     | Peek _ -> simplify_peek ~original_prim
     | Make_lazy _ -> simplify_lazy ~original_prim
+    | Template_env _ ->
+      Misc.fatal_errorf "[Template_env] should be handled by [Simplify_named]"
   in
   simplifier dacc ~original_term ~arg ~arg_ty ~result_var

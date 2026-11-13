@@ -1396,6 +1396,10 @@ module OfFlambda = struct
       make_lazy env (lazy_tag, alloc_region)
     | Num_conv { src; dst } -> num_conv env (src, dst)
     | Opaque_identity _ -> opaque_identity env ()
+    | Template_env _ ->
+      (* Simplify always removes these, so only unsimplified terms contain them,
+         and fexpr has no way to refer to their symbol, which has no value. *)
+      Misc.fatal_error "[Template_env] is not supported in fexpr"
     | Unbox_number bk -> unbox_num env bk
     | Untag_immediate -> untag_immediate env ()
     | Project_value_slot { project_from; value_slot } ->

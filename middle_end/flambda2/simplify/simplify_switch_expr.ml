@@ -925,7 +925,8 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
         begin match reason with
         | Specialization_disabled -> `Disabled
         | At_toplevel -> `Toplevel
-        | Contains_static_consts | Contains_set_of_closures ->
+        | Contains_static_consts | Contains_set_of_closures
+        | Contains_template_definition ->
           `Cannot_specialize
         end
       | Can_specialize spec_cost -> (
