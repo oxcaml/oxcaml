@@ -17,6 +17,7 @@
 open! Flambda.Import
 module Env = To_cmm_env
 module Ece = Effects_and_coeffects
+module R = To_cmm_result
 
 module C = struct
   include Cmm_helpers
@@ -129,6 +130,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     aux args args_arity
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
+  let callsite_counter = Apply.callsite_counter apply in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
@@ -156,7 +158,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
-      ( C.direct_call ~dbg
+      ( C.direct_call ~dbg ~callsite_counter
           (C.Extended_machtype.to_machtype return_ty)
           pos code_sym args,
         free_vars,
@@ -164,6 +166,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         res,
         Ece.all )
     | Some { name; enabled_at_init } ->
+      (* CR yusumez: The counter of the call of a probe handler is dropped. *)
       assert (Flambda_arity.cardinal_unarized return_arity = 0);
       ( C.probe ~dbg ~name ~handler_code_linkage_name:code_sym.sym_name ~args
           ~enabled_at_init,
@@ -181,7 +184,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg return_ty pos
+    ( C.indirect_call ~dbg ~callsite_counter return_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -215,7 +218,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
+      ( C.indirect_full_call ~dbg ~callsite_counter return_ty pos callee
+          ~callees args_ty args,
         free_vars,
         env,
         res,
@@ -252,8 +256,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let alloc_mode =
       C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
-    ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
-        dbg,
+    ( C.send ~callsite_counter kind callee obj (split_args ()) args_ty return_ty
+        (pos, alloc_mode) dbg,
       free_vars,
       env,
       res,
@@ -743,7 +747,7 @@ and let_cont_not_inlined env res k handler body =
   let is_exn_handler = Continuation_handler.is_exn_handler handler in
   let is_cold = Continuation_handler.is_cold handler in
   let vars, arity, handler, free_vars_of_handler, handler_symbol_inits, res =
-    continuation_handler env res handler
+    continuation_handler env res k handler
   in
   let catch_id, env =
     Env.add_jump_cont env k ~param_types:(List.map snd vars)
@@ -855,7 +859,7 @@ and let_cont_rec env res invariant_params conts body =
     Continuation.Lmap.fold
       (fun k handler (conts_to_handlers, res) ->
         let vars, _arity, handler, free_vars_of_handler, symbol_inits, res =
-          continuation_handler env res handler
+          continuation_handler env res k handler
         in
         (* It should be an flambda2 invariant that symbols are bound at
            top-level, and the handler of a loop is clearly not top-level *)
@@ -893,13 +897,23 @@ and let_cont_rec env res invariant_params conts body =
   let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
   cmm, free_vars, symbol_inits, res
 
-and continuation_handler env res handler =
+and continuation_handler env res k handler =
+  let is_exn_handler = Continuation_handler.is_exn_handler handler in
   Continuation_handler.pattern_match' handler
     ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
       let arity = Bound_parameters.arity params in
       let env, vars = C.continuation_bound_parameters env params in
+      let res, outer_fdo_region = R.enter_fdo_region res in
       let expr, free_vars_of_handler, symbol_inits, res =
         expr env res handler
+      in
+      let res, fdo_counters = R.leave_fdo_region res outer_fdo_region in
+      (* CR yusumez: An exception handler is entered by no edge, so the counters
+         that lose their edges in it are dropped, as in Simplify. *)
+      let res =
+        if is_exn_handler
+        then res
+        else R.set_fdo_handler_counters res k fdo_counters
       in
       let expr, free_vars_of_handler, symbol_inits =
         Env.place_symbol_inits ~params:vars expr free_vars_of_handler
@@ -963,6 +977,7 @@ and apply_expr env res apply =
       let wrap, _, res =
         Env.flush_delayed_lets ~mode:Flush_everything env res
       in
+      let res = R.add_fdo_region_counters res (R.fdo_handler_counters res k) in
       let cmm, free_vars, symbol_inits =
         wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty
       in
@@ -1048,6 +1063,7 @@ and apply_cont env res apply_cont =
       translate_jump_to_return_continuation ~dbg_with_inlined env res apply_cont
         k param_types args
     | Jump { param_types; cont } ->
+      let res = R.add_fdo_region_counters res (R.fdo_handler_counters res k) in
       translate_jump_to_continuation ~dbg_with_inlined env res apply_cont
         param_types cont args
     | Inline
@@ -1154,15 +1170,24 @@ and switch env res switch =
   let make_arm ~must_tag_discriminant env res (d, arm) =
     let d = prepare_discriminant ~must_tag:must_tag_discriminant d in
     let action = Switch_arm.action arm in
+    let res, outer_fdo_region = R.enter_fdo_region res in
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
+    in
+    let res, fdo_counters = R.leave_fdo_region res outer_fdo_region in
+    let annotations = Switch_arm.annotations arm in
+    let annotations =
+      Branch_annotations.with_fdo_annotation annotations
+        (Fdo_annotation.combine
+           (Branch_annotations.fdo_annotation annotations)
+           fdo_counters)
     in
     ( ( d,
         cmm_action,
         action_free_vars,
         action_symbol_inits,
         Env.add_inlined_debuginfo env (Apply_cont.debuginfo action),
-        Switch_arm.annotations arm ),
+        annotations ),
       res )
   in
   match Target_ocaml_int.Map.cardinal arms with
@@ -1270,8 +1295,9 @@ and switch env res switch =
         cases, res
     in
     (* CR-someday poechsel: Put a more precise value kind here *)
-    let expr =
+    let expr, fdo_counters =
       C.transl_switch_clambda dbg scrutinee index (Array.map Option.get cases)
     in
+    let res = R.add_fdo_region_counters res fdo_counters in
     let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res

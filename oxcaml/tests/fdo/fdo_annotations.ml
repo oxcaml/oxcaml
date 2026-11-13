@@ -8,7 +8,11 @@
    annotations, then those in only one of them.
 
    - [compare-counters <dump a> <dump b>] checks that the functions with the
-   same body hash in both dumps have the same interior counters, in order. *)
+   same body hash in both dumps have the same interior counters, in order.
+
+   - [compare-sets <dump a> <dump b>] prints the counters in the annotations of
+   only one of the dumps, which can also be Cmm dumps (as written with
+   [-fdo-counters -dcmm]). *)
 
 (* CR yusumez: This is done to not dump the entire fexpr. I still find this a
    bit sad. *)
@@ -73,16 +77,27 @@ let normalize_spaces s =
   |> List.filter (fun s -> not (String.equal s ""))
   |> String.concat " "
 
-(* The annotation starting at [i], if any, with the index just after it. *)
+let rec skip_spaces dump i =
+  if
+    i < String.length dump
+    && (Char.equal dump.[i] ' ' || Char.equal dump.[i] '\n')
+  then skip_spaces dump (i + 1)
+  else i
+
+(* The annotation starting at [i], if any, with the index just after it. A line
+   break can separate the keyword from the parenthesis. *)
 let annotation_at dump i =
   List.find_map
     (fun kind ->
-      let prefix = Kind.keyword kind ^ "(" in
-      let start = i + String.length prefix in
+      let keyword = Kind.keyword kind in
+      let after_keyword = i + String.length keyword in
+      let paren = skip_spaces dump after_keyword in
       if
-        start <= String.length dump
-        && String.equal (String.sub dump i (String.length prefix)) prefix
+        paren < String.length dump
+        && String.equal (String.sub dump i (String.length keyword)) keyword
+        && Char.equal dump.[paren] '('
       then
+        let start = paren + 1 in
         let close = closing_paren dump start in
         let contents =
           normalize_spaces (String.sub dump start (close - start))
@@ -217,12 +232,53 @@ let compare_counters a b =
          [ca.function_; positions a ca; positions b cb])
        different)
 
+(* The counters of an annotation's contents, which are separated by spaces
+   outside of names and specializations. A counter in inlined code is the
+   positions of its inlining stack separated by [" <- "]. *)
+let counters_of_contents contents =
+  let length = String.length contents in
+  let rec words i ~start ~depth acc =
+    let word () = String.sub contents start (i - start) :: acc in
+    if i >= length
+    then List.rev (word ())
+    else
+      match contents.[i] with
+      | '"' -> words (end_of_string contents i) ~start ~depth acc
+      | '(' -> words (i + 1) ~start ~depth:(depth + 1) acc
+      | ')' -> words (i + 1) ~start ~depth:(depth - 1) acc
+      | ' ' when depth = 0 -> words (i + 1) ~start:(i + 1) ~depth (word ())
+      | _ -> words (i + 1) ~start ~depth acc
+  in
+  let rec join = function
+    | counter :: "<-" :: position :: rest ->
+      join ((counter ^ " <- " ^ position) :: rest)
+    | counter :: rest -> counter :: join rest
+    | [] -> []
+  in
+  words 0 ~start:0 ~depth:0 []
+  |> List.filter (fun word ->
+      not (String.equal word "" || String.starts_with ~prefix:"body_hash:" word))
+  |> join
+
+let counters file =
+  annotations file
+  |> List.concat_map (fun ({ contents; _ } : Annotation.t) ->
+      counters_of_contents contents)
+  |> List.sort_uniq String.compare
+
+let compare_sets a b =
+  let ca = counters a and cb = counters b in
+  let only_in l1 l2 = List.filter (fun c -> not (List.mem c l2)) l1 in
+  print_lines ("only in " ^ a ^ ":") (only_in ca cb);
+  print_lines ("only in " ^ b ^ ":") (only_in cb ca)
+
 let () =
   match Sys.argv with
   | [| _; "list"; file |] -> list file
   | [| _; "compare-entries"; a; b |] -> compare_entries a b
   | [| _; "compare-counters"; a; b |] -> compare_counters a b
+  | [| _; "compare-sets"; a; b |] -> compare_sets a b
   | _ ->
     failwith
       "usage: fdo_annotations (list <dump> | (compare-entries | \
-       compare-counters) <dump a> <dump b>)"
+       compare-counters | compare-sets) <dump a> <dump b>)"

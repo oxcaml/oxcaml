@@ -23,6 +23,29 @@
  (action
   (diff fdo_counters.output fdo_counters.output.corrected)))
 
+; The counters of the cases of the switches compiled to Cmm.
+
+(executable
+ (name cmm_switch_counters)
+ (modules cmm_switch_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   cmm_switch_counters.output.corrected
+   (run ./cmm_switch_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps cmm_switch_counters.output cmm_switch_counters.output.corrected)
+ (action
+  (diff cmm_switch_counters.output cmm_switch_counters.output.corrected)))
+
 ; Extracting the FDO annotations from fexpr dumps.
 
 (executable
@@ -239,6 +262,90 @@
  (deps simplify_o3_reaper.output simplify_o3_reaper.output.corrected)
  (action
   (diff simplify_o3_reaper.output simplify_o3_reaper.output.corrected)))
+
+; The counters in Cmm: none of the Flambda translated to Cmm is lost, and none
+; is added. [to_cmm.ml] is also compiled with the inline fast path of
+; [caml_apply], whose two calls share the counter, and [simplify.ml] at -O3 with
+; the reaper.
+
+(rule
+ (targets to_cmm.output.corrected)
+ (deps to_cmm.ml simplify.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run mkdir -p to_cmm_fast_path to_cmm_o3_reaper)
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    simplify
+    -dcmm
+    -dump-into-file
+    -color
+    never
+    -o
+    to_cmm.cmx
+    to_cmm.ml)
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -caml-apply-inline-fast-path
+    -fdo-counters
+    -dfexpr-annot-after
+    simplify
+    -dcmm
+    -dump-into-file
+    -color
+    never
+    -o
+    to_cmm_fast_path/to_cmm.cmx
+    to_cmm.ml)
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -O3
+    -flambda2-reaper
+    -fdo-counters
+    -dfexpr-annot-after
+    reaper
+    -dcmm
+    -dump-into-file
+    -color
+    never
+    -o
+    to_cmm_o3_reaper/simplify.cmx
+    simplify.ml)
+   (with-stdout-to
+    to_cmm.output.corrected
+    (progn
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      to_cmm.simplify.fl
+      to_cmm.cmx.dump)
+     (run ./fdo_annotations.exe list to_cmm.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      to_cmm_fast_path/to_cmm.simplify.fl
+      to_cmm_fast_path/to_cmm.cmx.dump)
+     (run ./fdo_annotations.exe list to_cmm_fast_path/to_cmm.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      to_cmm_o3_reaper/simplify.reaper.fl
+      to_cmm_o3_reaper/simplify.cmx.dump))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps to_cmm.output to_cmm.output.corrected)
+ (action
+  (diff to_cmm.output to_cmm.output.corrected)))
 
 ; Continuation specialization, which needs match-in-match.
 

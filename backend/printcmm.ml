@@ -261,7 +261,9 @@ let static_cast : Cmm.static_cast -> string = function
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
-  | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
+  | Capply { result_type = _ty; region = _; callees = _; callsite_counter = _ }
+    ->
+    "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)
   | Cload { memory_chunk; mutability; is_atomic } -> (
@@ -345,6 +347,24 @@ let operation d = function
   | Cpoll -> "poll"
   | Cpause -> "pause"
 
+(* The FDO annotations are printed as in Flambda, and only if there are any. *)
+
+let callsite_counter ppf = function
+  | None -> ()
+  | Some counter ->
+    fprintf ppf "@ callsite_counter(%s)" (Fdo_counter.to_string counter)
+
+let fdo_annotation ppf annots =
+  let fdo_annotation = Branch_annotations.fdo_annotation annots in
+  if not (Fdo_annotation.is_empty fdo_annotation)
+  then fprintf ppf "fdo_annotation%a@ " Fdo_annotation.print fdo_annotation
+
+let fdo_entry_annotation ppf entry_annotation =
+  if not (Fdo_annotation.With_body_hash.is_empty entry_annotation)
+  then
+    fprintf ppf "@ fdo_entry_annotation%a" Fdo_annotation.With_body_hash.print
+      entry_annotation
+
 let probability ~uniform ~total ppf likelihood =
   match Likelihood.rescale ~total likelihood |> Likelihood.classify with
   | Cold -> fprintf ppf "[cold]"
@@ -414,6 +434,10 @@ let rec expr ppf = function
   | Cop (op, el, dbg) ->
     with_location_mapping ~label:"Cop" ~dbg ppf (fun () ->
         fprintf ppf "@[<2>(%s" (operation dbg op);
+        (match[@warning "-4"] op with
+        | Capply { callsite_counter = counter; _ } ->
+          callsite_counter ppf counter
+        | _ -> ());
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
         | Capply { result_type = mty; _ } -> fprintf ppf "@ %a" machtype mty
@@ -450,9 +474,9 @@ let rec expr ppf = function
     with_location_mapping ~label:"Cifthenelse-e1" ~dbg ppf (fun () ->
         fprintf ppf "@[<2>(if%t@ %a@ " likely_or_unlikely expr e1;
         with_location_mapping ~label:"Cifthenelse-e2" ~dbg:e2_dbg ppf (fun () ->
-            fprintf ppf "%a@ " expr e2);
+            fprintf ppf "%a%a@ " fdo_annotation e2_a expr e2);
         with_location_mapping ~label:"Cifthenelse-e3" ~dbg:e3_dbg ppf (fun () ->
-            fprintf ppf "%a" expr e3);
+            fprintf ppf "%a%a" fdo_annotation e3_a expr e3);
         fprintf ppf ")@]")
   | Cswitch (e1, index, cases, dbg) ->
     with_location_mapping ~label:"Cswitch" ~dbg ppf (fun () ->
@@ -476,9 +500,9 @@ let rec expr ppf = function
         let print_cases ppf =
           for i = 0 to Array.length cases - 1 do
             let case, _, annots = cases.(i) in
-            fprintf ppf "@ @[<2>%t@ %a@]"
+            fprintf ppf "@ @[<2>%t@ %a%a@]"
               (print_case ~likelihood:(Branch_annotations.likelihood annots) i)
-              sequence case
+              fdo_annotation annots sequence case
           done
         in
         fprintf ppf "@[<v 0>@[<2>(switch@ %a@ @]%t)@]" expr e1 print_cases)
@@ -546,10 +570,11 @@ let fundecl ppf f =
       cases
   in
   with_location_mapping ~label:"Function" ~dbg:f.fun_dbg ppf (fun () ->
-      fprintf ppf "@[<1>(function%s%a@ %s@;<1 4>@[<1>(%a) : %a@]@ @[%a@] )@]@."
+      fprintf ppf
+        "@[<1>(function%s%a@ %s%a@;<1 4>@[<1>(%a) : %a@]@ @[%a@] )@]@."
         (location f.fun_dbg) print_codegen_options f.fun_codegen_options
-        f.fun_name.sym_name print_cases f.fun_args machtype f.fun_ret_type
-        sequence f.fun_body)
+        f.fun_name.sym_name fdo_entry_annotation f.fun_fdo_entry_annotation
+        print_cases f.fun_args machtype f.fun_ret_type sequence f.fun_body)
 
 let data_item ppf = function
   | Cdefine_symbol { sym_name; sym_global = Local } ->

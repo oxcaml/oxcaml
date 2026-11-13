@@ -1,0 +1,75 @@
+jump table:
+(switch x/4 
+case 0: fdo_annotation("Test.f":0:00000001:0:branch(0)) (exit 1)
+case 1: fdo_annotation("Test.f":0:00000001:0:branch(1)) (exit 2)
+case 2: fdo_annotation("Test.f":0:00000001:0:branch(2)) (exit 3)
+case 3: fdo_annotation("Test.f":0:00000001:0:branch(3)) (exit 4)
+case 4: fdo_annotation("Test.f":0:00000001:0:branch(4)) (exit 5)
+case 5: fdo_annotation("Test.f":0:00000001:0:branch(5)) (exit 6))
+  on edges: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)
+    "Test.f":0:00000001:0:branch(4) "Test.f":0:00000001:0:branch(5)
+  returned:
+  lost:
+
+shared cases:
+(switch x/5 
+case 0[p = 0.400000]:case 2[p = 0.400000]:
+  fdo_annotation("Test.f":0:00000001:0:branch(0)) (exit 1)
+case 1[p = 0.400000]:case 3[p = 0.400000]:
+  fdo_annotation("Test.f":0:00000001:0:branch(1)) (exit 2)
+case 4[p = 0.200000]: fdo_annotation("Test.f":0:00000001:0:branch(2))
+  (exit 3))
+  on edges: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(2)
+  returned:
+  lost:
+
+tests:
+(if (>=s x/6 10)
+  (if[p = 0.100000] (>=s x/6 19)
+    fdo_annotation("Test.f":0:00000001:0:branch(2)) (exit 3)
+    fdo_annotation("Test.f":0:00000001:0:branch(1)) (exit 2))
+  fdo_annotation("Test.f":0:00000001:0:branch(0)) (exit 1))
+  on edges: "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(0)
+  returned:
+  lost:
+
+lookup:
+(load_mut val (+a L:"camlCmm_switch_counters__1" (<< x/7 3)))
+  on edges:
+  returned: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)
+  lost:
+
+lookup of arguments:
+(exit 7 (load_mut val (+a L:"camlCmm_switch_counters__2" (<< x/8 3))))
+  on edges:
+  returned: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)
+  lost:
+
+lookup cluster:
+(if[p = 0.840000] (>=s x/9 4)
+  (if[p = 0.047619] (>=s x/9 24)
+    fdo_annotation("Test.f":0:00000001:0:branch(5)) 19
+    fdo_annotation("Test.f":0:00000001:0:branch(4)) (exit 8))
+  fdo_annotation("Test.f":0:00000001:0:branch(0)
+                 "Test.f":0:00000001:0:branch(1)
+                 "Test.f":0:00000001:0:branch(2)
+                 "Test.f":0:00000001:0:branch(3))
+  (load_mut val (+a L:"camlCmm_switch_counters__3" (<< x/9 3))))
+  on edges: "Test.f":0:00000001:0:branch(5) "Test.f":0:00000001:0:branch(4)
+    "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)
+  returned:
+  lost:
+
+single case:
+(exit 9)
+  on edges:
+  returned: "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(0)
+  lost:
+

@@ -570,9 +570,11 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   in
   (* Translate the arg list and body *)
   let env, fun_params = C.function_bound_parameters env params in
+  let res, outer_fdo_region = R.enter_fdo_region res in
   let fun_body, fun_body_free_vars, fun_body_symbol_inits, res =
     translate_expr env res body
   in
+  let res, fdo_entry_counters = R.leave_fdo_region res outer_fdo_region in
   (* Symbol definitions should have been lifted at top-level *)
   if not (To_cmm_env.Symbol_inits.is_empty fun_body_symbol_inits)
   then
@@ -626,7 +628,17 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     |> Code_metadata.result_arity |> C.extended_machtype_of_return_arity
     |> C.Extended_machtype.to_machtype
   in
-  ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll fun_ret_type,
+  let fdo_entry_annotation =
+    let entry_annotation =
+      Env.get_code_metadata env code_id |> Code_metadata.fdo_entry_annotation
+    in
+    Fdo_annotation.With_body_hash.with_annotation entry_annotation
+      (Fdo_annotation.combine
+         (Fdo_annotation.With_body_hash.annotation entry_annotation)
+         fdo_entry_counters)
+  in
+  ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg
+      ~fdo_entry_annotation fun_poll fun_ret_type,
     res )
 
 let params_and_body env res code_id p ~result_arity ~fun_dbg

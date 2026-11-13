@@ -94,9 +94,11 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     R.create ~reachable_names
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
   in
+  let r, outer_fdo_region = R.enter_fdo_region r in
   let body, body_free_vars, body_symbol_inits, res =
     To_cmm_expr.expr env r (Flambda_unit.body flambda_unit)
   in
+  let res, fdo_entry_counters = R.leave_fdo_region res outer_fdo_region in
   if not (To_cmm_env.Symbol_inits.is_empty body_symbol_inits)
   then
     Misc.fatal_errorf
@@ -132,7 +134,11 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       else Cmm.No_CSE :: fun_codegen
     in
     C.cfunction
-      (C.fundecl entry_sym [] body fun_codegen dbg Default_poll Cmm.typ_val)
+      (C.fundecl entry_sym [] body fun_codegen dbg
+         ~fdo_entry_annotation:
+           (Fdo_annotation.With_body_hash.create ~annotation:fdo_entry_counters
+              ~body_hash:None)
+         Default_poll Cmm.typ_val)
   in
   let { R.data_items; gc_roots; functions } = R.to_cmm res in
   let _res, cmm_helpers_data = flush_cmm_helpers_state res in
