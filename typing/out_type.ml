@@ -1057,6 +1057,7 @@ let is_generic_curry_mode m =
 
 module Variable_names : sig
   val reset_names : unit -> unit
+  val reset_mode_names : unit -> unit
 
   val add_subst : (type_expr * type_expr) list -> unit
 
@@ -1076,6 +1077,7 @@ module Variable_names : sig
 
   val reserve: type_expr -> unit
   val reserve_with_base: base:With_locality.Const.t -> type_expr -> unit
+  val reserve_modes: base:With_locality.Const.t -> type_expr -> unit
 
   val remove_names : transient_expr list -> unit
 
@@ -2009,12 +2011,7 @@ end = struct
     fun heads v ->
       List.exists (fun (H u) -> Desc.Var.Head.equal u v) heads
 
-  let reset_names () =
-    names := [];
-    name_subst := [];
-    name_counter := 0;
-    named_vars := [];
-    visited_for_named_vars := [];
+  let reset_mode_names () =
     suppressed_curries := [];
     rejected_curries := [];
     visited_for_named_modevars := [];
@@ -2025,6 +2022,14 @@ end = struct
     Paths.reset visible_paths;
     VarTbl.reset visible_vars;
     modename_counter := 0
+
+  let reset_names () =
+    names := [];
+    name_subst := [];
+    name_counter := 0;
+    named_vars := [];
+    visited_for_named_vars := [];
+    reset_mode_names ()
 
   let add_visible_edges () =
     edge_table :=
@@ -2389,15 +2394,18 @@ end = struct
     named_weak_vars := s;
     weak_var_map := m
 
-  let reserve_with_base ~base ty =
-    normalize_type ty;
-    add_named_vars ty;
+  let reserve_modes ~base ty =
     if mode_polymorphism_printing_enabled () then begin
       register_visible_modes ty;
       add_visible_paths ();
       add_visible_edges ();
       suppress_curry_modes ~base ty
     end
+
+  let reserve_with_base ~base ty =
+    normalize_type ty;
+    add_named_vars ty;
+    reserve_modes ~base ty
 
   let reserve ty = reserve_with_base ~base:With_locality.Const.legacy ty
 end
@@ -4225,6 +4233,12 @@ let prepare_expansion Errortrace.{ty; expanded} =
   if not (same_path ty expanded) then
     Variable_names.reserve expanded;
   Errortrace.{ty; expanded}
+
+let reserve_fresh_modes_of_expansion Errortrace.{ty; expanded} =
+  Variable_names.reset_mode_names ();
+  Variable_names.reserve_modes ~base:With_locality.Const.legacy ty;
+  if not (same_path ty expanded) then
+    Variable_names.reserve_modes ~base:With_locality.Const.legacy expanded
 
 (* Adapt functions to exposed interface *)
 let abbreviate ~abbrev f =
