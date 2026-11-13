@@ -27,13 +27,9 @@
 
 type visibility = Visible | Hidden
 
-type cmx_presence = Cmx_guaranteed | Cmx_not_guaranteed
-
 type include_flags =
   { visibility : visibility;
-    cmx_presence : cmx_presence }
-
-val cmx_presence_of_bool : bool -> cmx_presence
+    cmx_guaranteed : bool }
 
 val add_dir : include_flags -> string -> unit
 (** Add a directory to the end of the load path (i.e. at lowest priority.) *)

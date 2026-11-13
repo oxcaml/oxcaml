@@ -40,7 +40,7 @@ let rec loadfiles ppf name =
     if d <> Filename.current_dir_name then begin
       if not (List.mem d (Load_path.get_path_list ())) then
         Load_path.add_dir
-          { visibility = Visible; cmx_presence = Cmx_not_guaranteed } d;
+          { visibility = Visible; cmx_guaranteed = false } d;
     end;
     fprintf ppf "File %s loaded@."
       (if d <> Filename.current_dir_name then

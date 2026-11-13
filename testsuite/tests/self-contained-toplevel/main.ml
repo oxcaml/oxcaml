@@ -51,7 +51,7 @@ let () =
              filename   = Sys.executable_name
            ; cmi        = cmi
            ; include_flags =
-               { visibility = Visible; cmx_presence = Cmx_not_guaranteed }
+               { visibility = Visible; cmx_guaranteed = false }
            }
     | _ -> old_loader ~allow_hidden ~unit_name);
   Toploop.add_hook (function

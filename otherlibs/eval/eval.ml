@@ -180,7 +180,7 @@ let eval (expr : 'a expr) =
                     Compilation_unit.Name.to_string unit_name;
                   cmi;
                   include_flags =
-                    { visibility = Visible; cmx_presence = Cmx_not_guaranteed }
+                    { visibility = Visible; cmx_guaranteed = false }
                 })
               (Compilation_unit.Name.Map.find_opt unit_name !cmis));
   let env = Compmisc.initial_env () in

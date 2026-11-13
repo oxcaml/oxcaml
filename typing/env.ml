@@ -3475,7 +3475,7 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
     Persistent_env.Persistent_signature.{
       filename; cmi;
       include_flags =
-        { visibility = Visible; cmx_presence = Cmx_not_guaranteed }
+        { visibility = Visible; cmx_guaranteed = false }
     }
   in
   Persistent_env.save_cmi !persistent_env pers_sig;
@@ -4554,9 +4554,9 @@ let open_pers_signature name env =
   in
   path, env
 
-let open_pers_signature_cmi ~cmx_presence filename env =
+let open_pers_signature_cmi ~cmx_guaranteed filename env =
   let global_name, _sign =
-    Persistent_env.read_cmi_file !persistent_env ~cmx_presence filename
+    Persistent_env.read_cmi_file !persistent_env ~cmx_guaranteed filename
   in
   let mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false

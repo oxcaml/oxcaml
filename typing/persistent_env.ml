@@ -409,7 +409,7 @@ let read_import penv ~check modname cmi =
   let pers_sig =
     { Persistent_signature.filename; cmi;
       include_flags =
-        { visibility = Visible; cmx_presence = Cmx_not_guaranteed } }
+        { visibility = Visible; cmx_guaranteed = false } }
   in
   acknowledge_import penv ~check modname pers_sig
 
@@ -708,10 +708,8 @@ and acknowledge_new_pers_name penv check global_name global import =
     let signature, staticity = sign.sign in
     let mode = Mode.With_regionality.disallow_right (mode_pers_mod staticity) in
     let mode =
-      match import.imp_include_flags.cmx_presence with
-      | Cmx_guaranteed ->
-        mode
-      | Cmx_not_guaranteed ->
+      if import.imp_include_flags.cmx_guaranteed then mode
+      else
         (* Without a guaranteed [.cmx], the unit is not available for
            compile-time evaluation, so its staticity is forced to [Dynamic]
            regardless of what the [.cmi] claims. *)
@@ -997,7 +995,7 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
 let read penv modname a =
   read_pers_struct penv true modname a
 
-let read_cmi_file penv ~cmx_presence filename =
+let read_cmi_file penv ~cmx_guaranteed filename =
   let cmi = read_cmi_lazy filename in
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
@@ -1006,7 +1004,7 @@ let read_cmi_file penv ~cmx_presence filename =
      are still reported as unbound; only transitive lookups can reach it. *)
   let pers_sig =
     { Persistent_signature.filename; cmi;
-      include_flags = { visibility = Hidden; cmx_presence } }
+      include_flags = { visibility = Hidden; cmx_guaranteed } }
   in
   let import = acknowledge_import penv ~check:true unit_name pers_sig in
   let pers_name =
