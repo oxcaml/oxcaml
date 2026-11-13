@@ -3665,18 +3665,22 @@ let restore_source_paths (program : Code.program) =
   | None -> program
   | Some map ->
       let map = Build_path_prefix_map.flip map in
-      let restore path =
-        if Filename.is_relative path then path else Build_path_prefix_map.rewrite map path
+      let restore (pi : Parse_info.t) =
+        match pi.src with
+        | Some src when not (Filename.is_relative src) ->
+            { pi with src = Some (Build_path_prefix_map.rewrite map src) }
+        | Some _ | None -> pi
       in
       let blocks =
         Addr.Map.map
           (fun block ->
             let body =
               List.map block.body ~f:(function
-                | Event ({ src = Some src; _ } as pi) ->
-                    Event { pi with src = Some (restore src) }
-                | (Event { src = None; _ } | Let _ | Assign _ | Set_field _
-                  | Offset_ref _ | Array_set _) as instr -> instr)
+                | Event pi -> Event (restore pi)
+                | Let (x, Closure (params, cont, (hint, Some pi))) ->
+                    Let (x, Closure (params, cont, (hint, Some (restore pi))))
+                | (Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _) as instr
+                  -> instr)
             in
             { block with body })
           program.blocks
