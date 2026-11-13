@@ -1,7 +1,11 @@
 (* TEST
  flags = "-flambda2-advanced-meet";
  flambda2;
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 type _ opt_or_string =

@@ -1,5 +1,9 @@
 (* TEST
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
 *)
 
 (* This test is just checking that zero_alloc attributes in signatures don't

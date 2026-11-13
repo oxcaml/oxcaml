@@ -29,6 +29,11 @@ val check_ocamlopt_byte_output : Actions.t
 val setup_ocamlopt_opt_build_env : Actions.t
 val ocamlopt_opt : Actions.t
 val check_ocamlopt_opt_output : Actions.t
+val no_jsir_reason : string
+val setup_ocamlopt_jsir_build_env : Actions.t
+val ocamlopt_jsir : Actions.t
+val check_ocamlopt_jsir_output : Actions.t
+val run_js : Actions.t
 val run_expect : Actions.t
 val run_expectnat : Actions.t
 val compare_bytecode_programs : Actions.t

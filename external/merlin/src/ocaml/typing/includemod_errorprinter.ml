@@ -180,9 +180,9 @@ module Runtime_coercion = struct
             find env (Context.Module id :: ctx) q md.md_type
         | _ -> raise Not_found
         end
-    | Mty_functor(Named (_,mt,_) as arg,_,_), InArg :: q ->
+    | Mty_functor(Named (_,mt,_) as arg,_,_,_), InArg :: q ->
         find env (Context.Arg arg :: ctx) q mt
-    | Mty_functor(arg, mt,_), InBody :: q ->
+    | Mty_functor(arg, mt,_,_), InBody :: q ->
         find env (Context.Body arg :: ctx) q mt
     | _ -> raise Not_found
 
@@ -1144,6 +1144,13 @@ and functor_symptom ~expansion_token ~env ~before ~ctx = function
   | Result res ->
       module_type ~expansion_token ~eqmode:false ~env ~before ~ctx res
   | Params d -> functor_params ~expansion_token ~env ~before ~ctx d
+  | Staticity ->
+      let printer =
+        Fmt.dprintf
+          "@[Their staticities disagree:@ \
+          one is a template functor@ and the other is not.@]"
+      in
+      dwith_context ctx printer :: before
 
 and signature ~expansion_token ~env:_ ~before ~ctx sgs =
   Printtyp.Doc.wrap_printing_env ~error:true sgs.env (fun () ->
