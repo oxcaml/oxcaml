@@ -206,12 +206,10 @@ Error: Signature mismatch:
        is not included in
          val f : (< m : 'c -> 'd -> 'a > as 'a) @ contended -> 'c -> 'd -> 'a
        The type
-         "(< m : 'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                ('d @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                 'a @ [< global uncontended read_write > 'm mod global many forkable unyielding | nonportable stateful dynamic]) @ [< global many forkable unyielding > nonportable stateful dynamic]
+         "(< m : 'c -> 'd -> 'a @ [> 'm mod global many forkable unyielding]
                 as 'b >
           as 'a) @ [< 'm mod aliased & uncontended read_write] ->
-         'b @ [> close('m) mod many | nonportable stateful]"
+         'b @ [> close('m) mod many]"
        is not compatible with the type
          "(< m : 'c -> 'd -> 'e > as 'e) @ contended -> 'c -> 'd -> 'e"
        The argument mode was expected to be "uncontended" but is "contended"
@@ -248,11 +246,10 @@ Error: Signature mismatch:
            (< m : 'c -> 'd -> 'a > as 'a) @ contended ->
            'c -> 'd -> (< m : 'c -> 'd -> 'b > as 'b)
        The type
-         "< m : 'b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-               ('c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                < m : 'a > @ [< global uncontended read_write > 'm mod global many forkable unyielding | nonportable stateful dynamic]) @ [< global many forkable unyielding > nonportable stateful dynamic]
+         "< m : 'b ->
+               'c -> < m : 'a > @ [> 'm mod global many forkable unyielding]
                as 'a > @ [< 'm mod aliased & uncontended read_write] ->
-         'a @ [> close('m) mod many | nonportable stateful]"
+         'a @ [> close('m) mod many]"
        is not compatible with the type
          "(< m : 'b -> 'c -> 'd > as 'd) @ contended ->
          'b -> 'c -> (< m : 'b -> 'c -> 'e > as 'e)"

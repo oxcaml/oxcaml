@@ -445,9 +445,7 @@ Error: Signature mismatch:
          val illegal : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
          val illegal : t -> t @ portable
-       The type
-         "t @ [< 'm > nonportable stateful dynamic] ->
-         t @ [> 'm | nonportable stateful dynamic]"
+       The type "t @ [< 'm] -> t @ [> 'm | nonportable stateful dynamic]"
        is not compatible with the type "t -> t @ portable"
        The return mode was expected to be "portable" but is "nonportable"
 |}]

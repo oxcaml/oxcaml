@@ -940,6 +940,29 @@ let mode_polymorphism_printing_enabled () =
     is_at_least Mode_polymorphism Alpha
     && is_enabled Mode_polymorphism_printing)
 
+let relevant_modes = ref []
+let got_modes = ref []
+let hidden_modes = ref []
+
+let is_hidden_mode m = List.memq m !hidden_modes
+
+let modes_of_types tys =
+  let visited = ref TypeSet.empty in
+  let modes = ref [] in
+  let rec visit ty =
+    if not (TypeSet.mem ty !visited) then begin
+      visited := TypeSet.add ty !visited;
+      Btype.iter_type_expr visit (fun m -> modes := m :: !modes) ty
+    end
+  in
+  List.iter visit tys;
+  !modes
+
+let with_relevant_modes ~relevant ~got f =
+  Misc.protect_refs
+    [R (relevant_modes, relevant); R (got_modes, modes_of_types got);
+     R (hidden_modes, [])] f
+
 module Internal_names : sig
 
   val reset : unit -> unit
@@ -1015,7 +1038,10 @@ let curry_acc :
     match With_locality.zap_to_legacy ~arg:true marg with
     | Some arg -> Curry_mode.add_const_arg acc arg
     | None ->
-      if mode_polymorphism_printing_enabled ()
+      if is_hidden_mode marg then
+        Curry_mode.add_const_arg acc
+          (With_locality.zap_to_legacy_force ~commit:false ~arg:true marg)
+      else if mode_polymorphism_printing_enabled ()
       then
         let marg = Option.value instance ~default:marg in
         Curry_mode.add_arg acc marg
@@ -1035,7 +1061,9 @@ let curry_mode_of_occurrence :
     match With_locality.zap_to_legacy ~arg m with
     | Some c -> Const c
     | None ->
-      if mode_polymorphism_printing_enabled ()
+      if is_hidden_mode m then
+        Const (With_locality.zap_to_legacy_force ~commit:false ~arg m)
+      else if mode_polymorphism_printing_enabled ()
       then
         let m = Option.value instance ~default:m in
         Variable
@@ -1054,6 +1082,14 @@ let equate_with_const_curry : With_locality.lr -> Curry_mode.t -> bool =
 
 let is_generic_curry_mode m =
   mode_polymorphism_printing_enabled () && With_locality.check_generic m
+
+let is_hidden_const_curry m acc_mode =
+  is_hidden_mode m
+  && match acc_mode with
+     | Curry_mode.Const c ->
+       With_locality.Const.equal
+         (With_locality.zap_to_legacy_force ~commit:false ~arg:false m) c
+     | Curry_mode.Variable _ -> false
 
 (** Forward reference to [Aliases.aliases_of], defined after [Variable_names].
     [Variable_names.reserve] needs the type aliases before the printer marks
@@ -2058,6 +2094,7 @@ end = struct
     printed_aliases := [];
     modenames := [];
     edge_table := [];
+    hidden_modes := [];
     suppressed_curry_heads := [];
     Paths.reset visible_paths;
     VarTbl.reset visible_vars;
@@ -2078,10 +2115,57 @@ end = struct
     | Some (_, edges) -> edges
     | None -> { lower = []; upper = [] }
 
+  let name_of_lower = function
+    | Lower_simple { name; _ } | Lower_comonadic { c_name = name; _ }
+    | Lower_closing_over_to { cls_edge = { name; _ }; _ } -> name
+
+  let name_of_upper = function
+    | Upper_simple { name; _ } | Upper_comonadic { c_name = name; _ } -> name
+
+  (** Whether [m] is one of the modes at fault in a mode error. *)
+  let is_relevant m = List.memq m !relevant_modes
+
+  let is_got m = List.memq m !got_modes
+
+  (** Whether only the constraints of [m] involving a relevant mode are
+      printed. *)
+  let is_partial m = is_got m && not (is_relevant m)
+
+  let names_of_edges { lower; upper } =
+    List.map name_of_lower lower @ List.map name_of_upper upper
+
+  (** Drops every edge of a partial mode that does not have a relevant mode
+      as an endpoint, at all of its occurrences. *)
+  let restrict_to_relevant_edges () =
+    let names_of_modes ms =
+      List.concat_map (fun m -> names_of_edges (find_edges (pair_of_mode m))) ms
+    in
+    let mem name names = List.exists (eq_boxedname name) names in
+    let relevant = names_of_modes !relevant_modes in
+    let partial_modes = List.filter is_partial !got_modes in
+    let partial = names_of_modes partial_modes in
+    let keep name = mem name relevant || not (mem name partial) in
+    edge_table :=
+      List.map (fun (pair, { lower; upper }) ->
+        pair,
+        { lower = List.filter (fun e -> keep (name_of_lower e)) lower;
+          upper = List.filter (fun e -> keep (name_of_upper e)) upper })
+        !edge_table;
+    hidden_modes :=
+      List.filter (fun m ->
+        With_locality.check_generic m
+        && begin
+          let { lower; upper } = find_edges (pair_of_mode m) in
+          List.is_empty lower && List.is_empty upper
+        end)
+        partial_modes
+
   let is_implied_curry_mode : With_locality.lr -> Curry_mode.t -> bool =
     fun m acc_mode ->
-      if is_generic_curry_mode m then List.memq m !suppressed_curries
-      else equate_with_const_curry m acc_mode
+      not (is_relevant m)
+      && (is_hidden_const_curry m acc_mode
+          || if is_generic_curry_mode m then List.memq m !suppressed_curries
+             else equate_with_const_curry m acc_mode)
 
   type instance_mapping =
     { mode : With_locality.lr;
@@ -2134,6 +2218,10 @@ end = struct
       candidate with its rigid counterpart, so that both instances match
       everywhere except at the curry modes. *)
   let equate_non_curry_modes ~instances_generic ~instances_rigid ty =
+    let equate_if_visible m =
+      if not (is_hidden_mode m) then
+        equate_instances m ~instances_generic ~instances_rigid
+    in
     let visited = ref [] in
     let rec visit ty =
       let px = proxy ty in
@@ -2141,15 +2229,16 @@ end = struct
         visited := px :: !visited;
         begin match get_desc ty with
         | Tarrow ((_, marg, mret), _, ty2, _) ->
-          equate_instances marg ~instances_generic ~instances_rigid;
+          equate_if_visible marg;
           begin match get_desc ty2 with
           (* The curry mode of a type alias is always printed, see
              [register_suppressed_curries] *)
           | Tarrow _
             when not (is_type_alias ty2)
+                 && not (is_relevant mret)
                  && is_generic_curry_mode mret
                  && not (has_upper_edges mret) -> ()
-          | _ -> equate_instances mret ~instances_generic ~instances_rigid
+          | _ -> equate_if_visible mret
           end
         | _ -> ()
         end;
@@ -2215,6 +2304,8 @@ end = struct
           let hidden =
             match get_desc ty2 with
             | Tarrow _ when is_type_alias ty2 -> false
+            | Tarrow _ when is_relevant mret -> false
+            | Tarrow _ when is_hidden_const_curry mret acc_mode -> true
             | Tarrow _ when is_generic_curry_mode mret ->
               register_curry_mode mret
                 ~m_generic:(find_mode_instance mret instances_generic)
@@ -2354,7 +2445,10 @@ end = struct
     with
     | Some (_, alias) -> "'" ^ alias
     | None ->
-      let bounds = construct_raw_bounds pair in
+      let bounds =
+        if is_partial modes then { lo = ""; hi = "" }
+        else construct_raw_bounds pair
+      in
       Fmt.asprintf "%a" (print_raw_constraints bounds) pair
 
   let substitute ty =
@@ -2457,6 +2551,7 @@ end = struct
       register_visible_modes ty;
       add_visible_paths ();
       add_visible_edges ();
+      restrict_to_relevant_edges ();
       suppress_curry_modes ~base ty
     end
 
