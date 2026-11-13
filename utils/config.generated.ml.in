@@ -154,6 +154,12 @@ let has_avx512bw = "@has_avx512bw@" = "yes"
 
 let has_avx512vl = "@has_avx512vl@" = "yes"
 
+let has_cssc = "@has_cssc@" = "yes"
+
+let has_lrcpc2 = "@has_lrcpc2@" = "yes"
+
+let has_lse = "@has_lse@" = "yes"
+
 let as_compress_debug_sections_flag = {@QS@|@as_compress_debug_sections_flag@|@QS@}
 let cc_compress_debug_sections_flag = {@QS@|@cc_compress_debug_sections_flag@|@QS@}
 let objcopy_compress_debug_sections_flag = {@QS@|@objcopy_compress_debug_sections_flag@|@QS@}

@@ -263,6 +263,43 @@ camlConftest__entry:
   OCAML_CC_RESTORE_VARIABLES
 ])
 
+dnl OCAML_AS_HAS_ARM64_EXTENSION(EXTENSION, DIRECTIVE, INSTRUCTION,
+dnl   ACTION-IF-SUPPORTED)
+dnl Check that the assembler accepts INSTRUCTION after DIRECTIVE, which is how
+dnl the arm64 backend enables EXTENSION (see Arch.Extension). An unsupported
+dnl extension is skipped with --with-arm64-extensions=native and an error
+dnl otherwise.
+AC_DEFUN([OCAML_AS_HAS_ARM64_EXTENSION], [
+  AC_MSG_CHECKING([whether the assembler supports $1])
+  OCAML_CC_SAVE_VARIABLES
+
+  # Modify C-compiler variables to use the assembler
+  CC="$AS"
+  CFLAGS="-o conftest.$ac_objext"
+  CPPFLAGS=""
+  ac_ext="S"
+  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+
+  AC_COMPILE_IFELSE(
+    [AC_LANG_SOURCE([
+        $2
+        .text
+        $3
+    ])],
+    [as_has_arm64_extension=true],
+    [as_has_arm64_extension=false])
+
+  OCAML_CC_RESTORE_VARIABLES
+
+  AS_IF([$as_has_arm64_extension],
+    [AC_MSG_RESULT([yes])
+    $4],
+    [AC_MSG_RESULT([no])
+    AS_IF([test x"$with_arm64_extensions" = "xnative"],
+      [AC_MSG_WARN([not using $1, which the assembler does not support])],
+      [AC_MSG_ERROR([the assembler does not support $1])])])
+])
+
 AC_DEFUN([OCAML_MMAP_SUPPORTS_MAP_STACK], [
   AC_MSG_CHECKING([whether mmap supports MAP_STACK])
   AC_RUN_IFELSE(

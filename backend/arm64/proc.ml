@@ -349,7 +349,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Static_cast
           (V128_of_scalar _|Scalar_of_v128 _))
   | Op (Intop Ipopcnt) ->
-      if !Arch.feat_cssc then
+      if Arch.Extension.enabled CSSC then
         [||]
       else
         destroy_neon_reg7

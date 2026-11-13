@@ -219,6 +219,14 @@ val protected : Asm_symbol.t -> unit
 *)
 val private_extern : Asm_symbol.t -> unit
 
+(** Set the architecture the assembler accepts, e.g. [arch "armv8.4-a"]. This
+    disables any extensions enabled before it. *)
+val arch : string -> unit
+
+(** Enable an optional instruction-set extension in the assembler, e.g.
+    [arch_extension "cssc"]. *)
+val arch_extension : string -> unit
+
 (** Mark an already encoded symbol as external. *)
 val extrn : Asm_symbol.t -> unit
 
@@ -460,6 +468,8 @@ module Directive : sig
         { str : string;
           comment : string option
         }
+    | Arch of string
+    | Arch_extension of string
     | Cfi_adjust_cfa_offset of int
     | Cfi_def_cfa_offset of int
     | Cfi_endproc
