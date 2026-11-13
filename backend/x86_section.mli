@@ -38,6 +38,8 @@ module Section_name : sig
 
   val is_data_like : t -> bool
 
+  val is_rodata_like : t -> bool
+
   val is_note_like : t -> bool
 
   module Map : Map.S with type key = t
