@@ -2,7 +2,7 @@
 
 (alias
  (name C-only)
- (deps libthreads_stubs.a dllthreads_stubs.so))
+ (deps libthreads_stubs.a dllthreads_stubs%{stub_dll_suffix}.so))
 
 (rule (target sync_posix.h) (action (copy %{dep:../../../runtime/sync_posix.h} %{target})))
 

@@ -163,7 +163,7 @@
     (unixLabels.mli as unix/unixLabels.mli)
     (libunix_stubs.a as unix/libunix_stubs.a)
     (libunix_stubs.a as libunix_stubs_native.a) ; for special_dune compat
-    (dllunix_stubs.so as stublibs/dllunix_stubs.so)
+    (dllunix_stubs%{stub_dll_suffix}.so as stublibs/dllunix_stubs%{stub_dll_suffix}.so)
     (socketaddr.h as caml/socketaddr.h)
     (unixsupport.h as caml/unixsupport.h)
     (META as unix/META)
@@ -174,7 +174,7 @@
 
 (alias
  (name C-only)
- (deps libunix_stubs.a dllunix_stubs.so))
+ (deps libunix_stubs.a dllunix_stubs%{stub_dll_suffix}.so))
 
 (rule
   (targets unix.ml)

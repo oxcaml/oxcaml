@@ -39,7 +39,7 @@
     (.runtime_events.objs/native/runtime_events.cmx as runtime_events/runtime_events.cmx)
     (libruntime_events_stubs.a as runtime_events/libruntime_events_stubs.a)
     (libruntime_events_stubs.a as libruntime_events_stubs_native.a) ; for special_dune compat
-    (dllruntime_events_stubs.so as stublibs/dllruntime_events_stubs.so)
+    (dllruntime_events_stubs%{stub_dll_suffix}.so as stublibs/dllruntime_events_stubs%{stub_dll_suffix}.so)
     (runtime_events.cmxa as runtime_events/runtime_events.cmxa)
     (runtime_events.a as runtime_events/runtime_events.a)
     (runtime_events.cmxs as runtime_events/runtime_events.cmxs)
@@ -56,4 +56,4 @@
 
 (alias
  (name C-only)
- (deps libruntime_events_stubs.a dllruntime_events_stubs.so))
+ (deps libruntime_events_stubs.a dllruntime_events_stubs%{stub_dll_suffix}.so))

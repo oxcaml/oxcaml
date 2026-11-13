@@ -63,6 +63,7 @@
   eval.cmxa
   eval.a
   libeval_stubs.a
+  (dlleval_stubs%{stub_dll_suffix}.so as stublibs/dlleval_stubs%{stub_dll_suffix}.so)
   eval.cmxs
   eval.cma
   eval.mli

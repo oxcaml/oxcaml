@@ -11,6 +11,6 @@
 
 (install
  (files
-  (dllgc_timings_stubs.so as stublibs/dllgc_timings_stubs.so))
+  (dllgc_timings_stubs%{stub_dll_suffix}.so as stublibs/dllgc_timings_stubs%{stub_dll_suffix}.so))
  (section lib)
  (package ocaml))

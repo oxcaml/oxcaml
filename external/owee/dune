@@ -13,6 +13,6 @@
 
 (install
  (files
-  (dllcompiler_owee_stubs.so as stublibs/dllcompiler_owee_stubs.so))
+  (dllcompiler_owee_stubs%{stub_dll_suffix}.so as stublibs/dllcompiler_owee_stubs%{stub_dll_suffix}.so))
  (section lib)
  (package ocaml))
