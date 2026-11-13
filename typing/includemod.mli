@@ -219,6 +219,11 @@ val check_modtype_equiv:
 val signatures: Env.t -> mark:bool -> modes:modes ->
   signature -> signature -> module_coercion
 
+(** [mark_signature_items_used sg] marks the items declared in [sg] as used.
+    This is useful for typing mli files, where all items should be considered
+    used. *)
+val mark_signature_items_used : signature -> unit
+
 val include_functor_signatures : Env.t -> mark:bool ->
   signature -> signature -> modes:modes -> (Ident.t * module_coercion) list
 
