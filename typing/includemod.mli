@@ -256,7 +256,8 @@ type application_name =
   | Full_application_path of Longident.t (** [F(G(X).P)(Y)] *)
   | Named_leftmost_functor of Longident.t (** [F(struct end)...(...)] *)
 
-exception Apply_error of {
+module Apply_error : sig
+  type t = {
     loc : Location.t ;
     env : Env.t ;
     app_name : application_name ;
@@ -264,6 +265,12 @@ exception Apply_error of {
     args : (Error.functor_arg_descr * Types.module_type *
       Typedtree.mode_with_locks)  list ;
   }
+
+  type exn += private In_context of t
+
+  val log_or_raise : t -> unit
+  val log_and_raise : t -> 'a
+end
 
 val expand_module_alias: strengthen:bool -> Env.t -> Path.t -> Types.module_type
 
