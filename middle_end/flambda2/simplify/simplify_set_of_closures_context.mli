@@ -37,6 +37,14 @@ val create_for_static_stub :
   simplify_function_body:Simplify_common.simplify_function_body ->
   t
 
+(** For code that has no closure, such as the code of the instantiations of
+    templates. Unlike in stubs, inlining is allowed. *)
+val create_for_code_without_closure :
+  DA.t ->
+  all_code:Code.t Code_id.Map.t ->
+  simplify_function_body:Simplify_common.simplify_function_body ->
+  t
+
 val dacc_inside_functions : t -> DA.t
 
 val dacc_prior_to_sets : t -> DA.t

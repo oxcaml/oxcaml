@@ -86,6 +86,11 @@ module type Code_metadata_accessors_result_type = sig
 
   val loopify : 'a t -> Loopify_attribute.t
 
+  (** For the code of an instantiation of a template, a symbol naming the
+      template. Such code has no closure: it is only called directly, and takes
+      the template's environment as its first parameter. *)
+  val template_key : 'a t -> Symbol.t option
+
   val function_slot_size : 'a t -> int
 end
 
@@ -123,6 +128,7 @@ type 'a create_type =
   absolute_history:Inlining_history.Absolute.t ->
   relative_history:Inlining_history.Relative.t ->
   loopify:Loopify_attribute.t ->
+  template_key:Symbol.t option ->
   'a
 
 val createk : (t -> 'a) -> 'a create_type
