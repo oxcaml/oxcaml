@@ -32,7 +32,7 @@
 #endif
 
 #include "caml/lf_skiplist.h"
-#include "sync_posix.h"
+#include <limits.h>
 
 #ifdef _WIN32
 /* CR nbarnes: The following comment is no longer quite true (since
@@ -142,35 +142,30 @@ CAMLexport void caml_plat_mutex_reinit(caml_plat_mutex *m)
 }
 
 /* Condition variables */
-static void caml_plat_cond_init_aux(caml_plat_cond *cond)
-{
-  custom_condvar_init(cond);
-}
-
 void caml_plat_cond_init(caml_plat_cond* cond)
 {
-  caml_plat_cond_init_aux(cond);
+  check_err("cond_init", pthread_cond_init(cond, NULL));
 }
 
 void caml_plat_wait(caml_plat_cond* cond, caml_plat_mutex* mut)
 {
   caml_plat_assert_locked(mut);
-  check_err("wait", custom_condvar_wait(cond, mut));
+  check_err("wait", pthread_cond_wait(cond, mut));
 }
 
 void caml_plat_broadcast(caml_plat_cond* cond)
 {
-  check_err("cond_broadcast", custom_condvar_broadcast(cond));
+  check_err("cond_broadcast", pthread_cond_broadcast(cond));
 }
 
 void caml_plat_signal(caml_plat_cond* cond)
 {
-  check_err("cond_signal", custom_condvar_signal(cond));
+  check_err("cond_signal", pthread_cond_signal(cond));
 }
 
 void caml_plat_cond_free(caml_plat_cond* cond)
 {
-  check_err("cond_free", custom_condvar_destroy(cond));
+  check_err("cond_free", pthread_cond_destroy(cond));
 }
 
 /* Futexes */
