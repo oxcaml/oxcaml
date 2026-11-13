@@ -66,11 +66,11 @@ let print_counters title counters =
 let test name ~index cases =
   let scrutinee = Cmm.Cvar (Backend_var.create_local "x") in
   let cases = Array.mapi (fun arm case -> case, annots arm) cases in
-  let expr, residual =
+  let { Cmm_helpers.switch_expr = expr; fdo_counters_into_switch } =
     Cmm_helpers.transl_switch_clambda dbg scrutinee index cases
   in
   let on_edges = edge_counters expr in
-  let residual = Fdo_annotation.to_list residual in
+  let residual = Fdo_annotation.to_list fdo_counters_into_switch in
   let lost =
     List.filter
       (fun arm ->

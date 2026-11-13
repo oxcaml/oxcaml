@@ -59,38 +59,12 @@ val add_gc_roots : t -> Symbol.t list -> t
 (** Register a function that has been translated to Cmm. *)
 val add_function : t -> Cmm.fundecl -> t
 
-(** {2 FDO counters without edges}
+(** The FDO counters that lost their edges (see [Fdo_to_cmm_region_counters]).
+*)
+val fdo_region_counters : t -> Fdo_to_cmm_region_counters.t
 
-    Some FDO counters lose the edge they were attached to in Cmm, e.g. those of
-    the arms of a switch that becomes a table lookup. As in Simplify (see
-    [Fdo_region_counters]), they are attached instead to the edges into their
-    region: the stretch of straight-line code they are in, which starts at a
-    function entry, a switch arm or a continuation handler. A region that jumps
-    to a handler gets the counters of the handler, which are known if the
-    handler was translated before the jump. *)
-
-(* CR yusumez: The jumps translated before their handler, such as the back edges
-   of a loop, miss the counters of the handler, as in Simplify. *)
-
-(** The counters of an enclosing region, put aside while translating a region in
-    it. *)
-type fdo_region
-
-(** Start translating a region. *)
-val enter_fdo_region : t -> t * fdo_region
-
-(** Stop translating the region, returning the counters to attach to the edges
-    into it. *)
-val leave_fdo_region : t -> fdo_region -> t * Fdo_annotation.t
-
-(** The given counters lost their edges in the region being translated. *)
-val add_fdo_region_counters : t -> Fdo_annotation.t -> t
-
-(** Record the counters to attach to the edges into the handler of the given
-    continuation. *)
-val set_fdo_handler_counters : t -> Continuation.t -> Fdo_annotation.t -> t
-
-val fdo_handler_counters : t -> Continuation.t -> Fdo_annotation.t
+val map_fdo_region_counters :
+  t -> (Fdo_to_cmm_region_counters.t -> Fdo_to_cmm_region_counters.t) -> t
 
 (** Record the given symbol as having been defined. This is used to keep track
     of whether the module block symbol for the current unit has been defined. *)

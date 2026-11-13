@@ -18,6 +18,7 @@ open! Flambda.Import
 module Env = To_cmm_env
 module Ece = Effects_and_coeffects
 module R = To_cmm_result
+module FRC = Fdo_to_cmm_region_counters
 
 module C = struct
   include Cmm_helpers
@@ -903,17 +904,17 @@ and continuation_handler env res k handler =
     ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
       let arity = Bound_parameters.arity params in
       let env, vars = C.continuation_bound_parameters env params in
-      let res, outer_fdo_region = R.enter_fdo_region res in
+      let res = R.map_fdo_region_counters res FRC.enter_region in
       let expr, free_vars_of_handler, symbol_inits, res =
         expr env res handler
       in
-      let res, fdo_counters = R.leave_fdo_region res outer_fdo_region in
       (* CR yusumez: An exception handler is entered by no edge, so the counters
          that lose their edges in it are dropped, as in Simplify. *)
       let res =
-        if is_exn_handler
-        then res
-        else R.set_fdo_handler_counters res k fdo_counters
+        R.map_fdo_region_counters res (fun fdo ->
+            if is_exn_handler
+            then FRC.leave_region fdo
+            else FRC.leave_handler fdo k)
       in
       let expr, free_vars_of_handler, symbol_inits =
         Env.place_symbol_inits ~params:vars expr free_vars_of_handler
@@ -977,7 +978,9 @@ and apply_expr env res apply =
       let wrap, _, res =
         Env.flush_delayed_lets ~mode:Flush_everything env res
       in
-      let res = R.add_fdo_region_counters res (R.fdo_handler_counters res k) in
+      let res =
+        R.map_fdo_region_counters res (fun fdo -> FRC.jump_to_handler fdo k)
+      in
       let cmm, free_vars, symbol_inits =
         wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty
       in
@@ -1063,7 +1066,9 @@ and apply_cont env res apply_cont =
       translate_jump_to_return_continuation ~dbg_with_inlined env res apply_cont
         k param_types args
     | Jump { param_types; cont } ->
-      let res = R.add_fdo_region_counters res (R.fdo_handler_counters res k) in
+      let res =
+        R.map_fdo_region_counters res (fun fdo -> FRC.jump_to_handler fdo k)
+      in
       translate_jump_to_continuation ~dbg_with_inlined env res apply_cont
         param_types cont args
     | Inline
@@ -1170,11 +1175,12 @@ and switch env res switch =
   let make_arm ~must_tag_discriminant env res (d, arm) =
     let d = prepare_discriminant ~must_tag:must_tag_discriminant d in
     let action = Switch_arm.action arm in
-    let res, outer_fdo_region = R.enter_fdo_region res in
+    let res = R.map_fdo_region_counters res FRC.enter_region in
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
     in
-    let res, fdo_counters = R.leave_fdo_region res outer_fdo_region in
+    let fdo_counters = FRC.region_counters (R.fdo_region_counters res) in
+    let res = R.map_fdo_region_counters res FRC.leave_region in
     let annotations = Switch_arm.annotations arm in
     let annotations =
       Branch_annotations.with_fdo_annotation annotations
@@ -1298,7 +1304,10 @@ and switch env res switch =
     let { C.switch_expr; fdo_counters_into_switch } =
       C.transl_switch_clambda dbg scrutinee index (Array.map Option.get cases)
     in
-    let res = R.add_fdo_region_counters res fdo_counters_into_switch in
+    let res =
+      R.map_fdo_region_counters res (fun fdo ->
+          FRC.add_counters fdo fdo_counters_into_switch)
+    in
     let cmm, free_vars, symbol_inits =
       wrap switch_expr free_vars symbol_inits
     in

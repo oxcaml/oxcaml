@@ -570,11 +570,18 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   in
   (* Translate the arg list and body *)
   let env, fun_params = C.function_bound_parameters env params in
-  let res, outer_fdo_region = R.enter_fdo_region res in
+  let res =
+    R.map_fdo_region_counters res Fdo_to_cmm_region_counters.enter_region
+  in
   let fun_body, fun_body_free_vars, fun_body_symbol_inits, res =
     translate_expr env res body
   in
-  let res, fdo_entry_counters = R.leave_fdo_region res outer_fdo_region in
+  let fdo_entry_counters =
+    Fdo_to_cmm_region_counters.region_counters (R.fdo_region_counters res)
+  in
+  let res =
+    R.map_fdo_region_counters res Fdo_to_cmm_region_counters.leave_region
+  in
   (* Symbol definitions should have been lifted at top-level *)
   if not (To_cmm_env.Symbol_inits.is_empty fun_body_symbol_inits)
   then
