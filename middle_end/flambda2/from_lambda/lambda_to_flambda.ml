@@ -476,9 +476,15 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     match Env.get_unboxed_product_fields env id with
     | None ->
       let kind =
-        match CCenv.find_simple_to_substitute_exn ccenv id with
-        | exception Not_found -> snd (CCenv.find_var ccenv id)
-        | _, kind -> kind
+        if CCenv.is_lcode ccenv id
+        then
+          (* [id] can only be the function of an application (see
+             [Closure_conversion.close_apply]). *)
+          Flambda_kind.With_subkind.any_value
+        else
+          match CCenv.find_simple_to_substitute_exn ccenv id with
+          | exception Not_found -> snd (CCenv.find_var ccenv id)
+          | _, kind -> kind
       in
       let arity_component =
         Flambda_arity.Component_for_creation.Singleton kind
@@ -525,7 +531,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
        Consider introducing a special debug UID for closures. See #3967. *)
     let dbg = Debuginfo.from_location func.loc in
     let func =
-      cps_function env ~fid:id ~fuid:id_duid ~let_bound:false
+      cps_function env ~fid:id ~fuid:id_duid ~let_bound:false ~has_closure:true
         ~recursive:(Non_recursive : Recursive.t)
         func
     in
@@ -569,12 +575,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               (Simple (Var temp_id)) ~body)
           body new_ids_with_kinds temp_id_unarized acc ccenv)
   | Llet ((Strict | Alias | StrictOpt), _, fun_id, duid, Lfunction func, body)
-  | Lcode
-      ({ code_name = fun_id; code_debug_uid = duid; code_fun = func; _ }, body)
     ->
     (* This case is here to get function names right. *)
-    (* CR layout poly: compile the code of instantiations ([Lcode]) without
-       closures. *)
     let bindings =
       cps_function_bindings env [L.{ id = fun_id; debug_uid = duid; def = func }]
     in
@@ -1209,7 +1211,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _
+  | Lcode _ ->
+    (* [Lcode] is only allowed at the top of the unit: see
+       [lambda_to_flambda]. *)
     Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
@@ -1389,14 +1394,14 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
   List.map
     (fun (fun_id, fun_uid, def) ->
       let fuid = Flambda_debug_uid.of_lambda_debug_uid fun_uid in
-      cps_function env ~fid:fun_id ~fuid ~let_bound:true
+      cps_function env ~fid:fun_id ~fuid ~let_bound:true ~has_closure:true
         ~recursive:(recursive fun_id)
         ~precomputed_free_idents:(Ident.Map.find fun_id free_idents)
         def)
     bindings_with_wrappers
 
-and cps_function env ~fid ~fuid ~let_bound ~(recursive : Recursive.t)
-    ?precomputed_free_idents
+and cps_function env ~fid ~fuid ~let_bound ~has_closure
+    ~(recursive : Recursive.t) ?precomputed_free_idents
     ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } as
      func :
       L.lfunction) : Function_decl.t =
@@ -1507,12 +1512,15 @@ and cps_function env ~fid ~fuid ~let_bound ~(recursive : Recursive.t)
        work, so we ignore [@unboxable] attributes. If we want to support them
        in the future, there is a bit of work to do for the case where the
        closures are lifted. *)
+    (* The unboxed calling convention needs a closure, for the function slot of
+       the unboxed version of the function, so [@unboxable] attributes are also
+       ignored for the code of instantiations of templates. *)
     let is_a_param_unboxed =
       List.exists (fun (p : Lambda.lparam) -> p.attributes.unbox_param) params
     in
     if
       Flambda_features.classic_mode ()
-      || attr.stub
+      || attr.stub || (not has_closure)
       || ((not (Option.is_some attr.unbox_return)) && not is_a_param_unboxed)
     then Normal_calling_convention
     else
@@ -1896,6 +1904,15 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
 
 (* CR pchambart: define a record `target_config` to hold things like
    `big_endian` *)
+(* Slambda binds the code of every instantiation of a template at the top of the
+   unit. *)
+let rec split_lcodes (lam : L.lambda) =
+  match[@warning "-fragile-match"] lam with
+  | Lcode (lcode, body) ->
+    let lcodes, body = split_lcodes body in
+    lcode :: lcodes, body
+  | _ -> [], lam
+
 let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
@@ -1913,7 +1930,22 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
       ~return_continuation ~exn_continuation ~my_region:None
       ~my_alloc_region:toplevel_my_alloc_region ~fdo
   in
+  let lcodes, lam = split_lcodes lam in
   let program acc ccenv =
+    let lcodes =
+      List.map
+        (fun ({ code_name; code_debug_uid; code_template; code_fun } : L.lcode)
+           ->
+          ( code_name,
+            code_template,
+            cps_function env ~fid:code_name
+              ~fuid:(Flambda_debug_uid.of_lambda_debug_uid code_debug_uid)
+              ~let_bound:true ~has_closure:false ~recursive:Non_recursive
+              code_fun ))
+        lcodes
+    in
+    let ccenv = CC.declare_lcodes ccenv lcodes in
+    let acc = CC.close_lcodes acc ccenv lcodes in
     cps_tail acc env ccenv lam return_continuation exn_continuation
   in
   CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader

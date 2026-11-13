@@ -45,7 +45,8 @@ type t =
     inlining_decision : Function_decl_inlining_decision_type.t;
     absolute_history : Inlining_history.Absolute.t;
     relative_history : Inlining_history.Relative.t;
-    loopify : Loopify_attribute.t
+    loopify : Loopify_attribute.t;
+    template_key : Symbol.t option
   }
 
 type code_metadata = t
@@ -115,6 +116,8 @@ module Code_metadata_accessors (X : Metadata_view_type) = struct
 
   let loopify t = (metadata t).loopify
 
+  let template_key t = (metadata t).template_key
+
   let function_slot_size t =
     let metadata = metadata t in
     let is_tupled = metadata.is_tupled in
@@ -169,6 +172,7 @@ type 'a create_type =
   absolute_history:Inlining_history.Absolute.t ->
   relative_history:Inlining_history.Relative.t ->
   loopify:Loopify_attribute.t ->
+  template_key:Symbol.t option ->
   'a
 
 let createk k code_id ~newer_version_of ~params_arity ~param_modes
@@ -177,7 +181,7 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
     ~regalloc_attribute ~regalloc_param_attribute ~cold ~is_a_functor ~is_opaque
     ~recursive ~cost_metrics ~inlining_arguments ~dbg ~fdo_entry_annotation
     ~is_tupled ~is_my_closure_used ~inlining_decision ~absolute_history
-    ~relative_history ~loopify =
+    ~relative_history ~loopify ~template_key =
   (match stub, inline with
   | true, (Available_inline | Never_inline | Default_inline)
   | ( false,
@@ -232,7 +236,8 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
       inlining_decision;
       absolute_history;
       relative_history;
-      loopify
+      loopify;
+      template_key
     }
 
 let create = createk (fun t -> t)
@@ -289,7 +294,7 @@ let [@ocamlformat "disable"] print ppf
          recursive; cost_metrics; inlining_arguments;
          dbg; fdo_entry_annotation;
          is_tupled; is_my_closure_used; inlining_decision;
-         absolute_history; relative_history; loopify } =
+         absolute_history; relative_history; loopify; template_key } =
   let module C = Flambda_colours in
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>%t(newer_version_of@ %a)%t@]@ \
@@ -318,6 +323,7 @@ let [@ocamlformat "disable"] print ppf
       %a\
       @[<hov 1>(inlining_decision@ %a)@]@ \
       @[<hov 1>(loopify@ %a)@]\
+      %a\
       )@]"
     (if Option.is_none newer_version_of then Flambda_colours.elide
     else Flambda_colours.none)
@@ -414,6 +420,13 @@ let [@ocamlformat "disable"] print ppf
     print_inlining_paths (relative_history, absolute_history)
     Function_decl_inlining_decision_type.print inlining_decision
     Loopify_attribute.print loopify
+    (fun ppf template_key ->
+      match template_key with
+      | None -> ()
+      | Some template_key ->
+        Format.fprintf ppf "@ @[<hov 1>(template_key@ %a)@]"
+          Symbol.print template_key)
+    template_key
 
 let free_names
     { code_id = _;
@@ -443,7 +456,8 @@ let free_names
       inlining_decision = _;
       absolute_history = _;
       relative_history = _;
-      loopify = _
+      loopify = _;
+      template_key = _
     } =
   (* [code_id] is only in [t.code_metadata] for the use of [compare]; it doesn't
      count as a free name. *)
@@ -489,7 +503,8 @@ let apply_renaming
        inlining_decision = _;
        absolute_history = _;
        relative_history = _;
-       loopify = _
+       loopify = _;
+       template_key
      } as t) renaming =
   (* inlined and modified version of Option.map to preserve sharing *)
   let newer_version_of' =
@@ -507,16 +522,21 @@ let apply_renaming
       Or_unknown_or_bottom.Ok
         (Result_types.apply_renaming result_types renaming)
   in
+  let template_key' =
+    Option.map (Renaming.apply_symbol renaming) template_key
+  in
   if
     code_id == code_id'
     && newer_version_of == newer_version_of'
     && result_types == result_types'
+    && Option.equal Symbol.equal template_key template_key'
   then t
   else
     { t with
       code_id = code_id';
       newer_version_of = newer_version_of';
-      result_types = result_types'
+      result_types = result_types';
+      template_key = template_key'
     }
 
 let ids_for_export
@@ -547,7 +567,8 @@ let ids_for_export
       inlining_decision = _;
       absolute_history = _;
       relative_history = _;
-      loopify = _
+      loopify = _;
+      template_key
     } =
   let ids =
     let newer_version_of_ids =
@@ -556,6 +577,11 @@ let ids_for_export
       | Some older -> Ids_for_export.add_code_id Ids_for_export.empty older
     in
     Ids_for_export.add_code_id newer_version_of_ids code_id
+  in
+  let ids =
+    match template_key with
+    | None -> ids
+    | Some template_key -> Ids_for_export.add_symbol ids template_key
   in
   Ids_for_export.union ids
     (match result_types with
@@ -590,7 +616,8 @@ let approx_equal
       inlining_decision = inlining_decision1;
       absolute_history = absolute_history1;
       relative_history = relative_history1;
-      loopify = loopify1
+      loopify = loopify1;
+      template_key = template_key1
     }
     { code_id = code_id2;
       newer_version_of = newer_version_of2;
@@ -619,7 +646,8 @@ let approx_equal
       inlining_decision = inlining_decision2;
       absolute_history = absolute_history2;
       relative_history = relative_history2;
-      loopify = loopify2
+      loopify = loopify2;
+      template_key = template_key2
     } =
   Code_id.equal code_id1 code_id2
   && (Option.equal Code_id.equal) newer_version_of1 newer_version_of2
@@ -651,6 +679,7 @@ let approx_equal
   && Inlining_history.Absolute.compare absolute_history1 absolute_history2 = 0
   && Inlining_history.Relative.compare relative_history1 relative_history2 = 0
   && Loopify_attribute.equal loopify1 loopify2
+  && Option.equal Symbol.equal template_key1 template_key2
 
 let map_result_types ({ result_types; _ } as t) ~f =
   let result_types' =
