@@ -95,7 +95,7 @@ let typecheck_intf info ast =
   @@ fun () ->
   (* A monitor root covering the inclusion check and delayed checks too, which
      run after [type_interface] returns. *)
-  Scheduler.Monitor.root @@ fun () ->
+  Typing_scheduler.Monitor.root @@ fun () ->
   let tsg =
     ast
     |> Typemod.type_interface

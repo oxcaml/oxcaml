@@ -524,7 +524,7 @@ end = struct
       Typing_recovery.monitor body ~with_:(fun e ->
           Option.map (fun err -> freeze_error (loc, env, err)) (with_ e))
     else
-      Scheduler.Monitor.try_ body ~with_:(fun e ->
+      Typing_scheduler.Monitor.try_ body ~with_:(fun e ->
           match with_ e with
           | Some err -> In_context (loc, env, err)
           | None -> e)
@@ -13554,7 +13554,7 @@ let type_representable_expression ~why env sexp =
 
 (* External entry point (e.g. compiler-libs users). *)
 let type_expression env sexp =
-  Scheduler.Monitor.root (fun () ->
+  Typing_scheduler.Monitor.root (fun () ->
       type_expression env (Jkind.Builtin.any ~why:Type_expression_call) sexp)
 
 (* Error report *)
