@@ -80,7 +80,7 @@ let dir_directory s =
   Dll.add_path [d];
   let dir =
     Load_path.Dir.create
-      { visibility = Visible; cmx_presence = Cmx_not_guaranteed } d
+      { visibility = Visible; cmx_guaranteed = false } d
   in
   Load_path.prepend_dir dir;
   toplevel_env :=

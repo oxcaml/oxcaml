@@ -313,7 +313,7 @@ let native unix
       List.iter
         (fun lib ->
           Load_path.add_dir
-            { visibility = Visible; cmx_presence = Cmx_guaranteed }
+            { visibility = Visible; cmx_guaranteed = true }
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
         extra_load_paths_for_eval
   end) : S)

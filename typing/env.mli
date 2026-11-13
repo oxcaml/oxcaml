@@ -605,7 +605,7 @@ val open_pers_signature: string -> t -> Path.t * t
    directly (bypassing the include path) and ignores any in-scope module of
    the same name. Used to implement [-open-cmi] and [-open-cmi-x]. *)
 val open_pers_signature_cmi:
-  cmx_presence:Load_path.cmx_presence -> string -> t -> Path.t * t
+  cmx_guaranteed:bool -> string -> t -> Path.t * t
 
 val remove_last_open: Path.t -> t -> t option
 

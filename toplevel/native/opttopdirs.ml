@@ -36,7 +36,7 @@ let dir_directory s =
   let d = expand_directory Config.standard_library s in
   let dir =
     Load_path.Dir.create
-      { visibility = Visible; cmx_presence = Cmx_guaranteed } d
+      { visibility = Visible; cmx_guaranteed = true } d
   in
   Load_path.append_dir dir;
   toplevel_env :=

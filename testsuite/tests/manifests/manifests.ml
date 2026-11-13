@@ -28,13 +28,13 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(hidden
           (String.sub path (String.length cwd) (String.length path - String.length cwd)))
       else path in
       let visibility = match include_flags with
-        | { Load_path.visibility = Visible; cmx_presence = Cmx_guaranteed } ->
+        | { Load_path.visibility = Visible; cmx_guaranteed = true } ->
           "visible, cmx_guaranteed"
-        | { visibility = Visible; cmx_presence = Cmx_not_guaranteed } ->
+        | { visibility = Visible; cmx_guaranteed = false } ->
           "visible"
-        | { visibility = Hidden; cmx_presence = Cmx_guaranteed } ->
+        | { visibility = Hidden; cmx_guaranteed = true } ->
           "hidden, cmx_guaranteed"
-        | { visibility = Hidden; cmx_presence = Cmx_not_guaranteed } ->
+        | { visibility = Hidden; cmx_guaranteed = false } ->
           "hidden"
       in
       Format.sprintf "%s (%s)" path visibility

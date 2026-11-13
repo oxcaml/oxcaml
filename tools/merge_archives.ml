@@ -25,7 +25,7 @@ let merge_cma ~target ~archives =
   List.iter
     (fun archive ->
       Load_path.add_dir
-        { visibility = Visible; cmx_presence = Cmx_not_guaranteed }
+        { visibility = Visible; cmx_guaranteed = false }
         (Filename.dirname archive))
     archives;
   let error reporter err =
