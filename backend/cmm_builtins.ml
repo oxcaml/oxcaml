@@ -82,7 +82,7 @@ let shift ~bits make_op arg count dbg =
     | Cconst_vec256 (_, _)
     | Cconst_vec512 (_, _)
     | Cconst_mask (_, _)
-    | Cconst_symbol (_, _)
+    | Cconst_symbol (_, _, _)
     | Cvar _
     | Clet (_, _, _)
     | Cphantom_let (_, _, _)

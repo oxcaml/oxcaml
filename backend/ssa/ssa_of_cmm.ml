@@ -305,9 +305,8 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       Ok
         (emit_op env c (Operation.Const_mask bits) Debuginfo.none Cmm.typ_mask
            [||])
-    | Cconst_symbol (n, _dbg) ->
-      Ok
-        (emit_op env c (SU.make_const_symbol n) Debuginfo.none Cmm.typ_int [||])
+    | Cconst_symbol (n, ty, _dbg) ->
+      Ok (emit_op env c (SU.make_const_symbol n) Debuginfo.none ty [||])
     | Cvar v -> Ok (env_find v env)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list ->
@@ -352,7 +351,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
   else Ok r
 
 and emit_invalid env c message symbol =
-  let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
+  let arg_expr = Cmm.Cconst_symbol (symbol, Cmm.typ_int, Debuginfo.none) in
   let* arg_instrs = emit_tuple env c [arg_expr] in
   let function_info = Ssa.function_info env.graph in
   let current_function_is_check_enabled =

@@ -34,7 +34,7 @@ type addressing_expr =
 let rec select_addr exp =
   let default = Alinear exp, 0 in
   match[@ocaml.warning "-fragile-match"] exp with
-  | Cmm.Cconst_symbol (s, _) when not !Clflags.dlcode -> Asymbol s, 0
+  | Cmm.Cconst_symbol (s, _, _) when not !Clflags.dlcode -> Asymbol s, 0
   | Cmm.Cop ((Caddi | Caddv | Cadda), [arg; Cconst_int (m, _)], _)
   | Cmm.Cop ((Caddi | Caddv | Cadda), [Cconst_int (m, _); arg], _) ->
     let a, n = select_addr arg in
@@ -312,7 +312,7 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cconst_natint (_, _)
   | Cconst_float32 (_, _)
   | Cconst_float (_, _)
-  | Cconst_symbol (_, _)
+  | Cconst_symbol (_, _, _)
   | Cvar _
   | Clet (_, _, _)
   | Cphantom_let (_, _, _)

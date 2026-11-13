@@ -1190,8 +1190,8 @@ let same_simple_value (e1 : expression) (e2 : expression) =
   | Cvar v1, Cvar v2 -> V.same v1 v2
   | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
   | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
-  | Cconst_symbol (s1, _), Cconst_symbol (s2, _) ->
-    String.equal s1.sym_name s2.sym_name
+  | Cconst_symbol (s1, ty1, _), Cconst_symbol (s2, ty2, _) ->
+    String.equal s1.sym_name s2.sym_name && equal_machtype ty1 ty2
   | _ -> false
 
 (** Whether [cond] is an equality test between the two arms of a [csel], so that
@@ -1740,18 +1740,18 @@ let box_float32 dbg mode exp =
   Cop
     ( Calloc (mode, Alloc_block_kind_float32),
       [ alloc_boxedfloat32_header mode dbg;
-        Cconst_symbol (global_symbol caml_float32_ops, dbg);
+        Cconst_symbol (global_symbol caml_float32_ops, typ_int, dbg);
         exp ],
       dbg )
 
 let unbox_float32 dbg =
   map_tail (function
-    | Cop (Calloc _, [Cconst_natint (hdr, _); Cconst_symbol (sym, _); c], _)
+    | Cop (Calloc _, [Cconst_natint (hdr, _); Cconst_symbol (sym, _, _); c], _)
       when (Nativeint.equal hdr boxedfloat32_header
            || Nativeint.equal hdr boxedfloat32_local_header)
            && String.equal sym.sym_name caml_float32_ops ->
       c
-    | Cconst_symbol (s, _dbg) as cmm -> (
+    | Cconst_symbol (s, _, _dbg) as cmm -> (
       match Cmmgen_state.structured_constant_of_sym s.sym_name with
       | Some (Const_float32 x) -> Cconst_float32 (x, dbg) (* or keep _dbg? *)
       | _ ->
@@ -1774,7 +1774,7 @@ let unbox_float dbg =
       when Nativeint.equal hdr float_header
            || Nativeint.equal hdr float_local_header ->
       c
-    | Cconst_symbol (s, _dbg) as cmm -> (
+    | Cconst_symbol (s, _, _dbg) as cmm -> (
       match Cmmgen_state.structured_constant_of_sym s.sym_name with
       | Some (Const_float x) -> Cconst_float (x, dbg) (* or keep _dbg? *)
       | _ -> Cop (mk_load_immut Double, [cmm], dbg))
@@ -1791,7 +1791,7 @@ let unbox_vector ~header ~local_header ~chunk ~structured_constant_of_sym dbg =
     | Cop (Calloc _, [Cconst_natint (hdr, _); c], _)
       when Nativeint.equal hdr header || Nativeint.equal hdr local_header ->
       c
-    | Cconst_symbol (s, _dbg) as cmm -> (
+    | Cconst_symbol (s, _, _dbg) as cmm -> (
       (* CR mshinwell: consider using [_dbg] *)
       match structured_constant_of_sym s.sym_name dbg with
       | Some const -> const
@@ -2676,7 +2676,7 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode)
           returns
         },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
-      Cconst_symbol (sym, dbg) :: obj :: tag :: cache :: pos :: args,
+      Cconst_symbol (sym, typ_int, dbg) :: obj :: tag :: cache :: pos :: args,
       dbg )
 
 (* Allocation *)
@@ -2963,21 +2963,21 @@ let box_int_gen dbg (bi : Primitive.boxed_integer) mode arg =
   Cop
     ( Calloc (mode, Alloc_block_kind_boxed_int bi),
       [ alloc_header_boxed_int bi mode dbg;
-        Cconst_symbol (operations_boxed_int bi, dbg);
+        Cconst_symbol (operations_boxed_int bi, typ_int, dbg);
         arg' ],
       dbg )
 
 let alloc_matches_boxed_int bi ~hdr ~ops =
   match (bi : Primitive.boxed_integer), hdr, ops with
-  | Boxed_nativeint, Cconst_natint (hdr, _dbg), Cconst_symbol (sym, _) ->
+  | Boxed_nativeint, Cconst_natint (hdr, _dbg), Cconst_symbol (sym, _, _) ->
     (Nativeint.equal hdr boxedintnat_header
     || Nativeint.equal hdr boxedintnat_local_header)
     && String.equal sym.sym_name caml_nativeint_ops
-  | Boxed_int32, Cconst_natint (hdr, _dbg), Cconst_symbol (sym, _) ->
+  | Boxed_int32, Cconst_natint (hdr, _dbg), Cconst_symbol (sym, _, _) ->
     (Nativeint.equal hdr boxedint32_header
     || Nativeint.equal hdr boxedint32_local_header)
     && String.equal sym.sym_name caml_int32_ops
-  | Boxed_int64, Cconst_natint (hdr, _dbg), Cconst_symbol (sym, _) ->
+  | Boxed_int64, Cconst_natint (hdr, _dbg), Cconst_symbol (sym, _, _) ->
     (Nativeint.equal hdr boxedint64_header
     || Nativeint.equal hdr boxedint64_local_header)
     && String.equal sym.sym_name caml_int64_ops
@@ -3010,7 +3010,7 @@ let unbox_int dbg bi =
     | Cop (Calloc _, [hdr; ops; contents], _dbg)
       when alloc_matches_boxed_int bi ~hdr ~ops ->
       contents
-    | Cconst_symbol (s, _dbg) as cmm -> (
+    | Cconst_symbol (s, _, _dbg) as cmm -> (
       match Cmmgen_state.structured_constant_of_sym s.sym_name, bi with
       | Some (Const_nativeint n), Primitive.Boxed_nativeint ->
         natint_const_untagged dbg n
@@ -3453,7 +3453,7 @@ let make_switch arg cases actions dbg =
     | Cconst_int (n, _) when n land 1 = 1 -> Some (Cint (Nativeint.of_int n))
     | Cconst_natint (n, _) when Nativeint.(to_int (logand n one) = 1) ->
       Some (Cint n)
-    | Cconst_symbol (s, _) -> Some (Csymbol_address s)
+    | Cconst_symbol (s, _, _) -> Some (Csymbol_address s)
     | _ -> None
   in
   let extract_affine ~cases ~const_actions =
@@ -3483,7 +3483,9 @@ let make_switch arg cases actions dbg =
          ( Local,
            Array.to_list (Array.map (fun act -> const_actions.(act)) cases) ));
     let table_sym = { sym_name = table; sym_global = Local } in
-    addr_array_ref (Cconst_symbol (table_sym, dbg)) (tag_int arg dbg) dbg
+    addr_array_ref
+      (Cconst_symbol (table_sym, typ_int, dbg))
+      (tag_int arg dbg) dbg
   in
   let make_affine_computation ~offset ~slope arg dbg =
     (* In case the resulting integers are an affine function of the index, we
@@ -3710,7 +3712,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode
   let ty = Extended_machtype.to_machtype extended_ty in
   let really_call_caml_apply clos args =
     let sym = apply_function_sym extended_args_type extended_ty mode in
-    let cargs = (Cconst_symbol (sym, dbg) :: args) @ [clos] in
+    let cargs = (Cconst_symbol (sym, typ_int, dbg) :: args) @ [clos] in
     Cop
       ( Capply { result_type = ty; region = pos; callees = Some [sym]; returns },
         cargs,
@@ -4452,6 +4454,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
                     (dbg ());
                   Cconst_symbol
                     ( global_symbol (name1 ^ "_" ^ Int.to_string (num + 1)),
+                      typ_int,
                       dbg () );
                   Cconst_natint
                     ( pack_closure_info
@@ -4466,6 +4469,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
                      [ Cconst_symbol
                          ( global_symbol
                              (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app"),
+                           typ_int,
                            dbg () ) ]
                    else [])
                 @ value_slot_given_machtype args
@@ -4849,7 +4853,7 @@ let emit_divide_by_zero_message () =
 let entry_point namelist =
   let dbg = placeholder_dbg in
   let cconst_int i = Cconst_int (i, dbg ()) in
-  let cconst_symbol sym = Cconst_symbol (sym, dbg ()) in
+  let cconst_symbol sym = Cconst_symbol (sym, typ_int, dbg ()) in
   let incr_global_inited () =
     Cop
       ( Cstore (Word_int, Assignment),
@@ -5158,7 +5162,7 @@ let unit ~dbg = Cconst_int (1, dbg)
 
 let var v = Cvar v
 
-let symbol ~dbg sym = Cconst_symbol (sym, dbg)
+let symbol ~dbg ~ty sym = Cconst_symbol (sym, ty, dbg)
 
 let float ~dbg f = Cconst_float (f, dbg)
 
@@ -5405,7 +5409,7 @@ let direct_call ~dbg ~returns ty pos f_code_sym args =
   Cop
     ( Capply
         { result_type = ty; region = pos; callees = Some [f_code_sym]; returns },
-      Cconst_symbol (f_code_sym, dbg) :: args,
+      Cconst_symbol (f_code_sym, typ_int, dbg) :: args,
       dbg )
 
 let indirect_call ~dbg ~returns ty pos alloc_mode f args_type args =
@@ -5783,7 +5787,7 @@ let perform ~dbg ~returns eff =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, dbg); eff; cont],
+      [Cconst_symbol (sym, typ_int, dbg); eff; cont],
       dbg )
 
 let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
@@ -5795,7 +5799,7 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
           callees = Some [sym];
           returns
         },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", typ_int, dbg);
         Cop
           ( Cextcall
               { func = "caml_alloc_stack";
@@ -5823,7 +5827,7 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg
           callees = Some [sym];
           returns
         },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", typ_int, dbg);
         Cop
           ( Cextcall
               { func = "caml_alloc_stack_preemptible";
@@ -5855,7 +5859,7 @@ let continue ~dbg ~cont ~value ~returns =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, dbg); cont; value],
+      [Cconst_symbol (sym, typ_int, dbg); cont; value],
       dbg )
 
 let discontinue ~dbg ~cont ~exn ~returns =
@@ -5867,7 +5871,7 @@ let discontinue ~dbg ~cont ~exn ~returns =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, dbg); cont; exn],
+      [Cconst_symbol (sym, typ_int, dbg); cont; exn],
       dbg )
 
 let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
@@ -5879,7 +5883,7 @@ let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, dbg); cont; exn; bt],
+      [Cconst_symbol (sym, typ_int, dbg); cont; exn; bt],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber ~returns =
@@ -5893,7 +5897,7 @@ let reperform ~dbg ~eff ~cont ~last_fiber ~returns =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, dbg); eff; cont; last_fiber],
+      [Cconst_symbol (sym, typ_int, dbg); eff; cont; last_fiber],
       dbg )
 
 let poll ~dbg = return_unit dbg (Cop (Cpoll, [], dbg))

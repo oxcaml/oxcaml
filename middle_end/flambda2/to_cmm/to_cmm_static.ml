@@ -68,8 +68,9 @@ let update_field symb env res acc i update_kind field =
       (* CR mshinwell/mslater: It would be nice to know if [var] is an
          immediate. *)
       let dbg = Simple.With_debuginfo.dbg field in
-      C.make_update env res dbg update_kind ~symbol:(C.symbol ~dbg symb) var
-        ~index:i ~prev_updates:acc)
+      C.make_update env res dbg update_kind
+        ~symbol:(C.symbol ~dbg ~ty:Cmm.typ_int symb)
+        var ~index:i ~prev_updates:acc)
     ~symbol:(fun _sym ~coercion:_ -> env, res, acc)
     ~const:(fun _cst -> env, res, acc)
 
@@ -99,8 +100,9 @@ let rec static_unboxed_array_updates symb env res acc update_kind i = function
       static_unboxed_array_updates symb env res acc update_kind (i + 1) r
     | Var (var, dbg) ->
       let env, res, acc =
-        C.make_update env res dbg update_kind ~symbol:(C.symbol ~dbg symb) var
-          ~index:i ~prev_updates:acc
+        C.make_update env res dbg update_kind
+          ~symbol:(C.symbol ~dbg ~ty:Cmm.typ_int symb)
+          var ~index:i ~prev_updates:acc
       in
       static_unboxed_array_updates symb env res acc update_kind (i + 1) r)
 
@@ -118,8 +120,9 @@ let static_boxed_number ~kind ~env ~symbol ~default ~emit ~transl ~structured v
       Cmmgen_state.add_structured_constant symbol structured_constant;
       env, res, updates
     | Var (v, dbg) ->
-      C.make_update env res dbg kind ~symbol:(C.symbol ~dbg symbol) v ~index:0
-        ~prev_updates:updates
+      C.make_update env res dbg kind
+        ~symbol:(C.symbol ~dbg ~ty:Cmm.typ_int symbol)
+        v ~index:0 ~prev_updates:updates
   in
   R.update_data res (or_variable aux default v), env, updates
 

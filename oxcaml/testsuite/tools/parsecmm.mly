@@ -220,7 +220,9 @@ traps:
 expr:
     INTCONST    { Cconst_int ($1, debuginfo ()) }
   | FLOATCONST  { Cconst_float (float_of_string $1, debuginfo ()) }
-  | STRING      { Cconst_symbol (Cmm.global_symbol $1, debuginfo ()) }
+  | STRING      { Cconst_symbol (Cmm.global_symbol $1, typ_int, debuginfo ()) }
+  | STRING COLON machtype
+                { Cconst_symbol (Cmm.global_symbol $1, $3, debuginfo ()) }
   | IDENT       { Cvar(find_ident $1) }
   | LBRACKET RBRACKET { Ctuple [] }
   | LPAREN LET letdef sequence RPAREN { make_letdef $3 $4 }

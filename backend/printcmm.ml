@@ -366,8 +366,8 @@ let rec expr ppf = function
   | Cconst_mask (n, _dbg) -> fprintf ppf "mask:%016Lx" n
   | Cconst_float32 (n, _dbg) -> fprintf ppf "%Fs" n
   | Cconst_float (n, _dbg) -> fprintf ppf "%F" n
-  | Cconst_symbol (s, _dbg) ->
-    fprintf ppf "%a:\"%s\"" is_global s.sym_global s.sym_name
+  | Cconst_symbol (s, ty, _dbg) ->
+    fprintf ppf "%a:\"%s\":%a" is_global s.sym_global s.sym_name machtype ty
   | Cvar id -> V.print ppf id
   | Clet (id, def, (Clet (_, _, _) as body)) ->
     let print_binding id ppf def =
