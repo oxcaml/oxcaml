@@ -1104,17 +1104,64 @@ let free_methods l =
     | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ -> ()
   in free l; !fv
 
-let transl_class ~scopes ids cl_id pub_meths cl vflag =
-  let open Value_rec_types in
+(* Raised when a cached class would receive a static value through its
+   environment, where slambda cannot see its static part. *)
+exception Static_capture
+
+(* The variables whose static part may be needed by an instantiation in [lam],
+   directly or through local bindings. Static values cannot flow through
+   function arguments or branches. *)
+let static_free_variables lam =
+  let uses = ref Ident.Set.empty and defs = ref [] in
+  let use l = uses := Ident.Set.union (free_variables l) !uses in
+  let rec collect l =
+    (match l with
+     | Lkindinstantiate { kinst_func; _ } -> use kinst_func
+     | Linstantiate { ap_func; ap_args; _ } ->
+         use ap_func; List.iter use ap_args
+     | Llet (_, _, id, _, def, _) | Lmutlet (_, id, _, def, _) ->
+         defs := (id, def) :: !defs
+     | _ -> ());
+    Lambda.iter_head_constructor collect l
+  in
+  collect lam;
+  let rec close vars =
+    let vars' =
+      List.fold_left
+        (fun vars (id, def) ->
+          if Ident.Set.mem id vars
+          then Ident.Set.union (free_variables def) vars
+          else vars)
+        vars !defs
+    in
+    if Ident.Set.equal vars vars' then vars else close vars'
+  in
+  close !uses
+
+let rec transl_class ~scopes ids cl_id pub_meths cl vflag =
   (* First check if it is not only a rebind *)
   let rebind = transl_class_rebind ~scopes cl vflag in
-  if rebind <> lambda_unit then rebind, Dynamic else
+  if rebind <> lambda_unit then rebind, Value_rec_types.Dynamic else
 
   (* Prepare for heavy environment handling *)
   let scopes = enter_class_definition ~scopes cl_id in
   let tables = Ident.create_local (Ident.name cl_id ^ "_tables") in
   let (top_env, req) = oo_add_class tables in
-  let top = not req in
+  let transl top =
+    transl_class_body ~scopes ~tables ~top_env ~top ids cl_id pub_meths cl
+      vflag
+  in
+  if not req then transl true else
+  let saved_method_ids = !method_ids in
+  try transl false with Static_capture ->
+    (* Fall back to building the class each time it is evaluated, which lets
+       the static values be used directly. *)
+    method_ids := saved_method_ids;
+    transl true
+
+and transl_class_body ~scopes ~tables ~top_env ~top ids cl_id pub_meths cl
+    vflag =
+  let open Value_rec_types in
   (* The manual specifies that toplevel lets *must* be evaluated outside of the
      class *)
   let cl_env, llets = build_class_lets ~scopes cl in
@@ -1136,6 +1183,9 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
        prerr_ids "method_ids =" (Ident.Set.elements !method_ids); *)
     let new_ids = List.fold_right Ident.Set.add new_ids !method_ids in
     let fv = Ident.Set.inter fv new_ids in
+    if not (Ident.Set.is_empty fv)
+       && not (Ident.Set.disjoint fv (static_free_variables lam))
+    then raise Static_capture;
     new_ids' := !new_ids' @ Ident.Set.elements fv;
     (* prerr_ids "new_ids' =" !new_ids'; *)
     let i = ref (i0-1) in

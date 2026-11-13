@@ -145,10 +145,17 @@ let wrapping = ref false
 let top_env = ref Env.empty
 let classes = ref []
 let method_ids = ref Ident.Set.empty
+let no_cache = ref false
 
 let oo_add_class id =
-  classes := id :: !classes;
-  (!top_env, !cache_required)
+  if !no_cache then (!top_env, false)
+  else begin
+    classes := id :: !classes;
+    (!top_env, !cache_required)
+  end
+
+let oo_no_cache f x =
+  Misc.protect_refs [Misc.R (no_cache, true)] (fun () -> f x)
 
 let oo_wrap_gen env req f x =
   if !wrapping then
@@ -194,4 +201,5 @@ let reset () =
   wrapping := false;
   top_env := Env.empty;
   classes := [];
-  method_ids := Ident.Set.empty
+  method_ids := Ident.Set.empty;
+  no_cache := false

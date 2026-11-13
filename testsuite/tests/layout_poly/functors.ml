@@ -541,9 +541,7 @@ let k6 =
   let module R = K (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+val k6 : int = 61
 |}]
 
 (* Capture an exception constructor from the enclosing scope. *)

@@ -806,9 +806,7 @@ let _ =
   let poly_ f x = ignore (object end); x in
   f 1
 [%%expect{|
->> Fatal error: let poly_ definitions must be functions
-Uncaught exception: Misc.Fatal_error
-
+- : int = 1
 |}]
 
 (* Instantiations at different layouts must not share a class cache. *)
@@ -820,9 +818,7 @@ let _ =
   in
   r ()
 [%%expect{|
-- : int = 69988912930932
-|}, Principal{|
-- : int = 69858513754228
+- : int = 42
 |}]
 
 (* Cached classes receive captured variables through an environment, where
@@ -835,9 +831,7 @@ let _ =
   in
   r ()
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+- : int = 3
 |}]
 
 (* This includes the parts of a class outside of its object structure. *)
@@ -851,7 +845,5 @@ let _ =
   in
   r ()
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+- : int = 4
 |}]
