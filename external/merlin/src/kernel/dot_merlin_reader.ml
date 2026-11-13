@@ -200,29 +200,24 @@ let ppx_of_package ~cwd ~findlib_config:config setup
     (List.fold_left ppxopts ~init:setup ~f:(fun setup (ppx, opts) ->
          Ppxsetup.add_ppxopts ppx opts setup))
 
+let standard_library_cache = Timed_cache.create ()
+
 let standard_library =
-  let cache = Hashtbl.create 17 in
-  fun ~cwd ->
-    match Hashtbl.find_opt cache cwd with
-    | Some stdlib -> stdlib
-    | None ->
-      let stdlib =
-        match Sys.getenv_opt "OCAMLLIB" with
+ fun ~cwd ->
+  Timed_cache.read_or_compute standard_library_cache ~key:cwd ~f:(fun () ->
+      match Sys.getenv_opt "OCAMLLIB" with
+      | Some stdlib -> stdlib
+      | None -> (
+        match Sys.getenv_opt "CAMLLIB" with
         | Some stdlib -> stdlib
         | None -> (
-          match Sys.getenv_opt "CAMLLIB" with
-          | Some stdlib -> stdlib
-          | None -> (
-            match
-              Findlib.ocaml_stdlib ~dir:cwd ~config:Findlib.Config.default
-            with
-            | Ok stdlib -> stdlib
-            | Error message ->
-              log ~title:"standard_library" "%s" message;
-              Standard_library.path))
-      in
-      Hashtbl.add cache cwd stdlib;
-      stdlib
+          match
+            Findlib.ocaml_stdlib ~dir:cwd ~config:Findlib.Config.default
+          with
+          | Ok stdlib -> stdlib
+          | Error message ->
+            log ~title:"standard_library" "%s" message;
+            Standard_library.path)))
 
 let is_package_optional name =
   let last = String.length name - 1 in
@@ -419,3 +414,7 @@ let load dot_merlin_file =
         process_one ~cfg file)
   in
   postprocess ~cwd:(Filename.dirname dot_merlin_file) cfg
+
+let flush ?older_than () =
+  Cache.flush ?older_than ();
+  Timed_cache.flush ?older_than standard_library_cache

@@ -47,15 +47,13 @@ let environment ~(config : Config.t) =
   Array.of_list
     (List.map overrides ~f:(fun (name, value) -> name ^ "=" ^ value) @ inherited)
 
+let cache = Timed_cache.create ()
+
 (** [run ~dir ~config args] runs ocamlfind with the given args and returns the
     stdout. Results are cached per [dir]. *)
-let run =
-  let cache = Hashtbl.create 17 in
-  fun ~dir ~(config : Config.t) args ->
-    let key = (dir, config, args) in
-    match Hashtbl.find_opt cache key with
-    | Some lines -> Ok lines
-    | None -> (
+let run ~dir ~(config : Config.t) args =
+  let key = (dir, config, args) in
+  Timed_cache.read_or_compute cache ~key ~f:(fun () ->
       let args =
         match config.toolchain with
         | None -> args
@@ -80,9 +78,10 @@ let run =
             List.filter (String.split_on_char ~sep:'\n' output) ~f:(fun line ->
                 String.is_non_empty line)
           in
-          Hashtbl.add cache key lines;
           Ok lines
         | _ -> Error (String.trim errors)))
+
+let flush ?older_than () = Timed_cache.flush ?older_than cache
 
 let unexpected_output lines =
   Error

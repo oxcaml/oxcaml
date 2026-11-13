@@ -45,3 +45,7 @@ val ocaml_stdlib : dir:string -> config:Config.t -> string result
 (** Resolves findlib's path notations, like [+] and [@]. *)
 val resolve_path :
   dir:string -> config:Config.t -> base:string -> string -> string result
+
+(** Delete all entries in the cache that were last accessed more than
+    [older_than] seconds ago. Does nothing if [older_than] is [None]. *)
+val flush : ?older_than:float -> unit -> unit
