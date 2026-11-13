@@ -193,7 +193,7 @@ let rec mod_smallerthan n (m : Subst.Lazy.module_type) =
             | Some n', _ -> Some (succ n')
           end
       end
-    | Mty_functor (m1, m2, _) ->
+    | Mty_functor (m1, m2, _, _) ->
       begin match (mod_smallerthan n m2, m1) with
       | None, _ -> None
       | result, Unit -> result
