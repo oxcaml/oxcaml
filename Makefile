@@ -82,6 +82,7 @@ DISTCLEAN_FILES = \
   runtime/caml/m.h \
   runtime/caml/s.h \
   runtime/caml/version.h \
+  runtime/ld.conf \
   $(wildcard otherlibs/*/META)
 
 ifdef dune

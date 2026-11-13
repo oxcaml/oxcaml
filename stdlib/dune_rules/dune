@@ -1,12 +1,12 @@
 ;; config.status isn't needed for the rule, the -o config.status allows the rule
 ;; to run in an unconfigured tree.
 (rule
- (targets build_settings.txt ld.conf)
+ (targets build_settings.txt)
  (deps
   ../../Makefile.upstream ../../Makefile.common ../../Makefile.config_if_required
   ../../Makefile.build_config ../../Makefile.config ../../Makefile.best_binaries
   ../../Makefile.menhir ../../.depend.menhir ../../Makefile.dev ../StdlibModules)
- (action (chdir ../../ (run make -s -o config.status -f Makefile.upstream V=1 COMPUTE_DEPS=false stdlib/dune_rules/build_settings.txt stdlib/dune_rules/ld.conf))))
+ (action (chdir ../../ (run make -s -o config.status -f Makefile.upstream V=1 COMPUTE_DEPS=false stdlib/dune_rules/build_settings.txt))))
 
 (executable
  (name gen)

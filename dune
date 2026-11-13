@@ -250,6 +250,19 @@
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags -linkall)
  (libraries flambda2_floats ocamlcommon)
+ ; The system compiler used for the default (boot) context lacks the
+ ; caml_dynlink_parse_ld_conf primitive. The boot compiler never needs ld.conf,
+ ; so it behaves as though it were empty.
+ (preprocess
+  (per_module
+   ((action
+     (run sed -e
+        "\| b %{context_name}
+        "\| :default
+        "\| /^external ld_conf_contents/s/.*/let ld_conf_contents _ = []/
+        "\| :main
+        %{input-file}))
+    dll)))
  (modules_without_implementation
   annot
   value_rec_types
