@@ -207,6 +207,7 @@ type 'a type_iterators =
     it_class_type_declaration:
         'a type_iterators -> class_type_declaration -> unit;
     it_jkind_declaration: 'a type_iterators -> jkind_declaration -> unit;
+    it_law_declaration: 'a type_iterators -> law_declaration -> unit;
     it_functor_param: 'a type_iterators -> functor_parameter -> unit;
     it_module_type: 'a type_iterators -> module_type -> unit;
     it_class_type: 'a type_iterators -> class_type -> unit;

@@ -113,6 +113,7 @@ module Typedtree_search =
       | Typedtree.Tstr_include _ -> ()
       | Typedtree.Tstr_eval _ -> ()
       | Typedtree.Tstr_attribute _ -> ()
+      | Typedtree.Tstr_law _ -> ()
       | Typedtree.Tstr_jkind _ -> Misc.fatal_error "Tstr_jkind"
 
     let tables typedtree =

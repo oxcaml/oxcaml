@@ -269,6 +269,7 @@ let print_cmt_infos cmt =
         | Class cd -> cd.ci_id_name
         | Class_type ctd -> ctd.ci_id_name
         | Jkind jd -> jd.jkind_name
+        | Law ld -> ld.law_name
       in
       let pp_loc fmt { Location.txt; loc } =
         Format.fprintf fmt "%s (%a)"

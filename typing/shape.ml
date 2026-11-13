@@ -170,6 +170,7 @@ module Sig_component_kind = struct
     | Class
     | Class_type
     | Jkind
+    | Law
 
   let to_string = function
     | Value -> "value"
@@ -183,10 +184,12 @@ module Sig_component_kind = struct
     | Class -> "class"
     | Class_type -> "class type"
     | Jkind -> "kind"
+    | Law -> "law"
 
   let can_appear_in_types = function
     | Value
-    | Extension_constructor ->
+    | Extension_constructor
+    | Law ->
         false
     | Type
     | Constructor
@@ -211,6 +214,7 @@ module Sig_component_kind = struct
     | Label -> 8
     | Unboxed_label -> 9
     | Jkind -> 10
+    | Law -> 11
 
   let compare a b =
     let a = rank a in

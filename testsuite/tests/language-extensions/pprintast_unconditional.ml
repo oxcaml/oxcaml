@@ -185,6 +185,8 @@ end = struct
   let string_of_expression = test_string_of "string_of_expression" string_of_expression Example.expression
   let string_of_structure = test_string_of "string_of_structure" string_of_structure Example.structure
 
+  let is_infix_operator = is_infix_operator
+
   let tyvar_of_name =
     test_string_of "tyvar_of_name" tyvar_of_name Example.tyvar_of_name
   let tyvar = test "tyvar" tyvar Example.tyvar

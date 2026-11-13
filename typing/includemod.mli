@@ -154,6 +154,7 @@ type field_kind =
   | Field_class
   | Field_classtype
   | Field_jkind
+  | Field_law
 
 type field_desc = { name: string; kind: field_kind }
 
