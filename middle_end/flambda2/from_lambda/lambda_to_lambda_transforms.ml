@@ -1481,6 +1481,11 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       let repr_res = mode, L.Same_as_ocaml_repr S.(product [vec128; vec128]) in
       Transformed (make_ccall repr_res)
     | repr_res -> Transformed (make_ccall repr_res))
+  | Ptemplate_env { template = _; shape; mode }, _ ->
+    (* CR layout poly: use the definitions of templates to optimise their
+       instantiations. *)
+    Transformed
+      (L.Lprim (Pmakeblock (0, Immutable, Shape shape, mode), args, loc))
   | _, _ -> Primitive (prim, args, loc)
 [@@ocaml.warning "-fragile-match"]
 

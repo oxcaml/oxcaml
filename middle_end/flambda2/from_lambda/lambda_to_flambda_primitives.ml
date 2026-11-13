@@ -2307,6 +2307,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     opaque ~machine_width layout arg ~middle_end_only:false
   | Pobj_magic layout, [arg] ->
     opaque ~machine_width layout arg ~middle_end_only:true
+  | Ptemplate_env _, _ ->
+    Misc.fatal_error
+      "[Ptemplate_env] is handled by [Lambda_to_lambda_transforms]"
   | Pduprecord (repr, num_fields), [[arg]] ->
     let kind : P.Duplicate_block_kind.t =
       match repr with
