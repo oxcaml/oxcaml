@@ -609,5 +609,5 @@ let emit_directive state ~current_section ~all_sections
   | Cfi_def_cfa_register _ | Comment _ | Direct_assignment _ | File _ | Global _
   | Indirect_symbol _ | Loc _ | New_label _ | New_line | Private_extern _
   | Section _ | Size _ | Type _ | Protected _ | Hidden _ | Weak _ | External _
-  | Reloc _ | Arch_extension _ ->
+  | Reloc _ | Arch _ | Arch_extension _ ->
     ()

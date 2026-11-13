@@ -629,6 +629,8 @@ let ocaml_ignored_flags =
     "-fno-aes";
     "-fcssc";
     "-fno-cssc";
+    "-flrcpc2";
+    "-fno-lrcpc2";
     "-no-auto-include-otherlibs";
     "-fbmi2";
     "-fno-bmi2";
