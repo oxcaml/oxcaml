@@ -213,8 +213,8 @@ external int_as_pointer : int -> Obj.t = "%int_as_pointer"
 
 let rec transl_const = function
     Const_base(Const_int i)
-  | Const_base(Const_untagged_int i)
-  | Const_base(Const_untagged_char i) -> Obj.repr i
+  | Const_base(Const_untagged_int i) -> Obj.repr i
+  | Const_base(Const_untagged_char i) -> Obj.repr (Numbers.Int8.to_int i)
   | Const_base(Const_char c) -> Obj.repr c
   | Const_base(Const_string (s, _, _)) -> Obj.repr s
   | Const_base(Const_float32 f)
@@ -226,15 +226,16 @@ let rec transl_const = function
   | Const_base(Const_float f)
   | Const_base(Const_unboxed_float f) -> Obj.repr (float_of_string f)
   | Const_base(Const_int8 i)
-  | Const_base(Const_untagged_int8 i) -> Obj.repr i
+  | Const_base(Const_untagged_int8 i) -> Obj.repr (Numbers.Int8.to_int i)
   | Const_base(Const_int16 i)
-  | Const_base(Const_untagged_int16 i) -> Obj.repr i
+  | Const_base(Const_untagged_int16 i) -> Obj.repr (Numbers.Int16.to_int i)
   | Const_base(Const_int32 i)
   | Const_base(Const_unboxed_int32 i) -> Obj.repr i
   | Const_base(Const_int64 i)
   | Const_base(Const_unboxed_int64 i) -> Obj.repr i
   | Const_base(Const_nativeint i)
-  | Const_base(Const_unboxed_nativeint i) -> Obj.repr i
+  | Const_base(Const_unboxed_nativeint i) ->
+      Obj.repr (Int64.to_nativeint (Targetint.to_int64 i))
   | Const_immstring s -> Obj.repr s
   | Const_block(tag, fields) ->
       let block = Obj.new_block tag (List.length fields) in
