@@ -344,6 +344,16 @@ module type S = sig
         [false]). *)
     val check_composition_jobs :
       full:bool -> unit -> (unit -> (unit, error) result) list
+
+    (** Validates that the join of two left-only morphisms [f] and [g] with the
+        same source and target agrees with [fun x -> join (f x) (g x)] on every
+        selected element, with [full] as in [check_composition_jobs]. *)
+    val check_join_jobs :
+      full:bool -> unit -> (unit -> (unit, error) result) list
+
+    (** Same as [check_join_jobs], for the meet of two right-only morphisms. *)
+    val check_meet_jobs :
+      full:bool -> unit -> (unit -> (unit, error) result) list
   end
 
   val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
