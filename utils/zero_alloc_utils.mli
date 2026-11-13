@@ -35,9 +35,7 @@ module Tag : sig
   val print : t -> string
 end
 
-(** Three fields, [nor], [exn], & [div], meaning "control flow that returns
-    normally," "control flow that raises," and "control flow that diverges,"
-    respectively. *)
+(** One value per component, all of the same type. *)
 module Components : sig
   type 'component t =
     { nor : 'component;
