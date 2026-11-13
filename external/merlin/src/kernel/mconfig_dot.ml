@@ -294,7 +294,6 @@ exception End_of_input
 
 let get_dot_merlin_config ~process_dir =
   log ~title:"get_config" "Reading .merlin from dir %s." process_dir;
-  (* CR lstevenson: why not do the realpath inside Dot_merlin_reader.load? *)
   let dot_merlin = Filename.concat (Unix.realpath process_dir) ".merlin" in
   match Dot_merlin_reader.load dot_merlin with
   | directives -> Ok directives
