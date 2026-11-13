@@ -60,6 +60,7 @@ module Error: sig
         (Types.class_declaration, class_declaration_symptom) mdiff
     | Modalities of Mode.Modality.error
     | Jkind_declarations of (jkind_declaration, Includecore.jkind_mismatch) diff
+    | Law_declarations of (law_declaration, Includecore.law_mismatch) diff
 
   type core_module_type_symptom =
     | Not_an_alias

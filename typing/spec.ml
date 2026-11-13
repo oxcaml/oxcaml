@@ -59,3 +59,41 @@ let rec paths_rev acc = function
       (paths_rev acc funct) args
 
 let paths e = List.rev (paths_rev [] e)
+
+(* Equality. [vars] relates the free variables of the first expression to those
+   of the second. *)
+
+let lookup vars id =
+  Option.map snd (List.find_opt (fun (id', _) -> Ident.same id id') vars)
+
+let same_var vars id1 id2 =
+  match lookup vars id1 with
+  | Some id2' -> Ident.same id2 id2'
+  | None ->
+    Misc.fatal_errorf "Spec.alpha_equal: unbound variable %a" Ident.print id1
+
+let same_constant c1 c2 =
+  match c1, c2 with Const_int n1, Const_int n2 -> Int.equal n1 n2
+
+let same_arg_label l1 l2 =
+  match l1, l2 with
+  | Nolabel, Nolabel -> true
+  | Labelled s1, Labelled s2 -> String.equal s1 s2
+  | (Nolabel | Labelled _), _ -> false
+
+let same_sort = Jkind_types.Sort.Const.equal
+
+let rec alpha_equal ~same_path ~vars e1 e2 =
+  match e1, e2 with
+  | Sexp_var id1, Sexp_var id2 -> same_var vars id1 id2
+  | Sexp_global p1, Sexp_global p2 -> same_path Value p1 p2
+  | Sexp_constant c1, Sexp_constant c2 -> same_constant c1 c2
+  | Sexp_apply (funct1, args1), Sexp_apply (funct2, args2) ->
+    alpha_equal ~same_path ~vars funct1 funct2
+    && List.equal
+         (fun (l1, e1, s1) (l2, e2, s2) ->
+           same_arg_label l1 l2
+           && alpha_equal ~same_path ~vars e1 e2
+           && same_sort s1 s2)
+         args1 args2
+  | (Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _), _ -> false

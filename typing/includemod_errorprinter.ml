@@ -311,7 +311,7 @@ module Is_modal = struct
     | Value_descriptions d -> value_mismatch d.symptom
     | Class_declarations d -> class_declaration_symptom d.symptom
     | Type_declarations _ | Extension_constructors _ | Class_type_declarations _
-    | Modalities _ | Jkind_declarations _ -> None
+    | Modalities _ | Jkind_declarations _ | Law_declarations _ -> None
 
   and class_declaration_symptom = function
     | Class_mode e ->
@@ -956,6 +956,21 @@ let core env id x =
         (Out_type.tree_of_jkind_declaration id diff.expected)
         (Includecore.report_jkind_mismatch "the first" "the second")
         diff.symptom show_locs (diff.got.jkind_loc, diff.expected.jkind_loc)
+  | Err.Law_declarations diff ->
+      (* CR sspies: The two laws are printed separately, whereas the subsequent
+         trace prints the names of their type variables together. As a result, a
+         variable can be printed as ['a] in both laws and yet appear as as ['a]
+         and ['a0] in the trace. *)
+      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
+        "Laws do not match"
+        !Oprint.out_sig_item
+        (Out_type.tree_of_law_declaration id diff.got)
+        "is not included in"
+        !Oprint.out_sig_item
+        (Out_type.tree_of_law_declaration id diff.expected)
+        (Includecore.report_law_mismatch env ~impl:diff.got
+           ~intf:diff.expected)
+        diff.symptom show_locs (diff.got.law_loc, diff.expected.law_loc)
 
 let missing_field ppf item =
   let id, loc, kind =  Includemod.item_ident_name item in

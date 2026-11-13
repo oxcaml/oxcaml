@@ -102,6 +102,7 @@ val extension_constructor:
 val class_declaration: t -> class_declaration -> class_declaration
 val cltype_declaration: t -> class_type_declaration -> class_type_declaration
 val jkind_declaration: t -> jkind_declaration -> jkind_declaration
+val law_declaration: t -> law_declaration -> law_declaration
 
 (**
    When applied to a signature item, a substitution not only modifies the types

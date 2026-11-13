@@ -49,3 +49,13 @@ type namespace = Value
 (** The global paths of an expression with their namespaces, in traversal order.
 *)
 val paths : expression -> (namespace * Path.t) list
+
+(** Equality up to the renaming of local variables. [same_path] compares global
+    paths. [vars] relates the free variables of the first expression to those of
+    the second. *)
+val alpha_equal :
+  same_path:(namespace -> Path.t -> Path.t -> bool) ->
+  vars:(Ident.t * Ident.t) list ->
+  expression ->
+  expression ->
+  bool
