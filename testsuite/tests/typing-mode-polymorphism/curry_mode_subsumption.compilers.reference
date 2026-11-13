@@ -8,11 +8,11 @@ Error: Signature mismatch:
        is not included in
          sig val f : 'a -> 'b -> 'b @@ stateless end
        Values do not match:
-         val f : 'a @ local -> 'b -> 'b
+         val f : 'a @ local -> ('b -> 'b) @ local
        is not included in
-         val f : 'a -> 'b -> 'b @@ stateless
-       The type 'a @ local -> 'b -> 'b is not compatible with the type
-         'a -> 'b -> 'b
+         val f : 'a -> ('b -> 'b) @@ stateless
+       The type 'a @ local -> ('b -> 'b) @ local
+       is not compatible with the type 'a -> ('b -> 'b)
        The return mode was expected to be global but is local
        File "curry_mode_subsumption.ml", line 17, characters 6-7:
          Expected declaration

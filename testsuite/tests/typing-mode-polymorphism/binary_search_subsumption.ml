@@ -100,13 +100,12 @@ Error: Signature mismatch:
          S
        Values do not match:
          val binary_search :
-           'a @ [< past('p) & 'mm0 & 'm & many] ->
+           'a @ [< 'o & 'm & many] ->
            length:('a @ [> 'm | aliased] -> int @ [< many read_write]) @ [< many > local] ->
-           get:('a @ [< past('n) > 'mm0 | aliased] ->
-                (int @ [> aliased] -> 'b @ [< 'q]) @ [> past('n) | past('o) | past('p) | local]) @ [< past('o) & many > local] ->
-           compare:('b @ [> 'q | dynamic] ->
-                    'c @ [> 'mm1 | aliased] -> int @ [< many read_write]) @ [< many > local] ->
-           'c @ [< 'mm1 & many] -> int option @ [> local aliased dynamic]
+           get:('a @ [> 'o | aliased] -> int @ [> aliased] -> 'b @ [< 'n]) @ [< many > local] ->
+           compare:('b @ [> 'n | dynamic] ->
+                    'c @ [> 'p | aliased] -> int @ [< many read_write]) @ [< many > local] ->
+           'c @ [< 'p & many] -> int option @ [> local aliased dynamic]
        is not included in
          val binary_search :
            't ->

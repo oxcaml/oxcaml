@@ -878,6 +878,20 @@ let core_prints_modes = function
       end
   | _ -> true
 
+let is_curry_mode_mismatch (trace : Errortrace.comparison Errortrace.error) =
+  match List.rev trace with
+  | Errortrace.Mode_mismatch (Return, _) :: Diff {got; _} :: _ ->
+      begin match Types.get_desc got.expanded with
+      | Tarrow (_, _, ret, _) -> Btype.is_Tarrow ret
+      | _ -> false
+      end
+  | _ -> false
+
+let core_prints_curry_modes = function
+  | Err.Value_descriptions {symptom = Type {trace}} ->
+      Some (is_curry_mode_mismatch trace)
+  | _ -> None
+
 (* Printers for leaves *)
 let core env id x =
   match x with
@@ -1172,7 +1186,8 @@ and signature ~expansion_token ~env:_ ~before ~ctx sgs =
 and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
   | Core c ->
       Out_type.with_modes (core_prints_modes c) (fun () ->
-        dwith_context ctx (core env.i_env name c))
+      Out_type.with_curry_modes (core_prints_curry_modes c) (fun () ->
+        dwith_context ctx (core env.i_env name c)))
       :: before
   | Module_type diff ->
       module_type ~expansion_token ~eqmode:false ~env ~before

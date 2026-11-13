@@ -204,6 +204,7 @@ let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
 let is_Tunivar ty = match get_desc ty with Tunivar _ -> true | _ -> false
 let is_Tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false
 let is_Tpoly ty = match get_desc ty with Tpoly _ -> true | _ -> false
+let is_Tarrow ty = match get_desc ty with Tarrow _ -> true | _ -> false
 let is_poly_Tpoly ty =
   match get_desc ty with Tpoly (_, _ :: _) -> true | _ -> false
 let type_kind_is_abstract decl =

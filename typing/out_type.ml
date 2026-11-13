@@ -943,6 +943,9 @@ let mode_polymorphism_printing_enabled () =
 let print_modes = ref true
 let with_modes b f = Misc.protect_refs [R (print_modes,b)] f
 
+let print_curry_modes = ref None
+let with_curry_modes b f = Misc.protect_refs [R (print_curry_modes,b)] f
+
 module Internal_names : sig
 
   val reset : unit -> unit
@@ -1407,7 +1410,13 @@ end = struct
     let px = proxy ty in
     if not (List.memq px !visited_for_named_modevars) then begin
       visited_for_named_modevars := px :: !visited_for_named_modevars;
-      printer_iter_type_expr register_visible_modes register_visible_mode ty
+      match get_desc ty, !print_curry_modes with
+      | Tarrow ((_, marg, _), ty1, ty2, _), Some false when is_Tarrow ty2 ->
+        register_visible_mode marg;
+        register_visible_modes ty1;
+        register_visible_modes ty2
+      | _ ->
+        printer_iter_type_expr register_visible_modes register_visible_mode ty
     end
 
   (* The next preprocessing step registers all direct
@@ -2849,7 +2858,12 @@ and tree_of_ret_typ_mutating (acc_mode : const_or_generic) m ty=
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
-      if not !print_modes || equate_with_const m acc_mode then begin
+      let elide =
+        match !print_curry_modes with
+        | Some print -> not print
+        | None -> equate_with_const m acc_mode
+      in
+      if not !print_modes || elide then begin
         (Orm_no_parens, acc_mode)
       end else begin
         (* In this branch we need to print parens. [m] might have undetermined

@@ -419,13 +419,19 @@ Error: Signature mismatch:
            val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
          end
        Values do not match:
-         val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
+         val f :
+           'a @ [< past('m) > local] ->
+           ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m) | local]
        is not included in
-         val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
+         val f :
+           'a @ [< past('m) & global] ->
+           ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)] @@ stateless
        The type
-         "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
+         "'a @ [< past('m) > past('p) | local] ->
+         ('b @ [< 'n > past('o)] -> 'b @ [> 'n]) @ [> past('m) | local]"
        is not compatible with the type
-         "'a @ [< past('o) & global] -> 'b @ [< 'p & past('n)] -> 'b @ [> 'p]"
+         "'a @ [< past('q) & past('p) & global] ->
+         ('b @ [< 'mm0 & past('o)] -> 'b @ [> 'mm0]) @ [> past('q)]"
        The return mode was expected to be "global" but is "local"
 |}]
 
