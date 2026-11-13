@@ -31,15 +31,22 @@
 name: oxfuzzer
 
 on:
-  # zizmor flags workflow_run because it runs with main's privileges
-  # whatever started the triggering run. Here the jobs run only when a
-  # push to this repository started it (see the `if` on `select`). Keep
-  # both of those conditions: a pull request, even one from a fork, can
-  # make its copy of the trusted workflow run on pull requests, and from
-  # a branch named main that run passes the `branches` filter below. A
-  # tag named main gets past them too, but pushing one takes write
-  # access, which already allows `commit`. This workflow also has only
-  # `contents: read` and uses no secrets or artifacts.
+  # zizmor flags workflow_run because such a run has this repository's
+  # privileges even if a fork's pull request started the run that
+  # triggered it, and this workflow runs code from that run's commit. It
+  # is safe here because:
+  #
+  # - The `if` on `select` lets the jobs run only when a push to this
+  #   repository started the triggering run, which takes write access.
+  #   Keep both of its conditions (a push, and to this repository). The
+  #   `branches` filter below is not enough: a fork's pull request can
+  #   make its copy of the trusted workflow run on pull requests, from a
+  #   branch named main.
+  # - A tag named main passes these checks, but pushing one also takes
+  #   write access, which already allows fuzzing any commit (the `commit`
+  #   input).
+  # - This workflow has only `contents: read`, and uses no secrets or
+  #   artifacts.
   workflow_run: # zizmor: ignore[dangerous-triggers]
     # Must equal the trusted workflow's `name:`, or this never fires.
     # workflow-run-triggers.yml checks that.

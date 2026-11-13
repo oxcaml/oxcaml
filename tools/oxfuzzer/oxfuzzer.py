@@ -488,8 +488,8 @@ class Stats:
     discarded: int = 0
     failures: list[SavedFailure] = field(default_factory=list)
     generation_timeouts: int = 0
-    # When fuzz started and ended, as time.monotonic() values. The self-check
-    # comes before.
+    # When fuzz started and ended, as time.monotonic() values. Startup,
+    # including the call to self_check, is before fuzzing_start.
     fuzzing_start: float | None = None
     fuzzing_end: float | None = None
 
@@ -572,11 +572,6 @@ def source_revision(directory: Path) -> str:
     return "unknown"
 
 
-# The line that reports the revision of a run, in the log and in meta.txt. A
-# build directory is inside the checkout it was built from. An installation
-# does not record the revision it was built from, so for one this reports the
-# checkout that contains this script, under another label: in CI that is the
-# commit being fuzzed, but elsewhere the installation may come from another.
 def revision_line(toolchain: Toolchain) -> str:
     if toolchain.installed:
         return f"oxfuzzer.py revision: {source_revision(REPOSITORY_ROOT)}"
