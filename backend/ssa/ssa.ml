@@ -680,12 +680,13 @@ let check_terminator (term : under_construction terminator) : unit =
          nontail"
   | Call { continuation = Raise _; _ } ->
     Misc.fatal_error "Ssa.check_terminator: a Call continuation cannot be Raise"
-  | Call { continuation = Unreachable; op = External _; _ } -> ()
-  | Call { continuation = Unreachable; op = Direct _ | Indirect _ | Probe _; _ }
+  | Call
+      { continuation = Unreachable; op = External _ | Direct _ | Indirect _; _ }
     ->
+    ()
+  | Call { continuation = Unreachable; op = Probe _; _ } ->
     Misc.fatal_error
-      "Ssa.check_terminator: a Call with continuation Unreachable must be an \
-       external call"
+      "Ssa.check_terminator: a probe cannot have continuation Unreachable"
   | Call { continuation = Goto _; _ } | Invalid _ -> ()
 
 module Cursor = struct

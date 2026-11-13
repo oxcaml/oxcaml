@@ -387,6 +387,17 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Cursor.move c ~new_pos:cont_block;
     Ok (Block.params cont_block)
   in
+  let call_not_returning op : result =
+    finish_block env c ~dbg
+      (Call
+         { op;
+           args = arg_instrs;
+           continuation = Unreachable;
+           may_raise;
+           nontail
+         });
+    Never_returns
+  in
   match new_op with
   | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
   | Call { op = Indirect candidates; _ } ->
@@ -395,16 +406,10 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     call_returning_to (External ext_call) ty_res
   | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
     call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
-  | Call_no_return ext_call ->
-    finish_block env c ~dbg
-      (Call
-         { op = External ext_call;
-           args = arg_instrs;
-           continuation = Unreachable;
-           may_raise;
-           nontail
-         });
-    Never_returns
+  | Call_no_return_ext ext_call -> call_not_returning (External ext_call)
+  | Call_no_return_func (Direct sym) -> call_not_returning (Direct sym)
+  | Call_no_return_func (Indirect candidates) ->
+    call_not_returning (Indirect candidates)
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
   | Invalid _ ->
