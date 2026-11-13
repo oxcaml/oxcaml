@@ -657,6 +657,32 @@ Lines 7-9, characters 18-5:
 Error: Recursive static functors are not supported
 |}]
 
+(* A static functor in a [let rec] that does not refer to itself *)
+let rec p14 =
+  (module functor (X : sig end @ static) -> struct
+    let f () = 1
+  end : F)
+[%%expect{|
+Lines 2-4, characters 18-5:
+2 | ..................(X : sig end @ static) -> struct
+3 |     let f () = 1
+4 |   end.....
+Error: Recursive static functors are not supported
+|}]
+
+(* A constrained static functor (with the trivial coercion) in a [let rec] *)
+let rec p15 =
+  (module (functor (X : sig end @ static) -> struct
+    let f () = ignore p15; 1
+  end : F) : F)
+[%%expect{|
+Lines 2-4, characters 19-5:
+2 | ...................(X : sig end @ static) -> struct
+3 |     let f () = ignore p15; 1
+4 |   end..........
+Error: Recursive static functors are not supported
+|}]
+
 (* A static functor taking another static functor as its argument *)
 let (h2i, h2f) =
   let module Wrap (M : Id @ static) = struct let poly_ id x = M.id x end in
@@ -687,4 +713,18 @@ let (h3i, h3f) =
 [%%expect{|
 val h3i : int = 43
 val h3f : float = 43.
+|}]
+
+(* A recursive module containing a layout-polymorphic value. Compiling it must
+   not mutate the shared [Id] signature. Must be the last test: if it does, the
+   later uses of [Id] fail. *)
+module rec D15 : sig module Y : Id end = struct
+  module Y = struct let poly_ id x = x end
+end
+
+module L15 : Id = struct let poly_ id x = x end
+[%%expect{|
+module rec D15 : sig module Y : Id end
+Uncaught exception: File "typing/jkind_types.ml", line 82, characters 4-10: Assertion failed
+
 |}]
