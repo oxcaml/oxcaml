@@ -3685,6 +3685,35 @@ type jsir_unit =
   ; whole_program : bool
   }
 
+(* The OxCaml JSIR backend records source files as the compiler does in debug
+   information, rewritten with [BUILD_PATH_PREFIX_MAP]. *)
+let restore_source_paths (program : Code.program) =
+  match Build_path_prefix_map.get_build_path_prefix_map () with
+  | None -> program
+  | Some map ->
+      let map = Build_path_prefix_map.flip map in
+      let restore (pi : Parse_info.t) =
+        match pi.src with
+        | Some src when not (Filename.is_relative src) ->
+            { pi with src = Some (Build_path_prefix_map.rewrite map src) }
+        | Some _ | None -> pi
+      in
+      let blocks =
+        Addr.Map.map
+          (fun block ->
+            let body =
+              List.map block.body ~f:(function
+                | Event pi -> Event (restore pi)
+                | Let (x, Closure (params, cont, (hint, Some pi))) ->
+                    Let (x, Closure (params, cont, (hint, Some (restore pi))))
+                | (Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _) as instr
+                  -> instr)
+            in
+            { block with body })
+          program.blocks
+      in
+      { program with blocks }
+
 let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic =
   let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
   (match Magic_number.kind magic with
@@ -3712,7 +3741,7 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
      variable of any unit. *)
   Code.Var.set_last last_var;
   List.iter var_names ~f:(fun (var, name) -> Code.Variable_name.set var name);
-  let program = Code.Marshalable_program.to_program program in
+  let program = restore_source_paths (Code.Marshalable_program.to_program program) in
   let program =
     if whole_program
     then Code.prepend program (register_predefined_exceptions ())
