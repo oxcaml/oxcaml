@@ -729,9 +729,15 @@ let rec expr scope ppf = function
     parens ~if_scope_is:Where_body scope ppf (fun scope ppf ->
         let_symbol_expr scope ppf l)
   | Switch { scrutinee; cases } ->
+    let scale =
+      Branch_annotations.likelihood_printing_scale
+        (List.map
+           (fun ({ annotations; _ } : Fexpr.switch_case) -> annotations)
+           cases)
+    in
     Format.fprintf ppf "@[<v 2>%tswitch%t %a%a@]" Flambda_colours.expr_keyword
       Flambda_colours.pop simple scrutinee
-      (pp_list ~sep:"" switch_case)
+      (pp_list ~sep:"" (switch_case ~scale))
       cases
     (* (fun ppf () -> if cases <> [] then Format.pp_print_cut ppf ()) () *)
   | Apply
@@ -743,20 +749,29 @@ let rec expr scope ppf = function
         exn_continuation = ek;
         args;
         func;
-        arities
+        arities;
+        callsite_counter
       } ->
     let pp_inlining_state ppf () =
       pp_option ~space:Before
         (pp_like "inlining_state(%a)" inlining_state)
         ppf is
     in
+    let pp_callsite_counter ppf () =
+      pp_option ~space:Before
+        (fun ppf counter ->
+          Format.fprintf ppf "callsite_counter(%s)"
+            (Fdo_counter.to_string counter))
+        ppf callsite_counter
+    in
     Format.fprintf ppf
-      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ %a@]@]@]"
+      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ \
+       %a@]@]@]"
       Flambda_colours.expr_keyword Flambda_colours.pop Flambda_colours.elide
       (call_kind_and_alloc_mode ~space:Before)
       (kind, alloc_mode)
       (inlined_attribute_opt ~space:Before)
-      inlined pp_inlining_state () Flambda_colours.pop
+      inlined pp_inlining_state () pp_callsite_counter () Flambda_colours.pop
       func_name_with_optional_arities (func, arities)
       (simple_args ~space:Before ~omit_if_empty:true)
       args result_continuation ret exn_continuation ek
@@ -778,8 +793,10 @@ and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
   | Named_cont ac -> apply_cont ppf ac
   | Inlined_goto e -> Format.fprintf ppf "(%a)" (expr Outer) e
 
-and switch_case ppf (v, c) =
-  Format.fprintf ppf "@;@[<hov 2>| %i ->@ %a@]" v apply_or_inlined_cont c
+and switch_case ~scale ppf ({ tag; action; annotations } : Fexpr.switch_case) =
+  Format.fprintf ppf "@;@[<hov 2>| %i%a ->@ %a@]" tag
+    (Branch_annotations.print scale)
+    annotations apply_or_inlined_cont action
 
 and let_expr scope ppf : let_ -> unit = function
   | { bindings = first :: rest; body; value_slots = ces } ->
