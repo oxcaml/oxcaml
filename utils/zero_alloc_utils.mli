@@ -1,9 +1,11 @@
-(** Bot/Safe/Top, meaning "impossible," "won't allocate," and "might allocate,"
-    respectively. *)
+(** Components classifying the behavior of a region of code. *)
 module Component : sig
   type 'top t =
+    (** This region of code may be reached and may allocate. *)
     | Top of 'top
+    (** This region of code may be reached but will not allocate. *)
     | Safe
+    (** This region of code will not be reached. *)
     | Bot
 
   val map : f:('a -> 'b) -> 'a t -> 'b t
