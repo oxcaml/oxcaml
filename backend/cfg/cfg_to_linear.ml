@@ -489,7 +489,11 @@ let run cfg_with_layout =
             if need_starting_label block ~prev_block
             then
               let instr =
-                to_linear_instr (Linear.Llabel_for_jump_target block.start)
+                to_linear_instr
+                  (Linear.Llabel_for_jump_target
+                     { label = block.start;
+                       is_loop_header = block.is_loop_header && not block.cold
+                     })
                   ~next:body
               in
               { instr with

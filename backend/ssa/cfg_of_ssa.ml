@@ -575,7 +575,8 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
     exn = None;
     can_raise;
     is_trap_handler;
-    cold = Block.cold block
+    cold = Block.cold block;
+    is_loop_header = false
   }
 
 (** Remember comparisons that will be folded into branch terminators. The branch
@@ -653,7 +654,8 @@ let make_entry_block env cfg ~ssa_entry_label ~fun_arg_locs : Cfg.basic_block =
     exn = None;
     can_raise = false;
     is_trap_handler = false;
-    cold = false
+    cold = false;
+    is_loop_header = false
   }
 
 (** Prepend the function-entry prologue to [entry]'s CFG block: param
