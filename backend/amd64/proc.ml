@@ -632,9 +632,18 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
                (Byte_unsigned | Byte_signed | Sixteen_unsigned |
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
                 Single _); _ })
-  | Op(Specific (Ifloatarithmem (Float32, _, _)))
-  | Op(Intop_atomic _) ->
-    destroyed_at_small_memory_op
+  | Op(Specific (Ifloatarithmem (Float32, _, _))) ->
+     destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Compare_set; _ }) ->
+    Array.append destroyed_at_small_memory_op destroyed_rax
+  | Op(Intop_atomic { op = Compare_exchange; _ }) -> destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Fetch_and_add; _ }) -> destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Exchange; _ }) -> destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Add; _ }) -> destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Sub; _ }) -> destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Land; _ }) -> destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Lor; _ }) -> destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Lxor; _ }) -> destroyed_at_small_memory_op
   | Op(Store( (Word_int | Word_mask | Word_val | Double |
                Onetwentyeight_aligned | Onetwentyeight_unaligned |
                Twofiftysix_aligned | Twofiftysix_unaligned |
