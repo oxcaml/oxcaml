@@ -3993,15 +3993,7 @@ let constrain_type_jkind_exn env texn ty jkind =
   | Error err -> raise_for texn (Bad_jkind (ty,err))
 
 
-(* The jkind we estimate for a type is an upper bound: a type whose estimated
-   jkind is [value_or_null] may well turn out to be a [value] once we learn
-   more about the abstract types and type variables in it. An [or_null] type
-   (the built-in one, or one declared with [[@@or_null]], possibly under
-   unboxed wrappers) is the exception. It is [maybe_null] whatever its
-   arguments are, so it cannot be equal to a type whose jkind is [non_null].
-
-   This checks whether [ty] is such a type and [jkind] is [non_null].
-   [ty_jkind] must be an upper bound of the jkind of [ty]. We only use it to
+(* [ty_jkind] must be an upper bound of the jkind of [ty]. We only use it to
    avoid unboxing [ty] in the common case where it isn't [maybe_null]. *)
 let is_or_null_type_but_jkind_is_non_null env ty ~ty_jkind jkind =
   match
@@ -4009,8 +4001,8 @@ let is_or_null_type_but_jkind_is_non_null env ty ~ty_jkind jkind =
   with
   | Some Maybe_null, Some Non_null ->
     Option.is_some (get_unboxed_type_approximation env ty).or_null
-  | (Some (Maybe_null | Non_null) | None),
-    (Some (Maybe_null | Non_null) | None) -> false
+  | (None | Some (Maybe_null | Non_null)),
+    (None | Some (Maybe_null | Non_null)) -> false
 
 (* Note: Because [estimate_type_jkind] actually returns an upper bound, this
    function computes an inaccurate intersection in some cases.
@@ -4983,9 +4975,9 @@ and mcomp_type_decl type_pairs env t1 t2 p1 p2 tl1 tl2 =
   try
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
-    (* The jkinds of the declarations don't tell us that an [or_null] type
-       can't be a [non_null] abstract type, so check for that too. *)
     let check_jkinds () =
+      (* The jkinds of the declarations don't tell us that an [or_null] type
+         can't be a [non_null] abstract type, so check for that too. *)
       if not (Jkind.may_have_intersection env
                 decl.type_jkind decl'.type_jkind)
          || is_or_null_type_but_jkind_is_non_null env t1
