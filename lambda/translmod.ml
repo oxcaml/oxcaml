@@ -373,6 +373,12 @@ let init_shape id modl =
   and init_shape_struct env sg =
     match sg with
       [] -> []
+    | Sig_value(_, {val_kind=Val_reg _; val_lpoly}, _) :: rem
+      when not (Lpoly.is_empty_exn val_lpoly) ->
+        (* Layout-polymorphic values are always functions,
+           and recursive modules will never instantiate them. *)
+        const_int 0 (* camlinternalMod.Function *)
+        :: init_shape_struct env rem
     | Sig_value(subid, {val_kind=Val_reg _; val_type=ty; val_loc=loc},_)
       :: rem ->
         let init_v =

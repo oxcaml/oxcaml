@@ -615,11 +615,8 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-(* Recursive functor. This is more broken than it initially looks.
-   [Recursive.M12.id]'s first argument ends up with the kind [value_or_null]
-   even though it should be polymorphic. The missing value error is coming from
-   how recursive modules are compiled: this ends up as calls to CamlinternalMod
-   which slambda eval can't see through. *)
+(* Recursive functor. Recursive modules compile to calls to CamlinternalMod,
+   which slambda eval can't see through, so they must be dynamic. *)
 let x12 =
  let module Recursive = struct
     module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
@@ -633,9 +630,11 @@ let x12 =
   end in
   Recursive.M12.id 7
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+Line 3, characters 15-18:
+3 |     module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
+                   ^^^
+Error: The module is "dynamic" because recursive modules are always dynamic.
+       However, the module highlighted is expected to be "static".
 |}]
 
 (* Recursive first-class functor *)
@@ -650,11 +649,33 @@ let rec p13 =
   end : F)
 [%%expect{|
 module type F = functor (X : sig end @ static) -> sig val f : unit -> int end
-Lines 7-9, characters 18-5:
-7 | ..................(X : sig end @ static) -> struct
+Lines 7-9, characters 2-10:
+7 | ..(module functor (X : sig end @ static) -> struct
 8 |     let f () = ignore p13; 1
-9 |   end.....
-Error: Recursive static functors are not supported
+9 |   end : F)
+Error: This kind of expression is not allowed as right-hand side of "let rec"
+|}]
+
+(* A static functor in a [let rec] that does not refer to itself *)
+let rec p14 =
+  (module functor (X : sig end @ static) -> struct
+    let f () = 1
+  end : F)
+[%%expect{|
+val p14 : (module F) = <module>
+|}]
+
+(* A constrained static functor (with the trivial coercion) in a [let rec] *)
+let rec p15 =
+  (module (functor (X : sig end @ static) -> struct
+    let f () = ignore p15; 1
+  end : F) : F)
+[%%expect{|
+Lines 2-4, characters 2-15:
+2 | ..(module (functor (X : sig end @ static) -> struct
+3 |     let f () = ignore p15; 1
+4 |   end : F) : F)
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 (* A static functor taking another static functor as its argument *)
@@ -687,4 +708,17 @@ let (h3i, h3f) =
 [%%expect{|
 val h3i : int = 43
 val h3f : float = 43.
+|}]
+
+(* A recursive module containing a layout-polymorphic value. Compiling it must
+   not mutate the shared [Id] signature. Must be the last test: if it does, the
+   later uses of [Id] fail. *)
+module rec D15 : sig module Y : Id end = struct
+  module Y = struct let poly_ id x = x end
+end
+
+module L15 : Id = struct let poly_ id x = x end
+[%%expect{|
+module rec D15 : sig module Y : Id end
+module L15 : Id
 |}]

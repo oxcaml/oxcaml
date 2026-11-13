@@ -4773,6 +4773,7 @@ module Report = struct
     | Non_template_functor -> Fmt.dprintf "non-template functors"
     | Non_template_functor_application ->
       Fmt.dprintf "non-template functor applications"
+    | Recursive_module -> Fmt.dprintf "recursive modules"
 
   let print_legacy = function
     | Toplevel -> print_article_noun Consonant "top-level clause"
