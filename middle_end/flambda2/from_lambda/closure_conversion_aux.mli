@@ -322,12 +322,39 @@ module Acc : sig
       where the code of its instantiations is optimized. *)
   val define_template : t -> Template_id.t -> t
 
+  (** In classic mode, the approximation of the environments of one of the
+      unit's templates is exported as that of the template's key (see
+      [Flambda_primitive.Template_env]). *)
+  val add_template_key_approximation :
+    t -> Symbol.t -> Env.value_approximation -> t
+
+  val template_keys : t -> Symbol.Set.t
+
   (** The approximation of a closure of the code bound to a [Lambda.Lcode]
       (although no such closure exists), once the code has been closed. *)
   val add_lcode_approximation : t -> Code_id.t -> Env.value_approximation -> t
 
   val find_lcode_approximation :
     t -> Code_id.t -> Env.value_approximation option
+
+  (** In classic mode, the code of an instantiation of one of the unit's
+      templates is closed at the template's definition, knowing the
+      approximation of its environments. Until then, the closing waits. *)
+  val await_template_definition :
+    t ->
+    Template_id.t ->
+    (t -> template_env_approximation:Env.value_approximation option -> t) ->
+    t
+
+  val close_lcodes_of_template :
+    t ->
+    Template_id.t ->
+    template_env_approximation:Env.value_approximation option ->
+    t
+
+  (** Close the code of the instantiations of templates whose definitions were
+      never reached, which therefore never receive any environment. *)
+  val close_lcodes_of_unreached_templates : t -> t
 
   val cost_metrics : t -> Cost_metrics.t
 

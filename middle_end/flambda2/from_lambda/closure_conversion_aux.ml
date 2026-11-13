@@ -428,7 +428,12 @@ module Acc = struct
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
       closure_infos : closure_info list;
       defined_templates : Template_id.Set.t;
-      lcode_approximations : Env.value_approximation Code_id.Map.t
+      template_keys : Symbol.Set.t;
+      lcode_approximations : Env.value_approximation Code_id.Map.t;
+      lcodes_awaiting_template_definition :
+        (t -> template_env_approximation:Env.value_approximation option -> t)
+        list
+        Template_id.Map.t
     }
 
   let cost_metrics t = t.cost_metrics
@@ -532,7 +537,9 @@ module Acc = struct
       code_slot_offsets = Code_id.Map.empty;
       closure_infos = [];
       defined_templates = Template_id.Set.empty;
-      lcode_approximations = Code_id.Map.empty
+      template_keys = Symbol.Set.empty;
+      lcode_approximations = Code_id.Map.empty;
+      lcodes_awaiting_template_definition = Template_id.Map.empty
     }
 
   let declared_symbols t = t.declared_symbols
@@ -625,6 +632,12 @@ module Acc = struct
           Symbol.Map.add symbol approx t.symbol_approximations
       }
 
+  let add_template_key_approximation t template_key approx =
+    let t = add_symbol_approximation t template_key approx in
+    { t with template_keys = Symbol.Set.add template_key t.template_keys }
+
+  let template_keys t = t.template_keys
+
   let add_lcode_approximation t code_id approx =
     { t with
       lcode_approximations =
@@ -633,6 +646,40 @@ module Acc = struct
 
   let find_lcode_approximation t code_id =
     Code_id.Map.find_opt code_id t.lcode_approximations
+
+  let await_template_definition t template close =
+    { t with
+      lcodes_awaiting_template_definition =
+        Template_id.Map.update template
+          (fun closes -> Some (close :: Option.value closes ~default:[]))
+          t.lcodes_awaiting_template_definition
+    }
+
+  let close_lcodes closes t ~template_env_approximation =
+    List.fold_left
+      (fun t close -> close t ~template_env_approximation)
+      t (List.rev closes)
+
+  let close_lcodes_of_template t template ~template_env_approximation =
+    match
+      Template_id.Map.find_opt template t.lcodes_awaiting_template_definition
+    with
+    | None -> t
+    | Some closes ->
+      close_lcodes closes
+        { t with
+          lcodes_awaiting_template_definition =
+            Template_id.Map.remove template
+              t.lcodes_awaiting_template_definition
+        }
+        ~template_env_approximation
+
+  let close_lcodes_of_unreached_templates t =
+    Template_id.Map.fold
+      (fun _template closes t ->
+        close_lcodes closes t ~template_env_approximation:None)
+      t.lcodes_awaiting_template_definition
+      { t with lcodes_awaiting_template_definition = Template_id.Map.empty }
 
   let symbol_approximations t = t.symbol_approximations
 

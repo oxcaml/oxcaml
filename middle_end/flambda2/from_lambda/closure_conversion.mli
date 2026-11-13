@@ -46,9 +46,15 @@ val close_let_rec :
 val declare_lcodes :
   Env.t -> (Ident.t * Template_id.t * Function_decl.t) list -> Env.t
 
-(** Close the code of instantiations of templates, which have no closure. *)
+(** Close the code of instantiations of templates, which have no closure. In
+    classic mode, the code of an instantiation of one of the unit's templates is
+    only closed at the template's definition. *)
 val close_lcodes :
   Acc.t -> Env.t -> (Ident.t * Template_id.t * Function_decl.t) list -> Acc.t
+
+(** In classic mode, close the code of the instantiations of templates whose
+    definitions were never reached. *)
+val close_lcodes_of_unreached_templates : Acc.t -> Acc.t
 
 val close_let_cont :
   Acc.t ->
@@ -100,8 +106,12 @@ type 'a close_program_metadata =
       (Exported_code.t
       * Code_or_metadata.t Value_approximation.t Symbol.Map.t
       * Name_occurrences.t
-      * Slot_offsets.t)
+      * Slot_offsets.t
+      * Symbol.Set.t)
       -> [`Classic] close_program_metadata
+      (** The last component is the set of keys of the unit's templates (see
+          [Flambda_primitive.Template_env]), whose approximations are those of
+          the templates' environments. *)
 
 type 'a close_program_result =
   { unit : Flambda_unit.t;

@@ -47,10 +47,14 @@ val prepare_cmx_file_contents :
   Exported_code.t ->
   Name_occurrences.t * Flambda_cmx_format.raw option
 
+(** As [prepare_cmx_file_contents], in classic mode: [approxs] gives the
+    approximations of the templates' environments as those of [template_keys].
+*)
 val prepare_cmx_from_approx :
   machine_width:Target_system.Machine_width.t ->
   approxs:Code_or_metadata.t Value_approximation.t Symbol.Map.t ->
   module_symbol:Symbol.t ->
+  template_keys:Symbol.Set.t ->
   exported_offsets:Exported_offsets.t ->
   used_value_slots:Value_slot.Set.t ->
   sections:File_sections.Builder.t ->

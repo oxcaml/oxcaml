@@ -37,7 +37,8 @@ type 'a close_program_metadata =
       (Exported_code.t
       * Code_or_metadata.t Value_approximation.t Symbol.Map.t
       * Name_occurrences.t
-      * Slot_offsets.t)
+      * Slot_offsets.t
+      * Symbol.Set.t)
       -> [`Classic] close_program_metadata
 
 type 'a close_program_result =
@@ -1319,8 +1320,20 @@ let close_template_env acc env template ~block dbg
   | None ->
     (* Without a unit to own the template, there is nothing to do. *)
     k acc [Named.create_simple block]
-  | Some _ when Flambda_features.classic_mode () ->
-    (* Simplify won't run. *)
+  | Some template_key when Flambda_features.classic_mode () ->
+    (* Simplify won't run, so the code of the template's instantiations is
+       closed here, knowing the approximation of its environments. *)
+    let template_env_approximation =
+      find_value_approximation_through_symbol acc env block
+    in
+    let acc =
+      Acc.add_template_key_approximation acc template_key
+        template_env_approximation
+    in
+    let acc =
+      Acc.close_lcodes_of_template acc template
+        ~template_env_approximation:(Some template_env_approximation)
+    in
     k acc [Named.create_simple block]
   | Some template_key ->
     let instantiations = Env.lcode_code_ids_of_template env template in
@@ -2867,8 +2880,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
 
 let close_one_function acc ~code_id ~external_env ~by_function_slot
     ~function_code_ids decl ~has_lifted_closure ~value_slots_from_idents
-    ~function_slots_from_idents ~approx_map ~template_key function_declarations
-    =
+    ~function_slots_from_idents ~approx_map ~template_key
+    ~template_env_approximation function_declarations =
   let acc = Acc.with_free_names Name_occurrences.empty acc in
   let body = Function_decl.body decl in
   let loc = Function_decl.loc decl in
@@ -3008,6 +3021,19 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         let env, _var = Env.add_var_like env p.name User_visible p.kind in
         env)
       unarized_params closure_env
+  in
+  let closure_env =
+    (* The code of an instantiation of a template takes the template's
+       environment as its first parameter. *)
+    match template_env_approximation, unarized_params with
+    | None, _ -> closure_env
+    | Some _, [] ->
+      Misc.fatal_errorf "Code %a of a template instantiation has no parameters"
+        Code_id.print code_id
+    | Some approx, (env_param : Function_decl.param) :: _ ->
+      Env.add_var_approximation closure_env
+        (fst (Env.find_var closure_env env_param.name))
+        approx
   in
   let closure_env, alloc_region =
     Env.add_var_like closure_env my_alloc_region Not_user_visible
@@ -3495,7 +3521,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
                 ~function_code_ids:function_code_ids_in_order function_decl
                 ~has_lifted_closure:can_be_lifted ~value_slots_from_idents
                 ~function_slots_from_idents ~approx_map ~template_key:None
-                function_declarations)
+                ~template_env_approximation:None function_declarations)
         in
         acc, approxs_and_code_ids)
       (acc, (Function_slot.Map.empty, []))
@@ -3607,7 +3633,7 @@ let declare_lcodes env lcodes =
           (metadata_only_closure_approximation decl ~code_id))
     env lcodes
 
-let close_lcode acc env ~lcode ~template decl =
+let close_lcode acc env ~lcode ~template ~template_env_approximation decl =
   (match Function_decl.calling_convention decl with
   | Normal_calling_convention -> ()
   | Unboxed_calling_convention _ ->
@@ -3620,9 +3646,9 @@ let close_lcode acc env ~lcode ~template decl =
   let function_declarations =
     Function_decls.create [decl] (Function_decl.closure_alloc_mode decl)
   in
-  (* The code has no closure, so it isn't part of the term being closed: closing
-     it mustn't change that term's free names, or whether it contains a function
-     (for inlining decisions). *)
+  (* The code may be closed in the middle of another function (see
+     [close_template_env]), whose free names must be kept. Since the code has no
+     closure, that function doesn't contain it, for inlining decisions. *)
   let free_names = Acc.free_names acc in
   let seen_a_function = Acc.seen_a_function acc in
   let _, _, acc, (approxs, _) =
@@ -3634,7 +3660,8 @@ let close_lcode acc env ~lcode ~template decl =
           ~approx_map:
             (Function_slot.Map.singleton function_slot
                (Env.lcode_metadata_approximation env lcode))
-          ~template_key:(template_key template) function_declarations)
+          ~template_key:(template_key template) ~template_env_approximation
+          function_declarations)
   in
   let acc = Acc.with_free_names free_names acc in
   let acc = Acc.with_seen_a_function acc seen_a_function in
@@ -3649,11 +3676,32 @@ let close_lcode acc env ~lcode ~template decl =
 let close_lcodes acc env lcodes =
   List.fold_left
     (fun acc (lcode, template, decl) ->
-      (* Simplify will simplify the code of an instantiation of one of the
-         unit's templates at the template's definition, using the type of its
-         environments. *)
-      close_lcode acc env ~lcode ~template decl)
+      if not (Flambda_features.classic_mode ())
+      then
+        (* Simplify will simplify the code using the type of the template's
+           environments. *)
+        close_lcode acc env ~lcode ~template ~template_env_approximation:None
+          decl
+      else
+        match Template_id.owner template, template_key template with
+        | Some owner, Some _
+          when Compilation_unit.equal owner (Current_unit.get_cu_exn ()) ->
+          Acc.await_template_definition acc template
+            (fun acc ~template_env_approximation ->
+              close_lcode acc env ~lcode ~template ~template_env_approximation
+                decl)
+        | _, template_key ->
+          let template_env_approximation =
+            Option.map
+              (fun template_key ->
+                Acc.find_symbol_approximation acc template_key)
+              template_key
+          in
+          close_lcode acc env ~lcode ~template ~template_env_approximation decl)
     acc lcodes
+
+let close_lcodes_of_unreached_templates =
+  Acc.close_lcodes_of_unreached_templates
 
 let close_let_rec acc env ~function_declarations
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) ~current_alloc_region
@@ -4652,5 +4700,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
           ( all_code,
             symbols_approximations,
             Acc.free_names acc,
-            Acc.slot_offsets acc )
+            Acc.slot_offsets acc,
+            Acc.template_keys acc )
     }
