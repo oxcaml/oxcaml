@@ -48,6 +48,8 @@ let fdo_annotation { fdo_annotation; _ } = fdo_annotation
 
 let with_fdo_annotation t fdo_annotation = { t with fdo_annotation }
 
+let map_fdo_annotation t ~f = { t with fdo_annotation = f t.fdo_annotation }
+
 let sum_likelihoods annots = Likelihood.sum_list (List.map likelihood annots)
 
 (* The merged branch is taken whenever one of the given branches would be, so

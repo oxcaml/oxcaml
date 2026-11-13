@@ -1179,14 +1179,12 @@ and switch env res switch =
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
     in
-    let fdo_counters = FRC.region_counters (R.fdo_region_counters res) in
+    let region_counters = FRC.region_counters (R.fdo_region_counters res) in
     let res = R.map_fdo_region_counters res FRC.leave_region in
-    let annotations = Switch_arm.annotations arm in
     let annotations =
-      Branch_annotations.with_fdo_annotation annotations
-        (Fdo_annotation.combine
-           (Branch_annotations.fdo_annotation annotations)
-           fdo_counters)
+      Switch_arm.annotations arm
+      |> Branch_annotations.map_fdo_annotation ~f:(fun fdo_annotation ->
+          Fdo_annotation.combine fdo_annotation region_counters)
     in
     ( ( d,
         cmm_action,
