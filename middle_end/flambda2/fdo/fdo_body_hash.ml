@@ -165,7 +165,7 @@ let bool_constant (lam : L.lambda) =
   | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _
   | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lwhile _ | Lfor _ | Lassign _
   | Lsend _ | Levent _ | Lifused _ | Lregion _ | Lexclave _ | Lkindtemplate _
-  | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
+  | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ | Lcode _ ->
     None
 
 let bool_node b = H.node ~tag:(if b then Tag.true_ else Tag.false_) []
@@ -174,7 +174,7 @@ let bool_node b = H.node ~tag:(if b then Tag.true_ else Tag.false_) []
    [Lstaticraise] as an index as opposed to a flaky [Static_label.t] *)
 let rec lambda handlers (lam : L.lambda) =
   match lam with
-  | Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ -> None
+  | Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lcode _ -> None
   | Lapply
       { ap_func;
         ap_args;
@@ -323,7 +323,7 @@ and condition handlers (cond : L.lambda) =
     | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lstaticcatch _ | Ltrywith _ | Lsequence _ | Lwhile _ | Lfor _ | Lassign _
     | Lsend _ | Levent _ | Lifused _ | Lregion _ | Lexclave _ | Lkindtemplate _
-    | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
+    | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ | Lcode _ ->
       test handlers cond)
 
 and condition_primitive handlers (prim : L.primitive) args ~cond =

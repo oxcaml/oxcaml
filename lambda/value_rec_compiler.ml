@@ -280,7 +280,8 @@ let compute_static_size lam =
       assert false
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
-    | Ltemplate _ | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
+    | Ltemplate _ | Lkindinstantiate _ | Linstantiate  _ | Lcode _ ->
+      dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -580,6 +581,7 @@ let compute_static_size lam =
     | Punboxed_nativeint_array_load_vec _
     | Pprobe_is_enabled _
     | Pobj_magic _
+    | Ptemplate_env _
     | Punbox_vector _
     | Pbox_vector (_, _)
     | Punbox_mask
@@ -893,7 +895,8 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lkindtemplate _
   | Lkindinstantiate _
   | Ltemplate _
-  | Linstantiate _ ->
+  | Linstantiate _
+  | Lcode _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun

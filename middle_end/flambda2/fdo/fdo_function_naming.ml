@@ -61,7 +61,7 @@ module Leading_tokens = struct
       | Lassign (id, _arg) -> ident id
       | Lifused (id, _arg) -> ident id
       | Lfor { for_id; _ } -> ident for_id
-      | Lfunction { params; _ } ->
+      | Lfunction { params; _ } | Lcode { code_fun = { params; _ }; _ } ->
         List.iter (fun (p : L.lparam) -> ident p.name) params
       | Lletrec (bindings, _body) ->
         List.iter (fun (b : L.rec_binding) -> ident b.id) bindings

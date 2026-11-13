@@ -398,7 +398,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         nontail = is_nontail rc;
         yielding
       }
-  | Lfunction f -> Pseudo_event (Function (comp_fun f), f.loc)
+  | Lfunction f | Lcode { code_fun = f; _ } ->
+    Pseudo_event (Function (comp_fun f), f.loc)
   | Llet (_, _k, id, _duid, arg, body) | Lmutlet (_k, id, _duid, arg, body) ->
     (* We are intentionally dropping the [debug_uid] identifiers here. *)
     Let { id; arg = comp_expr arg; body = comp_expr body }
@@ -830,6 +831,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           let total_len = List.length fields in
           pseudo_event (Prim (block_primitive shape ~tag ~total_len, fields)))
       | All_value -> pseudo_event (variadic (Makeblock { tag })))
+    | Ptemplate_env { template = _; shape; mode } ->
+      comp_expr
+        (Lambda.Lprim (Pmakeblock (0, Immutable, Shape shape, mode), args, loc))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
