@@ -2,4 +2,6 @@
 
 let rec x = let _y = [| |] in ();;
 
-let rec x = let y = [| |] in y :: x;;
+type 'a l = { hd : 'a; tl : unit -> 'a l }
+
+let rec x = let y = [| |] in { hd = y; tl = fun () -> x };;

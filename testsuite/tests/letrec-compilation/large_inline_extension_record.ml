@@ -4,7 +4,7 @@
    The extension constructor adds one more word to the runtime block. *)
 type t = ..
 type t += Record of {
-  next : t;
+  mutable next : t;
   f001 : int; f002 : int; f003 : int; f004 : int;
   f005 : int; f006 : int; f007 : int; f008 : int;
   f009 : int; f010 : int; f011 : int; f012 : int;

@@ -38,7 +38,7 @@ let high_to x = low_to (interleave_high_64 x x)
 let equal a b =
   Int64.equal (low_to a) (low_to b) && Int64.equal (high_to a) (high_to b)
 
-type t = { t : t option; v : int64x2# }
+type t = { mutable t : t option; v : int64x2# }
 
 let expected = of_i64s 0x1234L 0x5678L
 
