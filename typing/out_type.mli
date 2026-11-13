@@ -51,6 +51,10 @@ val with_labels: bool -> (unit -> 'a) -> 'a
 (** [with_modes false] disable modes in function types *)
 val with_modes: bool -> (unit -> 'a) -> 'a
 
+val with_relevant_modes:
+  relevant:Mode.With_locality.lr list -> got:type_expr list ->
+  (unit -> 'a) -> 'a
+
 (** {1 Printing idents and paths } *)
 
 val ident_name: Shape.Sig_component_kind.t option -> Ident.t -> out_name
