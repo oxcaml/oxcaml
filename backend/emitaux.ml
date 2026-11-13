@@ -223,6 +223,86 @@ let emit_frames ~debug_strings_section a =
       Hashtbl.add defstrings defname lbl;
       lbl
   in
+  let fully_pack_info fd_raise d has_next =
+    (* See format in caml_debuginfo_location in runtime/backtrace-nat.c *)
+    let open Debuginfo in
+    let kind = if fd_raise then 1 else 0
+    and has_next = if has_next then 1 else 0
+    and char_end = d.dinfo_char_end + d.dinfo_start_bol - d.dinfo_end_bol in
+    let char_end_offset = d.dinfo_end_bol - d.dinfo_start_bol in
+    Int64.(
+      add
+        (shift_left (of_int d.dinfo_line) 51)
+        (add
+           (shift_left (of_int (d.dinfo_end_line - d.dinfo_line)) 48)
+           (add
+              (shift_left (of_int d.dinfo_char_start) 42)
+              (add
+                 (shift_left (of_int char_end) 35)
+                 (add
+                    (shift_left (of_int char_end_offset) 26)
+                    (add (shift_left (of_int kind) 1) (of_int has_next)))))))
+  in
+  let partially_pack_info fd_raise d has_next =
+    (* Partially packed debuginfo: 1lllllllllmmmmmmmmddddddddddddkn 1 - d points
+       to a name_and_loc_info struct l (19 bits) - start line number m (18 bits)
+       - offset of end line number from start d (24 bits) - memory offset to
+       name_and_loc_info struct k (1 bit) - fd_raise flag n (1 bit) - has_next
+       flag *)
+    let open Debuginfo in
+    let start_line = Int.min 0x7FFFF d.dinfo_line
+    and end_line = Int.min 0x3FFFF (d.dinfo_end_line - d.dinfo_line)
+    and kind = if fd_raise then 1 else 0
+    and has_next = if has_next then 1 else 0 in
+    Int64.(
+      add (shift_left Int64.one 63)
+        (add
+           (shift_left (of_int start_line) 44)
+           (add
+              (shift_left (of_int end_line) 26)
+              (add (shift_left (of_int kind) 1) (of_int has_next)))))
+  in
+  let debuginfo_contents rs dbg =
+    (* Due to inlined functions, a single debuginfo may have multiple locations.
+       These are represented sequentially in memory (innermost frame first),
+       with the low bit of the packed debuginfo being 0 on the last entry. *)
+    let rec contents rs ds =
+      match ds with
+      | [] -> []
+      | d :: rest ->
+        let open Debuginfo in
+        let defname =
+          Scoped_location.string_of_scopes ~include_zero_alloc:false
+            d.dinfo_scopes
+        in
+        let char_end = d.dinfo_char_end + d.dinfo_start_bol - d.dinfo_end_bol in
+        let is_fully_packable =
+          d.dinfo_line <= 0xFFF
+          && d.dinfo_end_line - d.dinfo_line <= 0x7
+          && d.dinfo_char_start <= 0x3F && char_end <= 0x7F
+          && d.dinfo_end_bol - d.dinfo_start_bol <= 0x1FF
+        in
+        let info =
+          if is_fully_packable
+          then fully_pack_info rs d (not (Misc.Stdlib.List.is_empty rest))
+          else partially_pack_info rs d (not (Misc.Stdlib.List.is_empty rest))
+        in
+        let loc =
+          if is_fully_packable
+          then None
+          else
+            Some
+              ( Int.min 0xFFFF d.dinfo_char_start,
+                (* start_chr *)
+                Int.min 0xFFFF char_end,
+                (* end_chr *)
+                Int.min 0x3FFFFFFF d.dinfo_char_end )
+          (* end_offset *)
+        in
+        (label_defname d.dinfo_file defname loc, info) :: contents false rest
+    in
+    contents rs (dbg |> Debuginfo.Dbg.to_list |> List.rev)
+  in
   let module Label_table = Hashtbl.Make (struct
     type t = bool * Debuginfo.Dbg.t
 
@@ -422,45 +502,6 @@ let emit_frames ~debug_strings_section a =
        debuginfo word (name_and_loc_info only). *)
     Option.iter emit_loc loc
   in
-  let fully_pack_info fd_raise d has_next =
-    (* See format in caml_debuginfo_location in runtime/backtrace-nat.c *)
-    let open Debuginfo in
-    let kind = if fd_raise then 1 else 0
-    and has_next = if has_next then 1 else 0
-    and char_end = d.dinfo_char_end + d.dinfo_start_bol - d.dinfo_end_bol in
-    let char_end_offset = d.dinfo_end_bol - d.dinfo_start_bol in
-    Int64.(
-      add
-        (shift_left (of_int d.dinfo_line) 51)
-        (add
-           (shift_left (of_int (d.dinfo_end_line - d.dinfo_line)) 48)
-           (add
-              (shift_left (of_int d.dinfo_char_start) 42)
-              (add
-                 (shift_left (of_int char_end) 35)
-                 (add
-                    (shift_left (of_int char_end_offset) 26)
-                    (add (shift_left (of_int kind) 1) (of_int has_next)))))))
-  in
-  let partially_pack_info fd_raise d has_next =
-    (* Partially packed debuginfo: 1lllllllllmmmmmmmmddddddddddddkn 1 - d points
-       to a name_and_loc_info struct l (19 bits) - start line number m (18 bits)
-       - offset of end line number from start d (24 bits) - memory offset to
-       name_and_loc_info struct k (1 bit) - fd_raise flag n (1 bit) - has_next
-       flag *)
-    let open Debuginfo in
-    let start_line = Int.min 0x7FFFF d.dinfo_line
-    and end_line = Int.min 0x3FFFF (d.dinfo_end_line - d.dinfo_line)
-    and kind = if fd_raise then 1 else 0
-    and has_next = if has_next then 1 else 0 in
-    Int64.(
-      add (shift_left Int64.one 63)
-        (add
-           (shift_left (of_int start_line) 44)
-           (add
-              (shift_left (of_int end_line) 26)
-              (add (shift_left (of_int kind) 1) (of_int has_next)))))
-  in
   (* Chain suffixes already emitted in this unit, keyed by their emitted content
      (per element: name-struct label and packed info word); the value is a label
      on the suffix's first element. A chain whose tail matches an emitted suffix
@@ -470,46 +511,7 @@ let emit_frames ~debug_strings_section a =
   (* Matches [Debuginfo_jump_bias] in runtime/backtrace_nat.c. *)
   let debuginfo_jump_bias = 0x0300_0000l in
   let emit_debuginfo (rs, dbg) lbl =
-    let rdbg = dbg |> Debuginfo.Dbg.to_list |> List.rev in
-    (* Due to inlined functions, a single debuginfo may have multiple locations.
-       These are represented sequentially in memory (innermost frame first),
-       with the low bit of the packed debuginfo being 0 on the last entry. *)
-    let rec contents rs ds =
-      match ds with
-      | [] -> []
-      | d :: rest ->
-        let open Debuginfo in
-        let defname =
-          Scoped_location.string_of_scopes ~include_zero_alloc:false
-            d.dinfo_scopes
-        in
-        let char_end = d.dinfo_char_end + d.dinfo_start_bol - d.dinfo_end_bol in
-        let is_fully_packable =
-          d.dinfo_line <= 0xFFF
-          && d.dinfo_end_line - d.dinfo_line <= 0x7
-          && d.dinfo_char_start <= 0x3F && char_end <= 0x7F
-          && d.dinfo_end_bol - d.dinfo_start_bol <= 0x1FF
-        in
-        let info =
-          if is_fully_packable
-          then fully_pack_info rs d (not (Misc.Stdlib.List.is_empty rest))
-          else partially_pack_info rs d (not (Misc.Stdlib.List.is_empty rest))
-        in
-        let loc =
-          if is_fully_packable
-          then None
-          else
-            Some
-              ( Int.min 0xFFFF d.dinfo_char_start,
-                (* start_chr *)
-                Int.min 0xFFFF char_end,
-                (* end_chr *)
-                Int.min 0x3FFFFFFF d.dinfo_char_end )
-          (* end_offset *)
-        in
-        (label_defname d.dinfo_file defname loc, info) :: contents false rest
-    in
-    let elts = contents rs rdbg in
+    let elts = debuginfo_contents rs dbg in
     assert (not (Misc.Stdlib.List.is_empty elts));
     a.efa_align 4;
     a.efa_def_label lbl;
