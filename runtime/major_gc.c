@@ -2588,24 +2588,21 @@ void caml_major_collection_slice(intnat howmuch)
 {
   uintnat major_slice_epoch = atomic_load (&caml_major_slice_epoch);
 
-  /* if this is an auto-triggered GC slice, make it interruptible */
-  if (howmuch == AUTO_TRIGGERED_MAJOR_SLICE) {
-    major_collection_slice(
-        AUTO_TRIGGERED_MAJOR_SLICE,
-        0,
-        0,
-        Slice_interruptible,
-        Compaction_auto
-        );
-    if (caml_incoming_interrupts_queued()) {
-      CAML_GC_MESSAGE(SLICE, "Major slice interrupted, rescheduling major slice\n");
-      caml_request_major_slice(0);
-    }
-  } else {
+  collection_slice_mode mode =
+    /* if this is an auto-triggered GC slice, make it interruptible */
     /* TODO: could make forced API slices interruptible, but would need to do
        accounting or pass up interrupt */
-    major_collection_slice(howmuch, 0, 0, Slice_uninterruptible, Compaction_auto);
+    howmuch == AUTO_TRIGGERED_MAJOR_SLICE
+    ? Slice_interruptible
+    : Slice_uninterruptible;
+
+  major_collection_slice(howmuch, 0, 0, mode, Compaction_auto);
+
+  if (mode == Slice_interruptible && caml_incoming_interrupts_queued()) {
+    CAML_GC_MESSAGE(SLICE, "Major slice interrupted, rescheduling major slice\n");
+    caml_request_major_slice(0);
   }
+
   /* Record that this domain has completed a major slice for this minor cycle.
    */
   Caml_state->major_slice_epoch = major_slice_epoch;
