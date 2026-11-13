@@ -528,7 +528,7 @@ type jkind_mismatch =
 type law_mismatch =
   | Law_arity of { impl : int; intf : int }
   | Law_parameter_types of
-      { parameter : string option; error : Errortrace.equality_error }
+      { parameter : string option; error : Errortrace.moregen_error }
   | Law_assumption_count of { impl : int; intf : int }
   | Law_clauses of { impl : Spec.expression; intf : Spec.expression }
   | Law_module_path of { path : Path.t; name : string }
@@ -965,11 +965,11 @@ let report_law_mismatch env ~impl:decl_impl ~intf:decl_intf ppf err =
       pr "The first law has %d parameter%s, but the second has %d." impl
         (if impl = 1 then "" else "s") intf
   | Law_parameter_types { parameter = None; error } ->
-      Errortrace_report.equality ppf Type_scheme env error
-        (msg "The parameter types")
-        (msg "are not equal to the parameter types")
+      Errortrace_report.moregen ppf Type_scheme env error
+        (msg "The parameter types do not match: the type")
+        (msg "is not compatible with the type")
   | Law_parameter_types { parameter = Some x; error } ->
-      Errortrace_report.equality ppf Type_scheme env error
+      Errortrace_report.moregen ppf Type_scheme env error
         (Fmt.doc_printf "The parameter %a has type" Style.inline_code x)
         (msg "but it is expected to have type")
   | Law_assumption_count { impl; intf } ->
@@ -1988,19 +1988,23 @@ let law_arity (decl_impl : Types.law_declaration)
   if n_impl = n_intf then None
   else Some (Law_arity { impl = n_impl; intf = n_intf })
 
-let law_parameter_types env (decl_impl : Types.law_declaration)
+let law_parameter_types ~self_check env (decl_impl : Types.law_declaration)
       (decl_intf : Types.law_declaration) =
-  let equal = Ctype.equal env true in
+  let moregeneral tys_impl tys_intf =
+    (* Laws are not layout-polymorphic: no sort variables, no coercion. *)
+    ignore
+      (Ctype.moregeneral_list ~self_check env true [] [] tys_impl tys_intf)
+  in
   let types (decl : Types.law_declaration) = List.map snd decl.law_params in
-  match equal (types decl_impl) (types decl_intf) with
+  match moregeneral (types decl_impl) (types decl_intf) with
   | () -> None
-  | exception Ctype.Equality err_all ->
+  | exception Ctype.Moregen err_all ->
     let culprit =
       List.find_map
         (fun ((x, ty_impl), (_, ty_intf)) ->
-           match equal [ty_impl] [ty_intf] with
+           match moregeneral [ty_impl] [ty_intf] with
            | () -> None
-           | exception Ctype.Equality err -> Some (Some (Ident.name x), err))
+           | exception Ctype.Moregen err -> Some (Some (Ident.name x), err))
         (List.combine decl_impl.law_params decl_intf.law_params)
     in
     let parameter, error = Option.value culprit ~default:(None, err_all) in
@@ -2114,7 +2118,8 @@ let law_clauses env (decl_impl : Types.law_declaration)
     in
     first_mismatch (List.combine assumptions_impl assumptions_intf)
 
-let law_declarations ~loc env name (decl_impl : Types.law_declaration)
+let law_declarations ~self_check ~loc env name
+      (decl_impl : Types.law_declaration)
       (decl_intf : Types.law_declaration) =
   Builtin_attributes.check_alerts_inclusion
     ~def:decl_impl.law_loc
@@ -2124,7 +2129,8 @@ let law_declarations ~loc env name (decl_impl : Types.law_declaration)
     name;
   let[@inline always] if_none f = function None -> f () | Some x -> Some x in
   law_arity decl_impl decl_intf
-  |> if_none (fun () -> law_parameter_types env decl_impl decl_intf)
+  |> if_none (fun () ->
+       law_parameter_types ~self_check env decl_impl decl_intf)
   |> if_none (fun () -> law_clauses env decl_impl decl_intf)
 
 (* Inclusion between jkind declarations *)
