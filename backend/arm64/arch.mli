@@ -27,6 +27,7 @@ module Extension : sig
   type t =
     | CSSC
     | LRCPC2
+    | LSE
 
   val enabled : t -> bool
 
