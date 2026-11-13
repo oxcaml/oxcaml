@@ -126,7 +126,7 @@ let compute_label_offsets emitter ~all_sections =
       | File _ | Indirect_symbol _ | Loc _ | New_line | Private_extern _
       | Section _ | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _
       | Protected _ | Hidden _ | External _ | Reloc _ | Delta_uleb128 _
-      | Arch_extension _ ->
+      | Arch _ | Arch_extension _ ->
         ())
 
 (* Second pass: emit machine code and data *)

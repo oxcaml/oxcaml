@@ -2351,8 +2351,15 @@ let begin_assembly _unix =
       Buffer.add_string asm_line_buffer "\n";
       Emitaux.emit_buffer asm_line_buffer);
   D.file ~file_num:None ~file_name:"";
-  Arch.Extension.enabled_extensions ()
-  |> List.iter (fun ext -> D.arch_extension (Arch.Extension.assembler_name ext));
+  let arches, arch_extensions =
+    Arch.Extension.enabled_extensions ()
+    |> List.partition_map (fun ext ->
+        match Arch.Extension.assembler_directive ext with
+        | Arch arch -> Either.Left arch
+        | Arch_extension name -> Either.Right name)
+  in
+  List.iter D.arch arches;
+  List.iter D.arch_extension arch_extensions;
   (* PR#7037 *)
   let data_begin = Cmm_helpers.make_symbol "data_begin" in
   let data_begin_sym = S.create_global data_begin in

@@ -24,14 +24,23 @@ val is_asan_enabled : bool ref
     defaults to [Config.has_*] and can be toggled with [-f<name>] and
     [-fno-<name>]. *)
 module Extension : sig
-  type t = CSSC
+  type t =
+    | CSSC
+    | LRCPC2
 
   val enabled : t -> bool
 
   val enabled_extensions : unit -> t list
 
-  (** The name the assembler uses in [.arch_extension]. *)
-  val assembler_name : t -> string
+  (** How to make the assembler accept an extension's instructions. [Arch]
+      disables the extensions enabled before it, so it must come first. *)
+  module Assembler_directive : sig
+    type t =
+      | Arch of string
+      | Arch_extension of string
+  end
+
+  val assembler_directive : t -> Assembler_directive.t
 end
 
 val trap_notes : bool ref

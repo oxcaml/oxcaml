@@ -918,7 +918,7 @@ AC_ARG_WITH([arm64-extensions],
   [AS_HELP_STRING([--with-arm64-extensions=none|native|LIST],
     [arm64 extensions that compiled code uses by default: none (the
      default), those of the build machine, or a comma-separated list
-     (cssc)])],
+     (cssc, lrcpc2)])],
   [],
   [with_arm64_extensions=none])
 
@@ -3550,7 +3550,9 @@ int main(void) {
 # Optional arm64 extensions are off unless requested, since the build machine
 # need not match the machines the compiled code runs on.
 has_cssc=no
+has_lrcpc2=no
 AC_SUBST([has_cssc])
+AC_SUBST([has_lrcpc2])
 AS_CASE([$with_arm64_extensions],
   [none|no], [],
   [AS_IF([test x"$arch" != "xarm64"],
@@ -3569,11 +3571,26 @@ AS_CASE([$with_arm64_extensions],
            arm64_extensions="$arm64_extensions cssc"],
           [AC_MSG_RESULT([no])],
           [AC_MSG_ERROR([--with-arm64-extensions=native needs to run \
-programs on the build machine])])],
+programs on the build machine])])
+        AC_MSG_CHECKING([whether the build machine supports LRCPC2])
+        AC_RUN_IFELSE([AC_LANG_PROGRAM([], [[
+          long x[2] = {0, 2}, r;
+          __asm__ __volatile__(".arch armv8.4-a\n\tldapur %0, [%1, 8]"
+                               : "=r" (r) : "r" (x) : "memory");
+          return r != 2;
+        ]])],
+          [AC_MSG_RESULT([yes])
+           arm64_extensions="$arm64_extensions lrcpc2"],
+          [AC_MSG_RESULT([no])])],
      [arm64_extensions=`echo "$with_arm64_extensions" | tr ',' ' '`])
    for arm64_extension in $arm64_extensions; do
      AS_CASE([$arm64_extension],
-       [cssc], [has_cssc=yes],
+       [cssc],
+         [OCAML_AS_HAS_ARM64_EXTENSION([CSSC], [.arch_extension cssc],
+           [cnt x0, x1], [has_cssc=yes])],
+       [lrcpc2],
+         [OCAML_AS_HAS_ARM64_EXTENSION([LRCPC2], [.arch armv8.4-a],
+           [ldapur x0, @<:@x1, 8@:>@], [has_lrcpc2=yes])],
        [AC_MSG_ERROR([unknown arm64 extension: $arm64_extension])])
    done])
 

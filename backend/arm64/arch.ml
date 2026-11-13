@@ -26,23 +26,39 @@ let macosx = String.equal Config.system "macosx"
 let is_asan_enabled = ref false
 
 module Extension = struct
-  type t = CSSC
+  type t =
+    | CSSC
+    | LRCPC2
 
-  let all = [CSSC]
+  let all = [CSSC; LRCPC2]
 
   let name = function
     | CSSC -> "CSSC"
+    | LRCPC2 -> "LRCPC2"
 
   let description = function
     | CSSC -> "Common Short Sequence Compression"
+    | LRCPC2 -> "Load-Acquire RCpc, version 2"
 
-  let assembler_name = function
-    | CSSC -> "cssc"
+  module Assembler_directive = struct
+    type t =
+      | Arch of string
+      | Arch_extension of string
+  end
+
+  (* Only GNU as 2.42 and later accept [.arch_extension rcpc2], and LLVM has no
+     name for LRCPC2, but both accept armv8.4-a, which includes it. *)
+  let assembler_directive : t -> Assembler_directive.t = function
+    | CSSC -> Arch_extension "cssc"
+    | LRCPC2 -> Arch "armv8.4-a"
 
   let cssc = ref Config.has_cssc
 
+  let lrcpc2 = ref Config.has_lrcpc2
+
   let flag = function
     | CSSC -> cssc
+    | LRCPC2 -> lrcpc2
 
   let enabled t = !(flag t)
 
