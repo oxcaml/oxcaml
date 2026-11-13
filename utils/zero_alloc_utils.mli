@@ -1,12 +1,12 @@
 (** Components classifying the behavior of a region of code. *)
 module Component : sig
   type 'top t =
-    (** This region of code may be reached and may allocate. *)
     | Top of 'top
-    (** This region of code may be reached but will not allocate. *)
+      (** This region of code may be reached and may allocate. *)
     | Safe
-    (** This region of code will not be reached. *)
+      (** This region of code may be reached but will not allocate. *)
     | Bot
+      (** This region of code will not be reached. *)
 
   val map : f:('a -> 'b) -> 'a t -> 'b t
 
