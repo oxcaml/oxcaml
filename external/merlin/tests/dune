@@ -24,7 +24,6 @@
   %{bin:ocaml-index}
   %{bin:ocamlmerlin-server}
   %{bin:ocamlmerlin}
-  %{bin:dot-merlin-reader}
   %{bin:revert-newlines}
   (env_var MERLIN_TEST_OCAML_VERSION)))
 

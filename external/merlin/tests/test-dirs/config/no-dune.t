@@ -26,6 +26,4 @@
   > -filename main.ml <main.ml >output
 
   $ cat output | jq '.value.merlin.failures'
-  [
-    "Merlin could not find `dot-merlin-reader`. Please make sure that `dot-merlin-reader` is installed. `dot-merlin-reader` is expected to be in the same directory as the merlin executable or on the PATH. You may also specify the path to `dot-merlin-reader` via the `DOT_MERLIN_READER_EXE` environment variable."
-  ]
+  []

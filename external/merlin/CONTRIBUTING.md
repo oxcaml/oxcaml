@@ -93,11 +93,10 @@ Contains most of Merlin logic required to answer the queries.
 
 #### `/src/dot-protocol`
 The configuration protocol that configuration servers such as
-`dot-merlin-reader` or `dune ocaml-merlin` should implement.
+`dune ocaml-merlin` should implement.
 
-#### `/src/dot-merlin-reader`
-The historical configuration server of Merlin. It reads `.merlin` configuration
-files whose syntax is [documented in the
+#### `/src/kernel/dot_merlin_reader.ml`
+Reads `.merlin` configuration files whose syntax is [documented in the
 wiki](https://github.com/ocaml/merlin/wiki/Project-configuration).
 
 #### `/src/frontend/ocamlmerlin`
