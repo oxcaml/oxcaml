@@ -267,7 +267,7 @@ let event_after ~scopes exp lam =
   Translprim.event_after (of_location ~scopes exp.exp_loc) exp lam
 
 let event_function ~scopes exp lam =
-  if !Clflags.debug && not (Clflags.target_is_native ()) then
+  if !Clflags.debug && Clflags.target_is_bytecode () then
     let repr = Some (ref 0) in
     let (info, body) = lam repr in
     (info,
