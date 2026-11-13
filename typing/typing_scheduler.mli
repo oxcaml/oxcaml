@@ -15,7 +15,7 @@ module Monitor : sig
   type t
 
   (** The current monitor. Inside a job, it starts from the job's monitor.
-      Captured by {!Scheduler.add} and {!Ivar.upon}.
+      Captured by {!Typing_scheduler.add} and {!Typing_ivar.upon}.
 
       Safety: Only defined under a monitor {!root}. *)
   val current : unit -> t

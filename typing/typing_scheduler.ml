@@ -24,7 +24,7 @@ module Monitor = struct
       then disabled
       else
         Misc.fatal_error
-          "Scheduler.Monitor.current: current only defined under a root"
+          "Typing_scheduler.Monitor.current: current only defined under a root"
 
   let with_current t body =
     let saved = !current_ref in

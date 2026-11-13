@@ -116,8 +116,8 @@
   builtin_attributes
   global_module
   ident
-  scheduler
-  ivar
+  typing_scheduler
+  typing_ivar
   path
   unit_info
   current_unit
@@ -333,9 +333,9 @@
 
 (copy_files ../../typing/jkind_axis.ml)
 
-(copy_files ../../typing/scheduler.ml)
+(copy_files ../../typing/typing_scheduler.ml)
 
-(copy_files ../../typing/ivar.ml)
+(copy_files ../../typing/typing_ivar.ml)
 
 (copy_files ../../typing/jkind.ml)
 
@@ -554,9 +554,9 @@
 
 (copy_files ../../utils/defined_later.mli)
 
-(copy_files ../../typing/scheduler.mli)
+(copy_files ../../typing/typing_scheduler.mli)
 
-(copy_files ../../typing/ivar.mli)
+(copy_files ../../typing/typing_ivar.mli)
 
 (copy_files ../../typing/oprint.mli)
 
@@ -776,8 +776,8 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Location.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Language_extension.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Global_module.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scheduler.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ivar.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_scheduler.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_ivar.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ident.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Longident.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Compilation_unit.cmo
@@ -922,8 +922,8 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Terminfo.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Location.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Language_extension.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scheduler.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ivar.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_scheduler.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_ivar.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Global_module.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ident.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Longident.cmx

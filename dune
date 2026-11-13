@@ -249,8 +249,8 @@
   ;; ocamlcommon with the rest of utils/) because it depends on typing/
   profile_counters_functions
   ;; TYPING
-  scheduler
-  ivar
+  typing_scheduler
+  typing_ivar
   path
   current_unit
   jkind
