@@ -1816,10 +1816,7 @@ module Placeholder = struct
     }
 
   let create type_var =
-    { type_var;
-      ldd_var = Ldd.new_var ();
-      resolved = Ivar.create ~in_global_pool:false ()
-    }
+    { type_var; ldd_var = Ldd.new_var (); resolved = Ivar.create () }
 
   let upon_resolved t ~run =
     Ivar.upon t.resolved ~scheduler:(scheduler ()) ~run ~cancel:(fun () ->

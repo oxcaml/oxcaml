@@ -121,19 +121,28 @@ let lowest_level = Ident.lowest_scope
    [Ctype.with_local_level_gen] shall call [with_new_pool] to create
    a new pool at a given level. On return it shall process all nodes
    that were added to the pool.
-   Remark: the only function adding to a pool is [add_to_pool], and
-   the only function returning the contents of a pool is [with_new_pool],
-   so that the initial pool can be added to, but never read from. *)
+   Remark: the only function adding nodes to a pool is [add_to_pool],
+   and the only functions reading them are [with_new_pool] and
+   [iter_pool], so that the initial pool's nodes can be added to, but
+   never read from.
+   A pool also holds the ivars waited on at its level, added by
+   [add_to_ivar_pool]. They are read with [take_ivar_pool] while the pool
+   is open (including the initial pool, at the toplevel), or returned by
+   [with_new_pool]. *)
 
 type pool =
-  { level: int;
-    mutable pool: transient_expr list;
+  { level : int;
+    mutable pool : transient_expr list;
     mutable sort_pool: Jkind_types.Sort.t list;
-    next: pool}
+    mutable ivars : type_shape Ivar.t list;
+    next : pool
+  }
+
 (* To avoid an indirection we choose to add a dummy level at the end of
    the list. It will never be accessed, as [pool_of_level] is always called
    with [level >= 0]. *)
-let rec dummy = {level = max_int; pool = []; sort_pool = []; next = dummy}
+let rec dummy =
+  { level = max_int; pool = []; sort_pool = []; ivars = []; next = dummy }
 let pool_stack = s_table (fun () -> { dummy with level = 0 }) ()
 
 (* Lookup in the stack is linear, but the depth is the number of nested
@@ -151,11 +160,13 @@ let rec pool_of_level level pool =
 
 (* Create a new pool at given level, and use it locally. *)
 let with_new_pool ~level f =
-  let pool = {level; pool = []; sort_pool = []; next = !pool_stack} in
+  let pool =
+    { level; pool = []; sort_pool = []; ivars = []; next = !pool_stack }
+  in
   let r =
     Misc.protect_refs [ R(pool_stack, pool) ] f
   in
-  (r, pool.pool, pool.sort_pool)
+  (r, pool.pool, pool.sort_pool, pool.ivars)
 
 let add_to_pool ~level ty =
   if level >= generic_level || level <= lowest_level then () else
@@ -169,6 +180,24 @@ let add_to_sort_pool ~level v =
 
 let () =
   Jkind_types.Sort.set_add_to_pool add_to_sort_pool
+
+let add_to_ivar_pool ~level ivar =
+  if Ivar.has_handlers ivar
+  then
+    let pool = pool_of_level level !pool_stack in
+    pool.ivars <- ivar :: pool.ivars
+
+let in_generalization_scope () = !pool_stack.next != dummy
+
+let take_ivar_pool ~level =
+  let pool = pool_of_level level !pool_stack in
+  let ivars = pool.ivars in
+  pool.ivars <- [];
+  ivars
+
+let iter_pool ~level f =
+  let pool = pool_of_level level !pool_stack in
+  List.iter f pool.pool
 
 (**** Some type creators ****)
 
