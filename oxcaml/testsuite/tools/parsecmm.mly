@@ -189,6 +189,7 @@ fundecl:
            else [ Reduce_code_size ];
          fun_poll = Lambda.Default_poll;
          fun_dbg = debuginfo ();
+         fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
          (* CR yusumez: Adding return types to the parser might require a lot
             of changes, so we assume this for now. *)
          fun_ret_type = Cmm.typ_val } }
@@ -239,7 +240,8 @@ expr:
                         result_type = $6;
                         region = Lambda.Rc_normal;
                         callees = None;
-                        returns = true
+                        returns = true;
+                        callsite_counter = None
                       },
                       $4 :: List.rev $5, debuginfo ?loc:$3 ()) }
   | LPAREN EXTCALL STRING exprlist machtype RPAREN
