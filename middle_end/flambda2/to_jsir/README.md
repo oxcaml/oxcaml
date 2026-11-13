@@ -51,9 +51,9 @@ With `-g`, the JSIR of a unit carries the debug information that `js_of_ocaml` o
 - the names of the variables and functions of the source, which JSIR files record as `var_names` in [`Code.jsir_file`](../../../external/js_of_ocaml/compiler/lib/code.mli), and which the JSIR linker keeps.
 
 The debug location of code inlined by Flambda 2 is the one it had in the function it comes from.
-With `-jsir-inlined-frames`, we additionally record the call sites that the function was inlined through as a single string.
+With `-jsir-inlined-frames`, we additionally record the call sites that the function was inlined through, as a single string.
 For example, we might record `list.ml<-foo.ml:12:4<-bar.ml:40:2` for code of `list.ml` inlined at line 12, column 4 of `foo.ml`, itself inlined at line 40 of `bar.ml`.
-This is a specific convention to JSIR, and as such normal debuggers will not be able to find such source files.
+This is a convention specific to JSIR, and as such normal debuggers will not be able to find such source files.
 
 `-g` does not change the `js_of_ocaml` commands: what `js_of_ocaml` does with this information is chosen with `-jsoo-opt`, for example `--source-map`, `--pretty`, or `--debuginfo` (which puts the locations in comments in the generated JavaScript).
 
