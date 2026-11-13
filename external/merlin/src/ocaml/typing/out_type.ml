@@ -1070,83 +1070,56 @@ end = struct
 
 end
 
-(** A mode as seen by printing: either a determined constant, or a
-    generic comonadic mode. Along an arrow chain, the accumulated curry
-    mode is a constant until a generic mode variable is encountered.
-
-    A generic accumulator is the currying fold evaluated twice: the
-    argument modes themselves ([Ctype.curry_mode]), and their constant upper
-    bounds ([Ctype.curry_mode_const]). *)
-type const_or_generic =
-  | Const of With_locality.Const.t
-  | Generic of With_locality.Comonadic.l * With_locality.Const.t
-
-(** The upper bound of a const_or_generic: exact for [Const],
-    the constant upper bound for [Generic] *)
-let const_or_generic_upper :
-    const_or_generic ->
-    With_locality.Const.t = function
-  | Const c -> c
-  | Generic (_, bound) -> bound
-
 (** Extends the curry accumulator with the argument mode [marg] of an
     arrow. *)
-let curry_acc : const_or_generic -> With_locality.lr -> const_or_generic =
-  fun acc marg ->
-    match acc, With_locality.zap_to_legacy ~arg:true marg with
-    | Const acc, Some arg -> Const (Ctype.curry_mode_const acc arg)
-    | Generic (acc, bound), _ ->
-      Generic
-        (Ctype.curry_mode acc marg,
-         Ctype.curry_mode_const bound (With_locality.Guts.get_ceil marg))
-    | Const acc, None ->
+let curry_acc :
+    ?instance:With_locality.lr ->
+    Curry_mode.t ->
+    With_locality.lr ->
+    Curry_mode.t =
+  fun ?instance acc marg ->
+    match With_locality.zap_to_legacy ~arg:true marg with
+    | Some arg -> Curry_mode.add_const_arg acc arg
+    | None ->
       if mode_polymorphism_printing_enabled ()
       then
-        Generic
-          (Ctype.curry_mode
-             (With_locality.Comonadic.of_const
-                (With_locality.Const.partial_apply acc))
-             marg,
-           Ctype.curry_mode_const acc (With_locality.Guts.get_ceil marg))
+        let marg = Option.value instance ~default:marg in
+        Curry_mode.add_arg acc marg
+          ~upper_areality:(With_locality.Guts.get_ceil marg).areality
       else
-        Const
-          (Ctype.curry_mode_const acc
-             (With_locality.zap_to_legacy_force ~arg:true marg))
+        Curry_mode.add_const_arg acc
+          (With_locality.zap_to_legacy_force ~arg:true marg)
 
 (** The view of a mode occurrence [m]; zaps [m] when it has to be a
     constant. *)
-let const_or_generic_of_mode :
+let curry_mode_of_occurrence :
+    ?instance:With_locality.lr ->
     arg:bool ->
     With_locality.lr ->
-    const_or_generic =
-  fun ~arg m ->
+    Curry_mode.t =
+  fun ?instance ~arg m ->
     match With_locality.zap_to_legacy ~arg m with
     | Some c -> Const c
     | None ->
       if mode_polymorphism_printing_enabled ()
       then
-        Generic
-          (With_locality.Comonadic.disallow_right m.comonadic,
-           With_locality.Guts.get_ceil m)
+        let m = Option.value instance ~default:m in
+        Variable
+          { comonadic = With_locality.Comonadic.disallow_right m.comonadic;
+            areality = (With_locality.Guts.get_ceil m).areality }
       else Const (With_locality.zap_to_legacy_force ~arg m)
 
-(** Whether the return mode [m] of an arrow agrees with the constant
-    content of [acc_mode]. Mutating when [m] must be zapped: [m] is equated
-    with the constant (a [Generic] contains generic variables and cannot
-    be equated with directly); otherwise a pure bounds check.
-
-    [equate_with_const] additionally checks [m]'s edges. *)
-let equate_with_curry_bounds : With_locality.lr -> const_or_generic -> bool =
+(** Whether the return mode [m] of an arrow is the constant curry mode
+    implied by [acc_mode]. Mutating: [m] is equated with the constant. *)
+let equate_with_const_curry : With_locality.lr -> Curry_mode.t -> bool =
   fun m acc_mode ->
-    if not (With_locality.check_generic m)
-       || not (mode_polymorphism_printing_enabled ())
-    then
-      Result.is_ok
-        (With_locality.equate
-           m
-           (With_locality.of_const (const_or_generic_upper acc_mode)))
-    else
-      With_locality.Guts.in_bounds (const_or_generic_upper acc_mode) m
+    match acc_mode with
+    | Const c ->
+      Result.is_ok (With_locality.equate m (With_locality.of_const c))
+    | Variable _ -> false
+
+let is_generic_curry_mode m =
+  mode_polymorphism_printing_enabled () && With_locality.check_generic m
 
 module Variable_names : sig
   val reset_names : unit -> unit
@@ -1159,18 +1132,16 @@ module Variable_names : sig
   val name_of_type : (unit -> string) -> transient_expr -> string
   val name_of_modes : With_locality.lr -> string
 
-  (** Whether the edges on the curry mode [m] are exactly the
-      [past]/[close] edges from [acc], i.e. implied by the currying
-      interpretation. [bounds_implied] says whether the constant bounds of
-      [m] are implied as well ([equate_with_curry_bounds]); the edges into
-      [m] are suppressed (not printed by the other modes) only when both
-      hold, since [m] is then elided. Must be called after [reserve]. *)
-  val curry_edges_implied :
-    bounds_implied:bool -> acc:const_or_generic -> With_locality.lr -> bool
+  (** Whether the return mode [m] of an arrow can be elided: the arrow is
+      then printed without parens and [m] is not printed. Mutates [m] when
+      it must be zapped (see [equate_with_const_curry]). Must be called
+      after [reserve], which decides the elisions. *)
+  val is_implied_curry_mode : With_locality.lr -> Curry_mode.t -> bool
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
   val reserve: type_expr -> unit
+  val reserve_with_base: base:With_locality.Const.t -> type_expr -> unit
 
   val remove_names : transient_expr list -> unit
 
@@ -1196,6 +1167,7 @@ end = struct
   let name_counter = ref 0
   let named_vars = ref ([] : string list)
   let visited_for_named_vars = ref ([] : transient_expr list)
+
   let visited_for_named_modevars = ref ([] : transient_expr list)
 
   module Desc = With_locality.Desc
@@ -1428,6 +1400,8 @@ end = struct
     Desc.equal With_locality.obj_monadic mon0 mon1
     && Desc.equal With_locality.obj_comonadic com0 com1
 
+  let mem_pair pair pairs = List.exists (eq_pair pair) pairs
+
   (* The following preprocessing step registers all the
     modes pointed to by a type. Recall that a [With_locality.lr]
     has two parts: { monadic; comonadic }. We need to
@@ -1458,7 +1432,7 @@ end = struct
         let ({ monadic; comonadic } as pair) = pair_of_mode mode in
         add_visible With_locality.obj_monadic monadic;
         add_visible With_locality.obj_comonadic comonadic;
-        if not (List.exists (eq_pair pair) !visible_pairs) then
+        if not (mem_pair pair !visible_pairs) then
           visible_pairs := pair :: !visible_pairs
       end
 
@@ -2028,11 +2002,6 @@ end = struct
   type 'a interval = { lo: 'a; hi: 'a }
   let construct_raw_bounds { monadic; comonadic } :
       string interval =
-    let bound_diff bound trivial =
-      Mode.Const.erase_implications bound
-      |> With_locality.Const.Option.value ~default:trivial
-      |> fun bound -> With_locality.Const.diff bound trivial
-    in
     let mupper = dupper_lr With_locality.obj_monadic monadic in
     let mlower = dlower_lr With_locality.obj_monadic monadic in
     let cupper = dupper_lr With_locality.obj_comonadic comonadic in
@@ -2045,8 +2014,8 @@ end = struct
       With_locality.Const.merge
         { monadic = mlower; comonadic = cupper }
     in
-    let lower = bound_diff lower With_locality.Const.min in
-    let upper = bound_diff upper With_locality.Const.max in
+    let lower = With_locality.Const.diff lower With_locality.Const.min in
+    let upper = With_locality.Const.diff upper With_locality.Const.max in
     { lo = Fmt.asprintf "%a"
              With_locality.Const.Option.partial_print lower;
       hi = Fmt.asprintf "%a"
@@ -2091,9 +2060,11 @@ end = struct
 
   type boxedhead = H : 'a Desc.Var.Head.t -> boxedhead
 
-  (* Comonadic heads of elided curry modes; edges into them must not be
-     printed. *)
+  (* Comonadic heads of elided curry modes; edges to and from them are
+     not printed. *)
   let suppressed_curry_heads = ref ([] : boxedhead list)
+  let suppressed_curries = ref ([] : With_locality.lr list)
+  let rejected_curries = ref ([] : With_locality.lr list)
 
   let heads_of_mode (m : With_locality.lr) =
     match With_locality.get_comonadic_desc m.comonadic with
@@ -2110,6 +2081,8 @@ end = struct
     name_counter := 0;
     named_vars := [];
     visited_for_named_vars := [];
+    suppressed_curries := [];
+    rejected_curries := [];
     visited_for_named_modevars := [];
     visible_pairs := [];
     modenames := [];
@@ -2120,7 +2093,6 @@ end = struct
     modename_counter := 0
 
   let add_visible_edges () =
-    suppressed_curry_heads := [];
     edge_table :=
       List.map (fun pair ->
         let lower = construct_edges_to pair in
@@ -2135,55 +2107,204 @@ end = struct
     | Some (_, edges) -> edges
     | None -> { lower = []; upper = [] }
 
-  (* The variable heads of the curry accumulator. *)
-  let acc_heads (acc : const_or_generic) : boxedhead list =
-    match acc with
-    | Const _ -> []
-    | Generic (acc, _) ->
-      let head (Desc.Amorphvar (v, _)) = H v in
-      (match With_locality.get_comonadic_desc acc with
-       | Amode _ -> []
-       | Amodevar mv -> [head mv]
-       | Amodejoin (_, mvs) -> List.map head mvs)
+  let is_implied_curry_mode : With_locality.lr -> Curry_mode.t -> bool =
+    fun m acc_mode ->
+      if is_generic_curry_mode m then List.memq m !suppressed_curries
+      else equate_with_const_curry m acc_mode
 
-  (* See the signature for the specification. *)
-  let curry_edges_implied ~bounds_implied ~(acc : const_or_generic)
-      (m : With_locality.lr) =
-    let pair = pair_of_mode m in
-    let implied =
-      bounds_implied
-      &&
-      let { lower; upper } = find_edges pair in
-      let acc_heads = acc_heads acc in
-      let from_acc = function
-        | Simple_name { src; _ } -> mem_head acc_heads src
-        | Comonadic_name { src; _ } -> mem_head acc_heads src
+  type instance_mapping =
+    { mode : With_locality.lr;
+      instance : With_locality.lr }
+
+  let has_pair pair { mode; _ } = eq_pair pair (pair_of_mode mode)
+
+  let instantiate_modes ~level ty : instance_mapping list =
+    Mode.with_copy_scope (fun copy_scope ->
+      let instances = ref [] in
+      let visited = ref TypeSet.empty in
+      let instantiate_mode mode =
+        if not (List.exists (has_pair (pair_of_mode mode)) !instances)
+        then begin
+          let instance =
+            With_locality.instantiate ~copy_scope ~current_level:level mode
+          in
+          instances := { mode; instance } :: !instances
+        end
       in
-      (* no edges from [m]... *)
-      List.is_empty upper
-      (* ...and every edge into [m] is a [past]/[close] edge from [acc] *)
-      && List.for_all
-           (function
-             | Lower_simple _ -> false
-             | Lower_comonadic { c_name; _ } -> from_acc c_name
-             | Lower_closing_over_to { cls_edge = { name; _ }; _ } ->
-               from_acc name)
-           lower
+      let rec visit ty =
+        if not (TypeSet.mem ty !visited) then begin
+          visited := TypeSet.add ty !visited;
+          Btype.iter_type_expr visit instantiate_mode ty
+        end
+      in
+      visit ty;
+      !instances)
+
+  let find_mode_instance m instances =
+    let pair = pair_of_mode m in
+    let { instance; _ } = List.find (has_pair pair) instances in
+    instance
+
+  let equate_instances m ~instances_generic ~instances_rigid =
+    let res =
+      With_locality.equate
+        (find_mode_instance m instances_generic)
+        (find_mode_instance m instances_rigid)
     in
-    if implied then
-      suppressed_curry_heads := heads_of_mode m @ !suppressed_curry_heads;
+    assert (Result.is_ok res)
+
+  (** We only consider a curry mode implicit if it has no upper bounds.
+      This check catches modes with a variable upper bound, such as
+      bounds to other curry modes. *)
+  let has_upper_edges m =
+    not (List.is_empty (find_edges (pair_of_mode m)).upper)
+
+  (** Equates every mode of the generic instance that is not a curry mode
+      candidate with its rigid counterpart, so that both instances match
+      everywhere except at the curry modes. *)
+  let equate_non_curry_modes ~instances_generic ~instances_rigid ty =
+    let visited = ref [] in
+    let rec visit ty =
+      let px = proxy ty in
+      if not (List.memq px !visited) then begin
+        visited := px :: !visited;
+        begin match get_desc ty with
+        | Tarrow ((_, marg, mret), _, ty2, _) ->
+          equate_instances marg ~instances_generic ~instances_rigid;
+          begin match get_desc ty2 with
+          | Tarrow _
+            when is_generic_curry_mode mret && not (has_upper_edges mret) -> ()
+          | _ -> equate_instances mret ~instances_generic ~instances_rigid
+          end
+        | _ -> ()
+        end;
+        printer_iter_type_expr visit (Fun.const ()) ty
+      end
+    in
+    visit ty
+
+  (** Registers a curry mode, and returns [true] if the curry mode can be
+      hidden. *)
+  let register_curry_mode ~m_generic m ~acc_mode_rigid =
+    let curry_rigid =
+      Curry_mode.mode ~level:With_locality.rigid_level acc_mode_rigid
+    in
+    let implied =
+      (not (has_upper_edges m))
+      && (not (List.memq m !rejected_curries))
+      && Result.is_ok (With_locality.equate m_generic curry_rigid)
+    in
+    if implied then suppressed_curries := m :: !suppressed_curries
+    else begin
+      rejected_curries := m :: !rejected_curries;
+      suppressed_curries :=
+        List.filter (fun m' -> m' != m) !suppressed_curries
+    end;
+    suppressed_curry_heads :=
+      List.concat_map heads_of_mode !suppressed_curries;
     implied
+
+  let rec register_suppressed_curries ~instances_generic ~instances_rigid
+      ~visited (~acc_mode, ~acc_mode_rigid) ty =
+    let px = proxy ty in
+    if not (List.memq px visited) then begin
+      let visited = px :: visited in
+      let register =
+        register_suppressed_curries ~instances_generic ~instances_rigid ~visited
+      in
+      let acc_of_occurrence ~arg m =
+        ( ~acc_mode:(curry_mode_of_occurrence ~arg m),
+          ~acc_mode_rigid:
+            (curry_mode_of_occurrence ~arg m
+               ~instance:(find_mode_instance m instances_rigid)) )
+      in
+      match get_desc ty with
+      | Tarrow ((l, marg, mret), ty1, ty2, _) ->
+        let arg_acc = acc_of_occurrence ~arg:true marg in
+        if is_optional l then begin
+          match
+            get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
+          with
+          | Tconstr (path, [ty], _) when Path.same path Predef.path_option ->
+            register arg_acc ty
+          | _ -> ()
+        end
+        else register arg_acc ty1;
+        let acc_mode = curry_acc acc_mode marg in
+        let acc_mode_rigid =
+          curry_acc acc_mode_rigid marg
+            ~instance:(find_mode_instance marg instances_rigid)
+        in
+        let hidden =
+          match get_desc ty2 with
+          | Tarrow _ when is_generic_curry_mode mret ->
+            register_curry_mode mret
+              ~m_generic:(find_mode_instance mret instances_generic)
+              ~acc_mode_rigid
+          | Tarrow _ -> equate_with_const_curry mret acc_mode
+          | _ -> false
+        in
+        let acc_modes =
+          if hidden then (~acc_mode, ~acc_mode_rigid)
+          else acc_of_occurrence ~arg:false mret
+        in
+        register acc_modes ty2
+      | Tpoly (ty, _) | Trepr (ty, _) | Tmod (ty, _) | Tquote ty | Tsplice ty ->
+        register (~acc_mode, ~acc_mode_rigid) ty
+      | _ ->
+        let acc = Curry_mode.Const With_locality.Const.legacy in
+        printer_iter_type_expr
+          (register (~acc_mode:acc, ~acc_mode_rigid:acc))
+          (Fun.const ()) ty
+    end
+
+  (** Decides which curry modes of [ty] are hidden. This must happen before
+      printing and after the edges are computed.
+
+      We only want to print the curry mode when it happens to be more specific
+      than the curry mode implied by preceding arguments; we check this using
+      the same ideas behind subsumption. *)
+  let suppress_curry_modes ~base ty =
+    (* Instantiate each mode at [generic_level]. *)
+    let instances_generic =
+      instantiate_modes ~level:With_locality.generic_level ty
+    in
+    (* Instantiate each mode at [rigid_level]: this is used to construct a
+       rigid implied curry mode. *)
+    let instances_rigid =
+      instantiate_modes ~level:With_locality.rigid_level ty
+    in
+    (* Link each non-curry mode (e.g. argument modes) between the two
+       instances. *)
+    equate_non_curry_modes ~instances_generic ~instances_rigid ty;
+    let acc = Curry_mode.Const base in
+    (* [register_suppressed_curries] walks [ty] as the printer does, threading
+       the curry accumulator along with its rigid instance. A generic curry
+       mode is hidden when the type with the curry mode replaced by the one
+       implied by the accumulator is as general. *)
+    register_suppressed_curries ~instances_generic ~instances_rigid
+      ~visited:[] (~acc_mode:acc, ~acc_mode_rigid:acc) ty
 
   let print_raw_constraints { lo; hi } ppf pair =
     let { lower = edges_lower; upper = edges_upper } = find_edges pair in
+    let not_suppressed h = not (mem_head !suppressed_curry_heads h) in
     let edges_upper =
       List.filter
         (function
           | Upper_comonadic { c_name = Comonadic_name { target; _ }; _ } ->
-            not (mem_head !suppressed_curry_heads target)
+            not_suppressed target
           | Upper_comonadic { c_name = Simple_name _; _ }
           | Upper_simple _ -> true)
         edges_upper
+    in
+    let edges_lower =
+      List.filter
+        (function
+          | Lower_comonadic { c_name = Comonadic_name { src; _ }; _ } ->
+            not_suppressed src
+          | Lower_comonadic { c_name = Simple_name _; _ }
+          | Lower_simple _ | Lower_closing_over_to _ -> true)
+        edges_lower
     in
     if List.is_empty edges_lower && List.is_empty edges_upper
        && lo = "" && hi = ""
@@ -2233,7 +2354,7 @@ end = struct
 
   let name_of_modes (modes : With_locality.lr) =
     let pair = pair_of_mode modes in
-    if not (List.exists (eq_pair pair) !visible_pairs) then
+    if not (mem_pair pair !visible_pairs) then
       fatal_error "Out_type.name_of_modes: modes not registered by reserve";
     if List.exists (fun (H v) -> mem_head !suppressed_curry_heads v)
          (heads_of_mode modes)
@@ -2334,28 +2455,18 @@ end = struct
     named_weak_vars := s;
     weak_var_map := m
 
-  let reserve ty =
+  let reserve_with_base ~base ty =
     normalize_type ty;
     add_named_vars ty;
     if mode_polymorphism_printing_enabled () then begin
       register_visible_modes ty;
       add_visible_paths ();
-      add_visible_edges ()
+      add_visible_edges ();
+      suppress_curry_modes ~base ty
     end
-end
 
-(** Whether the return mode [m] of an arrow can be elided: the arrow is
-    then printed without parens and [m] is not printed. Mutates [m] when it
-    must be zapped (see [equate_with_curry_bounds]). *)
-let equate_with_const : With_locality.lr -> const_or_generic -> bool =
-  fun m acc_mode ->
-    if not (With_locality.check_generic m)
-       || not (mode_polymorphism_printing_enabled ())
-    then equate_with_curry_bounds m acc_mode
-    else
-      Variable_names.curry_edges_implied
-        ~bounds_implied:(equate_with_curry_bounds m acc_mode)
-        ~acc:acc_mode m
+  let reserve ty = reserve_with_base ~base:With_locality.Const.legacy ty
+end
 
 module Aliases = struct
   let visited_objects = ref ([] : transient_expr list)
@@ -2477,9 +2588,11 @@ module Aliases = struct
 
 end
 
-let prepare_type ty =
-  Variable_names.reserve ty;
+let prepare_type_with_base base ty =
+  Variable_names.reserve_with_base ~base ty;
   Aliases.mark_loops ty
+
+let prepare_type ty = prepare_type_with_base With_locality.Const.legacy ty
 
 
 let reset_except_conflicts () =
@@ -2489,9 +2602,12 @@ let reset () =
   Ident_conflicts.reset ();
   reset_except_conflicts ()
 
-let prepare_for_printing tyl =
+let prepare_for_printing_with_base ~base tyl =
   reset_except_conflicts ();
-  List.iter prepare_type tyl
+  List.iter (prepare_type_with_base base) tyl
+
+let prepare_for_printing tyl =
+  prepare_for_printing_with_base ~base:With_locality.Const.legacy tyl
 
 let add_type_to_preparation = prepare_type
 
@@ -2606,10 +2722,10 @@ let tree_of_modes_const (modes : Mode.With_locality.Const.t) =
            (Fmt.asprintf "%a" (Mode.With_locality.Const.print_axis ax)))
     Mode.With_locality.Axis.all
 
-let tree_of_modes : With_locality.lr -> const_or_generic -> string list =
+let tree_of_modes : With_locality.lr -> Curry_mode.t -> string list =
   fun modes acc ->
     match acc with
-    | Generic _ ->
+    | Variable _ ->
       [ (Fmt.asprintf "%s"
             (Variable_names.name_of_modes modes))]
     | Const c -> tree_of_modes_const c
@@ -2618,7 +2734,7 @@ let tree_of_modes : With_locality.lr -> const_or_generic -> string list =
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
 type modal =
   | Arrow_return of
-    { acc : const_or_generic;
+    { acc : Curry_mode.t;
       mode : Mode.With_locality.lr; }
     (** This is the RHS (say [r]) of an arrow type, where [mode] is the real
         mode of [r]. and:
@@ -2636,7 +2752,7 @@ type modal =
     If [r] is [Tpoly (Tarrow_, [])], it will be treated as NOT an arrow type.
     This gives tedious (but still correct) printing. *)
 
-  | Other of const_or_generic
+  | Other of Curry_mode.t
     (** In other cases, the caller has already printed the modes (as the
         constructor argument) on the type. *)
 
@@ -2655,7 +2771,7 @@ let rec tree_of_modal_typexp mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
-        let acc = const_or_generic_of_mode ~arg:false mode in
+        let acc = curry_mode_of_occurrence ~arg:false mode in
         Otyp_ret (Orm_any (tree_of_modes mode acc), tree)
     | Other _ -> tree
   in
@@ -2685,7 +2801,7 @@ let rec tree_of_modal_typexp mode modal ty =
            don't print anything for those axes, since user would interpret that
            as legacy. The best we can do is to zap to legacy and if they do land
            at legacy, we will be able to omit printing them. *)
-        let arg_acc = const_or_generic_of_mode ~arg:true marg in
+        let arg_acc = curry_mode_of_occurrence ~arg:true marg in
         let t1 =
           if is_optional l then
             match
@@ -2875,7 +2991,7 @@ let rec tree_of_modal_typexp mode modal ty =
     let tree =
       Otyp_alias
         {non_gen;
-         aliased = pr_typ (Const Mode.With_locality.Const.legacy);
+         aliased = pr_typ (Curry_mode.Const With_locality.Const.legacy);
          alias}
     in
     not_arrow tree end
@@ -2891,7 +3007,7 @@ and tree_of_acc_typexp mode acc_mode ty =
   tree_of_modal_typexp mode (Other acc_mode) ty
 
 and tree_of_typexp mode mode_with_locality ty =
-  tree_of_acc_typexp mode (Const mode_with_locality) ty
+  tree_of_acc_typexp mode (Curry_mode.Const mode_with_locality) ty
 
 and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
@@ -2967,22 +3083,22 @@ and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
 
 (** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
-and tree_of_ret_typ_mutating (acc_mode : const_or_generic) m ty=
+and tree_of_ret_typ_mutating (acc_mode : Curry_mode.t) m ty=
   match get_desc ty with
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
-      if equate_with_const m acc_mode then begin
+      if Variable_names.is_implied_curry_mode m acc_mode then begin
         (Orm_no_parens, acc_mode)
       end else begin
         (* In this branch we need to print parens. [m] might have undetermined
         axes and we adopt a similar logic to the [marg] above. *)
-        let acc_mode = const_or_generic_of_mode ~arg:false m in
+        let acc_mode = curry_mode_of_occurrence ~arg:false m in
         (Orm_parens (tree_of_modes m acc_mode), acc_mode)
       end
     end
   | _ ->
-    let acc_mode = const_or_generic_of_mode ~arg:false m in
+    let acc_mode = curry_mode_of_occurrence ~arg:false m in
     (Orm_any (tree_of_modes m acc_mode), acc_mode)
 
 and tree_of_typobject_repr fi =
@@ -3617,7 +3733,7 @@ let tree_of_value_description id decl =
     Mode.Modality.Const.apply_const moda Mode.With_regionality.Const.legacy
     |> Mode.Const.value_to_alloc_r2l
   in
-  let () = prepare_for_printing [decl.val_type] in
+  let () = prepare_for_printing_with_base ~base [decl.val_type] in
   let ty = tree_of_typexp ~base Type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
@@ -4004,7 +4120,8 @@ let rec tree_of_modtype ?abbrev = function
       Omty_ident (tree_of_path (Some Module_type) p)
   | Mty_signature sg ->
       Omty_signature (tree_of_signature ?abbrev sg)
-  | Mty_functor(param, ty_res, m_res) ->
+  | Mty_functor(param, ty_res, m_res, _st) ->
+    (* [_st]aticity is printed as part of mode annotations on [param] *)
       wrap_mutation (fun () ->
       let param, env =
         tree_of_functor_parameter ?abbrev param
