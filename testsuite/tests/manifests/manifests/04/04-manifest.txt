@@ -1,2 +1,4 @@
-file_x qux.cmi 04/qux
+file qux.cmi 04/qux x
+file qux.cmx 04/qux_cmx
 file quux.cmi 04/quux
+file unusual.cmx 04/unusual_cmx x

@@ -203,7 +203,7 @@ end = struct
     | [ "file"; basename; location ] ->
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.File { basename; location; cmx_guaranteed = false })
-    | [ "file_x"; basename; location ] ->
+    | [ "file"; basename; location; "x" ] ->
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.File { basename; location; cmx_guaranteed = true })
     | [ "manifest"; _; location ] ->

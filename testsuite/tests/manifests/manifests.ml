@@ -105,7 +105,7 @@ bar.cmi -> $PWD/manifests/01/bar (visible)
 baz.cmi -> $PWD/manifests/04-baz (hidden)
 |}]
 
-(* Test file_x entries in manifests: qux.cmi is cmx_guaranteed,
+(* Test 'x' entries in manifests: qux.cmi is cmx_guaranteed,
    quux.cmi is not *)
 let () =
   run_test ~include_manifests:[
@@ -117,15 +117,39 @@ qux.cmi -> $PWD/manifests/04/qux (visible, cmx_guaranteed)
 quux.cmi -> $PWD/manifests/04/quux (visible)
 |}]
 
-(* You can write `file_x` in a hidden includes manifest *)
+(* You can also write 'x' entries in hidden includes manifests. *)
 let () =
   run_test ~hidden_include_manifests:[
     "04/04-manifest.txt";
-  ] ~files_to_check:["qux.cmi"; "quux.cmi"] ()
+  ] ~files_to_check:["qux.cmi"; "qux.cmx"; "quux.cmi"] ()
 
 [%%expect{|
 qux.cmi -> $PWD/manifests/04/qux (hidden, cmx_guaranteed)
+qux.cmx -> $PWD/manifests/04/qux_cmx (hidden)
 quux.cmi -> $PWD/manifests/04/quux (hidden)
+|}]
+
+(* Writing 'x' on a cmx file (rather than its associated cmi) is not expected,
+   but the parser does permit it. *)
+let () =
+  run_test ~include_manifests:[
+    "04/04-manifest.txt";
+  ] ~files_to_check:["unusual.cmx"] ()
+
+[%%expect{|
+unusual.cmx -> $PWD/manifests/04/unusual_cmx (visible, cmx_guaranteed)
+|}]
+
+(* Marking a manifest file as cmx_guaranteed is a parse error. *)
+let () =
+  run_test ~include_manifests:[
+    "05/05-manifest.txt";
+  ] ~files_to_check:[] ()
+
+[%%expect{|
+Exception:
+Load_path.Parse_error
+ "Cannot parse manifest file line: manifest cmx_guaranteed_manifest 00/bad.txt x".
 |}]
 
 (* Parsing of -H-file arguments *)

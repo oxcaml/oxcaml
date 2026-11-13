@@ -1,0 +1,2 @@
+file foo.cmi 00/foo
+manifest cmx_guaranteed_manifest 00/bad.txt x
