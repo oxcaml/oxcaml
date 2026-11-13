@@ -9,19 +9,23 @@ module Monitor = struct
 
   let current_ref : t option ref = Local_store.s_ref None
 
+  (* Without omnidirectionality, jobs run immediately and ignore their
+     monitor, so no root is needed. *)
+  let disabled = { goto = raise; frames = [] }
+
   let current () =
     match !current_ref with
+    | Some t -> t
+    | None when not (Language_extension.is_enabled Omnidirectionality) ->
+      disabled
     | None ->
       Misc.fatal_error
         "Scheduler.Monitor.current: current only defined under a root"
-    | Some t -> t
-
-  let set_current new_current = current_ref := Some new_current
 
   let with_current t body =
-    let saved = current () in
-    set_current t;
-    Fun.protect body ~finally:(fun () -> set_current saved)
+    let saved = !current_ref in
+    current_ref := Some t;
+    Fun.protect body ~finally:(fun () -> current_ref := saved)
 
   let try_ body ~with_ =
     try

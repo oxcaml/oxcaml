@@ -500,17 +500,23 @@ let execute_phrase print_outcome ppf phr =
         Unit_info.make_dummy ~input_name:!phrase_name compilation_unit
       in
       Compilenv.reset unit_info;
-      Typecore.reset_delayed_checks ();
-      let (str, sg, names, _shape, newenv) =
-        Typemod.type_toplevel_phrase oldenv oldsig sstr
+      let str, sg', newenv, coercion =
+        (* A monitor root covering the inclusion check and delayed checks
+           too, which run after [type_toplevel_phrase] returns. *)
+        Scheduler.Monitor.root @@ fun () ->
+        Typecore.reset_delayed_checks ();
+        let (str, sg, names, _shape, newenv) =
+          Typemod.type_toplevel_phrase oldenv oldsig sstr
+        in
+        if !Clflags.dump_typedtree then Printtyped.implementation ppf str;
+        let sg' = Typemod.Signature_names.simplify newenv names sg in
+        let modes = Includemod.modes_toplevel in
+        let coercion =
+          Includemod.signatures oldenv ~mark:true ~modes sg sg'
+        in
+        Typecore.force_delayed_checks ();
+        str, sg', newenv, coercion
       in
-      if !Clflags.dump_typedtree then Printtyped.implementation ppf str;
-      let sg' = Typemod.Signature_names.simplify newenv names sg in
-      let modes = Includemod.modes_toplevel in
-      let coercion =
-        Includemod.signatures oldenv ~mark:true ~modes sg sg'
-      in
-      Typecore.force_delayed_checks ();
       let str, sg', rewritten =
         match str.str_items with
         | [ { str_desc = Tstr_eval (e, sort, attrs) ; str_loc = loc } ]

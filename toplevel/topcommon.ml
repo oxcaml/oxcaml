@@ -251,6 +251,9 @@ let preprocess_phrase ppf phr =
   phr
 
 let typecheck_phrase ppf oldenv oldsig sstr =
+  (* A monitor root covering the inclusion check and delayed checks too, which
+     run after [type_toplevel_phrase] returns. *)
+  Scheduler.Monitor.root @@ fun () ->
   Typecore.reset_delayed_checks ();
   let (str, sg, sn, shape, newenv) =
     Typemod.type_toplevel_phrase oldenv oldsig sstr
