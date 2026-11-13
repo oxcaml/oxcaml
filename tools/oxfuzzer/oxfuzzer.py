@@ -115,6 +115,7 @@ class Toolchain:
                     "-flambda2-match-in-match",
                     "-flambda2-join-algorithm", "n-way",
                     "-experimental-optimizations",
+                    "-no-ssa-validate",
                     "-caml-apply-inline-fast-path",
                 ),
                 ocamllib=self.ocamllib,
