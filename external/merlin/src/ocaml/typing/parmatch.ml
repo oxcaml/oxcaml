@@ -1232,9 +1232,10 @@ let build_other ext env =
       | Constant Const_untagged_char _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_char c) -> c
+            ~proj:(function Constant(Const_untagged_char c) ->
+                              Numbers.Int8.to_int c
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_char i)
+            ~make:(fun i -> Const_untagged_char (Numbers.Int8.of_int_exn i))
             [ Char.code 'a', Char.code 'z' ; Char.code 'A', Char.code 'Z' ;
               Char.code '0', Char.code '9' ; Char.code ' ', Char.code '~' ;
               0, 0x7f ; -0x80, -1 ] d env
@@ -1251,28 +1252,32 @@ let build_other ext env =
       | Constant Const_int8 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_int8 i) -> i | _ -> assert false)
-            ~make:(fun i -> Const_int8 i)
+            ~proj:(function Constant(Const_int8 i) -> Numbers.Int8.to_int i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_int8 (Numbers.Int8.of_int_exn i))
             [0, 0x7f; -0x80, -1] d env
       | Constant Const_untagged_int8 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_int8 i) -> i
+            ~proj:(function Constant(Const_untagged_int8 i) ->
+                            Numbers.Int8.to_int i
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_int8 i)
+            ~make:(fun i -> Const_untagged_int8 (Numbers.Int8.of_int_exn i))
             [0, 0x7f; -0x80, -1] d env
       | Constant Const_int16 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_int16 i) -> i | _ -> assert false)
-            ~make:(fun i -> Const_int16 i)
+            ~proj:(function Constant(Const_int16 i) -> Numbers.Int16.to_int i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_int16 (Numbers.Int16.of_int_exn i))
             [0, 0x7f_ff; -0x80_00, -1] d env
       | Constant Const_untagged_int16 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_int16 i) -> i
+            ~proj:(function Constant(Const_untagged_int16 i) ->
+                            Numbers.Int16.to_int i
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_int16 i)
+            ~make:(fun i -> Const_untagged_int16 (Numbers.Int16.of_int_exn i))
             [0, 0x7f_ff; -0x80_00, -1] d env
       | Constant Const_int32 _ ->
           build_other_constant
@@ -1288,7 +1293,7 @@ let build_other ext env =
           build_other_constant
             (function Constant(Const_nativeint i) -> i | _ -> assert false)
             (function i -> Tpat_constant(Const_nativeint i))
-            0n Nativeint.succ d env
+            Targetint.zero Targetint.succ d env
       | Constant Const_unboxed_int32 _ ->
           build_other_constant
             (function Constant(Const_unboxed_int32 i) -> i | _ -> assert false)
@@ -1303,7 +1308,7 @@ let build_other ext env =
           build_other_constant
             (function Constant(Const_unboxed_nativeint i) -> i | _ -> assert false)
             (function i -> Tpat_constant(Const_unboxed_nativeint i))
-            0n Nativeint.succ d env
+            Targetint.zero Targetint.succ d env
       | Constant Const_string _ ->
           build_other_constant
             (function Constant(Const_string (s, _, _)) -> String.length s
