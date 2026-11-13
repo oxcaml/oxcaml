@@ -239,8 +239,21 @@ let ikinds = ref true                   (* -no-ikinds *)
 let ikinds_debug = ref false            (* -ikinds-debug *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
+let all_profile_columns : profile_column list = [ `Time; `Alloc; `Counters ]
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
+let profile_level = ref 0 (* -dprofile-level *)
 let profile_granularity : profile_granularity_level ref = ref File_level (* -dgranularity *)
+
+(* Profiling is on iff [profile_level > 0] iff [profile_columns <> []] *)
+let set_profile_columns columns =
+  profile_columns := columns;
+  if columns = [] then profile_level := 0
+  else if !profile_level = 0 then profile_level := 1
+
+let set_profile_level level =
+  profile_level := level;
+  if level = 0 then profile_columns := []
+  else if !profile_columns = [] then profile_columns := all_profile_columns
 let profile_output_name : string option ref = ref None (* -dprofile-output *)
 
 let profile_granularity_level_mapping = [

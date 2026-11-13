@@ -651,6 +651,12 @@ let mk_dcounters f =
 let mk_dprofile f =
   "-dprofile", Arg.Unit f, Profile.options_doc
 
+let mk_dprofile_level f =
+  "-dprofile-level", Arg.Int f,
+  "<n>  Set the level of detail of -dprofile, -dtimings and -dcounters: \
+   0 disables them, 1 records the main passes (default), 2 also records the \
+   backend passes of each function"
+
 let mk_dgranularity f =
   "-dgranularity",
   Arg.Symbol (Clflags.all_profile_granularity_levels, f),
@@ -1335,6 +1341,7 @@ module type Compiler_options = sig
   val _dtimings_precision : int -> unit
   val _dcounters : unit -> unit
   val _dprofile : unit -> unit
+  val _dprofile_level : int -> unit
   val _dgranularity : string -> unit
   val _dprofile_output : string -> unit
   val _dump_into_file : unit -> unit
@@ -1650,6 +1657,7 @@ struct
     mk_dtimings_precision F._dtimings_precision;
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
+    mk_dprofile_level F._dprofile_level;
     mk_dgranularity F._dgranularity;
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
@@ -1964,6 +1972,7 @@ struct
     mk_dtimings_precision F._dtimings_precision;
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
+    mk_dprofile_level F._dprofile_level;
     mk_dgranularity F._dgranularity;
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
@@ -2477,10 +2486,13 @@ module Default = struct
     let _cmi_file s = cmi_file := Some s
     let _config = Misc.show_config_and_exit
     let _config_var = Misc.show_config_variable_and_exit
-    let _dprofile () = profile_columns := Profile.all_columns
-    let _dtimings () = profile_columns := [`Time]
+    let _dprofile () = set_profile_columns Profile.all_columns
+    let _dprofile_level n =
+      if n < 0 then raise (Arg.Bad "-dprofile-level: must not be negative");
+      set_profile_level n
+    let _dtimings () = set_profile_columns [`Time]
     let _dtimings_precision n = timings_precision := n
-    let _dcounters () = profile_columns := [`Counters]
+    let _dcounters () = set_profile_columns [`Counters]
     let _dgranularity = Clflags.set_profile_granularity
     let _dprofile_output s =
       Compenv.check_relative_path

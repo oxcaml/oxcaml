@@ -612,14 +612,16 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   Reg.clear_relocatable_regs ();
   fd_cmm
-  ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true ~level:2 "cmm_invariants"
+       (cmm_invariants ppf_dump)
   ++ (if !Oxcaml_flags.use_ssa
       then compile_via_ssa ~ppf_dump ~funcnames
       else Cfg_selection.emit_fundecl ~future_funcnames:funcnames)
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
        (if !Oxcaml_flags.use_ssa then "After SSA" else "After selection")
-  ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
-  ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
+  ++ Profile.record ~accumulate:true ~level:2 "cfg_invariants"
+       (cfg_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true ~level:2 "cfg" (fun cfg_with_layout ->
       if !Clflags.llvm_backend
       then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
       else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)

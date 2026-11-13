@@ -97,8 +97,15 @@ let create () = E (Hashtbl.create 2)
 let hierarchy = ref (create ())
 let reset () = hierarchy := create ()
 
-let record_call_internal ?(accumulate = false) ?counter_f name f =
-  if !Clflags.profile_columns = [] then f () else
+(* Set while a pass is skipped because of its level: its sub-passes are at
+   least as detailed, so they are skipped too *)
+let skipping = ref false
+
+let record_call_internal ?(accumulate = false) ?(level = 1) ?counter_f name f =
+  if !Clflags.profile_level = 0 || !skipping then f ()
+  else if !Clflags.profile_level < level then
+    Misc.protect_refs [R (skipping, true)] f
+  else
   let E prev_hierarchy = !hierarchy in
   let start_measure = Measure.create () in
   let this_measure_diff, this_table =
@@ -135,13 +142,14 @@ let record_call_internal ?(accumulate = false) ?counter_f name f =
 
 let record_call = record_call_internal ?counter_f:None
 
-let record_call_with_counters ?accumulate ~counter_f =
-  record_call_internal ?accumulate ~counter_f
+let record_call_with_counters ?accumulate ?level ~counter_f =
+  record_call_internal ?accumulate ?level ~counter_f
 
-let record ?accumulate pass f x = record_call ?accumulate pass (fun () -> f x)
+let record ?accumulate ?level pass f x =
+  record_call ?accumulate ?level pass (fun () -> f x)
 
-let record_with_counters ?accumulate ~counter_f pass f x =
-  record_call_internal ?accumulate ~counter_f pass (fun () -> f x)
+let record_with_counters ?accumulate ?level ~counter_f pass f x =
+  record_call_internal ?accumulate ?level ~counter_f pass (fun () -> f x)
 
 let file_prefix = "file="
 
@@ -370,7 +378,7 @@ let output_to_csv ppf columns =
   in
   output_columns output_row_f columns
 
-let all_columns = List.map fst column_mapping
+let all_columns = Clflags.all_profile_columns
 let column_names = List.map snd column_mapping
 
 let options_doc =

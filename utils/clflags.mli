@@ -291,7 +291,11 @@ val keep_locs : bool ref
 val opaque : bool ref
 val default_timings_precision : int
 val timings_precision : int ref
+val all_profile_columns : profile_column list
 val profile_columns : profile_column list ref
+val profile_level : int ref
+val set_profile_columns : profile_column list -> unit
+val set_profile_level : int -> unit
 val profile_granularity : profile_granularity_level ref
 val profile_output_name : string option ref
 val all_profile_granularity_levels : string list
