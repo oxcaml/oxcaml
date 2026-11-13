@@ -1810,16 +1810,17 @@ module Placeholder = struct
   type t =
     { type_var : Types.type_expr;
       ldd_var : Ldd.var;
-      resolved : unit Ivar.t
+      resolved : unit Typing_ivar.t
           (** Filled once [ldd_var] is solved *and* every placeholder it depends
               on is resolved. *)
     }
 
   let create type_var =
-    { type_var; ldd_var = Ldd.new_var (); resolved = Ivar.create () }
+    { type_var; ldd_var = Ldd.new_var (); resolved = Typing_ivar.create () }
 
   let upon_resolved t ~run =
-    Ivar.upon t.resolved ~scheduler:(scheduler ()) ~run ~cancel:(fun () ->
+    Typing_ivar.upon t.resolved ~scheduler:(scheduler ()) ~run
+      ~cancel:(fun () ->
         Misc.fatal_error "Ikind.Placeholder.upon_resolved: cancelled")
 
   let upon_resolved_all ts ~run =
@@ -1861,7 +1862,7 @@ module Placeholder = struct
   let solve t kind ~deps =
     Ldd.solve_lfp t.ldd_var kind;
     upon_resolved_all deps ~run:(fun () ->
-        match Ivar.fill t.resolved () ~scheduler:(scheduler ()) with
+        match Typing_ivar.fill t.resolved () ~scheduler:(scheduler ()) with
         | Ok -> ()
         | Already_full () ->
           Misc.fatal_error "Ikind.Placeholder.solve: resolved twice")

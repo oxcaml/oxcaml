@@ -1,7 +1,7 @@
-scheduler.ml
-scheduler.mli
-ivar.ml
-ivar.mli
+typing_scheduler.ml
+typing_scheduler.mli
+typing_ivar.ml
+typing_ivar.mli
 jkind.ml
 jkind.mli
 jkind_types.ml

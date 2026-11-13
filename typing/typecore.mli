@@ -436,8 +436,8 @@ module Error : sig
   val log_and_raise : Location.t -> Env.t -> error -> 'a
 
   (** [monitor loc env body ~with_] runs [body] in a
-      [Scheduler.Monitor.try_] frame that converts exceptions recognised by
-      [with_] into errors at [loc], including those raised later by jobs
+      [Typing_scheduler.Monitor.try_] frame that converts exceptions recognised
+      by [with_] into errors at [loc], including those raised later by jobs
       registered while [body] runs. Under [-typing-recovery], the error is
       logged as by [log_and_raise] (see [Typing_recovery.monitor]). *)
   val monitor :

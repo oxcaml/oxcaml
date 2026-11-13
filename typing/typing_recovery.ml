@@ -74,12 +74,12 @@ let is_recoverable exn =
 
 let monitor body ~with_ =
   let ctx = current_context () in
-  Scheduler.Monitor.try_ body ~with_:(fun e ->
+  Typing_scheduler.Monitor.try_ body ~with_:(fun e ->
       match with_ e with
       | Some exn ->
           log_in ctx exn;
           if Option.is_some ctx.errors && is_recoverable exn
-          then Scheduler.Monitor.recoverable exn
+          then Typing_scheduler.Monitor.recoverable exn
           else exn
       | None -> e)
 

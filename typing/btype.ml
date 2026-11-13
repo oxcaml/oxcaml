@@ -134,7 +134,7 @@ type pool =
   { level : int;
     mutable pool : transient_expr list;
     mutable sort_pool: Jkind_types.Sort.t list;
-    mutable ivars : type_shape Ivar.t list;
+    mutable ivars : type_shape Typing_ivar.t list;
     next : pool
   }
 
@@ -182,7 +182,7 @@ let () =
   Jkind_types.Sort.set_add_to_pool add_to_sort_pool
 
 let add_to_ivar_pool ~level ivar =
-  if Ivar.has_handlers ivar
+  if Typing_ivar.has_handlers ivar
   then
     let pool = pool_of_level level !pool_stack in
     pool.ivars <- ivar :: pool.ivars

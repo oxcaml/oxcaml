@@ -4,17 +4,17 @@ module Handler = struct
   type 'a t =
     { run : 'a -> unit;
       cancel : unit -> unit;
-      monitor : Scheduler.Monitor.t
+      monitor : Typing_scheduler.Monitor.t
     }
 
   let create ~run ~cancel =
-    { run; cancel; monitor = Scheduler.Monitor.current () }
+    { run; cancel; monitor = Typing_scheduler.Monitor.current () }
 
   let schedule_run t ~value ~scheduler =
-    Scheduler.add ~monitor:t.monitor scheduler (fun () -> t.run value)
+    Typing_scheduler.add ~monitor:t.monitor scheduler (fun () -> t.run value)
 
   let schedule_cancel t ~scheduler =
-    Scheduler.add ~monitor:t.monitor scheduler t.cancel
+    Typing_scheduler.add ~monitor:t.monitor scheduler t.cancel
 end
 
 module Cell = struct
@@ -74,7 +74,7 @@ let peek t = match cell t with Empty _ -> None | Full value -> Some value
 
 let peek_exn t =
   match cell t with
-  | Empty _ -> invalid_arg "Ivar.peek_exn: empty ivar cell"
+  | Empty _ -> invalid_arg "Typing_ivar.peek_exn: empty ivar cell"
   | Full value -> value
 
 module Fill_result = struct
@@ -93,7 +93,7 @@ let fill t value ~scheduler : _ Fill_result.t =
 
 let upon t ~run ~cancel ~scheduler =
   match cell t with
-  | Full value -> Scheduler.add scheduler (fun () -> run value)
+  | Full value -> Typing_scheduler.add scheduler (fun () -> run value)
   | Empty handlers ->
     set_cell t (Empty (Handler.create ~run ~cancel :: handlers))
 
