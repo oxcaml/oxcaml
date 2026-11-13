@@ -56,6 +56,9 @@ val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
 val set_lto_info : Flambda2_reaper.Lto_info.t -> unit
         (* Set the LTO information for the current unit. *)
 
+val set_laws : Laws_data.t -> unit
+        (* Record the laws data of the current unit *)
+
 val need_curry_fun:
   Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit
 val need_apply_fun:

@@ -374,6 +374,7 @@ endif
 	mkdir _runtest/tools
 	ln -s ../_install/bin/ocamlmklib.byte _runtest/tools/ocamlmklib
 	ln -s ../_install/bin/ocamlobjinfo.byte _runtest/tools/ocamlobjinfo
+	ln -s ../_install/bin/ocamllaws.byte _runtest/tools/ocamllaws
 	ln -s ../_install/bin/dumpobj.byte _runtest/tools/dumpobj
 	ln -s ../_install/bin/ocamlfilt _runtest/tools/ocamlfilt
         # ocamldoc

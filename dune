@@ -375,6 +375,8 @@
   main_args
   compmisc
   compile_common
+  laws_gen
+  laws_data
   instantiator
   functorizer
   ; manual update: mli only files

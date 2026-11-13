@@ -26,6 +26,19 @@
  (package ocaml))
 
 (executable
+ (name ocamllaws)
+ (modes byte native)
+ (modules ocamllaws)
+ (libraries ocamlfrontend ocamlbytecomp ocamloptcomp))
+
+(install
+ (files
+  (ocamllaws.bc as ocamllaws.byte)
+  (ocamllaws.exe as ocamllaws.opt))
+ (section bin)
+ (package ocaml))
+
+(executable
   (name ocamldep)
   (modes byte native)
   (modules ocamldep)

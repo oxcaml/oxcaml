@@ -41,6 +41,7 @@ type unit_infos_builder =
     mutable uib_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
     uib_zero_alloc_info: Zero_alloc_info.t;
     mutable uib_force_link : bool;
+    mutable uib_laws : Laws_data.Serializable.t File_sections.Idx.t option;
     mutable uib_requires_metaprogramming : bool;
     mutable uib_external_symbols : string list;
     mutable uib_lto_info :
@@ -70,6 +71,7 @@ let current_unit =
     uib_export_info = None;
     uib_zero_alloc_info = Zero_alloc_info.create ();
     uib_force_link = false;
+    uib_laws = None;
     uib_requires_metaprogramming = false;
     uib_external_symbols = [];
     uib_lto_info = None;
@@ -95,11 +97,19 @@ let reset unit_info =
   current_unit.uib_export_info <- None;
   Zero_alloc_info.reset current_unit.uib_zero_alloc_info;
   current_unit.uib_force_link <- !Clflags.link_everything;
+  current_unit.uib_laws <- None;
   current_unit.uib_requires_metaprogramming <-
     !Clflags.requires_metaprogramming;
   current_unit.uib_external_symbols <- [];
   current_unit.uib_lto_info <- None;
   File_sections.Builder.clear current_unit.uib_file_sections
+
+let set_laws laws =
+  match Laws_data.serialize laws with
+  | None -> ()
+  | Some laws ->
+    current_unit.uib_laws <-
+      Some (File_sections.Builder.add current_unit.uib_file_sections laws)
 
 let record_external_symbols () =
   current_unit.uib_external_symbols <- (List.filter_map (fun prim ->
@@ -133,6 +143,7 @@ let read_unit_info filename =
       ui_export_info = uir.uir_export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
       ui_force_link = uir.uir_force_link;
+      ui_laws = uir.uir_laws;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
       ui_static_data = uir.uir_static_data;
@@ -312,6 +323,7 @@ let write_unit_info info filename =
     uir_export_info = info.ui_export_info;
     uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
     uir_force_link = info.ui_force_link;
+    uir_laws = info.ui_laws;
     uir_requires_metaprogramming = info.ui_requires_metaprogramming;
     uir_section_toc = toc;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
@@ -351,6 +363,7 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_export_info = current_unit.uib_export_info;
     ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
     ui_force_link = current_unit.uib_force_link;
+    ui_laws = current_unit.uib_laws;
     ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
     ui_static_data = static_data;
     ui_external_symbols = current_unit.uib_external_symbols;
