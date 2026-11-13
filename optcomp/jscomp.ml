@@ -174,9 +174,9 @@ let var_names ~first_var =
 
 (* [first_var] is the first variable that [program] may use: the variables
    before it belong to the units compiled earlier by this process. *)
-let jsir_file ~target ~compilation_unit ~imported_compilation_units
-    ~symbol_imports ~symbol_exports ~first_var program :
-    Jsoo_imports.Code.jsir_file =
+let jsir_file ~target ~whole_program ~compilation_unit
+    ~imported_compilation_units ~symbol_imports ~symbol_exports ~first_var
+    program : Jsoo_imports.Code.jsir_file =
   { target = jsir_target target;
     program = Jsoo_imports.Code.Marshalable_program.of_program program;
     (* [Var] numbers variables with mutable state. js_of_ocaml needs to know the
@@ -187,6 +187,7 @@ let jsir_file ~target ~compilation_unit ~imported_compilation_units
     imported_compilation_units;
     exported_compilation_unit = compilation_unit;
     force_link = !Clflags.link_everything;
+    whole_program;
     symbol_imports;
     symbol_exports
   }
@@ -236,19 +237,17 @@ let remove_link_outputs ~(target : Clflags.Jsir_target.t) output_name =
     in
     Misc.remove_dir_contents (base ^ ".assets")
 
-(* The name of the unit js_of_ocaml compiles when linking a whole program.
-   wasm_of_ocaml uses it to name the initialisation function of the module. *)
 let program_unit_name output_name =
   Filename.basename output_name
   |> Filename.remove_extension
   |> String.map (fun c ->
       match c with 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' -> c | _ -> '_')
 
-(* The stubs to pass to [build-runtime]. As with C stubs, stub names are passed
-   on exactly as they were recorded in the library files or given on the command
-   line. Several libraries may record the same stub file; js_of_ocaml accepts
-   duplicates but there is no point in passing them. The first occurrence is
-   kept. *)
+(* The stubs to pass to [build-runtime], or to [compile] for a whole program. As
+   with C stubs, stub names are passed on exactly as they were recorded in the
+   library files or given on the command line. Several libraries may record the
+   same stub file; js_of_ocaml accepts duplicates but there is no point in
+   passing them. The first occurrence is kept. *)
 let stubs () =
   List.rev !Clflags.ccobjs
   |> List.fold_left
@@ -321,7 +320,7 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
         in
         let ir_file = prefixname ^ extensions.ir in
         write_jsir_file ~filename:ir_file
-          (jsir_file ~target
+          (jsir_file ~target ~whole_program:false
              ~compilation_unit:
                (Compilation_unit.full_path_as_string program.compilation_unit)
              ~imported_compilation_units ~symbol_imports ~symbol_exports
@@ -367,7 +366,8 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
             (linkall_args () @ ["-o"; output_name; runtime] @ objfiles))
 
     (* Whole program: the JSIR of the units is linked into one program, which
-       js_of_ocaml compiles and links with the runtime. *)
+       js_of_ocaml compiles to an executable, with the parts of the runtime and
+       of the stubs that it uses. *)
     let link_jsir_units (objfiles : Linkenv.objfile_to_link list) output_name
         ~(units_tolink : Linkenv.unit_link_info list) =
       (* The JSIR of the units to link: those of the object files, and the
@@ -429,27 +429,18 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
         |> Misc.Stdlib.String.Set.elements
       in
       let ir_file = output_name ^ extensions.ir in
-      let obj = output_name ^ extensions.obj in
-      let runtime = output_name ^ extensions.runtime in
       (* The JSIR file is left in place when js_of_ocaml fails on it. *)
       Misc.try_finally
-        ~always:(fun () ->
-          Misc.remove_file obj;
-          if not !Clflags.keep_startup_file then Misc.remove_file runtime)
         ~exceptionally:(fun () -> remove_link_outputs ~target output_name)
         (fun () ->
           write_jsir_file ~filename:ir_file
-            (jsir_file ~target
+            (jsir_file ~target ~whole_program:true
                ~compilation_unit:(program_unit_name output_name)
                ~imported_compilation_units ~symbol_imports:[] ~symbol_exports:[]
                ~first_var:0 program);
           Profile.record_call program_name (fun () ->
               run ~target "compile" ~phase:Compile ~input_left_in:ir_file
-                ["-o"; obj; ir_file];
-              run ~target "build-runtime" ~phase:Runtime
-                (["-o"; runtime] @ stubs ());
-              run ~target "link" ~phase:Link
-                (linkall_args () @ ["-o"; output_name; runtime; obj]));
+                (linkall_args () @ ["-o"; output_name] @ stubs () @ [ir_file]));
           if not !Clflags.keep_asm_file then Misc.remove_file ir_file)
 
     let link _linkenv objfiles output_name ~cached_genfns_imports:_ ~genfns:_

@@ -3651,11 +3651,38 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
   Code.invariant p.code;
   p
 
+let register_predefined_exceptions () =
+  let open Code in
+  List.map predefined_exceptions ~f:(fun (index, name) ->
+      assert (String.is_valid_utf_8 name);
+      let exn = Var.fresh () in
+      let v_name = Var.fresh () in
+      let v_index = Var.fresh () in
+      let by_index =
+        match Config.target () with
+        | `Wasm -> Some index
+        | `JavaScript -> None
+      in
+      [ Let (v_name, Constant (String name))
+      ; Let
+          ( v_index
+          , Constant
+              (Int
+                 ((* Predefined exceptions are registered in
+                     Symtable.init with [-index - 1] *)
+                  Targetint.of_int_exn
+                    (-index - 1))) )
+      ; Let (exn, Block (248, [| v_name; v_index |], NotArray, Immutable))
+      ]
+      @ register_global_instrs exn ~name:(Glob_predef (Predef name)) ?by_index [])
+  |> List.concat
+
 type jsir_unit =
   { name : string
   ; target : Code.jsir_target
   ; program : Code.program
   ; info : Unit_info.t
+  ; whole_program : bool
   }
 
 let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic =
@@ -3674,6 +3701,7 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
       ; imported_compilation_units
       ; exported_compilation_unit
       ; force_link
+      ; whole_program
       ; symbol_imports = _
       ; symbol_exports = _
       } =
@@ -3684,15 +3712,22 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
      variable of any unit. *)
   Code.Var.set_last last_var;
   List.iter var_names ~f:(fun (var, name) -> Code.Variable_name.set var name);
+  let program = Code.Marshalable_program.to_program program in
+  let program =
+    if whole_program
+    then Code.prepend program (register_predefined_exceptions ())
+    else program
+  in
   let unit =
     { name = exported_compilation_unit
     ; target
-    ; program = Code.Marshalable_program.to_program program
+    ; program
     ; info =
         Unit_info.of_compilation_units
           ~exported:exported_compilation_unit
           ~imported:imported_compilation_units
           ~force_link
+    ; whole_program
     }
   in
   let program_name : Code.jsir_target -> string = function
@@ -3761,32 +3796,7 @@ let from_channel ic =
 
 let predefined_exceptions () =
   (* Register predefined exceptions in case of separate compilation *)
-  let body =
-    let open Code in
-    List.map predefined_exceptions ~f:(fun (index, name) ->
-        assert (String.is_valid_utf_8 name);
-        let exn = Var.fresh () in
-        let v_name = Var.fresh () in
-        let v_index = Var.fresh () in
-        let by_index =
-          match Config.target () with
-          | `Wasm -> Some index
-          | `JavaScript -> None
-        in
-        [ Let (v_name, Constant (String name))
-        ; Let
-            ( v_index
-            , Constant
-                (Int
-                   ((* Predefined exceptions are registered in
-                       Symtable.init with [-index - 1] *)
-                    Targetint.of_int_exn
-                      (-index - 1))) )
-        ; Let (exn, Block (248, [| v_name; v_index |], NotArray, Immutable))
-        ]
-        @ register_global_instrs exn ~name:(Glob_predef (Predef name)) ?by_index [])
-    |> List.concat
-  in
+  let body = register_predefined_exceptions () in
   let block = { params = []; body; branch = Stop } in
   let unit_info =
     { Unit_info.provides = Global_name.Compunit_set.empty

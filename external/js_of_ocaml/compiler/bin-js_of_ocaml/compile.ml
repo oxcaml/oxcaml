@@ -433,32 +433,52 @@ let run
         ; debug = Parse_bytecode.Debug.default_summary
         }
       in
-      output_gen
-        ~write_shape:false
-        ~standalone:false
-        ~custom_header
-        ~build_info:(Build_info.create `Jsir)
-        ~source_map
-        (fst output_file)
-        (fun ~standalone ~shapes ~source_map ((_, fmt) as output_file) ->
-          let runtime =
-            if include_runtime
-            then [ output_partial_runtime ~standalone ~shapes ~source_map output_file ]
-            else []
-          in
-          Pretty_print.string fmt "\n";
-          Pretty_print.string fmt (Unit_info.to_string unit.info);
-          let sm =
+      if unit.whole_program
+      then
+        output_gen
+          ~write_shape:false
+          ~standalone:true
+          ~custom_header
+          ~build_info:(Build_info.create `Exe)
+          ~source_map
+          (fst output_file)
+          (fun ~standalone ~shapes ~source_map output_file ->
             output
               one
               ~check_sourcemap:false
               ~standalone
               ~shapes
               ~source_map
-              ~link:`Needed
+              ~link:(if linkall then `All else `Needed)
               output_file
-          in
-          sourcemap_of_infos ~base:source_map_base (runtime @ [ sm ]))
+            |> sourcemap_of_info ~base:source_map_base)
+      else
+        output_gen
+          ~write_shape:false
+          ~standalone:false
+          ~custom_header
+          ~build_info:(Build_info.create `Jsir)
+          ~source_map
+          (fst output_file)
+          (fun ~standalone ~shapes ~source_map ((_, fmt) as output_file) ->
+            let runtime =
+              if include_runtime
+              then [ output_partial_runtime ~standalone ~shapes ~source_map output_file ]
+              else []
+            in
+            Pretty_print.string fmt "\n";
+            Pretty_print.string fmt (Unit_info.to_string unit.info);
+            let sm =
+              output
+                one
+                ~check_sourcemap:false
+                ~standalone
+                ~shapes
+                ~source_map
+                ~link:`Needed
+                output_file
+            in
+            sourcemap_of_infos ~base:source_map_base (runtime @ [ sm ]))
   | (`Bytecode_stdin | `Bytecode_file _) as bytecode ->
       let kind, ic, close_ic, include_dirs =
         match bytecode with

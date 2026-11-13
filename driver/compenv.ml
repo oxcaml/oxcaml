@@ -61,7 +61,8 @@ let warn_jsir_ignore target what =
              ^ Jsir_target.program_name target)
 
 (* The files given on the command line that are recorded like C stubs and
-   passed to [js_of_ocaml build-runtime] or [wasm_of_ocaml build-runtime]. *)
+   passed to [js_of_ocaml build-runtime] or [wasm_of_ocaml build-runtime] (to
+   [compile] with [-link-jsir]). *)
 let is_jsir_stub name =
   match jsir_target () with
   | None -> false

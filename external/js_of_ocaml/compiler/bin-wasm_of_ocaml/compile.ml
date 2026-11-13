@@ -689,37 +689,44 @@ let run
        if times () then Format.eprintf "  parsing: %a (%s)@." Timer.print t1 unit_name;
        compile_unit ~unit_name ~unit_info ~cmi_files code cont
      in
-     let compile_jsir (unit : Parse_bytecode.jsir_unit) cont =
+     let jsir_code (unit : Parse_bytecode.jsir_unit) : Parse_bytecode.one =
        (* CR-soon selee: the OxCaml JSIR backend does not produce any
           debug-related information yet. This should be updated once the
           JSIR file format changes. *)
-       let code : Parse_bytecode.one =
-         { code = unit.program
-         ; cmis = StringSet.empty
-         ; debug = Parse_bytecode.Debug.default_summary
-         }
-       in
+       { code = unit.program
+       ; cmis = StringSet.empty
+       ; debug = Parse_bytecode.Debug.default_summary
+       }
+     in
+     let compile_jsir (unit : Parse_bytecode.jsir_unit) cont =
        compile_unit
          ~check_sourcemap:false
          ~unit_name:unit.name
          ~unit_info:unit.info
          ~cmi_files:[]
-         code
+         (jsir_code unit)
          cont
      in
      (match kind with
-     | `Exe ->
+     | (`Exe | `Jsir { Parse_bytecode.whole_program = true; _ }) as kind ->
          let t1 = Timer.make () in
          let dynlink = toplevel || dynlink in
-         let code =
-           Parse_bytecode.from_exe
-             ~includes:include_dirs
-             ~include_cmis
-             ?exported_unit
-             ~link_info:(toplevel || dynlink)
-             ~linkall:dynlink
-             ~debug:need_debug
-             ic
+         let code, check_sourcemap =
+           match kind with
+           | `Exe ->
+               ( Parse_bytecode.from_exe
+                   ~includes:include_dirs
+                   ~include_cmis
+                   ?exported_unit
+                   ~link_info:(toplevel || dynlink)
+                   ~linkall:dynlink
+                   ~debug:need_debug
+                   ic
+               , true )
+           | `Jsir unit ->
+               (* A whole program is compiled to an executable, like a bytecode
+                  executable. *)
+               jsir_code unit, false
          in
          Gc.compact ();
          if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
@@ -761,6 +768,7 @@ let run
          in
          let generated_js, _shapes =
            output
+             ~check_sourcemap
              code
              ~unit_name:None
              ~wat_file:(Filename.chop_extension output_file ^ ".wat")

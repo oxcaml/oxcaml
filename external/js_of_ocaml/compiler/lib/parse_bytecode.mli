@@ -75,6 +75,10 @@ type jsir_unit =
   ; target : Code.jsir_target
   ; program : Code.program
   ; info : Unit_info.t
+  ; whole_program : bool
+        (** Whether [program] is a whole program, to compile to an executable,
+            rather than a compilation unit (see {!Code.jsir_file}). It then
+            starts by registering the predefined exceptions. *)
   }
 
 val from_jsir_channel :

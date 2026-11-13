@@ -1379,17 +1379,17 @@ let mk_jsoo_opt f =
         "<opt>  Pass option <opt> to every js_of_ocaml or wasm_of_ocaml \
          invocation"
     | Compile ->
-        "<opt>  Pass option <opt> when compiling a unit (js_of_ocaml or \
-         wasm_of_ocaml compile)"
+        "<opt>  Pass option <opt> when compiling a unit, or the whole program \
+         with -link-jsir (js_of_ocaml or wasm_of_ocaml compile)"
     | Archive ->
         "<opt>  Pass option <opt> when creating an archive with -a \
          (js_of_ocaml or wasm_of_ocaml link -a)"
     | Runtime ->
         "<opt>  Pass option <opt> when building the runtime of an executable \
-         (js_of_ocaml or wasm_of_ocaml build-runtime)"
+         (js_of_ocaml or wasm_of_ocaml build-runtime, not run with -link-jsir)"
     | Link ->
         "<opt>  Pass option <opt> when linking an executable (js_of_ocaml or \
-         wasm_of_ocaml link)"
+         wasm_of_ocaml link, not run with -link-jsir)"
   in
   List.map
     (fun phase ->
