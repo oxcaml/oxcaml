@@ -119,6 +119,9 @@ val define_template :
   Flambda2_types.Typing_env_extension.With_extra_variables.t ->
   t
 
+val template_env_types :
+  t -> Flambda2_types.Typing_env_extension.With_extra_variables.t Symbol.Map.t
+
 (** Whether any template was defined since [earlier], an accumulator from
     earlier in the same traversal. *)
 val templates_defined_since : t -> t -> bool

@@ -32,9 +32,15 @@ val load_cmx_file_contents :
 val load_symbol_approx :
   loader -> Symbol.t -> Code_or_metadata.t Value_approximation.t
 
+(** [template_keys] name this unit's templates (see
+    [Flambda_primitive.Template_env]). They have no value, but
+    [final_typing_env] defines them, with the types of the templates'
+    environments, which are exported so that other units can simplify their
+    instantiations of those templates. *)
 val prepare_cmx_file_contents :
   final_typing_env:Flambda2_types.Typing_env.t ->
   module_symbol:Symbol.t ->
+  template_keys:Symbol.Set.t ->
   used_value_slots:Value_slot.Set.t ->
   exported_offsets:Exported_offsets.t ->
   sections:File_sections.Builder.t ->

@@ -148,6 +148,11 @@ val variable_is_from_missing_cmx_file : t -> Name.t -> bool
 
 val mem : ?min_name_mode:Name_mode.t -> t -> Name.t -> bool
 
+(** Unlike [mem], which assumes that every symbol of another compilation unit is
+    defined, this only holds for such a symbol if its unit's .cmx file defines
+    it. *)
+val symbol_has_known_definition : t -> Symbol.t -> bool
+
 val mem_simple : ?min_name_mode:Name_mode.t -> t -> Simple.t -> bool
 
 val alias_is_bound_strictly_earlier :

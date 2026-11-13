@@ -19,5 +19,6 @@ val run :
   all_code:Exported_code.t ->
   final_typing_env:('f, Typing_env.t) Traverse.With_types.t ->
   free_names:Name_occurrences.t ->
+  template_keys:Symbol.Set.t ->
   Flambda_unit.t ->
   'f Rebuild.result

@@ -30,21 +30,27 @@ module C = Simplify_set_of_closures_context
    created by the template's definition, so its environment parameter has their
    type (see [Flambda_primitive.Template_env]), when that is known: the type of
    the environments of one of this unit's templates is given by [context], since
-   the code is simplified at the template's definition. *)
+   the code is simplified at the template's definition, and that of another
+   unit's template comes from its .cmx file. *)
 let assume_template_env_type context code_metadata params denv =
   match Code_metadata.template_key code_metadata with
   | None -> denv
   | Some template_key -> (
     let typing_env = DE.typing_env denv in
     let typing_env =
-      Option.map
-        (fun env_type ->
-          (* [template_key] has no value: it is only defined here, to read the
-             type. *)
-          TE.add_env_extension_with_extra_variables
-            (TE.add_symbol_definition typing_env template_key)
-            env_type)
-        (C.template_env_type context)
+      if Current_unit.is_current (Symbol.compilation_unit template_key)
+      then
+        Option.map
+          (fun env_type ->
+            (* [template_key] has no value: it is only defined here, to read the
+               type. *)
+            TE.add_env_extension_with_extra_variables
+              (TE.add_symbol_definition typing_env template_key)
+              env_type)
+          (C.template_env_type context)
+      else if TE.symbol_has_known_definition typing_env template_key
+      then Some typing_env
+      else None
     in
     match typing_env, Bound_parameters.to_list params with
     | None, _ -> denv
