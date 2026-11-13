@@ -205,6 +205,11 @@ end) : S = struct
       (fun info ->
         Zero_alloc_info.merge info.ui_zero_alloc_info ~into:ui_zero_alloc_info)
       units;
+    let ui_laws =
+      Option.map
+        (File_sections.Builder.add file_sections)
+        (Laws_data.serialize Laws_data.none)
+    in
     let modname = Compilation_unit.name ui.ui_unit in
     let pkg_infos =
       { ui_unit = ui.ui_unit;
@@ -228,6 +233,7 @@ end) : S = struct
               union (List.map (fun info -> info.ui_generic_fns.send_fun) units)
           };
         ui_force_link = List.exists (fun info -> info.ui_force_link) units;
+        ui_laws;
         ui_requires_metaprogramming =
           List.exists (fun info -> info.ui_requires_metaprogramming) units;
         ui_export_info;

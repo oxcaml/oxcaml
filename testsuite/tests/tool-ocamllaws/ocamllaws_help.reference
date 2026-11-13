@@ -1,0 +1,13 @@
+Usage: ocamllaws <command> [<options>]
+Commands are:
+  extract  Extract the laws of a compiled unit
+Run 'ocamllaws <command> -help' for the options of a command.
+
+Usage: ocamllaws extract -format <format> [-o <file>] <unit>.cmo|<unit>.cmx
+Extract the laws of a compiled unit.
+Options are:
+  -format {laws-file}
+            Which laws to extract
+  -o <file> Write to <file> instead of standard output
+  -help     Display this list of options
+  --help    Display this list of options

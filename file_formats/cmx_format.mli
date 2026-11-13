@@ -69,6 +69,9 @@ type unit_infos =
     ui_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
     ui_zero_alloc_info: Zero_alloc_info.t;
     ui_force_link: bool;          (* Always linked *)
+    ui_laws: Laws_data.Serializable.t File_sections.Idx.t option;
+                                  (* Section containing the laws data of the
+                                     unit, absent if it records none *)
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
@@ -95,6 +98,7 @@ type unit_infos_raw =
     uir_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
     uir_zero_alloc_info: Zero_alloc_info.Raw.t;
     uir_force_link: bool;
+    uir_laws: Laws_data.Serializable.t File_sections.Idx.t option;
     uir_requires_metaprogramming: bool;
     uir_section_toc: int array;    (* Byte offsets of sections in .cmx
                                       relative to byte immediately after
