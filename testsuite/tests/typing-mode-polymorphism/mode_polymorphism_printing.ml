@@ -810,17 +810,12 @@ Error: Signature mismatch:
        is not included in
          sig val g : ('a -> int) -> unit end
        Values do not match:
-         val g :
-           ('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
-           unit @ [> dynamic]
+         val g : ('a -> 'b -> 'c -> 'c) -> unit
        is not included in
          val g : ('a -> int) -> unit
-       The type
-         "('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
-         unit @ [> dynamic]"
+       The type "('a -> 'b -> 'c -> 'c) -> unit"
        is not compatible with the type "('a -> int) -> unit"
-       Type "'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]" is not compatible with type
-         "int"
+       Type "'b -> 'c -> 'c" is not compatible with type "int"
 |}]
 
 let call_and_return f x = f x, f
