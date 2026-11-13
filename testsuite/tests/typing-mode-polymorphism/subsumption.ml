@@ -15,14 +15,14 @@ module M :
     val id : 'a @ [< 'm] -> 'a @ [> 'm]
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm]
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic]
+      ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+      ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+      'c @ [< 'o] -> 'b @ [> 'n | dynamic]
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p]
+      'a @ [< 'm & global] ->
+      'b @ [< 'n & global] ->
+      'c @ [< 'o & global] ->
+      'd @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm]
   end
 |}]
 
@@ -33,14 +33,14 @@ module M_self :
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
+      ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+      ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+      'c @ [< 'o] -> 'b @ [> 'n | dynamic] @@ stateless
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
+      'a @ [< 'm & global] ->
+      'b @ [< 'n & global] ->
+      'c @ [< 'o & global] ->
+      'd @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm] @@
       stateless
   end
 |}]
@@ -57,14 +57,14 @@ module M_restruct :
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
+      ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+      ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+      'c @ [< 'o] -> 'b @ [> 'n | dynamic] @@ stateless
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
+      'a @ [< 'm & global] ->
+      'b @ [< 'n & global] ->
+      'c @ [< 'o & global] ->
+      'd @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm] @@
       stateless
   end
 |}]
@@ -78,14 +78,14 @@ module type S =
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
+      ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+      ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+      'c @ [< 'o] -> 'b @ [> 'n | dynamic] @@ stateless
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
+      'a @ [< 'm & global] ->
+      'b @ [< 'n & global] ->
+      'c @ [< 'o & global] ->
+      'd @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm] @@
       stateless
   end
 module M_via_sig : S
@@ -400,9 +400,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
        The type
-         "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
+         "'a @ [> past('m) | local] -> 'b @ [< 'n > past('o)] -> 'b @ [> 'n]"
        is not compatible with the type
-         "'a @ [< past('o) & global] -> 'b @ [< 'p & past('n)] -> 'b @ [> 'p]"
+         "'a @ [< past('m) & global] -> 'b @ [< 'p & past('o)] -> 'b @ [> 'p]"
        The return mode was expected to be "global" but is "local"
 |}]
 

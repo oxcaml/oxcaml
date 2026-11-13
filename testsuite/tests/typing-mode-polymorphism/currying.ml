@@ -292,7 +292,7 @@ Error: The value "bar1" is "nonportable"
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
 val nest :
-  'a @ [< 'm & global] -> unit @ 'p -> unit @ 'o -> unit @ 'n -> 'a @ [> 'm] =
+  'a @ [< 'm & global] -> unit @ 'n -> unit @ 'o -> unit @ 'p -> 'a @ [> 'm] =
   <fun>
 |}]
 

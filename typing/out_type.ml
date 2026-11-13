@@ -1291,7 +1291,7 @@ end = struct
   let visible_pairs = ref ([] : visible_pair list)
 
   (* [printed_aliases] is a subset of [aliased_pairs] that records aliased mode
-  pairs that have already been printed *)
+  pairs that have already been printed, along with the name of their alias *)
   let aliased_pairs = ref ([] : visible_pair list)
   let printed_aliases = ref ([] : (visible_pair * string) list)
 
@@ -1368,24 +1368,27 @@ end = struct
   let mark_aliased pair =
     if not (is_aliased pair) then aliased_pairs := pair :: !aliased_pairs
 
-  let register_visible_mode : With_locality.lr -> unit =
-    fun mode ->
+  (** [register_visible_modes] iterates over the type and registers every
+      visible mode variable. *)
+  let register_visible_modes ty =
+    let seen = ref [] in
+    let register_visible_mode (mode : With_locality.lr) =
       if With_locality.check_generic mode then begin
         let ({ monadic; comonadic } as pair) = pair_of_mode mode in
         add_visible With_locality.obj_monadic monadic;
         add_visible With_locality.obj_comonadic comonadic;
-        if mem_pair pair !visible_pairs then mark_aliased pair
-        else visible_pairs := pair :: !visible_pairs
+        if mem_pair pair !seen then mark_aliased pair
+        else seen := pair :: !seen;
+        if not (mem_pair pair !visible_pairs) then
+          visible_pairs := pair :: !visible_pairs
       end
-
-  (** [register_visible_modes] iterates over the type and registers every
-      visible mode variable. *)
-  let rec register_visible_modes visited ty =
-    let px = proxy ty in
-    if not (List.memq px visited) then
-      printer_iter_type_expr
-        (register_visible_modes (px :: visited))
-        register_visible_mode ty
+    in
+    let rec visit visited ty =
+      let px = proxy ty in
+      if not (List.memq px visited) then
+        printer_iter_type_expr (visit (px :: visited)) register_visible_mode ty
+    in
+    visit [] ty
 
   (* The next preprocessing step registers all direct
     paths from one visible mode variable to another.
@@ -2416,7 +2419,7 @@ end = struct
     normalize_type ty;
     add_named_vars ty;
     if mode_polymorphism_printing_enabled () then begin
-      register_visible_modes [] ty;
+      register_visible_modes ty;
       add_visible_paths ();
       add_visible_edges ();
       suppress_curry_modes ~base ty
@@ -2727,10 +2730,11 @@ let rec tree_of_modal_typexp mode modal ty =
           else
             tree_of_acc_typexp mode arg_acc ty1
         in
+        let marg_tree = tree_of_modes marg arg_acc in
         let acc_mode = curry_acc acc_mode marg in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
-        Otyp_arrow (lab, tree_of_modes marg arg_acc, t1, t2)
+        Otyp_arrow (lab, marg_tree, t1, t2)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
