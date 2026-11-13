@@ -176,6 +176,7 @@ module Ast_io = struct
     (* The input version is determined by the fact that the input will get parsed by
        the current compiler Parse module *)
     let input_version = (module Compiler_version : OCaml_version) in
+    let all_source = prefix_read_from_source ^ In_channel.input_all ic in
     try
       (* To test if a file is an AST file, we have to read the first few bytes of the
          file. If it is not, we have to parse these bytes and the rest of the file as
@@ -187,7 +188,6 @@ module Ast_io = struct
          We have to put all the source into the lexing buffer at once this way
          for source quotation to work in error messages.
          See ocaml#12238 and ocaml/driver/pparse.ml. *)
-      let all_source = prefix_read_from_source ^ In_channel.input_all ic in
       let lexbuf = Lexing.from_string all_source in
       lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = input_name };
       Astlib.Location.set_input_lexbuf (Some lexbuf);
@@ -202,9 +202,29 @@ module Ast_io = struct
       in
       Ok { input_name; input_version; ast }
     with exn -> (
-      match Location.Error.of_exn exn with
-      | None -> raise exn
-      | Some error -> Error (Source_parse_error (error, input_version)))
+      (* Explain the error with lrgrep, from the source that was parsed. *)
+      let lrgrep_error =
+        let lexbuf = Lexing.from_string all_source in
+        Lexing.set_filename lexbuf input_name;
+        Skip_hash_bang.skip_hash_bang lexbuf;
+        match kind with
+        | Intf -> Oxcaml_private_lrgrep.Frontend.interface lexbuf
+        | Impl -> Oxcaml_private_lrgrep.Frontend.implementation lexbuf
+      in
+      match lrgrep_error with
+      (* The message is exactly "Syntax error" when lrgrep has no explanation
+         (see lrgrep/frontend.ml): report the compiler's own error then. *)
+      | Error { Oxcaml_private_lrgrep.Frontend.Syntax_error.msg; loc }
+        when not (String.equal msg "Syntax error") ->
+          Error
+            (Source_parse_error
+               ( Location.Error.make ~loc ~sub:[]
+                   ("Syntax Error. LRGrep analysis: " ^ msg),
+                 input_version ))
+      | Error _ | Ok () -> (
+          match Location.Error.of_exn exn with
+          | None -> raise exn
+          | Some error -> Error (Source_parse_error (error, input_version))))
 
   let magic_length = String.length Astlib.Config.ast_impl_magic_number
 

@@ -580,11 +580,152 @@ let
       '';
     };
 
+  # lrgrep explains syntax errors in ppxlib (see external/ppxlib/HACKING.jst.md).
+  # Only its runtime is installed, as ppxlib.private.lrgrep_runtime: the
+  # generator, and the libraries below that it needs, are only used while
+  # building ppxlib.private.lrgrep. ppxlib's project lists transitive
+  # dependencies explicitly.
+  lrgrepSrc =
+    let
+      runtimeOpen = "(flags (:standard -open Oxcaml_private_lrgrep_runtime))";
+      mainDune = pkgs.writeText "lrgrep-src-dune" ''
+        (executable
+         (name main)
+         (modules main)
+         (libraries cmon fix front menhirSdk mid oxcaml_private_lrgrep_runtime
+           support utils valmari)
+         ${runtimeOpen})
+      '';
+      midDune = pkgs.writeText "lrgrep-mid-dune" ''
+        (library
+         (name mid)
+         (libraries cmon fix front lrijkstra_utils menhirSdk
+           oxcaml_private_lrgrep_runtime support utils valmari)
+         ${runtimeOpen})
+      '';
+      utilsDune = pkgs.writeText "lrgrep-utils-dune" ''
+        (library
+         (name utils)
+         (libraries cmon fix pprint))
+      '';
+      supportDune = pkgs.writeText "lrgrep-support-dune" ''
+        (library
+         (name support)
+         (wrapped false)
+         (modules lrgrep_support)
+         (libraries fix utils oxcaml_private_lrgrep_runtime)
+         ${runtimeOpen})
+
+        (library
+         (name oxcaml_private_lrgrep_runtime)
+         (public_name ppxlib.private.lrgrep_runtime)
+         (modules lrgrep_runtime))
+      '';
+    in
+    pkgs.applyPatches {
+      name = "lrgrep-ba813a0-source";
+      src = pkgs.fetchFromGitHub {
+        owner = "let-def";
+        repo = "lrgrep";
+        rev = "ba813a0924297147787f7888978d344a348b6ab6";
+        hash = "sha256-sf5IaQOlFVkOaG6iKTpza5nnV3HwUhVqzpLInUQvjjc=";
+      };
+      postPatch = ''
+        find . -mindepth 1 -maxdepth 1 ! -name src ! -name support \
+          -exec rm -r {} +
+        cp ${mainDune} src/dune
+        cp ${midDune} src/mid/dune
+        cp ${utilsDune} src/utils/dune
+        cp ${supportDune} support/dune
+      '';
+    };
+
+  menhirSdkSrc = pkgs.applyPatches {
+    name = "menhir-${menhirVersion}-sdk-source";
+    src = menhirSrc;
+    postPatch = ''
+      find . -mindepth 1 -maxdepth 1 ! -name LICENSE ! -name sdk \
+        -exec rm -r {} +
+      substituteInPlace sdk/dune \
+        --replace-fail '%{version:menhir}' '${menhirVersion}' \
+        --replace-fail '(public_name menhirSdk)' ""
+    '';
+  };
+
+  pprintSrc = pkgs.applyPatches {
+    name = "pprint-cf300bd-source";
+    src = pkgs.fetchFromGitHub {
+      owner = "fpottier";
+      repo = "pprint";
+      rev = "cf300bd18accc35c67bd2e0f7f489973b1593643";
+      hash = "sha256-RyipBcVAKRUabHCcbwI/VjyjOP42EQ6byDpXiZVaeHc=";
+    };
+    postPatch = ''
+      find . -mindepth 1 -maxdepth 1 ! -name LICENSE ! -name src \
+        -exec rm -r {} +
+      substituteInPlace src/dune \
+        --replace-fail '(public_name pprint)' "" \
+        --replace-fail '(documentation)' ""
+    '';
+  };
+
+  cmonSrc = pkgs.applyPatches {
+    name = "cmon-540904d-source";
+    src = pkgs.fetchFromGitHub {
+      owner = "let-def";
+      repo = "cmon";
+      rev = "540904dde3f1dd453ba5dd113c0a8c7ac9fce7ab";
+      hash = "sha256-/MwjABGNxE/wjLCZNwzvqVH0kB4ck/rHXg4FKZ4CcPI=";
+    };
+    postPatch = ''
+      find . -mindepth 1 -maxdepth 1 ! -name LICENSE ! -name lib \
+        -exec rm -r {} +
+      substituteInPlace lib/dune \
+        --replace-fail '(public_name cmon)' "" \
+        --replace-fail 'grenier.fastdom grenier.binder_introducer' \
+          'fastdom binder_introducer'
+    '';
+  };
+
+  # Only cmon's dependencies, fastdom and binder_introducer, are kept.
+  grenierSrc =
+    let
+      binderIntroducerDune = pkgs.writeText "grenier-binder_introducer-dune" ''
+        (library
+         (name binder_introducer)
+         (modules Binder_introducer)
+         (libraries fastdom)
+         (wrapped false))
+      '';
+    in
+    pkgs.applyPatches {
+      name = "grenier-e09c26b-source";
+      src = pkgs.fetchFromGitHub {
+        owner = "let-def";
+        repo = "grenier";
+        rev = "e09c26b9c35a74ef14031627571ad4fadb56574a";
+        hash = "sha256-JOfuXmlJiJbUnCE8f/yzCQQkgv6UFP0P5+81UlATNS4=";
+      };
+      postPatch = ''
+        find . -mindepth 1 -maxdepth 1 ! -name LICENSE ! -name fastdom \
+          ! -name binder_introducer -exec rm -r {} +
+        substituteInPlace fastdom/dune \
+          --replace-fail '(public_name grenier.fastdom)' ""
+        rm binder_introducer/test.ml
+        cp ${binderIntroducerDune} binder_introducer/dune
+      '';
+    };
+
   # Read by the oxcaml-private/* and external/ast-dependent-libs/deps/* rules
   # of the Makefile.
   ppxlibSources = {
     PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
     PPXLIB_SEXP_TYPE_SRC = sexpTypeSrc;
+    PPXLIB_LRGREP_SRC = lrgrepSrc;
+    PPXLIB_MENHIR_SDK_SRC = menhirSdkSrc;
+    PPXLIB_PPRINT_SRC = pprintSrc;
+    PPXLIB_CMON_SRC = cmonSrc;
+    PPXLIB_GRENIER_SRC = grenierSrc;
   };
 
   jsooSources = {
@@ -679,6 +820,8 @@ let
     buildTarget = "ppxlib-build";
     installTarget = "ppxlib-install";
     sources = ppxlibSources;
+    # For the lrgrep generator's own grammar.
+    extraNativeBuildInputs = [ menhir ];
   };
 
   # Some generated sources of these projects are checked in and regenerated by
