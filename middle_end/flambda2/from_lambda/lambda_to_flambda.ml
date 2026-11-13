@@ -1939,7 +1939,10 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
     in
     let ccenv = CC.declare_lcodes ccenv lcodes in
     let acc = CC.close_lcodes acc ccenv lcodes in
-    cps_tail acc env ccenv lam return_continuation exn_continuation
+    let acc, body =
+      cps_tail acc env ccenv lam return_continuation exn_continuation
+    in
+    CC.close_lcodes_of_unreached_templates acc, body
   in
   CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr ~program

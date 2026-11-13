@@ -247,7 +247,7 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~template_keys
       ~exported_offsets ~sections all_code
 
 let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
-    ~exported_offsets ~used_value_slots ~sections all_code =
+    ~template_keys ~exported_offsets ~used_value_slots ~sections all_code =
   if Flambda_features.opaque ()
   then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
   else
@@ -270,7 +270,7 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
              ~code_free_names:Code_or_metadata.free_names approx)
     in
     prepare_cmx
-      ~roots:(Name_occurrences.singleton_symbol module_symbol Name_mode.normal)
+      ~roots:(template_roots ~module_symbol ~template_keys)
       create_typing_env ~free_names_of_name ~used_value_slots
       ~canonicalise:(fun id -> id)
       ~exported_offsets ~sections all_code

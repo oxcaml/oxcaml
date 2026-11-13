@@ -188,10 +188,9 @@ let flambda_to_flambda0 : type m.
         ~last_pass_name,
         ~lto_info ) =
     match mode, close_prog_metadata with
-    | Classic, Classic (all_code, approxs, free_names, slot_offsets) -> (
-      (* Classic mode doesn't export the types of the environments of the unit's
-         templates. *)
-      let template_keys = Flambda2_identifiers.Symbol.Set.empty in
+    | ( Classic,
+        Classic (all_code, approxs, free_names, slot_offsets, template_keys) )
+      -> (
       (if Flambda_features.inlining_report ()
        then
          let output_prefix = prefixname ^ ".cps_conv" in
@@ -230,8 +229,8 @@ let flambda_to_flambda0 : type m.
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
           Flambda_cmx.prepare_cmx_from_approx ~machine_width ~approxs
-            ~module_symbol ~exported_offsets ~used_value_slots ~sections
-            all_code
+            ~module_symbol ~template_keys ~exported_offsets ~used_value_slots
+            ~sections all_code
         in
         ( raw_flambda,
           ~all_code,
@@ -254,8 +253,8 @@ let flambda_to_flambda0 : type m.
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
           Flambda_cmx.prepare_cmx_from_approx ~machine_width ~approxs
-            ~module_symbol ~exported_offsets ~used_value_slots ~sections
-            all_code
+            ~module_symbol ~template_keys ~exported_offsets ~used_value_slots
+            ~sections all_code
         in
         ( raw_flambda,
           ~all_code,
