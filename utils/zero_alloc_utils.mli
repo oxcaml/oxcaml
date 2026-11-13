@@ -1,3 +1,66 @@
+(** Components classifying the behavior of a region of code. *)
+module Component : sig
+  type 'top t =
+    | Top of 'top  (** This region of code may be reached and may allocate. *)
+    | Safe  (** This region of code may be reached but will not allocate. *)
+    | Bot  (** This region of code will not be reached. *)
+
+  val map : f:('a -> 'b) -> 'a t -> 'b t
+
+  val print :
+    print_top:(Format.formatter -> 'top -> unit) ->
+    Format.formatter ->
+    'top t ->
+    unit
+
+  val compare : compare_top:('top -> 'top -> int) -> 'top t -> 'top t -> int
+
+  val join : join_top:('top -> 'top -> 'top) -> 'top t -> 'top t -> 'top t
+
+  val meet : meet_top:('top -> 'top -> 'top) -> 'top t -> 'top t -> 'top t
+
+  val lessequal :
+    lessequal_top:('top -> 'top -> bool) -> 'top t -> 'top t -> bool
+end
+
+module Tag : sig
+  type t =
+    | N
+    | E
+    | D
+
+  val compare : t -> t -> int
+
+  val print : t -> string
+end
+
+(** One value per component, all of the same type. *)
+module Components : sig
+  type 'component t =
+    { nor : 'component;
+          (** Property about all paths from this program location that may reach
+              a Normal Return *)
+      exn : 'component;
+          (** Property about all paths from this program point that may reach a
+              Return with Exception *)
+      div : 'component
+          (** Property about all paths from this program point that may diverge.
+          *)
+    }
+
+  val create : (Tag.t -> 'a) -> 'a t
+
+  val iter : f:(Tag.t -> 'a -> unit) -> 'a t -> unit
+
+  val map : f:(Tag.t -> 'a -> 'b) -> 'a t -> 'b t
+
+  val map2 : f:(Tag.t -> 'a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
+
+  val lessequal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+end
+
 (** Abstract domain used in static analysis for checking [@zero_alloc]
     annotations. See [backend/zero_alloc_checker] for details of the analysis.
     See this module's .ml file for details about the translation of
@@ -49,10 +112,7 @@ module type Component = sig
 end
 
 module Make_component (Witnesses : WS) : sig
-  type t =
-    | Top of Witnesses.t
-    | Safe
-    | Bot
+  type t = Witnesses.t Component.t
 
   include Component with type witnesses := Witnesses.t and type t := t
 end
@@ -61,17 +121,7 @@ module Make_value
     (Witnesses : WS)
     (V : Component with type witnesses := Witnesses.t) : sig
   (** Abstract value associated with each program location in a function. *)
-  type t =
-    { nor : V.t;
-          (** Property about all paths from this program location that may reach
-              a Normal Return *)
-      exn : V.t;
-          (** Property about all paths from this program point that may reach a
-              Return with Exception *)
-      div : V.t
-          (** Property about all paths from this program point that may diverge.
-          *)
-    }
+  type t = V.t Components.t
 
   val lessequal : t -> t -> bool
 
