@@ -82,7 +82,7 @@ let from_nodes ~path =
             annot
         in
         ret (Jkind (env, jkind))
-      with Jkind.Error.User_error _ -> None)
+      with Jkind.Error.In_context _ -> None)
     | Class_field
         { cf_desc = Tcf_method (_, _, Tcfk_concrete (_, { exp_type })) } ->
       begin match Types.get_desc exp_type with

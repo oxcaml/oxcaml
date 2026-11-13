@@ -730,6 +730,8 @@ module type Wrapped = sig
     Mty_ident of Path.t
   | Mty_signature of signature
   | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
+                   * Mode.Staticity.Const.t
+      (* [Mode.Staticity.Const.t] is [Static] for template functors. *)
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
@@ -839,15 +841,15 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
   let rec module_type m = function
     | Mty_ident p -> To.Mty_ident p
     | Mty_alias p -> To.Mty_alias p
-    | Mty_functor (parm,mty,mm) ->
-        To.Mty_functor (functor_parameter m parm, module_type m mty, mm)
+    | Mty_functor (parm,mty,mm,st) ->
+        To.Mty_functor (functor_parameter m parm, module_type m mty, mm, st)
     | Mty_signature sg -> To.Mty_signature (signature m sg)
     | Mty_strengthen (mty,p,aliasable) ->
         To.Mty_strengthen (module_type m mty, p, aliasable)
 
   and functor_parameter m = function
       | Unit -> To.Unit
-      | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
+      | Named (id, mty, mm) -> To.Named (id, module_type m mty, mm)
 
   let value_description m vd = m.map_value_description m vd
 
