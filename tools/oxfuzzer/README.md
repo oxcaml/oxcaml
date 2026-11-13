@@ -41,11 +41,6 @@ immediately (use it if shutdown gets stuck); further SIGTERMs and SIGHUPs are
 ignored. Under `nohup`, which starts a program with SIGHUP ignored, oxfuzzer
 leaves it ignored and keeps running when the terminal is closed.
 
-oxfuzzer also keeps running when it can no longer write to stderr, say because
-the terminal is gone or the program it is piped into has exited: it stops
-printing, and still saves failures, writes the summary and sets its exit
-status.
-
 Use `--summary-file PATH` to have oxfuzzer write a short Markdown summary to
 PATH when the run ends, whether it finished, was stopped by a signal, or ended
 with an error (such as a failed self-check, a toolchain that cannot be run, an

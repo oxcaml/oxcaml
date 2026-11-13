@@ -430,32 +430,12 @@ class SavedFailure:
     reason: str
 
 
-# All of oxfuzzer's own output goes to stderr through this function. A run
-# must outlive its stderr (a closed terminal, a pipe whose reader has exited):
-# its results are the saved failures, the summary and the exit status. So once
-# a write fails, nothing more is written. sys.stderr is then None, which is
-# also what Python sets it to when stderr is closed at startup (as after
-# `2>&-`), and which Python itself allows for: in particular it then skips the
-# flush on exit, whose failure would turn the exit status into 120.
-def log(*values: object, end: str = "\n") -> None:
-    if sys.stderr is None:
-        return
-    try:
-        print(*values, end=end, file=sys.stderr, flush=True)
-    except (OSError, ValueError):
-        sys.stderr = None
-
-
-def stderr_is_tty() -> bool:
-    return sys.stderr is not None and sys.stderr.isatty()
-
-
 # On a terminal the status is a single line updated in place (see
 # Stats.report). This ends that line, so that what is printed next starts on a
 # line of its own.
 def end_status_line() -> None:
-    if stderr_is_tty():
-        log()
+    if sys.stderr.isatty():
+        print(file=sys.stderr)
 
 
 class GitHubLog:
@@ -473,12 +453,12 @@ class GitHubLog:
         if not self.enabled or self.group == title:
             return
         self.close_group()
-        log(f"::group::{title}")
+        print(f"::group::{title}", file=sys.stderr)
         self.group = title
 
     def close_group(self) -> None:
         if self.group is not None:
-            log("::endgroup::")
+            print("::endgroup::", file=sys.stderr)
             self.group = None
 
     # Reports a saved failure. Under GitHub Actions it is an error
@@ -487,13 +467,13 @@ class GitHubLog:
     # folded into a group, since there can be many.
     def failure(self, message: str) -> None:
         if not self.enabled:
-            log(message)
+            print(message, file=sys.stderr)
             return
         self.open_group("oxfuzzer: failures")
         # The characters that a workflow command's message has to escape.
         escaped = message.replace("%", "%25").replace("\r", "%0D")
         escaped = escaped.replace("\n", "%0A")
-        log(f"::error title=oxfuzzer failure::{escaped}")
+        print(f"::error title=oxfuzzer failure::{escaped}", file=sys.stderr)
 
 
 GITHUB_LOG = GitHubLog()
@@ -539,21 +519,24 @@ class Stats:
 
     def print_line(self) -> None:
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        log(f"{timestamp} {self.summary()}")
+        print(f"{timestamp} {self.summary()}", file=sys.stderr, flush=True)
 
     # On a terminal the status is a single line updated in place. Elsewhere
     # nothing is printed while cases pass: a log shows the saved failures as
     # they are found and the totals at the end.
     def report(self) -> None:
-        if stderr_is_tty():
-            log(f"\r{self.summary()}", end="")
+        if sys.stderr.isatty():
+            print(f"\r{self.summary()}", end="", file=sys.stderr, flush=True)
 
     def final_report(self) -> None:
         GITHUB_LOG.close_group()
         end_status_line()
-        if not stderr_is_tty():
+        if not sys.stderr.isatty():
             self.print_line()
-        log(f"oxfuzzer: {self.generation_timeouts} generations timed out")
+        print(
+            f"oxfuzzer: {self.generation_timeouts} generations timed out",
+            file=sys.stderr,
+        )
 
 
 def command_output(command: Sequence[str], *, cwd: Path | None = None) -> str | None:
@@ -978,8 +961,6 @@ class ShutdownSignals:
         # Last, so that nothing above depends on it, and with os.write: this
         # may interrupt a print to stderr, which must not be re-entered, and a
         # failed write (say, to a closed terminal) is ignored.
-        if sys.stderr is None:
-            return
         message = (
             f"oxfuzzer: {self.received.name} received, stopping "
             f"(press Ctrl-C again to exit immediately)\n"
@@ -1013,11 +994,11 @@ class Limits:
 
     def print_summary(self) -> None:
         if self.iterations is not None:
-            log(f"iterations: {self.iterations}")
+            print(f"iterations: {self.iterations}", file=sys.stderr)
         if self.max_failures is not None:
-            log(f"max failures: {self.max_failures}")
+            print(f"max failures: {self.max_failures}", file=sys.stderr)
         if self.time_limit_minutes is not None:
-            log(f"time limit: {self.time_limit_minutes} minutes")
+            print(f"time limit: {self.time_limit_minutes} minutes", file=sys.stderr)
 
     # The iteration limit is enforced outside this function by the number of
     # seeds generated.
@@ -1159,7 +1140,7 @@ def write_summary(path: Path, text: str) -> None:
         staging.write_text(text, encoding="utf-8")
         staging.replace(path)
     except OSError as error:
-        log(f"oxfuzzer: cannot write summary file: {error}")
+        print(f"oxfuzzer: cannot write summary file: {error}", file=sys.stderr)
 
 
 # Creates the output directory if needed and checks that failures can be saved
@@ -1340,7 +1321,9 @@ self-check or a toolchain that cannot be run.""",
                 with open(step_summary, "a", encoding="utf-8") as file:
                     file.write(text)
             except OSError as error:
-                log(f"oxfuzzer: cannot write the step summary: {error}")
+                print(
+                    f"oxfuzzer: cannot write the step summary: {error}", file=sys.stderr
+                )
 
     # The first line of the message heads the summary and the rest goes in a
     # block under it.
@@ -1353,7 +1336,7 @@ self-check or a toolchain that cannot be run.""",
         # the run is killed while it finishes.
         summarize(f"Finished: {finished_because.value}")
         stats.final_report()
-        log(f"oxfuzzer: finished: {finished_because.value}")
+        print(f"oxfuzzer: finished: {finished_because.value}", file=sys.stderr)
         if stats.failed:
             raise SystemExit(1)
 
@@ -1366,13 +1349,14 @@ self-check or a toolchain that cannot be run.""",
         revision = revision_line(toolchain)
         shutdown.check()
         GITHUB_LOG.open_group("oxfuzzer: settings")
-        log(f"seed: {base_seed}")
+        print(f"seed: {base_seed}", file=sys.stderr)
         limits.print_summary()
-        log(
+        print(
             f"{'install' if toolchain.installed else 'build'} directory: "
-            f"{toolchain.root}"
+            f"{toolchain.root}",
+            file=sys.stderr,
         )
-        log(revision)
+        print(revision, file=sys.stderr)
         prepare_output_dir(args.output)
         if not toolchain.installed:
             toolchain_dir = Path(
@@ -1381,7 +1365,7 @@ self-check or a toolchain that cannot be run.""",
             # CR-someday xclerc: Clean up the snapshot after finishing fuzzing
             # if no failures were saved.
             toolchain = toolchain.snapshot(toolchain_dir)
-            log(f"toolchain: {toolchain_dir}")
+            print(f"toolchain: {toolchain_dir}", file=sys.stderr)
             shutdown.check()
         run_info = run_metadata(base_seed, toolchain, revision)
         shutdown.check()
@@ -1419,7 +1403,7 @@ self-check or a toolchain that cannot be run.""",
     except Fatal as fatal:
         summarize_error("Fatal error", str(fatal))
         GITHUB_LOG.close_group()
-        log(f"oxfuzzer: {fatal}")
+        print(f"oxfuzzer: {fatal}", file=sys.stderr)
         raise SystemExit(1)
     except Exception as error:
         # Not an error that oxfuzzer expects. Python prints its traceback and
