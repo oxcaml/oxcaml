@@ -537,3 +537,235 @@ let y = [: "stutter" for _x in [: This 1; This 2; Null :] :]
 val x : string array = [|"stutter"; "stutter"; "stutter"|]
 val y : string iarray = [:"stutter"; "stutter"; "stutter":]
 |}]
+
+(* GADT equations know that an [or_null] type is never [non_null]. *)
+
+type (_ : any) gadt =
+  | Int : int gadt
+  | Int_or_null : int or_null gadt
+  | Float_u : float# gadt
+
+[%%expect{|
+type (_ : any) gadt =
+    Int : int gadt
+  | Int_or_null : int or_null gadt
+  | Float_u : float# gadt
+|}]
+
+(* [a] is a [value], so [a] can be neither [int or_null] nor [float#]. *)
+
+let exhaustive (type a) (t : a gadt) : a =
+  match t with
+  | Int -> 0
+
+[%%expect{|
+val exhaustive : 'a gadt -> 'a = <fun>
+|}]
+
+let refuted (type a) (t : a gadt) : a =
+  match t with
+  | Int -> 0
+  | _ -> .
+
+[%%expect{|
+val refuted : 'a gadt -> 'a = <fun>
+|}]
+
+let unreachable (type a) (t : a gadt) : a =
+  match t with
+  | Int -> 0
+  | _ -> assert false
+
+[%%expect{|
+Line 4, characters 4-5:
+4 |   | _ -> assert false
+        ^
+Warning 56 [unreachable-case]: this match case is unreachable.
+  Consider replacing it with a refutation case "<pat> -> ."
+
+val unreachable : 'a gadt -> 'a = <fun>
+|}]
+
+let ill_typed (type a) (t : a gadt) : unit =
+  match t with
+  | Int -> ()
+  | Int_or_null -> ()
+
+[%%expect{|
+Line 4, characters 4-15:
+4 |   | Int_or_null -> ()
+        ^^^^^^^^^^^
+Error: This pattern matches values of type "int or_null gadt"
+       but a pattern was expected which matches values of type "a gadt"
+       The layout of int or_null is value_or_null non_pointer
+         because it is the primitive type or_null.
+       But the layout of int or_null must be a sublayout of value
+         because it is or unifies with an unannotated universal variable.
+|}]
+
+(* The same goes for an existential. *)
+
+type packed = Pack : 'a gadt -> packed
+
+let exhaustive (Pack t) =
+  match t with
+  | Int -> ()
+
+[%%expect{|
+type packed = Pack : 'a gadt -> packed
+val exhaustive : packed -> unit = <fun>
+|}]
+
+(* And for an abstract type that is not locally abstract. *)
+
+module Abstract_value : sig
+  type t
+end = struct
+  type t = int
+end
+
+let exhaustive (t : Abstract_value.t gadt) =
+  match t with
+  | Int -> ()
+
+[%%expect{|
+module Abstract_value : sig type t end
+val exhaustive : Abstract_value.t gadt -> unit = <fun>
+|}]
+
+(* A [value_or_null] can be an [or_null]. *)
+
+let not_exhaustive (type a : value_or_null) (t : a gadt) =
+  match t with
+  | Int -> ()
+
+[%%expect{|
+Lines 2-3, characters 2-13:
+2 | ..match t with
+3 |   | Int -> ()
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "Int_or_null"
+
+val not_exhaustive : 'a gadt -> unit = <fun>
+|}]
+
+let exhaustive (type a : value_or_null) (t : a gadt) : a =
+  match t with
+  | Int -> 0
+  | Int_or_null -> Null
+
+[%%expect{|
+val exhaustive : 'a gadt -> 'a = <fun>
+|}]
+
+(* Abbreviations, unboxed wrappers and [[@@or_null]] types are also never
+   [non_null]. *)
+
+type 'a abbreviation = 'a or_null
+type wrapper = { contents : string or_null } [@@unboxed]
+type 'a custom = Nothing | Just of 'a [@@or_null]
+
+type (_ : any) gadt =
+  | Abbreviation : int abbreviation gadt
+  | Wrapper : wrapper gadt
+  | Custom : int custom gadt
+  | String : string gadt
+
+let exhaustive (type a) (t : a gadt) =
+  match t with
+  | String -> ()
+
+[%%expect{|
+type 'a abbreviation = 'a or_null
+type wrapper = { contents : string or_null; } [@@unboxed]
+type 'a custom = Nothing | Just of 'a [@@or_null]
+type (_ : any) gadt =
+    Abbreviation : int abbreviation gadt
+  | Wrapper : wrapper gadt
+  | Custom : int custom gadt
+  | String : string gadt
+val exhaustive : 'a gadt -> unit = <fun>
+|}]
+
+(* The argument of [or_null] doesn't matter. *)
+
+type (_ : any) gadt =
+  | Or_null : 'a or_null gadt
+  | String : string gadt
+
+let exhaustive (type a) (t : a gadt) =
+  match t with
+  | String -> ()
+
+[%%expect{|
+type (_ : any) gadt = Or_null : 'a or_null gadt | String : string gadt
+val exhaustive : 'a gadt -> unit = <fun>
+|}]
+
+(* But an abstract [value_or_null] might be a [value] after all. *)
+
+module Abstract_value_or_null : sig
+  type t : value_or_null
+end = struct
+  type t = int
+end
+
+type (_ : any) gadt =
+  | Abstract : Abstract_value_or_null.t gadt
+  | String : string gadt
+
+let not_exhaustive (type a) (t : a gadt) =
+  match t with
+  | String -> ()
+
+[%%expect{|
+module Abstract_value_or_null : sig type t : value_or_null end
+type (_ : any) gadt =
+    Abstract : Abstract_value_or_null.t gadt
+  | String : string gadt
+Lines 12-13, characters 2-16:
+12 | ..match t with
+13 |   | String -> ()
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "Abstract"
+
+val not_exhaustive : 'a gadt -> unit = <fun>
+|}]
+
+let not_refuted (type a) (t : a gadt) =
+  match t with
+  | String -> ()
+  | Abstract -> ()
+
+[%%expect{|
+val not_refuted : 'a gadt -> unit = <fun>
+|}]
+
+(* Equality witnesses. *)
+
+type (_ : any, _ : any) eq = Refl : ('a : any). ('a, 'a) eq
+
+let refuted (type a) (eq : (a, int or_null) eq) =
+  match eq with
+  | _ -> .
+
+[%%expect{|
+type (_ : any, _ : any) eq = Refl : ('a : any). ('a, 'a) eq
+val refuted : ('a, int or_null) eq -> 'b = <fun>
+|}]
+
+let refuted (type a) (eq : (int or_null * int, a * int) eq) =
+  match eq with
+  | _ -> .
+
+[%%expect{|
+val refuted : (int or_null * int, 'a * int) eq -> 'b = <fun>
+|}]
+
+let not_refuted (type a : value_or_null) (eq : (a, int or_null) eq) (x : a) =
+  match eq with
+  | Refl -> (x : int or_null)
+
+[%%expect{|
+val not_refuted : ('a, int or_null) eq -> 'a -> int or_null = <fun>
+|}]

@@ -3993,6 +3993,25 @@ let constrain_type_jkind_exn env texn ty jkind =
   | Error err -> raise_for texn (Bad_jkind (ty,err))
 
 
+(* The jkind we estimate for a type is an upper bound: a type whose estimated
+   jkind is [value_or_null] may well turn out to be a [value] once we learn
+   more about the abstract types and type variables in it. An [or_null] type
+   (the built-in one, or one declared with [[@@or_null]], possibly under
+   unboxed wrappers) is the exception. It is [maybe_null] whatever its
+   arguments are, so it cannot be equal to a type whose jkind is [non_null].
+
+   This checks whether [ty] is such a type and [jkind] is [non_null].
+   [ty_jkind] must be an upper bound of the jkind of [ty]. We only use it to
+   avoid unboxing [ty] in the common case where it isn't [maybe_null]. *)
+let is_or_null_type_but_jkind_is_non_null env ty ~ty_jkind jkind =
+  match
+    Jkind.get_nullability env ty_jkind, Jkind.get_nullability env jkind
+  with
+  | Some Maybe_null, Some Non_null ->
+    Option.is_some (get_unboxed_type_approximation env ty).or_null
+  | (Some (Maybe_null | Non_null) | None),
+    (Some (Maybe_null | Non_null) | None) -> false
+
 (* Note: Because [estimate_type_jkind] actually returns an upper bound, this
    function computes an inaccurate intersection in some cases.
 
@@ -4002,6 +4021,9 @@ let constrain_type_jkind_exn env texn ty jkind =
    intersection is uninhabited".  It's fine to call the intersection non-empty
    in some cases where its not (this will happen when pattern matching on a
    "false" GADT pattern), but not to say the intersection is empty if it isn't.
+
+   The one case where we do better than the upper bound is the nullability of
+   an [or_null] type: see [is_or_null_type_but_jkind_is_non_null].
 *)
 let rec intersect_type_jkind ~reason env ty1 jkind2 =
   match get_desc ty1 with
@@ -4012,6 +4034,15 @@ let rec intersect_type_jkind ~reason env ty1 jkind2 =
     let type_equal = !type_equal' env in
     let jkind1 = type_jkind env ty1 in
     let context = mk_jkind_context_check_principal env in
+    if is_or_null_type_but_jkind_is_non_null env ty1 ~ty_jkind:jkind1 jkind2
+    then
+      (* The nullability of [ty1] is exact, so we can say that it must be a
+         subjkind, which is more helpful than saying it must overlap. *)
+      Jkind.No_intersection
+        (Jkind.Violation.of_ ~context env
+           (Not_a_subjkind
+              (jkind1, jkind2, [Layout_disagreement Incompatible])))
+    else
     let jkind1 = Jkind.round_up ~context env jkind1 in
     let jkind2 = Jkind.round_up ~context env jkind2 in
     (* This is strange, in that we're rounding up and then computing an
@@ -4717,7 +4748,9 @@ let rec expands_to_datatype env ty =
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
 let may_have_jkind_intersection_tk env ty jkind =
-  Jkind.may_have_intersection env (type_jkind env ty) jkind
+  let ty_jkind = type_jkind env ty in
+  Jkind.may_have_intersection env ty_jkind jkind
+  && not (is_or_null_type_but_jkind_is_non_null env ty ~ty_jkind jkind)
 
 (* [mcomp] tests if two types are "compatible" -- i.e., if there could
    exist a witness of their equality. This is distinct from [eqtype],
@@ -4792,7 +4825,7 @@ let rec mcomp type_pairs env t1 t2 =
         (* - If [aliasable1], then [is_aliasable t1'] and [t1'] is [Tconstr]. *)
         (* - If [aliasable2], then [is_aliasable t2'] and [t2'] is [Tconstr]. *)
         | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _), _, _) ->
-            mcomp_type_decl type_pairs env p1 p2 tl1 tl2
+            mcomp_type_decl type_pairs env t1' t2' p1 p2 tl1 tl2
         | (Tconstr (_, [], _), _, _, _) when has_injective_univars env t2' ->
             raise Incompatible
         | (_, Tconstr (_, [], _), _, _) when has_injective_univars env t1' ->
@@ -4946,13 +4979,20 @@ and mcomp_unsafe_mode_crossing type_pairs env umc1 umc2 =
       then ()
       else raise Incompatible
 
-and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
+and mcomp_type_decl type_pairs env t1 t2 p1 p2 tl1 tl2 =
   try
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
     let check_jkinds () =
       if not (Jkind.may_have_intersection env
                 decl.type_jkind decl'.type_jkind)
+      then raise Incompatible
+    in
+    (* [check_jkinds] compares the jkinds of the declarations, which doesn't
+       notice that an [or_null] type can't be a [non_null] abstract type. *)
+    let check_not_or_null ty ~ty_decl ~abstract_decl =
+      if is_or_null_type_but_jkind_is_non_null env ty
+           ~ty_jkind:ty_decl.type_jkind abstract_decl.type_jkind
       then raise Incompatible
     in
     if compatible_paths p1 p2 then begin
@@ -4988,8 +5028,12 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
       | Type_open, Type_open ->
           mcomp_list type_pairs env tl1 tl2
       | Type_abstract _, Type_abstract _ -> check_jkinds ()
-      | Type_abstract _, _ when not (non_aliasable p1 decl)-> check_jkinds ()
-      | _, Type_abstract _ when not (non_aliasable p2 decl') -> check_jkinds ()
+      | Type_abstract _, _ when not (non_aliasable p1 decl)->
+          check_jkinds ();
+          check_not_or_null t2 ~ty_decl:decl' ~abstract_decl:decl
+      | _, Type_abstract _ when not (non_aliasable p2 decl') ->
+          check_jkinds ();
+          check_not_or_null t1 ~ty_decl:decl ~abstract_decl:decl'
       | _ -> raise Incompatible
   with Not_found -> ()
 
