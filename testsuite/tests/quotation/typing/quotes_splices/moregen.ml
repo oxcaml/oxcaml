@@ -104,12 +104,12 @@ Error: Signature mismatch:
            val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
          end
        Values do not match:
-         val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
+         val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr
        is not included in
-         val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
-       The type "unit -> <[(string -> unit) * (string -> unit)]> expr @ once"
+         val f : unit -> <[(string -> unit) * (int -> unit)]> expr
+       The type "unit -> <[(string -> unit) * (string -> unit)]> expr"
        is not compatible with the type
-         "unit -> <[(string -> unit) * (int -> unit)]> expr @ once"
+         "unit -> <[(string -> unit) * (int -> unit)]> expr"
        Type "(string -> unit) * (string -> unit)" is not compatible with type
          "(string -> unit) * (int -> unit)"
        Type "string" is not compatible with type "int"

@@ -870,6 +870,14 @@ let subcase_list l ppf = match l with
         (Fmt.pp_print_list ~pp_sep:space pp_msg)
         (List.rev l)
 
+let core_prints_modes = function
+  | Err.Value_descriptions {symptom = Type {trace}} ->
+      begin match Misc.last trace with
+      | Some (Errortrace.Mode_mismatch _) -> true
+      | _ -> false
+      end
+  | _ -> true
+
 (* Printers for leaves *)
 let core env id x =
   match x with
@@ -1163,7 +1171,9 @@ and signature ~expansion_token ~env:_ ~before ~ctx sgs =
     )
 and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
   | Core c ->
-      dwith_context ctx (core env.i_env name c) :: before
+      Out_type.with_modes (core_prints_modes c) (fun () ->
+        dwith_context ctx (core env.i_env name c))
+      :: before
   | Module_type diff ->
       module_type ~expansion_token ~eqmode:false ~env ~before
         ~ctx:(Context.Module name :: ctx) diff

@@ -374,11 +374,10 @@ Error: Signature mismatch:
        is not included in
          sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
        Values do not match:
-         val f : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased]
+         val f : 'a -> 'a * 'a
        is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
-       The type "'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased]"
-       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
+         val f : 'a -> 'a @@ stateless
+       The type "'a -> 'a * 'a" is not compatible with the type "'a -> 'a"
        Type "'a * 'a" is not compatible with type "'a"
 |}]
 

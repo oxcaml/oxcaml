@@ -940,6 +940,9 @@ let mode_polymorphism_printing_enabled () =
     is_at_least Mode_polymorphism Alpha
     && is_enabled Mode_polymorphism_printing)
 
+let print_modes = ref true
+let with_modes b f = Misc.protect_refs [R (print_modes,b)] f
+
 module Internal_names : sig
 
   val reset : unit -> unit
@@ -1027,6 +1030,7 @@ let const_or_generic_upper :
     arrow. *)
 let curry_acc : const_or_generic -> With_locality.lr -> const_or_generic =
   fun acc marg ->
+    if not !print_modes then acc else
     match acc, With_locality.zap_to_legacy ~arg:true marg with
     | Const acc, Some arg -> Const (Ctype.curry_mode_const acc arg)
     | Generic (acc, bound), _ ->
@@ -1054,6 +1058,7 @@ let const_or_generic_of_mode :
     With_locality.lr ->
     const_or_generic =
   fun ~arg m ->
+    if not !print_modes then Const With_locality.Const.legacy else
     match With_locality.zap_to_legacy ~arg m with
     | Some c -> Const c
     | None ->
@@ -2271,7 +2276,7 @@ end = struct
   let reserve ty =
     normalize_type ty;
     add_named_vars ty;
-    if mode_polymorphism_printing_enabled () then begin
+    if !print_modes && mode_polymorphism_printing_enabled () then begin
       register_visible_modes ty;
       add_visible_paths ();
       add_visible_edges ()
@@ -2844,7 +2849,7 @@ and tree_of_ret_typ_mutating (acc_mode : const_or_generic) m ty=
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
-      if equate_with_const m acc_mode then begin
+      if not !print_modes || equate_with_const m acc_mode then begin
         (Orm_no_parens, acc_mode)
       end else begin
         (* In this branch we need to print parens. [m] might have undetermined
