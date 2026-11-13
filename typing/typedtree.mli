@@ -763,6 +763,10 @@ and 'k case =
      c_cont: Ident.t option;
      c_guard: expression option;
      c_rhs: expression;
+     c_generalized: Types.type_expr list;
+     (** The type variables generalized in the types of the variables bound by
+         [c_lhs], when the cases of a [match] generalize the type of the
+         scrutinee. *)
     }
 
 and function_param =
@@ -1086,6 +1090,10 @@ and value_binding =
     vb_sort: Jkind.sort;
     vb_attributes: attributes;
     vb_loc: Location.t;
+    vb_generalized: Types.type_expr list;
+    (** The type variables that this binding generalizes in the types of the
+        variables bound by [vb_pat]. Other variables in these types are
+        generalized by an enclosing binding, if at all. *)
   }
 
 and module_coercion =

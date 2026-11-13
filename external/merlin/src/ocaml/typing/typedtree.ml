@@ -510,6 +510,7 @@ and 'k case =
      c_cont: (Ident.t * Types.value_description) option;
      c_guard: expression option;
      c_rhs: expression;
+     c_generalized: Types.type_expr list;
     }
 
 and function_curry =
@@ -727,6 +728,7 @@ and value_binding =
     vb_sort: Jkind.sort;
     vb_attributes: attributes;
     vb_loc: Location.t;
+    vb_generalized: Types.type_expr list;
   }
 
 and module_coercion =

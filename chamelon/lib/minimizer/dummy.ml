@@ -155,6 +155,7 @@ let dummy1_str_it_desc =
                          [ { c_lhs = any_pat;
                              c_cont = None;
                              c_guard = None;
+                             c_generalized = [];
                              c_rhs =
                                exp_desc_to_exp
                                  (mkTexp_assert
@@ -261,6 +262,7 @@ let empty_value_case =
         ~pat_type:dummy_type_expr ~pat_env:Env.empty ~pat_attributes:[];
     c_cont = None;
     c_guard = None;
+    c_generalized = [];
     c_rhs =
       { exp_desc = apply_dummy2.exp_desc;
         exp_loc = Location.none;
@@ -278,6 +280,7 @@ let empty_computation_case =
            ~pat_type:dummy_type_expr ~pat_env:Env.empty ~pat_attributes:[]);
     c_cont = None;
     c_guard = None;
+    c_generalized = [];
     c_rhs =
       { exp_desc = apply_dummy2.exp_desc;
         exp_loc = Location.none;
