@@ -822,7 +822,8 @@ let ocaml_ignored_flags =
     "-stubs-forward-inlining";
     "-no-stubs-forward-inlining";
     "-djsir";
-    "-link-jsir"
+    "-link-jsir";
+    "-jsir-inlined-frames"
   ]
 
 let ocaml_ignored_parametrized_flags =

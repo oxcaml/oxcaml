@@ -280,6 +280,7 @@ end
     then hold JSIR (see [Jscomp]). *)
 val link_jsir : bool ref
 
+val jsir_inlined_frames : bool ref
 val set_jsoo_effects : Jsoo_effects.t -> unit
 val jsoo_effects : unit -> Jsoo_effects.t option
 
