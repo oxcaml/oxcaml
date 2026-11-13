@@ -341,7 +341,8 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
       (Yielding.join [yielding funct_mode; yielding md_mode])
   in
   match Mtype.scrape_alias env mty with
-  | Mty_functor (Named (param, mty_param, mm_param),mty_result,mm_result)
+  | Mty_functor (Named (param, mty_param, mm_param),
+                 mty_result, mm_result, staticity)
     as mty_func ->
       let sg_param =
         match Mtype.scrape env mty_param with
@@ -378,19 +379,21 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
-            Tincl_functor { input_coercion; input_repr; yielding }, sg_result,
-            mm_result
-        | Mty_functor (Unit, mty_result, mm_result) -> begin
+            Tincl_functor { input_coercion; input_repr; yielding; staticity },
+            sg_result, mm_result
+        | Mty_functor (Unit, mty_result, mm_result, staticity') -> begin
+            assert (staticity' = Staticity.Dynamic);
             check_for_generated_type_or_jkind ~funct_body env loc mty
               (fun tj -> Not_includable_in_functor_body tj);
             match Mtype.scrape extended_env mty_result with
             | Mty_signature sg_result ->
-              Tincl_gen_functor { input_coercion; input_repr; yielding },
+              Tincl_gen_functor { input_coercion; input_repr;
+                                  yielding; staticity },
               sg_result, mm_result
             | sg ->
                 Error.log_and_raise loc env
                   (Signature_result_expected
-                     (Mty_functor (Unit,sg, mm_result)))
+                     (Mty_functor (Unit, sg, mm_result, Dynamic)))
           end
         | sg ->
             Error.log_and_raise loc env (Signature_result_expected sg)
@@ -407,8 +410,8 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
               (Cannot_eliminate_dependency (Functor_included, mty_func))
       in
       let mm = mm_result |> with_locality_as_regionality in
-      (sg, mm, incl_kind)
-  | Mty_functor (Unit,_,_) as mty ->
+      (sg, mm, incl_kind, staticity)
+  | Mty_functor (Unit,_,_,_) as mty ->
       Error.log_and_raise loc env
         (Signature_parameter_expected mty)
   | Mty_alias path ->
@@ -640,7 +643,7 @@ let iterator_with_env super env =
       env := env_before
     );
     Btype.it_module_type = (fun self -> function
-    | Mty_functor (param, mty_body, _) ->
+    | Mty_functor (param, mty_body, _, _) ->
       let env_before = !env in
       begin match param with
       | Unit -> ()
@@ -669,7 +672,7 @@ let retype_applicative_functor_type ~loc env funct arg =
   let mty_arg = (Env.find_module arg env).md_type in
   let mty_param =
     match Mtype.scrape_alias env mty_functor with
-    | Mty_functor (Named (_, mty_param, _), _, _) -> mty_param
+    | Mty_functor (Named (_, mty_param, _), _, _, _) -> mty_param
     | _ -> assert false (* could trigger due to MPR#7611 *)
   in
   Includemod.check_functor_application ~loc env mty_arg arg mty_param
@@ -880,7 +883,7 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
   | Mty_signature sg ->
     Mty_signature
       (remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg)
-  | Mty_functor (param, mty, mm) ->
+  | Mty_functor (param, mty, mm, st) ->
     let param : Types.functor_parameter =
       match param with
       | Named (id, mty, mm) ->
@@ -894,7 +897,7 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
     let mty =
       remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
     in
-    Mty_functor (param, mty, mm)
+    Mty_functor (param, mty, mm, st)
   | Mty_strengthen (mty, path, alias) ->
       let mty =
         remove_modality_and_zero_alloc_variables_mty env
@@ -1563,6 +1566,32 @@ let apply_pmd_modalities env modalities mty =
     in
     mty, { modalities with moda_modalities }
 
+(** We distinguish template functors based on the annotation on their parameter.
+    Applicative functors are template functors ([Static]) if their parameter
+    is annotated [@ static], while generative functors are never templates.
+
+    Returned hints may be used to constrain the mode of the functor and result:
+    non-template functors are always [dynamic] and have [dynamic] results.
+
+    Note that the hints can only be used in lower bounds. Hence, they are
+    only non-trivial if the bound is [dynamic], like the hint acknowledges.  *)
+let transl_functor_staticity_of_parameter
+  : Parsetree.functor_parameter ->
+    Staticity.Const.t *
+    funct_hint:Allowance.left_only Allowance.neg Hint.const *
+    res_hint:Allowance.left_only Allowance.neg Hint.const =
+  function
+  | Unit ->
+    Dynamic,
+    ~funct_hint:(Mode_hint.Always_dynamic Generative_functor),
+    ~res_hint:(Mode_hint.Always_dynamic Generative_functor_application)
+  | Named (_, _, marg) ->
+    let { mode_modes } = Typemode.transl_mode_with_locality marg in
+    (With_locality.Const.split mode_modes).monadic.staticity,
+    ~funct_hint:(Mode_hint.Always_dynamic Non_template_functor),
+    ~res_hint:(Mode_hint.Always_dynamic Non_template_functor_application)
+
+
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
    type AST.  Retain only module, type, and module type
@@ -1585,6 +1614,11 @@ let rec approx_modtype env smty =
   | Pmty_signature ssg ->
       Mty_signature(approx_sig env ssg)
   | Pmty_functor(param, sres, mres) ->
+      (* Since we are only approximating the structure of the module types,
+         we do not incorporate mode constraints from the functor's staticity. *)
+      let staticity, ~funct_hint:_, ~res_hint:_ =
+        transl_functor_staticity_of_parameter param
+      in
       let (param, newenv) =
         match param with
         | Unit -> Types.Unit, env
@@ -1606,7 +1640,7 @@ let rec approx_modtype env smty =
       let res = approx_modtype newenv sres in
       let {mode_modes = mres} = Typemode.transl_mode_with_locality mres in
       let mres = With_locality.of_const mres in
-      Mty_functor(param, res, mres)
+      Mty_functor(param, res, mres, staticity)
   | Pmty_with(sbody, constraints) ->
       (* the module type body is approximated and resolved to a signature.*)
       let approx_body = approx_modtype env sbody in
@@ -2183,6 +2217,14 @@ and transl_modtype_aux md_mode env smty =
   | Pmty_functor(sarg_opt, sres, mres) ->
       let tmres = Typemode.transl_mode_with_locality mres in
       let mres = tmres.mode_modes |> With_locality.of_const in
+      (* Since we are translating a module type, and module types have no modes,
+         there's no functor mode to constrain. *)
+      let staticity, ~funct_hint:_, ~res_hint =
+        transl_functor_staticity_of_parameter sarg_opt
+      in
+      Staticity.submode_err (loc, Functor_return)
+        (Staticity.of_const ~hint:res_hint staticity)
+        (With_locality.proj_monadic Staticity mres);
       let t_arg, ty_arg, newenv =
         match sarg_opt with
         | Unit -> Unit, Types.Unit, env
@@ -2215,7 +2257,7 @@ and transl_modtype_aux md_mode env smty =
       in
       let res = transl_modtype newenv sres in
       mkmty (Tmty_functor (t_arg, res, tmres))
-        (Mty_functor(ty_arg, res.mty_type, mres)) env loc
+        (Mty_functor(ty_arg, res.mty_type, mres, staticity)) env loc
         smty.pmty_attributes
   | Pmty_with(sbody, constraints) ->
       let body = transl_modtype env sbody in
@@ -2348,7 +2390,7 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
         let funct_mode = With_regionality.disallow_right With_regionality.max in
-        let sg, mode, incl_kind =
+        let sg, mode, incl_kind, _staticity =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc
             md_mode ~funct_mode ~input_repr:(fun _ -> ())
         in
@@ -2912,7 +2954,7 @@ let rec nongen_modtype env f g = function
   | Mty_signature sg ->
       let env = Env.add_signature sg env in
       List.find_map (nongen_signature_item env f g) sg
-  | Mty_functor(arg_opt, body, _) as mty ->
+  | Mty_functor(arg_opt, body, _, _) as mty ->
       g env mty;
       let env =
         match arg_opt with
@@ -2945,7 +2987,7 @@ and nongen_signature_item env f g = function
   | _ -> None
 
 let remove_functor_mode_variables ~zap_scope = function
-  | Mty_functor (arg_opt, _, mres) ->
+  | Mty_functor (arg_opt, _, mres, _) ->
       let zap_mode ~arg mode =
         if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
           With_locality.add_mode_to_zap_scope ~arg mode zap_scope
@@ -3410,27 +3452,20 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           (smod.pmod_loc, Functor)
           closed_over_mode.comonadic env
       in
-      let staticity =
-        With_regionality.proj_monadic Staticity closed_over_mode
+      let staticity, ~funct_hint, ~res_hint =
+        transl_functor_staticity_of_parameter arg_opt
       in
+      Staticity.submode_err (smod.pmod_loc, Functor)
+        (Staticity.of_const ~hint:funct_hint staticity)
+        (With_regionality.proj_monadic Staticity closed_over_mode);
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
-          Staticity.submode_err (smod.pmod_loc, Functor)
-            (Staticity.of_const ~hint:(Always_dynamic Generative_functor)
-               Dynamic)
-            staticity;
           Unit, Types.Unit, newenv, Shape.for_unnamed_functor_param, false
         | Named (param, smty, smode) ->
           (* unspecified mode axes defaults to legacy *)
           let tmode = Typemode.transl_mode_with_locality smode in
           let mode = With_locality.of_const tmode.mode_modes in
-          let param_st =
-            Staticity.apply_hint (Parameter_to_functor param.loc)
-              (With_locality.proj_monadic Staticity mode)
-          in
-          (* See Note [Staticity of functors] in [typedtree.mli] *)
-          Staticity.equate_err (smod.pmod_loc, Functor) staticity param_st;
           let mty = transl_modtype_functor_arg env smty in
           let scope = Ctype.create_scope () in
           let (id, newenv, var) =
@@ -3466,6 +3501,9 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       With_regionality.submode_exn
         body_mode
         (ret_mode |> with_locality_as_regionality);
+      Staticity.submode_err (body.mod_loc, Module)
+        (Staticity.of_const ~hint:res_hint staticity)
+        (With_locality.proj_monadic Staticity ret_mode);
       (* Apply currying constraints if the body is a functor,
          similar to constraints for functions. *)
       (match body.mod_type with
@@ -3480,9 +3518,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
            (With_locality.partial_apply mode_with_locality)
            ret_mode
        | _ -> ());
-      { mod_desc =
-          Tmod_functor (t_arg, body, Staticity.disallow_left staticity);
-        mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode);
+      { mod_desc = Tmod_functor (t_arg, body, staticity);
+        mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode, staticity);
         mod_mode = With_regionality.disallow_right closed_over_mode, None;
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
@@ -3679,11 +3716,11 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
   (* Applying a functor runs its body, which can perform a free effect if the
      functor closes over a yielding value (its own mode) or is given a yielding
      argument (the argument's mode). *)
-  let functor_application_yielding ~funct ~arg_mode =
+  let functor_application_yielding ~funct_mode ~arg_mode =
     let yielding m = With_regionality.proj_comonadic Yielding m in
     Ctype.create_yielding_mode_l
       (Yielding.join
-         [yielding (mode_without_locks_exn funct.mod_mode); yielding arg_mode])
+         [yielding funct_mode; yielding arg_mode])
   in
   (* CR modes: Apply currying constraints if the application is partial
      and returns a functor, similar to constraints for functions.
@@ -3709,7 +3746,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     | _ -> ()
   in
   match Mtype.scrape_alias env funct.mod_type with
-  | Mty_functor (Unit, mty_res, mm_res) ->
+  | Mty_functor (Unit, mty_res, mm_res, staticity) ->
+      assert (staticity = Staticity.Dynamic);
       begin match app_view.arg with
         | None -> ()
         | Some arg ->
@@ -3741,7 +3779,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         mod_attributes = app_view.attributes;
         mod_loc = funct.mod_loc },
       Shape.app funct_shape ~arg:Shape.dummy_mod
-  | Mty_functor (Named (param, mty_param, mm_param), mty_res, mm_res)
+  | Mty_functor (Named (param, mty_param, mm_param), mty_res, mm_res, staticity)
       as mty_functor ->
       let mm_param = with_locality_as_regionality mm_param in
       let mm_res = with_locality_as_regionality mm_res in
@@ -3754,13 +3792,14 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         in
         Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args}
       in
+      let funct_mode = mode_without_locks_exn funct.mod_mode in
       begin match app_view with
       | { arg = None; loc = app_loc; attributes = app_attributes; _ } ->
           Typing_recovery.log_or_raise (apply_error ());
           { mod_desc =
               Tmod_apply_unit
                 (funct,
-                 functor_application_yielding ~funct
+                 functor_application_yielding ~funct_mode
                    ~arg_mode:
                      (With_regionality.disallow_right With_regionality.legacy));
             mod_type = mty_res;
@@ -3838,32 +3877,17 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
         ~mode_arg:(Some mm_param);
-      let mode_funct = mode_without_locks_exn funct.mod_mode in
-      let funct_staticity =
-        With_regionality.proj_monadic Staticity mode_funct
-      in
-      (* The following [submode] recovers the functor's original staticity [m].
-         See Note [Staticity of functors] in [typedtree.mli] *)
-      let staticity =
-        Staticity.apply_hint (Parameter_to_functor Location.none)
-          (With_regionality.proj_monadic Staticity mm_param)
-      in
-      Staticity.submode_err (funct.mod_loc, Functor) funct_staticity staticity;
-      let mm_res =
-        With_regionality.join
-          [ With_regionality.disallow_right mm_res;
-            With_regionality.min_with_monadic Staticity
-              (Staticity.apply_hint (Functor_to_application funct.mod_loc)
-                 funct_staticity) ]
-      in
+      Staticity.submode_err (funct.mod_loc, Functor)
+        (With_regionality.proj_monadic Staticity funct_mode)
+        (Staticity.of_const ~hint:Template_inst staticity);
       { mod_desc =
           Tmod_apply
             (funct, arg, coercion,
-             functor_application_yielding ~funct
+             functor_application_yielding ~funct_mode
                ~arg_mode:(fst arg.mod_mode),
-             Staticity.disallow_left staticity);
+             staticity);
         mod_type = mty_appl;
-        mod_mode = mm_res, None;
+        mod_mode = With_regionality.disallow_right mm_res, None;
         mod_env = env;
         mod_attributes = app_attributes;
         mod_loc = app_loc },
@@ -3971,11 +3995,14 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
         let funct_mode = Typedtree.mode_without_locks_exn modl.mod_mode in
-        let sg, mode, incl_kind =
+        let sg, mode, incl_kind, staticity =
           extract_sig_functor_open funct_body env smodl.pmod_loc
             modl.mod_type sig_acc md_mode ~funct_mode
             ~input_repr:(include_functor_input_repr env sig_acc)
         in
+        Staticity.submode_err (loc, Functor)
+          (With_regionality.proj_monadic Staticity funct_mode)
+          (Staticity.of_const ~hint:Template_inst staticity);
         incl_kind, sg, With_regionality.disallow_right mode
       | Structure ->
         Tincl_structure, extract_sig_open env smodl.pmod_loc modl.mod_type,
@@ -4496,7 +4523,7 @@ let rec normalize_modtype = function
     Mty_ident _
   | Mty_alias _ -> ()
   | Mty_signature sg -> normalize_signature sg
-  | Mty_functor(_param, body, _) -> normalize_modtype body
+  | Mty_functor(_param, body, _, _) -> normalize_modtype body
   | Mty_strengthen (mty,_,_) -> normalize_modtype mty
 
 and normalize_signature sg = List.iter normalize_signature_item sg
@@ -5146,7 +5173,8 @@ let functorize_signature ~params ~modules : Types.signature =
         Mty_functor
           (Named (Some param_id, param_type, With_locality.legacy),
            body,
-           With_locality.legacy))
+           With_locality.legacy,
+           Dynamic))
       params body
   in
   let body =
@@ -5180,7 +5208,9 @@ let functorize_signature ~params ~modules : Types.signature =
       (Path.Pident intf_id) make_params
   in
   let make_result = Mty_ident (Path.Pdot (intf_applied_path, "S")) in
-  let make_with_unit = Mty_functor (Unit, make_result, With_locality.legacy) in
+  let make_with_unit =
+    Mty_functor (Unit, make_result, With_locality.legacy, Dynamic)
+  in
   let make_mty = wrap_in_named_functor_layers make_params make_with_unit in
   [
     Sig_module (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported);

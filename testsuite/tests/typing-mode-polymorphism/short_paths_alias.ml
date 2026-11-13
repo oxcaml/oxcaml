@@ -20,5 +20,5 @@ module My_inner = Short_paths_lib.Inner
 
 let f = Short_paths_provider.f
 [%%expect{|
-val f : My_inner.t option -> unit = <fun>
+val f : Short_paths_lib.Inner.t option -> unit = <fun>
 |}]
