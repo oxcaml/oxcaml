@@ -1,3 +1,0 @@
-File "uses_d.ml", line 1:
-Error: The files libd/d.cmi and liba_alt/a.cmi make inconsistent assumptions
-       over interface A

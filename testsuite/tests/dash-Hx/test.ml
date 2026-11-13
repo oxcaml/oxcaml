@@ -18,8 +18,8 @@
       succeeds, or with -open-cmi, which fails because C is forced dynamic.
 *)
 
-subdirectories = "libb libc";
-readonly_files = "transitive.ml alias.ml open_cmi.ml";
+subdirectories = "liba libb libc libd";
+readonly_files = "transitive.ml alias.ml open_cmi.ml uses_d.ml uses_a.ml";
 setup-ocamlopt.byte-build-env;
 
 flags = "-extension layout_poly_alpha -Ix libc -nocwd";
@@ -36,6 +36,14 @@ ocamlopt.byte;
 module = "libb/b_alias.mli";
 ocamlopt.byte;
 module = "libb/b_alias.ml";
+ocamlopt.byte;
+
+flags = "-Ix liba -nocwd";
+module = "liba/a.ml";
+ocamlopt.byte;
+
+flags = "-Ix liba -Ix libd -nocwd";
+module = "libd/d.ml";
 ocamlopt.byte;
 
 (* The paths passed to -H-file and -Hx-file are relative to this. *)
@@ -62,7 +70,9 @@ set MANIFEST_FILES_ROOT = "${test_build_directory}";
   ocamlopt.byte;
 }
 {
-  (* The module alias causes us to look up C. Its cmx needs to be guaranteed. *)
+  (* The module alias causes us to look up C. Its cmx needs to be guaranteed.
+     CR layouts: this currently fails for the wrong reason; it should be rejected
+     in typing, but it fatal errors in slambda instead. *)
   flags = "-extension layout_poly_alpha -Ix libb -H libc -nocwd";
   module = "alias.ml";
   setup-ocamlopt.byte-build-env;
@@ -121,6 +131,24 @@ set MANIFEST_FILES_ROOT = "${test_build_directory}";
   ocamlopt_byte_exit_status = "2";
   ocamlopt.byte;
   compiler_reference = "${test_source_directory}/open_cmi.ocamlopt.reference";
+  check-ocamlopt.byte-output;
+}
+{
+  (* -Hx works for transitive dependency resolution. *)
+  flags = "-Hx liba -I libd -nocwd";
+  module = "uses_d.ml";
+  setup-ocamlopt.byte-build-env;
+  ocamlopt.byte;
+}
+{
+  (* Modules in -Hx directories can't be referenced directly. *)
+  flags = "-Hx liba -I libd -nocwd";
+  module = "uses_a.ml";
+  setup-ocamlopt.byte-build-env;
+  ocamlopt_byte_exit_status = "2";
+  ocamlopt.byte;
+  compiler_reference =
+    "${test_source_directory}/cant_reference_hidden.ocamlopt.reference";
   check-ocamlopt.byte-output;
 }
 *)
