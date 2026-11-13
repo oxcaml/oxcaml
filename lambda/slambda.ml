@@ -691,6 +691,29 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     let new_const = eval_structured_const env old_const in
     dynamic (if new_const == old_const then old_lambda else Lconst new_const)
   | Lapply
+      ({ ap_func = Lkindinstantiate kinst;
+         ap_args = old_args;
+         ap_result_layout = old_layout;
+         _
+       } as old_apply) ->
+    (* (kindinstantiate func [k1; ...; kn]) arg1 ... argm ~>
+         let { c = func_c; r = func_r } = eval_lam env func in
+         let { c = inst_c; r = inst_r } = func_c [k1; ...; kn] in
+         { c = Missing; r = << inst_r func_r arg1_r ... argm_r >> }
+
+       Applying the instantiation to the environment and the arguments at once
+       avoids allocating a partial application of it, which would also hide the
+       instantiation from inlining in classic mode. *)
+    let new_args = eval_dynamic_list_reverse ctx env old_args in
+    let instantiated, new_func = eval_kindinstantiate ctx env kinst in
+    dynamic
+      (Lapply
+         { old_apply with
+           ap_func = instantiated.slv_runtime;
+           ap_args = new_func :: new_args;
+           ap_result_layout = eval_layout env old_layout
+         })
+  | Lapply
       ({ ap_func = old_func;
          ap_args = old_args;
          ap_result_layout = old_layout;
@@ -991,31 +1014,18 @@ let rec eval_lam ?name ctx env old_lambda : halves =
   | Lkindtemplate template -> eval_template ?name ctx env (Kind template)
   | Ltemplate template -> eval_template ?name ctx env (Value template)
   | Lkindinstantiate
-      { kinst_func = old_func;
-        kinst_args = old_args;
-        kinst_result_layout = old_layout;
-        kinst_mode;
-        kinst_loc
-      } ->
+      ({ kinst_result_layout = old_layout; kinst_mode; kinst_loc; _ } as kinst)
+    ->
     (* kindinstantiate func [k1; ...; kn] ~>
          let { c = func_c; r = func_r } = eval_lam env func in
          let { c = inst_c; r = inst_r } = func_c [k1; ...; kn] in
          { c = inst_c; r = << inst_r func_r >> } *)
-    let new_args =
-      List.map
-        (fun old_layout_arg ->
-          Or_missing.Present (Vlayout (eval_layout env old_layout_arg)))
-        old_args
-    in
-    let new_func = eval_lam ctx env old_func in
-    let instantiated =
-      instantiate ctx ~loc:kinst_loc new_func.slv_comptime new_args
-    in
+    let instantiated, new_func = eval_kindinstantiate ctx env kinst in
     { slv_comptime = instantiated.slv_comptime;
       slv_runtime =
         Lapply
           { ap_func = instantiated.slv_runtime;
-            ap_args = [new_func.slv_runtime];
+            ap_args = [new_func];
             ap_result_layout = eval_layout env old_layout;
             ap_region_close = Rc_normal;
             ap_mode = kinst_mode;
@@ -1085,6 +1095,19 @@ and eval_lfunction ctx env
 (* Still evaluates static content and records template instantiations; only the
    returned static value is discarded. *)
 and eval_dynamic ctx env old_lambda = (eval_lam ctx env old_lambda).slv_runtime
+
+(** The instantiation, and the evaluated function. *)
+and eval_kindinstantiate ctx env
+    { kinst_func = old_func; kinst_args = old_args; kinst_loc; _ } =
+  let new_args =
+    List.map
+      (fun old_layout_arg ->
+        Or_missing.Present (Vlayout (eval_layout env old_layout_arg)))
+      old_args
+  in
+  let new_func = eval_lam ctx env old_func in
+  ( instantiate ctx ~loc:kinst_loc new_func.slv_comptime new_args,
+    new_func.slv_runtime )
 
 (* Primitive fields and static arguments are expanded right-to-left, while
    preserving their original order in the residual code. *)
