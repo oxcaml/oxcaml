@@ -1055,6 +1055,12 @@ let equate_with_const_curry : With_locality.lr -> Curry_mode.t -> bool =
 let is_generic_curry_mode m =
   mode_polymorphism_printing_enabled () && With_locality.check_generic m
 
+(** Forward reference to [Aliases.aliases_of], defined after [Variable_names].
+    [Variable_names.reserve] needs the type aliases before the printer marks
+    them. *)
+let aliases_of_type : (type_expr -> transient_expr list) ref =
+  ref (fun _ -> assert false)
+
 module Variable_names : sig
   val reset_names : unit -> unit
 
@@ -1368,10 +1374,27 @@ end = struct
   let mark_aliased pair =
     if not (is_aliased pair) then aliased_pairs := pair :: !aliased_pairs
 
+  (** Aliased types of the type being reserved, see [aliases_of_type] *)
+  let aliases = ref ([] : transient_expr list)
+
+  let is_alias ty = List.memq (proxy ty) !aliases
+
+  (** [entered] records the aliased types whose body was already traversed;
+      the printer prints later occurrences as the alias name *)
+  let enter_alias entered ty =
+    let px = proxy ty in
+    if not (List.memq px !aliases) then true
+    else if List.memq px !entered then false
+    else begin
+      entered := px :: !entered;
+      true
+    end
+
   (** [register_visible_modes] iterates over the type and registers every
       visible mode variable. *)
   let register_visible_modes ty =
     let seen = ref [] in
+    let entered = ref [] in
     let register_visible_mode (mode : With_locality.lr) =
       if With_locality.check_generic mode then begin
         let ({ monadic; comonadic } as pair) = pair_of_mode mode in
@@ -1383,12 +1406,11 @@ end = struct
           visible_pairs := pair :: !visible_pairs
       end
     in
-    let rec visit visited ty =
-      let px = proxy ty in
-      if not (List.memq px visited) then
-        printer_iter_type_expr (visit (px :: visited)) register_visible_mode ty
+    let rec visit ty =
+      if enter_alias entered ty then
+        printer_iter_type_expr visit register_visible_mode ty
     in
-    visit [] ty
+    visit ty
 
   (* The next preprocessing step registers all direct
     paths from one visible mode variable to another.
@@ -2120,7 +2142,9 @@ end = struct
           equate_instances marg ~instances_generic ~instances_rigid;
           begin match get_desc ty2 with
           | Tarrow _
-            when is_generic_curry_mode mret && not (has_upper_edges mret) -> ()
+            when not (is_alias ty2)
+                 && is_generic_curry_mode mret
+                 && not (has_upper_edges mret) -> ()
           | _ -> equate_instances mret ~instances_generic ~instances_rigid
           end
         | _ -> ()
@@ -2151,59 +2175,65 @@ end = struct
       List.concat_map heads_of_mode !suppressed_curries;
     implied
 
-  let rec register_suppressed_curries ~instances_generic ~instances_rigid
-      ~visited (~acc_mode, ~acc_mode_rigid) ty =
-    let px = proxy ty in
-    if not (List.memq px visited) then begin
-      let visited = px :: visited in
-      let register =
-        register_suppressed_curries ~instances_generic ~instances_rigid ~visited
-      in
-      let acc_of_occurrence ~arg m =
-        ( ~acc_mode:(curry_mode_of_occurrence ~arg m),
-          ~acc_mode_rigid:
-            (curry_mode_of_occurrence ~arg m
-               ~instance:(find_mode_instance m instances_rigid)) )
-      in
-      match get_desc ty with
-      | Tarrow ((l, marg, mret), ty1, ty2, _) ->
-        let arg_acc = acc_of_occurrence ~arg:true marg in
-        if is_optional l then begin
-          match
-            get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
-          with
-          | Tconstr (path, [ty], _) when Path.same path Predef.path_option ->
-            register arg_acc ty
-          | _ -> ()
-        end
-        else register arg_acc ty1;
-        let acc_mode = curry_acc acc_mode marg in
-        let acc_mode_rigid =
-          curry_acc acc_mode_rigid marg
-            ~instance:(find_mode_instance marg instances_rigid)
+  let register_suppressed_curries ~instances_generic ~instances_rigid acc ty =
+    let entered = ref [] in
+    let rec register (~acc_mode, ~acc_mode_rigid) ty =
+      if enter_alias entered ty then begin
+        let ~acc_mode, ~acc_mode_rigid =
+          if is_alias ty then
+            let acc = Curry_mode.Const With_locality.Const.legacy in
+            ~acc_mode:acc, ~acc_mode_rigid:acc
+          else ~acc_mode, ~acc_mode_rigid
         in
-        let hidden =
-          match get_desc ty2 with
-          | Tarrow _ when is_generic_curry_mode mret ->
-            register_curry_mode mret
-              ~m_generic:(find_mode_instance mret instances_generic)
-              ~acc_mode_rigid
-          | Tarrow _ -> equate_with_const_curry mret acc_mode
-          | _ -> false
+        let acc_of_occurrence ~arg m =
+          ( ~acc_mode:(curry_mode_of_occurrence ~arg m),
+            ~acc_mode_rigid:
+              (curry_mode_of_occurrence ~arg m
+                 ~instance:(find_mode_instance m instances_rigid)) )
         in
-        let acc_modes =
-          if hidden then (~acc_mode, ~acc_mode_rigid)
-          else acc_of_occurrence ~arg:false mret
-        in
-        register acc_modes ty2
-      | Tpoly (ty, _) | Trepr (ty, _) | Tmod (ty, _) | Tquote ty | Tsplice ty ->
-        register (~acc_mode, ~acc_mode_rigid) ty
-      | _ ->
-        let acc = Curry_mode.Const With_locality.Const.legacy in
-        printer_iter_type_expr
-          (register (~acc_mode:acc, ~acc_mode_rigid:acc))
-          (Fun.const ()) ty
-    end
+        match get_desc ty with
+        | Tarrow ((l, marg, mret), ty1, ty2, _) ->
+          let arg_acc = acc_of_occurrence ~arg:true marg in
+          if is_optional l then begin
+            match
+              get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
+            with
+            | Tconstr (path, [ty], _) when Path.same path Predef.path_option ->
+              register arg_acc ty
+            | _ -> ()
+          end
+          else register arg_acc ty1;
+          let acc_mode = curry_acc acc_mode marg in
+          let acc_mode_rigid =
+            curry_acc acc_mode_rigid marg
+              ~instance:(find_mode_instance marg instances_rigid)
+          in
+          let hidden =
+            match get_desc ty2 with
+            | Tarrow _ when is_alias ty2 -> false
+            | Tarrow _ when is_generic_curry_mode mret ->
+              register_curry_mode mret
+                ~m_generic:(find_mode_instance mret instances_generic)
+                ~acc_mode_rigid
+            | Tarrow _ -> equate_with_const_curry mret acc_mode
+            | _ -> false
+          in
+          let acc_modes =
+            if hidden then (~acc_mode, ~acc_mode_rigid)
+            else acc_of_occurrence ~arg:false mret
+          in
+          register acc_modes ty2
+        | Tpoly (ty, _) | Trepr (ty, _) | Tmod (ty, _)
+        | Tquote ty | Tsplice ty ->
+          register (~acc_mode, ~acc_mode_rigid) ty
+        | _ ->
+          let acc = Curry_mode.Const With_locality.Const.legacy in
+          printer_iter_type_expr
+            (register (~acc_mode:acc, ~acc_mode_rigid:acc))
+            (Fun.const ()) ty
+      end
+    in
+    register acc ty
 
   (** Decides which curry modes of [ty] are hidden. This must happen before
       printing and after the edges are computed.
@@ -2230,7 +2260,7 @@ end = struct
        mode is hidden when the type with the curry mode replaced by the one
        implied by the accumulator is as general. *)
     register_suppressed_curries ~instances_generic ~instances_rigid
-      ~visited:[] (~acc_mode:acc, ~acc_mode_rigid:acc) ty
+      (~acc_mode:acc, ~acc_mode_rigid:acc) ty
 
   let print_raw_constraints { lo; hi } ppf pair =
     let { lower = edges_lower; upper = edges_upper } = find_edges pair in
@@ -2419,6 +2449,7 @@ end = struct
     normalize_type ty;
     add_named_vars ty;
     if mode_polymorphism_printing_enabled () then begin
+      aliases := !aliases_of_type ty;
       register_visible_modes ty;
       add_visible_paths ();
       add_visible_edges ();
@@ -2499,10 +2530,18 @@ module Aliases = struct
   let mark_loops ty =
     mark_loops_rec [] ty
 
+  (** [aliases_of ty] returns the types that [mark_loops ty] marks as aliased,
+      without modifying the current state *)
+  let aliases_of ty =
+    protect_refs [R (visited_objects, []); R (aliased, [])]
+      (fun () -> mark_loops ty; !aliased)
+
   let reset () =
     visited_objects := []; aliased := []; delayed := []; printed_aliases := []
 
 end
+
+let () = aliases_of_type := Aliases.aliases_of
 
 let prepare_type_with_base base ty =
   Variable_names.reserve_with_base ~base ty;

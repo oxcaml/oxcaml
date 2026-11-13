@@ -155,12 +155,106 @@ val stack_args :
   unit @ 'o = <fun>
 |}]
 
-(* CR-soon mode-polymorphism-printing: printing crashes because a curry mode is
-   hidden in front of an arrow that is printed as an alias. Fix once aliased
-   types are handled properly. *)
 let aliased_return (o : < m : 't > as 'o) : 't = fun a b -> ignore (a, b); o
 [%%expect{|
->> Fatal error: Out_type.name_of_modes: printing an elided curry mode
-Uncaught exception: Misc.Fatal_error
+val aliased_return :
+  (< m : 'c @ [< global many uncontended forkable unyielding read_write] ->
+         'd @ [< global many uncontended forkable unyielding read_write] ->
+         'a @ [> 'm mod global many forkable unyielding] as 'b >
+   as 'a) @ [< 'm mod aliased] ->
+  'b @ [> close('m) mod many | stateful] = <fun>
+|}, Principal{|
+val aliased_return :
+  < m : 'b @ [< global many uncontended forkable unyielding read_write] ->
+        'c @ [< global many uncontended forkable unyielding read_write] ->
+        < m : 'a > @ [> 'm mod global many forkable unyielding] as 'a > @ [< 'm mod aliased] ->
+  'a @ [> close('m) mod many | stateful] = <fun>
+|}]
 
+module M : sig
+  val f : (< m : 'c -> 'd -> 'a > as 'a) @ contended -> 'c -> 'd -> 'a
+end = struct
+  let f = aliased_return
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f = aliased_return
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val f :
+             (< m : 'c @ [< global many uncontended forkable unyielding read_write] ->
+                    'd @ [< global many uncontended forkable unyielding read_write] ->
+                    'a @ [> 'm mod global many forkable unyielding] as 'b >
+              as 'a) @ [< 'm mod aliased] ->
+             'b @ [> close('m) mod many | stateful]
+         end
+       is not included in
+         sig
+           val f :
+             (< m : 'c -> 'd -> 'a > as 'a) @ contended -> 'c -> 'd -> 'a
+         end
+       Values do not match:
+         val f :
+           (< m : 'c @ [< global many uncontended forkable unyielding read_write] ->
+                  'd @ [< global many uncontended forkable unyielding read_write] ->
+                  'a @ [> 'm mod global many forkable unyielding] as 'b >
+            as 'a) @ [< 'm mod aliased] ->
+           'b @ [> close('m) mod many | stateful]
+       is not included in
+         val f : (< m : 'c -> 'd -> 'a > as 'a) @ contended -> 'c -> 'd -> 'a
+       The type
+         "(< m : 'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+                ('d @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+                 'a @ [< global uncontended read_write > 'm mod global many forkable unyielding | nonportable stateful dynamic]) @ [< global many forkable unyielding > nonportable stateful dynamic]
+                as 'b >
+          as 'a) @ [< 'm mod aliased & uncontended read_write] ->
+         'b @ [> close('m) mod many | nonportable stateful]"
+       is not compatible with the type
+         "(< m : 'c -> 'd -> 'e > as 'e) @ contended -> 'c -> 'd -> 'e"
+       The argument mode was expected to be "uncontended" but is "contended"
+|}, Principal{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f = aliased_return
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val f :
+             < m : 'b @ [< global many uncontended forkable unyielding read_write] ->
+                   'c @ [< global many uncontended forkable unyielding read_write] ->
+                   < m : 'a > @ [> 'm mod global many forkable unyielding]
+                   as 'a > @ [< 'm mod aliased] ->
+             'a @ [> close('m) mod many | stateful]
+         end
+       is not included in
+         sig
+           val f :
+             (< m : 'c -> 'd -> 'a > as 'a) @ contended ->
+             'c -> 'd -> (< m : 'c -> 'd -> 'b > as 'b)
+         end
+       Values do not match:
+         val f :
+           < m : 'b @ [< global many uncontended forkable unyielding read_write] ->
+                 'c @ [< global many uncontended forkable unyielding read_write] ->
+                 < m : 'a > @ [> 'm mod global many forkable unyielding]
+                 as 'a > @ [< 'm mod aliased] ->
+           'a @ [> close('m) mod many | stateful]
+       is not included in
+         val f :
+           (< m : 'c -> 'd -> 'a > as 'a) @ contended ->
+           'c -> 'd -> (< m : 'c -> 'd -> 'b > as 'b)
+       The type
+         "< m : 'b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+               ('c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+                < m : 'a > @ [< global uncontended read_write > 'm mod global many forkable unyielding | nonportable stateful dynamic]) @ [< global many forkable unyielding > nonportable stateful dynamic]
+               as 'a > @ [< 'm mod aliased & uncontended read_write] ->
+         'a @ [> close('m) mod many | nonportable stateful]"
+       is not compatible with the type
+         "(< m : 'b -> 'c -> 'd > as 'd) @ contended ->
+         'b -> 'c -> (< m : 'b -> 'c -> 'e > as 'e)"
+       The argument mode was expected to be "uncontended" but is "contended"
 |}]
