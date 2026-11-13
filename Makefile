@@ -318,6 +318,9 @@ $(jsoo_private_deps)/sedlex: src_var = JSOO_SEDLEX_SRC
 $(jsoo_private_deps)/cmdliner: src_var = JSOO_CMDLINER_SRC
 $(jsoo_private_deps)/menhir: src_var = JSOO_MENHIR_SRC
 $(jsoo_private_deps)/yojson: src_var = JSOO_YOJSON_SRC
+$(jsoo_private_deps)/re: src_var = JSOO_RE_SRC
+$(jsoo_private_deps)/wax: src_var = JSOO_WAX_SRC
+$(ast_dependent_libs_deps)/ppx_devtools: src_var = JSOO_PPX_DEVTOOLS_SRC
 $(ast_dependent_libs_deps)/out-channel-redirect: src_var = JSOO_OUT_CHANNEL_REDIRECT_SRC
 $(ast_dependent_libs_deps)/qcheck: src_var = JSOO_QCHECK_SRC
 
@@ -330,7 +333,10 @@ JSOO_DEPS = \
   $(jsoo_private_deps)/sedlex \
   $(jsoo_private_deps)/cmdliner \
   $(jsoo_private_deps)/menhir \
-  $(jsoo_private_deps)/yojson
+  $(jsoo_private_deps)/yojson \
+  $(jsoo_private_deps)/re \
+  $(jsoo_private_deps)/wax \
+  $(ast_dependent_libs_deps)/ppx_devtools
 
 JSOO_TEST_DEPS = \
   $(ast_dependent_libs_deps)/out-channel-redirect \
