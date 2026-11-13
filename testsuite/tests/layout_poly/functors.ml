@@ -615,11 +615,8 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-(* Recursive functor. This is more broken than it initially looks.
-   [Recursive.M12.id]'s first argument ends up with the kind [value_or_null]
-   even though it should be polymorphic. The missing value error is coming from
-   how recursive modules are compiled: this ends up as calls to CamlinternalMod
-   which slambda eval can't see through. *)
+(* Recursive functor. Recursive modules compile to calls to CamlinternalMod,
+   which slambda eval can't see through, so they must be dynamic. *)
 let x12 =
  let module Recursive = struct
     module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
@@ -633,9 +630,11 @@ let x12 =
   end in
   Recursive.M12.id 7
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+Line 3, characters 15-18:
+3 |     module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
+                   ^^^
+Error: The module is "dynamic" because recursive modules are always dynamic.
+       However, the module highlighted is expected to be "static".
 |}]
 
 (* Recursive first-class functor *)

@@ -2893,6 +2893,10 @@ and transl_recmodule_modtypes env ~sig_modalities ~md_mode sdecls =
               |> With_locality.of_const
               |> with_locality_as_regionality
             in
+            Staticity.submode_err (pmd.pmd_name.loc, Module)
+              (Staticity.of_const ~hint:(Always_dynamic Recursive_module)
+                 Dynamic)
+              (With_regionality.proj_monadic Staticity mmode);
             { tmmode with mode_modes = mmode }) smmode
           in
          (id_shape, pmd.pmd_name, md, mmode, (), ()))
