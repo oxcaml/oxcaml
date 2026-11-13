@@ -23,6 +23,7 @@ jobs:
       contents: read
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      merlin-matrix: ${{ steps.set-matrix.outputs.merlin-matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,8 +37,14 @@ jobs:
         name: Generate Nix Matrix
         run: |
           set -Eeuo pipefail
-          echo -n 'matrix=' >> "$GITHUB_OUTPUT"
-          nix eval --json '.#githubActions.matrix' | tee -a "$GITHUB_OUTPUT"
+          nix eval --raw '.#githubActions.matrix' --apply '
+            m:
+            let
+              split = p: builtins.toJSON { include = builtins.filter p m.include; };
+              isMerlin = e: e.name == "merlin";
+            in
+            "matrix=${split (e: !isMerlin e)}\nmerlin-matrix=${split isMerlin}\n"
+          ' | tee -a "$GITHUB_OUTPUT"
 
   # The `oxcaml` cachix cache is a CI-only optimization, NOT a
   # distribution channel: internal builds are always from source, and
@@ -65,6 +72,39 @@ jobs:
     strategy:
       fail-fast: true
       matrix: ${{fromJSON(needs.nix-matrix.outputs.matrix)}}
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          # Pin to nix 2.33.0; later versions of nix cause out of memory issues
+          # on darwin
+          install_url: https://releases.nixos.org/nix/nix-2.33.0/install
+
+      - name: Set up cache (read-only)
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          # Public caches are readable without credentials.
+          name: oxcaml
+
+      - env:
+          ATTR: ${{ matrix.attr }}
+        run: nix build -L ".#$ATTR"
+
+  # Merlin has its own job so that its failures don't cancel nix-build
+  # through fail-fast. Keep the steps in sync with nix-build.
+  nix-build-merlin:
+    name: ${{ matrix.name }} (${{ matrix.system }})
+    needs: nix-matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJSON(needs.nix-matrix.outputs.merlin-matrix)}}
 
     permissions:
       contents: read
