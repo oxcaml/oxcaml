@@ -12,6 +12,7 @@ let expect_size s x =
 type t =
   | A of int
   | B of t * t
+  | C of { c1 : t; mutable c2 : t }
 
 let f () =
   let x = Random.int 10 in
@@ -24,7 +25,7 @@ let f () =
   expect_size 5 (B (a, a)); (* sharing *)
   expect_size 7 (B (a, A (x + 1)));
 
-  let rec b = B (a, b) in (* cycle *)
+  let rec b = C { c1 = a; c2 = b } in (* cycle *)
   expect_size 5 b;
 
   print_endline "OK"

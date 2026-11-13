@@ -129,10 +129,11 @@ type pool =
   { level: int;
     mutable pool: transient_expr list;
     mutable sort_pool: Jkind_types.Sort.t list;
-    next: pool}
+    mutable next: pool [@warning "-unused-field"]}
 (* To avoid an indirection we choose to add a dummy level at the end of
    the list. It will never be accessed, as [pool_of_level] is always called
-   with [level >= 0]. *)
+   with [level >= 0]. [next] is mutable only so that [dummy] can be its own
+   successor. *)
 let rec dummy = {level = max_int; pool = []; sort_pool = []; next = dummy}
 let pool_stack = s_table (fun () -> { dummy with level = 0 }) ()
 

@@ -25,13 +25,18 @@
 Some recursive definitions are meaningful
 {[
   let rec factorial = function 0 -> 1 | n -> n * factorial (n - 1)
-  let rec infinite_list = 0 :: infinite_list
+  let rec cyclic_ref = ref (fun () -> !cyclic_ref ())
 ]}
 but some other are meaningless
 {[
   let rec x = x
   let rec x = x+1
 ]}
+
+We additionally require that every recursive occurrence goes through a
+function, a lazy, or a mutable field: the cycle must not consist only
+of immutable blocks. For example, [let rec l = 0 :: l] is rejected,
+but [let rec r = { mutable self = r }] is accepted.
 
 Intuitively, a recursive definition makes sense when the body of the
 definition can be evaluated without fully knowing what the recursive
@@ -42,8 +47,8 @@ evaluating the function definition [function ...] can be done
 immediately and will not force a recursive call to [factorial] -- this
 will only happen later, when [factorial] is called with an argument.
 
-In the [infinite_list] example, we can evaluate [0 :: infinite_list]
-without knowing the full content of [infinite_list], but with just its
+In the [cyclic_ref] example, we can evaluate [ref (fun () -> ...)]
+without knowing the full content of [cyclic_ref], but with just its
 address. This is a case of productive/guarded recursion.
 
 On the contrary, [let rec x = x] is unguarded recursion (the meaning
@@ -79,7 +84,8 @@ variables, where an "access mode" [m] is defined as either
 
     m ::= Ignore (* the value is not used at all *)
         | Delay (* the value is not needed at definition time *)
-        | Guard (* the value is stored under a data constructor *)
+        | Guard (* the value is stored in a mutable field *)
+        | Immutable_guard (* the value is stored in an immutable field *)
         | Return (* the value result is directly returned *)
         | Dereference (* full access and inspection of the value *)
 
@@ -385,10 +391,10 @@ module Mode = struct
         example, [fun x -> ?] or [lazy ?] are [Delay] contexts. *)
 
     | Guard
-    (** A [Guard] context returns the value as a member of a data structure,
-        for example a variant constructor or record. The value can safely be
-        defined mutually-recursively with their context, for example in
-        [let rec li = 1 :: li].
+    (** A [Guard] context stores the value in a mutable field of a data
+        structure, for example a mutable record field, a [ref] or an array.
+        The value can safely be defined mutually-recursively with its
+        context, for example in [let rec r = { mutable self = r }].
         When these subexpressions participate in a cyclic definition,
         this definition is productive/guarded.
 
@@ -400,6 +406,15 @@ module Mode = struct
         When these subexpressions participate in a cyclic definition,
         they cannot create a self-loop.
     *)
+
+    | Immutable_guard
+    (** An [Immutable_guard] context returns the value as a member of an
+        immutable data structure, for example a tuple, a variant constructor
+        or an immutable record field. The value can be defined
+        mutually-recursively with its context, but only if the cycle of
+        definitions also goes through a function, a lazy or a mutable field:
+        [let rec x = Some y and y = fun () -> x] is accepted, but
+        [let rec li = 1 :: li] is rejected. *)
 
     | Return
     (** A [Return] context returns its value without further inspection.
@@ -417,14 +432,15 @@ module Mode = struct
   (* Lower-ranked modes demand/use less of the variable/expression they qualify
      -- so they allow more recursive definitions.
 
-     Ignore < Delay < Guard < Return < Dereference
+     Ignore < Delay < Guard < Immutable_guard < Return < Dereference
   *)
   let rank = function
     | Ignore -> 0
     | Delay -> 1
     | Guard -> 2
-    | Return -> 3
-    | Dereference -> 4
+    | Immutable_guard -> 3
+    | Return -> 4
+    | Dereference -> 5
 
   (* Returns the more conservative (highest-ranking) mode of the two
      arguments.
@@ -446,13 +462,16 @@ module Mode = struct
     | Ignore, _ | _, Ignore -> Ignore
     | Dereference, _ -> Dereference
     | Delay, _ -> Delay
-    | Guard, Return -> Guard
+    | Guard, (Return | Immutable_guard) -> Guard
     | Guard, ((Dereference | Guard | Delay) as m) -> m
+    | Immutable_guard, (Return | Immutable_guard) -> Immutable_guard
+    | Immutable_guard, ((Dereference | Guard | Delay) as m) -> m
     | Return, Return -> Return
-    | Return, ((Dereference | Guard | Delay) as m) -> m
+    | Return, ((Dereference | Guard | Immutable_guard | Delay) as m) -> m
 end
 
-type mode = Mode.t = Ignore | Delay | Guard | Return | Dereference
+type mode = Mode.t =
+  | Ignore | Delay | Guard | Immutable_guard | Return | Dereference
 
 module Env :
 sig
@@ -472,6 +491,10 @@ sig
   val unguarded : t -> Ident.t list -> Ident.t list
   (** unguarded e l: the list of all identifiers in l that are dereferenced or
       returned in the environment e. *)
+
+  val immutably_guarded : t -> Ident.t list -> Ident.t list
+  (** immutably_guarded e l: the list of all identifiers in l that are
+      used in e with mode [Immutable_guard]. *)
 
   val dependent : t -> Ident.t list -> Ident.t list
   (** dependent e l: the list of all identifiers in l that are used in e
@@ -524,6 +547,9 @@ end = struct
 
   let unguarded env li =
     List.filter (fun id -> Mode.rank (find id env) > Mode.rank Guard) li
+
+  let immutably_guarded env li =
+    List.filter (fun id -> Mode.equal (find id env) Immutable_guard) li
 
   let dependent env li =
     List.filter (fun id -> Mode.rank (find id env) > Mode.rank Ignore) li
@@ -752,12 +778,14 @@ let rec expression : Typedtree.expression -> term_judg =
               list expression applied << Dereference;
               list expression delayed << Guard]
     | Texp_tuple (exprs, _) ->
-      list expression (List.map (fun (_, e, _) -> e) exprs) << Guard
+      list expression (List.map (fun (_, e, _) -> e) exprs) << Immutable_guard
     | Texp_unboxed_tuple exprs ->
       list expression (List.map (fun (_, e, _) -> e) exprs) << Return
     | Texp_atomic_loc { record = expr; _ } ->
-      expression expr << Guard
-    | Texp_array (_, _, exprs, _) ->
+      expression expr << Immutable_guard
+    | Texp_array (Immutable, _, exprs, _) ->
+      list expression exprs << Mode.join Immutable_guard (array_mode exp)
+    | Texp_array (Mutable _, _, exprs, _) ->
       list expression exprs << array_mode exp
     | Texp_idx (ba, _uas) ->
       let block_access = function
@@ -770,10 +798,15 @@ let rec expression : Typedtree.expression -> term_judg =
       let _unboxed_access = function Uaccess_unboxed_field _ -> empty in
       block_access ba
     | Texp_list_comprehension { comp_body; comp_clauses } ->
-      join ((expression comp_body << Guard) ::
+      join ((expression comp_body << Immutable_guard) ::
             comprehension_clauses comp_clauses)
-    | Texp_array_comprehension (_, _, { comp_body; comp_clauses }) ->
-      join ((expression comp_body << array_mode exp) ::
+    | Texp_array_comprehension (mut, _, { comp_body; comp_clauses }) ->
+      let body_mode =
+        match mut with
+        | Immutable -> Mode.join Immutable_guard (array_mode exp)
+        | Mutable _ -> array_mode exp
+      in
+      join ((expression comp_body << body_mode) ::
             comprehension_clauses comp_clauses)
     | Texp_construct (_, desc, shape, exprs, _) ->
       let access_constructor =
@@ -791,7 +824,10 @@ let rec expression : Typedtree.expression -> term_judg =
             | Constructor_mixed _
             | Constructor_variable _
             | Constructor_immediate_all_void ->
-              Guard
+              (* Constructor arguments are immutable. Inline records are
+                 handled by [Texp_record], which checks the mutability of
+                 each field. *)
+              Immutable_guard
             | Constructor_undetermined ->
                 Misc.fatal_error
                   "value_rec_check: unexpected undetermined representation")
@@ -803,11 +839,11 @@ let rec expression : Typedtree.expression -> term_judg =
       ]
     | Texp_variant (_, eo) ->
       (*
-        G |- e: m[Guard]
-        ------------------   -----------
-        G |- `A e: m         [] |- `A: m
+        G |- e: m[Immutable_guard]
+        --------------------------   -----------
+        G |- `A e: m                 [] |- `A: m
       *)
-      option (fun (e, _) -> expression e) eo << Guard
+      option (fun (e, _) -> expression e) eo << Immutable_guard
     | Texp_record { fields = es; extended_expression = eo;
                     representation = rep } ->
         let field_mode =
@@ -829,11 +865,16 @@ let rec expression : Typedtree.expression -> term_judg =
             Misc.fatal_error
               "value_rec_check: unexpected undetermined representation"
         in
-        let field (_, _, field_def) =
+        let field ((label : Data_types.label_description), _, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
             | Overridden (_, e) -> expression e
+          in
+          let field_mode =
+            match label.lbl_mut with
+            | Immutable -> Mode.join Immutable_guard field_mode
+            | Mutable _ -> field_mode
           in
           env << field_mode
         in
@@ -1261,13 +1302,23 @@ and structure : Typedtree.structure -> term_judg =
     G1, {x: _, x in vars(G1)} |- item1: G2 + ... + Gn in m
     G2, {x: _, x in vars(G2)} |- item2: G3 + ... + Gn in m
     ...
-    Gn, {x: _, x in vars(Gn)} |- itemn: [] in m
+    Gn, {x: _, x in vars(Gn)} |- itemn: E in m
     ---
     (G1 + ... + Gn) - V |- struct item1 ... itemn end: m
+
+    where E maps the identifiers bound by the structure to
+    m[Immutable_guard], as they are stored in the (immutable) module block.
   *)
   fun s m ->
+    let exported =
+      List.fold_left
+        (fun env item ->
+          let id = Types.signature_item_id item in
+          Env.join env (Env.single id (Mode.compose m Immutable_guard)))
+        Env.empty s.str_type
+    in
     List.fold_right (fun it env -> structure_item it m env)
-      s.str_items Env.empty
+      s.str_items exported
 
 (* G |- <structure item> : m -| G'
    where G is an output and m, G' are inputs *)
@@ -1558,28 +1609,108 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_or (l,r,_) ->
         is_destructuring_pattern l || is_destructuring_pattern r
 
-let is_valid_recursive_expression idlist expr : sd option =
+(* [recursive_expression idlist expr] checks that [expr] uses the
+   recursively-bound identifiers [idlist] in a valid way, and returns the
+   identifiers of [idlist] that [expr] stores in immutable fields. *)
+let recursive_expression idlist expr : (sd * Ident.t list) option =
   match expr.exp_desc with
   | Texp_function _ ->
      (* Fast path: functions can never have invalid recursive references *)
-     Some Static
+     Some (Static, [])
   | _ ->
      let rkind = classify_expression expr in
+     let ty = expression expr Return in
      let is_valid =
        match rkind with
        | Static ->
          (* The expression has known size or is constant *)
-         let ty = expression expr Return in
-         Env.unguarded ty idlist = []
+         List.for_all
+           (fun id ->
+              Mode.rank (Env.find id ty) <= Mode.rank Immutable_guard)
+           idlist
        | Dynamic ->
          (* The expression has unknown size *)
-         let ty = expression expr Return in
-         Env.unguarded ty idlist = [] && Env.dependent ty idlist = []
+         Env.dependent ty idlist = []
      in
-     if is_valid then Some rkind else None
+     if is_valid then Some (rkind, Env.immutably_guarded ty idlist) else None
+
+(* [on_cycle succs] returns, for each vertex of the directed graph [succs],
+   whether it belongs to a cycle (Tarjan's algorithm). *)
+let on_cycle (succs : int list array) : bool array =
+  let n = Array.length succs in
+  let index = Array.make n (-1) in
+  let lowlink = Array.make n 0 in
+  let on_stack = Array.make n false in
+  let result = Array.make n false in
+  let stack = ref [] in
+  let counter = ref 0 in
+  let rec visit v =
+    index.(v) <- !counter;
+    lowlink.(v) <- !counter;
+    incr counter;
+    stack := v :: !stack;
+    on_stack.(v) <- true;
+    List.iter
+      (fun w ->
+         if index.(w) < 0 then begin
+           visit w;
+           lowlink.(v) <- min lowlink.(v) lowlink.(w)
+         end else if on_stack.(w) then
+           lowlink.(v) <- min lowlink.(v) index.(w))
+      succs.(v);
+    if lowlink.(v) = index.(v) then begin
+      let rec pop component =
+        match !stack with
+        | w :: rest ->
+          stack := rest;
+          on_stack.(w) <- false;
+          if w = v then w :: component else pop (w :: component)
+        | [] -> component
+      in
+      match pop [] with
+      | [w] -> result.(w) <- List.mem w succs.(w)
+      | component -> List.iter (fun w -> result.(w) <- true) component
+    end
+  in
+  for v = 0 to n - 1 do
+    if index.(v) < 0 then visit v
+  done;
+  result
+
+let is_valid_recursive_bindings bindings : sd option list =
+  let idlist = List.concat_map fst bindings in
+  let results =
+    List.map (fun (_, expr) -> recursive_expression idlist expr) bindings
+  in
+  (* Every cycle of definitions must go through a function, a lazy or
+     a mutable field: we reject the bindings that belong to a cycle of
+     [Immutable_guard] uses. *)
+  let binding_of_id =
+    List.fold_left
+      (fun (i, tbl) (ids, _) ->
+         i + 1, List.fold_left (fun tbl id -> Ident.add id i tbl) tbl ids)
+      (0, Ident.empty) bindings
+    |> snd
+  in
+  let succs =
+    List.map
+      (function
+        | None -> []
+        | Some (_, deps) ->
+          List.map (fun id -> Ident.find_same id binding_of_id) deps)
+      results
+    |> Array.of_list
+  in
+  let on_cycle = on_cycle succs in
+  List.mapi
+    (fun i result ->
+       match result with
+       | Some (rkind, _) when not on_cycle.(i) -> Some rkind
+       | Some _ | None -> None)
+    results
 
 (* A class declaration may contain let-bindings. If they are recursive,
-   their validity will already be checked by [is_valid_recursive_expression]
+   their validity will already be checked by [is_valid_recursive_bindings]
    during type-checking. This function here prevents a different kind of
    invalid recursion, which is the unsafe creations of objects of this class
    in the let-binding. For example,

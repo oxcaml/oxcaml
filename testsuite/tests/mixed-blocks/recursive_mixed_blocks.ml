@@ -7,7 +7,7 @@
  }
 *)
 
-type t = { flt : float#; t : t }
+type t = { flt : float#; mutable t : t }
 
 (* Run Gc.full_major while constructing [t] so that it is promoted
    to the major heap. This ensures that the [caml_modify] run as part
@@ -32,7 +32,7 @@ let (_ : int) = Sys.opaque_identity v.i;
 
 (* An actually-cyclic value *)
 
-type p = { p : #(p * float#) }
+type p = { mutable p : #(p * float#) }
 
 let rec p = { p = #((Gc.full_major (); p), #4.0) }
 

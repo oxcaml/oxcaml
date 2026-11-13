@@ -19,8 +19,10 @@ val x : int t = {v = 1; next = Some <cycle>}
 let rec a = { back = b }
 and b = { v = a; next = None }
 [%%expect{|
-val a : r = {back = {v = <cycle>; next = None}}
-val b : r t = {v = {back = <cycle>}; next = None}
+Line 1, characters 12-24:
+1 | let rec a = { back = b }
+                ^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 type ('a : any) w = A of 'a * 'a w option
@@ -30,7 +32,10 @@ type ('a : any) w = A of 'a * 'a w option
 
 let rec y = A (1, Some y)
 [%%expect{|
-val y : int w = A (1, Some <cycle>)
+Line 1, characters 12-25:
+1 | let rec y = A (1, Some y)
+                ^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 type q = { unwrap : q w }
@@ -41,8 +46,10 @@ type q = { unwrap : q w; }
 let rec c = { unwrap = d }
 and d = A (c, None)
 [%%expect{|
-val c : q = {unwrap = A (<cycle>, None)}
-val d : q w = A ({unwrap = <cycle>}, None)
+Line 1, characters 12-26:
+1 | let rec c = { unwrap = d }
+                ^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 type ('a : any) opt = N | S of 'a
@@ -51,5 +58,8 @@ let rec leaf = { left = S leaf; right = S leaf; data = 42 }
 [%%expect{|
 type ('a : any) opt = N | S of 'a
 type tree = { left : tree opt; right : tree opt; data : int; }
-val leaf : tree = {left = S <cycle>; right = S <cycle>; data = 42}
+Line 3, characters 15-59:
+3 | let rec leaf = { left = S leaf; right = S leaf; data = 42 }
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
