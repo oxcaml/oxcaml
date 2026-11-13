@@ -120,6 +120,11 @@ jobs:
             ocamlrunparam: "v=0,V=1"
             run_regalloc_tool: true
 
+          - name: multidomain (aarch64-darwin)
+            config: --enable-poll-insertion --enable-multidomain --disable-warn-error
+            os: warp-macos-15-arm64-6x
+            sysdeps: gdb
+
           - name: regalloc (aarch64-linux)
             config: --disable-warn-error
             os: warp-ubuntu-latest-arm64-8x
