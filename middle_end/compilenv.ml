@@ -29,6 +29,7 @@ module CU = Compilation_unit
 type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
+  | Needs_no_crc of string
   | Illegal_renaming of CU.t * CU.t * string
 
 exception Error of error
@@ -116,6 +117,10 @@ let read_unit_info filename =
       raise(Error(Not_a_unit_info filename))
     end;
     let uir = (input_value ic : unit_infos_raw) in
+    if uir.uir_no_crc && not !Clflags.no_crc then begin
+      close_in ic;
+      raise (Error (Needs_no_crc filename))
+    end;
     let first_section_offset = pos_in ic in
     seek_in ic (first_section_offset + uir.uir_sections_length);
     let crc = Digest.input ic in
@@ -133,6 +138,7 @@ let read_unit_info filename =
       ui_export_info = uir.uir_export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
       ui_force_link = uir.uir_force_link;
+      ui_no_crc = uir.uir_no_crc;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
       ui_static_data = uir.uir_static_data;
@@ -153,6 +159,9 @@ let read_library_info filename =
       raise(Error(Not_a_unit_info filename));
     let infos = (input_value ic : library_infos) in
     close_in ic;
+    if (not !Clflags.no_crc)
+       && List.exists (fun li -> li.li_no_crc) infos.lib_units
+    then raise (Error (Needs_no_crc filename));
     infos
   with End_of_file | Failure _ ->
     close_in ic;
@@ -312,6 +321,7 @@ let write_unit_info info filename =
     uir_export_info = info.ui_export_info;
     uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
     uir_force_link = info.ui_force_link;
+    uir_no_crc = info.ui_no_crc;
     uir_requires_metaprogramming = info.ui_requires_metaprogramming;
     uir_section_toc = toc;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
@@ -351,6 +361,7 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_export_info = current_unit.uib_export_info;
     ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
     ui_force_link = current_unit.uib_force_link;
+    ui_no_crc = !Clflags.no_crc;
     ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
     ui_static_data = static_data;
     ui_external_symbols = current_unit.uib_external_symbols;
@@ -395,6 +406,13 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
+  | Needs_no_crc filename ->
+      fprintf ppf
+        "@[<hov>The file %a@ was compiled with %a.@ \
+         It can only be used by tools that also pass %a.@]"
+        Location.Doc.quoted_filename filename
+        Misc.Style.inline_code "-no-crc"
+        Misc.Style.inline_code "-no-crc"
 
 let () =
   Location.register_error_of_exn
