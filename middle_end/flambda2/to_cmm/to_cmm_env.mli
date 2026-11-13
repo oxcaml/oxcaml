@@ -295,16 +295,21 @@ val inline_variable :
   translation_result
 
 (** Look up the Cmm expression associated with a given Flambda variable in the
-    delayed let-bindings, if any. Returns [None] if the variable is not present
-    in the bindings map (for instance because it is a continuation parameter,
-    has been flushed, or is bound to a splittable primitive that has not yet
-    been materialised as a single Cmm expression), or if the bound defining
-    expression is not pure (i.e. has any effects or coeffects). Aliases (as
-    recorded by [add_alias]) are resolved before the lookup.
+    delayed let-bindings, if any, together with its free variables. (Any use of
+    the expression must account for these free variables, since a pure binding
+    whose variable is not free in the body is dropped when the bindings are
+    flushed.) Pure bindings flushed at a branching point remain visible within
+    the branches (see [flush_delayed_lets]). Returns [None] if the variable is
+    not otherwise present (for instance because it is a continuation parameter,
+    was flushed on entering a loop, or is bound to a splittable primitive that
+    has not yet been materialised as a single Cmm expression), or if the bound
+    defining expression is not pure (i.e. has any effects or coeffects). Aliases
+    (as recorded by [add_alias]) are resolved before the lookup.
 
     Note that using this function can throw off other assumptions made in
     To_cmm, so should be used with caution. *)
-val find_pure_bound_cmm_expr : t -> Variable.t -> Cmm.expression option
+val find_pure_bound_cmm_expr :
+  t -> Variable.t -> (Cmm.expression * free_vars) option
 
 type flush_mode =
   | Entering_loop
@@ -312,7 +317,10 @@ type flush_mode =
   | Flush_everything
 
 (** Wrap the given Cmm expression with all the delayed let bindings accumulated
-    in the environment. *)
+    in the environment. At a [Branching_point], the defining expressions of the
+    pure bindings that are flushed remain available to
+    [find_pure_bound_cmm_expr] in the returned environment; they are forgotten
+    on [Entering_loop] and [Flush_everything]. *)
 val flush_delayed_lets :
   mode:flush_mode ->
   t ->

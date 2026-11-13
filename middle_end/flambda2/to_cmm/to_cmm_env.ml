@@ -182,6 +182,9 @@ type t =
        scope. *)
     bindings : any_binding Variable.Map.t;
     (* All bindings currently in env. *)
+    flushed_pure_bindings : (Cmm.expression * free_vars) Variable.Map.t;
+    (* Defining expressions of pure bindings flushed at branching points, for
+       [find_pure_bound_cmm_expr]. *)
     inline_once_aliases : Variable.t Variable.Map.t;
     (* Maps for `Must_inline_once` variable that end up aliased. *)
     effect_stages : effect_stage list;
@@ -294,6 +297,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
     effect_stages = [];
     validity_stages = [];
     bindings = Variable.Map.empty;
+    flushed_pure_bindings = Variable.Map.empty;
     inline_once_aliases = Variable.Map.empty;
     vars_extra = Variable.Map.empty;
     vars = Variable.Map.empty;
@@ -1005,22 +1009,23 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
         let env = remove_binding env var in
         will_inline_simple env res binding))
 
+let pure_cmm_expr_of_binding (Binding binding) =
+  match To_cmm_effects.classify_by_effects_and_coeffects binding.effs with
+  | Effect | Coeffect_only | Generative_immutable -> None
+  | Pure ->
+    let cmm_expr_of_bound_expr (type a) (b : a bound_expr) =
+      match b with
+      | Simple { cmm_expr; free_vars } | Split { cmm_expr; free_vars } ->
+        Some (cmm_expr, free_vars)
+      | Splittable_prim _ -> None
+    in
+    cmm_expr_of_bound_expr binding.bound_expr
+
 let find_pure_bound_cmm_expr env var =
   let var = resolve_alias env var in
   match Variable.Map.find var env.bindings with
-  | exception Not_found -> None
-  | Binding binding -> (
-    match To_cmm_effects.classify_by_effects_and_coeffects binding.effs with
-    | Effect | Coeffect_only | Generative_immutable -> None
-    | Pure ->
-      let cmm_expr_of_bound_expr (type a) (b : a bound_expr) =
-        match b with
-        | Simple { cmm_expr; free_vars = _ } | Split { cmm_expr; free_vars = _ }
-          ->
-          Some cmm_expr
-        | Splittable_prim _ -> None
-      in
-      cmm_expr_of_bound_expr binding.bound_expr)
+  | exception Not_found -> Variable.Map.find_opt var env.flushed_pure_bindings
+  | binding -> pure_cmm_expr_of_binding binding
 
 (* Handling of aliases between variables *)
 
@@ -1179,6 +1184,15 @@ let flush_delayed_lets ~mode env res =
      make that decision of whether to substitute inside loops. *)
   let res = ref res in
   let bindings_to_flush = ref M.empty in
+  (* Pure bindings flushed here stay visible to [find_pure_bound_cmm_expr]
+     within the branches, since the flushed [Clet]s dominate them (and are
+     dropped if every use of the bound variable is thereby removed). This is not
+     done when entering a loop, to avoid duplicating work into loops. *)
+  let flushed_pure_bindings =
+    match mode with
+    | Branching_point -> ref env.flushed_pure_bindings
+    | Entering_loop | Flush_everything -> ref Variable.Map.empty
+  in
   let flush (Binding b as binding) =
     if M.mem b.order !bindings_to_flush
     then
@@ -1189,10 +1203,17 @@ let flush_delayed_lets ~mode env res =
   in
   let bindings_to_keep =
     Variable.Map.filter_map_sharing
-      (fun _ (Binding b as binding) ->
+      (fun var (Binding b as binding) ->
         match b.inline with
         | Do_not_inline ->
           flush binding;
+          (match mode, pure_cmm_expr_of_binding binding with
+          | Branching_point, Some cmm_expr_and_free_vars ->
+            flushed_pure_bindings
+              := Variable.Map.add var cmm_expr_and_free_vars
+                   !flushed_pure_bindings
+          | Branching_point, None -> ()
+          | (Entering_loop | Flush_everything), _ -> ());
           None
         | Must_inline_and_duplicate -> (
           let r, split_res = split_complex_binding ~env ~res:!res b in
@@ -1302,6 +1323,7 @@ let flush_delayed_lets ~mode env res =
       effect_stages = [];
       validity_stages;
       bindings = bindings_to_keep;
+      flushed_pure_bindings = !flushed_pure_bindings;
       symbol_inits = Backend_var.Map.empty
     }
   in
