@@ -696,7 +696,7 @@ and loaded_bit_length (memory_chunk : Cmm.memory_chunk) =
   | Byte_unsigned | Byte_signed -> 8
   | Sixteen_unsigned | Sixteen_signed -> 16
   | Thirtytwo_unsigned | Thirtytwo_signed -> 32
-  | Word_int | Word_mask | Word_val | Single _ | Double
+  | Word_int | Sixtyfour | Word_mask | Word_val | Single _ | Double
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     arch_bits
@@ -1126,7 +1126,7 @@ let store ~dbg memory_chunk init ~addr ~new_value =
     | Byte_unsigned | Byte_signed -> low_bits ~bits:8 ~dbg new_value
     | Sixteen_unsigned | Sixteen_signed -> low_bits ~bits:16 ~dbg new_value
     | Thirtytwo_unsigned | Thirtytwo_signed -> low_bits ~bits:32 ~dbg new_value
-    | Word_int | Word_mask | Word_val | Single _ | Double
+    | Word_int | Sixtyfour | Word_mask | Word_val | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
       new_value
