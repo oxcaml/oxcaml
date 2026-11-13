@@ -29,16 +29,19 @@ module Extension = struct
   type t =
     | CSSC
     | LRCPC2
+    | LSE
 
-  let all = [CSSC; LRCPC2]
+  let all = [CSSC; LRCPC2; LSE]
 
   let name = function
     | CSSC -> "CSSC"
     | LRCPC2 -> "LRCPC2"
+    | LSE -> "LSE"
 
   let description = function
     | CSSC -> "Common Short Sequence Compression"
     | LRCPC2 -> "Load-Acquire RCpc, version 2"
+    | LSE -> "Large System Extensions"
 
   module Assembler_directive = struct
     type t =
@@ -51,14 +54,18 @@ module Extension = struct
   let assembler_directive : t -> Assembler_directive.t = function
     | CSSC -> Arch_extension "cssc"
     | LRCPC2 -> Arch "armv8.4-a"
+    | LSE -> Arch_extension "lse"
 
   let cssc = ref Config.has_cssc
 
   let lrcpc2 = ref Config.has_lrcpc2
 
+  let lse = ref Config.has_lse
+
   let flag = function
     | CSSC -> cssc
     | LRCPC2 -> lrcpc2
+    | LSE -> lse
 
   let enabled t = !(flag t)
 
