@@ -47,6 +47,8 @@ module Int8 = struct
     else
       i
 
+  let of_bool = function false -> 0 | true -> 1
+
   let to_int i = i
 
   let print ppf t = Format.pp_print_int ppf t

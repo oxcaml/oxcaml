@@ -752,9 +752,12 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
     | Dynamic_size, Punboxedoruntaggedintarray Untagged_int ->
       Mutable, Resizable_array.make ~loc array_kind (untagged_int 0)
     | Dynamic_size, Punboxedoruntaggedintarray Untagged_int8 ->
-      Mutable, Resizable_array.make ~loc array_kind (untagged_int8 0)
+      ( Mutable,
+        Resizable_array.make ~loc array_kind (untagged_int8 Numbers.Int8.zero) )
     | Dynamic_size, Punboxedoruntaggedintarray Untagged_int16 ->
-      Mutable, Resizable_array.make ~loc array_kind (untagged_int16 0)
+      ( Mutable,
+        Resizable_array.make ~loc array_kind (untagged_int16 Numbers.Int16.zero)
+      )
     | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_int32 0l)
     | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int64 ->

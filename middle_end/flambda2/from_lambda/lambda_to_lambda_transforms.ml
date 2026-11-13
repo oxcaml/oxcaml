@@ -579,7 +579,8 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
          (Punboxedoruntaggedintarray_set Untagged_int8)
          (Thirty_two_or_less
             { width = Eight;
-              zero_init = Lconst (Const_base (Const_untagged_int8 0))
+              zero_init =
+                Lconst (Const_base (Const_untagged_int8 Numbers.Int8.zero))
             })
          ~init
   | Punboxedoruntaggedintarray Untagged_int16 ->
@@ -588,7 +589,8 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
          (Punboxedoruntaggedintarray_set Untagged_int16)
          (Thirty_two_or_less
             { width = Sixteen;
-              zero_init = Lconst (Const_base (Const_untagged_int16 0))
+              zero_init =
+                Lconst (Const_base (Const_untagged_int16 Numbers.Int16.zero))
             })
          ~init
   | Punboxedoruntaggedintarray Unboxed_int32 ->

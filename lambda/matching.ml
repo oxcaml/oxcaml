@@ -3571,7 +3571,7 @@ let combine_constant value_kind loc arg cst partial ctx def
         let int_lambda_list =
           List.map
             (function
-              | Const_int8 n, l -> (n, l)
+              | Const_int8 n, l -> (Numbers.Int8.to_int n, l)
               | _ -> assert false)
             const_lambda_list
         in
@@ -3582,7 +3582,7 @@ let combine_constant value_kind loc arg cst partial ctx def
         let int_lambda_list =
           List.map
             (function
-              | Const_int16 n, l -> (n, l)
+              | Const_int16 n, l -> (Numbers.Int16.to_int n, l)
               | _ -> assert false)
             const_lambda_list
         in
@@ -3659,7 +3659,7 @@ let combine_unboxed_bool value_kind loc arg partial ctx def
     make_test_sequence value_kind loc fail
       (Scalar.integral (Naked (Taggable Int8)))
       arg
-      (List.map (fun (b, l) -> Const_untagged_int8 (Bool.to_int b), l)
+      (List.map (fun (b, l) -> Const_untagged_int8 (Numbers.Int8.of_bool b), l)
          bool_list)
   in
   (lambda1, Jumps.union local_jumps total)
