@@ -819,7 +819,7 @@ and transl_structure ~scopes loc
       (* This debugging event provides information regarding the structure
          items. It is ignored by the OCaml debugger but is used by
          Js_of_ocaml to preserve variable names. *)
-      (if !Clflags.debug && not (Clflags.target_is_native ()) then
+      (if !Clflags.debug && Clflags.target_is_bytecode () then
          Levent(body,
                 {lev_loc = loc;
                  lev_kind = Lev_pseudo;

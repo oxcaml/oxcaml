@@ -229,6 +229,7 @@ end
 
 val set_target : Target.t -> unit
 val target_is_native : unit -> bool
+val target_is_bytecode : unit -> bool
 
 (** Whether the target is one of the JSIR targets. *)
 val target_is_jsir : unit -> bool

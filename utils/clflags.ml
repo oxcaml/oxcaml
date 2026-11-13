@@ -283,6 +283,11 @@ let[@inline] target_is_native () =
   | Native -> true
   | Bytecode | Js_of_ocaml | Wasm_of_ocaml -> false
 
+let[@inline] target_is_bytecode () =
+  match !target with
+  | Bytecode -> true
+  | Native | Js_of_ocaml | Wasm_of_ocaml -> false
+
 let[@inline] target_is_jsir () =
   match !target with
   | Js_of_ocaml | Wasm_of_ocaml -> true

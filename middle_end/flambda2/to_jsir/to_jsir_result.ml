@@ -107,7 +107,7 @@ let push_event parse_info (body : Jsir.instr list) : Jsir.instr list =
   | (Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _) :: _ | [] ->
     Event parse_info :: body
 
-let inlined_frames dbg =
+let inlined_frames dbg ~file =
   if not !Clflags.jsir_inlined_frames
   then ""
   else
@@ -117,8 +117,8 @@ let inlined_frames dbg =
       String.concat ""
         (List.map
            (fun (call_site : Debuginfo.item) ->
-             Printf.sprintf "<-%s:%d:%d" call_site.dinfo_file
-               call_site.dinfo_line call_site.dinfo_char_start)
+             Printf.sprintf "<-%s:%d:%d" (file call_site) call_site.dinfo_line
+               call_site.dinfo_char_start)
            call_sites)
 
 let parse_info_of_debuginfo dbg ~pos =
@@ -132,9 +132,17 @@ let parse_info_of_debuginfo dbg ~pos =
       let (pos : Lexing.position) =
         match pos with `Start -> loc.loc_start | `End -> loc.loc_end
       in
-      Some
-        (Parse_info.t_of_pos
-           { pos with pos_fname = pos.pos_fname ^ inlined_frames dbg })
+      let name =
+        pos.pos_fname
+        ^ inlined_frames dbg ~file:(fun (item : Debuginfo.item) ->
+            item.dinfo_file)
+      in
+      let src =
+        Option.map
+          (fun file -> file ^ inlined_frames dbg ~file:Debuginfo.item_file_path)
+          (Debuginfo.to_file_path dbg)
+      in
+      Some { (Parse_info.t_of_pos { pos with pos_fname = name }) with src }
 
 let add_event_at_exn t parse_info =
   map_top_current_block_exn t ~f:(push_event parse_info)
