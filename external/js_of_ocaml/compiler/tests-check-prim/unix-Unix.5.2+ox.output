@@ -464,6 +464,7 @@ caml_unix_filedescr_of_fd
 caml_unix_findclose
 caml_unix_findfirst
 caml_unix_findnext
+caml_unix_gettimeofday
 caml_unix_startup
 unix_error_message
 
