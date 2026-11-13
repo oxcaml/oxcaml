@@ -1511,10 +1511,17 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
             (Function_slot.size_from_arity ~num_complex_params:1
                ~is_tupled:false)
       in
+      (* Do not consult [unboxing_kind] unless return unboxing was actually
+         requested: it emits [Unboxing_impossible] warnings, which would
+         otherwise fire spuriously (for example for a function with an unboxable
+         parameter but a non-unboxable return type). *)
       let return_unboxing =
-        match unboxing_kind return, attr.unbox_return with
-        | Some kind, Some mode -> Some (kind, mode)
-        | _, _ -> None
+        match attr.unbox_return with
+        | None -> None
+        | Some mode -> (
+          match unboxing_kind return with
+          | Some kind -> Some (kind, mode)
+          | None -> None)
       in
       let unboxed_param (param : Lambda.lparam) =
         if param.attributes.unbox_param
