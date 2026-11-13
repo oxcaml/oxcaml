@@ -43,13 +43,6 @@
 
 open Lambda
 
-type error = | Recursive_template
-
-exception Error of (Location.t * error)
-
-let raise_error ~loc error =
-  raise (Error (Debuginfo.Scoped_location.to_location loc, error))
-
 (** Allocation and backpatching primitives *)
 
 let alloc_prim =
@@ -279,9 +272,7 @@ let compute_static_size lam =
       assert false
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
-    | Ltemplate tmpl ->
-      raise_error ~loc:tmpl.loc Recursive_template
-    | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
+    | Ltemplate _ | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -1188,18 +1179,3 @@ let compile_letrec input_bindings body =
       body_with_dynamic_values all_bindings_rev.static
   in
   body_with_pre_allocations
-
-open Format_doc
-
-let report_error ppf = function
-  | Recursive_template ->
-    fprintf ppf "Recursive static functors are not supported"
-
-let () =
-  Location.register_error_of_exn
-    (function
-      | Error (loc, err) ->
-          Some (Location.error_of_printer ~loc report_error err)
-      | _ ->
-          None
-    )
