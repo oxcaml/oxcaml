@@ -1292,11 +1292,11 @@ let type_constant: Typedtree.constant -> type_expr = function
   | Const_unboxed_nativeint _ -> instance Predef.type_nativeint_u
 
 type constant_integer_result =
-  | Int8 of int
-  | Int16 of int
+  | Int8 of Numbers.Int8.t
+  | Int16 of Numbers.Int16.t
   | Int32 of int32
   | Int64 of int64
-  | Nativeint of nativeint
+  | Nativeint of Targetint.t
   | Int of int
 
 type constant_integer_error =
@@ -1316,14 +1316,17 @@ let constant_integer i ~suffix :
   | Some 's' ->
     if Language_extension.is_enabled Small_numbers then
     begin
-      try Ok (Int8 (Misc.Int_literal_converter.int8 i))
+      try
+        Ok (Int8 (Numbers.Int8.of_int_exn (Misc.Int_literal_converter.int8 i)))
       with Failure _ -> Error Int8_literal_overflow
     end
     else Error (Int8_literal_not_enabled)
   | Some 'S' ->
     if Language_extension.is_enabled Small_numbers then
     begin
-      try Ok (Int16 (Misc.Int_literal_converter.int16 i))
+      try
+        Ok (Int16
+              (Numbers.Int16.of_int_exn (Misc.Int_literal_converter.int16 i)))
       with Failure _ -> Error Int16_literal_overflow
     end
     else Error (Int16_literal_not_enabled)
@@ -1339,7 +1342,7 @@ let constant_integer i ~suffix :
     end
   | Some 'n' ->
     begin
-      try Ok (Nativeint (Misc.Int_literal_converter.nativeint i))
+      try Ok (Nativeint (Targetint.of_string i))
       with Failure _ -> Error Nativeint_literal_overflow
     end
   | Some 'm' | None ->
@@ -1376,7 +1379,9 @@ let constant_desc
       if Language_extension.is_enabled Small_numbers
       then
         let extra_bits = Sys.int_size - 8 in
-        Ok (Const_untagged_char ((Char.code c lsl extra_bits) asr extra_bits))
+        Ok (Const_untagged_char
+              (Numbers.Int8.of_int_exn
+                 ((Char.code c lsl extra_bits) asr extra_bits)))
       else Error (Untagged_char_literal c)
   | Pconst_string (s,loc,d) -> Ok (Const_string (s,loc,d))
   | Pconst_float (f,None)-> Ok (Const_float f)
@@ -4120,7 +4125,9 @@ and type_pat_aux
           ~make:(fun loc i -> Const.char ~loc (Char.chr i))
       | Const_untagged_char c1, Const_untagged_char c2 ->
         (* Intervals are specified by character code, as for [char]. *)
-        expand_interval (c1 land 0xff) (c2 land 0xff)
+        expand_interval
+          (Numbers.Int8.to_int c1 land 0xff)
+          (Numbers.Int8.to_int c2 land 0xff)
           ~make:(fun loc i -> Const.untagged_char ~loc (Char.chr i))
       | _ ->
         Error.log_and_raise loc !!penv Invalid_interval
