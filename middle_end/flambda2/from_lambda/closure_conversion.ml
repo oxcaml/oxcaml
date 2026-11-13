@@ -4009,7 +4009,7 @@ type call_args_split =
         result_mode : Lambda.return_mode
       }
 
-let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
+let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
   let callee = find_simple_from_id env apply.func in
   let approx = find_value_approximation_through_symbol acc env callee in
   let code_info =
@@ -4025,7 +4025,7 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
           Code_metadata.result_mode metadata )
     | Unknown _ -> None
     | Value_symbol _ | Value_const _ | Block_approximation _ ->
-      if Flambda_features.check_invariants ()
+      if Flambda_features.kind_checks ()
       then
         Misc.fatal_errorf
           "Unexpected approximation for callee %a in [Closure_conversion], \
@@ -4161,6 +4161,12 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
         in
         wrap_over_application acc env full_args_call apply ~remaining
           ~remaining_arity ~result_mode)
+
+let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
+  match apply.kind with
+  | Function -> close_apply_function acc env apply
+  | Method _ ->
+    close_exact_or_unknown_apply acc env apply None ~replace_region:None
 
 module CIS = Code_id_or_symbol
 module GroupMap = Numbers.Int.Map
