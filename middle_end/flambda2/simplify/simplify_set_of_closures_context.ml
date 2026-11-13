@@ -24,7 +24,8 @@ type t =
       Bound_name.t Function_slot.Map.t list;
     old_to_new_code_ids_all_sets : Code_id.t Code_id.Map.t;
     previously_free_depth_variables : Variable.Set.t;
-    single_set_of_size_one : bool
+    single_set_of_size_one : bool;
+    template_env_type : T.Typing_env_extension.With_extra_variables.t option
   }
 
 let function_decl_type ?new_code_id ~rec_info old_code_id =
@@ -32,7 +33,7 @@ let function_decl_type ?new_code_id ~rec_info old_code_id =
   Or_unknown.Known (T.Function_type.create code_id ~rec_info)
 
 let create_for_code_where_bound dacc ~all_code ~simplify_function_body ~is_stub
-    =
+    ~template_env_type =
   let dacc_inside_functions =
     (* We ensure that inlining cannot happen inside the code of stubs. This is
        to avoid compile-time performance problems where large functions (or
@@ -48,7 +49,13 @@ let create_for_code_where_bound dacc ~all_code ~simplify_function_body ~is_stub
              let code rather than the set of closure. We should rename this
              `DE.enter_set_of_closures` function *)
           (let denv = DE.enter_set_of_closures denv in
-           if is_stub then DE.enter_stub_function denv else denv))
+           if is_stub
+           then DE.enter_stub_function denv
+           else
+             (* The definition of a template, where the code of its
+                instantiations is simplified, can be in a stub (for example in
+                the default value of an optional argument). *)
+             DE.leave_stub_function denv))
   in
   { dacc_prior_to_sets = dacc;
     simplify_function_body;
@@ -56,8 +63,11 @@ let create_for_code_where_bound dacc ~all_code ~simplify_function_body ~is_stub
     closure_bound_names_inside_functions_all_sets = [];
     old_to_new_code_ids_all_sets = Code_id.Map.empty;
     previously_free_depth_variables = Variable.Set.empty;
-    single_set_of_size_one = false
+    single_set_of_size_one = false;
+    template_env_type
   }
+
+let template_env_type t = t.template_env_type
 
 let simplify_function_body t = t.simplify_function_body
 
@@ -373,5 +383,6 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     old_to_new_code_ids_all_sets;
     simplify_function_body;
     previously_free_depth_variables;
-    single_set_of_size_one
+    single_set_of_size_one;
+    template_env_type = None
   }

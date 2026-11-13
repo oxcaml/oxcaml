@@ -502,7 +502,10 @@ type primitive =
   | Punbox of layout
   (* The definition of a template: allocates its environment like
      [Pmakeblock (0, Immutable, Shape shape, mode)]. The template's
-     instantiations ([Lcode]) are only ever passed environments created here. *)
+     instantiations ([Lcode]) are only ever passed environments created here.
+     The middle end optimises the code of the instantiations here, once, so
+     passes must not duplicate this primitive: [duplicate_function] fails on
+     it. *)
   | Ptemplate_env of
       { template : Template_id.t;
         shape : mixed_block_shape;
@@ -1121,8 +1124,9 @@ and lfunction = private
 
 (** [Lcode (code, body)] binds [code_name] in [body] to the code of an
     instantiation of a template, created by slambda evaluation. Its only
-    free variables are the names of other instantiations' code. The names bound
-    by this may only occur as the function of an [Lapply]. *)
+    free variables are the names of other instantiations' code, and its first
+    parameter is the template's environment. The names bound by this may only
+    occur as the function of an [Lapply]. *)
 and lcode =
   { code_name : Ident.t;
     code_debug_uid : debug_uid;
@@ -1495,7 +1499,9 @@ val rename : Ident.t Ident.Map.t -> lambda -> lambda
 
 val duplicate_function : ?rename:Ident.t Ident.Map.t -> lfunction -> lfunction
 (** Duplicate a term, freshening all locally-bound identifiers and renaming
-    free identifiers according to [rename]. *)
+    free identifiers according to [rename]. This is a fatal error if the term
+    contains a [Ptemplate_env], since the copy would define the template
+    again. *)
 
 val map : (lambda -> lambda) -> lambda -> lambda
   (** Bottom-up rewriting, applying the function on

@@ -418,6 +418,7 @@ let unary_prim_size ~machine_width prim =
   | String_length _ -> 5
   | Int_as_pointer _ -> 1
   | Opaque_identity _ -> 0
+  | Template_env _ -> 0
   | Int_arith (kind, op) -> unary_int_prim_size ~machine_width kind op
   | Float_arith _ -> 2
   | Num_conv { src; dst } -> arith_conversion_size ~machine_width src dst

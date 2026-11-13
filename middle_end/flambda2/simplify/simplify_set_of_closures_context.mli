@@ -34,13 +34,20 @@ val create :
 (** For simplifying code where it is bound rather than at the definition of a
     set of closures: stubs (unless they are simplified like other functions,
     with [-flambda2-simplify-stubs]) and code without a closure (see
-    [Code_metadata.template_key]). Inlining is not allowed inside stubs. *)
+    [Code_metadata.template_key]). Inlining is not allowed inside stubs. For the
+    code of an instantiation of one of this unit's templates,
+    [template_env_type] is the type of the template's environments, which the
+    code takes as its first parameter, as an equation on the template's key. *)
 val create_for_code_where_bound :
   DA.t ->
   all_code:Code.t Code_id.Map.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
   is_stub:bool ->
+  template_env_type:T.Typing_env_extension.With_extra_variables.t option ->
   t
+
+val template_env_type :
+  t -> T.Typing_env_extension.With_extra_variables.t option
 
 val dacc_inside_functions : t -> DA.t
 
