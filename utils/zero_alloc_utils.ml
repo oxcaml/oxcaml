@@ -43,11 +43,11 @@ module Component = struct
   let compare ~compare_top c1 c2 =
     match c1, c2 with
     | Bot, Bot -> 0
-    | Bot, _ -> -1
-    | _, Bot -> 1
+    | Bot, (Safe | Top _) -> -1
+    | (Safe | Top _), Bot -> 1
     | Safe, Safe -> 0
-    | Safe, _ -> -1
-    | _, Safe -> 1
+    | Safe, Top _ -> -1
+    | Top _, Safe -> 1
     | Top t1, Top t2 -> compare_top t1 t2
 
   let join ~join_top c1 c2 =
