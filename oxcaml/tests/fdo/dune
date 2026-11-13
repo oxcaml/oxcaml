@@ -23,11 +23,15 @@
  (action
   (diff fdo_counters.output fdo_counters.output.corrected)))
 
-; Stability of function identities ([Fdo_function_naming]): the entry counters of
-; function_ids.ml and of function_ids_edited.ml (the same module with extra anonymous
-; functions inserted, compiled under the same module name via -o) must agree
-; except for the inserted functions. Additionally, the discriminators should distinguish
-; functions with the same name (or anonymous functions with the same body).
+; Function identities ([Fdo_function_naming]). function_ids_edited.ml is
+; function_ids.ml with:
+; - anonymous functions inserted: other functions keep their names;
+; - an optional argument added to [opt]: it keeps its name, and gains a stub;
+; - the second [shadowing] removed.
+; In both:
+; - shadowed functions and anonymous functions with the same body get distinct
+;   discriminators;
+; - functions without a location (as in classes) are named by their binders.
 
 (executable
  (name fdo_entries)
@@ -72,3 +76,46 @@
  (deps function_ids.output function_ids.output.corrected)
  (action
   (diff function_ids.output function_ids.output.corrected)))
+
+; Body hashes ([Fdo_body_hash]). body_hash_edited.ml changes:
+; - the [keep_*] functions in ways that must keep their hashes;
+; - the [change_*] functions in ways that must change them.
+
+(rule
+ (targets body_hash.output.corrected)
+ (deps body_hash.ml body_hash_edited.ml fdo_entries.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    raw
+    -color
+    never
+    body_hash.ml)
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    raw
+    -color
+    never
+    -o
+    body_hash.edited.cmx
+    body_hash_edited.ml)
+   (with-stdout-to
+    body_hash.output.corrected
+    (run ./fdo_entries.exe body_hash.raw.fl body_hash.edited.raw.fl)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps body_hash.output body_hash.output.corrected)
+ (action
+  (diff body_hash.output body_hash.output.corrected)))
