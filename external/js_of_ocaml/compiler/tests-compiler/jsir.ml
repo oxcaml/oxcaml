@@ -71,7 +71,8 @@ let native_string s = Code.Pc (Code.NativeString (Code.Native_string.of_string s
 
 let extern name args = Code.Prim (Code.Extern (name, None), args)
 
-let jsir_file ?(target = Code.Js) ~name ~imports body : Code.jsir_file =
+let jsir_file ?(target = Code.Js) ?(whole_program = false) ~name ~imports body :
+    Code.jsir_file =
   let body = body ~fresh:Code.Var.fresh in
   let last_var = Code.Var.count () - 1 in
   let block = { Code.params = []; body; branch = Stop } in
@@ -84,6 +85,7 @@ let jsir_file ?(target = Code.Js) ~name ~imports body : Code.jsir_file =
   ; imported_compilation_units = imports
   ; exported_compilation_unit = name
   ; force_link = false
+  ; whole_program
   ; symbol_imports = []
   ; symbol_exports = []
   }
@@ -211,11 +213,24 @@ let setup () =
   js_of_ocaml [ "build-runtime"; "-o"; "runtime.js" ] |> print_string
 
 (* [filter] selects the lines of the program's output to print. *)
-let link_and_run ?(filter = fun _ -> true) files =
-  js_of_ocaml ([ "link"; "runtime.js" ] @ files @ [ "-o"; "bin.js" ]) |> print_string;
-  run_javascript (Filetype.js_file_of_path "bin.js")
+let run ?(filter = fun _ -> true) file =
+  run_javascript (Filetype.js_file_of_path file)
   |> String.split_on_char ~sep:'\n'
   |> List.iter ~f:(fun line -> if filter line then print_endline line)
+
+let link_and_run ?filter files =
+  js_of_ocaml ([ "link"; "runtime.js" ] @ files @ [ "-o"; "bin.js" ]) |> print_string;
+  run ?filter "bin.js"
+
+(* The number of times a generated file mentions [name]. *)
+let occurrences file name =
+  let regexp = Str.regexp_string name in
+  let rec count line pos =
+    match Str.search_forward regexp line pos with
+    | pos -> 1 + count line (pos + 1)
+    | exception Not_found -> 0
+  in
+  List.fold_left (file_lines_text file) ~init:0 ~f:(fun n line -> n + count line 0)
 
 (* The unit info headers of a generated file. *)
 let print_unit_infos file =
@@ -259,6 +274,44 @@ let%expect_test "JSIR file with --include-runtime" =
     //# unitInfo: Provides: B
     //# unitInfo: Requires: A
     hello A
+    |}]
+
+(* A whole program, as [ocamlopt -link-jsir] makes from the JSIR of the units
+   of an executable. *)
+let whole_program =
+  jsir_file ~whole_program:true ~name:"prog" ~imports:[] (fun ~fresh ->
+      let greeting = fresh () in
+      [ Let (greeting, extern "jsir_test_greet" [ string "whole program" ])
+      ; Let (fresh (), extern "jsir_test_print" [ Pv greeting ])
+      ; (* The runtime raises a predefined exception, which the program has to
+           register itself. *)
+        Let (fresh (), extern "caml_sys_getenv" [ string "JSIR_TEST_UNSET_VARIABLE" ])
+      ])
+
+let%expect_test "JSIR whole program" =
+  with_temp_dir ~f:(fun () ->
+      Filetype.write_js ~name:"stubs.js" (Filetype.js_text_of_string stubs) |> ignore;
+      write_jsir_file "prog.cm-jsir-js" whole_program;
+      js_of_ocaml [ "--pretty"; "stubs.js"; "prog.cm-jsir-js"; "-o"; "prog.js" ]
+      |> print_string;
+      (* The output is an executable, with the primitives that the program
+         uses. *)
+      print_unit_infos "prog.js";
+      List.iter
+        [ "jsir_test_greet"; "jsir_test_unused"; "caml_set_link_info" ]
+        ~f:(fun name -> Printf.printf "%s: %b\n" name (occurrences "prog.js" name > 0));
+      run
+        ~filter:(fun line ->
+          String.starts_with ~prefix:"hello" line
+          || String.starts_with ~prefix:"Fatal error" line)
+        "prog.js");
+  [%expect
+    {|
+    jsir_test_greet: true
+    jsir_test_unused: false
+    caml_set_link_info: false
+    Fatal error: exception Not_found
+    hello whole program
     |}]
 
 (* The error messages, without the path to the executable. *)
