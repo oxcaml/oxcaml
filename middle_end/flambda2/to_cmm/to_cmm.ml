@@ -134,11 +134,12 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       then fun_codegen
       else Cmm.No_CSE :: fun_codegen
     in
+    let fdo_entry_annotation =
+      Fdo_annotation.With_body_hash.create ~annotation:fdo_entry_counters
+        ~body_hash:None
+    in
     C.cfunction
-      (C.fundecl entry_sym [] body fun_codegen dbg
-         ~fdo_entry_annotation:
-           (Fdo_annotation.With_body_hash.create ~annotation:fdo_entry_counters
-              ~body_hash:None)
+      (C.fundecl entry_sym [] body fun_codegen dbg ~fdo_entry_annotation
          Default_poll Cmm.typ_val)
   in
   let { R.data_items; gc_roots; functions } = R.to_cmm res in
