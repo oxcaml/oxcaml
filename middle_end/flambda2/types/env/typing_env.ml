@@ -549,6 +549,20 @@ let mem ?min_name_mode t name =
       Symbol.Set.mem sym t.defined_symbols
       || not (Current_unit.is_current (Name.compilation_unit name)))
 
+let symbol_has_known_definition t sym =
+  let name = Name.symbol sym in
+  let comp_unit = Symbol.compilation_unit sym in
+  if Compilation_unit.equal comp_unit (Current_unit.get_cu_exn ())
+  then Symbol.Set.mem sym t.defined_symbols
+  else
+    Name.Map.mem name (names_to_types t)
+    ||
+    match (resolver t) comp_unit with
+    | None -> false
+    | Some serializable ->
+      Name.Map.mem name serializable.names_to_types
+      || List.mem sym serializable.defined_symbols_without_equations
+
 let mem_simple ?min_name_mode t simple =
   Simple.pattern_match simple
     ~name:(fun name ~coercion:_ -> mem ?min_name_mode t name)

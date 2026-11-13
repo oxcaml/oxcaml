@@ -1,0 +1,83 @@
+let code g_1 deleted in
+let code f_2 deleted in
+let code inline(never) loopify(never) size(3) newer_version_of(f_2)
+      f_2_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, 1) in
+  cont k (int_add)
+in
+let $camlEnv_types_lib__f_1 = closure f_2_1 @f &toplevel in
+let $camlEnv_types_lib__template_env_2 = Block 0 ($camlEnv_types_lib__f_1) in
+let $camlEnv_types_lib__template_env_3 = Block 0 ($camlEnv_types_lib__f_1) in
+let code inline(never) loopify(never) size(5) newer_version_of(g_1)
+      g_1_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let X = %project_value_slot.[g].[X] (my_closure) in
+  let Pfield = %block_load.[`0`] (X) in
+  let int_add = %int_barith.add (x, Pfield) in
+  cont k (int_add)
+in
+let x = %opaque (3) in
+let $camlEnv_types_lib__Pmakeblock_4 = Block 0 (x) in
+let code inline(never) loopify(never) size(4) newer_version_of(g_1_1)
+      g_1_2 (x_1 : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`0`] ($camlEnv_types_lib__Pmakeblock_4) in
+  let int_add = %int_barith.add (x_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEnv_types_lib__g_5 =
+  closure g_1_2 @g &toplevel
+  with { X = $camlEnv_types_lib__Pmakeblock_4 }
+in
+let int_mul = %int_barith.mul (x, 10) in
+let r = %opaque (int_mul) in
+let $camlEnv_types_lib__template_env_6 =
+  Block 0 ($camlEnv_types_lib__Pmakeblock_4,
+           $camlEnv_types_lib__f_1,
+           $camlEnv_types_lib__g_5,
+           r)
+in
+let x_1 = %opaque (4) in
+let $camlEnv_types_lib__Pmakeblock_8 = Block 0 (x_1) in
+let code inline(never) loopify(never) size(4) newer_version_of(g_1_1)
+      g_1_3 (x_2 : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`0`] ($camlEnv_types_lib__Pmakeblock_8) in
+  let int_add = %int_barith.add (x_2, Pfield) in
+  cont k (int_add)
+in
+let $camlEnv_types_lib__g_9 =
+  closure g_1_3 @g &toplevel
+  with { X = $camlEnv_types_lib__Pmakeblock_8 }
+in
+let int_mul_1 = %int_barith.mul (x_1, 10) in
+let r_1 = %opaque (int_mul_1) in
+let $camlEnv_types_lib__template_env_10 =
+  Block 0 ($camlEnv_types_lib__Pmakeblock_8,
+           $camlEnv_types_lib__f_1,
+           $camlEnv_types_lib__g_9,
+           r_1)
+in
+let $camlEnv_types_lib__Pmakeblock_12 =
+  Block 0 (r_1, $camlEnv_types_lib__template_env_10)
+in
+let $camlEnv_types_lib__Pmakeblock_13 =
+  Block 0 (r, $camlEnv_types_lib__template_env_6)
+in
+let $camlEnv_types_lib =
+  Block 0 ($camlEnv_types_lib__f_1,
+           $camlEnv_types_lib__template_env_2,
+           $camlEnv_types_lib__template_env_3,
+           $camlEnv_types_lib__Pmakeblock_13,
+           $camlEnv_types_lib__Pmakeblock_12)
+in
+cont done ($camlEnv_types_lib)

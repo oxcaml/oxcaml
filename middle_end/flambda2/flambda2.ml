@@ -116,7 +116,7 @@ let finalize_offsets ~free_names slot_offsets =
   Slot_offsets.finalize_offsets_from_free_names slot_offsets ~free_names
 
 let run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-    ~final_typing_env ~free_names flambda =
+    ~final_typing_env ~free_names ~template_keys flambda =
   let { unit;
         exported_code;
         slot_offsets;
@@ -124,7 +124,8 @@ let run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
       } =
     Profile.record_call ~accumulate:true "reaper" (fun () ->
         Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
-          ~final_typing_env:(With_types final_typing_env) ~free_names flambda)
+          ~final_typing_env:(With_types final_typing_env) ~free_names
+          ~template_keys flambda)
   in
   print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf unit;
   print_fexpr "reaper"
@@ -188,6 +189,9 @@ let flambda_to_flambda0 : type m.
         ~lto_info ) =
     match mode, close_prog_metadata with
     | Classic, Classic (all_code, approxs, free_names, slot_offsets) -> (
+      (* Classic mode doesn't export the types of the environments of the unit's
+         templates. *)
+      let template_keys = Flambda2_identifiers.Symbol.Set.empty in
       (if Flambda_features.inlining_report ()
        then
          let output_prefix = prefixname ^ ".cps_conv" in
@@ -207,12 +211,13 @@ let flambda_to_flambda0 : type m.
         in
         let flambda, all_code, slot_offsets, final_typing_env =
           run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-            ~final_typing_env ~free_names raw_flambda
+            ~final_typing_env ~free_names ~template_keys raw_flambda
         in
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
           Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-            ~used_value_slots ~exported_offsets ~sections all_code
+            ~template_keys ~used_value_slots ~exported_offsets ~sections
+            all_code
         in
         ( flambda,
           ~all_code,
@@ -237,7 +242,7 @@ let flambda_to_flambda0 : type m.
       | Lto_support ->
         let problem, skeleton =
           Flambda2_reaper.Traverse.run ~free_names
-            ~final_typing_env:Without_types raw_flambda
+            ~final_typing_env:Without_types ~template_keys raw_flambda
         in
         let imported_offsets = Exported_offsets.imported_offsets () in
         let slot_offsets = finalize_offsets ~free_names slot_offsets in
@@ -262,6 +267,7 @@ let flambda_to_flambda0 : type m.
       let round = 0 in
       let { Simplify.free_names;
             final_typing_env;
+            template_keys;
             all_code;
             slot_offsets;
             unit = flambda
@@ -304,7 +310,7 @@ let flambda_to_flambda0 : type m.
         | Single_unit_run ->
           let flambda, all_code, slot_offsets, final_typing_env =
             run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-              ~final_typing_env ~free_names flambda
+              ~final_typing_env ~free_names ~template_keys flambda
           in
           ( flambda,
             ~all_code,
@@ -315,7 +321,7 @@ let flambda_to_flambda0 : type m.
         | Lto_support ->
           let problem, skeleton =
             Flambda2_reaper.Traverse.run ~free_names
-              ~final_typing_env:Without_types flambda
+              ~final_typing_env:Without_types ~template_keys flambda
           in
           let imported_offsets = Exported_offsets.imported_offsets () in
           let slot_offsets = finalize_offsets ~free_names slot_offsets in
@@ -334,7 +340,7 @@ let flambda_to_flambda0 : type m.
       let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
           all_code =
         Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-          ~used_value_slots ~exported_offsets ~sections all_code
+          ~template_keys ~used_value_slots ~exported_offsets ~sections all_code
       in
       ( flambda,
         ~all_code,

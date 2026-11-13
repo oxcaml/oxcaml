@@ -23,6 +23,11 @@
 type simplify_result = private
   { free_names : Name_occurrences.t;
     final_typing_env : Typing_env.t;
+    template_keys : Symbol.Set.t;
+        (** The keys naming this unit's templates (see
+            [Flambda_primitive.Template_env]). They have no value, but
+            [final_typing_env] defines them, with the types of the templates'
+            environments. *)
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t;
     unit : Flambda_unit.t

@@ -20,6 +20,7 @@ open! Simplify_import
 type simplify_result =
   { free_names : Name_occurrences.t;
     final_typing_env : Typing_env.t;
+    template_keys : Symbol.Set.t;
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t;
     unit : Flambda_unit.t
@@ -146,6 +147,20 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
         (TE.create ~machine_width ~resolver)
         module_symbol
   in
+  (* The keys naming templates have no value, so only the typing environment
+     defines them, with the types of the templates' environments. *)
+  let final_typing_env, template_keys =
+    Symbol.Map.fold
+      (fun template_key env_type (typing_env, template_keys) ->
+        let typing_env =
+          TE.add_env_extension_with_extra_variables
+            (TE.add_symbol_definition typing_env template_key)
+            env_type
+        in
+        typing_env, Symbol.Set.add template_key template_keys)
+      (DA.template_env_types (UA.creation_dacc uacc))
+      (final_typing_env, Symbol.Set.empty)
+  in
   let all_code =
     Exported_code.merge all_code
       (Exported_code.mark_as_imported (get_imported_code ()))
@@ -163,6 +178,7 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   { unit;
     free_names = name_occurrences;
     final_typing_env;
+    template_keys;
     all_code;
     slot_offsets
   }
