@@ -2457,7 +2457,7 @@ and transl_bound_exp ~scopes ~in_structure pat layout expr loc attrs =
     | Texp_function _ -> true
     | _ when in_structure -> true
     | _ -> false in
-  let lam =
+  let transl () =
     match pat_bound_idents pat with
     | (id :: _) when should_introduce_scope ->
       let assume_zero_alloc = Zero_alloc_utils.Assume_info.none in
@@ -2466,6 +2466,15 @@ and transl_bound_exp ~scopes ~in_structure pat layout expr loc attrs =
       let scopes = enter_value_definition ~scopes ~assume_zero_alloc id in
       transl_scoped_exp ~scopes layout expr
     | _ -> transl_exp ~scopes layout expr
+  in
+  let lam =
+    match pat.pat_desc with
+    | Tpat_fun_layout { lpoly; _ }
+      when not (List.is_empty (Lpoly.get_exn lpoly)) ->
+      (* Class caches would be shared between instantiations of the template,
+         and binding them would stop the definition from being a function. *)
+      Translobj.oo_no_cache transl ()
+    | _ -> transl ()
   in
   Translattribute.add_function_attributes lam loc attrs
 

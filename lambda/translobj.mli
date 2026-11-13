@@ -29,4 +29,8 @@ val oo_wrap: Env.t -> bool -> ('a -> lambda) -> 'a -> lambda
 val oo_wrap_gen: Env.t -> bool -> ('a -> lambda * 'b) -> 'a -> lambda * 'b
 val oo_add_class: Ident.t -> Env.t * bool
 
+(** Translate without caching the classes defined within, which are then
+    rebuilt each time they are evaluated. *)
+val oo_no_cache: ('a -> lambda) -> 'a -> lambda
+
 val reset: unit -> unit

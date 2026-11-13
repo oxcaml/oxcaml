@@ -541,9 +541,13 @@ let k6 =
   let module R = K (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+Line 3, characters 32-36:
+3 |     class c = object method v = M.id 61 end
+                                    ^^^^
+Error: The value "M.id" is "dynamic"
+         because it is used in a class (at line 3, characters 14-43).
+       However, the value "M.id" highlighted is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
 |}]
 
 (* Capture an exception constructor from the enclosing scope. *)

@@ -2222,6 +2222,7 @@ let class_num = ref 0
 let class_declaration env virt sexpr =
   incr class_num;
   let self_scope = Ctype.get_current_level () in
+  let env = Env.add_dynamic_lock (sexpr.pcl_loc, Class) env in
   let expr =
     class_expr (Int.to_string !class_num) env env virt self_scope sexpr
   in
@@ -2268,6 +2269,7 @@ let class_type_declarations env cls =
 
 let type_object env loc s =
   incr class_num;
+  let env = Env.add_dynamic_lock (loc, Object) env in
   let desc =
     class_structure (Int.to_string !class_num)
       Concrete Btype.lowest_level Final env env loc s

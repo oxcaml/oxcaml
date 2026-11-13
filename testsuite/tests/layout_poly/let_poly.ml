@@ -806,9 +806,7 @@ let _ =
   let poly_ f x = ignore (object end); x in
   f 1
 [%%expect{|
->> Fatal error: let poly_ definitions must be functions
-Uncaught exception: Misc.Fatal_error
-
+- : int = 1
 |}]
 
 (* Instantiations at different layouts must not share a class cache. *)
@@ -820,14 +818,11 @@ let _ =
   in
   r ()
 [%%expect{|
-- : int = 69988912930932
-|}, Principal{|
-- : int = 69858513754228
+- : int = 42
 |}]
 
-(* Cached classes receive captured variables through an environment, where
-   slambda cannot see static values, so classes capturing them are not
-   cached. *)
+(* Objects cannot capture static values: cached classes receive captured
+   variables through an environment that slambda cannot see into. *)
 let _ =
   let r () =
     let poly_ id y = y in
@@ -835,9 +830,13 @@ let _ =
   in
   r ()
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+Line 4, characters 23-25:
+4 |     (object method v = id 3 end)#v
+                           ^^
+Error: The value "id" is "dynamic"
+         because it is used in an object (at line 4, characters 4-32).
+       However, the value "id" highlighted is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
 |}]
 
 (* This includes the parts of a class outside of its object structure. *)
@@ -851,7 +850,11 @@ let _ =
   in
   r ()
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+Line 5, characters 34-36:
+5 |       class c (k : int) = let v = id k in object method v = v end
+                                      ^^
+Error: The value "id" is "dynamic"
+         because it is used in a class (at line 5, characters 14-65).
+       However, the value "id" highlighted is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
 |}]

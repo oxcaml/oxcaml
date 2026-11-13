@@ -679,6 +679,7 @@ val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
 val add_region_lock : ?region:Mode.Hint.region -> t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
+val add_dynamic_lock : Mode.Hint.pinpoint -> t -> t
 val enter_quote : t -> t
 val enter_splice : loc:Location.t -> t -> t
 

@@ -186,6 +186,8 @@ type lock =
   | Region_lock of Mode.Hint.region option
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
+  | Dynamic_lock of Mode.Hint.pinpoint
+      (* to prevent capture of static values *)
 
 type lock_or_stage =
   | Nonstage_lock of lock
@@ -3272,6 +3274,9 @@ let add_exclave_lock env = add_lock Exclave_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
+let add_dynamic_lock closure_context env =
+  add_lock (Dynamic_lock closure_context) env
+
 let enter_quote env =
   add_stage_lock Quote_lock {env with stage = env.stage + 1}
 
@@ -3949,6 +3954,12 @@ with
     may_lookup_error errors (fst pp) env
       (Local_value_used_in_exclave (snd pp))
 
+let dynamic_mode vmode closure_context =
+  Mode.With_regionality.join
+    [ vmode;
+      Mode.With_regionality.min_with_monadic Staticity
+        (Mode.Staticity.of_const ~hint:(Is_used_in closure_context) Dynamic) ]
+
 let region_mode vmode =
   vmode
   |> Mode.with_regionality_to_locality_r2l
@@ -3995,6 +4006,8 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
+      | Dynamic_lock closure_context ->
+          dynamic_mode vmode closure_context
       with exn ->
         Typing_recovery.log_or_raise exn;
         vmode
@@ -4061,7 +4074,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
-      | Unboxed_lock -> mode
+      | Unboxed_lock | Dynamic_lock _ -> mode
     ) mode locks
 
 let lookup_ident_value ~errors ~use ~loc name env =
