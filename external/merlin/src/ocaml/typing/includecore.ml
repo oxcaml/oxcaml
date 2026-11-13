@@ -344,6 +344,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
            pc_kindtemplate = tc;
            pc_env = env;
            pc_loc;
+           pc_name = name;
           }
         in
         Tcoerce_primitive pc, ~static:(kindtemplate_coercion_instantiates tc)
