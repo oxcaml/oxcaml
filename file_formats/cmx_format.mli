@@ -81,6 +81,7 @@ type unit_infos =
                                      (see [Flambda2_reaper.Lto_info]),
                                      present iff compiled with -lto-support *)
     ui_file_sections: File_sections.t;
+    ui_need_stdlib: bool;         (* caml_standard_library_nat needed *)
   }
 
 type unit_infos_raw =
@@ -104,6 +105,7 @@ type unit_infos_raw =
     uir_lto_info:
       Flambda2_reaper.Lto_info.t File_sections.Idx.t option;
     uir_sections_length: int;      (* Byte length of all sections *)
+    uir_need_stdlib: bool;         (* caml_standard_library_nat needed *)
   }
 
 (* Each .a library has a matching .cmxa file that provides the following
@@ -119,6 +121,7 @@ type lib_unit_info =
     li_quoted_cmi : Bitmap.t;   (* subset of lib_quoted_cmi *)
     li_quoted_cmx : Bitmap.t;   (* subset of lib_quoted_cmx *)
     li_external_symbols: string array;
+    li_need_stdlib: bool;       (* caml_standard_library_nat needed *)
   }
 
 type library_infos =

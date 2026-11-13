@@ -14,6 +14,22 @@ OCaml 5.4 maintenance version
   normalised on both Windows and Unix.
   (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
 
+- #14244, #14802, #14846: Added --with-relative-libdir which allows the runtime
+  and the compilers to locate the Standard Library relative to where the
+  binaries themselves are installed, removing the absolute path previously
+  embedded in caml_standard_library_default. Executables linked with
+  `ocamlc -custom` now always attempt to load bytecode from the executable
+  itself, rather than first trying `argv[0]`.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez,
+   Samuel Hym and Vincent Laviron)
+
+### Compiler user-interface and warnings:
+
+- #14244: Add -set-runtime-default option to the compiler, allowing the default
+  value of the Standard Library location used by the runtime to be overridden.
+  (Antonin Décimo, review by David Allsopp, Jonah Beckford, Damien Doligez and
+   Samuel Hym)
+
 ### Internal/compiler-libs changes:
 
 - #14243: ocamlc now uses the same code as the runtime to parse ld.conf (via a
@@ -27,6 +43,14 @@ OCaml 5.4 maintenance version
   stublibs subdirectory is no longer created, nor added to ld.conf, when
   building OCaml with --disable-shared.
   (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+- #14244: When targeting native Windows on Cygwin or MSYS2, preserve
+  backslashes in the supplied `--prefix` (in particular, backslashes instead of
+  slashes will then be displayed by `ocamlopt -config-var standard_library`).
+  If the supplied prefix contains a slash, then it is normalised, as
+  previously.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
+   Samuel Hym)
 
 ### Bug fixes:
 

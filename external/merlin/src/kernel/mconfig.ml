@@ -853,6 +853,7 @@ let ocaml_ignored_parametrized_flags =
     "-rounds";
     "-runtime-variant";
     "-ocamlrunparam";
+    "-set-runtime-default";
     "-unbox-closures-factor";
     "-use-prims";
     "-use_runtime";

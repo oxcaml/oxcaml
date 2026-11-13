@@ -33,6 +33,7 @@ type compile_time_constant =
   | Ostype_win32
   | Ostype_cygwin
   | Backend_type
+  | Standard_library_default
   | Arch_amd64
   | Arch_arm64
 

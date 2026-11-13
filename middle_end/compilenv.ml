@@ -46,6 +46,7 @@ type unit_infos_builder =
     mutable uib_lto_info :
       Flambda2_reaper.Lto_info.t File_sections.Idx.t option;
     uib_file_sections : File_sections.Builder.t;
+    mutable uib_need_stdlib : bool;
   }
 
 module Infos_table = CU.Tbl
@@ -74,6 +75,7 @@ let current_unit =
     uib_external_symbols = [];
     uib_lto_info = None;
     uib_file_sections = File_sections.Builder.create 0;
+    uib_need_stdlib = false;
   }
 
 let current_zero_alloc_info () = current_unit.uib_zero_alloc_info
@@ -138,6 +140,7 @@ let read_unit_info filename =
       ui_static_data = uir.uir_static_data;
       ui_lto_info = uir.uir_lto_info;
       ui_file_sections = sections;
+      ui_need_stdlib = uir.uir_need_stdlib;
     }
     in
     (ui, crc)
@@ -272,6 +275,11 @@ let need_send_fun arity result mode =
     current_unit.uib_generic_fns <-
       { fns with send_fun = (arity, result, mode) :: fns.send_fun }
 
+(* Record that caml_standard_library_nat is needed *)
+
+let need_stdlib_location () =
+  current_unit.uib_need_stdlib <- true
+
 (* Write the description of the current unit *)
 
 (* CR mshinwell: let's think about this later, quadratic algorithm
@@ -318,6 +326,7 @@ let write_unit_info info filename =
     uir_static_data = info.ui_static_data;
     uir_lto_info = info.ui_lto_info;
     uir_sections_length = total_length;
+    uir_need_stdlib = info.ui_need_stdlib;
   } in
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
@@ -357,6 +366,7 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_lto_info = current_unit.uib_lto_info;
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
+    ui_need_stdlib = current_unit.uib_need_stdlib;
   }
 
 let save_unit_info filename ~main_module_block_format ~static_data =

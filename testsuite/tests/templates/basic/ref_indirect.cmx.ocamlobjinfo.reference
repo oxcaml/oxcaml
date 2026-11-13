@@ -20,6 +20,7 @@ Apply functions:
 Send functions:
 Force link: no
 Static data: (missing)
+Requires caml_standard_library_nat: no
 File ref_indirect.cmi
 Unit name: Ref_indirect
 Is parameter: no
