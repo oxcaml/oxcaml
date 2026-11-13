@@ -519,6 +519,25 @@ type unary_primitive =
       { lazy_tag : Lazy_block_tag.t;
         alloc_region : Variable.t
       }
+  | Template_env of
+      { template_key : Symbol.t;
+        instantiations : Code_id.t list
+      }
+      (** The identity on an environment block created by the definition of a
+          layout-polymorphic or static template. [template_key] names the
+          template: it is a symbol, but has no value. [instantiations] are the
+          code (without closures) of this unit's instantiations of the template,
+          which only ever receive environments created by its definition.
+
+          Simplify records the type of the environment here, as the type of
+          [template_key] (which is exported, for other units' instantiations),
+          simplifies the code of the instantiations using it, and removes this
+          primitive. The type describes the environments created by this
+          definition only, so Simplify must simplify the definition once: it
+          must never copy it before simplifying it (see [Template_definitions]).
+          In classic mode, closure conversion does the same with the
+          approximation of the environment, and doesn't create this primitive.
+      *)
 
 (** Whether a comparison is to yield a boolean result, as given by a particular
     comparison operator, or whether it is to behave in the manner of "compare"

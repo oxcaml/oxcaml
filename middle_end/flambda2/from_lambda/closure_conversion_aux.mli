@@ -59,6 +59,13 @@ module IR : sig
           ghost_region : Ident.t option;
           alloc_region : Ident.t
         }
+    | Template_env of
+        { template : Template_id.t;
+          block : Ident.t;
+          loc : Lambda.scoped_location
+        }
+        (** The definition of [template], whose environment [block] has already
+            been allocated (see [Lambda.Ptemplate_env]) *)
 
   type apply_kind =
     | Function
@@ -138,6 +145,7 @@ module Env : sig
   val declare_lcode :
     t ->
     Ident.t ->
+    template:Template_id.t ->
     code_id:Code_id.t ->
     metadata_approximation:value_approximation ->
     t
@@ -147,6 +155,8 @@ module Env : sig
   val lcode_metadata_approximation : t -> Ident.t -> value_approximation
 
   val is_lcode : t -> Ident.t -> bool
+
+  val lcode_code_ids_of_template : t -> Template_id.t -> Code_id.t list
 
   val add_var : t -> Ident.t -> Variable.t -> Flambda_kind.With_subkind.t -> t
 
@@ -306,6 +316,11 @@ module Acc : sig
      must be careful to update acc afterward when necessary *)
   val eval_branch_free_names :
     t -> f:(t -> t * 'a) -> Name_occurrences.t * t * 'a
+
+  (** Record the definition of a template (see [Lambda.Ptemplate_env]). Each
+      template must only be defined once in the input, since its definition is
+      where the code of its instantiations is optimized. *)
+  val define_template : t -> Template_id.t -> t
 
   (** The approximation of a closure of the code bound to a [Lambda.Lcode]
       (although no such closure exists), once the code has been closed. *)

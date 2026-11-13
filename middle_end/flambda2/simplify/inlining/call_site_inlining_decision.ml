@@ -271,7 +271,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         | Forward_inlined_attribute_but_nothing_to_forward | Attribute_always
         | Replay_history_says_must_inline _ | Begin_unrolling _
         | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
-          ->
+        | Template_definition_not_simplified ->
           (* These can't be returned by the speculative inlining cases below. *)
           if Flambda_features.check_light_invariants ()
           then
@@ -455,10 +455,44 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
             else do_not_inline Unrolling_depth_exceeded
           | `Always -> inline_if_code_present Attribute_always)))
 
+(* Inlining copies the callee's code. Code that hasn't been simplified yet must
+   not be copied if it contains the definition of a template, which must only be
+   simplified once (see [Flambda_primitive.Template_env]). Speculative inlining
+   only considers code that has already been simplified, so only the final
+   decision needs checking. *)
+let copies_template_definition dacc code_id =
+  match DE.find_code_exn (DA.denv dacc) code_id with
+  | exception Not_found -> false
+  | code_or_metadata -> (
+    Code_or_metadata.code_present code_or_metadata
+    &&
+    let code = Code_or_metadata.get_code code_or_metadata in
+    match Code.inlining_decision code with
+    | Not_yet_decided | Stub ->
+      (* Only code that hasn't been simplified yet has no inlining decision.
+         Stubs keep theirs when they are simplified, but are small, and can be
+         inlined before being simplified (for example with
+         [-flambda2-simplify-stubs]). *)
+      Template_definitions.in_code (DA.denv dacc) code
+    | Never_inline_attribute | Function_body_too_large _
+    | Functor_body_too_large _ | Attribute_inline | Small_function _
+    | Small_functor _ | Speculatively_inlinable _
+    | Speculatively_inlinable_functor _ | Recursive | Jsir_inlining_disabled ->
+      (* Simplified code never contains the definitions of templates. *)
+      false)
+
 let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
     ~return_arity : Call_site_inlining_decision_type.t =
   if Clflags.target_is_jsir ()
   then Jsir_inlining_disabled
   else
-    make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
-      ~return_arity
+    let decision =
+      make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
+        ~return_arity
+    in
+    match Call_site_inlining_decision_type.can_inline decision with
+    | Do_not_inline _ -> decision
+    | Inline _ ->
+      if copies_template_definition dacc (FT.code_id function_type)
+      then Template_definition_not_simplified
+      else decision

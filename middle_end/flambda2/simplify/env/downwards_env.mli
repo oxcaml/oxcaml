@@ -208,6 +208,10 @@ val enter_set_of_closures : t -> t
 
 val enter_stub_function : t -> t
 
+(** Allow inlining again when simplifying, inside a stub, code that isn't part
+    of it. *)
+val leave_stub_function : t -> t
+
 val set_rebuild_terms : t -> t
 
 val are_rebuilding_terms : t -> Are_rebuilding_terms.t

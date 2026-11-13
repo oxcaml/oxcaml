@@ -20,16 +20,19 @@ module Use_info = struct
     | Unused_because_of_call_site_decision
     | Unused_because_function_unknown
     | Jsir_inlining_disabled
+    | Template_definition_not_simplified
 
   let equal t1 t2 =
     match t1, t2 with
     | Expected_to_be_used, Expected_to_be_used
     | Unused_because_of_call_site_decision, Unused_because_of_call_site_decision
     | Unused_because_function_unknown, Unused_because_function_unknown
-    | Jsir_inlining_disabled, Jsir_inlining_disabled ->
+    | Jsir_inlining_disabled, Jsir_inlining_disabled
+    | Template_definition_not_simplified, Template_definition_not_simplified ->
       true
     | ( ( Expected_to_be_used | Unused_because_of_call_site_decision
-        | Unused_because_function_unknown | Jsir_inlining_disabled ),
+        | Unused_because_function_unknown | Jsir_inlining_disabled
+        | Template_definition_not_simplified ),
         _ ) ->
       false
 
@@ -39,6 +42,7 @@ module Use_info = struct
       | Unused_because_of_call_site_decision -> 1
       | Unused_because_function_unknown -> 2
       | Jsir_inlining_disabled -> 3
+      | Template_definition_not_simplified -> 4
     in
     Int.compare (use_info_numbering t1) (use_info_numbering t2)
 
@@ -58,6 +62,10 @@ module Use_info = struct
         else "")
     | Jsir_inlining_disabled ->
       Some "function inlining is disabled for Js_of_ocaml translation"
+    | Template_definition_not_simplified ->
+      Some
+        "the function's code defines a template, so it must not be copied \
+         before it has been optimized"
 end
 
 type t =

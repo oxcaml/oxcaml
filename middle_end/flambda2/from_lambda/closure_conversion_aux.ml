@@ -55,6 +55,11 @@ module IR = struct
           ghost_region : Ident.t option;
           alloc_region : Ident.t
         }
+    | Template_env of
+        { template : Template_id.t;
+          block : Ident.t;
+          loc : Lambda.scoped_location
+        }
 
   type apply_kind =
     | Function
@@ -119,6 +124,10 @@ module IR = struct
                (Format.pp_print_list ~pp_sep:Format.pp_print_space print_simple)
                arg))
         args
+    | Template_env { template; block; loc = _ } ->
+      fprintf ppf "@[<2>(Template_env[%a]@ %a)@]"
+        (Format_doc.compat Template_id.print)
+        template Ident.print block
 end
 
 module Inlining = struct
@@ -168,7 +177,8 @@ module Env = struct
       path_to_root : Debuginfo.Scoped_location.t;
       inlining_history_tracker : Inlining_history.Tracker.t;
       at_toplevel : bool;
-      lcodes : lcode Ident.Map.t
+      lcodes : lcode Ident.Map.t;
+      lcode_code_ids_by_template : Code_id.t list Template_id.Map.t
     }
 
   and lcode =
@@ -194,7 +204,8 @@ module Env = struct
       path_to_root = Debuginfo.Scoped_location.Loc_unknown;
       inlining_history_tracker = Inlining_history.Tracker.empty current_unit;
       at_toplevel = true;
-      lcodes = Ident.Map.empty
+      lcodes = Ident.Map.empty;
+      lcode_code_ids_by_template = Template_id.Map.empty
     }
 
   let set_not_at_toplevel t = { t with at_toplevel = false }
@@ -212,7 +223,8 @@ module Env = struct
         path_to_root;
         inlining_history_tracker;
         at_toplevel;
-        lcodes
+        lcodes;
+        lcode_code_ids_by_template
       } =
     let simples_to_substitute =
       Ident.Map.filter
@@ -229,12 +241,19 @@ module Env = struct
       path_to_root;
       inlining_history_tracker;
       at_toplevel;
-      lcodes
+      lcodes;
+      lcode_code_ids_by_template
     }
 
-  let declare_lcode t id ~code_id ~metadata_approximation =
+  let declare_lcode t id ~template ~code_id ~metadata_approximation =
     let lcode = { code_id; metadata_approximation } in
-    { t with lcodes = Ident.Map.add id lcode t.lcodes }
+    { t with
+      lcodes = Ident.Map.add id lcode t.lcodes;
+      lcode_code_ids_by_template =
+        Template_id.Map.update template
+          (fun code_ids -> Some (code_id :: Option.value code_ids ~default:[]))
+          t.lcode_code_ids_by_template
+    }
 
   let find_lcode_exn t id =
     match Ident.Map.find_opt id t.lcodes with
@@ -247,6 +266,11 @@ module Env = struct
     (find_lcode_exn t id).metadata_approximation
 
   let is_lcode t id = Ident.Map.mem id t.lcodes
+
+  let lcode_code_ids_of_template t template =
+    Option.value
+      (Template_id.Map.find_opt template t.lcode_code_ids_by_template)
+      ~default:[]
 
   let with_depth t depth_var = { t with current_depth = Some depth_var }
 
@@ -403,10 +427,22 @@ module Acc = struct
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
       closure_infos : closure_info list;
+      defined_templates : Template_id.Set.t;
       lcode_approximations : Env.value_approximation Code_id.Map.t
     }
 
   let cost_metrics t = t.cost_metrics
+
+  let define_template t template =
+    if Template_id.Set.mem template t.defined_templates
+    then
+      Misc.fatal_errorf
+        "Template %a is defined more than once: the definition has been copied"
+        (Format_doc.compat Template_id.print)
+        template;
+    { t with
+      defined_templates = Template_id.Set.add template t.defined_templates
+    }
 
   let machine_width t = t.machine_width
 
@@ -495,6 +531,7 @@ module Acc = struct
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
       closure_infos = [];
+      defined_templates = Template_id.Set.empty;
       lcode_approximations = Code_id.Map.empty
     }
 

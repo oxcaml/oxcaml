@@ -49,6 +49,7 @@ type reason =
   | At_toplevel
   | Contains_static_consts
   | Contains_set_of_closures
+  | Contains_template_definition
 
 type cost
 
@@ -74,7 +75,21 @@ val cannot_specialize : reason -> t
 (** Add a primitive of the given size to the cost of specialization *)
 val add_prim : Bound_var.t -> Flambda_primitive.t -> t -> t
 
-val add_continuations : can_be_lifted:bool -> Original_handlers.t -> t -> t
+(** Specialising a continuation copies its handler, so the handler must not
+    contain the definition of a template (see [Flambda_primitive.Template_env]),
+    which must only be simplified once. *)
+val add_template_definition : t -> t
+
+(** [define_templates] says whether the handlers, which haven't been simplified
+    yet, will be copied with the handler being specialised and contain the
+    definition of a template. It is only forced if that handler could be
+    specialised. *)
+val add_continuations :
+  can_be_lifted:bool ->
+  define_templates:bool Lazy.t ->
+  Original_handlers.t ->
+  t ->
+  t
 
 (** Add a set of closure containing [~num] closures to the cost of
     specialization. *)

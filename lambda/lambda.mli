@@ -500,8 +500,11 @@ type primitive =
   | Pbox of layout * locality_mode
   | Punbox of layout
   (* The definition of [template]: allocates its environment like
-     [Pmakeblock (0, Immutable, Shape shape, mode)]. The template's
-     instantiations ([Lcode]) are only ever passed environments created here. *)
+     [Pmakeblock (0, Immutable, Shape shape, mode)], which is the point at
+     which the middle end learns about the environments passed to the
+     template's instantiations ([Lcode]). The middle end optimizes the code of
+     the instantiations there, once, so passes must not duplicate this
+     primitive: [duplicate_function] fails on it. *)
   | Ptemplate_env of
       { template : Template_id.t;
         shape : mixed_block_shape;
@@ -1491,7 +1494,9 @@ val rename_lfun : Ident.t Ident.Map.t -> lfunction -> lfunction
 (** Identical to [rename] but operates on [lfunction] rather than [lambda]. *)
 
 val duplicate_function : lfunction -> lfunction
-(** Duplicate a term, freshening all locally-bound identifiers. *)
+(** Duplicate a term, freshening all locally-bound identifiers. This is a fatal
+    error if the term contains a [Ptemplate_env], since the copy would define
+    the template again. *)
 
 val map : (lambda -> lambda) -> lambda -> lambda
   (** Bottom-up rewriting, applying the function on

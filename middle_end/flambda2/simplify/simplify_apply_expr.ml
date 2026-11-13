@@ -222,7 +222,10 @@ let rebuild_apply
   after_rebuild expr uacc
 
 type inlining_decision =
-  | Do_not_inline of { erase_attribute : bool }
+  | Do_not_inline of
+      { erase_attribute : bool;
+        use_info : Inlined_attribute.Use_info.t
+      }
   | Inline of DA.t * Expr.t
 
 (* CR vlaviron: fetch [params_arity], [result_arity] and [result_types] from
@@ -236,7 +239,10 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
     match function_type with
     | None ->
       (* No rec info available, prevent inlining to avoid problems *)
-      Do_not_inline { erase_attribute = false }
+      Do_not_inline
+        { erase_attribute = false;
+          use_info = Unused_because_of_call_site_decision
+        }
     | Some function_type -> (
       let decision =
         Call_site_inlining_decision.make_decision dacc ~simplify_expr
@@ -258,7 +264,13 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
           ~apply ~inlined_forwarded_from decision;
       match Call_site_inlining_decision_type.can_inline decision with
       | Do_not_inline { erase_attribute_if_ignored } ->
-        Do_not_inline { erase_attribute = erase_attribute_if_ignored }
+        let use_info : Inlined_attribute.Use_info.t =
+          match[@ocaml.warning "-fragile-match"] decision with
+          | Template_definition_not_simplified ->
+            Template_definition_not_simplified
+          | _ -> Unused_because_of_call_site_decision
+        in
+        Do_not_inline { erase_attribute = erase_attribute_if_ignored; use_info }
       | Inline { unroll_to; was_inline_always } ->
         let dacc =
           DA.map_denv dacc ~f:(DE.record_inlining_decision ~apply decision)
@@ -286,14 +298,12 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
       down_to_up dacc simplified_body
     in
     simplify_expr dacc inlined ~down_to_up
-  | Do_not_inline { erase_attribute } -> (
+  | Do_not_inline { erase_attribute; use_info } -> (
     let apply =
       let inlined : Inlined_attribute.t =
         if erase_attribute
         then Default_inlined
-        else
-          Inlined_attribute.with_use_info (Apply.inlined apply)
-            Unused_because_of_call_site_decision
+        else Inlined_attribute.with_use_info (Apply.inlined apply) use_info
       in
       Apply.with_inlined_attribute apply inlined
     in

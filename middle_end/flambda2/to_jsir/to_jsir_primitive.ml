@@ -273,6 +273,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | String_length _ -> use_prim' (Extern ("caml_ml_string_length", None))
   | Int_as_pointer _ -> use_prim' (Extern ("caml_int_as_pointer", None))
   | Opaque_identity { middle_end_only = true; kind = _ } -> identity ~env ~res x
+  | Template_env _ -> identity ~env ~res x
   | Opaque_identity { middle_end_only = false; kind : Flambda_kind.t = _ } ->
     (* CR selee: treating these as the identity for now *)
     identity ~env ~res x
