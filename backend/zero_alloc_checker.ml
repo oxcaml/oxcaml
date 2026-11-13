@@ -244,7 +244,7 @@ end = struct
 end
 
 module Top = struct
-  type t = { witnesses : Witnesses.t }
+  type t = { witnesses : Witnesses.t } [@@unboxed]
 
   let compare { witnesses = w1 } { witnesses = w2 } = Witnesses.compare w1 w2
 
