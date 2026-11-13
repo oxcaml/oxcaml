@@ -134,14 +134,14 @@ let rec apply_coercion loc strict restr arg =
                 loc)
         in
         wrap_id_pos_list loc id_pos_list get_field get_layout lam)
-  | Tcoerce_functor(cc_arg, cc_res, yielding) ->
+  | Tcoerce_functor(cc_arg, cc_res, yielding, staticity) ->
       let param = Ident.create_local "funarg" in
       let param_duid = Lambda.debug_uid_none in
       let carg = apply_coercion loc Alias cc_arg (Lvar param) in
       apply_coercion_result loc strict arg
         [{name = param; debug_uid = param_duid; layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
-        [carg] yielding cc_res
+        [carg] yielding staticity cc_res
   | Tcoerce_kindtemplate tc ->
       apply_kindtemplate_coercion loc tc arg
   | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort;
@@ -162,9 +162,10 @@ let rec apply_coercion loc strict restr arg =
 and apply_coercion_field loc get_field (pos, cc) =
   apply_coercion loc Alias cc (get_field pos)
 
-and apply_coercion_result loc strict funct params args yielding cc_res =
+and apply_coercion_result loc strict funct params args yielding staticity cc_res =
   match cc_res with
-  | Tcoerce_functor(cc_arg, cc_res, level_yielding) ->
+  | Tcoerce_functor(cc_arg, cc_res, level_yielding, level_staticity)
+    when Mode.Staticity.Const.equal level_staticity staticity ->
     let param = Ident.create_local "funarg" in
     let param_duid = Lambda.debug_uid_none in
     let arg = apply_coercion loc Alias cc_arg (Lvar param) in
@@ -176,40 +177,51 @@ and apply_coercion_result loc strict funct params args yielding cc_res =
          mode = alloc_heap } :: params)
       (arg :: args)
       (Mode.Yielding.join [yielding; level_yielding])
+      staticity
       cc_res
   | _ ->
       name_lambda strict funct Lambda.layout_functor
         (fun id ->
-           lfunction
-             ~kind:(Curried {nlocal=0})
-             ~params:(List.rev params)
-             ~return:Lambda.layout_module
-             ~attr:{ default_function_attribute with
+          let staticity = Translmode.transl_staticity_mode staticity in
+          let body =
+            { ap_loc=loc;
+              ap_func=Lvar id;
+              ap_args=List.rev args;
+              ap_result_layout=Lambda.layout_module;
+              ap_region_close=Rc_normal;
+              ap_mode=not_alloc_stack;
+              (* The stub fully applies the coerced functor, so the
+                  call yields if any traversed coercion level does. *)
+              ap_yielding=
+                Translmode.transl_yielding_mode_l yielding;
+              ap_tailcall=Default_tailcall;
+              ap_inlined=forward_inlined_attribute ();
+              ap_specialised=Default_specialise;
+              ap_probe=None; }
+          in
+          let body =
+            match staticity with
+            | Dynamic -> Lapply body
+            | Static -> Linstantiate body
+          in
+          let lfun =
+            lfunction'
+              ~kind:(Curried {nlocal=0})
+              ~params:(List.rev params)
+              ~return:Lambda.layout_module
+              ~attr:{ default_function_attribute with
                         is_a_functor = true;
                         zero_alloc = Default_zero_alloc;
                         stub = true;
                         may_fuse_arity = true; }
-             ~loc
-             ~mode:alloc_heap
-             ~ret_mode:not_alloc_stack
-             ~body:(apply_coercion
-                   loc Strict cc_res
-                   (Lapply{
-                      ap_loc=loc;
-                      ap_func=Lvar id;
-                      ap_args=List.rev args;
-                      ap_result_layout=Lambda.layout_module;
-                      ap_region_close=Rc_normal;
-                      ap_mode=not_alloc_stack;
-                      (* The stub fully applies the coerced functor, so the
-                         call yields if any traversed coercion level does. *)
-                      ap_yielding=
-                        Translmode.transl_yielding_mode_l yielding;
-                      ap_tailcall=Default_tailcall;
-                      ap_inlined=forward_inlined_attribute ();
-                      ap_specialised=Default_specialise;
-                      ap_probe=None;
-                    })))
+              ~loc
+              ~mode:alloc_heap
+              ~ret_mode:not_alloc_stack
+              ~body:(apply_coercion loc Strict cc_res body)
+          in
+          match staticity with
+          | Dynamic -> Lfunction lfun
+          | Static -> Ltemplate lfun)
 
 and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
   let fv = free_variables lam in
@@ -297,10 +309,12 @@ let rec compose_coercions c1 c2 =
         ; pos_cc_list
         ; id_pos_list = ids1 @ ids2
         }
-  | (Tcoerce_functor(arg1, res1, y1), Tcoerce_functor(arg2, res2, y2)) ->
+  | (Tcoerce_functor(arg1, res1, y1, s1), Tcoerce_functor(arg2, res2, y2, s2))
+    ->
+      assert (Mode.Staticity.Const.equal s1 s2);
       Tcoerce_functor(compose_coercions arg2 arg1,
                       compose_coercions res1 res2,
-                      Mode.Yielding.join [y1; y2])
+                      Mode.Yielding.join [y1; y2], s1)
   | (c1, Tcoerce_alias (env, path, c2)) ->
       Tcoerce_alias (env, path, compose_coercions c1 c2)
   | (Tcoerce_kindtemplate tc, Tcoerce_kindtemplate tc') -> begin
@@ -614,7 +628,7 @@ let merge_functors ~scopes mexp coercion root_path =
         let arg_coercion, res_coercion =
           match coercion with
           | Tcoerce_none -> Tcoerce_none, Tcoerce_none
-          | Tcoerce_functor (arg_coercion, res_coercion, _) ->
+          | Tcoerce_functor (arg_coercion, res_coercion, _, _) ->
             arg_coercion, res_coercion
           | _ -> fatal_error "Translmod.merge_functors: bad coercion"
         in
