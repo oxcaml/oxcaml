@@ -747,14 +747,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.insert_moves env sub_cfg base [| locs.(i).(0) |];
         SU.insert_moves env sub_cfg offset [| locs.(i).(1) |];
         move_args (i + 1) ty_args' args'
-      | ( (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+      | ( (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat | XFloat32
            | XVec128 | XVec256 | XVec512 | XDummy_int | XDummy_float ) as ty_arg)
           :: ty_args',
           arg :: args' ) ->
         insert_move_extcall_arg env sub_cfg ty_arg arg locs.(i) dbg;
         move_args (i + 1) ty_args' args'
       | XFat_pointer :: _, ([] | [_])
-      | ( ( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+      | ( ( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat | XFloat32
           | XVec128 | XVec256 | XVec512 | XDummy_int | XDummy_float )
           :: _,
           [] )

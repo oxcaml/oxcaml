@@ -174,7 +174,8 @@ module Reg_class = struct
 
   let of_exttype (exttype : Cmm.exttype) : t =
     match exttype with
-    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XDummy_int | XFat_pointer ->
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XDummy_int
+    | XFat_pointer ->
       Int_regs
     | XFloat | XFloat32 | XVec128 | XVec256 | XVec512 | XDummy_float ->
       Float_regs
@@ -283,7 +284,7 @@ module Component = struct
 
   let reg_class_and_size (kind : K.With_subkind.t) : Reg_class.t * int =
     match To_cmm_shared.exttype_of_kind (K.With_subkind.kind kind) with
-    | XInt | XInt64 -> Int_regs, 8
+    | XInt | XInt64 | XMask -> Int_regs, 8
     | XInt32 -> Int_regs, 4
     | XInt16 -> Int_regs, 2
     | XInt8 -> Int_regs, 1
@@ -742,7 +743,7 @@ module Slot = struct
      x86-64. *)
   let amd64_stack_size args t =
     match exttype args t with
-    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32 -> 8
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat | XFloat32 -> 8
     | XVec128 -> 16
     | XVec256 -> 32
     | XVec512 -> 64

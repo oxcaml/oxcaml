@@ -383,7 +383,7 @@ let unix_loc_external_arguments_fat ty_args =
   let real_component (t : Cmm.exttype) : machtype_component =
     match t with
     | XFat_pointer -> Val
-    | XInt | XInt8 | XInt16 | XInt32 | XInt64 -> Int
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask -> Int
     | XFloat -> Float
     | XFloat32 -> Float32
     | XVec128 -> Vec128
@@ -435,8 +435,8 @@ let unix_loc_external_arguments_fat ty_args =
           | Stack _ | Unknown ->
             Misc.fatal_error
               "Proc.loc_external_arguments: no register left for a dummy")
-        | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32 | XVec128
-        | XVec256 | XVec512 ->
+        | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat | XFloat32
+        | XVec128 | XVec256 | XVec512 ->
           [| loc.(i) |])
       ty_args
   in

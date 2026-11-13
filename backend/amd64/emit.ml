@@ -2244,7 +2244,7 @@ let emit_instr ~first ~last ~fallthrough i =
           | XFat_pointer ->
             I.add (arg i (k + 1)) (arg i k);
             k + 2
-          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat | XFloat32
           | XVec128 | XVec256 | XVec512 ->
             k + 1
           | XDummy_int | XDummy_float -> k)
