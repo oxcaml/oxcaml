@@ -57,7 +57,7 @@ let log_in ctx exn =
 
 let monitor body ~with_ =
   let ctx = current_context () in
-  Scheduler.Monitor.try_ body ~with_:(fun e ->
+  Typing_scheduler.Monitor.try_ body ~with_:(fun e ->
       match with_ e with
       | Some exn ->
           log_in ctx exn;

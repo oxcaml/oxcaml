@@ -30,7 +30,7 @@ end
 (** [fill t v ~scheduler] fills [t] with [v] and enqueues the [run] of each
     waiting handler on [scheduler]. Does not run [scheduler]. If [t] is already
     full, [t] is unchanged. *)
-val fill : 'a t -> 'a -> scheduler:Scheduler.t -> 'a Fill_result.t
+val fill : 'a t -> 'a -> scheduler:Typing_scheduler.t -> 'a Fill_result.t
 
 (** [upon t ~run ~cancel ~scheduler] registers a handler on [t]. Each handler is
     run, cancelled or dropped, at most once:
@@ -46,12 +46,12 @@ val upon :
   'a t ->
   run:('a -> unit) ->
   cancel:(unit -> unit) ->
-  scheduler:Scheduler.t ->
+  scheduler:Typing_scheduler.t ->
   unit
 
 (** [cancel_all ts ~scheduler] detaches the handlers of every ivar in [ts], then
     enqueues each [cancel]. The ivars stay empty. *)
-val cancel_all : 'a t list -> scheduler:Scheduler.t -> unit
+val cancel_all : 'a t list -> scheduler:Typing_scheduler.t -> unit
 
 (** [drop_all ts] detaches the handlers of every ivar in [ts]. *)
 val drop_all : 'a t list -> unit
@@ -60,7 +60,7 @@ val drop_all : 'a t list -> unit
     empty, their handlers are combined. If exactly one is full, the other's
     handlers are enqueued as if by {!fill}. If both are full, [f] combines their
     values. *)
-val merge : 'a t -> 'a t -> f:('a -> 'a -> 'a) -> scheduler:Scheduler.t -> unit
+val merge : 'a t -> 'a t -> f:('a -> 'a -> 'a) -> scheduler:Typing_scheduler.t -> unit
 
 (** All mutations are reported to the log installed by [set_log], so they can be
     undone with [Change.undo]. Jobs enqueued on the scheduler are logged

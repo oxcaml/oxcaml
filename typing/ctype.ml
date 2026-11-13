@@ -106,7 +106,7 @@ let raise_for tr_exn e =
    any [tr_exn] exception it raises, including from checks it delays. *)
 let extend_trace_for (type a) (tr_exn : a trace_exn)
     (elt : (type_expr, a) Errortrace.elt) f =
-  Scheduler.Monitor.try_ f ~with_:(fun e ->
+  Typing_scheduler.Monitor.try_ f ~with_:(fun e ->
       match tr_exn, e with
       | Unify, Unify_trace tr -> Unify_trace (elt :: tr)
       | Equality, Equality_trace tr -> Equality_trace (elt :: tr)
@@ -186,7 +186,7 @@ let global_level = s_ref 0
 let saved_level = s_ref []
 
 (* Runs the handlers woken up by filling [Tivar]s during unification. *)
-let scheduler = s_ref_of_create Scheduler.create ()
+let scheduler = s_ref_of_create Typing_scheduler.create ()
 
 let scheduler () = !scheduler
 
@@ -197,31 +197,31 @@ let get_local_ivars ~level =
       if get_level ty >= level
       then
         match get_desc ty with
-        | Tivar { ivar; _ } when Ivar.has_handlers ivar ->
+        | Tivar { ivar; _ } when Typing_ivar.has_handlers ivar ->
           ivars := ivar :: !ivars
         | _ -> ());
   !ivars
 
 let get_all_ivars () =
-  List.filter Ivar.has_handlers (take_ivar_pool ~level:!current_level)
+  List.filter Typing_ivar.has_handlers (take_ivar_pool ~level:!current_level)
 
 (* Runs the scheduler, then defaults any still-empty ivars returned
    by [get_ivars], until none remain. *)
 let default_ivars get_ivars =
   let scheduler = scheduler () in
   let rec loop () =
-    Scheduler.run scheduler;
+    Typing_scheduler.run scheduler;
     match get_ivars () with
     | [] -> ()
     | ivars ->
-      Ivar.cancel_all ivars ~scheduler;
+      Typing_ivar.cancel_all ivars ~scheduler;
       loop ()
   in
   loop ()
 
 let drop_all_ivars () =
-  Ivar.drop_all (get_all_ivars ());
-  Scheduler.clear (scheduler ())
+  Typing_ivar.drop_all (get_all_ivars ());
+  Typing_scheduler.clear (scheduler ())
 
 let try_or_drop_all_ivars f =
   try f ()
@@ -246,7 +246,7 @@ let rewrite_defaulted_toplevel_tivars () =
     iter_pool ~level:!current_level (fun ty ->
         match ty.desc with
         | Tivar { ivar; name; jkind } ->
-          if Ivar.has_handlers ivar
+          if Typing_ivar.has_handlers ivar
           then
             fatal_error
               "Ctype.rewrite_defaulted_toplevel_tivars: undefaulted Tivar";
@@ -334,7 +334,7 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
           match ty.desc with
           | Tivar { ivar; name; jkind } ->
               (* Only empty generalizable [Tivar]s exist after defaulting *)
-              if Ivar.has_handlers ivar
+              if Typing_ivar.has_handlers ivar
               then fatal_error "Ctype.with_local_level_gen: unsupported Tivar";
               Transient_expr.set_desc ty (Tvar { name; jkind })
           | Tconstr (_, _, abbrev) when structure ->
@@ -1135,7 +1135,7 @@ let rec generalize stage_offset ty =
     | Tvar { name; jkind } ->
         generalize_var_stage_and_jkind stage_offset ty name jkind
     | Tivar { ivar; name; jkind } ->
-        if Ivar.has_handlers ivar
+        if Typing_ivar.has_handlers ivar
         then fatal_error "Ctype.generalize: unsupported Tivar";
         set_type_desc ty (Tvar { name; jkind });
         generalize_var_stage_and_jkind stage_offset ty name jkind
@@ -5309,7 +5309,7 @@ module Type_head = struct
   type t =
     | Var
     | Locally_abstract
-    | Ivar of type_shape Ivar.t
+    | Ivar of type_shape Typing_ivar.t
     | Shape of type_shape
     | Undefined
 
@@ -5360,7 +5360,7 @@ let transfer_ivar ivar t2 =
   set_type_desc t2 (Tivar { name; jkind; ivar })
 
 let merge_ivars tr_exn ivar1 ivar2 =
-  Ivar.merge ivar1 ivar2 ~scheduler:(scheduler ())
+  Typing_ivar.merge ivar1 ivar2 ~scheduler:(scheduler ())
     ~f:(fun got expected ->
       if equal_type_shape got expected then expected
       else raise_for tr_exn (Shape_mismatch { got; expected }))
@@ -5368,7 +5368,7 @@ let merge_ivars tr_exn ivar1 ivar2 =
 (* Fill [ivar] with [shape]. If [ivar] is already full, the
    shapes must be equal. *)
 let fill_ivar tr_exn ivar shape =
-  match Ivar.fill ivar shape ~scheduler:(scheduler ()) with
+  match Typing_ivar.fill ivar shape ~scheduler:(scheduler ()) with
   | Ok -> ()
   | Already_full expected ->
     if not (equal_type_shape shape expected)
@@ -5391,7 +5391,7 @@ let link_var tr_exn env t1 t2 =
       (* [t2'] has no shape, so [ivar1] will never be filled.
          No [Tivar] holds it any more, so no drain would find
          it: default now, as [upon_shape] does. *)
-      Ivar.cancel_all [ivar1] ~scheduler:(scheduler ())
+      Typing_ivar.cancel_all [ivar1] ~scheduler:(scheduler ())
     | Ivar ivar2 -> merge_ivars tr_exn ivar1 ivar2
     | Shape s -> fill_ivar tr_exn ivar1 s)
   | _ -> Misc.fatal_error "Ctype.link_var: expected Tvar or Tivar"
@@ -5485,23 +5485,23 @@ let upon_shape env ty ~run ~default =
   let ty = expand_head_ignoring_local_constraints env ty in
   let head = Type_head.of_expanded_type env ty in
   let wait ivar =
-    Ivar.upon ivar ~run ~cancel:default ~scheduler;
+    Typing_ivar.upon ivar ~run ~cancel:default ~scheduler;
     add_to_ivar_pool ~level:!current_level ivar
   in
   match head with
   | Var when not (Language_extension.is_enabled Omnidirectionality) ->
-    Scheduler.add scheduler default
+    Typing_scheduler.add scheduler default
   | Var ->
-    let ivar = Ivar.create () in
+    let ivar = Typing_ivar.create () in
     transfer_ivar ivar ty;
     wait ivar
   | Ivar ivar -> wait ivar
   | Shape s ->
     (* Fast path: [ty] is not a variable, so behaves as if its ivar
        were already filled, or defaulted if [ty] has no shape. *)
-    Scheduler.add scheduler (fun () -> run s)
+    Typing_scheduler.add scheduler (fun () -> run s)
   | Locally_abstract | Undefined ->
-    Scheduler.add scheduler (fun () -> default ())
+    Typing_scheduler.add scheduler (fun () -> default ())
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
@@ -7052,7 +7052,7 @@ let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
   in
   match
     (* A monitor frame, so that a delayed crossing fails as if here. *)
-    Scheduler.Monitor.try_
+    Typing_scheduler.Monitor.try_
       (fun () ->
         match v with
         | Invariant ->
@@ -7416,7 +7416,7 @@ let moregeneral ~self_check env inst_nongen
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
       match
-        Scheduler.Monitor.try_
+        Typing_scheduler.Monitor.try_
           (fun () ->
             try_then_default_all_ivars (fun () ->
               with_univar_pairs [] (fun () ->
@@ -7984,7 +7984,7 @@ let match_class_sig_shape ~strict sign1 sign2 =
    The handlers below are monitor frames, so that checks delayed by [moregen]
    (e.g. mode crossing) fail with the same [Moregen_clty_trace]. *)
 let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
-  Scheduler.Monitor.try_
+  Typing_scheduler.Monitor.try_
     ~with_:(function
       | Moregen_clty_trace error when trace || error = [] ->
         Moregen_clty_trace (CM_Class_type_mismatch (env, cty1, cty2) :: error)
@@ -7997,7 +7997,7 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
         moregen_clty ~arrow_index true type_pairs env cty1 cty2
     | Cty_arrow (l1, ty1, cty1'), Cty_arrow (l2, ty2, cty2') when l1 = l2 ->
         let arrow_index = arrow_index + 1 in
-        Scheduler.Monitor.try_
+        Typing_scheduler.Monitor.try_
           (fun () -> moregen true Covariant type_pairs env ty1 ty2)
           ~with_:(function
             | Moregen_trace trace ->
@@ -8015,7 +8015,7 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                   all methods in sign2 are present in sign1. *)
                assert false
              | (_, _, ty') ->
-                 Scheduler.Monitor.try_
+                 Typing_scheduler.Monitor.try_
                    (fun () -> moregen true Covariant type_pairs env ty' ty)
                    ~with_:(function
                      | Moregen_trace trace ->
@@ -8035,7 +8035,7 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                   all instance variables in sign2 are present in sign1. *)
                assert false
              | (_, _, ty') ->
-                 Scheduler.Monitor.try_
+                 Typing_scheduler.Monitor.try_
                    (fun () -> moregen true Covariant type_pairs env ty' ty)
                    ~with_:(function
                      | Moregen_trace trace ->
@@ -8052,7 +8052,7 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
   end
 
 let moregen_clty trace type_pairs env cty1 cty2 =
-  Scheduler.Monitor.try_
+  Typing_scheduler.Monitor.try_
     (fun () -> moregen_clty ~arrow_index:0 trace type_pairs env cty1 cty2)
     ~with_:(function Moregen_clty_trace trace -> Moregen_clty trace | e -> e)
 
@@ -8503,7 +8503,7 @@ let enlarge_type env ty =
   let enlarged = ref ty in
   (* [level = 4] allows 2 expansions involving objects/variants *)
   let (ty', _) =
-    Scheduler.Monitor.try_
+    Typing_scheduler.Monitor.try_
       (fun () -> build_subtype env [] [] true 4 ty)
       ~with_:(function
         | Crossing_failed_with_locality _ ->
@@ -8579,7 +8579,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
         in
         (* A monitor frame, so that a delayed crossing fails as
            [subtype_mode_with_locality] does. *)
-        Scheduler.Monitor.try_
+        Typing_scheduler.Monitor.try_
           (fun () ->
             let a2 = cross_left_with_locality env t2 a2 in
             subtype_mode_with_locality env trace a2 a1;

@@ -105,7 +105,7 @@ val upon_shape_later :
   Defined_later.Fun.t
 
 (** Defined as [Ctype.scheduler], to break the dependency cycle. *)
-val scheduler_later : (unit -> Scheduler.t) Defined_later.Fun.t
+val scheduler_later : (unit -> Typing_scheduler.t) Defined_later.Fun.t
 
 val instance_poly_for_jkind' :
   (Types.type_expr list -> Types.type_expr -> Types.type_expr) ref

@@ -109,7 +109,7 @@ and raw_type_desc ppf ty =
   | Tivar { name; jkind; ivar } ->
       fprintf ppf "@[<hov1>Tivar (@,%a,@,%a,@,%s)@]"
         print_name name Jkind.Debug_printers.t jkind
-        (match Ivar.peek ivar with None -> "empty" | Some _ -> "full")
+        (match Typing_ivar.peek ivar with None -> "empty" | Some _ -> "full")
   | Tarrow((l,arg,ret),t1,t2,c) ->
       fprintf ppf "@[<hov1>Tarrow((\"%s\",%a,%a),@,%a,@,%a,@,%s)@]"
         (string_of_label l)
