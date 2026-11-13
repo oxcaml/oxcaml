@@ -94,11 +94,12 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     R.create ~reachable_names
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
   in
-  let r, outer_fdo_region = R.enter_fdo_region r in
   let body, body_free_vars, body_symbol_inits, res =
     To_cmm_expr.expr env r (Flambda_unit.body flambda_unit)
   in
-  let res, fdo_entry_counters = R.leave_fdo_region res outer_fdo_region in
+  let fdo_entry_counters =
+    Fdo_to_cmm_region_counters.region_counters (R.fdo_region_counters res)
+  in
   if not (To_cmm_env.Symbol_inits.is_empty body_symbol_inits)
   then
     Misc.fatal_errorf

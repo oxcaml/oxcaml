@@ -27,10 +27,7 @@ type t =
     module_symbol : Symbol.t;
     module_symbol_defined : bool;
     invalid_message_symbols : Symbol.t String.Map.t;
-    fdo_region_counters : Fdo_annotation.t;
-    (* The FDO counters in the region being translated that lost their edges
-       (see [add_fdo_region_counters]). *)
-    fdo_handler_counters : Fdo_annotation.t Continuation.Map.t
+    fdo_region_counters : Fdo_to_cmm_region_counters.t
   }
 
 let create ~module_symbol ~reachable_names =
@@ -43,8 +40,7 @@ let create ~module_symbol ~reachable_names =
     module_symbol;
     module_symbol_defined = false;
     invalid_message_symbols = String.Map.empty;
-    fdo_region_counters = Fdo_annotation.empty;
-    fdo_handler_counters = Continuation.Map.empty
+    fdo_region_counters = Fdo_to_cmm_region_counters.empty
   }
 
 (* Symbol handling
@@ -99,36 +95,10 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
 
 (* *)
 
-type fdo_region = Fdo_annotation.t
+let fdo_region_counters t = t.fdo_region_counters
 
-let enter_fdo_region t =
-  { t with fdo_region_counters = Fdo_annotation.empty }, t.fdo_region_counters
-
-let leave_fdo_region t outer =
-  { t with fdo_region_counters = outer }, t.fdo_region_counters
-
-let add_fdo_region_counters t counters =
-  if Fdo_annotation.is_empty counters
-  then t
-  else
-    { t with
-      fdo_region_counters =
-        Fdo_annotation.combine t.fdo_region_counters counters
-    }
-
-let set_fdo_handler_counters t k counters =
-  if Fdo_annotation.is_empty counters
-  then t
-  else
-    { t with
-      fdo_handler_counters =
-        Continuation.Map.add k counters t.fdo_handler_counters
-    }
-
-let fdo_handler_counters t k =
-  Option.value
-    (Continuation.Map.find_opt k t.fdo_handler_counters)
-    ~default:Fdo_annotation.empty
+let map_fdo_region_counters t f =
+  { t with fdo_region_counters = f t.fdo_region_counters }
 
 let check_for_module_symbol t symbol =
   if Symbol.equal symbol t.module_symbol
