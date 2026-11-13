@@ -1549,18 +1549,19 @@ let const_scalar (kind : locality_mode Scalar.Integral.t) n =
   Lconst
     (match kind with
     | Value (Taggable Int) -> const_int n
-    | Value (Taggable Int8) -> const_int8 n
-    | Value (Taggable Int16) -> const_int16 n
+    | Value (Taggable Int8) -> const_int8 (Numbers.Int8.of_int_exn n)
+    | Value (Taggable Int16) -> const_int16 (Numbers.Int16.of_int_exn n)
     | Value (Boxable (Int32 _)) -> const_int32 (Int32.of_int n)
     | Value (Boxable (Int64 _)) -> const_int64 (Int64.of_int n)
-    | Value (Boxable (Nativeint _)) -> const_nativeint (Nativeint.of_int n)
+    | Value (Boxable (Nativeint _)) -> const_nativeint (Targetint.of_int n)
     | Naked (Taggable Int) -> const_untagged_int n
-    | Naked (Taggable Int8) -> const_untagged_int8 n
-    | Naked (Taggable Int16) -> const_untagged_int16 n
+    | Naked (Taggable Int8) -> const_untagged_int8 (Numbers.Int8.of_int_exn n)
+    | Naked (Taggable Int16) ->
+      const_untagged_int16 (Numbers.Int16.of_int_exn n)
     | Naked (Boxable (Int32 _)) -> const_unboxed_int32 (Int32.of_int n)
     | Naked (Boxable (Int64 _)) -> const_unboxed_int64 (Int64.of_int n)
     | Naked (Boxable (Nativeint _)) ->
-      const_unboxed_nativeint (Nativeint.of_int n))
+      const_unboxed_nativeint (Targetint.of_int n))
 
 let max_arity () =
   if Clflags.target_is_native () then 126 else max_int

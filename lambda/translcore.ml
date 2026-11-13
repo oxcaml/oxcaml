@@ -610,7 +610,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       Lprim(Punbox_unit, [lambda_unit],
             of_location ~scopes e.exp_loc)
   | Texp_unboxed_bool b ->
-      Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
+      Lconst(Const_base(Const_untagged_int8(Numbers.Int8.of_bool b)))
   | Texp_tuple (el, locality_mode) ->
       let ll, sorts, layouts =
         transl_list_with_layout ~scopes

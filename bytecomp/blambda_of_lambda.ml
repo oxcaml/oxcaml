@@ -48,7 +48,7 @@ let constant_int integral n : constant =
   | Boxable (Int32 Any_locality_mode) -> Const_int32 (Int32.of_int n)
   | Boxable (Int64 Any_locality_mode) -> Const_int64 (Int64.of_int n)
   | Boxable (Nativeint Any_locality_mode) ->
-    Const_nativeint (Nativeint.of_int n)
+    Const_nativeint (Targetint.of_int n)
 
 let const_int size n = Const_base (constant_int size n)
 
@@ -714,15 +714,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | Punboxedoruntaggedintarray Untagged_int ->
             Lconst (Const_base (Const_int 0))
           | Punboxedoruntaggedintarray Untagged_int8 ->
-            Lconst (Const_base (Const_int8 0))
+            Lconst (Const_base (Const_int8 Numbers.Int8.zero))
           | Punboxedoruntaggedintarray Untagged_int16 ->
-            Lconst (Const_base (Const_int16 0))
+            Lconst (Const_base (Const_int16 Numbers.Int16.zero))
           | Punboxedoruntaggedintarray Unboxed_int32 ->
             Lconst (Const_base (Const_int32 0l))
           | Punboxedoruntaggedintarray Unboxed_int64 ->
             Lconst (Const_base (Const_int64 0L))
           | Punboxedoruntaggedintarray Unboxed_nativeint ->
-            Lconst (Const_base (Const_nativeint 0n))
+            Lconst (Const_base (Const_nativeint Targetint.zero))
           | Punboxedvectorarray _ -> raise Not_found
           | Punboxedmaskarray -> raise Not_found
           | Pgcignorableproductarray ignorables ->
@@ -737,15 +737,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               | Punboxedoruntaggedint_ignorable Untagged_int ->
                 Lconst (Const_base (Const_int 0))
               | Punboxedoruntaggedint_ignorable Untagged_int8 ->
-                Lconst (Const_base (Const_int8 0))
+                Lconst (Const_base (Const_int8 Numbers.Int8.zero))
               | Punboxedoruntaggedint_ignorable Untagged_int16 ->
-                Lconst (Const_base (Const_int16 0))
+                Lconst (Const_base (Const_int16 Numbers.Int16.zero))
               | Punboxedoruntaggedint_ignorable Unboxed_int32 ->
                 Lconst (Const_base (Const_int32 0l))
               | Punboxedoruntaggedint_ignorable Unboxed_int64 ->
                 Lconst (Const_base (Const_int64 0L))
               | Punboxedoruntaggedint_ignorable Unboxed_nativeint ->
-                Lconst (Const_base (Const_nativeint 0n))
+                Lconst (Const_base (Const_nativeint Targetint.zero))
               | Punboxedvector_ignorable _ -> raise Not_found
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in

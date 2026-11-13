@@ -36,6 +36,7 @@ module Int8 : sig
   val one : t
 
   val of_int_exn : int -> t
+  val of_bool : bool -> t
   val to_int : t -> int
   val print : Format.formatter -> t -> unit
 end

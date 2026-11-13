@@ -105,13 +105,15 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     ( acc,
       reg_width
         (RWC.tagged_immediate
-           (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
+           (Target_ocaml_int.of_int (Acc.machine_width acc)
+              (Numbers.Int8.to_int c))),
       "int8" )
   | Const_base (Const_int16 c) ->
     ( acc,
       reg_width
         (RWC.tagged_immediate
-           (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
+           (Target_ocaml_int.of_int (Acc.machine_width acc)
+              (Numbers.Int16.to_int c))),
       "int16" )
   | Const_base (Const_char c) ->
     ( acc,
@@ -140,13 +142,12 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
   | Const_base (Const_nativeint c) ->
     (* CR pchambart: this should be pushed further to lambda *)
     let c =
-      Targetint_32_64.of_int64 (Acc.machine_width acc) (Int64.of_nativeint c)
+      Targetint_32_64.of_int64 (Acc.machine_width acc) (Targetint.to_int64 c)
     in
     register_const acc dbg (SC.boxed_nativeint (Const c)) "nativeint"
   | Const_base (Const_untagged_char c) ->
-    ( acc,
-      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
-      "untagged_char" )
+    let c = Numeric_types.Int8.of_int_exn (Numbers.Int8.to_int c) in
+    acc, reg_width (RWC.naked_int8 c), "untagged_char"
   | Const_base (Const_untagged_int c) ->
     ( acc,
       reg_width
@@ -154,13 +155,11 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
            (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
       "untagged_int" )
   | Const_base (Const_untagged_int8 c) ->
-    ( acc,
-      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
-      "untagged_int8" )
+    let c = Numeric_types.Int8.of_int_exn (Numbers.Int8.to_int c) in
+    acc, reg_width (RWC.naked_int8 c), "untagged_int8"
   | Const_base (Const_untagged_int16 c) ->
-    ( acc,
-      reg_width (RWC.naked_int16 (Numeric_types.Int16.of_int_exn c)),
-      "untagged_int16" )
+    let c = Numeric_types.Int16.of_int_exn (Numbers.Int16.to_int c) in
+    acc, reg_width (RWC.naked_int16 c), "untagged_int16"
   | Const_base (Const_unboxed_int32 c) ->
     acc, reg_width (RWC.naked_int32 c), "unboxed_int32"
   | Const_base (Const_unboxed_int64 c) ->
@@ -168,7 +167,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
   | Const_base (Const_unboxed_nativeint c) ->
     (* CR pchambart: this should be pushed further to lambda *)
     let c =
-      Targetint_32_64.of_int64 (Acc.machine_width acc) (Int64.of_nativeint c)
+      Targetint_32_64.of_int64 (Acc.machine_width acc) (Targetint.to_int64 c)
     in
     acc, reg_width (RWC.naked_nativeint c), "unboxed_nativeint"
   | Const_immstring c ->
