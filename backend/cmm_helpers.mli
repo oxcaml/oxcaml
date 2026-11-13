@@ -719,15 +719,21 @@ val setfield_computed :
   Lambda.initialization_or_assignment ->
   ternary_primitive
 
-(** [transl_switch_clambda loc arg index cases], with the FDO counters of the
-    cases that no edge of the result has (e.g. because it is a table lookup), to
-    be attached to the edges into the switch. *)
+type transl_switch_clambda_result =
+  { switch_expr : expression;
+    fdo_counters_into_switch : Fdo_annotation.t
+        (** The FDO counters of the cases that no edge of the result has (e.g.
+            because it is a table lookup), to be attached to the edges into the
+            switch. *)
+  }
+
+(** [transl_switch_clambda loc arg index cases] *)
 val transl_switch_clambda :
   Debuginfo.t ->
   expression ->
   int array ->
   (expression * Branch_annotations.t) array ->
-  expression * Fdo_annotation.t
+  transl_switch_clambda_result
 
 (** Method call : [send kind met obj args dbg]
 

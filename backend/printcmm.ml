@@ -347,8 +347,6 @@ let operation d = function
   | Cpoll -> "poll"
   | Cpause -> "pause"
 
-(* The FDO annotations are printed as in Flambda, and only if there are any. *)
-
 let callsite_counter ppf = function
   | None -> ()
   | Some counter ->

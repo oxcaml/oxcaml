@@ -28,7 +28,7 @@ type t =
     module_symbol_defined : bool;
     invalid_message_symbols : Symbol.t String.Map.t;
     fdo_region_counters : Fdo_annotation.t;
-    (* The FDO counters, in the region being translated, that lost their edges
+    (* The FDO counters in the region being translated that lost their edges
        (see [add_fdo_region_counters]). *)
     fdo_handler_counters : Fdo_annotation.t Continuation.Map.t
   }

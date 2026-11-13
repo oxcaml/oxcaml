@@ -3667,6 +3667,11 @@ end)
 
 module SwitcherBlocks = Switch.Make (SArgBlocks)
 
+type transl_switch_clambda_result =
+  { switch_expr : expression;
+    fdo_counters_into_switch : Fdo_annotation.t
+  }
+
 let transl_switch_clambda loc arg index cases =
   let store = StoreExpForSwitch.mk_store () in
   let index = Array.map (fun j -> store.Switch.act_store j cases.(j)) index in
@@ -3699,7 +3704,9 @@ let transl_switch_clambda loc arg index cases =
             (0, n_index - 1)
             a (Array.of_list inters) store)
   in
-  case, Branch_annotations.fdo_annotation annots
+  { switch_expr = case;
+    fdo_counters_into_switch = Branch_annotations.fdo_annotation annots
+  }
 
 let split_arity_for_apply arity args =
   (* Decides whether a caml_applyN needs to be split. If N <= max_arity, then
@@ -3821,12 +3828,12 @@ let rec might_split_call_caml_apply ?old_region ~callsite_counter result arity
              Rc_normal Cmx_format.Maybe_alloc_stack dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
-    (* Only the first of the calls has the counter, as for an over-application
-       in Flambda. *)
     let body old_region =
       bind "result"
         (call_caml_apply ~callsite_counter [| Val |] arity mut clos args
            Rc_normal Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
+          (* Only the first of the calls has the counter, as for an
+             over-application in Flambda. *)
           might_split_call_caml_apply ?old_region ~callsite_counter:None result
             arity' mut clos args' pos mode dbg)
     in

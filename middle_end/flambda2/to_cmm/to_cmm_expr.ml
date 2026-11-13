@@ -1295,9 +1295,11 @@ and switch env res switch =
         cases, res
     in
     (* CR-someday poechsel: Put a more precise value kind here *)
-    let expr, fdo_counters =
+    let { C.switch_expr; fdo_counters_into_switch } =
       C.transl_switch_clambda dbg scrutinee index (Array.map Option.get cases)
     in
-    let res = R.add_fdo_region_counters res fdo_counters in
-    let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
+    let res = R.add_fdo_region_counters res fdo_counters_into_switch in
+    let cmm, free_vars, symbol_inits =
+      wrap switch_expr free_vars symbol_inits
+    in
     cmm, free_vars, symbol_inits, res
