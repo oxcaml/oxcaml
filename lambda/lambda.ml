@@ -504,6 +504,11 @@ type primitive =
   | Pset_ext_ptr of layout * modify_mode
   | Pbox of layout * locality_mode
   | Punbox of layout
+  | Ptemplate_env of
+      { template : Template_id.t;
+        shape : mixed_block_shape;
+        mode : locality_mode
+      }
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -1280,6 +1285,7 @@ type lambda =
   | Lkindinstantiate of lkindinstantiate
   | Ltemplate of lfunction
   | Linstantiate of lambda_apply
+  | Lcode of lcode
 
 and rec_binding = {
   id : Ident.t;
@@ -1301,6 +1307,11 @@ and lfunction =
        effect (it neither closes over nor is passed any yielding value).
        Only set precisely by [Translcore]; other construction sites
        conservatively default to [May_yield]. *)
+  }
+
+and lcode =
+  { code_template : Template_id.t;
+    code_fun : lfunction
   }
 
 and lkindtemplate =
@@ -1372,6 +1383,7 @@ let rec try_to_find_location lam =
   | Lfunction { loc; _ }
   | Lkindtemplate { ktmpl_body = { loc; _ }; _ }
   | Ltemplate { loc; _ }
+  | Lcode { code_fun = { loc; _ }; _ }
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
   | Lkindinstantiate { kinst_loc = loc; _ }
@@ -1434,6 +1446,7 @@ let fatal_error_invalid_constructor lambda =
     | Lkindinstantiate _ -> "Lkindinstantiate"
     | Ltemplate _ -> "Ltemplate"
     | Linstantiate _ -> "Linstantiate"
+    | Lcode _ -> "Lcode"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1841,7 +1854,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _ | Lkindtemplate _ | Ltemplate _
+    | Lletrec _|Lfunction _ | Lkindtemplate _ | Ltemplate _ | Lcode _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1955,6 +1968,8 @@ let shallow_iter ~tail ~non_tail:f = function
       f body
   | Linstantiate {ap_func = fn; ap_args = args} ->
       f fn; List.iter f args
+  | Lcode {code_fun = {body}} ->
+      f body
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -2054,6 +2069,8 @@ let rec free_variables = function
       free_variables_lfun tmpl
   | Linstantiate {ap_func = fn; ap_args = args} ->
       free_variables_list (free_variables fn) args
+  | Lcode {code_fun} ->
+      free_variables_lfun code_fun
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -2350,6 +2367,8 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
           }
     | Ltemplate lf ->
         Ltemplate (subst_lfun s l lf)
+    | Lcode {code_template; code_fun} ->
+        Lcode {code_template; code_fun = subst_lfun s l code_fun}
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2565,6 +2584,11 @@ let shallow_map ~tail ~non_tail:f lam =
       if old_lfun == new_lfun
       then lam
       else Ltemplate new_lfun
+  | Lcode {code_template; code_fun = old_lfun} ->
+      let new_lfun = map_lfunction f old_lfun in
+      if old_lfun == new_lfun
+      then lam
+      else Lcode {code_template; code_fun = new_lfun}
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
       let new_e2 = tail old_e2 in
@@ -2882,6 +2906,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pignore -> None
   | Pgetglobal _ | Pgetpredef _ -> None
   | Pmakeblock (_, _, _, m) -> Some m
+  | Ptemplate_env { mode; _ } -> Some mode
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m
   | Pmakelazyblock _ -> Some alloc_heap
@@ -3221,7 +3246,7 @@ let primitive_can_raise prim =
   | Punboxed_int64_array_set_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_set_vec { unsafe = true; _ }
   | Pctconst _ | Pint_as_pointer _ | Popaque _
-  | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
+  | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _ | Ptemplate_env _
   | Pbox_vector (_, _) | Punbox_vector _
   | Pbox_mask _ | Punbox_mask
   | Pjoin_vec256 | Psplit_vec256
@@ -3578,6 +3603,7 @@ let primitive_result_layout (p : primitive) =
      | Naked (Floating (Float32 Any_locality_mode)) ->
        layout_unboxed_float Unboxed_float32)
   | Popaque layout | Pobj_magic layout -> layout
+  | Ptemplate_env _ -> layout_template_env
   | Pbytes_to_string | Pbytes_of_string -> layout_string
   | Pignore | Psetfield _ | Psetfield_computed _ | Psetfloatfield _ | Poffsetref _
   | Psetufloatfield _ | Psetmixedfield _
@@ -3863,7 +3889,7 @@ let may_allocate_in_region lam =
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
     | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_body={mode=Alloc_heap}}
-    | Ltemplate {mode=Alloc_heap} -> ()
+    | Ltemplate {mode=Alloc_heap} | Lcode _ -> ()
     | Lfunction {mode=Alloc_local}
     | Lkindtemplate {ktmpl_body={mode=Alloc_local}}
     | Ltemplate {mode=Alloc_local} -> raise Exit

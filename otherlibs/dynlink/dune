@@ -175,6 +175,7 @@
   debuginfo
   static_label
   layout_ident
+  template_id
   lambda
   mixed_product_bytes
   runtimedef
@@ -414,6 +415,8 @@
 
 (copy_files ../../lambda/layout_ident.ml)
 
+(copy_files ../../lambda/template_id.ml)
+
 (copy_files ../../lambda/mixed_product_bytes.ml)
 
 (copy_files ../../lambda/lambda.ml)
@@ -619,6 +622,8 @@
 (copy_files ../../lambda/static_label.mli)
 
 (copy_files ../../lambda/layout_ident.mli)
+
+(copy_files ../../lambda/template_id.mli)
 
 (copy_files ../../lambda/mixed_product_bytes.mli)
 
@@ -830,6 +835,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_recovery_state.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Layout_ident.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Template_id.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mixed_product_bytes.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_properties.cmo
@@ -973,6 +979,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_recovery_state.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Layout_ident.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Template_id.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mixed_product_bytes.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_properties.cmx

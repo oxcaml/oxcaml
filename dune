@@ -348,6 +348,7 @@
   simplif
   slambda
   layout_ident
+  template_id
   switch
   value_rec_compiler
   translmode

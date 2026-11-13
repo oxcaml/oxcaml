@@ -568,9 +568,16 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             CC.close_let acc ccenv [new_id_with_kind] User_visible
               (Simple (Var temp_id)) ~body)
           body new_ids_with_kinds temp_id_unarized acc ccenv)
-  | Llet ((Strict | Alias | StrictOpt), _, fun_id, duid, Lfunction func, body)
-    ->
+  | Llet
+      ( (Strict | Alias | StrictOpt),
+        _,
+        fun_id,
+        duid,
+        (Lfunction func | Lcode { code_fun = func; _ }),
+        body ) ->
     (* This case is here to get function names right. *)
+    (* CR layout poly: compile the code of instantiations ([Lcode]) without
+       closures. *)
     let bindings =
       cps_function_bindings env [L.{ id = fun_id; debug_uid = duid; def = func }]
     in
@@ -1204,7 +1211,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _
+  | Lcode _ ->
+    (* [Lcode] is only allowed as the definition of an [Llet]. *)
     Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
@@ -1744,7 +1753,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
+        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _
+        | Lcode _ ->
           Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in

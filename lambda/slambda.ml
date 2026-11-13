@@ -45,46 +45,6 @@ module Or_missing = struct
     | Missing
 end
 
-module Template_id = struct
-  (* The owner+stamp combination is globally unique (at least within one linked
-     unit). This fact is used to guarantee that the symbol names are unique. *)
-  type t =
-    { owner : Compilation_unit.t option;
-      stamp : int;
-      name : string option
-    }
-
-  let stamp = ref 0
-
-  let create ~owner ~name =
-    let t = { owner; stamp = !stamp; name } in
-    incr stamp;
-    t
-
-  let print ppf t =
-    Fmt.fprintf ppf "%a/%a/%i"
-      (Fmt.pp_print_option Compilation_unit.print)
-      t.owner
-      (Fmt.pp_print_option Fmt.pp_print_string)
-      t.name t.stamp
-
-  let equal t1 t2 =
-    t1.stamp = t2.stamp && Option.equal Compilation_unit.equal t1.owner t2.owner
-
-  let hash t =
-    match t.owner with
-    | Some owner -> Hashtbl.hash (Compilation_unit.hash owner, t.stamp)
-    | None -> t.stamp
-
-  module Tbl = Hashtbl.Make (struct
-    type nonrec t = t
-
-    let equal = equal
-
-    let hash = hash
-  end)
-end
-
 module rec Types : sig
   type template =
     | Kind of lkindtemplate
@@ -354,7 +314,11 @@ module Ctx : sig
   val instantiate :
     t ->
     loc:scoped_location ->
-    eval_apply:(Types.closure -> Types.value Or_missing.t list -> Types.halves) ->
+    eval_apply:
+      (Template_id.t ->
+      Types.closure ->
+      Types.value Or_missing.t list ->
+      Types.halves) ->
     Template_id.t ->
     Types.value Or_missing.t list ->
     Types.halves
@@ -400,7 +364,7 @@ end = struct
       match Template_store.find_template t.store id with
       | Some closure -> closure
       | None -> (
-        let cu_data = Option.map (get_cu_data t ~loc) id.owner in
+        let cu_data = Option.map (get_cu_data t ~loc) (Template_id.owner id) in
         let closure =
           Option.bind cu_data (fun { CU_data.templates; _ } ->
               Template_store.find_template templates id)
@@ -429,7 +393,7 @@ end = struct
         (* eval_apply might recursively call this function so mark this name as
            visited before calling it. *)
         Ident.Tbl.replace t.instantiated_templates name None;
-        let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
+        let { Types.slv_comptime; slv_runtime } = eval_apply id closure args in
         Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
         let instantiation =
           Lambda.subst
@@ -1064,6 +1028,9 @@ let rec eval_lam ?name ctx env old_lambda : halves =
             ap_result_layout = eval_layout env old_layout
           }
     }
+  | Lcode _ ->
+    (* Only evaluation creates [Lcode]. *)
+    Lambda.fatal_error_invalid_constructor old_lambda
 
 and eval_lfunction ctx env
     ({ kind;
@@ -1209,6 +1176,9 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
   | Pduprecord (old_repr, size) ->
     let new_repr = eval_record_representation env loc old_repr in
     dyn (if new_repr == old_repr then old_prim else Pduprecord (new_repr, size))
+  | Ptemplate_env _ ->
+    (* Only evaluation creates [Ptemplate_env] (see [eval_template]). *)
+    Misc.fatal_errorf "Slambda: unexpected %a" Printlambda.primitive old_prim
   | Pmixedfield (path, old_shape, sem) ->
     (* e.(pos1).(pos2) ~>
        let { c = e_c; r = e_r } = eval_lam env e in
@@ -1408,7 +1378,7 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
     template p1 ... pn -> body ~>
         let fv1, ..., fvk = free variables of the template in
         { c = closure (template, env);
-          r = << makeblock fv1 ... fvk >> }
+          r = << template_env fv1 ... fvk >> }
     ]} *)
 and eval_template ?name ctx env template =
   let func =
@@ -1453,7 +1423,7 @@ and eval_template ?name ctx env template =
   { slv_comptime = Present (Vclosure id);
     slv_runtime =
       Lprim
-        ( Pmakeblock (0, Immutable, Shape new_shape, func.mode),
+        ( Ptemplate_env { template = id; shape = new_shape; mode = func.mode },
           List.map (fun (id, _) -> Lvar id) clo_runtime_env,
           func.loc )
   }
@@ -1473,27 +1443,28 @@ and instantiate ctx ~loc func args =
         eval_lam { clo_env with k1=arg1; ...; kn=argn } body
       in
       { c = Missing
-        r = << fun closure p1 ... pm ->
-                 let fv1 = closure.(0) in
-                 ...
-                 let fvk = closure.(k-1) in
-                 body_r >> }
+        r = << code (fun closure p1 ... pm ->
+                       let fv1 = closure.(0) in
+                       ...
+                       let fvk = closure.(k-1) in
+                       body_r) >> }
 
     (template p1 ... pn -> body) arg1 ... argn ~>
       let { c = body_c; r = body_r } =
         eval_lam { clo_env with p1=arg1; ...; pn=argn } body
       in
       { c = body_c;
-        r = << fun closure p1 ... pn ->
-                 let fv1 = closure.(0) in
-                 ...
-                 let fvk = closure.(k-1) in
-                 body_r >> }
+        r = << code (fun closure p1 ... pn ->
+                       let fv1 = closure.(0) in
+                       ...
+                       let fvk = closure.(k-1) in
+                       body_r) >> }
     ]}
 
     where [fv1 ... fvk] are the variables captured by the closure, in the order
-    of [clo_runtime_env]. *)
-and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
+    of [clo_runtime_env]. [closure] is always an environment created by the
+    template's definition (see [eval_template]). *)
+and eval_apply ctx template { clo_template; clo_runtime_env; clo_env } args =
   let shape =
     Misc.Stdlib.Array.of_list_map
       (fun (_, layout) -> mixed_block_element_of_layout layout)
@@ -1531,11 +1502,22 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       | Tupled, _ ->
         Misc.fatal_error "Tupled static functions are not currently supported"
     in
-    (* All instances are closed functions and can therefore be heap-allocated *)
-    lfunction' ~kind:new_kind ~params:(closure_param :: params) ~return
-      ~body:closed_body ~attr ~loc ~mode:alloc_heap ~ret_mode
-    |> lfunction_with_yielding yielding
-    |> fun new_func -> Lfunction new_func
+    let code_fun =
+      (* The middle end doesn't support unboxed parameters or results for code
+         that has no closure, so [@unboxable] is ignored. *)
+      let params =
+        List.map
+          (fun (param : lparam) ->
+            { param with attributes = default_param_attribute })
+          params
+      in
+      lfunction' ~kind:new_kind ~params:(closure_param :: params) ~return
+        ~body:closed_body
+        ~attr:{ attr with unbox_return = None }
+        ~loc ~mode:alloc_heap ~ret_mode
+      |> lfunction_with_yielding yielding
+    in
+    Lcode { code_template = template; code_fun }
   in
   match clo_template with
   | Kind { ktmpl_params; ktmpl_body = old_func } ->
@@ -1653,6 +1635,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
   | Pmakeblock (_, _, Shape shape, _)
+  | Ptemplate_env { shape; _ }
   | Patomic_load_mixed_field { shape; _ }
   | Patomic_set_mixed_field { shape; _ }
   | Pduprecord
@@ -1691,7 +1674,8 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lconst constant -> assert_constant_contains_no_splices constant
   | Lapply { ap_result_layout; _ } ->
     assert_layout_contains_no_splices ap_result_layout
-  | Lfunction func -> assert_function_contains_no_splices func
+  | Lfunction func | Lcode { code_fun = func; _ } ->
+    assert_function_contains_no_splices func
   | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lletrec _ -> ()
@@ -1724,7 +1708,7 @@ let eval ~cu_static_data template_lam =
         eval_lam ~name:"main_module_block" ctx Env.empty template_lam
       in
       let lambda =
-        (* All instantiations are closed functions (they were closure converted)
+        (* All instantiations are closed code (they were closure converted)
            so they can be pulled to the top. *)
         List.fold_left
           (fun lam (id, def) ->
