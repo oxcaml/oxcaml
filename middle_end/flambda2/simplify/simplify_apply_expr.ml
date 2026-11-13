@@ -789,7 +789,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~is_my_closure_used:
                 (Function_params_and_body.is_my_closure_used params_and_body)
               ~inlining_decision:Stub ~absolute_history ~relative_history
-              ~loopify:Never_loopify
+              ~loopify:Never_loopify ~template_key:None
           in
           Static_const_or_code.create_code code
         in
@@ -1199,8 +1199,22 @@ let simplify_function_call ~simplify_expr ~rebuild_expr dacc apply ~callee_ty
       match DE.find_code_metadata_exn denv callee's_code_id with
       | exception Not_found -> type_unavailable call
       | callee's_code_metadata ->
+        let function_type =
+          match Code_metadata.template_key callee's_code_metadata with
+          | None ->
+            (* Simplify erases the callee of direct calls to code that doesn't
+               use its closure. Without the closure's type, there is no
+               recursion depth for the inliner. *)
+            None
+          | Some _ ->
+            (* The code of an instantiation of a template has no closure, and is
+               only called directly, without one. *)
+            Some
+              (T.Function_type.create callee's_code_id
+                 ~rec_info:(T.this_rec_info Rec_info_expr.initial))
+        in
         simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
-          None
+          function_type
           ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
           ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
           ~result_types:(Code_metadata.result_types callee's_code_metadata)

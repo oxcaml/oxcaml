@@ -1299,6 +1299,18 @@ let close_effect_primitive acc env ~dbg exn_continuation
        (%d args)"
       Printlambda.primitive prim (List.length args)
 
+(* The symbol naming [template] in Flambda, if it belongs to a unit. *)
+let template_key template =
+  match Template_id.owner template with
+  | Some owner ->
+    (* The symbol has no value, so its name only needs to be unique: no symbol
+       created from an identifier contains a [#]. *)
+    Some
+      (Symbol.create owner
+         (Linkage_name.of_string
+            (Printf.sprintf "template#%d" (Template_id.stamp template))))
+  | None -> None
+
 let close_primitive acc env ~let_bound_ids_with_kinds named
     (prim : Lambda.primitive) ~args loc
     (exn_continuation : IR.exn_continuation option) ~current_alloc_region
@@ -1931,7 +1943,8 @@ let close_exact_or_unknown_apply acc env
        return_arity
      } :
       IR.apply) callee_approx ~replace_region : Expr_with_acc.t =
-  let callee = find_simple_from_id env func in
+  (* The code of a template's instantiation has no closure. *)
+  let is_lcode = Env.is_lcode env func in
   let mode =
     let current_region, current_ghost_region =
       match replace_region with
@@ -1947,7 +1960,7 @@ let close_exact_or_unknown_apply acc env
       ~current_region ~current_ghost_region
   in
   let dbg = Debuginfo.from_location loc in
-  let acc, call_kind, can_erase_callee, replace_by_invalid =
+  let acc, (call_kind : Call_kind.t), can_erase_callee, replace_by_invalid =
     match kind with
     | Function -> (
       match (callee_approx : Env.value_approximation option) with
@@ -2021,11 +2034,25 @@ let close_exact_or_unknown_apply acc env
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
+    let callee =
+      if is_lcode
+      then (
+        (match call_kind with
+        | Function { function_call = Direct _ } -> ()
+        | Function
+            { function_call = Indirect_unknown_arity | Indirect_known_arity _ }
+        | Method _ | C_call _ | Effect _ ->
+          Misc.fatal_errorf "Template instantiation %a must be called directly"
+            Ident.print func);
+        None)
+      else if can_erase_callee
+      then None
+      else Some (find_simple_from_id env func)
+    in
     let apply =
-      Apply.create
-        ~callee:(if can_erase_callee then None else Some callee)
-        ~continuation:(Return continuation) apply_exn_continuation ~args
-        ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
+      Apply.create ~callee ~continuation:(Return continuation)
+        apply_exn_continuation ~args ~args_arity ~return_arity ~call_kind
+        ~return_mode:mode dbg
         ~callsite_counter:None
           (* CR yusumez: the counter of the source call, once calls have FDO
              ids. *)
@@ -2791,7 +2818,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         (* The wrapper isn't in the source: the function's entry counter is on
            [main_code]. *)
       ~is_tupled ~is_my_closure_used:true ~inlining_decision ~absolute_history
-      ~relative_history ~loopify:Never_loopify
+      ~relative_history ~loopify:Never_loopify ~template_key:None
   in
   let main_approx =
     let code = Code_or_metadata.create main_code in
@@ -2817,7 +2844,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
 
 let close_one_function acc ~code_id ~external_env ~by_function_slot
     ~function_code_ids decl ~has_lifted_closure ~value_slots_from_idents
-    ~function_slots_from_idents ~approx_map function_declarations =
+    ~function_slots_from_idents ~approx_map ~template_key function_declarations
+    =
   let acc = Acc.with_free_names Name_occurrences.empty acc in
   let body = Function_decl.body decl in
   let loc = Function_decl.loc decl in
@@ -3218,6 +3246,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~is_my_closure_used:
         (Function_params_and_body.is_my_closure_used params_and_body)
       ~inlining_decision ~absolute_history ~relative_history ~loopify
+      ~template_key
   in
   let function_code_ids = (function_slot, code_id) :: function_code_ids in
   let code, by_function_slot, function_code_ids, acc =
@@ -3258,6 +3287,68 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   ( acc,
     ( Function_slot.Map.add function_slot approx by_function_slot,
       function_code_ids ) )
+
+let metadata_only_closure_approximation decl ~code_id : Env.value_approximation
+    =
+  let compilation_unit = Current_unit.get_cu_exn () in
+  (* The only fields of metadata which are used for this pass are params_arity,
+     param_modes, is_tupled, first_complex_local_param, result_mode, and
+     result_arity. We try to populate the different fields as much as possible,
+     but put dummy values when they are not yet computed or simply too expensive
+     to compute for the other fields. *)
+  let function_slot = Function_decl.function_slot decl in
+  let params = Function_decl.params decl in
+  let params_arity = Function_decl.params_arity decl in
+  let param_modes =
+    List.map
+      (fun (p : Function_decl.param) -> Alloc_mode.For_types.from_lambda p.mode)
+      params
+  in
+  let result_arity = Function_decl.return decl in
+  let poll_attribute =
+    Poll_attribute.from_lambda (Function_decl.poll_attribute decl)
+  in
+  let regalloc_attribute =
+    Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl)
+  in
+  let regalloc_param_attribute =
+    Regalloc_param_attribute.from_lambda
+      (Function_decl.regalloc_param_attribute decl)
+  in
+  let zero_alloc_attribute =
+    Zero_alloc_attribute.from_lambda (Function_decl.zero_alloc_attribute decl)
+  in
+  let cost_metrics = Cost_metrics.zero in
+  let dbg = Debuginfo.from_location (Function_decl.loc decl) in
+  let is_tupled =
+    match Function_decl.kind decl with Curried _ -> false | Tupled -> true
+  in
+  let metadata =
+    Code_metadata.create code_id ~params_arity
+      ~first_complex_local_param:
+        (first_complex_local_param_of_function_decl decl)
+      ~param_modes ~result_arity ~result_types:Unknown
+      ~result_mode:(Function_decl.result_mode decl)
+      ~stub:(Function_decl.stub decl) ~inline:Never_inline ~zero_alloc_attribute
+      ~poll_attribute ~regalloc_attribute ~regalloc_param_attribute
+      ~cold:(Function_decl.cold decl)
+      ~is_a_functor:(Function_decl.is_a_functor decl)
+      ~is_opaque:(Function_decl.is_opaque decl)
+      ~recursive:(Function_decl.recursive decl)
+      ~newer_version_of:None ~cost_metrics
+      ~inlining_arguments:(Inlining_arguments.create ~round:0)
+      ~dbg
+        (* CR yusumez: the entry counter of [decl], once functions have FDO
+           ids. *)
+      ~fdo_entry_annotation:Fdo_annotation.empty ~is_tupled
+      ~is_my_closure_used:true ~inlining_decision:Recursive
+      ~absolute_history:(Inlining_history.Absolute.empty compilation_unit)
+      ~relative_history:Inlining_history.Relative.empty ~loopify:Never_loopify
+      ~template_key:None
+  in
+  let code = Code_or_metadata.create_metadata_only metadata in
+  Value_approximation.Closure_approximation
+    { code_id; function_slot; code; symbol = None }
 
 let close_functions acc external_env ~current_alloc_region ~current_region
     function_declarations =
@@ -3300,7 +3391,11 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             (Value_slot.create compilation_unit ~name ~is_always_immediate
                (Flambda_kind.With_subkind.kind kind))
             map)
-      (Function_decls.all_free_idents function_declarations)
+      (* Identifiers bound to [Lcode] have no value: calls to them are
+         direct. *)
+      (Ident.Set.filter
+         (fun id -> not (Env.is_lcode external_env id))
+         (Function_decls.all_free_idents function_declarations))
       Ident.Map.empty
   in
   let can_be_lifted =
@@ -3333,72 +3428,9 @@ let close_functions acc external_env ~current_alloc_region ~current_region
   let approx_map =
     List.fold_left
       (fun approx_map decl ->
-        (* The only fields of metadata which are used for this pass are
-           params_arity, param_modes, is_tupled, first_complex_local_param,
-           result_mode, and result_arity. We try to populate the different
-           fields as much as possible, but put dummy values when they are not
-           yet computed or simply too expensive to compute for the other
-           fields. *)
         let function_slot = Function_decl.function_slot decl in
         let code_id = Function_slot.Map.find function_slot function_code_ids in
-        let params = Function_decl.params decl in
-        let params_arity = Function_decl.params_arity decl in
-        let param_modes =
-          List.map
-            (fun (p : Function_decl.param) ->
-              Alloc_mode.For_types.from_lambda p.mode)
-            params
-        in
-        let result_arity = Function_decl.return decl in
-        let poll_attribute =
-          Poll_attribute.from_lambda (Function_decl.poll_attribute decl)
-        in
-        let regalloc_attribute =
-          Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl)
-        in
-        let regalloc_param_attribute =
-          Regalloc_param_attribute.from_lambda
-            (Function_decl.regalloc_param_attribute decl)
-        in
-        let zero_alloc_attribute =
-          Zero_alloc_attribute.from_lambda
-            (Function_decl.zero_alloc_attribute decl)
-        in
-        let cost_metrics = Cost_metrics.zero in
-        let dbg = Debuginfo.from_location (Function_decl.loc decl) in
-        let is_tupled =
-          match Function_decl.kind decl with
-          | Curried _ -> false
-          | Tupled -> true
-        in
-        let metadata =
-          Code_metadata.create code_id ~params_arity
-            ~first_complex_local_param:
-              (first_complex_local_param_of_function_decl decl)
-            ~param_modes ~result_arity ~result_types:Unknown
-            ~result_mode:(Function_decl.result_mode decl)
-            ~stub:(Function_decl.stub decl) ~inline:Never_inline
-            ~zero_alloc_attribute ~poll_attribute ~regalloc_attribute
-            ~regalloc_param_attribute ~cold:(Function_decl.cold decl)
-            ~is_a_functor:(Function_decl.is_a_functor decl)
-            ~is_opaque:(Function_decl.is_opaque decl)
-            ~recursive:(Function_decl.recursive decl)
-            ~newer_version_of:None ~cost_metrics
-            ~inlining_arguments:(Inlining_arguments.create ~round:0)
-            ~dbg
-              (* CR yusumez: the entry counter of [decl], once functions have
-                 FDO ids. *)
-            ~fdo_entry_annotation:Fdo_annotation.empty ~is_tupled
-            ~is_my_closure_used:true ~inlining_decision:Recursive
-            ~absolute_history:(Inlining_history.Absolute.empty compilation_unit)
-            ~relative_history:Inlining_history.Relative.empty
-            ~loopify:Never_loopify
-        in
-        let code = Code_or_metadata.create_metadata_only metadata in
-        let approx =
-          Value_approximation.Closure_approximation
-            { code_id; function_slot; code; symbol = None }
-        in
+        let approx = metadata_only_closure_approximation decl ~code_id in
         Function_slot.Map.add function_slot approx approx_map)
       Function_slot.Map.empty func_decl_list
   in
@@ -3439,7 +3471,8 @@ let close_functions acc external_env ~current_alloc_region ~current_region
               close_one_function acc ~code_id ~external_env ~by_function_slot
                 ~function_code_ids:function_code_ids_in_order function_decl
                 ~has_lifted_closure:can_be_lifted ~value_slots_from_idents
-                ~function_slots_from_idents ~approx_map function_declarations)
+                ~function_slots_from_idents ~approx_map ~template_key:None
+                function_declarations)
         in
         acc, approxs_and_code_ids)
       (acc, (Function_slot.Map.empty, []))
@@ -3537,6 +3570,64 @@ let close_functions acc external_env ~current_alloc_region ~current_region
     let acc = Acc.add_lifted_set_of_closures ~symbols ~set_of_closures acc in
     acc, Lifted symbols_with_approx
   else acc, Dynamic (set_of_closures, alloc_mode, approximations)
+
+let declare_lcodes env lcodes =
+  List.fold_left
+    (fun env (lcode, _template, decl) ->
+      let code_id =
+        Code_id.create ~name:(Ident.name lcode) ~slot_stamp:None
+          ~debug:(Debuginfo.from_location (Function_decl.loc decl))
+          (Current_unit.get_cu_exn ())
+      in
+      Env.declare_lcode env lcode ~code_id
+        ~metadata_approximation:
+          (metadata_only_closure_approximation decl ~code_id))
+    env lcodes
+
+let close_lcode acc env ~lcode ~template decl =
+  (match Function_decl.calling_convention decl with
+  | Normal_calling_convention -> ()
+  | Unboxed_calling_convention _ ->
+    Misc.fatal_errorf
+      "Unboxed parameters or results are not supported for the code of \
+       template instantiation %a"
+      Ident.print lcode);
+  let code_id = Env.lcode_code_id env lcode in
+  let function_slot = Function_decl.function_slot decl in
+  let function_declarations =
+    Function_decls.create [decl] (Function_decl.closure_alloc_mode decl)
+  in
+  (* The code has no closure, so it isn't part of the term being closed: closing
+     it mustn't change that term's free names, or whether it contains a function
+     (for inlining decisions). *)
+  let free_names = Acc.free_names acc in
+  let seen_a_function = Acc.seen_a_function acc in
+  let _, _, acc, (approxs, _) =
+    Acc.measure_cost_metrics acc ~f:(fun acc ->
+        close_one_function acc ~code_id ~external_env:env
+          ~by_function_slot:Function_slot.Map.empty ~function_code_ids:[] decl
+          ~has_lifted_closure:false ~value_slots_from_idents:Ident.Map.empty
+          ~function_slots_from_idents:(Ident.Map.singleton lcode function_slot)
+          ~approx_map:
+            (Function_slot.Map.singleton function_slot
+               (Env.lcode_metadata_approximation env lcode))
+          ~template_key:(template_key template) function_declarations)
+  in
+  let acc = Acc.with_free_names free_names acc in
+  let acc = Acc.with_seen_a_function acc seen_a_function in
+  Acc.add_lcode_approximation acc code_id
+    (Value_approximation.Closure_approximation
+       { code_id;
+         function_slot;
+         code = Function_slot.Map.find function_slot approxs;
+         symbol = None
+       })
+
+let close_lcodes acc env lcodes =
+  List.fold_left
+    (fun acc (lcode, template, decl) ->
+      close_lcode acc env ~lcode ~template decl)
+    acc lcodes
 
 let close_let_rec acc env ~function_declarations
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) ~current_alloc_region
@@ -4001,8 +4092,18 @@ type call_args_split =
       }
 
 let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
-  let callee = find_simple_from_id env apply.func in
-  let approx = find_value_approximation_through_symbol acc env callee in
+  let approx =
+    if Env.is_lcode env apply.func
+    then
+      match
+        Acc.find_lcode_approximation acc (Env.lcode_code_id env apply.func)
+      with
+      | Some approx -> approx
+      | None -> Env.lcode_metadata_approximation env apply.func
+    else
+      find_value_approximation_through_symbol acc env
+        (find_simple_from_id env apply.func)
+  in
   let code_info =
     match approx with
     | Closure_approximation { code; _ } ->
@@ -4021,7 +4122,7 @@ let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
         Misc.fatal_errorf
           "Unexpected approximation for callee %a in [Closure_conversion], \
            expected a closure approximation."
-          Simple.print callee
+          Ident.print apply.func
       else None
   in
   match code_info with

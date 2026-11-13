@@ -378,7 +378,10 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
     let old_code_ids =
       Code_id.Map.fold
         (fun code_id code old_code_ids ->
-          if Code.stub code && not (Flambda_features.simplify_stubs ())
+          if
+            (Code.stub code && not (Flambda_features.simplify_stubs ()))
+            (* The code of instantiations keeps its code ID when simplified. *)
+            || Option.is_some (Code.template_key code)
           then old_code_ids
           else
             match Code.newer_version_of code with
@@ -395,7 +398,34 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
     Static_const_group.match_against_bound_static static_consts bound_static
       ~init:([], [], dacc)
       ~code:(fun (bound_static, static_consts, dacc) code_id code ->
-        let code, static_const, dacc =
+        let simplify_in_place simplify =
+          let static_const, dacc_after_function = simplify dacc code in
+          match Rebuilt_static_const.to_const static_const with
+          | None ->
+            (* Not rebuilding terms: return the original code *)
+            code, Rebuilt_static_const.create_code' code, dacc
+          | Some static_const_or_code -> (
+            match Static_const_or_code.to_code static_const_or_code with
+            | None -> assert false
+            | Some code -> code, static_const, dacc_after_function)
+        in
+        let define_code (code, static_const, dacc) =
+          let dacc =
+            DA.map_denv dacc ~f:(fun denv -> DE.define_code denv ~code_id ~code)
+          in
+          ( Bound_static.Pattern.code code_id :: bound_static,
+            static_const :: static_consts,
+            dacc )
+        in
+        match Code.template_key code with
+        | Some _ ->
+          (* The code of an instantiation of a template has no closure to wait
+             for. *)
+          define_code
+            (simplify_in_place (fun dacc code ->
+                 Simplify_set_of_closures.simplify_code_without_closure dacc
+                   code ~all_code ~simplify_function_body))
+        | None ->
           if
             Code.stub code
             &&
@@ -403,33 +433,11 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
                functions at the definition of the set of closures. *)
             not (Flambda_features.simplify_stubs ())
           then
-            let dacc, prior_lifted_constants =
-              DA.get_and_clear_lifted_constants dacc
-            in
-            let static_const, dacc_after_function =
-              Simplify_set_of_closures.simplify_static_stub_function dacc code
-                ~all_code ~simplify_function_body
-            in
-            let dacc_after_function =
-              DA.add_to_lifted_constant_accumulator dacc_after_function
-                prior_lifted_constants
-            in
-            match Rebuilt_static_const.to_const static_const with
-            | None ->
-              (* Not rebuilding terms: return the original code *)
-              code, Rebuilt_static_const.create_code' code, dacc
-            | Some static_const_or_code -> (
-              match Static_const_or_code.to_code static_const_or_code with
-              | None -> assert false
-              | Some code -> code, static_const, dacc_after_function)
-          else code, Rebuilt_static_const.create_code' code, dacc
-        in
-        let dacc =
-          DA.map_denv dacc ~f:(fun denv -> DE.define_code denv ~code_id ~code)
-        in
-        ( Bound_static.Pattern.code code_id :: bound_static,
-          static_const :: static_consts,
-          dacc ))
+            define_code
+              (simplify_in_place (fun dacc code ->
+                   Simplify_set_of_closures.simplify_static_stub_function dacc
+                     code ~all_code ~simplify_function_body))
+          else define_code (code, Rebuilt_static_const.create_code' code, dacc))
       ~deleted_code:(fun acc _code_id -> acc)
       ~set_of_closures:(fun acc ~closure_symbols:_ _ -> acc)
       ~block_like:(fun

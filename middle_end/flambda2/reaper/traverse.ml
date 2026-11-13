@@ -82,6 +82,13 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     }
   in
   Acc.add_any_source acc (Code_id_or_name.code_id code_id);
+  if Option.is_some (Code.template_key code)
+  then
+    (* The code of an instantiation of a template has no closure, and is only
+       called directly, without one, so its [my_closure] has no value. It must
+       still be treated as having one, or the code would be considered as never
+       called. *)
+    Acc.add_any_source acc (Code_id_or_name.var my_closure);
   if never_delete
   then (
     List.iter
