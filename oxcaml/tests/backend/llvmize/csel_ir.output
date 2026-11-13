@@ -103,7 +103,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCsel__entry(i64 %0,
   %16 = alloca i64
   %17 = alloca ptr addrspace(1)
   %18 = alloca ptr addrspace(1)
-  %19 = alloca i64
+  %19 = alloca ptr
   %20 = alloca i64
   %21 = alloca i64
   %22 = alloca i64
@@ -116,7 +116,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCsel__entry(i64 %0,
   %29 = alloca i64
   %30 = alloca ptr addrspace(1)
   %31 = alloca ptr addrspace(1)
-  %32 = alloca i64
+  %32 = alloca ptr
   %33 = alloca i64
   %34 = alloca i64
   %35 = alloca i64
@@ -128,7 +128,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCsel__entry(i64 %0,
   %41 = alloca i64
   %42 = alloca ptr addrspace(1)
   %43 = alloca ptr addrspace(1)
-  %44 = alloca i64
+  %44 = alloca ptr
   %45 = alloca i64
   %46 = alloca i64
   %47 = alloca i64
@@ -140,7 +140,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCsel__entry(i64 %0,
   %53 = alloca i64
   %54 = alloca ptr addrspace(1)
   %55 = alloca ptr addrspace(1)
-  %56 = alloca i64
+  %56 = alloca ptr
   %57 = alloca i64
   %58 = alloca i64
   %59 = alloca i64
@@ -152,7 +152,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCsel__entry(i64 %0,
   %65 = alloca i64
   %66 = alloca ptr addrspace(1)
   %67 = alloca ptr addrspace(1)
-  %68 = alloca i64
+  %68 = alloca ptr
   %69 = alloca i64
   %70 = alloca i64
   %71 = alloca i64
@@ -219,8 +219,8 @@ L115:
   %103 = load ptr addrspace(1), ptr %17
   store ptr addrspace(1) %103, ptr %18
   %104 = load ptr addrspace(1), ptr %18
-  %105 = load i64, ptr addrspace(1) %104
-  store i64 %105, ptr %19
+  %105 = load ptr, ptr addrspace(1) %104
+  store ptr %105, ptr %19
   %106 = load i64, ptr %13
   store i64 %106, ptr %4
   %107 = load ptr addrspace(1), ptr %18
@@ -300,8 +300,8 @@ L119:
   %148 = load ptr addrspace(1), ptr %30
   store ptr addrspace(1) %148, ptr %31
   %149 = load ptr addrspace(1), ptr %31
-  %150 = load i64, ptr addrspace(1) %149
-  store i64 %150, ptr %32
+  %150 = load ptr, ptr addrspace(1) %149
+  store ptr %150, ptr %32
   %151 = load i64, ptr %26
   store i64 %151, ptr %4
   %152 = load ptr addrspace(1), ptr %31
@@ -377,8 +377,8 @@ L123:
   %191 = load ptr addrspace(1), ptr %42
   store ptr addrspace(1) %191, ptr %43
   %192 = load ptr addrspace(1), ptr %43
-  %193 = load i64, ptr addrspace(1) %192
-  store i64 %193, ptr %44
+  %193 = load ptr, ptr addrspace(1) %192
+  store ptr %193, ptr %44
   %194 = load i64, ptr %38
   store i64 %194, ptr %4
   %195 = load ptr addrspace(1), ptr %43
@@ -454,8 +454,8 @@ L127:
   %234 = load ptr addrspace(1), ptr %54
   store ptr addrspace(1) %234, ptr %55
   %235 = load ptr addrspace(1), ptr %55
-  %236 = load i64, ptr addrspace(1) %235
-  store i64 %236, ptr %56
+  %236 = load ptr, ptr addrspace(1) %235
+  store ptr %236, ptr %56
   %237 = load i64, ptr %50
   store i64 %237, ptr %4
   %238 = load ptr addrspace(1), ptr %55
@@ -531,8 +531,8 @@ L131:
   %277 = load ptr addrspace(1), ptr %66
   store ptr addrspace(1) %277, ptr %67
   %278 = load ptr addrspace(1), ptr %67
-  %279 = load i64, ptr addrspace(1) %278
-  store i64 %279, ptr %68
+  %279 = load ptr, ptr addrspace(1) %278
+  store ptr %279, ptr %68
   %280 = load i64, ptr %62
   store i64 %280, ptr %4
   %281 = load ptr addrspace(1), ptr %67

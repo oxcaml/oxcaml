@@ -162,6 +162,7 @@ module Type = struct
       val_ptr
       (* We interpret [Addr]s as [val_ptr]s to let the RS4GC pass in LLVM to
          handle derived pointers for us. *)
+    | Code_pointer -> ptr
     | Float -> double
     | Float32 -> float
     | Vec128 | Vec256 | Vec512 | Mask | Valx2 ->

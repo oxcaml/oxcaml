@@ -426,7 +426,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         match init with Initialization -> false | Assignment -> true
       in
       match[@ocaml.warning "-fragile-match"] chunk with
-      | Word_int | Word_val ->
+      | Word_int | Word_code_pointer | Word_val ->
         let op, newarg2 =
           match Target.is_store_out_of_range chunk ~byte_offset:0 with
           | Within_range -> (
@@ -1428,7 +1428,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* Intermediate registers to handle cases where some registers from src
            are present in dest *)
         let tmp_regs = Reg.createv_with_typs src in
-        (* Ccatch registers must not contain out of heap pointers *)
+        (* Ccatch registers must not contain derived pointers *)
         Array.iter
           (fun reg ->
             match reg.Reg.typ with
@@ -1437,7 +1437,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
                  Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 ->
+            | Val | Int | Code_pointer | Float | Vec128 | Vec256 | Vec512 | Mask
+            | Float32 ->
               ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;

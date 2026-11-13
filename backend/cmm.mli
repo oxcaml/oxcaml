@@ -21,6 +21,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
   | Int
+  | Code_pointer
   | Float
   | Vec128
   | Vec256
@@ -37,6 +38,7 @@ type machtype_component = Cmx_format.machtype_component =
    - [Addr] denotes pointers that are neither [Val] nor [Int], i.e.
      pointers into the heap that point in the middle of a heap block.
      Such derived pointers are produced by e.g. array indexing.
+   - [Code_pointer] is for off-heap pointers to code.
    - [Float] is for unboxed floating-point numbers.
 
 The purpose of these types is twofold.  First, they guide register
@@ -46,7 +48,7 @@ tracked by the GC:
    - Variables of type [Val] are GC roots.  If they are pointers, the
      GC will not deallocate the addressed heap block, and will update
      the local variable if the heap block moves.
-   - Variables of type [Int] and [Float] are ignored by the GC.
+   - Variables of type [Int], [Code_pointer], and [Float] are ignored by the GC.
      The GC does not change their values.
    - Variables of type [Addr] must never be live across an allocation
      point or function call.  They cannot be given as roots to the GC
@@ -66,6 +68,8 @@ val typ_val : machtype
 val typ_addr : machtype
 
 val typ_int : machtype
+
+val typ_code_pointer : machtype
 
 val typ_float : machtype
 
@@ -327,7 +331,8 @@ type memory_chunk =
   | Sixteen_signed
   | Thirtytwo_unsigned
   | Thirtytwo_signed
-  | Word_int (* integer or pointer outside heap *)
+  | Word_code_pointer (* pointer outside heap *)
+  | Word_int (* integer *)
   | Word_mask (* integer-sized AVX512 mask *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }

@@ -74,6 +74,7 @@ let access_array base numelt size =
 %token BYTE
 %token CASE
 %token CATCH
+%token CODE_POINTER
 %token COLON
 %token DATA
 %token DIVF
@@ -208,6 +209,7 @@ component:
     VAL                         { Val }
   | ADDR                        { Addr }
   | INT                         { Int }
+  | CODE_POINTER                { Code_pointer }
   | FLOAT                       { Float }
 ;
 componentlist:
@@ -381,6 +383,7 @@ chunk:
   | UNSIGNED INT32              { Thirtytwo_unsigned }
   | SIGNED INT32                { Thirtytwo_signed }
   | INT                         { Word_int }
+  | CODE_POINTER                { Word_code_pointer }
   | ADDR                        { Word_val }
   | FLOAT32                     { Single { reg = Float64 } }
   | FLOAT64                     { Double }

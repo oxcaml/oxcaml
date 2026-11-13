@@ -49,9 +49,9 @@
         (let temp (addraref a (>>s i 1))
              (addraset a (>>s i 1) (addraref a (>>s hi 1)))
              (addraset a (>>s hi 1) temp))
-        (app "quick" lo (- i 2) a unit)
-        (app "quick" (+ i 2) hi a unit))
+        (app "quick":code_pointer lo (- i 2) a unit)
+        (app "quick":code_pointer (+ i 2) hi a unit))
     []))
 
 (function "quicksort" (lo: int hi: int a: val)
-   (app "quick" (+ (<< lo 1) 1) (+ (<< hi 1) 1) a unit))
+   (app "quick":code_pointer (+ (<< lo 1) 1) (+ (<< hi 1) 1) a unit))

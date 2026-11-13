@@ -799,7 +799,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__entry(i64 %0
   %14 = alloca i64
   %15 = alloca ptr addrspace(1)
   %16 = alloca ptr addrspace(1)
-  %17 = alloca i64
+  %17 = alloca ptr
   %18 = alloca i64
   %19 = alloca i64
   %20 = alloca i64
@@ -810,7 +810,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__entry(i64 %0
   %25 = alloca i64
   %26 = alloca ptr addrspace(1)
   %27 = alloca ptr addrspace(1)
-  %28 = alloca i64
+  %28 = alloca ptr
   %29 = alloca i64
   %30 = alloca i64
   %31 = alloca i64
@@ -835,7 +835,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__entry(i64 %0
   %50 = alloca i64
   %51 = alloca ptr addrspace(1)
   %52 = alloca ptr addrspace(1)
-  %53 = alloca i64
+  %53 = alloca ptr
   %54 = alloca i64
   %55 = alloca i64
   %56 = alloca i64
@@ -894,8 +894,8 @@ L202:
   %84 = load ptr addrspace(1), ptr %15
   store ptr addrspace(1) %84, ptr %16
   %85 = load ptr addrspace(1), ptr %16
-  %86 = load i64, ptr addrspace(1) %85
-  store i64 %86, ptr %17
+  %86 = load ptr, ptr addrspace(1) %85
+  store ptr %86, ptr %17
   %87 = load i64, ptr %11
   store i64 %87, ptr %4
   %88 = load ptr addrspace(1), ptr %16
@@ -967,8 +967,8 @@ L206:
   %125 = load ptr addrspace(1), ptr %26
   store ptr addrspace(1) %125, ptr %27
   %126 = load ptr addrspace(1), ptr %27
-  %127 = load i64, ptr addrspace(1) %126
-  store i64 %127, ptr %28
+  %127 = load ptr, ptr addrspace(1) %126
+  store ptr %127, ptr %28
   %128 = load i64, ptr %22
   store i64 %128, ptr %4
   %129 = load ptr addrspace(1), ptr %27
@@ -1081,8 +1081,8 @@ L220:
   %190 = load ptr addrspace(1), ptr %51
   store ptr addrspace(1) %190, ptr %52
   %191 = load ptr addrspace(1), ptr %52
-  %192 = load i64, ptr addrspace(1) %191
-  store i64 %192, ptr %53
+  %192 = load ptr, ptr addrspace(1) %191
+  store ptr %192, ptr %53
   %193 = load ptr addrspace(1), ptr %47
   store ptr addrspace(1) %193, ptr %3
   %194 = load ptr addrspace(1), ptr %52

@@ -193,7 +193,7 @@ let zmm_reg_name =
 let register_name typ phys_reg : X86_ast.arg =
   let reg_index = Regs.index_in_class phys_reg in
   match (typ : Cmm.machtype_component) with
-  | Int | Val | Addr -> Reg64 int_reg_name.(reg_index)
+  | Int | Code_pointer | Val | Addr -> Reg64 int_reg_name.(reg_index)
   | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(reg_index)
   | Vec256 ->
     I.require_vec256 ();
@@ -447,7 +447,7 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
     I.require_vec512 ();
     VEC512
   | Valx2 -> VEC128
-  | Int | Addr | Val | Mask -> QWORD
+  | Int | Code_pointer | Addr | Val | Mask -> QWORD
   | Float32 -> REAL4
 
 let reg : Reg.t -> X86_ast.arg =
@@ -576,7 +576,7 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
           (* Masks may be used with smaller vectors, but imply zmm support *)
           v512 := true
         | Float | Vec128 | Float32 | Valx2 -> v128 := true
-        | Val | Addr | Int -> ())
+        | Val | Addr | Int | Code_pointer -> ())
     live;
   if !v512
   then (
@@ -619,7 +619,11 @@ let compute_live_offset live =
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
       | { typ = Val | Valx2; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask; _ } ->
+      | { typ =
+            ( Int | Code_pointer | Float | Float32 | Vec128 | Vec256 | Vec512
+            | Mask );
+          _
+        } ->
         ())
     live;
   !live_offset
@@ -1275,8 +1279,10 @@ let move (src : Reg.t) (dst : Reg.t) =
     if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->
     if distinct then movss (reg src) (reg dst)
-  | (Int | Val | Addr), (Reg _ | Stack _), (Int | Val | Addr), (Reg _ | Stack _)
-    ->
+  | ( (Int | Val | Addr | Code_pointer),
+      (Reg _ | Stack _),
+      (Int | Val | Addr | Code_pointer),
+      (Reg _ | Stack _) ) ->
     if distinct then I.mov (reg src) (reg dst)
   | _, Unknown, _, (Reg _ | Stack _ | Unknown)
   | _, (Reg _ | Stack _), _, Unknown ->
@@ -1284,7 +1290,7 @@ let move (src : Reg.t) (dst : Reg.t) =
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
   | ( ( Float | Float32 | Vec128 | Vec256 | Vec512 | Mask | Int | Val | Addr
-      | Valx2 ),
+      | Code_pointer | Valx2 ),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -1297,7 +1303,7 @@ let stack_to_stack_move (src : Reg.t) (dst : Reg.t) =
   if not (Reg.equal_location src.loc dst.loc)
   then
     match src.typ with
-    | Int | Val ->
+    | Int | Code_pointer | Val ->
       (* Not calling move because r15 is not in int_reg_name. *)
       I.mov (reg src) r15;
       I.mov r15 (reg dst)
@@ -1439,7 +1445,7 @@ end = struct
       | Byte_unsigned | Byte_signed -> I8
       | Sixteen_unsigned | Sixteen_signed -> I16
       | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> I32
-      | Word_int | Word_mask | Word_val | Double -> I64
+      | Word_int | Word_code_pointer | Word_mask | Word_val | Double -> I64
       | Onetwentyeight_unaligned | Onetwentyeight_aligned -> I128
       | Twofiftysix_unaligned | Twofiftysix_aligned -> I256
       | Fivetwelve_unaligned | Fivetwelve_aligned -> I512
@@ -1674,7 +1680,8 @@ end = struct
         match memory_chunk with
         | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
         | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int
-        | Word_mask | Word_val | Double | Onetwentyeight_aligned ->
+        | Word_code_pointer | Word_mask | Word_val | Double
+        | Onetwentyeight_aligned ->
           emit_shadow_check ?dependencies ~address ~report memory_chunk
         | Onetwentyeight_unaligned ->
           emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
@@ -2284,7 +2291,8 @@ let emit_instr ~first ~last ~fallthrough i =
       instruction address dest
     in
     match memory_chunk with
-    | Word_int | Word_val -> load ~dest:(res i 0) QWORD I.mov
+    | Word_int | Word_code_pointer | Word_val ->
+      load ~dest:(res i 0) QWORD I.mov
     | Word_mask ->
       load ~dest:(res i 0) QWORD (fun src dst ->
           I.simd kmovq_K_Km64 [| src; dst |])
@@ -2326,7 +2334,7 @@ let emit_instr ~first ~last ~fallthrough i =
       instruction src address
     in
     match chunk with
-    | Word_int | Word_val -> store QWORD arg I.mov
+    | Word_int | Word_code_pointer | Word_val -> store QWORD arg I.mov
     | Word_mask ->
       store QWORD arg (fun src dst -> I.simd kmovq_m64_K [| src; dst |])
     | Byte_unsigned | Byte_signed -> store BYTE arg8 I.mov
@@ -3111,7 +3119,7 @@ let size_of_regs regs =
   Array.fold_right
     (fun r acc ->
       match r.Reg.typ with
-      | Int | Addr | Val -> acc + size_int
+      | Int | Addr | Val | Code_pointer -> acc + size_int
       | Float | Float32 ->
         (* Float32 slots still take up a full word *)
         acc + size_float
@@ -3129,7 +3137,7 @@ let stack_locations ~offset regs =
           n
           +
           match r.Reg.typ with
-          | Int | Val | Addr -> size_int
+          | Int | Val | Addr | Code_pointer -> size_int
           | Float | Float32 ->
             (* Float32 slots still take up a full word *)
             size_float
@@ -3232,7 +3240,9 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
         | Stack (Outgoing k) -> (
           match r.typ with
           | Val -> k :: acc
-          | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 -> acc
+          | Int | Code_pointer | Float | Vec128 | Vec256 | Vec512 | Mask
+          | Float32 ->
+            acc
           | Valx2 -> k :: (k + Arch.size_addr) :: acc
           | Addr -> Misc.fatal_errorf "bad GC root %a" Printreg.reg r)
         | Stack (Incoming _ | Reg.Local _ | Domainstate _) | Reg _ | Unknown ->

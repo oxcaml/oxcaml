@@ -696,7 +696,7 @@ and loaded_bit_length (memory_chunk : Cmm.memory_chunk) =
   | Byte_unsigned | Byte_signed -> 8
   | Sixteen_unsigned | Sixteen_signed -> 16
   | Thirtytwo_unsigned | Thirtytwo_signed -> 32
-  | Word_int | Word_mask | Word_val | Single _ | Double
+  | Word_int | Word_code_pointer | Word_mask | Word_val | Single _ | Double
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     arch_bits
@@ -1126,7 +1126,7 @@ let store ~dbg memory_chunk init ~addr ~new_value =
     | Byte_unsigned | Byte_signed -> low_bits ~bits:8 ~dbg new_value
     | Sixteen_unsigned | Sixteen_signed -> low_bits ~bits:16 ~dbg new_value
     | Thirtytwo_unsigned | Thirtytwo_signed -> low_bits ~bits:32 ~dbg new_value
-    | Word_int | Word_mask | Word_val | Single _ | Double
+    | Word_int | Word_code_pointer | Word_mask | Word_val | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
       new_value
@@ -1909,7 +1909,7 @@ let memory_chunk_width_in_bytes : memory_chunk -> int = function
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed -> 4
   | Single { reg = Float64 | Float32 } -> 4
-  | Word_int -> size_int
+  | Word_int | Word_code_pointer -> size_int
   | Word_mask -> size_int
   | Word_val -> size_addr
   | Double -> size_float
@@ -1936,7 +1936,7 @@ let get_field_gen mut ptr n dbg =
   get_field_gen_given_memory_chunk Word_val mut ptr n dbg
 
 let get_field_codepointer mut ptr n dbg =
-  get_field_gen_given_memory_chunk Word_int mut ptr n dbg
+  get_field_gen_given_memory_chunk Word_code_pointer mut ptr n dbg
 
 let set_field ptr n newval init dbg =
   Cop (Cstore (Word_val, init), [field_address ptr n dbg; newval], dbg)
@@ -2525,19 +2525,6 @@ module Extended_machtype_component = struct
     | Mask
     | Float32
 
-  let of_machtype_component (component : machtype_component) =
-    match component with
-    | Val -> Val
-    | Addr -> Addr
-    | Int -> Any_int
-    | Float -> Float
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Mask -> Mask
-    | Float32 -> Float32
-    | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-
   let to_machtype_component t : machtype_component =
     match t with
     | Val -> Val
@@ -2587,9 +2574,6 @@ module Extended_machtype = struct
 
   let typ_void = [||]
 
-  let of_machtype machtype =
-    Array.map Extended_machtype_component.of_machtype_component machtype
-
   let to_machtype t =
     Array.map Extended_machtype_component.to_machtype_component t
 
@@ -2629,6 +2613,7 @@ let machtype_identifier t =
     match component with
     | Val -> 'V'
     | Int -> 'I'
+    | Code_pointer -> 'C'
     | Float -> 'F'
     | Vec128 -> 'X'
     | Vec256 -> 'Y'
@@ -2676,7 +2661,8 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode)
           returns
         },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
-      Cconst_symbol (sym, typ_int, dbg) :: obj :: tag :: cache :: pos :: args,
+      Cconst_symbol (sym, typ_code_pointer, dbg)
+      :: obj :: tag :: cache :: pos :: args,
       dbg )
 
 (* Allocation *)
@@ -2696,7 +2682,7 @@ let memory_chunk_size_in_words_for_mixed_block = function
         "Unable to compile mixed blocks on a platform where a float is not the \
          same width as a value.";
     1
-  | Word_int | Word_mask | Word_val -> 1
+  | Word_int | Word_code_pointer | Word_mask | Word_val -> 1
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 2
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 4
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 8
@@ -2710,7 +2696,7 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
   | Word_val ->
     (* Values must go through "caml_initialize" *)
     addr_array_initialize block ofs newval dbg
-  | Word_int | Word_mask -> generic_case ()
+  | Word_int | Word_code_pointer | Word_mask -> generic_case ()
   (* Generic cases that may differ under big endian archs *)
   | Single _ | Double | Thirtytwo_unsigned | Thirtytwo_signed
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
@@ -2830,16 +2816,16 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned | Word_mask ->
+          | Fivetwelve_aligned | Word_mask | Word_code_pointer ->
             error "the value prefix of a mixed block"
         else
           (* flat suffix part of the block *)
           match memory_chunk with
-          | Word_int | Word_mask | Thirtytwo_unsigned | Thirtytwo_signed
-          | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-          | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned | Single _ | Byte_unsigned | Byte_signed
-          | Sixteen_unsigned | Sixteen_signed ->
+          | Word_int | Word_code_pointer | Word_mask | Thirtytwo_unsigned
+          | Thirtytwo_signed | Double | Onetwentyeight_unaligned
+          | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+          | Fivetwelve_unaligned | Fivetwelve_aligned | Single _ | Byte_unsigned
+          | Byte_signed | Sixteen_unsigned | Sixteen_signed ->
             ok ()
           | Word_val -> error "the flat suffix of a mixed block")
       0 args_memory_chunks
@@ -3712,7 +3698,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode
   let ty = Extended_machtype.to_machtype extended_ty in
   let really_call_caml_apply clos args =
     let sym = apply_function_sym extended_args_type extended_ty mode in
-    let cargs = (Cconst_symbol (sym, typ_int, dbg) :: args) @ [clos] in
+    let cargs = (Cconst_symbol (sym, typ_code_pointer, dbg) :: args) @ [clos] in
     Cop
       ( Capply { result_type = ty; region = pos; callees = Some [sym]; returns },
         cargs,
@@ -4272,7 +4258,7 @@ let machtype_stored_size t =
       match (c : machtype_component) with
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-      | Val | Int -> cur + 1
+      | Val | Int | Code_pointer -> cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
         (* Float32 slots still take up a full word *)
@@ -4290,7 +4276,7 @@ let machtype_non_scanned_size t =
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
       | Val -> cur
-      | Int -> cur + 1
+      | Int | Code_pointer -> cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
         (* Float32 slots still take up a full word *)
@@ -4311,7 +4297,9 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> true
+        | Int | Code_pointer | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask
+          ->
+          true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> assert false)
@@ -4333,6 +4321,9 @@ let read_from_closure_given_machtype t clos base_offset dbg =
         match (c : machtype_component) with
         | Int ->
           (non_scanned_pos + 1, scanned_pos), load Word_int non_scanned_pos
+        | Code_pointer ->
+          ( (non_scanned_pos + 1, scanned_pos),
+            load Word_code_pointer non_scanned_pos )
         | Float ->
           ( (non_scanned_pos + ints_per_float, scanned_pos),
             load Double non_scanned_pos )
@@ -4454,7 +4445,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
                     (dbg ());
                   Cconst_symbol
                     ( global_symbol (name1 ^ "_" ^ Int.to_string (num + 1)),
-                      typ_int,
+                      typ_code_pointer,
                       dbg () );
                   Cconst_natint
                     ( pack_closure_info
@@ -4469,7 +4460,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
                      [ Cconst_symbol
                          ( global_symbol
                              (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app"),
-                           typ_int,
+                           typ_code_pointer,
                            dbg () ) ]
                    else [])
                 @ value_slot_given_machtype args
@@ -4885,7 +4876,7 @@ let entry_point namelist =
                 callees = None;
                 returns = true
               },
-            [Cop (mk_load_immut Word_int, [f], dbg ())],
+            [Cop (mk_load_immut Word_code_pointer, [f], dbg ())],
             dbg () ),
         incr_global_inited () )
   in
@@ -5409,7 +5400,7 @@ let direct_call ~dbg ~returns ty pos f_code_sym args =
   Cop
     ( Capply
         { result_type = ty; region = pos; callees = Some [f_code_sym]; returns },
-      Cconst_symbol (f_code_sym, typ_int, dbg) :: args,
+      Cconst_symbol (f_code_sym, typ_code_pointer, dbg) :: args,
       dbg )
 
 let indirect_call ~dbg ~returns ty pos alloc_mode f args_type args =
@@ -5787,7 +5778,7 @@ let perform ~dbg ~returns eff =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, typ_int, dbg); eff; cont],
+      [Cconst_symbol (sym, typ_code_pointer, dbg); eff; cont],
       dbg )
 
 let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
@@ -5799,7 +5790,7 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
           callees = Some [sym];
           returns
         },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", typ_int, dbg);
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", typ_code_pointer, dbg);
         Cop
           ( Cextcall
               { func = "caml_alloc_stack";
@@ -5827,7 +5818,7 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg
           callees = Some [sym];
           returns
         },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", typ_int, dbg);
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", typ_code_pointer, dbg);
         Cop
           ( Cextcall
               { func = "caml_alloc_stack_preemptible";
@@ -5859,7 +5850,7 @@ let continue ~dbg ~cont ~value ~returns =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, typ_int, dbg); cont; value],
+      [Cconst_symbol (sym, typ_code_pointer, dbg); cont; value],
       dbg )
 
 let discontinue ~dbg ~cont ~exn ~returns =
@@ -5871,7 +5862,7 @@ let discontinue ~dbg ~cont ~exn ~returns =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, typ_int, dbg); cont; exn],
+      [Cconst_symbol (sym, typ_code_pointer, dbg); cont; exn],
       dbg )
 
 let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
@@ -5883,7 +5874,7 @@ let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, typ_int, dbg); cont; exn; bt],
+      [Cconst_symbol (sym, typ_code_pointer, dbg); cont; exn; bt],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber ~returns =
@@ -5897,7 +5888,7 @@ let reperform ~dbg ~eff ~cont ~last_fiber ~returns =
           callees = Some [sym];
           returns
         },
-      [Cconst_symbol (sym, typ_int, dbg); eff; cont; last_fiber],
+      [Cconst_symbol (sym, typ_code_pointer, dbg); eff; cont; last_fiber],
       dbg )
 
 let poll ~dbg = return_unit dbg (Cop (Cpoll, [], dbg))

@@ -214,6 +214,7 @@ let oper_result_type = function
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
     | Word_val -> typ_val
+    | Word_code_pointer -> typ_code_pointer
     | Word_mask -> typ_mask
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
@@ -307,7 +308,7 @@ let oper_result_type = function
 (* [size_component] is placed here and not in [Cmm] to avoid cyclic
    dependencies, because it uses [Arch]. *)
 let size_component : machtype_component -> int = function
-  | Val | Addr -> Arch.size_addr
+  | Val | Addr | Code_pointer -> Arch.size_addr
   | Int ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
@@ -550,6 +551,7 @@ let chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk =
   | Vec512 -> Fivetwelve_unaligned
   | Mask -> Word_mask
   | Val | Addr | Int -> Word_val
+  | Code_pointer -> Word_code_pointer
   | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
 let float_test_of_float_comparison :

@@ -412,9 +412,6 @@ module Extended_machtype : sig
 
   val typ_mask : t
 
-  (** Conversion from a normal Cmm machtype. *)
-  val of_machtype : machtype -> t
-
   (** Conversion from a Lambda layout. *)
   val of_layout : Lambda.layout -> t
 

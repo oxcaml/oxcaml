@@ -422,7 +422,7 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__tail_call_outside_prol
   %14 = alloca ptr addrspace(1)
   %15 = alloca ptr addrspace(1)
   %16 = alloca i64
-  %17 = alloca i64
+  %17 = alloca ptr
   %18 = alloca i64
   %19 = alloca i64
   %20 = alloca i64
@@ -450,8 +450,8 @@ L190:
   store ptr addrspace(1) %32, ptr %15
   store i64 1, ptr %16
   %33 = load ptr addrspace(1), ptr %15
-  %34 = load i64, ptr addrspace(1) %33
-  store i64 %34, ptr %17
+  %34 = load ptr, ptr addrspace(1) %33
+  store ptr %34, ptr %17
   %35 = load i64, ptr %16
   store i64 %35, ptr %5
   %36 = load ptr addrspace(1), ptr %15
@@ -542,7 +542,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlTailcall__entry(i64
   %30 = alloca i64
   %31 = alloca ptr addrspace(1)
   %32 = alloca ptr addrspace(1)
-  %33 = alloca i64
+  %33 = alloca ptr
   %34 = alloca i64
   %35 = alloca i64
   %36 = alloca i64
@@ -554,7 +554,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlTailcall__entry(i64
   %42 = alloca i64
   %43 = alloca ptr addrspace(1)
   %44 = alloca ptr addrspace(1)
-  %45 = alloca i64
+  %45 = alloca ptr
   %46 = alloca i64
   %47 = alloca i64
   %48 = alloca i64
@@ -569,7 +569,7 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlTailcall__entry(i64
   %57 = alloca ptr addrspace(1)
   %58 = alloca ptr addrspace(1)
   %59 = alloca i64
-  %60 = alloca i64
+  %60 = alloca ptr
   %61 = alloca i64
   %62 = alloca i64
   %63 = alloca i64
@@ -685,8 +685,8 @@ L231:
   %119 = load ptr addrspace(1), ptr %31
   store ptr addrspace(1) %119, ptr %32
   %120 = load ptr addrspace(1), ptr %32
-  %121 = load i64, ptr addrspace(1) %120
-  store i64 %121, ptr %33
+  %121 = load ptr, ptr addrspace(1) %120
+  store ptr %121, ptr %33
   %122 = load i64, ptr %10
   store i64 %122, ptr %4
   %123 = load ptr addrspace(1), ptr %32
@@ -762,8 +762,8 @@ L235:
   %162 = load ptr addrspace(1), ptr %43
   store ptr addrspace(1) %162, ptr %44
   %163 = load ptr addrspace(1), ptr %44
-  %164 = load i64, ptr addrspace(1) %163
-  store i64 %164, ptr %45
+  %164 = load ptr, ptr addrspace(1) %163
+  store ptr %164, ptr %45
   %165 = load i64, ptr %39
   store i64 %165, ptr %4
   %166 = load ptr addrspace(1), ptr %44
@@ -835,8 +835,8 @@ L238:
   store ptr addrspace(1) %204, ptr %58
   store i64 1, ptr %59
   %205 = load ptr addrspace(1), ptr %58
-  %206 = load i64, ptr addrspace(1) %205
-  store i64 %206, ptr %60
+  %206 = load ptr, ptr addrspace(1) %205
+  store ptr %206, ptr %60
   %207 = load i64, ptr %59
   store i64 %207, ptr %4
   %208 = load ptr addrspace(1), ptr %58

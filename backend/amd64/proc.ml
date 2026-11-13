@@ -79,7 +79,7 @@ let win64 = Arch.win64
 
 let types_are_compatible (left : Reg.t)  (right : Reg.t) =
   match left.typ, right.typ with
-  | (Int | Val | Addr), (Int | Val | Addr)
+  | (Int | Val | Addr | Code_pointer), (Int | Val | Addr | Code_pointer)
   | Float, Float
   | Float32, Float32
   | (Valx2 | Vec128), (Valx2 | Vec128) ->
@@ -90,7 +90,7 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
     true
   | Mask, Mask ->
     true
-  | (Int | Val | Addr | Float | Float32 |
+  | (Int | Val | Addr | Code_pointer | Float | Float32 |
      Vec128 | Vec256 | Vec512 | Mask | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
@@ -141,7 +141,7 @@ let all_phys_regs = lazy ((* To be forced after flags are parsed. *)
 let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   let index_in_class = Regs.index_in_class phys_reg in
   match (ty : machtype_component) with
-  | Int | Addr | Val ->
+  | Int | Addr | Val | Code_pointer ->
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
@@ -211,7 +211,7 @@ let calling_conventions
     let ty : machtype_component = arg.(i) in
     let registers, size, ty =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int, ty
+      | Val | Int | Addr | Code_pointer -> int_registers, size_int, ty
       | Float | Float32 -> float_registers, size_float, ty
       | Vec128 -> float_registers, size_vec128, ty
       | Vec256 -> float_registers, size_vec256, ty
@@ -356,7 +356,8 @@ let win64_loc_external_arguments arg =
     let ty : machtype_component = arg.(i) in
     let arguments, size =
       match ty with
-      | Val | Int | Addr -> win64_int_external_arguments, size_int
+      | Val | Int | Addr | Code_pointer ->
+        win64_int_external_arguments, size_int
       | Float | Float32 -> win64_float_external_arguments, size_float
       | Vec128 | Vec256 | Vec512 | Mask ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)
@@ -398,7 +399,7 @@ let unix_loc_external_arguments_fat ty_args =
     Array.fold_left
       (fun k (c : machtype_component) ->
         match c with
-        | Val | Int | Addr -> k + 1
+        | Val | Int | Addr | Code_pointer -> k + 1
         | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask | Valx2 -> k)
       0 reals
   in
@@ -635,12 +636,12 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op(Specific (Ifloatarithmem (Float32, _, _)))
   | Op(Intop_atomic _) ->
     destroyed_at_small_memory_op
-  | Op(Store( (Word_int | Word_mask | Word_val | Double |
+  | Op(Store( (Word_int | Word_code_pointer | Word_mask | Word_val | Double |
                Onetwentyeight_aligned | Onetwentyeight_unaligned |
                Twofiftysix_aligned | Twofiftysix_unaligned |
                Fivetwelve_aligned | Fivetwelve_unaligned), _, _))
   | Op(Load { memory_chunk =
-                (Word_int | Word_mask | Word_val | Double |
+                (Word_int | Word_code_pointer | Word_mask | Word_val | Double |
                  Onetwentyeight_aligned | Onetwentyeight_unaligned |
                  Twofiftysix_aligned | Twofiftysix_unaligned |
                  Fivetwelve_aligned | Fivetwelve_unaligned); _})

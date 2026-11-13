@@ -21,6 +21,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
   | Int
+  | Code_pointer
   | Float
   | Vec128
   | Vec256
@@ -43,6 +44,8 @@ let typ_addr = [| Addr |]
 
 let typ_int = [| Int |]
 
+let typ_code_pointer = [| Code_pointer |]
+
 let typ_float = [| Float |]
 
 let typ_float32 = [| Float32 |]
@@ -62,6 +65,7 @@ let string_of_machtype_component (comp : machtype_component) =
   | Val -> "Val"
   | Addr -> "Addr"
   | Int -> "Int"
+  | Code_pointer -> "Code_pointer"
   | Float -> "Float"
   | Vec128 -> "Vec128"
   | Vec256 -> "Vec256"
@@ -73,7 +77,7 @@ let string_of_machtype_component (comp : machtype_component) =
 (** [machtype_component]s are partially ordered as follows:
 
     {v
-      Addr     Float32     Float     Vec128     Vec256     Vec512   Mask   Valx2
+      Addr
        ^
        |
       Val
@@ -81,6 +85,8 @@ let string_of_machtype_component (comp : machtype_component) =
        |
       Int
     v}
+    (all of the [machtype_component]s not in the diagram are unordered relative
+    to every other [machtype_component].)
 
     In particular, [Addr] must be above [Val], to ensure that if there is a join
     point between a code path yielding [Addr] and one yielding [Val] then the
@@ -100,6 +106,7 @@ let lub_component comp1 comp2 =
   | Addr, Int -> Addr
   | Addr, Addr -> Addr
   | Addr, Val -> Addr
+  | Code_pointer, Code_pointer -> Code_pointer
   | Float, Float -> Float
   | Float32, Float32 -> Float32
   | Vec128, Vec128 -> Vec128
@@ -107,6 +114,10 @@ let lub_component comp1 comp2 =
   | Vec512, Vec512 -> Vec512
   | Mask, Mask -> Mask
   | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
+  | ( Code_pointer,
+      (Int | Addr | Val | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask) )
+  | ( (Int | Addr | Val | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
+      Code_pointer )
   | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
   | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
@@ -133,6 +144,7 @@ let ge_component comp1 comp2 =
   | Addr, Int -> true
   | Addr, Addr -> true
   | Addr, Val -> true
+  | Code_pointer, Code_pointer -> true
   | Float, Float -> true
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
@@ -140,6 +152,11 @@ let ge_component comp1 comp2 =
   | Vec512, Vec512 -> true
   | Mask, Mask -> true
   | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
+  | ( Code_pointer,
+      (Int | Val | Addr | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask) )
+  | ( (Int | Val | Addr | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
+      Code_pointer ) ->
+    false
   | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
   | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
@@ -411,6 +428,7 @@ type memory_chunk =
   | Sixteen_signed
   | Thirtytwo_unsigned
   | Thirtytwo_signed
+  | Word_code_pointer
   | Word_int
   | Word_mask
   | Word_val
@@ -427,7 +445,7 @@ let size_of_memory_chunk : memory_chunk -> int = function
   | Byte_unsigned | Byte_signed -> 1
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> 4
-  | Word_int | Word_mask | Word_val | Double -> 8
+  | Word_int | Word_code_pointer | Word_mask | Word_val | Double -> 8
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 16
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 32
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 64
@@ -947,16 +965,17 @@ let rank_machtype_component : machtype_component -> int = function
   | Mask -> 7
   | Float32 -> 8
   | Valx2 -> 9
+  | Code_pointer -> 10
 
 let compare_machtype_component
     (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
-     | Valx2 ) as left :
+     | Valx2 | Code_pointer ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left - rank_machtype_component right
 
 let equal_machtype_component
     (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
-     | Valx2 ) as left :
+     | Valx2 | Code_pointer ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
@@ -1100,6 +1119,7 @@ let equal_memory_chunk left right =
   | Thirtytwo_unsigned, Thirtytwo_unsigned -> true
   | Thirtytwo_signed, Thirtytwo_signed -> true
   | Word_int, Word_int -> true
+  | Word_code_pointer, Word_code_pointer -> true
   | Word_mask, Word_mask -> true
   | Word_val, Word_val -> true
   | Single { reg = regl }, Single { reg = regr } -> equal_float_width regl regr
@@ -1112,100 +1132,112 @@ let equal_memory_chunk left right =
   | Fivetwelve_aligned, Fivetwelve_aligned -> true
   | ( Byte_unsigned,
       ( Byte_signed | Sixteen_unsigned | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Word_code_pointer | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Byte_signed,
       ( Byte_unsigned | Sixteen_unsigned | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Word_code_pointer | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Sixteen_unsigned,
       ( Byte_unsigned | Byte_signed | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Word_code_pointer | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Sixteen_signed,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Word_code_pointer | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Thirtytwo_unsigned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Word_code_pointer | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Thirtytwo_signed,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Word_int | Word_code_pointer | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_int,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_code_pointer | Word_mask
+      | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+  | ( Word_code_pointer,
+      ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_mask,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-      | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Word_val,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-      | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Double,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-      | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Word_val | Single _ | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Onetwentyeight_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_aligned | Twofiftysix_unaligned
-      | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Word_val | Single _ | Double | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
   | ( Onetwentyeight_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Twofiftysix_unaligned
-      | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
   | ( Twofiftysix_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
   | ( Twofiftysix_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
   | ( Fivetwelve_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_aligned ) )
   | ( Fivetwelve_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_unaligned ) )
   | ( Single _,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-      | Fivetwelve_aligned ) ) ->
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_mask | Word_val | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_unaligned | Fivetwelve_aligned ) ) ->
     false
 
 let equal_integer_comparison = Scalar.Integer_comparison.equal
@@ -1215,19 +1247,22 @@ let caml_flambda2_invalid = "caml_flambda2_invalid"
 let is_val (m : machtype_component) =
   match m with
   | Val -> true
-  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
+  | Code_pointer ->
     false
 
 let is_int (m : machtype_component) =
   match m with
   | Int -> true
-  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
+  | Code_pointer ->
     false
 
 let is_addr (m : machtype_component) =
   match m with
   | Addr -> true
-  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
+  | Code_pointer ->
     false
 
 let is_exn_handler (flag : ccatch_flag) =
