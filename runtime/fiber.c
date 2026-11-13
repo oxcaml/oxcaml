@@ -843,7 +843,7 @@ static void fill_arena_free_space(struct caml_local_arena arena, intnat sp)
 #endif
 
 static void scan_local_allocations(scanning_action f, void* fdata,
-                                   caml_local_arenas* loc, uintnat local_sp)
+                                   caml_local_arenas* loc, intnat local_sp)
 {
   int arena_ix;
   intnat sp;
