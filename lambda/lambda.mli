@@ -1120,8 +1120,9 @@ and lfunction = private
 
 (** The code of an instantiation of a template, created by slambda evaluation.
     It has no free variables: the template's environment is its first
-    parameter. The bound identifier may only occur as the function of an
-    [Lapply]. *)
+    parameter. Native code creates no closure for it and calls it directly,
+    while bytecode compiles it as an ordinary function. The bound identifier
+    may only occur as the function of an [Lapply]. *)
 and lcode =
   { code_template : Template_id.t;
     code_fun : lfunction

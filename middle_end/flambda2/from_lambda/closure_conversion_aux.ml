@@ -167,7 +167,13 @@ module Env = struct
       big_endian : bool;
       path_to_root : Debuginfo.Scoped_location.t;
       inlining_history_tracker : Inlining_history.Tracker.t;
-      at_toplevel : bool
+      at_toplevel : bool;
+      lcodes : lcode Ident.Map.t
+    }
+
+  and lcode =
+    { code_id : Code_id.t;
+      metadata_approximation : value_approximation
     }
 
   let current_unit t = t.current_unit
@@ -187,7 +193,8 @@ module Env = struct
       big_endian;
       path_to_root = Debuginfo.Scoped_location.Loc_unknown;
       inlining_history_tracker = Inlining_history.Tracker.empty current_unit;
-      at_toplevel = true
+      at_toplevel = true;
+      lcodes = Ident.Map.empty
     }
 
   let set_not_at_toplevel t = { t with at_toplevel = false }
@@ -204,7 +211,8 @@ module Env = struct
         big_endian;
         path_to_root;
         inlining_history_tracker;
-        at_toplevel
+        at_toplevel;
+        lcodes
       } =
     let simples_to_substitute =
       Ident.Map.filter
@@ -220,8 +228,25 @@ module Env = struct
       big_endian;
       path_to_root;
       inlining_history_tracker;
-      at_toplevel
+      at_toplevel;
+      lcodes
     }
+
+  let declare_lcode t id ~code_id ~metadata_approximation =
+    let lcode = { code_id; metadata_approximation } in
+    { t with lcodes = Ident.Map.add id lcode t.lcodes }
+
+  let find_lcode_exn t id =
+    match Ident.Map.find_opt id t.lcodes with
+    | Some lcode -> lcode
+    | None -> Misc.fatal_errorf "%a is not bound to [Lcode]" Ident.print id
+
+  let lcode_code_id t id = (find_lcode_exn t id).code_id
+
+  let lcode_metadata_approximation t id =
+    (find_lcode_exn t id).metadata_approximation
+
+  let is_lcode t id = Ident.Map.mem id t.lcodes
 
   let with_depth t depth_var = { t with current_depth = Some depth_var }
 
@@ -377,7 +402,8 @@ module Acc = struct
       seen_a_function : bool;
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
-      closure_infos : closure_info list
+      closure_infos : closure_info list;
+      lcode_approximations : Env.value_approximation Code_id.Map.t
     }
 
   let cost_metrics t = t.cost_metrics
@@ -468,7 +494,8 @@ module Acc = struct
       seen_a_function = false;
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
-      closure_infos = []
+      closure_infos = [];
+      lcode_approximations = Code_id.Map.empty
     }
 
   let declared_symbols t = t.declared_symbols
@@ -560,6 +587,15 @@ module Acc = struct
         symbol_approximations =
           Symbol.Map.add symbol approx t.symbol_approximations
       }
+
+  let add_lcode_approximation t code_id approx =
+    { t with
+      lcode_approximations =
+        Code_id.Map.add code_id approx t.lcode_approximations
+    }
+
+  let find_lcode_approximation t code_id =
+    Code_id.Map.find_opt code_id t.lcode_approximations
 
   let symbol_approximations t = t.symbol_approximations
 

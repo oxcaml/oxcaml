@@ -526,6 +526,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
       ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
       ~absolute_history ~relative_history ~loopify
+      ~template_key:(Code.template_key code)
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in
@@ -1211,10 +1212,9 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
     all_sets_of_closures_and_symbols
     closure_bound_names_inside_functions_all_sets value_slots_and_types_all_sets
 
-let simplify_static_stub_function dacc code ~all_code ~simplify_function_body =
-  let context =
-    C.create_for_static_stub dacc ~all_code ~simplify_function_body
-  in
+let simplify_code_without_closure0 ~create_context dacc code =
+  let dacc, prior_lifted_constants = DA.get_and_clear_lifted_constants dacc in
+  let context = create_context dacc in
   let closure_bound_names_inside_function =
     (* Unused, the type of the value slot is going to be unknown *)
     Function_slot.Map.empty
@@ -1228,4 +1228,12 @@ let simplify_static_stub_function dacc code ~all_code ~simplify_function_body =
     | None -> assert false
     | Some (_, code_constant) -> code_constant
   in
-  code, outer_dacc
+  code, DA.add_to_lifted_constant_accumulator outer_dacc prior_lifted_constants
+
+let simplify_static_stub_function dacc code ~all_code ~simplify_function_body =
+  simplify_code_without_closure0 dacc code ~create_context:(fun dacc ->
+      C.create_for_static_stub dacc ~all_code ~simplify_function_body)
+
+let simplify_code_without_closure dacc code ~all_code ~simplify_function_body =
+  simplify_code_without_closure0 dacc code ~create_context:(fun dacc ->
+      C.create_for_code_without_closure dacc ~all_code ~simplify_function_body)

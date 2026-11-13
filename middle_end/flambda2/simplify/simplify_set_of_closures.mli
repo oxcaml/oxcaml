@@ -51,3 +51,13 @@ val simplify_static_stub_function :
   all_code:Code.t Code_id.Map.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
   Rebuilt_static_const.t * Downwards_acc.t
+
+(** Simplify code that has no closure (see
+    [Simplify_set_of_closures_context.create_for_code_without_closure]), keeping
+    its code ID. *)
+val simplify_code_without_closure :
+  Downwards_acc.t ->
+  Code.t ->
+  all_code:Code.t Code_id.Map.t ->
+  simplify_function_body:Simplify_common.simplify_function_body ->
+  Rebuilt_static_const.t * Downwards_acc.t

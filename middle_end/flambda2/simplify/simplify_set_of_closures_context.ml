@@ -31,22 +31,27 @@ let function_decl_type ?new_code_id ~rec_info old_code_id =
   let code_id = Option.value new_code_id ~default:old_code_id in
   Or_unknown.Known (T.Function_type.create code_id ~rec_info)
 
-let create_for_static_stub dacc ~all_code ~simplify_function_body =
+let create_for_code_without_closure0 dacc ~all_code ~simplify_function_body
+    ~is_stub =
   let dacc_inside_functions =
-    (* We ensure that inlining cannot happen inside the code of stubs. This is
-       to avoid compile-time performance problems where large functions (or
-       other stubs) might get inlined repeatedly into stubs. One place where
-       this was seen was code generated for labelled / optional argument
-       application when there are a lot of parameters. *)
     DA.map_denv dacc ~f:(fun denv ->
+        (* CR pchambart: We are not entering a set of closure, this function
+           code creates a context to simplify a function while looking at the
+           let code rather than the set of closure. We should rename this
+           `DE.enter_set_of_closures` function *)
+        let denv = DE.enter_set_of_closures denv in
+        let denv =
+          (* We ensure that inlining cannot happen inside the code of stubs.
+             This is to avoid compile-time performance problems where large
+             functions (or other stubs) might get inlined repeatedly into stubs.
+             One place where this was seen was code generated for labelled /
+             optional argument application when there are a lot of
+             parameters. *)
+          if is_stub then DE.enter_stub_function denv else denv
+        in
         Code_id.Map.fold
           (fun code_id code denv -> DE.define_code denv ~code_id ~code)
-          all_code
-          (* CR pchambart: We are not entering a set of closure, this function
-             code creates a context to simplify a function while looking at the
-             let code rather than the set of closure. We should rename this
-             `DE.enter_set_of_closures` function *)
-          (DE.enter_stub_function (DE.enter_set_of_closures denv)))
+          all_code denv)
   in
   { dacc_prior_to_sets = dacc;
     simplify_function_body;
@@ -56,6 +61,14 @@ let create_for_static_stub dacc ~all_code ~simplify_function_body =
     previously_free_depth_variables = Variable.Set.empty;
     single_set_of_size_one = false
   }
+
+let create_for_static_stub dacc ~all_code ~simplify_function_body =
+  create_for_code_without_closure0 dacc ~all_code ~simplify_function_body
+    ~is_stub:true
+
+let create_for_code_without_closure dacc ~all_code ~simplify_function_body =
+  create_for_code_without_closure0 dacc ~all_code ~simplify_function_body
+    ~is_stub:false
 
 let simplify_function_body t = t.simplify_function_body
 
