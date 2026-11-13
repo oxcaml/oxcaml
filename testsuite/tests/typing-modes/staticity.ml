@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layout_poly_alpha";
+ flags = "-extension layout_poly_alpha -extension comprehensions";
  expect;
 *)
 
@@ -920,13 +920,25 @@ Error: This value is "dynamic" but is expected to be "static".
 |}]
 
 (* For-loop indices are dynamic *)
-let f () =
-  for i = 0 to 0 do
-    let _ @ static = i in
-    ()
+let f n =
+  for i = 0 to n do
+    let _ @ static = i in ()
   done
 [%%expect{|
-val f : unit -> unit = <fun>
+Line 3, characters 21-22:
+3 |     let _ @ static = i in ()
+                         ^
+Error: This value is "dynamic" but is expected to be "static".
+|}]
+
+(* Comprehension indices are dynamic *)
+let f n = [ (i @ static) for i = 0 to n ]
+[%%expect{|
+Line 1, characters 13-14:
+1 | let f n = [ (i @ static) for i = 0 to n ]
+                 ^
+Error: The value "i" has type "int" but an expression was expected of type
+         "'a list"
 |}]
 
 (* Unpacked first class modules must be dynamic *)

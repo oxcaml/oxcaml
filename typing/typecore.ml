@@ -2933,6 +2933,9 @@ let build_or_pat env loc lid =
           pat pats in
       (path, rp { r with pat_loc = loc })
 
+let min_except_staticity =
+  With_regionality.min_with_monadic Staticity (Staticity.of_const Dynamic)
+
 (* When typing a for-loop index or similar, we need to restrict ourselves to the
    [Ppat_any] and [Ppat_var] cases, and construct a [pattern_variable] with
    consistent fields.  However, in the case where we're reifying a name for
@@ -2947,8 +2950,10 @@ let type_for_loop_like_index ~error ~loc ~env ~param ~any ~var =
     any (Ident.create_local "_for",
          Uid.mk ~current_unit:(Env.get_current_unit ()))
   | Ppat_var name ->
+      (* We use [min_except_staticity] since [int] is [mod everything],
+         which does not include staticity. *)
       var ~name
-          ~pv_mode:With_regionality.(min |> disallow_right)
+          ~pv_mode:min_except_staticity
           ~pv_type:(instance Predef.type_int)
           ~pv_loc:loc
           ~pv_as_var:false
