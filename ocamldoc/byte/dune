@@ -1,0 +1,40 @@
+;**************************************************************************
+;*                                                                        *
+;*                                 OCaml                                  *
+;*                                                                        *
+;*                     David Allsopp, Tarides                             *
+;*                                                                        *
+;*   Copyright 2024 David Allsopp Ltd.                                    *
+;*                                                                        *
+;*   All rights reserved.  This file is distributed under the terms of    *
+;*   the GNU Lesser General Public License version 2.1, with the          *
+;*   special exception on linking described in the file LICENSE.          *
+;*                                                                        *
+;**************************************************************************
+
+; Byte-only build of the ocamldoc modules, linking the runtime-id-suffixed
+; str_byte/unix_byte instead of the plain-stubbed str/unix, so the installed
+; ocamldoc.byte loads only this version's dllstr_stubs/dllunix_stubs. The
+; native ocamldoc keeps using the odoc_lib library in the parent directory.
+;
+; The lexer/parser modules are regenerated here from their copied sources
+; (rather than copying the parent's generated .ml, which would depend on a
+; sibling directory's build artefacts); the source .ml/.mli are copied by name
+; so the globs never pick up those generated files.
+
+(copy_files ../odoc_*.mll)
+(copy_files ../odoc_*.mly)
+(copy_files
+  ../{odoc_analyse,odoc_args,odoc_ast,odoc_class,odoc_comments,odoc_comments_global,odoc_config,odoc_cross,odoc_dag2html,odoc_dep,odoc_dot,odoc_env,odoc_exception,odoc_extension,odoc_gen,odoc_global,odoc_html,odoc_info,odoc_latex,odoc_latex_style,odoc_man,odoc_merge,odoc_messages,odoc_misc,odoc_module,odoc_name,odoc_parameter,odoc_print,odoc_scan,odoc_search,odoc_sig,odoc_str,odoc_test,odoc_texi,odoc_text,odoc_to_text,odoc_type,odoc_types,odoc_value}.ml)
+(copy_files
+  ../{odoc_analyse,odoc_args,odoc_ast,odoc_class,odoc_comments,odoc_comments_global,odoc_config,odoc_cross,odoc_dag2html,odoc_dep,odoc_dot,odoc_env,odoc_exception,odoc_extension,odoc_gen,odoc_global,odoc_html,odoc_info,odoc_latex,odoc_latex_style,odoc_lexer,odoc_man,odoc_merge,odoc_messages,odoc_misc,odoc_module,odoc_name,odoc_ocamlhtml,odoc_parameter,odoc_print,odoc_scan,odoc_search,odoc_see_lexer,odoc_sig,odoc_str,odoc_test,odoc_texi,odoc_text,odoc_text_lexer,odoc_to_text,odoc_type,odoc_types,odoc_value}.mli)
+
+(ocamllex odoc_lexer odoc_ocamlhtml odoc_see_lexer odoc_text_lexer)
+(ocamlyacc odoc_parser odoc_text_parser)
+
+(library
+  (name odoc_lib_byte)
+  (modes byte)
+  (wrapped false)
+  (flags (:standard -w -9-32))
+  (libraries dynlink_internal ocamlfrontend str_byte unix_byte))

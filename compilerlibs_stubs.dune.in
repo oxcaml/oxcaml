@@ -1,0 +1,26 @@
+; Generated (via Makefile.common-ox: @STUB_SUFFIX@ -> $(TARGET)-$(BYTECODE_RUNTIME_ID))
+; into compilerlibs_stubs.inc, which the root dune (include)s. Installs the
+; compiler's C-stub libraries' .a files, whose archive name carries the runtime-id
+; suffix (see the per-library stub_dll.dune.in). The main install path is the
+; mangled name (matching the -l<name>_stubs-<suffix> recorded in ocamloptcomp.cmxa);
+; the _native.a alias is kept for special_dune compat.
+(install
+ (files
+  (external/owee/libcompiler_owee_stubs-@STUB_SUFFIX@.a
+   as compiler-libs/libcompiler_owee_stubs-@STUB_SUFFIX@.a)
+  (external/owee/libcompiler_owee_stubs-@STUB_SUFFIX@.a
+   as compiler-libs/libcompiler_owee_stubs_native.a)
+  (external/gc-timings/libgc_timings_stubs-@STUB_SUFFIX@.a
+   as compiler-libs/libgc_timings_stubs-@STUB_SUFFIX@.a)
+  (external/gc-timings/libgc_timings_stubs-@STUB_SUFFIX@.a
+   as compiler-libs/libgc_timings_stubs_native.a)
+  (middle_end/flambda2/numbers/floats/libflambda2_floats_stubs-@STUB_SUFFIX@.a
+   as compiler-libs/libflambda2_floats_stubs-@STUB_SUFFIX@.a)
+  (middle_end/flambda2/numbers/floats/libflambda2_floats_stubs-@STUB_SUFFIX@.a
+   as compiler-libs/libflambda2_floats_stubs_native.a)
+  (middle_end/flambda2/algorithms/libflambda2_algorithms_stubs-@STUB_SUFFIX@.a
+   as compiler-libs/libflambda2_algorithms_stubs-@STUB_SUFFIX@.a)
+  (middle_end/flambda2/algorithms/libflambda2_algorithms_stubs-@STUB_SUFFIX@.a
+   as compiler-libs/libflambda2_algorithms_stubs_native.a))
+ (section lib)
+ (package ocaml))

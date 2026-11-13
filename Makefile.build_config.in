@@ -117,6 +117,9 @@ OC_DLL_LDFLAGS=@oc_dll_ldflags@
 
 MKEXE_VIA_CC=$(CC) @mkexe_via_cc_ldflags@ @mkexe_via_cc_extra_cmd@
 
+LAUNCH_METHOD = @launch_method@
+SUFFIXING = @suffixing@
+
 # How to build sak
 SAK_BUILD=@SAK_BUILD@
 # How to invoke sak
@@ -198,6 +201,9 @@ OC_NATIVE_LINKFLAGS = -g
 
 BUILD_TRIPLET = @build@
 
+# Zinc Runtime ID is needed for installation only
+ZINC_RUNTIME_ID = @zinc_runtime_id@
+
 # Platform-dependent command to create symbolic links
 LN = @ln@
 
@@ -215,3 +221,5 @@ TSAN=@tsan@
 # Contains TSan-specific runtime files, or nothing if TSan support is
 # disabled
 TSAN_NATIVE_RUNTIME_C_SOURCES = @tsan_native_runtime_c_sources@
+
+RUNTIME_SEARCH = @runtime_search@
