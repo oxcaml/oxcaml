@@ -8,3 +8,8 @@ value make_dumb_external_block(value unit)
     *p = Caml_out_of_heap_header(0, 0);
     return Val_int(((intnat)p) + 1);
 }
+
+intnat caml_native_pointer_of_value(value v)
+{
+    return (intnat)v;
+}

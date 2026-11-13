@@ -93,14 +93,20 @@ val local_closure :
 let use_and_return g x = ignore (g x); g
 [%%expect{|
 val use_and_return :
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'n mod aliased contended immutable & global many] ->
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n mod aliased contended immutable & global many] ->
   'a @ [< 'm] ->
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'n | aliased] = <fun>
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [> 'n | aliased] =
+  <fun>
 |}, Principal{|
 val use_and_return :
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'n & global many] ->
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n & global many] ->
   'a @ [< 'm] ->
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'n | aliased] = <fun>
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [> 'n | aliased] =
+  <fun>
 |}]
 
 let both_branches g x = if x then g else (fun y -> y)
@@ -118,8 +124,8 @@ type 'a cell = { mutable v : 'a; }
 let store_and_call c g x = c.v <- g; c.v x
 [%%expect{|
 val store_and_call :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global read_write] ->
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many read_write] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global uncontended read_write] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many uncontended forkable unyielding read_write] ->
   'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
@@ -138,13 +144,14 @@ val unique_closure : 'a @ [< 'm & global unique] -> 'b @ 'n -> 'a @ [> 'm] =
 let unique_cell (c @ unique) x = c.v <- x; c
 [%%expect{|
 val unique_cell :
-  'a cell @ [< 'm & global unique write] ->
-  'a @ [< global many read_write] ->
+  'a cell @ [< 'm & global unique corrupted write] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
   'a cell @ [> 'm mod many forkable unyielding] = <fun>
 |}, Principal{|
 val unique_cell :
-  'a cell @ [< 'm & global unique write] ->
-  'a @ [< global many read_write] -> 'a cell @ [> 'm] = <fun>
+  'a cell @ [< 'm & global unique corrupted write] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  'a cell @ [> 'm] = <fun>
 |}]
 
 let stack_args g = g (stack_ (1, 2)) (stack_ (3, 4)); ()
@@ -152,4 +159,14 @@ let stack_args g = g (stack_ (1, 2)) (stack_ (3, 4)); ()
 val stack_args :
   (int * int @ [> local] -> int * int @ [> local] -> 'a @ 'm) @ 'o ->
   unit @ 'n = <fun>
+|}]
+
+(* CR-soon mode-polymorphism-printing: printing crashes because a curry mode is
+   hidden in front of an arrow that is printed as an alias. Fix once aliased
+   types are handled properly. *)
+let aliased_return (o : < m : 't > as 'o) : 't = fun a b -> ignore (a, b); o
+[%%expect{|
+>> Fatal error: Out_type.name_of_modes: printing an elided curry mode
+Uncaught exception: Misc.Fatal_error
+
 |}]
