@@ -359,6 +359,20 @@ let equal_specific_operation left right =
 let isomorphic_specific_operation op1 op2 =
   equal_specific_operation op1 op2
 
+(* Specific operations that compute a linear combination of their integer
+   arguments, read by the SSA loop analyses (backend/rocq/Operation.v) *)
+
+let linear_specific_operation = function
+  | Ishiftarith (op, shift) when shift >= 0 && shift <= 61 ->
+    let scaled = 1 lsl shift in
+    let scaled = match op with Ishiftadd -> scaled | Ishiftsub -> -scaled in
+    Some ([1; scaled], 0)
+  | Ishiftarith _ | Ifar_poll | Ifar_alloc _ | Ifar_stackcheck _ | Imuladd
+  | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf
+  | Isqrtf | Ibswap _ | Imove8 | Imove16 | Imove32 | Isignext _ | Isimd _
+  | Illvm_intrinsic _ ->
+    None
+
 (* Specific operations that are pure *)
 
 let operation_is_pure : specific_operation -> bool = function

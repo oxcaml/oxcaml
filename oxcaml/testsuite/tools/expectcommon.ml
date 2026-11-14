@@ -30,6 +30,12 @@ type expectation_kind =
      and also shows the trailing out-of-line code: GC jump pads, safety-error
      calls and the stack-realloc handler. *)
   | Expect_asm of { whole_function : bool }
+  (* The SSA of each function in the chunk as it leaves the SSA pipeline, with
+     a summary of what the SSA optimization passes did to it; see
+     [Ssa_expect]. Requires [-use-ssa]. The SSA is built after instruction
+     selection, so, as for [Expect_asm], every entry carries an architecture
+     tag and only the entry for the current architecture is checked. *)
+  | Expect_ssa
   | Expect_fexpr
 
 type expectation =
@@ -51,6 +57,9 @@ let register_assembly_callback :
 (* Set before compiling a chunk to tell the backend whether the [%%expect_asm]
    capture should extend to the whole function (see [Expect_asm]). *)
 let set_assembly_whole_function : (bool -> unit) option ref = ref None
+
+let register_ssa_callback :
+  ((string -> unit) -> unit) option ref = ref None
 
 let register_compilation_unit_callback :
   ((Compilation_unit.t -> unit) -> unit) option ref = ref None
@@ -82,6 +91,7 @@ let match_expect_extension (ext : Parsetree.extension) =
       Some (Expect_asm { whole_function = false })
     | "expect_asm_full" | "ocaml.expect_asm_full" ->
       Some (Expect_asm { whole_function = true })
+    | "expect_ssa" | "ocaml.expect_ssa" -> Some Expect_ssa
     | "expect_fexpr" | "ocaml.expect_fexpr" -> Some Expect_fexpr
     | _ -> None
   in
@@ -100,6 +110,8 @@ let match_expect_extension (ext : Parsetree.extension) =
       Option.is_none !register_assembly_callback
       && (match kind with Expect_asm _ -> true | _ -> false)
     then invalid_payload ~msg:"expect_asm is only supported by expect.opt" ();
+    if Option.is_none !register_ssa_callback && kind = Expect_ssa
+    then invalid_payload ~msg:"expect_ssa is only supported by expect.opt" ();
     if Option.is_none !register_compilation_unit_callback && kind = Expect_fexpr
     then invalid_payload ~msg:"expect_fexpr is only supported by expect.opt" ();
     let string_constant (e : Parsetree.expression) =
@@ -173,7 +185,7 @@ let match_expect_extension (ext : Parsetree.extension) =
         in
         invalid_payload ~msg ()
     in
-    let validate_expect_asm entries =
+    let validate_arch_tagged entries =
       (* All entries must have architecture tags *)
       if List.for_all ~f:(fun (f, _) ->
         match f with
@@ -183,7 +195,8 @@ let match_expect_extension (ext : Parsetree.extension) =
       then entries
       else
         invalid_payload
-          ~msg:"expected [%%expect_asm Arch1{|...|}, Arch2{|...|}, ...]"
+          ~msg:(Printf.sprintf
+                  "expected [%%%%%s Arch1{|...|}, Arch2{|...|}, ...]" txt)
           ()
     in
     let validate_expect_fexpr entries =
@@ -212,7 +225,7 @@ let match_expect_extension (ext : Parsetree.extension) =
         let expected_output =
           match kind with
           | Expect_toplevel -> validate_expect_toplevel expected_output
-          | Expect_asm _ -> validate_expect_asm expected_output
+          | Expect_asm _ | Expect_ssa -> validate_arch_tagged expected_output
           | Expect_fexpr -> validate_expect_fexpr expected_output
         in
         { extid_loc
@@ -229,7 +242,7 @@ let match_expect_extension (ext : Parsetree.extension) =
           ; expected_output = [([], { tag = ""; str = "" })]
           ; kind
           }
-        | Expect_asm _ | Expect_fexpr -> invalid_payload ())
+        | Expect_asm _ | Expect_ssa | Expect_fexpr -> invalid_payload ())
       | _ -> invalid_payload ()
     in
     Some expectation
@@ -350,9 +363,8 @@ let eval_toplevel_expectation expectation ~output =
   then None
   else Some { expectation with expected_output }
 
-(* For [%%expect_asm]:
-   - All entries must have architecture tags (X86_64)
-*)
+(* For [%%expect_asm] and [%%expect_ssa] (all entries must have architecture
+   tags, e.g. X86_64) and [%%expect_fexpr]. *)
 let eval_filtered_expectation expectation ~output ~to_update =
   match to_update with
   | [(filters, s)] when s.str <> output ->
@@ -365,7 +377,7 @@ let eval_filtered_expectation expectation ~output ~to_update =
   | _ :: _ :: _ ->
     Location.raise_errorf
       ~loc:expectation.payload_loc
-      "duplicate architectures in [%%%%expect_asm]"
+      "duplicate architectures in [%%%%expect_asm] or [%%%%expect_ssa]"
   | _ -> None
 
 let eval_expectation expectation ~output =
@@ -374,7 +386,7 @@ let eval_expectation expectation ~output =
   | Expect_fexpr ->
     eval_filtered_expectation expectation ~output
       ~to_update:expectation.expected_output
-  | Expect_asm _ ->
+  | Expect_asm _ | Expect_ssa ->
     let to_update =
       List.filter
         ~f:(fun (f, _) ->
@@ -426,6 +438,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
     Misc.Style.set_tag_handling ppf in
   let exec_phrases phrases =
     let last_asm = ref None in
+    let last_ssa = ref None in
     let last_unit = ref None in
     let phrases =
       match min_line_number phrases with
@@ -438,6 +451,9 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       Option.iter
         (fun register -> register (fun asm_out -> last_asm := Some asm_out))
         !register_assembly_callback;
+      Option.iter
+        (fun register -> register (fun ssa_out -> last_ssa := Some ssa_out))
+        !register_ssa_callback;
       Option.iter
         (fun register -> register (fun cu -> last_unit := Some cu))
         !register_compilation_unit_callback;
@@ -467,7 +483,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       Buffer.add_char buf '\n';
     let s = Buffer.contents buf in
     Buffer.clear buf;
-    (success, Misc.delete_eol_spaces s, !last_asm, !last_unit)
+    (success, Misc.delete_eol_spaces s, !last_asm, !last_ssa, !last_unit)
   in
   let fexpr_outputs unit filters =
     let read_dump_file pass =
@@ -509,7 +525,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
               List.filter_map chunk.expectations ~f:(fun exp ->
                   match exp.kind with
                   | Expect_asm { whole_function } -> Some (exp, whole_function)
-                  | Expect_toplevel | Expect_fexpr -> None)
+                  | Expect_toplevel | Expect_ssa | Expect_fexpr -> None)
             in
             let whole_function = List.exists ~f:snd asm_expectations in
             (if whole_function then
@@ -526,7 +542,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
             if has_fexpr then Clflags.keep_asm_file := true;
             Option.iter (fun set -> set whole_function)
               !set_assembly_whole_function;
-        let (success, toplevel_output, asm_output, last_unit) =
+        let (success, toplevel_output, asm_output, ssa_output, last_unit) =
           Fun.protect
             ~finally:(fun () ->
               Option.iter (fun set -> set false) !set_assembly_whole_function;
@@ -540,6 +556,11 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
                 if success then
                   Option.value asm_output
                     ~default:"\nNo assembly: compilation failed\n"
+                else toplevel_output
+            | Expect_ssa ->
+                if success then
+                  Option.value ssa_output
+                    ~default:"\nNo SSA: compilation failed\n"
                 else toplevel_output
             | Expect_fexpr ->
                 if success then
@@ -556,7 +577,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
+        ~f:(fun () -> let (_, r, _, _, _) = exec_phrases phrases in r)
   in
   let needs_principal =
     Option.is_some trailing_code
@@ -565,7 +586,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       List.exists chunk.expectations ~f:(fun expectation ->
         match expectation.kind with
         | Expect_toplevel -> true
-        | Expect_asm _ | Expect_fexpr -> false))
+        | Expect_asm _ | Expect_ssa | Expect_fexpr -> false))
   in
   { corrected_expectations; trailing_output }, ~needs_principal
 
