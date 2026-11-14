@@ -309,6 +309,10 @@ type jsir_file =
   ; force_link : bool
         (** Whether the unit was compiled with [-linkall], so must be linked
             even if nothing requires it. Needed to fill in [Unit_info.t]. *)
+  ; whole_program : bool
+        (** Whether [program] is a whole program, which the OxCaml JSIR linker
+            makes from the units of an executable, rather than a compilation
+            unit. *)
   ; symbol_imports : (Var.t * Linkage_name.t) list
         (** The variables bound at the start of the entry block of [program]
             to the symbols of other compilation units. Used by the OxCaml JSIR

@@ -244,8 +244,10 @@ val jsir_target_exn : unit -> Jsir_target.t
       with [-link-jsir];
     - [Archive]: [js_of_ocaml link -a], producing a [.cma-js] ([.cma-wasm])
       ([-a]); not run with [-link-jsir];
-    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
-    - [Link]: [js_of_ocaml link], when linking an executable. *)
+    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable (not
+      run with [-link-jsir]);
+    - [Link]: [js_of_ocaml link], when linking an executable (not run with
+      [-link-jsir]). *)
 module Jsoo_phase : sig
   type t = All | Compile | Archive | Runtime | Link
 
