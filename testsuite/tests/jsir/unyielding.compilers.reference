@@ -51,112 +51,110 @@ Entry point: 0
   return v30
 
 ==== 11 (v31) ====
-  v32 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__fn[unyielding.ml:25,63--76]_5"j, v31) 
-  v34 = fun(v33){12 ()} [hint:(int)->int never_inline]
-  branch 13 (v34)
+  v33 = fun(v32){12 ()} [hint:(int)->int never_inline]
+  branch 13 (v33)
 
 ==== 12 () ====
-  v35 = v26(v31)
-  return v35
+  v34 = v26(v31)
+  return v34
 
-==== 13 (v36) ====
-  v37 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__call_with_unyielding_arg_4"j, v36) 
-  v44 = fun(v43){15 ()} [hint:(int)->value never_inline]
-  branch 18 (v44)
+==== 13 (v35) ====
+  v36 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__call_with_unyielding_arg_4"j, v35) 
+  v43 = fun(v42){15 ()} [hint:(int)->value never_inline]
+  branch 18 (v43)
 
 ==== 14 () ====
-  v42 = v41 + v38
-  return v42
+  v41 = v40 + v37
+  return v41
 
 ==== 15 () ====
-  branch 16 (v43)
+  branch 16 (v42)
 
-==== 16 (v41) ====
-  v39 = fun(v38){14 ()} [hint:(int)->int]
-  branch 17 (v39)
+==== 16 (v40) ====
+  v38 = fun(v37){14 ()} [hint:(int)->int]
+  branch 17 (v38)
 
-==== 17 (v40) ====
-  return v39
+==== 17 (v39) ====
+  return v38
 
-==== 18 (v45) ====
-  v46 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__curried_6"j, v45) 
-  v48 = fun(v47){19 ()} [hint:(int)->int never_inline]
-  branch 21 (v48)
+==== 18 (v44) ====
+  v45 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__curried_6"j, v44) 
+  v47 = fun(v46){19 ()} [hint:(int)->int never_inline]
+  branch 21 (v47)
 
 ==== 19 () ====
-  v50 = CONST{1}
-  v51 = v45(v50)
-  branch 20 (v51)
+  v49 = CONST{1}
+  v50 = v44(v49)
+  branch 20 (v50)
 
-==== 20 (v49) ====
-  v52 = CONST{2}
-  v53 = v49(v52)
-  return v53
+==== 20 (v48) ====
+  v51 = CONST{2}
+  v52 = v48(v51)
+  return v52
 
-==== 21 (v54) ====
-  v55 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__over_app_7"j, v54) 
-  v58 = fun(v56, v57){22 ()} [hint:(int,int)->int never_inline]
-  branch 23 (v58)
+==== 21 (v53) ====
+  v54 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__over_app_7"j, v53) 
+  v57 = fun(v55, v56){22 ()} [hint:(int,int)->int never_inline]
+  branch 23 (v57)
 
 ==== 22 () ====
-  v59 = v56 + v57
-  return v59
+  v58 = v55 + v56
+  return v58
 
-==== 23 (v60) ====
-  v61 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__add_8"j, v60) 
-  branch 24 (v60)
+==== 23 (v59) ====
+  v60 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__add_8"j, v59) 
+  branch 24 (v59)
 
 ==== 24 (v4) ====
   v2 = fun(v1){1 ()} [hint:(int)->int]
   branch 25 (v2, v2)
 
-==== 25 (v62, v3) ====
-  v63 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_add_9"j, v62) 
-  v65 = fun(v64){26 ()} [hint:(int)->int never_inline]
-  branch 27 (v65)
+==== 25 (v61, v3) ====
+  v62 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_add_9"j, v61) 
+  v64 = fun(v63){26 ()} [hint:(int)->int never_inline]
+  branch 27 (v64)
 
 ==== 26 () ====
-  v66 = CONST{5}
-  v67 = v62(v66)
-  return v67
+  v65 = CONST{5}
+  v66 = v61(v65)
+  return v66
 
-==== 27 (v68) ====
-  v69 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_app_10"j, v68) 
-  v71 = CONST{0}
-  v72 = v18(v71)
-  branch 28 (v72)
+==== 27 (v67) ====
+  v68 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_app_10"j, v67) 
+  v70 = CONST{0}
+  v71 = v18(v70)
+  branch 28 (v71)
 
-==== 28 (v70) ====
-  v74 = CONST{0}
-  v75 = v36(v74)
-  branch 29 (v75)
+==== 28 (v69) ====
+  v73 = CONST{0}
+  v74 = v35(v73)
+  branch 29 (v74)
 
-==== 29 (v73) ====
-  v78 = fun(v77){31 ()} [hint:(int)->int]
-  branch 32 (v78)
+==== 29 (v72) ====
+  v77 = fun(v76){31 ()} [hint:(int)->int]
+  branch 32 (v77)
 
-==== 30 (v76) ====
-  v84 = CONST{0}
-  v85 = v54(v84)
-  branch 33 (v85)
+==== 30 (v75) ====
+  v82 = CONST{0}
+  v83 = v53(v82)
+  branch 33 (v83)
 
 ==== 31 () ====
-  v79 = CONST{8}
-  return v79
+  v78 = CONST{8}
+  return v78
 
-==== 32 (v80) ====
-  v81 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__fn[unyielding.ml:46,33--46]_11"j, v80) 
-  v82 = v26~(v80)
-  branch 30 (v82)
+==== 32 (v79) ====
+  v80 = v26~(v79)
+  branch 30 (v80)
 
-==== 33 (v83) ====
-  v87 = CONST{0}
-  v88 = v68(v87)
-  branch 34 (v88)
+==== 33 (v81) ====
+  v85 = CONST{0}
+  v86 = v67(v85)
+  branch 34 (v86)
 
-==== 34 (v86) ====
-  v89 = imm{tag=0; 0 = v10; 1 = v18; 2 = v26; 3 = v36; 4 = v45; 5 = v54; 6 = v60; 7 = v62; 8 = v68}
-  v90 = "caml_register_global"(v89, "Unyielding"j)
+==== 34 (v84) ====
+  v87 = imm{tag=0; 0 = v10; 1 = v18; 2 = v26; 3 = v35; 4 = v44; 5 = v53; 6 = v59; 7 = v61; 8 = v67}
+  v88 = "caml_register_global"(v87, "Unyielding"j)
   stop
 
 
