@@ -17,6 +17,7 @@
 #define CAML_MLVALUES_H
 
 #include "config.h"
+#include "header_bits.h"
 #include "misc.h"
 #include "camlatomic.h"
 #include "tsan.h"
@@ -61,6 +62,10 @@ extern "C" {
 typedef intnat value;
 typedef uintnat header_t;
 typedef header_t reserved_t;
+/* A block's layout word, in the header formats which have one: a scan
+   word, or a pointer to a layout block. Not a [value]: a scan word
+   need not look like one. */
+typedef uintnat layout_t;
 typedef uintnat mlsize_t;
 typedef unsigned int tag_t;             /* Actually, an unsigned char */
 typedef uintnat color_t;
@@ -190,41 +195,29 @@ Caml_inline int caml_result_is_exception(struct caml_result_private result)
 
 #define Result_unit Result_value(Val_unit)
 
-/* Structure of the header:
+/* Structure of the header word.
 
-For 16-bit and 32-bit architectures:
+For 32-bit architectures:
      +--------+-------+-----+
      | wosize | color | tag |
      +--------+-------+-----+
 bits  31    10 9     8 7   0
 
-For 64-bit architectures:
+For 64-bit architectures, see header_bits.h.
 
-     +----------+--------+-------+-----+
-     | reserved | wosize | color | tag |
-     +----------+--------+-------+-----+
-bits  63    64-R 63-R  10 9     8 7   0
-
-where 0 <= R <= 31 is HEADER_RESERVED_BITS. R is always
-set to 8 for the OxCaml compiler in order to support
-mixed blocks. In the upstream compiler, R is set with the
---enable-reserved-header-bits=R argument.
+The reserved bits currently hold the mixed-block scannable-prefix
+encoding (see below). They are being re-divided into the
+format/repeat/scan-mask fields of the interleaved-block design,
+defined in header_bits.h; the field macros exist (below) but nothing
+uses them yet.
 
 */
 
 #define HEADER_BITS (sizeof(header_t) * CHAR_BIT)
 
-#define HEADER_TAG_BITS 8
 #define HEADER_TAG_MASK ((1ull << HEADER_TAG_BITS) - 1ull)
-
-#define HEADER_COLOR_BITS 2
-#define HEADER_COLOR_SHIFT HEADER_TAG_BITS
 #define HEADER_COLOR_MASK (((1ull << HEADER_COLOR_BITS) - 1ull) \
                             << HEADER_COLOR_SHIFT)
-
-#define HEADER_WOSIZE_BITS (HEADER_BITS - HEADER_TAG_BITS \
-                            - HEADER_COLOR_BITS - HEADER_RESERVED_BITS)
-#define HEADER_WOSIZE_SHIFT (HEADER_COLOR_SHIFT  + HEADER_COLOR_BITS)
 #define HEADER_WOSIZE_MASK (((1ull << HEADER_WOSIZE_BITS) - 1ull) \
                              << HEADER_WOSIZE_SHIFT)
 
@@ -250,16 +243,49 @@ mixed blocks. In the upstream compiler, R is set with the
 
 #endif
 
+/* Interleaved-block header fields: see header_bits.h. Mixed blocks
+   use the inline (01) format; see the mixed-block macros below.
+
+   The layout-word accessors cover the shared 58+6 word format
+   intended for the extended header format, layout blocks and the mark
+   stack: 58 mask bits below a 6-bit repeat count. */
+
+#if defined(ARCH_SIXTYFOUR) && defined(CAML_INTERNALS)
+
+/* The field layout is checked against HEADER_RESERVED_BITS by
+   static_asserts in shared_heap.c. */
+
+#define Format_hd(hd) ((header_t)(hd) >> HEADER_FORMAT_SHIFT)
+#define Repeat_hd(hd)                                                   \
+  Low_bits_of((header_t)(hd) >> HEADER_REPEAT_SHIFT, HEADER_REPEAT_BITS)
+#define Scan_mask_hd(hd)                                                \
+  Low_bits_of((header_t)(hd) >> HEADER_SCAN_MASK_SHIFT, HEADER_SCAN_MASK_BITS)
+
+/* Whether the block with header [hd] has a scan mask (in the header,
+   a layout word or a layout block), so that some of its words may be
+   unscannable. Rare at present; revisit the hint when it isn't. */
+#define Has_scan_mask_hd(hd) CAMLunlikely(Reserved_hd(hd) != 0)
+
+/* Whether the block with header [hd] starts with a layout word
+   (formats 10 and 11). */
+#define Has_layout_word_hd(hd) (Format_hd(hd) >= HEADER_FORMAT_EXTENDED)
+
+#define Layout_repeat(w) ((uintnat)(w) >> LAYOUT_WORD_REPEAT_SHIFT)
+#define Layout_scan_mask(w) Low_bits_of(w, LAYOUT_WORD_MASK_BITS)
+
+#endif /* ARCH_SIXTYFOUR && CAML_INTERNALS */
+
 
 /* Header bits reserved for mixed blocks */
 
 #define Is_mixed_block_reserved(res) (((reserved_t)(res)) > 0)
 
-/* Native code versions of mixed block macros.
+/* Mixed blocks.
 
-   The scannable size of a block is how many fields are values as opposed
-   to flat floats/ints/etc. This is different than the (normal) size of a
-   block for mixed blocks.
+   A mixed block's reserved field uses the inline (01) format: a
+   16-bit scan mask (bit i = word i, 1 = unscannable), with a repeat
+   of 1 if the block is longer than the mask, so that its remaining
+   words repeat the mask's last bit.
 
    The runtime has several functions that traverse over the structure of
    an OCaml value. (e.g. polymorphic comparison, GC marking/sweeping)
@@ -267,67 +293,41 @@ mixed blocks. In the upstream compiler, R is set with the
    properties:
    - it's known that the input can never be a mixed block,
    - it raises an exception on mixed blocks, or
-   - it uses the scannable size (not the normal size) to figure out which
-   fields to recursively descend into.
+   - it uses the block's scan mask (see scan_mask.h) to find the fields
+   to recursively descend into.
 
    Otherwise, the traversal could attempt to recursively descend into
    a flat field, which could segfault (or worse).
 */
 
-#define Scannable_wosize_val_native(val) (Scannable_wosize_hd (Hd_val (val)))
-#define Reserved_mixed_block_scannable_wosize_native(sz)  (((mlsize_t)(sz)) + 1)
-#define Mixed_block_scannable_wosize_reserved_native(res) \
-  (((reserved_t)(res)) - 1)
-
-Caml_inline mlsize_t Scannable_wosize_reserved_native(reserved_t res,
-                                                      mlsize_t sz) {
-  return
-    Is_mixed_block_reserved(res)
-    ? Mixed_block_scannable_wosize_reserved_native(res)
-    : sz;
+/* The reserved field for a mixed block of [wosize] words: [sz]
+   scannable words, then a flat suffix reaching the end of the block.
+   Only a block longer than the mask has a repeat (of the mask's last
+   bit, for the rest of the suffix). Must match
+   [Mixed_block_support.make_header] in cmm_helpers.ml exactly:
+   weak.c and obj.c CAMLassert equality of independently produced
+   reserved fields. */
+Caml_inline reserved_t
+Reserved_mixed_block_scannable_wosize_native(mlsize_t sz, mlsize_t wosize)
+{
+  uintnat mask_all = Low_bits_mask(HEADER_SCAN_MASK_BITS);
+  uintnat repeat = wosize > HEADER_SCAN_MASK_BITS ? 1 : 0;
+  CAMLassert(sz < HEADER_SCAN_MASK_BITS);
+  return (reserved_t)
+    (((uintnat)HEADER_FORMAT_INLINE
+      << (HEADER_FORMAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
+     | (repeat << (HEADER_REPEAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
+     | (mask_all & ~Low_bits_mask(sz)));
 }
 
-Caml_inline mlsize_t Scannable_wosize_hd_native(header_t hd) {
-  reserved_t res = Reserved_hd(hd);
-  return
-    Is_mixed_block_reserved(res)
-    ? Mixed_block_scannable_wosize_reserved_native(res)
-    : Allocated_wosize_hd(hd);
-}
-
-/* Bytecode versions of mixed block macros.
-
-   Bytecode always uses the size of the block as the scannable size. That's
-   because bytecode doesn't represent mixed records as mixed blocks. They're
-   "faux mixed blocks", which are regular blocks with a sentinel value set
-   in the header bits.
-*/
-
-#define Scannable_wosize_hd_byte(hd)  (Allocated_wosize_hd (hd))
-#define Scannable_wosize_val_byte(val) (Allocated_wosize_hd (Hd_val (val)))
-Caml_inline mlsize_t Scannable_wosize_reserved_byte(reserved_t res,
-                                                    mlsize_t size) {
-  (void)res;
-  return size;
-}
-
-/* Users should specify whether they want to use the bytecode or native
-   versions of these macros. Internally to the runtime, the NATIVE_CODE
-   macro lets us make that determination, so we can define suffixless
-   versions of the mixed block macros.
-*/
-#ifdef CAML_INTERNALS
-#ifdef NATIVE_CODE
-#define Scannable_wosize_reserved(r, s) Scannable_wosize_reserved_native(r, s)
-#define Scannable_wosize_hd(hd)         Scannable_wosize_hd_native(hd)
-#define Scannable_wosize_val(val)       Scannable_wosize_val_native(val)
-#else
-#define Faux_mixed_block_sentinel ((reserved_t) 0xff)
-#define Scannable_wosize_reserved(r, s) Scannable_wosize_reserved_byte(r, s)
-#define Scannable_wosize_hd(hd)         Scannable_wosize_hd_byte(hd)
-#define Scannable_wosize_val(val)       Scannable_wosize_val_byte(val)
-#endif // NATIVE_CODE
-#endif // CAML_INTERNALS
+/* Bytecode doesn't represent mixed records as mixed blocks. They're
+   "faux mixed blocks": regular blocks, scanned in full, with this
+   sentinel in the header's reserved bits. */
+#if defined(CAML_INTERNALS) && !defined(NATIVE_CODE)
+#define Faux_mixed_block_sentinel                                       \
+  ((reserved_t)HEADER_FORMAT_INLINE                                     \
+   << (HEADER_FORMAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
+#endif
 
 /* Color values are pre-shifted */
 
@@ -764,7 +764,8 @@ CAMLextern value caml_set_oo_id(value obj);
 #define Assert_mixed_block_layout_v4 _Static_assert(0, "")
 #define Assert_mixed_block_layout_v5 _Static_assert(0, "")
 #define Assert_mixed_block_layout_v6 _Static_assert(0, "")
-#define Assert_mixed_block_layout_v7 _Static_assert(1, "")
+#define Assert_mixed_block_layout_v7 _Static_assert(0, "")
+#define Assert_mixed_block_layout_v8 _Static_assert(1, "")
 
 /* Header for out-of-heap blocks. */
 

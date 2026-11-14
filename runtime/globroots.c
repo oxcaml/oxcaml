@@ -22,6 +22,7 @@
 #include "caml/platform.h"
 #include "caml/roots.h"
 #include "caml/globroots.h"
+#include "caml/scan_mask.h"
 #include "caml/skiplist.h"
 #include "caml/stack.h"
 #include "caml/callback.h"
@@ -210,28 +211,31 @@ void caml_register_dyn_globals(void **globals, int nglobals) {
 /* Logic to determine at which index within a global root to start and stop
    scanning.  [*glob_block], [*start], and [*stop] may be updated by this
    function. */
-static void compute_index_for_global_root_scan(value* glob_block, int* start,
-                                               int* stop)
+static void scan_global_block(scanning_action f, void* fdata,
+                              value glob_block)
 {
-  *start = 0;
+  value v = glob_block;
 
-  CAMLassert (Is_block(*glob_block));
+  CAMLassert (Is_block(v));
 
-  if (Scannable_val(*glob_block)) {
-    if (Tag_val(*glob_block) == Infix_tag)
-      *glob_block -= Infix_offset_val(*glob_block);
+  if (!Scannable_val(v)) return;
 
-    if (Tag_val(*glob_block) == Closure_tag) {
-      *start = Start_env_closinfo(Closinfo_val(*glob_block));
-      *stop = Wosize_val(*glob_block);
+  if (Tag_val(v) == Infix_tag)
+    v -= Infix_offset_val(v);
+
+  if (Tag_val(v) == Closure_tag) {
+    mlsize_t wosize = Wosize_val(v);
+    for (mlsize_t j = Start_env_closinfo(Closinfo_val(v));
+         j < wosize; j++) {
+      f(fdata, Field(v, j), &Field(v, j));
     }
-    else {
-      *stop = Scannable_wosize_val(*glob_block);
-    }
-  }
-  else {
-    /* Set the index such that none of the block's fields will be scanned. */
-    *stop = 0;
+  } else {
+    header_t hd = Hd_val(v);
+    caml_block_scan bs;
+    mlsize_t j;
+    caml_block_scan_init(&bs, v, hd);
+    while (caml_block_scan_next(&bs, &j))
+      f(fdata, Field(v, j), &Field(v, j));
   }
 }
 
@@ -240,25 +244,15 @@ static void scan_native_globals(scanning_action f, void* fdata)
   /* The global roots */
   for (int i = 0; caml_globals[i] != 0; i++) {
     for(value *glob = caml_globals[i]; *glob != 0; glob++) {
-      value glob_block = *glob;
-      int start, stop;
-      compute_index_for_global_root_scan(&glob_block, &start, &stop);
-      for (int j = start; j < stop; j++) {
-        f(fdata, Field(glob_block, j), &Field(glob_block, j));
-      }
+      scan_global_block(f, fdata, *glob);
     }
   }
 
   /* Dynamic global roots (natdynlink and manual module init) */
   caml_plat_lock_blocking(&roots_mutex);
-  int start, stop;
   FOREACH_SKIPLIST_ELEMENT(e, &caml_dyn_globals, {
     for(value *glob = (value *) (e->key); *glob != 0; glob++) {
-      value glob_block = *glob;
-      compute_index_for_global_root_scan(&glob_block, &start, &stop);
-      for (int j = start; j < stop; j++) {
-        f(fdata, Field(glob_block, j), &Field(glob_block, j));
-      }
+      scan_global_block(f, fdata, *glob);
     }
   })
   caml_plat_unlock(&roots_mutex);

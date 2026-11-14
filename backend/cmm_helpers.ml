@@ -206,21 +206,17 @@ type t =
 module Mixed_block_support : sig
   val assert_mixed_block_support : unit -> unit
 
-  val make_header : Nativeint.t -> scannable_prefix:int -> Nativeint.t
+  val make_header :
+    Nativeint.t -> scannable_prefix:int -> wosize:int -> Nativeint.t
 end = struct
-  (* CR mixed blocks v1: This "8" is duplicated in [typedecl.ml]. We should fix
-     up this duplication when we make the "8" configurable. *)
-  let required_reserved_header_bits = 8
+  let required_reserved_header_bits = Header_bits.reserved_bits
 
   let required_addr_size_bits = 64
 
-  (* Many of these checks are duplicated *)
-
-  (* CR mixed blocks v1: This is also duplicated in [typedecl.ml]. *)
-  (* Why 2? We'd subtract 1 if the mixed block encoding could use all 8 bits of
-     the prefix. But the all-0 prefix means "not a mixed block", so we can't use
-     the all-0 pattern, and we must subtract 2 instead. *)
-  let max_scannable_prefix = (1 lsl required_reserved_header_bits) - 2
+  (* The prefix must end within the header's inline scan mask; larger prefixes
+     return with the layout-word formats. typedecl.ml enforces this limit with a
+     proper error. *)
+  let max_scannable_prefix = Header_bits.scan_mask_bits - 1
 
   let max_header =
     (1 lsl (required_addr_size_bits - required_reserved_header_bits)) - 1
@@ -248,24 +244,36 @@ end = struct
 
   let assert_mixed_block_support () = Lazy.force assert_mixed_block_support
 
-  let make_header header ~scannable_prefix =
+  let make_header header ~scannable_prefix ~wosize =
     assert_mixed_block_support ();
     if scannable_prefix > max_scannable_prefix
     then
       Misc.fatal_errorf "Scannable prefix too big (%d > %d)" scannable_prefix
         max_scannable_prefix;
-    (* This means we crash the compiler if someone tries to write a mixed record
-       with too many fields, but you effectively can't: you'd need something
-       like 2^46 fields. *)
     if header > max_header
     then
       Misc.fatal_errorf
         "Header too big for the mixed block encoding to be added (%nd > %nd)"
         header max_header;
+    (* The inline (01) format: 16-bit scan mask (bit i = word i, 1 =
+       unscannable). Only a block longer than the mask has a repeat (of the
+       mask's last bit, for the rest of the flat suffix). Must match
+       [Reserved_mixed_block_scannable_wosize_native] in mlvalues.h exactly. *)
+    let repeat = if wosize > Header_bits.scan_mask_bits then 1 else 0 in
+    let mask =
+      ((1 lsl Header_bits.scan_mask_bits) - 1)
+      land lnot ((1 lsl scannable_prefix) - 1)
+    in
+    let reserved =
+      Header_bits.format_inline
+      lsl (Header_bits.format_shift - Header_bits.scan_mask_shift)
+      lor (repeat lsl (Header_bits.repeat_shift - Header_bits.scan_mask_shift))
+      lor mask
+    in
     Nativeint.add
       (Nativeint.shift_left
-         (Nativeint.of_int (scannable_prefix + 1))
-         (required_addr_size_bits - required_reserved_header_bits))
+         (Nativeint.of_int reserved)
+         Header_bits.scan_mask_shift)
       header
 end
 
@@ -273,13 +281,13 @@ end
 let block_header ?(block_kind = Regular_block) tag sz =
   let hdr =
     Nativeint.add
-      (Nativeint.shift_left (Nativeint.of_int sz) 10)
+      (Nativeint.shift_left (Nativeint.of_int sz) Header_bits.wosize_shift)
       (Nativeint.of_int tag)
   in
   match block_kind with
   | Regular_block -> hdr
   | Mixed_block { scannable_prefix } ->
-    Mixed_block_support.make_header hdr ~scannable_prefix
+    Mixed_block_support.make_header hdr ~scannable_prefix ~wosize:sz
 
 (* Static data corresponding to "value"s must be marked black in case we are in
    no-naked-pointers mode. See [caml_darken] and the code below that emits

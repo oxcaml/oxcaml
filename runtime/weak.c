@@ -26,6 +26,7 @@
 #include "caml/major_gc.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
+#include "caml/scan_mask.h"
 #include "caml/shared_heap.h"
 #include "caml/signals.h"
 #include "caml/weak.h"
@@ -345,8 +346,28 @@ static void ephe_copy_and_darken(value from, value to)
     scan_to = Wosize_val(from);
   }
   else {
-    scan_from = 0;
-    scan_to = Scannable_wosize_val(from);
+    header_t hd = Hd_val(from);
+    caml_block_scan bs;
+    caml_domain_state* domain_state = Caml_state;
+    mlsize_t wosize = Wosize_val(from);
+    caml_block_scan_init(&bs, from, hd);
+    /* Copy and darken scannable words; copy the unscannable words
+       between them raw. [to] was allocated with the same reserved
+       field. */
+    mlsize_t copied = 0;
+    mlsize_t i;
+    while (caml_block_scan_next(&bs, &i)) {
+      memcpy (Op_val(to) + copied, Op_val(from) + copied,
+              Bsize_wsize(i - copied));
+      value field = Field(from, i);
+      if (caml_marking_started())
+        caml_darken (domain_state, field, 0);
+      Store_field(to, i, field);
+      copied = i + 1;
+    }
+    memcpy (Op_val(to) + copied, Op_val(from) + copied,
+            Bsize_wsize(wosize - copied));
+    return;
   }
 
   /* Copy non-scannable prefix */
@@ -420,8 +441,10 @@ static value ephe_get_field_copy (value e, mlsize_t offset)
     /* This allocation could provoke a GC, which could change the
        * header or size of val (e.g. in a finalizer). So we go around
        * the loop to read val again. */
-    copy = caml_alloc_with_reserved (Wosize_val(val), Tag_val(val),
-                                     Reserved_val(val));
+    header_t hd = Hd_val(val);
+    layout_t layout = Has_layout_word_hd(hd) ? (layout_t)Field(val, 0) : 0;
+    copy = caml_alloc_with_layout (Wosize_hd(hd), Tag_hd(hd),
+                                   Reserved_hd(hd), layout);
     val = Val_unit;
   }
 

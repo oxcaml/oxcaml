@@ -885,7 +885,8 @@ static value caml_make_unboxed_float32_vect0(value len, int local)
     ? Unboxed_float32_array_zero_tag : Unboxed_float32_array_one_tag;
   
   /* Mixed block with no scannable fields */
-  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+  reserved_t reserved =
+    Reserved_mixed_block_scannable_wosize_native(0, num_fields);
 
   if (local)
     return caml_alloc_local_reserved(num_fields, tag, reserved);

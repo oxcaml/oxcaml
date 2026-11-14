@@ -162,6 +162,7 @@
   load_path
   int_replace_polymorphic_compare
   domainstate
+  header_bits
   binutils
   local_store
   target_system

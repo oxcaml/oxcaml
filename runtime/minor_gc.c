@@ -36,6 +36,7 @@
 #include "caml/mlvalues.h"
 #include "caml/platform.h"
 #include "caml/roots.h"
+#include "caml/scan_mask.h"
 #include "caml/shared_heap.h"
 #include "caml/signals.h"
 #include "caml/sizeclasses.h"
@@ -319,6 +320,36 @@ Caml_inline value try_promote(value v, volatile value *p, header_t hd,
   return result;
 }
 
+/* Finish copying the masked block [v], with header [hd] and original
+   word 0 [field0], to its promoted copy [result]: copy word 0 and the
+   unscannable words. Returns the number of scannable words, setting
+   [*first_p] to the index of the first if there are any. */
+Caml_noinline static mlsize_t oldify_masked_copy(value v, value result,
+                                                 header_t hd, value field0,
+                                                 mlsize_t* first_p)
+{
+  mlsize_t wosize = Wosize_hd(hd);
+  mlsize_t count = 0;
+  mlsize_t copied = 1; /* words below this are copied, or scannable */
+  caml_block_scan bs;
+  mlsize_t i;
+
+  /* Word 0 of [v] is now the forwarding pointer. Put the original in
+     place first: it may be a layout word, which the scan reads. */
+  Field(result, 0) = field0;
+  caml_block_scan_init(&bs, result, hd);
+  while (caml_block_scan_next(&bs, &i)) {
+    for (mlsize_t j = copied; j < i; j++)
+      Field(result, j) = Field(v, j);
+    copied = i + 1;
+    if (count == 0) *first_p = i;
+    count ++;
+  }
+  for (mlsize_t j = copied; j < wosize; j++)
+    Field(result, j) = Field(v, j);
+  return count;
+}
+
 /* oldify_one is a no-op outside the minor heap. */
 static scanning_action_flags oldify_scanning_flags =
   SCANNING_ONLY_YOUNG_VALUES;
@@ -413,34 +444,62 @@ tail_call:
         }
       } else { /* Scannable, and neither Cont_tag nor Forward_tag */
         CAMLassert(tag < Infix_tag);
-        /* Copy the non-scannable suffix of fields.
-           There is some trickiness around the 0th field, which
-           has been overwritten in [v], so we have to use [field0]
-           directly.
-        */
-        mlsize_t scannable_sz = Scannable_wosize_hd(hd);
-        mlsize_t i = scannable_sz;
-        if (i == 0) {
-          Field(result, i) = field0;
-          i++;
-        }
-        for (; i < sz; i++) {
-          Field(result, i) = Field(v, i);
-        }
-
-        if (scannable_sz == 0) {
-          return;
-        } else if (scannable_sz > 1) { /* add to todo_list */
-          Field(result, 0) = field0;
-          Field(result, 1) = st->todo_list;
-          st->todo_list = v;
+        if (Has_scan_mask_hd(hd)) {
+          CAMLassert (infix_offset == 0);
+          mlsize_t first;
+          mlsize_t count = oldify_masked_copy(v, result, hd, field0, &first);
+          if (count == 0) { /* no scannable words */
+            return;
+          } else if (count == 1)  { /* just one scannable word, tail-recurse */
+            p = Op_val(result) + first;
+            v = (first == 0) ? field0 : Field(v, first);
+            goto tail_call;
+          } else { /* add to todo_list */
+            Field(result, 1) = st->todo_list;
+            st->todo_list = v;
+          }
         } else {
-          CAMLassert (scannable_sz == 1);
-          p = Op_val(result);
-          v = field0;
-          goto tail_call;
+          /* Every word is scannable, after any closure prefix (which
+             [try_promote] has copied). */
+          CAMLassert (sz > 0);
+          if (sz > 1) { /* add to todo_list */
+            Field(result, 0) = field0;
+            Field(result, 1) = st->todo_list;
+            st->todo_list = v;
+          } else {
+            p = Op_val(result);
+            v = field0;
+            goto tail_call;
+          }
         }
       }
+    }
+  }
+}
+
+/* Oldify the scannable words of the masked block [v], from the todo
+   list, into its promoted copy [new_v], with header [hd]. Its
+   unscannable words were copied by [oldify_one]. */
+Caml_noinline static void oldify_mopup_masked(struct oldify_state* st,
+                                              value v, value new_v,
+                                              header_t hd)
+{
+  caml_block_scan bs;
+  mlsize_t i;
+
+  /* Word 1 of the copy held the todo-list link: restore it, in case
+     it is unscannable. */
+  Field(new_v, 1) = Field(v, 1);
+  caml_block_scan_init(&bs, new_v, hd);
+  while (caml_block_scan_next(&bs, &i)) {
+    /* Word 0 of [v] is the forwarding pointer; [oldify_one] saved the
+       original in the copy. */
+    value f = (i == 0) ? Field(new_v, 0) : Field(v, i);
+    CAMLassert (!Is_debug_tag(f));
+    if (Is_block(f) && Is_young(f)) {
+      oldify_one(st, f, Op_val(new_v) + i);
+    } else {
+      Field(new_v, i) = f;
     }
   }
 }
@@ -470,15 +529,21 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
       /* TODO: Measure whether this prefetch helps or hurts */
       caml_prefetchw((void*)next);
 
-      mlsize_t scannable_wosize = Scannable_wosize_val(new_v);
+      header_t hd = Hd_val(new_v);
+      if (Has_scan_mask_hd(hd)) {
+        oldify_mopup_masked(st, v, new_v, hd);
+        continue;
+      }
 
-      /* [v] was only added to the [todo_list] if its [scannable_wosize > 1].
+      mlsize_t wosize = Wosize_hd(hd);
+
+      /* [v] was only added to the [todo_list] if its [wosize > 1].
          - It needs to be greater than 0 because we oldify the first field.
          - It needs to be greater than 1 so the below loop runs at least once,
          overwriting Field(new_v, 1) which [oldify_one] used as temporary
          storage of the next value of [todo_list].
       */
-      CAMLassert (scannable_wosize > 1);
+      CAMLassert (wosize > 1);
 
       value f = Field(new_v, 0);
       CAMLassert (!Is_debug_tag(f));
@@ -493,7 +558,7 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
         i = Start_env_closinfo(Closinfo_val(v));
       }
 
-      for (; i < scannable_wosize; i++){
+      for (; i < wosize; i++){
         f = Field(v, i);
         CAMLassert (!Is_debug_tag(f));
         if (Is_block (f) && Is_young(f)) {
@@ -502,9 +567,6 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
           Field(new_v, i) = f;
         }
       }
-      // The non-scannable suffix is already copied in [oldify_one].
-
-      CAMLassert (Wosize_val(new_v));
     }
 
     /* Oldify any ephemeron data fields pointing to the minor heap, and some keys.

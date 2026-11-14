@@ -34,6 +34,7 @@
 #include "caml/mlvalues.h"
 #include "caml/platform.h"
 #include "caml/roots.h"
+#include "caml/scan_mask.h"
 #include "caml/signals.h"
 #include "caml/shared_heap.h"
 #include "caml/startup_aux.h"
@@ -182,17 +183,6 @@ Caml_inline void pb_fill_mode(prefetch_buffer_t *pb)
   pb->waterline = PREFETCH_BUFFER_MIN;
 }
 
-Caml_inline void pb_push(prefetch_buffer_t* pb, value v)
-{
-  CAMLassert(Is_block(v));
-  CAMLassert(!Is_young(v));
-  CAMLassert(v != Debug_free_major);
-  CAMLassert(pb->enqueued < pb->dequeued + PREFETCH_BUFFER_SIZE);
-
-  pb->buffer[pb->enqueued & PREFETCH_BUFFER_MASK] = v;
-  pb->enqueued += 1;
-}
-
 Caml_inline value pb_pop(prefetch_buffer_t *pb)
 {
   CAMLassert(pb->enqueued > pb->dequeued);
@@ -228,6 +218,19 @@ Caml_inline void prefetch_block(value v)
      allocated). In such cases, a prefetchw causes contention. */
   caml_prefetchr((const void *)Hp_val(v));
   caml_prefetchr((const void *)&Field(v, 3));
+}
+
+/* Prefetch block [v] and add it to the buffer. */
+Caml_inline void pb_push(prefetch_buffer_t* pb, value v)
+{
+  CAMLassert(Is_block(v));
+  CAMLassert(!Is_young(v));
+  CAMLassert(v != Debug_free_major);
+  CAMLassert(pb->enqueued < pb->dequeued + PREFETCH_BUFFER_SIZE);
+
+  prefetch_block(v);
+  pb->buffer[pb->enqueued & PREFETCH_BUFFER_MASK] = v;
+  pb->enqueued += 1;
 }
 
 /*******************************************************************************
@@ -1152,6 +1155,17 @@ typedef struct {
   value_ptr end;
 } mark_entry; /* represents fields in the span [start, end) */
 
+/* An entry for a block with a scan mask (a "masked entry") is
+   different: [end] is the block itself, tagged, and [start] is the
+   address of the first of its words not yet scanned. The marker finds
+   the scannable words among the rest from the block's header. */
+#define Masked_entry_tag ((uintnat)1)
+#define Masked_entry_end(block) \
+  ((value_ptr)((uintnat)(block) | Masked_entry_tag))
+#define Is_masked_entry(me) (((uintnat)(me).end & Masked_entry_tag) != 0)
+#define Masked_entry_block(me) \
+  ((value)((uintnat)(me).end & ~Masked_entry_tag))
+
 struct mark_stack {
   mark_entry* stack;
   uintnat count;
@@ -1207,6 +1221,32 @@ Caml_inline int add_addr(struct addrmap* amap, value_ptr ptr) {
   return new_entry;
 }
 
+/* The number of words of its block that entry [me] still covers. */
+Caml_inline uintnat mark_entry_wsize(mark_entry me)
+{
+  if (Is_masked_entry(me)) {
+    value block = Masked_entry_block(me);
+    return Op_val(block) + Wosize_val(block) - me.start;
+  }
+  return me.end - me.start;
+}
+
+/* Add the scannable words of masked entry [me] to the compressed
+   stack [amap]. Returns the number of new compressed entries. */
+static uintnat masked_entry_compress(struct addrmap* amap, mark_entry me)
+{
+  value block = Masked_entry_block(me);
+  uintnat new_entries = 0;
+  caml_block_scan bs;
+  mlsize_t i;
+
+  caml_block_scan_init(&bs, block, Hd_val(block));
+  caml_block_scan_skip_to(&bs, me.start - Op_val(block));
+  while (caml_block_scan_next(&bs, &i))
+    new_entries += add_addr(amap, Op_val(block) + i);
+  return new_entries;
+}
+
 static void mark_stack_prune(struct mark_stack* stk)
 {
   /* Since addrmap is (currently) using open address hashing, we cannot insert
@@ -1235,10 +1275,12 @@ static void mark_stack_prune(struct mark_stack* stk)
   uintnat new_stk_count = 0, compressed_entries = 0, total_words = 0;
   for (uintnat i = 0; i < stk->count; i++) {
     mark_entry me = stk->stack[i];
-    total_words += me.end - me.start;
-    if (me.end - me.start > BITS_PER_WORD) {
+    total_words += mark_entry_wsize(me);
+    if (mark_entry_wsize(me) > BITS_PER_WORD) {
       /* keep entry in the stack as more efficient and move to front */
       stk->stack[new_stk_count++] = me;
+    } else if (Is_masked_entry(me)) {
+      compressed_entries += masked_entry_compress(&stk->compressed_stack, me);
     } else {
       while(me.start < me.end) {
         compressed_entries += add_addr(&stk->compressed_stack,
@@ -1276,7 +1318,7 @@ static void realloc_mark_stack (struct mark_stack* stk)
   if (mark_stack_bsize >= local_heap_bsize / 32) {
     for (uintnat i = 0; i < stk->count; ++i) {
       mark_entry* me = &stk->stack[i];
-      if (me->end - me->start > BITS_PER_WORD)
+      if (mark_entry_wsize(*me) > BITS_PER_WORD)
         mark_stack_large_bsize += sizeof(mark_entry);
     }
   }
@@ -1335,6 +1377,35 @@ Caml_inline void mark_stack_push_range(struct mark_stack* stk,
   me->end = end;
 }
 
+/* Pushing a block first skips its leading unmarkable words, up to
+   this many, so that a small block with nothing to mark (such as
+   [Some 42]) is not pushed at all. */
+#define MARK_STACK_PUSH_SKIP_MAX 8
+
+/* [mark_stack_push_block] for a block with a scan mask. */
+Caml_noinline static intnat mark_stack_push_masked_block(
+  struct mark_stack* stk, value block)
+{
+  header_t hd = Hd_val(block);
+  int unmarkable = 0;
+  caml_block_scan bs;
+  mlsize_t i;
+
+  /* As for other blocks, skip a few leading unmarkable words, and
+     don't push a small block which has nothing else. */
+  caml_block_scan_init(&bs, block, hd);
+  while (caml_block_scan_next(&bs, &i)) {
+    value v = volatile_load_uninstrumented(&Field(block, i));
+    if (unmarkable == MARK_STACK_PUSH_SKIP_MAX || Is_markable(v)) {
+      mark_stack_push_range(stk, Op_val(block) + i, Masked_entry_end(block));
+      return i;
+    }
+    ++ unmarkable;
+  }
+  /* nothing left to mark and credit header */
+  return Whsize_hd(hd);
+}
+
 /* returns the work done by skipping unmarkable objects */
 static intnat mark_stack_push_block(struct mark_stack* stk, value block)
 {
@@ -1357,11 +1428,15 @@ static intnat mark_stack_push_block(struct mark_stack* stk, value block)
   CAMLassert(Scannable_val(block));
   CAMLassert(Tag_val(block) != Cont_tag);
 
-  uintnat block_scannable_wsz = Scannable_wosize_val(block);
+  if (Has_scan_mask_hd(Hd_val(block)))
+    return mark_stack_push_masked_block(stk, block);
+
+  uintnat block_scannable_wsz = Wosize_val(block);
 
   /* Optimisation to avoid pushing small, unmarkable objects such as
      [Some 42] into the mark stack. */
-  end = (block_scannable_wsz < 8 ? block_scannable_wsz : 8);
+  end = (block_scannable_wsz < MARK_STACK_PUSH_SKIP_MAX
+         ? block_scannable_wsz : MARK_STACK_PUSH_SKIP_MAX);
 
   for (i = offset; i < end; i++) {
     value v = volatile_load_uninstrumented(&Field(block, i));
@@ -1469,6 +1544,87 @@ static void mark_slice_darken(struct mark_stack* stk, value child,
   }
 }
 
+/* Mark from [block], which has a scan mask and header [hd], starting
+   at word [from]: put its markable children into prefetch buffer
+   [pb]. Returns what is left of [budget].
+
+   Resuming a block with a scan mask part-way costs more than for an
+   ordinary block, so it is scanned in one go if at all possible, even
+   if that overruns the budget a little. A block which doesn't fit in
+   the prefetch buffer now, but will once the buffer has drained,
+   waits on the mark stack until then, as does any block when the
+   budget has run out. Only a block too large for the buffer is
+   scanned in parts. */
+Caml_noinline static intnat mark_masked_block(struct mark_stack* stk,
+                                              prefetch_buffer_t* pb,
+                                              value block, header_t hd,
+                                              mlsize_t from, intnat budget)
+{
+  mlsize_t remaining = Wosize_hd(hd) - from;
+  uintnat room = PREFETCH_BUFFER_SIZE - pb_size(pb);
+  caml_block_scan bs;
+  mlsize_t i;
+
+  if (Format_hd(hd) == HEADER_FORMAT_INLINE && from == 0
+      && remaining <= HEADER_SCAN_MASK_BITS) {
+    /* The common case: a small block, whose mask is all in its
+       header. Reading the mask directly is quicker than setting up a
+       scan. */
+    uintnat scannable = ~Scan_mask_hd(hd) & Low_bits_mask(remaining);
+    if (scannable == 0) return budget - (intnat)remaining;
+    if (budget > 0 && remaining <= room) {
+      while (scannable != 0) {
+        i = caml_ctz(scannable);
+        scannable &= scannable - 1; /* clear the lowest set bit */
+        value child = volatile_load_uninstrumented(&Field(block, i));
+        if (Is_markable(child)) {
+          pb_push(pb, child);
+        }
+      }
+      return budget - (intnat)remaining;
+    }
+  }
+
+  if (budget <= 0
+      || (remaining > room
+          && remaining <= PREFETCH_BUFFER_SIZE - PREFETCH_BUFFER_MIN)) {
+    /* Wait on the mark stack. Entries are only taken from it when
+       there is budget and the buffer has drained, so this won't
+       happen twice. */
+    mark_stack_push_range(stk, Op_val(block) + from, Masked_entry_end(block));
+    return budget;
+  }
+
+  caml_block_scan_init(&bs, block, hd);
+  caml_block_scan_skip_to(&bs, from);
+  if (remaining <= room) {
+    /* The rest of the block fits in the buffer. */
+    while (caml_block_scan_next(&bs, &i)) {
+      value child = volatile_load_uninstrumented(&Field(block, i));
+      if (Is_markable(child)) {
+        pb_push(pb, child);
+      }
+    }
+    return budget - (intnat)remaining;
+  }
+
+  /* A large block: scan as far as the budget and the buffer allow. */
+  while (caml_block_scan_next(&bs, &i)) {
+    value child = volatile_load_uninstrumented(&Field(block, i));
+    if (budget <= (intnat)(i - from)
+        || (Is_markable(child) && pb_full(pb))) {
+      /* Leave the rest on the stack. */
+      mark_stack_push_range(stk, Op_val(block) + i, Masked_entry_end(block));
+      if (pb_size(pb) > PREFETCH_BUFFER_MIN) pb_fill_mode(pb);
+      return budget - (intnat)(i - from);
+    }
+    if (Is_markable(child)) {
+      pb_push(pb, child);
+    }
+  }
+  return budget - (intnat)remaining;
+}
+
 Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
                                             intnat budget)
 {
@@ -1523,17 +1679,13 @@ Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
         continue;
       }
 
-      me.start = Op_val(block);
-
-      reserved_t reserved = Reserved_hd(hd);
-      if (Is_mixed_block_reserved(reserved)) {
-        uintnat scannable_wosize =
-          Scannable_wosize_reserved(reserved, Wosize_hd(hd));
-        me.end = me.start + scannable_wosize;
-        budget -= Wosize_hd(hd) - scannable_wosize; /* unscannable suffix */
-      } else {
-        me.end = me.start + Wosize_hd(hd);
+      if (Has_scan_mask_hd(hd)) {
+        budget = mark_masked_block(stk, &pb, block, hd, 0, budget);
+        continue;
       }
+
+      me.start = Op_val(block);
+      me.end = me.start + Wosize_hd(hd);
 
       if (Tag_hd(hd) == Closure_tag) {
         uintnat env_offset = Start_env_closinfo(Closinfo_val(block));
@@ -1556,6 +1708,12 @@ Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
     }
     else {
       me = stk->stack[--stk->count];
+      if (CAMLunlikely(Is_masked_entry(me))) {
+        value block = Masked_entry_block(me);
+        budget = mark_masked_block(stk, &pb, block, Hd_val(block),
+                                   me.start - Op_val(block), budget);
+        continue;
+      }
     }
 
     value_ptr scan_end = me.end;
@@ -1577,7 +1735,6 @@ Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
       if (Is_markable(child)) {
         if (pb_full(&pb))
           break;
-        prefetch_block(child);
         pb_push(&pb, child);
       }
     }
