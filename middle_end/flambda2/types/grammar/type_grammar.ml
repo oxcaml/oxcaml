@@ -3354,7 +3354,13 @@ and project_head_of_kind_naked_mask ~to_project:_ ~expand:_ head = head
 
 and project_head_of_kind_rec_info ~to_project ~expand head =
   match (head : head_of_kind_rec_info) with
-  | Const _ | Succ _ | Unroll_to _ -> head
+  | Const _ -> head
+  | Succ rec_info ->
+    Rec_info_expr.succ
+      (project_head_of_kind_rec_info ~to_project ~expand rec_info)
+  | Unroll_to (n, rec_info) ->
+    Rec_info_expr.unroll_to n
+      (project_head_of_kind_rec_info ~to_project ~expand rec_info)
   | Var var -> (
     if not (Variable.Set.mem var to_project)
     then head
