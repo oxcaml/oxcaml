@@ -87,6 +87,9 @@ let renumber (file : Jsir.jsir_file) ~first_var ~first_addr =
           blocks)
       program.blocks Jsir.Addr.Map.empty
   in
+  List.iter
+    (fun (v, name) -> Jsir.Variable_name.set (var v) name)
+    file.var_names;
   let symbol_imports =
     List.map (fun (v, symbol) -> var v, symbol) file.symbol_imports
   in

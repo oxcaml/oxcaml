@@ -229,6 +229,7 @@ module type Oxcaml_options = sig
   val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
   val jsoo_effects : Clflags.Jsoo_effects.t -> unit
   val link_jsir : unit -> unit
+  val jsir_inlined_frames : unit -> unit
   val djsir : unit -> unit
   val x : string -> unit
 end
