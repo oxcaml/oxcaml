@@ -96,14 +96,15 @@ val add_symbol :
     compilation units. *)
 val add_symbol_without_registering : t -> Symbol.t -> Jsir.Var.t -> t
 
-(** Register the given symbol to the global symbol table. Raises if the symbol
-    is not in the environment.
+(** Register the given symbol to the global symbol table, with an [Event] for
+    [loc] before the registration. Raises if the symbol is not in the
+    environment.
 
     Note that calling this function is usually a mistake, as most functions that
     add symbols will automatically call this function. However, it is necessary
     for [add_symbol_without_registering]. *)
 val register_symbol_exn :
-  t -> res:To_jsir_result.t -> Symbol.t -> To_jsir_result.t
+  t -> res:To_jsir_result.t -> ?loc:Parse_info.t -> Symbol.t -> To_jsir_result.t
 
 (** Set [var]/[symbol] to be an alias of [alias_of]. Raises if [alias_of] is
     from the current compilation unit and is not found in the environment. *)
@@ -130,13 +131,15 @@ type code_id =
             code itself is defined, and every [Set_of_closures] containing this
             code reuses it. Otherwise, [closure] is bound when translating a
             [Set_of_closures] containing this code. *)
-    hint : Optimization_hint.closure_hint option
+    hint : Optimization_hint.closure_hint option;
         (** The optimisation hint to attach to closures of this code. *)
+    loc : Parse_info.t option
+        (** The source location to attach to closures of this code. *)
   }
 
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block, its
-    parameters, the JSIR varible corresponding to its closure, and the hint for
-    its closures. *)
+    parameters, the JSIR varible corresponding to its closure, and the hint and
+    location for its closures. *)
 val add_code_id :
   t ->
   Code_id.t ->
@@ -145,6 +148,7 @@ val add_code_id :
   closure:Jsir.Var.t ->
   closure_bound_with_code:bool ->
   hint:Optimization_hint.closure_hint option ->
+  loc:Parse_info.t option ->
   t
 
 (** Map a Flambda2 function slot to the corresponding JSIR closure variable. *)

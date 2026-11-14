@@ -61,7 +61,13 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
         with
         | Deleted _ -> env, res, bindings
         | Code_id { code_id; only_full_applications = _ } ->
-          let ({ addr; params; closure = fn_var; closure_bound_with_code; hint }
+          let ({ addr;
+                 params;
+                 closure = fn_var;
+                 closure_bound_with_code;
+                 hint;
+                 loc
+               }
                 : To_jsir_env.code_id) =
             To_jsir_env.get_code_id_exn env code_id
           in
@@ -73,7 +79,7 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
               res
             else
               let expr : Jsir.expr =
-                Closure (params, (addr, []), (hint, None))
+                Closure (params, (addr, []), (hint, loc))
               in
               To_jsir_result.add_instr_exn res (Let (fn_var, expr))
           in
@@ -101,6 +107,21 @@ let dynamic_set_of_closures ~env ~res ~bound_vars soc =
     ~add_to_env:(fun ~env ~res var fn_var ->
       To_jsir_env.add_var env var fn_var, res, [])
     soc
+
+let closure_symbol_locs ~env ~closure_symbols soc =
+  let funs = Set_of_closures.function_decls soc |> Function_declarations.funs in
+  Function_slot.Lmap.fold
+    (fun slot symbol locs ->
+      match
+        (Function_slot.Map.find slot funs
+          : Function_declarations.code_id_in_function_declaration)
+      with
+      | Deleted _ -> locs
+      | Code_id { code_id; only_full_applications = _ } -> (
+        match (To_jsir_env.get_code_id_exn env code_id).loc with
+        | None -> locs
+        | Some loc -> Symbol.Map.add symbol loc locs))
+    closure_symbols Symbol.Map.empty
 
 let static_set_of_closures ~env ~res ~closure_symbols soc =
   let add_to_env ~env ~res symbol fn_var =

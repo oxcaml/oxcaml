@@ -39,7 +39,8 @@ type code_id =
     params : Jsir.Var.t list;
     closure : Jsir.Var.t;
     closure_bound_with_code : bool;
-    hint : Optimization_hint.closure_hint option
+    hint : Optimization_hint.closure_hint option;
+    loc : Parse_info.t option
   }
 
 type t =
@@ -102,7 +103,7 @@ let symbol_is_for_compilation_unit symbol =
   let compilation_unit = Symbol.compilation_unit symbol in
   Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
 
-let register_symbol' ~res symbol var =
+let register_symbol' ~res ?loc symbol var =
   match symbol_is_for_compilation_unit symbol with
   | true ->
     (* We don't need to add this symbol to our symbol table, because we will
@@ -111,6 +112,11 @@ let register_symbol' ~res symbol var =
     res
   | false ->
     let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    let res =
+      match loc with
+      | None -> res
+      | Some loc -> To_jsir_result.add_event_at_exn res loc
+    in
     To_jsir_result.add_instr_exn res
       (Let
          ( Jsir.Var.fresh (),
@@ -128,10 +134,10 @@ let add_symbol t ~res symbol jvar =
   t, register_symbol' ~res symbol jvar
 
 let add_code_id t code_id ~addr ~params ~closure ~closure_bound_with_code ~hint
-    =
+    ~loc =
   let code_ids =
     Code_id.Map.add code_id
-      { addr; params; closure; closure_bound_with_code; hint }
+      { addr; params; closure; closure_bound_with_code; hint; loc }
       t.code_ids
   in
   { t with code_ids }
@@ -216,10 +222,10 @@ let get_symbol_exn t ~res symbol =
   | Some (v, res) -> v, res
   | None -> raise Not_found
 
-let register_symbol_exn t ~res symbol =
+let register_symbol_exn t ~res ?loc symbol =
   (* Using the map directly rather than using [get_symbol], because we don't
      want to load external symbols *)
-  register_symbol' ~res symbol (Symbol.Map.find symbol t.symbols)
+  register_symbol' ~res ?loc symbol (Symbol.Map.find symbol t.symbols)
 
 let get_code_id_exn t code_id =
   match Code_id.Map.find_opt code_id t.code_ids with
