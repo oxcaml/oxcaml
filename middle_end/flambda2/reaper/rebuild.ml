@@ -44,11 +44,6 @@ module SC = Static_const
    without corresponding debugging uids. Does it make sense to properly
    propagate debugging uids there? If so, where should they come from? *)
 
-type should_preserve_direct_calls =
-  | Yes
-  | No
-  | Auto
-
 type 'f env =
   { machine_width : Target_system.Machine_width.t;
     solution : 'f Analysis.solution;
@@ -58,7 +53,6 @@ type 'f env =
       Unboxing_analysis.param_decision list Continuation.Map.t;
     should_keep_param :
       Continuation.t -> Variable.t -> KS.t -> Unboxing_analysis.param_decision;
-    should_preserve_direct_calls : should_preserve_direct_calls;
     inside_code_definition : bool
   }
 
@@ -1021,20 +1015,11 @@ let decide_whether_apply_needs_calling_convention_change env apply =
       | None -> Some code_id, call_kind
       | Some c ->
         let call_kind_if_unknown =
-          match env.should_preserve_direct_calls with
-          | Yes -> call_kind
-          | No ->
-            if
-              not
-                (Current_unit.is_current (Code_id.get_compilation_unit code_id))
-            then call_kind
-            else Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
-          | Auto ->
-            (* In [auto] mode, the direct call is preserved if and only if we
-               cannot identify which set of code_ids can be called. Since this
-               is exactly the same situation as the one where we do not replace
-               the call_kind, we can leave the direct call here. *)
-            call_kind
+          (* The direct call is preserved if and only if we cannot identify
+             which set of code_ids can be called. Since this is exactly the same
+             situation as the one where we do not replace the call_kind, we can
+             leave the direct call here. *)
+          call_kind
         in
         called c call_kind_if_unknown)
     | Function { function_call = Indirect_unknown_arity } ->
@@ -2129,17 +2114,6 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
 
 and rebuild_function_params_and_body env res code_metadata
     (params_and_body : Rev_expr.rev_params_and_body) =
-  let env =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Always | Never | Auto -> env
-    | Zero_alloc ->
-      let should_preserve_direct_calls =
-        match Code_metadata.zero_alloc_attribute code_metadata with
-        | Default_zero_alloc | Assume _ -> No
-        | Check _ -> Yes
-      in
-      { env with should_preserve_direct_calls }
-  in
   let env = { env with inside_code_definition = true } in
   let { Rev_expr.return_continuation;
         exn_continuation;
@@ -2408,12 +2382,6 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
         List.map2 (should_keep_param cont) info.params info.arity)
       continuation_info
   in
-  let should_preserve_direct_calls =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Never | Zero_alloc -> No
-    | Always -> Yes
-    | Auto -> Auto
-  in
   (* Make sure [get_code_metadata] returns the updated code metadata in case it
      exists *)
   let get_code_metadata =
@@ -2433,7 +2401,6 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
-      should_preserve_direct_calls;
       inside_code_definition = false
     }
   in

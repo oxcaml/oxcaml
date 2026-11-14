@@ -15,27 +15,20 @@
 
 type cont_kind = Normal of Variable.t list
 
-type should_preserve_direct_calls =
-  | Yes
-  | No
-  | Auto
-
 type t =
   { parent : Rev_expr.rev_expr_holed;
     conts : cont_kind Continuation.Map.t;
     current_code_id : Code_id.t option;
-    should_preserve_direct_calls : should_preserve_direct_calls;
     all_constants : Name.t;
     function_slots_to_keep : Function_slot.Set.t;
     value_slots_to_keep : Value_slot.Set.t
   }
 
-let create ~parent ~conts ~current_code_id ~should_preserve_direct_calls
-    ~all_constants ~function_slots_to_keep ~value_slots_to_keep =
+let create ~parent ~conts ~current_code_id ~all_constants
+    ~function_slots_to_keep ~value_slots_to_keep =
   { parent;
     conts;
     current_code_id;
-    should_preserve_direct_calls;
     all_constants;
     function_slots_to_keep;
     value_slots_to_keep
@@ -44,8 +37,6 @@ let create ~parent ~conts ~current_code_id ~should_preserve_direct_calls
 let parent t = t.parent
 
 let current_code_id t = t.current_code_id
-
-let should_preserve_direct_calls t = t.should_preserve_direct_calls
 
 let all_constants t = t.all_constants
 

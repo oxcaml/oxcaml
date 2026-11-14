@@ -735,19 +735,6 @@ let mk_no_flambda2_reaper f =
     Printf.sprintf " Disable reaper pass%s (Flambda2 only)"
       (format_not_default Flambda2.Default.enable_reaper) )
 
-let mk_reaper_preserve_direct_calls f =
-  ( "-reaper-preserve-direct-calls",
-    Arg.Symbol ([ "never"; "always"; "zero-alloc"; "auto" ], f),
-    Printf.sprintf
-      " Choose the direct call preservation strategy of the reaper (Flambda2 \
-       only)\n\
-      \      Valid values are: \n\
-      \       \"never\": do not try to preserve direct calls to old functions;\n\
-      \       \"always\": always preserve existing direct calls;\n\
-      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked;\n\
-      \       \"auto\": preserve direct calls only when the reaper is unable \
-       to identify a set of possibly called functions." )
-
 let mk_reaper_local_fields f =
   ( "-reaper-local-fields",
     Arg.Unit f,
@@ -1562,7 +1549,6 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
-  val reaper_preserve_direct_calls : string -> unit
   val reaper_local_fields : unit -> unit
   val no_reaper_local_fields : unit -> unit
   val reaper_unbox : unit -> unit
@@ -1792,7 +1778,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
-      mk_reaper_preserve_direct_calls F.reaper_preserve_direct_calls;
       mk_reaper_local_fields F.reaper_local_fields;
       mk_no_reaper_local_fields F.no_reaper_local_fields;
       mk_reaper_unbox F.reaper_unbox;
@@ -2279,24 +2264,6 @@ module Oxcaml_options_impl = struct
   let no_flambda2_reaper = clear Flambda2.enable_reaper
   let flambda2_match_in_match = set Flambda2.match_in_match
   let no_flambda2_match_in_match = clear Flambda2.match_in_match
-
-  let reaper_preserve_direct_calls s =
-    match s with
-    | "never" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set
-            (Oxcaml_flags.Never : Oxcaml_flags.reaper_preserve_direct_calls)
-    | "always" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Always
-    | "zero-alloc" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Zero_alloc
-    | "auto" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Auto
-    | _ -> () (* This should not occur as we use Arg.Symbol *)
-
   let reaper_local_fields = set Flambda2.reaper_local_fields
   let no_reaper_local_fields = clear Flambda2.reaper_local_fields
   let reaper_unbox = set Flambda2.reaper_unbox
@@ -2985,23 +2952,6 @@ module Extra_params = struct
                  (List.map Clflags.Jsoo_effects.to_string
                     Clflags.Jsoo_effects.all)))
     | "reaper" -> set Flambda2.enable_reaper
-    | "reaper-preserve-direct-calls" ->
-        (match String.lowercase_ascii v with
-        | "never" ->
-            Flambda2.reaper_preserve_direct_calls :=
-              Oxcaml_flags.(Set (Never : reaper_preserve_direct_calls))
-        | "always" ->
-            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Always)
-        | "zero-alloc" ->
-            Flambda2.reaper_preserve_direct_calls :=
-              Oxcaml_flags.(Set Zero_alloc)
-        | "auto" ->
-            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Auto)
-        | _ ->
-            Misc.fatal_error
-              "Syntax: reaper-preserve-direct-calls: \
-               always|never|zero-alloc|auto");
-        true
     | "reaper-local-fields" -> set Flambda2.reaper_local_fields
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
