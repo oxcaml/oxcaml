@@ -136,9 +136,14 @@ module Variable : sig
 
   val export : Set.t -> importer
 
+  exception Not_exported
+
   val import : importer -> t -> t
 
   val import_and_rename : importer -> t -> t
+
+  (* Returns the original identifier in the imported unit. *)
+  val import_backwards_exn : importer -> t -> t
 
   type stamp_state
 
@@ -175,7 +180,12 @@ module Symbol : sig
 
   val export : Set.t -> importer
 
+  exception Not_exported
+
   val import : importer -> t -> t
+
+  (* Returns the original identifier in the imported unit. *)
+  val import_backwards_exn : importer -> t -> t
 
   val external_symbols_compilation_unit : unit -> Compilation_unit.t
 end

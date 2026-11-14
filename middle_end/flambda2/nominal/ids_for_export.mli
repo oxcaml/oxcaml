@@ -116,7 +116,7 @@ module Table_data : sig
     t ->
     used_value_slots:Value_slot.Set.t ->
     original_compilation_unit:Compilation_unit.t ->
-    Renaming.t
+    Renaming.import_map
 end
 
 (** Snapshots of the stamp counters used to create identifiers. *)
