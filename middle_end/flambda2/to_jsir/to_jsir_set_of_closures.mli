@@ -37,14 +37,24 @@ val dynamic_set_of_closures :
   Set_of_closures.t ->
   To_jsir_env.t * To_jsir_result.t
 
-(** Translate a statically allocated [Set_of_closures.t] into a JSIR [Closure].
-*)
-val static_set_of_closures :
+type initialisation = private
+  { value_slot_bindings : To_jsir_result.var_binding list;
+        (** Bind value-slot variables to the values captured by the closures. *)
+    closures : To_jsir_shared.expr_binding list;
+        (** Bind function variables to their corresponding [Jsir.Closure]
+            expressions. *)
+    aliases : To_jsir_result.var_binding list
+        (** Bind symbol and function-slot variables to their corresponding
+            function variables. *)
+  }
+
+(** Prepare a static set of closures without emitting its bindings. *)
+val prepare_static_set_of_closures :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
   closure_symbols:Symbol.t Function_slot.Lmap.t ->
   Set_of_closures.t ->
-  To_jsir_env.t * To_jsir_result.t
+  To_jsir_result.t * initialisation
 
 (** The locations of the closures of a statically allocated [Set_of_closures.t],
     for its closure symbols. Closures without a location are left out. *)
