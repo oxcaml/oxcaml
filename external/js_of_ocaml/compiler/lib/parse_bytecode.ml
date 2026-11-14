@@ -466,13 +466,18 @@ end
 module Blocks : sig
   type t
 
-  val analyse : bytecode -> t * Addr.Set.t
+  val analyse : ?boundaries:Addr.Set.t -> bytecode -> t * Addr.Set.t
 
   val next : t -> int -> int
 
   val is_empty : t -> bool
+
+  val is_boundary : t -> int -> bool
 end = struct
-  type t = int array
+  type t =
+    { blocks : int array
+    ; boundaries : Addr.Set.t
+    }
 
   let add blocks pc = Addr.Set.add pc blocks
 
@@ -548,19 +553,22 @@ end = struct
       let k = (i + j) / 2 in
       if a.(k) <= x then find a k j x else find a i k x
 
-  let next blocks pc = find blocks 0 (Array.length blocks - 1) pc
+  let next { blocks; _ } pc = find blocks 0 (Array.length blocks - 1) pc
 
-  let is_empty x = Array.length x <= 1
+  let is_empty { blocks; _ } = Array.length blocks <= 1
 
-  let analyse code =
+  let is_boundary t pc = Addr.Set.mem pc t.boundaries
+
+  let analyse ?(boundaries = Addr.Set.empty) code =
     let len = String.length code / 4 in
     let blocks, starts, repeats =
       scan Addr.Set.empty Addr.Set.empty Addr.Set.empty code 0 len
     in
     let joins = Addr.Set.union repeats (Addr.Set.diff blocks starts) in
+    let blocks = Addr.Set.union blocks boundaries in
     let blocks = add blocks 0 in
     let blocks = add blocks len in
-    Array.of_list (Addr.Set.elements blocks), joins
+    { blocks = Array.of_list (Addr.Set.elements blocks); boundaries }, joins
 end
 
 (* Parse constants *)
@@ -1093,7 +1101,18 @@ let read_cont state ~nargs =
   in
   state, prelude, stack, args, Pv last
 
+let check_and_reset_state_if_deferred blocks pc (state : State.t) =
+  if Blocks.is_boundary blocks pc
+  then (
+    if not (List.is_empty state.stack)
+       || not (List.is_empty state.handlers)
+       || Array.length state.env <> 0
+    then failwith "Deferred initializer has a live stack or exception handler";
+    State.initial state.globals state.immutable)
+  else state
+
 let rec compile_block blocks joins hints debug_data code pc state : unit =
+  let state = check_and_reset_state_if_deferred blocks pc state in
   match Addr.Map.find_opt pc !tagged_blocks with
   | Some old_state -> (
       (* Check that the shape of the stack is compatible with the one used to compile the block *)
@@ -1132,6 +1151,7 @@ let rec compile_block blocks joins hints debug_data code pc state : unit =
          [accu] was [Unset] for that block, we make the current accu
          [Unset] *)
       let adjust_state pc =
+        let state' = check_and_reset_state_if_deferred blocks pc state' in
         match state', Addr.Map.find_opt pc !tagged_blocks with
         | _, None -> state'
         | { State.accu = Var _; _ }, Some { State.accu = Unset; _ } ->
@@ -3042,11 +3062,729 @@ type one =
   ; debug : Debug.summary
   }
 
-let parse_bytecode code globals hints debug_data =
+module Code_unit = struct
+  type t = 
+    { units: (Ocaml_compiler.Cmo_format.t * in_channel) list
+    ; num_words: int
+    }
+
+  let code_size units =
+    List.fold_left units ~init:0 ~f:(fun n (unit, _) -> n + unit.Cmo_format.cu_codesize) / 4
+
+  let create (units : (Ocaml_compiler.Cmo_format.t * in_channel) list) = 
+    { units
+    ; num_words = code_size units 
+    }
+
+  let empty =
+    { units = []
+    ; num_words = 0
+    }
+end 
+
+module Deferred_code = struct
+  type t = 
+    { id: string 
+    ; kind: [ `Root | `Shared ]
+    ; needs: string list (* The shared deferred code this code requires *)
+    ; code: Code_unit.t
+    }
+
+  let make ~kind ~needs units ~id = 
+    let code = Code_unit.create units in 
+    if code.num_words = 0 then invalid_arg "Deferred_code.create: empty deferred code is not allowed";
+    { id 
+    ; kind
+    ; needs
+    ; code 
+    }
+
+  let create units ~id = make ~kind:`Root ~needs:[] units ~id
+end 
+
+(* Places each of [dependencies] next to the code that needs it, following the units each
+   compilation unit requires:
+   - a dependency needed by eager code is eager;
+   - one needed by a single deferred root belongs to that root;
+   - one needed only by several deferred roots is shared deferred code, which runs the
+     first time one of them is loaded;
+   - one nothing needs is dropped, as when linking a library without [-linkall].
+
+   Dependencies keep their relative order, and come before the code that needs them.
+   Shared deferred code needed by more roots comes first, since it may be needed by
+   shared deferred code with fewer roots, but not the other way around. *)
+let place_dependencies ~dependencies (static : Code_unit.t) (deferred : Deferred_code.t list)
+    =
+  let name (unit, _) =
+    let (Global_name.Compunit name) = Ocaml_compiler.Cmo_format.name unit in
+    name
+  in
+  let requires (unit, _) =
+    List.map (Ocaml_compiler.Cmo_format.requires unit) ~f:(fun (Global_name.Compunit name) ->
+        name)
+  in
+  let dependency_by_name =
+    List.fold_left dependencies ~init:StringMap.empty ~f:(fun by_name unit ->
+        StringMap.add (name unit) unit by_name)
+  in
+  (* For each dependency, whether eager code needs it, and which roots do *)
+  let needed_by = ref StringMap.empty in
+  let rec mark part name =
+    match StringMap.find_opt name dependency_by_name with
+    | None -> ()
+    | Some unit ->
+        let eager, roots =
+          Option.value (StringMap.find_opt name !needed_by) ~default:(false, StringSet.empty)
+        in
+        let already =
+          match part with
+          | `Eager -> eager
+          | `Root id -> StringSet.mem id roots
+        in
+        if not already
+        then (
+          needed_by :=
+            StringMap.add
+              name
+              (match part with
+              | `Eager -> true, roots
+              | `Root id -> eager, StringSet.add id roots)
+              !needed_by;
+          List.iter (requires unit) ~f:(mark part))
+  in
+  List.iter static.units ~f:(fun unit -> List.iter (requires unit) ~f:(mark `Eager));
+  List.iter deferred ~f:(fun { Deferred_code.id; code; _ } ->
+      List.iter code.units ~f:(fun unit -> List.iter (requires unit) ~f:(mark (`Root id))));
+  let placement unit =
+    match StringMap.find_opt (name unit) !needed_by with
+    | None -> `Dropped
+    | Some (true, _) -> `Eager
+    | Some (false, roots) -> (
+        match StringSet.elements roots with
+        | [] -> `Dropped
+        | [ id ] -> `Root id
+        | _ :: _ :: _ -> `Shared roots)
+  in
+  let eager =
+    List.filter dependencies ~f:(fun unit ->
+        match placement unit with
+        | `Eager -> true
+        | `Dropped | `Root _ | `Shared _ -> false)
+  in
+  let shared =
+    List.fold_left dependencies ~init:[] ~f:(fun groups unit ->
+        match placement unit with
+        | `Shared roots -> (
+            match List.partition groups ~f:(fun (r, _) -> StringSet.equal r roots) with
+            | [ (_, units) ], others -> (roots, unit :: units) :: others
+            | _, others -> (roots, [ unit ]) :: others)
+        | `Dropped | `Eager | `Root _ -> groups)
+    |> List.map ~f:(fun (roots, units) ->
+        String.concat ~sep:"+" (StringSet.elements roots), roots, List.rev units)
+    |> List.sort ~cmp:(fun (a, ra, _) (b, rb, _) ->
+        match Int.compare (StringSet.cardinal rb) (StringSet.cardinal ra) with
+        | 0 -> String.compare a b
+        | c -> c)
+  in
+  (* The shared deferred code that [units], which belong to [id], require *)
+  let needs ~id units =
+    let shared_by_name =
+      List.fold_left shared ~init:StringMap.empty ~f:(fun by_name (shared, _, units) ->
+          List.fold_left units ~init:by_name ~f:(fun by_name unit ->
+              StringMap.add (name unit) shared by_name))
+    in
+    List.fold_left units ~init:StringSet.empty ~f:(fun needs unit ->
+        List.fold_left (requires unit) ~init:needs ~f:(fun needs required ->
+            match StringMap.find_opt required shared_by_name with
+            | Some shared when not (String.equal shared id) -> StringSet.add shared needs
+            | Some _ | None -> needs))
+    |> StringSet.elements
+  in
+  let shared =
+    List.map shared ~f:(fun (id, _, units) ->
+        Deferred_code.make ~kind:`Shared ~needs:(needs ~id units) units ~id)
+  in
+  let deferred =
+    List.map deferred ~f:(fun ({ Deferred_code.id; code; _ } as root) ->
+        let in_root unit =
+          match placement unit with
+          | `Root root -> String.equal root id
+          | `Dropped | `Eager | `Shared _ -> false
+        in
+        let units = List.filter dependencies ~f:in_root @ code.units in
+        { root with
+          code = Code_unit.create units
+        ; needs = needs ~id units
+        })
+  in
+  Code_unit.create (eager @ static.units), shared @ deferred
+
+let split_anchor = "caml_jsoo_split_anchor"
+
+let split_anchor_prefix = split_anchor ^ "__"
+
+let split_anchor_for_root root = split_anchor_prefix ^ root
+
+(* Runs a deferred root's code, given the program's deferred failure state *)
+let split_run = "caml_jsoo_split_run"
+
+let split_anchor_root name =
+  if String.starts_with ~prefix:split_anchor_prefix name
+  then
+    let pos = String.length split_anchor_prefix in
+    Some (String.sub name ~pos ~len:(String.length name - pos))
+  else None
+
+(* [program] is one initializer, with the eager code first and each deferred part's code
+   after it, in [deferred_parts] order. Each entry of [deferred_parts] names a part, says
+   whether it is a deferred root or shared deferred code, and gives the block where its
+   code starts.
+
+   Returns a program that runs only the eager code at startup. Each root's code becomes a
+   closure, passed to that root's split anchor. Shared deferred code becomes a closure
+   that runs it at most once, the first time a deferred part that uses it runs.
+
+   Deferred code behaves like eager code that runs the parts in the order they are
+   loaded, each at most once: once a part raises an exception it doesn't handle, no
+   deferred code runs again, and loading any root raises that exception. *)
+let defer_initializers (program : Code.program) ~deferred_parts =
+  let deferred_root_starts =
+    Addr.Set.of_list (List.map deferred_parts ~f:(fun (_, _, _, start) -> start))
+  in
+  (* Control falls through from one part into the next, so a part's blocks are those
+     reachable from its entry without entering another part's entry. *)
+  let leaves_region ~start pc = pc <> start && Addr.Set.mem pc deferred_root_starts in
+  let region start =
+    Code.traverse
+      { fold =
+          (fun blocks pc f acc ->
+            if leaves_region ~start pc then acc else Code.fold_children blocks pc f acc)
+      }
+      (fun pc acc -> if leaves_region ~start pc then acc else Addr.Set.add pc acc)
+      start
+      program.blocks
+      Addr.Set.empty
+  in
+  let starts_in_deferred_root = Addr.Set.mem program.start deferred_root_starts in
+  let eager_blocks =
+    if starts_in_deferred_root then Addr.Set.empty else region program.start
+  in
+  let deferred =
+    List.map deferred_parts ~f:(fun (id, kind, _, start) -> id, kind, start, region start)
+  in
+  let (_ : Addr.Set.t) =
+    List.fold_left deferred ~init:eager_blocks ~f:(fun owned (_, _, _, blocks) ->
+        if not (Addr.Set.is_empty (Addr.Set.inter blocks owned))
+        then failwith "Deferred initializer regions overlap";
+        Addr.Set.union owned blocks)
+  in
+  let kind_of =
+    let kinds =
+      List.fold_left deferred_parts ~init:StringMap.empty ~f:(fun kinds (id, kind, _, _) ->
+          StringMap.add id kind kinds)
+    in
+    fun id -> StringMap.find id kinds
+  in
+  let position_of =
+    let positions =
+      List.fold_left
+        (List.mapi deferred_parts ~f:(fun i (id, _, _, _) -> id, i))
+        ~init:StringMap.empty
+        ~f:(fun positions (id, i) -> StringMap.add id i positions)
+    in
+    fun id -> StringMap.find id positions
+  in
+  let describe = function
+    | `Eager -> "eager code"
+    | `Deferred id -> (
+        match kind_of id with
+        | `Root -> Printf.sprintf "deferred root %S" id
+        | `Shared -> Printf.sprintf "shared deferred code %S" id)
+  in
+  (* The blocks of a part, including the bodies of the closures it defines. *)
+  let code_from start =
+    let rec visit visited pc =
+      if Addr.Set.mem pc visited
+      then visited
+      else
+        let visited = Addr.Set.add pc visited in
+        let visited =
+          List.fold_left
+            (Addr.Map.find pc program.blocks).body
+            ~init:visited
+            ~f:(fun visited -> function
+              | Let (_, Closure (_, (body, _), _)) -> visit visited body
+              | _ -> visited)
+        in
+        fold_children
+          program.blocks
+          pc
+          (fun pc visited ->
+            if not (leaves_region ~start pc) then visit visited pc else visited)
+          visited
+    in
+    visit Addr.Set.empty start
+  in
+  let regions =
+    (if (* There is no eager code in this case *)
+        starts_in_deferred_root
+     then []
+     else [ `Eager, code_from program.start ])
+    @ List.map deferred_parts ~f:(fun (id, _, _, start) -> `Deferred id, code_from start)
+  in
+  let defining_region = Var.Hashtbl.create 17 in
+  List.iter regions ~f:(fun (part, pcs) ->
+      Addr.Set.iter
+        (fun pc ->
+          let block = Addr.Map.find pc program.blocks in
+          let define x =
+            if Var.Hashtbl.mem defining_region x
+            then
+              failwith
+                (Format.asprintf
+                   "Parse_bytecode.defer_initializers: variable %a is defined more than once"
+                   Var.print
+                   x);
+            Var.Hashtbl.add defining_region x part
+          in
+          Freevars.iter_block_bound_vars define block;
+          List.iter block.body ~f:(function
+            | Let (_, Closure (params, _, _)) -> List.iter params ~f:define
+            | _ -> ()))
+        pcs);
+  let same_part a b =
+    match a, b with
+    | `Eager, `Eager -> true
+    | `Deferred a, `Deferred b -> String.equal a b
+    | `Eager, `Deferred _ | `Deferred _, `Eager -> false
+  in
+  (* Each deferred part becomes its own closure, so it can only use values defined by the
+     eager part, by itself, or by shared deferred code, which it forces before running.
+     A value defined by a root is out of scope everywhere else, and eager code runs
+     before any deferred code. [imports] maps each deferred part to the values it uses
+     from each piece of shared deferred code. *)
+  let imports = ref StringMap.empty in
+  let import ~user ~shared x =
+    if position_of shared >= position_of user
+    then
+      invalid_arg
+        (Printf.sprintf
+           "Parse_bytecode.from_units: %s uses a value defined by %s, which comes after it"
+           (describe (`Deferred user))
+           (describe (`Deferred shared)));
+    imports :=
+      StringMap.update
+        user
+        (fun by_shared ->
+          Some
+            (StringMap.update
+               shared
+               (fun xs -> Some (Var.Set.add x (Option.value xs ~default:Var.Set.empty)))
+               (Option.value by_shared ~default:StringMap.empty)))
+        !imports
+  in
+  List.iter regions ~f:(fun (part, pcs) ->
+      Addr.Set.iter
+        (fun pc ->
+          Freevars.iter_block_free_vars
+            (fun x ->
+              match Var.Hashtbl.find_opt defining_region x with
+              | Some (`Deferred id) when not (same_part (`Deferred id) part) -> (
+                  match kind_of id, part with
+                  | `Shared, `Deferred user -> import ~user ~shared:id x
+                  | (`Root | `Shared), _ ->
+                      invalid_arg
+                        (Printf.sprintf
+                           "Parse_bytecode.from_units: %s uses a value defined by %s"
+                           (describe part)
+                           (describe (`Deferred id))))
+              | Some _ | None -> ())
+            (Addr.Map.find pc program.blocks))
+        pcs);
+  List.iter deferred_parts ~f:(fun (user, _, needs, _) ->
+      List.iter needs ~f:(fun shared ->
+          if position_of shared >= position_of user
+          then
+            invalid_arg
+              (Printf.sprintf
+                 "Parse_bytecode.from_units: %s needs %s, which comes after it"
+                 (describe (`Deferred user))
+                 (describe (`Deferred shared)))));
+  let needs_of =
+    List.fold_left deferred_parts ~init:StringMap.empty ~f:(fun m (id, _, needs, _) ->
+        StringMap.add id needs m)
+  in
+  let imports = !imports in
+  (* The values each piece of shared deferred code exposes, and where it stores them *)
+  let exports =
+    StringMap.fold
+      (fun _ by_shared exports ->
+        StringMap.fold
+          (fun shared xs exports ->
+            StringMap.update
+              shared
+              (fun ys -> Some (Var.Set.union xs (Option.value ys ~default:Var.Set.empty)))
+              exports)
+          by_shared
+          exports)
+      imports
+      StringMap.empty
+  in
+  let exports_of shared =
+    Option.value (StringMap.find_opt shared exports) ~default:Var.Set.empty
+  in
+  let free_pc = ref program.free_pc in
+  let fresh_pc () =
+    let pc = !free_pc in
+    incr free_pc;
+    pc
+  in
+  (* [deferred_initializers_pc] registers all of the deferred roots *)
+  let deferred_initializers_pc = fresh_pc () in
+  (* Each part gets its own return block: a block shared by several closures would be
+     part of several functions, which optimization passes (e.g. reference unboxing,
+     which adds parameters to a function's blocks) don't expect. *)
+  let exit_pcs =
+    List.map deferred ~f:(fun (_, _, start, _) -> start, fresh_pc ())
+  in
+  let exit_pc_of start =
+    Option.get
+      (List.find_map exit_pcs ~f:(fun (start', pc) ->
+           if start = start' then Some pc else None))
+  in
+  let return_unit ~before =
+    let returned = Var.fresh_n "split_unit" in
+    { params = []; body = before @ [ Let (returned, const 0) ]; branch = Return returned }
+  in
+  (* The deferred parts run as if they were the rest of the eager code, in the order they
+     are loaded, each at most once: once one raises an exception it doesn't handle, no
+     further deferred code runs, and every later load raises that exception again.
+     [failure] is the state [caml_jsoo_split_run] keeps: [0] until then, and a nonzero
+     kind with the exception in field 1 afterwards. *)
+  let failure = Var.fresh_n "deferred_failure" in
+  let shared_info =
+    List.filter_map deferred ~f:(fun (id, kind, start, _) ->
+        match kind with
+        | `Root -> None
+        | `Shared ->
+            let exported = Var.Set.elements (exports_of id) in
+            let slots =
+              List.fold_left
+                (List.mapi exported ~f:(fun i x -> x, i))
+                ~init:Var.Map.empty
+                ~f:(fun slots (x, i) -> Var.Map.add x i slots)
+            in
+            Some
+              ( id
+              , ( start
+                , Var.fresh_n "shared_state"
+                , Var.fresh_n "shared_values"
+                , Var.fresh_n "force_shared"
+                , slots
+                , fresh_pc () (* entry *) ) ))
+    |> List.fold_left ~init:StringMap.empty ~f:(fun m (id, info) -> StringMap.add id info m)
+  in
+  (* Code that forces the shared deferred code [user] uses, then reads the values it
+     uses from it, under fresh names. Returns the instructions and the renaming. *)
+  let prologue user =
+    let by_shared =
+      List.fold_left
+        (StringMap.find user needs_of)
+        ~init:(Option.value (StringMap.find_opt user imports) ~default:StringMap.empty)
+        ~f:(fun by_shared shared ->
+          if StringMap.mem shared by_shared
+          then by_shared
+          else StringMap.add shared Var.Set.empty by_shared)
+    in
+    match StringMap.bindings by_shared with
+    | [] -> [], Var.Map.empty
+    | by_shared ->
+        let zero = Var.fresh () in
+        let by_shared =
+          List.sort by_shared ~cmp:(fun (a, _) (b, _) ->
+              Int.compare (position_of a) (position_of b))
+        in
+        let body, renaming =
+          List.fold_left
+            by_shared
+            ~init:([], Var.Map.empty)
+            ~f:(fun (body, renaming) (shared, xs) ->
+              let _, _, values, force, slots, _ = StringMap.find shared shared_info in
+              let body =
+                Let
+                  ( Var.fresh ()
+                  , Apply { f = force; args = [ zero ]; exact = true; yielding = May_yield }
+                  )
+                :: body
+              in
+              Var.Set.fold
+                (fun x (body, renaming) ->
+                  let x' = Var.fork x in
+                  ( Let (x', Field (values, Var.Map.find x slots, Non_float)) :: body
+                  , Var.Map.add x x' renaming ))
+                xs
+                (body, renaming))
+        in
+        Let (zero, const 0) :: List.rev body, renaming
+  in
+  let map_branch f = function
+    | Branch c -> Branch (f c)
+    | Cond (v, a, b) -> Cond (v, f a, f b)
+    | Switch (v, cs) -> Switch (v, Array.map cs ~f)
+    | Pushtrap (body, exn, handler) -> Pushtrap (f body, exn, f handler)
+    | Poptrap c -> Poptrap (f c)
+    | (Return _ | Raise _ | Stop) as branch -> branch
+  in
+  let ensure_empty_stack_and_return args pc =
+    assert (List.is_empty args);
+    pc, []
+  in
+  let blocks =
+    Addr.Map.mapi
+      (fun pc block ->
+        if Addr.Set.mem pc eager_blocks
+        then
+          { block with
+            branch =
+              map_branch
+                (fun ((target, args) as cont) ->
+                  if Addr.Set.mem target deferred_root_starts
+                  then ensure_empty_stack_and_return args deferred_initializers_pc
+                  else cont)
+                block.branch
+          }
+        else
+          match
+            (* There should be no overlaps, so [pc] should only be a member of at most
+               1 deferred block *)
+            List.filter deferred ~f:(fun (_, _, _, blocks) -> Addr.Set.mem pc blocks)
+          with
+          | [] -> block
+          | [ (_, _, start, _) ] ->
+              let exit_pc = exit_pc_of start in
+              let enters_other_root target =
+                target <> start && Addr.Set.mem target deferred_root_starts
+              in
+              let branch =
+                match block.branch with
+                | Stop -> Branch (exit_pc, [])
+                | branch ->
+                    map_branch
+                      (fun ((target, args) as cont) ->
+                        if enters_other_root target
+                        then ensure_empty_stack_and_return args exit_pc
+                        else cont)
+                      branch
+              in
+              { block with branch }
+          | _ :: _ :: _ as owners ->
+              (* This should not be reachable due to the overlap check we did prior *)
+              failwith
+                (Printf.sprintf
+                   "Parse_bytecode.defer_initializers: block [%d] should belong to a \
+                    single deferred root, but belongs to roots %s"
+                   pc
+                   (String.concat
+                      ~sep:", "
+                      (List.map owners ~f:(fun (id, _, _, _) -> Printf.sprintf "[%S]" id)))))
+      program.blocks
+  in
+  (* Shared deferred code stores each value it exposes as soon as it defines it. *)
+  let blocks =
+    StringMap.fold
+      (fun _ (start, _, values, _, slots, _) blocks ->
+        if Var.Map.is_empty slots
+        then blocks
+        else
+          let store x = Set_field (values, Var.Map.find x slots, Non_float, x) in
+          let exported x = Var.Map.mem x slots in
+          let stored = ref Var.Set.empty in
+          let blocks =
+            Addr.Set.fold
+              (fun pc blocks ->
+                let block = Addr.Map.find pc blocks in
+                let params = List.filter block.params ~f:exported in
+                let body =
+                  List.concat_map block.body ~f:(function
+                    | Let (x, _) as instr when exported x ->
+                        stored := Var.Set.add x !stored;
+                        [ instr; store x ]
+                    | instr -> [ instr ])
+                in
+                stored := List.fold_left params ~init:!stored ~f:(fun s x -> Var.Set.add x s);
+                if List.is_empty params && List.length body = List.length block.body
+                then blocks
+                else Addr.Map.add pc { block with body = List.map params ~f:store @ body } blocks)
+              (region start)
+              blocks
+          in
+          Var.Map.iter
+            (fun x _ ->
+              if not (Var.Set.mem x !stored)
+              then
+                failwith
+                  (Format.asprintf
+                     "Parse_bytecode.defer_initializers: cannot share variable %a"
+                     Var.print
+                     x))
+            slots;
+          blocks)
+      shared_info
+      blocks
+  in
+  (* Each deferred part reads the shared values it uses under its own names. *)
+  let renamings =
+    List.map deferred ~f:(fun (id, _, start, _) ->
+        let body, renaming = prologue id in
+        id, start, body, renaming)
+  in
+  let blocks =
+    List.fold_left renamings ~init:blocks ~f:(fun blocks (_, start, _, renaming) ->
+        if Var.Map.is_empty renaming
+        then blocks
+        else
+          let s = Subst.from_map renaming in
+          Addr.Set.fold
+            (fun pc blocks ->
+              Addr.Map.add pc (Subst.Excluding_Binders.block s (Addr.Map.find pc blocks)) blocks)
+            (code_from start)
+            blocks)
+  in
+  (* A root's closure runs its code through [caml_jsoo_split_run], which raises the
+     recorded exception if earlier deferred code failed, and otherwise records an
+     exception escaping the root before throwing it on unchanged. The first time the
+     root's code runs, it forces the shared deferred code the root needs, then runs the
+     root's own code.
+
+     Shared deferred code runs within the root that forces it first, and records that it
+     ran once it completes. If it raises, the program has failed, so it is never forced
+     again. *)
+  let blocks, entries =
+    List.fold_left_map renamings ~init:blocks ~f:(fun blocks (id, start, body, _) ->
+        if not (List.is_empty (Addr.Map.find start blocks).params)
+        then failwith "Deferred initializer has live-in parameters";
+        let exit_pc = exit_pc_of start in
+        let try_pc = fresh_pc () in
+        let done_pc = fresh_pc () in
+        match kind_of id with
+        | `Root ->
+            let thunk_pc = fresh_pc () in
+            let run_pc = fresh_pc () in
+            let ran = Var.fresh_n ("ran_" ^ id) in
+            let already = Var.fresh_n "already_ran" in
+            let one = Var.fresh () in
+            let code = Var.fresh_n ("deferred_code_" ^ id) in
+            let result = Var.fresh () in
+            let blocks =
+              blocks
+              |> Addr.Map.add
+                   thunk_pc
+                   { params = []
+                   ; body =
+                       [ Let
+                           (code, Closure ([ Var.fresh_n "unit" ], (try_pc, []), (None, None)))
+                       ; Let (result, Prim (Extern (split_run, None), [ Pv failure; Pv code ]))
+                       ]
+                   ; branch = Return result
+                   }
+              |> Addr.Map.add
+                   try_pc
+                   { params = []
+                   ; body = [ Let (already, Field (ran, 0, Non_float)) ]
+                   ; branch = Cond (already, (done_pc, []), (run_pc, []))
+                   }
+              |> Addr.Map.add
+                   run_pc
+                   { params = []
+                   ; body = Let (one, const 1) :: Set_field (ran, 0, Non_float, one) :: body
+                   ; branch = Branch (start, [])
+                   }
+              |> Addr.Map.add exit_pc (return_unit ~before:[])
+              |> Addr.Map.add done_pc (return_unit ~before:[])
+            in
+            blocks, Some (id, thunk_pc, ran)
+        | `Shared ->
+            let _, state, _, _, _, entry_pc = StringMap.find id shared_info in
+            let ran = Var.fresh_n "ran" in
+            let one = Var.fresh () in
+            let blocks =
+              blocks
+              |> Addr.Map.add
+                   entry_pc
+                   { params = []
+                   ; body = [ Let (ran, Field (state, 0, Non_float)) ]
+                   ; branch = Cond (ran, (done_pc, []), (try_pc, []))
+                   }
+              |> Addr.Map.add try_pc { params = []; body; branch = Branch (start, []) }
+              |> Addr.Map.add
+                   exit_pc
+                   (return_unit
+                      ~before:[ Let (one, const 1); Set_field (state, 0, Non_float, one) ])
+              |> Addr.Map.add done_pc (return_unit ~before:[])
+            in
+            blocks, None)
+  in
+  let entries = List.filter_map entries ~f:Fun.id in
+  let register_deferred_initializers_fn =
+    let zero = Var.fresh () in
+    let shared =
+      List.concat_map deferred ~f:(fun (id, kind, _, _) ->
+          match kind with
+          | `Root -> []
+          | `Shared ->
+              let _, state, values, force, slots, entry_pc = StringMap.find id shared_info in
+              [ Let (state, Block (0, [| zero |], NotArray, Maybe_mutable)) ]
+              @ (if Var.Map.is_empty slots
+                 then []
+                 else
+                   [ Let
+                       ( values
+                       , Block
+                           ( 0
+                           , Array.make (Var.Map.cardinal slots) zero
+                           , NotArray
+                           , Maybe_mutable ) )
+                   ])
+              @ [ Let (force, Closure ([ Var.fresh_n "unit" ], (entry_pc, []), (None, None)))
+                ])
+    in
+    let roots =
+      List.concat_map entries ~f:(fun (id, entry, ran) ->
+          let thunk = Var.fresh_n ("deferred_init_" ^ id) in
+          let argument = Var.fresh_n "unit" in
+          [ Let (ran, Block (0, [| zero |], NotArray, Maybe_mutable))
+          ; Let (thunk, Closure ([ argument ], (entry, []), (None, None)))
+          ; Let (Var.fresh (), Prim (Extern (split_anchor_for_root id, None), [ Pv thunk ]))
+          ])
+    in
+    [ Let (zero, const 0)
+    ; Let (failure, Block (0, [| zero; zero |], NotArray, Maybe_mutable))
+    ]
+    @ shared
+    @ roots
+  in
+  { start =
+      (if Addr.Set.mem program.start deferred_root_starts
+       then deferred_initializers_pc
+       else program.start)
+  ; blocks =
+      blocks
+      |> Addr.Map.add
+           deferred_initializers_pc
+           { params = []; body = register_deferred_initializers_fn; branch = Stop }
+  ; free_pc = !free_pc
+  }
+
+let parse_bytecode ?deferred_roots code globals hints debug_data =
   let immutable = Code.Var.Hashtbl.create 0 in
   let state = State.initial globals immutable in
   Code.Var.reset ();
-  let blocks', joins = Blocks.analyse code in
+  let boundaries =
+    match deferred_roots with
+    | Some parts -> Addr.Set.of_list (List.map parts ~f:(fun (_, _, _, start) -> start))
+    | None -> Addr.Set.empty
+  in
+  let blocks', joins = Blocks.analyse ~boundaries code in
   Shape.State.reset ();
   let p =
     if not (Blocks.is_empty blocks')
@@ -3054,6 +3792,18 @@ let parse_bytecode code globals hints debug_data =
       let start = 0 in
 
       compile_block blocks' joins hints debug_data code start state;
+      (* [compile_block] only compiles what it reaches from its starting block, and code
+         before a root can always raise (e.g. [let () = raise Exit]), so nothing falls
+         through into the root. Compile each root from its own entry, so that it is present 
+         either way. 
+
+         Roots start from an empty initial state, like the program
+         itself; a root reached by fall-through is reset to the same state, and
+         [compile_block] skips any root it has already compiled. *)
+      Addr.Set.iter
+        (fun pc ->
+          compile_block blocks' joins hints debug_data code pc (State.initial globals immutable))
+        boundaries;
       let blocks =
         Addr.Map.mapi
           (fun _ (state, instr, last) ->
@@ -3079,6 +3829,18 @@ let parse_bytecode code globals hints debug_data =
   in
   compiled_blocks := Addr.Map.empty;
   tagged_blocks := Addr.Map.empty;
+  let p =
+    (* [Code.invariant] requires every block to be reachable from [start], but an
+       initializer that always raises can leave blocks unreachable after
+       [defer_initializers]:
+       - if the eager code always raises, startup never branches to the anchor block, so
+         the anchor block and every root become unreachable;
+       - if a root always raises, nothing branches to its return block.
+       Remove those blocks. *)
+    match deferred_roots with
+    | Some parts -> Deadcode.remove_unused_blocks (defer_initializers p ~deferred_parts:parts)
+    | None -> p
+  in
   let p = Code.compact p in
   let body =
     List.fold_left globals.cache_ids ~init:[] ~f:(fun body cache_id ->
@@ -3549,16 +4311,47 @@ module Reloc = struct
     globals
 end
 
-let from_compilation_units ~includes:_ ~include_cmis ~hints ~debug_data l =
+let from_compilation_units
+    ?exported_unit
+    ?deferred_roots
+    ~includes:_
+    ~include_cmis
+    ~hints
+    ~debug_data
+    l =
   let reloc = Reloc.create () in
   List.iter l ~f:(fun (compunit, code) -> Reloc.step1 reloc compunit code);
   List.iter l ~f:(fun (compunit, code) -> Reloc.step2 reloc compunit code);
   let globals = Reloc.make_globals reloc in
+  (* [exported_unit] selects which compilation units register themselves by name in the
+     global registry ([caml_register_global]) so that code outside this program can look
+     them up. 
+
+     By default, jsoo exports all units. 
+
+     When [exported_unit] is given, we effectively un-export units not in the set. 
+    
+     A unit that isn't exported is still initialized, and its [named_value] stays set, 
+     so a reference to a unit outside this program is still looked up through the registry 
+     ([caml_get_global]). 
+     
+     Only compilation units are affected; predefined exceptions keep their default. *)
+  (match exported_unit with
+  | None -> ()
+  | Some names ->
+      let names = StringSet.of_list names in
+      Array.iteri
+        ~f:(fun i -> function
+          | Some (Global_name.Glob_compunit (Compunit name)) ->
+              (* Keep [named_value] so imports still use the global registry. *)
+              globals.is_exported.(i) <- StringSet.mem name names
+          | None | Some (Glob_predef _) -> ())
+        globals.named_value);
   let code =
     let l = List.map l ~f:(fun (_, c) -> Bytes.to_string c) in
     String.concat ~sep:"" l
   in
-  let prog = parse_bytecode code globals hints debug_data in
+  let prog = parse_bytecode ?deferred_roots code globals hints debug_data in
   let body =
     Array.fold_right_i globals.vars ~init:[] ~f:(fun i var l ->
         match var with
@@ -3623,13 +4416,50 @@ let from_cmo ?(includes = []) ?(include_cmis = false) ?(debug = false) compunit 
   Code.invariant p.code;
   p
 
-let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
+let from_units
+    ?(includes = [])
+    ?(include_cmis = false)
+    ?exported_unit
+    ?(debug = false)
+    ?(deferred = [])
+    ?(dependencies = [])
+    (static : Code_unit.t) =
+  let static, deferred = place_dependencies ~dependencies static deferred in
   let debug_data = Debug.create ~include_cmis debug in
   let hints = Hints.create () in
   let orig = ref 0 in
-  let t = ref 0. in
+  let t = ref 0. in 
+  List.iter deferred ~f:(fun { Deferred_code.id ; kind; _} -> 
+    match kind with
+    | `Root -> Primitive.register (split_anchor_for_root id) `Mutator None (Some 1)
+    | `Shared -> ());
+  if not (List.is_empty deferred) then Primitive.register split_run `Mutator None (Some 2);
+  let (_ : int), deferred_roots =  
+    List.fold_left_map 
+      ~init:static.num_words
+      (deferred : Deferred_code.t list) ~f:(fun start { Deferred_code.id ; kind; needs; code } ->
+        let next_start = start + code.num_words in
+        next_start, (id, kind, needs, start))
+  in 
   let units =
-    List.map lib.Cmo_format.lib_units ~f:(fun compunit ->
+    let all_code = 
+      static.units 
+      @ List.concat_map deferred ~f:(fun { Deferred_code.code; _ } -> code.units) 
+    in
+    (* Ensure each compilation unit only appears once as initializing a unit twice would 
+       define its globals/run its side effects twice. *)
+    let (_ : StringSet.t) =
+      List.fold_left all_code ~init:StringSet.empty ~f:(fun seen (compunit, _) ->
+          let (Global_name.Compunit name) = Ocaml_compiler.Cmo_format.name compunit in
+          if StringSet.mem name seen
+          then
+            invalid_arg
+              (Printf.sprintf
+                 "Parse_bytecode.from_units: compilation unit %s appears more than once"
+                 name);
+          StringSet.add name seen)
+    in
+    List.map all_code ~f:(fun (compunit, ic) ->
         seek_in ic compunit.Cmo_format.cu_pos;
         let code = Bytes.create compunit.Cmo_format.cu_codesize in
         really_input ic code 0 compunit.Cmo_format.cu_codesize;
@@ -3647,9 +4477,25 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
         compunit, code)
   in
   if times () then Format.eprintf "    read debug events: %.2f@." !t;
-  let p = from_compilation_units ~includes ~include_cmis ~hints ~debug_data units in
+  let p =
+    from_compilation_units
+      ?exported_unit
+      ~deferred_roots
+      ~includes
+      ~include_cmis
+      ~hints
+      ~debug_data
+      units
+  in
   Code.invariant p.code;
   p
+
+let from_cma ?includes ?include_cmis ?debug lib ic =
+  from_units
+    ?includes
+    ?include_cmis
+    ?debug
+    (Code_unit.create (List.map lib.Cmo_format.lib_units ~f:(fun compunit -> compunit, ic)))
 
 type jsir_unit =
   { name : string

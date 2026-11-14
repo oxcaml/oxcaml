@@ -1,0 +1,8 @@
+(library
+ (name jsoo_static_partition_test)
+ (libraries js_of_ocaml-compiler jsoo_static_partition oxcaml_private_yojson)
+ (inline_tests)
+ (flags
+  (:standard -open Oxcaml_private_yojson))
+ (preprocess
+  (pps ppx_expect_light)))

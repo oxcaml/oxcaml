@@ -937,6 +937,8 @@
       : WebAssembly.instantiateStreaming(code, imports, options);
   }
   async function instantiateFromDir() {
+    if (args.merged_eager && link.length !== 1)
+      throw new Error("Merged eager Wasm requires exactly one module");
     imports.OCaml = {};
     const deps = [];
     async function loadModule(module, isRuntime) {
@@ -960,6 +962,7 @@
       }
     }
     await loadModule(link[0], 1);
+    if (args.merged_eager) imports.OCaml = imports.env;
     if (link.length > 1) {
       await loadModule(link[1]);
       const workers = new Array(20)
@@ -997,5 +1000,70 @@
       (event) => event.error && caml_handle_uncaught_exception(event.error),
     );
   }
-  await _initialize();
+  // Reentrant awaited load cycles (including eager -> lazy) are unsupported.
+  // Failures are sticky; partial initialization is neither rolled back nor retried.
+  let finishEager, failEager;
+  const eagerStartup = new Promise((resolve, reject) => {
+    finishEager = resolve;
+    failEager = reject;
+  });
+  const staticChunks = new Map(Object.entries(args.static_chunks || {}));
+  const staticLoads = new Map();
+  function loadStaticChunk(key) {
+    if (staticLoads.has(key)) return staticLoads.get(key);
+    const promise = eagerStartup.then(async () => {
+      const chunk = staticChunks.get(key);
+      if (!chunk) throw new Error(`Unknown static Wasm chunk: ${key}`);
+      if (
+        typeof chunk.module !== "string" ||
+        !/^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(chunk.module)
+      )
+        throw new Error(`Invalid static Wasm module name: ${chunk.module}`);
+      const [code, fragments] = await Promise.all([
+        loadCode(src + "/" + chunk.module + ".wasm"),
+        Promise.resolve().then(() => chunk.generated?.()),
+      ]);
+      const namespaces = Object.keys(fragments || {});
+      if (chunk.namespace !== undefined &&
+          namespaces.some(name => name !== chunk.namespace))
+        throw new Error(`Unexpected static Wasm fragment namespace: ${key}`);
+      for (const name of namespaces) {
+        if (!name.endsWith(".fragments") || Object.hasOwn(imports, name))
+          throw new Error(`Conflicting static Wasm import namespace: ${name}`);
+      }
+      Object.assign(imports, fragments);
+      const { instance } = await instantiateModule(code);
+      const initialize = instance.exports[chunk.initialize];
+      if (typeof initialize !== "function")
+        throw new Error(`Missing static Wasm initializer: ${chunk.initialize}`);
+      for (const name of Object.keys(instance.exports)) {
+        if (
+          Object.hasOwn(imports.OCaml, name) &&
+          !(
+            name === "_initialize" &&
+            typeof imports.OCaml[name] === "function" &&
+            typeof instance.exports[name] === "function"
+          )
+        )
+          throw new Error(`Conflicting static Wasm export: ${name}`);
+      }
+      Object.assign(imports.OCaml, instance.exports);
+      await make_promising(initialize)();
+      if (chunk.exported_unit !== undefined) {
+        const exported = instance.exports[chunk.exported_unit];
+        if (!(exported instanceof WebAssembly.Global))
+          throw new Error(`Missing static Wasm module export: ${chunk.exported_unit}`);
+        return exported.value;
+      }
+    });
+    staticLoads.set(key, promise);
+    return promise;
+  }
+  try {
+    args.install_static_loader?.(loadStaticChunk);
+    finishEager(_initialize());
+  } catch (error) {
+    failEager(error);
+  }
+  await eagerStartup;
 };
