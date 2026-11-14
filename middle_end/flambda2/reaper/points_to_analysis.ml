@@ -356,11 +356,17 @@ module Datalog_schedule = struct
 
   let ( let$$ ) x f = with_priority 1 x f
 
-  let make_schedule l =
+  let priority_split_schedule l =
     Schedule.fixpoint
       (List.init 2 (fun i ->
            Schedule.saturate
              (List.filter_map (fun (p, r) -> if i = p then Some r else None) l)))
+
+  (* CR-someday ncourant: For LTO, a single fixpoint is more efficient than the
+     priority-split rules. However, I think neither is optimal: we could try to
+     saturate priority-0 rules first, then perform a single step of priority-1
+     rules, saturate priority-0 again, and so on. *)
+  let flat_schedule l = Schedule.saturate (List.map snd l)
 
   let reverse_rules =
     (* Reverse relations, because datalog does not implement a more efficient
@@ -546,7 +552,7 @@ module Datalog_schedule = struct
        [zero_alloc_source from; rev_use ~from ~to_] ==> zero_alloc_source to_)
     ]
 
-  let schedule =
+  let rules =
     List.concat
       [ reverse_rules;
         alias_rules;
@@ -558,10 +564,21 @@ module Datalog_schedule = struct
         sources_rules;
         local_rules;
         zero_alloc_rules ]
-    |> make_schedule
+
+  (* Both schedules are built when this module is initialised, before the
+     command line is parsed, so the one to run is chosen by [datalog_schedule]
+     instead. *)
+  let priority_split = priority_split_schedule rules
+
+  let flat = flat_schedule rules
 end
 
-let datalog_schedule = Datalog_schedule.schedule
+(* The single-unit Reaper runs the priority-split schedule, while a
+   whole-program solve runs the flat one. *)
+let datalog_schedule (analysis_scope : Analysis_scope.t) =
+  match analysis_scope with
+  | Current_unit -> Datalog_schedule.priority_split
+  | Lto_participants _ -> Datalog_schedule.flat
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 
@@ -1016,7 +1033,7 @@ let perform_analysis ?stats db ~analysis_scope =
   current_analysis_scope := analysis_scope;
   let db =
     Profile.record_call ~accumulate:true "analysis" (fun () ->
-        Datalog.Schedule.run ?stats datalog_schedule db)
+        Datalog.Schedule.run ?stats (datalog_schedule analysis_scope) db)
   in
   let db =
     Profile.record_call ~accumulate:true "compute_field_usages" (fun () ->
