@@ -58,7 +58,7 @@ let compiler_stops_before_attributes_consumed () =
   let stops_before_lambda =
     match !Clflags.stop_after with
     | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
+    | Some pass -> Clflags.Compiler_pass.(compare pass Transl) < 0
   in
   stops_before_lambda || !Clflags.print_types
 
