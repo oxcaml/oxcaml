@@ -615,6 +615,10 @@ let destroyed_rax_rdx = [| rax; rdx |]
 let destroyed_rbp = [| rbp |]
 let destroyed_r10 = [| r10 |]
 
+let destroyed_at_atomic_compare_set =
+  (* CMPXCHG overwrites rax on failure, independently of the boolean result. *)
+  Array.append destroyed_at_small_memory_op destroyed_rax
+
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->
@@ -633,8 +637,12 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
                 Single _); _ })
   | Op(Specific (Ifloatarithmem (Float32, _, _)))
-  | Op(Intop_atomic _) ->
+  | Op(Intop_atomic
+         { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange
+              | Compare_exchange; _ }) ->
     destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Compare_set; _ }) ->
+    destroyed_at_atomic_compare_set
   | Op(Store( (Word_int | Word_mask | Word_val | Double |
                Onetwentyeight_aligned | Onetwentyeight_unaligned |
                Twofiftysix_aligned | Twofiftysix_unaligned |
