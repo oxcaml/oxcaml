@@ -1,46 +1,48 @@
 function_ids.raw.fl:
-  "Function_ids.apply":0
-  "Function_ids.twice":0
-  "Function_ids.a.(fun)@x,int_add,1":0
-  "Function_ids.b.(fun)@y,int_mul,2":0
-  "Function_ids.inner.(fun)@x,int_sub,n":0
-  "Function_ids.inner.(fun)@x,int_sub,n":1
-  "Function_ids.inner.(fun)@y,int_add,n":0
-  "Function_ids.inner.(fun)@y,x,int_add,n,p":0
-  "Function_ids.inner":0
-  "Function_ids.shadowing.f":0
-  "Function_ids.shadowing.f":1
-  "Function_ids.shadowing.f":2
-  "Function_ids.shadowing":0
-  "Function_ids.shadowing":1
-  "Function_ids.opt":0
-  "Function_ids.counter#incr":0
-  "Function_ids.counter_init.(fun)@env,self,Popaque,Pfield,CamlinternalOO":0
-  "Function_ids.counter_init":0
+  "Function_ids.apply":0 body_hash:3371523c
+  "Function_ids.twice":0 body_hash:063b8036
+  "Function_ids.a.(fun)@x,int_add,1":0 body_hash:00000000
+  "Function_ids.b.(fun)@y,int_mul,2":0 body_hash:00000000
+  "Function_ids.inner.(fun)@x,int_sub,n":0 body_hash:00000000
+  "Function_ids.inner.(fun)@x,int_sub,n":1 body_hash:00000000
+  "Function_ids.inner.(fun)@y,int_add,n":0 body_hash:00000000
+  "Function_ids.inner.(fun)@y,x,int_add,n,p":0 body_hash:00000000
+  "Function_ids.inner":0 body_hash:6cae4514
+  "Function_ids.shadowing.f":0 body_hash:00000000
+  "Function_ids.shadowing.f":1 body_hash:00000000
+  "Function_ids.shadowing.f":2 body_hash:00000000
+  "Function_ids.shadowing":0 body_hash:384342f1
+  "Function_ids.shadowing":1 body_hash:3371523c
+  "Function_ids.opt":0 body_hash:00000000
+  "Function_ids.counter#incr":0 body_hash:00000000
+  "Function_ids.counter_init.(fun)@env,self,Popaque,Pfield,CamlinternalOO":0 body_hash:e5bc9872
+  "Function_ids.counter_init":0 body_hash:5998174d
 function_ids.edited.raw.fl:
-  "Function_ids.apply":0
-  "Function_ids.twice":0
-  "Function_ids.a0.(fun)@z":0
-  "Function_ids.a.(fun)@x,int_add,1":0
-  "Function_ids.b.(fun)@y,int_mul,2":0
-  "Function_ids.inner.(fun)@z,int_mul,n":0
-  "Function_ids.inner.(fun)@x,int_sub,n":0
-  "Function_ids.inner.(fun)@x,int_sub,n":1
-  "Function_ids.inner.(fun)@y,int_add,n":0
-  "Function_ids.inner.(fun)@y,x,int_add,n,p":0
-  "Function_ids.inner":0
-  "Function_ids.shadowing.f":0
-  "Function_ids.shadowing.f":1
-  "Function_ids.shadowing.f":2
-  "Function_ids.shadowing":0
-  "Function_ids.opt":0
-  "Function_ids.opt(stub)":0
-  "Function_ids.counter#incr":0
-  "Function_ids.counter_init.(fun)@env,self,Popaque,Pfield,CamlinternalOO":0
-  "Function_ids.counter_init":0
+  "Function_ids.apply":0 body_hash:3371523c
+  "Function_ids.twice":0 body_hash:063b8036
+  "Function_ids.a0.(fun)@z":0 body_hash:00000000
+  "Function_ids.a.(fun)@x,int_add,1":0 body_hash:00000000
+  "Function_ids.b.(fun)@y,int_mul,2":0 body_hash:00000000
+  "Function_ids.inner.(fun)@z,int_mul,n":0 body_hash:00000000
+  "Function_ids.inner.(fun)@x,int_sub,n":0 body_hash:00000000
+  "Function_ids.inner.(fun)@x,int_sub,n":1 body_hash:00000000
+  "Function_ids.inner.(fun)@y,int_add,n":0 body_hash:00000000
+  "Function_ids.inner.(fun)@y,x,int_add,n,p":0 body_hash:00000000
+  "Function_ids.inner":0 body_hash:50d74eb6
+  "Function_ids.shadowing.f":0 body_hash:00000000
+  "Function_ids.shadowing.f":1 body_hash:00000000
+  "Function_ids.shadowing.f":2 body_hash:00000000
+  "Function_ids.shadowing":0 body_hash:384342f1
+  "Function_ids.opt":0 body_hash:00000000
+  "Function_ids.opt(stub)":0 body_hash:5bb3bd77
+  "Function_ids.counter#incr":0 body_hash:00000000
+  "Function_ids.counter_init.(fun)@env,self,Popaque,Pfield,CamlinternalOO":0 body_hash:e5bc9872
+  "Function_ids.counter_init":0 body_hash:5998174d
 only in function_ids.raw.fl:
-  "Function_ids.shadowing":1
+  "Function_ids.inner":0 body_hash:6cae4514
+  "Function_ids.shadowing":1 body_hash:3371523c
 only in function_ids.edited.raw.fl:
-  "Function_ids.a0.(fun)@z":0
-  "Function_ids.inner.(fun)@z,int_mul,n":0
-  "Function_ids.opt(stub)":0
+  "Function_ids.a0.(fun)@z":0 body_hash:00000000
+  "Function_ids.inner.(fun)@z,int_mul,n":0 body_hash:00000000
+  "Function_ids.inner":0 body_hash:50d74eb6
+  "Function_ids.opt(stub)":0 body_hash:5bb3bd77

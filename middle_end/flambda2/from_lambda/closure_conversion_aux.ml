@@ -803,7 +803,7 @@ module Function_decls = struct
         free_idents_of_body : Ident.Set.t;
         attr : Lambda.function_attribute;
         loc : Lambda.scoped_location;
-        fdo_entry_annotation : Fdo_annotation.t;
+        fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
         recursive : Recursive.t;
         closure_alloc_mode : Lambda.locality_mode;
         first_complex_local_param : int;

@@ -823,7 +823,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~regalloc_param_attribute:Default_regalloc_params ~cold:false
             ~dbg:Debuginfo.none
             ~fdo_entry_annotation:
-              (Option.value fdo_entry_annotation ~default:Fdo_annotation.empty)
+              (Option.value fdo_entry_annotation
+                 ~default:Fdo_annotation.With_body_hash.empty)
             ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
