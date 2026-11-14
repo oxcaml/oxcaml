@@ -1,6 +1,16 @@
 # dev
 
 ## Features/Changes
+* Compiler: with OCaml 5.6, use the optimization hints recorded in the bytecode
+  (primitive types, immutable blocks, closures, immediates, ...) (#1721, #2488)
+* Compiler/Runtime: support the OCaml 5.6 bit counting primitives
+  (`caml_int_clz`, `caml_int_ctz`, `caml_int_popcount`) (#2469)
+* Runtime: support `Sys.filepath_exists` (OCaml 5.6) (#2493)
+* Runtime: with OCaml 5.6, `Weak.get_copy` and the ephemeron `get_*_copy`
+  primitives no longer copy, as in the OCaml runtime (#2469)
+* Compiler/Wasm: add `--enable portable-int`, an experimental mode where OCaml
+  integers are 63-bit and `nativeint` is 64-bit as on native 64-bit
+  platforms; integers that do not fit in 31 bits are boxed
 * Compiler: with `--effects={cps,double-translation}`, specialize calls to
   known functions using the global flow analysis before the CPS transformation
   (#2456)
@@ -104,8 +114,41 @@
   targeting JavaScript (#2441)
 * Compiler: with `--effects=double-translation`, only generate a CPS version
   of the functions that may run below an effect handler (#2441)
+* Compiler: report JavaScript syntax errors (runtime files, `jsoo_minify`,
+  `wasm_of_ocaml`) as `file:line:col`, followed by the offending line; columns
+  start from 1 in all error messages, as editors expect (#2464, #2491)
 
 ## Bug fixes
+* Runtime: `Str.string_partial_match` stops at a partial match (JS) and no
+  longer returns invalid groups (OSEC-2026-21, ocaml/ocaml#15113) (#2492)
+* Compiler/wasm: `x land y` was assumed to fit in 31 bits as soon as one
+  operand did, which is wrong when that operand is negative (#2490)
+* Compiler: fix reference unboxing when a reference allocated in a loop is
+  read after leaving it (#2489)
+* Compiler: with `--effects=cps`, a call result could be unbound in its
+  continuation when a local reference was mutated in a `try` body (#2484)
+* Compiler: with `--effects=cps` or `double-translation`, fix mutable local
+  variables read in an exception handler (code compiled without `-g`) (#2484)
+* Runtime: `output_value` marshals forced lazy values as their value, as native
+  code does (#2486)
+* Runtime/Wasm: `caml_hash` follows forwarded values, counts objects and
+  ignores negative counts, as native code does (#2486)
+* Runtime: `caml_alloc_dummy_mixed` takes two arguments, as OxCaml calls it;
+  recursive definitions of mixed records failed to compile (#2461)
+* Runtime: `compare_digits_nat` compares digits as unsigned, and nats
+  marshalled with 32-bit digits can be read on 64-bit platforms (#2460)
+* Compiler: fix variable coalescing with ES classes: the heritage, computed
+  keys and decorators of a class declaration are evaluated at definition
+  time, and class field initializers and static blocks capture the variables
+  they reference (#2462)
+* Compiler: keep the parentheses around an optional chain in JavaScript code
+  (runtime files, `jsoo_minify`): `(a?.b).c` was printed as `a?.b.c`, which
+  is undefined rather than raising an exception when `a` is null, and
+  `` (a?.b)`t` `` and `new (a?.b)()` were printed without their parentheses,
+  which is a syntax error. Reject a template literal in an optional chain
+  (`` a?.b`t` ``), as the grammar requires (#2465)
+* Compiler: fix an invariant violation when a function is inlined both as an
+  argument of another inlined function and directly (#2482)
 * Compiler: with `--effects=double-translation`, fix calls with too many
   arguments to a function that does not perform effects (#2455)
 * Runtime/Wasm: with `--effects=native`, performing an effect that no
@@ -162,7 +205,7 @@
   builds the toplevel variant of library dependencies and their cmis (Stdlib,
   compiler-libs, ...) end up in `/static/cmis`. Previously only whole-program
   compilation embedded them, so a separately-compiled wasm toplevel failed to
-  load Stdlib at startup (#1721)
+  load Stdlib at startup (#2227)
 * Runtime: fix comparison between an immediate and a custom block that
   provides a compare op (e.g. zarith), broken by #2290 (#2391)
 * Wasm: resolve `.wasm` assets relative to the runtime file rather than the

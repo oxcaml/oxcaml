@@ -314,12 +314,17 @@ end
 
 type cont = Addr.t * Var.t list
 
+type field_type =
+  | Non_float
+  | Immediate
+  | Float
+
 type prim =
   | Vectlength of Optimization_hint.array_kind
-  | Array_get
+  | Array_get of field_type
   | Extern of string * Optimization_hint.ccall option
   | Not
-  | IsInt
+  | IsInt of { variant_only : bool }
   | Eq
   | Neq
   | Lt
@@ -480,10 +485,6 @@ type mutability =
   | Immutable
   | Maybe_mutable
 
-type field_type =
-  | Non_float
-  | Float
-
 type yielding_kind =
   | Unyielding
   | May_yield
@@ -601,7 +602,7 @@ module Print = struct
     | Int i -> Format.fprintf f "%s" (Targetint.to_string i)
     | Int32 i -> Format.fprintf f "%ldl" i
     | Int64 i -> Format.fprintf f "%LdL" i
-    | NativeInt i -> Format.fprintf f "%s" (Targetnativeint.to_string i)
+    | NativeInt i -> Format.fprintf f "%sn" (Targetnativeint.to_string i)
     | Tuple (tag, a, _) -> (
         Format.fprintf f "<%d>" tag;
         match Array.length a with
@@ -660,7 +661,8 @@ module Print = struct
           x
           Optimization_hint.print
           (Optimization_hint.Hint_arraylength k)
-    | Array_get, [ x; y ] -> Format.fprintf f "%a[%a]" arg x arg y
+    | Array_get Immediate, [ x; y ] -> Format.fprintf f "INT{%a[%a]}" arg x arg y
+    | Array_get _, [ x; y ] -> Format.fprintf f "%a[%a]" arg x arg y
     | Extern (s, h), [ x; y ] -> (
         try Format.fprintf f "%a %s %a%a" arg x (binop s) arg y hint h
         with Not_found -> Format.fprintf f "\"%s\"(%a)%a" s (list arg) l hint h)
@@ -669,7 +671,7 @@ module Print = struct
         with Not_found -> Format.fprintf f "\"%s\"(%a) %a" s (list arg) l hint h)
     | Extern (s, h), _ -> Format.fprintf f "\"%s\"(%a) %a" s (list arg) l hint h
     | Not, [ x ] -> Format.fprintf f "!%a" arg x
-    | IsInt, [ x ] -> Format.fprintf f "is_int(%a)" arg x
+    | IsInt _, [ x ] -> Format.fprintf f "is_int(%a)" arg x
     | Eq, [ x; y ] -> Format.fprintf f "%a === %a" arg x arg y
     | Neq, [ x; y ] -> Format.fprintf f "!(%a === %a)" arg x arg y
     | Lt, [ x; y ] -> Format.fprintf f "%a < %a" arg x arg y
@@ -708,6 +710,7 @@ module Print = struct
         done;
         Format.fprintf f "}"
     | Field (x, i, Non_float) -> Format.fprintf f "%a[%d]" Var.print x i
+    | Field (x, i, Immediate) -> Format.fprintf f "INT{%a[%d]}" Var.print x i
     | Field (x, i, Float) -> Format.fprintf f "FLOAT{%a[%d]}" Var.print x i
     | Closure (l, c, (hint, _)) -> (
         Format.fprintf f "fun(%a){%a}" var_list l cont c;
@@ -724,12 +727,14 @@ module Print = struct
     | Assign (x, y) -> Format.fprintf f "(assign) %a = %a" Var.print x Var.print y
     | Set_field (x, i, Non_float, y) ->
         Format.fprintf f "%a[%d] = %a" Var.print x i Var.print y
+    | Set_field (x, i, Immediate, y) ->
+        Format.fprintf f "INT{%a[%d]} = %a" Var.print x i Var.print y
     | Set_field (x, i, Float, y) ->
         Format.fprintf f "FLOAT{%a[%d]} = %a" Var.print x i Var.print y
     | Offset_ref (x, i) -> Format.fprintf f "%a[0] += %d" Var.print x i
     | Array_set (x, y, z) ->
         Format.fprintf f "%a[%a] = %a" Var.print x Var.print y Var.print z
-    | Event loc -> Format.fprintf f "event %s" (Parse_info.to_string loc)
+    | Event loc -> Format.fprintf f "event %s" (Parse_info.Debug.to_string loc)
 
   let last f l =
     match l with

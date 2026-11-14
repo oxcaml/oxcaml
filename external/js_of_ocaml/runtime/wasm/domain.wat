@@ -37,7 +37,6 @@
          (func $phys_eq (param (ref eq)) (param (ref eq)) (result i32)))
    ))
 
-
    (func (export "caml_atomic_cas")
       (param $ref (ref eq)) (param $o (ref eq)) (param $n (ref eq))
       (result (ref eq))

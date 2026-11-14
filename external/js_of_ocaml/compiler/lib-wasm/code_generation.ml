@@ -429,7 +429,7 @@ module Arith = struct
     | W.I31Get (S, n') -> return n'
     | _ -> return (W.RefI31 n)
 
-  let wrap31 n = Targetint.(of_int32_truncate n |> to_int32)
+  let wrap31 n = Int32.(shift_right (shift_left n 1) 1)
 
   let of_int31 n =
     let* n = n in
@@ -565,6 +565,11 @@ module Arith64 = struct
     let* e = e in
     let* e' = e' in
     return (W.BinOp (I64 (Lt U), e, e'))
+
+  let ule_i32 e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 (Le U), e, e'))
 
   let uge_i32 e e' =
     let* e = e in

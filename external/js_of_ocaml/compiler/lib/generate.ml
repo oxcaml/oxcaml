@@ -1390,9 +1390,8 @@ let invalid_arity name l ~loc ~expected =
     (Printf.sprintf
        "%sInvalid arity for primitive %s. Expecting %d but used with %d."
        (match (loc : J.location) with
-       | Pi { name = Some name; col; line; _ } ->
-           Printf.sprintf "%s:%d:%d: " name line col
-       | Pi _ | N | U -> "")
+       | Pi pi -> Printf.sprintf "%s: " (Parse_info.Diagnostic.to_string pi)
+       | N | U -> "")
        name
        expected
        (List.length l))
@@ -1560,10 +1559,8 @@ let _ =
     ]
     `Mutator
     (fun cx cy cz _ -> J.EBin (J.Eq, Mlvalue.Array.field cx cy, cz));
-  register_un_prims
-    [ "caml_alloc_dummy"; "caml_alloc_dummy_float" ]
-    `Pure
-    (fun _ _ -> J.array []);
+  register_un_prims [ "caml_alloc_dummy"; "caml_alloc_dummy_float" ] `Pure (fun _ _ ->
+      J.array []);
   register_bin_prim "caml_alloc_dummy_mixed" `Pure (fun _ _ _ -> J.array []);
   register_un_prims
     [ "caml_int_of_float"
@@ -1711,7 +1708,7 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
         | Vectlength _, [ x ] ->
             let* cx = access' ~ctx x in
             return (Mlvalue.Array.length cx)
-        | Array_get, [ x; y ] ->
+        | Array_get _, [ x; y ] ->
             let* cx = access' ~ctx x in
             let* cy = access' ~ctx y in
             let* () = info mutable_p in
@@ -1741,13 +1738,9 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             with Parse_js.Parsing_error pi ->
               failwith
                 (Printf.sprintf
-                   "Parsing error %S%s at l:%d col:%d"
-                   nm
-                   (match pi.Parse_info.src with
-                   | None -> ""
-                   | Some s -> Printf.sprintf ", file %S" s)
-                   pi.Parse_info.line
-                   pi.Parse_info.col))
+                   "%s: cannot parse the JavaScript expression %S"
+                   (Parse_info.Diagnostic.to_string pi)
+                   nm))
         | Extern ("caml_jsoo_runtime_value", _), [ Pc (String nm) ] when J.is_ident nm ->
             let prim = Share.get_prim (runtime_fun ctx) nm ctx.Ctx.share in
             return prim
@@ -1756,9 +1749,8 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
               (Printf.sprintf
                  "%sJsoo_runtime.Js.runtime_value expects a string literal."
                  (match (loc : J.location) with
-                 | Pi { name = Some name; col; line; _ } ->
-                     Printf.sprintf "%s:%d:%d: " name line col
-                 | Pi _ | N | U -> ""))
+                 | Pi pi -> Printf.sprintf "%s: " (Parse_info.Diagnostic.to_string pi)
+                 | N | U -> ""))
         | Extern ("%js_array", _), l ->
             let* args = list_map (fun x -> access' ~ctx x) l in
             return (J.array args)
@@ -1964,14 +1956,14 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             let* cy = access' ~ctx y in
             let* cz = access' ~ctx z in
             return (maybe_bool ctx x (J.EBin (J.NotEqEq, cy, cz)))
-        | IsInt, [ y ] ->
+        | IsInt _, [ y ] ->
             let* cy = access' ~ctx y in
             return (maybe_bool ctx x (Mlvalue.is_immediate cy))
         | Ult, [ y; z ] ->
             let* cy = access' ~ctx y in
             let* cz = access' ~ctx z in
             return (maybe_bool ctx x (J.EBin (J.LtInt, unsigned cy, unsigned cz)))
-        | (Vectlength _ | Array_get | Not | IsInt | Eq | Neq | Lt | Le | Ult), _ ->
+        | (Vectlength _ | Array_get _ | Not | IsInt _ | Eq | Neq | Lt | Le | Ult), _ ->
             assert false
       in
       return (res, [])

@@ -123,17 +123,22 @@ let int64_shiftop (l : constant list) (f : int64 -> int -> int64) : constant opt
 
 let nativeint i = Some (NativeInt i)
 
-let nativeint_unop (l : constant list) (f : Targetnativeint.t -> Targetnativeint.t) : constant option =
+let nativeint_unop (l : constant list) (f : Targetnativeint.t -> Targetnativeint.t) :
+    constant option =
   match l with
   | [ NativeInt i ] -> Some (NativeInt (f i))
   | _ -> None
 
-let nativeint_binop (l : constant list) (f : Targetnativeint.t -> Targetnativeint.t -> Targetnativeint.t) : constant option =
+let nativeint_binop
+    (l : constant list)
+    (f : Targetnativeint.t -> Targetnativeint.t -> Targetnativeint.t) : constant option =
   match l with
   | [ NativeInt i; NativeInt j ] -> Some (NativeInt (f i j))
   | _ -> None
 
-let nativeint_shiftop (l : constant list) (f : Targetnativeint.t -> int -> Targetnativeint.t) : constant option =
+let nativeint_shiftop
+    (l : constant list)
+    (f : Targetnativeint.t -> int -> Targetnativeint.t) : constant option =
   match l with
   | [ NativeInt i; Int j ] -> Some (NativeInt (f i (Targetint.to_int_exn j)))
   | _ -> None
@@ -175,6 +180,12 @@ let eval_prim ~target x =
       | "%int_neg", _ -> int_unop l Targetint.neg
       | "caml_int_compare", _ ->
           int_binop l Targetint.(fun i j -> of_int_exn (compare i j))
+      | "caml_int_clz", _ ->
+          int_unop l (fun i -> Targetint.(of_int_exn (leading_zeros i)))
+      | "caml_int_ctz", _ ->
+          int_unop l (fun i -> Targetint.(of_int_exn (trailing_zeros i)))
+      | "caml_int_popcount", _ ->
+          int_unop l (fun i -> Targetint.(of_int_exn (popcount i)))
       (* float *)
       | "caml_eq_float", _ -> float_binop_bool l Float.( = )
       | "caml_neq_float", _ -> float_binop_bool l Float.( <> )
@@ -268,8 +279,10 @@ let eval_prim ~target x =
           Some (Int (Targetint.of_int_exn (Int32.compare i j)))
       | "caml_int32_to_int", [ Int32 i ] -> Some (Int (Targetint.of_int32_truncate i))
       | "caml_int32_of_int", [ Int i ] -> int32 (Targetint.to_int32 i)
-      | "caml_nativeint_of_int32", [ Int32 i ] -> Some (NativeInt (Targetnativeint.of_int32_truncate i))
-      | "caml_nativeint_to_int32", [ NativeInt i ] -> Some (Int32 (Targetnativeint.to_int32 i))
+      | "caml_nativeint_of_int32", [ Int32 i ] ->
+          Some (NativeInt (Targetnativeint.of_int32_truncate i))
+      | "caml_nativeint_to_int32", [ NativeInt i ] ->
+          Some (Int32 (Targetnativeint.to_int32 i))
       (* nativeint *)
       | "caml_nativeint_bits_of_float", [ Float f ] when can_fold_bits_of_float ~target f ->
           nativeint (Targetnativeint.bits_of_float (Int64.float_of_bits f))
@@ -284,7 +297,8 @@ let eval_prim ~target x =
              | `Wasm -> true -> Some (float (Targetnativeint.float_of_bits i))
       | "caml_nativeint_of_float", [ Float f ] ->
           nativeint (Targetnativeint.of_float (Int64.float_of_bits f))
-      | "caml_nativeint_to_float", [ NativeInt i ] -> Some (float (Targetnativeint.to_float i))
+      | "caml_nativeint_to_float", [ NativeInt i ] ->
+          Some (float (Targetnativeint.to_float i))
       | "caml_nativeint_neg", _ -> nativeint_unop l Targetnativeint.neg
       | "caml_nativeint_add", _ -> nativeint_binop l Targetnativeint.add
       | "caml_nativeint_sub", _ -> nativeint_binop l Targetnativeint.sub
@@ -308,13 +322,18 @@ let eval_prim ~target x =
         when Int32.equal i (Targetint.to_int32 (Targetint.of_int32_truncate i)) ->
           Some (Int (Targetint.of_int32_truncate i))
       | "caml_checked_nativeint_to_int", [ NativeInt i ]
-        when Int64.equal (Targetnativeint.to_int64 i) (Targetnativeint.to_int64 i |> Targetint.of_int64_truncate |> Targetint.to_int64) ->
+        when Int64.equal
+               (Targetnativeint.to_int64 i)
+               (Targetnativeint.to_int64 i
+               |> Targetint.of_int64_truncate
+               |> Targetint.to_int64) ->
           Some (Int (Targetint.of_int64_truncate (Targetnativeint.to_int64 i)))
       | "caml_checked_int64_to_int", [ Int64 i ]
         when let j = Targetint.of_int64_truncate i in
-             Int64.equal i (Targetint.to_int64 j)->
+             Int64.equal i (Targetint.to_int64 j) ->
           Some (Int (Targetint.of_int64_truncate i))
-      | "caml_nativeint_of_int", [ Int i ] -> nativeint (Targetnativeint.of_int64_truncate (Targetint.to_int64 i))
+      | "caml_nativeint_of_int", [ Int i ] ->
+          nativeint (Targetnativeint.of_int64_truncate (Targetint.to_int64 i))
       (* int64 *)
       | "caml_int64_bits_of_float", [ Float f ] when can_fold_bits_of_float ~target f ->
           int64 f
@@ -343,12 +362,12 @@ let eval_prim ~target x =
       | "caml_int64_shift_right_unsigned", _ -> int64_shiftop l Int64.shift_right_logical
       | "caml_int64_compare", [ Int64 i; Int64 j ] ->
           Some (Int (Targetint.of_int_exn (Int64.compare i j)))
-      | "caml_int64_to_int", [ Int64 i ] ->
-          Some (Int (Targetint.of_int64_truncate i))
+      | "caml_int64_to_int", [ Int64 i ] -> Some (Int (Targetint.of_int64_truncate i))
       | "caml_int64_of_int", [ Int i ] -> int64 (Targetint.to_int64 i)
       | "caml_int64_to_int32", [ Int64 i ] -> int32 (Int64.to_int32 i)
       | "caml_int64_of_int32", [ Int32 i ] -> int64 (Int64.of_int32 i)
-      | "caml_int64_to_nativeint", [ Int64 i ] -> nativeint (Targetnativeint.of_int64_truncate i)
+      | "caml_int64_to_nativeint", [ Int64 i ] ->
+          nativeint (Targetnativeint.of_int64_truncate i)
       | "caml_int64_of_nativeint", [ NativeInt i ] -> int64 (Targetnativeint.to_int64 i)
       (* others *)
       | ("caml_string_get" | "caml_string_unsafe_get"), [ String s; Int pos ] ->
@@ -364,10 +383,8 @@ let eval_prim ~target x =
           | Some env -> Some (String env)
           | None -> None)
       | "caml_sys_const_word_size", [ _ ] ->
-        Some (Int (Targetint.of_int_exn
-        (if Config.Flag.portable_int ()
-         then 64
-         else 32)))
+          Some
+            (Int (Targetint.of_int_exn (if Config.Flag.portable_int () then 64 else 32)))
       | "caml_sys_const_int_size", [ _ ] ->
           Some (Int (Targetint.of_int_exn (Targetint.num_bits ())))
       | "caml_sys_const_big_endian", [ _ ] -> Some (Int Targetint.zero)
@@ -610,7 +627,7 @@ let eval_instr update_count inline_constant ~target info i =
                   | "caml_floatarray_unsafe_set"
                   | "caml_array_unsafe_set_addr" )
                 , _ )
-            | Array_get )
+            | Array_get _ )
           , _ ) ) ->
       (* Fresh parameters can be introduced for these primitives
            in Specialize_js, which would make the call to [the_const_of]
@@ -622,7 +639,7 @@ let eval_instr update_count inline_constant ~target info i =
       | Some i ->
           incr update_count;
           [ Let (x, Field (o, Targetint.to_int_exn i, Non_float)) ])
-  | Let (x, Prim (IsInt, [ y ])) -> (
+  | Let (x, Prim (IsInt _, [ y ])) -> (
       match is_int info y with
       | Unknown -> [ i ]
       | Y ->

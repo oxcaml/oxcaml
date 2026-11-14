@@ -251,9 +251,9 @@ end
 
 module SBT = Hashtbl.Make (Simple_block)
 
-(* Optimization can merge targets while retaining distinct phi arguments. *)
-let equal (pc, args) (pc', args') =
-  pc = pc' && List.equal ~eq:Var.equal args args'
+(* Continuations to the same block can carry different arguments if this
+   pass runs after other optimizations, so compare both. *)
+let equal (pc, args) (pc', args') = pc = pc' && List.equal ~eq:Var.equal args args'
 
 type switch_to_cond =
   [ `All_equals
