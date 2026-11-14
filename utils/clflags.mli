@@ -238,9 +238,10 @@ val jsir_target_exn : unit -> Jsir_target.t
 (** The invocations of [js_of_ocaml] (or [wasm_of_ocaml] with
     [-target wasm_of_ocaml]) that options can be passed through to, with
     [-jsoo-opt-<phase>] (and [-jsoo-opt] for all of them):
-    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo]
-      ([.cmwo]);
-    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([.cmwa]) ([-a]);
+    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmo-js]
+      ([.cmo-wasm]);
+    - [Archive]: [js_of_ocaml link -a], producing a [.cma-js] ([.cma-wasm])
+      ([-a]);
     - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
     - [Link]: [js_of_ocaml link], when linking an executable. *)
 module Jsoo_phase : sig

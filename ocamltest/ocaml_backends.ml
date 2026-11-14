@@ -34,14 +34,14 @@ let string_of_backend = function
 let module_extension = function
   | Bytecode -> "cmo"
   | Native -> "cmx"
-  | Jsir_js -> "cmjx"
-  | Jsir_wasm -> "cmwx"
+  | Jsir_js -> "cmx-js"
+  | Jsir_wasm -> "cmx-wasm"
 
 let library_extension = function
   | Bytecode -> "cma"
   | Native -> "cmxa"
-  | Jsir_js -> "cmjxa"
-  | Jsir_wasm -> "cmwxa"
+  | Jsir_js -> "cmxa-js"
+  | Jsir_wasm -> "cmxa-wasm"
 
 let executable_extension = function
   | Bytecode -> "byte"

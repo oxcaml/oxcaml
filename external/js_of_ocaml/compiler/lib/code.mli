@@ -262,7 +262,7 @@ module Marshalable_program : sig
   val to_program : t -> program
 end
 
-(** The target a JSIR file (.cmj or .cmw) was produced for. *)
+(** The target a JSIR file (.cm-jsir-js or .cm-jsir-wasm) was produced for. *)
 type jsir_target =
   | Js
   | Wasm
@@ -286,7 +286,7 @@ type jsir_file =
         (** Whether the unit was compiled with [-linkall], so must be linked
             even if nothing requires it. Needed to fill in [Unit_info.t]. *)
   }
-(** Contents of a JSIR file (.cmj or .cmw) produced by the OxCaml JSIR backend
+(** Contents of a JSIR file (.cm-jsir-js or .cm-jsir-wasm) produced by the OxCaml JSIR backend
     (after the magic number), marshaled. *)
 
 module Print : sig

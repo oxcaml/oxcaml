@@ -199,8 +199,8 @@ let get_unit comp_unit =
         let missing_extension =
           match Clflags.jsir_target () with
           | None -> "cmx"
-          | Some Js -> "cmjx"
-          | Some Wasm -> "cmwx"
+          | Some Js -> "cmx-js"
+          | Some Wasm -> "cmx-wasm"
         in
         try
           let filename =

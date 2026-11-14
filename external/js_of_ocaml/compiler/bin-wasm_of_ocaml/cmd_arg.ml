@@ -115,7 +115,7 @@ let options () =
     Arg.(value & opt (some filepath) None & info [ "o" ] ~docv:"FILE" ~doc)
   in
   let input_file =
-    let doc = "Compile the bytecode program or JSIR file (.cmw or .cmj) [$(docv)]. " in
+    let doc = "Compile the bytecode program or JSIR file (.cm-jsir-wasm or .cm-jsir-js) [$(docv)]. " in
     Arg.(value & pos ~rev:true 0 (some filepath) None & info [] ~docv:"PROGRAM" ~doc)
   in
   let build_config = Jsoo_cmdline.Arg.build_config in
@@ -244,8 +244,8 @@ let options () =
                        ~f:(fun (ext, _) -> Filename.check_suffix input_file ext)
                        [ ".cmo", ".wasmo"
                        ; ".cma", ".wasma"
-                       ; ".cmw", ".wasmo"
-                       ; ".cmj", ".wasmo"
+                       ; ".cm-jsir-wasm", ".wasmo"
+                       ; ".cm-jsir-js", ".wasmo"
                        ])
                 with Not_found -> ".js"
               in
