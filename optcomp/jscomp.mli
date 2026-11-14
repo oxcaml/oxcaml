@@ -30,9 +30,18 @@
     [-target wasm_of_ocaml]).
 
     The JSIR of a compilation unit is written to a JSIR file, [.cm-jsir-js] for
-    JS or [.cm-jsir-wasm] for WASM, from which the [js_of_ocaml] executable
-    produces JavaScript or the [wasm_of_ocaml] executable produces WebAssembly,
-    respectively. The file is intermediate, and is deleted unless [-S] is given.
+    JS or [.cm-jsir-wasm] for WASM. There are then two paths:
+
+    - Separate compilation (the default): the [js_of_ocaml] executable produces
+      JavaScript (or the [wasm_of_ocaml] executable produces WebAssembly) from
+      the JSIR file of each unit when it is compiled, and links these when
+      linking an executable. The JSIR file is intermediate, and is deleted
+      unless [-S] is given.
+
+    - Whole program: the JSIR files are the object files. Linking an executable
+      links the JSIR of its units into one program, which [js_of_ocaml] or
+      [wasm_of_ocaml] compiles at once. This makes compilation slower, but the
+      program is optimised across units.
 
     The correspondence with the native backend's files is (with the
     wasm_of_ocaml extensions in parentheses):
@@ -44,6 +53,11 @@
 
     - [.cmxa-js] and [.cma-js] ([.cmxa-wasm] and [.cma-wasm]): libraries,
       analogous to [.cmxa] and [.a];
+
+    - [.cm-jsir-js] and [.cma-jsir-js] ([.cm-jsir-wasm] and [.cma-jsir-wasm]):
+      the JSIR of a unit, and of the units of a library. These take the place of
+      [.cmo-js] and [.cma-js] with [-link-jsir]. As [-S] keeps the [.cm-jsir-js]
+      of a unit compiled separately, such a unit can be linked either way;
 
     - [.js] files given on the command line (and [.wat], [.wast] and [.wasm]
       files with wasm_of_ocaml): runtime stubs, analogous to C stubs. They are
@@ -69,6 +83,11 @@ type error =
       { target : Clflags.Jsir_target.t;
         option : string
       }
+  | Jsir_file_not_found of string
+  | Unit_not_in_object_file of
+      { compilation_unit : string;
+        object_file : string
+      }
 
 exception Error of error
 
@@ -79,10 +98,15 @@ val report_error_doc : error Format_doc.printer
 (** The backend for the given JSIR target. *)
 val make :
   Clflags.Jsir_target.t ->
+  link_jsir:bool ->
   lambda_to_jsir:
     (ppf_dump:Format.formatter ->
     prefixname:string ->
     keep_symbol_tables:bool ->
     Lambda.program ->
     Optcomp_intf.jsir_program) ->
+  jsir_linker:
+    (register_globals:bool ->
+    Jsoo_imports.Code.jsir_file list ->
+    Jsoo_imports.Code.program) ->
   (module Optcompile.S)

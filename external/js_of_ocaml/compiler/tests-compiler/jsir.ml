@@ -83,6 +83,8 @@ let jsir_file ?(target = Code.Js) ~name ~imports body : Code.jsir_file =
   ; imported_compilation_units = imports
   ; exported_compilation_unit = name
   ; force_link = false
+  ; symbol_imports = []
+  ; symbol_exports = []
   }
 
 let write_jsir_file file (body : Code.jsir_file) =

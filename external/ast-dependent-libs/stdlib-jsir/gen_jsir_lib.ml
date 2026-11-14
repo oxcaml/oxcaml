@@ -20,7 +20,10 @@ module StrMap = Map.Make (String)
 
 (* Keep in sync with [jsir_targets] in stdlib/dune_rules/gen.ml. The files of
    a target are named like the native ones, with [-ext_suffix] appended:
-   .cmx-js for .cmx, .cmo-js for .o, .cmxa-js for .cmxa and .cma-js for .a. *)
+   .cmx-js for .cmx, .cmo-js for .o, .cmxa-js for .cmxa and .cma-js for .a.
+   The JSIR of a unit (.cm-jsir-js) and of the units of a library
+   (.cma-jsir-js) are built too, with which they can also be linked with
+   -link-jsir. *)
 type jsir_target =
   { program : string; (* the value of -target *)
     env_var : string; (* where ocamlopt finds [program] *)
@@ -376,7 +379,9 @@ let () =
     let cmi = cmi_of_unit ~cmi_dir:!cmi_dir unit_name in
     let jsir_cmx = file_of_unit unit_name (ext target "cmx") in
     rule ~ppf
-      ~targets:[jsir_cmx; file_of_unit unit_name (ext target "cmo")]
+      ~targets:
+        [ jsir_cmx; file_of_unit unit_name (ext target "cmo");
+          file_of_unit unit_name (ext target "cm-jsir") ]
       ~deps:
         ((Printf.sprintf "(:src %s)" src_path :: cmi :: cmi_deps)
         @ List.map (fun d -> file_of_unit d (ext target "cmx")) jsir_cmx_deps
@@ -384,7 +389,8 @@ let () =
       ~action:
         (ocamlopt_action target
            (common_flags @ flags @ include_dirs library_deps
-           @ ["-cmi-file"; cmi; "-o"; jsir_cmx; "-c"; "-impl"; "%{src}"]))
+           (* -S keeps the JSIR of the unit. *)
+           @ ["-S"; "-cmi-file"; cmi; "-o"; jsir_cmx; "-c"; "-impl"; "%{src}"]))
   in
   let write_rules target =
     List.iter
@@ -405,19 +411,32 @@ let () =
             ~jsir_cmx_deps:(alias_deps @ unit_deps)
             ~flags:(extra_flags @ alias_flags))
       units;
+    (* The library is created twice: for separate compilation (.cma-js) and for
+       -link-jsir (.cma-jsir-js, from the JSIR of the units). Both write the
+       same .cmxa-js. *)
+    let archive_action flags =
+      ocamlopt_action target
+        (["-g"; "-nostdlib"] @ flags
+        @ (if force_link then ["-linkall"] else [])
+        @ ["-a"; "-o"; !name ^ ext target "cmxa"]
+        @ List.map
+            (fun u ->
+              Printf.sprintf "%%{dep:%s}"
+                (file_of_unit u.unit_name (ext target "cmx")))
+            units)
+    in
     rule ~ppf
-      ~targets:[!name ^ ext target "cmxa"; !name ^ ext target "cma"]
+      ~targets:
+        [ !name ^ ext target "cmxa"; !name ^ ext target "cma";
+          !name ^ ext target "cma-jsir" ]
       ~deps:
-        (List.map (fun u -> file_of_unit u.unit_name (ext target "cmo")) units)
+        (List.concat_map
+           (fun u ->
+             [ file_of_unit u.unit_name (ext target "cmo");
+               file_of_unit u.unit_name (ext target "cm-jsir") ])
+           units)
       ~action:
-        (ocamlopt_action target
-           (["-g"; "-nostdlib"]
-           @ (if force_link then ["-linkall"] else [])
-           @ ["-a"; "-o"; !name ^ ext target "cmxa"]
-           @ List.map
-               (fun u ->
-                 Printf.sprintf "%%{dep:%s}"
-                   (file_of_unit u.unit_name (ext target "cmx")))
-               units))
+        (Printf.sprintf "(progn %s %s)" (archive_action [])
+           (archive_action ["-link-jsir"]))
   in
   List.iter write_rules jsir_targets

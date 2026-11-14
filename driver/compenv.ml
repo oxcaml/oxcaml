@@ -784,6 +784,9 @@ let readenv ppf position =
         warn_jsir_ignore target "-ccopt";
         all_ccopts := []
       | Some _ | None -> ());
+     if not (Clflags.target_is_jsir ()) && !Clflags.link_jsir then
+       warn_once "ignoring -link-jsir, which is only used when \
+                  targeting js_of_ocaml or wasm_of_ocaml";
      if not (Clflags.target_is_jsir ()) then
        List.iter (fun phase ->
            if !(Clflags.jsoo_opts phase) <> [] then

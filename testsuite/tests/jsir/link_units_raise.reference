@@ -1,0 +1,2 @@
+init a
+Fatal error: exception Failure("init failed")

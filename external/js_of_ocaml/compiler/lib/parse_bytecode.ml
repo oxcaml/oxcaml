@@ -3673,6 +3673,8 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
       ; imported_compilation_units
       ; exported_compilation_unit
       ; force_link
+      ; symbol_imports = _
+      ; symbol_exports = _
       } =
     (Marshal.from_channel ic : Code.jsir_file)
   in
