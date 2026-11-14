@@ -1,0 +1,29 @@
+File "caller.ml", line 1, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Caller.internal_flat (camlCaller__internal_flat_HIDE_STAMP).
+
+File "wrap.ml", line 1, characters 38-61:
+Error: called function may allocate (direct tailcall camlCamlinternalza_flat__f_HIDE_STAMP) (caller.ml:1,35--55)
+
+File "caller.ml", line 3, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Caller.internal_structured (camlCaller__internal_structured_HIDE_STAMP).
+
+File "wrap.ml", line 3, characters 44-73:
+Error: called function may allocate (direct tailcall _CamlU25Camlinternalza_structuredF1f_HIDE_STAMP) (caller.ml:3,41--67)
+
+File "caller.ml", line 5, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Caller.ordinary_flat (camlCaller__ordinary_flat_HIDE_STAMP).
+
+File "wrap.ml", line 5, characters 38-55:
+Error: called function may allocate (direct tailcall camlOrdinary_flat__f_HIDE_STAMP) (caller.ml:5,35--55)
+Hint: Build artifacts for the library containing the callee are not available.
+Try adding the library as an explicit dependency.
+
+
+File "caller.ml", line 7, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Caller.ordinary_structured (camlCaller__ordinary_structured_HIDE_STAMP).
+
+File "wrap.ml", line 7, characters 44-67:
+Error: called function may allocate (direct tailcall _CamlU19Ordinary_structuredF1f_HIDE_STAMP) (caller.ml:7,41--67)
+Hint: Build artifacts for the library containing the callee are not available.
+Try adding the library as an explicit dependency.
+
