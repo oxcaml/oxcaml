@@ -1,0 +1,58 @@
+let code f_0 deleted in
+let code test_3 deleted in
+let $camlShared_closure_unboxing__immstring_0 = "shared_closure_unboxing.ml"
+in
+let $camlShared_closure_unboxing__const_block_1 =
+  Block 0 ($camlShared_closure_unboxing__immstring_0, 28, 2)
+in
+let $camlShared_closure_unboxing__Pmakeblock_2 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlShared_closure_unboxing__const_block_1)
+in
+let code inline(never) loopify(never) size(3) newer_version_of(f_0)
+      f_0_1 (z : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (z, 1) in
+  cont k (int_add)
+in
+let $camlShared_closure_unboxing__f_3 = closure f_0_1 @f &toplevel in
+let code loopify(never) size(4) stub
+      f_0_partial (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_0_1 &my_alloc_region) inlining_state(depth(2))
+    ($camlShared_closure_unboxing__f_3 : _ -> imm tagged) (param) -> k * k1
+in
+let code inline(never) loopify(never) size(11) newer_version_of(test_3)
+      test_3_1 (a : imm tagged, b : imm tagged, c : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_0_partial &my_alloc_region) inlined(never)  (c) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply direct(f_0_partial &my_alloc_region) inlined(never)
+          (c) -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           let int_add = %int_barith.add (apply_result_1, apply_result) in
+           cont k (int_add))
+in
+let $camlShared_closure_unboxing__test_6 = closure test_3_1 @test &toplevel
+in
+apply direct(test_3_1 &toplevel)
+  ($camlShared_closure_unboxing__test_6 : _ -> imm tagged)
+    (1, 2, 3)
+    -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    let prim = %phys_eq (apply_result, 8) in
+    switch prim
+      | 0 ->
+        error pop(regular error) ($camlShared_closure_unboxing__Pmakeblock_2)
+      | 1 -> k
+  where k =
+    let $camlShared_closure_unboxing =
+      Block 0 ($camlShared_closure_unboxing__test_6)
+    in
+    cont done ($camlShared_closure_unboxing)
