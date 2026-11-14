@@ -572,3 +572,14 @@ let[@inline never] [@local never] f_callback () =
   Sys.with_async_exns f_callback_inner
 
 let _ = f_callback ()
+
+(* Test case 8: Running OCaml code on a fiber. The stack trace will show OCaml
+   -> caml_runstack -> OCaml, unwinding from the fiber to the parent stack. *)
+let[@inline never] [@local never] f_fiber_inner (x : int) = x + 1
+
+let[@inline never] [@local never] f_fiber () =
+  Sys.opaque_identity
+    (Effect.Deep.match_with f_fiber_inner 41
+       { retc = Fun.id; exnc = raise; effc = (fun _ -> None) })
+
+let _ = f_fiber ()

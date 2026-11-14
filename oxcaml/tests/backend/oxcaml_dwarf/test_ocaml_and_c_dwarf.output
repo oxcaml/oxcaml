@@ -24,3 +24,7 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback(param=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
+=== Testing OCaml/C boundary - fiber (caml_runstack) ===
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_fiber_inner(x=41 : int @ value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_runstack
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_fiber(param=<unavailable>)
