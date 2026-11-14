@@ -37,6 +37,7 @@ type pinpoint_desc =
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Quote  (** A quoted expression *)
+  | Splice  (** An expression from a splice *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
   | Effect_match  (** A pattern match with effect cases *)
@@ -99,8 +100,9 @@ type containing =
   | Address of modality
   | Constructor of string * modality
   | Structure of structure_item * modality
+  | Quote
 (* Some structure items (such as classes) don't have modalities. We gloss over
-     for simplicity. *)
+   for simplicity. *)
 
 type contains =
   { containing : containing;
