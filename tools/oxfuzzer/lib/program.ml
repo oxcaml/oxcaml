@@ -507,7 +507,7 @@ let to_code
   let structure =
     opens
     @ record_declarations record_types
-    @ List.map Exn.to_code exceptions
+    @ List.filter_map Exn.to_code exceptions
     @ variant_declarations variant_types
     @ array_primitives @ conversions number_types @ float_helpers
     @ List.map Function.to_code functions
