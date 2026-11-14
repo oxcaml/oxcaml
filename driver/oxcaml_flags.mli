@@ -42,7 +42,6 @@ val x86_peephole_remove_redundant_test : bool ref
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 
-val cfg_eliminate_dead_trap_handlers : bool ref
 val cfg_eliminate_dead_code_validate : bool ref
 val cfg_dominators_validate : bool ref
 val cfg_liveness_validate : bool ref

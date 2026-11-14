@@ -622,16 +622,10 @@ end = struct
         "next_instruction_id %a is not greater than the largest id in use %a"
         InstructionId.print next_id InstructionId.print !max_id
 
-  (* Check that every block is reachable from the entry block, or from a block
-     with no predecessors. With the default flags, all blocks are expected to be
-     reachable from the entry block; unreachable blocks can however occur when
-     [-no-cfg-eliminate-dead-trap-handlers] is passed (a trap handler whose
-     region contains no instruction that can raise is then kept, although it has
-     no incoming edge). If dead blocks were to form a cycle in which every block
-     has a predecessor, passes building dominators (e.g. through
-     [check_reducibility], or [Cfg_polling]) would fatal-error while looking for
-     the roots of the dominator forest; hence the check below. *)
-  let check_dead_cycles t =
+  (* At pipeline boundaries, every block must be reachable from the entry block
+     through normal or exceptional edges. Trap handlers are not additional entry
+     points. *)
+  let check_reachability t =
     let num_blocks = Label.Tbl.length t.cfg.blocks in
     let visited = Label.Tbl.create num_blocks in
     let rec visit ~kind ?referrer label =
@@ -643,52 +637,23 @@ end = struct
           (fun successor -> visit ~kind:"successor" ~referrer:label successor)
           (Cfg.successor_labels ~normal:true ~exn:true block))
     in
-    let find_unvisited_pseudo_entry () =
-      Cfg.fold_blocks t.cfg ~init:None ~f:(fun label block acc ->
-          match acc with
-          | Some _ -> acc
-          | None ->
-            if
-              (not (Label.Tbl.mem visited label))
-              && Label.Set.is_empty block.predecessors
-            then Some label
-            else None)
-    in
-    let rec visit_all () =
-      if Label.Tbl.length visited < num_blocks
-      then
-        match find_unvisited_pseudo_entry () with
-        | Some label ->
-          visit ~kind:"block" label;
-          visit_all ()
-        | None ->
-          (* Every unvisited block has at least one predecessor. If the
-             predecessor/successor sets are consistent, every such predecessor
-             is itself unvisited, so the unvisited blocks necessarily contain a
-             cycle. If the sets are inconsistent, the message below may be
-             inaccurate, but [check_block] has then already reported the
-             inconsistency. *)
-          let remaining =
-            Cfg.fold_blocks t.cfg ~init:Label.Set.empty
-              ~f:(fun label (_ : Cfg.basic_block) acc ->
-                if Label.Tbl.mem visited label
-                then acc
-                else Label.Set.add label acc)
-          in
-          report t
-            "blocks %a are not reachable from the entry block or from a block \
-             with no predecessors (dead blocks form a cycle)"
-            Label.Set.print remaining
-    in
     visit ~kind:"entry block" t.cfg.entry_label;
-    visit_all ()
+    if Label.Tbl.length visited < num_blocks
+    then
+      let unreachable =
+        Cfg.fold_blocks t.cfg ~init:Label.Set.empty
+          ~f:(fun label (_ : Cfg.basic_block) acc ->
+            if Label.Tbl.mem visited label then acc else Label.Set.add label acc)
+      in
+      report t "blocks %a are not reachable from the entry block"
+        Label.Set.print unreachable
 
   let check_all t ~layout =
     check_layout t layout;
     Cfg.iter_blocks ~f:(check_block t) t.cfg;
     check_instruction_ids t;
     check_tailrec_position t;
-    check_dead_cycles t;
+    check_reachability t;
     not t.result
 end
 

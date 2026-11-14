@@ -620,10 +620,9 @@ let terminator_of_test :
   | Ieventest -> Parity_test { ifso = label_true; ifnot = label_false }
 
 module Stack_offset_and_exn = struct
-  (* This module relies on the field `can_raise` of basic blocks but does not
-     rely on this field of individual Cfg instructions. This may need to be
-     revisited when we remove dead trap handlers and the associated
-     pushtrap/poptrap operations. *)
+  (* This module derives exception edges from block-level [can_raise]. It runs
+     before CFG simplification; [Cfg.remove_blocks] adjusts stack offsets when
+     dead handlers are removed. *)
   type handler_stack = Label.t list
 
   let fun_name = ref ""
