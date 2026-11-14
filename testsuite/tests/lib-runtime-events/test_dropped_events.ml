@@ -1,5 +1,7 @@
 (* TEST
  {
+   reason = "flaky test: sporadically failing on both arm64 and amd64 (#5669)";
+   skip;
    include runtime_events;
    multicore;
    include unix;

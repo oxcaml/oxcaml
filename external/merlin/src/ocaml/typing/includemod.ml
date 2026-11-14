@@ -566,8 +566,9 @@ let pair_components subst sig1_comps sig2 =
               Subst.add_modtype id2 (Path.Pident id1) subst
           | Sig_jkind _ ->
               Subst.add_jkind id2 (Path.Pident id1) subst
-          | Sig_value _ | Sig_typext _
-          | Sig_class _ | Sig_class_type _ ->
+          | Sig_value _ ->
+              Subst.add_value id2 (Path.Pident id1) subst
+          | Sig_typext _ | Sig_class _ | Sig_class_type _ ->
               subst
         in
         pair new_subst
@@ -1360,7 +1361,9 @@ type application_name =
   | Anonymous_functor
   | Full_application_path of Longident.t
   | Named_leftmost_functor of Longident.t
-exception Apply_error of {
+
+module Apply_error = struct
+  type t = {
     loc : Location.t ;
     env : Env.t ;
     app_name : application_name ;
@@ -1368,6 +1371,18 @@ exception Apply_error of {
     args : (Error.functor_arg_descr * module_type
       * Typedtree.mode_with_locks) list ;
   }
+
+  type exn += In_context of t
+
+  let log_or_raise err = Typing_recovery.log_or_raise (In_context err)
+
+  let log_and_raise err = Typing_recovery.log_and_raise (In_context err)
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
 
 let signatures ~direction ~loc env subst sig1 sig2 mod_shape =
   let sig1 = Subst.Lazy.of_signature sig1 in
@@ -1416,7 +1431,7 @@ let check_functor_application_in_path
         let mty_f = (Env.find_module f0_path env).md_type in
         let args = List.map prepare_arg args in
         let app_name = Full_application_path lid_whole_app in
-        raise (Apply_error {loc; env; app_name; mty_f; args})
+        Apply_error.log_and_raise {loc; env; app_name; mty_f; args}
       else
         raise Not_found
 

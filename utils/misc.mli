@@ -178,6 +178,9 @@ module Stdlib : sig
 
     val map3 : ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
 
+    val iter3
+      : ('a -> 'b -> 'c -> unit) -> 'a list -> 'b list -> 'c list -> unit
+
     val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
 
     val concat_map2 : ('a -> 'b -> 'c list) -> 'a list -> 'b list -> 'c list

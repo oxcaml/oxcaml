@@ -69,11 +69,97 @@ type sort_map =
   | Nothing
     (* substitution has nothing to do with cmi operations *)
 
+(* [module_path modules path] applies the module substitution [modules] to
+   [path] (i.e., replaces it or its subcomponents where applicable). *)
+let rec module_path modules path =
+  match Path.Map.find_opt path modules with
+  | Some p -> p
+  | None ->
+    match path with
+    | Pident _ -> path
+    | Pdot(p, n) ->
+       Pdot(module_path modules p, n)
+    | Papply(p1, p2) ->
+       Papply(module_path modules p1, module_path modules p2)
+    | Pextra_ty _ ->
+       fatal_error "Subst.module_path"
+
+module Values : sig
+  type t
+
+  val empty : t
+
+  val add : (Ident.t * Path.t) list -> t -> t
+
+  (** [add_lazy bindings vals] is similar to [add (Lazy.force bindings) vals],
+      but may delay forcing the lazy to lookup time. No assumption should be
+      made over when the lazy is forced. *)
+  val add_lazy : (Ident.t * Path.t) list Lazy.t -> t -> t
+
+  (** [compose first modules second] returns [second o modules o first], the
+      value substitution where an identifier bound in [first] maps to its path
+      in [first], rewritten by [modules] (if it is a module component) or
+      [second] (if it is an identifier). Identifiers not bound in [first] are
+      looked up in [second]. *)
+  val compose : t -> Path.t Path.Map.t -> t -> t
+
+  val path : modules:Path.t Path.Map.t -> t -> Path.t -> Path.t
+  [@@warning "-32"]
+end = struct
+  type t =
+    | Empty
+    | Bindings of { bindings : (Ident.t * Path.t) list; rest : t }
+    | Lazy_bindings of
+        { bindings : (Ident.t * Path.t) list Lazy.t; rest : t }
+    | Composed of { first : t; modules : Path.t Path.Map.t; second : t }
+  (* For value substitutions, lookups are more rare than insertions. They are
+     only used for type-level expressions (rare). As such, the internal
+     representation favors insertions over lookups: insertions are constant time
+     with [Bindings] and [Lazy_bindings], as is composition with [Composed],
+     and, in exchange, lookups are linear time. If the balance ever changes, it
+     could make sense to use maps and make both logarithmic. The interface
+     intentionally does not constrain the exact implementation. *)
+
+  let empty = Empty
+
+  let add bindings rest = Bindings { bindings; rest }
+
+  let add_lazy bindings rest = Lazy_bindings { bindings; rest }
+
+  let compose first modules second =
+    match first with
+    | Empty -> second
+    | Bindings _ | Lazy_bindings _ | Composed _ ->
+      Composed { first; modules; second }
+
+  let rec path ~modules vals p =
+    match p with
+    | Pident id -> Option.value (find id vals) ~default:p
+    | Pdot (q, n) -> Pdot (module_path modules q, n)
+    | Papply _ | Pextra_ty _ -> fatal_error "Subst.Values.path"
+
+  and find id = function
+    | Empty -> None
+    | Bindings { bindings; rest } -> find_binding id bindings rest
+    | Lazy_bindings { bindings; rest } ->
+      find_binding id (Lazy.force bindings) rest
+    | Composed { first; modules; second } ->
+      match find id first with
+      | Some p -> Some (path ~modules second p)
+      | None -> find id second
+
+  and find_binding id bindings rest =
+    match List.find (fun (id', _) -> Ident.same id id') bindings with
+    | _, p -> Some p
+    | exception Not_found -> find id rest
+end
+
 type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
     modtypes: module_type Path.Map.t;
     jkinds: kind_replacement Path.Map.t;
+    values: Values.t;
 
     additional_action: additional_action;
     sort_var_mapping: sort_map;
@@ -112,6 +198,7 @@ let identity =
     modules = Path.Map.empty;
     modtypes = Path.Map.empty;
     jkinds = Path.Map.empty;
+    values = Values.empty;
     additional_action = No_action;
     sort_var_mapping = Nothing;
     loc = None;
@@ -165,6 +252,15 @@ let add_jkind_path id p s =
   { s with jkinds = Path.Map.add id (Jkind_path p) s.jkinds;
            last_compose = None }
 let add_jkind id p s = add_jkind_path (Pident id) p s
+
+let add_value id p s =
+  { s with values = Values.add [id, p] s.values; last_compose = None }
+
+let add_values vals s =
+  { s with values = Values.add vals s.values; last_compose = None }
+
+let add_lazy_values vals s =
+  { s with values = Values.add_lazy vals s.values; last_compose = None }
 
 type additional_action_config =
   | Duplicate_variables
@@ -378,18 +474,7 @@ let attrs s x =
       else x
   | No_action -> x
 
-let rec module_path s path =
-  match Path.Map.find_opt path s.modules with
-  | Some p -> p
-  | None ->
-    match path with
-    | Pident _ -> path
-    | Pdot(p, n) ->
-       Pdot(module_path s p, n)
-    | Papply(p1, p2) ->
-       Papply(module_path s p1, module_path s p2)
-    | Pextra_ty _ ->
-       fatal_error "Subst.module_path"
+let module_path s path = module_path s.modules path
 
 let modtype_path s path =
       match Path.Map.find path s.modtypes with
@@ -418,12 +503,11 @@ let jkind_path s path =
     | Papply(_, _) | Pextra_ty _ ->
        fatal_error "Subst.jkind_path"
 
-(* For values, extension constructors, classes and class types *)
-let value_path s path =
+let extension_constructor_path s path =
   match path with
   | Pident _ -> path
   | Pdot(p, n) -> Pdot(module_path s p, n)
-  | Papply _ | Pextra_ty _ -> fatal_error "Subst.value_path"
+  | Papply _ | Pextra_ty _ -> fatal_error "Subst.extension_constructor_path"
 
 let rec type_path s path =
   match Path.Map.find path s.types with
@@ -440,7 +524,7 @@ let rec type_path s path =
          match extra with
          | Pcstr_ty _ | Punboxed_ty ->
            Pextra_ty (type_path s p, extra)
-         | Pext_ty -> Pextra_ty (value_path s p, extra)
+         | Pext_ty -> Pextra_ty (extension_constructor_path s p, extra)
 
 let to_subst_by_type_function s p =
   match Path.Map.find p s.types with
@@ -1177,24 +1261,27 @@ let rename_bound_idents scoping s sg =
     | Make_local -> rename_ident s
     | Rescope scope -> (fun id -> create_scoped ~scope (name id))
   in
-  let rec rename_bound_idents s sg = function
-    | [] -> sg, s
+  let rec rename_bound_idents s values sg = function
+    | [] -> sg, add_values values s
     | Sig_type(id, td, rs, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents
           (add_type id (Pident id') s)
+          values
           (Sig_type(id', td, rs, vis) :: sg)
           rest
     | Sig_module(id, pres, md, rs, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents
           (add_module id (Pident id') s)
+          values
           (Sig_module (id', pres, md, rs, vis) :: sg)
           rest
     | Sig_modtype(id, mtd, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents
           (add_modtype id (Pident id') s)
+          values
           (Sig_modtype(id', mtd, vis) :: sg)
           rest
     | Sig_class(id, cd, rs, vis) :: rest ->
@@ -1202,6 +1289,7 @@ let rename_bound_idents scoping s sg =
         let id' = rename id in
         rename_bound_idents
           (add_type id (Pident id') s)
+          values
           (Sig_class(id', cd, rs, vis) :: sg)
           rest
     | Sig_class_type(id, ctd, rs, vis) :: rest ->
@@ -1209,23 +1297,28 @@ let rename_bound_idents scoping s sg =
         let id' = rename id in
         rename_bound_idents
           (add_type id (Pident id') s)
+          values
           (Sig_class_type(id', ctd, rs, vis) :: sg)
           rest
     | Sig_value(id, vd, vis) :: rest ->
         (* scope doesn't matter for value identifiers. *)
         let id' = rename_ident s id in
-        rename_bound_idents s (Sig_value(id', vd, vis) :: sg) rest
+        rename_bound_idents s
+          ((id, Pident id') :: values)
+          (Sig_value(id', vd, vis) :: sg)
+          rest
     | Sig_typext(id, ec, es, vis) :: rest ->
         let id' = rename id in
-        rename_bound_idents s (Sig_typext(id',ec,es,vis) :: sg) rest
+        rename_bound_idents s values (Sig_typext(id',ec,es,vis) :: sg) rest
     | Sig_jkind (id, jkd, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents
           (add_jkind id (Pident id') s)
+          values
           (Sig_jkind(id', jkd, vis) :: sg)
           rest
   in
-  rename_bound_idents s [] sg
+  rename_bound_idents s [] [] sg
 
 module To_lazy = Types.Map_wrapped(Types)(Lazy_types)
 
@@ -1408,6 +1501,7 @@ and compose s1 s2 =
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
           jkinds = merge_path_maps (jkind_replacement s2) s1.jkinds s2.jkinds;
+          values = Values.compose s1.values s2.modules s2.values;
           additional_action = begin
             match s1.additional_action, s2.additional_action with
             | action, No_action | No_action, action -> action

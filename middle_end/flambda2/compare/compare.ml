@@ -445,12 +445,13 @@ and subst_apply env apply =
   let inlining_state = Apply_expr.inlining_state apply in
   let relative_history = Apply_expr.relative_history apply in
   let position = Apply_expr.position apply in
+  let yielding = Apply_expr.yielding apply in
   let args_arity = Apply_expr.args_arity apply in
   let return_arity = Apply_expr.return_arity apply in
   let callsite_counter = Apply_expr.callsite_counter apply in
   Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind
     ~return_mode dbg ~callsite_counter ~inlined ~inlining_state ~probe:None
-    ~position ~relative_history ~args_arity ~return_arity
+    ~position ~yielding ~relative_history ~args_arity ~return_arity
   |> Expr.create_apply
 
 and subst_apply_cont env apply_cont =
@@ -1036,6 +1037,7 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
          (Apply.inlining_state apply1)
          (Apply.inlining_state apply2)
     && Apply.Position.equal (Apply.position apply1) (Apply.position apply2)
+    && Apply.Yielding.equal (Apply.yielding apply1) (Apply.yielding apply2)
     && Flambda_arity.equal_exact (Apply.args_arity apply1)
          (Apply.args_arity apply2)
     && Flambda_arity.equal_exact
@@ -1076,6 +1078,7 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
             ~inlined:(Apply.inlined apply1)
             ~inlining_state:(Apply.inlining_state apply1)
             ~probe:None ~position:(Apply.position apply1)
+            ~yielding:(Apply.yielding apply1)
             ~relative_history:(Apply_expr.relative_history apply1)
             ~args_arity:(Apply_expr.args_arity apply1)
             ~return_arity:(Apply_expr.return_arity apply1)

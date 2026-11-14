@@ -168,3 +168,18 @@ The error is reported
 We can locate the value that was used incorrectly
   $ $MERLIN single locate -position 5:18 -filename unboxed.ml < unboxed.ml | jq .value.pos -c
   {"line":3,"col":6}
+
+Assigning a branching expression to an unbound record field
+  $ cat > unbound_field.ml <<EOF
+  > let f r = r.l <- (if true then 1 else 2)
+  > EOF
+
+  $ $MERLIN single errors -filename unbound_field.ml < unbound_field.ml \
+  >   | revert-newlines \
+  >   | jq .value[].message -r
+  Unbound record field l
+
+  $ $MERLIN single type-enclosing -position 1:23 -filename unbound_field.ml < unbound_field.ml \
+  >   | revert-newlines \
+  >   | jq .value[0].type -r
+  bool

@@ -15,7 +15,6 @@ end @ static) -> struct
   let () = incr calls
   let initial = !X.counter
   let[@inline never] poly_ with_stamp x =
-    incr calls;
     incr X.counter;
-    #(X.offset + !X.counter, x)
+    #(X.offset + !X.counter, counted_id x)
 end

@@ -103,6 +103,7 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Laws_not_supported
   | Unrepresentable_include of Env.unrepresentable_item
   | Unrepresentable_open of Env.unrepresentable_item
   | Unrepresentable_argument of
@@ -2746,6 +2747,8 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) ~md_
         Signature_names.check_jkind names decl.jkind_loc decl.jkind_id;
         let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
         mksig (Tsig_jkind decl) env loc, [item], newenv
+    | Psig_law _ ->
+        Error.log_and_raise loc env Laws_not_supported
   in
   let rec transl_sig env sig_items sig_type sig_type_include_functor = function
     | [] -> List.rev sig_items, List.rev sig_type, env
@@ -3822,19 +3825,19 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       as mty_functor ->
       let mm_param = with_locality_as_regionality mm_param in
       let mm_res = with_locality_as_regionality mm_res in
-      let apply_error () =
+      let apply_error () : Includemod.Apply_error.t =
         let args = List.map simplify_app_summary args in
         let mty_f = md_f.mod_type in
         let app_name = match sfunct.pmod_desc with
           | Pmod_ident l -> Includemod.Named_leftmost_functor l.txt
           | _ -> Includemod.Anonymous_functor
         in
-        Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args}
+        { loc=apply_loc;env;app_name;mty_f;args }
       in
       let funct_mode = mode_without_locks_exn funct.mod_mode in
       begin match app_view with
       | { arg = None; loc = app_loc; attributes = app_attributes; _ } ->
-          Typing_recovery.log_or_raise (apply_error ());
+          Includemod.Apply_error.log_or_raise (apply_error ());
           { mod_desc =
               Tmod_apply_unit
                 (funct,
@@ -3854,7 +3857,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
               arg.mod_type mty_param
               ~modes:(Specific (arg.mod_mode, mm_param))
         with Includemod.Error _ ->
-          Typing_recovery.log_or_raise (apply_error ());
+          Includemod.Apply_error.log_or_raise (apply_error ());
           Tcoerce_none
       in
       let mty_appl =
@@ -3945,8 +3948,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         | Pmod_ident l -> Includemod.Named_leftmost_functor l.txt
         | _ -> Includemod.Anonymous_functor
       in
-      Typing_recovery.log_and_raise
-        (Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args})
+      Includemod.Apply_error.log_and_raise
+        { loc=apply_loc;env;app_name;mty_f;args }
 
 and type_open_decl ?used_slot ?toplevel ~funct_body names env sod =
   Builtin_attributes.warning_scope sod.popen_attributes
@@ -4501,6 +4504,8 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
         in
         let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
         Tstr_jkind decl, [item], shape_map, env
+    | Pstr_law _ ->
+        Error.log_and_raise loc env Laws_not_supported
   in
   let toplevel_sig =
     (* See comment on [type_structure] above *)
@@ -5858,6 +5863,8 @@ let report_error ~loc env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
+  | Laws_not_supported ->
+      Location.errorf ~loc "Laws are not supported yet."
   | Unrepresentable_include unrep ->
       Location.errorf ~loc ~sub:[unrepresentable_item_msg env unrep]
         "This module contains unrepresentable items, so it cannot be included."

@@ -1,0 +1,157 @@
+Entry point: 0
+
+==== 0 () ====
+  v8 = fun(v7){2 ()}
+  (assign) v10 = v8
+  v11 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__f_1"j, v10) 
+  v13 = fun(v12){3 ()}
+  (assign) v18 = v13
+  v19 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__call_unyielding_2"j, v18) 
+  v21 = fun(v20){5 ()}
+  (assign) v26 = v21
+  v27 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__call_yielding_3"j, v26) 
+  v29 = fun(v28){7 ()}
+  (assign) v31 = v29
+  v32 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__fn[unyielding.ml:25,63--76]_5"j, v31) 
+  v34 = fun(v33){8 ()}
+  (assign) v36 = v34
+  v37 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__call_with_unyielding_arg_4"j, v36) 
+  v44 = fun(v43){10 ()}
+  (assign) v45 = v44
+  v46 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__curried_6"j, v45) 
+  v48 = fun(v47){11 ()}
+  (assign) v54 = v48
+  v55 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__over_app_7"j, v54) 
+  v58 = fun(v56, v57){13 ()}
+  (assign) v60 = v58
+  v61 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__add_8"j, v60) 
+  (assign) v4 = v60
+  v2 = fun(v1){1 ()}
+  (assign) v3 = v2
+  (assign) v62 = v2
+  v63 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_add_9"j, v62) 
+  v65 = fun(v64){14 ()}
+  (assign) v68 = v65
+  v69 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_app_10"j, v68) 
+  v71 = CONST{0}
+  v72 = v18(v71)
+  branch 15 (v72)
+
+==== 1 () ====
+  v5 = CONST{1}
+  v6 = v4~(v5, v1)
+  return v6
+
+==== 2 () ====
+  event unyielding.ml:15:25
+  v9 = v7 + 1
+  event unyielding.ml:15:30
+  return v9
+
+==== 3 () ====
+  v15 = CONST{41}
+  v16 = v10(v15)
+  branch 4 (v16)
+
+==== 4 (v14) ====
+  event unyielding.ml:18:40
+  v17 = v14 + 1
+  event unyielding.ml:18:48
+  return v17
+
+==== 5 () ====
+  v23 = CONST{0}
+  v24 = v20~(v23)
+  branch 6 (v24)
+
+==== 6 (v22) ====
+  event unyielding.ml:21:66
+  v25 = v22 + 1
+  event unyielding.ml:21:74
+  return v25
+
+==== 7 () ====
+  v30 = CONST{7}
+  return v30
+
+==== 8 () ====
+  v35 = v26(v31)
+  return v35
+
+==== 9 () ====
+  event unyielding.ml:31:11
+  v42 = v41 + v38
+  event unyielding.ml:31:16
+  return v42
+
+==== 10 () ====
+  event unyielding.ml:30:10
+  event unyielding.ml:30:18
+  (assign) v41 = v43
+  v39 = fun(v38){9 ()}
+  (assign) v40 = v39
+  return v39
+
+==== 11 () ====
+  v50 = CONST{1}
+  v51 = v45(v50)
+  branch 12 (v51)
+
+==== 12 (v49) ====
+  v52 = CONST{2}
+  v53 = v49(v52)
+  return v53
+
+==== 13 () ====
+  event unyielding.ml:37:29
+  v59 = v56 + v57
+  event unyielding.ml:37:34
+  return v59
+
+==== 14 () ====
+  v66 = CONST{5}
+  v67 = v62(v66)
+  return v67
+
+==== 15 (v70) ====
+  event unyielding.ml:44:10
+  event unyielding.ml:44:37
+  v74 = CONST{0}
+  v75 = v36(v74)
+  branch 16 (v75)
+
+==== 16 (v73) ====
+  event unyielding.ml:45:10
+  event unyielding.ml:45:46
+  v78 = fun(v77){18 ()}
+  (assign) v80 = v78
+  v81 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__fn[unyielding.ml:46,33--46]_11"j, v80) 
+  v82 = v26~(v80)
+  branch 17 (v82)
+
+==== 17 (v76) ====
+  event unyielding.ml:46:10
+  event unyielding.ml:46:63
+  v84 = CONST{0}
+  v85 = v54(v84)
+  branch 19 (v85)
+
+==== 18 () ====
+  v79 = CONST{8}
+  return v79
+
+==== 19 (v83) ====
+  event unyielding.ml:47:10
+  event unyielding.ml:47:30
+  v87 = CONST{0}
+  v88 = v68(v87)
+  branch 20 (v88)
+
+==== 20 (v86) ====
+  event unyielding.ml:48:10
+  event unyielding.ml:48:33
+  v89 = imm{tag=0; 0 = v10; 1 = v18; 2 = v26; 3 = v36; 4 = v45; 5 = v54; 6 = v60; 7 = v62; 8 = v68}
+  v90 = "caml_register_global"(v89, "Unyielding"j)
+  stop
+
+

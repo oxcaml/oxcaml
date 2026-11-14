@@ -634,7 +634,8 @@ val nondep_jkind_declaration:
         (* Same for jkind declarations. *)
 
 (*val correct_abbrev: Env.t -> Path.t -> type_expr list -> type_expr -> unit*)
-val is_contractive: Env.t -> Path.t -> bool
+(** Check whether a type constructor is contractive, assuming `-rectypes`. *)
+val is_contractive_with_rectypes: Env.t -> Path.t -> bool
 val normalize_type: type_expr -> unit
 
 val remove_mode_and_jkind_variables:
@@ -768,6 +769,11 @@ val type_jkind_purely : Env.t -> type_expr -> jkind_l
    principally known. Useful to instantiate [jkind_of_type] in various
    functions exported by [Jkind]. *)
 val type_jkind_purely_if_principal : Env.t -> type_expr -> jkind_l option
+
+(* Get the base of the jkind of a type, expanding it and looking through
+   [[@@unboxed]] types. *)
+val type_jkind_base :
+  Env.t -> type_expr -> Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
 
 (* Helper functions for creating jkind contexts *)
 val mk_jkind_context :

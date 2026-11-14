@@ -234,7 +234,7 @@ Line 1, characters 0-53:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
-       but it is injective invariant.
+       but it is invariant.
 |}]
 
 type -'a contravariant_bad = #{ mutable x : 'a; y : int }
@@ -244,7 +244,7 @@ Line 1, characters 0-57:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be contravariant,
-       but it is injective invariant.
+       but it is invariant.
 |}]
 
 type !'a injective_invariant = #{ mutable x : 'a; y : int }
