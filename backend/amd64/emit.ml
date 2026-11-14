@@ -2068,6 +2068,22 @@ let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
   | Load op -> emit_simd ~mode:(mode, Load) op i
   | Store op -> emit_simd ~mode:(mode, Store_modify) op i
 
+let emit_combine_edx_eax dst =
+  let rdx = X86_ast.Reg64 RDX in
+  (* RDTSC and RDPMC fill the low 32 bits of the result registers. On
+     processors that support the Intel 64 architecture, the high-order
+     32 bits of each of RAX and RDX are cleared. *)
+  (* Combine edx and eax into a single 64-bit result. *)
+  I.sal (int 32) rdx;
+  (* Preserve the shifted high half when the destination is rdx. *)
+  match reg64 dst with
+  | RAX -> I.or_ rdx (reg dst)
+  | RDX -> I.or_ rax (reg dst)
+  | RBX | RCX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14
+  | R15 ->
+    I.mov rax (reg dst);
+    I.or_ rdx (reg dst)
+
 let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
@@ -2613,35 +2629,13 @@ let emit_instr ~first ~last ~fallthrough i =
     assert (Reg.same_loc ifnot i.res.(0));
     let taken c = I.cmov c (reg ifso) (res i 0) in
     emit_test i tst ~taken
-  | Lop (Specific Irdtsc) -> (
+  | Lop (Specific Irdtsc) ->
     I.rdtsc ();
-    let rdx = X86_ast.Reg64 RDX in
-    (* The instruction fills in the low 32 bits of the result registers. *)
-    (* Combine edx and eax into a single 64-bit result. *)
-    I.sal (int 32) rdx;
-    (* shift edx to the high part of rdx *)
-    (* On processors that support the Intel 64 architecture, the high-order 32
-       bits of each of RAX and RDX are cleared. *)
-    match reg64 i.res.(0) with
-    | RAX -> I.or_ rdx (res i 0) (* combine high and low into rax *)
-    | RDX -> I.or_ rax (res i 0) (* combine high and low into rdx *)
-    | RBX | RCX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14
-    | R15 ->
-      (* combine high and low into res *)
-      I.mov rax (res i 0);
-      I.or_ rdx (res i 0))
+    emit_combine_edx_eax i.res.(0)
   | Lop (Specific Irdpmc) ->
     assert (equal_reg64 (arg64 i 0) RCX);
     I.rdpmc ();
-    let rdx = X86_ast.Reg64 RDX in
-    (* The instruction fills in the low 32 bits of the result registers. *)
-    (* Combine edx and eax into a single 64-bit result. *)
-    I.sal (int 32) rdx;
-    (* shift edx to the high part of rdx *)
-    I.mov eax (res32 i 0);
-    (* zero-extend eax *)
-    I.or_ rdx (res i 0)
-    (* combine high and low into rax *)
+    emit_combine_edx_eax i.res.(0)
   | Lop (Specific Ilfence) -> I.lfence ()
   | Lop (Specific Isfence) -> I.sfence ()
   | Lop (Specific Imfence) -> I.mfence ()

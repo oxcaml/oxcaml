@@ -1188,3 +1188,79 @@ bs_cas_int64:
   incq  %rax
   ret
 |}]
+
+(* The return positions exercise the counter result in rax, rbx and rdx.
+   In particular, combining the halves must not overwrite the high half
+   when the destination is rdx. These functions are compiled, not called:
+   executing RDPMC requires performance-counter access. *)
+let rdpmc_rax counter = Builtins.rdpmc counter
+[%%expect_asm X86_64{|
+rdpmc_rax:
+  movq  %rax, %rcx
+  rdpmc
+  salq  $32, %rdx
+  orq   %rdx, %rax
+  ret
+|}]
+
+let rdpmc_rbx counter = #(#0L, Builtins.rdpmc counter)
+[%%expect_asm X86_64{|
+rdpmc_rbx:
+  movq  %rax, %rcx
+  rdpmc
+  salq  $32, %rdx
+  movq  %rax, %rbx
+  orq   %rdx, %rbx
+  xorl  %eax, %eax
+  ret
+|}]
+
+let rdpmc_rdx counter = #(#0L, #0L, #0L, #0L, Builtins.rdpmc counter)
+[%%expect_asm X86_64{|
+rdpmc_rdx:
+  movq  %rax, %rcx
+  rdpmc
+  salq  $32, %rdx
+  orq   %rax, %rdx
+  xorl  %esi, %esi
+  xorl  %edi, %edi
+  xorl  %ebx, %ebx
+  xorl  %eax, %eax
+  ret
+|}]
+
+let rdtsc_rax () = Builtins.rdtsc ()
+[%%expect_asm X86_64{|
+rdtsc_rax:
+  movl  $1, %eax
+  rdtsc
+  salq  $32, %rdx
+  orq   %rdx, %rax
+  ret
+|}]
+
+let rdtsc_rbx () = #(#0L, Builtins.rdtsc ())
+[%%expect_asm X86_64{|
+rdtsc_rbx:
+  movl  $1, %eax
+  rdtsc
+  salq  $32, %rdx
+  movq  %rax, %rbx
+  orq   %rdx, %rbx
+  xorl  %eax, %eax
+  ret
+|}]
+
+let rdtsc_rdx () = #(#0L, #0L, #0L, #0L, Builtins.rdtsc ())
+[%%expect_asm X86_64{|
+rdtsc_rdx:
+  movl  $1, %eax
+  rdtsc
+  salq  $32, %rdx
+  orq   %rax, %rdx
+  xorl  %esi, %esi
+  xorl  %edi, %edi
+  xorl  %ebx, %ebx
+  xorl  %eax, %eax
+  ret
+|}]
