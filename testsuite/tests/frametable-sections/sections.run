@@ -1,0 +1,66 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# First, run the program to make sure it works.
+${program}
+
+asm=${test_build_directory}/sections.s
+obj=${test_build_directory}/sections.o
+
+piece='\.section[[:space:]]+caml_frametable_pieces,"ao",[@%]progbits,'
+
+count () {
+  grep -c -E "$1" "$asm"
+}
+
+# Pieces linked to the unit's functions.
+n=$(count "${piece}camlSections__.*_code\$")
+if [ "$n" -ge 1 ]; then echo "function pieces: some"; \
+  else echo "function pieces: NONE"; fi
+
+# No plain (non link-order) piece: the linker would keep it whether or not
+# the function it describes is kept.
+plain=$(grep -E '^[[:space:]]*\.section[[:space:]]+caml_frametable_pieces' \
+  "$asm" | grep -vc '"ao"')
+echo "plain pieces: $plain"
+
+# Exactly one piece linked to code_begin, which keeps the section alive.
+echo "code_begin pieces: $(count "${piece}camlSections__code_begin\$")"
+
+# Exactly one count, also linked to code_begin.
+echo "counts: $(count 'caml_frametable_counts,')"
+echo "code_begin counts: $(count \
+  '\.section[[:space:]]+caml_frametable_counts,"ao",[@%]progbits,camlSections__code_begin$')"
+
+# The unit's frametable symbol names a header: the -1 tag, then the offsets
+# to the start and end of the pieces section and of the counts section.
+n=$(awk '
+  hdr == 1 && $NF == "-1" { hdr = 2; next }
+  hdr == 2 && /__start_caml_frametable_pieces/ { hdr = 3; next }
+  hdr == 3 && /__stop_caml_frametable_pieces/ { hdr = 4; next }
+  hdr == 4 && /__start_caml_frametable_counts/ { hdr = 5; next }
+  hdr == 5 && /__stop_caml_frametable_counts/ { n++ }
+  { hdr = (/^camlSections__frametable:/) ? 1 : 0 }
+  END { print n + 0 }' "$asm")
+echo "headers: $n"
+
+# The start and stop symbols are hidden, so that each executable or shared
+# object refers to its own sections.
+echo "hidden: $(count '\.hidden[[:space:]]+__(start|stop)_caml_frametable_(pieces|counts)$')"
+
+# In the object file, every caml_frametable_pieces section is link-order
+# (flag L) and linked to a text section.
+readelf -S -W "$obj" | sed 's/\[ */[/' | awk '
+  $1 ~ /^\[[0-9]+\]$/ {
+    idx = substr($1, 2, length($1) - 2)
+    name[idx] = $2
+    if ($2 == "caml_frametable_pieces") { n++; flags[n] = $8; link[n] = $9 }
+  }
+  END {
+    bad = 0
+    for (i = 1; i <= n; i++)
+      if (flags[i] !~ /L/ || name[link[i]] !~ /^\.text\.caml\./) bad++
+    print "object pieces: " (n > 0 ? "some" : "NONE")
+    print "unlinked object pieces: " bad
+  }'

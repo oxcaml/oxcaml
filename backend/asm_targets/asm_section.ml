@@ -57,6 +57,8 @@ type t =
   | Note_ocaml_eh
   | Note_gnu_stack
   | Debuginfo_strings
+  | Frametable_piece of { link_symbol : string }
+  | Frametable_count of { link_symbol : string }
   | Custom of
       { names : string list;
         flags : string option;
@@ -89,7 +91,8 @@ let is_delayed = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
   | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
-  | Note_gnu_stack | Debuginfo_strings ->
+  | Note_gnu_stack | Debuginfo_strings | Frametable_piece _ | Frametable_count _
+    ->
     false
   | Custom { is_delayed; _ } -> is_delayed
 
@@ -121,6 +124,10 @@ let print ppf t =
     | Note_ocaml_eh -> "Note_ocaml_eh"
     | Note_gnu_stack -> "Note_gnu_stack"
     | Debuginfo_strings -> "Debuginfo_strings"
+    | Frametable_piece { link_symbol } ->
+      Printf.sprintf "(Frametable_piece -> %s)" link_symbol
+    | Frametable_count { link_symbol } ->
+      Printf.sprintf "(Frametable_count -> %s)" link_symbol
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
@@ -145,7 +152,7 @@ let section_is_text = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
   | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack
-  | Debuginfo_strings ->
+  | Debuginfo_strings | Frametable_piece _ | Frametable_count _ ->
     false
   | Custom { flags; _ } -> (
     (* Check if the section is executable based on flags *)
@@ -159,6 +166,12 @@ type section_details =
     args : string list;
     is_delayed : bool
   }
+
+let progbits (arch : Target_system.architecture) =
+  (* "@" starts a comment on ARM *)
+  match arch with
+  | ARM | AArch64 -> "%progbits"
+  | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
 
 let details t first_occurrence =
   let first_occurrence =
@@ -270,13 +283,19 @@ let details t first_occurrence =
       ["__TEXT"; "__cstring"], None, ["cstring_literals"]
     | Debuginfo_strings, arch, _ ->
       (* "aMS" = SHF_ALLOC | SHF_MERGE | SHF_STRINGS; de-duped by linker *)
-      let progbits =
-        match arch with
-        | ARM | AArch64 -> "%progbits"
-        | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
-      in
-      [".rodata.str1.1"], Some "aMS", [progbits; "1"]
+      [".rodata.str1.1"], Some "aMS", [progbits arch; "1"]
     (* 1 = characters *)
+    | ( (Frametable_piece _ | Frametable_count _),
+        _,
+        (MacOS_like | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin) ) ->
+      Misc.fatal_error "Frametable sections are only supported on ELF targets"
+    (* "ao" = SHF_ALLOC | SHF_LINK_ORDER; the linker drops the section together
+       with the section defining [link_symbol]. The names are C identifiers, so
+       that these sections have start and stop symbols. *)
+    | Frametable_piece { link_symbol }, arch, _ ->
+      ["caml_frametable_pieces"], Some "ao", [progbits arch; link_symbol]
+    | Frametable_count { link_symbol }, arch, _ ->
+      ["caml_frametable_counts"], Some "ao", [progbits arch; link_symbol]
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in
@@ -339,3 +358,27 @@ let to_string t =
     details t `First_occurrence
   in
   String.concat " " names
+
+let is_c_identifier name =
+  let is_letter = function
+    | 'A' .. 'Z' | 'a' .. 'z' | '_' -> true
+    | _ -> false
+  in
+  let is_digit = function '0' .. '9' -> true | _ -> false in
+  String.length name > 0
+  && is_letter name.[0]
+  && String.for_all (fun c -> is_letter c || is_digit c) name
+
+let bound_symbol prefix t =
+  let name = to_string t in
+  (* The linker defines the symbol only if C code could refer to it. *)
+  if not (is_c_identifier name)
+  then
+    Misc.fatal_errorf
+      "Section %s has no start and stop symbols: its name is not a C identifier"
+      name;
+  Asm_symbol.create_without_encoding ~visibility:Global (prefix ^ name)
+
+let start_symbol t = bound_symbol "__start_" t
+
+let stop_symbol t = bound_symbol "__stop_" t

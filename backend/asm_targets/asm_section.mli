@@ -58,6 +58,13 @@ type t =
   | Note_ocaml_eh
   | Note_gnu_stack
   | Debuginfo_strings  (** Mergeable string section for debuginfo strings *)
+  | Frametable_piece of { link_symbol : string }
+      (** Frame descriptors linked (SHF_LINK_ORDER) to the section defining the
+          already-encoded [link_symbol], for [-frametable-sections] (ELF only)
+      *)
+  | Frametable_count of { link_symbol : string }
+      (** A unit's count of its frame descriptors, linked like a
+          [Frametable_piece] *)
   | Custom of
       { names : string list;
         flags : string option;
@@ -68,6 +75,13 @@ type t =
           not covered by the other variants. *)
 
 val to_string : t -> string
+
+(** The symbols that the linker defines at the start and end of the output
+    section into which it merges all the sections with this one's name (ELF
+    only). The name must be a C identifier. *)
+val start_symbol : t -> Asm_symbol.t
+
+val stop_symbol : t -> Asm_symbol.t
 
 val of_names : string list -> t option
 

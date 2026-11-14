@@ -61,6 +61,23 @@
  * Within a frametable, descriptors are concatenated in increasing
  * return-address order.
  *
+ * A unit's frametable is normally a native-word descriptor count
+ * followed by the descriptors. A unit compiled with
+ * -frametable-sections instead has a header, a
+ * [caml_frametable_sections_header] (see below).
+ *
+ * Each function's descriptors form a "piece" in a section linked to
+ * the function's code (SHF_LINK_ORDER), so the linker keeps the piece
+ * exactly when it keeps the code. The linker merges the pieces of all
+ * the units in an executable or shared object into one section, in no
+ * particular order, and every unit's header points to all of it (via
+ * the linker-defined __start_ and __stop_ symbols), so the runtime
+ * enters the section into the hashtable only once. The pieces are
+ * byte-contiguous, with no count or padding, and each starts with an
+ * escaped descriptor. The counts section, merged likewise, is an array
+ * of intnat, one per unit, each the number of descriptors in the
+ * unit's pieces; their sum bounds the number in the pieces section.
+ *
  * There are three descriptor layouts: "short", "medium", and "long".
  *
  * Almost all descriptors are "short". A short descriptor is preceded
@@ -135,9 +152,11 @@
  *
  * Each debug word is the byte offset, from its own address, of a
  * debuginfo record chain or suffix-sharing jump word (see
- * runtime/backtrace_nat.c); these are emitted after the descriptors,
- * so the offset is positive. In an allocating frame a zero word means
- * that allocation has no debuginfo. */
+ * runtime/backtrace_nat.c). The offset is signed: the records follow
+ * the descriptors of a count-prefixed table, but under
+ * -frametable-sections they follow the header, which may precede the
+ * pieces. In an allocating frame a zero word means that allocation has
+ * no debuginfo. */
 
 typedef unsigned char frame_descr;
 
@@ -148,6 +167,19 @@ typedef unsigned char frame_descr;
 #define FRAME_LONG_MARKER 0x7FFF
 
 #define FRAME_DELTA_ESCAPE 0
+
+/* A count is never negative */
+#define FRAMETABLE_SECTIONS_TAG ((intnat)-1)
+
+/* The frametable of a unit compiled with -frametable-sections. Each [_rel]
+   field holds the offset from the field itself to its target. */
+typedef struct {
+  intnat tag;               /* FRAMETABLE_SECTIONS_TAG */
+  int32_t pieces_start_rel; /* the pieces section */
+  int32_t pieces_stop_rel;  /* its end */
+  int32_t counts_start_rel; /* the counts section */
+  int32_t counts_stop_rel;  /* its end */
+} caml_frametable_sections_header;
 
 /* The eight most common GC-root registers. The compiler
  * (frame_hot_regs in backend/<arch>/arch.ml) and the runtime must
@@ -298,6 +330,11 @@ void caml_unregister_frametable(void *table);
 /* a linked list of frametables */
 typedef struct caml_frametable_list {
   intnat* frametable;
+  /* For a -frametable-sections header: whether this is the one table
+     whose (shared) pieces section has been entered into the hashtable */
+  bool owns_pieces;
+  /* If so, the next registered table that owns a pieces section */
+  struct caml_frametable_list *next_owner;
   struct caml_frametable_list *next;
 } caml_frametable_list;
 

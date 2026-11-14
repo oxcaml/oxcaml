@@ -41,6 +41,9 @@ val switch_to_section_raw :
   is_delayed:bool ->
   unit
 
+(** The section that subsequent directives are emitted to. *)
+val current_section : unit -> Asm_section.t
+
 (** Abbreviation for [switch_to_section Text]. *)
 val text : unit -> unit
 
@@ -323,6 +326,11 @@ val between_labels_32_bit_with_offsets :
     the assembler is currently emitting into. *)
 val between_this_and_label_offset_32bit_expr :
   upper:Asm_label.t -> offset_upper:Targetint.t -> unit
+
+(** Emit a 32-bit-wide expression giving the displacement obtained by
+    subtracting the current assembly location from the address of the given
+    symbol, which may be defined anywhere (it is resolved by the linker). *)
+val between_this_and_symbol_32bit_expr : Asm_symbol.t -> unit
 
 (** Emit a machine-width reference giving the displacement between the [lower]
     symbol and the sum of the address of the [upper] label plus [offset_upper].
