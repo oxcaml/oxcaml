@@ -1,5 +1,6 @@
 (* TEST
  flags = "-extension runtime_metaprogramming";
+ flat-float-array;
  expect;
 *)
 
@@ -555,4 +556,50 @@ val x : <[int64_u]> expr = <[#42L]>
 let x = <[ #("abc", #42L) ]>
 [%%expect {|
 val x : <[#(string * int64_u)]> expr = <[#("abc", #42L)]>
+|}]
+
+(* The following tests check that we cannot construct a type with an existential
+   that might both be a float and a non-float. *)
+
+(* Separability in expr *)
+
+type t = K : ('a : value). 'a expr -> t [@@unboxed]
+[%%expect {|
+type t = K : 'a expr -> t [@@unboxed]
+|}]
+
+(* Separability in quotes and splices *)
+
+type 'a s = <[$'a]>
+[%%expect {|
+type 'a s = 'a
+|}]
+
+type t = K : ('a : value). 'a s -> t [@@unboxed]
+[%%expect {|
+Line 1, characters 0-48:
+1 | type t = K : ('a : value). 'a s -> t [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of the existential variable "'a".
+       You should annotate it with "[@@ocaml.boxed]".
+|}]
+
+(* Separability in eval (and splices) *)
+
+type 'a s = 'a eval
+[%%expect {|
+type 'a s = 'a eval
+|}]
+
+type t = K : ('a : value). 'a s -> t [@@unboxed]
+[%%expect {|
+Line 1, characters 0-48:
+1 | type t = K : ('a : value). 'a s -> t [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of the existential variable "'a".
+       You should annotate it with "[@@ocaml.boxed]".
 |}]

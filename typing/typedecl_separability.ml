@@ -430,9 +430,6 @@ let check_type
     | (Tvariant(_)        , Sep    )
     | (Tobject(_,_)       , Sep    )
     | ((Tnil | Tfield _)  , Sep    )
-    | (Tquote(_)          , Sep    )
-    | (Tsplice(_)         , Sep    )
-    | (Tquote_eval(_)     , Sep    )
     | (Tbox(_)            , Sep    )
     | (Tpackage _         , Sep    )
     | (Tof_kind(_)        , Sep    ) -> empty
@@ -443,9 +440,6 @@ let check_type
     | (Tvariant(_)        , Deepsep)
     | (Tobject(_,_)       , Deepsep)
     | ((Tnil | Tfield _)  , Deepsep)
-    | (Tquote(_)          , Deepsep)
-    | (Tsplice(_)         , Deepsep)
-    | (Tquote_eval(_)     , Deepsep)
     | (Tbox(_)            , Deepsep)
     | (Tpackage _         , Deepsep) ->
         let tys = immediate_subtypes ty in
@@ -480,6 +474,11 @@ let check_type
     | (Tof_kind(_)         , _      ) -> empty
     | (Tmod(_, _)          , _      ) ->
         Misc.fatal_error "check_type: unexpected Tmod"
+    (* The parameter of quotes, splices and evals is [Sep]. *)
+    | (Tquote(ty)         , m      )
+    | (Tsplice(ty)        , m      )
+    | (Tquote_eval(ty)    , m      ) ->
+        check_type hyps ty m
     (* Type constructor case. *)
     | (Tconstr(path,tys,_), m      ) ->
         let msig = (Env.find_type path env).type_separability in

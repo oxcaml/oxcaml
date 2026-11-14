@@ -1082,7 +1082,7 @@ let decl_of_type_constr type_constr =
   | `Eval ->
     decl1
        ~variance:Variance.covariant
-       ~separability:Separability.Ind
+       ~separability:Separability.Sep
        ~manifest:(fun param ->
          newgenty (Tquote_eval (newgenty (Tsplice param))))
        ~jkind:(fun param ->
