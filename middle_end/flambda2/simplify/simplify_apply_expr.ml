@@ -214,7 +214,7 @@ let rebuild_apply
     *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
     * in *)
   let apply = if erase_callee then Apply.erase_callee apply else apply in
-  let uacc, expr =
+  let expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id ~is_cold
       (Flambda_arity.unarize_t result_arity)
       apply
@@ -276,9 +276,6 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
       let simplified_body =
         update_direct_call_benefit simplified_body ~original_call
           ~callee's_code_metadata
-      in
-      let simplified_body =
-        SE.notify_removed ~operation:Removed_operations.call simplified_body
       in
       let simplified_body =
         if is_cold then SE.mark_as_cold simplified_body else simplified_body
@@ -857,9 +854,6 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         SE.notify_removed ~operation:Removed_operations.direct_call_of_indirect
           expr
     in
-    (* Increase the counter of calls as the apply has been replaced by an
-       allocation of the partial set of closures. *)
-    let expr = SE.notify_removed ~operation:Removed_operations.call expr in
     down_to_up dacc expr
   in
   simplify_expr dacc expr ~down_to_up
