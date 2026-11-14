@@ -44,6 +44,11 @@ module Pattern : sig
 
   val var : Var.t -> 'a -> 'a t
 
+  val union : f:(Var.t -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+
+  val print :
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+
   val untag : 'a t -> 'a t
 
   type 'a block_field
