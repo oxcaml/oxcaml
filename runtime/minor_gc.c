@@ -431,15 +431,13 @@ tail_call:
         if (scannable_sz == 0) {
           return;
         } else if (scannable_sz > 1) { /* add to todo_list */
-          Field(result, 0) = field0;
           Field(result, 1) = st->todo_list;
           st->todo_list = v;
-        } else {
-          CAMLassert (scannable_sz == 1);
-          p = Op_val(result);
-          v = field0;
-          goto tail_call;
         }
+
+        p = Op_val(result);
+        v = field0;
+        goto tail_call;
       }
     }
   }
@@ -480,12 +478,6 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
       */
       CAMLassert (scannable_wosize > 1);
 
-      value f = Field(new_v, 0);
-      CAMLassert (!Is_debug_tag(f));
-      if (Is_block (f) && Is_young(f)) {
-        oldify_one (st, f, Op_val (new_v));
-      }
-
       mlsize_t i = 1;
       if(Tag_val(new_v) == Closure_tag) {
         /* non-scannable prefix already copied in oldify_one */
@@ -494,7 +486,7 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
       }
 
       for (; i < scannable_wosize; i++){
-        f = Field(v, i);
+        value f = Field(v, i);
         CAMLassert (!Is_debug_tag(f));
         if (Is_block (f) && Is_young(f)) {
           oldify_one (st, f, Op_val (new_v) + i);
@@ -698,7 +690,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                       refs_per_domain, participating_idx,
                       ref_start, ref_end);
 
-      for( r = ref_start ; r < foreign_major_ref->ptr && r < ref_end ; r++ )
+      for( r = ref_start ; r < ref_end ; r++ )
       {
         /* Because the work on the remembered set is shared, other threads may
            attempt to promote the same value; this is fine, but we need the

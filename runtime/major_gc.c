@@ -1419,7 +1419,8 @@ Caml_inline header_t mark_header(value block, header_t hd, status marked)
   header_t marked_hd;
 again:
   marked_hd = With_status_hd(hd, marked);
-  if (Tag_hd(hd) == Lazy_tag || Tag_hd(hd) == Forcing_tag) {
+  if (CAMLunlikely(Tag_hd(hd) == Lazy_tag)
+      || CAMLunlikely(Tag_hd(hd) == Forcing_tag)) {
     /* To detect and mitigate a race against some other domain
      * short-circuiting a lazy block, we compare-and-swap */
     if (!atomic_compare_exchange_strong(Hp_atomic_val(block), &hd, marked_hd)) {
@@ -1696,9 +1697,9 @@ void caml_darken(void* state, value v, volatile value* ignored) {
       hd = mark_header(v, hd, caml_global_heap_state.MARKED);
       if (Scannable_hd(hd)) {
         mark_stack_push_block(domain_state->mark_stack, v);
-        Caml_state->mark_work_done_between_slices += 1; /* just the header */
+        domain_state->mark_work_done_between_slices += 1; /* just the header */
       } else {
-        Caml_state->mark_work_done_between_slices += Whsize_hd(hd);
+        domain_state->mark_work_done_between_slices += Whsize_hd(hd);
       }
     }
   }
@@ -2587,24 +2588,21 @@ void caml_major_collection_slice(intnat howmuch)
 {
   uintnat major_slice_epoch = atomic_load (&caml_major_slice_epoch);
 
-  /* if this is an auto-triggered GC slice, make it interruptible */
-  if (howmuch == AUTO_TRIGGERED_MAJOR_SLICE) {
-    major_collection_slice(
-        AUTO_TRIGGERED_MAJOR_SLICE,
-        0,
-        0,
-        Slice_interruptible,
-        Compaction_auto
-        );
-    if (caml_incoming_interrupts_queued()) {
-      CAML_GC_MESSAGE(SLICE, "Major slice interrupted, rescheduling major slice\n");
-      caml_request_major_slice(0);
-    }
-  } else {
+  collection_slice_mode mode =
+    /* if this is an auto-triggered GC slice, make it interruptible */
     /* TODO: could make forced API slices interruptible, but would need to do
        accounting or pass up interrupt */
-    major_collection_slice(howmuch, 0, 0, Slice_uninterruptible, Compaction_auto);
+    howmuch == AUTO_TRIGGERED_MAJOR_SLICE
+    ? Slice_interruptible
+    : Slice_uninterruptible;
+
+  major_collection_slice(howmuch, 0, 0, mode, Compaction_auto);
+
+  if (mode == Slice_interruptible && caml_incoming_interrupts_queued()) {
+    CAML_GC_MESSAGE(SLICE, "Major slice interrupted, rescheduling major slice\n");
+    caml_request_major_slice(0);
   }
+
   /* Record that this domain has completed a major slice for this minor cycle.
    */
   Caml_state->major_slice_epoch = major_slice_epoch;
