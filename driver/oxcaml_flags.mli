@@ -64,6 +64,7 @@ val cfg_copy_propagation : bool ref
 
 val reorder_blocks_random : int option ref
 val module_entry_functions_section : bool ref
+val jump_table_sections : bool ref
 
 val dasm_comments : bool ref
 

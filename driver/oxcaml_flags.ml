@@ -72,6 +72,7 @@ let cfg_copy_propagation = ref false    (* -[no]-cfg-copy-propagation *)
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
 (* -module-entry-functions-section *)
 let module_entry_functions_section = ref false
+let jump_table_sections = ref false     (* -jump-table-sections *)
 
 let dasm_comments = ref false (* -dasm-comments *)
 
