@@ -1,0 +1,81 @@
+Compaction with RLE is broken. A few tests fail.
+
+This is an easy failing test case: /usr/local/home/nbarnes/o/dev/freelist-rle/_runtest/runtime/ocamlrun /home/nbarnes/local/o/dev/freelist-rle/_runtest/ocaml -noinit -no-version -noprompt  -nostdlib -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/stdlib -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/asmcomp -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/bytecomp -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/compilerlibs -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/driver -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/file_formats -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/lambda -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/middle_end -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/parsing -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/toplevel -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/typing -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/utils -I /home/nbarnes/local/o/dev/freelist-rle/_runtest/toplevel  ocamlcommon.cma
+
+The unswept large list is being corrupted in phase one of compaction.
+
+Both 'owner' and 'next' fields of the last item on the list, at
+0xfcf880, are corrupted, from
+   {owner = 0x476d70, next = 0x0}
+to {owner = 0x53,     next = 0x600}
+
+Can't get rr to work, possibly because I'm running on the wrong sort
+of machine. So gdb and some manual bisection.
+
+That block at 0xfcf880 is not corrupted by compact_phase_one_mark, but
+is corrupted before compact_run_phase reaches the end of
+EV_COMPACT_EVACUATE.
+
+In fact it's corrupted while evacuating the sizeclass 1 pools.
+
+Three pools are on the evac list. The corruption occurs while
+evacuating the second of these pools, at 0x7ffff63d0000.
+
+When evacuating that pool, to_pool starts at 0x7ffff4320000
+(gdb) p *to_pool
+$99 = {next = 0x7fffed708000, next_obj = 0xfcd0b8, owner = 0x476d70, sz = 1 '\001', evacuate = 0, chunk = 4, chunk_size = 256}
+
+Note that next_obj is not pointing inside the pool.
+
+When we start evacuating size class 0, that pool looks like this:
+
+(gdb) p *(pool*)0x7ffff4320000
+$101 = {next = 0x7fffed708000, next_obj = 0x7ffff4320040, owner = 0x476d70, sz = 1 '\001', evacuate = 0, chunk = 4, chunk_size = 256}
+
+which looks fine, but here's the free list in it:
+
+0x7ffff4320040:	0x00000000000e3ffb	0x00007ffff4323b90
+
+0x7ffff4323b90:	0x0000000000111bfb	0x0000000000fcce68
+
+Note that the "next" field of the second free run is bogus.
+
+When we first enter compact_run_phase, that pool looks like this:
+
+(gdb) p *(pool*)0x7ffff4320000
+$103 = {next = 0x0, next_obj = 0x7ffff4320040, owner = 0x476d70, sz = 1 '\001', evacuate = 0, chunk = 4, chunk_size = 256}
+
+0x7ffff4320040:	0x00000000000e3ffb	0x00007ffff4323ba0
+
+0x7ffff4323ba0:	0x00000000001117fb	0x0000000000000000
+
+Which seems legitimate to me. Note that that pool is not close to the
+head of the to_pool list.
+
+Hmm. There seems to be some non-determinism here. It's still that pool
+in question though. Starting from scratch, breaking just before we
+start evacuating the first pool, the free list in that problematic
+pool looks like this:
+
+$140 = {next = 0x7fffed708000, next_obj = 0x7ffff4320040, owner = 0x476d70, sz = 1 '\001', 
+  evacuate = 0, chunk = 4, chunk_size = 256}
+
+0x7ffff4320040:	0x00000000000e67fb	0x00007ffff4323c30
+
+0x7ffff4323c30:	0x000000000010f3fb	0x0000000000fcce68
+
+But at the start of compaction it's fine:
+
+$141 = {next = 0x0, next_obj = 0x7ffff4320040, owner = 0x476d70, sz = 1 '\001', 
+  evacuate = 0, chunk = 4, chunk_size = 256}
+
+0x7ffff4320040:	0x00000000000e67fb	0x00007ffff4323c40
+
+0x7ffff4323c40:	0x000000000010effb	0x0000000000000000
+
+Ah, this latter free block runs to the end of the pool:
+
+0x7ffff4323c40 + 16 * ((0x000000000010effb >> 10) + 1) -> 0x7ffff4328000
+
+Oh, look, the phase_one_mark code doesn't do the right thing with free
+blocks: last_free[1] needs to be set to NULL.
