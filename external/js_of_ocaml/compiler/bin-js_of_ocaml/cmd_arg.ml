@@ -59,12 +59,7 @@ type t =
   ; no_runtime : bool
   ; include_runtime : bool
   ; output_file : [ `Name of string | `Stdout ] * bool
-  ; input :
-      [ `Bytecode_file of string
-      | `Cmj of string
-      | `Bytecode_stdin
-      | `None
-      ]
+  ; input : [ `Bytecode_file of string | `Jsir_file of string | `Bytecode_stdin | `None ]
   ; params : (string * string) list
   ; static_env : (string * string) list
   ; wrap_with_fun : [ `Iife | `Named of string | `Anonymous ]
@@ -127,7 +122,7 @@ let options =
   in
   let input_file =
     let doc =
-      "Compile the bytecode program or Js_of_ocaml IR file (.cmj) [$(docv)]. "
+      "Compile the bytecode program or JSIR file (.cmj) [$(docv)]. "
       ^ "Use '-' to read from the standard input instead."
     in
     Arg.(value & pos ~rev:true 0 (some filepath) None & info [] ~docv:"PROGRAM" ~doc)
@@ -339,7 +334,11 @@ let options =
         let input =
           match input_file with
           | Some "-" -> `Bytecode_stdin
-          | Some x when Filename.check_suffix x ".cmj" -> `Cmj x
+          | Some x when Filename.check_suffix x ".cmj" || Filename.check_suffix x ".cmw"
+            ->
+              (* [.cmw] files are for wasm_of_ocaml, but reading them reports a clear
+                 error. *)
+              `Jsir_file x
           | Some x -> `Bytecode_file x
           | None -> `None
         in
@@ -349,8 +348,7 @@ let options =
           | Some s -> `Name s, true
           | None -> (
               match input with
-              | `Bytecode_file s | `Cmj s ->
-                  `Name (chop_extension s ^ ".js"), false
+              | `Bytecode_file s | `Jsir_file s -> `Name (chop_extension s ^ ".js"), false
               | `Bytecode_stdin | `None -> `Stdout, false)
         in
         let source_map =
