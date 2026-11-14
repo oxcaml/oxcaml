@@ -37,17 +37,27 @@ module Unboxed_fields : sig
     (Flambda_kind.t -> 'a -> 'b -> 'c -> 'c) -> 'a t -> 'b t -> 'c -> 'c
 
   val equal_shape : 'a t -> 'b t -> bool
+
+  val ids_for_export : ('a -> Ids_for_export.t) -> 'a t -> Ids_for_export.t
+
+  val apply_renaming : ('a -> Renaming.t -> 'a) -> 'a t -> Renaming.t -> 'a t
 end
 
 type unboxed = Variable.t Unboxed_fields.t
 
-type changed_representation =
-  | Block_representation of
-      (int * Flambda_primitive.Block_access_kind.t) Unboxed_fields.t * int
-  | Closure_representation of
-      Value_slot.t Unboxed_fields.t
-      * Function_slot.t Function_slot.Map.t
-      * Function_slot.t
+module Changed_representation : sig
+  type t =
+    | Block_representation of
+        (int * Flambda_primitive.Block_access_kind.t) Unboxed_fields.t * int
+    | Closure_representation of
+        Value_slot.t Unboxed_fields.t
+        * Function_slot.t Function_slot.Map.t
+        * Function_slot.t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
 
 type param_decision =
   | Keep of Variable.t * Flambda_kind.With_subkind.t
@@ -66,7 +76,7 @@ type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (Changed_representation.t * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
 type calling_convention_change =
@@ -77,21 +87,27 @@ type calling_convention_change =
         return_decisions : param_decision list
       }
 
-type code_changes
+module Code_changes : sig
+  type t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
 
 val get_calling_convention_change :
-  code_changes ->
+  Code_changes.t ->
   analysis_scope:Analysis_scope.t ->
   Code_id.t ->
   calling_convention_change
 
 val is_changing_calling_convention :
-  code_changes -> analysis_scope:Analysis_scope.t -> Code_id.t -> bool
+  Code_changes.t -> analysis_scope:Analysis_scope.t -> Code_id.t -> bool
 
 (* Returns [None] for code ids of units that did not participate in the
    solve. *)
 val find_code_metadata :
-  code_changes ->
+  Code_changes.t ->
   analysis_scope:Analysis_scope.t ->
   Code_id.t ->
   Code_metadata.t option
@@ -116,4 +132,4 @@ val compute_code_changes :
     Result_types.t ->
     Result_types.t Or_unknown_or_bottom.t) ->
   code_deps:Traverse_acc.Code_dep.t Code_id.Map.t ->
-  code_changes
+  Code_changes.t

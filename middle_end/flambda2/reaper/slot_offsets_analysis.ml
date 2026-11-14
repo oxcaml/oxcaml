@@ -71,7 +71,7 @@ let value_slots_to_be_built ~db ~unboxed_value_slots
 let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
     ~unboxed_fields
     ~(changed_representation :
-       (Unboxing_analysis.changed_representation * Code_id_or_name.t)
+       (Unboxing_analysis.Changed_representation.t * Code_id_or_name.t)
        Code_id_or_name.Map.t) ~closure_name (set : PTA.function_and_value_slots)
     =
   let db = uses.db in
@@ -160,7 +160,7 @@ let compute ~free_names ~analysis_scope
   let fresh_value_slots =
     Code_id_or_name.Map.fold
       (fun _ (repr, _) fresh_value_slots ->
-        match (repr : Unboxing_analysis.changed_representation) with
+        match (repr : Unboxing_analysis.Changed_representation.t) with
         | Block_representation _ -> fresh_value_slots
         | Closure_representation (unboxed_value_slots, _, _) ->
           Unboxed_fields.fold_with_kind

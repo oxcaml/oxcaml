@@ -155,6 +155,10 @@ let ids_for_export_code_id_or_name_map ids_for_export_value map =
   ids_for_export_map ~fold:Code_id_or_name.Map.fold
     ~add_ids_key:add_code_id_or_name ~ids_for_export_value map
 
+let ids_for_export_field_map ids_for_export_value map =
+  ids_for_export_map ~fold:Field.Map.fold ~add_ids_key:add_field
+    ~ids_for_export_value map
+
 module Table_data = struct
   type ids = t
 
