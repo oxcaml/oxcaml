@@ -38,3 +38,73 @@
        short
        -fno-avx))
      (run head -n 1))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (deps disabled256_call.expected disabled256_call.corrected)
+ (action
+  (progn
+   (diff disabled256_call.expected disabled256_call.corrected))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (targets disabled256_call.corrected)
+ (deps
+  (:ml disabled256_call.ml))
+ (action
+  (setenv
+   OCAMLRUNPARAM b=0
+   (with-outputs-to
+    disabled256_call.corrected
+    (pipe-outputs
+     (with-accepted-exit-codes
+      2
+      (run
+       %{bin:ocamlopt.opt}
+       %{ml}
+       -extension
+       simd
+       -color
+       never
+       -error-style
+       short
+       -fno-avx))
+     (run head -n 1))))))
+
+; Test that disabling extensions does not break code that does not need them
+
+(executable
+ (name float32_store)
+ (modules float32_store)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (ocamlopt_flags
+  (:standard -fno-avx)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (with-outputs-to
+   float32_store.out
+   (run ./float32_store.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (diff float32_store.expected float32_store.out)))

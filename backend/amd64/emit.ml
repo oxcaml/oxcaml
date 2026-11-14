@@ -101,12 +101,7 @@ let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end
 module I = struct
   include I
 
-  exception Extension_disabled of string
-
-  let () =
-    Printexc.register_printer (function
-      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
-      | _ -> None)
+  exception Extension_disabled = Arch.Extension.Disabled
 
   let require_vec256 () =
     if not (Arch.Extension.enabled_vec256 ())

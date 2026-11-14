@@ -167,14 +167,14 @@ let rbp = phys_reg Int (P RBP)
 
 (* CSE needs to know that all versions of xmm15 are destroyed. *)
 let destroy_xmm =
-  let types =
+  let types = lazy ((* To be forced after flags are parsed. *)
     ([ Float; Float32; Vec128 ] : machtype_component list)
     |> add_hard_vec256_regs ~f:(fun _ : machtype_component -> Vec256)
     |> add_hard_vec512_regs ~f:(fun _ : machtype_component -> Vec512)
-    |> Array.of_list
+    |> Array.of_list)
   in
   fun (mm_reg : [`SIMD] Regs.phys_reg_classed) ->
-    Array.map (fun t -> phys_reg t (P mm_reg)) types
+    Array.map (fun t -> phys_reg t (P mm_reg)) (Lazy.force types)
 
 let destroyed_by_plt_stub =
   if not X86_proc.use_plt then [| |] else [| r10; r11 |]
@@ -186,6 +186,29 @@ let stack_slot slot ty = Reg.create_at_location ty (Stack slot)
 (* Calling conventions *)
 
 let size_domainstate_args = 64 * size_int
+
+(* The register allocators only know about the physical registers of enabled
+   extensions, so wide registers must be rejected before they get that far. *)
+let require_extension (ty : machtype_component) =
+  let require enabled ~kind ~ext =
+    if not enabled
+    then
+      raise
+        (Arch.Extension.Disabled
+           (Printf.sprintf
+              "found %s in a function argument or result, but %s is not \
+               enabled."
+              kind ext))
+  in
+  match ty with
+  | Vec256 ->
+    require (Arch.Extension.enabled_vec256 ()) ~kind:"256-bit vector" ~ext:"AVX"
+  | Vec512 ->
+    require (Arch.Extension.enabled_vec512 ()) ~kind:"512-bit vector"
+      ~ext:"AVX512F"
+  | Mask ->
+    require (Arch.Extension.enabled_vec512 ()) ~kind:"mask" ~ext:"AVX512F"
+  | Val | Int | Addr | Float | Float32 | Vec128 | Valx2 -> ()
 
 let calling_conventions
       ~int_registers
@@ -209,6 +232,7 @@ let calling_conventions
   in
   for i = 0 to Array.length arg - 1 do
     let ty : machtype_component = arg.(i) in
+    require_extension ty;
     let registers, size, ty =
       match ty with
       | Val | Int | Addr -> int_registers, size_int, ty
@@ -550,28 +574,29 @@ let destroyed_at_small_memory_op =
 ;;
 
 let destroyed_at_single_float64_store =
-  if Config.with_address_sanitizer then
-    Array.append destroyed_at_small_memory_op (destroy_xmm MM15)
-  else
-    (destroy_xmm MM15)
-;;
+  lazy ((* To be forced after flags are parsed. *)
+    if Config.with_address_sanitizer then
+      Array.append destroyed_at_small_memory_op (destroy_xmm MM15)
+    else
+      (destroy_xmm MM15))
 
-let all_256bit_regs = []
+let all_256bit_regs = lazy ((* To be forced after flags are parsed. *)
+  []
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
-let all_simd_regs =
+let all_simd_regs = lazy ((* To be forced after flags are parsed. *)
   [hard_float32_reg; hard_float_reg; hard_vec128_reg]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
 let destroyed_by_simd_instr (instr : Simd.instr) =
   (* CR mslater: (SIMD) these don't effect regs 16-31 *)
   match[@warning "-4"] instr.id with
-  | Vzeroupper -> all_256bit_regs
-  | Vzeroall -> all_simd_regs
+  | Vzeroupper -> Lazy.force all_256bit_regs
+  | Vzeroall -> Lazy.force all_simd_regs
   | _ ->
     match instr.res with
     | Res_none | Arg _ -> [||]
@@ -624,7 +649,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Intop (Idiv _ | Imod _)) | Op (Intop_imm ((Idiv _ | Imod _), _)) ->
     destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
-    destroyed_at_single_float64_store
+    Lazy.force destroyed_at_single_float64_store
   | Op (Store ((Byte_unsigned | Byte_signed | Sixteen_unsigned |
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
                 Single { reg = Float32 } ), _, _))

@@ -210,6 +210,13 @@ module Extension = struct
   let enabled_vec256 () = enabled AVX
   let enabled_vec512 () = enabled AVX512F
 
+  exception Disabled of string
+
+  let () =
+    Printexc.register_printer (function
+      | Disabled msg -> Some ("extension disabled: " ^ msg)
+      | _ -> None)
+
   let enabled_instruction (instr : Amd64_simd_instrs.instr) =
     let enabled : Amd64_simd_defs.ext -> bool = function
       | SSE | SSE2 -> true
