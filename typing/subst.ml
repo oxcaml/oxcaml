@@ -1167,7 +1167,7 @@ let extension_constructor s ext =
 (* For every binding k |-> d of m1, add k |-> f d to m2
    and return resulting merged map. *)
 let merge_path_maps f m1 m2 =
-  Path.Map.fold (fun k d accu -> Path.Map.add k (f d) accu) m1 m2
+  Path.Map.union (fun _ d _ -> Some d) (Path.Map.map f m1) m2
 
 let merge_type_path_maps (f : type_replacement -> type_replacement)  m1 m2 =
   Path.Map.fold
