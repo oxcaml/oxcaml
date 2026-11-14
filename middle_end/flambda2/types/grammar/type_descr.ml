@@ -208,7 +208,7 @@ end = struct
 
   let[@inline always] get_alias_exn (t : _ t) =
     match t with
-    | Unknown | Bottom | Ok (No_alias _) -> raise Not_found
+    | Unknown | Bottom | Ok (No_alias _) -> raise_notrace Not_found
     | Ok (Equals alias) -> alias
 
   let apply_renaming ~apply_renaming_head ~free_names_head (t : _ t) renaming :
