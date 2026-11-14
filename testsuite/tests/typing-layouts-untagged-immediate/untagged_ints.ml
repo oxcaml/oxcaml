@@ -4,6 +4,10 @@
  {
    native;
  }{
+   (* Under js_of_ocaml, ints are 32 bits wide. *)
+   reference = "${test_source_directory}/untagged_ints.jsir-output.reference";
+   jsir;
+ }{
    bytecode;
  }{
    flags = "-extension layouts_alpha";

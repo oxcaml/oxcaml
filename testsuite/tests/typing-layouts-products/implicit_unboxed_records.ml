@@ -13,6 +13,9 @@
    flags = "-extension layouts_alpha";
    native;
  } {
+   flags = "-extension layouts_alpha";
+   jsir;
+ } {
    flags = "-extension layouts_alpha -Oclassic";
    native;
  } {

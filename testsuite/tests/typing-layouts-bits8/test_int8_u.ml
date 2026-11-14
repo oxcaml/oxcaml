@@ -1,11 +1,6 @@
 (* TEST
  include stdlib_stable;
  flags = "-extension layouts_beta";
- {
-   bytecode;
- }{
-   native;
- }
 *)
 
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"

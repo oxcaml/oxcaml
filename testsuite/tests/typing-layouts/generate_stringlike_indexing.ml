@@ -12,6 +12,8 @@ let template ~tests = {|(* TEST
  {
    native;
  }{
+   jsir;
+ }{
    flags = "-O3";
    native;
  }{
