@@ -1005,7 +1005,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
           ~callsite_counter:None (* C calls don't have counters. *)
           ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
-          ~probe:None ~position:Normal
+          ~probe:None ~position:Normal ~yielding:May_yield
           ~relative_history:(Env.relative_history_from_scoped ~loc env)
       in
       Expr_with_acc.create_apply acc apply
@@ -1246,7 +1246,7 @@ let close_effect_primitive acc env ~dbg exn_continuation
         dbg ~callsite_counter:None (* Effects don't have counters. *)
         ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
-        ~probe:None ~position:Normal
+        ~probe:None ~position:Normal ~yielding:May_yield
         ~relative_history:Inlining_history.Relative.empty
       |> Expr_with_acc.create_apply acc
     in
@@ -1924,6 +1924,7 @@ let close_exact_or_unknown_apply acc env
        probe;
        mode;
        region_close;
+       yielding;
        region;
        ghost_region;
        alloc_region;
@@ -2021,6 +2022,7 @@ let close_exact_or_unknown_apply acc env
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
+    let yielding = Apply.Yielding.from_lambda yielding in
     let apply =
       Apply.create
         ~callee:(if can_erase_callee then None else Some callee)
@@ -2031,7 +2033,7 @@ let close_exact_or_unknown_apply acc env
              ids. *)
         ~inlined:inlined_call
         ~inlining_state:(Inlining_state.default ~round:0)
-        ~probe ~position
+        ~probe ~position ~yielding
         ~relative_history:(Env.relative_history_from_scoped ~loc env)
     in
     if Flambda_features.classic_mode ()
@@ -2639,7 +2641,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         ~callsite_counter:None (* Only calls to the wrapper have counters. *)
         ~inlined:(Inlined_attribute.forward_inlined ())
         ~inlining_state:(Inlining_state.default ~round:0)
-        ~probe:None ~position:Normal
+        ~probe:None ~position:Normal ~yielding:May_yield
         ~relative_history:(Env.relative_history_from_scoped ~loc external_env)
     in
     let projection =
@@ -3747,6 +3749,10 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         continuation = return_continuation;
         exn_continuation;
         inlined = Lambda.forward_inlined_attribute ();
+        (* The full application inside the wrapper also receives the missing
+           arguments, whose modes are unknown here, so it may yield even if the
+           partial application itself cannot. *)
+        yielding = May_yield;
         mode = result_mode;
         return_arity = result_arity;
         region = my_region;
@@ -3874,6 +3880,9 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
+    (* [apply.yielding] covers the whole over-application, so it holds for both
+       the full application and this remaining one. *)
+    let yielding = Apply.Yielding.from_lambda apply.yielding in
     let return_mode =
       Alloc_mode.For_applications.from_lambda apply.mode
         ~current_alloc_region:apply_alloc_region ~current_region:apply_region
@@ -3896,7 +3905,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
              [Simplify_common.split_direct_over_application]). *)
         ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
-        ~probe ~position
+        ~probe ~position ~yielding
         ~relative_history:(Env.relative_history_from_scoped ~loc:apply.loc env)
     in
     match needs_region with

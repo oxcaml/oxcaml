@@ -92,6 +92,11 @@ val import_compilation_unit : t -> Compilation_unit.t -> t
 
 val global_data_var : t -> t * Jsir.Var.t
 
+(** Record that [var], a variable created ahead of its definition (one standing
+    for a function slot, value slot or symbol), has been bound by
+    [To_jsir_shared.bind_vars]. Raises if it has already been bound. *)
+val add_late_bound_var_exn : t -> Jsir.Var.t -> t
+
 type program =
   { program : Jsir.program;
     imported_compilation_units : Compilation_unit.Set.t

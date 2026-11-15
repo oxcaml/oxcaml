@@ -45,7 +45,7 @@ let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
         (* This should already be populated by To_jsir.let_expr_normal *)
         let symbol_var, res = To_jsir_env.get_symbol_exn env ~res symbol in
         let value_var = To_jsir_env.get_var_exn env v in
-        env, To_jsir_result.add_instr_exn res (Assign (symbol_var, value_var)))
+        env, To_jsir_shared.bind_vars ~res [symbol_var, value_var])
 
 let simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
   let fields = List.map Simple.With_debuginfo.simple fields in
@@ -269,15 +269,18 @@ let prepare_code ~env ~res ~code_id code =
         && Value_slot.Set.is_empty
              (Name_occurrences.value_slots_in_normal_projections free_names)
       in
+      let hint =
+        To_jsir_shared.closure_hint (Code0.code_metadata code) ~params
+      in
       let env =
         To_jsir_env.add_code_id env code_id ~addr ~params ~closure
-          ~closure_bound_with_code
+          ~closure_bound_with_code ~hint
       in
       let res =
         if closure_bound_with_code
         then
           To_jsir_result.add_instr_exn res
-            (Let (closure, Closure (params, (addr, []), (None, None))))
+            (Let (closure, Closure (params, (addr, []), (hint, None))))
         else res
       in
       let function_slots =
@@ -319,7 +322,12 @@ let code ~env ~res ~translate_body ~code_id code =
       ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)
-      let ({ addr; params = params_jvar; closure; closure_bound_with_code = _ }
+      let ({ addr;
+             params = params_jvar;
+             closure;
+             closure_bound_with_code = _;
+             hint = _
+           }
             : To_jsir_env.code_id) =
         To_jsir_env.get_code_id_exn env code_id
       in

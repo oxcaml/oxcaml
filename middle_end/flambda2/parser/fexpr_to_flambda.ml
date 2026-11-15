@@ -958,7 +958,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~args:((List.map (simple env)) args)
         ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
         ~callsite_counter:None ~inlined ~inlining_state ~probe:None
-        ~position:Normal ~relative_history:Inlining_history.Relative.empty
+        ~position:Normal ~yielding:May_yield
+        ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply
   | Invalid -> acc, Flambda.Expr.create_invalid (Message "Invalid from fexpr")

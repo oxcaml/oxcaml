@@ -125,15 +125,18 @@ type code_id =
   { addr : Jsir.Addr.t;
     params : Jsir.Var.t list;
     closure : Jsir.Var.t;
-    closure_bound_with_code : bool
+    closure_bound_with_code : bool;
         (** If [true], [closure] is bound to a closure for this code where the
             code itself is defined, and every [Set_of_closures] containing this
             code reuses it. Otherwise, [closure] is bound when translating a
             [Set_of_closures] containing this code. *)
+    hint : Optimization_hint.closure_hint option
+        (** The optimisation hint to attach to closures of this code. *)
   }
 
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block, its
-    parameters, and the JSIR varible corresponding to its closure. *)
+    parameters, the JSIR varible corresponding to its closure, and the hint for
+    its closures. *)
 val add_code_id :
   t ->
   Code_id.t ->
@@ -141,6 +144,7 @@ val add_code_id :
   params:Jsir.Var.t list ->
   closure:Jsir.Var.t ->
   closure_bound_with_code:bool ->
+  hint:Optimization_hint.closure_hint option ->
   t
 
 (** Map a Flambda2 function slot to the corresponding JSIR closure variable. *)
