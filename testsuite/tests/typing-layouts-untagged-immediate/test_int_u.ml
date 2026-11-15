@@ -2,11 +2,6 @@
    include stdlib_stable;
    include stdlib_upstream_compatible;
    flags = "-extension-universe beta";
-   {
-     bytecode;
-   }{
-     native;
-   }
 *)
 
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
@@ -379,54 +374,6 @@ let () =
   assert (unsigned_gt neg_100 pos_100 = true);
   assert (unsigned_gt pos_100 neg_100 = false);
 
-  (* Test unsigned div/mod primitives *)
-  let five_e_18_plus_42 = #0x4563_9182_44f4_002am in
-  (* = #5_000_000_000_000_000_042m,
-     but we don't have unsigned decimal literals *)
-
-  assert
-    (I.equal
-      (unsigned_div five_e_18_plus_42 #1_000m)
-      #5_000_000_000_000_000m);
-  assert
-    (I.equal
-      (unsigned_div five_e_18_plus_42 (id #1_000m))
-      #5_000_000_000_000_000m);
-  assert
-    (I.equal
-      (unsigned_div (id five_e_18_plus_42) #1_000m)
-      #5_000_000_000_000_000m);
-  assert
-    (I.equal
-      (unsigned_div (id five_e_18_plus_42) (id #1_000m))
-      #5_000_000_000_000_000m);
-  assert (I.equal (unsigned_mod five_e_18_plus_42 #1_000m) #42m);
-  assert (I.equal (unsigned_mod five_e_18_plus_42 (id #1_000m)) #42m);
-  assert (I.equal (unsigned_mod (id five_e_18_plus_42) #1_000m) #42m);
-  assert (I.equal (unsigned_mod (id five_e_18_plus_42) (id #1_000m)) #42m);
-
-  (* Test right-shift optimization *)
-  assert
-    (I.equal
-      (unsigned_div #0x7FFF_FFFF_FFFF_FFFFm #256m)
-      #0x7F_FFFF_FFFF_FFFFm);
-  assert
-    (I.equal
-      (unsigned_div #0x7FFF_FFFF_FFFF_FFFFm (id #256m))
-      #0x7F_FFFF_FFFF_FFFFm);
-  assert
-    (I.equal
-      (unsigned_div (id #0x7FFF_FFFF_FFFF_FFFFm) #256m)
-      #0x7F_FFFF_FFFF_FFFFm);
-  assert
-    (I.equal
-      (unsigned_div (id #0x7FFF_FFFF_FFFF_FFFFm) (id #256m))
-      #0x7F_FFFF_FFFF_FFFFm);
-  assert (I.equal (unsigned_mod #0x7FFF_FFFF_FFFF_FFFFm #256m) #255m);
-  assert (I.equal (unsigned_mod #0x7FFF_FFFF_FFFF_FFFFm (id #256m)) #255m);
-  assert (I.equal (unsigned_mod (id #0x7FFF_FFFF_FFFF_FFFFm) #256m) #255m);
-  assert (I.equal (unsigned_mod (id #0x7FFF_FFFF_FFFF_FFFFm) (id #256m)) #255m);
-
   (* Test div-by-minus-one optimization does not occur *)
   assert (I.equal (unsigned_div #42m (I.minus_one ())) #0m);
   assert (I.equal (unsigned_div #42m (id (I.minus_one ()))) #0m);
@@ -437,15 +384,66 @@ let () =
   assert (I.equal (unsigned_mod (id #42m) (I.minus_one ())) #42m);
   assert (I.equal (unsigned_mod (id #42m) (id (I.minus_one ()))) #42m);
 
-  (* Test div-by-min-int optimization does not occur *)
-  assert (I.equal (unsigned_div #0x4000_0000_0000_0042m (I.min_int ())) #1m);
-  assert (I.equal (unsigned_div #0x4000_0000_0000_0042m (id (I.min_int ()))) #1m);
-  assert (I.equal (unsigned_div (id #0x4000_0000_0000_0042m) (I.min_int ())) #1m);
-  assert (I.equal (unsigned_div (id #0x4000_0000_0000_0042m) (id (I.min_int ()))) #1m);
-  assert (I.equal (unsigned_mod #0x4000_0000_0000_0042m (I.min_int ())) #0x42m);
-  assert (I.equal (unsigned_mod #0x4000_0000_0000_0042m (id (I.min_int ()))) #0x42m);
-  assert (I.equal (unsigned_mod (id #0x4000_0000_0000_0042m) (I.min_int ())) #0x42m);
-  assert
-    (I.equal (unsigned_mod (id #0x4000_0000_0000_0042m) (id (I.min_int ()))) #0x42m);
+  (* The remaining tests need 64-bit ints (JavaScript has 32-bit ones) *)
+  if Sys.int_size = 63 then begin
+    (* Test unsigned div/mod primitives *)
+    let five_e_18_plus_42 = #0x4563_9182_44f4_002am in
+    (* = #5_000_000_000_000_000_042m,
+       but we don't have unsigned decimal literals *)
+
+    assert
+      (I.equal
+        (unsigned_div five_e_18_plus_42 #1_000m)
+        #5_000_000_000_000_000m);
+    assert
+      (I.equal
+        (unsigned_div five_e_18_plus_42 (id #1_000m))
+        #5_000_000_000_000_000m);
+    assert
+      (I.equal
+        (unsigned_div (id five_e_18_plus_42) #1_000m)
+        #5_000_000_000_000_000m);
+    assert
+      (I.equal
+        (unsigned_div (id five_e_18_plus_42) (id #1_000m))
+        #5_000_000_000_000_000m);
+    assert (I.equal (unsigned_mod five_e_18_plus_42 #1_000m) #42m);
+    assert (I.equal (unsigned_mod five_e_18_plus_42 (id #1_000m)) #42m);
+    assert (I.equal (unsigned_mod (id five_e_18_plus_42) #1_000m) #42m);
+    assert (I.equal (unsigned_mod (id five_e_18_plus_42) (id #1_000m)) #42m);
+
+    (* Test right-shift optimization *)
+    assert
+      (I.equal
+        (unsigned_div #0x7FFF_FFFF_FFFF_FFFFm #256m)
+        #0x7F_FFFF_FFFF_FFFFm);
+    assert
+      (I.equal
+        (unsigned_div #0x7FFF_FFFF_FFFF_FFFFm (id #256m))
+        #0x7F_FFFF_FFFF_FFFFm);
+    assert
+      (I.equal
+        (unsigned_div (id #0x7FFF_FFFF_FFFF_FFFFm) #256m)
+        #0x7F_FFFF_FFFF_FFFFm);
+    assert
+      (I.equal
+        (unsigned_div (id #0x7FFF_FFFF_FFFF_FFFFm) (id #256m))
+        #0x7F_FFFF_FFFF_FFFFm);
+    assert (I.equal (unsigned_mod #0x7FFF_FFFF_FFFF_FFFFm #256m) #255m);
+    assert (I.equal (unsigned_mod #0x7FFF_FFFF_FFFF_FFFFm (id #256m)) #255m);
+    assert (I.equal (unsigned_mod (id #0x7FFF_FFFF_FFFF_FFFFm) #256m) #255m);
+    assert (I.equal (unsigned_mod (id #0x7FFF_FFFF_FFFF_FFFFm) (id #256m)) #255m);
+
+    (* Test div-by-min-int optimization does not occur *)
+    assert (I.equal (unsigned_div #0x4000_0000_0000_0042m (I.min_int ())) #1m);
+    assert (I.equal (unsigned_div #0x4000_0000_0000_0042m (id (I.min_int ()))) #1m);
+    assert (I.equal (unsigned_div (id #0x4000_0000_0000_0042m) (I.min_int ())) #1m);
+    assert (I.equal (unsigned_div (id #0x4000_0000_0000_0042m) (id (I.min_int ()))) #1m);
+    assert (I.equal (unsigned_mod #0x4000_0000_0000_0042m (I.min_int ())) #0x42m);
+    assert (I.equal (unsigned_mod #0x4000_0000_0000_0042m (id (I.min_int ()))) #0x42m);
+    assert (I.equal (unsigned_mod (id #0x4000_0000_0000_0042m) (I.min_int ())) #0x42m);
+    assert
+      (I.equal (unsigned_mod (id #0x4000_0000_0000_0042m) (id (I.min_int ()))) #0x42m);
+  end;
 
   ()

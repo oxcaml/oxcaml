@@ -5,6 +5,8 @@
    bytecode;
  }{
    native;
+ }{
+   jsir;
  }
 *)
 let position = Lexing.{ (* This corresponds to File "file.ml", line 100, character 10 *)
