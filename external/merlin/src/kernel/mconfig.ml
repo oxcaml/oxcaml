@@ -702,6 +702,8 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
     "-no-cfg-prologue-shrink-wrap";
+    "-frame-pointers";
+    "-no-frame-pointers";
     "-omit-leaf-frame-pointers";
     "-no-omit-leaf-frame-pointers";
     "-cfg-merge-blocks";

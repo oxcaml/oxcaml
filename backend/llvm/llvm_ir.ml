@@ -469,7 +469,7 @@ module Calling_conventions = struct
   let to_string = function
     | Default -> ""
     | Oxcaml ->
-      if Config.with_frame_pointers then "oxcaml_fpcc" else "oxcaml_nofpcc"
+      if !Clflags.frame_pointers then "oxcaml_fpcc" else "oxcaml_nofpcc"
     | Oxcaml_c_call -> "oxcaml_ccc"
     | Oxcaml_c_call_stack_args -> "oxcaml_c_stackcc"
     | Oxcaml_alloc -> "oxcaml_alloccc"

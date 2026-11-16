@@ -222,7 +222,7 @@ let emit_debug_info_linear i =
   | None -> emit_debug_info i.dbg
   | Some { discriminator; dbg } -> emit_debug_info ~discriminator dbg
 
-let fp = Config.with_frame_pointers
+let fp () = !Clflags.frame_pointers
 
 (* Tradeoff between code size and code speed *)
 
@@ -2106,7 +2106,7 @@ let emit_combine_edx_eax dst =
 
 let prologue_stack_offset () =
   assert !frame_required;
-  frame_size () - 8 - if fp then 8 else 0
+  frame_size () - 8 - if fp () then 8 else 0
 
 let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
@@ -2130,7 +2130,7 @@ let emit_instr ~first ~last ~fallthrough i =
        can_place_prologues), the CFA is always rsp+8 here; reset it explicitly
        before the relative adjustments below. *)
     D.cfi_def_cfa_offset ~bytes:8;
-    if fp
+    if fp ()
     then (
       I.push rbp;
       D.cfi_adjust_cfa_offset ~bytes:8;
@@ -2149,14 +2149,14 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       I.add (int n) rsp;
       D.cfi_adjust_cfa_offset ~bytes:(-n));
-    if fp
+    if fp ()
     then (
       I.pop rbp;
       D.cfi_adjust_cfa_offset ~bytes:(-8))
   | Lepilogue_close ->
     (* reset CFA back cause function body may continue *)
     let n = prologue_stack_offset () in
-    let n = if fp then n + 8 else n in
+    let n = if fp () then n + 8 else n in
     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->
@@ -2799,7 +2799,7 @@ let emit_instr ~first ~last ~fallthrough i =
     let table = { table_lbl = lbl; elems = jumptbl } in
     jump_tables := table :: !jump_tables
   | Lentertrap ->
-    if fp
+    if fp ()
     then
       let delta =
         frame_size () - 16
@@ -2975,7 +2975,7 @@ let fundecl fundecl =
     ~gc_jump_pads_start:fun_body_end ~gc_jump_pads_end;
   (if !frame_required
    then
-     let n = frame_size () - 8 - if fp then 8 else 0 in
+     let n = frame_size () - 8 - if fp () then 8 else 0 in
      if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
   (match fun_end_label with
   | Some l ->
@@ -3132,7 +3132,7 @@ let make_stack_loc ~offset n (r : Reg.t) =
    |------------|<-- %rsp at probe site, 16-byte aligned by caller
    | ret        |
    |------------|
-   | fp         | only present when Config.with_frame_pointers is true
+   | fp         | only present when frame pointers are enabled
    |------------|
    | live       | saved live registers
    |------------|
@@ -3212,7 +3212,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   D.align ~fill:Nop ~bytes:16;
   D.define_symbol_label ~section:Text wrap_label;
   D.cfi_startproc ();
-  if fp
+  if fp ()
   then (
     push rbp;
     I.mov rsp rbp);
@@ -3235,7 +3235,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
      [loc_arguments] ensures that [loc_offset] is 16-byte aligned.
      All temporaries are 8 bytes long, the return address is already pushed,
      and optionally the frame pointer is already pushed on the stack. *)
-  let wrapper_frame_size k = 8 + (if fp then 8 else 0) + k in
+  let wrapper_frame_size k = 8 + (if fp () then 8 else 0) + k in
   let k = live_offset + aux_offset + tmp_offset + loc_offset in
   assert (k mod 8 = 0);
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
@@ -3299,7 +3299,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
      and free stack space. *)
   Array.iteri (fun i reg -> move saved_live.(i) reg) live;
   emit_stack_offset (-n);
-  if fp then pop rbp;
+  if fp () then pop rbp;
   I.ret ();
   D.cfi_endproc ();
   emit_function_type_and_size wrap_label

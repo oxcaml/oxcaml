@@ -660,7 +660,7 @@ let register_primary_file ~file_emitter ~sourcefile =
     file_pos_nums := (sourcefile, 0) :: !file_pos_nums)
 
 let debug_line_info_enabled () =
-  is_cfi_enabled () && (!Clflags.debug || Config.with_frame_pointers)
+  is_cfi_enabled () && (!Clflags.debug || !Clflags.frame_pointers)
 
 let has_source_line dbg =
   match List.rev (Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg)) with

@@ -623,5 +623,30 @@ let dissector_max_linker_parallelism = ref Misc.Maybe_bounded.Unbounded
 let manual_module_init = ref false
   (* -[no-]manual-module-init *)
 
+(* The target check mirrors the "## Frame pointers" case in configure.ac;
+   [Config.with_frame_pointers] only provides the default for
+   [Clflags.frame_pointers]. *)
+let validate_frame_pointers () =
+  if !Clflags.frame_pointers
+  then (
+    match Config.architecture, Config.system with
+    | "amd64", ("linux" | "macosx") -> ()
+    | _, _ ->
+      Compenv.fatal
+        "Frame pointers are not supported on this platform; \
+         remove -frame-pointers (or frame-pointers=1 in OCAMLPARAM)")
+  else if Config.with_address_sanitizer
+  then
+    Compenv.fatal
+      "AddressSanitizer requires frame pointers; \
+       remove -no-frame-pointers (or frame-pointers=0 in OCAMLPARAM)"
+  else if !Clflags.llvm_backend
+  then
+    (* The LLVM backend's trap-block scheme requires frame pointers,
+       whatever the configure default. *)
+    Compenv.fatal
+      "The LLVM backend requires frame pointers; \
+       enable them with -frame-pointers (or frame-pointers=1 in OCAMLPARAM)"
+
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

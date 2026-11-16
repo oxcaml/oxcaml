@@ -23,7 +23,7 @@ open Misc
 open Arch
 open Cmm
 
-let fp = Config.with_frame_pointers
+let fp () = !Clflags.frame_pointers
 
 (* Which ABI to use *)
 
@@ -746,7 +746,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
        | Thread_self_id | Pause)
   | Poptrap _ | Prologue | Epilogue ->
-    if fp then destroyed_rbp else [||]
+    if fp () then destroyed_rbp else [||]
   | Stack_check _ ->
     (* This case is used by [Cfg_available_regs].  r10 is actually saved and
        restored by the sequence to which [Stack_check] is expanded, but it may
@@ -763,7 +763,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Return | Raise _ | Tailcall_self  _ | Tailcall_func _
   | Prim {op = Probe _; _}
   ->
-    if fp then [| rbp |] else [||]
+    if fp () then [| rbp |] else [||]
   | Switch _ ->
     destroyed_rax_rdx
   | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
@@ -819,7 +819,7 @@ let initial_stack_offset ~num_stack_slots:_ ~contains_calls:_ = 0
 let trap_frame_size_in_bytes = 16
 
 let frame_required ~fun_contains_calls ~fun_num_stack_slots =
-  (fp && not !Oxcaml_flags.omit_leaf_frame_pointers)
+  (fp () && not !Oxcaml_flags.omit_leaf_frame_pointers)
   || fun_contains_calls ||
   Stack_class.Tbl.exists
     fun_num_stack_slots
@@ -837,7 +837,7 @@ let frame_size ~stack_offset ~contains_calls ~num_stack_slots =
       (stack_offset
        + 8
        + Stack_class.Tbl.total_size_in_bytes num_stack_slots
-       + (if fp then 8 else 0))
+       + (if fp () then 8 else 0))
     in Misc.align sz 16
   end else
     stack_offset + 8
@@ -883,7 +883,7 @@ let clear_pending_jit_run () = ()
    may not be allocatable (e.g. rbp when frame pointers are enabled). *)
 let precolored_regs () =
   let phys_regs = Reg.set_of_array (Lazy.force all_phys_regs) in
-  if fp then Reg.Set.remove rbp phys_regs else phys_regs
+  if fp () then Reg.Set.remove rbp phys_regs else phys_regs
 
 let has_three_operand_float_ops () = Arch.Extension.enabled AVX
 
