@@ -27,6 +27,7 @@ type dynunit = {
   dynu_quoted_cmi: Compilation_unit.Name.t array;
   dynu_quoted_cmx: Compilation_unit.t array;
   dynu_defines: Compilation_unit.t list;
+  dynu_codegen_fingerprint: (string * string) list;
 }
 
 type dynheader = {

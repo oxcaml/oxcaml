@@ -24,6 +24,7 @@ type unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -52,6 +53,12 @@ type error =
   | Archiver_error of string
   | Metaprogramming_not_supported_by_backend of filepath
   | Requires_metaprogramming_without_flag of filepath
+  | Inconsistent_codegen_variant of
+      { unit_name : Compilation_unit.t;
+        filename : filepath;
+        saved : Codegen_variant.fingerprint;
+        current : Codegen_variant.fingerprint
+      }
 
 exception Error of error
 
@@ -144,7 +151,21 @@ let check_cmx_consistency t file_name cmxs =
   ->
     raise (Error (Inconsistent_implementation (name, user, auth)))
 
+let check_codegen_variant_consistency ~unit =
+  let current = Codegen_variant.current_fingerprint () in
+  if not (Codegen_variant.equal_fingerprint unit.codegen_fingerprint current)
+  then
+    raise
+      (Error
+         (Inconsistent_codegen_variant
+            { unit_name = unit.name;
+              filename = unit.file_name;
+              saved = unit.codegen_fingerprint;
+              current
+            }))
+
 let check_consistency t ~unit cmis cmxs =
+  check_codegen_variant_consistency ~unit;
   check_cmi_consistency t unit.file_name cmis;
   check_cmx_consistency t unit.file_name cmxs;
   let ui_unit = CU.name unit.name in
@@ -313,6 +334,14 @@ let report_error ppf = function
       "@[<hov>The library %a@ requires metaprogramming support@ but \
        -uses-metaprogramming was not passed@]"
       Location.Doc.quoted_filename filename
+  | Inconsistent_codegen_variant { unit_name; filename; saved; current } ->
+    fprintf ppf
+      "@[<hov>File %a,@ which contains unit %a,@ was compiled with codegen \
+       configuration@ [%s],@ which is incompatible with this invocation's@ \
+       [%s]@]"
+      Location.Doc.quoted_filename filename CU.print_as_inline_code unit_name
+      (Codegen_variant.string_of_fingerprint saved)
+      (Codegen_variant.string_of_fingerprint current)
 
 let () =
   Location.register_error_of_exn (function

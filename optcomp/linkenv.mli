@@ -36,6 +36,7 @@ type unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -111,5 +112,11 @@ type error =
   | Archiver_error of string
   | Metaprogramming_not_supported_by_backend of filepath
   | Requires_metaprogramming_without_flag of filepath
+  | Inconsistent_codegen_variant of
+      { unit_name : Compilation_unit.t;
+        filename : filepath;
+        saved : Codegen_variant.fingerprint;
+        current : Codegen_variant.fingerprint
+      }
 
 exception Error of error

@@ -23,16 +23,28 @@
   run;
   check-program-output;
  }{
+  (* The "Codegen fingerprint" line in the objinfo output depends on the
+     configure defaults; strip it so the references hold on all
+     configurations.  It is checked by
+     tool-ocamlobjinfo/codegen_fingerprint.ml. *)
   program = "-no-code -no-approx cross_module_static_lib.cmx";
   output = "cross_module_static_lib.objinfo.output";
   reference = "${test_source_directory}/cross_module_static_lib.objinfo.reference";
   ocamlobjinfo;
+  stdout = "strip-codegen-fingerprint.stdout";
+  stderr = "strip-codegen-fingerprint.stderr";
+  script = "sh ${test_source_directory}/../../tool-ocamlobjinfo/strip-codegen-fingerprint.sh ${output}";
+  script;
   check-program-output;
  }{
   program = "-no-code -no-approx cross_module_static_relay.cmx";
   output = "cross_module_static_relay.objinfo.output";
   reference = "${test_source_directory}/cross_module_static_relay.objinfo.reference";
   ocamlobjinfo;
+  stdout = "strip-codegen-fingerprint.stdout";
+  stderr = "strip-codegen-fingerprint.stderr";
+  script = "sh ${test_source_directory}/../../tool-ocamlobjinfo/strip-codegen-fingerprint.sh ${output}";
+  script;
   check-program-output;
  }
 *)

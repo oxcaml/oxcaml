@@ -36,6 +36,7 @@ type unit_link_info = Linkenv.unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
