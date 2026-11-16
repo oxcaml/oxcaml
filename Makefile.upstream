@@ -1352,6 +1352,8 @@ stdlib/dune_rules/build_settings.txt:
 	echo "cflags.native: $(OC_NATIVE_CFLAGS) $(OC_NATIVE_CPPFLAGS)"; \
 	echo "cflags.debug: -DDEBUG"; \
 	echo "cflags.pic: $(SHAREDLIB_CFLAGS)"; \
+	echo "codegen_default_fp: $(WITH_FRAME_POINTERS)"; \
+	echo "build_codegen_variants: $(CODEGEN_VARIANTS)"; \
 	echo "mkexe: $(MKEXE)"; \
 	echo "mkexed: $(MKEXE) $(MKEXEDEBUGFLAG)"; \
 	echo "mkdll: $(MKDLL)"; \

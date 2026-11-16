@@ -71,7 +71,30 @@
 /* Define ASM_SIZE_TYPE_DIRECTIVES when the ".size" and ".type" assembler
    directives can be used */
 
-#undef WITH_FRAME_POINTERS
+#undef WITH_FRAME_POINTERS_DEFAULT
+
+/* WITH_FRAME_POINTERS_DEFAULT carries the configure-time default of the
+   frame-pointer codegen-variant axis as a value (always 1 or 0, never
+   undefined).  WITH_FRAME_POINTERS itself is resolved just below: a
+   -DWITH_FRAME_POINTERS=1|0 on the command line wins (the in-tree
+   codegen-variant archives pass one, see stdlib/dune_rules/gen.ml);
+   absent any, it takes the install's default, so out-of-tree code
+   compiled with a bare `cc -I$(ocamlopt -where)` sees the default
+   variant's value for this macro.  Nothing more is implied: the native
+   stack/frame layout macros derived from it in config.h and stack.h
+   additionally require -DNATIVE_CODE and the TARGET_<arch> define, as
+   they always have.  Out-of-tree code targeting a non-default variant
+   defines the macro to match the enclosing program.
+
+   WITH_FRAME_POINTERS is always defined (to 1 or 0) once this header is
+   included: test it with #if, never with #ifdef/#ifndef.  An undefined
+   WITH_FRAME_POINTERS means "the configure default", so
+   -UWITH_FRAME_POINTERS restores that default; only
+   -DWITH_FRAME_POINTERS=0 explicitly disables frame pointers. */
+
+#ifndef WITH_FRAME_POINTERS
+#define WITH_FRAME_POINTERS WITH_FRAME_POINTERS_DEFAULT
+#endif
 
 #undef WITH_ADDRESS_SANITIZER
 

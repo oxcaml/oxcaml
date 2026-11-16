@@ -118,5 +118,11 @@ type error =
         saved : Codegen_variant.fingerprint;
         current : Codegen_variant.fingerprint
       }
+    (* The runtime archive for a non-default codegen variant (e.g.
+       libasmrun_fp.a) was not found in the load path. *)
+  | Codegen_variant_runtime_not_found of
+      { filename : filepath;
+        variant : string
+      }
 
 exception Error of error

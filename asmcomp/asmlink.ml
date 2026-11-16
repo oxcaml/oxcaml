@@ -45,12 +45,39 @@ let runtime_lib () =
   let variant =
     if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
-  let libname = "libasmrun" ^ variant ^ ext_lib in
+  (* Archives for the install's default codegen variant have unsuffixed names;
+     other variants are suffixed with the variant name. The naming rule is
+     described in stdlib/dune_rules/gen.ml (write_runtime_dune). *)
+  let codegen_variant = Codegen_variant.current () in
+  let codegen_suffix =
+    if Codegen_variant.is_default codegen_variant
+    then ""
+    else "_" ^ Codegen_variant.to_string codegen_variant
+  in
+  let libname = "libasmrun" ^ variant ^ codegen_suffix ^ ext_lib in
   try
     if !Clflags.nopervasives || not !Clflags.with_runtime
     then []
     else [Load_path.find libname]
-  with Not_found -> raise (Linkenv.Error (File_not_found libname))
+  with Not_found ->
+    let unsuffixed_exists =
+      (not (String.equal codegen_suffix ""))
+      &&
+      match Load_path.find ("libasmrun" ^ variant ^ ext_lib) with
+      | (_ : string) -> true
+      | exception Not_found -> false
+    in
+    (* Blame the codegen variant only when the runtime variant itself exists for
+       the install's default codegen mode. *)
+    if unsuffixed_exists
+    then
+      raise
+        (Linkenv.Error
+           (Codegen_variant_runtime_not_found
+              { filename = libname;
+                variant = Codegen_variant.to_string codegen_variant
+              }))
+    else raise (Linkenv.Error (File_not_found libname))
 
 (* Second pass: generate the startup file and link it with everything else *)
 

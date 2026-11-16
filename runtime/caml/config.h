@@ -212,7 +212,7 @@ typedef uint64_t uintnat;
 #endif
 
 /* Whether to offset Stack_high to preserve alignment. */
-#if defined(TARGET_amd64) && !defined(WITH_FRAME_POINTERS)
+#if defined(TARGET_amd64) && !WITH_FRAME_POINTERS
 #define Stack_padding_word 1
 #else
 #define Stack_padding_word 0

@@ -1365,7 +1365,7 @@ int caml_try_realloc_stack(asize_t required_space)
       if (link->stack == old_stack) {
         ptrdiff_t delta =
           (char*)Stack_high(new_stack) - (char*)Stack_high(old_stack);
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
         struct stack_frame {
           struct stack_frame* prev;
           void* retaddr;
@@ -1762,7 +1762,7 @@ static void stack_wake(struct stack_info* idle, struct stack_info* stack,
       *p = *p + delta;
       p = (char**)*p;
     }
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
     /* Relocate chain of frame pointers, starting at [sp] with the frame
        pointer pushed when the stack was suspended (by
        SWITCH_OCAML_STACKS). The chain's last link is rewritten by
@@ -1849,7 +1849,7 @@ static value continuation_wake_stacks(value cont, struct stack_info* idle)
     stack_wake(idle, stack, &reloc);
     if (prev != NULL) {
       Stack_parent(prev) = stack;
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
       /* The oldest frame pointer saved on [prev] (pushed by the first
          function run on it, under caml_runstack) points into this, its
          parent, stack: relocate it too. The corresponding link of the

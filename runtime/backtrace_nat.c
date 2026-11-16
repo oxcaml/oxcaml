@@ -154,7 +154,7 @@ void caml_stash_backtrace_wrapper(value exn, char* rsp, char* trapsp)
 {
   char* pc;
   char* sp;
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
   pc = rsp + 8;
   sp = rsp + 16;
 #else

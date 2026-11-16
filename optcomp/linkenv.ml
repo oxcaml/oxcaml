@@ -59,6 +59,10 @@ type error =
         saved : Codegen_variant.fingerprint;
         current : Codegen_variant.fingerprint
       }
+  | Codegen_variant_runtime_not_found of
+      { filename : filepath;
+        variant : string
+      }
 
 exception Error of error
 
@@ -342,6 +346,11 @@ let report_error ppf = function
       Location.Doc.quoted_filename filename CU.print_as_inline_code unit_name
       (Codegen_variant.string_of_fingerprint saved)
       (Codegen_variant.string_of_fingerprint current)
+  | Codegen_variant_runtime_not_found { filename; variant } ->
+    fprintf ppf
+      "@[<hov>Cannot find the runtime library %a:@ this installation does not \
+       provide codegen variant %s@]"
+      Location.Doc.quoted_filename filename variant
 
 let () =
   Location.register_error_of_exn (function

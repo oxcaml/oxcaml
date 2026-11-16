@@ -395,7 +395,7 @@ G(name):
    instructions. The offset of the oldest saved x29 in a fiber from the stack
    handler is 48 = 4 words (caml_runstack) + 2 words (x30 and x29).
    */
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
 .macro UPDATE_BASE_POINTER reg
         sub     TMP2, sp, 16
         str     TMP2, [\reg, -48]
