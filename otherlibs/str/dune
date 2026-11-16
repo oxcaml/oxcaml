@@ -14,10 +14,11 @@
 
 (library
  (name str)
- ; Public in the main context only, like unix (see otherlibs/unix/dune).
+ ; Public outside the boot context only, like unix (see
+ ; otherlibs/unix/dune).
  (public_name str)
  (enabled_if
-  (= %{context_name} main))
+  (<> %{context_name} default))
  (wrapped false)
  (modes byte native)
  (flags (
@@ -50,3 +51,10 @@
   )
   (section lib)
   (package ocaml))
+
+; Harvested into the codegen-variant trees; see otherlibs/unix/dune.
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (or (= %{context_name} "main-fp") (= %{context_name} "main-base")))
+ (deps str.cmxa str.a str.cmxs))

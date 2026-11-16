@@ -1,0 +1,7 @@
+skipped 1 file(s) saved with another configuration (omit_leaf_frame_pointers: saved true, current false)
+skipped 1 file(s) saved with another configuration (omit_leaf_frame_pointers: saved true, current false)
+*** error: no file was saved with the configuration of this run (-help lists the options that select another one)
+skipped 1 file(s) saved with another configuration (omit_leaf_frame_pointers: saved false, current true)
+*** error: there is no saved IR (.cmir-cfg-regalloc file) to process
+File "_none_", line 1:
+Error: Expected Cfg format. Incompatible file not_ir/unit.cmir-cfg-regalloc

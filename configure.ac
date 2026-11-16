@@ -3129,6 +3129,16 @@ AS_IF([test x"$enable_codegen_variants" != "xno" \
   [codegen_variants=false])
 AC_SUBST([codegen_variants])
 
+AS_IF([test x"$codegen_variants" = "xtrue"],
+  [dnl C stubs that can call back into OCaml (or allocate) must preserve
+   dnl the rbp chain to be linked into frame-pointer-variant programs:
+   dnl the fp runtime's stack-reallocation walk (runtime/fiber.c) steps
+   dnl through every C frame between the c_stack_link and the stub entry.
+   dnl Building all in-tree C stubs with frame pointers is ABI-neutral for
+   dnl non-fp programs and lets one shared stub archive serve both
+   dnl variants.
+   common_cflags="$common_cflags -fno-omit-frame-pointer -g"])
+
 ## CPP mangling
 
 AS_IF([test x"$enable_cpp_mangling" = "xyes"],
@@ -3701,6 +3711,23 @@ native_cflags="$common_cflags $sharedlib_cflags $native_cflags\
 
 bytecode_cppflags="$common_cppflags $COMPILER_BYTECODE_CPPFLAGS"
 native_cppflags="$common_cppflags $COMPILER_NATIVE_CPPFLAGS"
+
+dnl The flags that the user adds come last and so override the others, as
+dnl they should, with one exception: where C code has to keep the frame
+dnl pointer (see "Frame pointers" and "Codegen variants" above), a flag of
+dnl theirs must not drop it, so the flag that keeps it is repeated after
+dnl theirs: in the C flags and in the preprocessor flags, which follow
+dnl them on the command line of a C compilation.
+AS_CASE([" $common_cflags "],
+  [*" -fno-omit-frame-pointer "*],
+    [AS_IF([test -n "$COMPILER_BYTECODE_CFLAGS"],
+       [bytecode_cflags="$bytecode_cflags -fno-omit-frame-pointer"])
+     AS_IF([test -n "$COMPILER_NATIVE_CFLAGS"],
+       [native_cflags="$native_cflags -fno-omit-frame-pointer"])
+     AS_IF([test -n "$COMPILER_BYTECODE_CPPFLAGS"],
+       [bytecode_cppflags="$bytecode_cppflags -fno-omit-frame-pointer"])
+     AS_IF([test -n "$COMPILER_NATIVE_CPPFLAGS"],
+       [native_cppflags="$native_cppflags -fno-omit-frame-pointer"])])
 
 AS_CASE([$target],
   [*-w64-mingw32*],

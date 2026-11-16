@@ -21,6 +21,17 @@ ifneq ($(BUILD_OCAMLPARAM),)
 main_ocamlparam = syntax-quotations=0,$(BUILD_OCAMLPARAM)
 endif
 
+# MAIN_CONTEXT_OCAMLPARAM: settings for the main context alone, after those
+# of BUILD_OCAMLPARAM, which the codegen-variant contexts have too (see
+# VARIANT_ENV_VARS). It is for measuring the build of the compiler
+# (profile=1 and where to write the result, as
+# tools/ci/actions/run-make-target.sh and scripts/profile-compiler-build.sh
+# do): the variant contexts build the main context's libraries again,
+# which such a measure must not count as well.
+ifneq ($(MAIN_CONTEXT_OCAMLPARAM),)
+main_ocamlparam := $(main_ocamlparam),$(MAIN_CONTEXT_OCAMLPARAM)
+endif
+
 # Also for the libraries of external/ast-dependent-libs, as js_of_ocaml and
 # wasm_of_ocaml ship with the compiler.
 ifeq ($(main_build_profile),dev)
@@ -71,6 +82,57 @@ define dune_main_context
       ("STDLIB_JSIR_OCAMLOPT_FLAGS" "$(main_ocamlopt_optimization_flags)"))))))
 endef
 
+# Codegen-variant (frame-pointer) library builds. The variant tree we build
+# and install is the frame-pointer mode OPPOSITE to the configure default;
+# its name is absolute ("fp" or "base"), agreeing with
+# utils/codegen_variant.ml, stdlib/dune_rules/gen.ml and the runtime archive
+# suffixes. Otherlibs for that mode are built in a dedicated dune context
+# main-$(codegen_variant_name), in its own workspace file so that ordinary
+# $(ws_main) builds never build anything there. Its OCAMLLIB points at the
+# variant stdlib tree (stdlib/build_fp or build_base, built in the boot
+# context by @stdlib_fp/@stdlib_base).
+ifeq ($(WITH_FRAME_POINTERS),true)
+codegen_variant_name = base
+codegen_variant_ocamlopt_flag = -no-frame-pointers
+codegen_variant_fp01 = 0
+else
+codegen_variant_name = fp
+codegen_variant_ocamlopt_flag = -frame-pointers
+codegen_variant_fp01 = 1
+endif
+ws_variant = --workspace=duneconf/main-$(codegen_variant_name).ws
+
+# The variant context carries the frame-pointer setting BOTH as an
+# ocamlopt flag (env + ocamlopt_variant_flags.sexp) and through OCAMLPARAM.
+# The latter is load-bearing: dune compiles the generated library alias
+# modules (<lib>__.ml-gen) and runs custom rules that invoke %{ocamlopt}
+# directly (e.g. dynlink.cmxa) without the configured ocamlopt_flags, and
+# only OCAMLPARAM reaches those. ocamlc silently ignores the key. A
+# defined-but-empty BUILD_OCAMLPARAM must degrade to the "_" form: OCAMLPARAM
+# values without a "_" separator are rejected and discarded wholesale, which
+# would silently drop the frame-pointers setting.
+VARIANT_ENV_VARS := (env-vars ("OCAMLPARAM" "syntax-quotations=0,$(if $(BUILD_OCAMLPARAM),$(BUILD_OCAMLPARAM),_),frame-pointers=$(codegen_variant_fp01)"))
+
+define dune_variant_context
+(lang dune 3.23)
+(using oxcaml 0.1)
+(context (default
+  (name main-$(codegen_variant_name))
+  (profile $(main_build_profile))
+  (cms_cmt_dependency cms)
+  (paths
+    (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
+    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/build_$(codegen_variant_name)"))
+    (OCAMLPATH ("$(CURDIR)/_build/main/no-findlib-packages"))
+    (OCAMLFIND_CONF ("/dev/null")))
+  (env (_
+    (binaries (duneconf/ocaml as ocaml))
+    (bin_annot_cms true)
+    (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
+    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan $(codegen_variant_ocamlopt_flag)))
+    $(VARIANT_ENV_VARS)))))
+endef
+
 
 .DEFAULT_GOAL := compiler
 .PHONY: boot-compiler boot-runtest compiler runtest runtest-llvmize runtest-dwarf runtest-sancov
@@ -89,12 +151,22 @@ boot-compiler: _build/_bootinstall
 boot-runtest: boot-compiler
 	$(dune) build $(coverage_dune_flags) --force $(runtest_targets)
 
+# Codegen-variant artifacts (fp runtime archives, the variant stdlib tree
+# and variant otherlibs) live outside the boot-compiler/main @install
+# builds (alias hygiene: @runtime_all and @stdlib stay variant-free, and
+# the variant otherlibs have their own dune context); `make compiler`
+# builds them so that everything downstream (e.g. `make _install`) has
+# them. @runtime_variants and @stdlib_fp/@stdlib_base are empty aliases
+# when codegen variants are disabled or when they name the configure
+# default's mode.
+ifeq ($(CODEGEN_VARIANTS),true)
+variant_boot_aliases = @runtime_variants @stdlib_$(codegen_variant_name)
+else
+variant_boot_aliases = @runtime_variants
+endif
+
 compiler: boot-compiler
-# Codegen-variant runtime archives (e.g. libasmrun_fp.a) live in the boot
-# context but are deliberately not part of boot-compiler (alias hygiene:
-# @runtime_all stays variant-free); build them here so `make compiler` and
-# everything downstream of it (e.g. `make _install`) provides them.
-	$(dune) build $(coverage_dune_flags) @runtime_variants
+	$(dune) build $(coverage_dune_flags) $(variant_boot_aliases)
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" $(compiler_jsoo_env) \
           $(dune) build --always-show-command-line $(ws_main) \
@@ -108,6 +180,10 @@ compiler: boot-compiler
           testsuite/lib/testing.cm{,x}a \
           @middle_end/flambda2/tests/tools/all \
           $(ocamldir)/tools/dumpobj.bc
+ifeq ($(CODEGEN_VARIANTS),true)
+	$(dune) build --always-show-command-line $(ws_variant) \
+          @otherlibs/codegen-variant-libs
+endif
 
 .PHONY: minimize-failure
 minimize-failure: boot-minimizer boot-compiler
@@ -152,6 +228,7 @@ runtest-sancov: compiler
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
 duneconf/main.ws: export contents = $(dune_main_context)
+duneconf/main-$(codegen_variant_name).ws: export contents = $(dune_variant_context)
 duneconf/%.ws: Makefile.common-ox
 	echo "$$contents" > $@
 
@@ -181,6 +258,10 @@ dune_config_targets = \
   $(ocamldir)/duneconf/ox-extra.inc \
   dune-project
 
+ifeq ($(CODEGEN_VARIANTS),true)
+dune_config_targets += duneconf/main-$(codegen_variant_name).ws
+endif
+
 _build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
 
@@ -189,6 +270,7 @@ _build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 # See: https://github.com/ocaml/dune/issues/13225
 	echo '($(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
 	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
+	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,) $(codegen_variant_ocamlopt_flag))' > ocamlopt_variant_flags.sexp
 	{ for flag in $(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,); do \
 	    echo "$$flag"; \
 	  done > ocamlopt_stdlib_flags.txt; }
@@ -252,6 +334,106 @@ _install: compiler
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
+ifeq ($(CODEGEN_VARIANTS),true)
+# Assemble the codegen-variant library tree: a COMPLETE stdlib root at
+# lib/ocaml/variants/$(codegen_variant_name) mirroring the base root's
+# shape, so a compile/link for the non-default frame-pointer mode can use
+# it wholesale via -I / as a remapped stdlib root. Rebuilt for the variant:
+# native stdlib and otherlibs artifacts (.cmx/.cmxa/.a/.cmxs/std_exit) and
+# the variant runtime archives (libasmrun*_$(codegen_variant_name).*).
+# Copied from the base root because they are FP-agnostic: .cmi/.cmt*/.cms*,
+# byte artifacts (.cma/.cmo, byte runtime archives), C stub
+# archives and stublibs (built once with -fno-omit-frame-pointer, see
+# configure.ac), ld.conf, Makefile.config, runtime-launch-info, expunge and
+# the toplevel support files. The caml/ headers are copied too, except
+# that the variant's caml/m.h gets a prefix naming the variant, so that C
+# code compiled against the tree's headers without
+# -DCAML_CODEGEN_VARIANT_EXPLICIT sees the tree's frame-pointer mode
+# instead of the configure default's. Deliberately absent: findlib META
+# files, and the compiler-libs/eval/ocaml-jit universe (eval and
+# metaprogramming are unsupported under non-default codegen variants).
+	rm -rf _install/lib/ocaml/variants
+	mkdir -p _install/lib/ocaml/variants/$(codegen_variant_name)
+	$(cpl) -R _build/default/stdlib/build_$(codegen_variant_name)/* \
+          _install/lib/ocaml/variants/$(codegen_variant_name)/
+	(set -e; \
+	 cd _install/lib/ocaml; \
+	 vroot=variants/$(codegen_variant_name); \
+	 rm -f $$vroot/dynlink/dynlink.cmxa; \
+	 rm -f $$vroot/{stdlib,camlinternal}*.{o,cmo}; \
+	 cp -f caml/* $$vroot/caml/; \
+	 rm -f $$vroot/caml/m.h; \
+	 { echo "/* Added at install time: these headers describe codegen"; \
+	   echo "   variant $(codegen_variant_name) unless"; \
+	   echo "   CAML_CODEGEN_VARIANT_EXPLICIT is defined on the command"; \
+	   echo "   line. */"; \
+	   echo '#ifndef CAML_CODEGEN_VARIANT_EXPLICIT'; \
+	   echo '#define CAML_CODEGEN_VARIANT_EXPLICIT 1'; \
+	   case "-$(codegen_variant_name)-" in *-fp-*) \
+	     echo '#define WITH_FRAME_POINTERS 1';; esac; \
+	   echo '#endif'; \
+	   cat caml/m.h; } > $$vroot/caml/m.h; \
+	 cp -R stublibs $$vroot/; \
+	 cp lib*_stubs*.a expunge $$vroot/; \
+	 cp {top,opttop}dirs.{cmi,mli,cmt,cmti} $$vroot/; \
+	 for libdir in unix str threads runtime_events dynlink stdlib_stable \
+	   stdlib_beta stdlib_alpha stdlib_upstream_compatible ; do \
+	   cp -R $$libdir $$vroot/ ; \
+	 done)
+	set -e; \
+	vroot=_install/lib/ocaml/variants/$(codegen_variant_name); \
+	vb=_build/main-$(codegen_variant_name)/otherlibs; \
+	cpv() { rm -f "$$1/$$3"; cp "$$2" "$$1/$$3"; }; \
+	for f in unix.cmxa unix.a unix.cmxs ; do \
+	  cpv $$vroot/unix $$vb/unix/$$f $$f; \
+	done; \
+	for m in unix unixLabels ; do \
+	  cpv $$vroot/unix $$vb/unix/.unix.objs/native/$$m.cmx $$m.cmx; \
+	done; \
+	for f in str.cmxa str.a str.cmxs ; do \
+	  cpv $$vroot/str $$vb/str/$$f $$f; \
+	done; \
+	cpv $$vroot/str $$vb/str/.str.objs/native/str.cmx str.cmx; \
+	for f in runtime_events.cmxa runtime_events.a runtime_events.cmxs ; do \
+	  cpv $$vroot/runtime_events $$vb/runtime_events/$$f $$f; \
+	done; \
+	cpv $$vroot/runtime_events \
+	  $$vb/runtime_events/.runtime_events.objs/native/runtime_events.cmx \
+	  runtime_events.cmx; \
+	cpv $$vroot/threads $$vb/systhreads/native/threadsnat.cmxa threads.cmxa; \
+	cpv $$vroot/threads $$vb/systhreads/native/threadsnat.a threads.a; \
+	for m in event thread multicore ; do \
+	  cpv $$vroot/threads \
+	    $$vb/systhreads/native/.threadsnat.objs/native/$$m.cmx $$m.cmx; \
+	done; \
+	cpv $$vroot/dynlink $$vb/dynlink/dynlink.cmxa dynlink.cmxa; \
+	cpv $$vroot/dynlink $$vb/dynlink/dynlink.a dynlink.a; \
+	cpv $$vroot/dynlink \
+	  $$vb/dynlink/.dynlink_internal.objs/native/dynlink.cmx dynlink.cmx; \
+	for m in dynlink_common dynlink_platform_intf dynlink_types ; do \
+	  cpv $$vroot/dynlink \
+	    $$vb/dynlink/.dynlink_internal_common.objs/native/$$m.cmx $$m.cmx; \
+	done; \
+	for m in dynlink_internal_byte dynlink_internal_native ; do \
+	  cpv $$vroot/dynlink \
+	    $$vb/dynlink/.$$m.objs/native/$$m.cmx $$m.cmx; \
+	done; \
+	for m in Axis_lattice Ldd_intf Ldd Misc ; do \
+	  cpv $$vroot \
+	    $$vb/dynlink/.dynlink_compilerlibs.objs/native/dynlink_compilerlibs__$$m.cmx \
+	    dynlink_compilerlibs__$$m.cmx; \
+	done; \
+	for u in stdlib_stable stdlib_beta stdlib_alpha \
+	  stdlib_upstream_compatible ; do \
+	  cpv $$vroot/$$u $$vb/$$u/$$u.cmxa $$u.cmxa; \
+	  cpv $$vroot/$$u $$vb/$$u/$$u.a $$u.a; \
+	  cpv $$vroot/$$u $$vb/$$u/$$u.cmxs $$u.cmxs; \
+	  rm -f $$vroot/$$u/*.cmx; \
+	  cp $$vb/$$u/.$$u.objs/native/*.cmx $$vroot/$$u/; \
+	done; \
+	find $$vroot -name META -delete; \
+	find $$vroot -type d -empty -delete
+endif
 
 
 # Copy _install to the final install directory (no-op if they are the same)

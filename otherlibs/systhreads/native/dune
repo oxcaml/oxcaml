@@ -4,6 +4,13 @@
  (name C-only)
  (deps libthreadsnat_stubs.a))
 
+; Harvested into the codegen-variant trees; see otherlibs/unix/dune.
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (or (= %{context_name} "main-fp") (= %{context_name} "main-base")))
+ (deps threadsnat.cmxa threadsnat.a))
+
 (rule (target sync_posix.h) (action (copy %{dep:../../../runtime/sync_posix.h} %{target})))
 
 (library

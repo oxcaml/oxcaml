@@ -1,0 +1,45 @@
+; A directory can hold IR saved under several configurations, that of each
+; codegen variant of a build for instance. A run processes the files of its
+; own configuration and reports the others; it fails when there are only
+; others, when there is no saved IR at all, and on a file that is not saved
+; IR. -omit-leaf-frame-pointers stands here for any configuration other than
+; the default one: every target accepts it. The options that the failure
+; points to select the other configuration: with it, the run processes the
+; files that the first run skipped and skips the others.
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps
+  unit.ml
+  (:regalloc ../regalloc.exe))
+ (action
+  (with-outputs-to
+   mixed_configurations.output
+   (progn
+    (system "mkdir -p ir/default ir/other not_ir no_ir")
+    (system "cp unit.ml ir/default && cp unit.ml ir/other")
+    (system "echo 'not saved IR' > not_ir/unit.cmir-cfg-regalloc")
+    (run %{bin:ocamlopt.opt} -c -nostdlib -nopervasives -save-ir-before
+      register_allocation ir/default/unit.ml)
+    (run %{bin:ocamlopt.opt} -c -nostdlib -nopervasives
+      -omit-leaf-frame-pointers -save-ir-before register_allocation
+      ir/other/unit.ml)
+    (run %{regalloc} -regalloc irc ir)
+    (with-accepted-exit-codes
+     1
+     (run %{regalloc} -regalloc irc ir/other))
+    (run %{regalloc} -omit-leaf-frame-pointers -regalloc irc ir)
+    (with-accepted-exit-codes
+     1
+     (run %{regalloc} -regalloc irc no_ir))
+    (with-accepted-exit-codes
+     2
+     (run %{regalloc} -regalloc irc not_ir))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (diff mixed_configurations.expected mixed_configurations.output)))

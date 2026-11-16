@@ -89,11 +89,17 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
         # Write CSV header
         csv_file.write("timestamp,commit_hash,pr_number,kind,name,value\n")
 
-        # Collect metrics for each artifact
+        # Collect metrics for each artifact. The codegen-variant library
+        # trees are left out, and so is every symbolic link: what is
+        # measured is the default library tree, of which a variant tree
+        # holds another build of the native files and links to the rest.
         kind = "size_in_bytes"
+        variants_path = install_path / "lib" / "ocaml" / "variants"
         for ext in extensions:
             files = list(install_path.rglob(f"*.{ext}"))
             for file in files:
+                if file.is_symlink() or variants_path in file.parents:
+                    continue
                 if file.is_file():
                     size = file.stat().st_size
                     relative_path = file.relative_to(install_path)

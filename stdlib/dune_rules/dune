@@ -15,7 +15,7 @@
 
 (rule
  (target runtime.dune)
- (enabled_if (<> %{context_name} main))
+ (enabled_if (= %{context_name} default))
  (action
    (with-stdout-to %{target} (run
      %{dep:gen.exe}
@@ -31,7 +31,7 @@
 ;; an unconfigured tree ../META will be empty.
 (rule
  (target stdlib.dune)
- (enabled_if (and (<> %{context_name} main) (<> %{read:../META} "")))
+ (enabled_if (and (= %{context_name} default) (<> %{read:../META} "")))
  (action
    (with-stdout-to %{target} (run
      %{dep:gen.exe}
@@ -41,13 +41,49 @@
 
 (rule
  (target stdlib.dune)
- (enabled_if (and (<> %{context_name} main) (= %{read:../META} "")))
+ (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
  (action (write-file %{target} "")))
 
-;; In the main build, don't rebuild the runtime and stdlib
+;; Codegen-variant (frame-pointer) stdlib trees. These are generated like
+;; stdlib.dune, but gen.exe emits rules only for the frame-pointer mode
+;; OPPOSITE to the configure default (and only when codegen variants are
+;; enabled); the other file contains just an empty @stdlib_fp/@stdlib_base
+;; alias. See the comment on write_stdlib_dune in gen.ml.
+(rule
+ (target stdlib_fp.dune)
+ (enabled_if (and (= %{context_name} default) (<> %{read:../META} "")))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     stdlib_fp
+     %{dep:stdlib_module_deps.txt}))))
+
+(rule
+ (target stdlib_fp.dune)
+ (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
+ (action (write-file %{target} "")))
+
+(rule
+ (target stdlib_base.dune)
+ (enabled_if (and (= %{context_name} default) (<> %{read:../META} "")))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     stdlib_base
+     %{dep:stdlib_module_deps.txt}))))
+
+(rule
+ (target stdlib_base.dune)
+ (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
+ (action (write-file %{target} "")))
+
+;; In the main build (and any other non-boot context, e.g. the main-fp
+;; codegen-variant context), don't rebuild the runtime and stdlib
 (rule
  (target runtime.dune)
- (enabled_if (= %{context_name} main))
+ (enabled_if (<> %{context_name} default))
  (action
    (with-stdout-to %{target} (run
      %{dep:gen.exe}
@@ -55,5 +91,13 @@
      primitives))))
 (rule
  (target stdlib.dune)
- (enabled_if (= %{context_name} main))
+ (enabled_if (<> %{context_name} default))
+ (action (write-file %{target} "")))
+(rule
+ (target stdlib_fp.dune)
+ (enabled_if (<> %{context_name} default))
+ (action (write-file %{target} "")))
+(rule
+ (target stdlib_base.dune)
+ (enabled_if (<> %{context_name} default))
  (action (write-file %{target} "")))
