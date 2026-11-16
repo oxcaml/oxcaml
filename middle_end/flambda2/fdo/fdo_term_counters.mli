@@ -34,6 +34,10 @@
 val map_counters_of_code :
   f:(Fdo_counter.t -> Fdo_counter.t) -> Code.t -> Code.t
 
+(** The number of OCaml calls (not C calls or effects) without a counter in the
+    body of [code]. Nested code is skipped. *)
+val calls_without_counter : Code.t -> int
+
 (** The entry counters of [code] inlined at the call corresponding to
     [callsite_counter]. *)
 val of_inlined_call :

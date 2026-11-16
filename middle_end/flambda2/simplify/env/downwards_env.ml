@@ -782,7 +782,7 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   { t with
     inlined_debuginfo;
     fdo =
-      Fdo_downwards_env.enter_inlined_apply t.fdo ~stub:(Code.stub called_code)
+      Fdo_downwards_env.enter_inlined_apply t.fdo ~called_code
         ~callsite_counter:(Apply.callsite_counter apply);
     inlined_attribute_to_forward;
     inlining_state;

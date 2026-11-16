@@ -52,7 +52,25 @@ let enter_set_of_closures t ~inlined_debuginfo =
     stub_callsite_counter = None
   }
 
-let enter_inlined_apply t ~stub ~callsite_counter =
+(* All the calls of a stub without a counter take the counter of the call it is
+   inlined at (see [stub_callsite_counter]): there must be at most one, or that
+   counter would be counted more than once per call. *)
+let check_stub_calls code =
+  let calls = Fdo_term_counters.calls_without_counter code in
+  if calls > 1
+  then
+    Misc.fatal_errorf
+      "Fdo_downwards_env: the stub %a has %d calls without a counter, which \
+       would all take the counter of the call it is inlined at"
+      Code_id.print (Code.code_id code) calls
+
+let enter_inlined_apply t ~called_code ~callsite_counter =
+  let stub = Code.stub called_code in
+  if
+    stub
+    && Flambda_features.fdo_counters ()
+    && Flambda_features.check_invariants ()
+  then check_stub_calls called_code;
   { t with
     copy_context = Inlined_debuginfo.none;
     stub_callsite_counter = (if stub then callsite_counter else None)
