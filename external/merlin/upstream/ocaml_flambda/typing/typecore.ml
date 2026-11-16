@@ -2933,6 +2933,9 @@ let build_or_pat env loc lid =
           pat pats in
       (path, rp { r with pat_loc = loc })
 
+let min_except_staticity =
+  With_regionality.min_with_monadic Staticity (Staticity.of_const Dynamic)
+
 (* When typing a for-loop index or similar, we need to restrict ourselves to the
    [Ppat_any] and [Ppat_var] cases, and construct a [pattern_variable] with
    consistent fields.  However, in the case where we're reifying a name for
@@ -2947,8 +2950,10 @@ let type_for_loop_like_index ~error ~loc ~env ~param ~any ~var =
     any (Ident.create_local "_for",
          Uid.mk ~current_unit:(Env.get_current_unit ()))
   | Ppat_var name ->
+      (* We use [min_except_staticity] since [int] is [mod everything],
+         which does not include staticity. *)
       var ~name
-          ~pv_mode:With_regionality.(min |> disallow_right)
+          ~pv_mode:min_except_staticity
           ~pv_type:(instance Predef.type_int)
           ~pv_loc:loc
           ~pv_as_var:false
@@ -10680,14 +10685,18 @@ and type_label_access
     in
     let make_fake_label (type rep) (record_form : rep record_form)
       : rep gen_label_description =
+      let lbl_mut =
+        Mutable {
+          mode = Mode.With_regionality.Comonadic.legacy;
+          atomic = Nonatomic
+        }
+      in
       {
         lbl_name = "";
         lbl_res = ty_exp;
         lbl_arg = newvar arg_kind;
-        lbl_mut =
-          Mutable { mode = Mode.With_regionality.Comonadic.legacy;
-                    atomic = Nonatomic };
-        lbl_modalities = Mode.Modality.Const.id;
+        lbl_mut;
+        lbl_modalities = Typemode.mutable_modalities lbl_mut;
         lbl_pos = 0;
         lbl_all = [||];
         lbl_repres =

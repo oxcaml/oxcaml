@@ -1,0 +1,40 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+#
+# Checks that each name under a workflow's `on.workflow_run.workflows` is
+# the name of exactly one workflow. GitHub never triggers on a name that
+# matches nothing, and reports no error, so renaming a workflow would stop
+# the ones it triggers.
+#
+# This runs for every pull request, with no path filter, and in the merge
+# queue, so that its job can be made a required check: a required check
+# that a path filter skips would stay pending and block the pull request.
+name: workflow_run triggers
+
+on:
+  pull_request:
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check workflow_run trigger names
+    # yq v4, which the script needs, comes with GitHub's Ubuntu runners.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check that workflow_run triggers name existing workflows
+        run: tools/ci/actions/check-workflow-run-triggers.sh
