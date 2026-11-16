@@ -1,7 +1,11 @@
 (* TEST
    flambda2;
    flags += "-flambda2-reaper -no-reaper-unbox";
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
  *)
 
 let[@inline] mk x =

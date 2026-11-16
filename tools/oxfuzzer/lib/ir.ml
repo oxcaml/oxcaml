@@ -347,6 +347,7 @@ module Bin_op = struct
     | Add
     | Sub
     | Mul
+    | Rem
     | Bit_and
     | Bit_or
     | Bit_xor
@@ -388,6 +389,7 @@ module Bin_op = struct
     | Add -> call "add"
     | Sub -> call "sub"
     | Mul -> call "mul"
+    | Rem -> call "rem"
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
     | Bit_xor -> call "logxor"

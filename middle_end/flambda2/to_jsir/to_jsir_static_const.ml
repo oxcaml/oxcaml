@@ -45,7 +45,7 @@ let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
         (* This should already be populated by To_jsir.let_expr_normal *)
         let symbol_var, res = To_jsir_env.get_symbol_exn env ~res symbol in
         let value_var = To_jsir_env.get_var_exn env v in
-        env, To_jsir_result.add_instr_exn res (Assign (symbol_var, value_var)))
+        env, To_jsir_shared.bind_vars ~res [symbol_var, value_var])
 
 let simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
   let fields = List.map Simple.With_debuginfo.simple fields in
@@ -150,10 +150,9 @@ let block_like ~env ~res symbol (const : Static_const.t) =
         (List.length values)
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:(fun float ->
-        Numeric_types.Float32_by_bit_pattern.to_bits float |> Int64.of_int32)
-      ~bits_to_constant:(fun bits -> Float32 bits)
-      ~bits_to_array:(fun bits -> Float_array bits)
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.float32_to_jsir_const
+      ~bits_to_array:(fun bits ->
+        Tuple (tag, Array.map To_jsir_shared.float32_to_jsir_const bits, Array))
   | Immutable_value_array values ->
     simple_block_or_array ~env ~res ~symbol ~tag:Tag.zero ~mut:Immutable
       ~array_or_not:Array values
@@ -256,8 +255,34 @@ let prepare_code ~env ~res ~code_id code =
       in
       let res, addr = To_jsir_result.reserve_address res in
       let closure = Jsir.Var.fresh () in
-      let env = To_jsir_env.add_code_id env code_id ~addr ~params ~closure in
       let free_names = Code0.free_names code in
+      (* Code that does not use [my_closure] or project from any closure can
+         share a single closure, which we bind here. This also provides a
+         binding when the reaper unboxes a closure and deletes its
+         [Set_of_closures]. It must be bound in [prepare_code], as a static
+         group may list a [Set_of_closures] before the code it uses, and JSIR
+         expects variables to be defined before they are used. *)
+      let closure_bound_with_code =
+        (not (Code0.is_my_closure_used code))
+        && Function_slot.Set.is_empty
+             (Name_occurrences.function_slots_in_normal_projections free_names)
+        && Value_slot.Set.is_empty
+             (Name_occurrences.value_slots_in_normal_projections free_names)
+      in
+      let hint =
+        To_jsir_shared.closure_hint (Code0.code_metadata code) ~params
+      in
+      let env =
+        To_jsir_env.add_code_id env code_id ~addr ~params ~closure
+          ~closure_bound_with_code ~hint
+      in
+      let res =
+        if closure_bound_with_code
+        then
+          To_jsir_result.add_instr_exn res
+            (Let (closure, Closure (params, (addr, []), (hint, None))))
+        else res
+      in
       let function_slots =
         Name_occurrences.all_function_slots_at_normal_mode free_names
       in
@@ -297,7 +322,13 @@ let code ~env ~res ~translate_body ~code_id code =
       ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)
-      let ({ addr; params = params_jvar; closure } : To_jsir_env.code_id) =
+      let ({ addr;
+             params = params_jvar;
+             closure;
+             closure_bound_with_code = _;
+             hint = _
+           }
+            : To_jsir_env.code_id) =
         To_jsir_env.get_code_id_exn env code_id
       in
       let res = To_jsir_result.new_block_with_addr_exn res ~addr ~params:[] in

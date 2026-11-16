@@ -1,5 +1,9 @@
 (* TEST
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 (* this failed at one point on flambda2 with -O3:

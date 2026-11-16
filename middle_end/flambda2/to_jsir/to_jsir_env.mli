@@ -124,17 +124,27 @@ val add_symbol_alias_of_var_exn :
 type code_id =
   { addr : Jsir.Addr.t;
     params : Jsir.Var.t list;
-    closure : Jsir.Var.t
+    closure : Jsir.Var.t;
+    closure_bound_with_code : bool;
+        (** If [true], [closure] is bound to a closure for this code where the
+            code itself is defined, and every [Set_of_closures] containing this
+            code reuses it. Otherwise, [closure] is bound when translating a
+            [Set_of_closures] containing this code. *)
+    hint : Optimization_hint.closure_hint option
+        (** The optimisation hint to attach to closures of this code. *)
   }
 
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block, its
-    parameters, and the JSIR varible corresponding to its closure. *)
+    parameters, the JSIR varible corresponding to its closure, and the hint for
+    its closures. *)
 val add_code_id :
   t ->
   Code_id.t ->
   addr:Jsir.Addr.t ->
   params:Jsir.Var.t list ->
   closure:Jsir.Var.t ->
+  closure_bound_with_code:bool ->
+  hint:Optimization_hint.closure_hint option ->
   t
 
 (** Map a Flambda2 function slot to the corresponding JSIR closure variable. *)
@@ -169,7 +179,8 @@ val get_symbol_exn :
   t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t * To_jsir_result.t
 
 (** Return the block address, parameter variables and closure variable
-    corresponding to the given [Code_id.t]. *)
+    corresponding to the given [Code_id.t]. Raises if the code ID is not in the
+    environment. *)
 val get_code_id_exn : t -> Code_id.t -> code_id
 
 (** Return the variable corresponding to a function slot. *)

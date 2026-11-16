@@ -1,5 +1,14 @@
 (* TEST
  include ocamlcommon;
+ {
+   bytecode;
+ }{
+   native;
+ }{
+   (* Under js_of_ocaml, ints are 32 bits wide. *)
+   reference = "${test_source_directory}/test_json.jsir-output.reference";
+   jsir;
+ }
 *)
 
 (* Test that various json values are serialized correctly. *)

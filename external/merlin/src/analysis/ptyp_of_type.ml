@@ -17,7 +17,7 @@ let rec module_type =
     Ast_helper.Mty.ident (Location.mknoloc (Untypeast.lident_of_path path))
   | Mty_alias path ->
     Ast_helper.Mty.alias (Location.mknoloc (Untypeast.lident_of_path path))
-  | Mty_functor (param, type_out, ret_mode) ->
+  | Mty_functor (param, type_out, ret_mode, _) ->
     let param =
       match param with
       | Unit -> Parsetree.Unit
