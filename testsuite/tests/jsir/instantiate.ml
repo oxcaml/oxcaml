@@ -203,18 +203,24 @@
    flags = "-link-jsir -w -misplaced-attribute";
    module = "instantiate.ml";
    ocamlopt.jsir-wasm;
+   flags = "-link-jsir -a";
+   module = "";
+   program = "instantiate_p_impl.cmxa-wasm";
+   all_modules = "instantiate_empty-Instantiate_p_impl.cmx-wasm instantiate_aux-Instantiate_p_impl.cmx-wasm instantiate_lib-Instantiate_p_impl.cmx-wasm";
+   ocamlopt.jsir-wasm;
+   flags = "-link-jsir -a";
+   module = "";
+   program = "instantiate_p_impl2.cmxa-wasm";
+   all_modules = "instantiate_empty-Instantiate_p_impl2.cmx-wasm instantiate_aux-Instantiate_p_impl2.cmx-wasm instantiate_lib-Instantiate_p_impl2.cmx-wasm";
+   ocamlopt.jsir-wasm;
    flags = "-link-jsir";
    module = "";
    program = "${test_build_directory}/instantiate.js";
    all_modules = "instantiate_p_impl.cmx-wasm \
      instantiate_p_impl2.cmx-wasm \
      instantiate_empty.cmx-wasm instantiate_aux.cmx-wasm instantiate_lib.cmx-wasm \
-     instantiate_empty-Instantiate_p_impl.cmx-wasm \
-     instantiate_aux-Instantiate_p_impl.cmx-wasm \
-     instantiate_lib-Instantiate_p_impl.cmx-wasm \
-     instantiate_empty-Instantiate_p_impl2.cmx-wasm \
-     instantiate_aux-Instantiate_p_impl2.cmx-wasm \
-     instantiate_lib-Instantiate_p_impl2.cmx-wasm \
+     instantiate_p_impl.cmxa-wasm \
+     instantiate_p_impl2.cmxa-wasm \
      instantiate.cmx-wasm";
    ocamlopt.jsir-wasm;
    run-wasm;
