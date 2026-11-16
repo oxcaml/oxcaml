@@ -188,3 +188,83 @@ run_structure {|
 module type S  = sig val x : int -> int @@ portable end
 - : unit = ()
 |}]
+
+(***********************************)
+(* The [ident] hook of the mapper sees each identifier together with the path
+   that type checking resolved it to. The mapper below replaces it with its
+   path, so that the output is independent of the opens in scope. *)
+
+let run_resolved s =
+  let structure = Parse.implementation (Lexing.from_string s) in
+  let typed_structure, _, _, _, _, _ =
+    Typemod.type_structure (Lazy.force Env.initial) structure
+  in
+  let resolved =
+    { Untypeast.default_mapper with
+      ident =
+        (fun _ path lid -> { lid with txt = Untypeast.lident_of_path path }) }
+  in
+  let structure = resolved.structure resolved typed_structure in
+  Format.printf "%a@." Pprintast.structure structure
+;;
+
+[%%expect{|
+val run_resolved : string -> unit = <fun>
+|}];;
+
+(* Values: [length] comes from a local open, [xs] is bound locally. *)
+run_resolved {|
+  module L = struct let length _ = 0 end
+  let f xs = let open L in length xs
+|};;
+
+[%%expect{|
+module L = struct let length _ = 0 end
+let f xs = let open L in L.length xs
+- : unit = ()
+|}];;
+
+(* Types and modules: inside [M], [t] is bound locally; after [open M], [t],
+   [zero] and [Inner] resolve to items of [M]. *)
+run_resolved {|
+  module M = struct
+    type t = int
+    let zero : t = 0
+    module Inner = struct end
+  end
+  open M
+  let f (x : t) = (x, zero)
+  module I = Inner
+|};;
+
+[%%expect{|
+module M =
+  struct type t = int
+         let (zero : t) = (0 : t)
+         module Inner = struct  end end
+open M
+let f (x : M.t) = (x, M.zero)
+module I = M.Inner
+- : unit = ()
+|}];;
+
+(* Module types: [S] resolves to the module type in [O] instead of the outer
+   [S]. *)
+run_resolved {|
+  module type S = sig end
+  module O = struct
+    module type S = sig val x : int end
+  end
+  open O
+  module F (X : S) = X
+  let pack (m : (module S)) = m
+|};;
+
+[%%expect{|
+module type S  = sig  end
+module O = struct module type S  = sig val x : int end end
+open O
+module F(X:O.S) = X
+let pack (m : (module O.S)) = m
+- : unit = ()
+|}];;
