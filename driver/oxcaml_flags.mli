@@ -353,3 +353,8 @@ module Flambda2 : sig
 end
 
 val opt_flag_handler : Clflags.Opt_flag_handler.t
+
+(** Check that the frame-pointer setting of the current invocation
+    ([Clflags.frame_pointers]) is supported on this target; exits with an
+    error otherwise. Run at the start of native compilation and linking. *)
+val validate_frame_pointers : unit -> unit

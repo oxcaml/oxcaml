@@ -160,10 +160,10 @@ module T = struct
     | SIMD -> phys_simd_regs
     | MASK -> phys_mask_regs
 
-  let available_registers =
-    if Config.with_frame_pointers
-    then registers_sans_frame_pointer
-    else registers
+  let available_registers reg_class =
+    if !Clflags.frame_pointers
+    then registers_sans_frame_pointer reg_class
+    else registers reg_class
 
   let num_available_registers reg_class =
     Array.length (available_registers reg_class)

@@ -663,7 +663,7 @@ let register_primary_file ~file_emitter ~sourcefile =
    for every instruction. *)
 let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
   let dbg = Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg) in
-  if is_cfi_enabled () && (!Clflags.debug || Config.with_frame_pointers)
+  if is_cfi_enabled () && (!Clflags.debug || !Clflags.frame_pointers)
   then
     match List.rev dbg with
     | [] -> ()

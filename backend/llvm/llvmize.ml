@@ -1935,7 +1935,7 @@ let invoke_clang_with_llvmir ~output_filename ~input_filename ~extra_flags =
     match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
   in
   let fp_flags =
-    if Config.with_frame_pointers
+    if !Clflags.frame_pointers
     then ["-fno-omit-frame-pointer"]
     else ["-fomit-frame-pointer"; "-momit-leaf-frame-pointer"]
   in

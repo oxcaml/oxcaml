@@ -409,6 +409,12 @@ let parse_command_line () =
       ( "-linscan-threshold",
         Arg.Set_int linscan_threshold,
         "Select linscan if the number of registers is above the threshold" );
+      ( "-frame-pointers",
+        Arg.Set Clflags.frame_pointers,
+        "Process IR saved with frame pointers enabled" );
+      ( "-no-frame-pointers",
+        Arg.Clear Clflags.frame_pointers,
+        "Process IR saved with frame pointers disabled" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
       ( "-copy-propagation",

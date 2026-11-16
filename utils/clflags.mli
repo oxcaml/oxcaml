@@ -305,6 +305,7 @@ val std_include_dir : unit -> string list
 val shared : bool ref
 val dlcode : bool ref
 val pic_code : bool ref
+val frame_pointers : bool ref
 val runtime_variant : string ref
 val ocamlrunparam : string ref
 val with_runtime : bool ref

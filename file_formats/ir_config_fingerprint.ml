@@ -13,7 +13,7 @@ type t = entry list
 
 let current () =
   [ { name = "with_frame_pointers";
-      value = string_of_bool Config.with_frame_pointers };
+      value = string_of_bool !Clflags.frame_pointers };
     { name = "with_address_sanitizer";
       value = string_of_bool Config.with_address_sanitizer };
     { name = "omit_leaf_frame_pointers";

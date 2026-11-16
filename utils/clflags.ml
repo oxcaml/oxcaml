@@ -394,6 +394,11 @@ let pic_code = ref (match Config.architecture with (* -fPIC *)
                      | "amd64" | "s390x" -> true
                      | _                 -> false)
 
+(* This ref lives here rather than in [Oxcaml_flags] because it is read by
+   [Translprim], which cannot depend on the driver libraries. *)
+let frame_pointers = ref Config.with_frame_pointers
+                                        (* -[no-]frame-pointers *)
+
 let runtime_variant = ref ""
 let ocamlrunparam = ref ""
 
