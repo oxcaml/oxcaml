@@ -98,6 +98,11 @@ val env_set_trap_stack : environment -> Operation.trap_stack -> environment
 
 val env_set_branch_dbg : environment -> Debuginfo.t -> environment
 
+(** The debuginfo of the terminator testing the condition [test] of a
+    [Cifthenelse] whose own debuginfo is [dbg]: [dbg], or failing that, the
+    debuginfo of the operation computing the condition. *)
+val dbg_of_test : Cmm.expression -> Debuginfo.t -> Debuginfo.t
+
 val phantom_vars_from_env : environment -> V.Set.t option
 
 val print_traps : Format.formatter -> Operation.trap_stack -> unit

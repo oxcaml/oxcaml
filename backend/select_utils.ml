@@ -109,6 +109,19 @@ let env_set_trap_stack env trap_stack = { env with trap_stack }
 
 let env_set_branch_dbg env branch_dbg = { env with branch_dbg }
 
+let dbg_of_test (test : Cmm.expression) dbg =
+  if not (Debuginfo.is_none dbg)
+  then dbg
+  else
+    match test with
+    | Cop (_, _, dbg) -> dbg
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
+    | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _
+    | Cinvalid _ ->
+      Debuginfo.none
+
 let phantom_vars_from_env env =
   if !Clflags.restrict_to_upstream_dwarf then None else Some env.phantom_lets
 

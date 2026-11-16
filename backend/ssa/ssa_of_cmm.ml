@@ -56,7 +56,9 @@ type env =
     static_exceptions : block Static_label.Map.t;
     (* Set while emitting the body of a [Ccatch] handler marked [is_cold], so
        that every block created for it is marked cold. *)
-    cold : bool
+    cold : bool;
+    (* See [Select_utils.environment]. *)
+    branch_dbg : Debuginfo.t
   }
 
 let env_find v env =
@@ -118,10 +120,13 @@ let bind_let env c v args =
   emit_name_for_debugger env c v args;
   env
 
-let emit_branch env c (test : Operation.test) rarg ~true_block ~false_block =
-  let make_cond op args =
-    (emit_op env c op Debuginfo.none Cmm.typ_int args).(0)
-  in
+let emit_const env c op dbg typ =
+  let dbg = if Debuginfo.is_none dbg then env.branch_dbg else dbg in
+  emit_op env c op dbg typ [||]
+
+let emit_branch env c (test : Operation.test) rarg ~dbg ~true_block ~false_block
+    =
+  let make_cond op args = (emit_op env c op dbg Cmm.typ_int args).(0) in
   (* A boolean branch is a two-target switch: [targets.(0)] is the false edge,
      [targets.(1)] the true edge. The condition is always a 0/1 comparison. *)
   let branch index ~true_block ~false_block : under_construction Terminator.t =
@@ -154,7 +159,7 @@ let emit_branch env c (test : Operation.test) rarg ~true_block ~false_block =
         (make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |])
         ~true_block:false_block ~false_block:true_block
   in
-  finish_block env c ~dbg:Debuginfo.none term
+  finish_block env c ~dbg term
 
 let rec emit_parts_list env c exp_list :
     (Cmm.expression list * env) Or_never_returns.t =
@@ -263,51 +268,36 @@ and emit env c (exp : Cmm.expression) ~tail : result =
     | Csequence (e1, e2) ->
       let* _ = emit env c e1 ~tail:false in
       emit env c e2 ~tail
-    | Cifthenelse
-        (econd, _ifso_dbg, ifso_p, eif, _ifnot_dbg, ifnot_p, eelse, _dbg) ->
-      emit_ifthenelse env c ~tail econd ifso_p eif ifnot_p eelse
-    | Cswitch (esel, index, ecases, _dbg) ->
-      emit_switch env c ~tail esel index ecases
+    | Cifthenelse (econd, ifso_dbg, ifso_p, eif, ifnot_dbg, ifnot_p, eelse, dbg)
+      ->
+      emit_ifthenelse env c ~tail econd ifso_dbg ifso_p eif ifnot_dbg ifnot_p
+        eelse dbg
+    | Cswitch (esel, index, ecases, dbg) ->
+      emit_switch env c ~tail esel index ecases dbg
     | Ccatch (_, [], e1) -> emit env c e1 ~tail
     | Ccatch (_flag, handlers, body) -> emit_catch env c ~tail handlers body
     (* Leaf expressions *)
-    | Cconst_int (n, _dbg) ->
-      Ok
-        (emit_op env c
-           (SU.make_const_int (Nativeint.of_int n))
-           Debuginfo.none Cmm.typ_int [||])
-    | Cconst_natint (n, _dbg) ->
-      Ok (emit_op env c (SU.make_const_int n) Debuginfo.none Cmm.typ_int [||])
-    | Cconst_float32 (n, _dbg) ->
-      Ok
-        (emit_op env c
-           (SU.make_const_float32 (Int32.bits_of_float n))
-           Debuginfo.none Cmm.typ_float32 [||])
-    | Cconst_float (n, _dbg) ->
-      Ok
-        (emit_op env c
-           (SU.make_const_float (Int64.bits_of_float n))
-           Debuginfo.none Cmm.typ_float [||])
-    | Cconst_vec128 (bits, _dbg) ->
-      Ok
-        (emit_op env c
-           (SU.make_const_vec128 bits)
-           Debuginfo.none Cmm.typ_vec128 [||])
-    | Cconst_vec256 (bits, _dbg) ->
-      Ok
-        (emit_op env c (Operation.Const_vec256 bits) Debuginfo.none
-           Cmm.typ_vec256 [||])
-    | Cconst_vec512 (bits, _dbg) ->
-      Ok
-        (emit_op env c (Operation.Const_vec512 bits) Debuginfo.none
-           Cmm.typ_vec512 [||])
-    | Cconst_mask (bits, _dbg) ->
-      Ok
-        (emit_op env c (Operation.Const_mask bits) Debuginfo.none Cmm.typ_mask
-           [||])
-    | Cconst_symbol (n, _dbg) ->
-      Ok
-        (emit_op env c (SU.make_const_symbol n) Debuginfo.none Cmm.typ_int [||])
+    | Cconst_int (n, dbg) ->
+      let op = SU.make_const_int (Nativeint.of_int n) in
+      Ok (emit_const env c op dbg Cmm.typ_int)
+    | Cconst_natint (n, dbg) ->
+      Ok (emit_const env c (SU.make_const_int n) dbg Cmm.typ_int)
+    | Cconst_float32 (n, dbg) ->
+      let op = SU.make_const_float32 (Int32.bits_of_float n) in
+      Ok (emit_const env c op dbg Cmm.typ_float32)
+    | Cconst_float (n, dbg) ->
+      let op = SU.make_const_float (Int64.bits_of_float n) in
+      Ok (emit_const env c op dbg Cmm.typ_float)
+    | Cconst_vec128 (bits, dbg) ->
+      Ok (emit_const env c (SU.make_const_vec128 bits) dbg Cmm.typ_vec128)
+    | Cconst_vec256 (bits, dbg) ->
+      Ok (emit_const env c (Operation.Const_vec256 bits) dbg Cmm.typ_vec256)
+    | Cconst_vec512 (bits, dbg) ->
+      Ok (emit_const env c (Operation.Const_vec512 bits) dbg Cmm.typ_vec512)
+    | Cconst_mask (bits, dbg) ->
+      Ok (emit_const env c (Operation.Const_mask bits) dbg Cmm.typ_mask)
+    | Cconst_symbol (n, dbg) ->
+      Ok (emit_const env c (SU.make_const_symbol n) dbg Cmm.typ_int)
     | Cvar v -> Ok (env_find v env)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list ->
@@ -347,7 +337,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
   in
   if tail
   then (
-    finish_block env c ~dbg:Debuginfo.none (continue Return r);
+    finish_block env c ~dbg:env.branch_dbg (continue Return r);
     Never_returns)
   else Ok r
 
@@ -475,44 +465,52 @@ and emit_expr_op env c op args dbg : result =
       Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Printcfg.basic_desc
         basic)
 
-and emit_ifthenelse env c ~tail econd ifa eif elsea eelse : result =
+and emit_ifthenelse env c ~tail econd ifso_dbg ifa eif ifnot_dbg elsea eelse dbg
+    : result =
+  let dbg = SU.dbg_of_test econd dbg in
   let cond, earg = Sel.select_condition econd in
   let* rarg = emit env c earg ~tail:false in
-  let then_env = if branch_is_cold ifa then { env with cold = true } else env in
+  let then_env =
+    { env with cold = env.cold || branch_is_cold ifa; branch_dbg = ifso_dbg }
+  in
   let else_env =
-    if branch_is_cold elsea then { env with cold = true } else env
+    { env with cold = env.cold || branch_is_cold elsea; branch_dbg = ifnot_dbg }
   in
   let then_block = new_block then_env ~params:[||] in
   let else_block = new_block else_env ~params:[||] in
-  emit_branch env c cond rarg ~true_block:then_block ~false_block:else_block;
+  emit_branch env c cond rarg ~dbg ~true_block:then_block
+    ~false_block:else_block;
   let then_c = Cursor.start then_block in
   let r_then = emit then_env then_c eif ~tail in
   let else_c = Cursor.start else_block in
   let r_else = emit else_env else_c eelse ~tail in
   join env c [| r_then, then_c; r_else, else_c |]
 
-and emit_switch env c ~tail esel index ecases : result =
+and emit_switch env c ~tail esel index ecases dbg : result =
   let* rsel = emit env c esel ~tail:false in
-  let case_blocks =
+  let case_envs =
     Array.map
-      (fun (_case_expr, _dbg, annots) ->
-        let env =
-          if branch_is_cold annots then { env with cold = true } else env
-        in
-        new_block env ~params:[||])
+      (fun (_case_expr, case_dbg, annots) ->
+        { env with
+          cold = env.cold || branch_is_cold annots;
+          branch_dbg = case_dbg
+        })
       ecases
+  in
+  let case_blocks =
+    Array.map (fun env -> new_block env ~params:[||]) case_envs
   in
   let targets = Array.map (fun idx -> case_blocks.(idx)) index in
   let index =
     assert (Array.length rsel = 1);
     rsel.(0)
   in
-  finish_block env c ~dbg:Debuginfo.none (Switch { index; targets });
+  finish_block env c ~dbg (Switch { index; targets });
   let case_results =
     Array.mapi
       (fun i (case_expr, _dbg, _) ->
         let case_c = Cursor.start case_blocks.(i) in
-        emit env case_c case_expr ~tail, case_c)
+        emit case_envs.(i) case_c case_expr ~tail, case_c)
       ecases
   in
   join env c case_results
@@ -581,12 +579,12 @@ and emit_expr_exit env c (lbl : Cmm.exit_label) args traps : result =
     let* src = emit_tuple ext_env c simple_list in
     let handler = find_handler env nfail in
     emit_trap_actions env c traps;
-    finish_block env c ~dbg:Debuginfo.none (continue (Goto handler) src);
+    finish_block env c ~dbg:env.branch_dbg (continue (Goto handler) src);
     Never_returns
   | Return_lbl ->
     let* src = emit_tuple ext_env c simple_list in
     emit_trap_actions env c traps;
-    finish_block env c ~dbg:Debuginfo.none (continue Return src);
+    finish_block env c ~dbg:env.branch_dbg (continue Return src);
     Never_returns
 
 (* Join a set of branches (each with its own end-cursor) into a fresh block. [c]
@@ -628,7 +626,8 @@ let emit_function (graph : under_construction Ssa.graph) (cmm : Cmm.fundecl) :
     { graph;
       vars = V.Map.empty;
       static_exceptions = Static_label.Map.empty;
-      cold = false
+      cold = false;
+      branch_dbg = Debuginfo.none
     }
   in
   let env, _offset =

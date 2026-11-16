@@ -313,19 +313,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let dbg = if Debuginfo.is_none dbg then env.branch_dbg else dbg in
     insert_op_debug env sub_cfg op dbg [||] rd
 
-  let dbg_of_test (test : Cmm.expression) dbg =
-    if not (Debuginfo.is_none dbg)
-    then dbg
-    else
-      match test with
-      | Cop (_, _, dbg) -> dbg
-      | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-      | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-      | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _
-      | Cname_for_debugger _ | Ctuple _ | Csequence _ | Cifthenelse _
-      | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
-        Debuginfo.none
-
   (* Default instruction selection for stores (of words) *)
 
   let insert_move_extcall_arg env sub_cfg ty_arg src dst dbg =
@@ -574,7 +561,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               Cfg.Poptrap { lbl_handler }
           in
           let phantom_available_before = SU.phantom_vars_from_env env in
-          Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] dbg
+          Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
             ~phantom_available_before)
         traps;
       let loc = Proc.loc_results_return (Reg.typv r) in
@@ -1234,7 +1221,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   and emit_expr_ifthenelse env sub_cfg bound_name econd ifso_dbg ifso_a eif
       (ifnot_dbg : Debuginfo.t) ifnot_a eelse (dbg : Debuginfo.t) :
       _ Or_never_returns.t =
-    let dbg = dbg_of_test econd dbg in
+    let dbg = SU.dbg_of_test econd dbg in
     let cond, earg = select_condition econd in
     match emit_expr env sub_cfg earg ~bound_name:None with
     | Never_returns -> Never_returns
@@ -1467,7 +1454,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 Cfg.Poptrap { lbl_handler }
             in
             let phantom_available_before = SU.phantom_vars_from_env env in
-            Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] dbg
+            Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
               ~phantom_available_before)
           traps;
         Sub_cfg.update_exit_terminator sub_cfg (Always handler.label) ~dbg
@@ -1566,7 +1553,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   and emit_tail_ifthenelse env sub_cfg econd (ifso_dbg : Debuginfo.t) ifso_a eif
       (ifnot_dbg : Debuginfo.t) ifnot_a eelse (dbg : Debuginfo.t) =
-    let dbg = dbg_of_test econd dbg in
+    let dbg = SU.dbg_of_test econd dbg in
     let cond, earg = select_condition econd in
     match emit_expr env sub_cfg earg ~bound_name:None with
     | Never_returns -> ()

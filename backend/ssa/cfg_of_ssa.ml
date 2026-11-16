@@ -145,15 +145,15 @@ let emit_result_moves body ~src ~dst =
 (* Like [emit_moves], but safe when [src] and [dst] overlap (e.g. a permutation
    of the target block's parameter registers): in that case the values are
    routed through fresh temporaries. *)
-let emit_parallel_moves body ~src ~dst =
+let emit_parallel_moves ?dbg body ~src ~dst =
   let dst_set = Reg.set_of_array dst in
   let has_overlap = Array.exists (fun s -> Reg.Set.mem s dst_set) src in
   if has_overlap
   then (
     let tmp_regs = Reg.createv_with_typs src in
-    emit_moves body ~src ~dst:tmp_regs;
-    emit_moves body ~src:tmp_regs ~dst)
-  else emit_moves body ~src ~dst
+    emit_moves ?dbg body ~src ~dst:tmp_regs;
+    emit_moves ?dbg body ~src:tmp_regs ~dst)
+  else emit_moves ?dbg body ~src ~dst
 
 (** A Branch condition that can be folded into the CFG test terminator,
     consuming the comparison's args directly. *)
@@ -395,7 +395,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         |> Misc.Stdlib.Array.filteri (fun i _ -> block_param_is_kept i)
         |> Array.map (get_reg_of_arg env)
       in
-      emit_parallel_moves body ~src:src_regs ~dst:dst_regs;
+      emit_parallel_moves ~dbg body ~src:src_regs ~dst:dst_regs;
       make_instr (Cfg.Always (label_of env goto)) [||] [||] dbg
     | Continue { continuation = Return; args } ->
       (* Emit a [Poptrap] for each handler still on the trap stack at block
@@ -409,7 +409,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         (Block.block_end_trap_stack block);
       let arg = Array.map (get_reg_of_arg env) args in
       let loc_res = Proc.loc_results_return (Reg.typv arg) in
-      emit_moves body ~src:arg ~dst:loc_res;
+      emit_moves ~dbg body ~src:arg ~dst:loc_res;
       DLL.add_end body (make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
       make_instr Cfg.Return loc_res [||] dbg
     | Continue { continuation = Raise raise_kind; args } ->
