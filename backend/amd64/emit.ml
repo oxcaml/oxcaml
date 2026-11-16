@@ -2074,7 +2074,10 @@ let prologue_stack_offset () =
 
 let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  (* A label that only delimits a DWARF range is not a branch target: aligning
+     it would make the generated code depend on debugging information. *)
+  if (not fallthrough) && !fastcode_flag && not is_dwarf_only_label
+  then D.align ~fill:Nop ~bytes:4;
   D.define_label lbl
 
 (* Emit an instruction *)
@@ -2849,7 +2852,17 @@ let rec emit_all ~first ~fallthrough i =
       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
         Printlinear.instr i;
       raise exn);
-    emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
+    let fallthrough =
+      match i.desc with
+      | Llabel_for_dwarf _ -> fallthrough
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _
+      | Llabel_for_jump_target _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
+        Linear.has_fallthrough i.desc
+    in
+    emit_all ~first:false ~fallthrough i.next
 
 let all_functions = ref []
 
