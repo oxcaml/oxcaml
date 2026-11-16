@@ -360,6 +360,9 @@ module Error : sig
 
   val log_or_raise : Location.t -> Env.t -> error -> unit
   val log_and_raise : Location.t -> Env.t -> error -> 'a
+
+  val monitor :
+    Location.t -> Env.t -> (unit -> 'a) -> with_:(exn -> error option) -> 'a
 end = struct
   type exn += In_context of Location.t * Env.t * error
 
@@ -515,6 +518,16 @@ end = struct
       Typing_recovery.log_or_raise (freeze_error (loc, env, err))
     else
       raise (In_context (loc, env, err))
+
+  let monitor loc env body ~with_ =
+    if !Clflags.typing_recovery then
+      Typing_recovery.monitor body ~with_:(fun e ->
+          Option.map (fun err -> freeze_error (loc, env, err)) (with_ e))
+    else
+      Scheduler.Monitor.try_ body ~with_:(fun e ->
+          match with_ e with
+          | Some err -> In_context (loc, env, err)
+          | None -> e)
 
   let () =
     Typing_recovery.register_recoverable (function
@@ -9719,6 +9732,12 @@ and type_coerce
   let { is_self; type_with_constraint; type_without_constraint } =
     constraint_arg
   in
+  (* Locates [Subtype] errors, including those raised later by
+     mode crossings that [enlarge_type] or [subtype] delays. *)
+  let not_subtype = function
+    | Subtype err -> Some (Not_subtype err)
+    | _ -> None
+  in
   match sty with
   | None ->
     let (cty', ty', force) =
@@ -9747,24 +9766,29 @@ and type_coerce
             && closed_type_expr ~env ty' ->
           if not gen && (* first try a single coercion *)
             let snap = snapshot () in
-            let ty, _b = enlarge_type env (generic_instance ty') in
+            let ty, _b =
+              Error.monitor loc env
+                (fun () -> enlarge_type env (generic_instance ty'))
+                ~with_:not_subtype
+            in
             try
               force (); Ctype.unify env arg_type ty; true
             with Unify _ ->
               backtrack snap; false
           then ()
-          else begin try
-            let force' = subtype env arg_type (generic_instance ty') in
-            force (); force' ();
-            if not gen && !Clflags.principal then
-              Location.prerr_warning loc
-                (not_principal "this ground coercion");
-          with Subtype err ->
-            (* prerr_endline "coercion failed"; *)
-            Error.log_and_raise loc env (Not_subtype err)
-          end;
+          else
+            Error.monitor loc env ~with_:not_subtype (fun () ->
+              let force' = subtype env arg_type (generic_instance ty') in
+              force (); force' ();
+              if not gen && !Clflags.principal then
+                Location.prerr_warning loc
+                  (not_principal "this ground coercion"))
       | _ ->
-          let ty, b = enlarge_type env (generic_instance ty') in
+          let ty, b =
+            Error.monitor loc env
+              (fun () -> enlarge_type env (generic_instance ty'))
+              ~with_:not_subtype
+          in
           force ();
           begin try Ctype.unify env arg_type ty with Unify err ->
             let expanded = full_expand ~may_forget_scope:true env ty' in
@@ -9787,14 +9811,11 @@ and type_coerce
           (cty, ty, force, cty', ty', force'), [ty; ty']
         end
       in
-      begin try
+      Error.monitor loc env ~with_:not_subtype (fun () ->
         let force'' =
           subtype env (generic_instance ty) (generic_instance ty')
         in
-        force (); force' (); force'' ()
-      with Subtype err ->
-        Error.log_and_raise loc env (Not_subtype err)
-      end;
+        force (); force' (); force'' ());
       (type_with_constraint env expected_mode ty,
        instance ty', Texp_coerce (Some cty, cty'))
 
