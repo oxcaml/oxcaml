@@ -3138,6 +3138,23 @@ AS_IF([test x"$enable_codegen_variants" != "xno" \
   [codegen_variants=false])
 AC_SUBST([codegen_variants])
 
+dnl Note: tested via enable_legacy_library_layout rather than legacy_layout,
+dnl because the AC_ARG_ENABLE default action only sets enable_legacy_layout
+dnl (so legacy_layout is empty, not "yes", when the flag is passed).
+AS_IF([test x"$codegen_variants" = "xtrue"],
+  [AS_IF([test x"$enable_legacy_library_layout" = "xyes"],
+    [AC_MSG_ERROR(m4_normalize([--enable-legacy-library-layout is not
+      supported together with codegen variants; configure with
+      --disable-codegen-variants]))])
+   dnl C stubs that can call back into OCaml (or allocate) must preserve
+   dnl the rbp chain to be linked into frame-pointer-variant programs:
+   dnl the fp runtime's stack-reallocation walk (runtime/fiber.c) steps
+   dnl through every C frame between the c_stack_link and the stub entry.
+   dnl Building all in-tree C stubs with frame pointers is ABI-neutral for
+   dnl non-fp programs and lets one shared stub archive serve both
+   dnl variants.
+   common_cflags="$common_cflags -fno-omit-frame-pointer -g"])
+
 ## CPP mangling
 
 AS_IF([test x"$enable_cpp_mangling" = "xyes"],

@@ -1,5 +1,11 @@
 (subdir build (dynamic_include ../dune_rules/stdlib.dune))
 
+;; Codegen-variant (frame-pointer) stdlib trees; the one whose mode is the
+;; configure default (or both, with --disable-codegen-variants) contains
+;; only an empty alias. See stdlib/dune_rules/gen.ml.
+(subdir build_fp (dynamic_include ../dune_rules/stdlib_fp.dune))
+(subdir build_base (dynamic_include ../dune_rules/stdlib_base.dune))
+
 ;; Write an empty file in an unconfigured tree
 (rule (target META) (mode fallback) (action (write-file %{target} "")))
 
@@ -14,4 +20,10 @@
 (subdir build/caml (dynamic_include ../../copy_workaround/headers.dune))
 (subdir build/stdlib (dynamic_include ../../copy_workaround/meta.dune))
 (subdir build/dynlink (dynamic_include ../../copy_workaround/fake_dynlink.dune))
+(subdir build_fp/caml (dynamic_include ../../copy_workaround/headers.dune))
+(subdir build_fp/dynlink
+  (dynamic_include ../../copy_workaround/fake_dynlink.dune))
+(subdir build_base/caml (dynamic_include ../../copy_workaround/headers.dune))
+(subdir build_base/dynlink
+  (dynamic_include ../../copy_workaround/fake_dynlink.dune))
 

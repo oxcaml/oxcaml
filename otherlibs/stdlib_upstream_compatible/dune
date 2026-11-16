@@ -44,3 +44,13 @@
   (META as stdlib_upstream_compatible/META))
  (section lib)
  (package ocaml))
+
+; Harvested into the codegen-variant trees; see otherlibs/unix/dune.
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (or (= %{context_name} "main-fp") (= %{context_name} "main-base")))
+ (deps
+  stdlib_upstream_compatible.cmxa
+  stdlib_upstream_compatible.a
+  stdlib_upstream_compatible.cmxs))

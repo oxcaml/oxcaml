@@ -14,7 +14,9 @@ ocamldir = .
 toplevels_installed = top opttop
 
 CLEAN_DUNE_WORKSPACES = \
-  duneconf/main.ws
+  duneconf/main.ws \
+  duneconf/main-fp.ws \
+  duneconf/main-base.ws
 
 # These are getting rm -rf'd, so be careful with this.
 
@@ -37,6 +39,7 @@ CLEAN_FILES = \
   otherlibs/dynlink/natdynlinkops \
   ocamlopt_upstream_flags.sexp \
   ocamlopt_oxcaml_flags.sexp \
+  ocamlopt_variant_flags.sexp \
   boot_oc_cflags.sexp \
   oc_cflags.sexp \
   oc_cppflags.sexp \

@@ -469,6 +469,19 @@
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
 
+; Codegen-variant contexts (main-fp / main-base): the OxCaml flags plus the
+; non-default frame-pointer flag. The sexp is written by the
+; _build/_bootinstall recipe in Makefile.common-ox.
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (or
+   (= %{context_name} "main-fp")
+   (= %{context_name} "main-base")))
+ (action
+  (copy %{project_root}/ocamlopt_variant_flags.sexp %{targets})))
+
 ; Write empty files in an unconfigured tree
 (rule
  (target Makefile.config)

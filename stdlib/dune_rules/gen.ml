@@ -70,7 +70,7 @@ let pp_flags ~awk_dir ~target =
   then sprintf " -pp \"awk -f %%{dep:%s/expand_module_aliases.awk}\"" awk_dir
   else ""
 
-let gen_rule ~ppf ~tgt_file ~base ~deps =
+let gen_rule ~ppf ~tgt_file ~base ~deps ~extra_native_flags =
   let ext, annot =
     match Filename.extension tgt_file with
     | ".cmo" -> `Cmo, true
@@ -111,6 +111,11 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
      in
      rule ~ppf ~target ~exts:["cmi";"cmsi";"cmti"] ~src ~deps ~action
   | `Cmx ->
+     let flags =
+       match extra_native_flags with
+       | "" -> flags
+       | extra -> extra ^ " " ^ flags
+     in
      let action =
        sprintf "(run %%{exe:../../boot_ocamlopt.exe} %s -cmi-file %s.cmi \
                  %%{read-lines:../../ocamlopt_stdlib_flags.txt} \
@@ -156,36 +161,93 @@ let iter_module_deps table f =
     in
     f ~tgt_file ~base ~deps)
 
-(* Generate rules to build the stdlib (only used in bootstrap build) *)
-let write_stdlib_dune ppf =
+(* Kept as a function: unconfigured trees have empty values for these keys,
+   and only the code paths that need them may evaluate them. *)
+let bool_setting key =
+  match setting key with
+  | ["true"] -> true
+  | ["false"] -> false
+  | v ->
+     failwith
+       (sprintf "Setting %s should be true or false, got: %s"
+          key (String.concat " " v))
+
+(* Generate rules to build the stdlib (only used in bootstrap build).
+
+   [variant] selects which stdlib tree the rules build:
+   - [`Base]: stdlib/build, the configure-default codegen mode.
+   - [`Fp] / [`Base_variant]: the sibling stdlib/build_fp / build_base trees, which
+     serve the NON-default frame-pointer mode (absolute naming: build_fp is
+     always the frame-pointer tree). Only the native artifacts are rebuilt,
+     by boot_ocamlopt with -frame-pointers / -no-frame-pointers prepended to
+     the stdlib flags; the FP-agnostic byte artifacts (.cmi/.cmo/.cma/...)
+     are copied from build/, and the matching codegen-variant runtime
+     archives (libasmrun*_fp.* / *_base.*, built by @runtime_variants) are
+     copied from runtime/, so that one variant tree is a complete stdlib
+     root for compiling and linking in that mode. When the requested mode IS
+     the configure default, or codegen variants are disabled, only an empty
+     alias is emitted, keeping @stdlib_fp / @stdlib_base well-defined. *)
+let write_stdlib_dune ~variant ppf =
+  let alias_name =
+    match variant with
+    | `Base -> "stdlib"
+    | `Fp -> "stdlib_fp"
+    | `Base_variant -> "stdlib_base"
+  in
+  let active =
+    match variant with
+    | `Base -> true
+    | `Fp ->
+       bool_setting "build_codegen_variants"
+       && not (bool_setting "codegen_default_fp")
+    | `Base_variant ->
+       bool_setting "build_codegen_variants"
+       && bool_setting "codegen_default_fp"
+  in
+  if not active then fprintf ppf "(alias (name %s))\n" alias_name else
+  let extra_native_flags =
+    match variant with
+    | `Base -> ""
+    | `Fp -> "-frame-pointers"
+    | `Base_variant -> "-no-frame-pointers"
+  in
+  let native_only = variant <> `Base in
   let table = module_deps_table Sys.argv.(3) in
   iter_module_deps table (fun ~tgt_file ~base ~deps ->
-    gen_rule ~ppf ~tgt_file ~base ~deps);
+    if (not native_only) || Filename.extension tgt_file = ".cmx" then
+      gen_rule ~ppf ~tgt_file ~base ~deps ~extra_native_flags);
   let modnames = setting "stdlib_modules" in
+  let native_flags_prefix =
+    match extra_native_flags with "" -> "" | extra -> extra ^ " "
+  in
   let action =
     modnames
     |> List.map (fun m -> sprintf "%%{dep:%s.cmx}" (get_target m))
     |> String.concat " "
-    |> sprintf "(run %%{exe:../../boot_ocamlopt.exe} -g -nostdlib -a \
+    |> sprintf "(run %%{exe:../../boot_ocamlopt.exe} %s-g -nostdlib -a \
                                                      -o stdlib.cmxa %s)"
+         native_flags_prefix
   in
   rule ~ppf ~target:"stdlib" ~exts:["cmxa";"a"] ~src:"stdlib.ml"
     ~deps:(modnames |> List.map (fun m -> get_target m ^ ".o"))
     ~action;
-  let action =
-    modnames
-    |> List.map (fun m -> sprintf "%%{dep:%s.cmo}" (get_target m))
-    |> String.concat " "
-    |> sprintf "(run %%{exe:../../main_native.exe} -g -nostdlib -a \
-                                                   -o stdlib.cma %s)"
-  in
-  rule ~ppf ~target:"stdlib" ~exts:["cma"] ~src:"stdlib.ml"
-    ~deps:(modnames |> List.map (fun m -> get_target m ^ ".cmo"))
-    ~action;
+  if not native_only then begin
+    let action =
+      modnames
+      |> List.map (fun m -> sprintf "%%{dep:%s.cmo}" (get_target m))
+      |> String.concat " "
+      |> sprintf "(run %%{exe:../../main_native.exe} -g -nostdlib -a \
+                                                     -o stdlib.cma %s)"
+    in
+    rule ~ppf ~target:"stdlib" ~exts:["cma"] ~src:"stdlib.ml"
+      ~deps:(modnames |> List.map (fun m -> get_target m ^ ".cmo"))
+      ~action
+  end;
   copy_files ~ppf "../../runtime/lib{asm,caml}run*.{a,so}";
   copy_files ~ppf "../../Makefile.config";
   copy_files ~ppf "../dune_rules/ld.conf";
-  fprintf ppf "%s\n" {|
+  if not native_only then
+    fprintf ppf "%s\n" {|
   (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
   (alias
     (name stdlib)
@@ -199,6 +261,37 @@ let write_stdlib_dune ppf =
        Makefile.config runtime-launch-info ld.conf
        stdlib/META dynlink/dynlink.cmxa))
   |}
+  else begin
+    (* Byte artifacts are FP-agnostic: copy them from the default tree.
+       (.ml files are regenerated locally as inputs of the .cmx rules;
+       .cmx/.o/.a/.cmxa are rebuilt with the variant flags above.) *)
+    copy_files ~ppf "../build/*.{cmi,cmti,cmsi,cmo,cms,cmt}";
+    copy_files ~ppf "../build/*.mli";
+    copy_files ~ppf "../build/stdlib.cma";
+    fprintf ppf "%s\n" {|
+  (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
+  |};
+    let codegen_suff =
+      match variant with
+      | `Fp -> "_fp"
+      | `Base_variant -> "_base"
+      | `Base -> assert false
+    in
+    fprintf ppf
+      "(alias\n\
+      \  (name %s)\n\
+      \  (deps\n\
+      \     libcamlrun.a libcamlrund.a libcamlrun_pic.a libcamlrun_shared.so\n\
+      \     libasmrun%s.a libasmrund%s.a libasmrun_pic%s.a\n\
+      \     libasmrun_shared%s.so\n\
+      \     stdlib.cma stdlib.cmxa stdlib.a\n\
+      \     std_exit.cmo std_exit.o std_exit.cmx\n\
+      \     (glob_files *.{mli,cmi,cmti,cmsi,cmo,cms,cmt,cmx})\n\
+      \     (glob_files caml/*.{h,tbl})\n\
+      \     Makefile.config runtime-launch-info ld.conf\n\
+      \     dynlink/dynlink.cmxa))\n"
+      alias_name codegen_suff codegen_suff codegen_suff codegen_suff
+  end
 
 let write_stdlib_jsir_sources_dune ppf =
   setting "stdlib_modules" @ ["std_exit"] |> List.iter (fun m ->
@@ -295,15 +388,6 @@ let write_runtime_dune ppf =
      build_settings.txt (keys codegen_default_fp and
      build_codegen_variants, written by Makefile.upstream from
      Makefile.config). *)
-  let bool_setting key =
-    match setting key with
-    | ["true"] -> true
-    | ["false"] -> false
-    | v ->
-       failwith
-         (sprintf "Setting %s should be true or false, got: %s"
-            key (String.concat " " v))
-  in
   let default_fp = bool_setting "codegen_default_fp" in
   let build_codegen_variants = bool_setting "build_codegen_variants" in
   let codegen_suff ~fp =
@@ -510,7 +594,9 @@ let write_runtime_dune ppf =
 
 let () =
   match Sys.argv.(2) with
-  | "stdlib" -> write_stdlib_dune stdout
+  | "stdlib" -> write_stdlib_dune ~variant:`Base stdout
+  | "stdlib_fp" -> write_stdlib_dune ~variant:`Fp stdout
+  | "stdlib_base" -> write_stdlib_dune ~variant:`Base_variant stdout
   | "stdlib-jsir-sources" -> write_stdlib_jsir_sources_dune stdout
   | "stdlib-jsir" -> write_stdlib_jsir_dune stdout
   | "runtime" -> write_runtime_dune stdout
