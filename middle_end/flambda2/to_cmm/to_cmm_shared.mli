@@ -55,6 +55,11 @@ val memory_chunk_of_kind : Flambda_kind.With_subkind.t -> Cmm.memory_chunk
 val memory_chunk_of_non_scannable_kind :
   Flambda_kind.With_subkind.t -> Cmm.memory_chunk
 
+(** Same as [memory_chunk_of_kind], but for accesses that need not be
+    word-aligned, such as through raw or off-heap pointers. *)
+val unaligned_memory_chunk_of_kind :
+  Flambda_kind.With_subkind.t -> Cmm.memory_chunk
+
 (** Create a constant int expression from a targetint. *)
 val targetint : dbg:Debuginfo.t -> Targetint_32_64.t -> Cmm.expression
 

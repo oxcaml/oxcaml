@@ -329,9 +329,11 @@ type memory_chunk =
   | Thirtytwo_signed
   | Word_int (* integer or pointer outside heap *)
   | Sixtyfour
-    (* 64-bit integer whose accesses do not follow OCaml alignment (e.g.
-       [Bytes.set_int64], [Bigarray] int64); must not use ordered
-       (release/acquire) accesses, which require natural alignment on Arm. *)
+    (* 64-bit integer in raw data that may be unaligned (e.g. [Bytes.set_int64],
+       [Bigarray] int64, native pointers). Accesses must not be ordered
+       (release/acquire), which requires natural alignment on Arm, and stores
+       get no memory-model barrier, like the narrower integer and float
+       chunks. *)
   | Word_mask (* integer-sized AVX512 mask *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }
