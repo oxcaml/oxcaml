@@ -55,7 +55,6 @@ type coeffects = No_coeffects | Has_coeffects
 type mode_poly =
   | Generic
   | Instance of Mode.Locality.l
-  | Arbitrary
 
 type mode =
   | Prim_local

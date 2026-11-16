@@ -72,9 +72,6 @@ type mode_poly =
   | Instance of Mode.Locality.l
   (** Denotes the locality of an instance of a polymorphic mode variable; used
       when a primitive is instantiated and applied. *)
-  | Arbitrary
-  (** Denotes a special case where the locality is irrelevant,
-      e.g. when checking the arity. *)
 
 type mode =
   | Prim_local

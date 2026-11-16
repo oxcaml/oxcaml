@@ -2130,8 +2130,7 @@ let prim_mode' mvars = function
 let prim_mode mvar prim ~level =
   match prim with
   | Primitive.Prim_mode_poly (Primitive.Instance m), _ -> m
-  | Primitive.Prim_mode_poly (Primitive.Generic | Primitive.Arbitrary), _ ->
-    assert false
+  | Primitive.Prim_mode_poly Primitive.Generic, _ -> assert false
   | (Primitive.Prim_global | Primitive.Prim_local | Primitive.Prim_poly), _ ->
     let mvar = Option.map
       (fun mvar_l -> mvar_l, (Forkable.newvar level, Yielding.newvar level))
@@ -2273,8 +2272,7 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
 
 let instance_mode_poly (prim, _) m =
   match prim with
-  | Primitive.Prim_mode_poly (Primitive.Instance _ | Primitive.Arbitrary)
-  | Primitive.Prim_poly ->
+  | Primitive.Prim_mode_poly (Primitive.Instance _) | Primitive.Prim_poly ->
     assert false
   | Primitive.Prim_mode_poly Primitive.Generic ->
     let mode_l = Locality.newvar 0 in
@@ -2283,14 +2281,14 @@ let instance_mode_poly (prim, _) m =
       (Primitive.Instance (Locality.disallow_right mode_l))
   | (Primitive.Prim_global | Primitive.Prim_local) as prim -> prim
 
-let rec instance_prim_poly modes res ty =
+let rec instance_prim_mode_poly modes res ty =
   match modes, get_desc ty with
   | m :: modes, Tarrow ((_, marg, mret), _, ret, _) ->
      let m = instance_mode_poly m marg in
      let modes, res =
        match modes with
        | [] -> [], instance_mode_poly res mret
-       | _ :: _ -> instance_prim_poly modes res ret
+       | _ :: _ -> instance_prim_mode_poly modes res ret
      in
      m :: modes, res
   | _ :: _, _ -> assert false
@@ -2435,7 +2433,8 @@ let instance_prim_with_desc env (desc : Primitive.description) ty =
   then
     let ty, sort = instance_prim_layout env desc (generic_instance ty) in
     let args, res =
-      instance_prim_poly desc.prim_native_repr_args desc.prim_native_repr_res ty
+      instance_prim_mode_poly
+        desc.prim_native_repr_args desc.prim_native_repr_res ty
     in
     ty, None, None, sort, Primitive.with_modes desc ~args ~res
   else
