@@ -241,7 +241,15 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_apply _ ->
         Dynamic
 
-    | Texp_array _
+    | Texp_array _ ->
+       begin match Typeopt.array_kind e with
+       | Pgenarray -> Dynamic
+       | Pfloatarray | Paddrarray | Pgcignorableaddrarray | Pintarray
+       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+       | Punboxedvectorarray _ | Punboxedmaskarray
+       | Pgcscannableproductarray _ | Pgcignorableproductarray _
+       | Punspecializedarray -> Static
+       end
     | Texp_idx _ ->
         Static
     | Texp_pack mexp ->
