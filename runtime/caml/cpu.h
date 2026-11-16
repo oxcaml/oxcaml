@@ -27,7 +27,8 @@ CAMLextern bool caml_cpu_lse;
 
 Caml_inline bool caml_cpu_has_lse(void)
 {
-#ifdef HAS_LSE
+#if defined(HAS_LSE) || defined(__ARM_FEATURE_ATOMICS)
+  /* Code built for LSE cannot run without it. */
   return true;
 #else
   return caml_cpu_lse;
