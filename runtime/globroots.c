@@ -300,7 +300,7 @@ void caml_scan_global_roots(scanning_action f, void* fdata) {
 /* Scan global roots for a minor collection */
 void caml_scan_global_young_roots(scanning_action f, void* fdata)
 {
-  caml_plat_lock_blocking(&roots_mutex);
+  caml_plat_lock_blocking(&roots_mutex); // TODO: Is this necessary? Are we not in a STW?
   iterating_roots ++;
 
   caml_iterate_global_roots(f, &caml_global_roots, fdata);

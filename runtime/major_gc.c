@@ -1645,7 +1645,7 @@ void caml_darken_cont(value cont)
   CAMLassert(!Is_young(cont));
   CAMLassert(Tag_val(cont) == Cont_tag);
   {
-    SPIN_WAIT {
+    SPIN_WAIT { // TODO: Relaxed followed by acquire seems odd
       header_t hd = atomic_load_relaxed(Hp_atomic_val(cont));
       CAMLassert(!Has_status_hd(hd, caml_global_heap_state.GARBAGE));
       if (Has_status_hd(hd, caml_global_heap_state.MARKED)) {
