@@ -91,10 +91,8 @@ let attach_fdo_region_counters uacc ~use_id action annotations =
   if Fdo_annotation.is_empty preserved
   then annotations
   else
-    Branch_annotations.with_fdo_annotation annotations
-      (Fdo_annotation.combine
-         (Branch_annotations.fdo_annotation annotations)
-         preserved)
+    Branch_annotations.map_fdo_annotation annotations ~f:(fun fdo_annotation ->
+        Fdo_annotation.combine fdo_annotation preserved)
 
 let rebuild_arm uacc arm (action, ~annotations, use_id, arity, env_at_use)
     (new_let_conts, arms, (mergeable_arms : mergeable_arms)) =
@@ -896,9 +894,8 @@ let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
   let action = AC.with_debuginfo action ~dbg in
   let annotations =
-    Branch_annotations.with_fdo_annotation annotations
-      (DE.inline_fdo_annotation (DA.denv dacc)
-         (Branch_annotations.fdo_annotation annotations))
+    Branch_annotations.map_fdo_annotation annotations
+      ~f:(DE.inline_fdo_annotation (DA.denv dacc))
   in
   let dacc =
     DA.map_flow_acc dacc

@@ -31,10 +31,8 @@ open! Flambda.Import
 let map_counters_of_switch ~f switch =
   let arms =
     Target_ocaml_int.Map.map
-      (Switch_arm.map_annotations (fun annotations ->
-           Branch_annotations.with_fdo_annotation annotations
-             (Fdo_annotation.map f
-                (Branch_annotations.fdo_annotation annotations))))
+      (Switch_arm.map_annotations
+         (Branch_annotations.map_fdo_annotation ~f:(Fdo_annotation.map f)))
       (Switch.arms switch)
   in
   Switch.create
