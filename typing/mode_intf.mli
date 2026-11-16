@@ -355,6 +355,9 @@ module type S = sig
       on [erase_hint] in [Solver_intf] for details. *)
   val erase_hints : unit -> unit
 
+  (** Remove watches from all variables, before marshalling them. *)
+  val erase_watches : unit -> unit
+
   (** Resets the counter allocating the (negative) ids of persistent copies of
       mode variables. (see [Subst.reset_additional_action_id]). *)
   val reset_persistent_id : unit -> unit
@@ -494,6 +497,9 @@ module type S = sig
         | Shareable
         | Corruptible
         | Nonportable
+        | Mod_shareable
+        | Mod_corruptible
+        | Mod_portable
 
       include Const with type t := t
     end
@@ -524,6 +530,9 @@ module type S = sig
         | Corrupted
         | Shared
         | Contended
+        | Mod_corrupted
+        | Mod_shared
+        | Mod_contended
 
       include Const with type t := t
     end
@@ -570,6 +579,9 @@ module type S = sig
         | Writing
         | Reading
         | Stateful
+        | Mod_writing
+        | Mod_reading
+        | Mod_stateless
 
       include Const with type t := t
     end
@@ -592,6 +604,9 @@ module type S = sig
         | Read
         | Write
         | Immutable
+        | Mod_read
+        | Mod_write
+        | Mod_immutable
 
       include Const with type t := t
     end
@@ -1034,6 +1049,61 @@ module type S = sig
        function [A -> B -> C] to [A] and get back [B -> C]. The mode of the
        three are constrained. *)
 
+    (** Mod modes: the comonadic upper bound for a function to be callable (the
+        old top on the mirrored axes). *)
+    val callable_bound : Comonadic.Const.t
+
+    (** [max] on the non-mirrored axes, [min] on the mirrored ones. *)
+    val comonadic_nonmirror_mask : Comonadic.Const.t
+
+    (** Lower bound (sub-moding) of the monadic mode of fresh allocations: the
+        old bottom on the mirrored axes, [min] elsewhere. *)
+    val monadic_alloc_bound : Monadic.Const.t
+
+    (** For a constant closure mode whose mirrored axes are the old top (or
+        above), the total monadic lock is the old join with this constant. *)
+    val const_lock_monadic : Comonadic.Const.t -> Monadic.Const.t option
+
+    (** For printing unconstrained bounds: clamps a mirrored axis to the old
+        lattice. *)
+    val print_clamp_axis : 'a Axis.t -> 'a -> 'a
+
+    (** The bottom and top of the old lattices (without mod modes). *)
+    val old_min : lr
+
+    val old_max : lr
+
+    (** Clamp the mirrored axes to the old region ([meet_const] old top). *)
+    val clamp_comonadic_old : (allowed * 'r) Comonadic.t -> Comonadic.l
+
+    (** [meet_const comonadic_nonmirror_mask] *)
+    val comonadic_nonmirror : (allowed * 'r) Comonadic.t -> Comonadic.l
+
+    (** [lock_comonadic_watch value closure] is the mode at which a captured
+        value of comonadic mode [value] is seen inside a closure of mode
+        [closure], as the exact total lock on the mirrored axes (the value
+        itself on the other axes). Does not constrain [value] against [closure].
+    *)
+    val lock_comonadic_watch :
+      (allowed * 'r) Comonadic.t -> ('l * allowed) Comonadic.t -> Comonadic.l
+
+    (** Same for the monadic fragment (including the old join with the dual of
+        [closure] on the non-mirrored axes). *)
+    val lock_monadic_watch :
+      (allowed * 'r) Monadic.t -> ('l * allowed) Comonadic.t -> Monadic.l
+
+    (** Whether a monadic mode can never reach the mod region (so that the old
+        closure rule is exact for it). *)
+    val monadic_in_old_region : ('l * 'r) Monadic.t -> bool
+
+    (** Whether capturing a value of the first comonadic mode in a closure of
+        the second is legal in every solution (the lock is the identity). *)
+    val comonadic_lock_is_identity :
+      ('l * 'r) Comonadic.t -> ('l1 * 'r1) Comonadic.t -> bool
+
+    (** Whether a comonadic submode error involves a non-mirrored axis. *)
+    val comonadic_error_nonmirror : Comonadic.error -> bool
+
     (** Returns the lower bound needed for [B -> C] in relation to [A] *)
     val close_over :
       (('l * allowed) Monadic.t, (allowed * 'r) Comonadic.t) monadic_comonadic ->
@@ -1394,9 +1464,7 @@ module type S = sig
 
       (** Apply mode crossing on a right monadic [With_locality] fragment. *)
       val apply_right_with_locality :
-        t ->
-        (disallowed * 'r) With_locality.Monadic.t ->
-        (disallowed * 'r) With_locality.Monadic.t
+        t -> With_locality.Monadic.r -> With_locality.Monadic.r
     end
 
     module Comonadic : sig
@@ -1432,9 +1500,7 @@ module type S = sig
 
       (** Apply mode crossing on a left comonadic [With_locality] fragment. *)
       val apply_left_with_locality :
-        t ->
-        ('l * disallowed) With_locality.Comonadic.t ->
-        ('l * disallowed) With_locality.Comonadic.t
+        t -> With_locality.Comonadic.l -> With_locality.Comonadic.l
     end
 
     (** The mode crossing capability on all axes, split into monadic and

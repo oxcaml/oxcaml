@@ -355,11 +355,40 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       mutable subst : 'a var option;
           (** Similar to Tsubst in a type, the [subst] field holds an optional
               copy used during instantiation *)
-      mutable gencopy : 'a var option
+      mutable gencopy : 'a var option;
           (** Calls to [generalize_structure] creates additional copies to make
               sure the bounds of a generalize structure is rigid: [gencopy]
               caches such copies *)
+      mutable watches : 'a watch list;
+          (** Constraints that are not edges of the graph (see [watch]) and that
+              have this variable as a trigger. *)
+      mutable upper_o : 'a
+          (** Mod modes, the O layer: the upper bound of the variable in the
+              system extended with the region constraints [v <= C.region_cap]
+              on every variable (the old system). [upper_o <= upper]. Eagerly
+              propagated through [vlower] and watches, but never checked
+              against [lower]: it is only used for defaults (zapping), never
+              for acceptance. *)
     }
+
+  (** [Watch {target; bound; witness}] on a trigger variable [v] is a constraint
+      [target <= bound ()], where [bound] is monotone in the current upper
+      bounds of its triggers (which include [v]). It is re-fired whenever the
+      upper bound of a trigger decreases. If firing because of [v] fails with
+      [target]'s lower bound being [w], then [witness w] is a lower bound of [v]
+      in every solution (given the other triggers' current upper bounds).
+      Watches only relate plain variables, so morphisms are never composed with
+      them. *)
+  and 'b watch =
+    | Watch :
+        { target : 'a var;
+          tobj : 'a C.obj;
+          bound : unit -> 'a;
+          witness : 'a -> 'b;
+          bound_o : unit -> 'a;  (** [bound] on the [upper_o] of the triggers *)
+          witness_o : 'a -> 'b  (** [witness] for the O layer *)
+        }
+        -> 'b watch
 
   and 'b lmorphvar = ('b, left_only) morphvar
 
@@ -385,6 +414,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Cvupper : 'a var * 'a rmorphvar VarMap.t -> change
     | Clevel : 'a var * int -> change
     | Cgencopy : 'a var * 'a var option -> change
+    | Cwatches : 'a var * 'a watch list -> change
+    | Cupper_o : 'a var * 'a -> change
 
   type changes = change list
 
@@ -399,6 +430,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Cvupper (v, vupper) -> v.vupper <- vupper
     | Clevel (v, level) -> v.level <- level
     | Cgencopy (v, copy) -> v.gencopy <- copy
+    | Cwatches (v, w) -> v.watches <- w
+    | Cupper_o (v, u) -> v.upper_o <- u
 
   let empty_changes = []
 
@@ -863,7 +896,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | None -> ()
     | Some log -> log := Cupper (v, v.upper, v.upper_hint) :: !log);
     v.upper <- C.meet obj v.upper a;
-    v.upper_hint <- hint_biased_meet obj v.upper v.upper_hint a a_hint
+    v.upper_hint <- hint_biased_meet obj v.upper v.upper_hint a a_hint;
+    if not (C.le obj v.upper_o a)
+    then begin
+      (match log with
+      | None -> ()
+      | Some log -> log := Cupper_o (v, v.upper_o) :: !log);
+      v.upper_o <- C.meet obj v.upper_o a
+    end
+
+  let update_upper_o (type a) ~log (obj : a C.obj) v a =
+    (match log with
+    | None -> ()
+    | Some log -> log := Cupper_o (v, v.upper_o) :: !log);
+    v.upper_o <- C.meet obj v.upper_o a
+
+  let mupper_o dst (Amorphvar (var, morph, _hint)) =
+    C.apply dst morph var.upper_o
 
   (** Arguments are not checked and used directly. They must satisfy the
       INVARIANT listed above. *)
@@ -993,6 +1042,55 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     in
     if C.le obj upper a then Ok () else Error (upper, Comp_hint.Unknown upper)
 
+  (** The O layer (see [upper_o]): propagate [v.upper_o <= a]. With
+      [~check:false] this never fails. With [~check:true] (trial mode, used to
+      compute floors in the O layer) it fails with a lower bound of [v] when
+      some reached variable would get [upper_o] below its [lower]. *)
+  let rec submode_vc_o : type a.
+      check:bool -> log:_ -> a C.obj -> a var -> a -> (unit, a) Result.t =
+   fun ~check ~log obj v a ->
+    if check && not (C.le obj v.lower a)
+    then Error v.lower
+    else if C.le obj v.upper_o a
+    then Ok ()
+    else (
+      update_upper_o ~log obj v a;
+      push_o ~check ~log obj v)
+
+  and push_o : type a.
+      check:bool -> log:_ -> a C.obj -> a var -> (unit, a) Result.t =
+   fun ~check ~log obj v ->
+    let a = v.upper_o in
+    match
+      find_error (fun mv -> submode_mvc_o ~check ~log obj mv a) v.vlower
+    with
+    | Error _ as e -> e
+    | Ok () -> fire_watches_o ~check ~log v.watches
+
+  and submode_mvc_o : type a r.
+      check:bool ->
+      log:_ ->
+      a C.obj ->
+      (a, allowed * r) morphvar ->
+      a ->
+      (unit, a) Result.t =
+   fun ~check ~log obj (Amorphvar (u, f, _)) a ->
+    let src = C.src obj f in
+    let f' = C.right_adjoint obj f in
+    match submode_vc_o ~check ~log src u (C.apply src f' a) with
+    | Ok () -> Ok ()
+    | Error e -> Error (C.apply obj f e)
+
+  and fire_watches_o : type b.
+      check:bool -> log:_ -> b watch list -> (unit, b) Result.t =
+   fun ~check ~log ws ->
+    match ws with
+    | [] -> Ok ()
+    | Watch { target; tobj; bound_o; witness_o; _ } :: ws -> (
+      match submode_vc_o ~check ~log tobj target (bound_o ()) with
+      | Ok () -> fire_watches_o ~check ~log ws
+      | Error w -> Error (witness_o w))
+
   (** Returns [Ok ()] if success; [Error x] if failed, and [x] is the next best
       (read: strictly lower) guess to replace the constant argument that MIGHT
       succeed. *)
@@ -1083,6 +1181,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     else if (not allow_rigid) && v.level = rigid_level
     then rigid_submode_vc obj v a'
     else (
+      let upper_o_before = v.upper_o in
       update_upper ~allow_rigid ~log obj v a' a'_hint;
       let r =
         v.vlower
@@ -1097,7 +1196,36 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                then update_lower ~allow_rigid ~log obj v mu_lower mu_lower_hint);
             r)
       in
-      r)
+      match r with
+      | Error _ -> r
+      | Ok () -> (
+        match fire_watches ~allow_rigid ~log v.watches with
+        | Error _ as e -> e
+        | Ok () ->
+          (if not (C.le obj upper_o_before v.upper_o)
+           then
+             let (_ : (unit, a) Result.t) = push_o ~check:false ~log obj v in
+             ());
+          Ok ()))
+
+  and fire_watches : type b.
+      allow_rigid:bool ->
+      log:_ ->
+      b watch list ->
+      (unit, b * (b, left_only) Comp_hint.t) Result.t =
+   fun ~allow_rigid ~log ws ->
+    match ws with
+    | [] -> Ok ()
+    | Watch { target; tobj; bound; witness } :: ws -> (
+      let c = bound () in
+      match
+        submode_vc ~allow_rigid ~log H.Pinpoint.unknown tobj target c
+          (Comp_hint.Unknown c)
+      with
+      | Ok () -> fire_watches ~allow_rigid ~log ws
+      | Error (w, _) ->
+        let w = witness w in
+        Error (w, Comp_hint.Unknown w))
 
   and submode_mvc :
       'a 'r.
@@ -1382,6 +1510,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       match submode_mvc ~allow_rigid ~log pp dst mv muupper muupper_hint with
       | Error (a, a_hint) -> Error (a, a_hint, muupper, muupper_hint)
       | Ok () -> (
+        (* O layer: [f v <= g u.upper_o]. *)
+        let (_ : (unit, a) Result.t) =
+          submode_mvc_o ~check:false ~log dst mv (mupper_o dst mu)
+        in
         let mvlower = mlower dst mv in
         let mvlower_hint = mlower_hint mv in
         match submode_cmv ~allow_rigid ~log pp dst mvlower mvlower_hint mu with
@@ -1787,7 +1919,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         vupper;
         id;
         gencopy;
-        subst
+        subst;
+        watches = [];
+        upper_o = C.meet obj upper (C.region_cap obj)
       }
     in
     vars := Var var :: !vars;
@@ -1803,6 +1937,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     v.vupper <- VarMap.map unhint_morphvar v.vupper
 
   let erase_hints () = List.iter (fun (Var v) -> unhint_var v) !vars
+
+  let erase_watches () = List.iter (fun (Var v) -> v.watches <- []) !vars
 
   type ('a, 'd) hint_raw = ('a, 'd) Comp_hint.t
 
@@ -2228,6 +2364,76 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                       find_error (fun mv -> submode_mvmv ~log pp obj mv mu) mvs)
                     mus)))
 
+  let plain_var : type a l r. a C.obj -> (a, l * r) mode -> a var =
+   fun obj m ->
+    match m with
+    | Amodevar (Amorphvar (v, f, _)) -> (
+      match C.equal_morph obj f C.id with
+      | Misc.Is_eq -> v
+      | Misc.Is_not_eq -> Misc.fatal_error "Solver.watch: not a plain variable")
+    | Amode _ | Amodejoin _ | Amodemeet _ ->
+      Misc.fatal_error "Solver.watch: not a plain variable"
+
+  let add_watch ~log v w =
+    (match log with
+    | None -> ()
+    | Some log -> log := Cwatches (v, v.watches) :: !log);
+    v.watches <- w :: v.watches
+
+  let fire_initial ~log tobj target bound bound_o =
+    let c = bound () in
+    match
+      submode_vc ~allow_rigid:false ~log H.Pinpoint.unknown tobj target c
+        (Comp_hint.Unknown c)
+    with
+    | Ok () ->
+      let (_ : (unit, _) Result.t) =
+        submode_vc_o ~check:false ~log tobj target (bound_o ())
+      in
+      Ok ()
+    | Error (left, left_hint) ->
+      Error { left; left_hint; right = c; right_hint = Comp_hint.Unknown c }
+
+  let watch1 (type a b l r l' r') ~log (tobj : a C.obj)
+      (target : (a, l * r) mode) (obj1 : b C.obj) (trig : (b, l' * r') mode)
+      ~(bound : b -> a) ~(witness : a -> b) =
+    let target = plain_var tobj target in
+    let v1 = plain_var obj1 trig in
+    let bound_o () = bound v1.upper_o in
+    let bound () = bound v1.upper in
+    add_watch ~log v1
+      (Watch { target; tobj; bound; witness; bound_o; witness_o = witness });
+    fire_initial ~log tobj target bound bound_o
+
+  let watch2 (type a b c l r l1 r1 l2 r2) ~log (tobj : a C.obj)
+      (target : (a, l * r) mode) (obj1 : b C.obj) (trig1 : (b, l1 * r1) mode)
+      (obj2 : c C.obj) (trig2 : (c, l2 * r2) mode) ~(bound : b -> c -> a)
+      ~(witness1 : a -> c -> b) ~(witness2 : a -> b -> c) =
+    let target = plain_var tobj target in
+    let v1 = plain_var obj1 trig1 in
+    let v2 = plain_var obj2 trig2 in
+    let bound_o () = bound v1.upper_o v2.upper_o in
+    let bound () = bound v1.upper v2.upper in
+    add_watch ~log v1
+      (Watch
+         { target;
+           tobj;
+           bound;
+           witness = (fun w -> witness1 w v2.upper);
+           bound_o;
+           witness_o = (fun w -> witness1 w v2.upper_o)
+         });
+    add_watch ~log v2
+      (Watch
+         { target;
+           tobj;
+           bound;
+           witness = (fun w -> witness2 w v1.upper);
+           bound_o;
+           witness_o = (fun w -> witness2 w v1.upper_o)
+         });
+    fire_initial ~log tobj target bound bound_o
+
   let populate_hint obj a hint =
     let ahint = Comp_hint.populate obj hint in
     assert (Misc.Le_result.equal ~le:(C.le obj) (fst ahint) a);
@@ -2347,7 +2553,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Some log -> log := append_changes !log log_);
     lower
 
-  let zap_to_floor : type a r. a C.obj -> (a, allowed * r) mode -> log:_ -> a =
+  (** H-layer zap to floor (the old algorithm). *)
+  let zap_to_floor_h : type a r. a C.obj -> (a, allowed * r) mode -> log:_ -> a
+      =
    fun obj m ~log ->
     match m with
     | Amode (a, _a_hint_lower, _a_hint_upper) -> a
@@ -2359,15 +2567,84 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             C.join obj acc (zap_to_floor_morphvar obj mv ~commit:None))
           mvs a
       in
+      let log' = ref empty_changes in
       VarMap.iter
         (fun _ mv ->
           (* We want a hint for why [floor] is low. However, we only have hint
              for why [floor] is high. There is no hint to use. *)
           submode_mvc ~allow_rigid:true H.Pinpoint.unknown obj mv floor
-            (Unknown floor) ~log
+            (Unknown floor) ~log:(Some log')
           |> Result.get_ok)
         mvs;
+      (match log with
+      | None -> undo_changes !log'
+      | Some log -> log := append_changes !log !log');
       floor
+
+  (** The floor of [mv] in the O layer (trial loop as in
+      [zap_to_floor_morphvar_aux], on [upper_o]); always reverted. [None] if the
+      loop makes no progress (the O layer is inconsistent around [mv]). *)
+  let floor_o (type a r) (obj : a C.obj) (mv : (a, allowed * r) morphvar) =
+    let rec loop lower =
+      let log = ref empty_changes in
+      let r = submode_mvc_o ~check:true ~log:(Some log) obj mv lower in
+      undo_changes !log;
+      match r with
+      | Ok () -> Some lower
+      | Error a ->
+        let next = C.join obj a lower in
+        if C.le obj next lower then None else loop next
+    in
+    loop (mlower obj mv)
+
+  (** Mod modes: defaults come from the O layer (the old system: every variable
+      in the old region), committed in H if H accepts them; otherwise the H
+      answer (the old algorithm on the exact system) is used. When the old
+      system is satisfiable this is exactly the old default. *)
+  let zap_to_floor : type a r. a C.obj -> (a, allowed * r) mode -> log:_ -> a =
+   fun obj m ->
+    let commit_o mvs a ~log =
+      let log' = ref empty_changes in
+      let ok =
+        List.for_all
+          (fun mv ->
+            Result.is_ok
+              (submode_mvc ~allow_rigid:true H.Pinpoint.unknown obj mv a
+                 (Unknown a) ~log:(Some log')))
+          mvs
+      in
+      if ok
+      then (
+        (match log with
+        | None -> undo_changes !log'
+        | Some log -> log := append_changes !log !log');
+        true)
+      else (
+        undo_changes !log';
+        false)
+    in
+    fun ~log ->
+      match m with
+      | Amode (a, _a_hint_lower, _a_hint_upper) -> a
+      | Amodevar mv -> (
+        match floor_o obj mv with
+        | Some a when commit_o [mv] a ~log -> a
+        | Some _ | None -> zap_to_floor_h obj m ~log)
+      | Amodejoin (a, _a_hint, mvs) -> (
+        let floor =
+          VarMap.fold
+            (fun _ mv acc ->
+              match acc with
+              | None -> None
+              | Some acc -> (
+                match floor_o obj mv with
+                | None -> None
+                | Some f -> Some (C.join obj acc f)))
+            mvs (Some a)
+        in
+        match floor with
+        | Some f when commit_o (var_map_to_list mvs) f ~log -> f
+        | Some _ | None -> zap_to_floor_h obj m ~log)
 
   (** Zaps a morphvar to its ceiling and returns the ceiling. [commit] could be
       [Some log], in which case the zapping is appended to [log]; it could also
@@ -2380,7 +2657,42 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Some log -> log := append_changes !log log_);
     upper
 
-  let zap_to_ceil : type a l. a C.obj -> (a, l * allowed) mode -> log:_ -> a =
+  (** Mod modes: before zapping to the ceiling, bring the H upper bound of each
+      variable of [m] down to its O-layer upper bound ([upper_o]), or failing
+      that to the region cap, when H accepts it. Returns the changes. *)
+  let sync_o : type a l r. a C.obj -> (a, l * r) mode -> changes =
+   fun obj m ->
+    let log = ref empty_changes in
+    let sync (type b d) (Amorphvar (v, f, _) : (a, b * d) morphvar) =
+      let src = C.src obj f in
+      let attempt c =
+        let l = ref empty_changes in
+        match
+          submode_vc ~allow_rigid:true ~log:(Some l) H.Pinpoint.unknown src v c
+            (Comp_hint.Unknown c)
+        with
+        | Ok () ->
+          log := append_changes !log !l;
+          true
+        | Error _ ->
+          undo_changes !l;
+          false
+      in
+      if not (attempt v.upper_o)
+      then
+        let (_ : bool) =
+          attempt (C.meet src v.upper (C.region_cap src))
+        in
+        ()
+    in
+    (match m with
+    | Amode _ -> ()
+    | Amodevar mv -> sync mv
+    | Amodejoin (_, _, mvs) -> VarMap.iter (fun _ mv -> sync mv) mvs
+    | Amodemeet (_, _, mvs) -> VarMap.iter (fun _ mv -> sync mv) mvs);
+    !log
+
+  let zap_to_ceil_h : type a l. a C.obj -> (a, l * allowed) mode -> log:_ -> a =
    fun obj m ~log ->
     match m with
     | Amode (a, _a_hint_lower, _a_hint_upper) -> a
@@ -2392,37 +2704,38 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             C.meet obj acc (zap_to_ceil_morphvar obj mv ~commit:None))
           mvs a
       in
+      let log' = ref empty_changes in
       VarMap.iter
         (fun _ mv ->
           let ok =
             submode_cmv ~allow_rigid:true H.Pinpoint.unknown obj ceil
-              (Unknown ceil) mv ~log
+              (Unknown ceil) mv ~log:(Some log')
           in
           assert (Result.is_ok ok))
         mvs;
+      (match log with
+      | None -> undo_changes !log'
+      | Some log -> log := append_changes !log !log');
       ceil
 
-  let get_floor : type a r. a C.obj -> (a, allowed * r) mode -> a =
-   fun obj m ->
+  (* [?cap] is subsumed by the O layer (the region cap of every variable). *)
+  let zap_to_ceil : type a l.
+      ?cap:a -> a C.obj -> (a, l * allowed) mode -> log:_ -> a =
+   fun ?cap:_ obj m ~log ->
     match m with
-    | Amode (a, _a_hint_lower, _a_hint_upper) -> a
-    | Amodevar mv -> zap_to_floor_morphvar obj mv ~commit:None
-    | Amodejoin (a, _a_hint, mvs) ->
-      VarMap.fold
-        (fun _ mv acc ->
-          C.join obj acc (zap_to_floor_morphvar obj mv ~commit:None))
-        mvs a
+    | Amode (a, _, _) -> a
+    | Amodevar _ | Amodemeet _ ->
+      let log' = sync_o obj m in
+      (match log with Some l -> l := append_changes !l log' | None -> ());
+      let r = zap_to_ceil_h obj m ~log in
+      (match log with None -> undo_changes log' | Some _ -> ());
+      r
 
-  let get_ceil : type a l. a C.obj -> (a, l * allowed) mode -> a =
-   fun obj m ->
-    match m with
-    | Amode (a, _a_hint_lower, _a_hint_upper) -> a
-    | Amodevar mv -> zap_to_ceil_morphvar obj mv ~commit:None
-    | Amodemeet (a, _a_hint, mvs) ->
-      VarMap.fold
-        (fun _ mv acc ->
-          C.meet obj acc (zap_to_ceil_morphvar obj mv ~commit:None))
-        mvs a
+  let get_floor : type a r. a C.obj -> (a, allowed * r) mode -> a =
+   fun obj m -> zap_to_floor obj m ~log:None
+
+  let get_ceil : type a l. ?cap:a -> a C.obj -> (a, l * allowed) mode -> a =
+   fun ?cap obj m -> zap_to_ceil ?cap obj m ~log:None
 
   let to_const_exn obj m =
     let floor = get_floor obj m in
@@ -2478,14 +2791,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* [~lower] is not precise (because [mlower mv] is not precise), but
          it doesn't need to be *)
-        ( Amodevar
-            (Amorphvar
-               ( fresh ~lower:(mlower obj mv) ~lower_hint:(mlower_hint mv)
-                   ~vlower:(VarMap.singleton (get_key obj mv) mv)
-                   ~level obj,
-                 C.id,
-                 Id )),
-          true )
+        let u =
+          fresh ~lower:(mlower obj mv) ~lower_hint:(mlower_hint mv)
+            ~vlower:(VarMap.singleton (get_key obj mv) mv)
+            ~level obj
+        in
+        let (_ : (unit, a) Result.t) = push_o ~check:false ~log obj u in
+        Amodevar (Amorphvar (u, C.id, Id)), true
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
@@ -2498,12 +2810,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       if VarMap.for_all (fun _ (Amorphvar (v, _, _)) -> v.level <= level) mvs
       then
         (* [~lower] is not precise here, but it doesn't need to be *)
-        ( Amodevar
-            (Amorphvar
-               ( fresh ~lower:a ~lower_hint:a_hint ~vlower:mvs ~level obj,
-                 C.id,
-                 Id )),
-          true )
+        let u = fresh ~lower:a ~lower_hint:a_hint ~vlower:mvs ~level obj in
+        let (_ : (unit, a) Result.t) = push_o ~check:false ~log obj u in
+        Amodevar (Amorphvar (u, C.id, Id)), true
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in

@@ -226,9 +226,7 @@ let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
 Line 1, characters 64-65:
 1 | let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
                                                                     ^
-Error: This value is "corrupted" because it crosses with something
-         which is "contended".
-       However, the highlighted expression is expected to be "shared" or "uncontended".
+Error: This value is "corrupted" but is expected to be "shared" or "uncontended".
 |}]
 
 let cross_corrupted1 (x : cross_corrupted @ corrupted) : _ @ uncontended = x
@@ -241,9 +239,7 @@ let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
 Line 1, characters 73-74:
 1 | let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
                                                                              ^
-Error: This value is "shared" because it crosses with something
-         which is "contended".
-       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+Error: This value is "shared" but is expected to be "corrupted" or "uncontended".
 |}]
 
 let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
@@ -344,9 +340,7 @@ let concrete_shared_no_cross
 Line 3, characters 2-3:
 3 |   x
       ^
-Error: This value is "corrupted" because it crosses with something
-         which is "contended".
-       However, the highlighted expression is expected to be "shared" or "uncontended".
+Error: This value is "corrupted" but is expected to be "shared" or "uncontended".
 |}]
 
 let concrete_corrupted_from_corrupted
@@ -371,7 +365,5 @@ let concrete_corrupted_no_cross
 Line 3, characters 2-3:
 3 |   x
       ^
-Error: This value is "shared" because it crosses with something
-         which is "contended".
-       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+Error: This value is "shared" but is expected to be "corrupted" or "uncontended".
 |}]

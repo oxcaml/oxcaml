@@ -67,7 +67,7 @@ module Mode_axis_pair = struct
     | Left Refl -> Atom (Comonadic Areality, Const.locality_as_regionality a)
     | Right ax -> Atom (ax, a)
 
-  let of_string ~loc s : t =
+  let of_string ?(allow_mod = false) ~loc s : t =
     let comonadic (type a) (ax : a With_locality.Comonadic.Axis.t) (a : a) : t =
       Atom (Comonadic ax, a)
     in
@@ -107,6 +107,19 @@ module Mode_axis_pair = struct
         Language_extension.Alpha;
       monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
+    (* Mod modes: only allowed as modes, not as modalities or kind bounds. *)
+    | "mod_shareable" when allow_mod -> comonadic Portability Mod_shareable
+    | "mod_corruptible" when allow_mod -> comonadic Portability Mod_corruptible
+    | "mod_portable" when allow_mod -> comonadic Portability Mod_portable
+    | "mod_corrupted" when allow_mod -> monadic Contention Mod_corrupted
+    | "mod_shared" when allow_mod -> monadic Contention Mod_shared
+    | "mod_contended" when allow_mod -> monadic Contention Mod_contended
+    | "mod_writing" when allow_mod -> comonadic Statefulness Mod_writing
+    | "mod_reading" when allow_mod -> comonadic Statefulness Mod_reading
+    | "mod_stateless" when allow_mod -> comonadic Statefulness Mod_stateless
+    | "mod_read" when allow_mod -> monadic Visibility Mod_read
+    | "mod_write" when allow_mod -> monadic Visibility Mod_write
+    | "mod_immutable" when allow_mod -> monadic Visibility Mod_immutable
     | _ -> raise Not_found
 end
 
@@ -187,7 +200,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       | Immutable -> Contended
       | Read -> Shared
       | Write -> Corrupted
-      | Read_write -> Uncontended
+      | Read_write | Mod_read | Mod_write | Mod_immutable -> Uncontended
     in
     [Atom (Monadic Contention, Join_const b)]
   | Comonadic Statefulness, Meet_const a ->
@@ -196,7 +209,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       | Stateless -> Portable
       | Reading -> Shareable
       | Writing -> Corruptible
-      | Stateful -> Nonportable
+      | Stateful | Mod_reading | Mod_writing | Mod_stateless -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
   | _ -> []
@@ -224,7 +237,7 @@ let transl_mode_annots annots =
     List.map
       (fun { txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
-        try { txt = Mode_axis_pair.of_string ~loc txt; loc }
+        try { txt = Mode_axis_pair.of_string ~allow_mod:true ~loc txt; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
       (mode_consts_of_modes annots)
@@ -400,7 +413,10 @@ let transl_modality_atoms ~warn_redundant ~default ~loc ~annot_type
     List.fold_left
       (fun (m, implied) { txt = Atom (ax, a) as t; loc } ->
         let current_a = Const.proj ax m in
-        (if Misc.Le_result.equal ~le:(Per_axis.le ax) a current_a
+        (if
+           Misc.Le_result.equal ~le:(Per_axis.le ax) a current_a
+           (* Mod modes: the old top/bottom is also the identity. *)
+           || (Per_axis.is_id ax a && Per_axis.is_id ax current_a)
          then
            let reason : Warnings.redundant_modifier_reason =
              match

@@ -445,13 +445,11 @@ module Close_over_value_comonadic = struct
     ()
 end
 [%%expect{|
-Line 6, characters 12-15:
-6 |     let _ = M.x in
-                ^^^
-Error: The value "M.x" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 5-7, characters 23-6
-         which is expected to be "portable".
+module Close_over_value_comonadic :
+  sig
+    module M : sig val x : 'a -> 'a end
+    val foo : unit -> unit @@ portable
+  end @@ stateless nonportable
 |}]
 
 (* Modalities on primitives are supported, but are interpreted differently in
@@ -1036,13 +1034,7 @@ let (foo @ portable) () =
     let _ = f in
     ()
 [%%expect{|
-Line 3, characters 12-13:
-3 |     let _ = f in
-                ^
-Error: The value "f" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 1-4, characters 21-6
-         which is expected to be "portable".
+val foo : unit -> unit = <fun>
 |}]
 
 let (_foo @ portable) () =
@@ -1062,13 +1054,10 @@ let () =
   in
   ()
 [%%expect{|
-Line 4, characters 12-13:
-4 |     let _ = f in
-                ^
-Error: The value "f" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 3-5, characters 23-6
-         which is expected to be "portable".
+Line 3, characters 7-10:
+3 |   let (foo @ portable) () =
+           ^^^
+Warning 26 [unused-var]: unused variable "foo".
 |}]
 
 let () =
@@ -1410,13 +1399,7 @@ let (bar @ portable) () =
     let module M' = (val m : Func_portable) in
     ()
 [%%expect{|
-Line 2, characters 25-26:
-2 |     let module M' = (val m : Func_portable) in
-                             ^
-Error: The value "m" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 1-3, characters 21-6
-         which is expected to be "portable".
+val bar : unit -> unit = <fun>
 |}]
 
 (* closing over values from modules crosses modes *)

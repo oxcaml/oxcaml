@@ -514,6 +514,7 @@ let record_declaration_dependency (rk, uid1, uid2) =
     uids_deps := (rk, uid1, uid2) :: !uids_deps
 
 let save_cmt target cu binary_annots initial_env cmi shape =
+  Mode.erase_watches ();
   if !Clflags.binary_annotations && not !Clflags.print_types then begin
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] (Unit_info.Artifact.filename target)

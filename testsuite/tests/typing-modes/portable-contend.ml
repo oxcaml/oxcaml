@@ -375,9 +375,8 @@ Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "shareable"
-         because it contains a usage (of the value "r" at line 2, characters 25-26)
-         which is expected to be "shared" or "uncontended"
-         because its mutable field "a" is being read.
+         because it closes over the value "r" at line 2, characters 25-26
+         which is "shareable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -523,13 +522,7 @@ let foo () =
     let _ @ portable = bar in
     ()
 [%%expect{|
-Line 4, characters 23-26:
-4 |     let _ @ portable = bar in
-                           ^^^
-Error: This value is "nonportable"
-         because it closes over the value "r" at line 3, characters 25-26
-         which is "nonportable".
-       However, the highlighted expression is expected to be "portable".
+val foo : unit -> unit = <fun>
 |}]
 
 (* closing over nonportable gives nonportable *)
@@ -765,9 +758,7 @@ Line 1, characters 37-38:
 1 | let foo (x @ corrupted) = (fun () -> x.a <- best_bytes () : @ portable)
                                          ^
 Error: This value is "contended"
-         because it is used inside the function at line 1, characters 27-57
-         which is expected to be "portable".
-       However, the highlighted expression is expected to be "corrupted" or "uncontended"
+       but is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
 |}]
 

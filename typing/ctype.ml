@@ -9143,8 +9143,10 @@ let constrain_decl_jkind env decl jkind =
 
 let exn_constructor_crossing env lid ~args locks =
   let vmode =
-    Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Constructor
-      None ((Mode.With_regionality.(disallow_right min)), locks)
+    (* Mod modes: the exception is a capsule whose contents are seen at the old
+       modes, so this uses the old (hard) locks from the old bottom. *)
+    Env.walk_locks ~hard:true ~env ~loc:lid.loc lid.txt ~item:Constructor
+      None ((Mode.With_regionality.(disallow_right old_min)), locks)
   in
   (* Exceptions cross contention and visibility on the monadic side, and
      portability and statefulness on the comonadic side, so we project those
@@ -9214,7 +9216,7 @@ let check_constructor_crossing_creation
       Result.bind
         (Mode.With_regionality.submode
           (Mode.Crossing.apply_left mode_crossing min_bound)
-          Mode.With_regionality.(disallow_left min))
+          Mode.With_regionality.(disallow_left old_min))
         (fun () -> Ok max_bound))
     env lid tag ~res ~args held_locks
 
@@ -9227,7 +9229,7 @@ let check_constructor_crossing_destruction
          submode on the monadic axis and cross the comonadic axis. *)
       Result.bind
         (Mode.With_regionality.submode
-          Mode.With_regionality.(disallow_right max)
+          Mode.With_regionality.(disallow_right old_max)
           (Mode.Crossing.apply_right mode_crossing max_bound))
         (fun () -> Ok min_bound))
     env lid tag ~res ~args held_locks

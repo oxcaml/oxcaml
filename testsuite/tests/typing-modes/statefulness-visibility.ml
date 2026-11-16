@@ -51,9 +51,7 @@ let read_no_cross (x : s @ immutable) : s @ read = x
 Line 1, characters 51-52:
 1 | let read_no_cross (x : s @ immutable) : s @ read = x
                                                        ^
-Error: This value is "write" because it crosses with something
-         which is "immutable".
-       However, the highlighted expression is expected to be "read" or "read_write".
+Error: This value is "write" but is expected to be "read" or "read_write".
 |}]
 
 let write_from_write (x : t @ write) : t @ read_write = x
@@ -71,9 +69,7 @@ let write_no_cross (x : t @ immutable) : t @ write = x
 Line 1, characters 53-54:
 1 | let write_no_cross (x : t @ immutable) : t @ write = x
                                                          ^
-Error: This value is "read" because it crosses with something
-         which is "immutable".
-       However, the highlighted expression is expected to be "write" or "read_write".
+Error: This value is "read" but is expected to be "write" or "read_write".
 |}]
 
 let reading_from_writing (x : u @ writing) : u @ stateless = x
@@ -91,9 +87,7 @@ let reading_no_cross (x : u @ reading) : u @ stateless = x
 Line 1, characters 57-58:
 1 | let reading_no_cross (x : u @ reading) : u @ stateless = x
                                                              ^
-Error: This value is "reading"
-       but is expected to be "writing" because it crosses with something
-         which is expected to be "stateless".
+Error: This value is "reading" but is expected to be "writing".
 |}]
 
 let writing_from_reading (x : v @ reading) : v @ stateless = x
@@ -801,8 +795,8 @@ Line 4, characters 24-27:
 4 |     let _ @ stateless = bar in
                             ^^^
 Error: This value is "stateful"
-         because it contains a usage (of the value "a" at line 3, characters 33-34)
-         which is expected to be "read_write".
+         because it closes over the value "a" at line 3, characters 33-34
+         which is "stateful".
        However, the highlighted expression is expected to be "stateless".
 |}]
 
@@ -817,8 +811,8 @@ Line 4, characters 24-27:
 4 |     let _ @ stateless = bar in
                             ^^^
 Error: This value is "writing"
-         because it contains a usage (of the value "a" at line 3, characters 28-29)
-         which is expected to be "write" or "read_write".
+         because it closes over the value "a" at line 3, characters 28-29
+         which is "writing".
        However, the highlighted expression is expected to be "stateless".
 |}]
 
@@ -833,8 +827,8 @@ Line 4, characters 24-27:
 4 |     let _ @ stateless = bar in
                             ^^^
 Error: This value is "reading"
-         because it contains a usage (of the value "a" at line 3, characters 28-29)
-         which is expected to be "read" or "read_write".
+         because it closes over the value "a" at line 3, characters 28-29
+         which is "reading".
        However, the highlighted expression is expected to be "stateless".
 |}]
 
@@ -1277,40 +1271,19 @@ val get : 'a @ corrupted -> 'a t3 = <fun>
 let foo (x : int ref) @ stateless = lazy (x.contents)
 
 [%%expect{|
-Line 1, characters 42-43:
-1 | let foo (x : int ref) @ stateless = lazy (x.contents)
-                                              ^
-Error: This value is "immutable"
-         because it is used inside the lazy expression at line 1, characters 36-53
-         which is expected to be "stateless".
-       However, the highlighted expression is expected to be "read" or "read_write"
-         because its mutable field "contents" is being read.
+val foo : int ref @ mod_immutable -> int lazy_t @ stateless = <fun>
 |}]
 
 let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
 [%%expect{|
-Line 1, characters 42-43:
-1 | let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
-                                              ^
-Error: This value is "immutable"
-         because it is used inside the lazy expression at line 1, characters 36-58
-         which is expected to be "stateless".
-       However, the highlighted expression is expected to be "write" or "read_write"
-         because its mutable field "contents" is being written.
+val zap : int ref @ mod_immutable -> unit lazy_t @ stateless = <fun>
 |}]
 
 (* [lazy_t @ reading] capture values at [read]. *)
 
 let bat (x : int ref) @ reading = lazy (x.contents <- 4)
 [%%expect{|
-Line 1, characters 40-41:
-1 | let bat (x : int ref) @ reading = lazy (x.contents <- 4)
-                                            ^
-Error: This value is "read"
-         because it is used inside the lazy expression at line 1, characters 34-56
-         which is expected to be "reading".
-       However, the highlighted expression is expected to be "write" or "read_write"
-         because its mutable field "contents" is being written.
+val bat : int ref @ mod_immutable -> unit lazy_t @ reading = <fun>
 |}]
 
 let bar (x : int ref) @ reading = lazy (x.contents)
@@ -1329,14 +1302,7 @@ val biz : int ref -> unit lazy_t @ writing = <fun>
 let boz (x : int ref) @ writing = lazy (x.contents)
 
 [%%expect{|
-Line 1, characters 40-41:
-1 | let boz (x : int ref) @ writing = lazy (x.contents)
-                                            ^
-Error: This value is "write"
-         because it is used inside the lazy expression at line 1, characters 34-51
-         which is expected to be "writing".
-       However, the highlighted expression is expected to be "read" or "read_write"
-         because its mutable field "contents" is being read.
+val boz : int ref @ mod_immutable -> int lazy_t @ writing = <fun>
 |}]
 
 let () =
@@ -2438,11 +2404,8 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
          val f : unit -> unit @@ stateless (* in a structure at stateful *)
-       The first is weaker than "writing"
-         because it closes over the value "set" at line 7, characters 21-24
-         which is "writing"
-         because it contains a usage (of the value "r" at line 6, characters 15-16)
-         which is expected to be "write" or "read_write"
-         because its mutable field "contents" is being written.
+       The first is "reading"
+         because it closes over the value "get" at line 7, characters 13-16
+         which is "reading".
        However, the second is "stateless".
 |}]

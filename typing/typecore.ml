@@ -1155,8 +1155,18 @@ let create_allocation_mode_r mode =
   |> newvar_below_if_modepoly 0
   |> Locality.disallow_left
 
+(* Mod modes: a fresh value is not below the old monadic bottom. *)
+let fresh_value_monadic_bound ~loc (expected_mode : expected_mode) =
+  With_regionality.Monadic.submode_err (loc, Expression)
+    (With_regionality.Monadic.of_const With_regionality.monadic_alloc_bound)
+    (as_single_mode expected_mode).Mode.monadic
+
 let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
+  (* Mod modes: a fresh allocation is not below the old monadic bottom. *)
+  With_regionality.Monadic.submode_err (loc, Expression)
+    (With_regionality.Monadic.of_const With_regionality.monadic_alloc_bound)
+    mode.Mode.monadic;
   let locality_mode =
     create_allocation_mode_r (with_regionality_to_locality_r2g mode)
   in
@@ -1668,7 +1678,11 @@ let mode_mutate_mutable mut_name =
 (** The [expected_mode] of the lazy expression when forcing it. *)
 let mode_force_lazy =
   let mode =
+    (* Mod modes: forcing runs the suspension, so it must not be in the mod
+       region on the comonadic mirrored axes. *)
     { With_regionality.Const.max with
+      portability = Nonportable;
+      statefulness = Stateful;
       contention = Uncontended }
     |> With_regionality.of_const ~hint_monadic:Lazy_forced
   in
@@ -5221,6 +5235,22 @@ let check_curried_application_complete ~env ~app_loc args =
   in
   loop false args
 
+(** Mod modes: in [f a b], the result of [f a] is called, so it must be
+    callable (not in the mod region). The head function is checked in
+    [Pexp_apply]; here the intermediate results. *)
+let check_intermediate_results_callable ~app_loc args =
+  List.iteri
+    (fun i (_lbl, arg) ->
+       match arg with
+       | Arg ( Known_arg { mode_fun; _ }
+             | Unknown_arg { mode_fun; _ }
+             | Eliminated_optional_arg { mode_fun; _ }) when i > 0 ->
+         With_locality.Comonadic.submode_err (app_loc, Expression)
+           mode_fun.comonadic
+           (With_locality.Comonadic.of_const With_locality.callable_bound)
+       | Arg _ | Omitted _ -> ())
+    args
+
 (* Note [Type-checking applications]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -7721,7 +7751,22 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
       in
-      submode ~loc ~env actual_mode expected_mode;
+      (* Mod modes: if the value was captured with the total lock and its use
+         fails, report the error of the old (hard) lock if there is one. *)
+      if Env.last_walk_used_soft_lock () then begin
+        match
+          With_regionality.submode ~pp:(loc, Expression) actual_mode
+            (as_single_mode expected_mode)
+        with
+        | Ok () -> ()
+        | Error _ ->
+            let _, hard_mode, _, _, _ =
+              type_ident ~hard:true env ~recarg lid
+            in
+            submode ~loc ~env hard_mode expected_mode;
+            submode ~loc ~env actual_mode expected_mode
+      end else
+        submode ~loc ~env actual_mode expected_mode;
       if List.is_empty layout_args then exp
       else { exp with exp_desc = Texp_apply_layout (exp, layout_args) }
   | Pexp_constant({pconst_desc = Pconst_string (str, _, _); _} as cst) -> (
@@ -7967,6 +8012,10 @@ and type_expect_
           mode
         | Nontail | Default -> With_regionality.newvar (get_current_level ())
       in
+      (* Mod modes: a function in the mod region cannot be called. *)
+      With_regionality.Comonadic.submode_exn funct_mode.comonadic
+        (With_regionality.Comonadic.of_const
+           With_regionality.callable_bound);
       let funct_expected_mode = mode_default funct_mode in
       let outer_level = get_current_level () in
       let outer_level_var () =
@@ -9016,6 +9065,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_lazy e ->
+      fresh_value_monadic_bound ~loc expected_mode;
       let expected_mode, closure_mode = mode_lazy expected_mode in
       let ty = newgenvar (Jkind.Builtin.value ~why:Lazy_expression) in
       let to_unify = Predef.type_lazy_t ty in
@@ -9484,6 +9534,7 @@ and type_expect_
       {exp with exp_extra}
   | Pexp_comprehension comp ->
       Language_extension.assert_enabled ~loc Comprehensions ();
+      fresh_value_monadic_bound ~loc expected_mode;
       type_comprehension_expr
         ~loc
         ~env
@@ -9557,6 +9608,7 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         Typetexp.Error.log_or_raise loc env
           (Unsupported_extension Runtime_metaprogramming);
+      fresh_value_monadic_bound ~loc expected_mode;
       let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let new_env =
         env
@@ -9903,7 +9955,7 @@ and type_newtype
   end
    ~before_generalize:(fun (_,ety,_,_) -> enforce_current_level env ety)
 
-and type_ident env ?(recarg=Rejected) lid =
+and type_ident ?hard env ?(recarg=Rejected) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
   let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
@@ -9944,8 +9996,8 @@ and type_ident env ?(recarg=Rejected) lid =
   *)
   (* CR modes: codify the above per-axis argument. *)
   let actual_mode =
-    Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
-      (mode, locks)
+    Env.walk_locks ?hard ~env ~loc:lid.loc lid.txt ~item:Value
+      (Some desc.val_type) (mode, locks)
   in
   (* We need to cross again, because the monadic fragment might have been
   weakened by the locks. Ideally, the first crossing only deals with comonadic,
@@ -10260,6 +10312,15 @@ and type_function
                        ~hint
                        fun_closure_mode)
                     env_mode;
+                  (* Mod modes: a [mod_portable] argument does not make the
+                     partial application uncallable; exactly, the closure's
+                     old part must be above the old part of the argument.
+                     Clamping to the old top is sound but not exact for
+                     arguments in the mod region (likewise the monadic
+                     constraint above sees such arguments at the old bottom). *)
+                  let arg_mode =
+                    With_locality.clamp_comonadic_old arg_mode
+                  in
                   begin match
                     With_locality.Comonadic.submode arg_mode fun_closure_mode
                   with
@@ -11497,6 +11558,7 @@ and type_application env app_loc expected_mode position_and_mode
               app_loc ty_ret mode_ret args
           in
           check_curried_application_complete ~env ~app_loc untyped_args;
+          check_intermediate_results_callable ~app_loc untyped_args;
           (* example:
              [ty_ret] becomes [a:bar -> unit]
              [args] becomes [(Label "a", Omitted ());

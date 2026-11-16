@@ -122,6 +122,12 @@ module type Lattices_mono = sig
   val right_adjoint :
     'b obj -> ('a, 'b, allowed * 'r) morph -> ('b, 'a, right_only) morph
 
+  (** Mod modes: the old region of the object (old top on mirrored axes). *)
+  val region_cap : 'a obj -> 'a
+
+  (** The same morphism as a left morphism, if it has a right adjoint. *)
+  val maybe_left : ('a, 'b, 'l * 'r) morph -> ('a, 'b, left_only) morph option
+
   include Allow_disallow with type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph
 
   (** Apply morphism on constant *)
@@ -238,7 +244,7 @@ module type Solver_mono = sig
 
   (** Pushes the mode variable to the highest constant possible. *)
   val zap_to_ceil :
-    'a obj -> ('a, 'l * allowed) mode -> log:changes ref option -> 'a
+    ?cap:'a -> 'a obj -> ('a, 'l * allowed) mode -> log:changes ref option -> 'a
 
   (** Create a new mode variable of the full range at given level. *)
   val newvar : 'a obj -> int -> ('a, 'l * 'r) mode
@@ -252,6 +258,10 @@ module type Solver_mono = sig
       The last line erases the hints on [m] (caused by [n]), but [m'] has an
       immutable hint on top of [m], which is not affected. *)
   val erase_hints : unit -> unit
+
+  (** Remove all watches (they contain closures, which cannot be marshalled).
+      Only to be called once type checking is finished. *)
+  val erase_watches : unit -> unit
 
   (** Raw hint returned by failed [submode a b]. To consume it, see
       [populate_hint]. *)
@@ -278,6 +288,35 @@ module type Solver_mono = sig
     ('a, allowed * 'r) mode ->
     ('a, 'l * allowed) mode ->
     log:changes ref option ->
+    (unit, 'a error_raw) result
+
+  (** [watch1 tobj target obj1 trig ~bound ~witness] adds the constraint
+      [target <= bound trig], where [bound] is monotone and [target] and [trig]
+      are plain variables (created by [newvar]). [witness w] must be a lower
+      bound for [trig] whenever [w] is a lower bound of [target] that is not
+      below [bound] of the current upper bound of [trig]. *)
+  val watch1 :
+    log:changes ref option ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    'b obj ->
+    ('b, 'l1 * 'r1) mode ->
+    bound:('b -> 'a) ->
+    witness:('a -> 'b) ->
+    (unit, 'a error_raw) result
+
+  (** Same as [watch1] for a bound depending on two variables. *)
+  val watch2 :
+    log:changes ref option ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    'b obj ->
+    ('b, 'l1 * 'r1) mode ->
+    'c obj ->
+    ('c, 'l2 * 'r2) mode ->
+    bound:('b -> 'c -> 'a) ->
+    witness1:('a -> 'c -> 'b) ->
+    witness2:('a -> 'b -> 'c) ->
     (unit, 'a error_raw) result
 
   (** Lowers a level of a variable. *)
@@ -367,7 +406,7 @@ module type Solver_mono = sig
   val get_floor : 'a obj -> ('a, allowed * 'r) mode -> 'a
 
   (** Returns the upper bound of the mode. Notes for [get_floor] applies. *)
-  val get_ceil : 'a obj -> ('a, 'l * allowed) mode -> 'a
+  val get_ceil : ?cap:'a -> 'a obj -> ('a, 'l * allowed) mode -> 'a
 
   (** Similar to [get_floor] but does not run the further constraining needed
       for a precise bound. As a result, the returned bound is loose; i.e., it

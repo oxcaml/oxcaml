@@ -127,7 +127,11 @@ let is_atomic = function
     mode of new values in future writes. *)
 let mutable_mode m0 : _ Mode.With_regionality.t =
   { comonadic = m0
-  ; monadic = Mode.With_regionality.Monadic.(min |> allow_left |> allow_right)
+  ; monadic =
+      (* Mod modes: new values are written at the old bottom (they are read
+         back at legacy). *)
+      Mode.With_regionality.(
+        Monadic.of_const monadic_alloc_bound)
   }
 
 (* Type expressions for the core language *)

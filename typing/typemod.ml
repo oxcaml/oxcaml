@@ -152,6 +152,10 @@ let register_allocation loc : With_locality.lr * With_regionality.lr =
       { With_locality.Const.max with areality = Global }
   in
   let mode_with_locality, _ = With_locality.newvar_below 0 upper_bound in
+  (* Mod modes: a fresh module is not below the old monadic bottom. *)
+  With_locality.Monadic.submode_exn
+    (With_locality.Monadic.of_const With_locality.monadic_alloc_bound)
+    mode_with_locality.monadic;
   let closed_over_mode =
     with_locality_as_regionality
       ~allocation:({loc; txt = Unknown})
@@ -3546,7 +3550,9 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
     if hold_locks then mode, Some (locks, lid.txt, lid.loc)
     else
       let vmode =
-        Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Module None (mode, locks)
+        (* Mod modes: modules are not captured with the total lock. *)
+        Env.walk_locks ~hard:true ~env ~loc:lid.loc lid.txt ~item:Module None
+          (mode, locks)
       in
       vmode, None
   in
@@ -3629,6 +3635,10 @@ and type_application loc ~strengthen ~funct_body env smod =
 
 and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     funct_body env (funct, funct_shape) app_view =
+  (* Mod modes: a functor in the mod region cannot be applied. *)
+  With_regionality.Comonadic.submode_err (apply_loc, Module)
+    (mode_without_locks_exn funct.mod_mode).comonadic
+    (With_regionality.Comonadic.of_const With_regionality.callable_bound);
   (* Applying a functor runs its body, which can perform a free effect if the
      functor closes over a yielding value (its own mode) or is given a yielding
      argument (the argument's mode). *)

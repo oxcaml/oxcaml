@@ -93,8 +93,7 @@ Line 1, characters 43-46:
                                                ^^^
 Error: This value is "shareable"
          because it is the field "x" of the record at line 1, characters 43-44
-         which is "shareable" because it crosses with something
-         which is "nonportable".
+         which is "shareable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -147,9 +146,7 @@ let s_no_self_cross (x : s @ shareable) : s @ portable = x
 Line 1, characters 57-58:
 1 | let s_no_self_cross (x : s @ shareable) : s @ portable = x
                                                              ^
-Error: This value is "shareable"
-       but is expected to be "corruptible" because it crosses with something
-         which is expected to be "portable".
+Error: This value is "shareable" but is expected to be "corruptible".
 |}]
 
 let u_from_shareable (x : u @ shareable) : u @ portable = x

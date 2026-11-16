@@ -388,7 +388,9 @@ let maybe_print_mode_r ~is_modal mode =
   | None -> fun _ppf -> ()
   | Some ax ->
       let (P ax) : Mode.With_regionality.Axis.packed = ax in
-      let mode = mode |> zap_axis_to_ceil ax in
+      let mode =
+        mode |> zap_axis_to_ceil ax |> Mode.With_regionality.print_clamp_axis ax
+      in
       print_out_mode ax mode
 
 let print_modes ?in_structure ax (modes : Includemod.modes) =
@@ -408,6 +410,7 @@ let print_modes ?in_structure ax (modes : Includemod.modes) =
   let mode2 =
     mode2
     |> zap_axis_to_ceil ax
+    |> Mode.With_regionality.print_clamp_axis ax
   in
   print_out_mode ?in_structure ax mode1, print_out_mode ?in_structure ax mode2
 

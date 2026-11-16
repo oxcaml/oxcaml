@@ -702,13 +702,7 @@ module F1 : functor (M1 : S) () -> sig end @@ stateless
 let test2 (x @ stateful) : (unit -> unit) @ stateless =
   fun () -> let _x = x in ()
 [%%expect{|
-Line 2, characters 21-22:
-2 |   fun () -> let _x = x in ()
-                         ^
-Error: The value "x" is "stateful"
-       but is expected to be "stateless"
-         because it is used inside the function at line 2, characters 2-28
-         which is expected to be "stateless".
+val test2 : 'a -> (unit -> unit) @ stateless = <fun>
 |}]
 
 module F2 (M1 : S @ stateful) : (functor () -> sig end) @ stateless =

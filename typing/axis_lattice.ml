@@ -229,14 +229,18 @@ module Levels = struct
     | Mode.Portability.Const.Portable -> 0
     | Mode.Portability.Const.Shareable -> 1
     | Mode.Portability.Const.Corruptible -> 2
-    | Mode.Portability.Const.Nonportable -> 3
+    | Mode.Portability.Const.(
+        Nonportable | Mod_shareable | Mod_corruptible | Mod_portable) ->
+      3
 
   let level_of_contention_monadic (x : Mode.Contention.Const.t) : int =
     match x with
     | Mode.Contention.Const.Contended -> 0
     | Mode.Contention.Const.Corrupted -> 1
     | Mode.Contention.Const.Shared -> 2
-    | Mode.Contention.Const.Uncontended -> 3
+    | Mode.Contention.Const.(
+        Uncontended | Mod_corrupted | Mod_shared | Mod_contended) ->
+      3
 
   let level_of_forkable (x : Mode.Forkable.Const.t) : int =
     match x with
@@ -253,14 +257,18 @@ module Levels = struct
     | Mode.Statefulness.Const.Stateless -> 0
     | Mode.Statefulness.Const.Writing -> 1
     | Mode.Statefulness.Const.Reading -> 2
-    | Mode.Statefulness.Const.Stateful -> 3
+    | Mode.Statefulness.Const.(
+        Stateful | Mod_writing | Mod_reading | Mod_stateless) ->
+      3
 
   let level_of_visibility_monadic (x : Mode.Visibility.Const.t) : int =
     match x with
     | Mode.Visibility.Const.Immutable -> 0
     | Mode.Visibility.Const.Read -> 1
     | Mode.Visibility.Const.Write -> 2
-    | Mode.Visibility.Const.Read_write -> 3
+    | Mode.Visibility.Const.(Read_write | Mod_read | Mod_write | Mod_immutable)
+      ->
+      3
 
   let level_of_staticity_monadic (x : Mode.Staticity.const) : int =
     match x with Mode.Staticity.Dynamic -> 0 | Mode.Staticity.Static -> 1
@@ -288,14 +296,15 @@ module Levels = struct
     | 0 -> Mode.Portability.Const.Portable
     | 1 -> Mode.Portability.Const.Shareable
     | 2 -> Mode.Portability.Const.Corruptible
-    | 3 -> Mode.Portability.Const.Nonportable
+    (* Mod modes: no crossing is the identity, i.e. [max]. *)
+    | 3 -> Mode.Portability.Const.max
     | _ -> invalid_arg "Axis_lattice.portability_of_level"
 
   let contention_of_level_monadic = function
     | 0 -> Mode.Contention.Const.Contended
     | 1 -> Mode.Contention.Const.Corrupted
     | 2 -> Mode.Contention.Const.Shared
-    | 3 -> Mode.Contention.Const.Uncontended
+    | 3 -> Mode.Contention.Const.min
     | _ -> invalid_arg "Axis_lattice.contention_of_level_monadic"
 
   let forkable_of_level = function
@@ -312,14 +321,14 @@ module Levels = struct
     | 0 -> Mode.Statefulness.Const.Stateless
     | 1 -> Mode.Statefulness.Const.Writing
     | 2 -> Mode.Statefulness.Const.Reading
-    | 3 -> Mode.Statefulness.Const.Stateful
+    | 3 -> Mode.Statefulness.Const.max
     | _ -> invalid_arg "Axis_lattice.statefulness_of_level"
 
   let visibility_of_level_monadic = function
     | 0 -> Mode.Visibility.Const.Immutable
     | 1 -> Mode.Visibility.Const.Read
     | 2 -> Mode.Visibility.Const.Write
-    | 3 -> Mode.Visibility.Const.Read_write
+    | 3 -> Mode.Visibility.Const.min
     | _ -> invalid_arg "Axis_lattice.visibility_of_level_monadic"
 
   let staticity_of_level_monadic = function

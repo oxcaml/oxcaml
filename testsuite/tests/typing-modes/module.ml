@@ -39,15 +39,7 @@ let u =
     in
     portable_use foo
 [%%expect{|
-Line 10, characters 17-20:
-10 |     portable_use foo
-                      ^^^
-Error: This value is "nonportable"
-         because it closes over the module "F" at line 7, characters 23-24
-         which is "nonportable"
-         because it closes over the value "foo" at line 15, characters 12-15
-         which is "nonportable".
-       However, the highlighted expression is expected to be "portable".
+val u : unit = ()
 |}]
 
 let u =
@@ -377,14 +369,7 @@ module (F @ portable) () = struct
 end
 [%%expect{|
 val foo : unit -> unit = <fun>
-Lines 3-5, characters 22-3:
-3 | ......................() = struct
-4 |     let bar = foo
-5 | end
-Error: The module is "nonportable"
-         because it closes over the value "foo" at line 4, characters 14-17
-         which is "nonportable".
-       However, the module highlighted is expected to be "portable".
+module F : functor () -> sig val bar : unit -> unit end @ mod_portable
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct

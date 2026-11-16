@@ -106,7 +106,7 @@ let check_modes env ~crossing ~static ~item ?typ = function
         | None -> m0 |> Mode.With_regionality.disallow_right
         | Some (locks, lid, loc) ->
             let m0 = Crossing.apply_left crossing m0 in
-            Env.walk_locks ~env ~loc lid ~item typ (m0, locks)
+            Env.walk_locks ~hard:true ~env ~loc lid ~item typ (m0, locks)
       in
       let m1 = Crossing.apply_right crossing m1 in
       let m1 =

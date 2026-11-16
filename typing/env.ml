@@ -3786,39 +3786,84 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
       path, (mode, locks), a
     end
 
-let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
+(* Mod modes: capturing is total. On the mirrored axes the value is seen
+   inside at the exact total lock of its mode (a watch), and only the other axes
+   are constrained by [value <= closure] (the old rule). The old rule is used on
+   all axes when it is exact (the capture is legal in every solution), or when
+   [hard] (legacy constructs, error messages). *)
+(* Whether the last [walk_locks] used the total lock somewhere (an illegal
+   capture, or the exact monadic lock). Used to report the old error message
+   when the use of such a value fails. *)
+let soft_lock_used = ref false
+
+let last_walk_used_soft_lock () = !soft_lock_used
+
+let lock_comonadic ~hard pp comonadic closure =
+  let module C = Mode.With_regionality.Comonadic in
+  if hard || Mode.With_regionality.comonadic_lock_is_identity comonadic closure
+  then begin
+    C.submode_err pp comonadic closure;
+    C.disallow_right comonadic
+  end else begin
+    (* The exact total lock on the mirrored axes; the old rule elsewhere. *)
+    C.submode_err pp
+      (Mode.With_regionality.comonadic_nonmirror comonadic)
+      closure;
+    soft_lock_used := true;
+    Mode.With_regionality.lock_comonadic_watch comonadic closure
+  end
+
+let closure_mode ~hard pp {Mode.monadic; comonadic} closure_context
+    comonadic0 =
   let hint_comonadic : _ Mode.Hint.morph =
     Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
   in
-  Mode.With_regionality.Comonadic.submode_err
-    pp
-    comonadic
-    (Mode.With_regionality.Comonadic.apply_hint
-       hint_comonadic
-       comonadic0);
-  let hint_monadic : _ Mode.Hint.morph =
-    Is_closed_by (Monadic, {closure = closure_context; closed = pp})
+  let closure =
+    Mode.With_regionality.Comonadic.apply_hint hint_comonadic comonadic0
   in
+  let comonadic' = lock_comonadic ~hard pp comonadic closure in
   let monadic =
-    Mode.With_regionality.Monadic.join
-      [ monadic;
-        Mode.With_regionality.comonadic_to_monadic_min
-          ~hint:hint_monadic
-          comonadic0 ]
+    if hard || Mode.With_regionality.monadic_in_old_region monadic then
+      let hint_monadic : _ Mode.Hint.morph =
+        Is_closed_by (Monadic, {closure = closure_context; closed = pp})
+      in
+      Mode.With_regionality.Monadic.join
+        [ monadic;
+          Mode.With_regionality.comonadic_to_monadic_min
+            ~hint:hint_monadic
+            comonadic0 ]
+    else begin
+      soft_lock_used := true;
+      Mode.With_regionality.lock_monadic_watch monadic closure
+    end
   in
-  {Mode.monadic; comonadic}
+  {Mode.monadic; comonadic = comonadic'}
 
-let const_closure_mode pp {Mode.monadic; comonadic}
+let const_closure_mode ~hard pp {Mode.monadic; comonadic}
   closure_context comonadic0 =
-  Mode.With_regionality.Comonadic.(submode_err pp comonadic
-    (of_const ~hint:(Is_used_in closure_context) comonadic0));
-  let monadic =
-    Mode.With_regionality.(Monadic.join
-      [ monadic;
-        Const.comonadic_to_monadic_min comonadic0
-        |> Monadic.of_const ~hint:(Is_used_in closure_context) ])
+  let closure =
+    Mode.With_regionality.Comonadic.of_const
+      ~hint:(Is_used_in closure_context) comonadic0
   in
-  {Mode.monadic; comonadic}
+  let comonadic' = lock_comonadic ~hard pp comonadic closure in
+  let monadic =
+    match Mode.With_regionality.const_lock_monadic comonadic0 with
+    | Some c when not hard ->
+      Mode.With_regionality.(Monadic.join
+        [ monadic;
+          Monadic.of_const ~hint:(Is_used_in closure_context) c ])
+    | _ ->
+    if hard || Mode.With_regionality.monadic_in_old_region monadic then
+      Mode.With_regionality.(Monadic.join
+        [ monadic;
+          Const.comonadic_to_monadic_min comonadic0
+          |> Monadic.of_const ~hint:(Is_used_in closure_context) ])
+    else begin
+      soft_lock_used := true;
+      Mode.With_regionality.lock_monadic_watch monadic closure
+    end
+  in
+  {Mode.monadic; comonadic = comonadic'}
 
 let exclave_mode ~errors ~env ~pp vmode =
   match
@@ -3866,15 +3911,16 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
     [None] when the function is used on modules and classes.
 
     [pp] is the pinpoint used in errors. *)
-let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
+let walk_locks ?(hard = false) ~errors ~env ~pp mode ty_and_lid locks =
+  soft_lock_used := false;
   List.fold_left
     (fun vmode lock ->
       try match lock with
       | Region_lock _ -> region_mode vmode
       | Const_closure_lock (_, closure_context, comonadic) ->
-          const_closure_mode pp vmode closure_context comonadic
+          const_closure_mode ~hard pp vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
-          closure_mode pp vmode closure_context comonadic
+          closure_mode ~hard pp vmode closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~pp vmode
       | Unboxed_lock ->
@@ -3895,6 +3941,7 @@ let walk_locks_for_legacy_construct ~env pp =
   let _stage_locks, locks = partition_locks locks in
   ignore
     (walk_locks
+       ~hard:true
        ~errors:true
        ~env
        ~pp
@@ -4259,11 +4306,20 @@ let lookup_dot_modtype ~errors ~use ~loc l s env =
       may_lookup_error errors loc env (Unbound_modtype (Ldot(l, s)))
 
 let lookup_dot_class ~errors ~use ~loc l s env =
-  let (p, (_, locks), comps) =
+  let (p, (mode, locks), comps) =
     lookup_structure_components ~errors ~use l env
   in
   match NameMap.find s.txt comps.comp_classes with
   | clda ->
+      (* Mod modes: a class of a module in the mod region (e.g. unpacked from
+         an illegally captured first-class module) cannot be used: its methods
+         are the module's code. *)
+      if use then
+        Mode.With_regionality.Comonadic.submode_err
+          (loc, Ident {category = Class; lid = Ldot (l, s)})
+          mode.Mode.comonadic
+          (Mode.With_regionality.Comonadic.of_const
+             Mode.With_regionality.callable_bound);
       let path = Pdot(p, s.txt) in
       use_class ~use ~loc path clda;
       (path, locks, clda.clda_declaration)
@@ -4651,7 +4707,8 @@ let lookup_class ~errors ~use ~loc lid env =
   let vmode =
     if use then
       let pp : Mode.Hint.pinpoint = (loc, Ident {category = Class; lid}) in
-      walk_locks ~errors ~env ~pp clda_mode None locks
+      (* Mod modes: classes are legacy; use the old (hard) locks. *)
+      walk_locks ~hard:true ~errors ~env ~pp clda_mode None locks
     else
       clda_mode
   in
@@ -4798,10 +4855,10 @@ let find_cltype_index id env = find_index_tbl id env.cltypes
 
 (* Ordinary lookup functions *)
 
-let walk_locks ~env ~loc lid ~item ty (mode, locks) =
+let walk_locks ?hard ~env ~loc lid ~item ty (mode, locks) =
   let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
   let ty_and_lid = Option.map (fun ty -> (ty, lid)) ty in
-  walk_locks ~errors:true ~env ~pp mode ty_and_lid locks
+  walk_locks ?hard ~errors:true ~env ~pp mode ty_and_lid locks
 
 let lookup_module_path ?(use=true) ~loc ~load lid env =
   lookup_module_path ~errors:true ~use ~loc ~load lid env

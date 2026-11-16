@@ -405,81 +405,166 @@ module Lattices = struct
   end
   [@@inline]
 
-  module type Diamond = sig
-    (** This interface and the [Diamond] functor below are specialized to
-        lattices of the following form
-        {v
-            Max
-            / \
-          Fst Snd
-            \ /
-            Min
-        v}
-        where [Fst] and [Snd] are incomparable.
-
-        The [Diamond] functor relies on the representation of immediate variant
-        types to efficiently implement bitwise operations over such lattices. *)
-
-    (** This must be an enumeration with four constructors, in the order of
-        [min], [fst], [snd], and [max]. Anything else will fail in the [Diamond]
-        functor. *)
+  module type Mirror = sig
+    (** A lattice of seven elements obtained by gluing a diamond and a mirrored
+        copy of it, as a sublattice of [diamond x diamond]. [t] must be an
+        enumeration with seven constructors; [bits.(i)] is the pair encoding
+        (low two bits, high two bits) of the [i]-th constructor, so that join,
+        meet and order are bitwise. The encoding must have [0] (the bottom) and
+        [15] (the top). *)
     type t [@@immediate]
 
-    val min : t
-
-    val fst : t
-
-    val snd : t
-
-    val max : t
+    val bits : int array
   end
 
-  module Diamond (L : Diamond) = struct
+  module Mirror (L : Mirror) = struct
+    [@@@warning "-32"]
+
     open struct
-      external l_to_int : L.t -> int = "%identity"
+      external to_int : L.t -> int = "%identity"
 
-      external l_of_int : int -> L.t = "%identity"
+      external of_int : int -> L.t = "%identity"
 
-      let mask = 0b11
+      let of_bits_tbl =
+        let a = Array.make 16 (-1) in
+        Array.iteri (fun i b -> a.(b) <- i) L.bits;
+        assert (a.(0) >= 0 && a.(15) >= 0);
+        a
 
-      let () =
-        assert (l_to_int L.min = 0b00);
-        assert (l_to_int L.fst = 0b01);
-        assert (l_to_int L.snd = 0b10);
-        assert (l_to_int L.max = 0b11)
+      let[@inline] b x = Array.unsafe_get L.bits (to_int x)
+
+      let[@inline] ob x = of_int (Array.unsafe_get of_bits_tbl x)
+
+      let elts = List.init 7 of_int
+
+      let le_ x y = b x land b y = b x
+
+      let tbl7 f =
+        let a = Array.make 49 (-1) in
+        List.iter
+          (fun x ->
+            List.iter
+              (fun y -> a.((to_int x * 7) + to_int y) <- to_int (f x y))
+              elts)
+          elts;
+        a
+
+      (* [imply c x] is the greatest [y] with [meet c y <= x]. *)
+      let imply_tbl =
+        tbl7 (fun c x ->
+            let ys = List.filter (fun y -> le_ (ob (b c land b y)) x) elts in
+            ob (List.fold_left (fun acc y -> acc lor b y) 0 ys))
+
+      (* [subtract a c] is the least [y] with [a <= join c y]. *)
+      let subtract_tbl =
+        tbl7 (fun a c ->
+            let ys = List.filter (fun y -> le_ a (ob (b c lor b y))) elts in
+            ob (List.fold_left (fun acc y -> acc land b y) 15 ys))
     end
 
-    let min = L.min
+    let min = ob 0
 
-    let max = L.max
+    let max = ob 15
 
-    let equal a b = a = b
+    let to_bits x = b x
 
-    let compare_total a b = Int.compare (l_to_int a) (l_to_int b)
+    let of_bits x = ob x
 
-    let join a b = l_of_int (l_to_int a lor l_to_int b)
+    let equal (a : L.t) b = a == b
 
-    let meet a b = l_of_int (l_to_int a land l_to_int b)
+    let compare_total a b = Int.compare (to_int a) (to_int b)
 
-    let le a b = meet a b = a
+    let join x y = ob (b x lor b y)
 
-    (* We can treat [fst] and [snd] as independent axes.
-       0b0 land (lnot 0b0) = 0b0 (min = min => min)
-       0b0 land (lnot 0b1) = 0b0 (min < max => min)
-       0b1 land (lnot 0b0) = 0b1 (max > min => max)
-       0b1 land (lnot 0b1) = 0b0 (max = max => min) *)
-    let subtract a c = l_of_int (l_to_int a land lnot (l_to_int c))
+    let meet x y = ob (b x land b y)
 
-    (* We can treat [fst] and [snd] as independent axes.
-       (lnot 0b0) lor 0b0 = 0b1 (min = min => max)
-       (lnot 0b0) lor 0b1 = 0b1 (min < max => max)
-       (lnot 0b1) lor 0b0 = 0b0 (max > min => min)
-       (lnot 0b1) lor 0b1 = 0b1 (max = max => max)
+    let le x y = b x land b y = b x
 
-       [lnot c lor b] sets the top 61 bits to 1, so we must mask them out. *)
-    let imply c b = l_of_int (lnot (l_to_int c) lor l_to_int b land mask)
+    let imply c x =
+      of_int (Array.unsafe_get imply_tbl ((to_int c * 7) + to_int x))
+
+    let subtract a c =
+      of_int (Array.unsafe_get subtract_tbl ((to_int a * 7) + to_int c))
+
+    let all = lazy elts
   end
   [@@inline]
+
+  (** Semantics of the mirrored axes on the pair encoding of a comonadic-shaped
+      mirrored lattice (portability, statefulness; monadic axes are converted by
+      complementing their bits, which is the dagger). An element is either
+      [in c] (high bits zero, [c] the old two-bit diamond element) or [mod j]
+      for [j] an old element other than top. *)
+  module Mirror_sem = struct
+    [@@@warning "-32"]
+
+    let[@inline] in_region x = x land 12 = 0
+
+    let[@inline] iota x =
+      if in_region x
+      then 3 lor ((lnot x land 3) lsl 2)
+      else lnot (x lsr 2) land 3
+
+    let[@inline] imp c d = lnot c lor d land 3
+
+    let[@inline] le x y = x land y = x
+
+    let[@inline] mod_ j = iota j
+
+    let[@inline] phi f = f land 3
+
+    (** [lock phi x]: the mode of [x] seen inside a closure whose old-lattice
+        part is [phi]. *)
+    let lock phi x =
+      if in_region x
+      then if le x phi then x else mod_ (imp x phi)
+      else mod_ (iota x land phi)
+
+    (** Right adjoint of [lock phi]. *)
+    let unlock phi t =
+      if in_region t
+      then t land phi
+      else
+        let i = iota t in
+        if le i phi then t else imp i phi
+
+    (** [mu k] is both the comonadic crossing by kind bound [k] and the modality
+        [k] (in the internal order; on monadic axes it is the right-hand
+        crossing and the modality). *)
+    let mu k x =
+      if in_region x
+      then x land k
+      else
+        let j = iota x in
+        if le k j then k else mod_ (imp k j)
+
+    let elements = [0; 1; 2; 3; 11; 7; 15]
+
+    (** Right adjoint of [mu k]. *)
+    let mu_r k t =
+      List.fold_left
+        (fun acc x -> if le (mu k x) t then acc lor x else acc)
+        0 elements
+
+    (** Monadic lock in the internal (kinding) order: the inside mode [b]
+        satisfies [b <= lockm phi n]. *)
+    let lockm phi n = iota (lock phi (iota n))
+
+    (** Least [t] with [y <= lockm phi t]. *)
+    let lockm_l phi y = iota (unlock phi (iota y))
+
+    (** Least [phi] (old lattice) such that [lock phi a <= b]. *)
+    let lock_fmin a b =
+      List.fold_left
+        (fun acc phi -> if le (lock phi a) b then acc land phi else acc)
+        3 [0; 1; 2; 3]
+
+    (** Least [phi] (old lattice) such that [y <= lockm phi n]. *)
+    let lockm_fmin y n =
+      List.fold_left
+        (fun acc phi -> if le y (lockm phi n) then acc land phi else acc)
+        3 [0; 1; 2; 3]
+  end
 
   type locality =
     | Global
@@ -620,65 +705,61 @@ module Lattices = struct
   end
 
   module Portability = struct
-    (* Changes to this type must consider the implementation of [Diamond]. *)
+    (* Changes to this type must consider the implementation of [Mirror]. *)
     type t =
-      | Portable (* 0b00 *)
-      | Shareable (* 0b01 *)
-      | Corruptible (* 0b10 *)
-      | Nonportable (* 0b11 *)
+      | Portable
+      | Shareable
+      | Corruptible
+      | Nonportable
+      | Mod_shareable
+      | Mod_corruptible
+      | Mod_portable
 
-    include Diamond (struct
+    include Mirror (struct
       type nonrec t = t
 
-      let min = Portable
-
-      let fst = Shareable
-
-      let snd = Corruptible
-
-      let max = Nonportable
+      let bits = [| 0; 1; 2; 3; 11; 7; 15 |]
     end)
 
     let legacy = Nonportable
-
-    let all = lazy [Portable; Shareable; Corruptible; Nonportable]
 
     let print ppf = function
       | Portable -> Fmt.fprintf ppf "portable"
       | Shareable -> Fmt.fprintf ppf "shareable"
       | Corruptible -> Fmt.fprintf ppf "corruptible"
       | Nonportable -> Fmt.fprintf ppf "nonportable"
+      | Mod_shareable -> Fmt.fprintf ppf "mod_shareable"
+      | Mod_corruptible -> Fmt.fprintf ppf "mod_corruptible"
+      | Mod_portable -> Fmt.fprintf ppf "mod_portable"
   end
 
   module Contention = struct
-    (* Changes to this type must consider the implementation of [Diamond]. *)
+    (* Changes to this type must consider the implementation of [Mirror]. *)
     type t =
-      | Uncontended (* 0b00 *)
-      | Corrupted (* 0b01 *)
-      | Shared (* 0b10 *)
-      | Contended (* 0b11 *)
+      | Uncontended
+      | Corrupted
+      | Shared
+      | Contended
+      | Mod_corrupted
+      | Mod_shared
+      | Mod_contended
 
-    include Diamond (struct
+    include Mirror (struct
       type nonrec t = t
 
-      let min = Uncontended
-
-      let fst = Corrupted
-
-      let snd = Shared
-
-      let max = Contended
+      let bits = [| 12; 13; 14; 15; 8; 4; 0 |]
     end)
 
     let legacy = Uncontended
 
-    let all = lazy [Uncontended; Corrupted; Shared; Contended]
-
     let print ppf = function
-      | Contended -> Fmt.fprintf ppf "contended"
+      | Uncontended -> Fmt.fprintf ppf "uncontended"
       | Corrupted -> Fmt.fprintf ppf "corrupted"
       | Shared -> Fmt.fprintf ppf "shared"
-      | Uncontended -> Fmt.fprintf ppf "uncontended"
+      | Contended -> Fmt.fprintf ppf "contended"
+      | Mod_corrupted -> Fmt.fprintf ppf "mod_corrupted"
+      | Mod_shared -> Fmt.fprintf ppf "mod_shared"
+      | Mod_contended -> Fmt.fprintf ppf "mod_contended"
   end
 
   module Forkable = struct
@@ -730,65 +811,61 @@ module Lattices = struct
   end
 
   module Statefulness = struct
-    (* Changes to this type must consider the implementation of [Diamond]. *)
+    (* Changes to this type must consider the implementation of [Mirror]. *)
     type t =
-      | Stateless (* 0b00 *)
-      | Writing (* 0b01 *)
-      | Reading (* 0b10 *)
-      | Stateful (* 0b11 *)
+      | Stateless
+      | Writing
+      | Reading
+      | Stateful
+      | Mod_writing
+      | Mod_reading
+      | Mod_stateless
 
-    include Diamond (struct
+    include Mirror (struct
       type nonrec t = t
 
-      let min = Stateless
-
-      let fst = Writing
-
-      let snd = Reading
-
-      let max = Stateful
+      let bits = [| 0; 1; 2; 3; 11; 7; 15 |]
     end)
 
     let legacy = Stateful
-
-    let all = lazy [Stateless; Writing; Reading; Stateful]
 
     let print ppf = function
       | Stateless -> Fmt.fprintf ppf "stateless"
       | Writing -> Fmt.fprintf ppf "writing"
       | Reading -> Fmt.fprintf ppf "reading"
       | Stateful -> Fmt.fprintf ppf "stateful"
+      | Mod_writing -> Fmt.fprintf ppf "mod_writing"
+      | Mod_reading -> Fmt.fprintf ppf "mod_reading"
+      | Mod_stateless -> Fmt.fprintf ppf "mod_stateless"
   end
 
   module Visibility = struct
-    (* Changes to this type must consider the implementation of [Diamond]. *)
+    (* Changes to this type must consider the implementation of [Mirror]. *)
     type t =
-      | Read_write (* 0b00 *)
-      | Read (* 0b01 *)
-      | Write (* 0b10 *)
-      | Immutable (* 0b11 *)
+      | Read_write
+      | Read
+      | Write
+      | Immutable
+      | Mod_read
+      | Mod_write
+      | Mod_immutable
 
-    include Diamond (struct
+    include Mirror (struct
       type nonrec t = t
 
-      let min = Read_write
-
-      let fst = Read
-
-      let snd = Write
-
-      let max = Immutable
+      let bits = [| 12; 13; 14; 15; 8; 4; 0 |]
     end)
 
     let legacy = Read_write
 
-    let all = lazy [Read_write; Read; Write; Immutable]
-
     let print ppf = function
-      | Immutable -> Fmt.fprintf ppf "immutable"
+      | Read_write -> Fmt.fprintf ppf "read_write"
       | Read -> Fmt.fprintf ppf "read"
       | Write -> Fmt.fprintf ppf "write"
-      | Read_write -> Fmt.fprintf ppf "read_write"
+      | Immutable -> Fmt.fprintf ppf "immutable"
+      | Mod_read -> Fmt.fprintf ppf "mod_read"
+      | Mod_write -> Fmt.fprintf ppf "mod_write"
+      | Mod_immutable -> Fmt.fprintf ppf "mod_immutable"
   end
 
   module Staticity = struct
@@ -1294,6 +1371,34 @@ module Lattices = struct
     | Monadic_op -> Monadic_op.max
     | Comonadic_with_locality -> Comonadic_with_locality.max
     | Comonadic_with_regionality -> Comonadic_with_regionality.max
+
+  (* Mod modes: the old region of each object (its old top on the mirrored
+     axes, in internal order). Used for defaults (the O layer of the solver). *)
+  let region_cap : type a. a obj -> a =
+   fun obj ->
+    match obj with
+    | Portability -> Portability.Nonportable
+    | Statefulness -> Statefulness.Stateful
+    | Contention_op -> Contention.Uncontended
+    | Visibility_op -> Visibility.Read_write
+    | Monadic_op ->
+      { (max obj) with
+        contention = Contention.Uncontended;
+        visibility = Visibility.Read_write
+      }
+    | Comonadic_with_locality ->
+      { (max obj) with
+        portability = Portability.Nonportable;
+        statefulness = Statefulness.Stateful
+      }
+    | Comonadic_with_regionality ->
+      { (max obj) with
+        portability = Portability.Nonportable;
+        statefulness = Statefulness.Stateful
+      }
+    | Locality | Regionality | Uniqueness_op | Linearity | Forkable | Yielding
+    | Staticity_op ->
+      max obj
 
   let le : type a. a obj -> a -> a -> bool =
    fun obj a b ->
@@ -2274,24 +2379,36 @@ module Lattices_mono = struct
       | Contention.Shared -> Portability.Shareable
       | Contention.Corrupted -> Portability.Corruptible
       | Contention.Uncontended -> Portability.Nonportable
+      | Contention.Mod_shared -> Portability.Mod_shareable
+      | Contention.Mod_corrupted -> Portability.Mod_corruptible
+      | Contention.Mod_contended -> Portability.Mod_portable
 
     let portability_to_contention_op = function
       | Portability.Portable -> Contention.Contended
       | Portability.Shareable -> Contention.Shared
       | Portability.Corruptible -> Contention.Corrupted
       | Portability.Nonportable -> Contention.Uncontended
+      | Portability.Mod_shareable -> Contention.Mod_shared
+      | Portability.Mod_corruptible -> Contention.Mod_corrupted
+      | Portability.Mod_portable -> Contention.Mod_contended
 
     let visibility_op_to_statefulness = function
       | Visibility.Immutable -> Statefulness.Stateless
       | Visibility.Read -> Statefulness.Reading
       | Visibility.Write -> Statefulness.Writing
       | Visibility.Read_write -> Statefulness.Stateful
+      | Visibility.Mod_read -> Statefulness.Mod_reading
+      | Visibility.Mod_write -> Statefulness.Mod_writing
+      | Visibility.Mod_immutable -> Statefulness.Mod_stateless
 
     let statefulness_to_visibility_op = function
       | Statefulness.Stateless -> Visibility.Immutable
       | Statefulness.Writing -> Visibility.Write
       | Statefulness.Reading -> Visibility.Read
       | Statefulness.Stateful -> Visibility.Read_write
+      | Statefulness.Mod_reading -> Visibility.Mod_read
+      | Statefulness.Mod_writing -> Visibility.Mod_write
+      | Statefulness.Mod_stateless -> Visibility.Mod_immutable
 
     let monadic_op_to_comonadic_min : type a.
         a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
@@ -3785,6 +3902,26 @@ module Lattices_mono = struct
       Simple_proj (Simple_morph.right_adjoint mid m, ax, dst)
     | Const_min _ -> Const_max dst
 
+  let maybe_left : type a b l r.
+      (a, b, l * r) morph -> (a, b, allowed * disallowed) morph option =
+    function
+    | Simple m -> (
+      match Simple_morph.maybe_allowed_left m with
+      | Allowed_left m -> Some (Simple (Simple_morph.disallow_right m))
+      | Not_allowed_left -> None)
+    | Simple_proj (m, ax, src) -> (
+      match Simple_morph.maybe_allowed_left m with
+      | Allowed_left m ->
+        Some (Simple_proj (Simple_morph.disallow_right m, ax, src))
+      | Not_allowed_left -> None)
+    | Min_with_simple (ax, m) -> (
+      match Simple_morph.maybe_allowed_left m with
+      | Allowed_left m ->
+        Some (Min_with_simple (ax, Simple_morph.disallow_right m))
+      | Not_allowed_left -> None)
+    | Const_min src -> Some (Const_min src)
+    | Max_with_simple _ | Const_max _ | Const _ | Compose _ -> None
+
   let left_adjoint : type a b l.
       b obj -> (a, b, l * allowed) morph -> (b, a, allowed * disallowed) morph =
    fun dst f ->
@@ -4440,6 +4577,8 @@ module C = Lattices_mono
 module S = Solver_mono (Hint_for_solver) (C)
 
 let erase_hints () = S.erase_hints ()
+
+let erase_watches () = S.erase_watches ()
 
 let reset_persistent_id () = S.reset_persistent_id ()
 
@@ -5526,6 +5665,10 @@ module type Obj = sig
   type const
 
   val obj : const C.obj
+
+  (** Mod modes: zapping to the (internal) ceiling first tries to stay below
+      [cap] (the old top on mirrored axes). *)
+  val cap : const option
 end
 
 let try_with_log op =
@@ -5566,6 +5709,11 @@ let equate_from_submode' submode m1 m2 =
     | Ok () -> Ok ())
 [@@inline]
 
+(* Mod modes: watches are not copied when mode variables are generalized and
+   instantiated, so mode polymorphism is disabled in this prototype: all mode
+   variables live at level 0 even under [-extension mode_polymorphism_alpha]. *)
+let mode_polymorphism_enabled () = false
+
 exception Cannot_zap_generic
 
 exception Cannot_get_constant_from_generic
@@ -5598,7 +5746,7 @@ module Comonadic_gen (Obj : Obj) = struct
   let allow_right m = S.allow_right m
 
   let choose_level level =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if mode_polymorphism_enabled ()
     then level
     else 0
 
@@ -5640,15 +5788,15 @@ module Comonadic_gen (Obj : Obj) = struct
   let update_level i a = with_log (S.update_level i obj a)
 
   let generalize_topology ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if mode_polymorphism_enabled ()
     then S.generalize_topology ~log:None ~current_level a
 
   let generalize ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if mode_polymorphism_enabled ()
     then S.generalize ~log:None ~current_level obj a
 
   let generalize_structure ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if mode_polymorphism_enabled ()
     then S.generalize_structure ~log:None ~current_level obj a
 
   let instantiate ~copy_scope ~current_level a =
@@ -5700,8 +5848,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let zap_to_ceil_force ?(commit = true) m =
     if commit
-    then with_log (S.zap_to_ceil obj m)
-    else S.zap_to_ceil ~log:None obj m
+    then with_log (S.zap_to_ceil ?cap:Obj.cap obj m)
+    else S.zap_to_ceil ?cap:Obj.cap ~log:None obj m
 
   let zap_to_floor_force ?(commit = true) m =
     if commit
@@ -5808,7 +5956,7 @@ module Monadic_gen (Obj : Obj) = struct
   let allow_right m = S.allow_left m
 
   let choose_level level =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if mode_polymorphism_enabled ()
     then level
     else 0
 
@@ -5848,15 +5996,15 @@ module Monadic_gen (Obj : Obj) = struct
   let update_level i a = with_log (S.update_level i obj a)
 
   let generalize_topology ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if mode_polymorphism_enabled ()
     then S.generalize_topology ~log:None ~current_level a
 
   let generalize ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if mode_polymorphism_enabled ()
     then S.generalize ~log:None ~current_level obj a
 
   let generalize_structure ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if mode_polymorphism_enabled ()
     then S.generalize_structure ~log:None ~current_level obj a
 
   let instantiate ~copy_scope ~current_level a =
@@ -5915,8 +6063,8 @@ module Monadic_gen (Obj : Obj) = struct
 
   let zap_to_floor_force ?(commit = true) m =
     if commit
-    then with_log (S.zap_to_ceil obj m)
-    else S.zap_to_ceil ~log:None obj m
+    then with_log (S.zap_to_ceil ?cap:Obj.cap obj m)
+    else S.zap_to_ceil ?cap:Obj.cap ~log:None obj m
 
   let zap_to_ceil_exn m =
     if check_generic m then raise Cannot_zap_generic;
@@ -5974,6 +6122,8 @@ module Monadic_gen (Obj : Obj) = struct
 
     let get_ceil m = S.get_floor obj m
 
+    let get_loose_floor m = S.get_loose_ceil obj m
+
     let check_const m =
       let floor = get_floor m in
       let ceil = get_ceil m in
@@ -5994,6 +6144,8 @@ module Locality = struct
     type const = Const.t
 
     let obj = C.Locality
+
+    let cap = None
   end
 
   include Comonadic_gen (Obj)
@@ -6026,6 +6178,8 @@ module Regionality = struct
     type const = Const.t
 
     let obj = C.Regionality
+
+    let cap = None
   end
 
   include Comonadic_gen (Obj)
@@ -6048,6 +6202,8 @@ module Linearity = struct
     type const = Const.t
 
     let obj : _ C.obj = C.Linearity
+
+    let cap = None
   end
 
   include Comonadic_gen (Obj)
@@ -6068,6 +6224,8 @@ module Statefulness = struct
     type const = Const.t
 
     let obj = C.Statefulness
+
+    let cap = Some Const.Stateful
   end
 
   include Comonadic_gen (Obj)
@@ -6082,7 +6240,9 @@ module Statefulness = struct
 
   let legacy = of_const Const.legacy
 
-  let zap_to_legacy_force = zap_to_ceil_force
+  let zap_to_legacy_force ?commit m =
+    (match submode m (of_const Const.Stateful) with Ok () | Error _ -> ());
+    zap_to_ceil_force ?commit m
 end
 
 module Visibility = struct
@@ -6092,6 +6252,8 @@ module Visibility = struct
     type const = Const.t
 
     let obj = C.Visibility_op
+
+    let cap = Some Const.Read_write
   end
 
   include Monadic_gen (Obj)
@@ -6106,7 +6268,9 @@ module Visibility = struct
 
   let legacy = of_const Const.legacy
 
-  let zap_to_legacy_force = zap_to_floor_force
+  let zap_to_legacy_force ?commit m =
+    (match submode (of_const Const.Read_write) m with Ok () | Error _ -> ());
+    zap_to_floor_force ?commit m
 end
 
 module Portability = struct
@@ -6116,6 +6280,8 @@ module Portability = struct
     type const = Const.t
 
     let obj : _ C.obj = C.Portability
+
+    let cap = Some Const.Nonportable
   end
 
   include Comonadic_gen (Obj)
@@ -6128,7 +6294,10 @@ module Portability = struct
 
   let zap_to_legacy_force ?commit ~statefulness m =
     match statefulness with
-    | Statefulness.Const.Stateful -> zap_to_ceil_force ?commit m
+    | Statefulness.Const.(Stateful | Mod_reading | Mod_writing | Mod_stateless)
+      ->
+      (* Defaults must not go above the old top. *)
+      zap_to_ceil_clamped_force ?commit Const.Nonportable m
     | Statefulness.Const.Reading ->
       zap_to_ceil_clamped_force ?commit Const.Shareable m
     | Statefulness.Const.Writing ->
@@ -6143,6 +6312,8 @@ module Uniqueness = struct
     type const = Const.t
 
     let obj = C.Uniqueness_op
+
+    let cap = None
   end
 
   include Monadic_gen (Obj)
@@ -6163,6 +6334,8 @@ module Contention = struct
     type const = Const.t
 
     let obj = C.Contention_op
+
+    let cap = Some Const.Uncontended
   end
 
   include Monadic_gen (Obj)
@@ -6175,7 +6348,9 @@ module Contention = struct
 
   let zap_to_legacy_force ?commit ~visibility ~arg m =
     match visibility with
-    | Visibility.Const.Read_write -> zap_to_floor_force ?commit m
+    | Visibility.Const.(Read_write | Mod_read | Mod_write | Mod_immutable) ->
+      (* Defaults must not go below the old bottom. *)
+      zap_to_floor_clamped_force ?commit Const.Uncontended m
     | Visibility.Const.Immutable -> zap_to_ceil_force ?commit m
     | Visibility.Const.Read ->
       if arg
@@ -6194,6 +6369,8 @@ module Forkable = struct
     type const = Const.t
 
     let obj = C.Forkable
+
+    let cap = None
   end
 
   include Comonadic_gen (Obj)
@@ -6219,6 +6396,8 @@ module Yielding = struct
     type const = Const.t
 
     let obj = C.Yielding
+
+    let cap = None
   end
 
   include Comonadic_gen (Obj)
@@ -6248,6 +6427,8 @@ module Staticity = struct
     type const = Const.t
 
     let obj = C.Staticity_op
+
+    let cap = None
   end
 
   include Monadic_gen (Obj)
@@ -6279,6 +6460,14 @@ module Comonadic_with (Areality : Areality) = struct
     type const = Areality.Const.t C.comonadic_with
 
     let obj = C.comonadic_with_obj Areality.Obj.obj
+
+    let cap =
+      Some
+        { C.Comonadic_with_regionality.max with
+          areality = Areality.Const.max;
+          portability = C.Portability.Nonportable;
+          statefulness = C.Statefulness.Stateful
+        }
   end
 
   include Comonadic_gen (Obj)
@@ -6360,6 +6549,11 @@ module Comonadic_with (Areality : Areality) = struct
   let proj ax m =
     S.apply ~hint:Skip (proj_obj ax) (Simple_proj (Id, ax, Obj.obj)) m
 
+  let axis_cap : type a. a Axis.t -> a option = function
+    | Portability -> Some C.Portability.Nonportable
+    | Statefulness -> Some C.Statefulness.Stateful
+    | Areality | Linearity | Forkable | Yielding -> None
+
   module Per_axis = struct
     let zap_to_floor ax m =
       let obj = proj_obj ax in
@@ -6367,7 +6561,7 @@ module Comonadic_with (Areality : Areality) = struct
 
     let zap_to_ceil ax m =
       let obj = proj_obj ax in
-      with_log (S.zap_to_ceil obj m)
+      with_log (S.zap_to_ceil ?cap:(axis_cap ax) obj m)
   end
 
   let min_with ax m =
@@ -6433,6 +6627,135 @@ module Comonadic_with (Areality : Areality) = struct
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
     Error.print_proj pp Obj.obj ax err
+
+  (* Mod modes: modalities and crossing by a constant [c] act on the mirrored
+     axes as [mu_c] (see [C.Mirror_sem.mu]). [mu_top] is the identity and
+     [mu_bot] is the constant [bot], both of which are meets; intermediate
+     constants are implemented by watches between fresh variables. *)
+  module Mod = struct
+    module M = C.Mirror_sem
+
+    let get (c : Const.t) =
+      C.Portability.to_bits c.portability, C.Statefulness.to_bits c.statefulness
+
+    let set (c : Const.t) (p, s) : Const.t =
+      { c with
+        portability = C.Portability.of_bits p;
+        statefulness = C.Statefulness.of_bits s
+      }
+
+    let is_inter x = x = 1 || x = 2
+
+    (** The meet constant implementing the non-intermediate part of [mu_c];
+        intermediate axes are mapped to [inter]. *)
+    let canon ~inter c =
+      let f x = if x = 3 then 15 else if is_inter x then inter else x in
+      let p, s = get c in
+      set c (f p, f s)
+
+    let canon_keep c =
+      let f x = if x = 3 then 15 else x in
+      let p, s = get c in
+      set c (f p, f s)
+
+    let inters c =
+      let p, s = get c in
+      if is_inter p || is_inter s then Some (p, s) else None
+
+    let per_axis ks ~inter ~other v =
+      let kp, ks = ks in
+      let vp, vs = get v in
+      set v
+        ( (if is_inter kp then inter kp vp else other vp),
+          if is_inter ks then inter ks vs else other vs )
+
+    (** [y] such that [y >= mu_k x] (on intermediate axes) for the left mode
+        [m]. *)
+    let mu_left ks m =
+      let x = newvar 0 in
+      submode_exn m x;
+      let y = newvar 0 in
+      let bound hy =
+        set Const.max (get (per_axis ks ~inter:M.mu_r ~other:(fun _ -> 15) hy))
+      in
+      let witness w =
+        set Const.min (get (per_axis ks ~inter:M.mu ~other:(fun _ -> 0) w))
+      in
+      (match with_log (S.watch1 Obj.obj x Obj.obj y ~bound ~witness) with
+      | Ok () -> ()
+      | Error _ -> Misc.fatal_error "Mode.mu_left");
+      y
+
+    (** [r <= g_k t] where [t <= m] for the right mode [m], with [g] given per
+        intermediate axis, and [g_l] its left "adjoint" (least [s] with
+        [w <= g_k s]). *)
+    let watch_right ks ~g ~g_l m =
+      let t = newvar 0 in
+      submode_exn t m;
+      let r = newvar 0 in
+      let bound ht =
+        set Const.max (get (per_axis ks ~inter:g ~other:(fun _ -> 15) ht))
+      in
+      let witness w =
+        set Const.min (get (per_axis ks ~inter:g_l ~other:(fun _ -> 0) w))
+      in
+      (match with_log (S.watch1 Obj.obj r Obj.obj t ~bound ~witness) with
+      | Ok () -> ()
+      | Error _ -> Misc.fatal_error "Mode.watch_right");
+      r
+
+    let least_above k w g =
+      List.fold_left
+        (fun acc s -> if M.le w (g k s) then acc land s else acc)
+        15 M.elements
+  end
+
+  (** Modality [c] applied to a left mode (reading). *)
+  let modal_left ?hint c m =
+    match Mod.inters c with
+    | None -> meet_const ?hint (Mod.canon ~inter:15 c) m
+    | Some ks ->
+      let base = meet_const ?hint (Mod.canon_keep c) m in
+      let y = Mod.mu_left ks m in
+      submode_exn base y;
+      allow_left (disallow_right y)
+
+  (** Comonadic crossing on a left mode, unhinted. *)
+  let cross_left_unhint c m =
+    match Mod.inters c with
+    | None -> meet_const_unhint (Mod.canon ~inter:15 c) m
+    | Some _ -> S.Unhint.unhint (allow_left (modal_left c (hint m)))
+
+  (** Comonadic crossing on a right mode, unhinted: [mu_c^R . mu_c]. *)
+  let cross_right_unhint c m =
+    let base c m =
+      imply_const_unhint c (S.Unhint.unhint (meet [of_const c; m]))
+    in
+    match Mod.inters c with
+    | None -> base (Mod.canon ~inter:15 c) m
+    | Some ks ->
+      let b = hint (base (Mod.canon_keep c) m) in
+      let g k t = Mod.M.mu_r k (Mod.M.mu k t) in
+      let g_l k w =
+        Mod.least_above k (Mod.M.mu k w) (fun k s -> Mod.M.mu k s)
+      in
+      let r = Mod.watch_right ks ~g ~g_l m in
+      submode_exn r b;
+      S.Unhint.unhint (allow_right (disallow_left r))
+
+  (** The constant used when a modality [c] is applied to a right mode
+      (constructing): the old top becomes the identity, intermediate constants
+      are kept as meets (conservative). *)
+  let modal_canon c =
+    let f x = if x = 3 then 15 else x in
+    let p, s = Mod.get c in
+    Mod.set c (f p, f s)
+
+  (** For printing modality constants: the identity with its old name. *)
+  let modal_uncanon c =
+    let f x = if x = 15 then 3 else x in
+    let p, s = Mod.get c in
+    Mod.set c (f p, f s)
 end
 [@@inline]
 
@@ -6442,6 +6765,14 @@ module Monadic = struct
     type const = C.Monadic_op.t
 
     let obj = C.Monadic_op
+
+    (* Internal order: the old top on the mirrored axes is [uncontended]. *)
+    let cap =
+      Some
+        { C.Monadic_op.max with
+          contention = C.Contention.Uncontended;
+          visibility = C.Visibility.Read_write
+        }
   end
 
   include Monadic_gen (Obj)
@@ -6520,14 +6851,19 @@ module Monadic = struct
   let proj ax m =
     S.apply ~hint:Skip (proj_obj ax) (Simple_proj (Id, ax, Obj.obj)) m
 
-  module Per_axis = struct
-    let zap_to_floor ax m =
-      let obj = proj_obj ax in
-      with_log (S.zap_to_ceil obj m)
+  let axis_cap : type a. a Axis.t -> a option = function
+    | Contention -> Some C.Contention.Uncontended
+    | Visibility -> Some C.Visibility.Read_write
+    | Uniqueness | Staticity -> None
 
+  module Per_axis = struct
     let zap_to_ceil ax m =
       let obj = proj_obj ax in
       with_log (S.zap_to_floor obj m)
+
+    let zap_to_floor ax m =
+      let obj = proj_obj ax in
+      with_log (S.zap_to_ceil ?cap:(axis_cap ax) obj m)
   end
 
   (* The monadic fragment is inverted. *)
@@ -6591,6 +6927,114 @@ module Monadic = struct
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
     Error.print_proj pp Obj.obj ax err
+
+  (* Mod modes, see [Comonadic_with.Mod]. All of this works in the internal
+     (kinding) order; [get] returns comonadic-shaped bits. *)
+  module Mod = struct
+    module M = C.Mirror_sem
+
+    let get (m : Const.t) =
+      ( 15 - C.Contention.to_bits m.contention,
+        15 - C.Visibility.to_bits m.visibility )
+
+    let set (m : Const.t) (c, v) : Const.t =
+      { m with
+        contention = C.Contention.of_bits (15 - c);
+        visibility = C.Visibility.of_bits (15 - v)
+      }
+
+    let is_inter x = x = 1 || x = 2
+
+    (** In the internal order, the identity is [max]; intermediate axes are
+        mapped to [inter]. *)
+    let canon ~inter c =
+      let f x = if x = 3 then 15 else if is_inter x then inter else x in
+      let a, b = get c in
+      set c (f a, f b)
+
+    let canon_keep c =
+      let f x = if x = 3 then 15 else x in
+      let a, b = get c in
+      set c (f a, f b)
+
+    let inters c =
+      let a, b = get c in
+      if is_inter a || is_inter b then Some (a, b) else None
+
+    let per_axis (ka, kb) ~inter ~other v =
+      let va, vb = get v in
+      ( (if is_inter ka then inter ka va else other va),
+        if is_inter kb then inter kb vb else other vb )
+
+    (* Internal constants: [max] internal is [Const.min] in sub-moding. *)
+    let imax = Const.min
+
+    let imin = Const.max
+
+    let crossm k x = M.iota (M.mu k (M.iota x))
+  end
+
+  (** Modality [c] (a sub-moding constant) canonicalized: the old bottom becomes
+      the identity. Intermediate constants are kept (conservative). *)
+  let modal_canon c =
+    let f x = if x = 3 then 15 else x in
+    let a, b = Mod.get c in
+    Mod.set c (f a, f b)
+
+  let modal_uncanon c =
+    let f x = if x = 15 then 3 else x in
+    let a, b = Mod.get c in
+    Mod.set c (f a, f b)
+
+  (** Monadic crossing on a right (expected) mode, unhinted: internally [mu_c].
+  *)
+  let cross_right_unhint c m =
+    match Mod.inters c with
+    | None -> join_const_unhint (Mod.canon ~inter:15 c) m
+    | Some ks ->
+      let base = join_const_unhint (Mod.canon_keep c) m in
+      let m = hint m in
+      (* internally: [x >= m], [y >= mu x] *)
+      let x = newvar 0 in
+      submode_exn x m;
+      let y = newvar 0 in
+      let bound hy =
+        Mod.set Mod.imax
+          (Mod.per_axis ks ~inter:Mod.M.mu_r ~other:(fun _ -> 15) hy)
+      in
+      let witness w =
+        Mod.set Mod.imin (Mod.per_axis ks ~inter:Mod.M.mu ~other:(fun _ -> 0) w)
+      in
+      (match with_log (S.watch1 Obj.obj x Obj.obj y ~bound ~witness) with
+      | Ok () -> ()
+      | Error _ -> Misc.fatal_error "Mode.Monadic.cross_right_unhint");
+      submode_exn y (hint base);
+      S.Unhint.unhint (allow_right (disallow_left y))
+
+  (** Monadic crossing on a left (value) mode, unhinted: internally [crossM_c].
+  *)
+  let cross_left_unhint c m =
+    let base c m = subtract_const_unhint c (unhint (join [of_const c; m])) in
+    match Mod.inters c with
+    | None -> base (Mod.canon ~inter:15 c) m
+    | Some ks ->
+      let b = hint (base (Mod.canon_keep c) m) in
+      (* internally: [t <= m], [r <= crossM t] *)
+      let t = newvar 0 in
+      submode_exn m t;
+      let r = newvar 0 in
+      let bound ht =
+        Mod.set Mod.imax
+          (Mod.per_axis ks ~inter:Mod.crossm ~other:(fun _ -> 15) ht)
+      in
+      let witness w =
+        Mod.set Mod.imin (Mod.per_axis ks ~inter:Mod.M.mu ~other:(fun _ -> 0) w)
+      in
+      (match with_log (S.watch1 Obj.obj r Obj.obj t ~bound ~witness) with
+      | Ok () -> ()
+      | Error _ -> Misc.fatal_error "Mode.Monadic.cross_left_unhint");
+      submode_exn b r;
+      S.Unhint.unhint (allow_left (disallow_right r))
 end
 
 type ('mo, 'como) monadic_comonadic =
@@ -7003,6 +7447,23 @@ module Mode_with (Areality : Areality) = struct
     (** See [With_locality.close_over] for explanation. *)
     let close_over m =
       let { monadic; comonadic } = split m in
+      (* Mod modes: the dagger of a mod value is clamped to the old region
+         (closing over a [mod_contended] value is like closing over an
+         [uncontended] one); see [Mode_with.close_over]. *)
+      let monadic =
+        { monadic with
+          contention = C.Contention.join monadic.contention C.Contention.Uncontended;
+          visibility = C.Visibility.join monadic.visibility C.Visibility.Read_write
+        }
+      in
+      let comonadic =
+        { comonadic with
+          portability =
+            C.Portability.meet comonadic.portability C.Portability.Nonportable;
+          statefulness =
+            C.Statefulness.meet comonadic.statefulness C.Statefulness.Stateful
+        }
+      in
       Comonadic.Const.join comonadic (monadic_to_comonadic_min monadic)
 
     (** See [With_locality.partial_apply] for explanation. *)
@@ -7642,13 +8103,211 @@ module Mode_with (Areality : Areality) = struct
     resolve_zap_scope zap_scope;
     res
 
+  (* Mod modes.
+
+     The mirrored axes are portability and statefulness (comonadic) and
+     contention and visibility (monadic). [Mirr] converts constants to the
+     comonadic-shaped pair encoding of [C.Mirror_sem] (monadic axes in the
+     internal, kinding, order), pairing portability with contention and
+     statefulness with visibility. *)
+
   (** This is about partially applying [A -> B -> C] to [A] and getting
       [B -> C]. [comonadic] and [monadic] constutute the mode of [A], and we
       need to give the lower bound mode of [B -> C]. *)
+  module Mirr = struct
+    [@@@warning "-32"]
+
+    module M = C.Mirror_sem
+
+    let co_get (c : Comonadic.Const.t) =
+      C.Portability.to_bits c.portability, C.Statefulness.to_bits c.statefulness
+
+    let co_set (c : Comonadic.Const.t) (p, s) : Comonadic.Const.t =
+      { c with
+        portability = C.Portability.of_bits p;
+        statefulness = C.Statefulness.of_bits s
+      }
+
+    let mo_get (m : Monadic.Const.t) =
+      ( 15 - C.Contention.to_bits m.contention,
+        15 - C.Visibility.to_bits m.visibility )
+
+    let mo_set (m : Monadic.Const.t) (c, v) : Monadic.Const.t =
+      { m with
+        contention = C.Contention.of_bits (15 - c);
+        visibility = C.Visibility.of_bits (15 - v)
+      }
+
+    let map2 f (a, b) (a', b') = f a a', f b b'
+
+    let map f (a, b) = f a, f b
+
+    let for_all f (a, b) = f a && f b
+
+    (** Comonadic: the old top on the mirrored axes, max elsewhere. *)
+    let co_old_top = co_set Comonadic.Const.max (3, 3)
+
+    (** Monadic: the old bottom (sub-moding) on the mirrored axes, min
+        elsewhere. *)
+    let mo_old_bot = mo_set Monadic.Const.min (3, 3)
+
+    let co_mask_nonmirror = co_set Comonadic.Const.max (0, 0)
+
+    let co_mask_mirror = co_set Comonadic.Const.min (15, 15)
+  end
+
+  (** The comonadic constraint for a function to be callable: not in the mod
+      region on any mirrored axis. *)
+  let callable_bound = Mirr.co_old_top
+
+  let comonadic_nonmirror_mask = Mirr.co_mask_nonmirror
+
+  let monadic_alloc_bound = Mirr.mo_old_bot
+
+  let print_clamp_axis : type a. a Axis.t -> a -> a =
+   fun ax v ->
+    match ax with
+    | Comonadic Portability -> C.Portability.meet v C.Portability.Nonportable
+    | Comonadic Statefulness -> C.Statefulness.meet v C.Statefulness.Stateful
+    | Monadic Contention -> C.Contention.join v C.Contention.Uncontended
+    | Monadic Visibility -> C.Visibility.join v C.Visibility.Read_write
+    | _ -> v
+  [@@warning "-4"]
+
+  let const_lock_monadic (c : Comonadic.Const.t) =
+    if Mirr.for_all (fun x -> x = 3 || x = 15) (Mirr.co_get c)
+    then Some (Monadic.modal_canon (Const.comonadic_to_monadic_min c))
+    else None
+
+  let old_min =
+    of_const
+      (Const.merge
+         { monadic = Mirr.mo_old_bot; comonadic = Comonadic.Const.min })
+
+  let old_max =
+    of_const
+      (Const.merge { monadic = Monadic.Const.max; comonadic = Mirr.co_old_top })
+
+  let clamp_comonadic_old m =
+    Comonadic.meet_const ~hint:Skip Mirr.co_old_top m
+
+  let comonadic_nonmirror m =
+    Comonadic.meet_const ~hint:Skip Mirr.co_mask_nonmirror m
+
+  let lock_comonadic_watch value closure =
+    let module M = Mirr.M in
+    let obj = Comonadic.Obj.obj in
+    let a = Comonadic.newvar 0 in
+    Comonadic.submode_exn value a;
+    let f = Comonadic.newvar 0 in
+    Comonadic.submode_exn f closure;
+    let b = Comonadic.newvar 0 in
+    Comonadic.submode_exn
+      (Comonadic.meet_const ~hint:Skip Mirr.co_mask_nonmirror value)
+      b;
+    let bound hf hb =
+      Mirr.co_set Comonadic.Const.max
+        (Mirr.map2
+           (fun f b -> M.unlock (M.phi f) b)
+           (Mirr.co_get hf) (Mirr.co_get hb))
+    in
+    let witness1 w hb =
+      Mirr.co_set Comonadic.Const.min
+        (Mirr.map2 M.lock_fmin (Mirr.co_get w) (Mirr.co_get hb))
+    in
+    let witness2 w hf =
+      Mirr.co_set Comonadic.Const.min
+        (Mirr.map2
+           (fun w f -> M.lock (M.phi f) w)
+           (Mirr.co_get w) (Mirr.co_get hf))
+    in
+    (match with_log (S.watch2 obj a obj f obj b ~bound ~witness1 ~witness2) with
+    | Ok () -> ()
+    | Error _ -> Misc.fatal_error "Mode.lock_comonadic_watch");
+    Comonadic.disallow_right b
+
+  let lock_monadic_watch value closure =
+    let module M = Mirr.M in
+    let mobj = Monadic.Obj.obj in
+    let cobj = Comonadic.Obj.obj in
+    let n = Monadic.newvar 0 in
+    Monadic.submode_exn value n;
+    let f = Comonadic.newvar 0 in
+    Comonadic.submode_exn f closure;
+    let b = Monadic.newvar 0 in
+    let dag : (_, Monadic.Const.t, _) C.morph =
+      C.Simple
+        (C.Simple_morph.Core
+           (C.Core_morph.Comonadic_to_monadic_op_max Areality.Const.areality))
+    in
+    let dag_l : (Monadic.Const.t, Comonadic.Const.t, _) C.morph =
+      C.Simple (C.Simple_morph.Core C.Core_morph.Monadic_op_to_comonadic_min)
+    in
+    let bound hf hn =
+      Mirr.mo_set
+        (C.meet mobj hn (C.apply mobj dag hf))
+        (Mirr.map2
+           (fun f n -> M.lockm (M.phi f) n)
+           (Mirr.co_get hf) (Mirr.mo_get hn))
+    in
+    let witness_f w hn =
+      Mirr.co_set (C.apply cobj dag_l w)
+        (Mirr.map2 M.lockm_fmin (Mirr.mo_get w) (Mirr.mo_get hn))
+    in
+    let witness_n w hf =
+      Mirr.mo_set w
+        (Mirr.map2
+           (fun f w -> M.lockm_l (M.phi f) w)
+           (Mirr.co_get hf) (Mirr.mo_get w))
+    in
+    (match
+       with_log
+         (S.watch2 mobj b cobj f mobj n ~bound ~witness1:witness_f
+            ~witness2:witness_n)
+     with
+    | Ok () -> ()
+    | Error _ -> Misc.fatal_error "Mode.lock_monadic_watch");
+    Monadic.disallow_right b
+
+  (** Whether capturing a value of comonadic mode [value] in a closure of
+      comonadic mode [closure] is legal in every solution, so that the lock is
+      the identity: [value] can never be in the mod region and [closure] is at
+      least the old top on the mirrored axes. Both facts are stable (upper
+      bounds only decrease, lower bounds only increase). *)
+  let comonadic_lock_is_identity value closure =
+    let ceil = Comonadic.Guts.get_loose_ceil value in
+    let floor = Comonadic.Guts.get_loose_floor closure in
+    Mirr.for_all Mirr.M.in_region (Mirr.co_get ceil)
+    && Mirr.for_all (fun x -> x = 3) (Mirr.co_get floor)
+
+  (** Whether the monadic mode can never be in the mod region of a mirrored
+      axis. Internal upper bounds are exact, so this stays true. *)
+  let monadic_in_old_region m =
+    let floor = Monadic.Guts.get_loose_floor m in
+    Mirr.for_all (fun x -> Mirr.M.in_region x) (Mirr.mo_get floor)
+
+  (** Splits a failing comonadic submode error: [true] if it fails on a
+      non-mirrored axis. *)
+  let comonadic_error_nonmirror (e : Comonadic.error) =
+    let ({ left; right; _ } : _ S.error_raw) = e in
+    let mask = Comonadic.Const.meet Mirr.co_mask_nonmirror in
+    not (Comonadic.Const.le (mask left) (mask right))
+
   let close_over { comonadic; monadic } =
-    let comonadic = Comonadic.disallow_right comonadic in
+    (* Mod modes: likewise, capturing a [mod_portable] value does not make the
+       closure uncallable (exactly: the closure's old part must be above the
+       old part of the value); clamped to the old top. *)
+    let comonadic = Comonadic.meet_const ~hint:Skip Mirr.co_old_top comonadic in
     (* The comonadic of the returned function is constrained by the monadic of the closed argument via the dualizing morphism. *)
-    let comonadic_dual = monadic_to_comonadic_min monadic in
+    (* Mod modes: the exact constraint is [lockM(phi closure, n) <= n] on the
+       mirrored axes, which is not monotone in [n] as an edge. The extended
+       dagger would send [mod_contended] to [mod_portable] (an uncallable
+       closure); instead the mod region is clamped to the old bottom first:
+       sound (a nonportable closure never degrades its captures) but not exact
+       for captured mod values. *)
+    let comonadic_dual =
+      monadic_to_comonadic_min (Monadic.join_const Mirr.mo_old_bot monadic)
+    in
     (* It's also constrained by the comonadic of the closed argument. *)
     let comonadic = Comonadic.join [comonadic; comonadic_dual] in
     (* The closure will access [A] at the specified monadic modes, and thus the
@@ -7794,14 +8453,14 @@ module Const = struct
     | Immutable -> Contended
     | Read -> Shared
     | Write -> Corrupted
-    | Read_write -> Uncontended
+    | Read_write | Mod_read | Mod_write | Mod_immutable -> Uncontended
 
   let implied_portability : Statefulness.Const.t -> Portability.Const.t =
     function
     | Stateless -> Portable
     | Reading -> Shareable
     | Writing -> Corruptible
-    | Stateful -> Nonportable
+    | Stateful | Mod_reading | Mod_writing | Mod_stateless -> Nonportable
 
   let apply_implications (m : With_locality.Const.Option.t) :
       With_locality.Const.Option.t =
@@ -7966,7 +8625,16 @@ module Modality = struct
     module Atom = struct
       type 'a t = Join_const of 'a [@@unboxed]
 
-      let is_id ax (Join_const c) = Mode.Const.Per_axis.(le ax c (min ax))
+      (* Mod modes: the old bottom is also the identity modality. *)
+      let is_old_id : type a. a axis -> a -> bool =
+       fun ax c ->
+        match ax with
+        | Contention -> c = C.Contention.Uncontended
+        | Visibility -> c = C.Visibility.Read_write
+        | Uniqueness | Staticity -> false
+
+      let is_id ax (Join_const c) =
+        Mode.Const.Per_axis.(le ax c (min ax)) || is_old_id ax c
 
       let is_constant ax (Join_const c) = Mode.Const.Per_axis.(le ax (max ax) c)
     end
@@ -7978,13 +8646,16 @@ module Modality = struct
 
       let id = Join_const Mode.Const.min
 
-      let is_id t = t = id
+      let canon c = Mode.modal_canon c
+
+      let is_id (Join_const c) = Mode.Const.equal (canon c) Mode.Const.min
 
       let max = Join_const Mode.Const.max
 
       let sub left right : (_, error) Result.t =
         match left, right with
         | Join_const c1, Join_const c2 ->
+          let c1 = canon c1 and c2 = canon c2 in
           if Mode.Const.le c1 c2
           then Ok ()
           else
@@ -7994,7 +8665,8 @@ module Modality = struct
 
       let concat ~then_ t =
         match then_, t with
-        | Join_const c1, Join_const c2 -> Join_const (Mode.Const.join c1 c2)
+        | Join_const c1, Join_const c2 ->
+          Join_const (Mode.Const.join (canon c1) (canon c2))
 
       let apply_const (Join_const c) x = Mode.Const.join c x
 
@@ -8011,7 +8683,7 @@ module Modality = struct
               (fun c -> Hint.Is_contained_by (Monadic, c))
               is_contained_by
           in
-          Mode.join_const ?hint c (Mode.disallow_left x)
+          Mode.join_const ?hint (Mode.modal_canon c) (Mode.disallow_left x)
 
       let apply_left : type r.
           ?is_contained_by:Hint.is_contained_by ->
@@ -8031,16 +8703,17 @@ module Modality = struct
             Option.map (fun c -> Hint.Contained_by c) is_contained_by
           in
           Mode.join
-            [ Mode.disallow_right (Mode.of_const ?hint c);
+            [ Mode.disallow_right (Mode.of_const ?hint (Mode.modal_canon c));
               Mode.disallow_right (Mode.apply_hint morph_hint x) ]
 
       let proj ax (Join_const c) : _ Atom.t = Join_const (Axis.proj ax c)
 
       let set ax (Join_const a : _ Atom.t) (Join_const c) =
-        Join_const (Axis.set ax a c)
+        Join_const (canon (Axis.set ax a c))
 
       let print ppf = function
-        | Join_const c -> Fmt.fprintf ppf "join_const(%a)" Mode.Const.print c
+        | Join_const c ->
+          Fmt.fprintf ppf "join_const(%a)" Mode.Const.print (Mode.modal_uncanon c)
     end
 
     type t =
@@ -8108,6 +8781,14 @@ module Modality = struct
            However, [subtract] requires [mm] to be constant. We get the ceil of
            [mm] to construct the floor of [c]. *)
         let cc = Mode.Guts.get_ceil mm in
+        (* Mod modes: [get_ceil] is the O-layer ceiling (the old default), which
+           may be below the exact one; enforce [mm <= cc] (see below), or fall
+           back to zapping [mm]. *)
+        let cc =
+          match Mode.submode mm (Mode.of_const cc) with
+          | Ok () -> cc
+          | Error _ -> Mode.zap_to_ceil_exn mm
+        in
         let c = Mode.subtract_const cc m in
         let c = Mode.zap_to_floor_exn c in
         (* Note that we did not mutate [mm] but simply took its ceil, which
@@ -8146,7 +8827,16 @@ module Modality = struct
     module Atom = struct
       type 'a t = Meet_const of 'a [@@unboxed]
 
-      let is_id ax (Meet_const c) = Mode.Const.Per_axis.(le ax (max ax) c)
+      (* Mod modes: the old top is also the identity modality. *)
+      let is_old_id : type a. a axis -> a -> bool =
+       fun ax c ->
+        match ax with
+        | Portability -> c = C.Portability.Nonportable
+        | Statefulness -> c = C.Statefulness.Stateful
+        | Areality | Linearity | Forkable | Yielding -> false
+
+      let is_id ax (Meet_const c) =
+        Mode.Const.Per_axis.(le ax (max ax) c) || is_old_id ax c
 
       let is_constant ax (Meet_const c) = Mode.Const.Per_axis.(le ax c (min ax))
     end
@@ -8158,13 +8848,16 @@ module Modality = struct
 
       let id = Meet_const Mode.Const.max
 
-      let is_id t = t = id
+      let canon c = Mode.modal_canon c
+
+      let is_id (Meet_const c) = Mode.Const.equal (canon c) Mode.Const.max
 
       let max = Meet_const Mode.Const.max
 
       let sub left right : (_, error) Result.t =
         match left, right with
         | Meet_const c1, Meet_const c2 ->
+          let c1 = canon c1 and c2 = canon c2 in
           if Mode.Const.le c1 c2
           then Ok ()
           else
@@ -8174,7 +8867,8 @@ module Modality = struct
 
       let concat ~then_ t =
         match then_, t with
-        | Meet_const c1, Meet_const c2 -> Meet_const (Mode.Const.meet c1 c2)
+        | Meet_const c1, Meet_const c2 ->
+          Meet_const (Mode.Const.meet (canon c1) (canon c2))
 
       let apply_const (Meet_const c) x = Mode.Const.meet c x
 
@@ -8191,7 +8885,7 @@ module Modality = struct
               (fun c -> Hint.Is_contained_by (Comonadic, c))
               is_contained_by
           in
-          Mode.meet_const ?hint c (Mode.disallow_right x)
+          Mode.modal_left ?hint c (Mode.disallow_right x)
 
       let apply_right : type l.
           ?is_contained_by:Hint.is_contained_by ->
@@ -8211,16 +8905,17 @@ module Modality = struct
             Option.map (fun c -> Hint.Contained_by c) is_contained_by
           in
           Mode.meet
-            [ Mode.disallow_left (Mode.of_const ?hint c);
+            [ Mode.disallow_left (Mode.of_const ?hint (Mode.modal_canon c));
               Mode.disallow_left (Mode.apply_hint morph_hint x) ]
 
       let proj ax (Meet_const c) : _ Atom.t = Meet_const (Axis.proj ax c)
 
       let set ax (Meet_const a : _ Atom.t) (Meet_const c) =
-        Meet_const (Axis.set ax a c)
+        Meet_const (canon (Axis.set ax a c))
 
       let print ppf = function
-        | Meet_const c -> Fmt.fprintf ppf "meet_const(%a)" Mode.Const.print c
+        | Meet_const c ->
+          Fmt.fprintf ppf "meet_const(%a)" Mode.Const.print (Mode.modal_uncanon c)
     end
 
     type t =
@@ -8298,6 +8993,12 @@ module Modality = struct
            [imply] requires [mm] to be constant. We get the floor of [mm] to
            construct the ceil of [c]. *)
         let cc = Mode.Guts.get_floor mm in
+        (* Mod modes: see the monadic case. *)
+        let cc =
+          match Mode.submode (Mode.of_const cc) mm with
+          | Ok () -> cc
+          | Error _ -> Mode.zap_to_floor_exn mm
+        in
         let c = Mode.imply_const cc m in
         let c = Mode.zap_to_ceil_exn c in
         (* Note that we did not mutate [mm] but simply took its floor, which
@@ -8386,12 +9087,35 @@ module Modality = struct
       | Comonadic ax, Meet_const a, Meet_const b ->
         With_regionality.Comonadic.Const.Per_axis.le ax a b
 
+    (* Mod modes: the identity modality on a mirrored axis is printed with its
+       old name. *)
+    let old_name_co : type b. b With_regionality.Comonadic.Axis.t -> b -> b =
+     fun ax t ->
+      match ax with
+      | Portability when t = C.Portability.Mod_portable ->
+        C.Portability.Nonportable
+      | Statefulness when t = C.Statefulness.Mod_stateless ->
+        C.Statefulness.Stateful
+      | _ -> t
+    [@@warning "-4"]
+
+    let old_name_mo : type b. b With_regionality.Monadic.Axis.t -> b -> b =
+     fun ax t ->
+      match ax with
+      | Contention when t = C.Contention.Mod_contended ->
+        C.Contention.Uncontended
+      | Visibility when t = C.Visibility.Mod_immutable ->
+        C.Visibility.Read_write
+      | _ -> t
+    [@@warning "-4"]
+
     let print (type a) (ax : a Axis.t) ppf (t : a) =
       match ax, t with
       | Comonadic ax, Meet_const t ->
-        With_regionality.Comonadic.Const.Per_axis.print ax ppf t
+        With_regionality.Comonadic.Const.Per_axis.print ax ppf
+          (old_name_co ax t)
       | Monadic ax, Join_const t ->
-        With_regionality.Monadic.Const.Per_axis.print ax ppf t
+        With_regionality.Monadic.Const.Per_axis.print ax ppf (old_name_mo ax t)
   end
 
   type error = Error : 'a Axis.t * 'a simple_error -> error
@@ -8536,6 +9260,10 @@ module Modality = struct
     { monadic; comonadic }
 end
 
+let modality_old_name_co = Modality.Per_axis.old_name_co
+
+let modality_old_name_mo = Modality.Per_axis.old_name_mo
+
 module Crossing = struct
   (* The mode crossing capability of a type [t] is characterized by a monotone
      function [f] from modes to some lattice [L], in the following way:
@@ -8610,7 +9338,7 @@ module Crossing = struct
         Modality (Join_const (Mode.Const.Per_axis.join ax c1 c2))
 
       let print ax ppf (Modality (Join_const c)) =
-        Mode.Const.Per_axis.print ax ppf c
+        Mode.Const.Per_axis.print ax ppf (modality_old_name_mo ax c)
     end
 
     type t = Modality of Modality.Const.t [@@unboxed]
@@ -8619,17 +9347,16 @@ module Crossing = struct
         ~contention:(Atom.Modality (Join_const contention))
         ~visibility:(Atom.Modality (Join_const visibility))
         ~staticity:(Atom.Modality (Join_const staticity)) =
-      Modality (Join_const { uniqueness; contention; visibility; staticity })
+      Modality
+        (Join_const
+           (Mode.modal_canon { uniqueness; contention; visibility; staticity }))
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
-    let apply_left (Modality (Join_const c)) m =
-      Mode.subtract_const_unhint c
-        (Mode.unhint (Mode.join [Mode.of_const c; m]))
+    let apply_left (Modality (Join_const c)) m = Mode.cross_left_unhint c m
 
     let apply_right_unhint (Modality (Join_const c)) m =
-      (* On the image of join, identity is its right adjoint *)
-      Mode.join_const_unhint c m
+      Mode.cross_right_unhint c m
 
     let apply_right_with_locality t m =
       Monadic.hint ~hint:Crossing (apply_right_unhint t (S.Unhint.unhint m))
@@ -8640,7 +9367,7 @@ module Crossing = struct
 
     let set (type a) (ax : a Mode.Axis.t) (Modality (Join_const a) : a Atom.t)
         (Modality (Join_const c)) =
-      Modality (Join_const ((Axis.set [@inlined hint]) ax a c))
+      Modality (Join_const (Mode.modal_canon ((Axis.set [@inlined hint]) ax a c)))
 
     let le (Modality (Join_const c1)) (Modality (Join_const c2)) =
       Mode.Const.le c2 c1
@@ -8700,7 +9427,7 @@ module Crossing = struct
         Modality (Meet_const (Mode.Const.Per_axis.meet ax c1 c2))
 
       let print ax ppf (Modality (Meet_const c)) =
-        Mode.Const.Per_axis.print ax ppf c
+        Mode.Const.Per_axis.print ax ppf (modality_old_name_co ax c)
     end
 
     type t = Modality of Modality.Const.t [@@unboxed]
@@ -8713,15 +9440,16 @@ module Crossing = struct
         ~statefulness:(Atom.Modality (Meet_const statefulness)) =
       Modality
         (Meet_const
-           { areality;
-             linearity;
-             portability;
-             statefulness;
-             forkable;
-             yielding
-           })
+           (Mode.modal_canon
+              { areality;
+                linearity;
+                portability;
+                statefulness;
+                forkable;
+                yielding
+              }))
 
-    let always_constructed_at c = Modality (Meet_const c)
+    let always_constructed_at c = Modality (Meet_const (Mode.modal_canon c))
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Meet_const c)) : a Atom.t
         =
@@ -8729,21 +9457,19 @@ module Crossing = struct
 
     let set (type a) (ax : a Mode.Axis.t) (Modality (Meet_const a) : a Atom.t)
         (Modality (Meet_const c)) =
-      Modality (Meet_const ((Axis.set [@inlined hint]) ax a c))
+      Modality (Meet_const (Mode.modal_canon ((Axis.set [@inlined hint]) ax a c)))
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left_unhint (Modality (Meet_const c)) m =
-      (* On the image of meet, identity is its left adjoint *)
-      Mode.meet_const_unhint c m
+      Mode.cross_left_unhint c m
 
     let apply_left_with_locality t m =
       With_locality.Comonadic.hint ~hint:Crossing
         (comonadic_locality_as_regionality (S.Unhint.unhint m)
         |> apply_left_unhint t |> comonadic_regional_to_local)
 
-    let apply_right (Modality (Meet_const c)) m =
-      Mode.imply_const_unhint c (Mode.unhint (Mode.meet [Mode.of_const c; m]))
+    let apply_right (Modality (Meet_const c)) m = Mode.cross_right_unhint c m
 
     let le (Modality (Meet_const c1)) (Modality (Meet_const c2)) =
       Mode.Const.le c1 c2

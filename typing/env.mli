@@ -311,9 +311,13 @@ val lookup_error: Location.t -> t -> lookup_error -> 'a
     list of locks and constrains the mode and the type. Return the access mode
     of the value allowed by the locks. [ty] is optional as the function works on
     modules and classes as well, for which [ty] should be [None]. *)
-val walk_locks : env:t -> loc:Location.t -> Longident.t ->
+val walk_locks : ?hard:bool -> env:t -> loc:Location.t -> Longident.t ->
   item:Mode.Hint.lock_item ->
   type_expr option -> mode_with_locks -> Mode.With_regionality.l
+
+(** Whether the last [walk_locks] used the total (mod-mode) lock. *)
+val last_walk_used_soft_lock : unit -> bool
+
 
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
