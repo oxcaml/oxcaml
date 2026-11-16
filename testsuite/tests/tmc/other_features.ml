@@ -42,6 +42,38 @@ module Non_recursive_let_bad :
   end
 |}]
 
+(* map' is inferred local, so it creates a region *)
+module Non_recursive_let_bad_also = struct
+  type 'a t =
+    | N of 'a
+    | C of 'a t * 'a t
+
+  let[@tail_mod_cons] rec map f l =
+    match l with
+    | N v -> N (f v)
+    | C (a, b) ->
+        let[@tail_mod_cons] map'  l = map f l in
+        C (map' a, (map' [@tailcall]) b)
+end
+[%%expect{|
+Line 11, characters 19-39:
+11 |         C (map' a, (map' [@tailcall]) b)
+                        ^^^^^^^^^^^^^^^^^^^^
+Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
+  position in a TMC function, but it is enclosed in a local-allocation region
+  that cannot be closed prior to the call, preventing the function from
+  running in constant stack space.
+  This happens when either the callee or an argument is at the "local" mode and
+  may point to a value allocated in the surrounding region. Recursive calls,
+  parameters, non-allocating projections of parameters, immediates, and
+  values at the "global" mode are allowed.
+
+module Non_recursive_let_bad_also :
+  sig
+    type 'a t = N of 'a | C of 'a t * 'a t
+    val map : ('a -> 'b) -> 'a t -> 'b t
+  end
+|}]
 
 module Non_recursive_let_good = struct
   type 'a t =
@@ -52,7 +84,7 @@ module Non_recursive_let_good = struct
     match l with
     | N v -> N (f v)
     | C (a, b) ->
-        let[@tail_mod_cons] map' l = map f l in
+        let[@tail_mod_cons] (map' @ global)  l = map f l in
         C (map' a, (map' [@tailcall]) b)
 end
 [%%expect {|
