@@ -347,7 +347,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
       | None ->
         (* Note that we can't reuse an existing label in the code since we rely
            on the ordering of range-related labels. *)
-        let label = Cmm.new_label () in
+        let label = Label.new_dwarf_label () in
         let label_insn : L.instruction =
           { desc = Llabel_for_dwarf label;
             next = insn;

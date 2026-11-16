@@ -35,6 +35,13 @@ include Identifiable.S with type t := t
 
 val new_label : unit -> t
 
+(** A fresh label that exists only for the benefit of DWARF: it must not be
+    referenced by generated code. Such labels are distinct from those returned
+    by [new_label], but are numbered separately, so that the labels used during
+    code generation (whose numbering can influence the generated code) do not
+    depend on the amount of debugging information being produced. *)
+val new_dwarf_label : unit -> t
+
 val set_label : t -> unit
 
 val cur_label : unit -> t

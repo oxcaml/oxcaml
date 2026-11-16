@@ -2976,8 +2976,9 @@ let begin_assembly unix =
   if !Oxcaml_flags.internal_assembler && !Emitaux.binary_backend_available
   then X86_proc.register_internal_assembler (Internal_assembler.assemble unix);
   (* We initialize the new assembly directives. *)
-  Asm_targets.Asm_label.initialize ~new_label:(fun () ->
-      Cmm.new_label () |> Label.to_int);
+  Asm_targets.Asm_label.initialize
+    ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
+    ~new_dwarf_label:(fun () -> Label.new_dwarf_label () |> Label.to_int);
   D.initialize ~big_endian:Arch.big_endian
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments
       (* As a first step, we emit by calling the corresponding x86 emit

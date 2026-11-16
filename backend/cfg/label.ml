@@ -45,11 +45,25 @@ let set_label l =
 
 let cur_label () = !label_counter
 
+(* Labels that exist only for the benefit of DWARF are numbered from here, so
+   that they are distinct from the others. *)
+let init_dwarf_label = 1 lsl 40
+
+let dwarf_label_counter = ref init_dwarf_label
+
 let new_label () =
   incr label_counter;
+  if !label_counter >= init_dwarf_label
+  then Misc.fatal_error "Label.new_label: too many labels";
   !label_counter
 
-let reset () = label_counter := init_label
+let new_dwarf_label () =
+  incr dwarf_label_counter;
+  !dwarf_label_counter
+
+let reset () =
+  label_counter := init_label;
+  dwarf_label_counter := init_dwarf_label
 
 let to_int t = t
 
