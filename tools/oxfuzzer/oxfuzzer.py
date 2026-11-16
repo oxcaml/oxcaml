@@ -7,6 +7,7 @@ if sys.version_info < (3, 11):
 
 import asyncio
 import argparse
+import datetime
 import errno
 import hashlib
 import itertools
@@ -14,6 +15,7 @@ import os
 from pathlib import Path
 import platform
 import random
+import re
 import shlex
 import shutil
 import signal
@@ -22,7 +24,7 @@ import time
 from dataclasses import dataclass, field
 import enum
 import math
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 import tempfile
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -113,7 +115,8 @@ class Toolchain:
                     "-flambda2-result-types-all-functions",
                     "-flambda2-expert-can-inline-recursive-functions",
                     "-flambda2-match-in-match",
-                    "-flambda2-join-algorithm", "n-way",
+                    "-flambda2-join-algorithm",
+                    "n-way",
                     "-experimental-optimizations",
                     "-no-ssa-validate",
                     "-caml-apply-inline-fast-path",
@@ -144,7 +147,11 @@ class Toolchain:
     def snapshot(self, destination: Path) -> "Toolchain":
         assert not self.installed
         for source in (
-            self.oxfuzzer, self.ocamlc, self.ocamlopt, self.ocamlrun, self.ocamllib,
+            self.oxfuzzer,
+            self.ocamlc,
+            self.ocamlopt,
+            self.ocamlrun,
+            self.ocamllib,
             *(self.library_dir(library) for library in LIBRARIES),
         ):
             target = destination / source.relative_to(self.root)
@@ -160,13 +167,11 @@ class Toolchain:
     def check_dependencies(self) -> None:
         missing = [
             path
-            for path in [self.oxfuzzer, self.ocamlc, self.ocamlopt]
+            for path in [self.oxfuzzer, self.ocamlc, self.ocamlopt, self.ocamlrun]
             if not path.is_file() or not os.access(path, os.X_OK)
         ]
         if not self.ocamllib.is_dir():
             missing.append(self.ocamllib)
-        if not os.access(self.ocamlrun, os.X_OK):
-            missing.append(self.ocamlrun)
 
         for library in LIBRARIES:
             if not self.library_dir(library).is_dir():
@@ -179,7 +184,7 @@ class Toolchain:
                 if self.installed
                 else "From the repository root, run:\n  make compiler"
             )
-            raise SystemExit(f"""oxfuzzer: some dependencies are missing.
+            raise Fatal(f"""some dependencies are missing.
 
 Missing files:
 {formatted}
@@ -193,8 +198,12 @@ RUN_TIMEOUT_SEC = 10.0
 GENERATE_TIMEOUT_SEC = 1.0
 MAX_PROGRAM_BYTES = 1024 * 1024
 
-RATE_SMOOTHING = 0.01
-PROGRESS_INTERVAL_SEC = 30.0
+
+class Fatal(Exception):
+    """An error that ends the run, such as a failed self-check. The message is
+    printed on exit, after "oxfuzzer: ", and its first line heads the
+    summary."""
+
 
 @dataclass(frozen=True)
 class CommandResult:
@@ -203,23 +212,30 @@ class CommandResult:
     stderr: bytes
     timed_out: bool
 
+    @property
+    def ok(self) -> bool:
+        return not self.timed_out and self.returncode == 0
+
+
 def kill_process_group(process: asyncio.subprocess.Process) -> None:
     try:
         os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
+        # The group is gone. macOS reports a group whose only member is a
+        # zombie, exited but not yet waited for, as a permission error.
         pass
 
 
 # stdout and stderr go to <output_prefix>.stdout and <output_prefix>.stderr
 # rather than pipes.
 async def run_command(
-        command: str,
-        args: Sequence[str],
-        *,
-        cwd: Path | None = None,
-        env: dict[str, str] | None = None,
-        timeout_sec: float,
-        output_prefix: Path,
+    command: str,
+    args: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+    timeout_sec: float,
+    output_prefix: Path,
 ) -> CommandResult:
     stdout_path = output_prefix.with_suffix(".stdout")
     stderr_path = output_prefix.with_suffix(".stderr")
@@ -267,6 +283,7 @@ class ConfigurationResult:
     compilation: CommandResult
     execution: CommandResult | None
 
+
 def source_filename(configuration: Configuration, seed: int) -> str:
     # Some compiler bugs depend on the source filename or compilation-unit name.
     # Vary names across configurations so output comparisons can expose them,
@@ -294,14 +311,20 @@ async def compile(
     executable: Path,
 ) -> CommandResult:
     command = compile_command(configuration, source=source, executable=executable)
-    return await run_command(
-        command[0],
-        command[1:],
-        cwd=source.parent,
-        env={"OCAMLLIB": str(configuration.ocamllib)},
-        timeout_sec=COMPILE_TIMEOUT_SEC,
-        output_prefix=source.parent / "compile",
-    )
+    try:
+        return await run_command(
+            command[0],
+            command[1:],
+            cwd=source.parent,
+            env={"OCAMLLIB": str(configuration.ocamllib)},
+            timeout_sec=COMPILE_TIMEOUT_SEC,
+            output_prefix=source.parent / "compile",
+        )
+    except OSError as error:
+        # The compiler could not be started. That is a problem with the
+        # toolchain (say, it was removed) and not with the case, and every
+        # later case would hit it too.
+        raise Fatal(f"cannot run the {configuration.name} compiler: {error}") from None
 
 
 async def run(executable: Path) -> CommandResult:
@@ -325,22 +348,20 @@ async def run(executable: Path) -> CommandResult:
 
 
 async def run_configuration(
-        configuration: Configuration,
-        *,
-        seed: int,
-        program: bytes,
-        work_dir: Path,
-        slots: asyncio.Semaphore,
+    configuration: Configuration,
+    *,
+    seed: int,
+    program: bytes,
+    work_dir: Path,
+    slots: asyncio.Semaphore,
 ) -> ConfigurationResult:
     async with slots:
         work_dir.mkdir(parents=True)
         source = work_dir / source_filename(configuration, seed)
         source.write_bytes(program)
         executable = work_dir / "program.exe"
-        compilation = await compile(
-            configuration, source=source, executable=executable
-        )
-        if compilation.timed_out or compilation.returncode != 0:
+        compilation = await compile(configuration, source=source, executable=executable)
+        if not compilation.ok:
             return ConfigurationResult(
                 configuration=configuration, compilation=compilation, execution=None
             )
@@ -350,17 +371,42 @@ async def run_configuration(
             configuration=configuration, compilation=compilation, execution=execution
         )
 
-# Returns None if generation timed out.
-async def generate(
-    seed: int, *, toolchain: Toolchain, work_dir: Path
-) -> bytes | None:
-    work_dir.mkdir(parents=True, exist_ok=True)
-    result = await run_command(
-        str(toolchain.oxfuzzer),
-        ["-seed", str(seed)],
-        timeout_sec=GENERATE_TIMEOUT_SEC,
-        output_prefix=work_dir / "generate",
+
+async def run_configurations(
+    toolchain: Toolchain,
+    *,
+    seed: int,
+    program: bytes,
+    work_dir: Path,
+    slots: asyncio.Semaphore,
+) -> list[ConfigurationResult]:
+    return await asyncio.gather(
+        *(
+            run_configuration(
+                configuration,
+                seed=seed,
+                program=program,
+                work_dir=work_dir / configuration.name,
+                slots=slots,
+            )
+            for configuration in toolchain.configurations
+        )
     )
+
+
+# Returns None if generation timed out.
+async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes | None:
+    work_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        result = await run_command(
+            str(toolchain.oxfuzzer),
+            ["-seed", str(seed)],
+            timeout_sec=GENERATE_TIMEOUT_SEC,
+            output_prefix=work_dir / "generate",
+        )
+    except OSError as error:
+        # As for a compiler that cannot be started (see compile).
+        raise Fatal(f"cannot run the generator: {error}") from None
     stderr = result.stderr.decode(errors="replace")
     if result.timed_out:
         return None
@@ -370,75 +416,123 @@ async def generate(
 
     # Generation failing is a fatal error.
     if result.returncode != 0:
-        raise SystemExit(
-            f"generation exited with code {result.returncode}. seed: {seed}.\n"
+        raise Fatal(
+            f"generation failed for seed {seed} "
+            f"(status: {status_text(result)}).\n"
             f"{stderr}"
         )
 
     return result.stdout
 
 
+@dataclass(frozen=True)
+class SavedFailure:
+    directory: str  # Relative to the output directory.
+    reason: str
+
+
+# On a terminal the status is a single line updated in place (see
+# Stats.report). This ends that line, so that what is printed next starts on a
+# line of its own.
+def end_status_line() -> None:
+    if sys.stderr.isatty():
+        print(file=sys.stderr)
+
+
+class GitHubLog:
+    """What oxfuzzer's log does differently under GitHub Actions, through the
+    workflow commands that GitHub reads from a step's output. Elsewhere the
+    groups do nothing and a failure is printed as a plain line."""
+
+    def __init__(self) -> None:
+        self.enabled = os.environ.get("GITHUB_ACTIONS") == "true"
+        self.group: str | None = None
+
+    # The lines printed between open_group and close_group are collapsed
+    # under the title. Groups do not nest.
+    def open_group(self, title: str) -> None:
+        if not self.enabled or self.group == title:
+            return
+        self.close_group()
+        print(f"::group::{title}", file=sys.stderr)
+        self.group = title
+
+    def close_group(self) -> None:
+        if self.group is not None:
+            print("::endgroup::", file=sys.stderr)
+            self.group = None
+
+    # Reports a saved failure. Under GitHub Actions it is an error
+    # annotation, which GitHub also lists on the page of the run (the first
+    # ten of a step: the others are only in the log), and the failures are
+    # folded into a group, since there can be many.
+    def failure(self, message: str) -> None:
+        if not self.enabled:
+            print(message, file=sys.stderr)
+            return
+        self.open_group("oxfuzzer: failures")
+        # The characters that a workflow command's message has to escape.
+        escaped = message.replace("%", "%25").replace("\r", "%0D")
+        escaped = escaped.replace("\n", "%0A")
+        print(f"::error title=oxfuzzer failure::{escaped}", file=sys.stderr)
+
+
+GITHUB_LOG = GitHubLog()
+
+
 @dataclass
 class Stats:
     """Statistics of a fuzzer's run. Describes how many programs passed, were
     discarded or failed."""
+
     passed: int = 0
     discarded: int = 0
-    failed: int = 0
+    failures: list[SavedFailure] = field(default_factory=list)
     generation_timeouts: int = 0
-    last_completion: float | None = None
-    smoothed_interval: float | None = None
-    last_report: float | None = None
+    # When fuzz started and ended, as time.monotonic() values. Startup,
+    # including the call to self_check, is before fuzzing_start.
+    fuzzing_start: float | None = None
+    fuzzing_end: float | None = None
 
-    def record_completion(self) -> None:
-        now = time.monotonic()
-        if self.last_completion is not None:
-            interval = now - self.last_completion
-            if self.smoothed_interval is None:
-                self.smoothed_interval = interval
-            else:
-                self.smoothed_interval += RATE_SMOOTHING * (
-                    interval - self.smoothed_interval
-                )
-        self.last_completion = now
+    @property
+    def failed(self) -> int:
+        return len(self.failures)
 
+    # Completed cases over the time spent fuzzing so far.
     def cases_per_hour(self) -> float | None:
-        if not self.smoothed_interval:
+        completed = self.passed + self.discarded + self.failed
+        if self.fuzzing_start is None or not completed:
             return None
-        return 3600 / self.smoothed_interval
+        end = time.monotonic() if self.fuzzing_end is None else self.fuzzing_end
+        if end <= self.fuzzing_start:
+            return None
+        return 3600 * completed / (end - self.fuzzing_start)
+
+    def rate_text(self) -> str:
+        rate = self.cases_per_hour()
+        return "--" if rate is None else f"{rate:,.0f}"
 
     def summary(self) -> str:
-        rate = self.cases_per_hour()
-        rate_text = "--" if rate is None else f"{rate:,.0f}"
         return (
             f"{self.passed} passed, {self.discarded} discarded, "
-            f"{self.failed} failed, {rate_text} cases/h"
+            f"{self.failed} failed, {self.rate_text()} cases/h"
         )
 
     def print_line(self) -> None:
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         print(f"{timestamp} {self.summary()}", file=sys.stderr, flush=True)
 
-    # On a terminal the status is a single line updated in place. Otherwise
-    # a timestamped line is printed at most every PROGRESS_INTERVAL_SEC seconds.
+    # On a terminal the status is a single line updated in place. Elsewhere
+    # nothing is printed while cases pass: a log shows the saved failures as
+    # they are found and the totals at the end.
     def report(self) -> None:
-        self.record_completion()
         if sys.stderr.isatty():
             print(f"\r{self.summary()}", end="", file=sys.stderr, flush=True)
-            return
-        now = time.monotonic()
-        if (
-            self.last_report is not None
-            and now - self.last_report < PROGRESS_INTERVAL_SEC
-        ):
-            return
-        self.last_report = now
-        self.print_line()
 
     def final_report(self) -> None:
-        if sys.stderr.isatty():
-            print(file=sys.stderr)
-        else:
+        GITHUB_LOG.close_group()
+        end_status_line()
+        if not sys.stderr.isatty():
             self.print_line()
         print(
             f"oxfuzzer: {self.generation_timeouts} generations timed out",
@@ -449,7 +543,13 @@ class Stats:
 def command_output(command: Sequence[str], *, cwd: Path | None = None) -> str | None:
     try:
         completed = subprocess.run(
-            command, cwd=cwd, capture_output=True, text=True, timeout=30
+            command,
+            check=False,
+            cwd=cwd,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -473,14 +573,21 @@ def source_revision(directory: Path) -> str:
     return "unknown"
 
 
-def run_metadata(base_seed: int, toolchain: Toolchain, revision: str) -> str:
+def revision_line(toolchain: Toolchain) -> str:
+    if toolchain.installed:
+        return f"oxfuzzer.py revision: {source_revision(REPOSITORY_ROOT)}"
+    return f"source revision: {source_revision(toolchain.root)}"
+
+
+# [revision] is the result of revision_line.
+def run_metadata(base_seed: str, toolchain: Toolchain, revision: str) -> str:
     lines = [
         f"command: {shlex.join(sys.argv)}",
         f"base seed: {base_seed}",
         f"host: {platform.node()}",
         f"platform: {platform.platform()}",
         f"python: {sys.version.split()[0]}",
-        f"source revision: {revision}",
+        revision,
         f"toolchain: {toolchain.root}{' (installed)' if toolchain.installed else ''}",
         f"ocamlopt version: {command_output([str(toolchain.ocamlopt), '-version']) or 'unknown'}",
         f"ocamlc version: {command_output([str(toolchain.ocamlc), '-version']) or 'unknown'}",
@@ -500,9 +607,7 @@ def run_metadata(base_seed: int, toolchain: Toolchain, revision: str) -> str:
 
 def failure_metadata(seed: int, run_info: str) -> str:
     return (
-        f"seed: {seed}\n"
-        f"time: {time.strftime('%Y-%m-%d %H:%M:%S %z')}\n"
-        + run_info
+        f"seed: {seed}\n" f"time: {time.strftime('%Y-%m-%d %H:%M:%S %z')}\n" + run_info
     )
 
 
@@ -515,7 +620,9 @@ def status_text(result: CommandResult) -> str:
 
 
 def write_command_result(directory: Path, prefix: str, result: CommandResult) -> None:
-    (directory / f"{prefix}.status").write_text(status_text(result) + "\n")
+    (directory / f"{prefix}.status").write_text(
+        status_text(result) + "\n", encoding="utf-8"
+    )
     (directory / f"{prefix}.stdout").write_bytes(result.stdout)
     (directory / f"{prefix}.stderr").write_bytes(result.stderr)
 
@@ -528,11 +635,12 @@ def reproduction_script(
     directory: Path,
 ) -> str:
     if not toolchain.installed:
-        toolchain = Toolchain(Path(os.path.relpath(
-            toolchain.root.resolve(), directory.resolve()
-        )))
+        toolchain = Toolchain(
+            Path(os.path.relpath(toolchain.root.resolve(), directory.resolve()))
+        )
     configuration = next(
-        candidate for candidate in toolchain.configurations
+        candidate
+        for candidate in toolchain.configurations
         if candidate.name == configuration.name
     )
     source = Path(source_filename(configuration, seed))
@@ -541,11 +649,13 @@ def reproduction_script(
     )
     # CR-soon xclerc: We should also capture OCAMLPARAM and OCAMLRUNPARAM,
     # which are inherited by compilation and execution by default, but may differ
-    # in the shell, which executes ./run.sh.
+    # in the shell, which executes run.bash.
+    # No #! line, and the file is not named *.sh: some download filters reject
+    # an archive of failures that contains either.
     return "\n".join(
         [
-            "#!/usr/bin/env bash",
             f"# oxfuzzer: configuration {configuration.name}, seed {seed}.",
+            "# Run with: bash run.bash",
             "set -eu",
             'cd "$(dirname "$0")"',
             f"export OCAMLLIB={shlex.quote(str(configuration.ocamllib))}",
@@ -559,13 +669,15 @@ def reproduction_script(
 
 
 # Save everything needed to reproduce and diagnose a failing case under
-# <output_dir>/seed-<seed>/:
+# <output_dir>/<seed>/ and return that directory:
 #   program.ml   the generated program
 #   reason.txt   why the case failed
 #   meta.txt     seed, time and the run-level metadata (see run_metadata)
-#   <config>/    one directory per configuration containing run.sh (a
+#   <config>/    one directory per configuration containing run.bash (a
 #                standalone reproducer), compile.{status,stdout,stderr} and,
 #                if the program was run, run.{status,stdout,stderr}
+# The directory is written under a temporary name and renamed into place, so
+# that a run killed while saving does not leave a partial failure directory.
 def save_failure(
     output_dir: Path,
     run_info: str,
@@ -575,25 +687,39 @@ def save_failure(
     reason: str,
     *,
     toolchain: Toolchain,
-) -> None:
-    failure_dir = output_dir / f"seed-{seed}"
-    failure_dir.mkdir(parents=True, exist_ok=True)
-    (failure_dir / "program.ml").write_bytes(program)
-    (failure_dir / "reason.txt").write_text(reason + "\n")
-    (failure_dir / "meta.txt").write_text(failure_metadata(seed, run_info))
+) -> SavedFailure:
+    failure_dir = output_dir / str(seed)
+    # Dot-prefixed, so that a leftover is not taken for a failure.
+    staging_dir = Path(tempfile.mkdtemp(prefix=f".{seed}.", dir=output_dir))
+    staging_dir.chmod(0o755)
+    (staging_dir / "program.ml").write_bytes(program)
+    (staging_dir / "reason.txt").write_text(reason + "\n", encoding="utf-8")
+    (staging_dir / "meta.txt").write_text(
+        failure_metadata(seed, run_info), encoding="utf-8"
+    )
     for result in results:
-        directory = failure_dir / result.configuration.name
-        directory.mkdir(exist_ok=True)
-        script = directory / "run.sh"
-        script.write_text(reproduction_script(
-            result.configuration, seed, toolchain=toolchain, directory=directory
-        ))
+        directory = staging_dir / result.configuration.name
+        directory.mkdir()
+        script = directory / "run.bash"
+        script.write_text(
+            reproduction_script(
+                result.configuration,
+                seed,
+                toolchain=toolchain,
+                directory=failure_dir / result.configuration.name,
+            ),
+            encoding="utf-8",
+        )
         script.chmod(0o755)
         write_command_result(directory, "compile", result.compilation)
         if result.execution is not None:
             write_command_result(directory, "run", result.execution)
-    print(f"\nseed {seed}: {reason}", file=sys.stderr)
-    print(f"saved failure to {failure_dir}", file=sys.stderr)
+    # Replace a failure saved by an earlier run into the same output directory.
+    shutil.rmtree(failure_dir, ignore_errors=True)
+    staging_dir.rename(failure_dir)
+    end_status_line()
+    GITHUB_LOG.failure(f"seed {seed}: {reason}")
+    return SavedFailure(failure_dir.name, reason)
 
 
 # A case passes when every configuration compiles and runs successfully and
@@ -610,68 +736,61 @@ def check_case(
     *,
     toolchain: Toolchain,
 ) -> None:
-    failed = [
-        r for r in results
-        if r.compilation.timed_out or r.compilation.returncode != 0
-    ]
-    if failed:
-        names = ", ".join(
-            f"{r.configuration.name} ({status_text(r.compilation)})"
-            for r in failed
-        )
-        save_failure(
-            output_dir, run_info, seed, program, results,
-            f"compilation failed or timed out: {names}",
-            toolchain=toolchain,
-        )
-        stats.failed += 1
-        stats.report()
-        return
-
-    # CR-soon xclerc: This is a bug, execution failures should take
-    # precedence over timeouts and if any execution fails the test is considered
-    # a failure.
-
-    # If any of the executions time out, we discard the case.
-    if any(r.execution.timed_out for r in results):
-        stats.discarded += 1
-        stats.report()
-        return
-    # Generated programs terminate normally by construction, so a non-zero exit
-    # is a bug in the generator, the compiler or the runtime, even when all
-    # configurations agree on it.
-    error = [r for r in results if r.execution.returncode != 0]
-    if error:
-        names = ", ".join(
-            f"{r.configuration.name} ({status_text(r.execution)})"
-            for r in error
-        )
-        save_failure(
-            output_dir, run_info, seed, program, results,
-            f"error exit: {names}",
-            toolchain=toolchain,
-        )
-        stats.failed += 1
-        stats.report()
-        return
-    reference, *others = results
-    for other in others:
-        reference_outcome = (reference.execution.stdout, reference.execution.stderr)
-        other_outcome = (other.execution.stdout, other.execution.stderr)
-
-        if reference_outcome != other_outcome:
+    def fail(reason: str) -> None:
+        stats.failures.append(
             save_failure(
                 output_dir,
                 run_info,
                 seed,
                 program,
                 results,
-                f"{reference.configuration.name} and "
-                f"{other.configuration.name} disagree",
+                reason,
                 toolchain=toolchain,
             )
-            stats.failed += 1
-            stats.report()
+        )
+        stats.report()
+
+    failed = [r for r in results if not r.compilation.ok]
+    if failed:
+        names = ", ".join(
+            f"{r.configuration.name} ({status_text(r.compilation)})" for r in failed
+        )
+        fail(f"compilation failed or timed out: {names}")
+        return
+
+    # CR-soon xclerc: This is a bug, execution failures should take
+    # precedence over timeouts and if any execution fails the test is considered
+    # a failure.
+
+    # Every configuration compiled the program, so every one ran it.
+    executions = [
+        (r.configuration, r.execution) for r in results if r.execution is not None
+    ]
+    # If any of the executions time out, we discard the case.
+    if any(execution.timed_out for _, execution in executions):
+        stats.discarded += 1
+        stats.report()
+        return
+    # Generated programs terminate normally by construction, so a non-zero exit
+    # is a bug in the generator, the compiler or the runtime, even when all
+    # configurations agree on it.
+    error = [(c, execution) for c, execution in executions if execution.returncode != 0]
+    if error:
+        names = ", ".join(
+            f"{c.name} ({status_text(execution)})" for c, execution in error
+        )
+        fail(f"error exit: {names}")
+        return
+    (reference_configuration, reference), *others = executions
+    for other_configuration, other in others:
+        reference_outcome = (reference.stdout, reference.stderr)
+        other_outcome = (other.stdout, other.stderr)
+
+        if reference_outcome != other_outcome:
+            fail(
+                f"{reference_configuration.name} and "
+                f"{other_configuration.name} disagree"
+            )
             return
     stats.passed += 1
     stats.report()
@@ -695,17 +814,8 @@ async def run_case(
             stats.discarded += 1
             stats.report()
             return
-        results = await asyncio.gather(
-            *(
-                run_configuration(
-                    configuration,
-                    seed=seed,
-                    program=program,
-                    work_dir=case_dir / configuration.name,
-                    slots=slots,
-                )
-                for configuration in toolchain.configurations
-            )
+        results = await run_configurations(
+            toolchain, seed=seed, program=program, work_dir=case_dir, slots=slots
         )
         check_case(
             seed, program, results, stats, output_dir, run_info, toolchain=toolchain
@@ -719,6 +829,7 @@ SELF_CHECK_SEED = 0
 # CR-soon xclerc: Self check more than 1 case, possibly ~100, maybe turn
 # off swarm testing for this also.
 
+
 # Compile and run one generated program before running the fuzzer. This
 # is supposed to give more informative messages when the compilation
 # pipeline itself is broken.
@@ -727,36 +838,29 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
         SELF_CHECK_SEED, toolchain=toolchain, work_dir=run_dir / "self-check"
     )
     if program is None:
-        raise SystemExit(
-            f"oxfuzzer: self-check failed: generation timed out for seed "
-            f"{SELF_CHECK_SEED}."
+        raise Fatal(
+            f"self-check failed: generation timed out for seed {SELF_CHECK_SEED}."
         )
-    slots = asyncio.Semaphore(len(toolchain.configurations))
-    results = await asyncio.gather(
-        *(
-            run_configuration(
-                configuration,
-                seed=SELF_CHECK_SEED,
-                program=program,
-                work_dir=run_dir / "self-check" / configuration.name,
-                slots=slots,
-            )
-            for configuration in toolchain.configurations
-        )
+    results = await run_configurations(
+        toolchain,
+        seed=SELF_CHECK_SEED,
+        program=program,
+        work_dir=run_dir / "self-check",
+        slots=asyncio.Semaphore(len(toolchain.configurations)),
     )
     for result in results:
         name = result.configuration.name
-        if result.compilation.timed_out or result.compilation.returncode != 0:
-            raise SystemExit(
-                f"oxfuzzer: self-check failed: {name} did not compile the program "
+        if not result.compilation.ok:
+            raise Fatal(
+                f"self-check failed: {name} did not compile the program "
                 f"generated from seed {SELF_CHECK_SEED} "
                 f"({status_text(result.compilation)}).\n"
                 + result.compilation.stderr.decode(errors="replace")
             )
         assert result.execution is not None
-        if result.execution.timed_out or result.execution.returncode != 0:
-            raise SystemExit(
-                f"oxfuzzer: self-check failed: {name} did not run the program "
+        if not result.execution.ok:
+            raise Fatal(
+                f"self-check failed: {name} did not run the program "
                 f"generated from seed {SELF_CHECK_SEED} "
                 f"({status_text(result.execution)}).\n"
                 + result.execution.stderr.decode(errors="replace")
@@ -767,6 +871,104 @@ class FinishReason(enum.Enum):
     ITERATIONS = "all iterations done"
     TIME_LIMIT = "time limit reached"
     MAX_FAILURES = "failure limit reached"
+    SIGINT = "interrupted (SIGINT)"
+    SIGTERM = "interrupted (SIGTERM)"
+    SIGHUP = "interrupted (SIGHUP)"
+
+
+# The first of these signals stops the run: startup is cut short, or cases in
+# flight are killed and dropped (neither counted nor saved), and the run
+# finishes as if a limit had been reached. While oxfuzzer is stopping, SIGINT
+# kills it immediately (so a second Ctrl-C forces a stuck shutdown) and further
+# SIGTERMs and SIGHUPs are ignored (so a supervisor's repeated SIGTERMs don't
+# cut the shutdown short). SIGHUP is what closing the terminal sends: dying of
+# it would leave the cases running, as they are in sessions of their own.
+SHUTDOWN_SIGNALS = {
+    signal.SIGINT: FinishReason.SIGINT,
+    signal.SIGTERM: FinishReason.SIGTERM,
+    signal.SIGHUP: FinishReason.SIGHUP,
+}
+
+
+class Interrupted(Exception):
+    """Raised between startup steps once a shutdown signal has arrived."""
+
+
+class ShutdownSignals:
+    """Handles SHUTDOWN_SIGNALS from its creation on, replacing asyncio.run's
+    SIGINT handler (which would cancel the main task and raise
+    KeyboardInterrupt).
+
+    The handlers are installed with signal.signal, so they run in the middle of
+    whatever the main thread is doing. They therefore only record the first
+    signal and, once cancel_on_signal has been called, ask the event loop to
+    cancel the task given. The loop does that between task steps, so never in
+    the middle of check_case or save_failure. Startup is synchronous and comes
+    before cancel_on_signal: there, check raises Interrupted once a signal has
+    been recorded. So the startup step in progress finishes (each is quick or
+    bounded by a timeout) and the remaining steps are skipped, rather than an
+    exception being raised in the middle of arbitrary code."""
+
+    def __init__(self) -> None:
+        self.received: signal.Signals | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._task: asyncio.Task[FinishReason] | None = None
+        for signum in SHUTDOWN_SIGNALS:
+            # A SIGHUP that is ignored stays ignored, so that oxfuzzer keeps
+            # running under nohup.
+            if signum == signal.SIGHUP and signal.getsignal(signum) == signal.SIG_IGN:
+                continue
+            signal.signal(signum, self._on_signal)
+
+    @property
+    def finish_reason(self) -> FinishReason:
+        assert self.received is not None
+        return SHUTDOWN_SIGNALS[self.received]
+
+    def check(self) -> None:
+        if self.received is not None:
+            raise Interrupted
+
+    # Makes the first signal cancel task, which must not have started yet.
+    def cancel_on_signal(self, task: asyncio.Task[FinishReason]) -> None:
+        # The task last, as the handler takes it to mean that the loop is set.
+        self._loop = asyncio.get_running_loop()
+        self._task = task
+        # After that assignment, so that no signal is lost: the handler only
+        # recorded a signal that arrived before it, and cancels the task
+        # itself for one that arrives after it. For one in between, both
+        # cancel the task, which is harmless: as the task has not started,
+        # this cancellation ends it before the loop gets to the handler's.
+        if self.received is not None:
+            task.cancel()
+
+    def _on_signal(self, signum: int, _frame: object) -> None:
+        if self.received is not None:
+            # A repeated SIGTERM or SIGHUP; SIGINT no longer reaches here.
+            return
+        self.received = signal.Signals(signum)
+        # Only SIGINT escalates: a second Ctrl-C forces a stuck shutdown.
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        # Not task.cancel() here: see the class comment. call_soon_threadsafe
+        # also wakes the loop up. Once the task is done there is nothing to
+        # cancel, and the loop may be closed.
+        if self._loop is not None and self._task is not None and not self._task.done():
+            self._loop.call_soon_threadsafe(self._task.cancel)
+        # Last, so that nothing above depends on it, and with os.write: this
+        # may interrupt a print to stderr, which must not be re-entered, and a
+        # failed write (say, to a closed terminal) is ignored.
+        message = (
+            f"oxfuzzer: {self.received.name} received, stopping "
+            f"(press Ctrl-C again to exit immediately)\n"
+        )
+        try:
+            fd = sys.stderr.fileno()
+            if os.isatty(fd):
+                # End the status line (see end_status_line).
+                message = "\n" + message
+            os.write(fd, message.encode())
+        except (OSError, ValueError):
+            pass
 
 
 @dataclass(frozen=True)
@@ -774,10 +976,11 @@ class Limits:
     """When to stop fuzzing. Once a limit is reached no new cases are started,
     but cases in flight finish and save their results, so a run can exceed its
     time or failure limit."""
+
     iterations: int | None
     max_failures: int | None
     time_limit_minutes: float | None
-    start: float = field(default_factory=time.monotonic)    # A time.monotonic() value.
+    start: float = field(default_factory=time.monotonic)  # A time.monotonic() value.
 
     @property
     def deadline(self) -> float | None:
@@ -803,6 +1006,30 @@ class Limits:
         return None
 
 
+CASE_SEED_BITS = 62
+
+
+# The seeds of a run's cases, in order, without end.
+def case_seeds(base_seed: str) -> Iterator[int]:
+    # A base seed that is a case seed (a number below 2^62) is the first case,
+    # so that `--seed N --iterations 1` runs case N again, such as a saved
+    # failure's. The length is checked first because int() rejects very long
+    # strings.
+    limit = 1 << CASE_SEED_BITS
+    if (
+        base_seed.isascii()
+        and base_seed.isdecimal()
+        and len(base_seed) <= len(str(limit))
+        and int(base_seed) < limit
+    ):
+        yield int(base_seed)
+    # Python seeds with all of a string, so any string is a seed, and it gives
+    # the same sequence of case seeds on every platform.
+    rng = random.Random(base_seed)
+    while True:
+        yield rng.getrandbits(CASE_SEED_BITS)
+
+
 async def fuzz(
     *,
     toolchain: Toolchain,
@@ -810,15 +1037,11 @@ async def fuzz(
     limits: Limits,
     jobs: int,
     output_dir: Path,
-    base_seed: int,
+    base_seed: str,
     run_info: str,
     stats: Stats,
 ) -> FinishReason:
-    rng = random.Random(base_seed)
-    seed_indices = (
-        itertools.count() if limits.iterations is None else range(limits.iterations)
-    )
-    pending = (rng.getrandbits(62) for _ in seed_indices)
+    pending = itertools.islice(case_seeds(base_seed), limits.iterations)
     slots = asyncio.Semaphore(jobs)
 
     finished_because = FinishReason.ITERATIONS
@@ -833,13 +1056,116 @@ async def fuzz(
                 return
             await run_case(toolchain, run_dir, seed, stats, output_dir, run_info, slots)
 
-    async with asyncio.TaskGroup() as group:
-        for _ in range(jobs):
-            group.create_task(iteration_worker())
+    stats.fuzzing_start = time.monotonic()
+    try:
+        async with asyncio.TaskGroup() as group:
+            for _ in range(jobs):
+                group.create_task(iteration_worker())
+    except ExceptionGroup as errors:
+        fatal = errors.subgroup(Fatal)
+        if fatal is None:
+            raise
+        raise fatal.exceptions[0] from None
+    finally:
+        stats.fuzzing_end = time.monotonic()
     return finished_because
 
 
+# The CPUs this process may run on. os.sched_getaffinity does not exist on
+# macOS, so fall back to all the CPUs there.
+def available_cpus() -> int:
+    if hasattr(os, "sched_getaffinity"):
+        return len(os.sched_getaffinity(0))
+    return os.cpu_count() or 1
+
+
+SUMMARY_DETAIL_LINES = 40
+
+
+def markdown_code_block(text: str) -> str:
+    lines = text.rstrip().splitlines()
+    if len(lines) > SUMMARY_DETAIL_LINES:
+        omitted = len(lines) - SUMMARY_DETAIL_LINES
+        lines = [*lines[:SUMMARY_DETAIL_LINES], f"[{omitted} more lines]"]
+    body = "\n".join(lines)
+    longest_run = max((len(run) for run in re.findall("`+", body)), default=0)
+    fence = "`" * max(3, longest_run + 1)
+    return f"{fence}text\n{body}\n{fence}"
+
+
+# A Markdown summary of the run for --summary-file, e.g. for a GitHub step
+# summary. It has no top-level heading, so that the caller can add its own.
+def summary_markdown(
+    outcome: str,
+    stats: Stats,
+    *,
+    wall_time_sec: float,
+    base_seed: str,
+    details: str | None = None,
+) -> str:
+    wall_time = datetime.timedelta(seconds=round(wall_time_sec))
+    lines = [
+        f"**{outcome}**",
+        "",
+        "| Passed | Discarded | Failed | Cases/h | Wall time |",
+        "| ---: | ---: | ---: | ---: | ---: |",
+        (
+            f"| {stats.passed} | {stats.discarded} | {stats.failed} "
+            f"| {stats.rate_text()} | {wall_time} |"
+        ),
+        "",
+        # In a block of its own, as a seed can be any string.
+        "Base seed:",
+        "",
+        markdown_code_block(base_seed),
+    ]
+    if details:
+        lines += ["", markdown_code_block(details)]
+    if stats.failures:
+        lines += ["", "Saved failures:", ""]
+        lines += [
+            f"- `{failure.directory}`: {failure.reason}" for failure in stats.failures
+        ]
+    return "\n".join(lines) + "\n"
+
+
+def write_summary(path: Path, text: str) -> None:
+    # Write and rename, so that readers never see a partial summary.
+    staging = path.with_name(f".{path.name}.tmp")
+    try:
+        staging.write_text(text, encoding="utf-8")
+        staging.replace(path)
+    except OSError as error:
+        print(f"oxfuzzer: cannot write summary file: {error}", file=sys.stderr)
+
+
+# Creates the output directory if needed and checks that failures can be saved
+# in it, so that a directory that cannot be written ends the run before any
+# fuzzing rather than when the first failure is saved.
+def prepare_output_dir(output_dir: Path) -> None:
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryFile(dir=output_dir):
+            pass
+    except OSError as error:
+        raise Fatal(
+            f"cannot write to the output directory {output_dir}: "
+            f"{error.strerror or error}"
+        ) from None
+
+
+# Says what an unexpected exception is, for the summary. A TaskGroup wraps the
+# exceptions of its tasks in a group whose own message does not say what they
+# are, so this describes the first of them.
+def describe_error(error: BaseException) -> str:
+    while isinstance(error, BaseExceptionGroup):
+        error = error.exceptions[0]
+    return f"{type(error).__name__}: {error}"
+
+
 async def main() -> None:
+    # First, so that a signal from here on stops the run cleanly.
+    shutdown = ShutdownSignals()
     parser = argparse.ArgumentParser(
         prog="oxfuzzer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -854,9 +1180,18 @@ A case fails if compilation fails in any configuration, a program exits with a
 non-zero status, or the configurations disagree. A case is discarded if
 generation or execution times out or generated source exceeds
 {MAX_PROGRAM_BYTES} bytes. Failures are saved under
-<output>/seed-<generator_seed>/. Discarded cases are not saved.
+<output>/<generator_seed>/. Discarded cases are not saved.
 
-Exit status is 1 if any case failed, 0 otherwise.""",
+SIGINT, SIGTERM or SIGHUP stops fuzzing like a limit, except that cases in
+flight are killed and dropped (neither counted nor saved). During startup, it
+takes effect when the step in progress (such as snapshotting the build
+directory) is done. While oxfuzzer is stopping, a second SIGINT kills it
+immediately; further SIGTERMs and SIGHUPs are ignored. A SIGHUP that is ignored
+when oxfuzzer starts, as under nohup, stays ignored.
+
+Exit status is 1 if any case failed, 0 otherwise, including when stopped by a
+signal. It is also 1 after an error that ends the run, such as a failed
+self-check or a toolchain that cannot be run.""",
         epilog="Before first use, run `make compiler` from the repository root.",
     )
     parser.add_argument(
@@ -893,16 +1228,17 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     parser.add_argument(
         "--jobs",
         type=int,
-        default=max(1, len(os.sched_getaffinity(0)) // 2),
+        default=1,
         metavar="N",
-        help="maximum concurrent compiler/program processes "
-        "(default: %(default)s, half the available CPUs)",
+        help="maximum concurrent compiler/program processes, or 0 for all "
+        "the available CPUs (default: %(default)s)",
     )
     parser.add_argument(
         "--seed",
-        type=int,
         default=None,
-        help="seed for the sequence of case seeds (default: random, printed)",
+        help="seed for the sequence of case seeds: any string. A case's seed "
+        "(a number below 2^62) runs that case first, so with --iterations 1 it "
+        "runs a saved failure's case again (default: random, printed)",
     )
     toolchain_group = parser.add_mutually_exclusive_group()
     toolchain_group.add_argument(
@@ -922,9 +1258,17 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         help="use the OxCaml installed in DIR (by `make install` or "
         "`nix build .#oxcaml`) in place, instead of a build directory",
     )
+    parser.add_argument(
+        "--summary-file",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="write a Markdown summary of the run to PATH when it ends "
+        "(under GitHub Actions it is also appended to the step summary)",
+    )
     args = parser.parse_args()
-    if args.jobs < 1:
-        parser.error("--jobs must be at least 1")
+    if args.jobs < 0:
+        parser.error("--jobs must not be negative")
     if args.iterations is None and args.time_limit_minutes is None:
         parser.error(
             "at least one of --iterations and --time-limit-minutes is required"
@@ -946,62 +1290,129 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         toolchain = Toolchain(args.install_dir.resolve(), installed=True)
     else:
         toolchain = Toolchain((args.build_dir or REPOSITORY_ROOT / "_build").resolve())
-    toolchain.check_dependencies()
-    revision = source_revision(toolchain.root)
     base_seed = (
-        args.seed if args.seed is not None else random.SystemRandom().getrandbits(62)
+        args.seed
+        if args.seed is not None
+        else str(random.SystemRandom().getrandbits(62))
     )
-    print(f"seed: {base_seed}", file=sys.stderr)
-    limits.print_summary()
-    print(
-        f"{'install' if toolchain.installed else 'build'} directory: "
-        f"{toolchain.root}",
-        file=sys.stderr,
-    )
-    print(f"revision: {revision}", file=sys.stderr)
-    args.output.mkdir(parents=True, exist_ok=True)
-    if not toolchain.installed:
-        toolchain_dir = Path(tempfile.mkdtemp(
-            prefix="toolchain-", dir=args.output.resolve()
-        ))
-        # CR-someday xclerc: Clean up the snapshot after finishing fuzzing if
-        # no failures were saved.
-        toolchain = toolchain.snapshot(toolchain_dir)
-        print(f"toolchain: {toolchain_dir}", file=sys.stderr)
-    run_info = run_metadata(base_seed, toolchain, revision)
     stats = Stats()
 
-    # Cancel task on SIGTERM (SIGINT already installed by default by asyncio.run).
-    main_task = asyncio.current_task()
-    assert main_task is not None
-    asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, main_task.cancel)
+    def summarize(outcome: str, details: str | None = None) -> None:
+        step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if args.summary_file is None and not step_summary:
+            return
+        text = summary_markdown(
+            outcome,
+            stats,
+            wall_time_sec=time.monotonic() - limits.start,
+            base_seed=base_seed,
+            details=details,
+        )
+        if args.summary_file is not None:
+            write_summary(args.summary_file, text)
+        if step_summary:
+            # GitHub Actions shows what a step appends to this file on the
+            # page of the run.
+            try:
+                with open(step_summary, "a", encoding="utf-8") as file:
+                    file.write(text)
+            except OSError as error:
+                print(
+                    f"oxfuzzer: cannot write the step summary: {error}", file=sys.stderr
+                )
 
-    with tempfile.TemporaryDirectory(prefix="oxfuzzer-") as run_dir:
-        try:
-            await self_check(Path(run_dir), toolchain)
-            finished_because = await fuzz(
-                toolchain=toolchain,
-                run_dir=Path(run_dir),
-                limits=limits,
-                jobs=args.jobs,
-                # CR-soon xclerc: We should instead create a temporary
-                # directory inside of args.output, so that there are no
-                # collisions on rerunning a command with the same output
-                # directory.
-                output_dir=args.output,
-                base_seed=base_seed,
-                run_info=run_info,
-                stats=stats,
+    # The first line of the message heads the summary and the rest goes in a
+    # block under it.
+    def summarize_error(kind: str, message: str) -> None:
+        first_line, _, details = message.partition("\n")
+        summarize(f"{kind}: {first_line}", details.lstrip("\n") or None)
+
+    def finish(finished_because: FinishReason) -> None:
+        # The summary first: it matters more than the last lines of the log if
+        # the run is killed while it finishes.
+        summarize(f"Finished: {finished_because.value}")
+        stats.final_report()
+        print(f"oxfuzzer: finished: {finished_because.value}", file=sys.stderr)
+        if stats.failed:
+            raise SystemExit(1)
+
+    # Every way out of this block writes the summary.
+    try:
+        # A signal during startup stops the run once the step in progress is
+        # done (see ShutdownSignals).
+        toolchain.check_dependencies()
+        shutdown.check()
+        revision = revision_line(toolchain)
+        shutdown.check()
+        GITHUB_LOG.open_group("oxfuzzer: settings")
+        print(f"seed: {base_seed}", file=sys.stderr)
+        limits.print_summary()
+        print(
+            f"{'install' if toolchain.installed else 'build'} directory: "
+            f"{toolchain.root}",
+            file=sys.stderr,
+        )
+        print(revision, file=sys.stderr)
+        prepare_output_dir(args.output)
+        if not toolchain.installed:
+            toolchain_dir = Path(
+                tempfile.mkdtemp(prefix="toolchain-", dir=args.output.resolve())
             )
-        except asyncio.CancelledError:
-            stats.final_report()
-            print("oxfuzzer: interrupted", file=sys.stderr)
-            raise SystemExit(130)
-    stats.final_report()
-    print(f"oxfuzzer: finished: {finished_because.value}", file=sys.stderr)
-    if stats.failed:
+            # CR-someday xclerc: Clean up the snapshot after finishing fuzzing
+            # if no failures were saved.
+            toolchain = toolchain.snapshot(toolchain_dir)
+            print(f"toolchain: {toolchain_dir}", file=sys.stderr)
+            shutdown.check()
+        run_info = run_metadata(base_seed, toolchain, revision)
+        shutdown.check()
+        GITHUB_LOG.close_group()
+
+        with tempfile.TemporaryDirectory(prefix="oxfuzzer-") as run_dir:
+
+            async def self_check_and_fuzz() -> FinishReason:
+                await self_check(Path(run_dir), toolchain)
+                return await fuzz(
+                    toolchain=toolchain,
+                    run_dir=Path(run_dir),
+                    limits=limits,
+                    jobs=args.jobs or available_cpus(),
+                    # CR-soon xclerc: We should instead create a temporary
+                    # directory inside of args.output, so that there are no
+                    # collisions on rerunning a command with the same output
+                    # directory.
+                    output_dir=args.output,
+                    base_seed=base_seed,
+                    run_info=run_info,
+                    stats=stats,
+                )
+
+            work = asyncio.create_task(self_check_and_fuzz())
+            shutdown.cancel_on_signal(work)
+            try:
+                finished_because = await work
+            except asyncio.CancelledError:
+                if shutdown.received is None:
+                    raise
+                finished_because = shutdown.finish_reason
+    except Interrupted:
+        finished_because = shutdown.finish_reason
+    except Fatal as fatal:
+        summarize_error("Fatal error", str(fatal))
+        GITHUB_LOG.close_group()
+        print(f"oxfuzzer: {fatal}", file=sys.stderr)
         raise SystemExit(1)
+    except Exception as error:
+        # Not an error that oxfuzzer expects. Python prints its traceback and
+        # exits with a non-zero status.
+        summarize_error("Internal error", describe_error(error))
+        raise
+    finish(finished_because)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    finally:
+        # Before the traceback of a crash is printed, so that it is not folded
+        # into a group.
+        GITHUB_LOG.close_group()

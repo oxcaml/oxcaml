@@ -1,6 +1,7 @@
 # CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
 # If you want this functionality, ask for help from a subset of:
 # @jvanburen @glittershark @mshinwell
+# oxfuzzer.yml's workflow_run trigger matches this name; workflow-run-triggers.yml fails if they differ.
 name: Nix Flake Actions (trusted)
 
 on:
@@ -62,7 +63,7 @@ jobs:
     if: github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix: ${{fromJSON(needs.nix-matrix.outputs.matrix)}}
 
     permissions:
