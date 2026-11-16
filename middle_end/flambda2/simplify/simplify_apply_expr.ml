@@ -114,7 +114,7 @@ let simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up =
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
   (* The call becomes a jump, which runs as often: its counter is preserved. *)
   let dacc =
-    DA.preserve_fdo_counters dacc
+    DA.add_orphaned_fdo_counters dacc
       (Fdo_annotation.of_list (Option.to_list (Apply.callsite_counter apply)))
   in
   Simplify_apply_cont_expr.simplify_apply_cont
