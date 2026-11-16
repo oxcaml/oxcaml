@@ -274,6 +274,7 @@ and string_switch handlers arg cases default_action =
     [H.of_option (lambda handlers arg); cases; default handlers default_action]
 
 and primitive handlers (prim : L.primitive) args =
+  (* CR yusumez: Consider having an exhaustive match *)
   match[@ocaml.warning "-fragile-match"] prim, args with
   | Psequand, [a; b] ->
     if_then_else handlers ~cond:a ~ifso:b
