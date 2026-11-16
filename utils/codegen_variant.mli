@@ -45,10 +45,21 @@ val equal : t -> t -> bool
 
 val is_default : t -> bool
 
-(** Canonical name encoding absolute axis values ("fp" / "base"). *)
+(** Sets every per-invocation axis flag ([Clflags.frame_pointers]) to [t]'s
+    values, for tools that select a whole variant by name. *)
+val apply : t -> unit
+
+(** Canonical name encoding absolute axis values ("fp" / "base"); the
+    scheme lives in [Codegen_variant_name]. *)
 val to_string : t -> string
 
 val of_string : string -> t option
+
+(** The suffix of the runtime archives [t] links ("" for archives shared
+    with the default variant): the projection of [t]'s name onto the
+    runtime axes, relative to the default's; see
+    [Codegen_variant_name.runtime_archive_suffix]. *)
+val runtime_archive_suffix : t -> string
 
 (** The marker recorded in native compilation artifacts.  Besides the
     per-invocation axes of [t] it includes configure-time settings

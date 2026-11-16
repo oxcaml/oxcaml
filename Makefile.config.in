@@ -203,7 +203,10 @@ INSTRUMENTED_RUNTIME_LIBS=@instrumented_runtime_libs@
 WITH_DEBUGGER=@with_debugger@
 ASM_CFI_SUPPORTED=@asm_cfi_supported@
 WITH_FRAME_POINTERS=@frame_pointers@
+# The space-separated list of non-default codegen variant names to build,
+# and the configure default's own name; see Makefile.codegen-variants.
 CODEGEN_VARIANTS=@codegen_variants@
+CODEGEN_DEFAULT_VARIANT=@codegen_default_variant@
 WITH_ADDRESS_SANITIZER=@address_sanitizer@
 WITH_CPP_MANGLING=@cpp_mangling@
 NAME_MANGLING_SCHEME=@name_mangling_scheme@

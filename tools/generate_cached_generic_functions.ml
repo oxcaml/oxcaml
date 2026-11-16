@@ -97,13 +97,24 @@ let generate filename =
 let arg_usage =
   Printf.sprintf "%s FILE : Generate an obj file containing cached generatic functions named FILE" Sys.argv.(0)
 
+let set_codegen_variant name =
+  match Codegen_variant.of_string name with
+  | Some variant -> Codegen_variant.apply variant
+  | None ->
+    raise (Arg.Bad (Printf.sprintf "unknown codegen variant %S" name))
+
 let arg_spec =
-  [ ( "-frame-pointers",
+  [ ( "-codegen-variant",
+      Arg.String set_codegen_variant,
+      "<name>  Generate the archive for the named codegen variant (e.g. \
+       base or fp)" );
+    (* Per-axis aliases of -codegen-variant. *)
+    ( "-frame-pointers",
       Arg.Set Clflags.frame_pointers,
-      " Generate the archive for the fp codegen variant" );
+      " Generate the archive for a frame-pointers codegen variant" );
     ( "-no-frame-pointers",
       Arg.Clear Clflags.frame_pointers,
-      " Generate the archive for the base codegen variant" ) ]
+      " Generate the archive for a no-frame-pointers codegen variant" ) ]
 
 (* The output file is only recorded during parsing and the generation runs
    once parsing is complete, so the variant flags take effect regardless of

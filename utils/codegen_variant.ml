@@ -45,12 +45,23 @@ let equal t1 t2 = Bool.equal t1.frame_pointers t2.frame_pointers
 
 let is_default t = equal t default
 
-let to_string t = if t.frame_pointers then "fp" else "base"
+let apply t = Clflags.frame_pointers := t.frame_pointers
 
-let of_string = function
-  | "fp" -> Some { frame_pointers = true }
-  | "base" -> Some { frame_pointers = false }
-  | _ -> None
+(* Naming goes through the dependency-free [Codegen_variant_name] token
+   scheme; each axis stage extends [name]/[of_name] alongside [t]. *)
+let name t =
+  Codegen_variant_name.of_tokens
+    (if t.frame_pointers then [Codegen_variant_name.Frame_pointers] else [])
+
+let of_name n =
+  { frame_pointers = Codegen_variant_name.(mem Frame_pointers n) }
+
+let to_string t = Codegen_variant_name.to_string (name t)
+
+let of_string s = Option.map of_name (Codegen_variant_name.of_string s)
+
+let runtime_archive_suffix t =
+  Codegen_variant_name.runtime_archive_suffix (name t) ~default:(name default)
 
 type fingerprint = (string * string) list
 

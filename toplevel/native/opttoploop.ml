@@ -947,15 +947,15 @@ let preload_objects = ref []
 
 let prepare ppf ?input:_ () =
   (* Compiled phrases are loaded into the toplevel's own image, so they must
-     use the frame-pointer setting the toplevel itself was built with. *)
-  if !Clflags.frame_pointers <> Config.with_frame_pointers then
+     use the codegen variant the toplevel itself was built for. *)
+  let current_variant = Codegen_variant.current () in
+  if not (Codegen_variant.is_default current_variant) then
     Compenv.fatal
       (Printf.sprintf
-         "ocamlnat was built %s frame pointers and cannot compile phrases \
-          with a different frame-pointer setting; remove the %s flag"
-         (if Config.with_frame_pointers then "with" else "without")
-         (if !Clflags.frame_pointers
-          then "-frame-pointers" else "-no-frame-pointers"));
+         "ocamlnat was built for codegen variant '%s' and cannot compile \
+          phrases for variant '%s'; remove the variant-selecting flags"
+         (Codegen_variant.to_string Codegen_variant.default)
+         (Codegen_variant.to_string current_variant));
   set_paths ();
   begin try
     initialize_toplevel_env ()

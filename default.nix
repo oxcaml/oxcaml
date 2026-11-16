@@ -950,18 +950,13 @@ stdenv.mkDerivation {
     ''
       $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
       # Each installed codegen-variant library tree gets its own archive,
-      # generated with the matching frame-pointer flag (the directory name
-      # is the variant name). No variants directory exists when codegen
-      # variants are disabled or unsupported on this platform.
+      # generated for the variant the directory is named after. No variants
+      # directory exists when codegen variants are disabled or unsupported
+      # on this platform.
       for variant_dir in $out/lib/ocaml/variants/*/; do
         [ -d "$variant_dir" ] || continue
         variant=$(basename "$variant_dir")
-        case "$variant" in
-          fp) variant_flag=-frame-pointers ;;
-          base) variant_flag=-no-frame-pointers ;;
-          *) echo "unknown codegen variant: $variant" >&2; exit 1 ;;
-        esac
-        $out/bin/generate_cached_generic_functions.exe $variant_flag \
+        $out/bin/generate_cached_generic_functions.exe -codegen-variant "$variant" \
           "$variant_dir/cached-generic-functions"
       done
     ''

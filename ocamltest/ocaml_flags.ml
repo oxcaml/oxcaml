@@ -16,21 +16,28 @@
 (* Flags used in OCaml commands *)
 
 (* The [codegen_variant] TSL variable selects the codegen variant (absolute
-   name, "fp" or "base") that native compilation and linking target.  It
-   swaps the standard-library include path to the variant's library root
+   name, e.g. "base" or "fp"; see utils/codegen_variant_name.ml, copied
+   into ocamltest) that native compilation and linking target.  It swaps
+   the standard-library include path to the variant's library root
    (<stdlib>/variants/<name>) when the named variant is not the install's
-   configure-time default, and adds the corresponding compiler flag to
-   native compiler invocations (see [codegen_variant_flags]; bytecode
-   compilers do not accept the flag and bytecode is unaffected by codegen
-   variants, but they still use the variant root so that one test block can
-   mix backends). *)
+   configure-time default, and adds the corresponding per-axis compiler
+   flags to native compiler invocations (see [codegen_variant_flags];
+   bytecode compilers do not accept the flags and bytecode is unaffected by
+   codegen variants, but they still use the variant root so that one test
+   block can mix backends). *)
 let codegen_variant env =
   match Environments.safe_lookup Ocaml_variables.codegen_variant env with
   | "" -> None
   | name -> Some name
 
+(* Composed from the copied utils/config.ml, which carries the configure
+   default of every axis (each axis stage adds its [Config] read here). *)
 let default_codegen_variant =
-  if Ocamltest_config.frame_pointers then "fp" else "base"
+  Codegen_variant_name.to_string
+    (Codegen_variant_name.of_tokens
+       (if Config.with_frame_pointers
+        then [Codegen_variant_name.Frame_pointers]
+        else []))
 
 let codegen_variant_directory name =
   if String.equal name default_codegen_variant
@@ -51,12 +58,13 @@ let codegen_variant_flags env backend =
   match backend, codegen_variant env with
   | Ocaml_backends.(Bytecode | Jsir_js | Jsir_wasm), _ | _, None -> ""
   | Ocaml_backends.Native, Some name ->
-    (match name with
-     | "fp" -> "-frame-pointers"
-     | "base" -> "-no-frame-pointers"
-     | _ ->
+    (match Codegen_variant_name.of_string name with
+     | Some variant ->
+       String.concat " " (Codegen_variant_name.ocamlopt_flags variant)
+     | None ->
        Printf.ksprintf failwith
-         "unknown codegen_variant %S (expected \"fp\" or \"base\")" name)
+         "unknown codegen_variant %S (expected a variant name such as \
+          \"base\" or \"fp\")" name)
 
 (* Library modifiers (see ocaml_modifiers.ml, e.g. [include unix]) append
    default-tree library directories of the form <srcdir>/otherlibs/<lib>.

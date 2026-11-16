@@ -92,14 +92,11 @@ let runtime_lib () =
     if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
   (* Archives for the install's default codegen variant have unsuffixed names;
-     other variants are suffixed with the variant name. The naming rule is
-     described in stdlib/dune_rules/gen.ml (write_runtime_dune). *)
+     other variants are suffixed with the projection of the variant name onto
+     the runtime axes. The naming rule is described in stdlib/dune_rules/gen.ml
+     (write_runtime_dune). *)
   let codegen_variant = Codegen_variant.current () in
-  let codegen_suffix =
-    if Codegen_variant.is_default codegen_variant
-    then ""
-    else "_" ^ Codegen_variant.to_string codegen_variant
-  in
+  let codegen_suffix = Codegen_variant.runtime_archive_suffix codegen_variant in
   let libname = "libasmrun" ^ variant ^ codegen_suffix ^ ext_lib in
   try
     if !Clflags.nopervasives || not !Clflags.with_runtime

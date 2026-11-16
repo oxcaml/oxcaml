@@ -369,8 +369,7 @@ let report_error ppf = function
   | Cached_generic_functions_not_found { filename; variant } ->
     let generator_flag =
       match Codegen_variant.of_string variant with
-      | Some { Codegen_variant.frame_pointers = true } -> " -frame-pointers"
-      | Some { Codegen_variant.frame_pointers = false } -> " -no-frame-pointers"
+      | Some _ -> " -codegen-variant " ^ variant
       | None -> ""
     in
     fprintf ppf

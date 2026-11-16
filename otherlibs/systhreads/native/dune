@@ -8,7 +8,7 @@
 (alias
  (name codegen-variant-libs)
  (enabled_if
-  (or (= %{context_name} "main-fp") (= %{context_name} "main-base")))
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
  (deps threadsnat.cmxa threadsnat.a))
 
 (rule (target sync_posix.h) (action (copy %{dep:../../../runtime/sync_posix.h} %{target})))

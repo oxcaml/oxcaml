@@ -49,7 +49,7 @@
 (alias
  (name codegen-variant-libs)
  (enabled_if
-  (or (= %{context_name} "main-fp") (= %{context_name} "main-base")))
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
  (deps
   stdlib_upstream_compatible.cmxa
   stdlib_upstream_compatible.a

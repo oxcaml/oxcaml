@@ -149,6 +149,7 @@
   numbers
   arg_helper
   clflags
+  codegen_variant_name
   codegen_variant
   debug
   profile
@@ -469,18 +470,20 @@
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
 
-; Codegen-variant contexts (main-fp / main-base): the OxCaml flags plus the
-; non-default frame-pointer flag. The sexp is written by the
-; _build/_bootinstall recipe in Makefile.common-ox.
+; Codegen-variant contexts (main-<name>, the complement of default/main):
+; the OxCaml flags plus the variant's per-axis flags. The per-context sexps
+; are written by the _build/_bootinstall recipe in Makefile.common-ox.
 
 (rule
  (targets ocamlopt_flags.sexp)
  (enabled_if
-  (or
-   (= %{context_name} "main-fp")
-   (= %{context_name} "main-base")))
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
  (action
-  (copy %{project_root}/ocamlopt_variant_flags.sexp %{targets})))
+  (copy
+   %{project_root}/duneconf/ocamlopt_flags_%{context_name}.sexp
+   %{targets})))
 
 ; Write empty files in an unconfigured tree
 (rule

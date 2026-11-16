@@ -1,6 +1,6 @@
 (* TEST
- fp_variant_available;
  codegen_variant = "fp";
+ variant_available;
  flags = "-no-frame-pointers";
  set OCAMLPARAM = "_,frame-pointers=1";
  native;
