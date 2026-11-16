@@ -1,6 +1,13 @@
 (* TEST
  flags = "-I ${ocamlsrcdir}/parsing -I ${ocamlsrcdir}/toplevel";
  include ocamlcommon;
+ {
+   bytecode;
+ }{
+   native;
+ }{
+   jsir;
+ }
 *)
 let position = Lexing.{ (* This corresponds to File "file.ml", line 100, character 10 *)
     pos_fname = "------should not appear------";

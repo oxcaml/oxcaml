@@ -1,6 +1,11 @@
 (* TEST
    modules = "mkroot_stubs.c";
- *)
+   {
+     bytecode;
+   }{
+     native;
+   }
+*)
 
 type 'a box
 external box_make : 'a -> 'a box = "box_make"

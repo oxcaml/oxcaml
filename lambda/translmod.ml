@@ -600,7 +600,7 @@ let merge_functors ~scopes mexp coercion root_path =
     let finished = acc, mexp, path, coercion, inline_attribute, staticity in
     match mexp.mod_desc with
     | Tmod_functor (param, body, new_staticity) ->
-      let new_staticity = Translmode.transl_staticity_mode_r new_staticity in
+      let new_staticity = Translmode.transl_staticity_mode new_staticity in
       begin match acc, staticity, new_staticity with
       | _ :: _, Dynamic, Static | _ :: _, Static, Dynamic ->
         (* Only care about the old staticity if length acc > 0, otherwise it's
@@ -621,7 +621,9 @@ let merge_functors ~scopes mexp coercion root_path =
         let loc = of_location ~scopes mexp.mod_loc in
         let path, param =
           match param with
-          | Unit -> None, Ident.create_local "*"
+          | Unit ->
+            assert (staticity = Dynamic);
+            None, Ident.create_local "*"
           | Named (None, _, _, _) ->
             let id = Ident.create_local "_" in
             functor_path path id, id
@@ -713,7 +715,7 @@ and transl_module ~scopes cc rootpath mexp =
         compile_functor ~scopes mexp cc rootpath loc) ()
   | Tmod_apply(funct, arg, ccarg, yielding, staticity) ->
       let translated_arg = transl_module ~scopes ccarg None arg in
-      let staticity = Translmode.transl_staticity_mode_r staticity in
+      let staticity = Translmode.transl_staticity_mode staticity in
       transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding ~staticity
         translated_arg
   | Tmod_apply_unit (funct, yielding) ->
@@ -990,12 +992,16 @@ and transl_structure ~scopes loc
             | Tincl_structure ->
                 pure_module modl, transl_module ~scopes Tcoerce_none
                   rootpath modl
-            | Tincl_functor { input_coercion; input_repr; yielding } ->
+            | Tincl_functor { input_coercion; input_repr;
+                              yielding; staticity } ->
                 Strict, transl_include_functor ~generative:false modl
-                          input_coercion scopes loc ~input_repr ~yielding
-            | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
+                          input_coercion scopes loc ~input_repr
+                          ~yielding ~staticity
+            | Tincl_gen_functor { input_coercion; input_repr;
+                                  yielding; staticity } ->
                 Strict, transl_include_functor ~generative:true modl
-                          input_coercion scopes loc ~input_repr ~yielding
+                          input_coercion scopes loc ~input_repr
+                          ~yielding ~staticity
           in
           Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
           repr
@@ -1051,33 +1057,43 @@ and transl_structure ~scopes loc
           transl_structure ~scopes loc fields cc rootpath final_env rem
 
 (* construct functor application in "include functor" case *)
-and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
-      loc =
+and transl_include_functor ~generative ~input_repr ~yielding ~staticity
+      modl params scopes loc =
   let input_repr = transl_module_representation input_repr in
-  let inlined_attribute =
-    Translattribute.get_inlined_attribute_on_module modl
-  in
-  let modl = transl_module ~scopes Tcoerce_none None modl in
-  let arg =
+  let mod_block args =
     Lprim(block_of_module_representation ~loc:(to_location loc) input_repr,
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
-            params,
+            args,
           loc)
   in
-  let args = if generative then [arg; lambda_unit] else [arg] in
-  Lapply {
-    ap_loc = loc;
-    ap_func = modl;
-    ap_args = args;
-    ap_result_layout = Lambda.layout_module;
-    ap_region_close=Rc_normal;
-    ap_mode = not_alloc_stack;
-    ap_yielding = Translmode.transl_yielding_mode_l yielding;
-    ap_tailcall = Default_tailcall;
-    ap_inlined = inlined_attribute;
-    ap_specialised = Default_specialise;
-    ap_probe = None;}
+  let inlined_attribute =
+    Translattribute.get_inlined_attribute_on_module modl
+  in
+  let mod_apply ap_func ap_args =
+    { ap_loc = loc;
+      ap_func;
+      ap_args;
+      ap_result_layout = Lambda.layout_module;
+      ap_region_close = Rc_normal;
+      ap_mode = not_alloc_stack;
+      ap_yielding = Translmode.transl_yielding_mode_l yielding;
+      ap_tailcall = Default_tailcall;
+      ap_inlined = inlined_attribute;
+      ap_specialised = Default_specialise;
+      ap_probe = None }
+  in
+  let modl = transl_module ~scopes Tcoerce_none None modl in
+  let params = mod_block params in
+  match generative, Translmode.transl_staticity_mode staticity with
+  | false, Dynamic ->
+    Lapply (mod_apply modl [params])
+  | true, Dynamic ->
+    Lapply (mod_apply modl [params; lambda_unit])
+  | false, Static ->
+    Linstantiate (mod_apply modl [params])
+  | true, Static ->
+    Lapply (mod_apply (Linstantiate (mod_apply modl [params])) [lambda_unit])
 
 (* Update forward declaration in Translcore *)
 let _ =
@@ -1418,12 +1434,14 @@ let transl_toplevel_item ~scopes item =
         match incl.incl_kind with
         | Tincl_structure ->
             transl_module ~scopes Tcoerce_none None modl
-        | Tincl_functor { input_coercion; input_repr; yielding } ->
+        | Tincl_functor { input_coercion; input_repr;
+                          yielding; staticity } ->
             transl_include_functor ~generative:false modl input_coercion scopes
-              loc ~input_repr ~yielding
-        | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
+              loc ~input_repr ~yielding ~staticity
+        | Tincl_gen_functor { input_coercion; input_repr;
+                              yielding; staticity } ->
             transl_include_functor ~generative:true modl input_coercion scopes
-              loc ~input_repr ~yielding
+              loc ~input_repr ~yielding ~staticity
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in

@@ -1,5 +1,10 @@
 (* TEST
  modules = "minor_no_postpone_stub.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 module MP = Gc.Memprof

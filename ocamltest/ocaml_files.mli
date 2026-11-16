@@ -36,6 +36,15 @@ val ocamlopt_dot_opt : string
 
 val ocamlnat : string
 
+val js_of_ocaml : string
+
+(** Whether [js_of_ocaml] is installed, so that programs can be compiled with
+    [ocamlopt -target js_of_ocaml] *)
+val jsir_available : bool
+
+(** The JavaScript engine used to run JSIR programs ($NODE, or node) *)
+val node : string
+
 val cmpbyt : string
 
 val expect : string

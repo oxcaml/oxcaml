@@ -1011,9 +1011,7 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
   if !Clflags.typing_recovery then
     Typing_recovery_state.with_saved_types (fun () ->
         try delayed ()
-        with
-        | Error.In_context _
-        | Env.Error.In_context _ ->
+        with exn when Typing_recovery.is_recoverable exn ->
             let ty =
               new_global_var
                 (Jkind.of_new_sort

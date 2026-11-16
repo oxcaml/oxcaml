@@ -200,10 +200,43 @@ let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
   let make lhs rhs = Expr.Bin_op { ty; op; lhs; rhs } in
   match op with
   | And | Or -> make lhs rhs
+  | Div | Rem ->
+    (* Assume right-to-left evaluation rather than binding the operands, so
+       differences in exception order remain observable. *)
+    make lhs rhs
   | Add | Sub | Mul | Bit_and | Bit_or | Bit_xor | Shift_left | Shift_right
   | Shift_right_logical | Eq | Lt | Le | Gt | Ge ->
     bind_operand st rhs ~f:(fun rhs ->
         bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
+
+(* Guard integer division and remainder when [Division_by_zero] cannot be
+   caught. Evaluate both operands once, right-to-left, even when the divisor is
+   zero, returning the dividend in that case. *)
+let safe_div_or_rem (st : State.t) (nty : NumberTy.t) op ~lhs ~rhs =
+  let lhs_name = State.fresh st in
+  let rhs_name = State.fresh st in
+  let dividend = Expr.Read (Place.Variable lhs_name) in
+  let divisor = Expr.Read (Place.Variable rhs_name) in
+  let ty = Ty.Number nty in
+  let zero =
+    Expr.Convert
+      { expr = Expr.Const (Number.of_integral_bits nty.base 0L);
+        from = NumberTy.boxed nty.base;
+        to_ = nty
+      }
+  in
+  let body =
+    Expr.If
+      { condition = Expr.Bin_op { ty; op = Eq; lhs = divisor; rhs = zero };
+        if_true = dividend;
+        if_false = Expr.Bin_op { ty; op; lhs = dividend; rhs = divisor }
+      }
+  in
+  Expr.Let
+    { name = rhs_name;
+      expr = rhs;
+      body = Expr.Let { name = lhs_name; expr = lhs; body }
+    }
 
 let assign (st : State.t) ty target expr =
   match st.swarm.assertions with
@@ -218,26 +251,6 @@ let assign (st : State.t) ty target expr =
 
 let maybe_opaque st ~enabled ~probability expr =
   if enabled && with_probability st ~probability then Expr.Opaque expr else expr
-
-(* CR-soon xclerc: Add general expressions for shift counts. *)
-let gen_shift_count (st : State.t) (nty : NumberTy.t) =
-  let width =
-    match nty.base with
-    | Int -> Sys.int_size
-    | Nativeint -> Sys.word_size
-    | Int64 -> 64
-    | Int32 -> 32
-    | Int16 -> 16
-    | Int8 -> 8
-    | Float | Float32 ->
-      Misc.fatal_errorf "gen_shift_count: expected an integral type"
-  in
-  let count =
-    if Random.State.bool st.random_state
-    then random_element st [0; 1; width - 2; width - 1]
-    else Random.State.int st.random_state width
-  in
-  Expr.Const (Number.Int count)
 
 let gen_array_dimensions (st : State.t) =
   let dimensions =
@@ -348,15 +361,16 @@ let gen_exception (st : State.t) id =
     then Some (gen_record_or_scalar_type ~value_only:true st)
     else None
   in
-  { Exn.id; payload }
+  Exn.Generated { id; payload }
 
 let gen_exceptions (st : State.t) =
   if not st.swarm.exceptions
   then []
   else
-    List.init
-      (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
-      (gen_exception st)
+    Exn.Division_by_zero
+    :: List.init
+         (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
+         (gen_exception st)
 
 let gen_constructor_type (st : State.t) constructor_index =
   let args =
@@ -596,13 +610,32 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
               Random.State.int_in_range st.random_state ~min ~max
               |> Int64.of_int)
         in
+        let extrema =
+          Gen.create (fun () ->
+              let min, max =
+                match (base : NumberTy.Base.t) with
+                | Int -> Int64.of_int min_int, Int64.of_int max_int
+                | Nativeint ->
+                  ( Int64.of_nativeint Nativeint.min_int,
+                    Int64.of_nativeint Nativeint.max_int )
+                | Int64 -> Int64.min_int, Int64.max_int
+                | Int32 ->
+                  Int64.of_int32 Int32.min_int, Int64.of_int32 Int32.max_int
+                | Int16 -> -32768L, 32767L
+                | Int8 -> -128L, 127L
+                | Float | Float32 ->
+                  Misc.fatal_errorf "gen_const_int: expected an integral type"
+              in
+              if Random.State.bool st.random_state then min else max)
+        in
         let bits =
           Gen.run_exn
             (Gen.weighted st.random_state
                [ 5, small ~min:(-1) ~max:1;
                  5, small ~min:(-10) ~max:10;
+                 5, extrema;
                  10, Gen.create (fun () -> Random.State.bits64 st.random_state)
-                 (* CR-soon xclerc: Add max_int and min_int. *) ])
+               ])
         in
         Expr.Const (Number.of_integral_bits base bits))
   in
@@ -678,7 +711,7 @@ let can_gen_try (st : State.t) =
 
 let gen_handler (st : State.t) (env : Env.t) ~gen_body (exn : Exn.t) =
   let payload =
-    match exn.payload with
+    match Exn.payload exn with
     | Some ty
       when with_probability st ~probability:Config.payload_binding_probability
       ->
@@ -733,14 +766,18 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
           match binop with
           | Bin_op.Shift_left | Bin_op.Shift_right | Bin_op.Shift_right_logical
             ->
-            gen_shift_count st inner_ty
+            gen_shift_count st env inner_ty
           | _ -> gen_value st env (Ty.Number inner_ty)
         in
-        Expr.Convert
-          { from = inner_ty;
-            to_ = nty;
-            expr = bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
-          })
+        let expr =
+          match binop with
+          | (Div | Rem)
+            when (not (NumberTy.is_floating_point inner_ty))
+                 && not (Env.can_raise env Exn.Division_by_zero) ->
+            safe_div_or_rem st inner_ty binop ~lhs ~rhs
+          | _ -> bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
+        in
+        Expr.Convert { from = inner_ty; to_ = nty; expr })
   in
   let leaf =
     Gen.weighted st.random_state
@@ -753,6 +790,36 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
          1, gen_fun_call st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
+
+and gen_shift_count (st : State.t) env (nty : NumberTy.t) =
+  let width =
+    match nty.base with
+    | Int -> Sys.int_size
+    | Nativeint -> Sys.word_size
+    | Int64 -> 64
+    | Int32 -> 32
+    | Int16 -> 16
+    | Int8 -> 8
+    | Float | Float32 ->
+      Misc.fatal_errorf "gen_shift_count: expected an integral type"
+  in
+  if Random.State.bool st.random_state
+  then
+    let count =
+      if Random.State.bool st.random_state
+      then random_element st [0; 1; width - 2; width - 1]
+      else Random.State.int st.random_state width
+    in
+    Expr.Const (Number.Int count)
+  else
+    let ty = Ty.Number (NumberTy.boxed Int) in
+    let expr = gen_value st env ty in
+    (* Make the remainder nonnegative, including for [min_int]. Unlike masking
+       with [width - 1], this also covers every count for tagged integers. *)
+    let nonnegative =
+      bin_op st ty Bit_and ~lhs:expr ~rhs:(Expr.Const (Number.Int max_int))
+    in
+    bin_op st ty Rem ~lhs:nonnegative ~rhs:(Expr.Const (Number.Int width))
 
 (* CR-someday xclerc: These function calls can have side effects, because of
    mutable records. Outside [May_raise] mode we rely on a de facto right-to-left
@@ -876,7 +943,7 @@ and gen_bool (st : State.t) env =
 
 and gen_raise (st : State.t) (env : Env.t) : Expr.raise =
   let exn = random_element st env.catchable_exceptions in
-  let payload = Option.map (fun ty -> gen_value st env ty) exn.payload in
+  let payload = Option.map (fun ty -> gen_value st env ty) (Exn.payload exn) in
   let notrace =
     with_probability st ~probability:Config.raise_notrace_probability
   in

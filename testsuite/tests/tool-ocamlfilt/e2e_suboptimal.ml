@@ -102,17 +102,17 @@ let deferred () =
    would aim to fix.
 
    - Method bodies lose their name: every method below mangles to an
-     anonymous [fn] -- mostly a bare top-level [E2e_suboptimal.fn],
-     rarely as [<class>.fn] -- so methods are indistinguishable from
-     each other, from the unrelated top-level [scale], and from
-     ordinary anonymous functions.
+     anonymous [fn] under its class or object ([E2e_suboptimal.dog.fn],
+     [E2e_suboptimal.make_logger.object.fn]), so the methods of a class
+     are indistinguishable from each other and from anonymous functions
+     in it.
    - Instance variables ([val nick], [val count]) and their accessors
      produce no symbol of their own.
    - A [virtual] class yields no constructor symbol, and [inherit]
      leaves no trace in any name.
    - An immediate object ([object ... end] with no class, in
-     [make_logger]) loses even the name of the binding it is attached
-     to. *)
+     [make_logger]) is only named [object], after its enclosing
+     function. *)
 let scale k = k + 1
 
 class virtual animal = object

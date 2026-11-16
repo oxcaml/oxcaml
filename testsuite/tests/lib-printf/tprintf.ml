@@ -80,6 +80,9 @@ try
   | 31 ->
      test (sprintf "%u" (-1) = "2147483647");
      test (sprintf "%#u" (-1) = "2_147_483_647");
+  | 32 ->
+     test (sprintf "%u" (-1) = "4294967295");
+     test (sprintf "%#u" (-1) = "4_294_967_295");
   | 63 ->
      test (sprintf "%u" (-1) = "9223372036854775807");
      test (sprintf "%#u" (-1) = "9_223_372_036_854_775_807");
@@ -107,6 +110,8 @@ try
   begin match Sys.int_size with
   | 31 ->
      test (sprintf "%x" (-42) = "7fffffd6");
+  | 32 ->
+     test (sprintf "%x" (-42) = "ffffffd6");
   | 63 ->
      test (sprintf "%x" (-42) = "7fffffffffffffd6");
   | _ -> test false
@@ -130,6 +135,8 @@ try
   begin match Sys.int_size with
   | 31 ->
      test (sprintf "%X" (-42) = "7FFFFFD6");
+  | 32 ->
+     test (sprintf "%X" (-42) = "FFFFFFD6");
   | 63 ->
      test (sprintf "%X" (-42) = "7FFFFFFFFFFFFFD6");
   | _ -> test false
@@ -153,6 +160,8 @@ try
   begin match Sys.int_size with
   | 31 ->
      test (sprintf "%o" (-42) = "17777777726");
+  | 32 ->
+     test (sprintf "%o" (-42) = "37777777726");
   | 63 ->
      test (sprintf "%o" (-42) = "777777777777777777726");
   | _ -> test false
