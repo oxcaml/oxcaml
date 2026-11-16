@@ -71,7 +71,28 @@
 /* Define ASM_SIZE_TYPE_DIRECTIVES when the ".size" and ".type" assembler
    directives can be used */
 
+/* Codegen-variant axis macro.
+
+   WITH_FRAME_POINTERS is defined (to 1) when frame pointers are on and
+   left undefined when they are off: test it with #ifdef or defined().
+
+   The template below records this installation's default, which is what
+   C code compiled against these headers with no further flags sees.  A
+   compilation for a specific variant defines
+   CAML_CODEGEN_VARIANT_EXPLICIT on the command line, together with
+   -DWITH_FRAME_POINTERS when the variant has frame pointers; the default
+   below is then skipped.  The build does so for the variant runtime
+   archives (stdlib/dune_rules/gen.ml).  Without
+   CAML_CODEGEN_VARIANT_EXPLICIT, a -DWITH_FRAME_POINTERS on the command
+   line turns frame pointers on whatever the default is.
+
+   Nothing more is implied: the native stack/frame layout macros derived
+   from it in config.h and stack.h additionally require -DNATIVE_CODE and
+   the TARGET_<arch> define, as they always have. */
+
+#ifndef CAML_CODEGEN_VARIANT_EXPLICIT
 #undef WITH_FRAME_POINTERS
+#endif
 
 #undef WITH_ADDRESS_SANITIZER
 

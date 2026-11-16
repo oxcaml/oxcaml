@@ -90,6 +90,11 @@ boot-runtest: boot-compiler
 	$(dune) build $(coverage_dune_flags) --force $(runtest_targets)
 
 compiler: boot-compiler
+# Codegen-variant runtime archives (e.g. libasmrun_fp.a) live in the boot
+# context but are deliberately not part of boot-compiler (alias hygiene:
+# @runtime_all stays variant-free); build them here so `make compiler` and
+# everything downstream of it (e.g. `make _install`) provides them.
+	$(dune) build $(coverage_dune_flags) @runtime_variants
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" $(compiler_jsoo_env) \
           $(dune) build --always-show-command-line $(ws_main) \

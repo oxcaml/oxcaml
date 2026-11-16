@@ -717,6 +717,12 @@ AC_ARG_ENABLE([address-sanitizer],
   [AS_HELP_STRING([--enable-address-sanitizer],
     [use Address Sanitizer and alter codegen to expose native OCaml operations to ASAN (also enables frame pointers)])])
 
+AC_ARG_ENABLE([codegen-variants],
+  [AS_HELP_STRING([--disable-codegen-variants],
+    [do not build runtime archives for non-default codegen variants
+     (e.g. frame pointers); such variants are only available on x86_64
+     Linux/macOS with gcc or clang])])
+
 AC_ARG_ENABLE([cpp-mangling],
   [AS_HELP_STRING([--enable-cpp-mangling],
     [use cpp mangling for exported symbols])])
@@ -3100,6 +3106,28 @@ AS_IF([test x"$enable_address_sanitizer" = "xyes"],
   [AC_MSG_NOTICE([not using Address Sanitizer])
   address_sanitizer=false])
 
+## Codegen variants
+
+dnl Whether to additionally build runtime archives for non-default codegen
+dnl variants (currently: the frame-pointer setting opposite to this
+dnl configuration's default), so that one install can link programs built
+dnl with either -frame-pointers or -no-frame-pointers. Silently disabled on
+dnl platforms where frame pointers are unsupported, and under Address
+dnl Sanitizer (ASan forces frame pointers, so the base variant may not be
+dnl built there).
+
+AS_IF([test x"$enable_codegen_variants" != "xno" \
+        -a x"$address_sanitizer" = "xfalse"],
+  [AS_CASE([$target],
+    [x86_64-*-linux*|x86_64-*-darwin*],
+     [AS_CASE([$ocaml_cc_vendor],
+        [clang-*|gcc-*],
+         [codegen_variants=true
+         AC_MSG_NOTICE([building codegen-variant runtime archives])],
+         [codegen_variants=false])],
+    [codegen_variants=false])],
+  [codegen_variants=false])
+AC_SUBST([codegen_variants])
 
 ## CPP mangling
 

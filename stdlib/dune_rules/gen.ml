@@ -293,21 +293,80 @@ let write_primitives_dune ppf =
 
 (* Generate runtime.dune for the bootstrap build (which builds the runtime) *)
 let write_runtime_dune ppf =
+  (* Codegen-variant (frame-pointer) dimension of the native runtime
+     archives. THE NAMING RULE LIVES HERE: the unsuffixed archive names
+     (libasmrun.a, libasmrund.a, ...) always serve the configure-time
+     default frame-pointer mode, and the non-default mode's archives are
+     suffixed with "_" ^ the ABSOLUTE name of that mode: "fp" or "base".
+     So a no-frame-pointers configure additionally builds libasmrun_fp.a
+     etc., and a --enable-frame-pointers configure builds libasmrun_base.a
+     etc. The absolute names must agree with Codegen_variant.to_string
+     (utils/codegen_variant.ml) and with the archive-name composition in
+     asmcomp/asmlink.ml (runtime_lib), which resolves these archives at
+     link time. gen.ml is a standalone generator that cannot depend on
+     compilerlibs, so the configure default reaches it through
+     build_settings.txt (keys codegen_default_fp and
+     build_codegen_variants, written by Makefile.upstream from
+     Makefile.config). *)
+  let bool_setting key =
+    match setting key with
+    | ["true"] -> true
+    | ["false"] -> false
+    | [] -> false (* an unconfigured tree has no value *)
+    | v ->
+       failwith
+         (sprintf "Setting %s should be true or false, got: %s"
+            key (String.concat " " v))
+  in
+  let default_fp = bool_setting "codegen_default_fp" in
+  let build_codegen_variants = bool_setting "build_codegen_variants" in
+  let codegen_suff ~fp =
+    match fp with
+    | `Default -> ""
+    | `Other -> if default_fp then "_base" else "_fp"
+  in
+  (* A variant archive states its frame-pointer mode in full:
+     -DCAML_CODEGEN_VARIANT_EXPLICIT makes m.h skip its definition for the
+     configure default, and -DWITH_FRAME_POINTERS=1 is added when the mode
+     has frame pointers.  The default archives pass neither and take m.h's
+     definition.  The flags are appended AFTER the configure-provided
+     flags (command-line order wins).  Assembly (.S) files need the macro
+     too (amd64.S and arm64.S include m.h and test WITH_FRAME_POINTERS),
+     hence the separate aspp list. *)
+  let explicit_variant_flag = "-DCAML_CODEGEN_VARIANT_EXPLICIT" in
+  let codegen_cc_flags ~fp =
+    match fp with
+    | `Default -> []
+    | `Other ->
+       if default_fp
+       then [explicit_variant_flag]
+       else [explicit_variant_flag; "-DWITH_FRAME_POINTERS=1";
+             "-fno-omit-frame-pointer"; "-g"]
+  in
+  let codegen_aspp_flags ~fp =
+    match fp with
+    | `Default -> []
+    | `Other ->
+       if default_fp
+       then [explicit_variant_flag]
+       else [explicit_variant_flag; "-DWITH_FRAME_POINTERS=1"]
+  in
   let variant_suff ~variant =
     match variant with
     | `Normal -> ""
     | `Debug -> "d"
     | `PIC | `Shared -> "_pic"
   in
-  let obj_suff ~variant ~mode =
+  let obj_suff ~variant ~mode ~fp =
     (match mode with
      | `Byte -> ".b"
      | `Native -> ".n") ^
     variant_suff ~variant ^
+    codegen_suff ~fp ^
     ".o"
   in
-  let obj_name ~variant ~mode src =
-    Filename.(basename src |> remove_extension) ^ obj_suff ~variant ~mode
+  let obj_name ~variant ~mode ~fp src =
+    Filename.(basename src |> remove_extension) ^ obj_suff ~variant ~mode ~fp
   in
   let mode_flags ~mode =
     match mode with
@@ -329,13 +388,15 @@ let write_runtime_dune ppf =
   in
 
   (* object files *)
-  let compile_object ~variant ~mode src =
+  let compile_object ~variant ~mode ~fp src =
     match Filename.extension src with
     | ".c" | ".S" ->
        let cmd =
          match Filename.extension src with
          | ".c" -> setting "cc" @ mode_flags ~mode @ variant_flags ~variant
+                   @ codegen_cc_flags ~fp
          | ".S" -> setting "aspp" @ variant_flags ~variant
+                   @ codegen_aspp_flags ~fp
          | s -> failwith ("Unknown source type " ^ s)
        in
        fprintf ppf
@@ -343,30 +404,32 @@ let write_runtime_dune ppf =
          \ (target %s)\n\
          \ (deps %s (glob_files caml/*.{h,tbl}) (glob_files *.h))\n\
          \ (action (chdir .. (run %s %s -o %%{target}))))\n"
-         (obj_name ~variant ~mode src)
+         (obj_name ~variant ~mode ~fp src)
          (Filename.basename src)
          (String.concat " " cmd)
          src
     | s -> failwith ("Unknown source type " ^ s)
   in
 
-  (* library archives *)
-  let archive ~variant ~mode =
+  (* library archives; returns the archive file name *)
+  let archive ~variant ~mode ~fp =
     let srcs = sources ~variant ~mode in
-    let objs = List.map (obj_name ~variant ~mode) srcs in
+    let objs = List.map (obj_name ~variant ~mode ~fp) srcs in
     let target, cmd =
       match variant, mode with
       | (`Normal|`Debug|`PIC) as variant, `Byte ->
+         assert (fp = `Default);
          "libcamlrun" ^ variant_suff ~variant ^ ".a",
          setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
       | (`Normal|`Debug|`PIC) as variant, `Native ->
-         "libasmrun" ^ variant_suff ~variant ^ ".a",
+         "libasmrun" ^ variant_suff ~variant ^ codegen_suff ~fp ^ ".a",
          setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
       | `Shared, `Byte ->
+         assert (fp = `Default);
          "libcamlrun_shared.so",
          setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"] @ setting "bytecclibs"
       | `Shared, `Native ->
-         "libasmrun_shared.so",
+         "libasmrun_shared" ^ codegen_suff ~fp ^ ".so",
          setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"]
            @ setting "nativecclibs"
     in
@@ -376,14 +439,32 @@ let write_runtime_dune ppf =
       \ (target %s)\n\
       \ (deps %s)\n\
       \ (action (progn (run rm -f %%{target}) (run %s))))\n"
-      target (String.concat " " objs) (String.concat " " cmd)
+      target (String.concat " " objs) (String.concat " " cmd);
+    target
   in
 
-  [`Byte; `Native] |> List.iter (fun mode ->
-    [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
-      sources ~variant ~mode |> List.iter (compile_object ~variant ~mode));
-    [`Normal; `Debug; `PIC; `Shared] |> List.iter (fun variant ->
-      archive ~variant ~mode));
+  let default_archives =
+    [`Byte; `Native] |> List.concat_map (fun mode ->
+      [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
+        sources ~variant ~mode
+        |> List.iter (compile_object ~variant ~mode ~fp:`Default));
+      [`Normal; `Debug; `PIC; `Shared] |> List.map (fun variant ->
+        archive ~variant ~mode ~fp:`Default))
+  in
+  (* Native archives for the non-default frame-pointer mode. These are
+     deliberately kept out of @runtime_all (and hence out of
+     `make boot-compiler`); they are built by the @runtime_variants alias
+     (hooked into `make compiler`, see Makefile.common-ox). *)
+  let variant_archives =
+    if not build_codegen_variants then []
+    else begin
+      [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
+        sources ~variant ~mode:`Native
+        |> List.iter (compile_object ~variant ~mode:`Native ~fp:`Other));
+      [`Normal; `Debug; `PIC; `Shared] |> List.map (fun variant ->
+        archive ~variant ~mode:`Native ~fp:`Other)
+    end
+  in
 
   (* primitives *)
   write_primitives_dune ppf;
@@ -399,7 +480,7 @@ let write_runtime_dune ppf =
     (String.concat " " prim_files);
 
   (* ocamlrun and ocamlrund *)
-  compile_object ~variant:`Normal ~mode:`Byte "runtime/prims.c";
+  compile_object ~variant:`Normal ~mode:`Byte ~fp:`Default "runtime/prims.c";
   [`Normal; `Debug] |> List.iter (fun variant ->
     let target = "ocamlrun" ^ variant_suff ~variant in
     fprintf ppf
@@ -427,10 +508,17 @@ let write_runtime_dune ppf =
   ))
 |};
 
-  (* aliases *)
-  fprintf ppf "(alias
-    (name runtime_all)
-    (deps ocamlrun ocamlrund (glob_files *.{a,so})))\n";
+  (* aliases. runtime_all must list the default-codegen archives explicitly
+     (not a glob) so that the codegen-variant archives never leak into
+     boot-compiler builds. *)
+  fprintf ppf
+    "(alias\n    (name runtime_all)\n    (deps ocamlrun ocamlrund %s))\n"
+    (String.concat " " default_archives);
+  (match variant_archives with
+   | [] -> fprintf ppf "(alias (name runtime_variants))\n"
+   | archives ->
+      fprintf ppf "(alias (name runtime_variants) (deps %s))\n"
+        (String.concat " " archives));
   fprintf ppf "(alias (name runtime) (deps libasmrun.a))\n";
   fprintf ppf "(alias (name stdlib) (deps (alias runtime_all)))\n"
 
