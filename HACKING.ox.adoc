@@ -74,22 +74,30 @@ directory to regenerate the printing script.
 ## Benchmarking
 
 A small but relatively comprehensive benchmark is to run our compiler against `typing/typecore.ml`. First we install the
-opam switch with FP (frame pointers) enabled; adjust the version number as needed:
+opam switch to build with; adjust the version number as needed:
 
-    $ opam switch create 4.14.1-fp --packages=ocaml-variants.4.14.1+options,ocaml-option-fp --repos=default
+    $ opam switch create 4.14.1 --packages=ocaml-variants.4.14.1+options --repos=default
+
+You no longer need a dedicated opam switch (or a separate OxCaml build) to get
+frame pointers: OxCaml selects frame-pointer code generation per invocation.
+Pass `-frame-pointers` to `ocamlopt` (or set `OCAMLPARAM=_,frame-pointers=1`)
+when compiling the code you want to profile; a single OxCaml installation
+serves both variants, with the frame-pointer and non-frame-pointer runtimes
+and libraries installed under `lib/ocaml/variants/`. Configuring OxCaml with
+`--enable-frame-pointers` now only selects which variant is the default.
+(Frame pointers are supported on x86-64 Linux and macOS.)
 
 Remember to check that the newly installed switch is being used:
 
     $ opam switch
     #   switch     compiler                                         description
-        4.14.1     ocaml-base-compiler.4.14.1                       4.14.1
-    ->  4.14.1-fp  ocaml-option-fp.1,ocaml-variants.4.14.1+options  4.14.1-fp
+    ->  4.14.1     ocaml-variants.4.14.1+options                    4.14.1
 
 Then build the compiler &mdash; the following command will build the compiler using the opam switch, then use the newly-built compiler to build itself.
 
     $ make compiler
 
-We can now benchmark our compiler against `typecore.ml`. The following `_bootinstall` is built using the opam switch and has FP enabled.
+We can now benchmark our compiler against `typecore.ml`. The following `_bootinstall` is built using the opam switch.
 
     $ cd _build/main
     $ perf stat -r 5 ../_bootinstall/bin/ocamlc.opt -strict-sequence -principal -w +a-4-9-40-41-42-44-45-48-66-70 -warn-error A -bin-annot -safe-string -strict-formats -w -67 -g -bin-annot -I .ocamlfrontend.objs/byte -I ../runtime_stdlib_install/lib/ocaml_runtime_stdlib/  -intf-suffix .ml -no-alias-deps -o .ocamlfrontend.objs/byte/typecore.cmo -c -impl typecore.ml

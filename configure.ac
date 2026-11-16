@@ -711,7 +711,10 @@ AC_ARG_ENABLE([native-toplevel],
 
 AC_ARG_ENABLE([frame-pointers],
   [AS_HELP_STRING([--enable-frame-pointers],
-    [use frame pointers in runtime and generated code])])
+    [use frame pointers by default in generated code, and select the
+     frame-pointer runtime and library variant as the install default
+     (either default can be overridden per invocation with
+     -frame-pointers/-no-frame-pointers)])])
 
 AC_ARG_ENABLE([address-sanitizer],
   [AS_HELP_STRING([--enable-address-sanitizer],
@@ -719,9 +722,9 @@ AC_ARG_ENABLE([address-sanitizer],
 
 AC_ARG_ENABLE([codegen-variants],
   [AS_HELP_STRING([--disable-codegen-variants],
-    [do not build runtime archives for non-default codegen variants
-     (e.g. frame pointers); such variants are only available on x86_64
-     Linux/macOS with gcc or clang])])
+    [do not build runtime archives and library trees for non-default
+     codegen variants (e.g. frame pointers); such variants are only
+     available on x86_64 Linux/macOS with gcc or clang])])
 
 AC_ARG_ENABLE([cpp-mangling],
   [AS_HELP_STRING([--enable-cpp-mangling],

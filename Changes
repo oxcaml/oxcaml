@@ -1,6 +1,29 @@
 OCaml 5.4.1
 -----------
 
+### Code generation and optimizations:
+
+- Make frame-pointer code generation a per-invocation choice on x86-64
+  Linux/macOS: `ocamlopt` accepts `-frame-pointers`/`-no-frame-pointers`
+  (also `frame-pointers=0|1` in `OCAMLPARAM`), and a single installation
+  serves both codegen variants. The runtime ships variant archives
+  (`libasmrun*_fp`/`libasmrun*_base`), the stdlib and otherlibs are
+  installed per variant under `lib/ocaml/variants/<name>` (`fp` or
+  `base`), and the compiler selects the matching runtime and library
+  tree per invocation. Native artifacts (`.cmx`/`.cmxa`/`.cmxs`) now
+  record a codegen-variant fingerprint that is enforced at compile,
+  link, and `Dynlink.loadfile` time. Configuring with
+  `--enable-frame-pointers` now only selects the default variant:
+  `ocamlopt -config` reports that default as `with_frame_pointers` and
+  gains a `codegen_variants` line listing the installed non-default
+  variants; `--disable-codegen-variants` skips building the non-default
+  variant. The LLVM backend still requires frame pointers
+  (`-no-frame-pointers` is rejected with it), and `ocamlnat` only
+  evaluates phrases with the frame-pointer setting it was built with.
+  ocamltest gains a `codegen_variant` variable and
+  `fp_variant_available`/`base_variant_available` predicates.
+  (Jacob Van Buren)
+
 ### Bug fixes:
 
 - #14010: Fix miscompilation / liveness errors for string operations
