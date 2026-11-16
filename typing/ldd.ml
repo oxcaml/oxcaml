@@ -114,8 +114,6 @@ module Make (V : Ordered) = struct
       if Var_id.needs_log var.id then log (Solve_var (var, var.state));
       var.state <- Solved node
 
-  let var_id var = var.id
-
   let compare_var_full (a : var) (b : var) : int =
     match a.state, b.state with
     | Rigid na, Rigid nb -> V.compare na nb

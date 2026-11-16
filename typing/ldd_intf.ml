@@ -28,13 +28,6 @@ module type S = sig
 
   type var
 
-  module Var_id : sig
-    type t
-  end
-
-  (** Unique and stable for non-rigid variables. *)
-  val var_id : var -> Var_id.t
-
   module Name : Ordered
 
   (** Constructors. *)

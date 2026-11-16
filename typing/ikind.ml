@@ -162,6 +162,11 @@ module Solver = struct
             table, so that a kind cached in another mode cannot skip the
             callback. Constructor coefficients are still computed in [Normal]
             mode. *)
+    | Round_up_except_vars of (Types.type_expr -> Ldd.node)
+        (** Like [Round_up], but the kind of a non-generic type variable is
+            given by the callback (capped by its jkind), so that it can stand
+            for the kind of whatever the variable is solved to. Used for
+            omnidirectional mode crossing. *)
     | Round_up
 
   let constr_to_string (path : Path.t) : string =
@@ -249,9 +254,10 @@ module Solver = struct
 
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
     match ctx.mode, name with
-    | (Normal | Normal_except_vars _), _ | Round_up, Provenance _ ->
+    | (Normal | Normal_except_vars _), _
+    | (Round_up | Round_up_except_vars _), Provenance _ ->
       Ldd.node_of_var (Ldd.rigid name)
-    | Round_up, _ -> Ldd.const Axis_lattice.top
+    | (Round_up | Round_up_except_vars _), _ -> Ldd.const Axis_lattice.top
 
   (** A rigid variable corresponding to a type parameter [t]. *)
   let rigid (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
@@ -502,7 +508,7 @@ module Solver = struct
     let constr_ctx =
       match constr_ctx.mode with
       | Normal_except_vars _ -> { constr_ctx with mode = Normal }
-      | Normal | Round_up -> constr_ctx
+      | Normal | Round_up | Round_up_except_vars _ -> constr_ctx
     in
     let base, coeffs =
       constr_kind constr_ctx ~min_arity:(List.length args) path
@@ -581,6 +587,13 @@ module Solver = struct
   (** Compute the kind for [t]. *)
   and kind ?(check_principality = true) ~use_tables (ctx : ctx)
       (ty : Types.type_expr) : Ldd.node =
+    let check_principality =
+      match ctx.mode with
+      | Normal | Normal_except_vars _ | Round_up -> check_principality
+      | Round_up_except_vars _ ->
+        (* Principality is not checked when using omnidirectionality. *)
+        false
+    in
     if check_principality && not (is_principal_type ty)
     then Ldd.const Axis_lattice.top
     else
@@ -635,11 +648,19 @@ module Solver = struct
     match desc with
     | Types.Tvar { name = _name; jkind }
     | Types.Tivar { name = _name; jkind; ivar = _ } ->
-      (match ctx.mode with
-      | Normal_except_vars on_var -> on_var ty
-      | Normal | Round_up -> ());
-      (* Keep a rigid param, but cap it by its annotated jkind. *)
-      self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
+      (* Keep a rigid param (or a placeholder, for a non-generic variable in
+         [Round_up_except_vars]), but cap it by its annotated jkind. *)
+      let param =
+        match ctx.mode with
+        | Round_up_except_vars kind_of_var
+          when Types.get_level ty <> Btype.generic_level ->
+          kind_of_var ty
+        | Normal_except_vars on_var ->
+          on_var ty;
+          rigid ctx ty
+        | Normal | Round_up | Round_up_except_vars _ -> rigid ctx ty
+      in
+      self_provenance (Ldd.meet param (ckind_of_jkind child_ctx jkind))
     | Types.Tunivar { name = _name; jkind } ->
       (* Keep a rigid param, but cap it by its annotated jkind. *)
       self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
@@ -1763,13 +1784,129 @@ let crossing_of_jkind ~(context : Jkind.jkind_context) env
       let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
       Axis_lattice.to_mode_crossing lat
 
-let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
+let rounded_up_kind env ty =
   let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
-  Solver.round_up (Solver.kind ~use_tables:false ctx ty)
+  Solver.normalize (Solver.kind ~use_tables:false ctx ty)
+
+let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
+  Solver.round_up (rounded_up_kind env ty)
 
 let crossing_of_type env (ty : Types.type_expr) : Mode.Crossing.t =
   let lat = round_up_type env ty in
   Axis_lattice.to_mode_crossing lat
+
+let upon_shape_later = Defined_later.Fun.create ~name:"Ctype.upon_shape"
+
+let upon_shape env ty ~run ~default =
+  Defined_later.Fun.get upon_shape_later env ty ~run ~default
+
+module Placeholder = struct
+  (** A solver variable that stands for the kind of a type variable, until it is
+      linked to a non-variable type or defaulted. *)
+  type t =
+    { type_var : Types.type_expr;
+      ldd_var : Ldd.var
+    }
+
+  let create type_var = { type_var; ldd_var = Ldd.new_var () }
+
+  module Ctx = struct
+    (** The placeholders of [kind_with_placeholders].
+
+        Not backtracked: [t] is only valid while within a given
+        [upon_crossing_of_type]. Callers must [take ()] the context before
+        returning.
+
+        We use a [list] in place of a [Hashtbl.t] since the number of
+        placeholders is usually small. *)
+    type nonrec t = t list
+
+    let t : t ref = ref []
+
+    let[@inline always] reset () = t := []
+
+    let take () =
+      let placeholders = !t in
+      t := [];
+      placeholders
+
+    let find_or_add_placeholder type_var =
+      let rec loop type_var = function
+        | [] ->
+          let p = create type_var in
+          t := p :: !t;
+          p
+        | p :: ps ->
+          if Types.eq_type type_var p.type_var then p else loop type_var ps
+      in
+      loop type_var !t
+  end
+end
+
+let placeholder_kind_of_var type_var =
+  Ldd.node_of_var (Placeholder.Ctx.find_or_add_placeholder type_var).ldd_var
+
+let round_up_except_placeholders =
+  Solver.Round_up_except_vars placeholder_kind_of_var
+
+(* [kind_with_placeholders env ty] is [ty]'s kind with each unsolved type
+   variable's kind replaced by a new placeholder. The caller must take those
+   placeholders with [Placeholder.Ctx.take] straight away. They are not
+   registered or solved yet. *)
+let kind_with_placeholders env (ty : Types.type_expr) =
+  Placeholder.Ctx.reset ();
+  let ctx = create_ctx ~mode:round_up_except_placeholders ~env:(Some env) in
+  Solver.normalize (Solver.kind ~use_tables:false ctx ty)
+
+let crossing_of_kind kind = Axis_lattice.to_mode_crossing (Ldd.round_up kind)
+
+let rec when_crossing_known env ~kind ~(placeholders : Placeholder.t list)
+    ~known =
+  match placeholders with
+  | [] -> known (crossing_of_kind kind)
+  | p :: placeholders ->
+    let solve kind_of_p ~new_placeholders =
+      Ldd.solve_lfp p.ldd_var kind_of_p;
+      when_crossing_known env ~kind
+        ~placeholders:(List.rev_append new_placeholders placeholders)
+        ~known
+    in
+    let[@inline always] default () =
+      solve (rounded_up_kind env p.type_var) ~new_placeholders:[]
+    in
+    (* Because we don't have guards of type variables, a placeholder
+       variable may be generalized *before* we solve the placeholder.
+
+       In this case, it is consistent to default it with lazy defaulting. *)
+    if Types.get_level p.type_var = Btype.generic_level
+    then default ()
+    else
+      upon_shape env p.type_var
+        ~run:(fun _ ->
+          let kind_of_p = kind_with_placeholders env p.type_var in
+          solve kind_of_p ~new_placeholders:(Placeholder.Ctx.take ()))
+        ~default
+
+let upon_crossing_of_type env (ty : Types.type_expr) ~cross ~later =
+  let kind = kind_with_placeholders env ty in
+  match Placeholder.Ctx.take () with
+  | [] -> cross (crossing_of_kind kind)
+  | _ :: _ as placeholders -> (
+    (* Fast-path optimization: if the crossing is immediately known,
+       we can return [cross crossing] instead of allocating a temporary
+       mode variable via [later ()]. *)
+    let known_now = ref None in
+    let run_later = ref None in
+    when_crossing_known env ~kind ~placeholders ~known:(fun crossing ->
+        match !run_later with
+        | None -> known_now := Some crossing
+        | Some run -> run (cross crossing));
+    match !known_now with
+    | Some crossing -> cross crossing
+    | None ->
+      let result, ~run = later () in
+      run_later := Some run;
+      result)
 
 type sub_or_intersect = Jkind.sub_or_intersect
 
