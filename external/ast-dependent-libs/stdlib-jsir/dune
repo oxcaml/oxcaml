@@ -20,10 +20,16 @@
  (enabled_if %{env:OXCAML_BUILD_STDLIB_JSIR=false})
  (files ../stdlib/dune_rules/gen.ml))
 
+; gen.ml links the codegen-variant name tables (see stdlib/dune_rules/dune).
+
+(copy_files#
+ (enabled_if %{env:OXCAML_BUILD_STDLIB_JSIR=false})
+ (files ../../../utils/codegen_variant_name.ml))
+
 (executable
  (name gen)
  (enabled_if %{env:OXCAML_BUILD_STDLIB_JSIR=false})
- (modules gen)
+ (modules gen codegen_variant_name)
  (modes native))
 
 (executable

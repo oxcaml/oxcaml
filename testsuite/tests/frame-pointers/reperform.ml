@@ -1,6 +1,6 @@
 (* TEST
-   fp_variant_available;
    codegen_variant = "fp";
+   variant_available;
    script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
    config_script;
    readonly_files = "fp_backtrace.c";

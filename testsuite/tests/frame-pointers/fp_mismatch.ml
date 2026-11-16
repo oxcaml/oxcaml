@@ -1,6 +1,8 @@
 (* TEST
- fp_variant_available;
- base_variant_available;
+ codegen_variant = "fp";
+ variant_available;
+ codegen_variant = "base";
+ variant_available;
  readonly_files = "fp_unit.ml";
  setup-ocamlopt.byte-build-env;
  codegen_variant = "fp";

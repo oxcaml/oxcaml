@@ -1570,35 +1570,34 @@ let only_stack_checks_codegen = Actions.make
    correct if the variant trees are absent (e.g. --disable-codegen-variants
    builds, or incomplete installs). *)
 let codegen_variant_available name =
-  let is_default =
-    match name with
-    | "fp" -> Ocamltest_config.frame_pointers
-    | "base" -> not Ocamltest_config.frame_pointers
-    | _ -> false
-  in
-  is_default ||
+  String.equal name Ocaml_flags.default_codegen_variant ||
   (let dir =
      Filename.make_path [Ocaml_directories.stdlib; "variants"; name]
    in
    Sys.file_exists dir && Sys.is_directory dir)
 
-let fp_variant_available = Actions.make
-  ~name:"fp_variant_available"
+(* TSL actions take no arguments, so the variant to probe is the value of
+   the [codegen_variant] variable; set it before this action, e.g.
+     codegen_variant = "fp";
+     variant_available;
+   An unset variable names the install's default variant (always
+   available). *)
+let variant_available = Actions.make
+  ~name:"variant_available"
   ~description:"Passes if the tested install can compile and link native \
-                code with frame pointers (codegen_variant = \"fp\")"
+                code for the codegen variant named by the codegen_variant \
+                variable (the install's default variant when unset)"
   ~does_something:false
-  (Actions_helpers.predicate (codegen_variant_available "fp")
-    "fp codegen variant available"
-    "fp codegen variant not available")
-
-let base_variant_available = Actions.make
-  ~name:"base_variant_available"
-  ~description:"Passes if the tested install can compile and link native \
-                code without frame pointers (codegen_variant = \"base\")"
-  ~does_something:false
-  (Actions_helpers.predicate (codegen_variant_available "base")
-    "base codegen variant available"
-    "base codegen variant not available")
+  (fun log env ->
+    let name =
+      match Ocaml_flags.codegen_variant env with
+      | None -> Ocaml_flags.default_codegen_variant
+      | Some name -> name
+    in
+    Actions_helpers.predicate (codegen_variant_available name)
+      (Printf.sprintf "%s codegen variant available" name)
+      (Printf.sprintf "%s codegen variant not available" name)
+      log env)
 
 let ocamldoc = Ocaml_tools.ocamldoc
 module Ocamldoc = (val ocamldoc)
@@ -1828,6 +1827,5 @@ let init () =
     no_stack_checks;
     only_default_codegen;
     only_stack_checks_codegen;
-    fp_variant_available;
-    base_variant_available
+    variant_available
   ]

@@ -726,6 +726,14 @@ AC_ARG_ENABLE([codegen-variants],
      codegen variants (e.g. frame pointers); such variants are only
      available on x86_64 Linux/macOS with gcc or clang])])
 
+AC_ARG_WITH([codegen-variants],
+  [AS_HELP_STRING([--with-codegen-variants=NAME,NAME],
+    [comma- or space-separated list of non-default codegen variant names
+     to build runtime archives and library trees for (e.g. fp, base);
+     an empty list builds none, like --disable-codegen-variants; without
+     this option, defaults to flipping each supported axis from the
+     configure default])])
+
 AC_ARG_ENABLE([cpp-mangling],
   [AS_HELP_STRING([--enable-cpp-mangling],
     [use cpp mangling for exported symbols])])
@@ -3111,28 +3119,86 @@ AS_IF([test x"$enable_address_sanitizer" = "xyes"],
 
 ## Codegen variants
 
-dnl Whether to additionally build runtime archives for non-default codegen
-dnl variants (currently: the frame-pointer setting opposite to this
-dnl configuration's default), so that one install can link programs built
-dnl with either -frame-pointers or -no-frame-pointers. Silently disabled on
-dnl platforms where frame pointers are unsupported, and under Address
-dnl Sanitizer (ASan forces frame pointers, so the base variant may not be
-dnl built there).
+dnl The configure-default codegen variant's name: the '-'-joined, sorted
+dnl names of the enabled axis tokens (currently only "fp"), or "base" when
+dnl every axis is off. The naming scheme is defined by
+dnl utils/codegen_variant_name.ml, which this must agree with.
 
-AS_IF([test x"$enable_codegen_variants" != "xno" \
-        -a x"$address_sanitizer" = "xfalse"],
+AS_IF([test x"$frame_pointers" = "xtrue"],
+  [codegen_default_variant=fp],
+  [codegen_default_variant=base])
+AC_SUBST([codegen_default_variant])
+
+dnl The space-separated list of NON-default codegen variant names that
+dnl additionally get runtime archives and library trees, so that one
+dnl install can serve several per-invocation codegen configurations
+dnl (currently: the frame-pointer setting opposite to this configuration's
+dnl default). Computed by flipping each supported axis from the configure
+dnl default and applying constraint closure in both directions (no closure
+dnl is needed while the frame-pointer axis is the only one; later axis
+dnl stages extend the flip list). Overridable with
+dnl --with-codegen-variants=NAME,NAME; emptied by
+dnl --disable-codegen-variants. Silently empty on platforms where frame
+dnl pointers are unsupported, and under Address Sanitizer (ASan forces
+dnl frame pointers, so the base variant may not be built there).
+
+codegen_variants_supported=false
+AS_IF([test x"$address_sanitizer" = "xfalse"],
   [AS_CASE([$target],
     [x86_64-*-linux*|x86_64-*-darwin*],
      [AS_CASE([$ocaml_cc_vendor],
-        [clang-*|gcc-*],
-         [codegen_variants=true
-         AC_MSG_NOTICE([building codegen-variant runtime archives])],
-         [codegen_variants=false])],
-    [codegen_variants=false])],
-  [codegen_variants=false])
+        [clang-*|gcc-*], [codegen_variants_supported=true])])])
+
+codegen_variants=''
+AS_IF([test x"$enable_codegen_variants" = "xno"],
+  [AS_IF([test -n "$with_codegen_variants" \
+            -a x"$with_codegen_variants" != "xno"],
+     [AC_MSG_ERROR(m4_normalize([--with-codegen-variants conflicts with
+       --disable-codegen-variants]))])],
+  [test x"${with_codegen_variants-unset}" = "xno" \
+     -o -z "${with_codegen_variants-unset}"],
+  [dnl --with-codegen-variants= gives a list like any other, which
+   dnl happens to be empty: it builds no variant, not the automatic list.
+   :],
+  [test x"$codegen_variants_supported" = "xfalse"],
+  [AS_IF([test -n "$with_codegen_variants" \
+            -a x"$with_codegen_variants" != "xyes"],
+     [AC_MSG_ERROR(m4_normalize([--with-codegen-variants: codegen variants
+       are not supported on this platform/configuration]))])],
+  [test -n "$with_codegen_variants" -a x"$with_codegen_variants" != "xyes"],
+  [dnl Explicit list: validate each name against the supported token
+   dnl subsets and drop the default variant (served in situ).
+   save_IFS=$IFS
+   IFS=' ,'
+   dnl The list is split into names, which must not be expanded as file
+   dnl name patterns as well.
+   set -f
+   for name in $with_codegen_variants; do
+     IFS=$save_IFS
+     AS_CASE([$name],
+       [base|fp], [:],
+       [AC_MSG_ERROR(m4_normalize([unknown codegen variant name
+         '$name' in --with-codegen-variants]))])
+     AS_IF([test x"$name" = x"$codegen_default_variant"],
+       [AC_MSG_NOTICE(m4_normalize([--with-codegen-variants: '$name' is the
+         default variant; skipping]))],
+       [AS_CASE([" $codegen_variants "],
+          [*" $name "*], [:],
+          [codegen_variants="$codegen_variants $name"])])
+   done
+   set +f
+   IFS=$save_IFS
+   codegen_variants=`echo $codegen_variants`],
+  [dnl Flip each supported axis from the default (fp only, so the list is
+   dnl the single opposite frame-pointer variant).
+   AS_IF([test x"$frame_pointers" = "xtrue"],
+     [codegen_variants=base],
+     [codegen_variants=fp])])
+AS_IF([test -n "$codegen_variants"],
+  [AC_MSG_NOTICE([building codegen variants: $codegen_variants])])
 AC_SUBST([codegen_variants])
 
-AS_IF([test x"$codegen_variants" = "xtrue"],
+AS_IF([test -n "$codegen_variants"],
   [dnl C stubs that can call back into OCaml (or allocate) must preserve
    dnl the rbp chain to be linked into frame-pointer-variant programs:
    dnl the fp runtime's stack-reallocation walk (runtime/fiber.c) steps

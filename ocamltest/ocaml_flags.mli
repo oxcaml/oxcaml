@@ -18,7 +18,8 @@
 (* The value of the [codegen_variant] TSL variable ([None] when unset). *)
 val codegen_variant : Environments.t -> string option
 
-(* The configure-time default variant's name. *)
+(* The configure-time default variant's name, composed from the copied
+   utils/config.ml. *)
 val default_codegen_variant : string
 
 (* [-nostdlib -I <root>], where <root> honors the [codegen_variant] TSL
@@ -26,7 +27,7 @@ val default_codegen_variant : string
    a non-default codegen variant is selected. *)
 val stdlib : Environments.t -> string
 
-(* The native compiler flag selecting the codegen variant named by the
+(* The native compiler flags selecting the codegen variant named by the
    [codegen_variant] TSL variable ("" when the variable is unset or the
    backend is bytecode). *)
 val codegen_variant_flags : Environments.t -> Ocaml_backends.t -> string

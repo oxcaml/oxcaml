@@ -180,13 +180,14 @@
 
 ; Native artifacts harvested into the codegen-variant library trees
 ; (lib/ocaml/variants/<name>/) by the _install recipe in Makefile.common-ox.
-; Only enabled in the codegen-variant contexts, which compile with the
-; non-default frame-pointer flag (see Makefile.common-ox and
-; %{project_root}/ocamlopt_variant_flags.sexp).
+; Only enabled in the codegen-variant contexts (the complement of the
+; default and main contexts), which compile with the variant's per-axis
+; flags (see Makefile.common-ox and
+; %{project_root}/duneconf/ocamlopt_flags_main-<name>.sexp).
 (alias
  (name codegen-variant-libs)
  (enabled_if
-  (or (= %{context_name} "main-fp") (= %{context_name} "main-base")))
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
  (deps unix.cmxa unix.a unix.cmxs))
 
 (rule
