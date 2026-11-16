@@ -53,7 +53,7 @@ module Position_hash = struct
     let equal = equal
 
     (* Already mixed. *)
-    let hash t = Int32.to_int t land max_int
+    let hash = Int32.to_int
   end)
 end
 

@@ -8,11 +8,6 @@ _CamlU9E2e_ocamlF17with_local_moduleDN_DN_                                      
 _CamlU9E2e_ocamlF17with_local_moduleM1MF5scaleDN_DN_                             (error)                           E2e_ocaml.with_local_module.M.scale                          E2e_ocaml.with_local_module.M.scale
 _CamlU9E2e_ocamlF2fnDN_DN_                                                       (error)                           E2e_ocaml.fn                                                 E2e_ocaml.fn
 _CamlU9E2e_ocamlF2fnDN_DN_                                                       (error)                           E2e_ocaml.fn                                                 E2e_ocaml.fn
-_CamlU9E2e_ocamlF2fnDN_DN_                                                       (error)                           E2e_ocaml.fn                                                 E2e_ocaml.fn
-_CamlU9E2e_ocamlF2fnDN_DN_                                                       (error)                           E2e_ocaml.fn                                                 E2e_ocaml.fn
-_CamlU9E2e_ocamlF2fnDN_DN_                                                       (error)                           E2e_ocaml.fn                                                 E2e_ocaml.fn
-_CamlU9E2e_ocamlF2fnDN_DN_                                                       (error)                           E2e_ocaml.fn                                                 E2e_ocaml.fn
-_CamlU9E2e_ocamlF2fnDN_DN_                                                       (error)                           E2e_ocaml.fn                                                 E2e_ocaml.fn
 _CamlU9E2e_ocamlF9tree_sizeDN_DN_                                                (error)                           E2e_ocaml.tree_size                                          E2e_ocaml.tree_size
 _CamlU9E2e_ocamlLu21J2e_e2e_ocamlml_138_6F2fnDN_DN_                              (error)                           E2e_ocaml.fn(e2e_ocaml.ml:138:6).fn                          E2e_ocaml.fn(e2e_ocaml.ml:138:6).fn
 _CamlU9E2e_ocamlLu21J2e_e2e_ocamlml_138_6F2fnDN_DN_                              (error)                           E2e_ocaml.fn(e2e_ocaml.ml:138:6).fn                          E2e_ocaml.fn(e2e_ocaml.ml:138:6).fn
@@ -69,7 +64,12 @@ _CamlU9E2e_ocamlM9Int_orderF7compareDN_DN_                                      
 _CamlU9E2e_ocamlM9Make_pairF4makeDN_DN_                                          (error)                           E2e_ocaml.Make_pair.make                                     E2e_ocaml.Make_pair.make
 _CamlU9E2e_ocamlM9Make_pairF4swapDN_DN_                                          (error)                           E2e_ocaml.Make_pair.swap                                     E2e_ocaml.Make_pair.swap
 _CamlU9E2e_ocamlM9Make_pairF9Make_pairDN_DN_                                     (error)                           E2e_ocaml.Make_pair.Make_pair                                E2e_ocaml.Make_pair.Make_pair
+_CamlU9E2e_ocamlO5shapeF2fnDN_DN_                                                (error)                           E2e_ocaml.shape.fn                                           E2e_ocaml.shape.fn
 _CamlU9E2e_ocamlO6circleF2fnDN_DN_                                               (error)                           E2e_ocaml.circle.fn                                          E2e_ocaml.circle.fn
+_CamlU9E2e_ocamlO6circleF2fnDN_DN_                                               (error)                           E2e_ocaml.circle.fn                                          E2e_ocaml.circle.fn
+_CamlU9E2e_ocamlO7point2dF2fnDN_DN_                                              (error)                           E2e_ocaml.point2d.fn                                         E2e_ocaml.point2d.fn
+_CamlU9E2e_ocamlO7point2dF2fnDN_DN_                                              (error)                           E2e_ocaml.point2d.fn                                         E2e_ocaml.point2d.fn
+_CamlU9E2e_ocamlO7point2dF2fnDN_DN_                                              (error)                           E2e_ocaml.point2d.fn                                         E2e_ocaml.point2d.fn
 _CamlU9E2e_ocamlO7point2dF2fnDN_DN_                                              (error)                           E2e_ocaml.point2d.fn                                         E2e_ocaml.point2d.fn
 camlE2e_ocaml                                                                    E2e_ocaml                         (error)                                                      E2e_ocaml
 camlE2e_ocaml__$3e$3e$3d_N                                                       E2e_ocaml.>>=_N                   (error)                                                      E2e_ocaml.>>=_N
