@@ -204,7 +204,7 @@ Caml_inline void write_barrier(
      /* this update is creating a new link from major to minor, remember it */
      if (Is_block_and_young(new_val)) {
        Ref_table_add(&Caml_state->minor_tables->major_ref, Op_val(obj) + field);
-     }
+     } // TODO: The ref table access above has 3 levels of indirection!
    }
 }
 
