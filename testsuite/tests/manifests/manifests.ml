@@ -150,6 +150,18 @@ Exception:
 Load_path.Parse_error "Only cmi files may be marked cmx_guaranteed".
 |}]
 
+(* Backwards compatibility: long forms 'file' and 'manifest' still accepted. *)
+let () =
+  run_test ~include_manifests:[
+    "07/07-manifest.txt";
+  ] ~files_to_check:["qux.cmi"; "quux.cmi"; "bar.cmi"] ()
+
+[%%expect{|
+qux.cmi -> $PWD/manifests/04/qux (visible, cmx_guaranteed)
+quux.cmi -> $PWD/manifests/04/quux (visible)
+bar.cmi -> $PWD/manifests/01/bar (visible)
+|}]
+
 (* Parsing of -H-file arguments *)
 let () =
   List.iter (fun entry ->

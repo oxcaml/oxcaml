@@ -1,2 +1,2 @@
-file foo.cmi 00/foo
-file foo.cmx 01/bad x
+f foo.cmi 00/foo
+f foo.cmx 01/bad x
