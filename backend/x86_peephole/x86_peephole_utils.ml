@@ -37,6 +37,33 @@ let is_hard_barrier = function
       false)
   | Ins instr -> is_control_flow instr
 
+let is_debug_directive = function
+  | Directive d -> (
+    match d with
+    | New_label (Label label, _) ->
+      Asm_targets.Asm_label.is_dwarf_only_label label
+    | Loc _ | File _ | Comment _ | New_line -> true
+    | New_label (Symbol _, _)
+    | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ | Align _
+    | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
+    | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _ | Const _
+    | Direct_assignment _ | Global _ | Indirect_symbol _ | Private_extern _
+    | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _
+    | Weak _ | External _ | Reloc _ | Delta_uleb128 _ ->
+      false)
+  | Ins _ -> false
+
+let next_ignoring_debug_directives cell =
+  let rec loop cell_opt =
+    match cell_opt with
+    | None -> None
+    | Some cell ->
+      if is_debug_directive (DLL.value cell)
+      then loop (DLL.next cell)
+      else Some cell
+  in
+  loop (DLL.next cell)
+
 let get_cells cell n =
   let rec loop acc remaining current_opt =
     if remaining <= 0

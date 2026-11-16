@@ -107,9 +107,9 @@ let combine_add_rsp stats cell =
    same program point in both versions.
 
    We restrict x to Reg64 to avoid issues with aliasing or zeroed bits. *)
-let remove_mov_to_dead_register stats cell =
-  match U.get_cells cell 2 with
-  | [cell1; cell2] -> (
+let remove_mov_to_dead_register stats cell1 =
+  match U.next_ignoring_debug_directives cell1 with
+  | Some cell2 -> (
     match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, Reg64 dst1)), Ins (MOV (Reg64 src2, dst2))
       when equal_reg64 dst1 src2
@@ -129,7 +129,7 @@ let remove_mov_to_dead_register stats cell =
       end
       else U.No_match
     | _, _ -> U.No_match)
-  | _ -> U.No_match
+  | None -> U.No_match
 
 let find_redundant_cmp src dst start_cell =
   let rec loop cell_opt =
@@ -191,9 +191,9 @@ let remove_redundant_cmp stats cell =
 let is_low_part_register (arg : X86_ast.arg) =
   match arg with Reg8L _ | Reg16 _ | Reg32 _ | Reg64 _ -> true | _ -> false
 
-let remove_redundant_extension stats cell =
-  match U.get_cells cell 2 with
-  | [cell1; cell2] -> (
+let remove_redundant_extension stats cell1 =
+  match U.next_ignoring_debug_directives cell1 with
+  | Some cell2 -> (
     match DLL.value cell1, DLL.value cell2 with
     | Ins (MOVSX (src1, dst1)), Ins (MOVSX (src2, dst2))
     | Ins (MOVSXD (src1, dst1)), Ins (MOVSXD (src2, dst2))
@@ -205,7 +205,7 @@ let remove_redundant_extension stats cell =
       (* Return cell1 so that a third identical extension is also removed *)
       U.Matched (Some cell1)
     | _, _ -> U.No_match)
-  | _ -> U.No_match
+  | None -> U.No_match
 
 (* Rewrite rule: remove a TEST made redundant by the preceding instruction.
    Pattern: op src, r; test r, r (where op is one of and/or/xor and r is a
@@ -220,9 +220,9 @@ let remove_redundant_extension stats cell =
    checking which flags the following instructions read. Both operands are
    restricted to 64-bit registers so that the flag-setting operation and the
    test have the same width. *)
-let remove_redundant_test stats cell =
-  match U.get_cells cell 2 with
-  | [cell1; cell2] -> (
+let remove_redundant_test stats cell1 =
+  match U.next_ignoring_debug_directives cell1 with
+  | Some cell2 -> (
     match DLL.value cell1, DLL.value cell2 with
     | ( Ins (AND (_, Reg64 dst) | OR (_, Reg64 dst) | XOR (_, Reg64 dst)),
         Ins (TEST (Reg64 src1, Reg64 src2)) )
@@ -231,7 +231,7 @@ let remove_redundant_test stats cell =
       stats.remove_redundant_test <- stats.remove_redundant_test + 1;
       U.Matched (Some cell1)
     | _, _ -> U.No_match)
-  | _ -> U.No_match
+  | None -> U.No_match
 
 (* Apply all rewrite rules in sequence using a pipeline. *)
 let apply stats cell =

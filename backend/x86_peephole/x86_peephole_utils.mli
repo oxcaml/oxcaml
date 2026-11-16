@@ -12,6 +12,13 @@ type rule_result =
 
 val get_cells : asm_line DLL.cell -> int -> asm_line DLL.cell list
 
+(** The cell following the given one, ignoring the directives that only carry
+    debugging information (source locations, comments, and labels that only
+    delimit DWARF ranges). Rules about adjacent instructions use it so that the
+    generated code does not depend on debugging information. *)
+val next_ignoring_debug_directives :
+  asm_line DLL.cell -> asm_line DLL.cell option
+
 val is_hard_barrier : asm_line -> bool
 
 val is_control_flow : instruction -> bool
