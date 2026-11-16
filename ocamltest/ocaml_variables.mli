@@ -44,6 +44,8 @@ val caml_ld_library_path : Variables.t
 
 val codegen_exit_status : Variables.t
 
+val codegen_variant : Variables.t
+
 val compare_programs : Variables.t
 
 val compiler_directory_suffix : Variables.t

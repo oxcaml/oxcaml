@@ -1,5 +1,8 @@
 (* TEST
- frame_pointers;
+ fp_variant_available;
+ codegen_variant = "fp";
+ script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
+ config_script;
  readonly_files = "fp_backtrace.c c_call_.c";
  all_modules = "${readonly_files} c_call.ml";
  native;

@@ -58,7 +58,11 @@ let plugins env =
   Actions_helpers.words_of_variable env Ocaml_variables.plugins
 
 let directories env =
-  Actions_helpers.words_of_variable env Ocaml_variables.directories
+  (* Resolve library-modifier directories against the selected codegen
+     variant's library root (see [Ocaml_flags.variant_library_directory]). *)
+  List.map
+    (Ocaml_flags.variant_library_directory env)
+    (Actions_helpers.words_of_variable env Ocaml_variables.directories)
 
 let directory_flags env =
   let f dir = ("-I " ^ dir) in
@@ -290,10 +294,11 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
                                   (has_c_file || bytecode_links_c_code);
         c_headers_flags;
         Ocaml_flags.target_flags Compiler.target;
-        Ocaml_flags.stdlib;
+        Ocaml_flags.stdlib env;
         directory_flags env;
         libraries;
         backend_default_flags env Compiler.target;
+        Ocaml_flags.codegen_variant_flags env Compiler.target;
         flags env;
         backend_flags env Compiler.target;
         compile_flags;
@@ -334,11 +339,12 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
   [
     Compiler.name;
     Ocaml_flags.target_flags Compiler.target;
-    Ocaml_flags.stdlib;
+    Ocaml_flags.stdlib env;
     c_headers_flags;
     directory_flags env;
     libraries Compiler.target env;
     backend_default_flags env Compiler.target;
+    Ocaml_flags.codegen_variant_flags env Compiler.target;
     flags env;
     backend_flags env Compiler.target;
     compile_only_flag_opt;
@@ -681,7 +687,7 @@ let mklib log env =
     String.concat " "
     [
       Ocaml_commands.ocamlrun_ocamlc;
-      Ocaml_flags.stdlib;
+      Ocaml_flags.stdlib env;
     ]
   in
   let commandline =
@@ -907,6 +913,21 @@ let cc =
     ~does_something:true
     run_cc
 
+(* Expect and toplevel tests compile their phrases in-process through a
+   prebuilt host binary (expect/expect.opt, ocaml/ocamlnat) whose codegen
+   variant is fixed at build time, so a [codegen_variant] selection cannot
+   take effect there; fail loudly rather than silently producing
+   default-variant results. *)
+let reject_codegen_variant ~tests env =
+  match Ocaml_flags.codegen_variant env with
+  | Some name
+    when not (String.equal name Ocaml_flags.default_codegen_variant) ->
+    Some (Printf.sprintf
+            "codegen_variant \"%s\" is not supported by %s tests: they \
+             compile phrases in-process with a host binary built for the \
+             default variant" name tests)
+  | Some _ | None -> None
+
 let run_expect_once input_file principal log env ~backend =
   let expect_flags = Sys.safe_getenv "EXPECT_FLAGS" in
   let principal_flag = if principal then "-principal" else "" in
@@ -923,7 +944,7 @@ let run_expect_once input_file principal log env ~backend =
     Ocaml_flags.toplevel_default_flags;
     backend_default_flags env backend;
     backend_flags env backend;
-    Ocaml_flags.stdlib;
+    Ocaml_flags.stdlib env;
     directory_flags env;
     Ocaml_flags.include_toplevel_directory;
     flags env;
@@ -967,8 +988,11 @@ let run_expect_twice input_file log env ~backend =
   end
 
 let run_expect_with ~backend log env =
-  let input_file = Actions_helpers.testfile env in
-  run_expect_twice input_file log env ~backend
+  match reject_codegen_variant ~tests:"expect" env with
+  | Some reason -> (Actions.Static (Result.fail_with_reason reason), env)
+  | None ->
+    let input_file = Actions_helpers.testfile env in
+    run_expect_twice input_file log env ~backend
 
 let run_expect =
   Actions.make ~name:"run-expect" ~description:"Run expect test"
@@ -1112,7 +1136,8 @@ let compile_module compiler compilername compileroutput log env
       | Some file -> "-o " ^ file in
     [
       compilername;
-      Ocaml_flags.stdlib;
+      Ocaml_flags.stdlib env;
+      Ocaml_flags.codegen_variant_flags env backend;
       flags env;
       backend_flags env backend;
       optional_flags;
@@ -1173,6 +1198,9 @@ let compile_modules compiler compilername compileroutput
   compile_mods initial_env modules_with_filetypes
 
 let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
+  match reject_codegen_variant ~tests:"toplevel" env with
+  | Some reason -> (Actions.Static (Result.fail_with_reason reason), env)
+  | None ->
   let (module Toplevel) = toplevel in
   let backend = Toplevel.backend in
   let libraries = libraries backend env in
@@ -1222,7 +1250,7 @@ let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
           toplevel_name;
           Ocaml_flags.toplevel_default_flags;
           Toplevel.flags;
-          Ocaml_flags.stdlib;
+          Ocaml_flags.stdlib env;
           directory_flags env;
           Ocaml_flags.include_toplevel_directory;
           flags env;
@@ -1534,6 +1562,44 @@ let only_stack_checks_codegen = Actions.make
     "stack-checks codegen"
     "non-stack-checks codegen")
 
+(* Whether the tested install can compile and link native code for the named
+   codegen variant: either the variant is the configure-time default (served
+   by the standard-library root itself), or the install provides a library
+   tree for it under <stdlib>/variants/.  Checked against the actual tree
+   being tested rather than configure-time truth, so that predicates stay
+   correct if the variant trees are absent (e.g. --disable-codegen-variants
+   builds, or incomplete installs). *)
+let codegen_variant_available name =
+  let is_default =
+    match name with
+    | "fp" -> Ocamltest_config.frame_pointers
+    | "base" -> not Ocamltest_config.frame_pointers
+    | _ -> false
+  in
+  is_default ||
+  (let dir =
+     Filename.make_path [Ocaml_directories.stdlib; "variants"; name]
+   in
+   Sys.file_exists dir && Sys.is_directory dir)
+
+let fp_variant_available = Actions.make
+  ~name:"fp_variant_available"
+  ~description:"Passes if the tested install can compile and link native \
+                code with frame pointers (codegen_variant = \"fp\")"
+  ~does_something:false
+  (Actions_helpers.predicate (codegen_variant_available "fp")
+    "fp codegen variant available"
+    "fp codegen variant not available")
+
+let base_variant_available = Actions.make
+  ~name:"base_variant_available"
+  ~description:"Passes if the tested install can compile and link native \
+                code without frame pointers (codegen_variant = \"base\")"
+  ~does_something:false
+  (Actions_helpers.predicate (codegen_variant_available "base")
+    "base codegen variant available"
+    "base codegen variant not available")
+
 let ocamldoc = Ocaml_tools.ocamldoc
 module Ocamldoc = (val ocamldoc)
 
@@ -1580,7 +1646,7 @@ let compile_ocamldoc (basename,filetype as module_) log env =
        don't have per-module flags *)
     [
     Ocaml_commands.ocamlrun_ocamldoc;
-    Ocaml_flags.stdlib;
+    Ocaml_flags.stdlib env;
     "-dump " ^ compiled_doc_name basename;
      filename;
   ] in
@@ -1663,7 +1729,7 @@ let run_ocamldoc =
   [
     Ocaml_commands.ocamlrun_ocamldoc;
     ocamldoc_backend_flag env;
-    Ocaml_flags.stdlib;
+    Ocaml_flags.stdlib env;
     ocamldoc_flags env]
   @ load_all @ with_plugins @
    [ input_file;
@@ -1761,5 +1827,7 @@ let init () =
     stack_checks;
     no_stack_checks;
     only_default_codegen;
-    only_stack_checks_codegen
+    only_stack_checks_codegen;
+    fp_variant_available;
+    base_variant_available
   ]

@@ -15,7 +15,28 @@
 
 (* Flags used in OCaml commands *)
 
-val stdlib : string
+(* The value of the [codegen_variant] TSL variable ([None] when unset). *)
+val codegen_variant : Environments.t -> string option
+
+(* The configure-time default variant's name. *)
+val default_codegen_variant : string
+
+(* [-nostdlib -I <root>], where <root> honors the [codegen_variant] TSL
+   variable: the base standard library, or its variants/<name> subtree when
+   a non-default codegen variant is selected. *)
+val stdlib : Environments.t -> string
+
+(* The native compiler flag selecting the codegen variant named by the
+   [codegen_variant] TSL variable ("" when the variable is unset or the
+   backend is bytecode). *)
+val codegen_variant_flags : Environments.t -> Ocaml_backends.t -> string
+
+(* Resolves a library directory added by a library modifier
+   (<srcdir>/otherlibs/<lib>, e.g. via [include unix]) against the library
+   root of the variant named by the [codegen_variant] TSL variable, when a
+   non-default variant is selected and the variant tree provides the
+   library; returns the directory unchanged otherwise. *)
+val variant_library_directory : Environments.t -> string -> string
 
 val include_toplevel_directory : string
 
