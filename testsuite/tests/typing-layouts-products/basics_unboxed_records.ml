@@ -208,6 +208,7 @@ Line 1, characters 30-31:
                                   ^
 Error: Unbound record field "i"
 Hint: There is an unboxed record field with this name.
+Only mutable fields of boxed records can be mutated.
 |}]
 
 type atomic_bad = #{ mutable a : int [@atomic] }
@@ -632,6 +633,7 @@ Line 1, characters 30-31:
                                   ^
 Error: Unbound record field "i"
 Hint: There is an unboxed record field with this name.
+Only mutable fields of boxed records can be mutated.
 |}]
 
 (********************************)
