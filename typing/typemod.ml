@@ -5219,6 +5219,12 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
         Tcoerce_none
   end
 
+let functorize_implementation initial_env ~params ~modules ~module_sigs
+    unit_info modulename =
+  Scheduler.Monitor.root (fun () ->
+      functorize_implementation initial_env ~params ~modules ~module_sigs
+        unit_info modulename)
+
 let package_signatures units =
   let units_with_ids =
     List.map
@@ -5354,6 +5360,18 @@ let package_units initial_env objfiles target_cmi modulename =
     Tcoerce_none
   end
 
+let package_units initial_env objfiles target_cmi modulename =
+  Scheduler.Monitor.root (fun () ->
+      package_units initial_env objfiles target_cmi modulename)
+
+(* External entry points (e.g. mdx). Defined here, not where [type_structure]
+   and [type_module] are specialised, so that their uses above (e.g. by
+   [type_implementation]) stay under their caller's root. *)
+let type_structure env sstr =
+  Scheduler.Monitor.root (fun () -> type_structure env sstr)
+
+let type_module env smod =
+  Scheduler.Monitor.root (fun () -> type_module env smod)
 
 (* Error report *)
 open Printtyp.Doc

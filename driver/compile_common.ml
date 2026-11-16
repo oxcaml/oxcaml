@@ -93,6 +93,9 @@ let typecheck_intf info ast =
           count_language_extensions (Typedtree_signature_output signature)))
       typing)
   @@ fun () ->
+  (* A monitor root covering the inclusion check and delayed checks too, which
+     run after [type_interface] returns. *)
+  Scheduler.Monitor.root @@ fun () ->
   let tsg =
     ast
     |> Typemod.type_interface
