@@ -15,9 +15,87 @@
 
 (* Flags used in OCaml commands *)
 
-let stdlib =
-  let stdlib_path = Ocaml_directories.stdlib in
+(* The [codegen_variant] TSL variable selects the codegen variant (absolute
+   name, "fp" or "base") that native compilation and linking target.  It
+   swaps the standard-library include path to the variant's library root
+   (<stdlib>/variants/<name>) when the named variant is not the install's
+   configure-time default, and adds the corresponding compiler flag to
+   native compiler invocations (see [codegen_variant_flags]; bytecode
+   compilers do not accept the flag and bytecode is unaffected by codegen
+   variants, but they still use the variant root so that one test block can
+   mix backends). *)
+let codegen_variant env =
+  match Environments.safe_lookup Ocaml_variables.codegen_variant env with
+  | "" -> None
+  | name -> Some name
+
+let default_codegen_variant =
+  if Ocamltest_config.frame_pointers then "fp" else "base"
+
+let codegen_variant_directory name =
+  if String.equal name default_codegen_variant
+  then Ocaml_directories.stdlib
+  else
+    Ocamltest_stdlib.Filename.make_path
+      [Ocaml_directories.stdlib; "variants"; name]
+
+let stdlib env =
+  let stdlib_path =
+    match codegen_variant env with
+    | None -> Ocaml_directories.stdlib
+    | Some name -> codegen_variant_directory name
+  in
   "-nostdlib -I " ^ stdlib_path
+
+let codegen_variant_flags env backend =
+  match backend, codegen_variant env with
+  | Ocaml_backends.(Bytecode | Jsir_js | Jsir_wasm), _ | _, None -> ""
+  | Ocaml_backends.Native, Some name ->
+    (match name with
+     | "fp" -> "-frame-pointers"
+     | "base" -> "-no-frame-pointers"
+     | _ ->
+       Printf.ksprintf failwith
+         "unknown codegen_variant %S (expected \"fp\" or \"base\")" name)
+
+(* Library modifiers (see ocaml_modifiers.ml, e.g. [include unix]) append
+   default-tree library directories of the form <srcdir>/otherlibs/<lib>.
+   Under a non-default [codegen_variant] such a directory would mix the
+   default tree's artifacts into a variant compilation, so resolve it
+   against the variant's library root instead (the read-time analogue of
+   the [stdlib] remap above) whenever the variant tree provides the
+   library; directories without a variant counterpart, and every directory
+   when the variant is unset or the default, are left unchanged.  The
+   systhreads source directory is named "systhreads", but it installs (and
+   gets variant trees) as "threads". *)
+let variant_library_directory env dir =
+  match codegen_variant env with
+  | None -> dir
+  | Some name when String.equal name default_codegen_variant -> dir
+  | Some name ->
+    let prefix =
+      Ocamltest_stdlib.Filename.make_path
+        [Ocaml_directories.srcdir; "otherlibs"]
+      ^ Filename.dir_sep
+    in
+    if String.starts_with ~prefix dir
+    then begin
+      let rest =
+        String.sub dir (String.length prefix)
+          (String.length dir - String.length prefix)
+      in
+      let rest =
+        if String.equal rest "systhreads" then "threads" else rest
+      in
+      let candidate =
+        Ocamltest_stdlib.Filename.make_path
+          [codegen_variant_directory name; rest]
+      in
+      if Sys.file_exists candidate && Sys.is_directory candidate
+      then candidate
+      else dir
+    end
+    else dir
 
 let include_toplevel_directory =
   "-I " ^ Ocaml_directories.toplevel
