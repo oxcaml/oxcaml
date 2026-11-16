@@ -448,6 +448,24 @@ let unboxing_rules =
       (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
          field; when1 field_cannot_be_destructured field ] ==> cannot_unbox0
          x); *)
+      (let$ [allocation_id; alias; alias_source; field; v] =
+         ["allocation_id"; "alias"; "alias_source"; "field"; "v"]
+       in
+       [ usages allocation_id alias;
+         sources alias alias_source;
+         has_source alias_source;
+         distinct Cols.n alias_source allocation_id;
+         rev_accessor ~base:alias field ~to_:v;
+         has_usage v ]
+       ==> cannot_unbox0 allocation_id);
+      (let$ [allocation_id; alias; field; v] =
+         ["allocation_id"; "alias"; "field"; "v"]
+       in
+       [ usages allocation_id alias;
+         any_source alias;
+         rev_accessor ~base:alias field ~to_:v;
+         has_usage v ]
+       ==> cannot_unbox0 allocation_id);
       (* Unboxing a closure requires changing its calling convention, as we must
          pass the value slots as extra arguments. Thus, we prevent unboxing of
          closures if their calling convention cannot be changed. *)
@@ -567,11 +585,15 @@ type result =
   }
 
 type calling_convention_change =
-  | Not_changing_calling_convention
+  | Not_changing_calling_convention of
+      { used_params : Points_to_analysis.keep_or_delete list;
+        never_returns : bool
+      }
   | Changing_calling_convention of
       { my_closure_decision : my_closure_param_decision;
         params_decisions : param_decision list;
-        return_decisions : param_decision list
+        return_decisions : param_decision list;
+        never_returns : bool
       }
 
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
@@ -987,6 +1009,12 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
               Code_metadata.print code_metadata
         else Code_metadata.with_is_my_closure_used false code_metadata
       in
+      let never_returns =
+        List.exists
+          (fun return ->
+            not (PTA.has_source_query uses.db (Code_id_or_name.var return)))
+          code_dep.return
+      in
       let calling_convention_change, code_metadata =
         if cannot_change_calling_convention ~analysis_scope uses code_id
         then
@@ -1005,6 +1033,14 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
               (rewrite_kinds code_dep.params
                  (Flambda_arity.unarize original_arity))
           in
+          let used_params =
+            List.map
+              (fun param ->
+                if PTA.has_use uses.db (Code_id_or_name.var param)
+                then PTA.Keep
+                else PTA.Delete)
+              code_dep.params
+          in
           let result_arity =
             let original_result_arity =
               Code_metadata.result_arity code_metadata
@@ -1013,7 +1049,7 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
               (rewrite_kinds code_dep.return
                  (Flambda_arity.unarize original_result_arity))
           in
-          ( Not_changing_calling_convention,
+          ( Not_changing_calling_convention { used_params; never_returns },
             Code_metadata.with_params_arity params_arity
               (Code_metadata.with_result_arity result_arity code_metadata) )
         else
@@ -1091,7 +1127,11 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
               First_complex_local_param.Never_partially_applied code_metadata
           in
           ( Changing_calling_convention
-              { params_decisions; return_decisions; my_closure_decision },
+              { params_decisions;
+                return_decisions;
+                my_closure_decision;
+                never_returns
+              },
             code_metadata )
       in
       let code_metadata =
@@ -1104,7 +1144,7 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
             else
               let params_vars_and_keep, results_vars_and_keep =
                 match calling_convention_change with
-                | Not_changing_calling_convention ->
+                | Not_changing_calling_convention _ ->
                   ( List.map
                       (fun p -> p, Points_to_analysis.Keep)
                       code_dep.params,
@@ -1114,7 +1154,8 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
                 | Changing_calling_convention
                     { my_closure_decision = _;
                       params_decisions;
-                      return_decisions
+                      return_decisions;
+                      never_returns = _
                     } ->
                   ( List.map2
                       (fun p decision ->
@@ -1138,7 +1179,7 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
       { calling_convention_change; code_metadata })
     code_deps
 
-let get_calling_convention_change t ~analysis_scope code_id =
+let get_calling_convention_change t ~analysis_scope ~params_arity code_id =
   match Code_id.Map.find_opt code_id t with
   | None ->
     if Analysis_scope.contains_code_id analysis_scope code_id
@@ -1147,13 +1188,28 @@ let get_calling_convention_change t ~analysis_scope code_id =
         "[get_calling_convention_change]: code_id %a is in analysis scope but \
          missing in code changes"
         Code_id.print code_id
-    else Not_changing_calling_convention
+    else
+      let used_params =
+        List.init (Flambda_arity.cardinal_unarized params_arity) (fun _ ->
+            PTA.Keep)
+      in
+      Not_changing_calling_convention { used_params; never_returns = false }
   | Some code_change -> code_change.calling_convention_change
 
 let is_changing_calling_convention t ~analysis_scope code_id =
-  match get_calling_convention_change t ~analysis_scope code_id with
-  | Not_changing_calling_convention -> false
-  | Changing_calling_convention _ -> true
+  match Code_id.Map.find_opt code_id t with
+  | None ->
+    if Analysis_scope.contains_code_id analysis_scope code_id
+    then
+      Misc.fatal_errorf
+        "[is_changing_calling_convention]: code_id %a is in analysis scope but \
+         missing in code changes"
+        Code_id.print code_id
+    else false
+  | Some code_change -> (
+    match code_change.calling_convention_change with
+    | Not_changing_calling_convention _ -> false
+    | Changing_calling_convention _ -> true)
 
 let find_code_metadata t ~analysis_scope code_id =
   match Code_id.Map.find_opt code_id t with

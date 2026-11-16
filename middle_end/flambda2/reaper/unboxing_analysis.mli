@@ -70,11 +70,15 @@ type result =
   }
 
 type calling_convention_change =
-  | Not_changing_calling_convention
+  | Not_changing_calling_convention of
+      { used_params : Points_to_analysis.keep_or_delete list;
+        never_returns : bool
+      }
   | Changing_calling_convention of
       { my_closure_decision : my_closure_param_decision;
         params_decisions : param_decision list;
-        return_decisions : param_decision list
+        return_decisions : param_decision list;
+        never_returns : bool
       }
 
 type code_changes
@@ -82,6 +86,7 @@ type code_changes
 val get_calling_convention_change :
   code_changes ->
   analysis_scope:Analysis_scope.t ->
+  params_arity:[`Complex] Flambda_arity.t ->
   Code_id.t ->
   calling_convention_change
 

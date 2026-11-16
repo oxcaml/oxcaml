@@ -24,8 +24,11 @@ type 'f solution =
     has_source : unit Code_id_or_name.Map.t;
     field_of_constructor_is_used : unit Field.Map.t Code_id_or_name.Map.t;
     directly_called : Code_id.Set.t Or_unknown.t Code_id_or_name.Map.t;
-    known_masks : PTA.keep_or_delete list Code_id_or_name.Map.t;
-    unknown_masks : PTA.keep_or_delete list list Code_id_or_name.Map.t;
+    known_masks :
+      (PTA.keep_or_delete list * PTA.returns_with_source) Code_id_or_name.Map.t;
+    unknown_masks :
+      (PTA.keep_or_delete list * PTA.returns_with_source) list
+      Code_id_or_name.Map.t;
     unboxed_fields : UA.unboxed Code_id_or_name.Map.t;
     changed_representation :
       (UA.changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
@@ -204,38 +207,66 @@ let code_id_actually_directly_called solution closure =
     (Code_id_or_name.name closure)
     "direct-call targets"
 
-let rec apply_mask callee query mask args =
-  match args, mask with
+let rec apply_mask callee query mask arity =
+  match arity, mask with
   | [], _ -> []
-  | arg :: args, keep :: mask ->
-    (arg, keep) :: apply_mask callee query mask args
+  | _ :: arity, keep :: mask -> keep :: apply_mask callee query mask arity
   | _ :: _, [] ->
     Misc.fatal_errorf "Analysis: insufficient %s argument width for callee %a"
       query Code_id_or_name.print callee
 
-let arguments_used_by_known_arity_call solution callee args =
-  let mask = find_answer solution.known_masks callee "known-arity" in
-  apply_mask callee "known-arity" mask args
+let never_returns (returns_with_source : PTA.returns_with_source) return_arity =
+  match returns_with_source with
+  | All_returns_have_source -> false
+  | Returns_with_source returns_with_source ->
+    (* CR ncourant: we should probably consider adding kinds to returns and
+       params *)
+    let num_returns = Flambda_arity.cardinal_unarized return_arity in
+    let rec loop i =
+      if i < 0
+      then false
+      else
+        (not
+           (Field.Map.mem (Field.normal_return_of_call i) returns_with_source))
+        || loop (i - 1)
+    in
+    loop (num_returns - 1)
 
-let arguments_used_by_unknown_arity_call solution callee args =
+let arguments_used_by_known_arity_call solution callee ~params_arity
+    ~return_arity =
+  let mask, returns_with_source =
+    find_answer solution.known_masks callee "known-arity"
+  in
+  ( apply_mask callee "known-arity" mask (Flambda_arity.unarize params_arity),
+    ~never_returns:(never_returns returns_with_source return_arity) )
+
+let arguments_used_by_unknown_arity_call solution callee ~params_arity
+    ~return_arity =
   let masks = find_answer solution.unknown_masks callee "unknown-arity" in
-  let rec apply_groups masks args =
-    match args, masks with
-    | [], _ -> []
-    | args :: rest, mask :: masks ->
-      apply_mask callee "unknown-arity" mask args :: apply_groups masks rest
+  let rec apply_groups masks arity =
+    match arity, masks with
+    | [], _ ->
+      Misc.fatal_errorf
+        "arguments_used_by_known_arity_call: need at least one argument"
+    | [arity], (mask, returns_with_source) :: _ ->
+      ( apply_mask callee "unknown-arity" mask arity,
+        ~never_returns:(never_returns returns_with_source return_arity) )
+    | arity :: rest, (mask, _) :: masks ->
+      let arguments_used, ~never_returns = apply_groups masks rest in
+      ( apply_mask callee "unknown-arity" mask arity @ arguments_used,
+        ~never_returns )
     | _ :: _, [] ->
       Misc.fatal_errorf
         "Analysis: insufficient unknown-arity argument groups for callee %a"
         Code_id_or_name.print callee
   in
-  apply_groups masks args
+  apply_groups masks (Flambda_arity.unarize_per_parameter params_arity)
 
 let has_source solution v = Code_id_or_name.Map.mem v solution.has_source
 
-let get_calling_convention_change solution code_id =
+let get_calling_convention_change solution ~params_arity code_id =
   Unboxing_analysis.get_calling_convention_change solution.code_changes
-    ~analysis_scope:solution.analysis_scope code_id
+    ~analysis_scope:solution.analysis_scope ~params_arity code_id
 
 let is_changing_calling_convention solution code_id =
   Unboxing_analysis.is_changing_calling_convention solution.code_changes
