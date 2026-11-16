@@ -1013,14 +1013,14 @@ let transl_builtin name args dbg typ_res =
     Some (value_of_int (one_arg name args) dbg)
   | "caml_native_pointer_load_immediate"
   | "caml_native_pointer_load_unboxed_nativeint" ->
-    Some (Cop (mk_load_mut Word_int, args, dbg))
+    Some (Cop (mk_load_mut Sixtyfour, args, dbg))
   | "caml_native_pointer_store_immediate"
   | "caml_native_pointer_store_unboxed_nativeint" ->
-    Some (return_unit dbg (Cop (Cstore (Word_int, Assignment), args, dbg)))
+    Some (return_unit dbg (Cop (Cstore (Sixtyfour, Assignment), args, dbg)))
   | "caml_native_pointer_load_unboxed_int64" when size_int = 8 ->
-    Some (Cop (mk_load_mut Word_int, args, dbg))
+    Some (Cop (mk_load_mut Sixtyfour, args, dbg))
   | "caml_native_pointer_store_unboxed_int64" when size_int = 8 ->
-    Some (return_unit dbg (Cop (Cstore (Word_int, Assignment), args, dbg)))
+    Some (return_unit dbg (Cop (Cstore (Sixtyfour, Assignment), args, dbg)))
   | "caml_native_pointer_load_signed_int32"
   | "caml_native_pointer_load_unboxed_int32" ->
     Some (Cop (mk_load_mut Thirtytwo_signed, args, dbg))
@@ -1059,14 +1059,14 @@ let transl_builtin name args dbg typ_res =
   (* Ext_pointer: handled as tagged int *)
   | "caml_ext_pointer_load_immediate"
   | "caml_ext_pointer_load_unboxed_nativeint" ->
-    ext_pointer_load Word_int name args dbg
+    ext_pointer_load Sixtyfour name args dbg
   | "caml_ext_pointer_store_immediate"
   | "caml_ext_pointer_store_unboxed_nativeint" ->
-    ext_pointer_store Word_int name args dbg
+    ext_pointer_store Sixtyfour name args dbg
   | "caml_ext_pointer_load_unboxed_int64" when size_int = 8 ->
-    ext_pointer_load Word_int name args dbg
+    ext_pointer_load Sixtyfour name args dbg
   | "caml_ext_pointer_store_unboxed_int64" when size_int = 8 ->
-    ext_pointer_store Word_int name args dbg
+    ext_pointer_store Sixtyfour name args dbg
   | "caml_ext_pointer_load_signed_int32" | "caml_ext_pointer_load_unboxed_int32"
     ->
     ext_pointer_load Thirtytwo_signed name args dbg

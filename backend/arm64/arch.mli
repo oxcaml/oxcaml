@@ -44,6 +44,10 @@ module Extension : sig
   val assembler_directive : t -> Assembler_directive.t
 end
 
+(* Use a store-release (stlr/stlur) for the assignment memory-model barrier
+   instead of dmb ishld; str. *)
+val store_release : bool ref
+
 val trap_notes : bool ref
 (* Machine-specific command-line options *)
 

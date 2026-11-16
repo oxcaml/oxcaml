@@ -87,6 +87,19 @@ module Extension = struct
     List.concat_map option all
 end
 
+(* Store-ordering strategy for the multicore memory-model barrier that
+   precedes a non-initializing store to a mutable field or array element.
+
+   By default this is a store-release [stlr], which gives the required
+   load->store ordering in a single instruction; with LRCPC2 it becomes
+   [stlur] (a store-release with an unscaled immediate offset, avoiding an
+   address computation).  A few old cores (e.g. Cortex-A53, Cortex-A72) are
+   slower with a release store and instead use a [dmb ishld; str] barrier.
+
+   [configure] selects the barrier by default by setting [Config.model] to
+   "arm64_barrier".  The default can be overridden on the command line. *)
+let store_release = ref (String.compare Config.model "arm64_barrier" <> 0)
+
 (* Emit elf notes with trap handling information. *)
 let trap_notes = ref true
 
@@ -97,6 +110,17 @@ let command_line_options = [
     Arg.Clear is_asan_enabled,
     " Disable AddressSanitizer. This is only meaningful if the compiler was \
      built with AddressSanitizer support enabled."
+  ;
+
+  "-fbarrier-store",
+    Arg.Clear store_release,
+    " Use a dmb ishld; str barrier instead of a store-release for \
+     assignment stores (faster on some old cores)."
+  ;
+
+  "-fstore-release",
+    Arg.Set store_release,
+    " Use a store-release (stlr/stlur) for assignment stores (default)."
 ] @ Extension.command_line_options
 
 (* Addressing modes *)

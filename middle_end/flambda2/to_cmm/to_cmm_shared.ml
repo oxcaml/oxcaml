@@ -156,7 +156,17 @@ let memory_chunk_of_non_scannable_kind kind : Cmm.memory_chunk =
   match memory_chunk_of_kind kind with
   | Word_val -> Word_int
   | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Single _ | Double
+    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Single _
+    | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+    | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+    | Fivetwelve_aligned | Word_mask ) as mem ->
+    mem
+
+let unaligned_memory_chunk_of_kind kind : Cmm.memory_chunk =
+  match memory_chunk_of_kind kind with
+  | Word_int | Word_val -> Sixtyfour
+  | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+    | Thirtytwo_unsigned | Thirtytwo_signed | Sixtyfour | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned
     | Word_mask ) as mem ->

@@ -422,8 +422,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let is_assign =
         match init with Initialization -> false | Assignment -> true
       in
-      match[@ocaml.warning "-fragile-match"] chunk with
-      | Word_int | Word_val ->
+      match chunk with
+      | Word_int | Sixtyfour | Word_val ->
         let op, newarg2 =
           match Target.is_store_out_of_range chunk ~byte_offset:0 with
           | Within_range -> (
@@ -438,7 +438,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               (Printcmm.operation dbg op)
         in
         SU.basic_op op, [newarg2; eloc]
-      | _ -> SU.basic_op (Store (chunk, addr, is_assign)), [arg2; eloc]
+      | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask | Single _ | Double
+      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ->
+        SU.basic_op (Store (chunk, addr, is_assign)), [arg2; eloc]
       (* Inversion addr/datum in Istore *))
     | Cdls_get -> SU.basic_op Dls_get, args
     | Ctls_get -> SU.basic_op Tls_get, args

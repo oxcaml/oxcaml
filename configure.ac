@@ -1939,6 +1939,22 @@ AS_CASE([$target],
     [has_native_backend=yes; arch=amd64; system=gnu]
 )
 
+# On arm64, choose how the multicore memory-model barrier that precedes a
+# non-initializing store to a mutable field/element is emitted (see
+# https://github.com/ocaml/ocaml/issues/13262).  The default is a
+# store-release (stlr, or stlur with LRCPC2, see --with-arm64-extensions).  A
+# few old cores (Cortex-A53/-A57/-A72/-A73) are slower with a release store,
+# so we keep the dmb ishld; str barrier on them.  This is a build-host
+# heuristic and can be overridden with ocamlopt's -fbarrier-store /
+# -fstore-release.
+AS_IF([test x"$arch" = "xarm64"],
+  [AC_MSG_CHECKING([arm64 store for the assignment memory barrier])
+   AS_IF([test x"$cross_compiling" != "xyes" && test -r /proc/cpuinfo &&
+          grep -Eq 'CPU part.*(0xd03|0xd04|0xd07|0xd08|0xd09)' /proc/cpuinfo],
+     [model=arm64_barrier; ocaml_arm64_store="dmb ishld; str (old core)"],
+     [ocaml_arm64_store="stlr (store-release)"])
+   AC_MSG_RESULT([$ocaml_arm64_store])])
+
 AS_CASE([$arch],
   [amd64],
     [arch_specific_SOURCES='$(intel_SOURCES)'],

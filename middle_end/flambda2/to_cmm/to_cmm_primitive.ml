@@ -1355,7 +1355,7 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
   | Poke kind ->
     let memory_chunk =
       K.Standard_int_or_float.to_kind_with_subkind kind
-      |> C.memory_chunk_of_kind
+      |> C.unaligned_memory_chunk_of_kind
     in
     C.store ~dbg memory_chunk Assignment ~addr:x ~new_value:y
     |> C.return_unit dbg
@@ -1399,7 +1399,7 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
       (atomic_offset offset_units y)
       ~new_value:z
   | Write_offset (write_offset_kind, kind, mode) ->
-    let memory_chunk = C.memory_chunk_of_kind kind in
+    let memory_chunk = C.unaligned_memory_chunk_of_kind kind in
     let store =
       if KS.must_be_gc_scannable kind
       then
