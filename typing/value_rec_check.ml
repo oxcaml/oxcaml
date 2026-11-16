@@ -241,20 +241,17 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_apply _ ->
         Dynamic
 
-<<<<<<< OxCaml
-    | Texp_array _
-    | Texp_idx _ ->
-        Static
-||||||| Upstream OCaml
-    | Texp_array _ ->
-        Static
-=======
     | Texp_array _ ->
        begin match Typeopt.array_kind e with
        | Pgenarray -> Dynamic
-       | Pfloatarray | Paddrarray | Pintarray -> Static
+       | Pfloatarray | Paddrarray | Pgcignorableaddrarray | Pintarray
+       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+       | Punboxedvectorarray _ | Punboxedmaskarray
+       | Pgcscannableproductarray _ | Pgcignorableproductarray _
+       | Punspecializedarray -> Static
        end
->>>>>>> ocaml/ocaml#14993
+    | Texp_idx _ ->
+        Static
     | Texp_pack mexp ->
         classify_module_expression env mexp
     | Texp_function _ ->

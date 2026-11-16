@@ -417,15 +417,9 @@ let compute_static_size lam =
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
-<<<<<<< OxCaml
-        | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray ->
-||||||| Upstream OCaml
-        | Pgenarray | Paddrarray | Pintarray ->
-=======
         | Pgenarray ->
-            dynamic_size ()
-        | Paddrarray | Pintarray ->
->>>>>>> ocaml/ocaml#14993
+            dynamic_size lam
+        | Paddrarray | Pgcignorableaddrarray | Pintarray ->
             Block (Regular_block size)
         | Pfloatarray ->
             Block (Float_record size)

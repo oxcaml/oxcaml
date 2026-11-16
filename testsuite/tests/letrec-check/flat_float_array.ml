@@ -58,6 +58,6 @@ Error: This kind of expression is not allowed as right-hand side of "let rec"
 let make v = let rec a = [| v; v; v; v; v; v; v; v |] in a
 let fa = make 2.5
 [%%expect {|
-val make : 'a -> 'a array = <fun>
+val make : ('a : value_maybe_null). 'a -> 'a array = <fun>
 val fa : float array = [|2.5; 2.5; 2.5; 2.5; 2.5; 2.5; 2.5; 2.5|]
 |}]
