@@ -25,8 +25,67 @@ let macosx = String.equal Config.system "macosx"
 
 let is_asan_enabled = ref false
 
-(* CR gyorsh: refactor to use [Arch.Extension] like amd64 *)
-let feat_cssc = ref false
+module Extension = struct
+  type t =
+    | CSSC
+    | LRCPC2
+    | LSE
+
+  let all = [CSSC; LRCPC2; LSE]
+
+  let name = function
+    | CSSC -> "CSSC"
+    | LRCPC2 -> "LRCPC2"
+    | LSE -> "LSE"
+
+  let description = function
+    | CSSC -> "Common Short Sequence Compression"
+    | LRCPC2 -> "Load-Acquire RCpc, version 2"
+    | LSE -> "Large System Extensions"
+
+  module Assembler_directive = struct
+    type t =
+      | Arch of string
+      | Arch_extension of string
+  end
+
+  (* Only GNU as 2.42 and later accept [.arch_extension rcpc2], and LLVM has no
+     name for LRCPC2, but both accept armv8.4-a, which includes it. *)
+  let assembler_directive : t -> Assembler_directive.t = function
+    | CSSC -> Arch_extension "cssc"
+    | LRCPC2 -> Arch "armv8.4-a"
+    | LSE -> Arch_extension "lse"
+
+  let cssc = ref Config.has_cssc
+
+  let lrcpc2 = ref Config.has_lrcpc2
+
+  let lse = ref Config.has_lse
+
+  let flag = function
+    | CSSC -> cssc
+    | LRCPC2 -> lrcpc2
+    | LSE -> lse
+
+  let enabled t = !(flag t)
+
+  let enabled_extensions () = List.filter enabled all
+
+  let command_line_options =
+    let option t =
+      let flag_name = String.lowercase_ascii (name t) in
+      let default b = if b then " (default)" else "" in
+      [ "-f" ^ flag_name,
+        Arg.Set (flag t),
+        Printf.sprintf " Enable %s (%s) instructions%s"
+          (name t) (description t) (default (enabled t));
+        "-fno-" ^ flag_name,
+        Arg.Clear (flag t),
+        Printf.sprintf " Disable %s (%s) instructions%s"
+          (name t) (description t) (default (not (enabled t))) ]
+    in
+    List.concat_map option all
+end
 
 (* Emit elf notes with trap handling information. *)
 let trap_notes = ref true
@@ -38,12 +97,7 @@ let command_line_options = [
     Arg.Clear is_asan_enabled,
     " Disable AddressSanitizer. This is only meaningful if the compiler was \
      built with AddressSanitizer support enabled."
-  ;
-
-  "-fcssc",
-    Arg.Set feat_cssc,
-    " Enable the Common Short Sequence Compression (CSSC) instructions."
-]
+] @ Extension.command_line_options
 
 (* Addressing modes *)
 
