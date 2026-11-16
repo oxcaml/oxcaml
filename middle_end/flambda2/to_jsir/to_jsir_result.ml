@@ -316,10 +316,11 @@ let resolve_var_aliases var_aliases =
 let add_entry_prelude_instr t instr =
   { t with entry_prelude = instr :: t.entry_prelude }
 
+let compilation_unit_name = Compilation_unit.full_path_as_string
+
 let symbol_to_name_constants symbol : Jsir.constant * Jsir.constant =
   ( Symbol.compilation_unit symbol
-    |> Compilation_unit.name |> Compilation_unit.Name.to_string
-    |> To_jsir_target.name_constant,
+    |> compilation_unit_name |> To_jsir_target.name_constant,
     Symbol.linkage_name_as_string symbol |> To_jsir_target.name_constant )
 
 let symbol_is_for_compilation_unit symbol =
@@ -376,9 +377,7 @@ let external_symbol_lookup t symbol : t * Jsir.expr =
     | true ->
       let compilation_unit = Symbol.compilation_unit symbol in
       let t = import_compilation_unit t compilation_unit in
-      let compilation_unit_name =
-        Compilation_unit.name_as_string compilation_unit
-      in
+      let compilation_unit_name = compilation_unit_name compilation_unit in
       ( t,
         Prim
           ( Extern ("caml_get_global", None),
