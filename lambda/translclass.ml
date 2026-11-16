@@ -208,7 +208,7 @@ let layout_tables = layout_any_value
 
 
 let lfunction ?(kind=Curried {nlocal=0})
-    ?(ret_mode=not_alloc_stack) return_layout params body =
+    ?(ret_mode=not_alloc_stack) ?(loc=Loc_unknown) return_layout params body =
   if params = [] then body else
   match kind, body with
   | Curried {nlocal=0},
@@ -227,7 +227,7 @@ let lfunction ?(kind=Curried {nlocal=0})
       lfunction ~kind ~params ~return:return_layout
                 ~body
                 ~attr:default_function_attribute
-                ~loc:Loc_unknown
+                ~loc
                 ~mode:alloc_heap
                 ~ret_mode
 
@@ -1148,7 +1148,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   let no_env_update _ _ env = env in
   let msubst arr = function
       Lfunction {kind = Curried _ as kind; ret_mode;
-                 params = self :: args; return; body} ->
+                 params = self :: args; return; body; loc} ->
         let env = Ident.create_local "env" in
         let env_duid = Lambda.debug_uid_none in
         let body' =
@@ -1160,7 +1160,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
           if not arr || !Clflags.debug then raise Not_found;
           builtin_meths [self.name] env env2 (lfunction return args body')
         with Not_found ->
-          [lfunction ~kind ~ret_mode return (self :: args)
+          [lfunction ~kind ~ret_mode ~loc return (self :: args)
              (if not (Ident.Set.mem env (free_variables body')) then body' else
               Llet(Alias, layout_block, env, env_duid,
                    Lprim(Pfield_computed Reads_vary,
