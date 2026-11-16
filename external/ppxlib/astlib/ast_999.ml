@@ -26,6 +26,8 @@ module Asttypes = struct
 
   type atomic_flag (*IF_CURRENT = Asttypes.atomic_flag *) = Nonatomic | Atomic
 
+  type law_flag (*IF_CURRENT = Asttypes.law_flag *) = Testable | Provable
+
   type access_flag (*IF_CURRENT = Asttypes.access_flag *) =
     | Immutable_access
     | Mutable_access
@@ -962,6 +964,7 @@ module Parsetree = struct
 
   and law_declaration (*IF_CURRENT = Parsetree.law_declaration *) =
     {
+      plaw_flag : law_flag;
       plaw_name : string loc;
       plaw_params : (string loc * core_type option) list;
       plaw_assumptions : expression list;
@@ -969,7 +972,8 @@ module Parsetree = struct
       plaw_attributes : attributes;
       plaw_loc : Location.t
     }
-    (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C] *)
+    (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C] or
+        [law_ name ...] *)
 
 
   (** {1 Class language} *)

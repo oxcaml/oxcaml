@@ -23,3 +23,8 @@ law_? clause_attrs : a [@attr_a] implies_ b [@attr_b]
 (** Documented. *)
 law_? documented : true
 [@@@floating]
+
+(* [law_?] declares a testable law and [law_] a provable one. *)
+
+law_? testable (a : bool) : a implies_ a
+law_ provable (a : bool) : a implies_ a

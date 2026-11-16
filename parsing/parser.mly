@@ -4242,11 +4242,12 @@ jkind_decl:
     }
 ;
 
-(* Laws: [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C],
-   where each parameter is [x] or [(x : T)] *)
+(* Laws: [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C]
+   (testable) or [law_ name ...] (provable), where each parameter is [x] or
+   [(x : T)] *)
 
 law_declaration:
-  LAW QUESTION
+  plaw_flag = law_flag
   attrs1 = attributes
   plaw_name = mkrhs(LIDENT)
   plaw_params = law_param*
@@ -4258,9 +4259,14 @@ law_declaration:
       let plaw_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
       let plaw_loc = make_loc $sloc in
       let plaw_assumptions, plaw_conclusion = body in
-      { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+      { plaw_flag; plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
         plaw_attributes; plaw_loc }
     }
+;
+
+law_flag:
+  | LAW QUESTION { Testable }
+  | LAW { Provable }
 ;
 
 law_param:

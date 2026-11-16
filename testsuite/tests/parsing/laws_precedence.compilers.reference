@@ -1,7 +1,7 @@
 [
   structure_item (laws_precedence.ml[11,288+0]..[11,288+58])
     Pstr_law
-    law_declaration "infix" (laws_precedence.ml[11,288+6]..[11,288+11]) (laws_precedence.ml[11,288+0]..[11,288+58])
+    law_declaration Testable "infix" (laws_precedence.ml[11,288+6]..[11,288+11]) (laws_precedence.ml[11,288+0]..[11,288+58])
       plaw_params =
         [
           "a" (laws_precedence.ml[11,288+13]..[11,288+14])
@@ -49,7 +49,7 @@
           ]
   structure_item (laws_precedence.ml[12,347+0]..[12,347+57])
     Pstr_law
-    law_declaration "equality" (laws_precedence.ml[12,347+6]..[12,347+14]) (laws_precedence.ml[12,347+0]..[12,347+57])
+    law_declaration Testable "equality" (laws_precedence.ml[12,347+6]..[12,347+14]) (laws_precedence.ml[12,347+0]..[12,347+57])
       plaw_params =
         [
           "x" (laws_precedence.ml[12,347+16]..[12,347+17])
@@ -97,7 +97,7 @@
           ]
   structure_item (laws_precedence.ml[13,405+0]..[13,405+56])
     Pstr_law
-    law_declaration "if_" (laws_precedence.ml[13,405+6]..[13,405+9]) (laws_precedence.ml[13,405+0]..[13,405+56])
+    law_declaration Testable "if_" (laws_precedence.ml[13,405+6]..[13,405+9]) (laws_precedence.ml[13,405+0]..[13,405+56])
       plaw_params =
         [
           "a" (laws_precedence.ml[13,405+11]..[13,405+12])
@@ -126,7 +126,7 @@
           Pexp_ident "b" (laws_precedence.ml[13,405+55]..[13,405+56])
   structure_item (laws_precedence.ml[14,462+0]..[14,462+49])
     Pstr_law
-    law_declaration "let_" (laws_precedence.ml[14,462+6]..[14,462+10]) (laws_precedence.ml[14,462+0]..[14,462+49])
+    law_declaration Testable "let_" (laws_precedence.ml[14,462+6]..[14,462+10]) (laws_precedence.ml[14,462+0]..[14,462+49])
       plaw_params =
         [
           "a" (laws_precedence.ml[14,462+12]..[14,462+13])
@@ -154,7 +154,7 @@
           Pexp_ident "a" (laws_precedence.ml[14,462+48]..[14,462+49])
   structure_item (laws_precedence.ml[15,512+0]..[15,512+45])
     Pstr_law
-    law_declaration "fun_" (laws_precedence.ml[15,512+6]..[15,512+10]) (laws_precedence.ml[15,512+0]..[15,512+45])
+    law_declaration Testable "fun_" (laws_precedence.ml[15,512+6]..[15,512+10]) (laws_precedence.ml[15,512+0]..[15,512+45])
       plaw_params =
         [
           "a" (laws_precedence.ml[15,512+12]..[15,512+13])
@@ -184,7 +184,7 @@
           Pexp_ident "a" (laws_precedence.ml[15,512+44]..[15,512+45])
   structure_item (laws_precedence.ml[16,558+0]..[16,558+75])
     Pstr_law
-    law_declaration "match_" (laws_precedence.ml[16,558+6]..[16,558+12]) (laws_precedence.ml[16,558+0]..[16,558+75])
+    law_declaration Testable "match_" (laws_precedence.ml[16,558+6]..[16,558+12]) (laws_precedence.ml[16,558+0]..[16,558+75])
       plaw_params =
         [
           "a" (laws_precedence.ml[16,558+14]..[16,558+15])
@@ -220,7 +220,7 @@
           Pexp_ident "a" (laws_precedence.ml[16,558+74]..[16,558+75])
   structure_item (laws_precedence.ml[21,781+0]..[21,781+53])
     Pstr_law
-    law_declaration "clause_attrs" (laws_precedence.ml[21,781+6]..[21,781+18]) (laws_precedence.ml[21,781+0]..[21,781+53])
+    law_declaration Testable "clause_attrs" (laws_precedence.ml[21,781+6]..[21,781+18]) (laws_precedence.ml[21,781+0]..[21,781+53])
       plaw_params =
         []
       plaw_assumptions =
@@ -237,7 +237,7 @@
           Pexp_ident "b" (laws_precedence.ml[21,781+42]..[21,781+43])
   structure_item (laws_precedence.ml[24,855+0]..[24,855+23])
     Pstr_law
-    law_declaration "documented" (laws_precedence.ml[24,855+6]..[24,855+16]) (laws_precedence.ml[24,855+0]..[24,855+23])
+    law_declaration Testable "documented" (laws_precedence.ml[24,855+6]..[24,855+16]) (laws_precedence.ml[24,855+0]..[24,855+23])
       attribute "ocaml.doc"
         [
           structure_item (laws_precedence.ml[23,836+0]..[23,836+18])
@@ -258,5 +258,43 @@
   structure_item (laws_precedence.ml[25,879+0]..[25,879+13])
     Pstr_attribute "floating"
     []
+  structure_item (laws_precedence.ml[29,960+0]..[29,960+40])
+    Pstr_law
+    law_declaration Testable "testable" (laws_precedence.ml[29,960+6]..[29,960+14]) (laws_precedence.ml[29,960+0]..[29,960+40])
+      plaw_params =
+        [
+          "a" (laws_precedence.ml[29,960+16]..[29,960+17])
+            Some
+              core_type (laws_precedence.ml[29,960+20]..[29,960+24])
+                Ptyp_constr "bool" (laws_precedence.ml[29,960+20]..[29,960+24])
+                []
+        ]
+      plaw_assumptions =
+        [
+          expression (laws_precedence.ml[29,960+28]..[29,960+29])
+            Pexp_ident "a" (laws_precedence.ml[29,960+28]..[29,960+29])
+        ]
+      plaw_conclusion =
+        expression (laws_precedence.ml[29,960+39]..[29,960+40])
+          Pexp_ident "a" (laws_precedence.ml[29,960+39]..[29,960+40])
+  structure_item (laws_precedence.ml[30,1001+0]..[30,1001+39])
+    Pstr_law
+    law_declaration Provable "provable" (laws_precedence.ml[30,1001+5]..[30,1001+13]) (laws_precedence.ml[30,1001+0]..[30,1001+39])
+      plaw_params =
+        [
+          "a" (laws_precedence.ml[30,1001+15]..[30,1001+16])
+            Some
+              core_type (laws_precedence.ml[30,1001+19]..[30,1001+23])
+                Ptyp_constr "bool" (laws_precedence.ml[30,1001+19]..[30,1001+23])
+                []
+        ]
+      plaw_assumptions =
+        [
+          expression (laws_precedence.ml[30,1001+27]..[30,1001+28])
+            Pexp_ident "a" (laws_precedence.ml[30,1001+27]..[30,1001+28])
+        ]
+      plaw_conclusion =
+        expression (laws_precedence.ml[30,1001+38]..[30,1001+39])
+          Pexp_ident "a" (laws_precedence.ml[30,1001+38]..[30,1001+39])
 ]
 

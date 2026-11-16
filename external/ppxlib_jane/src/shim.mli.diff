@@ -47,6 +47,9 @@
 -|type nonrec jkind_declaration = jkind_declaration =
 +|and jkind_declaration =
 @|============================================================
+-|type nonrec law_flag = law_flag =
++|type law_flag =
+@|============================================================
 -|type nonrec law_declaration = law_declaration =
 +|type law_declaration =
 @|============================================================

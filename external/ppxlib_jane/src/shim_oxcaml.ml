@@ -429,8 +429,13 @@ type nonrec jkind_declaration = jkind_declaration =
   ; pjkind_loc : Location.t
   }
 
+type nonrec law_flag = law_flag =
+  | Testable
+  | Provable
+
 type nonrec law_declaration = law_declaration =
-  { plaw_name : string loc
+  { plaw_flag : law_flag
+  ; plaw_name : string loc
   ; plaw_params : (string loc * core_type option) list
   ; plaw_assumptions : expression list
   ; plaw_conclusion : expression

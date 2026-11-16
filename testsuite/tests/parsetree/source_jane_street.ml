@@ -1959,6 +1959,14 @@ Line 1, characters 0-20:
 Error: Laws are not supported yet.
 |}]
 
+law_ trivial_provable : true
+[%%expect{|
+Line 1, characters 0-28:
+1 | law_ trivial_provable : true
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws are not supported yet.
+|}]
+
 (* Laws in every structure and signature position. *)
 
 module M = struct

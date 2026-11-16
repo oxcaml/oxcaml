@@ -942,8 +942,8 @@ let default_iterator =
       );
 
     law_declaration =
-      (fun this { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-                  plaw_attributes; plaw_loc } ->
+      (fun this { plaw_flag = _; plaw_name; plaw_params; plaw_assumptions;
+                  plaw_conclusion; plaw_attributes; plaw_loc } ->
          iter_loc this plaw_name;
          List.iter
            (fun (name, ty) ->
