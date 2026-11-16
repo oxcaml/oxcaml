@@ -303,8 +303,8 @@ let value_descriptions_without_modes ~loc env name ~self_check
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
-        let ty1, mode_l1, _, sort1, p1 =
-          Ctype.instance_prim_with_desc env p1 vd1.val_type
+        let ty1, (args1, res1), sort1 =
+          Ctype.instance_prim_with_modes env p1 vd1.val_type
         in
         let tc =
           try
@@ -325,7 +325,9 @@ let value_descriptions_without_modes ~loc env name ~self_check
         in
         let pc =
           {pc_desc = p1; pc_type = vd2.Types.val_type;
-           pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l1;
+           pc_poly_mode =
+             { args = List.map (Option.map Mode.Locality.disallow_right) args1;
+               res = Option.map Mode.Locality.disallow_right res1 };
            pc_poly_sort = sort1;
            pc_yielding =
              Ctype.prim_params_yielding env vd2.Types.val_type

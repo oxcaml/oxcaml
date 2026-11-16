@@ -2120,7 +2120,7 @@ let prim_mode' mvars = function
     Locality.allow_right Locality.global, None
   | Primitive.Prim_local, _ ->
     Locality.allow_right Locality.local, None
-  | Primitive.Prim_mode_poly _, _ -> assert false
+  | Primitive.Prim_mode_poly, _ -> assert false
   | Primitive.Prim_poly, _ ->
     match mvars with
     | Some (mvar_l, (mvar_f, mvar_y)) -> mvar_l, Some (mvar_f, mvar_y)
@@ -2128,10 +2128,10 @@ let prim_mode' mvars = function
 
 (* Exported version. *)
 let prim_mode mvar prim ~level =
-  match prim with
-  | Primitive.Prim_mode_poly (Primitive.Instance m), _ -> m
-  | Primitive.Prim_mode_poly Primitive.Generic, _ -> assert false
-  | (Primitive.Prim_global | Primitive.Prim_local | Primitive.Prim_poly), _ ->
+  match prim, mvar with
+  | (Primitive.Prim_mode_poly, _), Some m -> m
+  | (Primitive.Prim_mode_poly, _), None -> assert false
+  | (Primitive.(Prim_global | Prim_local | Prim_poly), _), _ ->
     let mvar = Option.map
       (fun mvar_l -> mvar_l, (Forkable.newvar level, Yielding.newvar level))
       mvar
@@ -2272,14 +2272,12 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
 
 let instance_mode_poly (prim, _) m =
   match prim with
-  | Primitive.Prim_mode_poly (Primitive.Instance _) | Primitive.Prim_poly ->
-    assert false
-  | Primitive.Prim_mode_poly Primitive.Generic ->
+  | Primitive.Prim_poly -> assert false
+  | Primitive.Prim_mode_poly ->
     let mode_l = Locality.newvar 0 in
     Locality.equate_exn (With_locality.proj_comonadic Areality m) mode_l;
-    Primitive.Prim_mode_poly
-      (Primitive.Instance (Locality.disallow_right mode_l))
-  | (Primitive.Prim_global | Primitive.Prim_local) as prim -> prim
+    Some mode_l
+  | Primitive.Prim_global | Primitive.Prim_local -> None
 
 let rec instance_prim_mode_poly modes res ty =
   match modes, get_desc ty with
@@ -2293,7 +2291,7 @@ let rec instance_prim_mode_poly modes res ty =
      m :: modes, res
   | _ :: _, _ -> assert false
   | [], _ ->
-     [], fst res
+     [], None
 
 (* This function makes a copy of [ty] if [desc] is marked [prim_is_layout_poly]
    AND at least one generic type variable with jkind [any] is present. The
@@ -2423,23 +2421,30 @@ let instance_prim env (desc : Primitive.description) ty =
   let ty, mode_l, mode_y = instance_prim_mode desc ty in
   ty, mode_l, mode_y, sort
 
-let instance_prim_with_desc env (desc : Primitive.description) ty =
+let instance_prim_with_modes env (desc : Primitive.description) ty =
   let is_mode_poly = function
-    | Primitive.Prim_mode_poly _, _ -> true
+    | Primitive.Prim_mode_poly, _ -> true
     | _ -> false
   in
   if is_mode_poly desc.prim_native_repr_res
      || List.exists is_mode_poly desc.prim_native_repr_args
   then
     let ty, sort = instance_prim_layout env desc (generic_instance ty) in
-    let args, res =
+    let modes =
       instance_prim_mode_poly
         desc.prim_native_repr_args desc.prim_native_repr_res ty
     in
-    ty, None, None, sort, Primitive.with_modes desc ~args ~res
+    ty, modes, sort
   else
-    let ty, mode_l, mode_y, sort = instance_prim env desc ty in
-    ty, mode_l, mode_y, sort, desc
+    let ty, mode_l, _, sort = instance_prim env desc ty in
+    let instance = function
+      | Primitive.Prim_poly, _ -> mode_l
+      | Primitive.(Prim_global | Prim_local | Prim_mode_poly), _ -> None
+    in
+    ty,
+    (List.map instance desc.prim_native_repr_args,
+     instance desc.prim_native_repr_res),
+    sort
 
 (**** Instantiation with parameter substitution ****)
 

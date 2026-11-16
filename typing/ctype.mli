@@ -284,15 +284,15 @@ val instance_prim:
         Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
         Jkind.Sort.t option
 
-(** Similar to [instance_prim], but returns an updated primitive description
-    of the instance. If a mode is polymorphic, its [Prim_mode_poly Generic] are
-    instantiated with the localities of the instantiated type. *)
-val instance_prim_with_desc:
+(** Similar to [instance_prim], but returns the localities of the instance for
+    each argument and the result: [Some] for [Prim_poly] and [Prim_mode_poly]
+    modes, [None] otherwise. *)
+val instance_prim_with_modes:
         Env.t ->
         Primitive.description -> type_expr ->
         type_expr *
-        Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
-        Jkind.Sort.t option * Primitive.description
+        (Mode.Locality.lr option list * Mode.Locality.lr option) *
+        Jkind.Sort.t option
 
 val create_yielding_mode_l : Mode.Yielding.l -> Mode.Yielding.l
 

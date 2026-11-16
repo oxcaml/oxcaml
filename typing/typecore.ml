@@ -10033,16 +10033,16 @@ and type_ident env ?(recarg=Rejected) lid =
       Error.log_and_raise lid.loc env Inlined_record_escape
   | false, Required, _  -> () (* will fail later *)
   end;
-  let layout_args, val_type, val_kind, kind =
+  let layout_args, val_type, kind =
     match desc.val_kind with
     | Val_prim prim ->
        if not @@ Lpoly.is_empty_exn desc.val_lpoly then
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
-       let ty, mode, _, sort, prim =
-         instance_prim_with_desc env prim desc.val_type
+       let ty, (args, res), sort =
+         instance_prim_with_modes env prim desc.val_type
        in
        let ty = instance ty in
-       begin match prim.prim_native_repr_res, mode with
+       begin match prim.prim_native_repr_res, res with
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
@@ -10053,8 +10053,11 @@ and type_ident env ?(recarg=Rejected) lid =
        let yielding =
          prim_params_yielding env ty ~arity:prim.prim_type_arity
        in
-       [], ty, Val_prim prim,
-       Id_prim (Option.map Locality.disallow_right mode, sort, yielding)
+       let modes =
+         { args = List.map (Option.map Locality.disallow_right) args;
+           res = Option.map Locality.disallow_right res }
+       in
+       [], ty, Id_prim (modes, sort, yielding)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
        begin match lvars with
@@ -10070,12 +10073,12 @@ and type_ident env ?(recarg=Rejected) lid =
            lvars
            (fun () -> instance desc.val_type)
        in
-       layout_args, val_type, desc.val_kind, Id_value
+       layout_args, val_type, Id_value
   in
   (* after layout instantiation, the value loses layout polymorphism. *)
   let val_lpoly = Lpoly.determined [] in
   path, actual_mode, layout_args,
-  { desc with val_type; val_kind; val_lpoly }, kind
+  { desc with val_type; val_lpoly }, kind
 
 and type_binding_op_ident env s =
   let loc = s.loc in
