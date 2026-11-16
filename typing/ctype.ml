@@ -102,6 +102,17 @@ let raise_unexplained_for tr_exn =
 let raise_for tr_exn e =
   raise_trace_for tr_exn [e]
 
+(* [extend_trace_for tr_exn elt f] runs [f], prepending [elt] to the trace of
+   any [tr_exn] exception it raises, including from checks it delays. *)
+let extend_trace_for (type a) (tr_exn : a trace_exn)
+    (elt : (type_expr, a) Errortrace.elt) f =
+  Scheduler.Monitor.try_ f ~with_:(fun e ->
+      match tr_exn, e with
+      | Unify, Unify_trace tr -> Unify_trace (elt :: tr)
+      | Equality, Equality_trace tr -> Equality_trace (elt :: tr)
+      | Moregen, Moregen_trace tr -> Moregen_trace (elt :: tr)
+      | _ -> e)
+
 (* Thrown from [moregen_kind] *)
 exception Public_method_to_private_method
 
@@ -195,6 +206,9 @@ let run_scheduler_and_default_ivars () =
     if !defaulted then loop ()
   in
   loop ()
+
+let try_then_default_all_ivars f =
+  Misc.try_finally f ~always:run_scheduler_and_default_ivars
 
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
@@ -6936,8 +6950,7 @@ let may_instantiate inst_nongen t1 =
 
 let rec moregen inst_nongen variance type_pairs env t1 t2 =
   if eq_type t1 t2 then () else
-
-  try
+  extend_trace_for Moregen (Diff { got = t1; expected = t2 }) begin fun () ->
     match (get_desc t1, get_desc t2) with
       (Tvar { jkind }, _) when may_instantiate inst_nongen t1
                             && not (deep_occur t1 t2) ->
@@ -7052,8 +7065,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (_, _) ->
               raise_unexplained_for Moregen
         end
-  with Moregen_trace trace ->
-    raise_trace_for Moregen (Diff {got = t1; expected = t2} :: trace)
+  end
 
 
 and moregen_list inst_nongen variance type_pairs env tl1 tl2 =
@@ -7105,9 +7117,10 @@ and moregen_fields inst_nongen variance type_pairs env ty1 ty2 =
     (fun (name, k1, t1, k2, t2) ->
        (* The below call should never throw [Public_method_to_private_method] *)
        moregen_kind k1 k2;
-       try moregen inst_nongen variance type_pairs env t1 t2 with Moregen_trace trace ->
-         raise_trace_for Moregen
-           (incompatible_fields ~name ~got:t1 ~expected:t2 :: trace)
+       extend_trace_for Moregen (incompatible_fields ~name ~got:t1 ~expected:t2)
+         begin fun () ->
+           moregen inst_nongen variance type_pairs env t1 t2
+         end
     )
     pairs
 
@@ -7168,46 +7181,43 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
          if f1 == f2 then () else
          match row_field_repr f1, row_field_repr f2 with
          (* Both matching [Rpresent]s *)
-         | Rpresent(Some t1), Rpresent(Some t2) -> begin
-             try
-               moregen inst_nongen variance type_pairs env t1 t2
-             with Moregen_trace trace ->
-               raise_trace_for Moregen
-                 (Variant (Incompatible_types_for l) :: trace)
-           end
+         | Rpresent(Some t1), Rpresent(Some t2) ->
+             extend_trace_for Moregen (Variant (Incompatible_types_for l))
+               begin fun () ->
+                 moregen inst_nongen variance type_pairs env t1 t2
+               end
          | Rpresent None, Rpresent None -> ()
          (* Both [Reither] *)
-         | Reither(c1, tl1, _), Reither(c2, tl2, m2) -> begin
-             try
-               if not (eq_row_field_ext f1 f2) then begin
-                 if c1 && not c2 then raise_unexplained_for Moregen;
-                 let f2' =
-                   rf_either [] ~use_ext_of:f2 ~no_arg:c2 ~matched:m2 in
-                 link_row_field_ext ~inside:f1 f2';
-                 if List.length tl1 = List.length tl2 then
-                   List.iter2 (moregen inst_nongen variance type_pairs env) tl1 tl2
-                 else match tl2 with
-                   | t2 :: _ ->
-                     List.iter
-                       (fun t1 -> moregen inst_nongen variance type_pairs env t1 t2)
-                       tl1
-                   | [] -> if tl1 <> [] then raise_unexplained_for Moregen
+         | Reither(c1, tl1, _), Reither(c2, tl2, m2) ->
+             extend_trace_for Moregen (Variant (Incompatible_types_for l))
+               begin fun () ->
+                 if not (eq_row_field_ext f1 f2) then begin
+                   if c1 && not c2 then raise_unexplained_for Moregen;
+                   let f2' =
+                     rf_either [] ~use_ext_of:f2 ~no_arg:c2 ~matched:m2 in
+                   link_row_field_ext ~inside:f1 f2';
+                   if List.length tl1 = List.length tl2 then
+                     List.iter2
+                       (moregen inst_nongen variance type_pairs env)
+                       tl1 tl2
+                   else match tl2 with
+                     | t2 :: _ ->
+                       List.iter
+                         (fun t1 ->
+                           moregen inst_nongen variance type_pairs env t1 t2)
+                         tl1
+                     | [] -> if tl1 <> [] then raise_unexplained_for Moregen
+                 end
                end
-             with Moregen_trace trace ->
-               raise_trace_for Moregen
-                 (Variant (Incompatible_types_for l) :: trace)
-           end
          (* Generalizing [Reither] *)
-         | Reither(false, tl1, _), Rpresent(Some t2) when may_inst -> begin
-             try
-               link_row_field_ext ~inside:f1 f2;
-               List.iter
-                 (fun t1 -> moregen inst_nongen variance type_pairs env t1 t2)
-                 tl1
-             with Moregen_trace trace ->
-               raise_trace_for Moregen
-                 (Variant (Incompatible_types_for l) :: trace)
-           end
+         | Reither(false, tl1, _), Rpresent(Some t2) when may_inst ->
+             extend_trace_for Moregen (Variant (Incompatible_types_for l))
+               begin fun () ->
+                 link_row_field_ext ~inside:f1 f2;
+                 List.iter
+                   (fun t1 -> moregen inst_nongen variance type_pairs env t1 t2)
+                   tl1
+               end
          | Reither(true, [], _), Rpresent None when may_inst ->
              link_row_field_ext ~inside:f1 f2
          | Reither(_, _, _), Rabsent when may_inst ->
@@ -7234,6 +7244,13 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
   with exn ->
     (* Undo [link_type] if we failed *)
     set_type_desc rm1 md1; raise exn
+
+let moregen inst_nongen variance type_pairs env t1 t2 =
+  Scheduler.Monitor.try_
+    (fun () -> moregen inst_nongen variance type_pairs env t1 t2)
+    ~with_:(function
+      | Moregen_trace trace -> Moregen (expand_to_moregen_error env trace)
+      | e -> e)
 
 (*
    Non-generic variable can be instantiated only if [inst_nongen] is
@@ -7277,13 +7294,16 @@ let moregeneral ~self_check env inst_nongen
         Jkind.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
-      try
-        with_univar_pairs [] begin fun () ->
-          let type_pairs = fresh_moregen_pairs () in
-          moregen inst_nongen Covariant type_pairs env pat_inst subj_inst';
-        end;
-        subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
-      with Moregen_trace trace -> subj_inst, Error trace
+      match
+        Scheduler.Monitor.root (fun () ->
+            try_then_default_all_ivars (fun () ->
+                with_univar_pairs [] (fun () ->
+                    let type_pairs = fresh_moregen_pairs () in
+                    moregen inst_nongen Covariant type_pairs env pat_inst
+                      subj_inst')))
+      with
+      | () -> subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
+      | exception Moregen trace -> subj_inst, Error trace
     end
       ~before_generalize:(fun (subj_inst, _) ->
         ignore (Jkind.Sort.generalize_with (fun () -> generalize subj_inst)))
@@ -7310,7 +7330,7 @@ let moregeneral ~self_check env inst_nongen
             |> Jkind_types.Sort.Const.subst subst_map
             |> Option.some)
         pat_inst_sorts
-    | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
+    | _, Error trace -> raise (Moregen trace)
   end
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
@@ -7774,7 +7794,12 @@ type class_match_failure =
   | CM_Private_method of string
   | CM_Virtual_method of string
 
-exception Failure of class_match_failure list
+exception Class_match_failure of class_match_failure list
+
+type moregen_clty_trace = class_match_failure list
+
+exception Moregen_clty_trace of moregen_clty_trace
+exception Moregen_clty of moregen_clty_trace
 
 let match_class_sig_shape ~strict sign1 sign2 =
   let errors =
@@ -7829,10 +7854,16 @@ let match_class_sig_shape ~strict sign1 sign2 =
       else err)
     sign1.csig_vars errors
 
-(* [arrow_index] is the number of [Cty_arrow]
-           constructors we've seen so far. *)
+(* [arrow_index] is the number of [Cty_arrow] constructors we've seen so far.
+   The handlers below are monitor frames, so that checks delayed by [moregen]
+   (e.g. mode crossing) fail with the same [Moregen_clty_trace]. *)
 let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
-  try
+  Scheduler.Monitor.try_
+    ~with_:(function
+      | Moregen_clty_trace error when trace || error = [] ->
+        Moregen_clty_trace (CM_Class_type_mismatch (env, cty1, cty2) :: error)
+      | e -> e)
+  begin fun () ->
     match cty1, cty2 with
     | Cty_constr (_, _, cty1), _ ->
         moregen_clty ~arrow_index true type_pairs env cty1 cty2
@@ -7840,12 +7871,13 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
         moregen_clty ~arrow_index true type_pairs env cty1 cty2
     | Cty_arrow (l1, ty1, cty1'), Cty_arrow (l2, ty2, cty2') when l1 = l2 ->
         let arrow_index = arrow_index + 1 in
-        begin
-          try moregen true Covariant type_pairs env ty1 ty2 with Moregen_trace trace ->
-            raise (Failure [
-                CM_Parameter_mismatch
-                  (arrow_index, env, expand_to_moregen_error env trace)])
-        end;
+        Scheduler.Monitor.try_
+          (fun () -> moregen true Covariant type_pairs env ty1 ty2)
+          ~with_:(function
+            | Moregen trace ->
+              Moregen_clty_trace
+                [CM_Parameter_mismatch (arrow_index, env, trace)]
+            | e -> e);
         moregen_clty ~arrow_index false type_pairs env cty1' cty2'
     | Cty_signature sign1, Cty_signature sign2 ->
         Meths.iter
@@ -7856,15 +7888,13 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                   all methods in sign2 are present in sign1. *)
                assert false
              | (_, _, ty') ->
-                 match moregen true Covariant type_pairs env ty' ty with
-                 | () -> ()
-                 | exception Moregen_trace trace ->
-                     raise (Failure [
-                       CM_Meth_type_mismatch
-                         (lab,
-                          env,
-                          Moregen_error
-                            (expand_to_moregen_error env trace))]))
+                 Scheduler.Monitor.try_
+                   (fun () -> moregen true Covariant type_pairs env ty' ty)
+                   ~with_:(function
+                     | Moregen trace ->
+                       Moregen_clty_trace
+                         [CM_Meth_type_mismatch (lab, env, Moregen_error trace)]
+                     | e -> e))
           sign2.csig_meths;
         Vars.iter
           (fun lab (_, _, ty) ->
@@ -7874,24 +7904,22 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                   all instance variables in sign2 are present in sign1. *)
                assert false
              | (_, _, ty') ->
-                 match moregen true Covariant type_pairs env ty' ty with
-                 | () -> ()
-                 | exception Moregen_trace trace ->
-                     raise (Failure [
-                       CM_Val_type_mismatch
-                         (lab,
-                          env,
-                          Moregen_error
-                            (expand_to_moregen_error env trace))]))
+                 Scheduler.Monitor.try_
+                   (fun () -> moregen true Covariant type_pairs env ty' ty)
+                   ~with_:(function
+                     | Moregen trace ->
+                       Moregen_clty_trace
+                         [CM_Val_type_mismatch (lab, env, Moregen_error trace)]
+                     | e -> e))
           sign2.csig_vars
     | _ ->
-        raise (Failure [])
-  with
-    Failure error when trace || error = [] ->
-      raise (Failure (CM_Class_type_mismatch (env, cty1, cty2)::error))
+        raise (Moregen_clty_trace [])
+  end
 
 let moregen_clty trace type_pairs env cty1 cty2 =
-  moregen_clty ~arrow_index:0 trace type_pairs env cty1 cty2
+  Scheduler.Monitor.try_
+    (fun () -> moregen_clty ~arrow_index:0 trace type_pairs env cty1 cty2)
+    ~with_:(function Moregen_clty_trace trace -> Moregen_clty trace | e -> e)
 
 let match_class_types ?(trace=true) env pat_sch subj_sch =
   let sign1 = signature_of_class_type pat_sch in
@@ -7937,8 +7965,13 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
           (* Always succeeds *)
           moregen true Covariant type_pairs env row1 row2;
           (* May fail *)
-          try moregen_clty trace type_pairs env patt subj; []
-          with Failure res -> res
+          match
+            Scheduler.Monitor.root (fun () ->
+                try_then_default_all_ivars (fun () ->
+                    moregen_clty trace type_pairs env patt subj))
+          with
+          | () -> []
+          | exception Moregen_clty res -> res
         end
       end
   | errors ->
@@ -7957,7 +7990,7 @@ let equal_clsig trace type_pairs subst env sign1 sign2 =
              match eqtype true type_pairs subst env ty' ty with
              | () -> ()
              | exception Equality_trace trace ->
-                 raise (Failure [
+                 raise (Class_match_failure [
                    CM_Meth_type_mismatch
                      (lab,
                       env,
@@ -7975,7 +8008,7 @@ let equal_clsig trace type_pairs subst env sign1 sign2 =
              match eqtype true type_pairs subst env ty' ty with
              | () -> ()
              | exception Equality_trace trace ->
-                 raise (Failure [
+                 raise (Class_match_failure [
                    CM_Val_type_mismatch
                      (lab,
                       env,
@@ -7983,8 +8016,8 @@ let equal_clsig trace type_pairs subst env sign1 sign2 =
                         (expand_to_equality_error env trace !subst))]))
       sign2.csig_vars
   with
-    Failure error when trace ->
-      raise (Failure (CM_Class_type_mismatch
+    Class_match_failure error when trace ->
+      raise (Class_match_failure (CM_Class_type_mismatch
                         (env, Cty_signature sign1, Cty_signature sign2)::error))
 
 let match_class_declarations env patt_params patt_type subj_params subj_type =
@@ -8006,10 +8039,10 @@ let match_class_declarations env patt_params patt_type subj_params subj_type =
         let lp = List.length patt_params in
         let ls = List.length subj_params in
         if lp  <> ls then
-          raise (Failure [CM_Parameter_arity_mismatch (lp, ls)]);
+          raise (Class_match_failure [CM_Parameter_arity_mismatch (lp, ls)]);
         Stdlib.List.iteri2 (fun n p s ->
           try eqtype true type_pairs subst env p s with Equality_trace trace ->
-            raise (Failure
+            raise (Class_match_failure
                      [CM_Type_parameter_mismatch
                         (n+1, env, expand_to_equality_error env trace !subst)]))
           patt_params subj_params;
@@ -8022,7 +8055,7 @@ let match_class_declarations env patt_params patt_type subj_params subj_type =
         match_class_types ~trace:false env
           (clty_params patt_params patt_type)
           (clty_params subj_params subj_type)
-      with Failure r -> r
+      with Class_match_failure r -> r
     end
   | error ->
       error
