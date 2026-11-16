@@ -2070,8 +2070,9 @@ let rec free_variables = function
       free_variables_lfun tmpl
   | Linstantiate {ap_func = fn; ap_args = args} ->
       free_variables_list (free_variables fn) args
-  | Lcode {code_fun} ->
-      free_variables_lfun code_fun
+  | Lcode _ ->
+      (* An invariant of Lcode is that it has no free variables. *)
+      Ident.Set.empty
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -2236,7 +2237,7 @@ let rec free_sort_vars = function
   | Lapply{ap_func = fn; ap_args = args; ap_result_layout = layout}
   | Linstantiate{ap_func = fn; ap_args = args; ap_result_layout = layout} ->
       free_sort_vars_list (sort_vars_of_layout layout) (fn :: args)
-  | Lfunction lfun | Ltemplate lfun | Lcode { code_fun = lfun } ->
+  | Lfunction lfun | Ltemplate lfun ->
       free_sort_vars_lfun lfun
   | Llet(_, layout, _id, _duid, arg, body)
   | Lmutlet(layout, _id, _duid, arg, body) ->
@@ -2307,6 +2308,9 @@ let rec free_sort_vars = function
         (sort_vars_of_list sort_vars_of_layout
            (kinst_result_layout :: kinst_args))
         (free_sort_vars fn)
+  |  Lcode _ ->
+      (* An invariant of Lcode is that it has no free variables. *)
+      Layout_ident.Set.empty
 
 and free_sort_vars_list set exprs =
   List.fold_left
