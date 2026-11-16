@@ -28,3 +28,7 @@ law_? documented : true
 
 law_? testable (a : bool) : a implies_ a
 law_ provable (a : bool) : a implies_ a
+
+(* Types come before the parameters and may have kinds. *)
+
+law_ types (type a (b : value_or_null)) (type c) (x : a) : true

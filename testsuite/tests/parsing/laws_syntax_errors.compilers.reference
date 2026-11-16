@@ -42,6 +42,10 @@ Line 2, characters 10-11:
 2 | law_? foo _ : true;;
               ^
 Error: Syntax error
+Line 4, characters 21-25:
+4 | law_? foo (x : int) (type a) : true;;
+                         ^^^^
+Error: Syntax error
 Line 4, characters 4-9:
 4 | law_?foo: true;;
         ^^^^^

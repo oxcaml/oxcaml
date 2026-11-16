@@ -49,6 +49,45 @@ Line 1, characters 0-36:
 Error: Laws are not supported yet.
 |}]
 
+(* Types, with and without kinds, come before the parameters. *)
+
+law_? types (type a (b : value_or_null)) (type c) (x : a) (y : b) : true
+[%%expect {|
+
+law_? types (type a) (type (b : value_or_null)) (type c) (x : a) (y :
+  b) : true;;
+Line 1, characters 0-72:
+1 | law_? types (type a (b : value_or_null)) (type c) (x : a) (y : b) : true
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws are not supported yet.
+|}]
+
+law_? kinded (type a : value_or_null) (x : a) : true
+[%%expect {|
+
+law_? kinded (type (a : value_or_null)) (x : a) : true;;
+Line 1, characters 0-52:
+1 | law_? kinded (type a : value_or_null) (x : a) : true
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws are not supported yet.
+|}]
+
+module type U = sig
+  law_ provable_types (type a) (xs : a list) : List.rev (List.rev xs) = xs
+end
+[%%expect {|
+
+module type U  =
+  sig
+    law_ provable_types (type a) (xs : a list) :
+      (List.rev (List.rev xs)) = xs
+  end;;
+Line 2, characters 2-74:
+2 |   law_ provable_types (type a) (xs : a list) : List.rev (List.rev xs) = xs
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws are not supported yet.
+|}]
+
 module M = struct
   law_? trivial : true
 end
