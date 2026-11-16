@@ -493,7 +493,7 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
     }
   } else {
     CAMLassert (Scannable_tag(tag));
-    CAMLassert(Scannable_val(dummy));
+    CAMLassert (Scannable_val(dummy));
     CAMLassert (Tag_val(dummy) != Infix_tag);
     CAMLassert (Reserved_val(dummy) == Reserved_val(newval));
     Unsafe_store_tag_val(dummy, tag);
