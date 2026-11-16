@@ -227,11 +227,12 @@ let flip_sign_bit ~env ~res ~(kind : Flambda_kind.Standard_int.t)
    pointer). As in bytecode, this is unsupported and raises [Failure] at
    runtime; see [caml_check_idx_base] in the JS runtime.
 
-   The base of a pointer may also be a string, bytes or one-dimensional bigarray
-   of bytes, in which case the field index is the position of a byte. Only
-   accesses to naked int8s can have such a base, and they go through
-   [caml_idx_base_get_int8] and [caml_idx_base_set_int8] in the runtime, which
-   dispatch on the base. *)
+   The base may also be a string, bytes or one-dimensional bigarray of bytes, in
+   which case the field index is the position of a byte. Only accesses to naked
+   int8s can have such a base, whether through a block index or a pointer (as
+   for the string-like indices of [caml_get_idx_bytecode] and
+   [caml_set_idx_bytecode]). They go through [caml_idx_base_get_int8] and
+   [caml_idx_base_set_int8] in the runtime, which dispatch on the base. *)
 let field_index_of_byte_offset ~env ~res offset =
   let offset, res = prim_arg ~env ~res offset in
   let offset, env, res =
@@ -288,15 +289,8 @@ let read_offset ~env ~res ~kind ~base ~offset =
       (Extern ("caml_array_unsafe_get", None))
       [Pv base; Pv index]
 
-let write_offset ~env ~res
-    ~(write_offset_kind : Flambda_primitive.Write_offset_kind.t) ~kind ~base
-    ~offset new_value =
-  let base_may_be_string_like =
-    match write_offset_kind with
-    | Into_block -> false
-    | Into_block_or_off_heap -> is_naked_int8 kind
-  in
-  if base_may_be_string_like
+let write_offset ~env ~res ~kind ~base ~offset new_value =
+  if is_naked_int8 kind
   then
     let base, res = prim_arg ~env ~res base in
     let index, env, res = field_index_of_byte_offset ~env ~res offset in
@@ -1020,8 +1014,8 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Atomic_exchange (offset_units, _, _) ->
     atomic_field ~env ~res offset_units "caml_atomic_exchange_field" ~base:x
       ~offset:y [z]
-  | Write_offset (write_offset_kind, kind, _) ->
-    write_offset ~env ~res ~write_offset_kind ~kind ~base:x ~offset:y z
+  | Write_offset (_, kind, _) ->
+    write_offset ~env ~res ~kind ~base:x ~offset:y z
 
 let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
     z =
