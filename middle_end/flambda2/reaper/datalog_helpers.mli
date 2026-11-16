@@ -258,6 +258,11 @@ module Schemas : sig
         Code_id_or_name.t ->
         Datalog.nil
 
+  module F :
+    Schema_with_renaming
+      with type t = unit Field.Map.t
+       and type keys = Field.t -> Datalog.nil
+
   module NF :
     Schema_with_renaming
       with type t = unit Field.Map.t Code_id_or_name.Map.t

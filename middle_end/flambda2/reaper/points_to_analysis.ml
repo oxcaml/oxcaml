@@ -1138,24 +1138,58 @@ let cofield_has_use :
      in
      One.to_bool out)
 
+let is_normal_return_of_call field =
+  match Field.view field with
+  | Return_of_call (Normal _) -> true
+  | Return_of_call Exn
+  | Block _ | Value_slot _ | Function_slot _ | Call_witness _ | Is_int | Get_tag
+  | Boxed_number _ | Code_id_of_call_witness ->
+    false
+
+let get_returns_with_source :
+    Datalog.database -> unit Code_id_or_name.Map.t -> unit Field.Map.t =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let@ out = fix1' (empty Cols.[f]) in
+     [ (let$ [x; field; y] = ["x"; "field"; "y"] in
+        [ in_ % [x];
+          constructor ~base:x field ~from:y;
+          when1 is_normal_return_of_call field;
+          has_source y ]
+        ==> out % [field]) ])
+
+type returns_with_source =
+  | All_returns_have_source
+  | Returns_with_source of unit Field.Map.t
+
 let rec arguments_used_by_call db ep callee_sources num_args =
   match num_args with
   | [] -> []
   | num_first_arg :: num_args_rest -> (
     match callee_sources with
-    | Any_source -> List.map (fun n -> List.init n (fun _ -> Keep)) num_args
+    | Any_source ->
+      List.map
+        (fun n -> List.init n (fun _ -> Keep), All_returns_have_source)
+        num_args
     | Sources callee_sources -> (
       let witness_sources =
         get_field_sources db callee_sources (Field.call_witness ep)
       in
       match witness_sources with
-      | Any_source -> List.map (fun n -> List.init n (fun _ -> Keep)) num_args
+      | Any_source ->
+        List.map
+          (fun n -> List.init n (fun _ -> Keep), All_returns_have_source)
+          num_args
       | Sources witness_sources ->
         let first_arg_group =
           List.init num_first_arg (fun i ->
               if cofield_has_use db witness_sources (Cofield.param i)
               then Keep
               else Delete)
+        in
+        let returns_with_source =
+          Returns_with_source (get_returns_with_source db witness_sources)
         in
         let grouped_args_rest =
           match num_args_rest with
@@ -1166,13 +1200,16 @@ let rec arguments_used_by_call db ep callee_sources num_args =
                  (Field.normal_return_of_call 0))
               num_args_rest
         in
-        first_arg_group :: grouped_args_rest))
+        (first_arg_group, returns_with_source) :: grouped_args_rest))
 
 let arguments_used_by_known_arity_call db callee args =
-  List.flatten
-    (arguments_used_by_call db Field.Known_arity_code_pointer
-       (get_direct_sources db (Code_id_or_name.Map.singleton callee ()))
-       [args])
+  match
+    arguments_used_by_call db Field.Known_arity_code_pointer
+      (get_direct_sources db (Code_id_or_name.Map.singleton callee ()))
+      [args]
+  with
+  | [r] -> r
+  | [] | _ :: _ :: _ -> Misc.fatal_errorf "arguments_used_by_known_arity_call"
 
 let arguments_used_by_unknown_arity_call db callee args =
   arguments_used_by_call db Field.Unknown_arity_code_pointer

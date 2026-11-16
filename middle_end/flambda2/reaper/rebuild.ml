@@ -750,17 +750,17 @@ let rewrite_apply_cont_expr env ac =
     Some (Apply_cont_expr.with_continuation_and_args ac cont ~args)
 
 let reaper_produce_invalid_when_never_returns =
-  Sys.getenv_opt "REAPER_INVALIDS" <> None
+  lazy (Flambda_features.debug_reaper "invalids")
 
 let make_apply_wrapper env
     (make_apply : continuation:Apply_expr.Result_continuation.t -> Apply_expr.t)
-    apply_continuation return_decisions =
+    apply_continuation return_decisions ~never_returns =
   match (apply_continuation : Apply_expr.Result_continuation.t) with
   | Never_returns ->
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
       ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
-  | Return return_cont -> (
+  | Return return_cont ->
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
       Continuation.Map.find return_cont env.cont_params_to_keep
@@ -773,13 +773,52 @@ let make_apply_wrapper env
         ()
     in
     let apply = make_apply ~continuation:(Return return_cont_wrapper) in
-    let rev_args_or_invalid =
-      List.fold_left2
-        (fun (rev_args_or_invalid : _ Or_invalid.t) apply_decision func_decision
-             : _ Or_invalid.t ->
-          match rev_args_or_invalid with
-          | Invalid -> Invalid
-          | Ok (i, rev_args) -> (
+    let return_parameters = get_parameters return_decisions in
+    if never_returns
+    then
+      (* For the same reason as below, we need to not introduce a wrapper in
+       this case. However this makes it impossible to introduce a runtime
+       error if the function actually returns due to a bug in the reaper, so
+       we gate the [Invalid] wrapper behind an option which can be enabled
+       when debugging. The typical example would be something like: *)
+      (* let rec loop () =
+       *   do_something ();
+       *   loop ()
+       *)
+      (* where we don't want to degrade the tail call to a non-tail one as it
+       would blow up the stack. *)
+      if Lazy.force reaper_produce_invalid_when_never_returns
+      then
+        let handler =
+          RE.from_expr
+            ~expr:
+              (Expr.create_invalid
+                 (Message
+                    (Format.asprintf "Function call to %a never returns"
+                       Simple.print
+                       (Option.get (Apply.callee apply)))))
+            ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+        in
+        let cont_handler =
+          RE.create_continuation_handler
+            (Bound_parameters.create return_parameters)
+            ~handler ~is_exn_handler:false ~is_cold:true
+        in
+        let body =
+          RE.from_expr ~expr:(Expr.create_apply apply)
+            ~free_names:(Apply.free_names apply)
+            ~code_size:(Code_size.apply apply)
+        in
+        RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
+      else
+        let apply = make_apply ~continuation:Never_returns in
+        RE.from_expr ~expr:(Expr.create_apply apply)
+          ~free_names:(Apply.free_names apply)
+          ~code_size:(Code_size.apply apply)
+    else
+      let _, rev_args =
+        List.fold_left2
+          (fun (i, rev_args) apply_decision func_decision ->
             (* The decisions might not match, because [apply_decision] is the
                decision for the return continuation of the apply (it might have
                other uses, if the apply is in the branch of a conditional), and
@@ -789,48 +828,30 @@ let make_apply_wrapper env
               ( (apply_decision : Unboxing_analysis.param_decision),
                 (func_decision : Unboxing_analysis.param_decision) )
             with
-            | Delete, _ -> Ok (i + 1, rev_args)
-            | Unbox _, (Keep _ | Delete) | Keep _, Unbox _ ->
-              let[@inline] error () =
-                Misc.fatal_errorf
-                  "Inconsistent apply (%a) and func (%a) decisions:@ %a@."
-                  Unboxing_analysis.print_param_decision apply_decision
-                  Unboxing_analysis.print_param_decision func_decision
-                  Apply.print apply
-              in
-              (* let direct_or_indirect = match Apply.call_kind apply with |
-                 Function { function_call = Direct _; _ } -> error () | Function
-                 { function_call = Indirect_known_arity _; _ } ->
-                 GFG.Known_arity_code_pointer | Function { function_call =
-                 Indirect_unknown_arity; _ } | C_call _ | Method _ | Effect _ ->
-                 GFG.Unknown_arity_code_pointer in let field = GFG.Field.Apply
-                 (direct_or_indirect, GFG.Field.Normal i) in let has_any_source
-                 = Analysis.not_local_field_has_source env.uses (Simple.pattern_match
-                 (Option.get (Apply.callee apply)) ~name:(fun name ~coercion:_
-                 -> Code_id_or_name.name name) ~const:(fun _ -> assert false))
-                 field in *)
-              (* CR ncourant: restore this check *)
-              let has_any_source = false in
-              if has_any_source then error () else Invalid
-            | Keep (_, _), Keep (v, _) -> Ok (i + 1, Simple.var v :: rev_args)
-            | Keep (_, kind), Delete ->
-              Ok
-                ( i + 1,
-                  poison "reaper_unused_variable_of_continuation" (KS.kind kind)
-                  :: rev_args )
+            | Delete, _ -> i + 1, rev_args
+            | Keep (_, _), Keep (v, _) -> i + 1, Simple.var v :: rev_args
+            | Keep (_, kind), (Delete | Unbox _) ->
+              (* This can happen if the continuation has a fixed arity and the
+                 variable is unused (for instance if this call was a tail call,
+                 and the function containing the call cannot have a changed
+                 calling convention) *)
+              ( i + 1,
+                poison "reaper_unused_variable_of_continuation" (KS.kind kind)
+                :: rev_args )
+            | Unbox _, (Keep _ | Delete) ->
+              Misc.fatal_errorf
+                "Inconsistent apply (%a) and func (%a) decisions:@ %a@."
+                Unboxing_analysis.print_param_decision apply_decision
+                Unboxing_analysis.print_param_decision func_decision Apply.print
+                apply
             | Unbox fields_apply, Unbox fields_func ->
-              Ok
-                ( i + 1,
-                  Unboxed_fields.fold2_subset
-                    (fun _var_apply var_func rev_args ->
-                      Simple.var var_func :: rev_args)
-                    fields_apply fields_func rev_args )))
-        (Or_invalid.Ok (0, []))
-        apply_decisions return_decisions
-    in
-    let return_parameters = get_parameters return_decisions in
-    match rev_args_or_invalid with
-    | Ok (_, rev_args) ->
+              ( i + 1,
+                Unboxed_fields.fold2_subset
+                  (fun _var_apply var_func rev_args ->
+                    Simple.var var_func :: rev_args)
+                  fields_apply fields_func rev_args ))
+          (0, []) apply_decisions return_decisions
+      in
       let args = List.rev rev_args in
       if
         List.compare_lengths args return_parameters = 0
@@ -871,6 +892,10 @@ let make_apply_wrapper env
            can only happen because the uses of [g] do not match those of [f],
            which would be the case if a loop of tail calls between them
            existed. *)
+        (* CR ncourant: I'm slightly worried this might not actually be true:
+           if [f] and [g] tail-call each other, have an unused return variable,
+           but [f] can have a changed calling convention while [g] cannot,
+           I think we could lose the tailcalls in a loop? *)
         let apply = make_apply ~continuation:(Return return_cont) in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
@@ -897,46 +922,6 @@ let make_apply_wrapper env
             ~code_size:(Code_size.apply apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
-    | Invalid ->
-      (* For the same reason as above, we need not to introduce a wrapper in
-         this case. However this makes it impossible to introduce a runtime
-         error if the function actually returns due to a bug in the reaper, so
-         we gate the [Invalid] wrapper behind an option which can be enabled
-         when debugging. The typical example would be something like: *)
-      (* let rec loop () =
-       *   do_something ();
-       *   loop ()
-       *)
-      (* where we don't want to degrade the tail call to a non-tail one as it
-         would blow up the stack. *)
-      if reaper_produce_invalid_when_never_returns
-      then
-        let handler =
-          RE.from_expr
-            ~expr:
-              (Expr.create_invalid
-                 (Message
-                    (Format.asprintf "Function call to %a never returns"
-                       Simple.print
-                       (Option.get (Apply.callee apply)))))
-            ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
-        in
-        let cont_handler =
-          RE.create_continuation_handler
-            (Bound_parameters.create return_parameters)
-            ~handler ~is_exn_handler:false ~is_cold:true
-        in
-        let body =
-          RE.from_expr ~expr:(Expr.create_apply apply)
-            ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply apply)
-        in
-        RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
-      else
-        let apply = make_apply ~continuation:Never_returns in
-        RE.from_expr ~expr:(Expr.create_apply apply)
-          ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply apply))
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
@@ -978,17 +963,48 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
 
 let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in
-  let code_id_actually_called, call_kind =
-    let called c call_kind_if_unknown =
+  let[@local] unknown call_kind =
+    let used_params =
+      List.init
+        (Flambda_arity.cardinal_unarized (Apply.args_arity apply))
+        (fun _ -> Points_to_analysis.Keep)
+    in
+    ( Unboxing_analysis.Not_changing_calling_convention
+        { used_params; never_returns = false },
+      call_kind )
+  in
+  let[@local] direct code_id =
+    let call_kind = Call_kind.direct_function_call code_id in
+    ( Analysis.get_calling_convention_change env.solution
+        ~params_arity:(Apply.args_arity apply) code_id,
+      call_kind )
+  in
+  let[@local] known_arity callee call_kind_if_unknown =
+    let callee =
+      Simple.pattern_match callee
+        ~const:(fun _ -> None)
+        ~name:(fun name ~coercion:_ -> Some name)
+    in
+    match callee with
+    | None -> unknown call_kind_if_unknown
+    | Some callee -> (
+      let[@local] not_changing call_kind =
+        let used_params, ~never_returns =
+          Analysis.arguments_used_by_known_arity_call env.solution
+            (Code_id_or_name.name callee)
+            ~params_arity:(Apply.args_arity apply)
+            ~return_arity:(Apply.return_arity apply)
+        in
+        ( Unboxing_analysis.Not_changing_calling_convention
+            { used_params; never_returns },
+          call_kind )
+      in
       let code_ids =
-        Simple.pattern_match c
-          ~const:(fun _ -> Or_unknown.Unknown)
-          ~name:(fun name ~coercion:_ ->
-            Analysis.code_id_actually_directly_called env.solution name)
+        Analysis.code_id_actually_directly_called env.solution callee
       in
       match code_ids with
-      | Unknown -> None, call_kind_if_unknown
-      | Known code_ids ->
+      | Unknown -> not_changing call_kind_if_unknown
+      | Known code_ids -> (
         if Code_id.Set.is_empty code_ids
         then
           (* ncourant: I don't think this can happen if the closure is not dead
@@ -998,43 +1014,53 @@ let decide_whether_apply_needs_calling_convention_change env apply =
           Misc.fatal_errorf
             "Empty potentially called code_ids while trying to rewrite \
              call_kind %a with callee %a@."
-            Call_kind.print call_kind Simple.print c;
+            Call_kind.print call_kind Name.print callee;
         let singleton_code_id = Code_id.Set.get_singleton code_ids in
-        let new_call_kind =
-          match singleton_code_id with
-          | Some code_id -> Call_kind.direct_function_call code_id
-          | None ->
-            Call_kind.indirect_function_call_known_arity
-              ~code_ids:(Known code_ids)
-        in
-        singleton_code_id, new_call_kind
-    in
-    match call_kind with
-    | Function { function_call = Direct code_id } -> (
-      match Apply.callee apply with
-      | None -> Some code_id, call_kind
-      | Some c ->
-        let call_kind_if_unknown =
-          (* The direct call is preserved if and only if we cannot identify
-             which set of code_ids can be called. Since this is exactly the same
-             situation as the one where we do not replace the call_kind, we can
-             leave the direct call here. *)
-          call_kind
-        in
-        called c call_kind_if_unknown)
-    | Function { function_call = Indirect_unknown_arity } ->
-      (* CR-someday ncourant: when possible, try to identify direct calls. *)
-      None, call_kind
-    | Function { function_call = Indirect_known_arity _ } ->
-      called
-        (Option.get (Apply.callee apply))
-        (Call_kind.indirect_function_call_known_arity ~code_ids:Unknown)
-    | C_call _ | Method _ | Effect _ -> None, call_kind
+        match singleton_code_id with
+        | None ->
+          not_changing
+            (Call_kind.indirect_function_call_known_arity
+               ~code_ids:(Known code_ids))
+        | Some code_id -> direct code_id))
   in
-  match code_id_actually_called with
-  | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-  | Some code_id ->
-    Analysis.get_calling_convention_change env.solution code_id, call_kind
+  match call_kind with
+  | Function { function_call = Direct code_id } -> (
+    match Apply.callee apply with
+    | None -> direct code_id
+    | Some callee ->
+      let call_kind_if_unknown =
+        (* The direct call is preserved if and only if we cannot identify which
+           set of code_ids can be called. Since this is exactly the same
+           situation as the one where we do not replace the call_kind, we can
+           leave the direct call here. *)
+        call_kind
+      in
+      known_arity callee call_kind_if_unknown)
+  | Function { function_call = Indirect_unknown_arity } -> (
+    (* CR-someday ncourant: when possible, try to identify direct calls. *)
+    let callee =
+      Simple.pattern_match
+        (Option.get (Apply.callee apply))
+        ~const:(fun _ -> None)
+        ~name:(fun name ~coercion:_ -> Some name)
+    in
+    match callee with
+    | None -> unknown call_kind
+    | Some callee ->
+      let used_params, ~never_returns =
+        Analysis.arguments_used_by_unknown_arity_call env.solution
+          (Code_id_or_name.name callee)
+          ~params_arity:(Apply.args_arity apply)
+          ~return_arity:(Apply.return_arity apply)
+      in
+      ( Unboxing_analysis.Not_changing_calling_convention
+          { used_params; never_returns },
+        call_kind ))
+  | Function { function_call = Indirect_known_arity _ } ->
+    known_arity
+      (Option.get (Apply.callee apply))
+      (Call_kind.indirect_function_call_known_arity ~code_ids:Unknown)
+  | C_call _ | Method _ | Effect _ -> unknown call_kind
 
 let rebuild_apply env apply =
   let callee_is_dead =
@@ -1098,7 +1124,7 @@ let rebuild_apply env apply =
       Exn_continuation.create ~exn_handler ~extra_args
     in
     match updating_calling_convention with
-    | Not_changing_calling_convention -> (
+    | Not_changing_calling_convention { used_params; never_returns } -> (
       match Apply.callee apply with
       | Some callee when simple_is_unboxable env callee ->
         (* The callee has been unboxed but the calling convention can't be
@@ -1115,49 +1141,10 @@ let rebuild_apply env apply =
       | None | Some _ ->
         (* Format.eprintf "NOT CHANGING CALLING CONVENTION %a@." Apply.print
            apply; *)
-        let callee_and_known_arity =
-          match (call_kind : Call_kind.t) with
-          | Function { function_call = Direct _ | Indirect_known_arity _; _ }
-            -> (
-            match Apply.callee apply with
-            | None -> None
-            | Some callee ->
-              Simple.pattern_match callee
-                ~const:(fun _ -> None)
-                ~name:(fun name ~coercion:_ ->
-                  Some (Code_id_or_name.name name, true)))
-          | Function { function_call = Indirect_unknown_arity; _ } ->
-            Simple.pattern_match
-              (Option.get (Apply.callee apply))
-              ~const:(fun _ -> None)
-              ~name:(fun name ~coercion:_ ->
-                Some (Code_id_or_name.name name, false))
-          | C_call _ | Method _ | Effect _ -> None
-        in
-        let args_and_keep =
-          match callee_and_known_arity with
-          | None ->
-            List.map
-              (fun arg -> rewrite_simple env arg, Points_to_analysis.Keep)
-              (Apply.args apply)
-          | Some (callee, known_arity) ->
-            if known_arity
-            then
-              Analysis.arguments_used_by_known_arity_call env.solution callee
-                (Apply.args apply)
-            else
-              let grouped_args =
-                Flambda_arity.group_by_parameter (Apply.args_arity apply)
-                  (Apply.args apply)
-              in
-              List.flatten
-                (Analysis.arguments_used_by_unknown_arity_call env.solution
-                   callee grouped_args)
-        in
         let args, args_arity =
           List.split
-            (List.map2
-               (fun (arg, to_keep) kind ->
+            (Misc.Stdlib.List.map3
+               (fun arg to_keep kind ->
                  match (to_keep : Points_to_analysis.keep_or_delete) with
                  | Keep ->
                    ( arg,
@@ -1172,7 +1159,7 @@ let rebuild_apply env apply =
                        ~name:(fun name ~coercion:_ ->
                          name_poison ~category:"reaper_unused_argument" name),
                      Types_rewriter.erase_subkind kind ))
-               args_and_keep
+               (Apply.args apply) used_params
                (Flambda_arity.unarize (Apply.args_arity apply)))
         in
         (* The calling convention is not changing, but the arguments might have
@@ -1232,9 +1219,13 @@ let rebuild_apply env apply =
             (Flambda_arity.unarize return_arity)
         in
         make_apply_wrapper env make_apply (Apply.continuation apply)
-          func_decisions)
+          func_decisions ~never_returns)
     | Changing_calling_convention
-        { my_closure_decision; params_decisions; return_decisions } ->
+        { my_closure_decision;
+          params_decisions;
+          return_decisions;
+          never_returns
+        } ->
       (* Format.eprintf "CHANGING CALLING CONVENTION %a %a@." Code_id.print
          code_id Apply.print apply; *)
       let original_callee = Apply.callee apply in
@@ -1354,7 +1345,7 @@ let rebuild_apply env apply =
           ~relative_history:(Apply.relative_history apply)
       in
       make_apply_wrapper env make_apply (Apply.continuation apply)
-        return_decisions
+        return_decisions ~never_returns
 
 let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
     ~hole =
@@ -2127,7 +2118,9 @@ and rebuild_function_params_and_body env res code_metadata
   in
   let code_id = Code_metadata.code_id code_metadata in
   let updating_calling_convention =
-    Analysis.get_calling_convention_change env.solution code_id
+    Analysis.get_calling_convention_change env.solution
+      ~params_arity:(Code_metadata.params_arity code_metadata)
+      code_id
   in
   let rebuild_body env =
     let region_vars =
@@ -2165,8 +2158,16 @@ and rebuild_function_params_and_body env res code_metadata
          ~recursive:(Code_metadata.recursive code_metadata))
       (Code_metadata.with_cost_metrics cost_metrics code_metadata)
   in
+  let check_never_returns (body : Rebuilt_expr.t) return_continuation =
+    if Name_occurrences.mem_continuation body.free_names return_continuation
+    then
+      Misc.fatal_errorf
+        "In [rebuild_function_params_and_body], rebuilt expr is %a, with \
+         return continuation %a, but the code was supposed never to return@."
+        Flambda.Expr.print body.expr Continuation.print return_continuation
+  in
   match updating_calling_convention with
-  | Not_changing_calling_convention ->
+  | Not_changing_calling_convention { used_params = _; never_returns } ->
     (* The value_kind of the parameters might have been rewritten and stored in
        the metadata; update the parameters to match *)
     let params =
@@ -2176,6 +2177,7 @@ and rebuild_function_params_and_body env res code_metadata
            (Flambda_arity.unarize (Code_metadata.params_arity code_metadata)))
     in
     let body, res = rebuild_body env in
+    if never_returns then check_never_returns body return_continuation;
     let code_metadata = update_size code_metadata body in
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
        Name_occurrences.print body.free_names; *)
@@ -2185,7 +2187,8 @@ and rebuild_function_params_and_body env res code_metadata
       code_metadata,
       res )
   | Changing_calling_convention
-      { my_closure_decision; params_decisions; return_decisions } ->
+      { my_closure_decision; params_decisions; return_decisions; never_returns }
+    ->
     let params_decisions =
       List.map2
         (fun decision param : Unboxing_analysis.param_decision ->
@@ -2251,6 +2254,7 @@ and rebuild_function_params_and_body env res code_metadata
       }
     in
     let body, res = rebuild_body env in
+    if never_returns then check_never_returns body return_continuation;
     let code_metadata = update_size code_metadata body in
     ( Function_params_and_body.create ~return_continuation ~exn_continuation
         (Bound_parameters.create params)

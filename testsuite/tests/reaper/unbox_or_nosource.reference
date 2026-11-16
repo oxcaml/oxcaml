@@ -1,0 +1,3 @@
+f true 3 = 3
+f false 5 raised Exit
+f true 7 = 7
