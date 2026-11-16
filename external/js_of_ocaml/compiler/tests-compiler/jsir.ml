@@ -323,7 +323,7 @@ let missing_primitive =
 let%expect_test "JSIR whole program with a missing primitive" =
   with_temp_dir ~f:(fun () ->
       write_jsir_file "prog.cm-jsir-js" missing_primitive;
-      js_of_ocaml [ "prog.cm-jsir-js"; "-o"; "prog.js" ] |> print_endline;
+      js_of_ocaml [ "prog.cm-jsir-js"; "-o"; "prog.js" ] |> print_string;
       run ~filter:(String.starts_with ~prefix:"Fatal error") "prog.js");
   [%expect
     {|
@@ -332,7 +332,6 @@ let%expect_test "JSIR whole program with a missing primitive" =
     You can prevent the generation of dummy implementations with the commandline option '--disable genprim'
     Missing primitives:
       jsir_test_missing
-
     Fatal error: exception Failure("jsir_test_missing not implemented")
     |}]
 
