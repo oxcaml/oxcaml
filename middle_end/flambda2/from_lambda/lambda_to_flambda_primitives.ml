@@ -3059,52 +3059,54 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           block,
           new_ref_value ) ]
   | Pctconst const, _ -> (
-    if Clflags.target_is_jsir ()
-    then
+    let target_is_jsir = Clflags.target_is_jsir () in
+    match const with
+    | Target_is_jsir -> [Simple (Simple.const_bool machine_width target_is_jsir)]
+    | Big_endian | Word_size | Int_size | Max_wosize | Ostype_unix
+    | Ostype_win32 | Ostype_cygwin | Arch_amd64 | Arch_arm64 | Backend_type
+      when target_is_jsir ->
       Misc.fatal_errorf
         "Saw %a in JSIR mode, but it should've been simplified away in \
          [Lambda_to_lambda_transforms]:@ %a"
         Printlambda.primitive prim Debuginfo.print_compact dbg
-    else
-      match const with
-      | Big_endian -> [Simple (Simple.const_bool machine_width big_endian)]
-      | Word_size ->
-        [ Simple
-            (Simple.const_int
-               (Target_ocaml_int.of_int machine_width (8 * size_int))) ]
-      | Int_size ->
-        [ Simple
-            (Simple.const_int
-               (Target_ocaml_int.of_int machine_width ((8 * size_int) - 1))) ]
-      | Max_wosize ->
-        [ Simple
-            (Simple.const_int
-               (Target_ocaml_int.of_int machine_width
-                  ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
-                  - 1))) ]
-      | Ostype_unix ->
-        [ Simple
-            (Simple.const_bool machine_width
-               (String.equal Config.target_os_type "Unix")) ]
-      | Ostype_win32 ->
-        [ Simple
-            (Simple.const_bool machine_width
-               (String.equal Config.target_os_type "Win32")) ]
-      | Ostype_cygwin ->
-        [ Simple
-            (Simple.const_bool machine_width
-               (String.equal Config.target_os_type "Cygwin")) ]
-      (* CR-someday gyorsh: replace string comparisons with dedicated types for
-         [arch] and [os_type]. *)
-      | Arch_amd64 ->
-        [ Simple
-            (Simple.const_bool machine_width
-               (String.equal Config.architecture "amd64")) ]
-      | Arch_arm64 ->
-        [ Simple
-            (Simple.const_bool machine_width
-               (String.equal Config.architecture "arm64")) ]
-      | Backend_type -> [Simple (Simple.const_zero machine_width)])
+    | Big_endian -> [Simple (Simple.const_bool machine_width big_endian)]
+    | Word_size ->
+      [ Simple
+          (Simple.const_int
+             (Target_ocaml_int.of_int machine_width (8 * size_int))) ]
+    | Int_size ->
+      [ Simple
+          (Simple.const_int
+             (Target_ocaml_int.of_int machine_width ((8 * size_int) - 1))) ]
+    | Max_wosize ->
+      [ Simple
+          (Simple.const_int
+             (Target_ocaml_int.of_int machine_width
+                ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
+                - 1))) ]
+    | Ostype_unix ->
+      [ Simple
+          (Simple.const_bool machine_width
+             (String.equal Config.target_os_type "Unix")) ]
+    | Ostype_win32 ->
+      [ Simple
+          (Simple.const_bool machine_width
+             (String.equal Config.target_os_type "Win32")) ]
+    | Ostype_cygwin ->
+      [ Simple
+          (Simple.const_bool machine_width
+             (String.equal Config.target_os_type "Cygwin")) ]
+    (* CR-someday gyorsh: replace string comparisons with dedicated types for
+       [arch] and [os_type]. *)
+    | Arch_amd64 ->
+      [ Simple
+          (Simple.const_bool machine_width
+             (String.equal Config.architecture "amd64")) ]
+    | Arch_arm64 ->
+      [ Simple
+          (Simple.const_bool machine_width
+             (String.equal Config.architecture "arm64")) ]
+    | Backend_type -> [Simple (Simple.const_zero machine_width)])
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)
