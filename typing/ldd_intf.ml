@@ -87,6 +87,10 @@ module type S = sig
 
   val map_rigid : (Name.t -> node) -> node -> node
 
+  (** [iter_unsolved_vars f n] calls [f] once on each unsolved non-rigid
+      variable of [n] (after inlining solved ones), in an unspecified order. *)
+  val iter_unsolved_vars : (var -> unit) -> node -> unit
+
   (** Pretty printers and checks. *)
   val pp : node -> string
 

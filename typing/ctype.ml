@@ -6851,6 +6851,10 @@ let crossing_of_ty env ?modalities ty =
   | None -> crossing
   | Some m -> Crossing.modality m crossing
 
+let () =
+  Defined_later.Fun.define_exn Ikind.upon_shape_later upon_shape;
+  Defined_later.Fun.define_exn Ikind.scheduler_later scheduler
+
 let cross_left env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
   mode |> With_regionality.disallow_right |> Crossing.apply_left crossing
