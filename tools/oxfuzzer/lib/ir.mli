@@ -138,15 +138,20 @@ end
 
 module Exn : sig
   type t =
-    { id : int;
-      payload : Ty.t option  (** Must be a value type (boxed). *)
-    }
+    | Division_by_zero
+    | Generated of
+        { id : int;
+          payload : Ty.t option  (** Must be a value type (boxed). *)
+        }
 
   val equal : t -> t -> bool
 
   val name : t -> string
 
-  val to_code : t -> Parsetree.structure_item
+  val payload : t -> Ty.t option
+
+  (** Built-in exceptions need no declaration. *)
+  val to_code : t -> Parsetree.structure_item option
 end
 
 module Handler : sig
@@ -168,6 +173,7 @@ module Bin_op : sig
     | Add
     | Sub
     | Mul
+    | Div
     | Rem
     | Bit_and
     | Bit_or
@@ -203,6 +209,11 @@ module Expr : sig
           expr : t;
           body : t
         }  (** Immutable binding. *)
+    | If of
+        { condition : t;
+          if_true : t;
+          if_false : t
+        }
     | Read of place
     | Array_literal of t list
     | Array_make of

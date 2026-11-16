@@ -281,23 +281,39 @@ end
 
 module Exn = struct
   type t =
-    { id : int;
-      payload : Ty.t option
-    }
+    | Division_by_zero
+    | Generated of
+        { id : int;
+          payload : Ty.t option
+        }
 
-  let equal left right = Int.equal left.id right.id
+  let equal left right =
+    match left, right with
+    | Division_by_zero, Division_by_zero -> true
+    | Generated left, Generated right -> Int.equal left.id right.id
+    | Division_by_zero, Generated _ | Generated _, Division_by_zero -> false
 
-  let name { id; _ } = Format.sprintf "Exn_%d" id
+  let name = function
+    | Division_by_zero -> "Division_by_zero"
+    | Generated { id; _ } -> Format.sprintf "Exn_%d" id
 
-  let to_code t =
-    let args =
-      match t.payload with
-      | None -> []
-      | Some ty -> [Ast_helper.Type.constructor_arg (Ty.to_code ty)]
-    in
-    Ast_helper.Str.exception_
-      (Ast_helper.Te.mk_exception
-         (Ast_helper.Te.decl ~args:(Parsetree.Pcstr_tuple args) (loc (name t))))
+  let payload = function
+    | Division_by_zero -> None
+    | Generated { payload; _ } -> payload
+
+  let to_code = function
+    | Division_by_zero -> None
+    | Generated { payload; _ } as t ->
+      let args =
+        match payload with
+        | None -> []
+        | Some ty -> [Ast_helper.Type.constructor_arg (Ty.to_code ty)]
+      in
+      Some
+        (Ast_helper.Str.exception_
+           (Ast_helper.Te.mk_exception
+              (Ast_helper.Te.decl ~args:(Parsetree.Pcstr_tuple args)
+                 (loc (name t)))))
 end
 
 module Handler = struct
@@ -317,7 +333,7 @@ module Handler = struct
     | Catch_all -> Ast_helper.Pat.any ()
     | Exn { exn; payload } ->
       let payload =
-        match exn.payload, payload with
+        match Exn.payload exn, payload with
         | None, None -> None
         | Some _, None -> Some ([], Ast_helper.Pat.any ())
         | Some ty, Some (binding : Binding.t) ->
@@ -341,12 +357,11 @@ end
 
 (* CR-someday xclerc: Add unary operations as well. *)
 module Bin_op = struct
-  (* CR-soon xclerc: Add more operators. Especially division and modulo (with
-     safe wrappers). *)
   type t =
     | Add
     | Sub
     | Mul
+    | Div
     | Rem
     | Bit_and
     | Bit_or
@@ -362,7 +377,7 @@ module Bin_op = struct
     | And
     | Or
 
-  let num_binops = [Add; Sub; Mul]
+  let num_binops = [Add; Sub; Mul; Div; Rem]
 
   let integral_binops =
     num_binops
@@ -389,6 +404,7 @@ module Bin_op = struct
     | Add -> call "add"
     | Sub -> call "sub"
     | Mul -> call "mul"
+    | Div -> call "div"
     | Rem -> call "rem"
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
@@ -417,6 +433,11 @@ module Expr = struct
         { name : Name.t;
           expr : t;
           body : t
+        }
+    | If of
+        { condition : t;
+          if_true : t;
+          if_false : t
         }
     | Read of place
     | Array_literal of t list
@@ -533,6 +554,9 @@ module Expr = struct
       Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None)
     | Let { name; expr; body } ->
       bind name (to_code expr) (fun _ -> to_code body)
+    | If { condition; if_true; if_false } ->
+      Ast_helper.Exp.ifthenelse (to_code condition) (to_code if_true)
+        (Some (to_code if_false))
     | Read place -> place_to_code place
     | Array_literal elements ->
       Ast_helper.Exp.array Mutable (List.map to_code elements)
@@ -640,7 +664,7 @@ module Expr = struct
 
   and raise_to_code { exn; payload; notrace } =
     let payload =
-      match exn.payload, payload with
+      match Exn.payload exn, payload with
       | None, None -> None
       | Some _, Some payload -> Some (to_code payload)
       | Some _, None | None, Some _ ->
