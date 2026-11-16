@@ -55,6 +55,35 @@ void __sanitizer_cov_trace_pc_guard(uint32_t *guard)
     : "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "xmm0",
       "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9",
       "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15", "cc");
+#elif defined(__aarch64__)
+  if ((uintptr_t)__builtin_frame_address(0) % 16 != 0) misaligned_calls++;
+  /* As above. A callee must preserve the low halves of v8-v15 only: the
+     compiler saves and restores those, so that the high halves end up
+     clobbered. */
+  __asm__ volatile(
+    "mov x0, #-1\n\tmov x1, #-1\n\tmov x2, #-1\n\tmov x3, #-1\n\t"
+    "mov x4, #-1\n\tmov x5, #-1\n\tmov x6, #-1\n\tmov x7, #-1\n\t"
+    "mov x8, #-1\n\tmov x9, #-1\n\tmov x10, #-1\n\tmov x11, #-1\n\t"
+    "mov x12, #-1\n\tmov x13, #-1\n\tmov x14, #-1\n\tmov x15, #-1\n\t"
+    "mov x16, #-1\n\tmov x17, #-1\n\t"
+    "movi v0.16b, #255\n\tmovi v1.16b, #255\n\tmovi v2.16b, #255\n\t"
+    "movi v3.16b, #255\n\tmovi v4.16b, #255\n\tmovi v5.16b, #255\n\t"
+    "movi v6.16b, #255\n\tmovi v7.16b, #255\n\tmovi v8.16b, #255\n\t"
+    "movi v9.16b, #255\n\tmovi v10.16b, #255\n\tmovi v11.16b, #255\n\t"
+    "movi v12.16b, #255\n\tmovi v13.16b, #255\n\tmovi v14.16b, #255\n\t"
+    "movi v15.16b, #255\n\tmovi v16.16b, #255\n\tmovi v17.16b, #255\n\t"
+    "movi v18.16b, #255\n\tmovi v19.16b, #255\n\tmovi v20.16b, #255\n\t"
+    "movi v21.16b, #255\n\tmovi v22.16b, #255\n\tmovi v23.16b, #255\n\t"
+    "movi v24.16b, #255\n\tmovi v25.16b, #255\n\tmovi v26.16b, #255\n\t"
+    "movi v27.16b, #255\n\tmovi v28.16b, #255\n\tmovi v29.16b, #255\n\t"
+    "movi v30.16b, #255\n\tmovi v31.16b, #255"
+    :
+    :
+    : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10",
+      "x11", "x12", "x13", "x14", "x15", "x16", "x17", "v0", "v1", "v2", "v3",
+      "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14",
+      "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24",
+      "v25", "v26", "v27", "v28", "v29", "v30", "v31", "cc");
 #endif
 }
 
@@ -115,7 +144,6 @@ value caml_tpcg_misaligned_calls(value unit)
 BUILTIN(caml_vec128_unreachable);
 BUILTIN(caml_int64x2_low_of_int64);
 BUILTIN(caml_int64x2_low_to_int64);
-BUILTIN(caml_sse2_int64x2_add);
+BUILTIN(caml_simd_int64x2_add);
 BUILTIN(caml_float64x2_low_of_float);
 BUILTIN(caml_float64x2_low_to_float);
-BUILTIN(caml_sse2_float64x2_add);

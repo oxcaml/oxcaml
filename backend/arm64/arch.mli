@@ -67,6 +67,7 @@ type specific_operation =
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
   | Illvm_intrinsic of string
+  | Itrace_pc_guard of int (* coverage probe, see [Cfg_trace_pc_guard] *)
 
 and arith_operation =
     Ishiftadd

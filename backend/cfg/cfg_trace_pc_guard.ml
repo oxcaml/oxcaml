@@ -34,40 +34,25 @@ let gate = "__sancov_should_track"
 
 let callback = "__sanitizer_cov_trace_pc_guard"
 
-(* An edge is critical if its source has several successors and its destination
-   several predecessors. A probe can only record such an edge if a block is
-   inserted on it. Exceptional edges cannot be split, but they still count
-   towards the number of successors. *)
+(* A probe can only record a critical edge if a block is inserted on it.
+   Exceptional edges cannot be split, but they still count towards the number of
+   successors. *)
 let split_critical_edges cfg_with_layout =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let critical_edges =
-    Cfg.fold_blocks cfg ~init:[] ~f:(fun _label block acc ->
-        let num_successors =
-          Label.Set.cardinal (Cfg.successor_labels ~normal:true ~exn:true block)
-        in
-        if num_successors <= 1
-        then acc
-        else
-          Label.Set.fold
-            (fun successor acc ->
-              let successor_block = Cfg.get_block_exn cfg successor in
-              if Label.Set.cardinal successor_block.predecessors > 1
-              then (block.start, successor) :: acc
-              else acc)
-            (Cfg.successor_labels ~normal:true ~exn:false block)
-            acc)
-  in
-  List.iter
-    (fun (source, destination) ->
+  let critical_edges = Regalloc_rewrite.compute_critical_edges ~all:true cfg in
+  Cfg_edge.Set.iter
+    (fun { Cfg_edge.src; dst } ->
       let (_ : Cfg.basic_block list) =
         Cfg_with_layout.insert_block cfg_with_layout (DLL.make_empty ())
-          ~after:(Cfg.get_block_exn cfg source)
-          ~before:(Some (Cfg.get_block_exn cfg destination))
+          ~after:(Cfg.get_block_exn cfg src)
+          ~before:(Some (Cfg.get_block_exn cfg dst))
       in
       ())
     critical_edges;
-  not (Misc.Stdlib.List.is_empty critical_edges)
+  not (Cfg_edge.Set.is_empty critical_edges)
 
+(* CR-soon xclerc: use the upcoming generic framework computing
+   (post-)dominators on Cfg/SSA instead of this module. *)
 module Post_dominators : sig
   type t
 
@@ -252,7 +237,10 @@ let is_unreachable (block : Cfg.basic_block) =
    constants, jumps) usually have no location, so this is the first location in
    the block; failing that, the function's location for the entry probe, or the
    location of the branch leading to the block if all predecessors that have one
-   agree. Otherwise the probe has no source line. *)
+   agree. Otherwise it is the function's location: reaching the block implies
+   that the function was entered, so this never reports a line that was not
+   executed as covered, whereas a probe without any location could be attributed
+   by the assembler to the line of unrelated code. *)
 let probe_dbg (cfg : Cfg.t) (block : Cfg.basic_block) ~is_entry =
   let has_line (dbg : Debuginfo.t) = Emitaux.has_source_line dbg in
   let in_block =
@@ -279,7 +267,7 @@ let probe_dbg (cfg : Cfg.t) (block : Cfg.basic_block) ~is_entry =
           else acc)
         block.predecessors []
     in
-    match branch_dbgs with [dbg] -> dbg | [] | _ :: _ :: _ -> Debuginfo.none)
+    match branch_dbgs with [dbg] -> dbg | [] | _ :: _ :: _ -> cfg.fun_dbg)
 
 (* A probe is a single target-specific operation at the start of the block,
    whose out-of-line slow path preserves all registers (see

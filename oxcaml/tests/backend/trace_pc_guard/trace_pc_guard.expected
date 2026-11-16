@@ -7,5 +7,10 @@ loop: iterating covers more than not: true
 try: the handler adds coverage: true
 values preserved across probes: true true true
 vectors preserved across probes: true true
+exception payload: true, covered: true, deterministic: true
+leaf function: true, covered: true, deterministic: true
+deep recursion: true, covered: true, deterministic: true
+allocation and GC: true, covered: true, deterministic: true
+fiber: true, covered: true, deterministic: true
 callback called with an aligned stack: true
 results: big negative 55 0

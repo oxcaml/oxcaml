@@ -335,26 +335,32 @@ let threshold_split_live_ranges = 1024
 (* A critical edge is an edge such that the source has several successors and
    the destination has several predecessors. Such edges are problematic because
    if an instruction needs to be inserted between the source and the
-   destination, a block will need to be inserted. *)
-let compute_critical_edges : Cfg.t -> Cfg_edge.Set.t =
- fun cfg ->
+   destination, a block will need to be inserted. Only normal edges are
+   returned. If [all] is [false], exceptional successors are not counted, and
+   edges whose source has an exception handler or a terminator that can raise,
+   as well as edges from a block to itself, are left out. *)
+let compute_critical_edges : all:bool -> Cfg.t -> Cfg_edge.Set.t =
+ fun ~all cfg ->
   Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty
     ~f:(fun label block critical_edges ->
       match block.exn with
-      | Some _ -> critical_edges
-      | None -> (
+      | Some _ when not all -> critical_edges
+      | Some _ | None -> (
         let successor_labels =
           Cfg.successor_labels ~normal:true ~exn:false block
         in
-        match Label.Set.cardinal successor_labels with
+        match
+          Label.Set.cardinal (Cfg.successor_labels ~normal:true ~exn:all block)
+        with
         | 0 | 1 -> critical_edges
         | _ ->
           Label.Set.fold
             (fun successor_label critical_edges ->
               let successor_block = Cfg.get_block_exn cfg successor_label in
               if
-                (not (Cfg.can_raise_terminator block.terminator.desc))
-                && (not (Label.equal label successor_label))
+                (all
+                || (not (Cfg.can_raise_terminator block.terminator.desc))
+                   && not (Label.equal label successor_label))
                 && Label.Set.cardinal successor_block.predecessors > 1
               then (
                 assert (not successor_block.is_trap_handler);
@@ -434,7 +440,7 @@ let prelude :
      register allocator will not have to change the shape of the CFG. *)
   let critical_edges =
     Cfg_edge.Set.union
-      (compute_critical_edges cfg)
+      (compute_critical_edges ~all:false cfg)
       (compute_destruction_edges cfg)
   in
   if not (Cfg_edge.Set.is_empty critical_edges)

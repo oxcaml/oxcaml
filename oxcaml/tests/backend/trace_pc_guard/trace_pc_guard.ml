@@ -1,3 +1,5 @@
+[@@@alert "-unsafe_effects"]
+
 external set_gate : bool -> unit = "caml_tpcg_set_gate" [@@noalloc]
 
 external reset : unit -> unit = "caml_tpcg_reset" [@@noalloc]
@@ -64,7 +66,7 @@ external int64x2_to_int64 : int64x2 -> int64
 [@@noalloc] [@@unboxed] [@@builtin]
 
 external int64x2_add : int64x2 -> int64x2 -> int64x2
-  = "caml_vec128_unreachable" "caml_sse2_int64x2_add"
+  = "caml_vec128_unreachable" "caml_simd_int64x2_add"
 [@@noalloc] [@@unboxed] [@@builtin]
 
 external float64x2_of_float : float -> float64x2
@@ -73,10 +75,6 @@ external float64x2_of_float : float -> float64x2
 
 external float64x2_to_float : float64x2 -> float
   = "caml_vec128_unreachable" "caml_float64x2_low_to_float"
-[@@noalloc] [@@unboxed] [@@builtin]
-
-external float64x2_add : float64x2 -> float64x2 -> float64x2
-  = "caml_vec128_unreachable" "caml_sse2_float64x2_add"
 [@@noalloc] [@@unboxed] [@@builtin]
 
 (* 128-bit vectors live in registers across probes, which the probe must save to
@@ -90,8 +88,59 @@ let[@inline never] vec_int a b c =
 let[@inline never] vec_float a b c =
   let v = float64x2_of_float a in
   let w = float64x2_of_float b in
-  let r = if c > 0 then float64x2_add v w else float64x2_add w w in
-  float64x2_to_float r +. float64x2_to_float v
+  let r = if c > 0 then v else w in
+  let s = if c > 1 then w else v in
+  float64x2_to_float r +. float64x2_to_float s +. float64x2_to_float v
+  +. float64x2_to_float w
+
+(* The handler starts with a probe, across which the exception is live. *)
+exception Payload of int * string
+
+let[@inline never] raise_payload n =
+  if n > 0 then raise (Payload (n, "payload")) else n
+
+let[@inline never] catch_payload n =
+  try raise_payload n
+  with Payload (m, s) -> if String.equal s "payload" then m * 2 else -1
+
+(* Probes in a function that keeps its return address in a register, and deep
+   recursion through probes. *)
+let[@inline never] leaf x y = if x > y then x - y else y - x
+
+let[@inline never] rec depth n = if n = 0 then 0 else 1 + depth (n - 1)
+
+(* Allocation and garbage collection between probes: the stack must remain
+   scannable and the values live across probes must remain valid. *)
+let[@inline never] rec build n acc =
+  if n = 0 then acc else build (n - 1) ((n, Float.of_int n) :: acc)
+
+let[@inline never] alloc_and_gc n =
+  let l = build n [] in
+  Gc.full_major ();
+  let l' = build n [] in
+  Gc.minor ();
+  List.fold_left (fun acc (i, f) -> acc + i + Float.to_int f) 0 l
+  + List.length l'
+
+(* Probes run on the stack of a fiber. *)
+type _ Effect.t += Yield : int -> int Effect.t
+
+let[@inline never] in_fiber n =
+  Effect.Deep.try_with
+    (fun () ->
+      let a = Effect.perform (Yield n) in
+      let b = Effect.perform (Yield (depth 1000)) in
+      leaf a b + catch_payload a)
+    ()
+    { effc =
+        (fun (type a) (e : a Effect.t) ->
+          match e with
+          | Yield k ->
+            Some
+              (fun (cont : (a, _) Effect.Deep.continuation) ->
+                Effect.Deep.continue cont (if k > 3 then k + 1 else k - 1))
+          | _ -> None)
+    }
 
 (* Number of distinct guards hit while running [f] with the gate open. *)
 let hits f =
@@ -160,6 +209,20 @@ let () =
   Printf.printf "vectors preserved across probes: %b %b\n"
     (Int64.equal expected_vec_int !actual_vec_int)
     (Float.equal expected_vec_float !actual_vec_float);
+  let check name f =
+    let expected = f () in
+    let actual = ref None in
+    let n = hits (fun () -> actual := Some (f ())) in
+    let n' = hits (fun () -> actual := Some (f ())) in
+    Printf.printf "%s: %b, covered: %b, deterministic: %b\n" name
+      (Option.equal Int.equal (Some expected) !actual)
+      (n > 0) (n = n')
+  in
+  check "exception payload" (fun () -> catch_payload 21 + catch_payload 0);
+  check "leaf function" (fun () -> leaf 3 10 + leaf 10 3);
+  check "deep recursion" (fun () -> depth 100_000);
+  check "allocation and GC" (fun () -> alloc_and_gc 10_000);
+  check "fiber" (fun () -> in_fiber 1 + in_fiber 10);
   Printf.printf "callback called with an aligned stack: %b\n"
     (misaligned_calls () = 0);
   Printf.printf "results: %s %s %d %d\n" (classify 5) (name (-2)) (sum 0 10)

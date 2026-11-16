@@ -1,0 +1,172 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
+[@@@ocaml.warning "+a-40-41-42"]
+
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+open X86_dsl
+module D = Asm_targets.Asm_directives
+module L = Asm_targets.Asm_label
+module S = Asm_targets.Asm_symbol
+
+type slow_path =
+  { lbl : L.t;
+    return_lbl : L.t;
+    guard : L.t;
+    live : Reg.Set.t;
+    dbg : Debuginfo.t
+  }
+
+(* The slow paths of the current function, most recent first. *)
+let slow_paths = ref ([] : slow_path list)
+
+(* The guards of the current unit, one per probe, most recent first. *)
+let guards = ref ([] : L.t list)
+
+let reset_function () = slow_paths := []
+
+let reset_unit () =
+  slow_paths := [];
+  guards := []
+
+let label_arg lbl = sym (L.encode lbl)
+
+(* if (__sancov_should_track) goto slow path. The gate is defined hidden in this
+   unit (see [emit_data]), so it can be addressed PC-relatively, even in
+   position-independent code. *)
+let emit_probe ~live ~dbg =
+  let gate = S.create_global Cfg_trace_pc_guard.gate in
+  I.cmp (int 0) (mem64_rip QWORD (S.encode gate));
+  let lbl = L.create Text in
+  let return_lbl = L.create Text in
+  I.jne (label_arg lbl);
+  D.define_label return_lbl;
+  let guard = L.create Trace_pc_guards in
+  guards := guard :: !guards;
+  slow_paths := { lbl; return_lbl; guard; live; dbg } :: !slow_paths
+
+(* The callback records its return address, which lies in the slow path, and
+   coverage tools map that address to a source line. A probe without a source
+   line is given line 0 ("no source line"), so that it is not attributed to the
+   line of the code that precedes the slow path. *)
+let emit_debug_info dbg =
+  let file_emitter ~file_num ~file_name =
+    D.file ~file_num:(Some file_num) ~file_name
+  in
+  if Emitaux.has_source_line dbg
+  then Emitaux.emit_debug_info_gen dbg file_emitter D.loc
+  else Emitaux.emit_no_source_line_gen file_emitter D.loc
+
+let slot_size (r : Reg.t) =
+  match r.typ with
+  | Int | Val | Addr | Mask | Float | Float32 -> 8
+  | Vec128 | Valx2 -> 16
+  | Vec256 -> 32
+  | Vec512 -> 64
+
+(* The slow path calls [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack
+   (or, without stack checks, on the current stack, once aligned), as for a C
+   call that does not allocate. Unlike such a call, it preserves every register:
+   those that are live and that C functions do not preserve are saved in a frame
+   on the stack that the callback runs on.
+
+   [r13] holds the original stack pointer across the call and is the CFA
+   register meanwhile. It is first pushed on the current stack. Like the return
+   address pushed by a call to [caml_call_gc], this word lies within the red
+   zone that the runtime keeps below the stack frames of OCaml code
+   ([Stack_threshold]). *)
+let emit_slow_path ~must_save ~move ~emit_call t =
+  D.define_label t.lbl;
+  emit_debug_info t.dbg;
+  (* The frame is 16-byte aligned, and so is every vector slot, since [move]
+     uses aligned moves for [Vec128] and [Valx2] stack slots. [Outgoing] slots
+     are addressed relative to the stack pointer, independently of the frame of
+     the function. *)
+  let saved, size =
+    Reg.Set.fold
+      (fun (r : Reg.t) (saved, offset) ->
+        if Reg.is_reg r && must_save r
+        then
+          let size = slot_size r in
+          let offset = Misc.align offset (Int.min size 16) in
+          let slot = Reg.create_at_location r.typ (Stack (Outgoing offset)) in
+          (r, slot) :: saved, offset + size
+        else saved, offset)
+      t.live ([], 0)
+  in
+  let frame_size = Misc.align size 16 in
+  I.push r13;
+  D.cfi_adjust_cfa_offset ~bytes:8;
+  I.mov rsp r13;
+  D.cfi_remember_state ();
+  D.cfi_def_cfa_register ~reg:"r13";
+  if Config.no_stack_checks
+  then I.and_ (int (-16)) rsp
+  else
+    I.mov
+      (mem64 QWORD
+         (Domainstate.idx_of_field Domain_c_stack * 8)
+         (Scalar R14))
+      rsp;
+  if frame_size > 0 then I.sub (int frame_size) rsp;
+  List.iter (fun (r, slot) -> move r slot) saved;
+  I.lea (mem64_rip NONE (L.encode t.guard)) rdi;
+  emit_call (Cmm.global_symbol Cfg_trace_pc_guard.callback);
+  List.iter (fun (r, slot) -> move slot r) saved;
+  I.mov r13 rsp;
+  D.cfi_restore_state ();
+  I.pop r13;
+  D.cfi_adjust_cfa_offset ~bytes:(-8);
+  I.jmp (label_arg t.return_lbl)
+
+let emit_slow_paths ~must_save ~move ~emit_call =
+  List.iter (emit_slow_path ~must_save ~move ~emit_call) (List.rev !slow_paths)
+
+let emit_data ~add_def_symbol =
+  if not (Misc.Stdlib.List.is_empty !guards)
+  then (
+    D.switch_to_section Trace_pc_guards;
+    D.align ~fill:Zero ~bytes:4;
+    List.iter
+      (fun lbl ->
+        D.define_label lbl;
+        D.int32 0l)
+      (List.rev !guards);
+    (* The gate, defined as by clang: every instrumented unit has a zero
+       default, which a strong definition elsewhere (e.g. in the coverage
+       runtime) overrides. Being hidden, it is resolved within the linked
+       object, which lets probes address it PC-relatively. *)
+    let gate = S.create_global Cfg_trace_pc_guard.gate in
+    add_def_symbol Cfg_trace_pc_guard.gate;
+    D.hidden gate;
+    D.type_symbol gate ~ty:Object;
+    D.switch_to_section Trace_pc_guard_gate;
+    D.weak gate;
+    D.align ~fill:Zero ~bytes:8;
+    D.define_symbol_label ~section:Trace_pc_guard_gate gate;
+    D.int64 0L;
+    D.size gate)

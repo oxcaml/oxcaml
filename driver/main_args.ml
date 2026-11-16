@@ -1187,7 +1187,7 @@ let mk_trace_pc_guard f =
   "Enable coverage instrumentation compatible with\n\
   \     LLVM's -fsanitize-coverage=trace-pc-guard (the\n\
   \     __sanitizer_cov_trace_pc_guard callbacks must be\n\
-  \     provided at link time; amd64 only)"
+  \     provided at link time)"
 
 let mk__ f =
   "-", Arg.String f,

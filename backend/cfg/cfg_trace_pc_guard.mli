@@ -35,16 +35,18 @@
     32-bit slot of a per-unit array that the emitter places in the
     [ocaml_trace_pc_guards] section. The linker concatenates the arrays of all
     units and provides [__start_ocaml_trace_pc_guards] and
-    [__stop_ocaml_trace_pc_guards], which the runtime uses to call
-    [__sanitizer_cov_trace_pc_guard_init].
+    [__stop_ocaml_trace_pc_guards]. The compiler does not emit a call to
+    [__sanitizer_cov_trace_pc_guard_init]: the coverage runtime has to make it
+    with these bounds. Only ELF targets are supported.
 
     As with clang, every instrumented unit defines [__sancov_should_track] as a
     weak, hidden, zero-initialised 64-bit global in the [__sancov_gate] section,
     so that probes can address it PC-relatively. A strong definition (e.g. in
     the coverage runtime) takes precedence.
 
-    A probe is the target-specific operation [Arch.trace_pc_guard_operation].
-    The emitter places the call out of line, and it preserves every register.
+    A probe is the target-specific operation [Arch.trace_pc_guard_operation],
+    implemented for amd64 and arm64. The emitter places the call out of line
+    (see [Emit_sancov]), and it preserves every register.
 
     See https://clang.llvm.org/docs/SanitizerCoverage.html *)
 
