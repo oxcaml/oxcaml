@@ -1243,6 +1243,7 @@ type change =
   | Czero_alloc : Zero_alloc.Change.t -> change
   | Cscheduler : Scheduler.Change.t -> change
   | Civar : Ivar.Change.t -> change
+  | Cldd : Ldd.Change.t -> change
 
 type changes =
     Change of change * changes ref
@@ -1261,7 +1262,8 @@ let () =
   Jkind_types.Sort.set_log (fun change -> log_change (Csort change));
   Zero_alloc.set_log (fun change -> log_change (Czero_alloc change));
   Scheduler.set_log (fun change -> log_change (Cscheduler change));
-  Ivar.set_log (fun change -> log_change (Civar change))
+  Ivar.set_log (fun change -> log_change (Civar change));
+  Ldd.set_log (fun change -> log_change (Cldd change))
 
 (* constructor and accessors for [field_kind] *)
 
@@ -1732,6 +1734,7 @@ let undo_change = function
   | Czero_alloc c -> Zero_alloc.Change.undo c
   | Cscheduler c -> Scheduler.Change.undo c
   | Civar c -> Ivar.Change.undo c
+  | Cldd c -> Ldd.Change.undo c
 
 type snapshot = changes ref * With_backtracking.Snapshot.t
 

@@ -28,6 +28,13 @@ module type S = sig
 
   type var
 
+  module Var_id : sig
+    type t
+  end
+
+  (** Unique and stable for non-rigid variables. *)
+  val var_id : var -> Var_id.t
+
   module Name : Ordered
 
   (** Constructors. *)
@@ -84,4 +91,8 @@ module type S = sig
   val pp : node -> string
 
   val pp_debug : node -> string
+
+  (** Solving a variable is logged if the variable was created before the latest
+      snapshot (see {!With_backtracking.Stamp}). *)
+  include With_backtracking.S
 end
