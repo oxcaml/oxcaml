@@ -827,7 +827,7 @@ module type Of_struct =
   end
 |}];;
 
-(* The implementaiton holds a more general primitive than the in the signature *)
+(* The implementation holds a more general primitive than the one in the signature *)
 
 module Ext_legacy : sig
   external add : int32 -> int32 -> int32 = "%int32_add"
