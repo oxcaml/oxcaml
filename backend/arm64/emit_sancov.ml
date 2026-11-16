@@ -56,7 +56,8 @@ let new_guard ~register =
 
 let macosx = String.equal Config.system "macosx"
 
-let local_label lbl = O.symbol (Ast.Symbol.create_label Same_section_and_unit lbl)
+let local_label lbl =
+  O.symbol (Ast.Symbol.create_label Same_section_and_unit lbl)
 
 (* Scratch registers of the emitter, which the register allocator does not
    use. *)
