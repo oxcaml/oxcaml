@@ -1,0 +1,106 @@
+[@@@ocaml.warning "-27"]
+module Laws_gen_Stdlib = Stdlib
+module Laws_gen_Shape = Shape
+type 'a each = {
+  double_grows: 'a ;
+  trivial: 'a }
+let names = { double_grows = "double_grows"; trivial = "trivial" }
+let locations =
+  {
+    double_grows =
+      {
+        CamlinternalLaw.file = "shape.ml";
+        start_line = 33;
+        start_col = 0;
+        end_line = 33;
+        end_col = 58
+      };
+    trivial =
+      {
+        CamlinternalLaw.file = "shape.ml";
+        start_line = 34;
+        start_col = 0;
+        end_line = 34;
+        end_col = 21
+      }
+  }
+let map { double_grows; trivial } ~f =
+  { double_grows = (f double_grows); trivial = (f trivial) }
+let to_list { double_grows; trivial } = [double_grows; trivial]
+type double_grows_input =
+  | Double_grows_input: {
+  x: int } -> double_grows_input 
+type trivial_input =
+  | Trivial_input: trivial_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Choices  =
+      sig
+        val double_grows : double_grows_input Choice.t
+        val trivial : trivial_input Choice.t
+      end
+    let double_grows ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.double_grows),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.double_grows;
+                     predicate =
+                       (fun ((Double_grows_input { x }) : double_grows_input)
+                          -> (Laws_gen_Stdlib.(>) x 0 : bool));
+                     location =
+                       {
+                         CamlinternalLaw.file = "shape.ml";
+                         start_line = 33;
+                         start_col = 31;
+                         end_line = 33;
+                         end_col = 36
+                       }
+                   }),
+                 (fun () ->
+                    Law.Assertion
+                      {
+                        value = input;
+                        source = C.double_grows;
+                        predicate =
+                          (fun
+                             ((Double_grows_input { x }) : double_grows_input)
+                             ->
+                             (Laws_gen_Stdlib.(>) (Laws_gen_Shape.double x) x : 
+                             bool));
+                        location =
+                          {
+                            CamlinternalLaw.file = "shape.ml";
+                            start_line = 33;
+                            start_col = 46;
+                            end_line = 33;
+                            end_col = 58
+                          }
+                      }))))
+    let trivial ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.trivial),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.trivial;
+                 predicate =
+                   (fun ((Trivial_input) : trivial_input) ->
+                      (Laws_gen_Stdlib.(=) 1 1 : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shape.ml";
+                     start_line = 34;
+                     start_col = 16;
+                     end_line = 34;
+                     end_col = 21
+                   }
+               }))
+    let laws choices =
+      { double_grows = (double_grows choices); trivial = (trivial choices) }
+  end

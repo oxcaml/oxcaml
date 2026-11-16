@@ -31,4 +31,5 @@
 
 val generate :
   unit:Compilation_unit.t -> Typedtree.implementation -> Laws_data.t
-(** Always [Laws_data.none] if the laws extension is disabled. *)
+(** Always [Laws_data.none] if the laws extension is disabled. Raises
+    [Location.Error] for a law that cannot be generated. *)

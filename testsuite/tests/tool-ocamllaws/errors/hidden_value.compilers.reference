@@ -1,0 +1,5 @@
+File "hidden_value.ml", line 18, characters 0-37:
+18 | law_? about_g (x : int) : g x = x + 1
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The law about_g refers to the value Hidden_value.g,
+       which the interface of the unit does not export.

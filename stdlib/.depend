@@ -183,6 +183,14 @@ camlinternalFormatBasics.cmo : \
 camlinternalFormatBasics.cmx : \
     camlinternalFormatBasics.cmi
 camlinternalFormatBasics.cmi :
+camlinternalLaw.cmo : \
+    stdlib.cmi \
+    camlinternalLaw.cmi
+camlinternalLaw.cmx : \
+    stdlib.cmx \
+    camlinternalLaw.cmi
+camlinternalLaw.cmi : \
+    stdlib.cmi
 camlinternalLazy.cmo : \
     stdlib__Sys.cmi \
     stdlib.cmi \
