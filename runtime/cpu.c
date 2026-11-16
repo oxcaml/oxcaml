@@ -18,6 +18,15 @@
 #include <cpuid.h>
 #endif
 
+#if defined(__aarch64__) && defined(__linux__)
+#include <sys/auxv.h>
+#ifndef HWCAP_ATOMICS
+#define HWCAP_ATOMICS (1 << 8)
+#endif
+#elif defined(__aarch64__) && defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
+
 #include "caml/cpu.h"
 
 #define PTWRITE_LEAF 0x14
@@ -25,6 +34,25 @@
 #define PTWRITE_BIT (1 << 4)
 
 CAMLexport bool caml_cpu_ptwrite __attribute__((visibility("hidden")));
+
+#ifdef __aarch64__
+CAMLexport bool caml_cpu_lse;
+
+static bool caml_arm64_detect_lse(void) {
+#if defined(HAS_LSE)
+  return true;
+#elif defined(__linux__)
+  return (getauxval(AT_HWCAP) & HWCAP_ATOMICS) != 0;
+#elif defined(__APPLE__)
+  int value = 0;
+  size_t size = sizeof(value);
+  return sysctlbyname("hw.optional.arm.FEAT_LSE", &value, &size, NULL, 0) == 0
+         && value != 0;
+#else
+  return false;
+#endif
+}
+#endif
 
 static void caml_cpuid(unsigned int leaf, unsigned int subleaf,
                        unsigned int *eax, unsigned int *ebx, unsigned int *ecx,
@@ -50,4 +78,8 @@ CAMLexport void caml_detect_cpu_features(void) {
 
   caml_cpuid(PTWRITE_LEAF, PTWRITE_SUBLEAF, &eax, &ebx, &ecx, &edx);
   caml_cpu_ptwrite = (ebx & PTWRITE_BIT) != 0;
+
+#ifdef __aarch64__
+  caml_cpu_lse = caml_arm64_detect_lse();
+#endif
 }

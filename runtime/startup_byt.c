@@ -34,6 +34,7 @@
 #include "caml/backtrace.h"
 #include "caml/callback.h"
 #include "caml/codefrag.h"
+#include "caml/cpu.h"
 #include "caml/custom.h"
 #include "caml/debugger.h"
 #include "caml/domain_state.h"
@@ -461,6 +462,7 @@ CAMLexport void caml_main(char_os const * const * argv)
   char_os * exe_name, * proc_self_exe;
 
   caml_init_os_params();
+  caml_detect_cpu_features();
 
   /* Determine options */
   caml_parse_ocamlrunparam();
@@ -598,6 +600,8 @@ CAMLexport value caml_startup_code_exn(
 {
   char_os * exe_name;
   value res;
+
+  caml_detect_cpu_features();
 
   /* Determine options */
   caml_parse_ocamlrunparam();
