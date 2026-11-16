@@ -150,7 +150,10 @@ let prepare_rewrite_context result all_sets_of_closures =
    impossible).
 
    - the usages, if provided, correspond to a **subset** of the possible usages
-   computed by the reaper of any possible source for that value. *)
+   **computed by the reaper** of any possible source for that value. In
+   particular, if a possible source has [any_usage], it can be included, even if
+   it is not among the [sources] computed by the reaper of that usage. This is
+   crucial for correctness of [join_metadata] below. *)
 
 type rewrite_metadata =
   | No_source
@@ -702,12 +705,13 @@ module Rewriter = struct
           Function_slot.print current_function_slot
       | Some (source, _) -> source
     in
-    let[@local] for_known_sources sources =
+    let[@local] for_known_sources ~include_any_usage sources =
       let must_be_erased set_of_closures =
         let candidate_source =
           get_source_of_current_function_slot set_of_closures
         in
         Code_id_or_name.Map.mem candidate_source sources
+        || (include_any_usage && PTA.any_usage context.db candidate_source)
       in
       List.filter must_be_erased candidates, Must_be_local
     in
@@ -764,9 +768,14 @@ module Rewriter = struct
         for_any_source_with_usages (Some (Usages s))
       else
         let possible_sources = inter_many usages_sources in
-        for_known_sources possible_sources
+        (* If a source has [any_usage], it is considered to be compatible with
+           [Many_sources_usages (Usages s)], even if it not a source of some
+           values of [s]. If this happens, we must make sure to include it in
+           the result. *)
+        for_known_sources ~include_any_usage:true possible_sources
     | Single_source source ->
-      for_known_sources (Code_id_or_name.Map.singleton source ())
+      for_known_sources ~include_any_usage:false
+        (Code_id_or_name.Map.singleton source ())
 
   let get_set_of_closures_changed_representation context set_of_closures =
     if
