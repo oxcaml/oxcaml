@@ -1,0 +1,13 @@
+string: 97 98 99 -1
+string, two bytes: 98 99
+Invalid_argument "index out of bounds"
+bytes: 97 98 99
+bytes after writes: "xb\255" -1
+Invalid_argument "index out of bounds"
+Invalid_argument "index out of bounds"
+bigarray: 97 98 -1
+bigarray after writes: 'y' 128
+Invalid_argument "index out of bounds"
+Invalid_argument "index out of bounds"
+record: 1 -2
+record after writes: 3 s -4

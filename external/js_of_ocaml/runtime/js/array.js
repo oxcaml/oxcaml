@@ -458,3 +458,40 @@ function caml_check_idx_base(base) {
     caml_failwith("External ptrs are unimplemented in JavaScript");
   return base;
 }
+
+// The base of a pointer to a byte is either a block, or a string, bytes or
+// one-dimensional bigarray of bytes. For the latter, the field index is the
+// position of the byte, and accesses are bounds checked and reads sign
+// extended, as for the string-like indices of [caml_get_idx_bytecode].
+
+//Provides: caml_idx_base_get_int8 mutable (mutable, const)
+//Requires: caml_check_idx_base, MlBytes
+//Requires: caml_string_geti8, caml_bytes_geti8, caml_ba_uint8_geti8
+//Version: >= 5.2
+//If: oxcaml
+function caml_idx_base_get_int8(base, i) {
+  if (Array.isArray(base)) return base[i + 1];
+  caml_check_idx_base(base);
+  if (base instanceof MlBytes) return caml_bytes_geti8(base, i);
+  if (typeof base === "string") return caml_string_geti8(base, i);
+  return caml_ba_uint8_geti8(base, i);
+}
+
+//Provides: caml_idx_base_set_int8 (mutable, const, const)
+//Requires: caml_check_idx_base, MlBytes, caml_invalid_argument
+//Requires: caml_bytes_set8, caml_ba_uint8_set8
+//Version: >= 5.2
+//If: oxcaml
+function caml_idx_base_set_int8(base, i, v) {
+  if (Array.isArray(base)) {
+    base[i + 1] = v;
+    return 0;
+  }
+  caml_check_idx_base(base);
+  if (base instanceof MlBytes) return caml_bytes_set8(base, i, v);
+  if (typeof base === "string")
+    caml_invalid_argument(
+      "caml_idx_base_set_int8: attempted to write to a string",
+    );
+  return caml_ba_uint8_set8(base, i, v);
+}

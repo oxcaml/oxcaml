@@ -100,6 +100,11 @@ let numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not ~to_bits
     let expr : Jsir.expr = Block (tag, values, array_or_not, Immutable) in
     bind_expr_to_symbol ~env ~res symbol expr
 
+(* As in bytecode, arrays of unboxed numbers other than floats have tag 0, like
+   the ones that the runtime creates (see [Make_array] in
+   [To_jsir_primitive]). *)
+let unboxed_number_array_tag = 0
+
 let block_like ~env ~res symbol (const : Static_const.t) =
   match const with
   | Set_of_closures _closures ->
@@ -142,10 +147,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       ~bits_to_constant:(fun bits -> Float bits)
       ~bits_to_array:(fun bits -> Float_array bits)
   | Immutable_float32_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_tag
-        (List.length values)
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.float32_to_jsir_const
       ~bits_to_array:(fun bits ->
@@ -154,9 +156,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     simple_block_or_array ~env ~res ~symbol ~tag:Tag.zero ~mut:Immutable
       ~array_or_not:Array values
   | Immutable_int_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int_array_tag
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id
       ~bits_to_constant:To_jsir_shared.target_ocaml_int_to_jsir_const
@@ -166,44 +166,31 @@ let block_like ~env ~res symbol (const : Static_const.t) =
             Array.map To_jsir_shared.target_ocaml_int_to_jsir_const bits,
             Array ))
   | Immutable_int8_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int8_array_tag
-        (List.length values)
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int8_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int8_to_jsir_const bits, Array))
   | Immutable_int16_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int16_array_tag
-        (List.length values)
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int16_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int16_to_jsir_const bits, Array))
   | Immutable_int32_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_tag
-        (List.length values)
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_int64_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int64_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int64_to_jsir_const bits, Array))
   | Immutable_nativeint_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.nativeint_to_jsir_const
       ~bits_to_array:(fun bits ->
