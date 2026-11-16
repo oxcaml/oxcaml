@@ -36,6 +36,7 @@ type unit_link_info = Linkenv.unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -247,6 +248,14 @@ let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
        until it is properly tested for shared library linking. *)
     Emitaux.binary_backend_available := false;
   let objfiles = List.rev ml_objfiles @ List.rev !Clflags.ccobjs in
+  (* The generic functions that the archives on the command line need are left
+     out of a plugin when the link selects no unit at all (as it may from an
+     archive given alone without -linkall): the plugin would hold code compiled
+     for this invocation's settings and no unit whose header tells the loader
+     what these were. *)
+  let genfns =
+    match units_tolink with [] -> Generic_fns.Tbl.make () | _ :: _ -> genfns
+  in
   let named_startup_file = named_startup_file () in
   let startup =
     if named_startup_file

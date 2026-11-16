@@ -153,6 +153,7 @@
   numbers
   arg_helper
   clflags
+  codegen_variant
   debug
   profile
   priority_queue

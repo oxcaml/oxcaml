@@ -62,6 +62,16 @@ let cmx_bundle ~quoted_cmx =
       | exception Not_found -> ()
       | path -> begin
         let unit_info, _crc = Compilenv.read_unit_info path in
+        (* The file is found by name: nothing else compares it with the units
+           being linked. *)
+        let saved = unit_info.ui_codegen_fingerprint in
+        let current = Codegen_variant.current_fingerprint () in
+        if not (Codegen_variant.equal_fingerprint saved current)
+        then
+          raise
+            (Linkenv.Error
+               (Inconsistent_codegen_variant
+                  { unit_name = cu; filename = path; saved; current }));
         CU.Tbl.add cmxes cu unit_info;
         List.iter
           (fun import -> find_all_cmxes (Import_info.cu import))
@@ -92,6 +102,7 @@ let cmx_bundle ~quoted_cmx =
           uir_sections_length = total_length;
           uir_external_symbols = Array.of_list info.ui_external_symbols;
           uir_static_data = info.ui_static_data;
+          uir_codegen_fingerprint = info.ui_codegen_fingerprint;
           uir_lto_info = info.ui_lto_info
         }
       in

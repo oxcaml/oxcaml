@@ -228,6 +228,15 @@
      output = "main_basic__.cmo.objinfo.output";
      ocamlobjinfo;
 
+     (* The native flavor of this dump has lines that depend on the
+        codegen variant: strip them, so that the reference holds for
+        every variant.  The bytecode flavor has no such lines, but both
+        flavors of this test are one text (see gen-native.sh). *)
+     stdout = "strip-codegen-fingerprint.stdout";
+     stderr = "strip-codegen-fingerprint.stderr";
+     script = "sh ${test_source_directory}/../../tool-ocamlobjinfo/strip-codegen-fingerprint.sh ${output}";
+     script;
+
      reference = "main_basic__.cmo.objinfo.reference";
      check-program-output;
    }
@@ -241,6 +250,12 @@
      program = "-no-approx -no-code main_basic/main_basic.cmi main_basic/main_basic.cmo";
      output = "main_basic.cmo.objinfo.output";
      ocamlobjinfo;
+
+     (* Strip the lines that depend on the codegen variant, as above. *)
+     stdout = "strip-codegen-fingerprint.stdout";
+     stderr = "strip-codegen-fingerprint.stderr";
+     script = "sh ${test_source_directory}/../../tool-ocamlobjinfo/strip-codegen-fingerprint.sh ${output}";
+     script;
 
      reference = "main_basic.cmo.objinfo.reference";
      check-program-output;
@@ -434,6 +449,12 @@
      program = "-no-approx -no-code main/main.cmi main/main.cmo";
      output = "main.cmo.objinfo.output";
      ocamlobjinfo;
+
+     (* Strip the lines that depend on the codegen variant, as above. *)
+     stdout = "strip-codegen-fingerprint.stdout";
+     stderr = "strip-codegen-fingerprint.stderr";
+     script = "sh ${test_source_directory}/../../tool-ocamlobjinfo/strip-codegen-fingerprint.sh ${output}";
+     script;
 
      reference = "main.cmo.objinfo.reference";
      check-program-output;

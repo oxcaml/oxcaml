@@ -32,11 +32,19 @@ module type S = sig
 
     val defined_symbols : t -> string list
     val unsafe_module : t -> bool
+
+    (** Codegen variant the unit was compiled for; compared against
+        [host_codegen_fingerprint] (unused when the latter is [None]). *)
+    val codegen_fingerprint : t -> (string * string) list
   end
 
   val init : unit -> unit
 
   val is_native : bool
+
+  (** Codegen variant of the host program, or [None] if loaded units need
+      not match any particular variant (bytecode). *)
+  val host_codegen_fingerprint : (string * string) list option
 
   val adapt_filename : Dynlink_types.filename -> Dynlink_types.filename
 

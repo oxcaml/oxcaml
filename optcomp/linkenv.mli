@@ -36,6 +36,7 @@ type unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -84,9 +85,11 @@ val get_quoted_cmx : t -> CU.Set.t
 
 val extract_missing_globals : t -> (CU.t * filepath list) list
 
-val check_cmi_consistency : t -> filepath -> Import_info.t array -> unit
-
-val check_cmx_consistency : t -> filepath -> Import_info.t array -> unit
+(* Checks what an archive imports against what the files checked so far import
+   and define. The units of the archive that the link uses are then checked one
+   by one, with [check_consistency] (and no imports). *)
+val check_library_consistency :
+  t -> filepath -> Cmx_format.library_infos -> unit
 
 val check_consistency :
   t -> unit:unit_link_info -> Import_info.t array -> Import_info.t array -> unit
@@ -111,5 +114,11 @@ type error =
   | Archiver_error of string
   | Metaprogramming_not_supported_by_backend of filepath
   | Requires_metaprogramming_without_flag of filepath
+  | Inconsistent_codegen_variant of
+      { unit_name : Compilation_unit.t;
+        filename : filepath;
+        saved : Codegen_variant.fingerprint;
+        current : Codegen_variant.fingerprint
+      }
 
 exception Error of error

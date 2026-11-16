@@ -320,9 +320,15 @@ let names_to_types t =
 
 exception Binding_time_resolver_failure
 
+(* The resolver reads the .cmx file of another unit. An exception it raises that
+   the driver knows how to report (the file is corrupted, or was compiled for
+   another codegen variant) is an error in the input and propagates; any other
+   exception is a bug. *)
+let is_internal_error exn = Option.is_none (Location.error_of_exn exn)
+
 let binding_time_resolver resolver name =
   match resolver (Name.compilation_unit name) with
-  | exception _ ->
+  | exception exn when is_internal_error exn ->
     Misc.fatal_errorf
       "Exception in resolver (via [binding_time_resolver])@ Backtrace is: %s"
       (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
@@ -389,7 +395,7 @@ let variable_is_from_missing_cmx_file t name =
     then false
     else
       match (resolver t) comp_unit with
-      | exception _ -> true
+      | exception exn when is_internal_error exn -> true
       | None -> true
       | Some _ -> false
 
@@ -429,7 +435,7 @@ let find_with_binding_time_and_mode' t name kind =
       Name.pattern_match name ~var ~symbol
     else
       match (resolver t) comp_unit with
-      | exception exn ->
+      | exception exn when is_internal_error exn ->
         Misc.fatal_errorf "Exception in resolver: %s@ Backtrace is: %s"
           (Printexc.to_string exn)
           (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))

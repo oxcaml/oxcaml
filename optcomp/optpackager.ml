@@ -236,6 +236,7 @@ end) : S = struct
           union (List.map (fun info -> info.ui_external_symbols) units);
         ui_static_data = ui.ui_static_data;
         ui_lto_info = None;
+        ui_codegen_fingerprint = ui.ui_codegen_fingerprint;
         ui_file_sections = File_sections.Builder.build file_sections
       }
     in

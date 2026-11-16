@@ -380,6 +380,8 @@ let print_cmx_infos (uir, sections, crc) =
     printf "Flambda 2 unit with LTO information\n";
   print_generic_fns uir.uir_generic_fns;
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
+  printf "Codegen fingerprint: %s\n"
+    (Codegen_variant.string_of_fingerprint uir.uir_codegen_fingerprint);
   Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
     (Format_doc.compat Slambda.CU_data.print)
     (Slambda.CU_data.read uir.uir_static_data ~sections);
@@ -405,7 +407,9 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
             B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx)
           (fun f -> B.iter (fun i -> f lib.lib_quoted_cmi.(i)) u.li_quoted_cmi)
           (fun f -> B.iter (fun i -> f lib.lib_quoted_cmx.(i)) u.li_quoted_cmx);
-        printf "Force link: %s\n" (if u.li_force_link then "YES" else "no"))
+        printf "Force link: %s\n" (if u.li_force_link then "YES" else "no");
+        printf "Codegen fingerprint: %s\n"
+          (Codegen_variant.string_of_fingerprint u.li_codegen_fingerprint))
 
 let print_cmxs_infos header =
   List.iter
@@ -418,7 +422,9 @@ let print_cmxs_infos header =
          (fun f -> Array.iter f ui.dynu_imports_cmi)
          (fun f -> Array.iter f ui.dynu_imports_cmx)
          (fun f -> Array.iter f ui.dynu_quoted_cmi)
-         (fun f -> Array.iter f ui.dynu_quoted_cmx);)
+         (fun f -> Array.iter f ui.dynu_quoted_cmx);
+       printf "Codegen fingerprint: %s\n"
+         (Codegen_variant.string_of_fingerprint ui.dynu_codegen_fingerprint))
     header.dynu_units
 
 let p_title title = printf "%s:\n" title

@@ -89,6 +89,7 @@
   arg_helper
   zero_alloc_annotations
   clflags
+  codegen_variant
   debug
   language_extension_kernel
   language_extension
@@ -257,6 +258,8 @@
 (copy_files ../../utils/zero_alloc_annotations.ml)
 
 (copy_files ../../utils/clflags.ml)
+
+(copy_files ../../utils/codegen_variant.ml)
 
 (copy_files ../../utils/debug.ml)
 
@@ -472,6 +475,8 @@
 (copy_files ../../utils/zero_alloc_annotations.mli)
 
 (copy_files ../../utils/clflags.mli)
+
+(copy_files ../../utils/codegen_variant.mli)
 
 (copy_files ../../utils/debug.mli)
 
@@ -761,6 +766,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Numbers.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Targetint.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Clflags.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Codegen_variant.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Warnings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Json.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Action_trace.cmo
@@ -907,6 +913,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Numbers.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Targetint.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Clflags.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Codegen_variant.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Warnings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Json.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Action_trace.cmx

@@ -39,6 +39,11 @@ type error = DT.error =
   | Module_already_loaded of string
   | Private_library_cannot_implement_interface of string
   | Library_file_already_loaded_privately of { filename : string; }
+  | Inconsistent_codegen_variant of
+      { filename : string;
+        unit_name : string;
+        unit_fingerprint : string;
+        host_fingerprint : string; }
 
 exception Error = DT.Error
 let error_message = DT.error_message

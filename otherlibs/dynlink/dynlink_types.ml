@@ -42,6 +42,11 @@ type error =
   | Module_already_loaded of string
   | Private_library_cannot_implement_interface of string
   | Library_file_already_loaded_privately of { filename : string; }
+  | Inconsistent_codegen_variant of
+      { filename : string;
+        unit_name : string;
+        unit_fingerprint : string;
+        host_fingerprint : string; }
 
 exception Error of error
 
@@ -81,6 +86,12 @@ let error_message = function
   | Library_file_already_loaded_privately { filename } ->
     "The dynamic library file `" ^ filename ^ "' has already been loaded \
       privately (make a copy of the file to load it a second time)"
+  | Inconsistent_codegen_variant
+      { filename; unit_name; unit_fingerprint; host_fingerprint } ->
+    "The unit `" ^ unit_name ^ "' in the dynamic library file `" ^ filename
+    ^ "' was compiled with codegen configuration [" ^ unit_fingerprint
+    ^ "], which is incompatible with the host program's ["
+    ^ host_fingerprint ^ "]"
 
 let () =
   Printexc.Safe.register_printer (function
@@ -114,6 +125,11 @@ let () =
         Printf.sprintf "Private_library_cannot_implement_interface %S" name
       | Library_file_already_loaded_privately { filename } ->
         Printf.sprintf "Library_file_already_loaded_privately %S" filename
+      | Inconsistent_codegen_variant
+          { filename; unit_name; unit_fingerprint; host_fingerprint } ->
+        Printf.sprintf
+          "Inconsistent_codegen_variant (%S, %S, [%s], [%s])"
+          filename unit_name unit_fingerprint host_fingerprint
       in
       Some (Printf.sprintf "Dynlink.Error (Dynlink.%s)" msg)
     | _ -> None)

@@ -140,6 +140,13 @@ type error = private
   | Library_file_already_loaded_privately of { filename : string; }
     (** In native code, it is forbidden to dynamically load the same .cmxs
         file more than once in private mode. *)
+  | Inconsistent_codegen_variant of
+      { filename : string;
+        unit_name : string;
+        unit_fingerprint : string;
+        host_fingerprint : string; }
+    (** In native code, a loaded unit must have been compiled for the same
+        codegen configuration (e.g. frame pointers) as the host program. *)
 
 (* CR-someday mshinwell: Consider implementing the check required for
    [Library_file_already_loaded_privately] in bytecode mode.  It might be

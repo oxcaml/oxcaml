@@ -1,0 +1,19 @@
+File codegen_fingerprint.cmx
+Name: Codegen_fingerprint
+CRC of implementation: 00000000000000000000000000000000
+Globals defined:
+	Codegen_fingerprint
+Interfaces imported:
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	Codegen_fingerprint
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Implementations imported:
+Interfaces used in quotations:
+Implementations used in quotations:
+Flambda 2 unit with export information
+Currying functions:
+Apply functions:
+Send functions:
+Force link: no
+Codegen fingerprint: frame_pointers=false, address_sanitizer=false
+Static data: (missing)

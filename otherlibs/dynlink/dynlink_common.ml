@@ -231,9 +231,24 @@ module Make (P : Dynlink_platform_intf.S) = struct
       raise (DT.Error Unsafe_file)
     end
 
+  let check_codegen_variant filename ui =
+    match P.host_codegen_fingerprint with
+    | None -> ()
+    | Some host ->
+      let module CV = Dynlink_compilerlibs.Codegen_variant in
+      let unit_fingerprint = UH.codegen_fingerprint ui in
+      if not (CV.equal_fingerprint unit_fingerprint host) then begin
+        raise (DT.Error (Inconsistent_codegen_variant
+          { filename;
+            unit_name = UH.name ui;
+            unit_fingerprint = CV.string_of_fingerprint unit_fingerprint;
+            host_fingerprint = CV.string_of_fingerprint host }))
+      end
+
   let check filename (units : UH.t list) (state : State.t)
       ~unsafe_allowed ~priv =
     List.iter (fun ui -> check_unsafe_module unsafe_allowed ui) units;
+    List.iter (fun ui -> check_codegen_variant filename ui) units;
     let new_units =
       String.Set.of_list (List.map (fun ui -> UH.name ui) units)
     in

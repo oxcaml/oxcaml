@@ -28,6 +28,8 @@ let convert_cmi_import import =
   let crc = Import_info.crc import in
   name, crc
 
+external frame_pointers : bool = "%frame_pointers"
+
 type global_map = {
   name : Compilation_unit.t;
   crc_intf : Digest.t option;
@@ -79,11 +81,19 @@ module Native = struct
         t.dynu_defines
 
     let unsafe_module _t = false
+
+    let codegen_fingerprint (t : t) = t.dynu_codegen_fingerprint
   end
 
   let init () = ()
 
   let is_native = true
+
+  (* The frame pointer axis is the value this unit was compiled with,
+     which is the host program's codegen variant (dynlink is rebuilt per
+     variant). *)
+  let host_codegen_fingerprint =
+    Some (Codegen_variant.fingerprint { Codegen_variant.frame_pointers })
   let adapt_filename f = Filename.chop_extension f ^ ".cmxs"
 
   let num_globals_inited () = ndl_globals_inited ()
@@ -188,6 +198,11 @@ type error = DT.error =
   | Module_already_loaded of string
   | Private_library_cannot_implement_interface of string
   | Library_file_already_loaded_privately of { filename : string; }
+  | Inconsistent_codegen_variant of
+      { filename : string;
+        unit_name : string;
+        unit_fingerprint : string;
+        host_fingerprint : string; }
 
 exception Error = DT.Error
 let error_message = DT.error_message

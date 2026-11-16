@@ -44,6 +44,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       file_name : string;
       crc : Digest.t;
       imports_cmx : Import_info.t list;
+      codegen_fingerprint : Codegen_variant.fingerprint;
       (* for shared libs *)
       dynunit : Cmxs_format.dynunit option
     }
@@ -159,7 +160,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
               dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
               dynu_quoted_cmi = info.ui_quoted_cmi |> Array.of_list;
-              dynu_quoted_cmx = info.ui_quoted_cmx |> Array.of_list
+              dynu_quoted_cmx = info.ui_quoted_cmx |> Array.of_list;
+              dynu_codegen_fingerprint = info.ui_codegen_fingerprint
             }
       in
       let unit =
@@ -168,6 +170,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           defines = info.ui_defines;
           file_name = resolved_pathname;
           imports_cmx = info.ui_imports_cmx;
+          codegen_fingerprint = info.ui_codegen_fingerprint;
           dynunit
         }
       in
@@ -214,10 +217,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
           infos.lib_generic_fns
       in
-      Linkenv.check_cmi_consistency linkenv resolved_pathname
-        infos.lib_imports_cmi;
-      Linkenv.check_cmx_consistency linkenv resolved_pathname
-        infos.lib_imports_cmx;
+      Linkenv.check_library_consistency linkenv resolved_pathname infos;
       if
         (not shared) && infos.lib_requires_metaprogramming
         && not !Clflags.uses_metaprogramming
@@ -304,7 +304,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                         imports_list infos.lib_imports_cmx info.li_imports_cmx
                         |> Array.of_list;
                       dynu_quoted_cmi = quoted_cmi |> Array.of_list;
-                      dynu_quoted_cmx = quoted_cmx |> Array.of_list
+                      dynu_quoted_cmx = quoted_cmx |> Array.of_list;
+                      dynu_codegen_fingerprint = info.li_codegen_fingerprint
                     }
               in
               let imports_cmx =
@@ -316,6 +317,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                   defines = info.li_defines;
                   file_name = resolved_pathname;
                   imports_cmx;
+                  codegen_fingerprint = info.li_codegen_fingerprint;
                   dynunit
                 }
               in
@@ -515,6 +517,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         defines = u.ui_defines;
         crc;
         imports_cmx = u.ui_imports_cmx;
+        codegen_fingerprint = u.ui_codegen_fingerprint;
         dynunit = None
       }
     in

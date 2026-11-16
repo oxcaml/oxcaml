@@ -81,6 +81,9 @@ type unit_infos =
                                   (* Section containing LTO information
                                      (see [Flambda2_reaper.Lto_info]),
                                      present iff compiled with -lto-support *)
+    ui_codegen_fingerprint: (string * string) list;
+                                  (* Codegen variant the unit was compiled
+                                     for (see [Codegen_variant]) *)
     ui_file_sections: File_sections.t;
   }
 
@@ -104,6 +107,7 @@ type unit_infos_raw =
     uir_static_data: Slambda.CU_data.raw;
     uir_lto_info:
       Flambda2_reaper.Lto_info.t File_sections.Idx.t option;
+    uir_codegen_fingerprint: (string * string) list;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 
@@ -120,6 +124,7 @@ type lib_unit_info =
     li_quoted_cmi : Bitmap.t;   (* subset of lib_quoted_cmi *)
     li_quoted_cmx : Bitmap.t;   (* subset of lib_quoted_cmx *)
     li_external_symbols: string array;
+    li_codegen_fingerprint: (string * string) list;
   }
 
 type library_infos =
