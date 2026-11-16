@@ -124,5 +124,15 @@ type error =
       { filename : filepath;
         variant : string
       }
+    (* Programs using eval need compiler-libs, which installations only provide
+       for the default codegen variant. *)
+  | Metaprogramming_not_supported_under_codegen_variant of { variant : string }
+    (* -use-cached-generic-functions was passed without an explicit path and the
+       selected variant's standard-library root has no cached-generic-functions
+       archive. *)
+  | Cached_generic_functions_not_found of
+      { filename : filepath;
+        variant : string
+      }
 
 exception Error of error

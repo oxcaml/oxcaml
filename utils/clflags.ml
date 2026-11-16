@@ -380,12 +380,19 @@ let dont_write_files = ref false        (* set to true under ocamldoc *)
 let insn_sched_default = true
 let insn_sched = ref insn_sched_default (* -[no-]insn-sched *)
 
+(* Overridden by [Codegen_variant] (which this module cannot depend on: it
+   reads [frame_pointers] below) so that the standard library serving the
+   selected codegen variant is used.  Consulted afresh wherever the directory
+   is needed: the selection can change between files via OCAMLPARAM. *)
+let effective_standard_library : (unit -> string) ref =
+  ref (fun () -> Config.standard_library)
+
 let std_include_flag prefix =
   if !no_std_include then ""
-  else (prefix ^ (Filename.quote Config.standard_library))
+  else (prefix ^ (Filename.quote (!effective_standard_library ())))
 
 let std_include_dir () =
-  if !no_std_include then [] else [Config.standard_library]
+  if !no_std_include then [] else [!effective_standard_library ()]
 
 let shared = ref false (* -shared *)
 let dlcode = ref true (* not -nodynlink *)

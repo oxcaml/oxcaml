@@ -110,10 +110,22 @@ let compile_file ?output ?(opt="") ?stable_name name =
     else
       ""
   in
+  let codegen_variant_flags =
+    (* C stubs that can call back into OCaml (or allocate) must be compiled
+       with frame pointers to be linked into fp-variant programs (the
+       runtime's stack-reallocation walk requires an unbroken rbp chain).
+       When the configure default is already fp, Config.native_cflags carry
+       these flags, so only non-default fp invocations append them. *)
+    if Clflags.target_is_native ()
+       && !Clflags.frame_pointers
+       && not Config.with_frame_pointers
+    then "-fno-omit-frame-pointer -g"
+    else ""
+  in
   let exit =
     command
       (Printf.sprintf
-         "%s%s %s %s -c %s %s %s %s %s%s"
+         "%s%s %s %s -c %s %s %s %s %s %s%s"
          (match !Clflags.c_compiler with
           | Some cc -> cc
           | None ->
@@ -128,9 +140,10 @@ let compile_file ?output ?(opt="") ?stable_name name =
           | Some o -> Printf.sprintf "%s%s" Config.c_output_obj o)
          opt
          debug_flags
+         codegen_variant_flags
          (String.concat " " (List.rev !Clflags.all_ccopts))
          (quote_prefixed ~response_files:true "-I"
-            (List.map (Misc.expand_directory Config.standard_library)
+            (List.map Codegen_variant.expand_directory
                (List.rev (  !Clflags.hidden_include_dirs
                           @ List.map
                               (fun (e : Clflags.visible_include) -> e.path)

@@ -63,6 +63,11 @@ type error =
       { filename : filepath;
         variant : string
       }
+  | Metaprogramming_not_supported_under_codegen_variant of { variant : string }
+  | Cached_generic_functions_not_found of
+      { filename : filepath;
+        variant : string
+      }
 
 exception Error of error
 
@@ -342,15 +347,38 @@ let report_error ppf = function
     fprintf ppf
       "@[<hov>File %a,@ which contains unit %a,@ was compiled with codegen \
        configuration@ [%s],@ which is incompatible with this invocation's@ \
-       [%s]@]"
+       [%s]%t@]"
       Location.Doc.quoted_filename filename CU.print_as_inline_code unit_name
       (Codegen_variant.string_of_fingerprint saved)
-      (Codegen_variant.string_of_fingerprint current)
+      (Codegen_variant.string_of_fingerprint current) (fun ppf ->
+        Option.iter (fprintf ppf "@ (%s)")
+          (Codegen_variant.missing_root_hint ()))
   | Codegen_variant_runtime_not_found { filename; variant } ->
     fprintf ppf
       "@[<hov>Cannot find the runtime library %a:@ this installation does not \
-       provide codegen variant %s@]"
-      Location.Doc.quoted_filename filename variant
+       provide codegen variant %s%t@]"
+      Location.Doc.quoted_filename filename variant (fun ppf ->
+        Option.iter (fprintf ppf "@ (%s)")
+          (Codegen_variant.missing_root_hint ()))
+  | Metaprogramming_not_supported_under_codegen_variant { variant } ->
+    fprintf ppf
+      "@[<hov>Programs using eval (metaprogramming) are not supported under \
+       codegen variant %s:@ installations only provide compiler-libs for the \
+       default codegen variant@]"
+      variant
+  | Cached_generic_functions_not_found { filename; variant } ->
+    let generator_flag =
+      match Codegen_variant.of_string variant with
+      | Some { Codegen_variant.frame_pointers = true } -> " -frame-pointers"
+      | Some { Codegen_variant.frame_pointers = false } -> " -no-frame-pointers"
+      | None -> ""
+    in
+    fprintf ppf
+      "@[<hov>Cannot find %a:@ codegen variant '%s' of this installation does \
+       not provide a cached-generic-functions archive;@ generate it with \
+       generate_cached_generic_functions%s@ or drop \
+       -use-cached-generic-functions@]"
+      Location.Doc.quoted_filename filename variant generator_flag
 
 let () =
   Location.register_error_of_exn (function

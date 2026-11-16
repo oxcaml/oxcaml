@@ -810,7 +810,9 @@ let set_paths () =
   (* Add whatever -I options have been specified on the command line,
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
-  let expand = Misc.expand_directory Config.standard_library in
+  (* ocamlnat's variant is pinned to the binary's baked default (see
+     [prepare]), so this is the base root in practice. *)
+  let expand = Codegen_variant.expand_directory in
   let expand_entry (e : Clflags.visible_include) : Clflags.visible_include =
     { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
   in
@@ -822,7 +824,7 @@ let set_paths () =
       List.map expand_entry (List.rev !Clflags.include_dirs);
       List.map expand_entry (List.rev !Compenv.last_include_dirs);
       visible;
-      [ include_no_cmx (expand "+camlp4") ];
+      [ include_no_cmx (Codegen_variant.expand_directory_unchecked "+camlp4") ];
     ]
   in
   let hidden = List.concat [

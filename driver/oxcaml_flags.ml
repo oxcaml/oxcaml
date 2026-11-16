@@ -614,8 +614,33 @@ let opt_flag_handler : Clflags.Opt_flag_handler.t =
   { set_oclassic; set_o2; set_o3; set_o4 }
 
 let use_cached_generic_functions = ref false
-let cached_generic_functions_path =
-  ref (Filename.concat Config.standard_library ("cached-generic-functions" ^ Config.ext_lib))
+
+(* [None] until -cached-generic-functions-path is passed.  The default cannot
+   be computed at module initialization: it depends on the selected codegen
+   variant's standard-library root, and the flags are not parsed yet. *)
+let cached_generic_functions_path = ref None
+
+let get_cached_generic_functions_path () =
+  match !cached_generic_functions_path with
+  | Some path -> path
+  | None ->
+    (* Variant-STRICT resolution, deliberately not
+       [Codegen_variant.effective_standard_library]: its fallback to the
+       default root when a non-default variant's tree is absent would
+       silently select the DEFAULT variant's archive — the one compiler-
+       generated native artifact with no fingerprint to catch the mismatch
+       at link.  Resolving into the (possibly absent) variant root instead
+       makes the link-time existence check fail with the established
+       missing-archive error, unless the default root verifiably is the
+       selected variant's own tree (see cached_generic_functions_path in
+       asmcomp/asmlink.ml). *)
+    let variant = Codegen_variant.current () in
+    let root =
+      if Codegen_variant.is_default variant
+      then Config.standard_library
+      else Codegen_variant.variant_root variant
+    in
+    Filename.concat root ("cached-generic-functions" ^ Config.ext_lib)
 
 let dissector_assume_lld_without_64_bit_eh_frames = ref true
   (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)

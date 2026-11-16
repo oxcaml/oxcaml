@@ -80,6 +80,22 @@ type configuration_value =
   | Int of int
   | Bool of bool
 
+(* The names of the non-default codegen variants this installation provides,
+   sorted alphabetically.  A property of the install tree, not of configure:
+   the <standard_library>/variants directory is scanned when this is called
+   (with_frame_pointers etc. describe the default variant, served by the
+   standard-library root itself). *)
+let installed_codegen_variants () =
+  let dir = Filename.concat standard_library "variants" in
+  match Sys.readdir dir with
+  | exception Sys_error _ -> []
+  | entries ->
+    Array.to_list entries
+    |> List.filter (fun e ->
+        try Sys.is_directory (Filename.concat dir e)
+        with Sys_error _ -> false)
+    |> List.sort compare
+
 let configuration_variables () =
   let p x v = (x, String v) in
   let p_int x v = (x, Int v) in
@@ -116,6 +132,7 @@ let configuration_variables () =
   p_bool "asm_file0_supported" asm_file0_supported;
   p_bool "asm_size_type_directives" asm_size_type_directives;
   p_bool "with_frame_pointers" with_frame_pointers;
+  p "codegen_variants" (String.concat " " (installed_codegen_variants ()));
   p_bool "with_address_sanitizer" with_address_sanitizer;
   p_bool "with_cpp_mangling" with_cpp_mangling;
   p_bool "with_nonexecstack_note" with_nonexecstack_note;

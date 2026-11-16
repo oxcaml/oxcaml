@@ -41,6 +41,52 @@ type unit_link_info = Linkenv.unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
+(* Whether [Config.standard_library] is itself a library root built for
+   [variant] (e.g. OCAMLLIB pointing directly at a variant's tree), judged by
+   the codegen fingerprint in the unit info of the standard library there. *)
+let standard_library_is_built_for (variant : Codegen_variant.t) =
+  let std_exit = Filename.concat Config.standard_library "std_exit.cmx" in
+  match Compilenv.read_unit_info std_exit with
+  | exception (Compilenv.Error _ | Sys_error _ | End_of_file | Failure _) ->
+    false
+  | info, _crc ->
+    Codegen_variant.equal_fingerprint info.ui_codegen_fingerprint
+      (Codegen_variant.fingerprint variant)
+
+let cached_generic_functions_path () =
+  match !Oxcaml_flags.cached_generic_functions_path with
+  | Some path ->
+    (* An explicit -cached-generic-functions-path is passed through
+       untouched. *)
+    path
+  | None ->
+    (* The default path points into the selected variant's standard-library
+       root, and installations do not necessarily ship the archive (make
+       installs never do); fail clearly rather than with a linker error. *)
+    let path = Oxcaml_flags.get_cached_generic_functions_path () in
+    let variant = Codegen_variant.current () in
+    let root_archive =
+      Filename.concat Config.standard_library (Filename.basename path)
+    in
+    if Sys.file_exists path
+    then path
+    else if
+      (* The root has no tree for the selected non-default variant, but it may
+         itself be that variant's tree. The archive carries no fingerprint of
+         its own, so its root's archive is only used when the root is verifiably
+         built for the selected variant; a different variant's archive is never
+         used. *)
+      (not (Codegen_variant.is_default variant))
+      && (not (Sys.file_exists (Codegen_variant.variant_root variant)))
+      && Sys.file_exists root_archive
+      && standard_library_is_built_for variant
+    then root_archive
+    else
+      raise
+        (Linkenv.Error
+           (Cached_generic_functions_not_found
+              { filename = path; variant = Codegen_variant.to_string variant }))
+
 let runtime_lib () =
   let variant =
     if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
@@ -315,7 +361,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
       let file_list_rev = List.map (fun f -> f.Linkenv.path) file_list_rev in
       let file_list_rev =
         if !Oxcaml_flags.use_cached_generic_functions
-        then !Oxcaml_flags.cached_generic_functions_path :: file_list_rev
+        then cached_generic_functions_path () :: file_list_rev
         else file_list_rev
       in
       let files = startup_file :: List.rev file_list_rev in
@@ -476,7 +522,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     then (
       let cached_genfns =
         if !Oxcaml_flags.use_cached_generic_functions
-        then Some !Oxcaml_flags.cached_generic_functions_path
+        then Some (cached_generic_functions_path ())
         else None
       in
       let temp_dir = mk_temp_dir "camldissector" "" in

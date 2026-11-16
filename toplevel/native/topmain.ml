@@ -114,4 +114,10 @@ let main () =
 let main () =
   match main () with
   | exception Exit_with_status n -> n
+  | exception x ->
+    (* E.g. [Codegen_variant.Directory_not_provided_by_variant] from an -I
+       directory, raised while [Opttoploop.prepare] sets up the load path;
+       exceptions without a registered printer are re-raised. *)
+    Location.report_exception Format.err_formatter x;
+    2
   | () -> 0

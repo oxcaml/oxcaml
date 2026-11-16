@@ -68,3 +68,83 @@ let equal_fingerprint f1 f2 =
 
 let string_of_fingerprint f =
   String.concat ", " (List.map (fun (n, v) -> n ^ "=" ^ v) f)
+
+let variant_root t =
+  Filename.concat
+    (Filename.concat Config.standard_library "variants")
+    (to_string t)
+
+let directory_exists dir = try Sys.is_directory dir with Sys_error _ -> false
+
+let effective_standard_library () =
+  let t = current () in
+  if is_default t
+  then Config.standard_library
+  else
+    (* Remap only when the variant tree is present.  When it is absent the
+       base root may itself serve the requested variant (the in-tree build
+       compiles with -frame-pointers against an fp stdlib via OCAMLLIB, and
+       users may point OCAMLLIB at a custom-built variant tree); genuinely
+       wrong roots are caught by the artifact-fingerprint check at the first
+       .cmx import and by the runtime-archive lookup at link, which append
+       [missing_root_hint]. *)
+    let root = variant_root t in
+    if directory_exists root then root else Config.standard_library
+
+let missing_root_hint () =
+  let t = current () in
+  if is_default t || directory_exists (variant_root t)
+  then None
+  else
+    Some
+      (Printf.sprintf "note: %s does not contain codegen variant '%s'"
+         Config.standard_library (to_string t))
+
+type directory_error =
+  { directory : string;
+    variant : string;
+    variant_root : string
+  }
+
+exception Directory_not_provided_by_variant of directory_error
+
+let is_plus_directory s = String.length s > 0 && s.[0] = '+'
+
+let expand_directory_unchecked s =
+  if is_plus_directory s
+  then Misc.expand_directory (effective_standard_library ()) s
+  else s
+
+let expand_directory s =
+  if is_plus_directory s
+  then begin
+    let root = effective_standard_library () in
+    let expanded = Misc.expand_directory root s in
+    if String.equal root Config.standard_library || directory_exists expanded
+    then expanded
+    else if
+      (* The selected variant's tree exists but lacks this subdirectory.
+         When the DEFAULT root provides it, the include would silently
+         resolve to a nonexistent directory while a directory of that name
+         exists one root over, so fail with a targeted error naming what
+         is missing from the selected root.  (Nothing is assumed about the
+         default root's copy: whether its artifacts suit this variant is
+         for the fingerprint checks to decide if the caller names it by
+         absolute path.)  Directories absent from both roots keep the
+         permissive expansion (a nonexistent include directory is not an
+         error). *)
+      directory_exists (Misc.expand_directory Config.standard_library s)
+    then
+      raise
+        (Directory_not_provided_by_variant
+           { directory = s;
+             variant = to_string (current ());
+             variant_root = root
+           })
+    else expanded
+  end
+  else s
+
+(* [Clflags] computes the -I flag for the standard library but cannot depend
+   on this module (this module reads the [Clflags.frame_pointers] flag). *)
+let () = Clflags.effective_standard_library := effective_standard_library
