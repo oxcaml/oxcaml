@@ -46,7 +46,9 @@
 
     A probe is the target-specific operation [Arch.trace_pc_guard_operation],
     implemented for amd64 and arm64. The emitter places the call out of line
-    (see [Emit_sancov]), and it preserves every register.
+    (see [Emit_sancov]), and it preserves every register. The callback is called
+    like an external function that does not allocate: it must not call into the
+    OCaml runtime.
 
     See https://clang.llvm.org/docs/SanitizerCoverage.html *)
 

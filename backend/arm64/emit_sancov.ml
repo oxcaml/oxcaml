@@ -133,6 +133,9 @@ let emit_slow_path ~move ~guard t =
   A.ins3 (STP X) reg_x_saved_sp O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
   D.cfi_adjust_cfa_offset ~bytes:16;
   D.cfi_remember_state ();
+  (* This is where the link register was just saved if the function has no
+     frame; otherwise it is the slot of the frame that holds the return
+     address, if the function saves it. *)
   D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
   A.ins_mov_from_sp ~dst:reg_x_saved_sp;
   D.cfi_def_cfa_register
