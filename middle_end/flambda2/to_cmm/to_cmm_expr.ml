@@ -899,7 +899,6 @@ and let_cont_rec env res invariant_params conts body =
   cmm, free_vars, symbol_inits, res
 
 and continuation_handler env res k handler =
-  let is_exn_handler = Continuation_handler.is_exn_handler handler in
   Continuation_handler.pattern_match' handler
     ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
       let arity = Bound_parameters.arity params in
@@ -908,13 +907,8 @@ and continuation_handler env res k handler =
       let expr, free_vars_of_handler, symbol_inits, res =
         expr env res handler
       in
-      (* CR yusumez: An exception handler is entered by no edge, so the counters
-         that lose their edges in it are dropped, as in Simplify. *)
       let res =
-        R.map_fdo_region_counters res (fun fdo ->
-            if is_exn_handler
-            then FRC.leave_region fdo
-            else FRC.leave_handler fdo k)
+        R.map_fdo_region_counters res (fun fdo -> FRC.leave_handler fdo k)
       in
       let expr, free_vars_of_handler, symbol_inits =
         Env.place_symbol_inits ~params:vars expr free_vars_of_handler
@@ -1059,7 +1053,11 @@ and apply_cont env res apply_cont =
   let k = Apply_cont.continuation apply_cont in
   let args = Apply_cont.args apply_cont in
   if Env.is_exn_handler env k
-  then translate_raise ~dbg_with_inlined env res apply_cont k args
+  then
+    let res =
+      R.map_fdo_region_counters res (fun fdo -> FRC.jump_to_handler fdo k)
+    in
+    translate_raise ~dbg_with_inlined env res apply_cont k args
   else
     match Env.get_continuation env k with
     | Return { param_types } ->

@@ -39,6 +39,10 @@
 (* CR yusumez: The jumps translated before their handler, such as the back edges
    of a loop, miss the counters of the handler, as in Simplify. *)
 
+(* CR yusumez: An exception handler is also entered by the calls that raise in
+   its scope, which have no edge for its counters, as in Simplify. A raise to a
+   handler of the same function is a jump to it. *)
+
 type t
 
 (** In the region of the unit's toplevel code. *)
@@ -61,5 +65,6 @@ val leave_handler : t -> Continuation.t -> t
 (** The given counters lost their edges in the current region. *)
 val add_counters : t -> Fdo_annotation.t -> t
 
-(** The current region jumps to the handler of the given continuation. *)
+(** The current region jumps to the handler of the given continuation, or raises
+    to it. *)
 val jump_to_handler : t -> Continuation.t -> t
