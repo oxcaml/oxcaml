@@ -39,7 +39,7 @@ val enter_set_of_closures : t -> inlined_debuginfo:Inlined_debuginfo.t -> t
 (** For the body of an inlined function. The call site's counter already carries
     the copy context of the function the call is in. *)
 val enter_inlined_apply :
-  t -> stub:bool -> callsite_counter:Fdo_counter.t option -> t
+  t -> called_code:Code.t -> callsite_counter:Fdo_counter.t option -> t
 
 (** [t] with the copy context and {!stub_callsite_counter} of [from]. *)
 val with_copy_context_of : t -> from:t -> t

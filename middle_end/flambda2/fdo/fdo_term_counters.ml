@@ -115,6 +115,53 @@ let map_counters_of_code ~f code =
     ~free_names_of_params_and_body:(Code.free_names_of_params_and_body code)
     ~code_metadata
 
+let rec fold_applies_of_expr ~f ~init expr =
+  match Expr.descr expr with
+  | Let let_expr ->
+    Let.pattern_match let_expr ~f:(fun _ ~body ->
+        fold_applies_of_expr ~f ~init body)
+  | Let_cont (Non_recursive { handler; _ }) ->
+    Non_recursive_let_cont_handler.pattern_match handler ~f:(fun _ ~body ->
+        let init =
+          fold_applies_of_handler ~f ~init
+            (Non_recursive_let_cont_handler.handler handler)
+        in
+        fold_applies_of_expr ~f ~init body)
+  | Let_cont (Recursive handlers) ->
+    Recursive_let_cont_handlers.pattern_match handlers
+      ~f:(fun ~invariant_params:_ ~body handlers ->
+        let init =
+          Continuation.Lmap.fold
+            (fun _ handler init -> fold_applies_of_handler ~f ~init handler)
+            (Continuation_handlers.to_map handlers)
+            init
+        in
+        fold_applies_of_expr ~f ~init body)
+  | Apply apply -> f init apply
+  | Switch _ | Apply_cont _ | Invalid _ -> init
+
+and fold_applies_of_handler ~f ~init handler =
+  Continuation_handler.pattern_match handler ~f:(fun _ ~handler:body ->
+      fold_applies_of_expr ~f ~init body)
+
+let calls_without_counter code =
+  Function_params_and_body.pattern_match (Code.params_and_body code)
+    ~f:(fun
+        ~return_continuation:_
+        ~exn_continuation:_
+        _
+        ~body
+        ~my_closure:_
+        ~is_my_closure_used:_
+        ~my_alloc_mode:_
+        ~my_depth:_
+        ~free_names_of_body:_
+      ->
+      fold_applies_of_expr body ~init:0 ~f:(fun calls apply ->
+          match Apply.callsite_counter apply, Apply.call_kind apply with
+          | None, (Function _ | Method _) -> calls + 1
+          | Some _, _ | None, (C_call _ | Effect _) -> calls))
+
 let of_inlined_call ~callsite_counter code =
   let entry_counters =
     Fdo_annotation.With_body_hash.annotation (Code.fdo_entry_annotation code)
