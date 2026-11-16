@@ -194,11 +194,11 @@ type accepted = #{ mutable i : int; }
 
 let cannot_set (x : accepted) = x.i <- 1
 [%%expect{|
-Line 1, characters 32-33:
+Line 1, characters 32-40:
 1 | let cannot_set (x : accepted) = x.i <- 1
-                                    ^
-Error: This expression has type "accepted",
-       which is an unboxed record rather than a boxed one.
+                                    ^^^^^^^^
+Error: The unboxed record field "i" is declared mutable,
+       but fields of unboxed records can't be mutated.
 |}]
 
 let cannot_set_inferred x = x.i <- 1
@@ -618,11 +618,11 @@ type immutable_unboxed = #{ i : int; }
 
 let cannot_set (x : immutable_unboxed) = x.i <- 2
 [%%expect{|
-Line 1, characters 41-42:
+Line 1, characters 41-49:
 1 | let cannot_set (x : immutable_unboxed) = x.i <- 2
-                                             ^
-Error: This expression has type "immutable_unboxed",
-       which is an unboxed record rather than a boxed one.
+                                             ^^^^^^^^
+Error: The unboxed record field "i" is not mutable
+Hint: Only mutable fields of boxed records can be mutated.
 |}]
 
 let cannot_set_inferred x = x.i <- 2
