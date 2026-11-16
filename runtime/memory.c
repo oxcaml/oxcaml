@@ -380,8 +380,10 @@ Caml_inline void write_barrier_local(
        LSE we emit the LSE instruction ourselves with inline asm (so the choice
        does not depend on how the C compiler lowers C11 atomics -- outline vs
        LL/SC); otherwise we keep the fenced C11 sequence.
-     - on other targets: keep the fenced C11 sequence. */
-#if defined(__aarch64__) && !defined(__ARM_FEATURE_ATOMICS)
+     - on other targets, and under TSan (which cannot see atomics done in
+       inline asm): keep the fenced C11 sequence. */
+#if defined(__aarch64__) && !defined(__ARM_FEATURE_ATOMICS) \
+    && !defined(WITH_THREAD_SANITIZER)
 #define CAML_AARCH64_LSE_RUNTIME_DISPATCH
 
 /* Enable the LSE (armv8.1-a) encodings for an inline asm, even when the
