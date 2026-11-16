@@ -26,6 +26,7 @@
 #include <malloc.h>
 #endif
 #include "caml/config.h"
+#include "caml/cpu.h"
 #include "caml/custom.h"
 #include "caml/misc.h"
 #include "caml/fail.h"
@@ -129,7 +130,12 @@
    default anyway, so all of these fences compile away to nothing
    (They're still useful, though: they serve to inhibit an overeager C
    compiler's optimisations). On ARMv8, actual hardware fences are
-   generated.
+   generated -- except that the atomic read-modify-writes below omit them
+   when the RMW executes as a single LSE atomic, which is itself a full
+   ordering point (see the dispatch helpers before caml_atomic_exchange_field:
+   an LSE RMW is redundant with the fences, but the baseline LL/SC expansion
+   is not; ocaml/ocaml#10972 and
+   https://github.com/sebpop/ocaml-arm64-barrier-proofs).
 */
 
 /* Note [MMMOC]: Mixing the Memory Models of OCaml and C.
@@ -357,9 +363,86 @@ Caml_inline void write_barrier_local(
 
 
 /* stores are implemented as exchanges */
+/* AArch64: a seq_cst read-modify-write is a full ordering point -- making the
+   acquire/release fences Note [MM] places around it redundant -- ONLY when it
+   executes as a single LSE atomic (SWPAL / CASAL / LDADDAL / LDCLRAL / LDSETAL
+   / LDEORAL).  The baseline ARMv8.0 LL/SC expansion (LDAXR ... STLXR) is NOT a
+   full ordering point: an STLXR does not order a program-order-later plain
+   store, so the fences are load-bearing there (ocaml/ocaml#10972; herd7 proofs
+   at https://github.com/sebpop/ocaml-arm64-barrier-proofs).
+
+   We therefore issue the RMW as an explicit LSE instruction, skipping the
+   fences, whenever [caml_cpu_has_lse] holds: always if the C compiler targets
+   LSE or it is a configured arm64 extension, and otherwise as detected at
+   startup.  Using inline asm makes this independent of how the C compiler
+   lowers C11 atomics (outline, LL/SC or LSE).  Otherwise, on other targets,
+   and under TSan (which cannot see atomics done in inline asm), we keep the
+   fenced C11 sequence. */
+#if defined(__aarch64__) && !defined(WITH_THREAD_SANITIZER)
+#define CAML_AARCH64_LSE_ATOMICS
+
+/* Enable the LSE (armv8.1-a) encodings for an inline asm, even when the
+   translation unit is built for plain ARMv8.0.  This must be part of each asm
+   statement: clang's integrated assembler handles each one separately. */
+#define CAML_LSE_ASM(insn) ".arch_extension lse\n\t" insn
+
+/* Explicit LSE atomics, used only when caml_cpu_has_lse().  Each is
+   acquire+release (AL), hence a full ordering point, so no surrounding fence is
+   needed.  They return the old value. */
+Caml_inline value caml_lse_swap(atomic_value *p, value v)
+{
+  value old;
+  __asm__ __volatile__(CAML_LSE_ASM("swpal %2, %0, [%1]")
+                       : "=&r" (old) : "r" (p), "r" (v) : "memory");
+  return old;
+}
+Caml_inline value caml_lse_compare_exchange(atomic_value *p, value expected,
+                                            value newv)
+{
+  value witnessed = expected;
+  __asm__ __volatile__(CAML_LSE_ASM("casal %0, %2, [%1]")
+                       : "+&r" (witnessed) : "r" (p), "r" (newv) : "memory");
+  return witnessed;
+}
+Caml_inline value caml_lse_fetch_add(atomic_value *p, value a)
+{
+  value old;
+  __asm__ __volatile__(CAML_LSE_ASM("ldaddal %2, %0, [%1]")
+                       : "=&r" (old) : "r" (p), "r" (a) : "memory");
+  return old;
+}
+Caml_inline value caml_lse_fetch_and(atomic_value *p, value a)
+{
+  /* LDCLR clears the bits set in its operand ([p] &= ~operand), so pass the
+     complement of the AND mask. */
+  value old, clr = ~a;
+  __asm__ __volatile__(CAML_LSE_ASM("ldclral %2, %0, [%1]")
+                       : "=&r" (old) : "r" (p), "r" (clr) : "memory");
+  return old;
+}
+Caml_inline value caml_lse_fetch_or(atomic_value *p, value a)
+{
+  value old;
+  __asm__ __volatile__(CAML_LSE_ASM("ldsetal %2, %0, [%1]")
+                       : "=&r" (old) : "r" (p), "r" (a) : "memory");
+  return old;
+}
+Caml_inline value caml_lse_fetch_xor(atomic_value *p, value a)
+{
+  value old;
+  __asm__ __volatile__(CAML_LSE_ASM("ldeoral %2, %0, [%1]")
+                       : "=&r" (old) : "r" (p), "r" (a) : "memory");
+  return old;
+}
+#endif
+
 static value atomic_exchange_field (value obj, intnat field, value v)
 {
   value ret;
+#ifdef CAML_AARCH64_LSE_ATOMICS
+  if (caml_cpu_has_lse())
+    return caml_lse_swap(&Op_atomic_val(obj)[field], v);
+#endif
   /* See Note [MM] above */
   atomic_thread_fence(memory_order_acquire);
   ret = atomic_exchange(&Op_atomic_val(obj)[field], v);
@@ -411,6 +494,13 @@ static value atomic_compare_exchange_field (
   value obj, intnat field, value oldv, value newv, int* success)
 {
   atomic_value* p = &Op_atomic_val(obj)[field];
+#ifdef CAML_AARCH64_LSE_ATOMICS
+  if (caml_cpu_has_lse()) {
+    value witnessed = caml_lse_compare_exchange(p, oldv, newv);
+    *success = (witnessed == oldv);
+    return witnessed;
+  }
+#endif
   *success = atomic_compare_exchange_strong(p, &oldv, newv);
   atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return oldv;
@@ -477,6 +567,10 @@ CAMLprim value caml_atomic_fetch_add_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
   atomic_value *p = &Op_atomic_val(obj)[field];
+#ifdef CAML_AARCH64_LSE_ATOMICS
+  if (caml_cpu_has_lse())
+    return caml_lse_fetch_add(p, 2 * Long_val(incr));
+#endif
   value ret = atomic_fetch_add(p, 2 * Long_val(incr));
   atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return ret;
@@ -491,6 +585,12 @@ CAMLprim value caml_atomic_add_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
   atomic_value *p = &Op_atomic_val(obj)[field];
+#ifdef CAML_AARCH64_LSE_ATOMICS
+  if (caml_cpu_has_lse()) {
+    (void) caml_lse_fetch_add(p, 2*Long_val(incr));
+    return Val_unit;
+  }
+#endif
   atomic_fetch_add(p, 2*Long_val(incr)); /* ignore the result */
   atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
@@ -505,6 +605,12 @@ CAMLprim value caml_atomic_sub_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
   atomic_value *p = &Op_atomic_val(obj)[field];
+#ifdef CAML_AARCH64_LSE_ATOMICS
+  if (caml_cpu_has_lse()) {
+    (void) caml_lse_fetch_add(p, -2*Long_val(incr)); /* no LSE sub */
+    return Val_unit;
+  }
+#endif
   atomic_fetch_sub(p, 2*Long_val(incr)); /* ignore the result */
   atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
@@ -519,6 +625,12 @@ CAMLprim value caml_atomic_land_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
   atomic_value *p = &Op_atomic_val(obj)[field];
+#ifdef CAML_AARCH64_LSE_ATOMICS
+  if (caml_cpu_has_lse()) {
+    (void) caml_lse_fetch_and(p, incr);
+    return Val_unit;
+  }
+#endif
   atomic_fetch_and(p, incr); /* ignore the result */
   atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
@@ -533,6 +645,12 @@ CAMLprim value caml_atomic_lor_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
   atomic_value *p = &Op_atomic_val(obj)[field];
+#ifdef CAML_AARCH64_LSE_ATOMICS
+  if (caml_cpu_has_lse()) {
+    (void) caml_lse_fetch_or(p, incr);
+    return Val_unit;
+  }
+#endif
   atomic_fetch_or(p, incr); /* ignore the result */
   atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
@@ -547,6 +665,12 @@ CAMLprim value caml_atomic_lxor_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
   atomic_value *p = &Op_atomic_val(obj)[field];
+#ifdef CAML_AARCH64_LSE_ATOMICS
+  if (caml_cpu_has_lse()) {
+    (void) caml_lse_fetch_xor(p, 2*Long_val(incr));
+    return Val_unit;
+  }
+#endif
   atomic_fetch_xor(p, 2*Long_val(incr)); /* ignore the result */
   atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
