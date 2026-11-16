@@ -746,6 +746,29 @@ module Make (V : Ordered) = struct
   let map_rigid (f : V.t -> node) (node : node) : node =
     map_rigid_rec f (inline_solved_vars node)
 
+  let iter_unsolved_vars f node =
+    let visited : (Var_id.t, unit) Hashtbl.t = Hashtbl.create 16 in
+    let rec visit node =
+      if is_leaf node
+      then ()
+      else
+        let block = Unsafe.node_block node in
+        let var = block.v in
+        match var.state with
+        | Rigid _ ->
+          (* Rigid vars have larger ids than all non-rigids, so nothing under
+             [node] is unsolved. *)
+          ()
+        | Unsolved | Solved _ ->
+          if not (Hashtbl.mem visited var.id)
+          then (
+            Hashtbl.add visited var.id ();
+            f var);
+          visit block.lo;
+          visit block.hi
+    in
+    visit (inline_solved_vars node)
+
   (* --------- structural debug printer --------- *)
   let pp_debug (node : node) : string =
     let pp_coeff = Axis_lattice.to_string in
