@@ -40,12 +40,11 @@ let bind_expr_to_symbol ~env ~res symbol expr =
 let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
   match x with
   | Const c -> bind_expr_to_symbol ~env ~res symbol (Constant (to_jsir_const c))
-  | Var (v, dbg) ->
-    To_jsir_result.with_debuginfo_exn res dbg ~f:(fun res ->
-        (* This should already be populated by To_jsir.let_expr_normal *)
-        let symbol_var, res = To_jsir_env.get_symbol_exn env ~res symbol in
-        let value_var = To_jsir_env.get_var_exn env v in
-        env, To_jsir_shared.bind_vars ~res [symbol_var, value_var])
+  | Var (v, _dbg) ->
+    (* This should already be populated by To_jsir.let_expr_normal *)
+    let symbol_var, res = To_jsir_env.get_symbol_exn env ~res symbol in
+    let value_var = To_jsir_env.get_var_exn env v in
+    env, To_jsir_shared.bind_vars ~res [symbol_var, value_var]
 
 let simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
   let fields = List.map Simple.With_debuginfo.simple fields in
@@ -93,10 +92,7 @@ let numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not ~to_bits
             ( var :: values,
               To_jsir_result.add_instr_exn res
                 (Let (var, Constant (bits_to_constant (to_bits c)))) )
-          | Var (v, dbg) ->
-            To_jsir_result.with_debuginfo_exn res dbg ~f:(fun res ->
-                let var = To_jsir_env.get_var_exn env v in
-                var :: values, res))
+          | Var (v, _dbg) -> To_jsir_env.get_var_exn env v :: values, res)
         values ([], res)
     in
     let values = Array.of_list values in
@@ -272,15 +268,20 @@ let prepare_code ~env ~res ~code_id code =
       let hint =
         To_jsir_shared.closure_hint (Code0.code_metadata code) ~params
       in
+      (* As for bytecode, the location of a closure is the end of its
+         function. *)
+      let loc =
+        To_jsir_result.parse_info_of_debuginfo (Code0.dbg code) ~pos:`End
+      in
       let env =
         To_jsir_env.add_code_id env code_id ~addr ~params ~closure
-          ~closure_bound_with_code ~hint
+          ~closure_bound_with_code ~hint ~loc
       in
       let res =
         if closure_bound_with_code
         then
           To_jsir_result.add_instr_exn res
-            (Let (closure, Closure (params, (addr, []), (hint, None))))
+            (Let (closure, Closure (params, (addr, []), (hint, loc))))
         else res
       in
       let function_slots =
@@ -326,12 +327,14 @@ let code ~env ~res ~translate_body ~code_id code =
              params = params_jvar;
              closure;
              closure_bound_with_code = _;
-             hint = _
+             hint = _;
+             loc = _
            }
             : To_jsir_env.code_id) =
         To_jsir_env.get_code_id_exn env code_id
       in
       let res = To_jsir_result.new_block_with_addr_exn res ~addr ~params:[] in
+      let res = To_jsir_result.add_event_exn res (Code0.dbg code) ~pos:`Start in
       let params_fvar =
         Bound_parameters.to_list bound_params |> List.map Bound_parameter.var
       in
