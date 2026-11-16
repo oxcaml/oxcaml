@@ -1,0 +1,3 @@
+file qux.cmi 04/qux x
+file quux.cmi 04/quux
+manifest legacy 02/02-manifest.txt
