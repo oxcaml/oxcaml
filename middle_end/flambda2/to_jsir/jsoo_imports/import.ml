@@ -27,6 +27,7 @@
  ******************************************************************************)
 
 module Jsir = Code
+module Jsir_subst = Subst
 module Optimization_hint = Optimization_hint
 module Parse_info = Parse_info
 module Targetint = Targetint
