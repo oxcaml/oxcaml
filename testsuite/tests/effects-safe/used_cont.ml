@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+ { bytecode; }
+ { native; }
+*)
 
 open Effect
 open Effect.Deep
