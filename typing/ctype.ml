@@ -5411,32 +5411,42 @@ let at_current_levels f =
     nongen_level := nongen;
     wrap_end_def (fun () -> f x)
 
-(* Registers [run] on [ivar]. If [ivar] is defaulted, calls [run (default ())]
-   instead. A conflicting default fails in [run]'s unification. *)
-let ivar_upon ivar ~run ~default ~scheduler =
-  Ivar.upon ivar ~run ~cancel:(fun () -> run (default ())) ~scheduler
-
 let upon_shape env ty ~run ~default =
   let run = at_current_levels run in
+  let default = at_current_levels default in
   let scheduler = scheduler () in
   if get_level ty = generic_level
   then Misc.fatal_error "Ctype.upon_shape: generic type";
   let ty = expand_head_ignoring_local_constraints env ty in
   let head = Type_head.of_expanded_type env ty in
+  let wait ivar =
+    let cancel () =
+      (* [cancel]ling because we did not determine [ty]'s shape: turn [ty]
+         back into a [Tvar] and run its default constraint. If [ty] is now a
+         [Tivar] for a different ivar (registered by an earlier default),
+         leave it. *)
+      (match get_desc ty with
+      | Tivar { name; jkind; ivar = ivar' } when ivar == ivar' ->
+        set_type_desc ty (Tvar { name; jkind })
+      | _ -> ());
+      default ()
+    in
+    Ivar.upon ivar ~run ~cancel ~scheduler
+  in
   match head with
   | Var when not (Language_extension.is_enabled Omnidirectionality) ->
-    Scheduler.add scheduler (fun () -> run (default ()))
+    Scheduler.add scheduler default
   | Var ->
     let ivar = Ivar.create ~in_global_pool:true () in
     transfer_ivar ivar ty;
-    ivar_upon ivar ~run ~default ~scheduler
-  | Ivar ivar -> ivar_upon ivar ~run ~default ~scheduler
+    wait ivar
+  | Ivar ivar -> wait ivar
   | Shape s ->
     (* Fast path: [ty] is not a variable, so behaves as if its ivar
        were already filled, or defaulted if [ty] has no shape. *)
     Scheduler.add scheduler (fun () -> run s)
   | Locally_abstract | Undefined ->
-    Scheduler.add scheduler (fun () -> run (default ()))
+    Scheduler.add scheduler (fun () -> default ())
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
