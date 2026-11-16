@@ -321,7 +321,11 @@ val curry_mode :
     variable whose lower bound is the implied curry mode, unconstrained
     otherwise. Its areality is bounded below by the constant upper bounds
     of the areality of the arguments: a closure is as local as the
-    arguments it may close over. *)
+   otherwise. By default, its areality is bounded below by the constant upper 
+   bounds of the areality of the arguments: a closure is as local as the
+   arguments it may close over. Primitives ([primitive]) don't pin areality: 
+   their partial applications are eta-expanded, so the curry mode's locality
+   can use the instantiated localities of the arguments. *)
 module Curry_mode : sig
   type t =
     | Const of { mode : With_locality.Const.t; pin_areality : bool }
