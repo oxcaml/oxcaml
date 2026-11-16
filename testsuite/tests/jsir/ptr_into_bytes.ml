@@ -5,9 +5,9 @@
  jsir;
 *)
 
-(* Pointers to bytes whose base is a string, bytes or bigarray instead of a
-   block. Block indices count 8 bytes for every field under JSIR, so the index
-   of the byte at position [i] is [8 * i]. *)
+(* Pointers to bytes and block indices of bytes whose base is a string, bytes or
+   bigarray instead of a block. Block indices count 8 bytes for every field
+   under JSIR, so the index of the byte at position [i] is [8 * i]. *)
 
 open Stdlib_stable
 open Stdlib_upstream_compatible
@@ -27,6 +27,18 @@ let[@inline never] get_byte base i = Int8_u.to_int (get #(base, byte_idx i))
 
 let[@inline never] set_byte base i v =
   set #(base, byte_idx i) (Int8_u.of_int v)
+
+external[@layout_poly] get_idx :
+  'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b = "%get_idx"
+
+external[@layout_poly] set_idx :
+  'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+
+let[@inline never] get_byte_idx base i =
+  Int8_u.to_int (get_idx base (byte_idx i))
+
+let[@inline never] set_byte_idx base i v =
+  set_idx base (byte_idx i) (Int8_u.of_int v)
 
 let[@inline never] get_two_bytes base i =
   let #(x, y) : #(int8# * int8#) = get #(base, byte_idx i) in
@@ -81,4 +93,47 @@ let () =
   set #(r, (.x)) #3s;
   set #(r, (.y)) (-#4s);
   Printf.printf "record after writes: %d %s %d\n" (Int8_u.to_int r.x) r.s
+    (Int8_u.to_int r.y)
+
+(* The same accesses through block indices rather than pointers. *)
+
+let () =
+  let s = "abc\255" in
+  Printf.printf "string, idx: %d %d %d %d\n" (get_byte_idx s 0)
+    (get_byte_idx s 1) (get_byte_idx s 2) (get_byte_idx s 3);
+  print_out_of_bounds (fun () -> get_byte_idx s 4)
+
+let () =
+  let b = Bytes.of_string "abc" in
+  Printf.printf "bytes, idx: %d %d %d\n" (get_byte_idx b 0) (get_byte_idx b 1)
+    (get_byte_idx b 2);
+  set_byte_idx b 0 (Char.code 'x');
+  set_byte_idx b 2 (-1);
+  Printf.printf "bytes after idx writes: %S %d\n" (Bytes.to_string b)
+    (get_byte_idx b 2);
+  print_out_of_bounds (fun () -> get_byte_idx b 3);
+  print_out_of_bounds (fun () -> set_byte_idx b 3 0; 0)
+
+let () =
+  let ba = Bigarray.Array1.create Bigarray.char Bigarray.c_layout 3 in
+  Bigarray.Array1.set ba 0 'a';
+  Bigarray.Array1.set ba 1 'b';
+  Bigarray.Array1.set ba 2 '\255';
+  Printf.printf "bigarray, idx: %d %d %d\n" (get_byte_idx ba 0)
+    (get_byte_idx ba 1) (get_byte_idx ba 2);
+  set_byte_idx ba 1 (Char.code 'y');
+  set_byte_idx ba 2 (-128);
+  Printf.printf "bigarray after idx writes: %C %d\n" (Bigarray.Array1.get ba 1)
+    (Char.code (Bigarray.Array1.get ba 2));
+  print_out_of_bounds (fun () -> get_byte_idx ba 3);
+  print_out_of_bounds (fun () -> set_byte_idx ba 3 0; 0)
+
+let () =
+  let r = { x = #1s; s = "s"; y = -#2s } in
+  Printf.printf "record, idx: %d %d\n"
+    (Int8_u.to_int (get_idx r (.x)))
+    (Int8_u.to_int (get_idx r (.y)));
+  set_idx r (.x) #3s;
+  set_idx r (.y) (-#4s);
+  Printf.printf "record after idx writes: %d %s %d\n" (Int8_u.to_int r.x) r.s
     (Int8_u.to_int r.y)
