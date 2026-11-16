@@ -644,6 +644,18 @@ let destroyed_at_atomic_compare_set =
   (* CMPXCHG overwrites rax on failure, independently of the boolean result. *)
   Array.append destroyed_at_small_memory_op destroyed_rax
 
+let may_be_destroyed_by_c_function (r : Reg.t) =
+  match r.loc with
+  | Reg (P (RAX | RDI | RSI | RDX | RCX | R8 | R9 | R10 | R11)) -> true
+  | Reg (P (RBX | RBP | R12 | R13)) -> false
+  | Reg
+      (P
+        ( MM0 | MM1 | MM2 | MM3 | MM4 | MM5 | MM6 | MM7 | MM8 | MM9 | MM10
+        | MM11 | MM12 | MM13 | MM14 | MM15 )) ->
+    true
+  | Reg (P (K1 | K2 | K3 | K4 | K5 | K6 | K7)) -> true
+  | Stack _ | Unknown -> false
+
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->

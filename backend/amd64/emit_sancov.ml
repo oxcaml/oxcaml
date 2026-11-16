@@ -81,13 +81,6 @@ let emit_debug_info dbg =
   then Emitaux.emit_debug_info_gen dbg file_emitter D.loc
   else Emitaux.emit_no_source_line_gen file_emitter D.loc
 
-let slot_size (r : Reg.t) =
-  match r.typ with
-  | Int | Val | Addr | Mask | Float | Float32 -> 8
-  | Vec128 | Valx2 -> 16
-  | Vec256 -> 32
-  | Vec512 -> 64
-
 (* The slow path calls [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack
    (or, without stack checks, on the current stack, once aligned), as for a C
    call that does not allocate. Unlike such a call, it preserves every register:
@@ -99,7 +92,7 @@ let slot_size (r : Reg.t) =
    address pushed by a call to [caml_call_gc], this word lies within the red
    zone that the runtime keeps below the stack frames of OCaml code
    ([Stack_threshold]). *)
-let emit_slow_path ~must_save ~move ~emit_call t =
+let emit_slow_path ~move ~emit_call t =
   D.define_label t.lbl;
   emit_debug_info t.dbg;
   (* The frame is 16-byte aligned, and so is every vector slot, since [move]
@@ -109,9 +102,9 @@ let emit_slow_path ~must_save ~move ~emit_call t =
   let saved, size =
     Reg.Set.fold
       (fun (r : Reg.t) (saved, offset) ->
-        if Reg.is_reg r && must_save r
+        if Proc.may_be_destroyed_by_c_function r
         then
-          let size = slot_size r in
+          let size = Select_utils.size_component r.typ in
           let offset = Misc.align offset (Int.min size 16) in
           let slot = Reg.create_at_location r.typ (Stack (Outgoing offset)) in
           (r, slot) :: saved, offset + size
@@ -143,8 +136,8 @@ let emit_slow_path ~must_save ~move ~emit_call t =
   D.cfi_adjust_cfa_offset ~bytes:(-8);
   I.jmp (label_arg t.return_lbl)
 
-let emit_slow_paths ~must_save ~move ~emit_call =
-  List.iter (emit_slow_path ~must_save ~move ~emit_call) (List.rev !slow_paths)
+let emit_slow_paths ~move ~emit_call =
+  List.iter (emit_slow_path ~move ~emit_call) (List.rev !slow_paths)
 
 let emit_data ~add_def_symbol =
   if not (Misc.Stdlib.List.is_empty !guards)

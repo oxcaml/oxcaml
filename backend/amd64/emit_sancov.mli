@@ -44,15 +44,10 @@ val emit_probe : live:Reg.Set.t -> dbg:Debuginfo.t -> unit
     the callback with the address of the probe's guard, preserving every
     register.
 
-    [must_save] tells whether a hardware register is clobbered by a call to a C
-    function. It need not hold of [r13], which the slow path always preserves.
     [move] emits a move between a hardware register and an [Outgoing] stack
     slot. [emit_call] emits a call to a C function. *)
 val emit_slow_paths :
-  must_save:(Reg.t -> bool) ->
-  move:(Reg.t -> Reg.t -> unit) ->
-  emit_call:(Cmm.symbol -> unit) ->
-  unit
+  move:(Reg.t -> Reg.t -> unit) -> emit_call:(Cmm.symbol -> unit) -> unit
 
 (** Emit the guards of the probes of the current unit and the definition of the
     gate, if the unit has any probe. [add_def_symbol] is called on the name of

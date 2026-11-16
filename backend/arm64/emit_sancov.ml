@@ -101,34 +101,6 @@ let emit_debug_info dbg =
   then Emitaux.emit_debug_info_gen dbg file_emitter D.loc
   else Emitaux.emit_no_source_line_gen file_emitter D.loc
 
-let slot_size (r : Reg.t) =
-  match r.typ with
-  | Int | Val | Addr | Float | Float32 -> 8
-  | Vec128 | Valx2 -> 16
-  | Vec256 | Vec512 | Mask ->
-    Misc.fatal_errorf "Emit_sancov: unexpected register %a" Printreg.reg r
-
-(* Whether a C function may clobber a hardware register. This includes the
-   whole of every vector register, of which C functions preserve at most the
-   low half. [x19] is preserved by the slow path itself; [x16] and [x17] are
-   never live. *)
-let must_save (r : Reg.t) =
-  match r.loc with
-  | Reg
-      ( X0 | X1 | X2 | X3 | X4 | X5 | X6 | X7 | X8 | X9 | X10 | X11 | X12 | X13
-      | X14 | X15 ) ->
-    true
-  | Reg
-      ( X16 | X17 | X19 | X20 | X21 | X22 | X23 | X24 | X25 | X26 | X27 | X28 )
-    ->
-    false
-  | Reg
-      ( D0 | D1 | D2 | D3 | D4 | D5 | D6 | D7 | D8 | D9 | D10 | D11 | D12 | D13
-      | D14 | D15 | D16 | D17 | D18 | D19 | D20 | D21 | D22 | D23 | D24 | D25
-      | D26 | D27 | D28 | D29 | D30 | D31 ) ->
-    true
-  | Stack _ | Unknown -> false
-
 (* The slow path calls [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack,
    as for a C call that does not allocate. Unlike such a call, it preserves
    every register: those that are live and that C functions do not preserve are
@@ -148,9 +120,9 @@ let emit_slow_path ~move ~guard t =
   let saved, size =
     Reg.Set.fold
       (fun (r : Reg.t) (saved, offset) ->
-        if must_save r
+        if Proc.may_be_destroyed_by_c_function r
         then
-          let size = slot_size r in
+          let size = Select_utils.size_component r.typ in
           let offset = Misc.align offset size in
           let slot = Reg.create_at_location r.typ (Stack (Outgoing offset)) in
           (r, slot) :: saved, offset + size

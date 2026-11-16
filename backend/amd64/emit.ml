@@ -2864,17 +2864,6 @@ let emit_function_type_and_size fun_sym =
 
 (* Emission of a function declaration *)
 
-(* Whether the slow path of an [Itrace_pc_guard] probe must save a hardware
-   register around its call to a C function. The slow path preserves [r13]
-   itself. *)
-let trace_pc_guard_must_save (r : Reg.t) =
-  match r.typ with
-  | Int | Val | Addr -> (
-    match reg64 r with
-    | RAX | RDI | RSI | RDX | RCX | R8 | R9 | R10 | R11 -> true
-    | RBX | RBP | RSP | R12 | R13 | R14 | R15 -> false)
-  | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 | Mask -> true
-
 let fundecl fundecl =
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
@@ -2930,8 +2919,7 @@ let fundecl fundecl =
   let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
-  Emit_sancov.emit_slow_paths ~must_save:trace_pc_guard_must_save ~move
-    ~emit_call;
+  Emit_sancov.emit_slow_paths ~move ~emit_call;
   let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
