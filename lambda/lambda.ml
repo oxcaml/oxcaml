@@ -1285,7 +1285,7 @@ type lambda =
   | Lkindinstantiate of lkindinstantiate
   | Ltemplate of lfunction
   | Linstantiate of lambda_apply
-  | Lcode of lcode
+  | Lcode of lcode * lambda
 
 and rec_binding = {
   id : Ident.t;
@@ -1310,7 +1310,9 @@ and lfunction =
   }
 
 and lcode =
-  { code_template : Template_id.t;
+  { code_name : Ident.t;
+    code_debug_uid : debug_uid;
+    code_template : Template_id.t;
     code_fun : lfunction
   }
 
@@ -1383,7 +1385,7 @@ let rec try_to_find_location lam =
   | Lfunction { loc; _ }
   | Lkindtemplate { ktmpl_body = { loc; _ }; _ }
   | Ltemplate { loc; _ }
-  | Lcode { code_fun = { loc; _ }; _ }
+  | Lcode ({ code_fun = { loc; _ }; _ }, _)
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
   | Lkindinstantiate { kinst_loc = loc; _ }
@@ -1969,8 +1971,9 @@ let shallow_iter ~tail ~non_tail:f = function
       f body
   | Linstantiate {ap_func = fn; ap_args = args} ->
       f fn; List.iter f args
-  | Lcode {code_fun = {body}} ->
-      f body
+  | Lcode ({code_fun}, body) ->
+      tail body;
+      f (Lfunction code_fun)
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -2070,9 +2073,10 @@ let rec free_variables = function
       free_variables_lfun tmpl
   | Linstantiate {ap_func = fn; ap_args = args} ->
       free_variables_list (free_variables fn) args
-  | Lcode _ ->
-      (* An invariant of Lcode is that it has no free variables. *)
-      Ident.Set.empty
+  | Lcode ({code_name; code_fun}, body) ->
+      Ident.Set.union
+        (free_variables_lfun code_fun)
+        (Ident.Set.remove code_name (free_variables body))
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -2308,9 +2312,8 @@ let rec free_sort_vars = function
         (sort_vars_of_list sort_vars_of_layout
            (kinst_result_layout :: kinst_args))
         (free_sort_vars fn)
-  |  Lcode _ ->
-      (* An invariant of Lcode is that it has no free variables. *)
-      Layout_ident.Set.empty
+  | Lcode ({code_fun}, body) ->
+      Layout_ident.Set.union (free_sort_vars_lfun code_fun) (free_sort_vars body)
 
 and free_sort_vars_list set exprs =
   List.fold_left
@@ -2611,8 +2614,13 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
           }
     | Ltemplate lf ->
         Ltemplate (subst_lfun s l lf)
-    | Lcode {code_template; code_fun} ->
-        Lcode {code_template; code_fun = subst_lfun s l code_fun}
+    | Lcode (code, body) ->
+        let code_name, code_debug_uid, l' =
+          bind code.code_name code.code_debug_uid l
+        in
+        let code_fun = subst_lfun s l code.code_fun in
+        Lcode ({ code with code_name; code_debug_uid; code_fun },
+               subst s l' body)
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2827,11 +2835,12 @@ let shallow_map ~tail ~non_tail:f lam =
       if old_lfun == new_lfun
       then lam
       else Ltemplate new_lfun
-  | Lcode {code_template; code_fun = old_lfun} ->
+  | Lcode (({ code_fun = old_lfun; _ } as code), old_body) ->
       let new_lfun = map_lfunction f old_lfun in
-      if old_lfun == new_lfun
+      let new_body = tail old_body in
+      if old_lfun == new_lfun && old_body == new_body
       then lam
-      else Lcode {code_template; code_fun = new_lfun}
+      else Lcode ({ code with code_fun = new_lfun }, new_body)
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
       let new_e2 = tail old_e2 in
@@ -4132,7 +4141,7 @@ let may_allocate_in_region lam =
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
     | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_body={mode=Alloc_heap}}
-    | Ltemplate {mode=Alloc_heap} | Lcode _ -> ()
+    | Ltemplate {mode=Alloc_heap} -> ()
     | Lfunction {mode=Alloc_local}
     | Lkindtemplate {ktmpl_body={mode=Alloc_local}}
     | Ltemplate {mode=Alloc_local} -> raise Exit
@@ -4161,7 +4170,7 @@ let may_allocate_in_region lam =
     | ( Lapply _  | Lkindinstantiate _ | Linstantiate _ | Llet _ | Lmutlet _
       | Lletrec _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
       | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _
-      | Lsend _ | Levent _ | Lifused _) as lam ->
+      | Lsend _ | Levent _ | Lifused _ | Lcode _) as lam ->
        iter_head_constructor loop lam
   in
   if not Config.stack_allocation then false

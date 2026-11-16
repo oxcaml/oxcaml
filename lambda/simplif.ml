@@ -40,9 +40,9 @@ let rec eliminate_ref id = function
   | Lfunction lfun as lam ->
       check_function_escape id lfun;
       lam
-  | Lcode _ as lam ->
-      (* Instantiations are closed. *)
-      lam
+  | Lcode (code, body) ->
+      (* The code of instantiations can't refer to [id]. *)
+      Lcode (code, eliminate_ref id body)
   | Llet(str, kind, v, duid, e1, e2) ->
       Llet(str, kind, v, duid, eliminate_ref id e1, eliminate_ref id e2)
   | Lmutlet(kind, v, duid, e1, e2) ->
@@ -142,12 +142,15 @@ let simplify_exits lam =
   | Lapply ap ->
       count ~try_depth ap.ap_func;
       List.iter (count ~try_depth) ap.ap_args
-  | Lfunction {body} | Lcode {code_fun = {body}} -> count ~try_depth body
+  | Lfunction {body} -> count ~try_depth body
   | Llet(_, _kind, _v, _duid, l1, l2)
   | Lmutlet(_kind, _v, _duid, l1, l2) ->
       count ~try_depth l2; count ~try_depth l1
   | Lletrec(bindings, body) ->
       List.iter (fun { def = { body } } -> count ~try_depth body) bindings;
+      count ~try_depth body
+  | Lcode ({ code_fun = { body = code_body } }, body) ->
+      count ~try_depth code_body;
       count ~try_depth body
   | Lprim(_p, ll, _) -> List.iter (count ~try_depth) ll
   | Lswitch(l, sw, _loc, _kind) ->
@@ -256,11 +259,11 @@ let simplify_exits lam =
                      ap_args = List.map (simplif ~layout:None ~try_depth) ap.ap_args}
   | Lfunction lfun ->
       Lfunction (map_lfunction (simplif ~layout:None ~try_depth) lfun)
-  | Lcode {code_template; code_fun} ->
+  | Lcode (code, body) ->
       let code_fun =
-        map_lfunction (simplif ~layout:None ~try_depth) code_fun
+        map_lfunction (simplif ~layout:None ~try_depth) code.code_fun
       in
-      Lcode {code_template; code_fun}
+      Lcode ({ code with code_fun }, simplif ~layout ~try_depth body)
   | Llet(str, kind, v, duid, l1, l2) ->
       Llet(str, kind, v, duid, simplif ~layout:None ~try_depth l1,
            simplif ~layout ~try_depth l2)
@@ -502,7 +505,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
           end
       | _ -> no_opt ()
       end
-  | Lfunction fn | Lcode {code_fun = fn} ->
+  | Lfunction fn ->
       count_lfunction fn
   | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize_except_alias_bindings ->
       (* v will be replaced by w in l2, so each occurrence of v in l2
@@ -518,6 +521,9 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
      count bv l2
   | Lletrec(bindings, body) ->
       List.iter (fun { def } -> count_lfunction def) bindings;
+      count bv body
+  | Lcode ({ code_fun }, body) ->
+      count_lfunction code_fun;
       count bv body
   | Lprim(_p, ll, _) -> List.iter (count bv) ll
   | Lswitch(l, sw, _loc, _kind) ->
@@ -736,8 +742,9 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       if count_var v > 0 then simplif l else lambda_unit
   | Lregion (l, layout) -> Lregion (simplif l, layout)
   | Lexclave l -> Lexclave (simplif l)
-  | Lcode {code_template; code_fun} ->
-      Lcode {code_template; code_fun = map_lfunction simplif code_fun}
+  | Lcode (code, body) ->
+      Lcode ({ code with code_fun = map_lfunction simplif code.code_fun },
+             simplif body)
   | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
   | Linstantiate _ as l ->
     fatal_error_invalid_constructor l
@@ -771,7 +778,7 @@ let rec emit_tail_infos is_tail lambda =
       end;
       emit_tail_infos false ap.ap_func;
       list_emit_tail_infos false ap.ap_args
-  | Lfunction lfun | Lcode {code_fun = lfun} ->
+  | Lfunction lfun ->
       emit_tail_infos_lfunction is_tail lfun
   | Llet (_, _k, _, _, lam, body)
   | Lmutlet (_k, _, _, lam, body) ->
@@ -779,6 +786,9 @@ let rec emit_tail_infos is_tail lambda =
       emit_tail_infos is_tail body
   | Lletrec (bindings, body) ->
       List.iter (fun { def } -> emit_tail_infos_lfunction is_tail def) bindings;
+      emit_tail_infos is_tail body
+  | Lcode ({ code_fun }, body) ->
+      emit_tail_infos_lfunction is_tail code_fun;
       emit_tail_infos is_tail body
   | Lprim ((Pbytes_to_string | Pbytes_of_string |
             Parray_to_iarray | Parray_of_iarray),
@@ -1117,7 +1127,9 @@ let simplify_local_functions lam =
     | Lfunction lf ->
         check_static lf;
         function_definition lf
-    | Lcode {code_fun} -> function_definition code_fun
+    | Lcode ({ code_fun }, body) ->
+        function_definition code_fun;
+        tail body
     | Lregion (lam, _) -> region lam
     | Lexclave lam -> exclave lam
     | lam ->

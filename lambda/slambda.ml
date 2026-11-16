@@ -144,7 +144,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lconst constant -> assert_constant_contains_no_splices constant
   | Lapply { ap_result_layout; _ } ->
     assert_layout_contains_no_splices ap_result_layout
-  | Lfunction func | Lcode { code_fun = func; _ } ->
+  | Lfunction func | Lcode ({ code_fun = func; _ }, _) ->
     assert_function_contains_no_splices func
   | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
@@ -531,23 +531,24 @@ module Ctx : sig
 
   (** Instantiate a template. This is memoized so if this template has already
       been instantiated with these arguments it just returns the previously
-      computed results, otherwise it uses [eval_apply] to evaluate the closure.
-      The returned runtime half is a reference to the instantiated function. *)
+      computed results, otherwise it uses [eval_apply] to evaluate the closure
+      to its compile-time value and the code of the instantiation. The returned
+      runtime half is a reference to the code. *)
   val instantiate :
     t ->
     loc:scoped_location ->
     eval_apply:
-      (Template_id.t ->
-      Types.closure ->
+      (Types.closure ->
       Types.value Or_missing.t list ->
-      Types.halves) ->
+      Types.value Or_missing.t * lfunction) ->
     Template_id.t ->
     Types.value Or_missing.t list ->
     Types.halves
 
-  (** All of the template instantiations cached by [instantiate]. These are in
-      dependency order; entries earlier in the list may depend on later ones. *)
-  val instantiations : t -> (Ident.t * lambda) list
+  (** The code of all of the template instantiations cached by [instantiate].
+      These are in dependency order; entries earlier in the list may depend on
+      later ones. *)
+  val instantiations : t -> lcode list
 
   (** Makes the given string unique in the context of this [Ctx.t] by adding a
       stamp to the end. It should already be unique across [Ctx.t]s, which is
@@ -558,7 +559,7 @@ end = struct
     { cu_static_data : Compilation_unit.t -> CU_data.t option;
       store : Template_store.t;
       instantiated_templates : Types.value Or_missing.t option Ident.Tbl.t;
-      mutable instantiations : (Ident.t * lambda) list;
+      mutable instantiations : lcode list;
       uniqueify : int Misc.Stdlib.String.Tbl.t
     }
 
@@ -621,9 +622,16 @@ end = struct
         (* eval_apply might recursively call this function so mark this name as
            visited before calling it. *)
         Ident.Tbl.replace t.instantiated_templates name None;
-        let { Types.slv_comptime; slv_runtime } = eval_apply id closure args in
+        let slv_comptime, code_fun = eval_apply closure args in
         Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
-        t.instantiations <- (name, slv_runtime) :: t.instantiations;
+        let code =
+          { code_name = name;
+            code_debug_uid = debug_uid_none;
+            code_template = id;
+            code_fun
+          }
+        in
+        t.instantiations <- code :: t.instantiations;
         slv_comptime
         end
     in
@@ -1678,34 +1686,37 @@ and instantiate ctx ~loc func args =
     Note that the arguments must have already been evaluated. This function
     currently does not support partial- or over-application.
 
+    The result is the compile-time value of the application and the code of the
+    instantiation:
+
     {[
     (kindtemplate k1 ... kn -> fun p1 ... pm -> body) arg1 ... argn ~>
       let { c = _; r = body_r } =
         eval_lam { clo_env with k1=arg1; ...; kn=argn } body
       in
-      { c = Missing
-        r = << code (fun closure p1 ... pm ->
-                       let fv1 = closure.(0) in
-                       ...
-                       let fvk = closure.(k-1) in
-                       body_r) >> }
+      ( Missing,
+        << fun closure p1 ... pm ->
+             let fv1 = closure.(0) in
+             ...
+             let fvk = closure.(k-1) in
+             body_r >> )
 
     (template p1 ... pn -> body) arg1 ... argn ~>
       let { c = body_c; r = body_r } =
         eval_lam { clo_env with p1=arg1; ...; pn=argn } body
       in
-      { c = body_c;
-        r = << code (fun closure p1 ... pn ->
-                       let fv1 = closure.(0) in
-                       ...
-                       let fvk = closure.(k-1) in
-                       body_r) >> }
+      ( body_c,
+        << fun closure p1 ... pn ->
+             let fv1 = closure.(0) in
+             ...
+             let fvk = closure.(k-1) in
+             body_r >> )
     ]}
 
     where [fv1 ... fvk] are the variables captured by the closure, in the order
     of [clo_runtime_env]. [closure] is always an environment created by the
     template's definition (see [eval_template]). *)
-and eval_apply ctx template { clo_template; clo_runtime_env; clo_env } args =
+and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
   let shape =
     Misc.Stdlib.Array.of_list_map
       (fun (_, layout) -> mixed_block_element_of_layout layout)
@@ -1743,22 +1754,19 @@ and eval_apply ctx template { clo_template; clo_runtime_env; clo_env } args =
       | Tupled, _ ->
         Misc.fatal_error "Tupled static functions are not currently supported"
     in
-    let code_fun =
-      (* The middle end doesn't support unboxed parameters or results for code
-         that has no closure, so [@unboxable] is ignored. *)
-      let params =
-        List.map
-          (fun (param : lparam) ->
-            { param with attributes = default_param_attribute })
-          params
-      in
-      lfunction' ~kind:new_kind ~params:(closure_param :: params) ~return
-        ~body:closed_body
-        ~attr:{ attr with unbox_return = None }
-        ~loc ~mode:alloc_heap ~ret_mode
-      |> lfunction_with_yielding yielding
+    (* The middle end doesn't support unboxed parameters or results for code
+       that has no closure, so [@unboxable] is ignored. *)
+    let params =
+      List.map
+        (fun (param : lparam) ->
+          { param with attributes = default_param_attribute })
+        params
     in
-    Lcode { code_template = template; code_fun }
+    lfunction' ~kind:new_kind ~params:(closure_param :: params) ~return
+      ~body:closed_body
+      ~attr:{ attr with unbox_return = None }
+      ~loc ~mode:alloc_heap ~ret_mode
+    |> lfunction_with_yielding yielding
   in
   match clo_template with
   | Kind { ktmpl_params; ktmpl_body = old_func } ->
@@ -1778,7 +1786,7 @@ and eval_apply ctx template { clo_template; clo_runtime_env; clo_env } args =
         Misc.fatal_error "Layout poly kind function should be fully applied."
     in
     let new_func = eval_lfunction ctx env old_func in
-    dynamic (build_function new_func)
+    Or_missing.Missing, build_function new_func
   | Value
       { kind;
         params = old_params;
@@ -1813,7 +1821,7 @@ and eval_apply ctx template { clo_template; clo_runtime_env; clo_env } args =
         ~attr ~loc ~mode ~ret_mode
       |> lfunction_with_yielding yielding
     in
-    { slv_comptime = body_c; slv_runtime = build_function new_func }
+    body_c, build_function new_func
 
 let eval ~cu_static_data template_lam =
   Profile.record_call "static_eval" (fun () ->
@@ -1825,8 +1833,7 @@ let eval ~cu_static_data template_lam =
         (* All instantiations are closed code (they were closure converted)
            so they can be pulled to the top. *)
         List.fold_left
-          (fun lam (id, def) ->
-            Llet (Strict, layout_function, id, debug_uid_none, def, lam))
+          (fun lam code -> Lcode (code, lam))
           slv_runtime (Ctx.instantiations ctx)
       in
       (try assert_no_splices lambda

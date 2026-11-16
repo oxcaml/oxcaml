@@ -697,7 +697,7 @@ let declare_binding ctx (var, def) =
 let rec choice ctx t =
   let rec choice ctx ~tail ~region_depth t =
     match t with
-    | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lcode _ | Lsend _
+    | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lsend _
       | Lassign _ | Lfor _ | Lwhile _) ->
         let t = traverse ctx t in
         Choice.lambda t
@@ -743,6 +743,12 @@ let rec choice ctx t =
         in
         let+ body = choice ctx ~tail ~region_depth body in
         Lletrec(bindings, body)
+    | Lcode (code, body) ->
+        let code =
+          { code with code_fun = traverse_lfunction ctx code.code_fun }
+        in
+        let+ body = choice ctx ~tail ~region_depth body in
+        Lcode (code, body)
     | Lswitch (l1, sw, loc, kind) ->
         (* decompose *)
         let consts_lhs, consts_rhs = List.split sw.sw_consts in

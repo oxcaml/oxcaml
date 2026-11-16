@@ -280,8 +280,9 @@ let compute_static_size lam =
       assert false
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
-    | Ltemplate _ | Lkindinstantiate _ | Linstantiate  _ | Lcode _ ->
-      dynamic_size lam
+    | Ltemplate _ | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
+    | Lcode (_, body) ->
+      compute_expression_size env body
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))

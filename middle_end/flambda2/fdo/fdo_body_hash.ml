@@ -174,7 +174,7 @@ let bool_node b = H.node ~tag:(if b then Tag.true_ else Tag.false_) []
    [Lstaticraise] as an index as opposed to a flaky [Static_label.t] *)
 let rec lambda handlers (lam : L.lambda) =
   match lam with
-  | Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lcode _ -> None
+  | Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ -> None
   | Lapply
       { ap_func;
         ap_args;
@@ -221,6 +221,7 @@ let rec lambda handlers (lam : L.lambda) =
   | Llet (_, _, _, _, arg, body) | Lmutlet (_, _, _, arg, body) ->
     node ~tag:Tag.let_ [lambda handlers arg; lambda handlers body]
   | Lletrec (_bindings, body) -> lambda handlers body
+  | Lcode (_code, body) -> lambda handlers body
   | Lsequence (first, second) ->
     node ~tag:Tag.sequence [lambda handlers first; lambda handlers second]
   | Lstaticraise (label, args) ->
