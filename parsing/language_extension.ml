@@ -143,7 +143,7 @@ module Exist_pair = struct
     | Pair (Let_mutable, ()) -> Some Stable
     | Pair (Layout_poly, m) -> Some m
     | Pair (Runtime_metaprogramming, ()) -> Some Beta
-    | Pair (Omnidirectionality, _scheduler_policy) -> Some Alpha
+    | Pair (Omnidirectionality, _scheduler_policy) -> None
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
 
