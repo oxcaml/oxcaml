@@ -422,7 +422,7 @@ let place_lifted_constants uacc ~lifted_constants_from_defining_expr
   let body, uacc = put_bindings_around_body uacc ~body in
   place_constants uacc ~around:body lifted_constants_from_defining_expr
 
-let preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms =
+let add_orphaned_fdo_counters_of_collapsed_switch uacc ~fdo_region arms =
   match fdo_region with
   | None -> uacc
   | Some region ->
@@ -436,10 +436,10 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms ~fdo_region =
   else
     let change_to_apply_cont action =
       (* The arms' edges become a single jump, which runs every time: their
-         counters are preserved in the region (imprecisely, see
+         counters are orphaned and go to the region (imprecisely, see
          [Fdo_region_counters]). *)
       let uacc =
-        preserve_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
+        add_orphaned_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
       in
       let uacc =
         UA.add_free_names uacc (Apply_cont.free_names action)

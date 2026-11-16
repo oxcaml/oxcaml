@@ -156,8 +156,8 @@ let entry_annotation t ~specialization_map code_id entry_annotation =
    better solution. *)
 
 (* CR yusumez: An exception handler entered by a call that raises has no edge
-   for its preserved counters (a local raise continues into it like a jump).
-   We'd need to have annotations on exceptional edges for that. *)
+   for its orphaned counters (a local raise continues into it like a jump). We'd
+   need to have annotations on exceptional edges for that. *)
 
 (* CR-someday yusumez: Simplifying a copy again doesn't rename the counters of
    the sets of closures in its body, which the previous run renamed. But a

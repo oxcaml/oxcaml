@@ -82,9 +82,9 @@ val create_switch :
   fdo_region:Fdo_region_counters.Region.t option ->
   Rebuilt_expr.t * Upwards_acc.t
 
-(** Preserve the FDO counters of the given switch arms in the region (see
-    [Fdo_region_counters]), for a switch that collapses into a single jump. *)
-val preserve_fdo_counters_of_collapsed_switch :
+(** Given a switch that collapses into a single jump, add its orphaned FDO
+    counters to [fdo_region]. *)
+val add_orphaned_fdo_counters_of_collapsed_switch :
   Upwards_acc.t ->
   fdo_region:Fdo_region_counters.Region.t option ->
   Switch_arm.t Target_ocaml_int.Map.t ->

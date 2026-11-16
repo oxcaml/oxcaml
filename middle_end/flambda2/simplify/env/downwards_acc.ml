@@ -133,7 +133,7 @@ let map_fdo_region_counters t ~f =
   | Some region ->
     { t with fdo_region_counters = f t.fdo_region_counters region }
 
-let preserve_fdo_counters t counters =
+let add_orphaned_fdo_counters t counters =
   map_fdo_region_counters t ~f:(fun region_counters region ->
       Fdo_region_counters.add_counters region_counters region counters)
 

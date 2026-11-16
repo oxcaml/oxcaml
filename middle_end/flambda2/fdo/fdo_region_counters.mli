@@ -26,8 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** An [Fdo_region_counters.t] keeps track of FDO counters whose instruction
-    Simplify removes while the code they count stays. This includes:
+(** An [Fdo_region_counters.t] keeps track of orphaned FDO counters: those whose
+    instruction Simplify removes while the code they count stays. This includes:
 
     * The entry counters of the callee of an inlined call
 
@@ -36,8 +36,8 @@
     * The counters of the arms of a switch that collapses into a single jump.
 
     A [Region.t] is a stretch of straight-line control flow: a function body or
-    a continuation handler, up to its terminator. The counters described above
-    are preserved by attaching them to the edges into its [Region.t].
+    a continuation handler, up to its terminator. Orphaned counters are attached
+    to the edges into their [Region.t].
 
     The counters are recorded during the downward traversal and when rebuilding.
     They are read when rebuilding a switch arm, before its target can change,
@@ -57,7 +57,7 @@ type t
 
 val empty : t
 
-(** The given counters are preserved in [region]. *)
+(** The given counters are orphaned in [region]. *)
 val add_counters : t -> Region.t -> Fdo_annotation.t -> t
 
 (** [region] continues into the handler of [cont], by the use [use_id] (for

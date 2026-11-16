@@ -46,7 +46,7 @@ let[@inline never] raised x =
   try if x > 0 then raise Exit else 0 with Exit -> choose true x
 
 (* An arm into code that is left with just a jump goes straight to the jump's
-   target, but keeps the counters preserved in that code. *)
+   target, but keeps the counters orphaned in that code. *)
 let[@inline always] pure b x = if b then x else x + 1
 
 let[@inline never] absorbed c y =
