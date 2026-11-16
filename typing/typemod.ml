@@ -4428,6 +4428,9 @@ let type_toplevel_phrase env sig_acc s =
   Typecore.optimise_allocations ();
   (str, sg, to_remove_from_sg, shape, env)
 
+let type_toplevel_phrase env sig_acc s =
+  Scheduler.Monitor.root (fun () -> type_toplevel_phrase env sig_acc s)
+
 let type_module_alias env smod =
   type_module_maybe_hold_locks ~alias:true ~hold_locks:true ~strengthen:true
     ~funct_body:false None env smod
@@ -4979,6 +4982,10 @@ let type_implementation target modulename initial_env ast =
           save_cmt_and_cms target annots initial_env None None)
       )
 
+let type_implementation target modulename initial_env ast =
+  Scheduler.Monitor.root (fun () ->
+    type_implementation target modulename initial_env ast)
+
 let save_signature target modname tsg initial_env cmi =
   let decl_deps =
     (* This is cleared after saving the cmt so we have to save is before *)
@@ -5036,6 +5043,9 @@ let type_interface target modulename env ast =
             sg.sig_type arg_type
           : Typedtree.argument_interface option);
   sg
+
+let type_interface target modulename env ast =
+  Scheduler.Monitor.root (fun () -> type_interface target modulename env ast)
 
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)

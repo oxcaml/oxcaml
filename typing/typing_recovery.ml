@@ -41,6 +41,29 @@ let log_and_raise exn =
   log_or_raise exn;
   raise exn
 
+(* The error context current at a [monitor] call, captured so that a delayed
+   job's error is logged where the job was registered, not where it runs. *)
+type context =
+  { errors : (exn list ref * unit RawTypeHash.t) option;
+    has_errors : bool ref
+  }
+
+let current_context () =
+  { errors = !ref_errors; has_errors = !ref_monitor_errors }
+
+let log_in ctx exn =
+  ctx.has_errors := true;
+  match ctx.errors with Some (l, _) -> l := exn :: !l | None -> ()
+
+let monitor body ~with_ =
+  let ctx = current_context () in
+  Scheduler.Monitor.try_ body ~with_:(fun e ->
+      match with_ e with
+      | Some exn ->
+          log_in ctx exn;
+          exn
+      | None -> e)
+
 let catch_errors caught f =
   let e = !ref_errors in
   ref_errors := Some (caught, RawTypeHash.create 3);
