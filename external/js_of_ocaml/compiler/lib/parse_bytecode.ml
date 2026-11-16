@@ -3714,6 +3714,14 @@ let restore_source_paths (program : Code.program) =
       in
       { program with blocks }
 
+let register_externals (program : Code.program) =
+  Addr.Map.iter
+    (fun _ block ->
+      List.iter block.body ~f:(function
+        | Let (_, Prim (Extern (name, _), _)) -> Primitive.add_external name
+        | Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _ | Event _ -> ()))
+    program.blocks
+
 let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic =
   let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
   (match Magic_number.kind magic with
@@ -3742,6 +3750,7 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
   Code.Var.set_last last_var;
   List.iter var_names ~f:(fun (var, name) -> Code.Variable_name.set var name);
   let program = restore_source_paths (Code.Marshalable_program.to_program program) in
+  register_externals program;
   let program =
     if whole_program
     then Code.prepend program (register_predefined_exceptions ())
