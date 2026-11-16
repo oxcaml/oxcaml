@@ -461,9 +461,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let stub = Code.stub code in
       let fdo_entry_annotation =
         let annotation = Code.fdo_entry_annotation code in
-        if
-          Flambda_features.fdo_counters ()
-          && not (Fdo_annotation.With_body_hash.is_empty annotation)
+        if Flambda_features.fexpr_print_fdo_counters ()
         then Some annotation
         else None
       in
@@ -718,7 +716,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let inlining_state = inlining_state (Apply_expr.inlining_state app) in
   let callsite_counter =
-    if Flambda_features.fdo_counters ()
+    if Flambda_features.fexpr_print_fdo_counters ()
     then Apply_expr.callsite_counter app
     else None
   in
@@ -770,7 +768,11 @@ and switch_expr env switch : Fexpr.expr =
           |> Targetint_32_64.to_int
         in
         let action = Fexpr.Named_cont (apply_cont env app_cont) in
-        let annotations = Switch_arm.annotations arm in
+        let annotations =
+          if Flambda_features.fexpr_print_branch_annotations ()
+          then Switch_arm.annotations arm
+          else Branch_annotations.default
+        in
         ({ tag; action; annotations } : Fexpr.switch_case))
       (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
   in

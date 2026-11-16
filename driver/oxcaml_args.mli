@@ -216,6 +216,8 @@ module type Oxcaml_options = sig
   val dfexpr_after : string -> unit
   val dfexpr_annot : unit -> unit
   val dfexpr_annot_after : string -> unit
+  val fexpr_print_branch_annotations : unit -> unit
+  val fexpr_print_fdo_counters : unit -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit

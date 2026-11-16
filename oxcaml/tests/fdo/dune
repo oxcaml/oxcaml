@@ -50,6 +50,7 @@
     %{bin:ocamlopt.opt}
     -c
     -fdo-counters
+    -fexpr-print-fdo-counters
     -dfexpr-annot-after
     raw
     -color
@@ -59,6 +60,7 @@
     %{bin:ocamlopt.opt}
     -c
     -fdo-counters
+    -fexpr-print-fdo-counters
     -dfexpr-annot-after
     raw
     -color
@@ -97,6 +99,7 @@
     %{bin:ocamlopt.opt}
     -c
     -fdo-counters
+    -fexpr-print-fdo-counters
     -dfexpr-annot-after
     raw
     -color
@@ -106,6 +109,7 @@
     %{bin:ocamlopt.opt}
     -c
     -fdo-counters
+    -fexpr-print-fdo-counters
     -dfexpr-annot-after
     raw
     -color

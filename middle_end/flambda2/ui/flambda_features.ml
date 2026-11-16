@@ -181,6 +181,12 @@ let dump_fexpr_annot () = !Oxcaml_flags.Flambda2.Dump.fexpr_annot
 
 let dump_fexpr_annot_after () = !Oxcaml_flags.Flambda2.Dump.fexpr_annot_after
 
+let fexpr_print_branch_annotations () =
+  !Oxcaml_flags.Flambda2.Dump.fexpr_print_branch_annotations
+
+let fexpr_print_fdo_counters () =
+  !Oxcaml_flags.Flambda2.Dump.fexpr_print_fdo_counters
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string

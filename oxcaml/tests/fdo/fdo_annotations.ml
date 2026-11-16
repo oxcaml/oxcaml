@@ -1,6 +1,7 @@
 (* Extracts the FDO annotations from fexpr dumps (as written with [-fdo-counters
-   -dfexpr-annot-after raw]), so that tests can check the counters without
-   depending on the rest of the dump.
+   -fexpr-print-fdo-counters -fexpr-print-branch-annotations -dfexpr-annot-after
+   raw]), so that tests can check the counters without depending on the rest of
+   the dump.
 
    - [list <dump>] prints every annotation of the dump, in order.
 
