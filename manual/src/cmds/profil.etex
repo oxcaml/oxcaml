@@ -180,13 +180,9 @@ Of these options, frame pointers are recommended for profiling OCaml code. It ha
 
 The process for compiling an executable for time profiling depends on the OCaml version. For OCaml versions 4.14 and earlier, either frame pointers or DWARF can be used, while for OCaml 5.0 and later, enabling frame pointers is recommended.
 
-To enable frame pointers, configure the compiler with \texttt{--enable-frame-pointers}. Alternatively, you can install an opam switch with frame pointers enabled, as follows:
+To enable frame pointers, pass the \texttt{-frame-pointers} flag to \texttt{ocamlopt} for every compilation and for the final link (with an existing build system, set \texttt{OCAMLPARAM="_,frame-pointers=1"} in the environment, which reaches both). By default a compiler installation ships both the frame-pointer and the non-frame-pointer variants of the runtime and libraries (\texttt{ocamlopt -config-var codegen\_variants} lists the variants it has besides its default), so no separate compiler build or opam switch is needed; an installation configured with \texttt{--disable-codegen-variants} serves its default only. Configuring the compiler with \texttt{--enable-frame-pointers} only selects which variant is the default.
 
-\begin{verbatim}
-        opam switch create <YOUR-SWITCH-NAME-HERE> ocaml-option-fp
-\end{verbatim}
-
-Frame pointer support for OCaml is available on AMD64 architecture for Linux starting with OCaml 4.12 and on macOS from OCaml 5.3. ARM64 architecture is supported on Linux and macOS from OCaml 5.4, while other Tier-1 architectures (POWER, RISC-V, and s390x) are currently unsupported.
+In OxCaml, frame pointer support is available on the AMD64 (x86-64) architecture on Linux and macOS; other architectures are currently unsupported.
 
 \subsection{s:ocamlprof-profiling-perf}{Profiling an Execution}
 
