@@ -2,8 +2,9 @@
    -dfexpr-annot-after raw]), so that tests can check the counters without
    depending on the rest of the dump.
 
-   - [list <dump>] prints every annotation of the dump, in order. -
-   [compare-entries <dump a> <dump b>] prints each dump's function entry
+   - [list <dump>] prints every annotation of the dump, in order.
+
+   - [compare-entries <dump a> <dump b>] prints each dump's function entry
    annotations, then those in only one of them. *)
 
 (* CR yusumez: This is done to not dump the entire fexpr. I still find this a
