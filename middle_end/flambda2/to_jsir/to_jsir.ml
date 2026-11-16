@@ -540,10 +540,11 @@ and apply_cont0 ~env ~res apply_cont =
         "Apply_cont to %a, which has sort [Return] but is not the return \
          continuation of the function being translated"
         Continuation.print continuation
-    (* The [Define_root_symbol] continuation is bound by an ordinary [Let_cont]
-       in [Closure_conversion.close_program]: its handler defines the module
-       symbol and then applies the [Toplevel_return] continuation. *)
     | Normal_or_exn | Define_root_symbol -> (
+      (* The [Define_root_symbol] continuation is bound by an ordinary
+         [Let_cont] in [Closure_conversion.close_program]: its handler defines
+         the module symbol and then applies the [Toplevel_return]
+         continuation. *)
       match raise_kind_and_exn_handler with
       | None ->
         let addr = To_jsir_env.get_continuation_exn env continuation in
