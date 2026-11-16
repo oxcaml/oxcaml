@@ -337,26 +337,30 @@ val try_expand_safe_opt: Env.t -> type_expr -> type_expr
 val expand_head_once: Env.t -> type_expr -> type_expr
 val expand_head: Env.t -> type_expr -> type_expr
 
-(** [upon_shape env ty ~run ~default] adds [run shape] to {!scheduler}
-    once [ty]'s head has a shape, or [run (default ())] if it is defaulted
-    first. [run] runs at the levels current when [upon_shape] was called.
-    Depending on the scheduling policy (see {!Scheduler}), [run] may run
+(** [upon_shape env ty ~run ~default] adds [run shape] to {!scheduler} once
+    [ty]'s head has a shape. If instead [ty] is defaulted, [default ()] is
+    added. Both [run] and [default] run at the levels and the monitor (see
+    {!Scheduler.Monitor}) current when [upon_shape] was called. Depending on
+    the scheduling policy (see {!Scheduler}), [run] or [default] may run
     before [upon_shape] returns.
 
     If [-extension omnidirectionality] is enabled, a [Tvar] head becomes a
-    [Tivar], and [run] waits for it to be filled or defaulted. Otherwise, a
-    [Tvar] head is defaulted immediately.
+    [Tivar], and [run] or [default] waits until its ivar is filled or
+    defaulted. Before [default] runs, [ty] is turned back into a [Tvar] if it
+    is still the [Tivar] for that ivar (it may since have been linked to
+    another type, or given a different ivar).
+    If the extension is disabled, a [Tvar] head is defaulted immediately.
 
-    [ty] must not be generic: [run] (and [upon_shape] itself) may mutate it.
+    [ty] must not be generic: [run] or [default] (and [upon_shape] itself) may
+    mutate it.
 
     Safety: [run shape] must give [ty]'s head shape [shape] (e.g. by
-    unification), which fails if a different shape is already there.
-    This is especially important for handling defaults. *)
+    unification), which fails if a different shape is already there. *)
 val upon_shape :
   Env.t ->
   type_expr ->
   run:(type_shape -> unit) ->
-  default:(unit -> type_shape) ->
+  default:(unit -> unit) ->
   unit
 
 val expand_head_opt: Env.t -> type_expr -> type_expr
