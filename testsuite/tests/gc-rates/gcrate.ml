@@ -498,13 +498,15 @@ let report_watch ~test =
     | Some (n, t) -> (!n, !t)
     | None -> (0, 0)
   in
-  let slices, sweep_work = counter_tally RE.EV_C_MAJOR_SLICE_SWEEP_WORK in
+  let _, sweep_work = counter_tally RE.EV_C_MAJOR_SLICE_SWEEP_WORK in
   let _, mark_work = counter_tally RE.EV_C_MAJOR_SLICE_MARK_WORK in
   let _, ephe_mark_work =
     counter_tally RE.EV_C_MAJOR_SLICE_EPHE_MARK_WORK in
   let _, ephe_sweep_work =
     counter_tally RE.EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK in
-  let _, ev_total = counter_tally RE.EV_C_MAJOR_SLICE_WORK_DONE in
+  (* The per-phase counters are only emitted when non-zero, so count
+     slices by the total, which every slice emits. *)
+  let slices, ev_total = counter_tally RE.EV_C_MAJOR_SLICE_WORK_DONE in
   let phase_work = sweep_work + mark_work + ephe_mark_work
                    + ephe_sweep_work in
   (* Both minor counters are emitted in bytes. *)
