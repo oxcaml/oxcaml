@@ -104,6 +104,10 @@ val get_public_method :
     must be linked before this one. *)
 val import_compilation_unit : t -> Compilation_unit.t -> t
 
+(** The name under which a compilation unit registers its module block and its
+    symbols. *)
+val compilation_unit_name : Compilation_unit.t -> string
+
 (** Register [var] as the value of [symbol] in the global symbol table, so that
     other compilation units can fetch it, with an [Event] for [loc] before the
     registration, and record it as an export of the unit. Does nothing for

@@ -493,24 +493,19 @@ and apply_cont0 ~env ~res apply_cont =
   in
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
-    | (Toplevel_return | Define_root_symbol) as sort ->
+    | Toplevel_return ->
       let module_symbol =
         match args with
         | [arg] -> arg
-        | [] ->
-          Misc.fatal_errorf "Found %a with no arguments" Continuation.Sort.print
-            sort
-        | _ :: _ ->
-          Misc.fatal_errorf "Found %a with multiple arguments"
-            Continuation.Sort.print sort
+        | [] | _ :: _ :: _ ->
+          Misc.fatal_errorf
+            "Expected one argument for the toplevel return continuation:@ %a"
+            Apply_cont.print apply_cont
       in
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit
       in
-      let module_name =
-        Compilation_unit.name compilation_unit
-        |> Compilation_unit.Name.to_string
-      in
+      let module_name = To_jsir_result.compilation_unit_name compilation_unit in
       let var = Jsir.Var.fresh () in
       let res =
         To_jsir_result.add_instr_exn res
@@ -545,7 +540,7 @@ and apply_cont0 ~env ~res apply_cont =
         "Apply_cont to %a, which has sort [Return] but is not the return \
          continuation of the function being translated"
         Continuation.print continuation
-    | Normal_or_exn -> (
+    | Normal_or_exn | Define_root_symbol -> (
       match raise_kind_and_exn_handler with
       | None ->
         let addr = To_jsir_env.get_continuation_exn env continuation in
