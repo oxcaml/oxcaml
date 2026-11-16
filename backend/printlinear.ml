@@ -89,7 +89,9 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     call_operation ppf op i.arg
   | Lreloadretaddr -> fprintf ppf "reload retaddr"
   | Lreturn -> fprintf ppf "return %a" regs i.arg
-  | Llabel_for_jump_target lbl -> fprintf ppf "%a:" label lbl
+  | Llabel_for_jump_target { label = lbl; is_loop_header } ->
+    fprintf ppf "%a%s:" label lbl
+      (if is_loop_header then "[loop header]" else "")
   | Llabel_for_dwarf lbl -> fprintf ppf "%a: (DWARF only label)" label lbl
   | Lbranch lbl -> fprintf ppf "goto %a" label lbl
   | Lcondbranch (tst, lbl) ->
