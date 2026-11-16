@@ -568,13 +568,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             CC.close_let acc ccenv [new_id_with_kind] User_visible
               (Simple (Var temp_id)) ~body)
           body new_ids_with_kinds temp_id_unarized acc ccenv)
-  | Llet
-      ( (Strict | Alias | StrictOpt),
-        _,
-        fun_id,
-        duid,
-        (Lfunction func | Lcode { code_fun = func; _ }),
-        body ) ->
+  | Llet ((Strict | Alias | StrictOpt), _, fun_id, duid, Lfunction func, body)
+  | Lcode
+      ({ code_name = fun_id; code_debug_uid = duid; code_fun = func; _ }, body)
+    ->
     (* This case is here to get function names right. *)
     (* CR layout poly: compile the code of instantiations ([Lcode]) without
        closures. *)
@@ -1212,9 +1209,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _
-  | Lcode _ ->
-    (* [Lcode] is only allowed as the definition of an [Llet]. *)
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :

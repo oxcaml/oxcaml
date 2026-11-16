@@ -1088,9 +1088,9 @@ type lambda =
   | Ltemplate of lfunction
   (* [Linstantiate] should only exist in the tlambda stage. *)
   | Linstantiate of lambda_apply
-  (* [Lcode] should only exist after slambda evaluation, as the definition of
-     an [Llet] at the top of the unit. *)
-  | Lcode of lcode
+  (* [Lcode] should only exist after slambda evaluation, at the top of the
+     unit. *)
+  | Lcode of lcode * lambda
 
 and rec_binding = {
   id : Ident.t;
@@ -1119,12 +1119,15 @@ and lfunction = private
         conservatively default to [May_yield]. *)
   }
 
-(** The code of an instantiation of a template, created by slambda evaluation.
-    It has no free variables: the template's environment is its first
-    parameter. The bound identifier may only occur as the function of an
-    [Lapply]. *)
+(** [Lcode (code, body)] binds [code_name] in [body] to the code of an
+    instantiation of a template, created by slambda evaluation. The code has no
+    closure: the template's environment is its first parameter, and its only
+    free variables are the names of other instantiations' code. Those names may
+    only occur as the function of an [Lapply]. *)
 and lcode =
-  { code_template : Template_id.t;
+  { code_name : Ident.t;
+    code_debug_uid : debug_uid;
+    code_template : Template_id.t;
     code_fun : lfunction
   }
 

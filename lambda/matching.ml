@@ -4765,6 +4765,7 @@ let rec map_return f = function
   | Lmutlet (k, id, duid, l1, l2) ->
     Lmutlet (k, id, duid, l1, map_return f l2)
   | Lletrec (l1, l2) -> Lletrec (l1, map_return f l2)
+  | Lcode (code, l) -> Lcode (code, map_return f l)
   | Lifthenelse (lcond, lthen, lelse, k) ->
       Lifthenelse (lcond, map_return f lthen, map_return f lelse, k)
   | Lsequence (l1, l2) -> Lsequence (l1, map_return f l2)
@@ -4794,7 +4795,7 @@ let rec map_return f = function
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
     | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lkindtemplate _
-    | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ | Lcode _ )
+    | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ )
     as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
