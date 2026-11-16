@@ -106,8 +106,9 @@ let[@inline always] classify limit x =
 
 (* Inlining a functor application copies the functions of its body: the copies
    get the call site as copy context, so that their counters are not conflated
-   with the original's. [Make] is applied through [Outer], so that the copies
-   are made through two inlinings. *)
+   with the original's. [Make] is applied through [Outer]: nothing is known
+   about [C] there, so [Outer] keeps the original [count], which is copied when
+   [Outer] is applied. *)
 module Make (C : Config) = struct
   let[@inline never] count a =
     match classify C.limit a with 0 -> side a | 1 -> a | _ -> side (a + 1)
@@ -127,6 +128,35 @@ end)
 
 module High = Outer (struct
   let limit = 30
+end)
+
+(* A copy of a copy: [Make2] is applied inside [Twice] to a config that is
+   partly known, so the copy made there is improved and kept. Applying [Twice]
+   copies it again, and its counters get both copy contexts. *)
+module type Config2 = sig
+  val limit : int
+
+  val step : int
+end
+
+module Make2 (C : Config2) = struct
+  let[@inline never] count a = if a < C.limit then side (a + C.step) else a
+end
+[@@inline always]
+
+module Twice (C : Config) = struct
+  module Inner = Make2 (struct
+    let limit = 5
+
+    let step = C.limit
+  end)
+
+  let[@inline never] run a = Inner.count a
+end
+[@@inline always]
+
+module T = Twice (struct
+  let limit = 1
 end)
 
 (* A call that is inlined only in a copy (where [X.g] is known): the counters of

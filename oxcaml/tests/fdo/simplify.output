@@ -99,6 +99,24 @@ simplify.simplify.fl:
   call: "Simplify.Make.count":0@("Simplify":0:module("Simplify.High":0):0:call):e41f8e18:2:call
   entry: "Simplify.Outer.run":0@("Simplify":0:module("Simplify.High":0):0:call) body_hash:3371523c
   call: "Simplify.Outer.run":0@("Simplify":0:module("Simplify.High":0):0:call):3371523c:0:call
+  entry: "Simplify.Make2.count":0 body_hash:6fcbb642
+  branch: "Simplify.Make2.count":0:6fcbb642:0:branch(1)
+  branch: "Simplify.Make2.count":0:6fcbb642:0:branch(2)
+  call: "Simplify.Make2.count":0:6fcbb642:1:call
+  entry: "Simplify.Make2":0 body_hash:00000000
+  entry: "Simplify.Make2.count":0@("Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call) body_hash:6fcbb642
+  branch: "Simplify.Make2.count":0@("Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call):6fcbb642:0:branch(1)
+  branch: "Simplify.Make2.count":0@("Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call):6fcbb642:0:branch(2)
+  call: "Simplify.Make2.count":0@("Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call):6fcbb642:1:call
+  entry: "Simplify.Twice.run":0 body_hash:3371523c
+  call: "Simplify.Twice.run":0:3371523c:0:call
+  entry: "Simplify.Twice":0 "Simplify.Make2":0 <- "Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call body_hash:33a16f6f
+  entry: "Simplify.Make2.count":0@("Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call)@("Simplify":0:module("Simplify.T":0):0:call) body_hash:6fcbb642
+  branch: "Simplify.Make2.count":0@("Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call)@("Simplify":0:module("Simplify.T":0):0:call):6fcbb642:0:branch(1)
+  branch: "Simplify.Make2.count":0@("Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call)@("Simplify":0:module("Simplify.T":0):0:call):6fcbb642:0:branch(2)
+  call: "Simplify.Make2.count":0@("Simplify.Twice":0:module("Simplify.Twice.Inner":0):0:call)@("Simplify":0:module("Simplify.T":0):0:call):6fcbb642:1:call
+  entry: "Simplify.Twice.run":0@("Simplify":0:module("Simplify.T":0):0:call) body_hash:3371523c
+  call: "Simplify.Twice.run":0@("Simplify":0:module("Simplify.T":0):0:call):3371523c:0:call
   entry: "Simplify.Wrap.f":0 body_hash:915a3e01
   call: "Simplify.Wrap.f":0:915a3e01:0:call
   entry: "Simplify.Wrap":0 body_hash:00000000
