@@ -28,8 +28,18 @@
 
 type t =
   { current : Fdo_annotation.t;
+        (* Loose counters in the current region, to be attached onto incoming
+           edges. *)
     enclosing : Fdo_annotation.t list;
+        (* The counters of the enclosing regions as a stack (head is
+           innermost). *)
     handlers : Fdo_annotation.t Continuation.Map.t
+        (* Counters into a continuation handler. When a handler is translated,
+           this is populated with the counters loose in that handler via
+           [leave_handler]. Later, if another region jumps into a handler, its
+           region also takes over the region counters of the handler. This
+           relies on the handler being translated before the jump (see CR
+           below). *)
   }
 
 let empty =
@@ -66,3 +76,11 @@ let jump_to_handler t k =
   match Continuation.Map.find_opt k t.handlers with
   | None -> t
   | Some counters -> add_counters t counters
+
+(* CR yusumez: In line with the behaviour in Simplify (see the CRs in
+   [Fdo_region_counters]), the following counters are dropped for now:
+
+   * Counters on a jump that gets translated before its destination handler
+   (like loop back edges)
+
+   * Counters into an exception handler entered by a call that raises *)

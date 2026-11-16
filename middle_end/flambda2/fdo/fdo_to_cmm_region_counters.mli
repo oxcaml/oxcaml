@@ -26,22 +26,12 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** FDO counters that lose their edges in the translation to Cmm, e.g. those of
-    the arms of a switch that becomes a table lookup. As in Simplify (see
-    [Fdo_region_counters]), they are attached instead to the edges into their
-    region: the stretch of straight-line code they are in, which starts at a
-    function entry, a switch arm or a continuation handler.
-
-    The translation is done downwards, so regions are entered and left as they
-    are translated. A region that jumps to a handler continues into it, and gets
-    its counters. *)
-
-(* CR yusumez: The jumps translated before their handler, such as the back edges
-   of a loop, miss the counters of the handler, as in Simplify. *)
-
-(* CR yusumez: An exception handler is also entered by the calls that raise in
-   its scope, which have no edge for its counters, as in Simplify. A raise to a
-   handler of the same function is a jump to it. *)
+(** The analogue of [Fdo_region_counters] for the translation to Cmm. Counters
+    that lose the edges they're attached to (which we call "loose" counters) are
+    instead attached to the edges into their "region" (a straight-line code
+    segment). A region is started by a function entry, a switch arm or a
+    continuation handler. The translation is done downwards, so regions are
+    entered and left as they are translated. *)
 
 type t
 
@@ -51,20 +41,18 @@ val empty : t
 (** Start translating a region inside the current one. *)
 val enter_region : t -> t
 
-(** The counters to attach to the edges into the current region. *)
+(** The loose counters to attach to the edges into the current region. *)
 val region_counters : t -> Fdo_annotation.t
 
-(** Go back to the enclosing region, forgetting the counters of the current one.
-*)
+(** Go back to the enclosing region and drop the current region's loose
+    counters. *)
 val leave_region : t -> t
 
-(** [leave_region], keeping the counters of the current region, the handler of
-    the given continuation, for the jumps to it. *)
+(** [leave_region] when the region is a continuation handler. *)
 val leave_handler : t -> Continuation.t -> t
 
-(** The given counters lost their edges in the current region. *)
+(** Add loose counters to the current region. *)
 val add_counters : t -> Fdo_annotation.t -> t
 
-(** The current region jumps to the handler of the given continuation, or raises
-    to it. *)
+(** The current region jumps/raises to the handler of the given continuation. *)
 val jump_to_handler : t -> Continuation.t -> t
