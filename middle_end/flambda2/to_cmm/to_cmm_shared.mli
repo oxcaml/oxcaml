@@ -64,11 +64,7 @@ val nativeint_of_targetint : Targetint_32_64.t -> Nativeint.t
 
 (** This does not inline effectful expressions. *)
 val name :
-  dbg:Debuginfo.t ->
-  To_cmm_env.t ->
-  To_cmm_result.t ->
-  Name.t ->
-  To_cmm_env.translation_result
+  To_cmm_env.t -> To_cmm_result.t -> Name.t -> To_cmm_env.translation_result
 
 val const : dbg:Debuginfo.t -> Reg_width_const.t -> Cmm.expression
 
