@@ -6868,53 +6868,122 @@ let () =
   Defined_later.Fun.define_exn Ikind.upon_shape_later upon_shape;
   Defined_later.Fun.define_exn Ikind.scheduler_later scheduler
 
-let cross_left env ?modalities ty mode =
-  let crossing = crossing_of_ty env ?modalities ty in
-  mode |> With_regionality.disallow_right |> Crossing.apply_left crossing
+let upon_crossing env ?modalities ty ~cross ~later =
+  if Language_extension.is_enabled Omnidirectionality && !Clflags.ikinds
+  then
+    Ikind.upon_crossing_of_type env ty
+      ~cross:(fun crossing ->
+        cross
+          (match modalities with
+          | None -> crossing
+          | Some m -> Crossing.modality m crossing))
+      ~later
+  else cross (crossing_of_ty env ?modalities ty)
 
-let cross_right env ?modalities ty mode =
-  let crossing = crossing_of_ty env ?modalities ty in
-  mode |> With_regionality.disallow_left |> Crossing.apply_right crossing
+exception Crossing_failed of Mode.With_regionality.error
+exception Crossing_failed_with_locality of Mode.With_locality.error
 
-let cross_left_with_locality env ?modalities ty mode =
-  let crossing = crossing_of_ty env ?modalities ty in
-  mode
-  |> With_locality.disallow_right
-  |> Crossing.apply_left_with_locality crossing
+(* Mode crossing, shared between [With_regionality] and [With_locality]. *)
+module Cross (M : sig
+  type 'd t constraint 'd = 'l * 'r
 
-let cross_right_with_locality env ?modalities ty mode =
-  let crossing = crossing_of_ty env ?modalities ty in
-  mode
-  |> With_locality.disallow_left
-  |> Crossing.apply_right_with_locality crossing
+  type error
+
+  val newvar : int -> ('l * 'r) t
+
+  val disallow_left : ('l * 'r) t -> (disallowed * 'r) t
+
+  val disallow_right : ('l * 'r) t -> ('l * disallowed) t
+
+  val submode :
+    ?pp:Mode_hint.pinpoint ->
+    (allowed * 'r) t ->
+    ('l * allowed) t ->
+    (unit, error) result
+
+  val crossing_failed : error -> exn
+end) = struct
+  (* Runs from a delayed handler, so it cannot return an error to the caller of
+     [left] or [right]: it raises, and the monitor current at that call
+     converts the exception (see [cross_right] in the mli). *)
+  let check ?pp mode expected_mode =
+    match M.submode ?pp mode expected_mode with
+    | Ok () -> ()
+    | Error e -> raise (M.crossing_failed e)
+
+  (* If the crossing is delayed, return a fresh [mode'] and check
+     [apply crossing mode <= mode'] once the crossing is known. *)
+  let left ~apply env ?modalities ?pp ty mode =
+    let mode = M.disallow_right mode in
+    upon_crossing env ?modalities ty
+      ~cross:(fun crossing -> apply crossing mode)
+      ~later:(fun () ->
+        let mode' = M.newvar (get_current_level ()) in
+        ( M.disallow_right mode',
+          ~run:(fun crossed -> check ?pp crossed mode') ))
+
+  (* If the crossing is delayed, return a fresh [mode'] and check
+     [mode' <= apply crossing mode] once the crossing is known. *)
+  let right ~apply env ?modalities ?pp ty mode =
+    let mode = M.disallow_left mode in
+    upon_crossing env ?modalities ty
+      ~cross:(fun crossing -> apply crossing mode)
+      ~later:(fun () ->
+        let mode' = M.newvar (get_current_level ()) in
+        ( M.disallow_left mode',
+          ~run:(fun crossed -> check ?pp mode' crossed) ))
+end
+
+module Cross_with_regionality = Cross (struct
+  include With_regionality
+
+  let crossing_failed e = Crossing_failed e
+end)
+
+module Cross_with_locality = Cross (struct
+  include With_locality
+
+  let crossing_failed e = Crossing_failed_with_locality e
+end)
+
+let cross_left env ?modalities ?pp ty mode =
+  Cross_with_regionality.left ~apply:Crossing.apply_left
+    env ?modalities ?pp ty mode
+
+let cross_right env ?modalities ?pp ty mode =
+  Cross_with_regionality.right ~apply:Crossing.apply_right
+    env ?modalities ?pp ty mode
+
+let cross_left_with_locality env ?modalities ?pp ty mode =
+  Cross_with_locality.left ~apply:Crossing.apply_left_with_locality
+    env ?modalities ?pp ty mode
+
+let cross_right_with_locality env ?modalities ?pp ty mode =
+  Cross_with_locality.right ~apply:Crossing.apply_right_with_locality
+    env ?modalities ?pp ty mode
 
 (* The locality axis of the return mode of an arrow cannot cross modes,
    because a local-returning function might allocate in the caller's region,
    and this info must be preserved. The [_ret] variants below cross modes on
    all axes except locality and are to be used on return modes. *)
 
-let cross_left_with_locality_ret env ?modalities ty mode =
-  let mode' = cross_left_with_locality env ?modalities ty mode in
-  With_locality.join
-    [mode';
-     With_locality.min_with_comonadic
-       Areality
-       (With_locality.proj_comonadic Areality mode)]
+let cross_left_with_locality_ret env ?modalities ?pp ty mode =
+  Cross_with_locality.left
+    ~apply:(fun crossing mode ->
+      With_locality.join
+        [ Crossing.apply_left_with_locality crossing mode;
+          With_locality.min_with_comonadic Areality
+            (With_locality.proj_comonadic Areality mode) ])
+    env ?modalities ?pp ty mode
 
-let cross_right_with_locality_ret env ?modalities ty mode =
-  let mode' = cross_right_with_locality env ?modalities ty mode in
-  With_locality.meet
-    [mode';
-     With_locality.max_with_comonadic
-       Areality
-       (With_locality.proj_comonadic Areality mode)]
-
-let submode_with_cross env ~is_ret ty l r =
-  let r' =
-    if is_ret then cross_right_with_locality_ret env ty r
-    else cross_right_with_locality env ty r
-  in
-  With_locality.submode l r'
+let cross_right_with_locality_ret env ?modalities ?pp ty mode =
+  Cross_with_locality.right
+    ~apply:(fun crossing mode ->
+      With_locality.meet
+        [ Crossing.apply_right_with_locality crossing mode;
+          With_locality.max_with_comonadic Areality
+            (With_locality.proj_comonadic Areality mode) ])
+    env ?modalities ?pp ty mode
 
 let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
   let tighten () =
@@ -6925,22 +6994,37 @@ let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
       With_locality.Guts.zap_towards_ceil_of a1 ~towards:a2 |> ignore
     | Invariant | Bivariant -> ()
   in
-  match
-    match v with
-    | Invariant ->
-        Result.bind (submode_with_cross env ~is_ret ty a1 a2)
-          (fun _ -> submode_with_cross env ~is_ret ty a2 a1)
-    | Covariant -> submode_with_cross env ~is_ret ty a1 a2
-    | Contravariant -> submode_with_cross env ~is_ret ty a2 a1
-    | Bivariant -> Ok ()
-  with
-  | Ok () -> ()
-  | Error e ->
+  let mismatch e =
     tighten ();
     let pos : Errortrace.arrow_position =
       if is_ret then Return else Argument
     in
-    raise_for Moregen (Mode_mismatch (pos, e))
+    Moregen_trace [Mode_mismatch (pos, e)]
+  in
+  let submode_with_cross l r =
+    let r' =
+      if is_ret then cross_right_with_locality_ret env ty r
+      else cross_right_with_locality env ty r
+    in
+    With_locality.submode l r'
+  in
+  match
+    (* A monitor frame, so that a delayed crossing fails as if here. *)
+    Scheduler.Monitor.try_
+      (fun () ->
+        match v with
+        | Invariant ->
+            Result.bind (submode_with_cross a1 a2)
+              (fun _ -> submode_with_cross a2 a1)
+        | Covariant -> submode_with_cross a1 a2
+        | Contravariant -> submode_with_cross a2 a1
+        | Bivariant -> Ok ())
+      ~with_:(function
+        | Crossing_failed_with_locality e -> mismatch e
+        | e -> e)
+  with
+  | Ok () -> ()
+  | Error e -> raise (mismatch e)
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
@@ -8369,8 +8453,26 @@ and build_subtype_tuple env visited loops posi level t labeled_tlist
 
 let enlarge_type env ty =
   warn := false;
+  (* A mode crossing delayed by [build_subtype] fails once [ty'] has been
+     unified with the type it is meant to accept, so report that type as not
+     being a subtype of [ty]. [build_subtype] does not fill ivars, so the
+     handler below only runs after [ty'] is assigned to [enlarged]. *)
+  let enlarged = ref ty in
   (* [level = 4] allows 2 expansions involving objects/variants *)
-  let (ty', _) = build_subtype env [] [] true 4 ty in
+  let (ty', _) =
+    Scheduler.Monitor.try_
+      (fun () -> build_subtype env [] [] true 4 ty)
+      ~with_:(function
+        | Crossing_failed_with_locality _ ->
+          Subtype
+            (Subtype.error
+               ~trace:
+                 (expand_subtype_trace env
+                    [Subtype.Diff {got = !enlarged; expected = ty}])
+               ~unification_trace:[])
+        | e -> e)
+  in
+  enlarged := ty';
   (ty', !warn)
 
 (**** Check whether a type is a subtype of another type. ****)
@@ -8432,10 +8534,21 @@ let rec subtype_rec env trace t1 t2 cstrs =
             t2 t1
             cstrs
         in
-        let a2 = cross_left_with_locality env t2 a2 in
-        subtype_mode_with_locality env trace a2 a1;
-        let r2 = cross_right_with_locality_ret env u2 r2 in
-        subtype_mode_with_locality env trace r1 r2;
+        (* A monitor frame, so that a delayed crossing fails as
+           [subtype_mode_with_locality] does. *)
+        Scheduler.Monitor.try_
+          (fun () ->
+            let a2 = cross_left_with_locality env t2 a2 in
+            subtype_mode_with_locality env trace a2 a1;
+            let r2 = cross_right_with_locality_ret env u2 r2 in
+            subtype_mode_with_locality env trace r1 r2)
+          ~with_:(function
+            | Crossing_failed_with_locality _ ->
+              Subtype
+                (Subtype.error
+                   ~trace:(expand_subtype_trace env (List.rev trace))
+                   ~unification_trace:[])
+            | e -> e);
         subtype_rec
           env
           (Subtype.Diff {got = u1; expected = u2} :: trace)
