@@ -183,21 +183,23 @@ resumption (value: bytes copied).
 @since 5.4 *)
 | EV_C_MAJOR_SLICE_SWEEP_WORK
 (**
-Words of sweeping work performed in the major slice that just ended.
+Words of sweeping work performed in the major slice that just ended,
+excluding ephemeron sweeping. Only emitted if non-zero.
 @since 5.5 *)
 | EV_C_MAJOR_SLICE_MARK_WORK
 (**
-Words of marking work performed in the major slice that just ended.
+Words of marking work performed in the major slice that just ended,
+excluding ephemeron marking. Only emitted if non-zero.
 @since 5.5 *)
 | EV_C_MAJOR_SLICE_EPHE_MARK_WORK
 (**
 Words of ephemeron marking work performed in the major slice that just
-ended.
+ended. Only emitted if non-zero.
 @since 5.5 *)
 | EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK
 (**
 Words of ephemeron sweeping work performed in the major slice that just
-ended.
+ended. Only emitted if non-zero.
 @since 5.5 *)
 
 (** The type for span events emitted by the runtime. *)
