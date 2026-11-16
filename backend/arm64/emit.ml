@@ -45,6 +45,179 @@ module R = Ast.Reg
 module S = Asm_targets.Asm_symbol
 open! Int_replace_polymorphic_compare
 
+(* Instrumentation for [%%expect_asm] tests, as in the amd64 emitter. *)
+
+type expect_asm_item =
+  | Asm_instruction of string
+  | Asm_label of L.t
+
+let expect_asm_callbacks = ref []
+
+let asm_collected_for_expect_asm = ref []
+
+(* When set, the captured body extends past the hot body to the end of the
+   function's emission, including the trailing out-of-line code. Used by the
+   [%%expect_asm_full] variant. *)
+let expect_asm_whole_function = ref false
+
+(* The items emitted since recording was last started or taken, most recent
+   first; [None] when not recording. *)
+let expect_asm_recording : expect_asm_item list option ref = ref None
+
+let register_expect_asm_callback f =
+  expect_asm_callbacks := f :: !expect_asm_callbacks
+
+let invoke_expect_asm_callbacks () =
+  let output =
+    "\n" ^ String.concat "\n" (List.rev !asm_collected_for_expect_asm)
+  in
+  let callbacks = !expect_asm_callbacks in
+  expect_asm_callbacks := [];
+  asm_collected_for_expect_asm := [];
+  List.iter (fun f -> f output) callbacks
+
+let record_instruction_for_expect_asm str =
+  match !expect_asm_recording with
+  | None -> ()
+  | Some items -> expect_asm_recording := Some (Asm_instruction str :: items)
+
+let record_directive_for_expect_asm (d : D.Directive.t) =
+  match !expect_asm_recording with
+  | None -> ()
+  | Some items -> (
+    match[@warning "-4"] d with
+    | New_label (Label l, _) ->
+      expect_asm_recording := Some (Asm_label l :: items)
+    | _ -> ())
+
+let start_recording_for_expect_asm ~name =
+  if
+    (not (List.is_empty !expect_asm_callbacks))
+    && (not (String.ends_with ~suffix:"__entry" name))
+    && not (String.starts_with ~prefix:"caml_curry" name)
+  then expect_asm_recording := Some []
+
+(* The items recorded since the previous call, in emission order. *)
+let take_recorded_for_expect_asm () =
+  match !expect_asm_recording with
+  | None -> []
+  | Some items ->
+    expect_asm_recording := Some [];
+    List.rev items
+
+(* Labels are renumbered from zero and printed in a fixed syntax, so that they
+   depend neither on label numbering nor on the operating system. References to
+   symbols are left in the syntax of the target system. *)
+let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
+  let tab_stops = [| 2; 8 |] in
+  let tabs_to_spaces s =
+    let result = Buffer.create (String.length s) in
+    let col = ref 0 in
+    let tab_index = ref 0 in
+    String.iter
+      (fun c ->
+        if Char.equal c '\t' && !tab_index < Array.length tab_stops
+        then (
+          let spaces = max 1 (tab_stops.(!tab_index) - !col) in
+          Buffer.add_string result (String.make spaces ' ');
+          col := !col + spaces;
+          incr tab_index)
+        else (
+          Buffer.add_char result c;
+          incr col))
+      s;
+    Buffer.contents result
+  in
+  (* Hide labels that only delimit DWARF ranges. *)
+  let body =
+    List.filter
+      (function
+        | Asm_label l -> not (L.is_dwarf_only_label l)
+        | Asm_instruction _ -> true)
+      body
+  in
+  let label_map : (string, string) Hashtbl.t = Hashtbl.create 16 in
+  List.iter
+    (function
+      | Asm_label l ->
+        Hashtbl.add label_map (L.encode l)
+          (Printf.sprintf ".L%d" (Hashtbl.length label_map))
+      | Asm_instruction _ -> ())
+    body;
+  let hidden_labels : (string, unit) Hashtbl.t = Hashtbl.create 16 in
+  List.iter
+    (function
+      | Asm_label l -> Hashtbl.replace hidden_labels (L.encode l) ()
+      | Asm_instruction _ -> ())
+    hidden_gc_jump_pads;
+  let rewrite_label s =
+    match Hashtbl.find_opt label_map s with
+    | Some new_label -> new_label
+    | None -> if Hashtbl.mem hidden_labels s then "<hidden GC jump pad>" else s
+  in
+  (* Instructions are recorded as text, so references to labels are found by
+     looking at each identifier-like token. *)
+  let rewrite_labels_in_instruction s =
+    let is_token_char = function
+      | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '.' | '$' -> true
+      | _ -> false
+    in
+    let result = Buffer.create (String.length s) in
+    let token = Buffer.create 16 in
+    let flush_token () =
+      Buffer.add_string result (rewrite_label (Buffer.contents token));
+      Buffer.clear token
+    in
+    String.iter
+      (fun c ->
+        if is_token_char c
+        then Buffer.add_char token c
+        else (
+          flush_token ();
+          Buffer.add_char result c))
+      s;
+    flush_token ();
+    Buffer.contents result
+  in
+  let buf = Buffer.create 1024 in
+  Printf.bprintf buf "%s:\n" name;
+  List.iter
+    (fun item ->
+      match item with
+      | Asm_instruction str ->
+        (* [str] is of the form "\t<mnemonic>[\t<operands>]\n". *)
+        Buffer.add_string buf
+          (tabs_to_spaces (rewrite_labels_in_instruction str))
+      | Asm_label l -> Printf.bprintf buf "%s:\n" (rewrite_label (L.encode l)))
+    body;
+  Buffer.contents buf
+
+let finish_recording_for_expect_asm ~name ~debug_info ~fun_body ~gc_jump_pads
+    ~rest =
+  match !expect_asm_recording with
+  | None -> ()
+  | Some _ ->
+    expect_asm_recording := None;
+    let name =
+      match Debuginfo.to_items debug_info with
+      | item :: _ ->
+        Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+          item.dinfo_scopes
+        (* Remove the module name introduced by the toplevel eval loop. *)
+        |> Misc.Stdlib.String.split_first_exn ~split_on:'.'
+        |> snd
+      | [] -> name
+    in
+    let body =
+      if !expect_asm_whole_function
+      then fun_body @ gc_jump_pads @ rest
+      else fun_body
+    in
+    let output =
+      format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads:gc_jump_pads
+    in
+    asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
+
 (* Emitter environment *)
 
 type gc_call =
@@ -1988,9 +2161,11 @@ let emit_instr env i =
         A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond EQ))
   | Lreloadretaddr -> ()
   | Lreturn -> A.ins0 RET
-  | Llabel_for_jump_target lbl | Llabel_for_dwarf lbl ->
-    let lbl = label_to_asm_label ~section:Text lbl in
-    D.define_label lbl
+  | Llabel_for_jump_target lbl ->
+    D.define_label (label_to_asm_label ~section:Text lbl)
+  | Llabel_for_dwarf lbl ->
+    D.define_label
+      (L.create_int ~is_dwarf_only_label:true Text (Label.to_int lbl))
   | Lbranch lbl -> emit_branch lbl
   | Lcondbranch (tst, lbl) -> emit_condbranch i.arg tst lbl
   | Lcondbranch3 (lbl0, lbl1, lbl2) ->
@@ -2254,10 +2429,16 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   let num_call_gc_sites = relax_branches env fundecl.fun_body in
+  start_recording_for_expect_asm ~name:fundecl.fun_name;
   emit_all env fundecl.fun_body;
+  let fun_body = take_recorded_for_expect_asm () in
   List.iter emit_call_gc (Env.call_gc_sites env);
   List.iter emit_local_realloc (Env.local_realloc_sites env);
+  let gc_jump_pads = take_recorded_for_expect_asm () in
   emit_stack_realloc env;
+  let rest = take_recorded_for_expect_asm () in
+  finish_recording_for_expect_asm ~name:fundecl.fun_name
+    ~debug_info:fundecl.fun_dbg ~fun_body ~gc_jump_pads ~rest;
   let num_call_gc_sites_after_relaxation =
     List.length (Env.call_gc_sites env)
   in
@@ -2306,7 +2487,9 @@ let file_emitter ~file_num ~file_name =
 let begin_assembly _unix =
   reset_debug_info ();
   Probe_emission.reset ();
-  A.set_emit_string ~emit_string:Emitaux.emit_string;
+  A.set_emit_string ~emit_string:(fun str ->
+      record_instruction_for_expect_asm str;
+      Emitaux.emit_string str);
   Asm_targets.Asm_label.initialize ~new_label:(fun () ->
       Cmm.new_label () |> Label.to_int);
   (* Set up binary emitter if JIT hook is registered or save_binary_sections is
@@ -2315,6 +2498,7 @@ let begin_assembly _unix =
   let asm_line_buffer = Buffer.create 200 in
   D.initialize ~big_endian:Arch.big_endian
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments ~emit:(fun d ->
+      record_directive_for_expect_asm d;
       (* Emit to binary emitter if enabled *)
       binary_emitter_callback d;
       (* Emit to text *)
@@ -2344,11 +2528,6 @@ let begin_assembly _unix =
     D.align ~fill:Nop ~bytes:8);
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
-
-(* Not implemented for arm64 *)
-let register_expect_asm_callback (_ : string -> unit) = ()
-
-let expect_asm_whole_function = ref false
 
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in
@@ -2419,6 +2598,7 @@ let end_assembly () =
   D.size frametable_sym;
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
+  invoke_expect_asm_callbacks ();
   Probe_emission.emit_probe_notes ~add_def_symbol:(fun _ -> ());
   D.mark_stack_non_executable ();
   (* Finalize binary emitter if enabled *)
