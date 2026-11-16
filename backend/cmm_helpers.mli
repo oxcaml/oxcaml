@@ -724,7 +724,7 @@ val transl_switch_clambda :
   Debuginfo.t ->
   expression ->
   int array ->
-  (expression * Branch_annotations.t) array ->
+  (expression * Debuginfo.t * Branch_annotations.t) array ->
   expression
 
 (** Method call : [send kind met obj args dbg]

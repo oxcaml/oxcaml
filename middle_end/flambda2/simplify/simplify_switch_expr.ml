@@ -496,8 +496,8 @@ let enough_arms ~num_arms = function
 let bound_tagged_scrutinee scrutinee dbg =
   bound_prim "tagged_scrutinee" K.value (P.Unary (Tag_immediate, scrutinee)) dbg
 
-let rebuild_mergeable_argument ~machine_width ~scrutinee mergeable_argument k =
-  let dbg = Debuginfo.none in
+let rebuild_mergeable_argument ~machine_width ~scrutinee ~dbg mergeable_argument
+    k =
   match mergeable_argument with
   | Invariant_argument simple -> k simple
   | Affine_argument { kind; offset; slope } -> (
@@ -793,7 +793,7 @@ let rebuild_switch
       let uacc = UA.notify_removed ~operation:Removed_operations.branch uacc in
       RE.create_invalid Zero_switch_arms, uacc
     else
-      let dbg = Debuginfo.none in
+      let dbg = condition_dbg in
       let[@inline] normal_case uacc =
         (* In that case, even though some branches were removed by simplify we
            should not count them in the number of removed operations: these
@@ -834,8 +834,9 @@ let rebuild_switch
               ~added_code_size:(Code_size.apply_cont apply_cont)
               ~free_names:(Apply_cont.free_names apply_cont)
           | special_arg :: special_args ->
-            rebuild_mergeable_argument ~machine_width ~scrutinee special_arg
-              (fun arg -> rebuild_merged_switch special_args (arg :: args_rev))
+            rebuild_mergeable_argument ~machine_width ~scrutinee ~dbg
+              special_arg (fun arg ->
+                rebuild_merged_switch special_args (arg :: args_rev))
         in
         run uacc ~shareable_constants ~typing_env_before_switch
           ~cse_before_switch

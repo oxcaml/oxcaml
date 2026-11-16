@@ -48,12 +48,17 @@ type environment =
     tailrec_label : Label.t;
     phantom_lets : V.Set.t;
     all_phantom_lets :
-      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref;
         (** Accumulates every phantom let encountered in the current function
             (unlike [phantom_lets], which is scoped). The [ref] is created
             afresh by [env_create], once per function, and shared between all
             environments derived from that environment; it is read at the end of
             function construction by [phantom_lets_for_fundecl]. *)
+    branch_dbg : Debuginfo.t
+        (** The debuginfo of the innermost enclosing branch of a [Cifthenelse]
+            or [Cswitch]. It is used for constants that have no debuginfo of
+            their own, and for the instructions implementing a [Cexit] or
+            return. *)
   }
 
 val env_create : tailrec_label:Label.t -> environment
@@ -90,6 +95,8 @@ val env_find_regs_for_exception_extra_args :
 val env_find_static_exception : Static_label.t -> environment -> static_handler
 
 val env_set_trap_stack : environment -> Operation.trap_stack -> environment
+
+val env_set_branch_dbg : environment -> Debuginfo.t -> environment
 
 val phantom_vars_from_env : environment -> V.Set.t option
 
@@ -305,10 +312,16 @@ val insert_op_debug' :
   Reg.t array ->
   Reg.t array
 
-val insert_move : environment -> Sub_cfg.t -> Reg.t -> Reg.t -> unit
+val insert_move :
+  ?dbg:Debuginfo.t -> environment -> Sub_cfg.t -> Reg.t -> Reg.t -> unit
 
 val insert_moves :
-  environment -> Sub_cfg.t -> Reg.t array -> Reg.t array -> unit
+  ?dbg:Debuginfo.t ->
+  environment ->
+  Sub_cfg.t ->
+  Reg.t array ->
+  Reg.t array ->
+  unit
 
 val insert_move_args :
   environment -> Sub_cfg.t -> Reg.t array -> Reg.t array -> int -> unit

@@ -184,25 +184,24 @@ let nativeint_of_targetint t =
   | Int32 i -> Nativeint.of_int32 i
   | Int64 i -> Int64.to_nativeint i
 
-let name0 ?consider_inlining_effectful_expressions env res name =
+let name0 ?consider_inlining_effectful_expressions ~dbg env res name =
   Name.pattern_match name
     ~var:(fun v ->
       To_cmm_env.inline_variable ?consider_inlining_effectful_expressions env
         res v)
     ~symbol:(fun s ->
       let sym = To_cmm_result.symbol res s in
-      (* CR mshinwell: fix debuginfo? *)
       To_cmm_env.
         { env;
           res;
           expr =
-            { cmm = symbol ~dbg:Debuginfo.none sym;
+            { cmm = symbol ~dbg sym;
               free_vars = Backend_var.Set.empty;
               effs = Ece.pure_can_be_duplicated
             }
         })
 
-let name env name = name0 env name
+let name ~dbg env res name = name0 ~dbg env res name
 
 let rec const ~dbg cst =
   match Reg_width_const.descr cst with
@@ -254,7 +253,7 @@ let rec const ~dbg cst =
 let simple ?consider_inlining_effectful_expressions ~dbg env res s =
   Simple.pattern_match s
     ~name:(fun n ~coercion:_ ->
-      name0 ?consider_inlining_effectful_expressions env res n)
+      name0 ?consider_inlining_effectful_expressions ~dbg env res n)
     ~const:(fun c ->
       To_cmm_env.
         { env;
