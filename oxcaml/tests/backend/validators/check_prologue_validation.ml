@@ -116,6 +116,84 @@ let () =
        instruction needs prologue but no prologue on the stack"
 
 let () =
+  List.iter
+    (fun fun_prologue_required ->
+      check
+        (if fun_prologue_required
+         then "Incoming argument before a required prologue"
+         else "Incoming argument in a frameless function")
+        (fun () ->
+          seq := InstructionId.make_sequence ();
+          let incoming =
+            [| Reg.create_at_location Int (Stack (Incoming 0)) |]
+          in
+          let cfg : Cfg_desc.t =
+            { fun_args = incoming;
+              blocks =
+                [ { start = entry_label;
+                    body =
+                      [ { id = make_id ();
+                          desc = Op Move;
+                          arg = incoming;
+                          res = [| int.(0) |]
+                        } ];
+                    exn = None;
+                    terminator =
+                      { id = make_id ();
+                        desc = Return;
+                        arg = [| int.(0) |];
+                        res = [||]
+                      }
+                  } ];
+              fun_contains_calls = fun_prologue_required;
+              fun_ret_type = Cmm.typ_int
+            }
+          in
+          let cfg = Cfg_desc.make_post_regalloc cfg in
+          (Cfg_with_infos.cfg cfg).fun_prologue_required
+            <- fun_prologue_required;
+          cfg)
+        ~exp_std:""
+        ~exp_err:
+          (if fun_prologue_required
+           then
+             ">> Fatal error: Cfg_prologue: error validating instruction \
+              #0001: instruction needs prologue but no prologue on the stack"
+           else ""))
+    [false; true]
+
+let () =
+  check "Incoming result written before epilogue and returned after it"
+    (fun () ->
+      seq := InstructionId.make_sequence ();
+      let incoming = [| Reg.create_at_location Int (Stack (Incoming 0)) |] in
+      let cfg : Cfg_desc.t =
+        { fun_args = [||];
+          blocks =
+            [ { start = entry_label;
+                body =
+                  [ { id = make_id (); desc = Prologue; arg = [||]; res = [||] };
+                    { id = make_id ();
+                      desc = Op Move;
+                      arg = [| int.(0) |];
+                      res = incoming
+                    };
+                    { id = make_id (); desc = Epilogue; arg = [||]; res = [||] }
+                  ];
+                exn = None;
+                terminator =
+                  { id = make_id (); desc = Return; arg = incoming; res = [||] }
+              } ];
+          fun_contains_calls = true;
+          fun_ret_type = Cmm.typ_int
+        }
+      in
+      let cfg = Cfg_desc.make_post_regalloc cfg in
+      (Cfg_with_infos.cfg cfg).fun_prologue_required <- true;
+      cfg)
+    ~exp_std:"" ~exp_err:""
+
+let () =
   check "Epilogue without prologue"
     (fun () ->
       seq := InstructionId.make_sequence ();
