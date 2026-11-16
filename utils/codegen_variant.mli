@@ -65,3 +65,55 @@ val equal_fingerprint : fingerprint -> fingerprint -> bool
 (** Renders e.g. "frame_pointers=true, address_sanitizer=false", for use
     in error messages and [ocamlobjinfo]. *)
 val string_of_fingerprint : fingerprint -> string
+
+(** The standard-library root serving the codegen variant selected by the
+    current invocation's flags: [Config.standard_library] (which already
+    honors OCAMLLIB/CAMLLIB) for the install's default variant;
+    [Config.standard_library]/variants/<name> when that directory exists;
+    and [Config.standard_library] unchanged otherwise (the base root may
+    itself be a variant tree, e.g. via OCAMLLIB during the in-tree build —
+    mistakes are caught by the artifact-fingerprint and runtime-archive
+    checks).  The flags are read at every call (they can change between
+    files via OCAMLPARAM), so callers must not capture the result at
+    module-initialization time. *)
+val effective_standard_library : unit -> string
+
+(** The directory that would serve [t]'s standard library when [t] is not
+    the default, [Config.standard_library]/variants/<name>, whether or not
+    it exists; callers wanting the fallback semantics described above use
+    [effective_standard_library]. *)
+val variant_root : t -> string
+
+(** A '+'-directory that the selected non-default variant's library tree
+    does not provide while the default root does: expanding it against the
+    variant root would silently resolve to a nonexistent directory even
+    though a directory of that name exists one root over.  The error
+    printer is registered in [Compmisc]. *)
+type directory_error =
+  { directory : string;  (** as written, e.g. "+compiler-libs" *)
+    variant : string;
+    variant_root : string
+  }
+
+exception Directory_not_provided_by_variant of directory_error
+
+(** [Misc.expand_directory] against [effective_standard_library], resolving
+    the root only when [s] actually starts with '+'.  For directories the
+    caller asked to read from (-I, -H, [#directory], ...): raises
+    [Directory_not_provided_by_variant] when the selected variant's tree
+    exists but lacks the subdirectory while the default root provides it;
+    directories absent from both roots expand permissively as always (a
+    nonexistent include directory is not an error). *)
+val expand_directory : string -> string
+
+(** Like [expand_directory], but never raises: the plain expansion within
+    the selected root.  For '+'-directories the caller did not ask to read
+    from, such as optional search-path entries the tools add on their own
+    (which must not turn into errors when the selected variant's tree
+    happens to lack them) and directories being removed from the path. *)
+val expand_directory_unchecked : string -> string
+
+(** When a non-default variant is selected but the base root has no tree for
+    it, a note to append to variant-related errors pointing at the probable
+    cause; [None] otherwise. *)
+val missing_root_hint : unit -> string option

@@ -422,7 +422,8 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
         CU.print_as_inline_code unit_name
         (Codegen_variant.string_of_fingerprint saved)
-        (Codegen_variant.string_of_fingerprint current)
+        (Codegen_variant.string_of_fingerprint current);
+      Option.iter (fprintf ppf "@ (%s)") (Codegen_variant.missing_root_hint ())
 
 let () =
   Location.register_error_of_exn

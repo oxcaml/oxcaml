@@ -20,6 +20,26 @@ let auto_include find_in_dir fn =
     let alert = Location.auto_include_alert in
     Load_path.auto_include_otherlibs alert find_in_dir fn
 
+(* [Codegen_variant.expand_directory] (used by [init_path] below and the
+   other resolution points for caller-requested '+'-directories) rejects
+   directories that the selected variant's library tree does not provide
+   while the default root does; [Codegen_variant] sits in utils and cannot
+   register the printer itself. *)
+let report_variant_directory_error ppf
+      ({ directory; variant; variant_root }
+       : Codegen_variant.directory_error) =
+  Format_doc.fprintf ppf
+    "@[<hov>'%s' does not exist in the library root selected for codegen \
+     variant '%s'@ (%s);@ to use a build of it that matches this variant,@ \
+     pass its absolute path instead@]"
+    directory variant variant_root
+
+let () =
+  Location.register_error_of_exn (function
+    | Codegen_variant.Directory_not_provided_by_variant err ->
+      Some (Location.error_of_printer_file report_variant_directory_error err)
+    | _ -> None)
+
 (* Initialize the search path.
    [dir] (default: the current directory)
    is always searched first  unless -nocwd is specified,
@@ -44,13 +64,20 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
          (fun path : Clflags.include_dir ->
             { path; cmx_guaranteed = false })
          (* Config.flexdll_dirs is either [] or ["+flexdll"]: don't include a
-            reference to the Standard Library when -nostdlib was specified. *)
-         (if !Clflags.no_std_include then [] else Config.flexdll_dirs);
+            reference to the Standard Library when -nostdlib was specified.
+            Nobody asked for this directory, so it is expanded here without
+            the check [Codegen_variant.expand_directory] applies below to
+            the caller-requested ones (which leaves it alone once
+            expanded). *)
+         (if !Clflags.no_std_include then []
+          else
+            List.map Codegen_variant.expand_directory_unchecked
+              Config.flexdll_dirs);
        !Compenv.first_include_dirs]
   in
   let visible =
     List.map (fun (e : Clflags.include_dir) : Clflags.include_dir ->
-      { path = Misc.expand_directory Config.standard_library e.path;
+      { path = Codegen_variant.expand_directory e.path;
         cmx_guaranteed = e.cmx_guaranteed })
       visible
   in
@@ -64,7 +91,7 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
   in
   let hidden =
     List.rev_map (fun (e : Clflags.include_dir) : Clflags.include_dir ->
-      { path = Misc.expand_directory Config.standard_library e.path;
+      { path = Codegen_variant.expand_directory e.path;
         cmx_guaranteed = e.cmx_guaranteed })
       !Clflags.hidden_include_dirs
   in

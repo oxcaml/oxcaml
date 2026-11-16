@@ -2532,7 +2532,7 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.use_cached_generic_functions
 
   let cached_generic_functions_path file =
-    Oxcaml_flags.cached_generic_functions_path := file
+    Oxcaml_flags.cached_generic_functions_path := Some file
 
   let target = Clflags.set_target
   let jsoo_opt = Compenv.add_first_jsoo_opt
@@ -3017,7 +3017,7 @@ module Extra_params = struct
     | "use-cached-generic-functions" ->
         set' Oxcaml_flags.use_cached_generic_functions
     | "cached-generic-functions-path" ->
-        Oxcaml_flags.cached_generic_functions_path := v;
+        Oxcaml_flags.cached_generic_functions_path := Some v;
         true
     | "target" -> (
         let set target =

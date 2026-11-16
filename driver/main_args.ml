@@ -809,7 +809,10 @@ let mk_error_style f =
     \  be set through the OCAML_ERROR_STYLE environment variable."
 
 let mk_where f =
-  "-where", Arg.Unit f, " Print location of standard library and exit"
+  "-where", Arg.Unit f,
+  " Print location of standard library and exit (always the base directory,\n\
+  \  regardless of any selected codegen variant; variant trees live under\n\
+  \  <where>/variants/<name>)"
 
 let mk_nopervasives f =
   "-nopervasives", Arg.Unit f, " (undocumented)"

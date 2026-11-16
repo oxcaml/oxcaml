@@ -142,7 +142,13 @@ val verify_binary_emitter : bool ref
 val gc_timings : bool ref
 
 val use_cached_generic_functions : bool ref
-val cached_generic_functions_path : string ref
+
+(** Set by -cached-generic-functions-path.  When unset, the archive is looked
+    up in the selected codegen variant's standard-library root; use
+    [get_cached_generic_functions_path] to read the resolved path. *)
+val cached_generic_functions_path : string option ref
+
+val get_cached_generic_functions_path : unit -> string
 
 val dissector_assume_lld_without_64_bit_eh_frames : bool ref
 

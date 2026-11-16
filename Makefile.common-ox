@@ -436,15 +436,54 @@ ifeq ($(CODEGEN_VARIANTS),true)
 endif
 
 
-# Copy _install to the final install directory (no-op if they are the same)
+# Copy _install to the final install directory, $(DESTDIR)$(prefix), unless
+# that is _install itself, as with the development prefix: nothing is
+# compared or copied then. The files are compared by their contents
+# (--checksum): going by size and modification time, rsync would keep a
+# file of the destination that only looks like this installation's, which
+# files whose times were normalized do.
+# A prefix that already holds an installation keeps the files that this one
+# does not have, with two exceptions.
+# - Under lib/ocaml/variants: the compiler offers every codegen-variant
+#   tree that it finds there (see installed_codegen_variants in
+#   utils/config.common.ml.in), so it would compile and link against a tree
+#   that an earlier installation left behind. The second rsync only
+#   deletes: it creates no file and updates none.
+# - The cached generic functions of the default library root
+#   (-use-cached-generic-functions), which are generated in the installed
+#   tree by the compiler that was installed there: this installation's
+#   default variant need not be that one's, and a link would take the
+#   archive as it is.
+define copy_install_to_prefix
+	mkdir -p $(install_destination)
+	set -e; \
+	if ! [ _install -ef $(install_destination) ]; then \
+	  rsync --chmod=u+rw,go+r -rl --checksum _install/ \
+	    $(install_destination); \
+	  if [ -d _install/lib/ocaml/variants ]; then \
+	    rsync -rl --delete --existing --ignore-existing \
+	      _install/lib/ocaml/variants/ \
+	      $(install_destination)/lib/ocaml/variants; \
+	  else \
+	    rm -rf $(install_destination)/lib/ocaml/variants; \
+	  fi; \
+	  [ -e _install/lib/ocaml/cached-generic-functions.a ] || rm -f \
+	    $(install_destination)/lib/ocaml/cached-generic-functions.a; \
+	fi
+endef
+
+# The destination as one word of a shell command: between single quotes,
+# with those of the name itself escaped, so that it may have spaces and
+# quotes. A `$` in DESTDIR or prefix is make's, as in any variable of make:
+# `$$` stands for the character.
+install_destination = '$(subst ','\'',$(DESTDIR)$(prefix))'
+
 install: _install
-	mkdir -p '$(prefix)'
-	rsync --chmod=u+rw,go+r -rl _install/ '$(prefix)'
+	$(copy_install_to_prefix)
 
 # Same as above, but relies on a successfull earlier _install
 install_for_opam:
-	mkdir -p '$(prefix)'
-	rsync --chmod=u+rw,go+r -rl _install/ '$(prefix)'
+	$(copy_install_to_prefix)
 
 main_prefix = _build/install/main
 main_build = _build/main
