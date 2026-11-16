@@ -286,15 +286,15 @@ let details t first_occurrence =
       Misc.fatal_error "-trace-pc-guard is not supported on this target system"
     | Trace_pc_guards, arch, _ ->
       (* Writable data. The section name is a valid C identifier, so that the
-         linker defines [__start_ocaml_trace_pc_guards] and
-         [__stop_ocaml_trace_pc_guards] around the concatenation of the guard
+         linker defines [__start_oxcaml_trace_pc_guards] and
+         [__stop_oxcaml_trace_pc_guards] around the concatenation of the guard
          arrays of all compilation units. *)
       let progbits =
         match arch with
         | ARM | AArch64 -> "%progbits"
         | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
       in
-      ["ocaml_trace_pc_guards"], Some "aw", [progbits]
+      ["oxcaml_trace_pc_guards"], Some "aw", [progbits]
     | Trace_pc_guard_gate, arch, _ ->
       (* Writable data, named as by clang. *)
       let progbits =

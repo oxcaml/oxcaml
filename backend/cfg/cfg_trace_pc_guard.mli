@@ -33,9 +33,9 @@
     Each probe tests the global [__sancov_should_track] and, if it is non-zero,
     calls [__sanitizer_cov_trace_pc_guard(&guard)], where [guard] is a distinct
     32-bit slot of a per-unit array that the emitter places in the
-    [ocaml_trace_pc_guards] section. The linker concatenates the arrays of all
-    units and provides [__start_ocaml_trace_pc_guards] and
-    [__stop_ocaml_trace_pc_guards]. The compiler does not emit a call to
+    [oxcaml_trace_pc_guards] section. The linker concatenates the arrays of all
+    units and provides [__start_oxcaml_trace_pc_guards] and
+    [__stop_oxcaml_trace_pc_guards]. The compiler does not emit a call to
     [__sanitizer_cov_trace_pc_guard_init]: the coverage runtime has to make it
     with these bounds. Only ELF targets are supported.
 
