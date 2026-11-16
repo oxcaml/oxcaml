@@ -418,11 +418,15 @@ CAMLprim value caml_alloc_dummy(value size)
   return caml_alloc (wosize, 0);
 }
 
-/* [size] is a [value] representing number of floats. */
+/* [size] is a [value] representing number of floats. The dummy gets its
+   final tag now: a block the marker has seen as scannable must not later
+   have unboxed floats stored in it by [caml_update_dummy]. */
 CAMLprim value caml_alloc_dummy_float (value size)
 {
   mlsize_t wosize = Long_val(size) * Double_wosize;
-  return caml_alloc (wosize, 0);
+  /* Empty float arrays are [Atom(0)], which is never updated. */
+  if (wosize == 0) return Atom(0);
+  return caml_alloc(wosize, Double_array_tag);
 }
 
 /* [size] is a [value] representing the total size of the block in words (not
@@ -489,6 +493,7 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
     }
   } else {
     CAMLassert (Scannable_tag(tag));
+    CAMLassert(Scannable_val(dummy));
     CAMLassert (Tag_val(dummy) != Infix_tag);
     CAMLassert (Reserved_val(dummy) == Reserved_val(newval));
     Unsafe_store_tag_val(dummy, tag);
