@@ -354,3 +354,5 @@ module Flambda2 : sig
 end
 
 val opt_flag_handler : Clflags.Opt_flag_handler.t
+
+val reset_opt_level : unit -> unit
