@@ -339,6 +339,16 @@ let simple_static res s =
     ~name:(fun n ~coercion:_ -> name_static res n)
     ~const:(fun c -> `Static_data (const_static c))
 
+let look_through_tagged_comparison env simple (expr : To_cmm_env.expr_with_info)
+    : To_cmm_env.expr_with_info =
+  match Simple.must_be_var simple with
+  | None -> expr
+  | Some (var, _coercion) -> (
+    match To_cmm_env.find_pure_bound_cmm_expr env var with
+    | Some (cmm, free_vars) when is_tagged_comparison_of_simples cmm ->
+      { cmm; free_vars; effs = Ece.pure_can_be_duplicated }
+    | Some _ | None -> expr)
+
 let simple_list ?consider_inlining_effectful_expressions ~dbg env res l =
   (* Note that [To_cmm_primitive] relies on this function translating the
      [Simple] at the head of the list first. *)

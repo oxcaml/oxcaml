@@ -84,6 +84,18 @@ val simple_static :
   Simple.t ->
   [> `Static_data of Cmm.data_item list | `Var of Variable.t]
 
+(** If [simple] is a variable whose delayed let-binding is a tagged comparison
+    that is cheap to recompute, return that expression (with its free variables)
+    in place of the given translation of the variable. For use at consumers that
+    strip the tag: the comparison may then be computed twice, which the
+    backend's CSE merges, and if every use of the variable does this its binding
+    is dropped entirely. See [To_cmm_env.find_pure_bound_cmm_expr]. *)
+val look_through_tagged_comparison :
+  To_cmm_env.t ->
+  Simple.t ->
+  To_cmm_env.expr_with_info ->
+  To_cmm_env.expr_with_info
+
 (** This function translates the [Simple] at the head of the list first.
     Regarding [consider_inlining_effectful_expressions], see [simple] above. *)
 val simple_list :

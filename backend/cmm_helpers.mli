@@ -227,6 +227,14 @@ val mk_compare_float32s_untagged :
 (** Convert a tagged integer into a raw integer with boolean meaning *)
 val test_bool : Debuginfo.t -> expression -> expression
 
+(** [true] iff the expression is the tagging of an integer or float comparison
+    whose operands are variables or constants: a tagged boolean that is cheap to
+    recompute. [To_cmm] uses this to look through a variable let-bound to such
+    an expression at consumers that can strip the tag (see [or_int] and
+    [test_bool]), so that when every use does so the tagged value is never
+    materialised. *)
+val is_tagged_comparison_of_simples : expression -> bool
+
 (** Conversions for 16-bit floats *)
 val float_of_float16 : Debuginfo.t -> expression -> expression
 
