@@ -668,7 +668,22 @@ let rec typexp copy_scope s ty =
         For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
         ty'
       else ty
-  | Tivar _ -> Misc.fatal_error "Subst.typexp: Tivar is not supported yet"
+  | Tivar { name; jkind = jk; ivar = _ } -> (
+      let jk' = jkind copy_scope s jk in
+      match s.additional_action with
+      | No_action when jk == jk' ->
+        (* Shared, like a [Tvar]: its pending constraints stay attached. *)
+        ty
+      | Duplicate_variables ->
+        (* A fresh [Tvar] variable, unrelated to the original [Tivar]. *)
+        let ty' = newpersty (Tvar { name; jkind = jk' }) in
+        For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
+        ty'
+      | No_action | Prepare_for_saving _ ->
+        (* [Tivar]s should not appear in .cmi files ([Prepare_for_saving]),
+           nor have their jkind substituted ([No_action] with a changed
+           jkind). *)
+        Misc.fatal_error "Subst.typexp: unexpected Tivar")
   | Tsubst (ty, _) ->
       ty
   | Tfield (m, k, _t1, _t2) when not should_duplicate_vars && m = dummy_method

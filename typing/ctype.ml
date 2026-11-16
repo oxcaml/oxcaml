@@ -190,9 +190,8 @@ let scheduler = s_ref_of_create Scheduler.create ()
 
 let scheduler () = !scheduler
 
-(* Runs the scheduler, then defaults any still-empty ivars, until none remain.
-   Defaulting calls each handler's [run] with its [default ()]; [run]'s
-   unification fills the ivar (see [upon_shape]). *)
+(* Runs the scheduler, then defaults any still-empty ivars, until none
+   remain. *)
 let run_scheduler_and_default_ivars () =
   let rec loop () =
     Scheduler.run (scheduler ());
@@ -6729,7 +6728,7 @@ let moregen_occur env level ty =
       let lv = get_level ty in
       if lv <= level then () else
       match get_desc ty with
-      | Tvar _ when lv >= subject_level -> raise Occur
+      | (Tvar _ | Tivar _) when lv >= subject_level -> raise Occur
       | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
       | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _
       | Tnil | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _
@@ -6954,14 +6953,17 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
   if eq_type t1 t2 then () else
   extend_trace_for Moregen (Diff { got = t1; expected = t2 }) begin fun () ->
     match (get_desc t1, get_desc t2) with
-      (Tvar { jkind }, _) when may_instantiate inst_nongen t1
-                            && not (deep_occur t1 t2) ->
+      ((Tvar { jkind } | Tivar { jkind; _ }), _)
+        when may_instantiate inst_nongen t1 && not (deep_occur t1 t2) ->
         moregen_occur env (get_level t1) t2;
         update_scope_for Moregen (get_scope t1) t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
         check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
-        link_type t1 t2
+        (* A [Tivar] [t1] may be waited on by a crossing delayed by
+           [moregen]. An orphaned ivar is defaulted on exit from [moregeneral]
+           or [match_class_types]. *)
+        link_var Moregen env t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | _ ->
@@ -6973,14 +6975,15 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         if not (TypePairs.mem pairs (t1', t2')) then begin
           TypePairs.add pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
-            (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
+            ((Tvar { jkind } | Tivar { jkind; _ }), _)
+              when may_instantiate inst_nongen t1' ->
               let t2 = reduce_head ~expand_reducible_abbrevs:false env t2 in
               moregen_occur env (get_level t1') t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
               check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
-              link_type t1' t2
+              link_var Moregen env t1' t2
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
               eq_labels Moregen ~in_pattern_mode:false l1 l2;
