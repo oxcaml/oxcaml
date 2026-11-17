@@ -18,9 +18,8 @@ let f (c : t) (g : int -> bool) =
 let result = f #{ a = 5; b = true } (fun _ -> false)
 [%%expect{|
 type t = #{ a : int; b : bool; }
->> Fatal error: exit(2) outside appropriated catch
-Uncaught exception: Misc.Fatal_error
-
+val f : t -> (int -> bool) -> int = <fun>
+val result : int = 3
 |}]
 
 (* The same, for an implicit unboxed record. *)
@@ -35,9 +34,8 @@ let f (c : r#) (g : int -> bool) =
 let result = f #{ c = 5; d = true } (fun _ -> false)
 [%%expect{|
 type r = { c : int; d : bool; }
->> Fatal error: exit(9) outside appropriated catch
-Uncaught exception: Misc.Fatal_error
-
+val f : r# -> (int -> bool) -> int = <fun>
+val result : int = 3
 |}]
 
 (* The same, for [#()]. *)
@@ -49,9 +47,8 @@ let f (c : #(int * unit# * bool)) (g : int -> bool) =
 
 let result = f #(5, #(), true) (fun _ -> false)
 [%%expect{|
->> Fatal error: exit(16) outside appropriated catch
-Uncaught exception: Misc.Fatal_error
-
+val f : #(int * unit# * bool) -> (int -> bool) -> int = <fun>
+val result : int = 3
 |}]
 
 (* An or-pattern over an unboxed record that caused a test on another
@@ -69,5 +66,5 @@ let result = f #(true, #{ a = 1 }, true)
 [%%expect{|
 type u = #{ a : int; }
 val f : #(bool * u * bool) -> int = <fun>
-val result : int = 3
+val result : int = 4
 |}]
