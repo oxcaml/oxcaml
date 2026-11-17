@@ -655,8 +655,11 @@ type class_type_declaration =
 
 type visibility =
   | Exported
-  | Unmentionable
   | Hidden
+
+type mentionability =
+  | Mentionable
+  | Unmentionable
 
 type rec_status =
   Trec_not                   (* first in a nonrecursive group *)
@@ -745,6 +748,7 @@ module type Wrapped = sig
   | Sig_typext of Ident.t * extension_constructor * ext_status * visibility
   | Sig_module of
       Ident.t * module_presence * module_declaration * rec_status * visibility
+      * mentionability
   | Sig_modtype of Ident.t * modtype_declaration * visibility
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
@@ -790,7 +794,7 @@ module Make_wrapped(Wrap : Wrap) = struct
       end
     | Sig_typext _ ->
       Some Jkind_types.Sort.(of_const Const.for_type_extension)
-    | Sig_module(_, pres, _, _, _) ->
+    | Sig_module(_, pres, _, _, _, _) ->
       begin match pres with
       | Mp_present ->
         Some Jkind_types.Sort.(of_const Const.for_module)
@@ -852,8 +856,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
         To.Sig_value (id, value_description m vd, vis)
     | Sig_type (id,td,rs,vis) ->
         To.Sig_type (id,td,rs,vis)
-    | Sig_module (id,pres,md,rs,vis) ->
-        To.Sig_module (id, pres, module_declaration m md, rs, vis)
+    | Sig_module (id,pres,md,rs,vis,ment) ->
+        To.Sig_module (id, pres, module_declaration m md, rs, vis, ment)
     | Sig_modtype (id,mtd,vis) ->
         To.Sig_modtype (id, modtype_declaration m mtd, vis)
     | Sig_typext (id,ec,es,vis) ->
@@ -1109,18 +1113,23 @@ let item_visibility = function
   | Sig_value (_, _, vis)
   | Sig_type (_, _, _, vis)
   | Sig_typext (_, _, _, vis)
-  | Sig_module (_, _, _, _, vis)
+  | Sig_module (_, _, _, _, vis, _)
   | Sig_modtype (_, _, vis)
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis)
   | Sig_jkind (_, _, vis) -> vis
+
+let item_mentionability = function
+  | Sig_module (_, _, _, _, _, ment) -> ment
+  | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_modtype _ | Sig_class _
+  | Sig_class_type _ | Sig_jkind _ -> Mentionable
 
 let rec bound_value_identifiers = function
     [] -> []
   | Sig_value(id, {val_kind = Val_reg _}, _) :: rem ->
       id :: bound_value_identifiers rem
   | Sig_typext(id, _, _, _) :: rem -> id :: bound_value_identifiers rem
-  | Sig_module(id, Mp_present, _, _, _) :: rem ->
+  | Sig_module(id, Mp_present, _, _, _, _) :: rem ->
       id :: bound_value_identifiers rem
   | Sig_class(id, _, _, _) :: rem -> id :: bound_value_identifiers rem
   | _ :: rem -> bound_value_identifiers rem
@@ -1129,7 +1138,7 @@ let signature_item_id = function
   | Sig_value (id, _, _)
   | Sig_type (id, _, _, _)
   | Sig_typext (id, _, _, _)
-  | Sig_module (id, _, _, _, _)
+  | Sig_module (id, _, _, _, _, _)
   | Sig_modtype (id, _, _)
   | Sig_class (id, _, _, _)
   | Sig_class_type (id, _, _, _)

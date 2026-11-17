@@ -220,13 +220,13 @@ let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
         in
         let vd = {vd with val_modalities} in
         Sig_value (id, vd, vis)
-    | Sig_module (id, pres, md, rec_, vis) ->
+    | Sig_module (id, pres, md, rec_, vis, ment) ->
         let md_modalities =
           md.md_modalities
           |> rebase_modalities ~loc ~loc_md (Module, id) ~md_mode ~mode
         in
         let md = {md with md_modalities} in
-        Sig_module (id, pres, md, rec_, vis)
+        Sig_module (id, pres, md, rec_, vis, ment)
     | item -> item
     ) sg
 
@@ -606,7 +606,7 @@ let retype_applicative_functor_type ~loc env funct arg =
 let check_usage_of_path_of_substituted_item paths ~loc ~lid env super =
     { super with
       Btype.it_signature_item = (fun self -> function
-      | Sig_module (id, _, { md_type = Mty_alias aliased_path; _ }, _, _)
+      | Sig_module (id, _, { md_type = Mty_alias aliased_path; _ }, _, _, _)
         when List.exists
                (fun path -> path_is_strict_prefix path ~prefix:aliased_path)
                paths
@@ -659,7 +659,7 @@ let check_usage_after_substitution env ~loc ~lid paths sg =
 (* After substitution one also needs to re-check the well-foundedness
    of type declarations in recursive modules *)
 let rec extract_next_modules = function
-  | Sig_module (id, _, mty, Trec_next, _) :: rem ->
+  | Sig_module (id, _, mty, Trec_next, _, _) :: rem ->
       let (id_mty_l, rem) = extract_next_modules rem in
       ((id, mty) :: id_mty_l, rem)
   | sg -> ([], sg)
@@ -671,7 +671,7 @@ let check_well_formed_module env loc context mty =
   let make_iterator mark =
     let rec check_signature env = function
       | [] -> ()
-      | Sig_module (id, _, mty, Trec_first, _) :: rem ->
+      | Sig_module (id, _, mty, Trec_first, _, _) :: rem ->
           let (id_mty_l, rem) = extract_next_modules rem in
           begin try
             check_recmod_decls (Lazy.force env) ((id, mty) :: id_mty_l)
@@ -781,7 +781,7 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
         in
         let desc = {desc with val_modalities; val_zero_alloc} in
         Sig_value (id, desc, vis)
-    | Sig_module (id, pres, md, re, vis) ->
+    | Sig_module (id, pres, md, re, vis, ment) ->
         let md_type =
           remove_modality_and_zero_alloc_variables_mty env ~zap_modality
             md.md_type
@@ -790,7 +790,7 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
           md.md_modalities |> zap_modality |> Mode.Modality.of_const
         in
         let md = {md with md_type; md_modalities} in
-        Sig_module (id, pres, md, re, vis)
+        Sig_module (id, pres, md, re, vis, ment)
     | item -> item
   in
   List.map sg_item sg
@@ -950,7 +950,7 @@ module Merge = struct
     | item, [s] -> patch item s env outer_sg ~ghosts
 
     (* Deep constraints *)
-    | Sig_module(id, _, md, rs, priv) as current_item, s :: namelist
+    | Sig_module(id, _, md, rs, priv, ment) as current_item, s :: namelist
       when Ident.name id = s ->
         let sig_env = Env.add_signature outer_sg env in
         let sg = extract_sig sig_env loc md.md_type in
@@ -974,7 +974,9 @@ module Merge = struct
                 ~replace_by:(Some current_item) path ~late_typedtree
           | _, _ ->
               let new_md = {md with md_type = Mty_signature newsg} in
-              let new_item = Sig_module(id, Mp_present, new_md, rs, priv) in
+              let new_item =
+                Sig_module(id, Mp_present, new_md, rs, priv, ment)
+              in
               return_payload ~ghosts ~replace_by:(Some new_item)
                 path ~paths ~late_typedtree
         end
@@ -1153,7 +1155,7 @@ module Merge = struct
       (md': Types.module_declaration) path remove_aliases =
     let patch item s sig_env sg_for_env ~ghosts =
       match item with
-      | Sig_module(id, pres, md, rs, priv) when Ident.name id = s ->
+      | Sig_module(id, pres, md, rs, priv, ment) when Ident.name id = s ->
           let sig_env = Env.add_signature sg_for_env sig_env in
           let real_path = Pident id in
           if destructive then
@@ -1181,7 +1183,7 @@ module Merge = struct
                ignore (Includemod.modtypes ~mark:true ~loc sig_env
                          ~modes:All newmd.md_type md.md_type) in
             return ~ghosts
-              ~replace_by:(Some(Sig_module(id, pres, newmd, rs, priv)))
+              ~replace_by:(Some(Sig_module(id, pres, newmd, rs, priv, ment)))
               real_path
       | _ -> None
     in
@@ -1418,13 +1420,13 @@ let rec apply_modalities_signature ~recursive env modalities sg =
       let val_modalities = concat_modalities vd.val_modalities in
       let vd = {vd with val_modalities = of_const val_modalities} in
       Sig_value (id, vd, vis)
-  | Sig_module (id, pres, md, rec_, vis) when recursive ->
+  | Sig_module (id, pres, md, rec_, vis, ment) when recursive ->
       let md_modalities = concat_modalities md.md_modalities in
       let md_type, md_modalities =
         apply_modalities_module_type env md_modalities md.md_type
       in
       let md = {md with md_type; md_modalities = of_const md_modalities} in
-      Sig_module (id, pres, md, rec_, vis)
+      Sig_module (id, pres, md, rec_, vis, ment)
   | item -> item
   ) sg
 
@@ -1604,7 +1606,8 @@ and approx_sig_items env ssg=
             Env.enter_module_declaration ~scope (Option.get pmd.pmd_name.txt)
               pres md ~mode:With_regionality.legacy env
           in
-          Sig_module(id, pres, md, Trec_not, Exported) :: approx_sig_items newenv srem
+          Sig_module(id, pres, md, Trec_not, Exported, Mentionable)
+          :: approx_sig_items newenv srem
       | Psig_modsubst pms ->
           let scope = Ctype.create_scope () in
           let _, md, _ =
@@ -1638,11 +1641,13 @@ and approx_sig_items env ssg=
           let newenv =
             List.fold_left
               (fun env (id, md) -> Env.add_module_declaration ~check:false
-                  id Mp_present md ~mode:(With_regionality.min) env)
+                  ~ment:Mentionable id Mp_present md
+                  ~mode:(With_regionality.min) env)
               env decls
           in
           map_rec
-            (fun rs (id, md) -> Sig_module(id, Mp_present, md, rs, Exported))
+            (fun rs (id, md) ->
+               Sig_module(id, Mp_present, md, rs, Exported, Mentionable))
             decls
             (approx_sig_items newenv srem)
       | Psig_modtype d ->
@@ -1933,7 +1938,7 @@ end = struct
     let open Sig_component_kind in
     function
     | Sig_type(id, _, _, _) -> Type, id
-    | Sig_module(id, _, _, _, _) -> Module, id
+    | Sig_module(id, _, _, _, _, _) -> Module, id
     | Sig_modtype(id, _, _) -> Module_type, id
     | Sig_typext(id, _, _, _) -> Extension_constructor, id
     | Sig_value (id, _, _) -> Value, id
@@ -1987,7 +1992,7 @@ end = struct
         | Sig_value(id, v, _) -> Value, id, v.val_loc
         | Sig_type (id, td, _, _) -> Type, id, td.type_loc
         | Sig_typext (id, te, _, _) -> Extension_constructor, id, te.ext_loc
-        | Sig_module (id, _, md, _, _) -> Module, id, md.md_loc
+        | Sig_module (id, _, md, _, _, _) -> Module, id, md.md_loc
         | Sig_modtype (id, mtd, _) -> Module_type, id, mtd.mtd_loc
         | Sig_class (id, c, _, _) -> Class, id, c.cty_loc
         | Sig_class_type (id, ct, _, _) -> Class_type, id, ct.clty_loc
@@ -2456,7 +2461,8 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
         let tsg =
           match id with
           | None -> []
-          | Some id -> [Sig_module(id, pres, md, Trec_not, Exported)]
+          | Some id ->
+              [Sig_module(id, pres, md, Trec_not, Exported, Mentionable)]
         in
         sig_item, tsg, newenv
     | Psig_modsubst pms ->
@@ -2525,7 +2531,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
                      md_loc = md.md_loc;
                      md_uid = uid;
                     } in
-            Sig_module(id, Mp_present, d, rs, Exported))
+            Sig_module(id, Mp_present, d, rs, Exported, Mentionable))
             decls []
         in
         mksig (Tsig_recmodule (List.map (fun (md, _, _, _) -> md) tdecls))
@@ -2683,8 +2689,8 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.fold_left (fun env (id_shape, _, md, mode, _, _) ->
       let mode = Option.map (fun m -> m.mode_modes) mode in
       Option.fold ~none:env ~some:(fun (id, shape) ->
-        Env.add_module_declaration ~check:true ~shape ~arg:true
-          id Mp_present md ?mode env
+        Env.add_module_declaration ~check:true ~ment:Mentionable
+          ~shape ~arg:true id Mp_present md ?mode env
       ) id_shape
     ) env curr
   in
@@ -2858,7 +2864,7 @@ and nongen_signature_item env f g = function
   | Sig_value(_id, desc, _) ->
       f env desc.val_type
       |> Option.map (fun vars -> (vars, desc))
-  | Sig_module(_id, _, md, _, _) ->
+  | Sig_module(_id, _, md, _, _, _) ->
       nongen_modtype env f g md.md_type
   | _ -> None
 
@@ -2901,7 +2907,7 @@ let check_nongen_signature_item ~zap_scope env sig_item =
           in
           raise (Error (vd.val_loc, env, error))
         )
-  | Sig_module (_id, _, md, _, _) ->
+  | Sig_module (_id, _, md, _, _, _) ->
       check_nongen_modtype ~zap_scope env md.md_loc md.md_type
   | _ -> ()
 
@@ -3113,7 +3119,7 @@ let rec package_constraints_sig env loc sg constrs =
               },
               rs,
               priv )
-      | Sig_module (id, pres, md, rs, priv) ->
+      | Sig_module (id, pres, md, rs, priv, ment) ->
           let rec aux = function
             | (m :: ((_ :: _) as l), t) :: rest when m = Ident.name id ->
                 (l, t) :: aux rest
@@ -3125,7 +3131,7 @@ let rec package_constraints_sig env loc sg constrs =
              md_type = package_constraints env loc md.md_type (aux constrs)
             }
           in
-          Sig_module (id, pres, md, rs, priv)
+          Sig_module (id, pres, md, rs, priv, ment)
       | item -> item
     )
     sg
@@ -3363,8 +3369,10 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
               let id = Ident.create_scoped ~scope name in
               let shape = Shape.var md_uid id in
               let mode = with_locality_as_regionality mode in
-              let newenv = Env.add_module_declaration
-                ~shape ~arg:true ~check:true id Mp_present arg_md ~mode newenv
+              let newenv =
+                Env.add_module_declaration ~ment:Mentionable
+                  ~shape ~arg:true ~check:true id Mp_present arg_md ~mode
+                  newenv
               in
               Some id, newenv, id
           in
@@ -3872,8 +3880,8 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
         | Sig_value(id, vd, _) -> Sig_value(id, vd, visibility)
         | Sig_type(id, td, rs, _) -> Sig_type(id, td, rs, visibility)
         | Sig_typext(id, ec, et, _) -> Sig_typext(id, ec, et, visibility)
-        | Sig_module(id, mp, md, rs, _) ->
-            Sig_module(id, mp, md, rs, visibility)
+        | Sig_module(id, mp, md, rs, _, ment) ->
+            Sig_module(id, mp, md, rs, visibility, ment)
         | Sig_modtype(id, mtd, _) -> Sig_modtype(id, mtd, visibility)
         | Sig_class(id, cd, rs, _) -> Sig_class(id, cd, rs, visibility)
         | Sig_class_type(id, ctd, rs, _) ->
@@ -4143,7 +4151,7 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
                          md_attributes = attrs;
                          md_loc = pmb_loc;
                          md_uid;
-                        }, Trec_not, Exported)]
+                        }, Trec_not, Exported, Mentionable)]
         in
         let shape_map = match id with
           | Some id -> Shape.Map.add_module shape_map id md_shape
@@ -4218,7 +4226,8 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
                        md_uid = uid;
                      }
                    in
-                   Env.add_module_declaration ~check:true ~shape
+                   Env.add_module_declaration ~check:true
+                     ~ment:Mentionable ~shape
                      id Mp_present mdecl ~mode:mode.mode_modes env
             )
             env bindings1
@@ -4249,7 +4258,7 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
                 md_attributes=mb.mb_attributes;
                 md_loc=mb.mb_loc;
                 md_uid = uid;
-              }, rs, Exported))
+              }, rs, Exported, Mentionable))
            mbs [],
         shape_map,
         newenv
@@ -4462,7 +4471,7 @@ and normalize_signature sg = List.iter normalize_signature_item sg
 
 and normalize_signature_item = function
     Sig_value(_id, desc, _) -> Ctype.normalize_type desc.val_type
-  | Sig_module(_id, _, md, _, _) -> normalize_modtype md.md_type
+  | Sig_module(_id, _, md, _, _, _) -> normalize_modtype md.md_type
   | _ -> ()
 
 (* Extract the module type of a module expression *)
@@ -4520,7 +4529,7 @@ let lookup_type_in_sig sg =
              let types, modules = acc in
              let types = String.Map.add (Ident.name id) id types in
              types, modules
-         | Sig_module(id, _, _, _, _) ->
+         | Sig_module(id, _, _, _, _, _) ->
              let types, modules = acc in
              let modules = String.Map.add (Ident.name id) id modules in
              types, modules
@@ -5033,9 +5042,10 @@ let functorize_signature ~params ~modules : Types.signature =
   in
   let body =
     List.map
-      (fun (id, visibility, sign) ->
+      (fun (id, ment, sign) ->
         Sig_module
-          (id, Mp_present, make_md (Mty_signature sign), Trec_not, visibility))
+          (id, Mp_present, make_md (Mty_signature sign), Trec_not, Exported,
+           ment))
       modules
   in
   let intf_id = Ident.create_local "Intf" in
@@ -5065,8 +5075,10 @@ let functorize_signature ~params ~modules : Types.signature =
   let make_with_unit = Mty_functor (Unit, make_result, With_locality.legacy) in
   let make_mty = wrap_in_named_functor_layers make_params make_with_unit in
   [
-    Sig_module (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported);
-    Sig_module (make_id, Mp_present, make_md make_mty, Trec_not, Exported);
+    Sig_module (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported,
+                Mentionable);
+    Sig_module (make_id, Mp_present, make_md make_mty, Trec_not, Exported,
+                Mentionable);
   ]
 
 let functorize_interface initial_env ~params ~module_sigs unit_info
@@ -5186,7 +5198,7 @@ let package_signatures units =
           md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
         }
       in
-      Sig_module(newid, Mp_present, md, Trec_not, Exported))
+      Sig_module(newid, Mp_present, md, Trec_not, Exported, Mentionable))
     units_with_ids
 
 let package_units initial_env objfiles target_cmi modulename =

@@ -68,7 +68,7 @@ let recursive_sigitem = function
   | Types.Sig_type(ident, _, rs, _)
   | Types.Sig_class(ident,_,rs,_)
   | Types.Sig_class_type (ident,_,rs,_)
-  | Types.Sig_module(ident, _, _, rs, _) -> Some (ident,rs)
+  | Types.Sig_module(ident, _, _, rs, _, _) -> Some (ident,rs)
   | Types.(Sig_value _ | Sig_modtype _ | Sig_typext _ | Sig_jkind _)  -> None
 
 let next x =
@@ -111,8 +111,8 @@ let update_rec_next rs rem =
       match rem with
       | Types.Sig_type (id, decl, Trec_next, priv) :: rem ->
           Types.Sig_type (id, decl, rs, priv) :: rem
-      | Types.Sig_module (id, pres, mty, Trec_next, priv) :: rem ->
-          Types.Sig_module (id, pres, mty, rs, priv) :: rem
+      | Types.Sig_module (id, pres, mty, Trec_next, priv, ment) :: rem ->
+          Types.Sig_module (id, pres, mty, rs, priv, ment) :: rem
       | _ -> rem
 
 type in_place_patch = {

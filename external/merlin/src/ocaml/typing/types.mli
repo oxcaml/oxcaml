@@ -1152,10 +1152,15 @@ type class_type_declaration =
 
 type visibility =
   | Exported
-  | Unmentionable
-      (** like [Exported]: the item has a path which is its identity, but it
-          cannot be mentioned by name in user code. *)
   | Hidden
+
+(** Whether an item can be referred to by name in user code. An
+    [Unmentionable] item still has a path, which is its identity, but name
+    lookups do not resolve to it. Orthogonal to [visibility]. Only modules
+    carry a mentionability; items of the other kinds are always mentionable. *)
+type mentionability =
+  | Mentionable
+  | Unmentionable
 
 type rec_status =
     Trec_not                   (* first in a nonrecursive group *)
@@ -1274,6 +1279,7 @@ module type Wrapped = sig
   | Sig_typext of Ident.t * extension_constructor * ext_status * visibility
   | Sig_module of
       Ident.t * module_presence * module_declaration * rec_status * visibility
+      * mentionability
   | Sig_modtype of Ident.t * modtype_declaration * visibility
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
@@ -1329,6 +1335,7 @@ end
 include Wrapped with type 'a wrapped = 'a
 
 val item_visibility : signature_item -> visibility
+val item_mentionability : signature_item -> mentionability
 
 (* Constructors are the same *)
 val equal_tag :  tag -> tag -> bool

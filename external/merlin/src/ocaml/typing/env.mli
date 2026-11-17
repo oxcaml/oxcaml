@@ -46,7 +46,7 @@ type summary =
   | Env_type of summary * Ident.t * type_declaration
   | Env_extension of summary * Ident.t * extension_constructor
   | Env_module of summary * Ident.t * module_presence * module_declaration *
-      visibility * Mode.With_regionality.l * locks
+      mentionability * Mode.With_regionality.l * locks
   (* CR zqian: change to [locks option], so for module aliases it could be
   [Some []]. *)
   | Env_modtype of summary * Ident.t * modtype_declaration
@@ -486,12 +486,12 @@ val add_module_lazy:
   ?mode:Mode.With_regionality.l ->
   t ->
   t
-val add_module_declaration: ?arg:bool -> ?vis:visibility -> ?shape:Shape.t ->
-  check:bool ->
+val add_module_declaration: ?arg:bool -> ment:mentionability ->
+  ?shape:Shape.t -> check:bool ->
   Ident.t -> module_presence -> module_declaration ->
   ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks -> t -> t
 val add_module_declaration_lazy: ?arg:bool -> update_summary:bool ->
-  ?vis:visibility ->
+  ment:mentionability ->
   Ident.t -> module_presence -> Subst.Lazy.module_declaration ->
   ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks -> t -> t
 val add_modtype: Ident.t -> modtype_declaration -> t -> t

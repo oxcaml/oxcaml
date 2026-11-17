@@ -1173,11 +1173,11 @@ let rename_bound_idents scoping s sg =
           (add_type id (Pident id') s)
           (Sig_type(id', td, rs, vis) :: sg)
           rest
-    | Sig_module(id, pres, md, rs, vis) :: rest ->
+    | Sig_module(id, pres, md, rs, vis, ment) :: rest ->
         let id' = rename id in
         rename_bound_idents
           (add_module id (Pident id') s)
-          (Sig_module (id', pres, md, rs, vis) :: sg)
+          (Sig_module (id', pres, md, rs, vis, ment) :: sg)
           rest
     | Sig_modtype(id, mtd, vis) :: rest ->
         let id' = rename id in
@@ -1364,9 +1364,9 @@ and subst_lazy_signature_item' copy_scope scoping s comp =
       Sig_type(id, type_declaration' copy_scope s d, rs, vis)
   | Sig_typext(id, ext, es, vis) ->
       Sig_typext(id, extension_constructor' copy_scope s ext, es, vis)
-  | Sig_module(id, pres, d, rs, vis) ->
+  | Sig_module(id, pres, d, rs, vis, ment) ->
       Sig_module(id, pres,
-                 subst_lazy_module_decl copy_scope scoping s d, rs, vis)
+                 subst_lazy_module_decl copy_scope scoping s d, rs, vis, ment)
   | Sig_modtype(id, d, vis) ->
       Sig_modtype(id, subst_lazy_modtype_decl copy_scope scoping s d, vis)
   | Sig_class(id, d, rs, vis) ->
