@@ -134,7 +134,7 @@ let commandline_options =
   ("-no-diff", Arg.Unit (fun () -> no_diff := true),
    " Instead of running diff, copy generated outputs to the source directory");
   ("-override", Arg.String add_override,
-   " Specify path to an OCaml component");
+   " Specify path to an OCaml component. (Uses '/' as directory seperator)");
   ("-shell", Arg.Unit (fun () -> shell := true),
    " Instead of running a test, print its commands in sh format");
 ]

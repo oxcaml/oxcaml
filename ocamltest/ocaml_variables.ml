@@ -77,11 +77,11 @@ let export_caml_ld_library_path value =
     (* Under dune, CAML_LD_LIBRARY_PATH may contain relative paths.
        They are relative to the startup directory, but we may have
        chdir'd since. *)
-    let paths = String.split_on_char ':' new_value in
+    let paths = String.split_on_char Filename.path_sep.[0] new_value in
     let paths = paths |> List.map (fun p ->
       if Filename.is_relative p then Filename.concat startup_cwd p else p)
     in
-    String.concat ":" paths
+    String.concat Filename.path_sep paths
   in
   new_value
 

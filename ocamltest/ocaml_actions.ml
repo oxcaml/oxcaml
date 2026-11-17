@@ -935,8 +935,6 @@ let run_expect_once input_file principal log env ~backend =
   in
   Actions_helpers.run_cmd
     ~environment:default_ocaml_env
-    (* CR sdolan: reimplement skipping -principal mode on exit 3.
-       See https://github.com/oxcaml/oxcaml/pull/6375 *)
     ~exits:[0, Result.pass; 3, Result.pass]
     ~what:"expect"
     log env commandline,

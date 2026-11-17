@@ -9,7 +9,10 @@ let promoted_output (files : Filecompare.files) =
     | None -> files.output_filename
   in
   let name =
-    String.concat "__" (String.split_on_char '/' name) in (* dune limitation *)
+    (* work around dune limitation *)
+    String.concat "__"
+      (String.split_on_char Filename.dir_sep.[0] name)
+  in
   Filename.concat ref_dir name
 
 let run_task_item ~log : Actions.task_item -> Result.t = function

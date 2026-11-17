@@ -427,7 +427,7 @@ let config_script = make
   ~description:"Run the script specified by the script variable once, when \
                 checking test dependencies. The script may result in TEST_SKIP \
                 but does not have build artifacts available."
-  ~does_something:true
+  ~does_something:false
   Actions_helpers.run_config_script
 
 let check_program_output = make
