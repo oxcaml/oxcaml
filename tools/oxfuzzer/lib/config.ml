@@ -48,6 +48,18 @@ let max_closure_param_count = 3
 
 let max_closure_call_count = 8
 
+let max_let_rec_count = 4
+
+let max_recursive_functions = 3
+
+let max_recursive_param_count = 2
+
+let max_recursive_calls = 2
+
+let max_fuel = 3
+
+let unused_recursive_functions = false
+
 let max_probability = 10_000
 
 (* Probabilities out of [max_probability], conditional on reaching each
@@ -100,6 +112,8 @@ let closure_probability = 1_500
 
 let curried_lambda_probability = 2_500
 
+let opaque_recursive_call_probability = 2_500
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -134,7 +148,8 @@ module Swarm = struct
       opaque_loop_bounds : bool;
       exceptions : bool;
       closures : bool;
-      partial_applications : bool
+      partial_applications : bool;
+      recursive_functions : bool
     }
 
   let create random_state =
@@ -169,7 +184,8 @@ module Swarm = struct
       opaque_loop_bounds = Random.State.bool random_state;
       exceptions = Random.State.bool random_state;
       closures = Random.State.bool random_state;
-      partial_applications = Random.State.bool random_state
+      partial_applications = Random.State.bool random_state;
+      recursive_functions = Random.State.bool random_state
     }
 
   let to_string t =
@@ -199,7 +215,8 @@ module Swarm = struct
       "opaque_loop_bounds", t.opaque_loop_bounds;
       "exceptions", t.exceptions;
       "closures", t.closures;
-      "partial_applications", t.partial_applications ]
+      "partial_applications", t.partial_applications;
+      "recursive_functions", t.recursive_functions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> List.cons
          (Format.sprintf "  assertions = %s"

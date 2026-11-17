@@ -595,6 +595,10 @@ module Expr = struct
         { func : t;
           args : t list
         }
+    | Let_rec of
+        { functions : (Name.t * t) list;
+          body : t
+        }
 
   and raise =
     { exn : Exn.t;
@@ -798,6 +802,19 @@ module Expr = struct
     | Apply { func; args } ->
       if List.is_empty args then Misc.fatal_errorf "Apply: no arguments";
       apply (to_code func) (List.map to_code args)
+    | Let_rec { functions; body } ->
+      if List.is_empty functions then Misc.fatal_errorf "Let_rec: no functions";
+      let binding (name, lambda) =
+        match lambda with
+        | Lambda _ ->
+          Ast_helper.Vb.mk
+            (Ast_helper.Pat.var (loc (Name.to_string name)))
+            (to_code lambda)
+        | _ -> Misc.fatal_errorf "Let_rec: expected a function"
+      in
+      Ast_helper.Exp.let_ Immutable Recursive
+        (List.map binding functions)
+        (to_code body)
 
   and raise_to_code { exn; payload; notrace } =
     let payload =

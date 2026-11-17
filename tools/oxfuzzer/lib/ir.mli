@@ -318,6 +318,11 @@ module Expr : sig
         { func : t;
           args : t list
         }  (** Application of a function value. *)
+    | Let_rec of
+        { functions : (Name.t * t) list;
+              (** Each function must be a [Lambda]. *)
+          body : t
+        }  (** Local mutually recursive functions. *)
 
   and raise =
     { exn : Exn.t;

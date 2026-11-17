@@ -46,6 +46,25 @@ val max_closure_param_count : int
 
 val max_closure_call_count : int
 
+val max_let_rec_count : int
+
+val max_recursive_functions : int
+
+val max_recursive_param_count : int
+
+(* Calls from the body of a local recursive function to the functions of its
+   set. *)
+val max_recursive_calls : int
+
+val max_fuel : int
+
+(* Whether to keep local recursive functions that the first function of their
+   set cannot reach. Off, as the native compilers fail on some such sets:
+   "let-rec group of [lfunction] declarations have inconsistent alloc modes",
+   e.g. for [let rec g n x = x + y and h n = n + y in Sys.opaque_identity (g
+   0)]. *)
+val unused_recursive_functions : bool
+
 val max_probability : int
 
 (* Probabilities out of [max_probability]. *)
@@ -97,6 +116,8 @@ val closure_probability : int
 
 val curried_lambda_probability : int
 
+val opaque_recursive_call_probability : int
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -131,7 +152,8 @@ module Swarm : sig
       opaque_loop_bounds : bool;
       exceptions : bool;
       closures : bool;
-      partial_applications : bool
+      partial_applications : bool;
+      recursive_functions : bool
     }
 
   val create : Random.State.t -> t

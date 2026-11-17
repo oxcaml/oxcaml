@@ -28,7 +28,10 @@ module State = struct
       mutable variant_types : Ty.variant list;
       mutable matches_remaining : int;
       mutable tries_remaining : int;
-      mutable closure_calls_remaining : int
+      mutable closure_calls_remaining : int;
+      mutable let_recs_remaining : int;
+      mutable recursive_calls_remaining : int;
+      mutable recursive_callees : Name.t list
     }
 
   let create random_state =
@@ -44,7 +47,10 @@ module State = struct
       variant_types = [];
       matches_remaining = Config.max_match_count;
       tries_remaining = Config.max_try_count;
-      closure_calls_remaining = Config.max_closure_call_count
+      closure_calls_remaining = Config.max_closure_call_count;
+      let_recs_remaining = Config.max_let_rec_count;
+      recursive_calls_remaining = 0;
+      recursive_callees = []
     }
 
   let fresh t = Fresh.next t.names
@@ -62,14 +68,36 @@ module Loop_variable = struct
     }
 end
 
+(* The functions of a set of local recursive functions, as seen from their
+   bodies. Each function takes [fuel] first, and calls between them decrease
+   it. *)
+module Recursion = struct
+  type function_ =
+    { name : Name.t;
+      params : Ty.t list;
+      result : Ty.t
+    }
+
+  type t =
+    { fuel : Name.t;
+      functions : function_ list
+    }
+end
+
 module Env = struct
   type t =
     { bindings : Binding.t list;
       loop_variables : Loop_variable.t list;
-      catchable_exceptions : Exn.t list
+      catchable_exceptions : Exn.t list;
+      recursion : Recursion.t option
     }
 
-  let empty = { bindings = []; loop_variables = []; catchable_exceptions = [] }
+  let empty =
+    { bindings = [];
+      loop_variables = [];
+      catchable_exceptions = [];
+      recursion = None
+    }
 
   let can_raise t exn = List.exists (Exn.equal exn) t.catchable_exceptions
 
@@ -91,7 +119,8 @@ module Env = struct
 
   (* Closures cannot capture mutable variables, which include loop variables.
      They can be called after the handlers around them have been left, so they
-     must not raise. *)
+     must not raise, nor call the recursive functions around them, which could
+     then be called without a bound. *)
   let for_closure t =
     let is_loop_variable (binding : Binding.t) =
       List.exists
@@ -883,6 +912,8 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
                  }) );
          1, gen_fun_call st env (Ty.Number nty);
          1, gen_closure_call st env (Ty.Number nty);
+         1, gen_recursive_call st env (Ty.Number nty);
+         1, gen_let_rec st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
 
@@ -1218,6 +1249,180 @@ and gen_lambda (st : State.t) (env : Env.t) params result_ty =
   in
   Expr.Lambda { params; inline; body; result_ty }
 
+(* Calls a function of the recursive set whose body is being generated, with
+   less fuel. *)
+and gen_recursive_call (st : State.t) (env : Env.t) result_ty =
+  match env.recursion with
+  | None -> Gen.unavailable
+  | Some { fuel; functions } ->
+    let functions =
+      List.filter
+        (fun ({ result; _ } : Recursion.function_) ->
+          can_convert st result result_ty)
+        functions
+    in
+    Gen.when_
+      (st.recursive_calls_remaining > 0 && not (List.is_empty functions))
+      (fun () ->
+        st.recursive_calls_remaining <- st.recursive_calls_remaining - 1;
+        let { Recursion.name; params; result } = random_element st functions in
+        st.recursive_callees <- name :: st.recursive_callees;
+        let func =
+          maybe_opaque st ~enabled:true
+            ~probability:Config.opaque_recursive_call_probability
+            (Expr.Read (Place.Variable name))
+        in
+        let fuel =
+          Expr.Bin_op
+            { ty = Ty.Number (NumberTy.boxed Int);
+              op = Sub;
+              lhs = Expr.Read (Place.Variable fuel);
+              rhs = Expr.Const (Number.Int 1)
+            }
+        in
+        let args = List.map (gen_value st env) params in
+        bind_operands st args ~f:(fun args ->
+            convert_value st result result_ty
+              (Expr.Apply { func; args = fuel :: args })))
+
+(* Local mutually recursive functions, which capture the immutable variables in
+   scope, and a call to the first one with a small amount of fuel. For a
+   function type, the call is a partial application and returns a function
+   value. *)
+and gen_let_rec (st : State.t) (env : Env.t) ty =
+  Gen.when_
+    (st.swarm.recursive_functions && st.let_recs_remaining > 0)
+    (fun () ->
+      st.let_recs_remaining <- st.let_recs_remaining - 1;
+      let gen_params () =
+        List.init
+          (random_int_in_range st ~min:0 ~max:Config.max_recursive_param_count)
+          (fun _ -> gen_type ~arrows:false st)
+      in
+      let first =
+        match Ty.uncurry ty with
+        | [], _ -> gen_params (), ty
+        | params, result -> params, result
+      in
+      let signatures =
+        first
+        :: List.init
+             (random_int_in_range st ~min:0
+                ~max:(Config.max_recursive_functions - 1))
+             (fun _ -> gen_params (), gen_type ~arrows:false st)
+      in
+      let functions =
+        List.map
+          (fun (params, result) ->
+            { Recursion.name = State.fresh st; params; result })
+          signatures
+      in
+      let fuel_ty = Ty.Number (NumberTy.boxed Int) in
+      let gen_function ({ Recursion.params; result; _ } : Recursion.function_) =
+        let fuel = State.fresh st in
+        let params =
+          List.map
+            (fun ty ->
+              { Binding.name = State.fresh st; ty; is_mutable = false })
+            params
+        in
+        let body_env =
+          List.fold_left Env.extend (Env.for_closure env)
+            ({ Binding.name = fuel; ty = fuel_ty; is_mutable = false } :: params)
+        in
+        let base = gen_value st body_env result in
+        let saved_calls = st.recursive_calls_remaining in
+        let saved_callees = st.recursive_callees in
+        st.recursive_calls_remaining <- Config.max_recursive_calls;
+        st.recursive_callees <- [];
+        let step =
+          let env = { body_env with recursion = Some { fuel; functions } } in
+          match gen_recursive_call st env result with
+          | Some generate when Random.State.bool st.random_state -> generate ()
+          | Some _ | None -> gen_value st env result
+        in
+        let callees = st.recursive_callees in
+        st.recursive_calls_remaining <- saved_calls;
+        st.recursive_callees <- saved_callees;
+        let body =
+          Expr.If
+            { condition =
+                Expr.Bin_op
+                  { ty = fuel_ty;
+                    op = Le;
+                    lhs = Expr.Read (Place.Variable fuel);
+                    rhs = Expr.Const (Number.Int 0)
+                  };
+              if_true = base;
+              if_false = step
+            }
+        in
+        ( Expr.Lambda
+            { params =
+                { Binding.name = fuel; ty = fuel_ty; is_mutable = false }
+                :: params;
+              inline = Default;
+              body;
+              result_ty = result
+            },
+          callees )
+      in
+      let lambdas = List.map gen_function functions in
+      let first = List.hd functions in
+      let callees name =
+        List.concat
+          (List.map2
+             (fun ({ name = caller; _ } : Recursion.function_) (_, callees) ->
+               if Name.equal caller name then callees else [])
+             functions lambdas)
+      in
+      let rec reach reached = function
+        | [] -> reached
+        | name :: names ->
+          if List.exists (Name.equal name) reached
+          then reach reached names
+          else reach (name :: reached) (callees name @ names)
+      in
+      let reached = reach [] [first.name] in
+      let is_kept ({ name; _ } : Recursion.function_) =
+        Config.unused_recursive_functions
+        || List.exists (Name.equal name) reached
+      in
+      let fuel =
+        Expr.Const
+          (Number.Int (random_int_in_range st ~min:0 ~max:Config.max_fuel))
+      in
+      let func = Expr.Read (Place.Variable first.name) in
+      let call =
+        match ty with
+        | Ty.Arrow _ -> Expr.Apply { func; args = [fuel] }
+        | _ ->
+          let partial =
+            (not (List.is_empty first.params))
+            && Random.State.bool st.random_state
+          in
+          let args = List.map (gen_value st env) first.params in
+          bind_operands st args ~f:(fun args ->
+              if partial
+              then
+                (* Apply the closure of a partial application. *)
+                Expr.Apply
+                  { func = Expr.Opaque (Expr.Apply { func; args = [fuel] });
+                    args
+                  }
+              else Expr.Apply { func; args = fuel :: args })
+      in
+      Expr.Let_rec
+        { functions =
+            List.filter_map
+              (fun ((function_ : Recursion.function_), (lambda, _)) ->
+                if is_kept function_
+                then Some (function_.name, lambda)
+                else None)
+              (List.combine functions lambdas);
+          body = call
+        })
+
 and gen_bool (st : State.t) env =
   let gen_binop op arg_ty gen_arg =
     Gen.create (fun () ->
@@ -1247,6 +1452,7 @@ and gen_bool (st : State.t) env =
          1, gen_bool_binop Bin_op.Or;
          1, gen_fun_call st env Ty.Bool;
          1, gen_closure_call st env Ty.Bool;
+         1, gen_recursive_call st env Ty.Bool;
          1, gen_try_expr st env Ty.Bool;
          1, gen_match st env Ty.Bool ])
 
@@ -1361,6 +1567,7 @@ and gen_value (st : State.t) env ty =
              [ 3, gen_existing st env ty;
                2, Gen.create (fun () -> gen_lambda st env params result);
                1, gen_partial_application st env params result;
+               1, gen_let_rec st env ty;
                1, gen_fun_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ]))
