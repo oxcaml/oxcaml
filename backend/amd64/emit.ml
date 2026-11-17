@@ -2065,9 +2065,9 @@ let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
 
 let emit_combine_edx_eax dst =
   let rdx = X86_ast.Reg64 RDX in
-  (* RDTSC and RDPMC fill the low 32 bits of the result registers. On
-     processors that support the Intel 64 architecture, the high-order
-     32 bits of each of RAX and RDX are cleared. *)
+  (* RDTSC and RDPMC fill the low 32 bits of the result registers. On processors
+     that support the Intel 64 architecture, the high-order 32 bits of each of
+     RAX and RDX are cleared. *)
   I.sal (int 32) rdx;
   (* Preserve the shifted high half when the destination is rdx. *)
   match reg64 dst with
