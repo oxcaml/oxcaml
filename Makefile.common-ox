@@ -380,6 +380,8 @@ ifneq ($(codegen_variant_names),)
 	     echo '#define CAML_CODEGEN_VARIANT_EXPLICIT 1'; \
 	     case "-$$name-" in *-fp-*) \
 	       echo '#define WITH_FRAME_POINTERS 1';; esac; \
+	     case "-$$name-" in *-sc-*) \
+	       echo '#define STACK_CHECKS_ENABLED 1';; esac; \
 	     echo '#endif'; \
 	     cat caml/m.h; } > $$vroot/caml/m.h; \
 	   cp -R stublibs $$vroot/; \

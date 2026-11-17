@@ -26,11 +26,20 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type t = { frame_pointers : bool }
+type t =
+  { frame_pointers : bool;
+    stack_checks : bool
+  }
 
-let flags_variant () = { frame_pointers = !Clflags.frame_pointers }
+let flags_variant () =
+  { frame_pointers = !Clflags.frame_pointers;
+    stack_checks = !Clflags.stack_checks
+  }
 
-let default = { frame_pointers = Config.with_frame_pointers }
+let default =
+  { frame_pointers = Config.with_frame_pointers;
+    stack_checks = not Config.no_stack_checks
+  }
 
 (* The axes describe native code generation only.  A JSIR compilation
    (-target js_of_ocaml or wasm_of_ocaml) emits no native code, and the
@@ -41,20 +50,27 @@ let default = { frame_pointers = Config.with_frame_pointers }
 let current () =
   if Clflags.target_is_jsir () then default else flags_variant ()
 
-let equal t1 t2 = Bool.equal t1.frame_pointers t2.frame_pointers
+let equal t1 t2 =
+  Bool.equal t1.frame_pointers t2.frame_pointers
+  && Bool.equal t1.stack_checks t2.stack_checks
 
 let is_default t = equal t default
 
-let apply t = Clflags.frame_pointers := t.frame_pointers
+let apply t =
+  Clflags.frame_pointers := t.frame_pointers;
+  Clflags.stack_checks := t.stack_checks
 
 (* Naming goes through the dependency-free [Codegen_variant_name] token
    scheme; a new axis extends [name]/[of_name] alongside [t]. *)
 let name t =
   Codegen_variant_name.of_tokens
-    (if t.frame_pointers then [Codegen_variant_name.Frame_pointers] else [])
+    ((if t.frame_pointers then [Codegen_variant_name.Frame_pointers] else [])
+    @ if t.stack_checks then [Codegen_variant_name.Stack_checks] else [])
 
 let of_name n =
-  { frame_pointers = Codegen_variant_name.(mem Frame_pointers n) }
+  { frame_pointers = Codegen_variant_name.(mem Frame_pointers n);
+    stack_checks = Codegen_variant_name.(mem Stack_checks n)
+  }
 
 let to_string t = Codegen_variant_name.to_string (name t)
 
@@ -63,10 +79,17 @@ let of_string s = Option.map of_name (Codegen_variant_name.of_string s)
 let runtime_archive_suffix t =
   Codegen_variant_name.runtime_archive_suffix (name t) ~default:(name default)
 
+(* 4096 is the smallest page size of any supported target; the runtime
+   asserts [page_size >= Stack_guard_stride] when allocating a guard-paged
+   stack (see Stack_guard_stride in runtime/caml/config.h, which must agree
+   with this value, and the assertion in runtime/fiber.c). *)
+let stack_guard_stride () = if !Clflags.stack_checks then 0 else 4096
+
 type fingerprint = (string * string) list
 
 let fingerprint t =
   [ "frame_pointers", string_of_bool t.frame_pointers;
+    "stack_checks", string_of_bool t.stack_checks;
     "address_sanitizer", string_of_bool Config.with_address_sanitizer ]
 
 let current_fingerprint () = fingerprint (current ())

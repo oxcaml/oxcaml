@@ -1,0 +1,13 @@
+[00] Growing stack to 64k bytes
+[00] Growing stack to 128k bytes
+[00] Growing stack to 256k bytes
+[00] Growing stack to 512k bytes
+camlStack_realloc2__callback_5_16_code
+caml_start_program
+caml_callback
+c_fun
+caml_c_call
+camlStack_realloc2__f_comp_7_18_code
+caml_runstack
+camlStack_realloc2__entry
+caml_program

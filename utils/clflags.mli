@@ -325,6 +325,7 @@ val shared : bool ref
 val dlcode : bool ref
 val pic_code : bool ref
 val frame_pointers : bool ref
+val stack_checks : bool ref
 val runtime_variant : string ref
 val ocamlrunparam : string ref
 val with_runtime : bool ref

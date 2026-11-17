@@ -694,7 +694,7 @@ let compile_genfuns ~ppf_dump f =
 
 let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     ~may_reduce_heap ~ppf_dump gen =
-  Oxcaml_flags.validate_frame_pointers ();
+  Oxcaml_flags.validate_codegen_variant ();
   reset ();
   Emitaux.output_prefix := output_prefix;
   let create_asm =

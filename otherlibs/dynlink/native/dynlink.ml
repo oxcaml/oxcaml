@@ -95,7 +95,8 @@ module Native = struct
     Some
       (Codegen_variant.fingerprint
          { Codegen_variant.frame_pointers =
-             Dynlink_host_variant.frame_pointers })
+             Dynlink_host_variant.frame_pointers;
+           stack_checks = Dynlink_host_variant.stack_checks })
   let adapt_filename f = Filename.chop_extension f ^ ".cmxs"
 
   let num_globals_inited () = ndl_globals_inited ()

@@ -858,11 +858,12 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     preproc_stack_check ~fun_body:fundecl.fun_body ~frame_size ~trap_size
   in
   let insert_stack_check =
-    if Config.no_stack_checks
-    then
-      Domainstate.stack_guard_stride > 0
-      && max_frame_size >= Domainstate.stack_guard_stride
-    else contains_nontail_calls || max_frame_size >= stack_threshold_size
+    if !Clflags.stack_checks
+    then contains_nontail_calls || max_frame_size >= stack_threshold_size
+    else
+      (* Only frames big enough to step over the stack's guard page need
+         probing. *)
+      max_frame_size >= Codegen_variant.stack_guard_stride ()
   in
   if insert_stack_check
   then

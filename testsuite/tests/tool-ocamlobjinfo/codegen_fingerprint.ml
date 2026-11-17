@@ -1,5 +1,6 @@
 (* TEST
  no-frame_pointers;
+ no-stack-checks;
  no-address-sanitizer;
  shared-libraries;
  setup-ocamlopt.byte-build-env;
@@ -15,6 +16,6 @@
 
 (* Checks that ocamlobjinfo prints the codegen fingerprint recorded in
    native artifacts.  Gated to configurations where the default variant
-   is known (no frame pointers, no address sanitizer); question.ml
-   covers the rest of the output on all configurations. *)
+   is known (no frame pointers, no stack checks, no address sanitizer);
+   question.ml covers the rest of the output on all configurations. *)
 let answer () = 42

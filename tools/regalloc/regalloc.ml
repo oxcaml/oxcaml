@@ -464,6 +464,12 @@ let parse_command_line () =
       ( "-no-frame-pointers",
         Arg.Clear Clflags.frame_pointers,
         "Process IR saved with frame pointers disabled" );
+      ( "-stack-checks",
+        Arg.Set Clflags.stack_checks,
+        "Process IR saved with stack checks enabled" );
+      ( "-no-stack-checks",
+        Arg.Clear Clflags.stack_checks,
+        "Process IR saved with stack checks disabled" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
       ( "-copy-propagation",

@@ -237,6 +237,18 @@ let mk_no_frame_pointers f =
     " Do not maintain frame pointers in generated code (default: the setting \
      the compiler was configured with)" )
 
+let mk_stack_checks f =
+  ( "-stack-checks",
+    Arg.Unit f,
+    " Generate explicit stack-limit checks instead of relying on guard pages \
+     (default: the setting the compiler was configured with)" )
+
+let mk_no_stack_checks f =
+  ( "-no-stack-checks",
+    Arg.Unit f,
+    " Rely on stack guard pages instead of explicit stack-limit checks \
+     (default: the setting the compiler was configured with)" )
+
 let mk_cfg_merge_blocks f =
   ("-cfg-merge-blocks", Arg.Unit f, " Merge equivalent CFG blocks")
 
@@ -1531,6 +1543,8 @@ module type Oxcaml_options = sig
   val no_omit_leaf_frame_pointers : unit -> unit
   val frame_pointers : unit -> unit
   val no_frame_pointers : unit -> unit
+  val stack_checks : unit -> unit
+  val no_stack_checks : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
   val cfg_block_layout : unit -> unit
@@ -1757,6 +1771,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_omit_leaf_frame_pointers F.no_omit_leaf_frame_pointers;
       mk_frame_pointers F.frame_pointers;
       mk_no_frame_pointers F.no_frame_pointers;
+      mk_stack_checks F.stack_checks;
+      mk_no_stack_checks F.no_stack_checks;
       mk_cfg_merge_blocks F.cfg_merge_blocks;
       mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
       mk_cfg_block_layout F.cfg_block_layout;
@@ -2145,6 +2161,8 @@ module Oxcaml_options_impl = struct
   let no_omit_leaf_frame_pointers = clear' Oxcaml_flags.omit_leaf_frame_pointers
   let frame_pointers = set' Clflags.frame_pointers
   let no_frame_pointers = clear' Clflags.frame_pointers
+  let stack_checks = set' Clflags.stack_checks
+  let no_stack_checks = clear' Clflags.stack_checks
   let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
   let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
   let cfg_block_layout = set' Oxcaml_flags.cfg_block_layout
@@ -2745,6 +2763,7 @@ module Extra_params = struct
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
     | "frame-pointers" -> set' Clflags.frame_pointers
+    | "stack-checks" -> set' Clflags.stack_checks
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
     | "cfg-block-layout" -> set' Oxcaml_flags.cfg_block_layout
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation

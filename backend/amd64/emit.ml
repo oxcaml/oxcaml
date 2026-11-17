@@ -799,15 +799,15 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
        }
        :: !stack_realloc
 
-(* Probe the prospective stack frame at [Domainstate.stack_guard_stride]-byte
-   strides, descending, so that a frame big enough to step over the stack's
+(* Probe the prospective stack frame at [Codegen_variant.stack_guard_stride]-
+   byte strides, descending, so that a frame big enough to step over the stack's
    guard page faults in it instead; the SEGV handler raises [Stack_overflow].
    Used instead of [emit_stack_check] when stack checks are disabled. The probes
    touch but do not change memory. Since a shrink-wrapped prologue may already
    have moved %rsp by up to a page, we start probing at offset zero. We unroll
    up to four strides; beyond that we generate a loop. *)
 let emit_stack_probes ~size_in_bytes ~save_registers =
-  let stride = Domainstate.stack_guard_stride in
+  let stride = Codegen_variant.stack_guard_stride () in
   assert (stride > 0 && size_in_bytes >= stride);
   let full_strides = size_in_bytes / stride in
   let probe ofs = I.or_ (int 0) (mem64 QWORD (-ofs) (Scalar RSP)) in
@@ -2307,7 +2307,7 @@ let emit_instr ~first ~last ~fallthrough i =
       emit_call (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_c_call");
       record_frame i.live (Dbg_other i.dbg))
     else
-      let switch_stacks = not Config.no_stack_checks in
+      let switch_stacks = !Clflags.stack_checks in
       if switch_stacks
       then (
         I.mov rsp r13;
@@ -2850,14 +2850,14 @@ let emit_instr ~first ~last ~fallthrough i =
       I.pop r11;
       I.jmp r11)
   | Lstackcheck { max_frame_size_bytes } ->
-    if Config.no_stack_checks
+    if !Clflags.stack_checks
     then
-      emit_stack_probes ~size_in_bytes:max_frame_size_bytes
-        ~save_registers:(not first)
-    else
       emit_stack_check ~size_in_bytes:max_frame_size_bytes
         ~save_registers:(not first)
         ~save_simd:(must_save_simd_regs i.live)
+    else
+      emit_stack_probes ~size_in_bytes:max_frame_size_bytes
+        ~save_registers:(not first)
 
 let emit_instr ~first ~last ~fallthrough i =
   try emit_instr ~first ~last ~fallthrough i with
@@ -2949,7 +2949,7 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
-  if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
+  if !Clflags.stack_checks && String.equal !Clflags.runtime_variant "d"
   then
     emit_call
       (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_assert_stack_invariants");
@@ -3241,14 +3241,14 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if Config.no_stack_checks
+  if !Clflags.stack_checks
   then (
-    if Domainstate.stack_guard_stride > 0 && n >= Domainstate.stack_guard_stride
-    then emit_stack_probes ~size_in_bytes:n ~save_registers:true)
-  else if n >= Stack_check.stack_threshold_size
-  then
-    emit_stack_check ~size_in_bytes:n ~save_registers:true
-      ~save_simd:(must_save_simd_regs p.probe_insn.live);
+    if n >= Stack_check.stack_threshold_size
+    then
+      emit_stack_check ~size_in_bytes:n ~save_registers:true
+        ~save_simd:(must_save_simd_regs p.probe_insn.live))
+  else if n >= Codegen_variant.stack_guard_stride ()
+  then emit_stack_probes ~size_in_bytes:n ~save_registers:true;
   emit_stack_offset n;
   (* Save all live hard registers *)
   let offset = aux_offset + tmp_offset + loc_offset in

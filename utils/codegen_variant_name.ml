@@ -38,17 +38,25 @@
    (testsuite/tests/frame-pointers/codegen_variant_names.ml) checks the rule
    for every installed variant. *)
 
-type token = Frame_pointers
+type token =
+  | Frame_pointers
+  | Stack_checks
 
 (* In canonical (sorted-name) order. *)
-let all_tokens = [Frame_pointers]
+let all_tokens = [Frame_pointers; Stack_checks]
 
-let token_name = function Frame_pointers -> "fp"
+let token_name = function Frame_pointers -> "fp" | Stack_checks -> "sc"
 
-let token_of_name = function "fp" -> Some Frame_pointers | _ -> None
+let token_of_name = function
+  | "fp" -> Some Frame_pointers
+  | "sc" -> Some Stack_checks
+  | _ -> None
 
 let equal_token t1 t2 =
-  match t1, t2 with Frame_pointers, Frame_pointers -> true
+  match t1, t2 with
+  | Frame_pointers, Frame_pointers -> true
+  | Stack_checks, Stack_checks -> true
+  | (Frame_pointers | Stack_checks), _ -> false
 
 let compare_token t1 t2 = String.compare (token_name t1) (token_name t2)
 
@@ -65,10 +73,14 @@ let ocamlopt_flag token ~enabled =
   match token, enabled with
   | Frame_pointers, true -> "-frame-pointers"
   | Frame_pointers, false -> "-no-frame-pointers"
+  | Stack_checks, true -> "-stack-checks"
+  | Stack_checks, false -> "-no-stack-checks"
 
 let ocamlparam token ~enabled =
   let value = if enabled then "1" else "0" in
-  match token with Frame_pointers -> "frame-pointers=" ^ value
+  match token with
+  | Frame_pointers -> "frame-pointers=" ^ value
+  | Stack_checks -> "stack-checks=" ^ value
 
 (* Passed by every C or assembler compilation that states its codegen
    variant on the command line; m.h then skips the configure defaults. *)
@@ -83,15 +95,19 @@ let cc_flags token ~enabled =
   | Frame_pointers, true ->
     ["-DWITH_FRAME_POINTERS=1"; "-fno-omit-frame-pointer"; "-g"]
   | Frame_pointers, false -> []
+  | Stack_checks, true -> ["-DSTACK_CHECKS_ENABLED=1"]
+  | Stack_checks, false -> []
 
 let aspp_flags token ~enabled =
   match token, enabled with
   | Frame_pointers, true -> ["-DWITH_FRAME_POINTERS=1"]
   | Frame_pointers, false -> []
+  | Stack_checks, true -> ["-DSTACK_CHECKS_ENABLED=1"]
+  | Stack_checks, false -> []
 
 (* Whether the token changes the runtime (so its archives differ); tokens
    that only affect OCaml code generation share the projection's archives. *)
-let is_runtime_axis = function Frame_pointers -> true
+let is_runtime_axis = function Frame_pointers -> true | Stack_checks -> true
 
 type t = token list
 

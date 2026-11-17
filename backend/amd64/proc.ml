@@ -517,11 +517,17 @@ let domainstate_ptr_dwarf_register_number = 14
 let int_regs_destroyed_at_c_call_win64 =
   Regs.[|RAX; RBX; RDX; RCX; R8; R9; R10; R11; RBP|]
 
-let int_regs_destroyed_at_c_call =
-  if not Config.no_stack_checks
-  then (* Clobbers R13 to hold stack pointer. See emit.ml *)
-       Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
-  else Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
+(* The stack-checks flag can change between the source files of a single
+   invocation ([ocaml_compiler_internal_params]; see compenv.ml), so the
+   R13 clobber cannot be captured by a once-forced lazy: both variants are
+   precomputed and [destroyed_at_c_call] selects through the flag at each
+   call, allocation-free. *)
+let int_regs_destroyed_at_c_call_stack_checks =
+  (* Clobbers R13 to hold stack pointer. See emit.ml *)
+  Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
+
+let int_regs_destroyed_at_c_call_no_stack_checks =
+  Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
 
 let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
@@ -534,22 +540,35 @@ let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   |> add_hard_mask_regs ~f:(fun regs -> regs)
   |> Array.concat)
 
-let destroyed_at_c_call_unix = lazy ((* To be forced after flags are parsed. *)
-  (* Unix: rbx, rbp, r12-r15 preserved *)
-  [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call;
-    hard_float_reg;
-    hard_float32_reg;
-    hard_vec128_reg ]
-  |> add_hard_vec256_regs ~f:(fun regs -> regs)
-  |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> add_hard_mask_regs ~f:(fun regs -> regs)
-  |> Array.concat)
+let destroyed_at_c_call_unix ~int_regs =
+  lazy ((* To be forced after flags are parsed. *)
+    (* Unix: rbx, rbp, r12-r15 preserved (R13 clobbered under stack checks;
+       see above) *)
+    [ Array.map (fun p -> phys_reg Int (P p)) int_regs;
+      hard_float_reg;
+      hard_float32_reg;
+      hard_vec128_reg ]
+    |> add_hard_vec256_regs ~f:(fun regs -> regs)
+    |> add_hard_vec512_regs ~f:(fun regs -> regs)
+    |> add_hard_mask_regs ~f:(fun regs -> regs)
+    |> Array.concat)
 
-let destroyed_at_c_call =
+let destroyed_at_c_call_unix_stack_checks =
+  destroyed_at_c_call_unix ~int_regs:int_regs_destroyed_at_c_call_stack_checks
+
+let destroyed_at_c_call_unix_no_stack_checks =
+  destroyed_at_c_call_unix
+    ~int_regs:int_regs_destroyed_at_c_call_no_stack_checks
+
+let destroyed_at_c_call () =
   (* C calling conventions preserve rbx, but it is clobbered
      by the code sequence used for C calls in emit.ml, so it
      is marked as destroyed. *)
-  if win64 then destroyed_at_c_call_win64 else destroyed_at_c_call_unix
+  if win64
+  then Lazy.force destroyed_at_c_call_win64
+  else if !Clflags.stack_checks
+  then Lazy.force destroyed_at_c_call_unix_stack_checks
+  else Lazy.force destroyed_at_c_call_unix_no_stack_checks
 
 let destroyed_at_alloc_or_poll =
   if X86_proc.use_plt then destroyed_by_plt_stub else [| r11 |]
@@ -773,12 +792,12 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     assert (stack_ofs >= 0);
     if alloc || stack_ofs > 0
     then Lazy.force all_phys_regs
-    else Lazy.force destroyed_at_c_call
+    else destroyed_at_c_call ()
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
     if stack_ofs > 0
     then Lazy.force all_phys_regs
-    else Lazy.force destroyed_at_c_call
+    else destroyed_at_c_call ()
   | Call_no_return _
   | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
 
