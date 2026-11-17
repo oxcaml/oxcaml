@@ -319,13 +319,11 @@ val curry_mode :
     a constant until a generic mode variable is encountered, then the join
     of the modes closed over ([curry_mode]). A hidden curry mode is a
     variable whose lower bound is the implied curry mode, unconstrained
-    otherwise. Its areality is bounded below by the constant upper bounds
-    of the areality of the arguments: a closure is as local as the
-   otherwise. By default, its areality is bounded below by the constant upper 
-   bounds of the areality of the arguments: a closure is as local as the
-   arguments it may close over. Primitives ([primitive]) don't pin areality: 
-   their partial applications are eta-expanded, so the curry mode's locality
-   can use the instantiated localities of the arguments. *)
+    otherwise. By default, its areality is bounded below by the constant upper
+    bounds of the areality of the arguments: a closure is as local as the
+    arguments it may close over. Primitives ([primitive]) don't pin areality:
+    their partial applications are eta-expanded, so the curry mode's locality
+    can use the instantiated localities of the arguments. *)
 module Curry_mode : sig
   type t =
     | Const of { mode : With_locality.Const.t; pin_areality : bool }
