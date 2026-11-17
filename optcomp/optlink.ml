@@ -45,6 +45,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       crc : Digest.t;
       imports_cmx : Import_info.t list;
       codegen_fingerprint : Codegen_variant.fingerprint;
+      polled : bool;
       (* for shared libs *)
       dynunit : Cmxs_format.dynunit option
     }
@@ -161,7 +162,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
               dynu_quoted_cmi = info.ui_quoted_cmi |> Array.of_list;
               dynu_quoted_cmx = info.ui_quoted_cmx |> Array.of_list;
-              dynu_codegen_fingerprint = info.ui_codegen_fingerprint
+              dynu_codegen_fingerprint = info.ui_codegen_fingerprint;
+              dynu_polled = info.ui_polled
             }
       in
       let unit =
@@ -171,6 +173,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           file_name = resolved_pathname;
           imports_cmx = info.ui_imports_cmx;
           codegen_fingerprint = info.ui_codegen_fingerprint;
+          polled = info.ui_polled;
           dynunit
         }
       in
@@ -305,7 +308,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                         |> Array.of_list;
                       dynu_quoted_cmi = quoted_cmi |> Array.of_list;
                       dynu_quoted_cmx = quoted_cmx |> Array.of_list;
-                      dynu_codegen_fingerprint = info.li_codegen_fingerprint
+                      dynu_codegen_fingerprint = info.li_codegen_fingerprint;
+                      dynu_polled = info.li_polled
                     }
               in
               let imports_cmx =
@@ -318,6 +322,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                   file_name = resolved_pathname;
                   imports_cmx;
                   codegen_fingerprint = info.li_codegen_fingerprint;
+                  polled = info.li_polled;
                   dynunit
                 }
               in
@@ -518,6 +523,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         crc;
         imports_cmx = u.ui_imports_cmx;
         codegen_fingerprint = u.ui_codegen_fingerprint;
+        polled = u.ui_polled;
         dynunit = None
       }
     in

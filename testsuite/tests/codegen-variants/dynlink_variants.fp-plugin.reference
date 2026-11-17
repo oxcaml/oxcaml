@@ -1,0 +1,1 @@
+refused: Dynlink_variants_plugin was compiled for [frame_pointers=true, stack_checks=false, address_sanitizer=false], the program for [frame_pointers=false, stack_checks=false, address_sanitizer=false]

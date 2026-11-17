@@ -113,7 +113,6 @@ val function_layout : Function_layout.t ref
 val float_op_fusion : bool ref
 
 val disable_builtin_check : bool ref
-val disable_poll_insertion : bool ref
 val allow_long_frames : bool ref
 val max_long_frames_threshold : int
 val long_frames_threshold : int ref

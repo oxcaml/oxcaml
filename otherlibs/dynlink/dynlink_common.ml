@@ -231,6 +231,15 @@ module Make (P : Dynlink_platform_intf.S) = struct
       raise (DT.Error Unsafe_file)
     end
 
+  let check_polled filename ui =
+    (* A domain cap above 1 is only sound while every unit polls, and a cap
+       of 1 (also via OCAMLRUNPARAM d=1) permits the load, as the error says:
+       so this is the last check, of a unit that would otherwise load. *)
+    if not (UH.polled ui) && P.max_domain_count () > 1 then begin
+      raise (DT.Error (Library_not_fully_polled
+        { filename; unit_name = UH.name ui }))
+    end
+
   let check_codegen_variant filename ui =
     match P.host_codegen_fingerprint with
     | None -> ()
@@ -285,6 +294,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
         state.defined_symbols
         units
     in
+    List.iter (fun ui -> check_polled filename ui) units;
     if priv then begin
       state
     end else begin

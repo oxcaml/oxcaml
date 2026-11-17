@@ -40,23 +40,29 @@
 
 type token =
   | Frame_pointers
+  | Poll_insertion
   | Stack_checks
 
 (* In canonical (sorted-name) order. *)
-let all_tokens = [Frame_pointers; Stack_checks]
+let all_tokens = [Frame_pointers; Poll_insertion; Stack_checks]
 
-let token_name = function Frame_pointers -> "fp" | Stack_checks -> "sc"
+let token_name = function
+  | Frame_pointers -> "fp"
+  | Poll_insertion -> "poll"
+  | Stack_checks -> "sc"
 
 let token_of_name = function
   | "fp" -> Some Frame_pointers
+  | "poll" -> Some Poll_insertion
   | "sc" -> Some Stack_checks
   | _ -> None
 
 let equal_token t1 t2 =
   match t1, t2 with
   | Frame_pointers, Frame_pointers -> true
+  | Poll_insertion, Poll_insertion -> true
   | Stack_checks, Stack_checks -> true
-  | (Frame_pointers | Stack_checks), _ -> false
+  | (Frame_pointers | Poll_insertion | Stack_checks), _ -> false
 
 let compare_token t1 t2 = String.compare (token_name t1) (token_name t2)
 
@@ -73,6 +79,8 @@ let ocamlopt_flag token ~enabled =
   match token, enabled with
   | Frame_pointers, true -> "-frame-pointers"
   | Frame_pointers, false -> "-no-frame-pointers"
+  | Poll_insertion, true -> "-enable-poll-insertion"
+  | Poll_insertion, false -> "-disable-poll-insertion"
   | Stack_checks, true -> "-stack-checks"
   | Stack_checks, false -> "-no-stack-checks"
 
@@ -80,6 +88,7 @@ let ocamlparam token ~enabled =
   let value = if enabled then "1" else "0" in
   match token with
   | Frame_pointers -> "frame-pointers=" ^ value
+  | Poll_insertion -> "poll-insertion=" ^ value
   | Stack_checks -> "stack-checks=" ^ value
 
 (* Passed by every C or assembler compilation that states its codegen
@@ -95,6 +104,7 @@ let cc_flags token ~enabled =
   | Frame_pointers, true ->
     ["-DWITH_FRAME_POINTERS=1"; "-fno-omit-frame-pointer"; "-g"]
   | Frame_pointers, false -> []
+  | Poll_insertion, (true | false) -> []
   | Stack_checks, true -> ["-DSTACK_CHECKS_ENABLED=1"]
   | Stack_checks, false -> []
 
@@ -102,12 +112,19 @@ let aspp_flags token ~enabled =
   match token, enabled with
   | Frame_pointers, true -> ["-DWITH_FRAME_POINTERS=1"]
   | Frame_pointers, false -> []
+  | Poll_insertion, (true | false) -> []
   | Stack_checks, true -> ["-DSTACK_CHECKS_ENABLED=1"]
   | Stack_checks, false -> []
 
 (* Whether the token changes the runtime (so its archives differ); tokens
-   that only affect OCaml code generation share the projection's archives. *)
-let is_runtime_axis = function Frame_pointers -> true | Stack_checks -> true
+   that only affect OCaml code generation share the projection's archives.
+   Poll insertion is such a token: inserted polls reuse the ordinary
+   caml_call_gc machinery present in every runtime build, so the poll
+   variant links the archives of its projection onto {fp, sc}. *)
+let is_runtime_axis = function
+  | Frame_pointers -> true
+  | Poll_insertion -> false
+  | Stack_checks -> true
 
 type t = token list
 

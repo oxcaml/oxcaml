@@ -144,6 +144,7 @@ let read_unit_info filename =
       ui_static_data = uir.uir_static_data;
       ui_lto_info = uir.uir_lto_info;
       ui_codegen_fingerprint = uir.uir_codegen_fingerprint;
+      ui_polled = uir.uir_polled;
       ui_file_sections = sections;
     }
     in
@@ -335,14 +336,35 @@ let write_unit_info info filename =
     uir_static_data = info.ui_static_data;
     uir_lto_info = info.ui_lto_info;
     uir_codegen_fingerprint = info.ui_codegen_fingerprint;
+    uir_polled = info.ui_polled;
     uir_sections_length = total_length;
   } in
+  (* The CRC identifies the implementation to the units that import it, and
+     poll insertion changes nothing that they see: units compiled with
+     either setting link together, against the library tree of either
+     setting (see [Codegen_variant.selected_tree]).  So the CRC is the
+     digest of the file that the same unit has without poll insertion.
+     That file is what is written and digested first; for a unit with
+     polls its unit info is then written over the other, which has the same
+     size, the two differing in one boolean.  Nothing is built in memory
+     that is the size of the file. *)
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
-  output_value oc raw_info;
+  let info_start = pos_out oc in
+  output_value oc { raw_info with uir_polled = false };
+  let info_end = pos_out oc in
   Array.iter (output_string oc) serialized_sections;
   flush oc;
   let crc = Digest.file filename in
+  if info.ui_polled then begin
+    seek_out oc info_start;
+    output_value oc raw_info;
+    if pos_out oc <> info_end then
+      Misc.fatal_errorf
+        "Compilenv.write_unit_info: the unit info of %s has another size \
+         with the polled bit set" filename;
+    seek_out oc (out_channel_length oc)
+  end;
   Digest.output oc crc)
 
 let build_unit_info ~main_module_block_format ~static_data =
@@ -374,6 +396,16 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_external_symbols = current_unit.uib_external_symbols;
     ui_lto_info = current_unit.uib_lto_info;
     ui_codegen_fingerprint = Codegen_variant.current_fingerprint ();
+    (* The LLVM backend discards [Poll] instructions when lowering CFG to
+       LLVM IR (see [llvmize]), so a unit it compiles is not polled no
+       matter what [Clflags.poll_insertion] says; record it as nonpolled
+       so the link-time AND ([caml_code_fully_polled]) stays sound.  A
+       JSIR compilation generates no native code for the flag to change,
+       so its unit info does not depend on the flag either. *)
+    ui_polled =
+      !Clflags.poll_insertion
+      && (not !Clflags.llvm_backend)
+      && not (Clflags.target_is_jsir ());
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
   }

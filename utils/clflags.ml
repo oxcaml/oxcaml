@@ -433,6 +433,13 @@ let frame_pointers = ref Config.with_frame_pointers
 let stack_checks = ref (not Config.no_stack_checks)
                                         (* -[no-]stack-checks *)
 
+(* This ref lives here rather than in [Oxcaml_flags] because it is read by
+   [Lambda.primitive_may_allocate] and [Cmm_helpers] (the [Pcpu_relax]
+   lowering), which cannot depend on the driver libraries.
+   [Config.poll_insertion] only provides the default. *)
+let poll_insertion = ref Config.poll_insertion
+                                        (* -{enable,disable}-poll-insertion *)
+
 let runtime_variant = ref ""
 let ocamlrunparam = ref ""
 

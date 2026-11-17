@@ -38,6 +38,9 @@ let default_codegen_variant =
        ((if Config.with_frame_pointers
          then [Codegen_variant_name.Frame_pointers]
          else [])
+        @ (if Config.poll_insertion
+           then [Codegen_variant_name.Poll_insertion]
+           else [])
         @ (if Config.no_stack_checks
            then []
            else [Codegen_variant_name.Stack_checks])))

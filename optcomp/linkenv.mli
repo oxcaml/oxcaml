@@ -37,6 +37,7 @@ type unit_link_info =
     crc : Digest.t;
     imports_cmx : Import_info.t list;
     codegen_fingerprint : Codegen_variant.fingerprint;
+    polled : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -93,6 +94,10 @@ val check_library_consistency :
 
 val check_consistency :
   t -> unit:unit_link_info -> Import_info.t array -> Import_info.t array -> unit
+
+(* Whether a file that the link has checked, an archive or the file of one unit,
+   holds a unit of that name, which the link need not have taken from it. *)
+val file_holds_unit : t -> filepath -> CU.t -> bool
 
 type error =
   | File_not_found of filepath

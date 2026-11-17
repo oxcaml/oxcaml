@@ -35,7 +35,7 @@
 codegen_variant_names := $(strip $(CODEGEN_VARIANTS))
 
 # Every supported axis token, in canonical (sorted-name) order.
-codegen_tokens := fp sc
+codegen_tokens := fp poll sc
 
 # Passed by every C or assembler compilation that states its codegen
 # variant on the command line; m.h then skips the configure defaults.
@@ -53,6 +53,16 @@ codegen_token_fp_cc_on  := -DWITH_FRAME_POINTERS=1 -fno-omit-frame-pointer -g
 codegen_token_fp_cc_off :=
 codegen_token_fp_aspp_on  := -DWITH_FRAME_POINTERS=1
 codegen_token_fp_aspp_off :=
+
+# Poll insertion changes only OCaml code generation (not the runtime), so
+# its cc/aspp columns are empty.
+codegen_token_poll_ocamlopt_on  := -enable-poll-insertion
+codegen_token_poll_ocamlopt_off := -disable-poll-insertion
+codegen_token_poll_param := poll-insertion
+codegen_token_poll_cc_on  :=
+codegen_token_poll_cc_off :=
+codegen_token_poll_aspp_on  :=
+codegen_token_poll_aspp_off :=
 
 codegen_token_sc_ocamlopt_on  := -stack-checks
 codegen_token_sc_ocamlopt_off := -no-stack-checks

@@ -1,0 +1,20 @@
+File poll_ocamlparam.cmx
+Name: Poll_ocamlparam
+CRC of implementation: 00000000000000000000000000000000
+Globals defined:
+	Poll_ocamlparam
+Interfaces imported:
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	Poll_ocamlparam
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Implementations imported:
+Interfaces used in quotations:
+Implementations used in quotations:
+Flambda 2 unit with export information
+Currying functions:
+Apply functions:
+Send functions:
+Force link: no
+Codegen fingerprint: frame_pointers=false, stack_checks=false, address_sanitizer=false
+Polled: true
+Static data: (missing)

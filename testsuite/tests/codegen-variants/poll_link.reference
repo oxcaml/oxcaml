@@ -1,0 +1,18 @@
+units with polls, linked with: more than one domain
+first unit without polls, linked with: one domain
+second unit without polls, linked with: one domain
+last unit without polls, linked with: one domain
+units without polls, linked with: one domain
+units with polls, linked without: one domain
+first unit without polls, linked without: one domain
+second unit without polls, linked without: one domain
+last unit without polls, linked without: one domain
+units without polls, linked without: one domain
+archive with polls, linked with: more than one domain
+archive with polls, linked without: one domain
+archive, first unit without polls, linked with: one domain
+archive, second unit without polls, linked with: one domain
+pack with polls, linked with: more than one domain
+pack with polls, linked without: one domain
+pack, first unit without polls, linked with: one domain
+pack, second unit without polls, linked with: one domain

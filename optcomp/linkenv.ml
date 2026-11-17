@@ -25,6 +25,7 @@ type unit_link_info =
     crc : Digest.t;
     imports_cmx : Import_info.t list;
     codegen_fingerprint : Codegen_variant.fingerprint;
+    polled : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -128,13 +129,13 @@ let get_quoted_cmx t = t.quoted_cmx
 
 (* Consistency check between interfaces and implementations: *)
 
-(* The libraries of two codegen variants do not have the same CRCs, so a file
-   that was compiled for another variant than that of this invocation disagrees
-   with the other files on what it imports. That is what to report then,
-   whichever of the two files of an inconsistency it is: the check of each
-   unit's fingerprint comes too late for an archive, whose imports are checked
-   before any of its units is, and never for a unit that the link does not
-   use. *)
+(* The libraries of two codegen variants that differ in more than poll insertion
+   do not have the same CRCs, so a file that was compiled for a variant with
+   another fingerprint than this invocation's disagrees with the other files on
+   what it imports. That is what to report then, whichever of the two files of
+   an inconsistency it is: the check of each unit's fingerprint comes too late
+   for an archive, whose imports are checked before any of its units is, and
+   never for a unit that the link does not use. *)
 let unit_of_another_variant t ~user ~auth =
   let current = Codegen_variant.current_fingerprint () in
   List.find_map
@@ -247,6 +248,12 @@ let check_consistency t ~unit cmis cmxs =
   CU.Tbl.replace t.implementations_defined unit.name unit.file_name;
   if CU.is_packed unit.name
   then t.cmx_required <- CU.Set.add unit.name t.cmx_required
+
+let file_holds_unit t file_name unit_name =
+  match Hashtbl.find_opt t.codegen_of_files file_name with
+  | None -> false
+  | Some { fingerprints } ->
+    List.exists (fun (name, _) -> CU.equal name unit_name) fingerprints
 
 let extract_crc_interfaces t =
   CU.Name.Tbl.fold

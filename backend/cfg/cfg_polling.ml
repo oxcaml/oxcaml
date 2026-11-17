@@ -12,8 +12,7 @@ let function_is_assumed_to_never_poll func =
   || String.begins_with ~prefix:"caml_tuplify" func
 
 let is_disabled fun_name =
-  !Oxcaml_flags.disable_poll_insertion
-  || function_is_assumed_to_never_poll fun_name
+  (not !Clflags.poll_insertion) || function_is_assumed_to_never_poll fun_name
 
 (* These are used for the poll error annotation later on*)
 type polling_point =

@@ -237,6 +237,12 @@ end) : S = struct
         ui_static_data = ui.ui_static_data;
         ui_lto_info = None;
         ui_codegen_fingerprint = ui.ui_codegen_fingerprint;
+        (* The packed unit is fully polled only if every member is AND the pack
+           invocation itself inserts polls (a polled pack of an unpolled member
+           must not launder the member's bit: the linker's
+           caml_code_fully_polled AND sees only the pack). *)
+        ui_polled =
+          ui.ui_polled && List.for_all (fun info -> info.ui_polled) units;
         ui_file_sections = File_sections.Builder.build file_sections
       }
     in

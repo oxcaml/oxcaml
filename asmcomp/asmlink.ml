@@ -37,13 +37,16 @@ type unit_link_info = Linkenv.unit_link_info =
     crc : Digest.t;
     imports_cmx : Import_info.t list;
     codegen_fingerprint : Codegen_variant.fingerprint;
+    polled : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
 
-(* Whether [Config.standard_library] is itself a library root built for
+(* Whether [Config.standard_library] is itself a library root that serves
    [variant] (e.g. OCAMLLIB pointing directly at a variant's tree), judged by
-   the codegen fingerprint in the unit info of the standard library there. *)
+   the codegen fingerprint in the unit info of the standard library there. The
+   poll-insertion setting of the root does not matter: see
+   [Codegen_variant.selected_tree]. *)
 let standard_library_is_built_for (variant : Codegen_variant.t) =
   let std_exit = Filename.concat Config.standard_library "std_exit.cmx" in
   match Compilenv.read_unit_info std_exit with
@@ -60,28 +63,43 @@ let cached_generic_functions_path () =
        untouched. *)
     path
   | None ->
-    (* The default path points into the selected variant's standard-library
-       root, and installations do not necessarily ship the archive (make
+    (* The default path points into the library tree that serves the selected
+       variant, and installations do not necessarily ship the archive (make
        installs never do); fail clearly rather than with a linker error. *)
     let path = Oxcaml_flags.get_cached_generic_functions_path () in
     let variant = Codegen_variant.current () in
+    let tree = Codegen_variant.selected_tree () in
     let root_archive =
       Filename.concat Config.standard_library (Filename.basename path)
     in
-    if Sys.file_exists path
+    let trusted =
+      (* The archive carries no fingerprint of its own. The root is taken at its
+         word for the default variant, and so is a tree under variants/ for its
+         own. When the root serves the default variant with the other
+         poll-insertion setting it is checked like a root that has no tree for
+         the selected variant: OCAMLLIB can make it anything. *)
+      match tree with
+      | Some (tree_variant, _root) ->
+        Codegen_variant.equal tree_variant variant
+        || (not (Codegen_variant.is_default tree_variant))
+        || standard_library_is_built_for variant
+      | None -> false
+    in
+    if trusted && Sys.file_exists path
     then path
     else if
-      (* The root has no tree for the selected non-default variant, but it may
-         itself be that variant's tree. The archive carries no fingerprint of
-         its own, so its root's archive is only used when the root is verifiably
-         built for the selected variant; a different variant's archive is never
-         used. *)
-      (not (Codegen_variant.is_default variant))
-      && (not (Sys.file_exists (Codegen_variant.variant_root variant)))
+      (* The root has no tree that serves the selected variant, but it may
+         itself be such a tree: its archive is only used when the root is
+         verifiably built for the fingerprint of the selected variant; the
+         archive of a variant with another fingerprint is never used. *)
+      Option.is_none tree
       && Sys.file_exists root_archive
       && standard_library_is_built_for variant
     then root_archive
     else
+      let variant =
+        match tree with Some (variant, _root) -> variant | None -> variant
+      in
       raise
         (Linkenv.Error
            (Cached_generic_functions_not_found
@@ -151,6 +169,78 @@ let emit_ocamlrunparam ~ppf_dump =
               "caml_ocamlrunparam");
          Cmm.Cstring (!Clflags.ocamlrunparam ^ "\000") ])
 
+(* Whether every OCaml unit being linked was compiled with poll insertion: the
+   AND of the per-unit [polled] bits over [units]. The poll-insertion setting of
+   the link itself is not part of it: it only chooses the library tree (see
+   [Codegen_variant.selected_tree]), whose units have their own bits.
+
+   Generic functions take part in the link without a [unit_link_info], the
+   cached ones from the archive of the selected tree and the others compiled
+   into this startup file, and none of them ever gets polls, under either
+   setting (see [Cfg_polling.function_is_assumed_to_never_poll]). This does not
+   weaken what the bit stands for, because none of them can run unboundedly
+   between two polls of the code that it calls: [caml_apply*], [caml_curry*] and
+   [caml_tuplify*] have no loop, and the one loop, the method lookup of
+   [caml_send*] on a cache miss ([Cmm_helpers.cache_public_method]), is a binary
+   search bounded by the size of the method table. A function added to
+   [Generic_fns] must keep that property.
+
+   The runtime reads the symbol at startup to pick the default domain cap (see
+   runtime/startup_aux.c); it is emitted only into the main startup object
+   ([make_startup_file], which also serves -output-obj), never into the
+   shared-startup object of a .cmxs, which must not carry a second definition
+   into the host program. *)
+let emit_code_fully_polled linkenv ~ppf_dump units =
+  let fully_polled = List.for_all (fun u -> u.polled) units in
+  (* A link with poll insertion asks for the libraries that have it, and gets
+     the others where the installation has none. A program that links a unit of
+     those is limited to one domain however its own units were compiled, which
+     nothing else tells whoever builds it. This is an alert and not a warning:
+     such a link has always been accepted, and must not fail where warnings are
+     errors. It is about the units that are linked and what their unit infos
+     say, not about the tree that was searched or its name: a program that takes
+     nothing from the libraries is fully polled when its own units are. And it
+     is about the standard library: the file that holds the unit Stdlib, of
+     which a link may take other units only, and the unit Std_exit, which is a
+     file of its own, wherever the link found them (a directory given with -I
+     comes before the library root) and however their paths are spelled. A unit
+     of the program without polls is the program's own business, wherever its
+     file is, unless it is named Std_exit or its file holds the unit Stdlib. *)
+  (if (Codegen_variant.current ()).poll_insertion
+   then
+     let of_the_standard_library u =
+       Linkenv.file_holds_unit linkenv u.file_name
+         (Compilation_unit.of_string "Stdlib")
+       || String.equal (Compilation_unit.full_path_as_string u.name) "Std_exit"
+     in
+     match
+       List.find_opt
+         (fun u -> (not u.polled) && of_the_standard_library u)
+         units
+     with
+     | None -> ()
+     | Some unit ->
+       Location.prerr_alert Location.none
+         { Warnings.kind = "no_polled_libraries";
+           use = Location.none;
+           def = Location.none;
+           message =
+             Printf.sprintf
+               "the libraries in %s, which this link uses for codegen variant \
+                %s, were compiled without poll insertion (%s, for one), so the \
+                program is not fully polled and is limited to one domain by \
+                default."
+               (Filename.dirname unit.file_name)
+               (Codegen_variant.to_string (Codegen_variant.current ()))
+               (Compilation_unit.full_path_as_string unit.name)
+         });
+  Asmgen.compile_phrase ~ppf_dump
+    (Cmm.Cdata
+       [ Cmm.Cdefine_symbol
+           (Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
+              "caml_code_fully_polled");
+         Cmm.Cint (if fully_polled then 1n else 0n) ])
+
 (* With [-gated-trace-pc-guard-define-gate], the startup file defines the gate
    of [Cfg_trace_pc_guard]. This definition takes precedence over the weak ones
    of instrumented units. *)
@@ -187,6 +277,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     if !Oxcaml_flags.manual_module_init then [] else name_list
   in
   emit_ocamlrunparam ~ppf_dump;
+  emit_code_fully_polled linkenv ~ppf_dump units;
   List.iter compile_phrase (Cmm_helpers.entry_point init_name_list);
   List.iter compile_phrase
     (* Emit the GC roots table, for dynlink. *)

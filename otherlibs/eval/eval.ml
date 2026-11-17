@@ -91,6 +91,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_static_data = uir.uir_static_data;
             ui_lto_info = uir.uir_lto_info;
             ui_codegen_fingerprint = uir.uir_codegen_fingerprint;
+            ui_polled = uir.uir_polled;
             ui_file_sections = sections
           }
         in
@@ -141,6 +142,12 @@ let eval (expr : 'a expr) =
   Clflags.no_std_include := false;
   (* TODO: Set a bunch of flags to match the initial compile; nopervasives is
      false to ensure Stdlib is available *)
+  (* Refuse before compiling anything: evaluated code is compiled with the
+     current [Clflags.poll_insertion], and JIT-loading non-polled code into
+     a process whose domain cap exceeds 1 would reintroduce the STW-stall
+     hazard the cap's fully-polled derivation excludes (the dynlink
+     equivalent is the Library_not_fully_polled rejection). *)
+  Opttoploop.check_poll_insertion_for_in_process_load ();
   Location.reset ();
   Env.reset_cache ~preserve_persistent_env:true;
   (* TODO: set commandline flags *)

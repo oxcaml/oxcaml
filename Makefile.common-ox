@@ -210,8 +210,11 @@ runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out autom
 # which uses the boot compiler. Use the final compiler for [runtest],
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
+# OXCAML_POLL_INSERTION carries the poll setting of the codegen variant
+# the runtest context builds (the configure default), for tests that must
+# gate on compiler-inserted polls (oxcaml/tests/simd/preemption256.ml).
 runtest: compiler
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) build $(ws_main) $(runtest_targets)
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(if $(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),poll),true,false) $(dune) build $(ws_main) $(runtest_targets)
 
 runtest-llvmize: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)

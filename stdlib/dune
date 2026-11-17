@@ -11,7 +11,11 @@
 (subdir build_sc (dynamic_include ../dune_rules/stdlib_sc.dune))
 (subdir build_poll (dynamic_include ../dune_rules/stdlib_poll.dune))
 (subdir build_asan-fp (dynamic_include ../dune_rules/stdlib_asan-fp.dune))
+(subdir build_fp-poll (dynamic_include ../dune_rules/stdlib_fp-poll.dune))
+(subdir build_fp-poll-sc
+  (dynamic_include ../dune_rules/stdlib_fp-poll-sc.dune))
 (subdir build_fp-sc (dynamic_include ../dune_rules/stdlib_fp-sc.dune))
+(subdir build_poll-sc (dynamic_include ../dune_rules/stdlib_poll-sc.dune))
 
 ;; Write an empty file in an unconfigured tree
 (rule (target META) (mode fallback) (action (write-file %{target} "")))
@@ -43,6 +47,18 @@
   (dynamic_include ../../copy_workaround/headers.dune))
 (subdir build_asan-fp/dynlink
   (dynamic_include ../../copy_workaround/fake_dynlink.dune))
+(subdir build_fp-poll/caml
+  (dynamic_include ../../copy_workaround/headers.dune))
+(subdir build_fp-poll/dynlink
+  (dynamic_include ../../copy_workaround/fake_dynlink.dune))
+(subdir build_fp-poll-sc/caml
+  (dynamic_include ../../copy_workaround/headers.dune))
+(subdir build_fp-poll-sc/dynlink
+  (dynamic_include ../../copy_workaround/fake_dynlink.dune))
 (subdir build_fp-sc/caml (dynamic_include ../../copy_workaround/headers.dune))
 (subdir build_fp-sc/dynlink
+  (dynamic_include ../../copy_workaround/fake_dynlink.dune))
+(subdir build_poll-sc/caml
+  (dynamic_include ../../copy_workaround/headers.dune))
+(subdir build_poll-sc/dynlink
   (dynamic_include ../../copy_workaround/fake_dynlink.dune))

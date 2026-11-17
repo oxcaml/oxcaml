@@ -124,8 +124,6 @@ let function_layout = ref Function_layout.default   (* -function-layout *)
 let float_op_fusion = ref true          (* -[no-]float-op-fusion *)
 
 let disable_builtin_check = ref false   (* -disable-builtin-check *)
-let disable_poll_insertion = ref (not Config.poll_insertion)
-                                        (* -disable-poll-insertion *)
 let allow_long_frames = ref true        (* -no-long-frames *)
 (* Keep the value of [max_long_frames_threshold] in sync with LONG_FRAME_MARKER
    in runtime/roots_nat.c *)
@@ -623,19 +621,21 @@ let get_cached_generic_functions_path () =
   | None ->
     (* Variant-STRICT resolution, deliberately not
        [Codegen_variant.effective_standard_library]: its fallback to the
-       default root when a non-default variant's tree is absent would
-       silently select the DEFAULT variant's archive — the one compiler-
-       generated native artifact with no fingerprint to catch the mismatch
-       at link.  Resolving into the (possibly absent) variant root instead
-       makes the link-time existence check fail with the established
-       missing-archive error, unless the default root verifiably is the
-       selected variant's own tree (see cached_generic_functions_path in
-       asmcomp/asmlink.ml). *)
-    let variant = Codegen_variant.current () in
+       default root when no tree of the installation serves the selected
+       variant would silently select the DEFAULT variant's archive — the
+       one compiler-generated native artifact with no fingerprint to catch
+       the mismatch at link.  Resolving into the (possibly absent) variant
+       root instead makes the link-time existence check fail with the
+       established missing-archive error, unless the default root
+       verifiably is a tree that serves the selected variant (see
+       cached_generic_functions_path in asmcomp/asmlink.ml).  The archive of
+       the tree with the other poll-insertion setting will do, like the rest
+       of that tree: generic functions never get polls (see
+       emit_code_fully_polled there). *)
     let root =
-      if Codegen_variant.is_default variant
-      then Config.standard_library
-      else Codegen_variant.variant_root variant
+      match Codegen_variant.selected_tree () with
+      | Some (_variant, root) -> root
+      | None -> Codegen_variant.variant_root (Codegen_variant.current ())
     in
     Filename.concat root ("cached-generic-functions" ^ Config.ext_lib)
 

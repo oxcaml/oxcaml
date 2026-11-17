@@ -28,16 +28,19 @@
 
 type t =
   { frame_pointers : bool;
+    poll_insertion : bool;
     stack_checks : bool
   }
 
 let flags_variant () =
   { frame_pointers = !Clflags.frame_pointers;
+    poll_insertion = !Clflags.poll_insertion;
     stack_checks = !Clflags.stack_checks
   }
 
 let default =
   { frame_pointers = Config.with_frame_pointers;
+    poll_insertion = Config.poll_insertion;
     stack_checks = not Config.no_stack_checks
   }
 
@@ -52,12 +55,14 @@ let current () =
 
 let equal t1 t2 =
   Bool.equal t1.frame_pointers t2.frame_pointers
+  && Bool.equal t1.poll_insertion t2.poll_insertion
   && Bool.equal t1.stack_checks t2.stack_checks
 
 let is_default t = equal t default
 
 let apply t =
   Clflags.frame_pointers := t.frame_pointers;
+  Clflags.poll_insertion := t.poll_insertion;
   Clflags.stack_checks := t.stack_checks
 
 (* Naming goes through the dependency-free [Codegen_variant_name] token
@@ -65,10 +70,12 @@ let apply t =
 let name t =
   Codegen_variant_name.of_tokens
     ((if t.frame_pointers then [Codegen_variant_name.Frame_pointers] else [])
+    @ (if t.poll_insertion then [Codegen_variant_name.Poll_insertion] else [])
     @ if t.stack_checks then [Codegen_variant_name.Stack_checks] else [])
 
 let of_name n =
   { frame_pointers = Codegen_variant_name.(mem Frame_pointers n);
+    poll_insertion = Codegen_variant_name.(mem Poll_insertion n);
     stack_checks = Codegen_variant_name.(mem Stack_checks n)
   }
 
@@ -87,6 +94,10 @@ let stack_guard_stride () = if !Clflags.stack_checks then 0 else 4096
 
 type fingerprint = (string * string) list
 
+(* Poll insertion is deliberately NOT a fingerprint key: mixing polled and
+   non-polled units is sound (the program is merely not fully polled), so
+   it is recorded as the separate per-unit [ui_polled] bit that the linker
+   ANDs into [caml_code_fully_polled] rather than enforced by equality. *)
 let fingerprint t =
   [ "frame_pointers", string_of_bool t.frame_pointers;
     "stack_checks", string_of_bool t.stack_checks;
@@ -110,29 +121,48 @@ let variant_root t =
 
 let directory_exists dir = try Sys.is_directory dir with Sys_error _ -> false
 
-let effective_standard_library () =
-  let t = current () in
+(* The library tree built for exactly [t], when the installation has it. *)
+let tree t =
   if is_default t
-  then Config.standard_library
+  then Some (t, Config.standard_library)
   else
-    (* Remap only when the variant tree is present.  When it is absent the
-       base root may itself serve the requested variant (the in-tree build
-       compiles with -frame-pointers against an fp stdlib via OCAMLLIB, and
-       users may point OCAMLLIB at a custom-built variant tree); genuinely
-       wrong roots are caught by the artifact-fingerprint check at the first
-       .cmx import and by the runtime-archive lookup at link, which append
-       [missing_root_hint]. *)
     let root = variant_root t in
-    if directory_exists root then root else Config.standard_library
+    if directory_exists root then Some (t, root) else None
+
+(* Poll insertion is a property of each unit and not of the program (see
+   [fingerprint]), and it changes nothing that the users of a unit see: the
+   trees of two variants that differ only in it have the same interfaces,
+   implementation CRCs and symbols.  So either tree serves both variants,
+   at compile time and at link time alike, and the poll-insertion setting
+   of an invocation only says which of the two it prefers. *)
+let selected_tree () =
+  let t = current () in
+  match tree t with
+  | Some _ as selected -> selected
+  | None -> tree { t with poll_insertion = not t.poll_insertion }
+
+let effective_standard_library () =
+  match selected_tree () with
+  | Some (_, root) -> root
+  | None ->
+    (* The base root may itself serve the requested variant (the in-tree
+       build compiles with -frame-pointers against an fp stdlib via
+       OCAMLLIB, and users may point OCAMLLIB at a custom-built variant
+       tree); genuinely wrong roots are caught by the artifact-fingerprint
+       check at the first .cmx import and by the runtime-archive lookup at
+       link, which append [missing_root_hint].  A root that differs from
+       the requested variant in poll insertion alone is not a wrong one:
+       its libraries are used, with their own polled bits. *)
+    Config.standard_library
 
 let missing_root_hint () =
-  let t = current () in
-  if is_default t || directory_exists (variant_root t)
-  then None
-  else
+  match selected_tree () with
+  | Some _ -> None
+  | None ->
     Some
       (Printf.sprintf "note: %s does not contain codegen variant '%s'"
-         Config.standard_library (to_string t))
+         Config.standard_library
+         (to_string (current ())))
 
 type directory_error =
   { directory : string;

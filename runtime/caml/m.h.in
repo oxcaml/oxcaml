@@ -105,6 +105,12 @@
 
 #define CAML_SAFE_STRING 1
 
+/* Every runtime is multidomain-capable. The macro remains defined, in the
+   header that defined it when it was a configure option, for compatibility
+   with out-of-tree code that selected multidomain-aware implementations
+   with it. */
+#define MULTIDOMAIN 1
+
 #undef FLAT_FLOAT_ARRAY
 
 #undef FUNCTION_SECTIONS
@@ -116,8 +122,6 @@
 #undef USE_MMAP_MAP_STACK
 
 #undef STACK_ALLOCATION
-
-#undef MULTIDOMAIN
 
 #undef HAS_POPCNT
 

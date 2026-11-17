@@ -136,7 +136,8 @@ end) : S = struct
                   mk_bitmap quoted_cmx quoted_cmx_index unit.ui_quoted_cmx
                     ~find:Compilation_unit.Tbl.find ~get_name:Fun.id;
                 li_external_symbols = Array.of_list unit.ui_external_symbols;
-                li_codegen_fingerprint = unit.ui_codegen_fingerprint
+                li_codegen_fingerprint = unit.ui_codegen_fingerprint;
+                li_polled = unit.ui_polled
               })
             descr_list
         in

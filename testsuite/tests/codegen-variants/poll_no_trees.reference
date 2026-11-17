@@ -1,0 +1,6 @@
+variants: []
+-enable-poll-insertion: linked
+-disable-poll-insertion: linked
+-enable-poll-insertion -alert -no_polled_libraries: linked
+units with polls, linked with: what these libraries allow
+no unit of the libraries linked: 0 alerts

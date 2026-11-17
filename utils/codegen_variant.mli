@@ -26,12 +26,17 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** A codegen variant is the tuple of whole-program code generation axis
-    values selected for a native compilation or link.  Units compiled for
-    different variants must never be mixed within one image. *)
+(** A codegen variant is the tuple of code generation axis values selected
+    for a native compilation or link.  Frame pointers, stack checks and
+    AddressSanitizer are whole-program axes: units compiled with different
+    values of one of them must never be mixed within one image (see
+    [fingerprint]).  Poll insertion is a per-unit axis: units compiled with
+    either setting can be mixed, and at link time the setting only chooses
+    between library trees (see [selected_tree]). *)
 
 type t =
   { frame_pointers : bool;
+    poll_insertion : bool;
     stack_checks : bool
   }
 
@@ -49,8 +54,8 @@ val equal : t -> t -> bool
 val is_default : t -> bool
 
 (** Sets every per-invocation axis flag ([Clflags.frame_pointers],
-    [Clflags.stack_checks]) to [t]'s values, for tools that select a whole
-    variant by name. *)
+    [Clflags.poll_insertion], [Clflags.stack_checks]) to [t]'s values, for
+    tools that select a whole variant by name. *)
 val apply : t -> unit
 
 (** Canonical name encoding absolute axis values ("fp" / "base"); the
@@ -76,7 +81,9 @@ val stack_guard_stride : unit -> int
 (** The marker recorded in native compilation artifacts.  Besides the
     per-invocation axes of [t] it includes configure-time settings
     (address sanitizer) whose mixing across installs must also be
-    rejected. *)
+    rejected.  Poll insertion is deliberately not a key: mixing polled and
+    non-polled units is sound, so polledness is tracked by the separate
+    per-unit [ui_polled] bit ANDed at link time instead of by equality. *)
 type fingerprint = (string * string) list
 
 val fingerprint : t -> fingerprint
@@ -90,16 +97,32 @@ val equal_fingerprint : fingerprint -> fingerprint -> bool
     [ocamlobjinfo]. *)
 val string_of_fingerprint : fingerprint -> string
 
-(** The standard-library root serving the codegen variant selected by the
-    current invocation's flags: [Config.standard_library] (which already
-    honors OCAMLLIB/CAMLLIB) for the install's default variant;
-    [Config.standard_library]/variants/<name> when that directory exists;
-    and [Config.standard_library] unchanged otherwise (the base root may
-    itself be a variant tree, e.g. via OCAMLLIB during the in-tree build —
-    mistakes are caught by the artifact-fingerprint and runtime-archive
-    checks).  The flags are read at every call (they can change between
-    files via OCAMLPARAM), so callers must not capture the result at
+(** The library tree of this installation that serves the codegen variant
+    selected by the current invocation's flags, with the variant that the
+    tree was built for; [None] when the installation has no such tree.
+
+    The tree of the default variant is [Config.standard_library] (which
+    already honors OCAMLLIB/CAMLLIB), that of any other variant is
+    [Config.standard_library]/variants/<name>, when that directory exists.
+    Poll insertion is a property of each unit, not of the program: two trees
+    that differ only in it have the same interfaces, implementation CRCs and
+    symbols, and units compiled with either setting link against either.
+    So the tree that serves a variant is its own when the installation has
+    it, and otherwise the tree of the variant with the other poll-insertion
+    setting.  This is the rule for compiling and for linking alike: at link
+    time the poll-insertion flags thus choose between the libraries with
+    polls and those without, where both are installed.
+
+    The flags are read at every call (they can change between files via
+    OCAMLPARAM), so callers must not capture the result at
     module-initialization time. *)
+val selected_tree : unit -> (t * string) option
+
+(** The root of [selected_tree ()], and [Config.standard_library] when
+    there is none (the base root may itself be a variant tree, e.g. via
+    OCAMLLIB during the in-tree build; mistakes are caught by the
+    artifact-fingerprint and runtime-archive checks).  Like
+    [selected_tree], not to be captured at module-initialization time. *)
 val effective_standard_library : unit -> string
 
 (** The directory that would serve [t]'s standard library when [t] is not
@@ -137,7 +160,7 @@ val expand_directory : string -> string
     happens to lack them) and directories being removed from the path. *)
 val expand_directory_unchecked : string -> string
 
-(** When a non-default variant is selected but the base root has no tree for
-    it, a note to append to variant-related errors pointing at the probable
-    cause; [None] otherwise. *)
+(** When the installation has no tree that serves the selected variant
+    ([selected_tree] is [None]), a note to append to variant-related errors
+    pointing at the probable cause; [None] otherwise. *)
 val missing_root_hint : unit -> string option

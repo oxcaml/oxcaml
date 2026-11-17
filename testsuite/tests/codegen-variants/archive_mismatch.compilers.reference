@@ -1,0 +1,7 @@
+File "archive_mismatch.ml", line 1:
+Error: File archive_mismatch_unit.cmxa,
+       which contains unit Archive_mismatch_unit,
+       was compiled with codegen configuration
+       [frame_pointers=true, stack_checks=false, address_sanitizer=false],
+       which is incompatible with this invocation's
+       [frame_pointers=false, stack_checks=false, address_sanitizer=false]
