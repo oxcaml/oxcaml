@@ -101,6 +101,7 @@
     -c
     -fdo-counters
     -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dfexpr-annot-after
     raw
     -color
@@ -111,6 +112,7 @@
     -c
     -fdo-counters
     -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dfexpr-annot-after
     raw
     -color
