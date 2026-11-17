@@ -6,6 +6,10 @@ let fun_min_param_count = 0
 
 let fun_max_param_count = 5
 
+let wide_fun_min_param_count = 16
+
+let wide_fun_max_param_count = 64
+
 let max_block_depth = 4
 
 let max_loop_stride = 8
@@ -116,6 +120,10 @@ let curried_lambda_probability = 2_500
 
 let opaque_recursive_call_probability = 2_500
 
+let wide_function_probability = 1_500
+
+let tail_call_probability = 2_500
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -151,7 +159,8 @@ module Swarm = struct
       exceptions : bool;
       closures : bool;
       partial_applications : bool;
-      recursive_functions : bool
+      recursive_functions : bool;
+      wide_functions : bool
     }
 
   let create random_state =
@@ -187,7 +196,8 @@ module Swarm = struct
       exceptions = Random.State.bool random_state;
       closures = Random.State.bool random_state;
       partial_applications = Random.State.bool random_state;
-      recursive_functions = Random.State.bool random_state
+      recursive_functions = Random.State.bool random_state;
+      wide_functions = Random.State.bool random_state
     }
 
   let to_string t =
@@ -218,7 +228,8 @@ module Swarm = struct
       "exceptions", t.exceptions;
       "closures", t.closures;
       "partial_applications", t.partial_applications;
-      "recursive_functions", t.recursive_functions ]
+      "recursive_functions", t.recursive_functions;
+      "wide_functions", t.wide_functions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> List.cons
          (Format.sprintf "  assertions = %s"
