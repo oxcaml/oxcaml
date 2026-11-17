@@ -3722,6 +3722,35 @@ let register_externals (program : Code.program) =
         | Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _ | Event _ -> ()))
     program.blocks
 
+let assign_jsir_import_shapes (program : Code.program) =
+  let shape_of_name (name : Code.constant) =
+    match name with
+    | NativeString (Byte name | Utf (Utf8 name)) | String name -> Shape.Store.load ~name
+    | _ -> None
+  in
+  let fields = Var.Hashtbl.create 16 in
+  Addr.Map.iter
+    (fun _ block ->
+      List.iter block.body ~f:(function
+        | Let (x, Prim (Extern ("caml_get_global", _), [ Pc name ])) ->
+            Option.iter (shape_of_name name) ~f:(Shape.State.assign x)
+        | Let (y, Field (x, n, _)) -> Var.Hashtbl.replace fields y (x, n)
+        | Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _ | Event _ -> ()))
+    program.blocks;
+  let rec propagate y =
+    if not (Shape.State.mem y)
+    then
+      match Var.Hashtbl.find_opt fields y with
+      | None -> ()
+      | Some (x, n) -> (
+          propagate x;
+          match Shape.State.get x with
+          | Some { desc = Block l; _ } when n < List.length l ->
+              Shape.State.propagate x n y
+          | Some _ | None -> ())
+  in
+  Var.Hashtbl.iter (fun y _ -> propagate y) fields
+
 let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic =
   let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
   (match Magic_number.kind magic with
@@ -3754,7 +3783,9 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
   let program =
     if whole_program
     then Code.prepend program (register_predefined_exceptions ())
-    else program
+    else (
+      assign_jsir_import_shapes program;
+      program)
   in
   let unit =
     { name = exported_compilation_unit
