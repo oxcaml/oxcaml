@@ -50,10 +50,10 @@
  (action (write-file %{target} "")))
 
 ;; Codegen-variant stdlib trees, one per name in the closed curated set
-;; {base, fp, sc, poll, asan-fp, asan-fp-poll, fp-sc} (dune subdir stanzas
-;; are static, so the set is enumerated here and in stdlib/dune even for
-;; names no configure builds by default). These are generated like
-;; stdlib.dune, but gen.exe emits
+;; {base, fp, sc, poll, asan-fp, asan-fp-poll, fp-poll, fp-poll-sc, fp-sc,
+;; poll-sc} (dune subdir stanzas are static, so the set is enumerated here
+;; and in stdlib/dune even for names no configure builds by default).
+;; These are generated like stdlib.dune, but gen.exe emits
 ;; build rules only for names in the configure-computed variant list; every
 ;; other file contains just an empty @stdlib_<name> alias. See the comment
 ;; on write_stdlib_dune in gen.ml.
@@ -148,6 +148,36 @@
  (action (write-file %{target} "")))
 
 (rule
+ (target stdlib_fp-poll.dune)
+ (enabled_if (and (= %{context_name} default) (<> %{read:../META} "")))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     stdlib_fp-poll
+     %{dep:stdlib_module_deps.txt}))))
+
+(rule
+ (target stdlib_fp-poll.dune)
+ (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
+ (action (write-file %{target} "")))
+
+(rule
+ (target stdlib_fp-poll-sc.dune)
+ (enabled_if (and (= %{context_name} default) (<> %{read:../META} "")))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     stdlib_fp-poll-sc
+     %{dep:stdlib_module_deps.txt}))))
+
+(rule
+ (target stdlib_fp-poll-sc.dune)
+ (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
+ (action (write-file %{target} "")))
+
+(rule
  (target stdlib_fp-sc.dune)
  (enabled_if (and (= %{context_name} default) (<> %{read:../META} "")))
  (action
@@ -159,6 +189,21 @@
 
 (rule
  (target stdlib_fp-sc.dune)
+ (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
+ (action (write-file %{target} "")))
+
+(rule
+ (target stdlib_poll-sc.dune)
+ (enabled_if (and (= %{context_name} default) (<> %{read:../META} "")))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     stdlib_poll-sc
+     %{dep:stdlib_module_deps.txt}))))
+
+(rule
+ (target stdlib_poll-sc.dune)
  (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
  (action (write-file %{target} "")))
 
@@ -201,6 +246,18 @@
  (enabled_if (<> %{context_name} default))
  (action (write-file %{target} "")))
 (rule
+ (target stdlib_fp-poll.dune)
+ (enabled_if (<> %{context_name} default))
+ (action (write-file %{target} "")))
+(rule
+ (target stdlib_fp-poll-sc.dune)
+ (enabled_if (<> %{context_name} default))
+ (action (write-file %{target} "")))
+(rule
  (target stdlib_fp-sc.dune)
+ (enabled_if (<> %{context_name} default))
+ (action (write-file %{target} "")))
+(rule
+ (target stdlib_poll-sc.dune)
  (enabled_if (<> %{context_name} default))
  (action (write-file %{target} "")))

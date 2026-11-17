@@ -1613,68 +1613,117 @@ let no_stack_allocation = Actions.make
     "Stack allocation disabled"
     "Stack allocation enabled")
 
+(* The per-axis predicates below read the EFFECTIVE codegen variant
+   ([Ocaml_flags.effective_codegen_variant]: the [codegen_variant] TSL
+   variable when set, the configure default otherwise), not the raw
+   configure constants: the variable changes the axes a block's native
+   compilations actually use, and each predicate's meaning is the axis's
+   value in that variant.  With the variable unset the effective variant is
+   the configure default, reproducing the old [Config]-based behavior. *)
 let poll_insertion = Actions.make
   ~name:"poll-insertion"
-  ~description:"Passes if poll insertion is enabled"
+  ~description:"Passes if the effective codegen variant inserts polls"
   ~does_something:false
-  (Actions_helpers.predicate Ocamltest_config.poll_insertion
-    "Poll insertion enabled"
-    "Poll insertion disabled")
+  (fun log env ->
+    Actions_helpers.predicate
+      (Ocaml_flags.effective_codegen_variant_mem env
+         Codegen_variant_name.Poll_insertion)
+      "Poll insertion enabled"
+      "Poll insertion disabled"
+      log env)
 
 let no_poll_insertion = Actions.make
   ~name:"no-poll-insertion"
-  ~description:"Passes if poll insertion is disabled"
+  ~description:"Passes if the effective codegen variant does not insert polls"
   ~does_something:false
-  (Actions_helpers.predicate (not Ocamltest_config.poll_insertion)
-    "Poll insertion disabled"
-    "Poll insertion enabled")
+  (fun log env ->
+    Actions_helpers.predicate
+      (not
+         (Ocaml_flags.effective_codegen_variant_mem env
+            Codegen_variant_name.Poll_insertion))
+      "Poll insertion disabled"
+      "Poll insertion enabled"
+      log env)
 
 let stack_checks = Actions.make
   ~name:"stack-checks"
-  ~description:"Passes if stack checks are enabled"
+  ~description:"Passes if the effective codegen variant has stack checks"
   ~does_something:false
-  (Actions_helpers.predicate (not Config.no_stack_checks)
-    "Stack checks enabled"
-    "Stack checks disabled")
+  (fun log env ->
+    Actions_helpers.predicate
+      (Ocaml_flags.effective_codegen_variant_mem env
+         Codegen_variant_name.Stack_checks)
+      "Stack checks enabled"
+      "Stack checks disabled"
+      log env)
 
 let no_stack_checks = Actions.make
   ~name:"no-stack-checks"
-  ~description:"Passes if stack checks are disabled"
+  ~description:"Passes if the effective codegen variant has no stack checks"
   ~does_something:false
-  (Actions_helpers.predicate Config.no_stack_checks
-    "Stack checks disabled"
-    "Stack checks enabled")
+  (fun log env ->
+    Actions_helpers.predicate
+      (not
+         (Ocaml_flags.effective_codegen_variant_mem env
+            Codegen_variant_name.Stack_checks))
+      "Stack checks disabled"
+      "Stack checks enabled"
+      log env)
 
 (* CR ttebbi: We should also protect against non-default register allocation
     options. *)
-let only_default_codegen = Actions.make
-  ~name:"only-default-codegen"
-  ~description:"Passes if all the codegen options are at the current default, \
-                useful for [%%expect_asm]"
-  ~does_something:false
-  (Actions_helpers.predicate
-    (Config.no_stack_checks
-      && not Config.poll_insertion
-      && not Config.with_address_sanitizer
-      && not Config.with_frame_pointers)
-    "default codegen"
-    "non-default codegen")
+
+(* The two predicates below guard [%%expect_asm] recordings, which are
+   ABSOLUTE: the expected assembly was captured under one specific codegen
+   setting (all axes off, or stack checks only).  So they compare the
+   effective variant against that absolute name, NOT against the configure
+   default: a default-relative check would be a tautology whenever the
+   [codegen_variant] variable is unset (the effective variant is then the
+   default by construction), and on e.g. an --enable-stack-checks configure
+   it would run the tests under non-base codegen against base-recorded
+   assembly.  With the variable unset the effective variant is the
+   configure default, so comparing against the absolute name reproduces
+   the old [Config]-based skips on non-base-default configures, while an
+   explicit [codegen_variant] still selects the matching setting. *)
+
+let only_default_codegen =
+  let base = Codegen_variant_name.to_string Codegen_variant_name.base in
+  Actions.make
+    ~name:"only-default-codegen"
+    ~description:"Passes if the effective codegen variant (the configure \
+                  default, or the codegen_variant variable when set) is the \
+                  all-off \"base\" variant that the [%%expect_asm] \
+                  recordings assume"
+    ~does_something:false
+    (fun log env ->
+      Actions_helpers.predicate
+        (String.equal (Ocaml_flags.effective_codegen_variant env) base)
+        "base codegen"
+        "non-base codegen"
+        log env)
 
 (* Like [only_default_codegen] but requires stack checks to be enabled. Used by
    [%%expect_asm] tests that check the code emitted for stack checks (e.g. the
    stack-realloc handler), which only exists when stack checks are on. *)
-let only_stack_checks_codegen = Actions.make
-  ~name:"only-stack-checks-codegen"
-  ~description:"Passes if codegen options are at the default except that stack \
-                checks are enabled"
-  ~does_something:false
-  (Actions_helpers.predicate
-    (not Config.no_stack_checks
-      && not Config.poll_insertion
-      && not Config.with_address_sanitizer
-      && not Config.with_frame_pointers)
-    "stack-checks codegen"
-    "non-stack-checks codegen")
+let only_stack_checks_codegen =
+  let stack_checks_only =
+    Codegen_variant_name.to_string
+      (Codegen_variant_name.of_tokens [Codegen_variant_name.Stack_checks])
+  in
+  Actions.make
+    ~name:"only-stack-checks-codegen"
+    ~description:"Passes if the effective codegen variant (the configure \
+                  default, or the codegen_variant variable when set) is the \
+                  stack-checks-only \"sc\" variant that the [%%expect_asm] \
+                  recordings assume"
+    ~does_something:false
+    (fun log env ->
+      Actions_helpers.predicate
+        (String.equal
+           (Ocaml_flags.effective_codegen_variant env) stack_checks_only)
+        "stack-checks codegen"
+        "non-stack-checks codegen"
+        log env)
 
 (* Whether the tested install can compile and link native code for the named
    codegen variant: either the variant is the configure-time default (served
@@ -1703,11 +1752,7 @@ let variant_available = Actions.make
                 variable (the install's default variant when unset)"
   ~does_something:false
   (fun log env ->
-    let name =
-      match Ocaml_flags.codegen_variant env with
-      | None -> Ocaml_flags.default_codegen_variant
-      | Some name -> name
-    in
+    let name = Ocaml_flags.effective_codegen_variant env in
     Actions_helpers.predicate (codegen_variant_available name)
       (Printf.sprintf "%s codegen variant available" name)
       (Printf.sprintf "%s codegen variant not available" name)

@@ -80,7 +80,23 @@ external max_domain_count : unit -> int
    rejection.  The cap above 1 implies the host itself is fully polled
    (or ran with an explicit OCAMLRUNPARAM d= override), so under default
    flags this only fires when the phrase flags diverge from the host's
-   build, which the toplevel's host-variant pin already makes rare. *)
+   build, which the toplevel's host-variant pin already makes rare.
+
+   No friendlier alternative (e.g. silently enabling poll insertion for
+   the phrase) is needed, because a legitimately multi-domain host can
+   never reach this failure under default phrase flags: an eval-using
+   program links the DEFAULT variant's compiler-libs (the linker's
+   [set_load_path_for_eval] rejects eval under any other codegen variant
+   and resolves the eval support libraries against the default library
+   root).  So when the install's default variant lacks poll insertion,
+   those compiler-libs units are unpolled and the host is never fully
+   polled -- its cap defaults to 1 and the check passes vacuously; and
+   when the default variant includes poll insertion, phrases compile
+   with poll insertion on by default and the check passes positively.
+   The failure therefore fires only on explicit user divergence (an
+   OCAMLRUNPARAM d= override of an unpolled host's cap, or disabling
+   poll insertion for phrases on a poll-default install), where failing
+   with this message is the right answer. *)
 let check_poll_insertion_for_in_process_load () =
   (* As in [Compilenv.build_unit_info], the LLVM backend discards [Poll]
      instructions, so code it compiles is nonpolled even when

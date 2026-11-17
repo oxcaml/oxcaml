@@ -270,7 +270,20 @@ ifneq ($(filter asan-fp,$(all_variant_context_names)),)
 	  @oxcaml/tests/backend/address_sanitizer/runtest
 endif
 
+# The LLVM backend requires frame pointers and rejects stack checks
+# whatever the configure default (see validate_frame_pointers and
+# validate_stack_checks in driver/oxcaml_flags.ml), and these tests
+# compile, link and run against the main context's library tree. They
+# therefore need a compiler whose main context is built with frame
+# pointers and without stack checks; fail early, rather than on the first
+# test's driver diagnostic, on any other configure.
 runtest-llvmize: compiler
+ifeq ($(call codegen_variant_has,$(main_context_variant),fp),)
+	@echo "runtest-llvmize: the LLVM backend requires frame pointers, but this build's main context is the '$(main_context_variant)' codegen variant; configure with --enable-frame-pointers" >&2; exit 1
+endif
+ifneq ($(call codegen_variant_has,$(main_context_variant),sc),)
+	@echo "runtest-llvmize: the LLVM backend does not support stack checks, but this build's main context is the '$(main_context_variant)' codegen variant; configure without --enable-stack-checks" >&2; exit 1
+endif
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
 
 runtest-dwarf: compiler

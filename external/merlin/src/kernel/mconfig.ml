@@ -698,6 +698,8 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-shrink-wrap";
     "-frame-pointers";
     "-no-frame-pointers";
+    "-stack-checks";
+    "-no-stack-checks";
     "-omit-leaf-frame-pointers";
     "-no-omit-leaf-frame-pointers";
     "-cfg-merge-blocks";
@@ -788,6 +790,8 @@ let ocaml_ignored_flags =
     "-dslot-offsets";
     "-dump-inlining-paths";
     "-enable-poll-insertion";
+    "-asan";
+    "-no-asan";
     "-fno-asan";
     "-favx512vl";
     "-fno-avx512vl";
