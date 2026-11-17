@@ -47,6 +47,12 @@ let cur_label () = !label_counter
 
 (* Labels that exist only for the benefit of DWARF are numbered from here, so
    that they are distinct from the others. *)
+(* CR-someday mshinwell: give DWARF-only labels an abstract type of their own
+   rather than a range of numbers. A range boundary of [Compute_ranges] is
+   either an existing label or a DWARF-only one, so this means a sum type
+   through [Compute_ranges], its DWARF clients, [Linear.Llabel_for_dwarf],
+   branch relaxation and the emitters, and a second namespace of labels in
+   [Asm_label]. *)
 let init_dwarf_label = 1 lsl 40
 
 let dwarf_label_counter = ref init_dwarf_label

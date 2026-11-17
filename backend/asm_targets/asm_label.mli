@@ -83,6 +83,10 @@ val encode : t -> string
 val initialize :
   new_label:(unit -> int) -> new_dwarf_label:(unit -> int) -> unit
 
+(* CR-someday mshinwell: the functions given to [initialize] should return
+   abstract types of labels instead of [int]. That requires [Label] (or its two
+   counters) to live in a library that this one can depend on. *)
+
 (** Which section a label is in. *)
 val section : t -> Asm_section.t
 
