@@ -878,19 +878,28 @@ let core env id x =
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Value_descriptions diff ->
-      let is_modal = Is_modal.value_mismatch diff.symptom in
-      let mode1, mode2 =
-        maybe_print_modes ~in_structure:true ~is_modal diff.modes
+      let header =
+        match diff.symptom with
+        | Type _ ->
+            Fmt.dprintf "The value %a does not match@ its expected declaration"
+              (Style.as_inline_code Printtyp.ident) id
+        | _ ->
+            let is_modal = Is_modal.value_mismatch diff.symptom in
+            let mode1, mode2 =
+              maybe_print_modes ~in_structure:true ~is_modal diff.modes
+            in
+            Fmt.dprintf "%s:@;<1 2>%a%t@ %s@;<1 2>%a%t"
+              "Values do not match"
+              !Oprint.out_sig_item
+              (Out_type.tree_of_value_description id diff.got)
+              mode1
+              "is not included in"
+              !Oprint.out_sig_item
+              (Out_type.tree_of_value_description id diff.expected)
+              mode2
       in
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a%t@ %s@;<1 2>%a%t@]%a%a@]"
-        "Values do not match"
-        !Oprint.out_sig_item
-        (Out_type.tree_of_value_description id diff.got)
-        mode1
-        "is not included in"
-        !Oprint.out_sig_item
-        (Out_type.tree_of_value_description id diff.expected)
-        mode2
+      Fmt.dprintf "@[<v>@[<hv>%t@]%a%a@]"
+        header
         (Includecore.report_value_mismatch
            ~pp:(diff.got.val_loc, Structure_item (Value, id))
            "the first" "the second" env) diff.symptom

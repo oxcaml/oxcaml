@@ -2024,10 +2024,7 @@ Error: This application of the functor "H" is ill-typed.
             $S2 : sig val f : 'a -> 'a end
           is not included in
             $T2 = sig val f : 'a X/2.s -> 'a end
-          Values do not match:
-            val f : 'a -> 'a
-          is not included in
-            val f : 'a X.s -> 'a
+          The value "f" does not match its expected declaration
           The type "'a X.s -> 'a X.s" is not compatible with the type
             "'a X.s -> 'a"
           Type "'a X.s" is not compatible with type "'a"
@@ -2276,7 +2273,7 @@ Error: Signature mismatch:
          $S1 = sig val f : t val g : Inner.t val h : int end
        does not include
          $T1 = sig val f : t/2 val g : Inner/2.t val h : float end
-       Values do not match: val h : float is not included in val h : int
+       The value "h" does not match its expected declaration
        The type "float" is not compatible with the type "int"
 Line 8, characters 2-8:
   Definition of type "t/1"

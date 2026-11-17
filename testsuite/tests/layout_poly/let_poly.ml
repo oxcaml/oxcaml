@@ -116,10 +116,7 @@ Error: Signature mismatch:
          sig val regular_id : 'a -> 'a end
        is not included in
          sig val poly_ regular_id : 'a -> 'a end
-       Values do not match:
-         val regular_id : 'a -> 'a
-       is not included in
-         val poly_ regular_id : 'a -> 'a
+       The value "regular_id" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.

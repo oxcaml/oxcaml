@@ -38,10 +38,7 @@ Error: Signature mismatch:
          sig val f : unit -> [> `A ] end
        is not included in
          sig val f : unit -> [ `A | `B of 'a -> 'a ] @ portable end
-       Values do not match:
-         val f : unit -> [> `A ]
-       is not included in
-         val f : unit -> [ `A | `B of 'a -> 'a ] @ portable
+       The value "f" does not match its expected declaration
        The type "unit -> [ `A | `B of 'a -> 'a ]"
        is not compatible with the type
          "unit -> [ `A | `B of 'a -> 'a ] @ portable"
@@ -77,10 +74,7 @@ Error: Signature mismatch:
          sig val f : unit -> int @ local forkable unyielding end
        is not included in
          sig val f : unit -> int end
-       Values do not match:
-         val f : unit -> int @ local forkable unyielding
-       is not included in
-         val f : unit -> int
+       The value "f" does not match its expected declaration
        The type "unit -> int @ local forkable unyielding"
        is not compatible with the type "unit -> int"
        The return mode was expected to be "global" but is "local"

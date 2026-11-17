@@ -1995,13 +1995,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val add : int32 @ local -> int32 @ local -> int32 end
-       Values do not match:
-         val add :
-           int32 @ local forkable unyielding ->
-           int32 @ local forkable unyielding -> int32 @ local forkable
-           unyielding
-       is not included in
-         val add : int32 @ local -> int32 @ local -> int32
+       The value "add" does not match its expected declaration
        The type
          "int32 @ local forkable unyielding ->
          int32 @ local forkable unyielding -> int32 @ local forkable
@@ -2036,12 +2030,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val add : int32 @ local -> int32 @ local -> int32 end
-       Values do not match:
-         external add :
-           (int32 [@local_opt]) ->
-           (int32 [@local_opt]) -> (int32 [@local_opt]) = "%int32_add"
-       is not included in
-         val add : int32 @ local -> int32 @ local -> int32
+       The value "add" does not match its expected declaration
        The type
          "int32 @ local forkable unyielding ->
          int32 @ local forkable unyielding -> int32 @ local forkable
@@ -2369,10 +2358,7 @@ Error: Signature mismatch:
          sig val foo : float -> string end
        is not included in
          sig val foo : float @ local -> string end
-       Values do not match:
-         val foo : float -> string
-       is not included in
-         val foo : float @ local -> string
+       The value "foo" does not match its expected declaration
        The type "float -> string" is not compatible with the type
          "float @ local -> string"
        The argument mode was expected to be "global"
@@ -2391,10 +2377,7 @@ Error: Signature mismatch:
          sig val foo : float -> string @ local end
        is not included in
          sig val foo : float -> string end
-       Values do not match:
-         val foo : float -> string @ local
-       is not included in
-         val foo : float -> string
+       The value "foo" does not match its expected declaration
        The type "float -> string @ local" is not compatible with the type
          "float -> string"
        The return mode was expected to be "global" but is "local"
@@ -2412,10 +2395,7 @@ Error: Signature mismatch:
          sig val foo : float @ local -> float -> string end
        is not included in
          sig val foo : float -> float -> string end
-       Values do not match:
-         val foo : float @ local -> float -> string
-       is not included in
-         val foo : float -> float -> string
+       The value "foo" does not match its expected declaration
        The type "float @ local -> float -> string"
        is not compatible with the type "float -> float -> string"
        The return mode was expected to be "global"
@@ -2461,10 +2441,7 @@ Error: Signature mismatch:
          sig val foo : (float -> string) inv end
        is not included in
          sig val foo : (float -> string @ local) inv end
-       Values do not match:
-         val foo : (float -> string) inv
-       is not included in
-         val foo : (float -> string @ local) inv
+       The value "foo" does not match its expected declaration
        The type "(float -> string) inv" is not compatible with the type
          "(float -> string @ local) inv"
        Type "float -> string" is not compatible with type
@@ -2493,10 +2470,7 @@ Error: Signature mismatch:
          sig val foo : (float -> string) contra end
        is not included in
          sig val foo : (float -> string @ local) contra end
-       Values do not match:
-         val foo : (float -> string) contra
-       is not included in
-         val foo : (float -> string @ local) contra
+       The value "foo" does not match its expected declaration
        The type "(float -> string) contra" is not compatible with the type
          "(float -> string @ local) contra"
        Type "float -> string" is not compatible with type
@@ -2525,10 +2499,7 @@ Error: Signature mismatch:
          sig val foo : (float -> string @ local) inv end
        is not included in
          sig val foo : (float -> string) inv end
-       Values do not match:
-         val foo : (float -> string @ local) inv
-       is not included in
-         val foo : (float -> string) inv
+       The value "foo" does not match its expected declaration
        The type "(float -> string @ local) inv" is not compatible with the type
          "(float -> string) inv"
        Type "float -> string @ local" is not compatible with type
@@ -2548,10 +2519,7 @@ Error: Signature mismatch:
          sig val foo : (float -> string @ local) co end
        is not included in
          sig val foo : (float -> string) co end
-       Values do not match:
-         val foo : (float -> string @ local) co
-       is not included in
-         val foo : (float -> string) co
+       The value "foo" does not match its expected declaration
        The type "(float -> string @ local) co" is not compatible with the type
          "(float -> string) co"
        Type "float -> string @ local" is not compatible with type
@@ -2888,10 +2856,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val f : string -> string -> string @ local end
-       Values do not match:
-         val f : 'a -> ('b -> string @ local) @ local forkable unyielding
-       is not included in
-         val f : string -> string -> string @ local
+       The value "f" does not match its expected declaration
        The type
          "string -> (string -> string @ local) @ local forkable unyielding"
        is not compatible with the type "string -> string -> string @ local"

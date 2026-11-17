@@ -495,10 +495,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val poly_ id : 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-       is not included in
-         val poly_ id : 'a -> 'a
+       The value "id" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
@@ -520,10 +517,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val id : layout_ l l0. ('a : l). 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-       is not included in
-         val id : layout_ l l0. ('a : l). 'a -> 'a
+       The value "id" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
@@ -543,10 +537,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val id : layout_ l l0. ('a : l0). 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-       is not included in
-         val id : layout_ l l0. ('a : l0). 'a -> 'a
+       The value "id" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
@@ -594,10 +585,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val poly_ id : 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-       is not included in
-         val poly_ id : 'a -> 'a
+       The value "id" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
@@ -636,10 +624,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val id : layout_ l l0. ('a : l0). 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-       is not included in
-         val id : layout_ l l0. ('a : l0). 'a -> 'a
+       The value "id" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
@@ -662,10 +647,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val id : layout_ l l0. ('a : l). 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-       is not included in
-         val id : layout_ l l0. ('a : l). 'a -> 'a
+       The value "id" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.

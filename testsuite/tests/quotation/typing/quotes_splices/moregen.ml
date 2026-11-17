@@ -103,10 +103,7 @@ Error: Signature mismatch:
          sig
            val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
          end
-       Values do not match:
-         val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
-       is not included in
-         val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
+       The value "f" does not match its expected declaration
        The type "unit -> <[(string -> unit) * (string -> unit)]> expr @ once"
        is not compatible with the type
          "unit -> <[(string -> unit) * (int -> unit)]> expr @ once"
@@ -149,10 +146,7 @@ Error: Signature mismatch:
          sig val x : <[$('a) * $('a)]> expr end
        is not included in
          sig val x : <[int * string]> expr end
-       Values do not match:
-         val x : <[$('a) * $('a)]> expr
-       is not included in
-         val x : <[int * string]> expr
+       The value "x" does not match its expected declaration
        The type "<[int * int]> expr" is not compatible with the type
          "<[int * string]> expr"
        Type "int * int" is not compatible with type "int * string"
@@ -177,10 +171,7 @@ Error: Signature mismatch:
          sig val e : <[$('a) -> unit]> expr end
        is not included in
          sig val e : ('a -> unit) expr end
-       Values do not match:
-         val e : <[$('a) -> unit]> expr
-       is not included in
-         val e : ('a -> unit) expr
+       The value "e" does not match its expected declaration
        The type "<[$('a) -> unit]> expr" is not compatible with the type
          "('b -> unit) expr"
        Type "$('a) -> unit" is not compatible with type "$('b -> unit)"
@@ -202,10 +193,7 @@ Error: Signature mismatch:
          sig val e : ('a : any) ('b : any). ('a -> 'b) expr end
        is not included in
          sig val e : <[$('a) -> unit]> expr end
-       Values do not match:
-         val e : ('a : any) ('b : any). ('a -> 'b) expr
-       is not included in
-         val e : <[$('a) -> unit]> expr
+       The value "e" does not match its expected declaration
        The type "('a -> 'b) expr" is not compatible with the type
          "<[$('c) -> unit]> expr"
        Type "'a -> 'b" is not compatible with type "<[$('c) -> unit]>"

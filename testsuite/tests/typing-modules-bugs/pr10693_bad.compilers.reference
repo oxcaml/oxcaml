@@ -41,10 +41,7 @@ Error: Signature mismatch:
        is not included in
          sig val x : X.t option end
        In module M.M:
-       Values do not match:
-         val x : X/1.t option
-       is not included in
-         val x : X/2.t option
+       The value x does not match its expected declaration
        The type X/1.t option is not compatible with the type X/2.t option
        Type X/1.t is not compatible with type X/2.t
        File "_none_", line 1:

@@ -352,7 +352,7 @@ Error: Signature mismatch:
          sig val f : p1 end
        is not included in
          sig val f : p2 end
-       Values do not match: val f : p1 is not included in val f : p2
+       The value "f" does not match its expected declaration
        The type "p1" = "('a. 'a -> 'a) -> int" is not compatible with the type
          "p2" = "('a 'b. 'a -> 'b) -> int"
        Type "'a" is not compatible with type "'b"
@@ -396,7 +396,7 @@ Error: Signature mismatch:
          sig val f : p1 end
        is not included in
          sig val f : p2 end
-       Values do not match: val f : p1 is not included in val f : p2
+       The value "f" does not match its expected declaration
        The type "p1" = "(bool -> bool) -> int" is not compatible with the type
          "p2" = "('a. 'a -> 'a) -> int"
        Type "bool" is not compatible with type "'a"

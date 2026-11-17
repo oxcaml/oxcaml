@@ -31,10 +31,7 @@ Error: Signature mismatch:
          sig val with_ : f:('a -> 'b) @ local unyielding -> unit end
        is not included in
          sig val with_ : f:('a -> 'a) @ local -> unit end
-       Values do not match:
-         val with_ : f:('a -> 'b) @ local unyielding -> unit
-       is not included in
-         val with_ : f:('a -> 'a) @ local -> unit
+       The value "with_" does not match its expected declaration
        The type "f:('a -> 'a) @ local unyielding -> unit"
        is not compatible with the type "f:('a -> 'a) @ local -> unit"
        The argument mode was expected to be "unyielding" but is "yielding"
@@ -82,10 +79,7 @@ Error: Signature mismatch:
          sig val with_ : ('a -> 'b) @ local unyielding -> unit end
        is not included in
          sig val with_ : ('a -> 'a) @ local -> unit end
-       Values do not match:
-         val with_ : ('a -> 'b) @ local unyielding -> unit
-       is not included in
-         val with_ : ('a -> 'a) @ local -> unit
+       The value "with_" does not match its expected declaration
        The type "('a -> 'a) @ local unyielding -> unit"
        is not compatible with the type "('a -> 'a) @ local -> unit"
        The argument mode was expected to be "unyielding" but is "yielding"
@@ -107,10 +101,7 @@ Error: Signature mismatch:
          sig val local_ret : 'a @ local -> 'a @ local end
        is not included in
          sig val local_ret : 'a @ local -> 'a @ local unyielding end
-       Values do not match:
-         val local_ret : 'a @ local -> 'a @ local
-       is not included in
-         val local_ret : 'a @ local -> 'a @ local unyielding
+       The value "local_ret" does not match its expected declaration
        The type "'a @ local -> 'a @ local" is not compatible with the type
          "'a @ local -> 'a @ local unyielding"
        The return mode was expected to be "unyielding" but is "yielding"

@@ -39,7 +39,7 @@ Line 5, characters 18-20:
 5 |   include functor F1
                       ^^
 Error: Signature mismatch in included functor's parameter:
-       Values do not match: val x : bool is not included in val x : t
+       The value "x" does not match its expected declaration
        The type "bool" is not compatible with the type "t" = "int"
 |}];;
 
@@ -114,7 +114,7 @@ Line 5, characters 18-20:
 5 |   include functor F5
                       ^^
 Error: Signature mismatch in included functor's parameter:
-       Values do not match: val x : bool is not included in val x : t
+       The value "x" does not match its expected declaration
        The type "bool" is not compatible with the type "t"
 |}];;
 

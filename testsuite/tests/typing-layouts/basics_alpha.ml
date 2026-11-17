@@ -697,10 +697,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val x : string end
-       Values do not match:
-         val x : ('a : immediate). 'a
-       is not included in
-         val x : string
+       The value "x" does not match its expected declaration
        The type "('a : immediate)" is not compatible with the type "string"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -740,10 +737,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val x : string end
-       Values do not match:
-         val x : ('a : immediate). 'a t
-       is not included in
-         val x : string
+       The value "x" does not match its expected declaration
        The type "'a t" = "('a : immediate)" is not compatible with the type
          "string"
        The layout of string is value non_float

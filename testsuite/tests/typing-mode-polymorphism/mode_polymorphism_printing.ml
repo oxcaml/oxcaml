@@ -441,10 +441,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig type t val illegal : t -> t @ portable end
-       Values do not match:
-         val illegal : 'a @ [< 'm] -> 'a @ [> 'm]
-       is not included in
-         val illegal : t -> t @ portable
+       The value "illegal" does not match its expected declaration
        The type
          "t @ [< 'm > nonportable stateful dynamic] ->
          t @ [> 'm | nonportable stateful dynamic]"
@@ -809,12 +806,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val g : ('a -> int) -> unit end
-       Values do not match:
-         val g :
-           ('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
-           unit @ [> dynamic]
-       is not included in
-         val g : ('a -> int) -> unit
+       The value "g" does not match its expected declaration
        The type
          "('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
          unit @ [> dynamic]"

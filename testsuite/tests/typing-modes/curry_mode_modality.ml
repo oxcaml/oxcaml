@@ -186,10 +186,7 @@ Error: Signature mismatch:
        is not included in
          sig val f : 'a @ portable contended -> unit -> unit @@ portable end
        In module "M":
-       Values do not match:
-         val f : 'a @ portable contended -> unit -> unit
-       is not included in
-         val f : 'a @ portable contended -> unit -> unit @@ portable
+       The value "f" does not match its expected declaration
        The type "'a @ portable contended -> unit -> unit"
        is not compatible with the type
          "'a @ portable contended -> (unit -> unit) @ portable"

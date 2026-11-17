@@ -879,10 +879,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val x : string end
-       Values do not match:
-         val x : ('a : immediate). 'a
-       is not included in
-         val x : string
+       The value "x" does not match its expected declaration
        The type "('a : immediate)" is not compatible with the type "string"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -922,10 +919,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val x : string end
-       Values do not match:
-         val x : ('a : immediate). 'a t
-       is not included in
-         val x : string
+       The value "x" does not match its expected declaration
        The type "'a t" = "('a : immediate)" is not compatible with the type
          "string"
        The layout of string is value non_float
@@ -2020,10 +2014,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          sig val f : ('a : any). 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : ('a : any). 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is any
          because of the definition of f at line 2, characters 2-30.
@@ -2076,10 +2067,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          S_any
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : ('a : any). 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is any
          because of the definition of f at line 2, characters 2-30.
@@ -2098,10 +2086,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          S_float64
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : ('a : float64). 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is float64
          because of the definition of f at line 10, characters 2-34.
@@ -2237,10 +2222,7 @@ Error: Signature mismatch:
          sig val f : (('a : any). 'a -> unit) -> unit end
        is not included in
          sig val f : ('a. 'a -> unit) -> unit end
-       Values do not match:
-         val f : (('a : any). 'a -> unit) -> unit
-       is not included in
-         val f : ('a. 'a -> unit) -> unit
+       The value "f" does not match its expected declaration
        The type "(('a : any). 'a -> unit) -> unit"
        is not compatible with the type "('a. 'a -> unit) -> unit"
        Type "'a" is not compatible with type "'a0"
@@ -2264,10 +2246,7 @@ Error: Signature mismatch:
          sig val f : ('a. 'a -> 'a) -> unit end
        is not included in
          sig val f : (('a : any). 'a -> 'a) -> unit end
-       Values do not match:
-         val f : ('a. 'a -> 'a) -> unit
-       is not included in
-         val f : (('a : any). 'a -> 'a) -> unit
+       The value "f" does not match its expected declaration
        The type "('a. 'a -> 'a) -> unit" is not compatible with the type
          "(('a : any). 'a -> 'a) -> unit"
        Type "'a" is not compatible with type "'a0"

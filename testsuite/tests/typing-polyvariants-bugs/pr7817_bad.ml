@@ -25,10 +25,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val write : [< `A of string | `B of int ] -> unit end
-       Values do not match:
-         val write : ([< `A of '_weak3 | `B of '_weak4 ] as '_weak2) -> unit
-       is not included in
-         val write : [< `A of string | `B of int ] -> unit
+       The value "write" does not match its expected declaration
        The type "([< `A of '_weak3 | `B of '_weak4 ] as '_weak2) -> unit"
        is not compatible with the type "[< `A of string | `B of int ] -> unit"
        Type "[< `A of '_weak3 | `B of '_weak4 ] as '_weak2"

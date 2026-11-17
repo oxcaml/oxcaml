@@ -22,10 +22,7 @@ Error: Signature mismatch:
          sig type t = B val f : t -> unit end
        is not included in
          sig val f : t -> unit end
-       Values do not match:
-         val f : t/1 -> unit
-       is not included in
-         val f : t/2 -> unit
+       The value "f" does not match its expected declaration
        The type "t/1 -> unit" is not compatible with the type "t/2 -> unit"
        Type "t/1" is not compatible with type "t/2"
        Line 6, characters 4-14:
@@ -145,10 +142,7 @@ Error: Signature mismatch:
          sig module type s type t = B val f : (module s) -> t/2 -> t/1 end
        is not included in
          sig val f : (module s) -> t -> t end
-       Values do not match:
-         val f : (module s/1) -> t/2 -> t/1
-       is not included in
-         val f : (module s/2) -> t/2 -> t/2
+       The value "f" does not match its expected declaration
        The type "(module s/1) -> t/2 -> t/1" is not compatible with the type
          "(module s/2) -> t/2 -> t/2"
        Modules do not match: s/1 is not included in s/2
@@ -178,10 +172,7 @@ Error: Signature mismatch:
          sig type a = B val f : a/2 -> 'a -> a/1 end
        is not included in
          sig val f : a -> (module a) -> a end
-       Values do not match:
-         val f : a/2 -> 'a -> a/1
-       is not included in
-         val f : a/2 -> (module a) -> a/2
+       The value "f" does not match its expected declaration
        The type "a/2 -> (module a) -> a/1" is not compatible with the type
          "a/2 -> (module a) -> a/2"
        Type "a/1" is not compatible with type "a/2"
@@ -368,10 +359,7 @@ Error: Signature mismatch:
          sig val f : t/2 -> t/3 -> t/4 -> t/1 end
        is not included in
          sig val f : t -> t -> t -> t end
-       Values do not match:
-         val f : t/2 -> t/3 -> t/4 -> t/1
-       is not included in
-         val f : t/1 -> t/1 -> t/1 -> t/1
+       The value "f" does not match its expected declaration
        The type "t/2 -> t/3 -> t/4 -> t/1" is not compatible with the type
          "t/1 -> t/1 -> t/1 -> t/1"
        Type "t/2" is not compatible with type "t/1"

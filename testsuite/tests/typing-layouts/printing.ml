@@ -19,10 +19,7 @@ Error: Signature mismatch:
          sig val f : ('a : '_representable_layout_1). unit -> 'a -> unit end
        is not included in
          sig val f : int -> bool -> char end
-       Values do not match:
-         val f : ('a : '_representable_layout_1). unit -> 'a -> unit
-       is not included in
-         val f : int -> bool -> char
+       The value "f" does not match its expected declaration
        The type "unit -> 'a -> unit" is not compatible with the type
          "int -> bool -> char"
        Type "unit" is not compatible with type "int"

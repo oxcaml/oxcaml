@@ -105,10 +105,7 @@ Error: Signature mismatch:
          sig val x : ('a. 'a -> unit) -> unit end
        is not included in
          sig val x : ((repr_ 'a). 'a -> unit) -> unit end
-       Values do not match:
-         val x : ('a. 'a -> unit) -> unit
-       is not included in
-         val x : ((repr_ 'a). 'a -> unit) -> unit
+       The value "x" does not match its expected declaration
        The type "('a. 'a -> unit) -> unit" is not compatible with the type
          "((repr_ 'a). 'a -> unit) -> unit"
        Type "'a -> unit" is not compatible with type "(repr_ 'a0). 'a0 -> unit"
@@ -130,10 +127,7 @@ Error: Signature mismatch:
          sig val x : ((repr_ 'a). 'a -> unit) -> unit end
        is not included in
          sig val x : ('a. 'a -> unit) -> unit end
-       Values do not match:
-         val x : ((repr_ 'a). 'a -> unit) -> unit
-       is not included in
-         val x : ('a. 'a -> unit) -> unit
+       The value "x" does not match its expected declaration
        The type "((repr_ 'a). 'a -> unit) -> unit"
        is not compatible with the type "('a. 'a -> unit) -> unit"
        Type "(repr_ 'a). 'a -> unit" is not compatible with type "'a -> unit"
@@ -161,10 +155,7 @@ Error: Signature mismatch:
          sig val f : (repr_ 'a). 'a -> unit end
        is not included in
          sig val f : (repr_ 'b). 'b -> 'b end
-       Values do not match:
-         val f : (repr_ 'a). 'a -> unit
-       is not included in
-         val f : (repr_ 'b). 'b -> 'b
+       The value "f" does not match its expected declaration
        The type "(repr_ 'a). 'a -> unit" is not compatible with the type
          "(repr_ 'b). 'b -> 'b"
        Type "unit" is not compatible with type "'b"
@@ -194,10 +185,7 @@ Error: Signature mismatch:
          sig val f : (repr_ 'a). 'a -> unit end
        is not included in
          sig val f : (repr_ 'b). ('b -> 'b) -> unit end
-       Values do not match:
-         val f : (repr_ 'a). 'a -> unit
-       is not included in
-         val f : (repr_ 'b). ('b -> 'b) -> unit
+       The value "f" does not match its expected declaration
        The type "(repr_ 'a). 'a -> unit" is not compatible with the type
          "(repr_ 'b). ('b -> 'b) -> unit"
        Type "'a" is not compatible with type "'b -> 'b"
@@ -218,10 +206,7 @@ Error: Signature mismatch:
          sig val f : (repr_ 'a) (repr_ 'b). 'a -> 'b end
        is not included in
          sig val f : (repr_ 'a) (repr_ 'b). 'b -> 'a end
-       Values do not match:
-         val f : (repr_ 'a) (repr_ 'b). 'a -> 'b
-       is not included in
-         val f : (repr_ 'a) (repr_ 'b). 'b -> 'a
+       The value "f" does not match its expected declaration
        The type "(repr_ 'a) (repr_ 'b). 'a -> 'b"
        is not compatible with the type "(repr_ 'a) (repr_ 'b). 'b -> 'a"
        Type "'a" is not compatible with type "'b"
@@ -252,10 +237,7 @@ Error: Signature mismatch:
          sig val f : (repr_ 'a). 'a -> unit end
        is not included in
          sig val f : 'a -> unit end
-       Values do not match:
-         val f : (repr_ 'a). 'a -> unit
-       is not included in
-         val f : 'a -> unit
+       The value "f" does not match its expected declaration
        The type "(repr_ 'a). 'a -> unit" is not compatible with the type
          "'b -> unit"
 |}]

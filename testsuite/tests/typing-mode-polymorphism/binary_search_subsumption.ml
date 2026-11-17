@@ -100,22 +100,7 @@ Error: Signature mismatch:
          end
        is not included in
          S
-       Values do not match:
-         val binary_search :
-           'a @ [< 'm & 'n & many] ->
-           length:('a @ [> 'n | aliased] ->
-                   int @ [< many uncontended read_write]) @ [< many > local] ->
-           get:('a @ [> 'm | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ [< many > local] ->
-           compare:('b @ [> 'o | dynamic] ->
-                    'c @ [> 'p | aliased] ->
-                    int @ [< many uncontended read_write]) @ [< many > local] ->
-           'c @ [< 'p & many] -> int option @ [> local aliased dynamic]
-       is not included in
-         val binary_search :
-           't ->
-           length:('t -> int) @ local ->
-           get:('t -> int -> 'elt) @ local ->
-           compare:('elt -> 'key -> int) @ local -> 'key -> int option
+       The value "binary_search" does not match its expected declaration
        The type
          "'a @ [< 'm & 'n & global many uncontended forkable unyielding read_write] ->
          length:('a @ [< global many uncontended forkable unyielding read_write > 'n | aliased] ->
