@@ -82,7 +82,14 @@ let load_lambda ppf tlam =
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam = Simplif.simplify_lambda_for_bytecode rawlam in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let blam = Blambda_of_lambda.blambda_of_lambda ~compilation_unit:None lam in
+  let blam =
+    Blambda_of_lambda.blambda_of_lambda
+      ~machine_width:
+        (if Sys.word_size = 64
+         then Target_system.Machine_width.Sixty_four
+         else Target_system.Machine_width.Thirty_two)
+      ~compilation_unit:None lam
+  in
   if !Clflags.dump_blambda then fprintf ppf "%a@." Printblambda.blambda blam;
   let instrs, can_free = Bytegen.compile_phrase blam in
   if !Clflags.dump_instr then

@@ -217,6 +217,10 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
   let blam =
     Blambda_of_lambda.blambda_of_lambda
+      ~machine_width:
+        (if Sys.word_size = 64
+         then Target_system.Machine_width.Sixty_four
+         else Target_system.Machine_width.Thirty_two)
       ~compilation_unit:(Some packed_compilation_unit) lam in
   if !Clflags.dump_blambda then
     Format.fprintf ppf_dump "%a@." Printblambda.blambda blam;

@@ -361,7 +361,8 @@ let in_place_copy_array_slice ~(length : Blambda.blambda)
            },
          Var arr_id ))
 
-let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
+let rec comp_expr ~machine_width (exp : Lambda.lambda) : Blambda.blambda =
+  let comp_expr = comp_expr ~machine_width in
   let comp_fun ({ params; body; loc = _ } as lfunction : Lambda.lfunction) :
       Blambda.bfunction =
     (* assume kind = Curried *)
@@ -1158,14 +1159,14 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Preinterpret_tuple_as_boxed_vector _ ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
-      if Target_system.is_64_bit ()
+      if Target_system.Machine_width.is_64_bit machine_width
       then unary (Ccall "caml_reinterpret_tagged_int63_as_unboxed_int64")
       else
         Misc.fatal_error
           "Preinterpret_tagged_int63_as_unboxed_int64 can only be used on \
            64-bit targets"
     | Preinterpret_unboxed_int64_as_tagged_int63 ->
-      if Target_system.is_64_bit ()
+      if Target_system.Machine_width.is_64_bit machine_width
       then unary (Ccall "caml_reinterpret_unboxed_int64_as_tagged_int63")
       else
         Misc.fatal_error
@@ -1644,8 +1645,8 @@ let thunkify_compilation_unit_initialization ~thunk_name blam =
           }
     }
 
-let blambda_of_lambda ~compilation_unit x =
-  let blam = comp_expr x in
+let blambda_of_lambda ~machine_width ~compilation_unit x =
+  let blam = comp_expr ~machine_width x in
   match compilation_unit with
   | None -> blam
   | Some cu ->
