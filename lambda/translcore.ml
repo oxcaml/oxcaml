@@ -393,7 +393,7 @@ let can_apply_primitive p pmode pos args =
     else if pos <> Typedtree.Tail then true
     else begin
       let return_mode =
-        Ctype.prim_mode pmode p.prim_native_repr_res ~level:0
+        Ctype.prim_mode pmode.res p.prim_native_repr_res ~level:0
       in
       is_heap_mode (transl_locality_mode_l return_mode)
     end

@@ -837,10 +837,14 @@ and function_cases =
 and ident_kind =
   | Id_value
   | Id_prim of
-      Mode.Locality.l option * Jkind.Sort.t option * Mode.Yielding.l
+      prim_instance_modes * Jkind.Sort.t option * Mode.Yielding.l
       (** The [Mode.Yielding.l] is the join of the yielding modes of the
           primitive's parameters, for when the primitive is closed over rather
           than directly applied. *)
+
+and prim_instance_modes =
+  { args : Mode.Locality.l option list;
+    res : Mode.Locality.l option }
 
 and block_access =
   | Baccess_field of
@@ -1169,7 +1173,7 @@ and primitive_coercion =
   {
     pc_desc: Primitive.description;
     pc_type: Types.type_expr;
-    pc_poly_mode: Mode.Locality.l option;
+    pc_poly_mode: prim_instance_modes;
     pc_poly_sort: Jkind.Sort.t option;
     pc_yielding: Mode.Yielding.l;
     (** As the [Mode.Yielding.l] in [Id_prim]. *)

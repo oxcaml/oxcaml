@@ -35,7 +35,7 @@ val check_primitive_arity :
 val transl_primitive :
   Lambda.scoped_location -> Primitive.description -> Env.t ->
   Types.type_expr ->
-  poly_mode:Mode.Locality.l option ->
+  poly_mode:Typedtree.prim_instance_modes ->
   poly_sort:Jkind.Sort.t option ->
   yielding:Mode.Yielding.l ->
   zero_alloc_check:Zero_alloc.check option ->
@@ -45,7 +45,7 @@ val transl_primitive :
 val transl_primitive_application :
   Lambda.scoped_location -> Primitive.description -> Env.t ->
   Types.type_expr ->
-  poly_mode:Mode.Locality.l option -> stack:bool ->
+  poly_mode:Typedtree.prim_instance_modes -> stack:bool ->
   poly_sort:Jkind.Sort.t option ->
   yielding:Lambda.yielding_kind -> Path.t ->
   Typedtree.expression option ->

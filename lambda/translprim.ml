@@ -192,7 +192,7 @@ let prim_sys_argv =
 let to_locality ~poly = function
   | Prim_global, _ -> alloc_heap
   | Prim_local, _ -> alloc_local
-  | Prim_poly, _ ->
+  | (Prim_poly | Prim_mode_poly), _ ->
     match poly with
     | None -> assert false
     | Some locality -> transl_locality_mode_l locality
@@ -200,7 +200,7 @@ let to_locality ~poly = function
 let to_modify_mode ~poly = function
   | Prim_global, _ -> modify_heap
   | Prim_local, _ -> modify_maybe_stack
-  | Prim_poly, _ ->
+  | (Prim_poly | Prim_mode_poly), _ ->
     match poly with
     | None -> assert false
     | Some mode -> transl_modify_mode mode
@@ -208,7 +208,7 @@ let to_modify_mode ~poly = function
 let to_return_mode ~poly = function
   | Prim_global, _ -> not_alloc_stack
   | Prim_local, _ -> maybe_alloc_stack
-  | Prim_poly, _ ->
+  | (Prim_poly | Prim_mode_poly), _ ->
     match poly with
     | None -> assert false
     | Some locality -> transl_return_mode_l locality
@@ -632,14 +632,14 @@ let array_vec_primitives = lazy (
    then specialize the array kind based on the context.
 *)
 let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
-  let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
+  let mode = to_locality ~poly:poly_mode.res p.prim_native_repr_res in
   let arg_modes =
     List.filter_map
       (function
-        | _, Elided_void -> None
-        | (_, Native_repr _) as repr ->
-          Some (to_modify_mode ~poly:poly_mode repr))
-      p.prim_native_repr_args
+        | _, (_, Elided_void) -> None
+        | poly, ((_, Native_repr _) as repr) ->
+          Some (to_modify_mode ~poly repr))
+      (List.combine poly_mode.args p.prim_native_repr_args)
   in
   let get_first_arg_mode () =
     match arg_modes with
@@ -2609,12 +2609,16 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
 let check_primitive_arity loc p =
   let mode =
     match p.prim_native_repr_res with
-    | Prim_global, _ | Prim_poly, _ ->
+    | Prim_global, _ | Prim_poly, _ | Prim_mode_poly, _ ->
       (* We assume all primitives are compiled to have the same arity for
          different modes and types, so just pick one of the modes in the
          [Prim_poly] case. *)
       Some Mode.Locality.global
     | Prim_local, _ -> Some Mode.Locality.local
+  in
+  let mode = Option.map Mode.Locality.disallow_right mode in
+  let mode =
+    { args = List.map (fun _ -> mode) p.prim_native_repr_args; res = mode }
   in
   (* By a similar assumption, the sort shouldn't change the arity.  So it's ok
      to lie here. *)
@@ -2688,14 +2692,16 @@ let transl_primitive
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
   in
-  let to_locality repr = to_locality ~poly:poly_mode repr in
   let error_loc = to_location loc in
-  let rec make_params ty repr_args repr_res =
-    match repr_args, repr_res with
-    | [], (_, res_repr) ->
+  let rec make_params ty repr_args mode_args repr_res =
+    match repr_args, mode_args, repr_res with
+    | [], [], (_, res_repr) ->
       let res_sort = sort_of_native_repr res_repr ~poly_sort in
       [], Typeopt.layout env error_loc res_sort ty
-    | (((_, arg_repr) as arg) :: repr_args), _ ->
+    | [], _ :: _, _ | _ :: _, [], _ ->
+      Misc.fatal_errorf "Primitive %s modes do not correspond to arity"
+        (Primitive.byte_name p)
+    | (((_, arg_repr) as arg) :: repr_args), (poly :: mode_args), _ ->
       match Typeopt.is_function_type env ty with
       | None ->
           Misc.fatal_errorf "Primitive %s type does not correspond to arity"
@@ -2705,9 +2711,9 @@ let transl_primitive
           let arg_layout =
             Typeopt.layout env error_loc arg_sort arg_ty
           in
-          let arg_mode = to_locality arg in
+          let arg_mode = to_locality ~poly arg in
           let params, return =
-            make_params ret_ty repr_args repr_res
+            make_params ret_ty repr_args mode_args repr_res
           in
           { name = Ident.create_local "prim";
             debug_uid = Lambda.debug_uid_none;
@@ -2719,7 +2725,7 @@ let transl_primitive
           :: params, return
   in
   let params, return =
-    make_params ty p.prim_native_repr_args p.prim_native_repr_res
+    make_params ty p.prim_native_repr_args poly_mode.args p.prim_native_repr_res
   in
   let args =
     filter_elided_args p (List.map (fun p -> Lvar p.name) params)
@@ -2736,7 +2742,9 @@ let transl_primitive
      let body =
        lambda_of_prim p.prim_name prim ~yielding loc args None
      in
-     let locality_mode = to_locality p.prim_native_repr_res in
+     let locality_mode =
+       to_locality ~poly:poly_mode.res p.prim_native_repr_res
+     in
      let () =
        (* CR mshinwell: Write a version of [primitive_may_allocate] that
           works on the [prim] type. *)
@@ -2781,7 +2789,11 @@ let transl_primitive
        | Alloc_heap :: args -> count_nlocal args
        | (Alloc_local :: _) as args -> List.length args
      in
-     let nlocal = count_nlocal (List.map to_locality p.prim_native_repr_args) in
+     let nlocal =
+       count_nlocal
+         (List.map2 (fun poly arg -> to_locality ~poly arg)
+            poly_mode.args p.prim_native_repr_args)
+     in
      let zero_alloc : Lambda.zero_alloc_attribute =
        match (zero_alloc_check : Zero_alloc.check option) with
        | None -> Default_zero_alloc
@@ -2798,7 +2810,7 @@ let transl_primitive
        ~loc
        ~body
        ~mode:alloc_heap
-       ~ret_mode:(to_return_mode ~poly:poly_mode p.prim_native_repr_res)
+       ~ret_mode:(to_return_mode ~poly:poly_mode.res p.prim_native_repr_res)
 
 let lambda_primitive_needs_event_after = function
   (* We add an event after any primitive resulting in a C call that MAY raise

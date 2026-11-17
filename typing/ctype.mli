@@ -274,14 +274,24 @@ val instance_label_declarations:
 (* Same, but for label declarations and the type parameters from the
    type declaration *)
 val prim_mode :
-        (Mode.allowed * 'r) Mode.Locality.t option ->
+        Mode.Locality.l option ->
         (Primitive.mode * Primitive.native_repr) -> level:int
-        -> (Mode.allowed * 'r) Mode.Locality.t
+        -> Mode.Locality.l
 val instance_prim:
         Env.t ->
         Primitive.description -> type_expr ->
         type_expr *
         Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
+        Jkind.Sort.t option
+
+(** Similar to [instance_prim], but returns the localities of the instance for
+    each argument and the result: [Some] for [Prim_poly] and [Prim_mode_poly]
+    modes, [None] otherwise. *)
+val instance_prim_with_modes:
+        Env.t ->
+        Primitive.description -> type_expr ->
+        type_expr *
+        (Mode.Locality.lr option list * Mode.Locality.lr option) *
         Jkind.Sort.t option
 
 val create_yielding_mode_l : Mode.Yielding.l -> Mode.Yielding.l
@@ -309,15 +319,23 @@ val curry_mode :
     a constant until a generic mode variable is encountered, then the join
     of the modes closed over ([curry_mode]). A hidden curry mode is a
     variable whose lower bound is the implied curry mode, unconstrained
-    otherwise. Its areality is bounded below by the constant upper bounds
-    of the areality of the arguments: a closure is as local as the
-    arguments it may close over. *)
+    otherwise. By default, its areality is bounded below by the constant upper
+    bounds of the areality of the arguments: a closure is as local as the
+    arguments it may close over. Primitives ([primitive]) don't pin areality:
+    their partial applications are eta-expanded, so the curry mode's locality
+    can use the instantiated localities of the arguments. *)
 module Curry_mode : sig
   type t =
-    | Const of With_locality.Const.t
+    | Const of { mode : With_locality.Const.t; pin_areality : bool }
     | Variable of
         { comonadic : With_locality.Comonadic.l;
-          areality : Locality.Const.t }
+          areality : Locality.Const.t option }
+
+  val const : With_locality.Const.t -> t
+
+  val legacy : t
+
+  val primitive : With_locality.Const.t -> t
 
   val add_const_arg : t -> With_locality.Const.t -> t
 
