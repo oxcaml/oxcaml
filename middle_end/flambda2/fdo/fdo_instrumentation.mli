@@ -26,22 +26,13 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** The FDO counters (see [Fdo_counter]) of the calls and switch arms of a
-    function, attached during the translation from Lambda.
-
-    Counters are numbered by visiting the Lambda body: the index of a call or
-    switch is its position in the order of the translation, which only depends
-    on the body (whose body hash guards it).
-
-    Calls and switches that the translation introduces when going to Flambda
-    (e.g. bounds checks, or the dispatch on whether a variant is an immediate)
-    get no counters of their own, while those it first creates in Lambda (e.g.
-    the tests of a string switch, or the loops of [Array.blit]) are numbered
-    like the source's (see [Fdo_body_hash]). *)
+(** Handles inserting FDO counters for calls and switch arms of a function. The
+    functions provided are called (via [Fdo_from_lambda_env]) during the
+    translation from Lambda. *)
 
 type t
 
-(** The instrumentation of the body of the given function. *)
+(** Create the instrumentation context for the given function. *)
 val create :
   function_:Fdo_counter.Function.t -> body_hash:Fdo_counter.Body_hash.t -> t
 
@@ -80,6 +71,5 @@ module Lambda_switch_counters : sig
   val is_int : t -> Switch_counters.t
 end
 
-(** Arm 0 of a [Lambda] switch is its default arm, followed by its constants and
-    then its tags. *)
+(** Counters on the arms of a given Lambda switch. *)
 val switch : t -> Lambda.lambda_switch -> Lambda_switch_counters.t
