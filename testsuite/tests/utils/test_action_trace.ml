@@ -1,11 +1,11 @@
 (* TEST
+ (* A directory that does not exist yet, to check that [Action_trace] creates
+    it. *)
+ set DUNE_ACTION_TRACE_DIR = "action_trace_dir";
  include ocamlcommon;
- include unix;
 *)
 
-(* A directory that does not exist yet, to check that [Action_trace] creates
-   it. *)
-let trace_dir = Filename.concat (Sys.getcwd ()) "action_trace_dir"
+let trace_dir = Sys.getenv "DUNE_ACTION_TRACE_DIR"
 
 let print_and_remove_trace_files () =
   let files = Sys.readdir trace_dir |> Array.to_list in
@@ -20,7 +20,6 @@ let print_and_remove_trace_files () =
 
 let () =
   Clflags.enable_action_trace := true;
-  Unix.putenv "DUNE_ACTION_TRACE_DIR" trace_dir;
   (* [Action_trace] closes its trace file in an [at_exit] handler registered
      when the first event is written. [at_exit] handlers run in reverse order of
      registration, so registering ours first means it sees the closed file. *)
