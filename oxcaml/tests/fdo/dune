@@ -193,6 +193,8 @@
     %{bin:ocamlopt.opt}
     -c
     -fdo-counters
+    -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dflambda-heavy-invariants
     -dfexpr-annot-after
     simplify
@@ -228,6 +230,8 @@
     -O3
     -flambda2-reaper
     -fdo-counters
+    -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dflambda-heavy-invariants
     -dfexpr-annot-after
     reaper
@@ -263,6 +267,8 @@
     -O3
     -flambda2-match-in-match
     -fdo-counters
+    -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dflambda-heavy-invariants
     -dfexpr-annot-after
     simplify
