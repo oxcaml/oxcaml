@@ -163,7 +163,7 @@ end
 
 let si_modtype_opt : Subst.Lazy.signature_item -> _ = function
   | Sig_modtype (_, m, _) -> m.mtd_type
-  | Sig_module (_, _, m, _, _) -> Some m.md_type
+  | Sig_module (_, _, m, _, _, _) -> Some m.md_type
   | _ -> None
 
 (* Check if module is smaller (= has less definition, counting nested ones)

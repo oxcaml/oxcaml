@@ -85,7 +85,7 @@ let signature_of_env ?(ignore_extensions = true) env =
       | _ -> Some (Sig_typext (i, e, Text_first, Exported))
       end
     | Env_module (_, i, pr, m, _, _, _) ->
-      Some (Sig_module (i, pr, m, Trec_not, Exported))
+      Some (Sig_module (i, pr, m, Trec_not, Exported, Mentionable))
     | Env_modtype (_, i, m) -> Some (Sig_modtype (i, m, Exported))
     | Env_class (_, i, c) -> Some (Sig_class (i, c, Trec_not, Exported))
     | Env_cltype (_, i, c) -> Some (Sig_class_type (i, c, Trec_not, Exported))

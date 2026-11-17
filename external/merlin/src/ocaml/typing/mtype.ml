@@ -676,22 +676,10 @@ and type_and_jkind_paths_sig env p sg =
     let { types; jkinds } = type_and_jkind_paths_sig env p rem in
     { types = (Pdot(p, Ident.name id) :: types); jkinds }
   | Sig_jkind(id, _decl, _) :: rem ->
-<<<<<<< Merlin:nonmentionable
     let { types; jkinds } = type_and_jkind_paths_sig env p rem in
     { types; jkinds = (Pdot(p, Ident.name id) :: jkinds) }
-  | Sig_module(id, pres, md, _, vis) :: rem ->
-    let { types = nested_types; jkinds = nested_jkinds } =
-||||||| Compiler:last-imported
-    let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
-    ~types, ~jkinds:(Pdot(p, Ident.name id) :: jkinds)
-  | Sig_module(id, pres, md, _, vis) :: rem ->
-    let ~types:nested_types, ~jkinds:nested_jkinds =
-=======
-    let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
-    ~types, ~jkinds:(Pdot(p, Ident.name id) :: jkinds)
   | Sig_module(id, pres, md, _, _, ment) :: rem ->
-    let ~types:nested_types, ~jkinds:nested_jkinds =
->>>>>>> Compiler:HEAD
+    let { types = nested_types; jkinds = nested_jkinds } =
       type_and_jkind_paths env (Pdot(p, Ident.name id)) md.md_type
     in
     let env =

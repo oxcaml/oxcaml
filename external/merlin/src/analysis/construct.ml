@@ -261,7 +261,7 @@ module Gen = struct
         @@ Util.var_of_id id
       in
       Ast_helper.Str.modtype mtd
-    | Sig_module (id, _, mod_decl, _, _) ->
+    | Sig_module (id, _, mod_decl, _, _, _) ->
       let module_binding =
         Ast_helper.Mb.mk (Location.mknoloc (Some (Ident.name id)))
         @@ module_ env mod_decl.md_type

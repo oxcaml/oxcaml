@@ -287,7 +287,7 @@ and signature_item (str_item : Types.signature_item) =
     Sig.type_ rec_flag [ type_declaration id type_decl ]
   | Sig_modtype (id, modtype_decl, _visibility) ->
     Sig.modtype @@ modtype_declaration id modtype_decl
-  | Sig_module (id, _, mod_decl, _, _) ->
+  | Sig_module (id, _, mod_decl, _, _, _) ->
     Sig.module_ @@ module_declaration id mod_decl
   | Sig_jkind (id, jkind_decl, _visibility) ->
     Sig.jkind @@ jkind_declaration id jkind_decl
