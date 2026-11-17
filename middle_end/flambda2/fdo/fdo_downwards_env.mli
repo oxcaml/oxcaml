@@ -41,10 +41,10 @@ val enter_set_of_closures : t -> inlined_debuginfo:Inlined_debuginfo.t -> t
 val enter_inlined_apply :
   t -> called_code:Code.t -> callsite_counter:Fdo_counter.t option -> t
 
-(** [t] with the copy context and {!stub_callsite_counter} of [from]. *)
+(** [t] with the copy context and stub callsite counter of [from]. *)
 val with_copy_context_of : t -> from:t -> t
 
-(** Also clears {!stub_callsite_counter}. *)
+(** Also clears the stub callsite counter. *)
 val clear_copy_context : t -> t
 
 (** If we are in the body of an inlined stub, this returns the counter of the

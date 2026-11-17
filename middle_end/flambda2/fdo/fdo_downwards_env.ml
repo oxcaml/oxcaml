@@ -29,8 +29,9 @@
 type t =
   { copy_context : Inlined_debuginfo.t;
         (** The inlinings for a specialized set of closures whose function we're
-            simplifying. Kept track of separately since debuginfo for
-            specializations doesn't change, while FDO names do. *)
+            simplifying. Separate from [Downward_env]'s own [inlined_debuginfo]
+            because a specialized copy isn't inlined anywhere (so shouldn't
+            contain any inlining frames), while the counters are renamed. *)
     region : Fdo_region_counters.Region.t option;
     stub_callsite_counter : Fdo_counter.t option
         (** In the body of an inlined stub, the counter of the call it was
