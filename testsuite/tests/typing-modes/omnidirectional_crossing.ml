@@ -499,3 +499,58 @@ Line 2, characters 4-5:
         ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
+
+
+(* Simple abbreviations cannot leak between branches *)
+type (_, _) eq = Refl : ('a, 'a) eq
+
+module T : sig
+  type t
+
+  type s = t
+end = struct
+  type t
+
+  type s = t
+end
+
+type r =
+  { x : int;
+    y : int
+  }
+
+let f (w : (T.t, r) eq option) (c : T.s) =
+  match w with None -> c | Some Refl -> { c with x = 0 }
+[%%expect {|
+type (_, _) eq = Refl : ('a, 'a) eq
+module T : sig type t type s = t end
+type r = { x : int; y : int; }
+Line 19, characters 42-43:
+19 |   match w with None -> c | Some Refl -> { c with x = 0 }
+                                               ^
+Error: This expression has type "T.s" = "r"
+       but an expression was expected of type "r"
+       This instance of "r" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
+type (_, _) eq = Refl : ('a, 'a) eq
+module T : sig type t type s = t end
+type r = { x : int; y : int; }
+Line 19, characters 40-56:
+19 |   match w with None -> c | Some Refl -> { c with x = 0 }
+                                             ^^^^^^^^^^^^^^^^
+Error: This expression has type "r" but an expression was expected of type
+         "T.s" = "r"
+       This instance of "r" is ambiguous:
+       it would escape the scope of its equation
+|}]
+
+let f (w : (T.t, r) eq option) (c : T.s) =
+  match w with Some Refl -> { c with x = 0 } | None -> c
+[%%expect {|
+Line 2, characters 55-56:
+2 |   match w with Some Refl -> { c with x = 0 } | None -> c
+                                                           ^
+Error: The value "c" has type "T.s" = "T.t" but an expression was expected of type
+         "r"
+|}]
