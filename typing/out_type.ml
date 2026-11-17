@@ -1375,18 +1375,20 @@ end = struct
     if not (is_aliased pair) then aliased_pairs := pair :: !aliased_pairs
 
   (** Aliased types of the type being reserved, see [aliases_of_type] *)
-  let aliases = ref ([] : transient_expr list)
+  let type_aliases = ref ([] : transient_expr list)
 
-  let is_alias ty = List.memq (proxy ty) !aliases
+  let is_type_alias ty = List.memq (proxy ty) !type_aliases
 
-  (** [entered] records the aliased types whose body was already traversed;
-      the printer prints later occurrences as the alias name *)
-  let enter_alias entered ty =
+  (** [should_walk ~walked_type_aliases ty] returns [false] iff [ty] is a type
+      alias whose body was already walked, since the printer prints later
+      occurrences as the alias name. Otherwise, it returns [true] and records
+      [ty] in [walked_type_aliases] if it is a type alias. *)
+  let should_walk ~walked_type_aliases ty =
     let px = proxy ty in
-    if not (List.memq px !aliases) then true
-    else if List.memq px !entered then false
+    if not (List.memq px !type_aliases) then true
+    else if List.memq px !walked_type_aliases then false
     else begin
-      entered := px :: !entered;
+      walked_type_aliases := px :: !walked_type_aliases;
       true
     end
 
@@ -1394,7 +1396,7 @@ end = struct
       visible mode variable. *)
   let register_visible_modes ty =
     let seen = ref [] in
-    let entered = ref [] in
+    let walked_type_aliases = ref [] in
     let register_visible_mode (mode : With_locality.lr) =
       if With_locality.check_generic mode then begin
         let ({ monadic; comonadic } as pair) = pair_of_mode mode in
@@ -1407,7 +1409,7 @@ end = struct
       end
     in
     let rec visit ty =
-      if enter_alias entered ty then
+      if should_walk ~walked_type_aliases ty then
         printer_iter_type_expr visit register_visible_mode ty
     in
     visit ty
@@ -2141,8 +2143,10 @@ end = struct
         | Tarrow ((_, marg, mret), _, ty2, _) ->
           equate_instances marg ~instances_generic ~instances_rigid;
           begin match get_desc ty2 with
+          (* The curry mode of a type alias is always printed, see
+             [register_suppressed_curries] *)
           | Tarrow _
-            when not (is_alias ty2)
+            when not (is_type_alias ty2)
                  && is_generic_curry_mode mret
                  && not (has_upper_edges mret) -> ()
           | _ -> equate_instances mret ~instances_generic ~instances_rigid
@@ -2176,11 +2180,11 @@ end = struct
     implied
 
   let register_suppressed_curries ~instances_generic ~instances_rigid acc ty =
-    let entered = ref [] in
+    let walked_type_aliases = ref [] in
     let rec register (~acc_mode, ~acc_mode_rigid) ty =
-      if enter_alias entered ty then begin
+      if should_walk ~walked_type_aliases ty then begin
         let ~acc_mode, ~acc_mode_rigid =
-          if is_alias ty then
+          if is_type_alias ty then
             let acc = Curry_mode.Const With_locality.Const.legacy in
             ~acc_mode:acc, ~acc_mode_rigid:acc
           else ~acc_mode, ~acc_mode_rigid
@@ -2210,7 +2214,7 @@ end = struct
           in
           let hidden =
             match get_desc ty2 with
-            | Tarrow _ when is_alias ty2 -> false
+            | Tarrow _ when is_type_alias ty2 -> false
             | Tarrow _ when is_generic_curry_mode mret ->
               register_curry_mode mret
                 ~m_generic:(find_mode_instance mret instances_generic)
@@ -2449,7 +2453,7 @@ end = struct
     normalize_type ty;
     add_named_vars ty;
     if mode_polymorphism_printing_enabled () then begin
-      aliases := !aliases_of_type ty;
+      type_aliases := !aliases_of_type ty;
       register_visible_modes ty;
       add_visible_paths ();
       add_visible_edges ();
