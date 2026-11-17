@@ -1,0 +1,6 @@
+File "sc_mismatch.ml", line 1:
+Error: File sc_unit.cmx, which contains unit Sc_unit,
+       was compiled with codegen configuration
+       [frame_pointers=false, stack_checks=true, address_sanitizer=false],
+       which is incompatible with this invocation's
+       [frame_pointers=false, stack_checks=false, address_sanitizer=false]

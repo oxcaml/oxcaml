@@ -676,5 +676,36 @@ let validate_frame_pointers () =
       "The LLVM backend requires frame pointers; \
        enable them with -frame-pointers (or frame-pointers=1 in OCAMLPARAM)"
 
+(* The architecture check mirrors the stack-checks case in configure.ac
+   (checks are forced on everywhere but amd64/arm64);
+   [Config.no_stack_checks] only provides the default for
+   [Clflags.stack_checks]. *)
+let validate_stack_checks () =
+  if !Clflags.stack_checks
+  then (
+    if Config.with_address_sanitizer
+    then
+      Compenv.fatal
+        "Stack checks together with AddressSanitizer is an untested \
+         combination; remove -stack-checks (or stack-checks=1 in OCAMLPARAM)";
+    if !Clflags.llvm_backend
+    then
+      Compenv.fatal
+        "The LLVM backend does not support stack checks; \
+         remove -stack-checks (or stack-checks=1 in OCAMLPARAM)")
+  else
+    match Config.architecture with
+    | "amd64" | "arm64" -> ()
+    | _ ->
+      Compenv.fatal
+        "Stack checks cannot be disabled on this architecture; \
+         remove -no-stack-checks (or stack-checks=0 in OCAMLPARAM)"
+
+(* The whole validation DAG for the per-invocation codegen-variant axes;
+   run at the start of native compilation and linking. *)
+let validate_codegen_variant () =
+  validate_frame_pointers ();
+  validate_stack_checks ()
+
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

@@ -753,8 +753,10 @@
        ocamlopt.byte;
 
        (* This dump contains a configure-dependent "Codegen fingerprint"
-          line; only check it for the default codegen configuration. *)
+          line; only check it for the default codegen configuration (no
+          frame pointers, no stack checks, no address sanitizer). *)
        no-frame_pointers;
+       no-stack-checks;
        no-address-sanitizer;
 
        program = "-no-code -no-approx ref_indirect.cmx ref_indirect.cmi";

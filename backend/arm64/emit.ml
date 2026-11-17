@@ -1242,7 +1242,7 @@ let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
   (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
   (* Reached only with stack checks enabled; [emit_stack_probes] handles the
      disabled case and never needs the far/realloc machinery. *)
-  assert (not Config.no_stack_checks);
+  assert !Clflags.stack_checks;
   let sc_label = L.create Text and sc_return = L.create Text in
   let threshold_offset =
     (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
@@ -1263,11 +1263,11 @@ let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
   sc_label, sc_return
 
 (* When stack checks are disabled, probe the prospective stack frame at
-   [Domainstate.stack_guard_stride]-byte strides so that a frame big enough to
-   step over the stack's guard page faults. Each probe loads (and discards) into
-   x16, a reserved temporary. *)
+   [Codegen_variant.stack_guard_stride]-byte strides so that a frame big enough
+   to step over the stack's guard page faults. Each probe loads (and discards)
+   into x16, a reserved temporary. *)
 let emit_stack_probes ~max_frame_size_bytes =
-  let stride = Domainstate.stack_guard_stride in
+  let stride = Codegen_variant.stack_guard_stride () in
   assert (stride > 0 && max_frame_size_bytes >= stride);
   let full_pages = max_frame_size_bytes / stride in
   let probe_at offset =
@@ -1295,14 +1295,14 @@ let emit_stack_probes ~max_frame_size_bytes =
   if max_frame_size_bytes mod stride <> 0 then probe_at max_frame_size_bytes
 
 let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
-  if Config.no_stack_checks
-  then emit_stack_probes ~max_frame_size_bytes
-  else
+  if !Clflags.stack_checks
+  then
     let sc_label, sc_return =
       assembly_code_for_stack_check0 ~far ~max_frame_size_bytes
     in
     Env.set_stack_realloc env
       { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
+  else emit_stack_probes ~max_frame_size_bytes
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
@@ -2181,13 +2181,13 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
     in
     ()
   | Far_stackcheck { max_frame_size_bytes } ->
-    if Config.no_stack_checks
-    then emit_stack_probes ~max_frame_size_bytes
-    else
+    if !Clflags.stack_checks
+    then
       let _sc_label, _sc_return =
         assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
       in
       ()
+    else emit_stack_probes ~max_frame_size_bytes
   | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
   | Branch lbl -> emit_branch lbl
 

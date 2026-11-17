@@ -346,7 +346,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     not (String.equal output_name "/dev/null")
 
   let link_shared ~ppf_dump linkenv objfiles output_name =
-    Oxcaml_flags.validate_frame_pointers ();
+    Oxcaml_flags.validate_codegen_variant ();
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
         let genfns = Generic_fns.Tbl.make () in
         let _full_paths, ml_objfiles, units_tolink, _ =
@@ -365,7 +365,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let link ~ppf_dump objfiles output_name =
     let shared = false in
-    Oxcaml_flags.validate_frame_pointers ();
+    Oxcaml_flags.validate_codegen_variant ();
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
         let stdlib = "stdlib" ^ Backend.ext_flambda_lib in
         let stdexit = "std_exit" ^ Backend.ext_flambda_obj in

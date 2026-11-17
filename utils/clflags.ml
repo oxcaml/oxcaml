@@ -406,6 +406,12 @@ let pic_code = ref (match Config.architecture with (* -fPIC *)
 let frame_pointers = ref Config.with_frame_pointers
                                         (* -[no-]frame-pointers *)
 
+(* This ref lives here rather than in [Oxcaml_flags] because it is read by
+   [Codegen_variant] (in utils, which cannot depend on the driver
+   libraries).  [Config.no_stack_checks] only provides the default. *)
+let stack_checks = ref (not Config.no_stack_checks)
+                                        (* -[no-]stack-checks *)
+
 let runtime_variant = ref ""
 let ocamlrunparam = ref ""
 

@@ -49,7 +49,7 @@
 #include "caml/stack.h"
 #include "caml/frame_descriptors.h"
 #endif
-#if defined(USE_MMAP_MAP_STACK) || !defined(STACK_CHECKS_ENABLED)
+#if defined(USE_MMAP_MAP_STACK) || !STACK_CHECKS_ENABLED
 #include <sys/mman.h>
 #endif
 #ifdef __linux__
@@ -1424,7 +1424,7 @@ static void free_stack_memory(struct stack_info* stack)
   caml_atomic_counter_incr(Stack_stat(freed));
   (void)caml_atomic_counter_decr(&stack_count);
   CAML_EV_COUNTER(EV_C_STACK_FREED, stack->size);
-#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
+#if defined(DEBUG) && STACK_CHECKS_ENABLED
   memset(stack, 0x42, (char*)stack->handler - (char*)stack);
 #endif
 #if defined(USE_MMAP_MAP_STACK)
@@ -1544,7 +1544,7 @@ static void stack_release_memory(struct stack_info* stack)
   stack->tls_state = Val_null;
 
   if (cache_bucket != -1) {
-#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
+#if defined(DEBUG) && STACK_CHECKS_ENABLED
     memset(Stack_base(stack), 0x42,
           (Stack_high(stack)-Stack_base(stack))*sizeof(value));
 #endif

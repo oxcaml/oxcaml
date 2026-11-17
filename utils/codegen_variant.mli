@@ -30,7 +30,10 @@
     values selected for a native compilation or link.  Units compiled for
     different variants must never be mixed within one image. *)
 
-type t = { frame_pointers : bool }
+type t =
+  { frame_pointers : bool;
+    stack_checks : bool
+  }
 
 (** The variant selected by the current invocation's flags.  Always
     [default] when the target is JSIR (js_of_ocaml or wasm_of_ocaml): the
@@ -45,8 +48,9 @@ val equal : t -> t -> bool
 
 val is_default : t -> bool
 
-(** Sets every per-invocation axis flag ([Clflags.frame_pointers]) to [t]'s
-    values, for tools that select a whole variant by name. *)
+(** Sets every per-invocation axis flag ([Clflags.frame_pointers],
+    [Clflags.stack_checks]) to [t]'s values, for tools that select a whole
+    variant by name. *)
 val apply : t -> unit
 
 (** Canonical name encoding absolute axis values ("fp" / "base"); the
@@ -61,6 +65,14 @@ val of_string : string -> t option
     [Codegen_variant_name.runtime_archive_suffix]. *)
 val runtime_archive_suffix : t -> string
 
+(** The stride, in bytes, at which the backend probes large stack frames of
+    the variant selected by the current invocation's flags, so that a frame
+    big enough to step over a stack's guard page faults in the guard page
+    instead; zero under stack checks, where stacks have no guard page (and
+    limit checks make probing unnecessary).  Reads the flags at every call;
+    callers must not capture the result at module-initialization time. *)
+val stack_guard_stride : unit -> int
+
 (** The marker recorded in native compilation artifacts.  Besides the
     per-invocation axes of [t] it includes configure-time settings
     (address sanitizer) whose mixing across installs must also be
@@ -73,8 +85,9 @@ val current_fingerprint : unit -> fingerprint
 
 val equal_fingerprint : fingerprint -> fingerprint -> bool
 
-(** Renders e.g. "frame_pointers=true, address_sanitizer=false", for use
-    in error messages and [ocamlobjinfo]. *)
+(** Renders e.g. "frame_pointers=true, stack_checks=false,
+    address_sanitizer=false", for use in error messages and
+    [ocamlobjinfo]. *)
 val string_of_fingerprint : fingerprint -> string
 
 (** The standard-library root serving the codegen variant selected by the

@@ -35,9 +35,12 @@ let codegen_variant env =
 let default_codegen_variant =
   Codegen_variant_name.to_string
     (Codegen_variant_name.of_tokens
-       (if Config.with_frame_pointers
-        then [Codegen_variant_name.Frame_pointers]
-        else []))
+       ((if Config.with_frame_pointers
+         then [Codegen_variant_name.Frame_pointers]
+         else [])
+        @ (if Config.no_stack_checks
+           then []
+           else [Codegen_variant_name.Stack_checks])))
 
 let codegen_variant_directory name =
   if String.equal name default_codegen_variant

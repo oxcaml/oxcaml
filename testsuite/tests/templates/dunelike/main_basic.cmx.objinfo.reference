@@ -46,5 +46,5 @@ Currying functions:
 Apply functions:
 Send functions:
 Force link: no
-Codegen fingerprint: frame_pointers=false, address_sanitizer=false
+Codegen fingerprint: frame_pointers=false, stack_checks=false, address_sanitizer=false
 Static data: (missing)

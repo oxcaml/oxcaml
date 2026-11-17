@@ -1952,12 +1952,18 @@ AS_CASE([$arch],
     [arch_specific_SOURCES='$(intel_SOURCES)'],
   [arch_specific_SOURCES=''])
 
+dnl Stack checks can be disabled (in favor of guard pages) only on
+dnl amd64/arm64; every other architecture is forced to checks.  The
+dnl default is recorded in m.h as the STACK_CHECKS_ENABLED_DEFAULT value
+dnl (see "## Stack checks" below), from which m.h resolves
+dnl STACK_CHECKS_ENABLED when no command-line -D overrides it, as the
+dnl codegen-variant runtime archives do per archive (see
+dnl stdlib/dune_rules/gen.ml).
 AS_IF([test x"$enable_stack_checks" = xyes],
-  [AC_DEFINE([STACK_CHECKS_ENABLED])],
+  [],
   [AS_CASE([$arch],
     [amd64|arm64], [],
-    [enable_stack_checks=yes
-     AC_DEFINE([STACK_CHECKS_ENABLED])])])
+    [enable_stack_checks=yes])])
 
 native_cflags=''
 oc_native_cflags=''
@@ -3125,27 +3131,53 @@ AS_IF([test x"$enable_address_sanitizer" = "xyes"],
   [AC_MSG_NOTICE([not using Address Sanitizer])
   address_sanitizer=false])
 
+## Stack checks
+
+dnl The decision (including the forced-on architectures) was made next to
+dnl the architecture determination above; here the default is recorded in
+dnl m.h as the STACK_CHECKS_ENABLED_DEFAULT 1/0 value, from which m.h
+dnl resolves STACK_CHECKS_ENABLED when no command-line -D overrides it, as
+dnl the codegen-variant runtime archives do per archive.
+
+AS_IF([test x"$enable_stack_checks" = "xyes"],
+  [AS_IF([test x"$address_sanitizer" = "xtrue"],
+     [AC_MSG_ERROR(m4_normalize([stack checks together with Address
+       Sanitizer is an untested combination; configure with at most one of
+       --enable-stack-checks and --enable-address-sanitizer]))])
+   AC_DEFINE([STACK_CHECKS_ENABLED_DEFAULT], [1])
+   stack_checks=true
+   AC_MSG_NOTICE([using stack checks])],
+  [AC_DEFINE([STACK_CHECKS_ENABLED_DEFAULT], [0])
+   stack_checks=false
+   AC_MSG_NOTICE([not using stack checks (using stack guard pages)])])
+
 ## Codegen variants
 
 dnl The configure-default codegen variant's name: the '-'-joined, sorted
-dnl names of the enabled axis tokens (currently only "fp"), or "base" when
-dnl every axis is off. The naming scheme is defined by
-dnl utils/codegen_variant_name.ml, which this must agree with.
+dnl names of the enabled axis tokens ("fp", "sc"), or "base" when every
+dnl axis is off. The naming scheme is defined by
+dnl utils/codegen_variant_name.ml, which this must agree with; appending
+dnl the tokens in canonical (sorted-name) order keeps the joined name
+dnl canonical.
 
+codegen_default_tokens=''
 AS_IF([test x"$frame_pointers" = "xtrue"],
-  [codegen_default_variant=fp],
-  [codegen_default_variant=base])
+  [codegen_default_tokens="$codegen_default_tokens fp"])
+AS_IF([test x"$stack_checks" = "xtrue"],
+  [codegen_default_tokens="$codegen_default_tokens sc"])
+AS_IF([test -z "$codegen_default_tokens"],
+  [codegen_default_variant=base],
+  [codegen_default_variant=`echo $codegen_default_tokens | tr ' ' '-'`])
 AC_SUBST([codegen_default_variant])
 
 dnl The space-separated list of NON-default codegen variant names that
 dnl additionally get runtime archives and library trees, so that one
-dnl install can serve several per-invocation codegen configurations
-dnl (currently: the frame-pointer setting opposite to this configuration's
-dnl default). Computed by flipping each supported axis from the configure
-dnl default and applying constraint closure in both directions (no closure
-dnl is needed while the frame-pointer axis is the only one; later axis
-dnl stages extend the flip list). Overridable with
-dnl --with-codegen-variants=NAME,NAME; emptied by
+dnl install can serve several per-invocation codegen configurations.
+dnl Computed by flipping each supported axis from the configure default
+dnl and applying constraint closure in both directions (no closure relates
+dnl the frame-pointer and stack-checks axes; closure arrives with the
+dnl address-sanitizer axis), then appending the curated extras list below.
+dnl Overridable with --with-codegen-variants=NAME,NAME; emptied by
 dnl --disable-codegen-variants. Silently empty on platforms where frame
 dnl pointers are unsupported, and under Address Sanitizer (ASan forces
 dnl frame pointers, so the base variant may not be built there).
@@ -3178,7 +3210,7 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
    for name in $with_codegen_variants; do
      IFS=$save_IFS
      AS_CASE([$name],
-       [base|fp], [:],
+       [base|fp|sc|fp-sc], [:],
        [AC_MSG_ERROR(m4_normalize([unknown codegen variant name
          '$name' in --with-codegen-variants]))])
      AS_IF([test x"$name" = x"$codegen_default_variant"],
@@ -3190,11 +3222,45 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
    done
    IFS=$save_IFS
    codegen_variants=`echo $codegen_variants`],
-  [dnl Flip each supported axis from the default (fp only, so the list is
-   dnl the single opposite frame-pointer variant).
+  [dnl Flip each supported axis from the default, keeping the other axes
+   dnl at their defaults, then append the curated extras: additional
+   dnl variants deliberately built by default even though no single flip
+   dnl produces them.  The only extra today is fp-sc, the one configuration
+   dnl that executes the frame-pointer stack-reallocation walk in
+   dnl runtime/fiber.c (live only with frame pointers AND stack checks).
+   dnl Extras are validated like --with-codegen-variants names, and the
+   dnl default variant and duplicates are dropped.
    AS_IF([test x"$frame_pointers" = "xtrue"],
-     [codegen_variants=base],
-     [codegen_variants=fp])])
+     [fp_default_token=fp; fp_flipped_token=''],
+     [fp_default_token=''; fp_flipped_token=fp])
+   AS_IF([test x"$stack_checks" = "xtrue"],
+     [sc_default_token=sc; sc_flipped_token=''],
+     [sc_default_token=''; sc_flipped_token=sc])
+   codegen_variant_extras='fp-sc'
+   codegen_variant_candidates=''
+   for tokens in "$fp_flipped_token $sc_default_token" \
+                 "$fp_default_token $sc_flipped_token"
+   do
+     name=`echo $tokens | tr ' ' '-'`
+     AS_IF([test -z "$name"], [name=base])
+     codegen_variant_candidates="$codegen_variant_candidates $name"
+   done
+   for name in $codegen_variant_extras; do
+     AS_CASE([$name],
+       [base|fp|sc|fp-sc],
+         [codegen_variant_candidates="$codegen_variant_candidates $name"],
+       [AC_MSG_ERROR(m4_normalize([unknown codegen variant name '$name'
+         in the curated extras list]))])
+   done
+   for name in $codegen_variant_candidates; do
+     AS_IF([test x"$name" = x"$codegen_default_variant"], [:],
+       [AS_CASE([" $codegen_variants "],
+          [*" $name "*], [:],
+          [codegen_variants="$codegen_variants $name"])])
+   done
+   codegen_variants=`for name in $codegen_variants; do echo $name; done \
+     | LC_ALL=C sort`
+   codegen_variants=`echo $codegen_variants`])
 AS_IF([test -n "$codegen_variants"],
   [AC_MSG_NOTICE([building codegen variants: $codegen_variants])])
 AC_SUBST([codegen_variants])

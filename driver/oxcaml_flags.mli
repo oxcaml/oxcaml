@@ -360,7 +360,8 @@ end
 
 val opt_flag_handler : Clflags.Opt_flag_handler.t
 
-(** Check that the frame-pointer setting of the current invocation
-    ([Clflags.frame_pointers]) is supported on this target; exits with an
-    error otherwise. Run at the start of native compilation and linking. *)
-val validate_frame_pointers : unit -> unit
+(** Check that the codegen-variant axis settings of the current invocation
+    ([Clflags.frame_pointers], [Clflags.stack_checks]) are supported on
+    this target and mutually consistent; exits with an error otherwise.
+    Run at the start of native compilation and linking. *)
+val validate_codegen_variant : unit -> unit

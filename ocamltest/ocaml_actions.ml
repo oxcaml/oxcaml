@@ -1580,7 +1580,7 @@ let stack_checks = Actions.make
 
 let no_stack_checks = Actions.make
   ~name:"no-stack-checks"
-  ~description:"Passes if stack checks are enabled"
+  ~description:"Passes if stack checks are disabled"
   ~does_something:false
   (Actions_helpers.predicate Config.no_stack_checks
     "Stack checks disabled"

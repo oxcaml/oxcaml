@@ -30,7 +30,7 @@
     a variant name being the '-'-joined, canonically sorted names of the
     enabled tokens, with the all-off variant spelled "base" (names are
     absolute, independent of the configure default).  Examples: "base",
-    "fp", and once further axes exist, "sc", "asan-fp", "fp-sc".
+    "fp", "sc", "fp-sc", and once further axes exist, "asan-fp".
 
     This module is dependency-free (no [Clflags]/[Config]/[Misc]): it is the
     single source of the name scheme and of the per-token flag tables, and
@@ -43,7 +43,9 @@
     never equals a runtime-variant suffix string ("d", "i", "pic", "nnp");
     see codegen_variant_name.ml and the consistency test. *)
 
-type token = Frame_pointers
+type token =
+  | Frame_pointers
+  | Stack_checks
 
 (** Every supported token, in canonical (sorted-name) order. *)
 val all_tokens : token list
