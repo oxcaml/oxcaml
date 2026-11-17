@@ -30,20 +30,25 @@ module FC = Fdo_counter
 
 type t =
   { naming_context : Fdo_function_naming.Context.t;
-    function_ : FC.Function.t
+    function_ : FC.Function.t;
+    body_hash : FC.Body_hash.t
   }
 
-let toplevel compilation_unit =
+let toplevel compilation_unit module_initializer =
   { naming_context = Fdo_function_naming.Context.toplevel compilation_unit;
-    function_ = Fdo_function_naming.toplevel_function compilation_unit
+    function_ = Fdo_function_naming.toplevel_function compilation_unit;
+    body_hash = Fdo_body_hash.of_toplevel module_initializer
   }
 
 let enter_function t ~binder fn =
   let function_, naming_context =
     Fdo_function_naming.of_function t.naming_context ~binder fn
   in
-  { naming_context; function_ }
+  { naming_context; function_; body_hash = Fdo_body_hash.of_function fn }
 
 let entry_annotation t =
-  Fdo_annotation.of_list
-    [t.function_ |> FC.Position.create_function_entry |> FC.of_position]
+  let annotation =
+    Fdo_annotation.of_list
+      [t.function_ |> FC.Position.create_function_entry |> FC.of_position]
+  in
+  Fdo_annotation.With_body_hash.create ~annotation ~body_hash:(Some t.body_hash)

@@ -1,0 +1,72 @@
+File "region_handlers.ml", lines 21-27, characters 39-41:
+21 | .......................................n =
+22 |   let local_ p = (Sys.opaque_identity n, n) in
+23 |   use_local p;
+24 |   try
+25 |     if n = 0 then fail ();
+26 |     n :: try_body_local (n - 1)
+27 |   with Exit when n = 2 -> [ fst p * 100 ]
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+
+File "region_handlers.ml", lines 31-36, characters 42-24:
+31 | ..........................................n =
+32 |   let p = (n, n) in
+33 |   try
+34 |     if n = 0 then fail ();
+35 |     n :: try_body_inferred (n - 1)
+36 |   with Exit -> [ fst p ]
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+
+File "region_handlers.ml", lines 40-44, characters 43-17:
+40 | ...........................................n =
+41 |   try
+42 |     if n = 0 then fail ();
+43 |     n :: try_body_no_region (n - 1)
+44 |   with Exit -> []
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+
+File "region_handlers.ml", lines 48-53, characters 37-71:
+48 | .....................................t ~f =
+49 |   let local_ p = (Sys.opaque_identity 0, 0) in
+50 |   use_local p;
+51 |   match t with
+52 |   | [] -> []
+53 |   | hd :: tl -> (try f hd :: map_try_body tl ~f with Exit -> [ fst p ])
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+
+File "region_handlers.ml", lines 67-74, characters 42-48:
+67 | ..........................................n =
+68 |   let go n =
+69 |     let local_ q = (Sys.opaque_identity n, n) in
+70 |     use_local q;
+71 |     if n = 0 then fail ();
+72 |     n :: try_helper_region (n - 1)
+73 |   in
+74 |   if n < 0 then [] else try go n with Exit -> []
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+
+File "region_handlers.ml", lines 80-87, characters 42-54:
+80 | ..........................................n =
+81 |   let local_ p = (Sys.opaque_identity n, n) in
+82 |   use_local p;
+83 |   if n = 0 then []
+84 |   else
+85 |     match Effect.perform Ask with
+86 |     | v -> v :: effect_value_case (n - 1)
+87 |     | effect Ask, k -> Effect.Deep.continue k (n * 10)
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+
+File "region_handlers.ml", lines 97-101, characters 39-26:
+ 97 | .......................................n =
+ 98 |   let local_ p = (Sys.opaque_identity n, n) in
+ 99 |   use_local p;
+100 |   try if n = 0 then [] else Effect.perform Ask :: perform_in_try (n - 1)
+101 |   with Exit -> [ - fst p ]
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.

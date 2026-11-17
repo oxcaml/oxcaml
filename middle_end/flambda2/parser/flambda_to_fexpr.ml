@@ -463,7 +463,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         let annotation = Code.fdo_entry_annotation code in
         if
           Flambda_features.fdo_counters ()
-          && not (Fdo_annotation.is_empty annotation)
+          && not (Fdo_annotation.With_body_hash.is_empty annotation)
         then Some annotation
         else None
       in

@@ -79,7 +79,7 @@ let rebuild_let
     no_constants_from_defining_expr && UA.no_lifted_constants uacc
   in
   let put_bindings_around_body uacc ~body =
-    let uacc = UA.notify_removed ~operation:removed_operations uacc in
+    let body = RE.notify_removed ~operation:removed_operations body in
     let bindings =
       List.map
         (fun (binding : Simplified_named.binding_to_place) :
@@ -115,7 +115,7 @@ let rebuild_let
     in
     (* Phantom let creation *)
     let generate_phantom_lets = UA.generate_phantom_lets uacc in
-    let free_names_of_body = UA.name_occurrences uacc in
+    let free_names_of_body = RE.free_names body in
     let compute_greatest_name_mode (bound_vars : Bound_pattern.t) =
       match bound_vars with
       | Singleton bound_var ->
@@ -247,24 +247,23 @@ let rebuild_let
                   { binding with let_bound = bound_vars })
         bindings
     in
-    let uacc, bindings =
+    let body, bindings =
       let Flow_types.Mutable_unboxing_result.{ let_rewrites; _ } =
         UA.mutable_unboxing_result uacc
       in
       match Named_rewrite_id.Map.find rewrite_id let_rewrites with
-      | exception Not_found -> uacc, bindings
+      | exception Not_found -> body, bindings
       | rewrite -> (
         match bindings with
-        | [] -> uacc, []
+        | [] -> body, []
         | _ :: _ :: _ -> assert false
-        | [(Delete_binding _ as binding)] -> uacc, [binding]
+        | [(Delete_binding _ as binding)] -> body, [binding]
         | [Keep_binding binding] -> (
           match rewrite, binding.original_defining_expr with
           | Prim_rewrite prim_rewrite, Some (Prim (original_prim, dbg)) ->
-            let uacc =
-              UA.notify_removed
+            let body =
+              RE.notify_removed body
                 ~operation:(Removed_operations.prim original_prim)
-                uacc
             in
             let machine_width = UE.machine_width (UA.uenv uacc) in
             let new_bindings =
@@ -310,7 +309,7 @@ let rebuild_let
                 [ Simplified_named.Keep_binding
                     { binding with simplified_defining_expr } ]
             in
-            uacc, new_bindings
+            body, new_bindings
           | ( Prim_rewrite _,
               ( None
               | Some

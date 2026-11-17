@@ -214,7 +214,7 @@ let rebuild_apply
     *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
     * in *)
   let apply = if erase_callee then Apply.erase_callee apply else apply in
-  let uacc, expr =
+  let expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id ~is_cold
       (Flambda_arity.unarize_t result_arity)
       apply
@@ -785,7 +785,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
               ~dbg
-              ~fdo_entry_annotation:Fdo_annotation.empty
+              ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
                 (* The eta-expanded function doesn't exist in the source, so
                    shouldn't have counters. *)
               ~is_tupled:false
