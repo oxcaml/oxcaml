@@ -91,17 +91,6 @@ let fdo_entry_annotation ppf entry_annotation =
       |> List.map ~f:Fdo_counter.to_string
       |> fun counters -> String.concat " " (counters @ body_hash) )
 
-let callsite_counter ppf = function
-  | None -> ()
-  | Some counter ->
-    Format.fprintf ppf " callsite_counter(%s)" (Fdo_counter.to_string counter)
-
-let func_call_callsite_counter ppf (call : Cfg.func_call_operation) =
-  match call with
-  | Indirect { callees = _; callsite_counter = counter }
-  | Direct { sym = _; callsite_counter = counter } ->
-    callsite_counter ppf counter
-
 let successor ppf ({ target; fdo_annotation = annotation } : Cfg.successor) =
   Format.fprintf ppf "%a%a" Label.format target fdo_annotation annotation
 
@@ -164,9 +153,10 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
   | Call_no_return call ->
     dump_linear_call_op ppf
       (match call with
-      | Indirect _ -> Linear.Lcall_ind
-      | Direct { sym = func; callsite_counter = _ } -> Linear.Lcall_imm { func });
-    func_call_callsite_counter ppf call;
+      | Indirect { callees = _; callsite_counter } ->
+        Linear.Lcall_ind { callsite_counter }
+      | Direct { sym = func; callsite_counter } ->
+        Linear.Lcall_imm { func; callsite_counter });
     fprintf ppf " (no return)"
   | External_call_no_return { func_symbol; _ } ->
     fprintf ppf "external_call_no_return %s%a" func_symbol print_args args
@@ -182,16 +172,17 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
        they are known *)
     dump_linear_call_op ppf
       (match call with
-      | Indirect _ -> Linear.Ltailcall_ind
-      | Direct { sym = func; callsite_counter = _ } ->
-        Linear.Ltailcall_imm { func });
-    func_call_callsite_counter ppf call
+      | Indirect { callees = _; callsite_counter } ->
+        Linear.Ltailcall_ind { callsite_counter }
+      | Direct { sym = func; callsite_counter } ->
+        Linear.Ltailcall_imm { func; callsite_counter })
   | Call { op = call; label_after } ->
     dump_linear_call_op ppf
       (match call with
-      | Indirect _ -> Linear.Lcall_ind
-      | Direct { sym = func; callsite_counter = _ } -> Linear.Lcall_imm { func });
-    func_call_callsite_counter ppf call;
+      | Indirect { callees = _; callsite_counter } ->
+        Linear.Lcall_ind { callsite_counter }
+      | Direct { sym = func; callsite_counter } ->
+        Linear.Lcall_imm { func; callsite_counter });
     Format.fprintf ppf "%s\n           goto %a" sep Label.format label_after
   | Prim { op = prim; label_after } ->
     dump_linear_call_op ppf

@@ -33,11 +33,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
         Hashtbl.add map lbl pc;
         fill_map pc instr.next (List.tl sizes)
       | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
-      | Lcondbranch (_, _)
-      | Lcondbranch3 (_, _, _)
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-      | Lstackcheck _ ->
+      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _ | Lcondbranch _
+      | Lcondbranch3 _ | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _
+      | Lraise _ | Lstackcheck _ ->
         let { Branch_relaxation_intf.size; _ } = List.hd sizes in
         fill_map (pc + size) instr.next (List.tl sizes)
     in
@@ -59,7 +57,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
   let opt_branch_overflows map pc_branch opt_lbl_dest max_branch_offset =
     match opt_lbl_dest with
     | None -> false
-    | Some lbl_dest -> branch_overflows map pc_branch lbl_dest max_branch_offset
+    | Some ({ target; fdo_annotation = _ } : Linear.successor) ->
+      branch_overflows map pc_branch target max_branch_offset
 
   let instr_overflows ~code_size ~max_out_of_line_code_offset instr
       max_displacement map pc =
@@ -85,8 +84,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
            a short, fixed-distance local branch in the relaxed sequence;
            relaxing it again would be incorrect.) *)
         false
-      | Lcondbranch (_, lbl) -> branch_overflows map pc lbl max_branch_offset
-      | Lcondbranch3 (lbl0, lbl1, lbl2) ->
+      | Lcondbranch { test = _; taken; fallthrough_annotation = _ } ->
+        branch_overflows map pc taken.target max_branch_offset
+      | Lcondbranch3
+          { lt = lbl0; eq = lbl1; gt = lbl2; fallthrough_annotation = _ } ->
         opt_branch_overflows map pc lbl0 max_branch_offset
         || opt_branch_overflows map pc lbl1 max_branch_offset
         || opt_branch_overflows map pc lbl2 max_branch_offset
@@ -113,7 +114,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
     let expand_optbranch lbl n arg next =
       match lbl with
       | None -> next
-      | Some l ->
+      | Some ({ target = l; fdo_annotation = _ } : Linear.successor) ->
         let ri = T.relax_condbranch (Iinttest_imm (Ceq, n)) l ~arg in
         instr_cons
           (T.relaxed_instruction_desc ri)
@@ -126,9 +127,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Lend -> did_fix, List.rev acc
       | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
       | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel_for_jump_target _
-      | Llabel_for_dwarf _ | Lbranch _
-      | Lcondbranch (_, _)
-      | Lcondbranch3 (_, _, _)
+      | Llabel_for_dwarf _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
       | Lstackcheck _ -> (
         let ({ size; max_displacement }
@@ -158,7 +157,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
               (T.relax_allocation ~num_bytes ~dbginfo ~res:instr.res.(0) ~mode)
           | Lstackcheck { max_frame_size_bytes } ->
             relax_instr (T.relax_stackcheck ~max_frame_size_bytes)
-          | Lcondbranch (test, lbl) ->
+          | Lcondbranch { test; taken = { target = lbl; _ }; _ } ->
             let lbl2 = Cmm.new_label () in
             let llabel = Llabel_for_jump_target lbl2 in
             let ri_branch = T.relax_branch lbl in
@@ -189,7 +188,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
             fixup true (inverted_size :: acc) (pc + inverted_size.size)
               instr.next
               (branch_size :: label_size :: rest)
-          | Lcondbranch3 (lbl0, lbl1, lbl2) ->
+          | Lcondbranch3
+              { lt = lbl0; eq = lbl1; gt = lbl2; fallthrough_annotation = _ } ->
             let original_next = instr.next in
             let cont =
               expand_optbranch lbl0 0 instr.arg
@@ -207,7 +207,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
               else
                 let ri =
                   match i.desc with
-                  | Lcondbranch (test, lbl) ->
+                  | Lcondbranch { test; taken = { target = lbl; _ }; _ } ->
                     T.relax_condbranch test lbl ~arg:i.arg
                   | Lprologue | Lepilogue_open | Lepilogue_close | Lend
                   | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _ | Lop _
