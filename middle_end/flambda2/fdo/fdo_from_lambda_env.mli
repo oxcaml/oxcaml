@@ -26,11 +26,11 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** The FDO state of the translation from Lambda (see [Lambda_to_flambda_env]):
-    the instrumentation of the function being translated (see
-    [Fdo_instrumentation]), from its identity and body hash (see
-    [Fdo_function_naming] and [Fdo_body_hash]), and what is needed to name the
-    functions defined in it. *)
+(** The FDO state of the translation from Lambda, used in
+    [Lambda_to_flambda_env]. Keeps track of the current function we are in, and
+    accordingly handler Handles function naming ([Fdo_function_naming]),
+    computing body hashes ([Fdo_body_hash]), and inserting counters
+    ([Fdo_instrumentation]). *)
 
 type t
 

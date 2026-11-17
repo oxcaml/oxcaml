@@ -2083,14 +2083,14 @@ let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
 let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     Expr_with_acc.t =
   let arm_with_counters action ~counters =
+    let switch_arm = Switch_arm.from_apply_cont action in
     match sw.counters with
-    | None -> Switch_arm.from_apply_cont action
+    | None -> switch_arm
     | Some sw_counters ->
-      Switch_arm.create
-        ~annotations:
-          (Branch_annotations.with_fdo_annotation Branch_annotations.default
-             (counters sw_counters))
-        action
+      Switch_arm.map_annotations
+        (fun annots ->
+          Branch_annotations.with_fdo_annotation annots (counters sw_counters))
+        switch_arm
   in
   let case_counters case sw_counters =
     Fdo_instrumentation.Switch_counters.case sw_counters

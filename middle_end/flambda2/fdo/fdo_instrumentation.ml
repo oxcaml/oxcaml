@@ -29,9 +29,17 @@
 module FC = Fdo_counter
 module String = Misc.Stdlib.String
 
+(* Note: calls and switches that the translation introduces when going to
+   Flambda (e.g. bounds checks, or the dispatch on whether a variant is an
+   immediate) get no counters of their own, while those it first creates in
+   Lambda (e.g. the tests of a string switch, or the loops of [Array.blit]) are
+   numbered like the source's (see [Fdo_body_hash]). *)
+
 type t =
   { function_ : FC.Function.t;
     body_hash : FC.Body_hash.t;
+        (** The body hash of the current function (which guards the indices we
+            put on the counters). *)
     mutable next_index : int;
         (** For a position in the lambda body of the current function *)
     module_call_indices : int String.Tbl.t

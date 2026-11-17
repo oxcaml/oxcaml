@@ -47,3 +47,5 @@ val likelihood : t -> Likelihood.t
 val is_cold : t -> bool
 
 val map_action : (Apply_cont_expr.t -> Apply_cont_expr.t) -> t -> t
+
+val map_annotations : (Branch_annotations.t -> Branch_annotations.t) -> t -> t
