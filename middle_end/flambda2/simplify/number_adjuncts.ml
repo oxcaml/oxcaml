@@ -230,25 +230,28 @@ module For_tagged_immediates : Int_number_kind = struct
 
     (* Note this doesn't say 31 and 63! See the comments on the shift operations
        e.g. [lsl] in stdlib.mli. *)
-    let integer_bit_width = if Target_system.is_32_bit () then 32 else 64
+    let integer_bit_width t =
+      match machine_width t with
+      | Thirty_two | Thirty_two_no_gc_tag_bit -> 32
+      | Sixty_four -> 64
 
     let shift_left t shift =
       with_shift shift
         (Target_ocaml_int.zero (machine_width t))
         (fun shift_int -> Target_ocaml_int.shift_left t shift_int)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let shift_right t shift =
       with_shift shift
         (Target_ocaml_int.zero (machine_width t))
         (fun shift_int -> Target_ocaml_int.shift_right t shift_int)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let shift_right_logical t shift =
       with_shift shift
         (Target_ocaml_int.zero (machine_width t))
         (fun shift_int -> Target_ocaml_int.shift_right_logical t shift_int)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let swap_byte_endianness =
       Target_ocaml_int.get_least_significant_16_bits_then_byte_swap
@@ -321,28 +324,32 @@ module For_naked_immediates : Int_number_kind = struct
 
     let unsigned_mod = checked_div ~f:unsigned_mod
 
-    let integer_bit_width = if Target_system.is_32_bit () then 31 else 63
+    let integer_bit_width t =
+      match machine_width t with
+      | Thirty_two -> 31
+      | Thirty_two_no_gc_tag_bit -> 32
+      | Sixty_four -> 63
 
     let shift_left t shift =
       let machine_width = Target_ocaml_int.machine_width t in
       with_shift shift
         (Target_ocaml_int.zero machine_width)
         (fun shift -> shift_left t shift)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let shift_right t shift =
       let machine_width = Target_ocaml_int.machine_width t in
       with_shift shift
         (Target_ocaml_int.zero machine_width)
         (fun shift -> shift_right t shift)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let shift_right_logical t shift =
       let machine_width = Target_ocaml_int.machine_width t in
       with_shift shift
         (Target_ocaml_int.zero machine_width)
         (fun shift -> shift_right_logical t shift)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let swap_byte_endianness =
       Target_ocaml_int.get_least_significant_16_bits_then_byte_swap
@@ -973,22 +980,22 @@ module For_nativeints : Boxable_int_number_kind = struct
 
     let unsigned_mod = checked_div ~f:unsigned_rem
 
-    let integer_bit_width = if Target_system.is_32_bit () then 32 else 64
+    let integer_bit_width t = match repr t with Int32 _ -> 32 | Int64 _ -> 64
 
     let shift_left t shift =
       with_shift shift (zero_like t)
         (fun shift -> shift_left t shift)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let shift_right t shift =
       with_shift shift (zero_like t)
         (fun shift -> shift_right t shift)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let shift_right_logical t shift =
       with_shift shift (zero_like t)
         (fun shift -> shift_right_logical t shift)
-        ~integer_bit_width
+        ~integer_bit_width:(integer_bit_width t)
 
     let to_const t = Reg_width_const.naked_nativeint t
 
