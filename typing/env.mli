@@ -605,6 +605,16 @@ val open_pers_signature: string -> t -> Path.t * t
 val open_pers_signature_cmi:
   cmx_guaranteed:bool -> string -> t -> Path.t * t
 
+(* [bind_unit name intf env] makes the module name [name] refer to the
+   compilation unit [intf], which may be a hidden dependency, shadowing the
+   earlier bindings of [name] in [env] like an open. Used to implement
+   [-bind]. *)
+val bind_unit: string -> Compilation_unit.Name.t -> t -> t
+
+(* Opens the given compilation unit, which may be a hidden dependency. Used to
+   implement [-open-h]. *)
+val open_hidden_module: Compilation_unit.Name.t -> t -> t
+
 val remove_last_open: Path.t -> t -> t option
 
 (* Insertion by name *)
