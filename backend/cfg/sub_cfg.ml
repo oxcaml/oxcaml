@@ -73,6 +73,8 @@ let make_empty () =
 
 let start_label sub_cfg = sub_cfg.entry.start
 
+let exit_label sub_cfg = sub_cfg.exit.start
+
 let add_block_at_start sub_cfg block =
   DLL.add_begin sub_cfg.layout block;
   sub_cfg.entry <- block

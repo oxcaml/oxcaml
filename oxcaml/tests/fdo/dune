@@ -491,3 +491,130 @@
  (deps to_cmm_probe.output to_cmm_probe.output.corrected)
  (action
   (diff to_cmm_probe.output to_cmm_probe.output.corrected)))
+
+; The counters in Cfg: none of the Cmm selected is lost, and none is added. A
+; self tail call becomes a jump, whose counter goes onto the edges into its
+; block. The Cfg dumps hold every pass that prints one.
+
+(rule
+ (targets cfg.output.corrected)
+ (deps cfg.ml to_cmm.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run mkdir -p cfg_cmm cfg_cfg)
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     cfg_cmm/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcfg
+     -dump-into-file
+     -color
+     never
+     -o
+     cfg_cfg/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     cfg_cmm/to_cmm.cmx
+     to_cmm.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcfg
+     -dump-into-file
+     -color
+     never
+     -o
+     cfg_cfg/to_cmm.cmx
+     to_cmm.ml))
+   (with-stdout-to
+    cfg.output.corrected
+    (progn
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      cfg_cmm/cfg.cmx.dump
+      cfg_cfg/cfg.cmx.dump)
+     (run ./fdo_annotations.exe list cfg_cmm/cfg.cmx.dump)
+     (run ./fdo_annotations.exe list cfg_cfg/cfg.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      cfg_cmm/to_cmm.cmx.dump
+      cfg_cfg/to_cmm.cmx.dump))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps cfg.output cfg.output.corrected)
+ (action
+  (diff cfg.output cfg.output.corrected)))
+
+; Continuation specialization, which needs match-in-match.
+
+(rule
+ (targets specialization.output.corrected)
+ (deps specialization.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -O3
+    -flambda2-match-in-match
+    -fdo-counters
+    -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
+    -dflambda-heavy-invariants
+    -dfexpr-annot-after
+    simplify
+    -color
+    never
+    specialization.ml)
+   (with-stdout-to
+    specialization.output.corrected
+    (run ./fdo_annotations.exe list specialization.simplify.fl)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps specialization.output specialization.output.corrected)
+ (action
+  (diff specialization.output specialization.output.corrected)))

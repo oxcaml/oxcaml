@@ -576,34 +576,37 @@ end = struct
           Label.format l1 InstructionId.format s1 Label.format l2
           InstructionId.format s2
     in
+    let compare_successor (s1 : Cfg.successor) (s2 : Cfg.successor) =
+      compare_label s1.target s2.target
+    in
     match old_instr, instr with
     | Never, Never -> ()
     | Always l1, Always l2 -> compare_label l1 l2
     | ( Parity_test { ifso = ifso1; ifnot = ifnot1 },
         Parity_test { ifso = ifso2; ifnot = ifnot2 } ) ->
-      compare_label ifso1 ifso2;
-      compare_label ifnot1 ifnot2
+      compare_successor ifso1 ifso2;
+      compare_successor ifnot1 ifnot2
     | ( Truth_test { ifso = ifso1; ifnot = ifnot1 },
         Truth_test { ifso = ifso2; ifnot = ifnot2 } ) ->
-      compare_label ifso1 ifso2;
-      compare_label ifnot1 ifnot2
+      compare_successor ifso1 ifso2;
+      compare_successor ifnot1 ifnot2
     | ( Float_test { width = w1; lt = lt1; eq = eq1; gt = gt1; uo = uo1 },
         Float_test { width = w2; lt = lt2; eq = eq2; gt = gt2; uo = uo2 } )
       when Cmm.equal_float_width w1 w2 ->
-      compare_label lt1 lt2;
-      compare_label eq1 eq2;
-      compare_label gt1 gt2;
-      compare_label uo1 uo2
+      compare_successor lt1 lt2;
+      compare_successor eq1 eq2;
+      compare_successor gt1 gt2;
+      compare_successor uo1 uo2
     | ( Int_test { lt = lt1; eq = eq1; gt = gt1; is_signed = sign1; imm = imm1 },
         Int_test { lt = lt2; eq = eq2; gt = gt2; is_signed = sign2; imm = imm2 }
       )
       when Scalar.Signedness.equal sign1 sign2
            && Option.equal Int.equal imm1 imm2 ->
-      compare_label lt1 lt2;
-      compare_label eq1 eq2;
-      compare_label gt1 gt2
+      compare_successor lt1 lt2;
+      compare_successor eq1 eq2;
+      compare_successor gt1 gt2
     | Switch labels1, Switch labels2 ->
-      Array.iter2 (fun l1 l2 -> compare_label l1 l2) labels1 labels2
+      Array.iter2 (fun l1 l2 -> compare_successor l1 l2) labels1 labels2
     | Return, Return -> ()
     | Raise rk1, Raise rk2 when Lambda.equal_raise_kind rk1 rk2 -> ()
     | Tailcall_self { destination = l1 }, Tailcall_self { destination = l2 } ->

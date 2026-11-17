@@ -32,9 +32,24 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 module S = struct
+  (** A successor of a branching terminator, with the FDO counters of the edge
+      to it. Transformations that redirect or rearrange successors keep the
+      counters with the edge they describe. *)
+  type successor =
+    { target : Label.t;
+      fdo_annotation : Fdo_annotation.t
+    }
+
+  (** [callsite_counter] is the FDO counter of the call site. *)
   type func_call_operation =
-    | Indirect of Cmm.symbol list option
-    | Direct of Cmm.symbol
+    | Indirect of
+        { callees : Cmm.symbol list option;
+          callsite_counter : Fdo_counter.t option
+        }
+    | Direct of
+        { sym : Cmm.symbol;
+          callsite_counter : Fdo_counter.t option
+        }
 
   type external_call_operation =
     { func_symbol : string;
@@ -56,8 +71,8 @@ module S = struct
         }
 
   type bool_test =
-    { ifso : Label.t;  (** if test is true goto [ifso] label *)
-      ifnot : Label.t  (** if test is false goto [ifnot] label *)
+    { ifso : successor;  (** if test is true goto [ifso] label *)
+      ifnot : successor  (** if test is false goto [ifnot] label *)
     }
 
   (** [int_test] represents all possible outcomes of a comparison between two
@@ -66,9 +81,9 @@ module S = struct
       [Some n], compare variable x and immediate [n]. This corresponds to
       [Mach.Iinttest] and [Mach.Iinttest_imm] in the compiler. *)
   type int_test =
-    { lt : Label.t;  (** if x < y (resp. x < n) goto [lt] label *)
-      eq : Label.t;  (** if x = y (resp. x = n) goto [eq] label *)
-      gt : Label.t;  (** if x > y (resp. x > n) goto [gt] label *)
+    { lt : successor;  (** if x < y (resp. x < n) goto [lt] label *)
+      eq : successor;  (** if x = y (resp. x = n) goto [eq] label *)
+      gt : successor;  (** if x > y (resp. x > n) goto [gt] label *)
       is_signed : Scalar.Signedness.t;
       imm : int option
     }
@@ -79,10 +94,10 @@ module S = struct
       the arguments involve NaNs. *)
   type float_test =
     { width : Cmm.float_width;
-      lt : Label.t;
-      eq : Label.t;
-      gt : Label.t;
-      uo : Label.t  (** if at least one of x or y is NaN *)
+      lt : successor;
+      eq : successor;
+      gt : successor;
+      uo : successor  (** if at least one of x or y is NaN *)
     }
 
   type 'a instruction =
@@ -139,7 +154,7 @@ module S = struct
     | Truth_test of bool_test  (** Check if the argument is true or false. *)
     | Float_test of float_test
     | Int_test of int_test
-    | Switch of Label.t array
+    | Switch of successor array
     | Return
     | Raise of Lambda.raise_kind
     | Tailcall_self of { destination : Label.t }

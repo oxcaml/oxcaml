@@ -146,6 +146,9 @@ let run :
               with
               | None -> block :: seen
               | Some (repr : Cfg.basic_block) ->
+                (* CR-someday yusumez: The FDO counters of [block] are dropped.
+                   Those of its edges could be combined into [repr]'s, but a
+                   call has only one counter. *)
                 (* CR-someday xclerc for xclerc: double check whether it is
                    actually a good idea to merge blocks that disagree on
                    coldness, and if so what the resulting coldness should be. *)

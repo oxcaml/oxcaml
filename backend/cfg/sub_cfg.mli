@@ -167,6 +167,10 @@ val set_block_entry_debuginfo : Cfg.basic_block -> Debuginfo.t -> unit
     passed to [join] or [join_tail]. *)
 val set_entry_debuginfo : t -> Debuginfo.t -> unit
 
+(** The label of the block that instructions and the terminator are being added
+    to. *)
+val exit_label : t -> Label.t
+
 val mark_as_trap_handler : t -> unit
 
 val dump : t -> unit

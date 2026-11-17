@@ -29,8 +29,41 @@ open! Int_replace_polymorphic_compare
 module C = Cfg
 module Dll = Doubly_linked_list
 
+let counters_of_edges_to label successors =
+  List.filter_map
+    (fun (successor : C.successor) ->
+      if Label.equal successor.target label
+      then Some successor.fdo_annotation
+      else None)
+    successors
+  |> Fdo_annotation.union
+
+(* The unconditional jump to [label] replacing the terminator of [block], whose
+   control flow was [from]'s. The edges of [from] to [label] are now the jump,
+   so their counters are orphaned in [block]. *)
+let always (block : C.basic_block) ~orphaned ~(from : C.terminator) label :
+    C.terminator C.instruction =
+  C.Orphaned_counters.add orphaned block.start
+    (counters_of_edges_to label (C.branch_successors from));
+  { block.terminator with desc = Always label; arg = [||]; res = [||] }
+
 (* Convert simple [Switch] to branches. *)
-let simplify_switch (block : C.basic_block) labels =
+
+(* The successor of an int test replacing the arms [first] to [last] of a
+   switch, which all go to [target]. *)
+let merge_arms (successors : C.successor array) ~target ~first ~last :
+    C.successor =
+  let fdo_annotation =
+    Array.sub successors first (last - first + 1)
+    |> Array.to_list
+    |> List.map (fun (successor : C.successor) -> successor.fdo_annotation)
+    |> Fdo_annotation.union
+  in
+  { target; fdo_annotation }
+
+let simplify_switch (block : C.basic_block) ~orphaned
+    (successors : C.successor array) =
+  let labels = Array.map (fun (s : C.successor) -> s.target) successors in
   let len = Array.length labels in
   if len < 1
   then Misc.fatal_error "Malformed terminator: switch with empty arms";
@@ -47,18 +80,23 @@ let simplify_switch (block : C.basic_block) labels =
             if Label.equal hd l then (hd, n + 1) :: tl else (l, 1) :: acc)
       labels []
   in
+  let merge = merge_arms successors in
   match labels_with_counts with
   | [(l, _)] ->
     (* All labels are the same and equal to l *)
-    block.terminator
-      <- { block.terminator with desc = Always l; arg = [||]; res = [||] }
+    block.terminator <- always block ~orphaned ~from:block.terminator.desc l
   | [(l0, n); (ln, k)] ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(n) ln);
     assert (len = n + k);
     let desc =
       C.Int_test
-        { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
+        { is_signed = Unsigned;
+          imm = Some n;
+          lt = merge ~target:l0 ~first:0 ~last:(n - 1);
+          eq = merge ~target:ln ~first:n ~last:n;
+          gt = merge ~target:ln ~first:(n + 1) ~last:(len - 1)
+        }
     in
     block.terminator <- { block.terminator with desc }
   | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 ->
@@ -68,7 +106,12 @@ let simplify_switch (block : C.basic_block) labels =
     assert (len = m + 1 + n);
     let desc =
       C.Int_test
-        { is_signed = Unsigned; imm = Some m; lt = l0; eq = l1; gt = l0 }
+        { is_signed = Unsigned;
+          imm = Some m;
+          lt = merge ~target:l0 ~first:0 ~last:(m - 1);
+          eq = merge ~target:l1 ~first:m ~last:m;
+          gt = merge ~target:l0 ~first:(m + 1) ~last:(len - 1)
+        }
     in
     block.terminator <- { block.terminator with desc }
   | [(l0, 1); (l1, 1); (l2, n)] ->
@@ -78,7 +121,12 @@ let simplify_switch (block : C.basic_block) labels =
     assert (len = n + 2);
     let desc =
       C.Int_test
-        { is_signed = Unsigned; imm = Some 1; lt = l0; eq = l1; gt = l2 }
+        { is_signed = Unsigned;
+          imm = Some 1;
+          lt = merge ~target:l0 ~first:0 ~last:0;
+          eq = merge ~target:l1 ~first:1 ~last:1;
+          gt = merge ~target:l2 ~first:2 ~last:(len - 1)
+        }
     in
     block.terminator <- { block.terminator with desc }
   | _ -> ()
@@ -194,21 +242,23 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
       let predecessor_terminator = predecessor_block.terminator in
       begin[@ocaml.warning "-4"] match predecessor_terminator.desc with
       | Truth_test { ifso; ifnot } ->
-        if Label.equal ifnot block.start && not (Label.equal ifso ifnot)
+        if
+          Label.equal ifnot.target block.start
+          && not (Label.equal ifso.target ifnot.target)
         then replace predecessor_block.terminator.arg.(0) (Const_int 0n)
       | Int_test { lt; eq; gt; is_signed = Signed; imm = Some const } ->
         if
-          Label.equal eq block.start
-          && (not (Label.equal eq gt))
-          && not (Label.equal eq lt)
+          Label.equal eq.target block.start
+          && (not (Label.equal eq.target gt.target))
+          && not (Label.equal eq.target lt.target)
         then
           replace
             predecessor_terminator.arg.(0)
             (Const_int (Nativeint.of_int const))
-      | Switch labels ->
+      | Switch successors ->
         let idx =
-          find_unique_index labels ~f:(fun label ->
-              Label.equal block.start label)
+          find_unique_index successors ~f:(fun (successor : C.successor) ->
+              Label.equal block.start successor.target)
         in
         begin match idx with
         | None -> ()
@@ -374,12 +424,14 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
       ~f:(fun const ->
         if Nativeint.equal (Nativeint.logand const 1n) 0n
-        then Some ifso
-        else Some ifnot)
+        then Some ifso.target
+        else Some ifnot.target)
   | Truth_test { ifso; ifnot } ->
     apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
       ~f:(fun const ->
-        if not (Nativeint.equal const 0n) then Some ifso else Some ifnot)
+        if not (Nativeint.equal const 0n)
+        then Some ifso.target
+        else Some ifnot.target)
   | Int_test { lt; eq; gt; is_signed; imm } ->
     let left_arg = get_known_value ~arg_idx:0 in
     let right_arg =
@@ -394,8 +446,12 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
           | Signed -> Nativeint.compare left_const right_const
           | Unsigned -> Nativeint.unsigned_compare left_const right_const
         in
-        if result < 0 then Some lt else if result > 0 then Some gt else Some eq)
-  | Float_test { width; lt : Label.t; eq : Label.t; gt : Label.t; uo } -> (
+        if result < 0
+        then Some lt.target
+        else if result > 0
+        then Some gt.target
+        else Some eq.target)
+  | Float_test { width; lt; eq; gt; uo } -> (
     let apply_float_constructors : type a.
         known_value option ->
         known_value option ->
@@ -408,14 +464,14 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
           let left_const = convert left_const in
           let right_const = convert right_const in
           if Float.is_nan left_const || Float.is_nan right_const
-          then Some uo
+          then Some uo.target
           else
             let result = Float.compare left_const right_const in
             if result < 0
-            then Some lt
+            then Some lt.target
             else if result > 0
-            then Some gt
-            else Some eq)
+            then Some gt.target
+            else Some eq.target)
     in
     match width with
     | Float32 ->
@@ -428,14 +484,14 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
         (get_known_value ~arg_idx:0)
         (get_known_value ~arg_idx:1)
         ~extract:const_float ~convert:Int64.float_of_bits)
-  | Switch labels ->
+  | Switch successors ->
     apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
       ~f:(fun const ->
         if Nativeint.compare const (Nativeint.of_int Int.max_int) <= 0
         then
           let idx = Nativeint.to_int const in
-          if idx >= 0 && idx < Array.length labels
-          then Some (Array.unsafe_get labels idx)
+          if idx >= 0 && idx < Array.length successors
+          then Some (Array.unsafe_get successors idx).target
           else None
         else None)
   | Never ->
@@ -446,7 +502,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     ->
     None
 
-let block_known_values (cfg : Cfg.t) (block : C.basic_block)
+let block_known_values (cfg : Cfg.t) (block : C.basic_block) ~orphaned
     ~(is_after_regalloc : bool) ~(allowed_to_be_irreducible : bool) : bool =
   if
     !Oxcaml_flags.cfg_value_propagation
@@ -457,7 +513,7 @@ let block_known_values (cfg : Cfg.t) (block : C.basic_block)
     | None -> false
     | Some succ ->
       block.terminator
-        <- { block.terminator with desc = Always succ; arg = [||]; res = [||] };
+        <- always block ~orphaned ~from:block.terminator.desc succ;
       true)
   else false
 
@@ -479,7 +535,7 @@ let block_known_values (cfg : Cfg.t) (block : C.basic_block)
    order. Also, for linear to cfg and back will be harder to generate exactly
    the same layout. Also, how do we map execution counts about branches onto
    this terminator? *)
-let block (cfg : C.t) (block : C.basic_block) : bool =
+let block (cfg : C.t) (block : C.basic_block) ~orphaned : bool =
   let is_after_regalloc = cfg.register_locations_are_set in
   match block.terminator.desc with
   | Always successor_label ->
@@ -509,11 +565,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       match new_successor with
       | Some succ ->
         block.terminator
-          <- { block.terminator with
-               desc = Always succ;
-               arg = [||];
-               res = [||]
-             };
+          <- always block ~orphaned ~from:successor_block.terminator.desc succ;
         true
       | None -> (
         if
@@ -550,30 +602,30 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     if Label.Set.cardinal labels = 1
     then (
       let l = Label.Set.min_elt labels in
-      block.terminator
-        <- { block.terminator with desc = Always l; arg = [||]; res = [||] };
+      block.terminator <- always block ~orphaned ~from:block.terminator.desc l;
       false)
     else
-      block_known_values cfg block ~is_after_regalloc
+      block_known_values cfg block ~orphaned ~is_after_regalloc
         ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
-  | Switch labels ->
+  | Switch successors ->
     let shortcircuit =
-      block_known_values cfg block ~is_after_regalloc
+      block_known_values cfg block ~orphaned ~is_after_regalloc
         ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
     in
     if shortcircuit
     then true
     else (
-      simplify_switch block labels;
+      simplify_switch block ~orphaned successors;
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
   | External_call_no_return _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let run cfg =
+  let orphaned = C.Orphaned_counters.create () in
   let registration_needed =
     C.fold_blocks cfg ~init:false ~f:(fun _ b registration_needed ->
-        let shortcircuit = block cfg b in
+        let shortcircuit = block cfg b ~orphaned in
         registration_needed || shortcircuit)
   in
   if registration_needed
@@ -583,4 +635,5 @@ let run cfg =
        first set all to empty. *)
     C.iter_blocks cfg ~f:(fun _label block ->
         block.predecessors <- Label.Set.empty);
-    Cfg.register_predecessors_for_all_blocks cfg)
+    Cfg.register_predecessors_for_all_blocks cfg);
+  C.Orphaned_counters.attach orphaned cfg

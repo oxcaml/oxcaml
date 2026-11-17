@@ -386,15 +386,18 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Never_returns
   in
   match new_op with
-  | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
-  | Call { op = Indirect candidates; _ } ->
+  | Call { op = Direct { sym; callsite_counter = _ }; _ } ->
+    call_returning_to (Direct sym) ty
+  | Call { op = Indirect { callees = candidates; callsite_counter = _ }; _ } ->
     call_returning_to (Indirect candidates) ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
     call_returning_to (External ext_call) ty_res
   | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
     call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
-  | Call_no_return (Direct sym) -> call_no_return (Direct sym)
-  | Call_no_return (Indirect candidates) -> call_no_return (Indirect candidates)
+  | Call_no_return (Direct { sym; callsite_counter = _ }) ->
+    call_no_return (Direct sym)
+  | Call_no_return (Indirect { callees = candidates; callsite_counter = _ }) ->
+    call_no_return (Indirect candidates)
   | External_call_no_return ext_call -> call_no_return (External ext_call)
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
@@ -655,7 +658,8 @@ let convert ~ppf_dump (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph
         codegen_options = cmm.fun_codegen_options;
         dbg = cmm.fun_dbg;
         poll = cmm.fun_poll;
-        ret_type = cmm.fun_ret_type
+        ret_type = cmm.fun_ret_type;
+        fdo_entry_annotation = cmm.fun_fdo_entry_annotation
       }
     in
     let g = Ssa.create_graph function_info ~keep_unused_ops in
