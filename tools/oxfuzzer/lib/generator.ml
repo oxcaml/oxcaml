@@ -34,7 +34,8 @@ module State = struct
       mutable let_recs_remaining : int;
       mutable recursive_calls_remaining : int;
       mutable recursive_callees : Name.t list;
-      mutable handles_remaining : int
+      mutable handles_remaining : int;
+      mutable conditional_expressions_remaining : int
     }
 
   let create random_state =
@@ -55,7 +56,9 @@ module State = struct
       let_recs_remaining = Config.max_let_rec_count;
       recursive_calls_remaining = 0;
       recursive_callees = [];
-      handles_remaining = Config.max_handle_count
+      handles_remaining = Config.max_handle_count;
+      conditional_expressions_remaining =
+        Config.max_conditional_expression_count
     }
 
   let fresh t = Fresh.next t.names
@@ -1591,6 +1594,21 @@ and gen_try_expr (st : State.t) (env : Env.t) ty =
    do not inject assertions at the root, but their generated expressions can
    still raise assertions in subexpressions or callees. *)
 and gen_value (st : State.t) env ty =
+  if
+    st.swarm.conditionals
+    && st.conditional_expressions_remaining > 0
+    && with_probability st
+         ~probability:Config.conditional_expression_probability
+  then (
+    st.conditional_expressions_remaining
+      <- st.conditional_expressions_remaining - 1;
+    let condition = gen_value st env Ty.Bool in
+    let if_true = gen_value st env ty in
+    let if_false = gen_value st env ty in
+    Expr.If { condition; if_true; if_false })
+  else gen_value_of_type st env ty
+
+and gen_value_of_type (st : State.t) env ty =
   maybe_assert st ~f:(fun () ->
       match ty with
       | Ty.Number nty -> gen_number st env nty
