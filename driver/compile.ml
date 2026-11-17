@@ -59,6 +59,10 @@ let tlambda_to_bytecode i tlambda =
        |> Simplif.simplify_lambda_for_bytecode
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
        |> Blambda_of_lambda.blambda_of_lambda
+            ~machine_width:
+              (if Sys.word_size = 64
+               then Target_system.Machine_width.Sixty_four
+               else Target_system.Machine_width.Thirty_two)
             ~compilation_unit:(Some i.module_name)
        |> print_if i.ppf_dump Clflags.dump_blambda Printblambda.blambda
        |> Bytegen.compile_implementation i.module_name
