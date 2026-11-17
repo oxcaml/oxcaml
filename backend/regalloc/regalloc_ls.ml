@@ -260,8 +260,9 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
   let spilled =
     State.fold_intervals state ~init:Reg.Set.empty
       ~f:(fun acc (interval : Interval.t) ->
-        (* Equivalent to [walk_interval] in "backend/linscan.ml".*)
-        let pos = interval.begin_ land lnot 1 in
+        (* Arguments ending at [on] do not overlap results starting at [on + 1],
+           so expire ranges at the exact interval start. *)
+        let pos = interval.begin_ in
         if debug
         then log_interval ~kind:(Printf.sprintf "<pos=%d>" pos) interval;
         State.release_expired_intervals state ~pos;
