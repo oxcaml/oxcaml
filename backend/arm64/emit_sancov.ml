@@ -74,6 +74,9 @@ let reg_x_saved_sp = H.reg_x reg_saved_sp
 (* if (__sancov_should_track) goto slow path. The gate is defined hidden in this
    unit (see [emit_data]), so it is addressed directly. The branch to the slow
    path is unconditional, since a conditional branch might not reach it. *)
+(* CR-someday mshinwell: use a single [cbnz] to the slow path, relying on branch
+   relaxation for slow paths that are out of its range. This would save a taken
+   branch per probe when the gate is off. *)
 let emit_probe ~live ~dbg =
   let gate = S.create_global Cfg_trace_pc_guard.gate in
   let lbl = L.create Text in
