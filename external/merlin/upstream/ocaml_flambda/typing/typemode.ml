@@ -13,6 +13,30 @@ type modalities =
     moda_desc : Mode.Modality.atom Location.loc list
   }
 
+type 'd morph =
+  | Past : ('l * 'r) morph
+  | Close : (Allowance.allowed * Allowance.disallowed) morph
+
+type 'd modepoly_elem =
+  { elem_var : string Location.loc;
+    elem_morph : 'd morph option;
+    elem_mod : Mode.With_locality.Const.Option.t
+  }
+
+type 'd modepoly_bound =
+  { bound_vars : 'd modepoly_elem list;
+    bound_const : Mode.With_locality.Const.Option.t modes
+  }
+
+type modepoly_bounds =
+  { upper : (Allowance.disallowed * Allowance.allowed) modepoly_bound;
+    lower : (Allowance.allowed * Allowance.disallowed) modepoly_bound
+  }
+
+type modepoly_annot =
+  | Pmode_var of string Location.loc
+  | Pmode_bounds of modepoly_bounds Location.loc
+
 type 'ax annot_type =
   | Modifier : 'a Axis.t annot_type
   | Mode : 'a With_locality.Axis.t annot_type
@@ -48,6 +72,11 @@ type error =
   | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
   | Duplicated_axis : 'a annot_type * 'a -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
+  | Mode_variable_not_allowed : error
+  | Mixed_mode_annotation : error
+  | Conflicting_mode_annotations : error
+  | Unrecognized_morphism : string -> error
+  | Morphism_only_in_lower_bound : string -> error
 
 module Error : sig
   type exn += private In_context of Location.t * error
@@ -96,8 +125,7 @@ end
 let mode_variable_error ~loc =
   Language_extension.assert_enabled ~loc Mode_polymorphism
     Language_extension.Alpha;
-  Misc.fatal_errorf "%a: mode variables and mode bounds are not yet supported"
-    Location.print_loc loc
+  Error.log_or_raise loc Mode_variable_not_allowed
 
 module Mode_axis_pair = struct
   type t = Mode.With_locality.atom
@@ -254,14 +282,16 @@ let enforce_forbidden_modalities ~loc annot_type m =
   | _ -> ()
 
 let mode_consts_of_modes annots =
-  List.map
+  List.filter_map
     (fun { txt; loc } ->
       match (txt : Parsetree.mode) with
-      | Pmode txt -> { txt; loc }
-      | Pmode_var _ | Pmode_bounded _ -> mode_variable_error ~loc)
+      | Pmode txt -> Some { txt; loc }
+      | Pmode_var _ | Pmode_bounded _ ->
+        mode_variable_error ~loc;
+        None)
     annots
 
-let transl_mode_annots annots =
+let transl_mode_atoms atoms =
   let step modes_so_far { txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     match Mode_axis_pair.of_string ~loc txt with
@@ -278,11 +308,12 @@ let transl_mode_annots annots =
           Some { txt = atom; loc } )
   in
   let modes, annots =
-    List.fold_left_map step With_locality.Const.Option.none
-      (mode_consts_of_modes annots)
+    List.fold_left_map step With_locality.Const.Option.none atoms
   in
   let annots = List.filter_map Fun.id annots in
   { mode_modes = modes; mode_desc = annots }
+
+let transl_mode_annots annots = transl_mode_atoms (mode_consts_of_modes annots)
 
 let untransl_mode modes =
   let untransl_annot =
@@ -601,6 +632,73 @@ let transl_mode_with_locality annots =
 let legacy_modes : With_locality.lr modes =
   { mode_modes = With_locality.legacy; mode_desc = [] }
 
+type 'd bound_position =
+  | Upper_bound : (Allowance.disallowed * Allowance.allowed) bound_position
+  | Lower_bound : (Allowance.allowed * Allowance.disallowed) bound_position
+
+let transl_modepoly_elem : type l r.
+    position:(l * r) bound_position ->
+    Parsetree.mode_bound_var ->
+    (l * r) modepoly_elem option =
+ fun ~position elem ->
+  let elem_morph : (l * r) morph option Error.Result.t =
+    match elem.pbound_morph with
+    | None -> Ok None
+    | Some { txt; loc } -> (
+      match txt, position with
+      | "past", _ -> Ok (Some Past)
+      | "close", Lower_bound -> Ok (Some Close)
+      | "close", Upper_bound ->
+        Error.Result.error loc (Morphism_only_in_lower_bound txt)
+      | s, _ -> Error.Result.error loc (Unrecognized_morphism s))
+  in
+  Option.map
+    (fun elem_morph ->
+      let elem_mod = (transl_mode_atoms elem.pbound_mod).mode_modes in
+      { elem_var = elem.pbound_var; elem_morph; elem_mod })
+    (Error.Result.to_opt_exn elem_morph)
+
+let transl_modepoly_bound : type l r.
+    position:(l * r) bound_position ->
+    Parsetree.mode_bound ->
+    (l * r) modepoly_bound =
+ fun ~position bound ->
+  let bound_vars, bound_const =
+    List.partition_map
+      (function
+        | Parsetree.Pbound_var v -> Either.Left v
+        | Parsetree.Pbound_const c -> Either.Right c)
+      bound
+  in
+  { bound_vars = List.filter_map (transl_modepoly_elem ~position) bound_vars;
+    bound_const = transl_mode_atoms (List.concat bound_const)
+  }
+
+let transl_modepoly_annot annots : modepoly_annot option =
+  let transl_annot { Location.txt; loc } =
+    match (txt : Parsetree.mode) with
+    | Pmode _ -> Either.Left loc
+    | Pmode_var name ->
+      Language_extension.assert_enabled ~loc Mode_polymorphism
+        Language_extension.Alpha;
+      Either.Right (loc, Pmode_var { txt = name; loc })
+    | Pmode_bounded { pmode_upper; pmode_lower } ->
+      Language_extension.assert_enabled ~loc Mode_polymorphism
+        Language_extension.Alpha;
+      let upper = transl_modepoly_bound ~position:Upper_bound pmode_upper in
+      let lower = transl_modepoly_bound ~position:Lower_bound pmode_lower in
+      Either.Right (loc, Pmode_bounds { txt = { upper; lower }; loc })
+  in
+  match List.partition_map transl_annot annots with
+  | _, [] -> None
+  | const_locs, (loc, annot) :: rest ->
+    List.iter
+      (fun loc -> Error.log_or_raise loc Mixed_mode_annotation)
+      const_locs;
+    if not (List.is_empty rest)
+    then Error.log_or_raise loc Conflicting_mode_annotations;
+    Some annot
+
 let everything_modality =
   List.fold_left
     (fun acc -> function
@@ -832,6 +930,21 @@ let report_error ppf =
       annot_type Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
   | Unrecognized_modifier (annot_type, modifier) ->
     fprintf ppf "Unrecognized %a %s." print_annot_type annot_type modifier
+  | Mode_variable_not_allowed ->
+    fprintf ppf
+      "Mode variables and mode bounds are only allowed on function types."
+  | Mixed_mode_annotation ->
+    fprintf ppf
+      "Constant modes and mode variables cannot be mixed in a mode annotation."
+  | Conflicting_mode_annotations ->
+    fprintf ppf
+      "A mode annotation must be a single mode variable or a single bounds \
+       annotation."
+  | Unrecognized_morphism s ->
+    fprintf ppf "Unrecognized mode morphism %a." Misc.Style.inline_code s
+  | Morphism_only_in_lower_bound s ->
+    fprintf ppf "The mode morphism %a may only appear in a lower bound."
+      Misc.Style.inline_code s
 
 let () =
   Location.register_error_of_exn (function
