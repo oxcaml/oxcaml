@@ -93,6 +93,7 @@ let cmx_bundle ~quoted_cmx =
           uir_external_symbols = Array.of_list info.ui_external_symbols;
           uir_static_data = info.ui_static_data;
           uir_codegen_fingerprint = info.ui_codegen_fingerprint;
+          uir_polled = info.ui_polled;
           uir_lto_info = info.ui_lto_info
         }
       in

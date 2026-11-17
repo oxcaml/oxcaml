@@ -167,8 +167,9 @@ let test_gc_stress () =
     (fun () -> run_spin_and_check preempted)
 
 (* Dune has no poll-insertion condition available in [enabled_if] on this dune
-   lang version, so [make runtest] passes the configure-time value through
-   the environment and we gate the body on it here. The tight SIMD loop has
+   lang version, so [make runtest] passes the poll setting of the codegen
+   variant this context builds (the configure default) through the
+   environment and we gate the body on it here. The tight SIMD loop has
    no C-call or allocation-site polls, so without compiler-inserted back-edge
    polls preemption would never fire and the safety net would [failwith]. *)
 let poll_insertion_enabled () =

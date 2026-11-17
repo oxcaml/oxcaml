@@ -438,10 +438,16 @@ let mk_disable_builtin_check f =
      to the corresponding C stub, instead of compilation error." )
 
 let mk_disable_poll_insertion f =
-  ("-disable-poll-insertion", Arg.Unit f, " Do not insert poll points")
+  ( "-disable-poll-insertion",
+    Arg.Unit f,
+    " Do not insert poll points (default: the setting the compiler was \
+     configured with)" )
 
 let mk_enable_poll_insertion f =
-  ("-enable-poll-insertion", Arg.Unit f, " Insert poll points")
+  ( "-enable-poll-insertion",
+    Arg.Unit f,
+    " Insert poll points (default: the setting the compiler was configured \
+     with)" )
 
 let mk_long_frames f =
   ("-long-frames", Arg.Unit f, " Allow stack frames longer than 2^16 bytes")
@@ -2235,8 +2241,8 @@ module Oxcaml_options_impl = struct
     | None -> ()
 
   let disable_builtin_check = set' Oxcaml_flags.disable_builtin_check
-  let disable_poll_insertion = set' Oxcaml_flags.disable_poll_insertion
-  let enable_poll_insertion = clear' Oxcaml_flags.disable_poll_insertion
+  let disable_poll_insertion = clear' Clflags.poll_insertion
+  let enable_poll_insertion = set' Clflags.poll_insertion
 
   let symbol_visibility_protected =
     set' Oxcaml_flags.symbol_visibility_protected
@@ -2838,7 +2844,11 @@ module Extra_params = struct
             raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
         )
     | "builtin-check" -> set' Oxcaml_flags.disable_builtin_check
-    | "poll-insertion" -> set' Oxcaml_flags.disable_poll_insertion
+    (* poll-insertion=1 enables poll insertion.  (It used to back the
+       inverted [disable_poll_insertion] ref, so =1 DISABLED insertion;
+       the key now matches every other boolean OCAMLPARAM axis key and
+       the codegen-variant OCAMLPARAM fragments rely on it.) *)
+    | "poll-insertion" -> set' Clflags.poll_insertion
     | "symbol-visibility-protected" ->
         set' Oxcaml_flags.symbol_visibility_protected
     | "long-frames" -> set' Oxcaml_flags.allow_long_frames

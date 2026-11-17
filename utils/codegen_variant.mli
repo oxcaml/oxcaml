@@ -32,6 +32,7 @@
 
 type t =
   { frame_pointers : bool;
+    poll_insertion : bool;
     stack_checks : bool
   }
 
@@ -49,8 +50,8 @@ val equal : t -> t -> bool
 val is_default : t -> bool
 
 (** Sets every per-invocation axis flag ([Clflags.frame_pointers],
-    [Clflags.stack_checks]) to [t]'s values, for tools that select a whole
-    variant by name. *)
+    [Clflags.poll_insertion], [Clflags.stack_checks]) to [t]'s values, for
+    tools that select a whole variant by name. *)
 val apply : t -> unit
 
 (** Canonical name encoding absolute axis values ("fp" / "base"); the
@@ -76,7 +77,9 @@ val stack_guard_stride : unit -> int
 (** The marker recorded in native compilation artifacts.  Besides the
     per-invocation axes of [t] it includes configure-time settings
     (address sanitizer) whose mixing across installs must also be
-    rejected. *)
+    rejected.  Poll insertion is deliberately not a key: mixing polled and
+    non-polled units is sound, so polledness is tracked by the separate
+    per-unit [ui_polled] bit ANDed at link time instead of by equality. *)
 type fingerprint = (string * string) list
 
 val fingerprint : t -> fingerprint

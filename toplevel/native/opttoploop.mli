@@ -191,6 +191,16 @@ val register_jit : Jit.t -> unit
 
 val default_lookup : string -> Obj.t option
 
+(** Fails (with a [Failure] mirroring natdynlink's
+    [Library_not_fully_polled] wording) when the current flags would
+    compile a non-polled phrase while the runtime's domain cap exceeds 1:
+    phrases are compiled in-process, so their polledness is the current
+    [Clflags.poll_insertion] rather than a recorded bit, and loading
+    non-polled code would falsify the fully-polled property the cap was
+    derived from.  Called by the phrase loader; exposed for other
+    in-process loaders (otherlibs/eval). *)
+val check_poll_insertion_for_in_process_load : unit -> unit
+
 (* Internals required by the JIT *)
 
 val need_symbol : string -> bool

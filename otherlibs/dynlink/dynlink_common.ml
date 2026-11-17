@@ -231,6 +231,15 @@ module Make (P : Dynlink_platform_intf.S) = struct
       raise (DT.Error Unsafe_file)
     end
 
+  let check_polled filename ui =
+    (* A domain cap above 1 is only sound while every unit in the program
+       polls; loading a non-polled unit would falsify it.  A cap of 1
+       (including via an explicit OCAMLRUNPARAM d=1) permits the load. *)
+    if not (UH.polled ui) && P.max_domain_count () > 1 then begin
+      raise (DT.Error (Library_not_fully_polled
+        { filename; unit_name = UH.name ui }))
+    end
+
   let check_codegen_variant filename ui =
     match P.host_codegen_fingerprint with
     | None -> ()
@@ -249,6 +258,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
       ~unsafe_allowed ~priv =
     List.iter (fun ui -> check_unsafe_module unsafe_allowed ui) units;
     List.iter (fun ui -> check_codegen_variant filename ui) units;
+    List.iter (fun ui -> check_polled filename ui) units;
     let new_units =
       String.Set.of_list (List.map (fun ui -> UH.name ui) units)
     in

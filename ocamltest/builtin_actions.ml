@@ -114,19 +114,41 @@ let hasstr = make
     "str library available"
     "str library not available")
 
-(* Upstream's multicore predicate is merged with our older multidomain predicate
-   meaning that tests marked multicore will only run if it both possible and
-   permitted to spawn domains. *)
-let multicore_possible_and_allowed =
-  Domain.recommended_domain_count () >= 2 && Config.multidomain
+(* Upstream's multicore predicate is merged with our older multidomain
+   predicate, meaning that tests marked multicore run only when it is both
+   possible and permitted to spawn domains.  With the multidomain build
+   axis gone, permission is per-program: a native program's runtime allows
+   more than one domain only when every linked unit was compiled with poll
+   insertion, which in the testsuite means the effective codegen variant
+   (the codegen_variant TSL variable, or the install's default variant
+   when it is unset) enables poll insertion.  One predicate guards both
+   the byte and native legs of a test block, so it conservatively requires
+   the native condition even though bytecode is always fully polled; set
+     codegen_variant = "poll";  (or another poll-enabled variant name)
+   before this predicate to opt a test in on installs whose default
+   variant does not poll. *)
+let multicore_possible_and_allowed env =
+  Domain.recommended_domain_count () >= 2
+  && (let name =
+        match Ocaml_flags.codegen_variant env with
+        | None -> Ocaml_flags.default_codegen_variant
+        | Some name -> name
+      in
+      match Codegen_variant_name.of_string name with
+      | Some variant ->
+        Codegen_variant_name.(mem Poll_insertion variant)
+      | None -> false)
 
 let multicore = make
   ~name:"multicore"
-  ~description:"Pass if running on multicore"
+  ~description:"Pass if running on multicore and the effective codegen \
+                variant inserts polls (so spawned domains are permitted)"
   ~does_something:false
-  (Actions_helpers.predicate multicore_possible_and_allowed
-    "running on multicore"
-    "not running on multicore")
+  (fun log env ->
+    Actions_helpers.predicate (multicore_possible_and_allowed env)
+      "running on multicore"
+      "not running on multicore"
+      log env)
 
 let windows_OS = "Windows_NT"
 

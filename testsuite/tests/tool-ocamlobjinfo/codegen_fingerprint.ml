@@ -2,6 +2,7 @@
  no-frame_pointers;
  no-stack-checks;
  no-address-sanitizer;
+ no-poll-insertion;
  shared-libraries;
  setup-ocamlopt.byte-build-env;
  flags = "-shared";

@@ -125,8 +125,6 @@ end
 let function_layout = ref Function_layout.default   (* -function-layout *)
 
 let disable_builtin_check = ref false   (* -disable-builtin-check *)
-let disable_poll_insertion = ref (not Config.poll_insertion)
-                                        (* -disable-poll-insertion *)
 let allow_long_frames = ref true        (* -no-long-frames *)
 (* Keep the value of [max_long_frames_threshold] in sync with LONG_FRAME_MARKER
    in runtime/roots_nat.c *)

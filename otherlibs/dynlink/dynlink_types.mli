@@ -47,6 +47,9 @@ type error =
         unit_name : string;
         unit_fingerprint : string;
         host_fingerprint : string; }
+  | Library_not_fully_polled of
+      { filename : string;
+        unit_name : string; }
 
 exception Error of error
 

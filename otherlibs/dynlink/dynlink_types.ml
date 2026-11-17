@@ -47,6 +47,9 @@ type error =
         unit_name : string;
         unit_fingerprint : string;
         host_fingerprint : string; }
+  | Library_not_fully_polled of
+      { filename : string;
+        unit_name : string; }
 
 exception Error of error
 
@@ -92,6 +95,12 @@ let error_message = function
     ^ "' was compiled with codegen configuration [" ^ unit_fingerprint
     ^ "], which is incompatible with the host program's ["
     ^ host_fingerprint ^ "]"
+  | Library_not_fully_polled { filename; unit_name } ->
+    "The unit `" ^ unit_name ^ "' in the dynamic library file `" ^ filename
+    ^ "' was compiled without poll insertion, and this program's runtime \
+      allows more than one domain; rebuild the library with \
+      -enable-poll-insertion, or run the program with OCAMLRUNPARAM=d=1 \
+      to permit the load"
 
 let () =
   Printexc.Safe.register_printer (function
@@ -130,6 +139,9 @@ let () =
         Printf.sprintf
           "Inconsistent_codegen_variant (%S, %S, [%s], [%s])"
           filename unit_name unit_fingerprint host_fingerprint
+      | Library_not_fully_polled { filename; unit_name } ->
+        Printf.sprintf "Library_not_fully_polled (%S, %S)"
+          filename unit_name
       in
       Some (Printf.sprintf "Dynlink.Error (Dynlink.%s)" msg)
     | _ -> None)

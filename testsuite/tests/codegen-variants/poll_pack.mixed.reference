@@ -1,0 +1,1 @@
+spawn failed: failed to allocate domain: this program is not fully polled, so it is limited to one domain; compile and link everything with -enable-poll-insertion, or override the limit with OCAMLRUNPARAM=d=<domains>

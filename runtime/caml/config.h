@@ -19,6 +19,12 @@
 /* This runtime provides some OxCaml-specific features */
 #define OXCAML_RUNTIME 1
 
+/* Every runtime is multidomain-capable. The macro remains defined for
+   compatibility with out-of-tree code that selected multidomain-aware
+   implementations with it; it lives in this public header (reachable
+   from mlvalues.h alone) so that normal external stubs see it. */
+#define MULTIDOMAIN 1
+
 #include "m.h"
 #include "s.h"
 #include "compatibility.h"

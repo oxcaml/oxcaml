@@ -184,7 +184,7 @@ struct caml_thread_table {
   int ticks_elapsed;
 };
 
-/* thread_table instance, up to caml_params->max_domains */
+/* thread_table instance, up to caml_max_domains */
 static struct caml_thread_table* thread_table;
 
 /* How many ticks have we received since the last yield?
@@ -721,12 +721,12 @@ CAMLprim value caml_thread_initialize(value unit)
     caml_failwith("caml_thread_initialize: cannot initialize Thread "
                   "while several domains are running.");
 
-  thread_table = caml_stat_calloc_noexc(caml_params->max_domains,
+  thread_table = caml_stat_calloc_noexc(caml_max_domains,
                                         sizeof(struct caml_thread_table));
   if (thread_table == NULL)
     caml_fatal_error("caml_thread_initialize: failed to allocate thread"
                      " table");
-  for (uintnat i = 0; i < caml_params->max_domains; i++) {
+  for (uintnat i = 0; i < caml_max_domains; i++) {
     st_masterlock *default_lock = Default_lock(i);
     if (st_masterlock_init(default_lock)) {
       caml_fatal_error("caml_thread_initialize: failed to initialize domain locks");

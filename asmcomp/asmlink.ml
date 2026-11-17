@@ -37,13 +37,16 @@ type unit_link_info = Linkenv.unit_link_info =
     crc : Digest.t;
     imports_cmx : Import_info.t list;
     codegen_fingerprint : Codegen_variant.fingerprint;
+    polled : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
 
 (* Whether [Config.standard_library] is itself a library root built for
    [variant] (e.g. OCAMLLIB pointing directly at a variant's tree), judged by
-   the codegen fingerprint in the unit info of the standard library there. *)
+   the unit info of the standard library there: the fingerprint for the enforced
+   axes and the polled bit for poll insertion, which is deliberately not a
+   fingerprint key. *)
 let standard_library_is_built_for (variant : Codegen_variant.t) =
   let std_exit = Filename.concat Config.standard_library "std_exit.cmx" in
   match Compilenv.read_unit_info std_exit with
@@ -52,6 +55,7 @@ let standard_library_is_built_for (variant : Codegen_variant.t) =
   | info, _crc ->
     Codegen_variant.equal_fingerprint info.ui_codegen_fingerprint
       (Codegen_variant.fingerprint variant)
+    && Bool.equal info.ui_polled variant.poll_insertion
 
 let cached_generic_functions_path () =
   match !Oxcaml_flags.cached_generic_functions_path with
@@ -143,6 +147,23 @@ let emit_ocamlrunparam ~ppf_dump =
            { sym_name = "caml_ocamlrunparam"; sym_global = Global };
          Cmm.Cstring (!Clflags.ocamlrunparam ^ "\000") ])
 
+(* Whether every OCaml unit being linked was compiled with poll insertion: the
+   AND of the per-unit [polled] bits over [units]. Cached generic functions
+   participate in the link without a [unit_link_info], but they are
+   straight-line code with no loop back edges, so they cannot break the "every
+   loop polls" property the bit stands for. The runtime reads the symbol at
+   startup to pick the default domain cap (see runtime/startup_aux.c); it is
+   emitted only into the main startup object ([make_startup_file], which also
+   serves -output-obj), never into the shared-startup object of a .cmxs, which
+   must not carry a second definition into the host program. *)
+let emit_code_fully_polled ~ppf_dump units =
+  let fully_polled = List.for_all (fun u -> u.polled) units in
+  Asmgen.compile_phrase ~ppf_dump
+    (Cmm.Cdata
+       [ Cmm.Cdefine_symbol
+           { sym_name = "caml_code_fully_polled"; sym_global = Global };
+         Cmm.Cint (if fully_polled then 1n else 0n) ])
+
 let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
   Location.input_name := "caml_startup";
@@ -167,6 +188,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     if !Oxcaml_flags.manual_module_init then [] else name_list
   in
   emit_ocamlrunparam ~ppf_dump;
+  emit_code_fully_polled ~ppf_dump units;
   List.iter compile_phrase (Cmm_helpers.entry_point init_name_list);
   List.iter compile_phrase
     (* Emit the GC roots table, for dynlink. *)

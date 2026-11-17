@@ -67,6 +67,29 @@ let register_jit j = jit := Some j
 external ndl_run_toplevel: string -> string -> res
   = "caml_natdynlink_run_toplevel"
 
+external max_domain_count : unit -> int
+  = "caml_sys_exit" "caml_max_domain_count"
+  [@@noalloc]
+
+(* The native toplevel and eval compile phrases in-process with the
+   current flags, so a phrase's polledness is [!Clflags.poll_insertion]
+   at compile time (there is no cmx record to consult).  Loading a
+   non-polled phrase into a process whose domain cap exceeds 1 would
+   falsify the fully-polled property the cap was derived from: this is
+   the in-process analogue of natdynlink's [Library_not_fully_polled]
+   rejection.  The cap above 1 implies the host itself is fully polled
+   (or ran with an explicit OCAMLRUNPARAM d= override), so under default
+   flags this only fires when the phrase flags diverge from the host's
+   build, which the toplevel's default-variant pin already makes rare. *)
+let check_poll_insertion_for_in_process_load () =
+  if (not !Clflags.poll_insertion) && max_domain_count () > 1 then
+    failwith
+      "in-process loading of code compiled without poll insertion is not \
+       permitted when the runtime allows more than one domain; enable poll \
+       insertion for the evaluated code (-enable-poll-insertion, or \
+       poll-insertion=1 in OCAMLPARAM), or run the program with \
+       OCAMLRUNPARAM=d=1 to permit the load"
+
 let default_lookup sym =
   Dynlink.unsafe_get_global_value ~bytecode_or_asm_symbol:sym
 
@@ -358,6 +381,7 @@ let default_load ppf (program : Lambda.program) =
   res
 
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
+  check_poll_insertion_for_in_process_load ();
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
   let (static_data, rawlam) = Slambda.eval ~cu_static_data tlam in

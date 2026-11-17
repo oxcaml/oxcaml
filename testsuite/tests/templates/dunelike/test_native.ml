@@ -230,6 +230,7 @@
      no-frame_pointers;
      no-stack-checks;
      no-address-sanitizer;
+     no-poll-insertion;
      program = "-no-approx -no-code main_basic/main_basic__.cmi main_basic/main_basic__.cmx";
      output = "main_basic__.cmx.objinfo.output";
      ocamlobjinfo;
@@ -250,6 +251,7 @@
      no-frame_pointers;
      no-stack-checks;
      no-address-sanitizer;
+     no-poll-insertion;
      program = "-no-approx -no-code main_basic/main_basic.cmi main_basic/main_basic.cmx";
      output = "main_basic.cmx.objinfo.output";
      ocamlobjinfo;
@@ -449,6 +451,7 @@
      no-frame_pointers;
      no-stack-checks;
      no-address-sanitizer;
+     no-poll-insertion;
      program = "-no-approx -no-code main/main.cmi main/main.cmx";
      output = "main.cmx.objinfo.output";
      ocamlobjinfo;

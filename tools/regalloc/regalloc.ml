@@ -421,6 +421,12 @@ let parse_command_line () =
       ( "-no-stack-checks",
         Arg.Clear Clflags.stack_checks,
         "Process IR saved with stack checks disabled" );
+      ( "-enable-poll-insertion",
+        Arg.Set Clflags.poll_insertion,
+        "Process IR saved with poll insertion enabled" );
+      ( "-disable-poll-insertion",
+        Arg.Clear Clflags.poll_insertion,
+        "Process IR saved with poll insertion disabled" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
       ( "-copy-propagation",

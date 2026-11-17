@@ -44,6 +44,9 @@ type error = DT.error =
         unit_name : string;
         unit_fingerprint : string;
         host_fingerprint : string; }
+  | Library_not_fully_polled of
+      { filename : string;
+        unit_name : string; }
 
 exception Error = DT.Error
 let error_message = DT.error_message

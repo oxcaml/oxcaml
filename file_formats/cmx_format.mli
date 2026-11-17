@@ -83,6 +83,12 @@ type unit_infos =
     ui_codegen_fingerprint: (string * string) list;
                                   (* Codegen variant the unit was compiled
                                      for (see [Codegen_variant]) *)
+    ui_polled: bool;              (* Whether the unit was compiled with
+                                     poll insertion.  Not part of the
+                                     fingerprint: the linker ANDs the bit
+                                     over all units into
+                                     caml_code_fully_polled, which gates
+                                     the runtime's default domain cap. *)
     ui_file_sections: File_sections.t;
   }
 
@@ -107,6 +113,7 @@ type unit_infos_raw =
     uir_lto_info:
       Flambda2_reaper.Lto_info.t File_sections.Idx.t option;
     uir_codegen_fingerprint: (string * string) list;
+    uir_polled: bool;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 
@@ -124,6 +131,7 @@ type lib_unit_info =
     li_quoted_cmx : Bitmap.t;   (* subset of lib_quoted_cmx *)
     li_external_symbols: string array;
     li_codegen_fingerprint: (string * string) list;
+    li_polled: bool;
   }
 
 type library_infos =

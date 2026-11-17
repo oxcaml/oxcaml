@@ -144,6 +144,7 @@ let read_unit_info filename =
       ui_static_data = uir.uir_static_data;
       ui_lto_info = uir.uir_lto_info;
       ui_codegen_fingerprint = uir.uir_codegen_fingerprint;
+      ui_polled = uir.uir_polled;
       ui_file_sections = sections;
     }
     in
@@ -335,6 +336,7 @@ let write_unit_info info filename =
     uir_static_data = info.ui_static_data;
     uir_lto_info = info.ui_lto_info;
     uir_codegen_fingerprint = info.ui_codegen_fingerprint;
+    uir_polled = info.ui_polled;
     uir_sections_length = total_length;
   } in
   Misc.protect_output_to_file filename (fun oc ->
@@ -374,6 +376,11 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_external_symbols = current_unit.uib_external_symbols;
     ui_lto_info = current_unit.uib_lto_info;
     ui_codegen_fingerprint = Codegen_variant.current_fingerprint ();
+    (* The LLVM backend discards [Poll] instructions when lowering CFG to
+       LLVM IR (see [llvmize]), so a unit it compiles is not polled no
+       matter what [Clflags.poll_insertion] says; record it as nonpolled
+       so the link-time AND ([caml_code_fully_polled]) stays sound. *)
+    ui_polled = !Clflags.poll_insertion && not !Clflags.llvm_backend;
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
   }

@@ -454,7 +454,6 @@ AC_SUBST([compute_deps])
 AC_SUBST([intel_jcc_bug_cflags])
 AC_SUBST([stack_allocation])
 AC_SUBST([poll_insertion])
-AC_SUBST([enable_multidomain])
 AC_SUBST([dune])
 AC_SUBST([opam])
 AC_SUBST([opam_switch])
@@ -871,7 +870,10 @@ AC_ARG_ENABLE([stack-allocation],
 
 AC_ARG_ENABLE([poll-insertion],
   [AS_HELP_STRING([--enable-poll-insertion],
-    [enable insertion of poll points])])
+    [insert poll points by default in generated code, and select the
+     poll-insertion library variant as the install default (either
+     default can be overridden per invocation with
+     -enable-poll-insertion/-disable-poll-insertion)])])
 
 AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
   [AS_HELP_STRING([--enable-oxcaml-dwarf-on-compiler],
@@ -884,10 +886,6 @@ AC_ARG_ENABLE([keep-compiler-asm],
     [Configure the compiler to use -S during bootstrapping, which will produce .s assembly files for the files in the compiler tree. The files can be found in _build/main when building with dune])],
   [],
   [enable_keep_compiler_asm=no])
-
-AC_ARG_ENABLE([multidomain],
-  [AS_HELP_STRING([--enable-multidomain],
-    [allow the creation of multiple domains])])
 
 AC_ARG_ENABLE([assembler-suitable-for-dissector],
   [AS_HELP_STRING([--enable-assembler-suitable-for-dissector@<:@=PATH@:>@],
@@ -3151,11 +3149,25 @@ AS_IF([test x"$enable_stack_checks" = "xyes"],
    stack_checks=false
    AC_MSG_NOTICE([not using stack checks (using stack guard pages)])])
 
+## Poll insertion
+
+dnl Only the default of the per-invocation -enable-poll-insertion flag:
+dnl poll insertion changes OCaml code generation but neither the runtime
+dnl nor C stubs (inserted polls reuse the ordinary caml_call_gc
+dnl machinery), so there is no macro to define.  (The old POLL_INSERTION
+dnl AC_DEFINE was dead: m.h.in never carried a template line for it.)
+
+AS_IF([test x"$enable_poll_insertion" = "xyes"],
+  [poll_insertion=true
+   AC_MSG_NOTICE([inserting poll points by default])],
+  [poll_insertion=false
+   AC_MSG_NOTICE([not inserting poll points by default])])
+
 ## Codegen variants
 
 dnl The configure-default codegen variant's name: the '-'-joined, sorted
-dnl names of the enabled axis tokens ("fp", "sc"), or "base" when every
-dnl axis is off. The naming scheme is defined by
+dnl names of the enabled axis tokens ("fp", "poll", "sc"), or "base" when
+dnl every axis is off. The naming scheme is defined by
 dnl utils/codegen_variant_name.ml, which this must agree with; appending
 dnl the tokens in canonical (sorted-name) order keeps the joined name
 dnl canonical.
@@ -3163,6 +3175,8 @@ dnl canonical.
 codegen_default_tokens=''
 AS_IF([test x"$frame_pointers" = "xtrue"],
   [codegen_default_tokens="$codegen_default_tokens fp"])
+AS_IF([test x"$poll_insertion" = "xtrue"],
+  [codegen_default_tokens="$codegen_default_tokens poll"])
 AS_IF([test x"$stack_checks" = "xtrue"],
   [codegen_default_tokens="$codegen_default_tokens sc"])
 AS_IF([test -z "$codegen_default_tokens"],
@@ -3175,8 +3189,9 @@ dnl additionally get runtime archives and library trees, so that one
 dnl install can serve several per-invocation codegen configurations.
 dnl Computed by flipping each supported axis from the configure default
 dnl and applying constraint closure in both directions (no closure relates
-dnl the frame-pointer and stack-checks axes; closure arrives with the
-dnl address-sanitizer axis), then appending the curated extras list below.
+dnl the frame-pointer, poll-insertion and stack-checks axes; closure
+dnl arrives with the address-sanitizer axis), then appending the curated
+dnl extras list below.
 dnl Overridable with --with-codegen-variants=NAME,NAME; emptied by
 dnl --disable-codegen-variants. Silently empty on platforms where frame
 dnl pointers are unsupported, and under Address Sanitizer (ASan forces
@@ -3210,7 +3225,7 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
    for name in $with_codegen_variants; do
      IFS=$save_IFS
      AS_CASE([$name],
-       [base|fp|sc|fp-sc], [:],
+       [base|fp|fp-poll|fp-poll-sc|fp-sc|poll|poll-sc|sc], [:],
        [AC_MSG_ERROR(m4_normalize([unknown codegen variant name
          '$name' in --with-codegen-variants]))])
      AS_IF([test x"$name" = x"$codegen_default_variant"],
@@ -3233,13 +3248,17 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
    AS_IF([test x"$frame_pointers" = "xtrue"],
      [fp_default_token=fp; fp_flipped_token=''],
      [fp_default_token=''; fp_flipped_token=fp])
+   AS_IF([test x"$poll_insertion" = "xtrue"],
+     [poll_default_token=poll; poll_flipped_token=''],
+     [poll_default_token=''; poll_flipped_token=poll])
    AS_IF([test x"$stack_checks" = "xtrue"],
      [sc_default_token=sc; sc_flipped_token=''],
      [sc_default_token=''; sc_flipped_token=sc])
    codegen_variant_extras='fp-sc'
    codegen_variant_candidates=''
-   for tokens in "$fp_flipped_token $sc_default_token" \
-                 "$fp_default_token $sc_flipped_token"
+   for tokens in "$fp_flipped_token $poll_default_token $sc_default_token" \
+                 "$fp_default_token $poll_flipped_token $sc_default_token" \
+                 "$fp_default_token $poll_default_token $sc_flipped_token"
    do
      name=`echo $tokens | tr ' ' '-'`
      AS_IF([test -z "$name"], [name=base])
@@ -3247,7 +3266,7 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
    done
    for name in $codegen_variant_extras; do
      AS_CASE([$name],
-       [base|fp|sc|fp-sc],
+       [base|fp|fp-poll|fp-poll-sc|fp-sc|poll|poll-sc|sc],
          [codegen_variant_candidates="$codegen_variant_candidates $name"],
        [AC_MSG_ERROR(m4_normalize([unknown codegen variant name '$name'
          in the curated extras list]))])
@@ -3480,19 +3499,6 @@ AS_IF([test x"$enable_stack_allocation" = "xno"],
      stack_allocation=true],
     [AC_MSG_ERROR([Stack allocation is only supported on 64-bit platforms. \
 Please pass '--enable-stack-allocation=no'.])])])
-
-AS_IF([test x"$enable_poll_insertion" = "xyes"],
-  [AC_DEFINE([POLL_INSERTION])
-   poll_insertion=true],
-  [poll_insertion=false])
-
-# Multidomain is permitted without stack checks, you'll just get large
-# non-resizeable fiber stacks.
-AS_IF([test x"$enable_multidomain" = "xyes"],
-  [AS_IF([test x"$enable_poll_insertion" = "xyes"],
-    [AC_DEFINE([MULTIDOMAIN]) enable_multidomain=yes],
-    [AC_MSG_ERROR([Creating multiple domains is only supported with \
-poll insertion enabled.])])], [])
 
 AC_SUBST([has_popcnt])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[

@@ -30,7 +30,7 @@
     a variant name being the '-'-joined, canonically sorted names of the
     enabled tokens, with the all-off variant spelled "base" (names are
     absolute, independent of the configure default).  Examples: "base",
-    "fp", "sc", "fp-sc", and once further axes exist, "asan-fp".
+    "fp", "poll", "fp-sc", and once further axes exist, "asan-fp".
 
     This module is dependency-free (no [Clflags]/[Config]/[Misc]): it is the
     single source of the name scheme and of the per-token flag tables, and
@@ -45,6 +45,7 @@
 
 type token =
   | Frame_pointers
+  | Poll_insertion
   | Stack_checks
 
 (** Every supported token, in canonical (sorted-name) order. *)
