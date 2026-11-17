@@ -15,6 +15,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Operands used by a two-way branch when its condition is fused into the
+    terminator, or [None] when the branch uses the condition itself. Their uses
+    occur at the branch, even if the comparison is defined in another block. *)
+val fused_branch_args :
+  Ssa.finished Ssa.Value.t -> Ssa.finished Ssa.Value.t array option
+
 val convert :
   future_funcnames:Misc.Stdlib.String.Set.t ->
   Ssa.finished Ssa.graph ->
