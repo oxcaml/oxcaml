@@ -48,12 +48,6 @@ Caml_inline float caml_float16_to_float(uint16 d)
   u.i = d; return u.f;
 }
 
-Caml_inline uint16 caml_float_to_float16(float d)
-{
-  union float16_bits u;
-  u.f = d; return u.i;
-}
-
 #elif defined(__GNUC__) && defined(__F16C__)
 
 #include <immintrin.h>
