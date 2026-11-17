@@ -29,3 +29,23 @@ let[@inline never] pick x y z =
   match x with
   | None (* LINE *) -> y
   | Some _ -> z
+
+(* When all arms of a match are constants, Simplify can replace it by a load
+   from a table or by arithmetic on the scrutinee.  That code replaces the
+   match and must carry its debuginfo. *)
+
+type t = A | B | C | D
+
+let[@inline never] lookup x =
+  match x with
+  | A (* LINE *) -> "a"
+  | B -> "b"
+  | C -> "c"
+  | D -> "d"
+
+let[@inline never] affine x =
+  match x with
+  | A (* LINE *) -> 10
+  | B -> 12
+  | C -> 14
+  | D -> 16
