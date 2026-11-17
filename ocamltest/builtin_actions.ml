@@ -132,15 +132,8 @@ let hasstr = make
    variant does not poll. *)
 let multicore_possible_and_allowed env =
   Domain.recommended_domain_count () >= 2
-  && (let name =
-        match Ocaml_flags.codegen_variant env with
-        | None -> Ocaml_flags.default_codegen_variant
-        | Some name -> name
-      in
-      match Codegen_variant_name.of_string name with
-      | Some variant ->
-        Codegen_variant_name.(mem Poll_insertion variant)
-      | None -> false)
+  && Ocaml_flags.effective_codegen_variant_mem env
+       Codegen_variant_name.Poll_insertion
 
 let multicore = make
   ~name:"multicore"
@@ -347,21 +340,35 @@ let function_sections = make
      "Target supports function sections"
      "Target does not support function sections")
 
+(* The per-axis predicates below read the EFFECTIVE codegen variant (the
+   [codegen_variant] TSL variable when set, the configure default
+   otherwise), not the raw configure default: the variable changes the axes
+   a block's native compilations actually use, and each predicate's meaning
+   is the axis's value in that variant. *)
 let frame_pointers = make
   ~name:"frame_pointers"
-  ~description:"Pass if frame pointers are available"
+  ~description:"Pass if the effective codegen variant has frame pointers"
   ~does_something:false
-  (Actions_helpers.predicate (Ocamltest_config.frame_pointers)
-     "frame-pointers available"
-     "frame-pointers not available")
+  (fun log env ->
+    Actions_helpers.predicate
+      (Ocaml_flags.effective_codegen_variant_mem env
+         Codegen_variant_name.Frame_pointers)
+      "frame-pointers available"
+      "frame-pointers not available"
+      log env)
 
 let no_frame_pointers = make
   ~name:"no-frame_pointers"
-  ~description:"Pass if frame pointers are available"
+  ~description:"Pass if the effective codegen variant has no frame pointers"
   ~does_something:false
-  (Actions_helpers.predicate (not Ocamltest_config.frame_pointers)
-     "frame-pointers not available"
-     "frame-pointers available")
+  (fun log env ->
+    Actions_helpers.predicate
+      (not
+         (Ocaml_flags.effective_codegen_variant_mem env
+            Codegen_variant_name.Frame_pointers))
+      "frame-pointers not available"
+      "frame-pointers available"
+      log env)
 
 let probes = make
   ~name:"probes"
@@ -397,11 +404,17 @@ let no_tsan = make
 
 let no_address_sanitizer = make
   ~name:"no-address-sanitizer"
-  ~description:"Pass if address sanitizer is not supported"
+  ~description:"Pass if the effective codegen variant has no \
+                AddressSanitizer instrumentation"
   ~does_something:false
-  (Actions_helpers.predicate (not Ocamltest_config.address_sanitizer)
-     "address-sanitizer not available"
-     "address-sanitizer available")
+  (fun log env ->
+    Actions_helpers.predicate
+      (not
+         (Ocaml_flags.effective_codegen_variant_mem env
+            Codegen_variant_name.Address_sanitizer))
+      "address-sanitizer not available"
+      "address-sanitizer available"
+      log env)
 
 let has_symlink = make
   ~name:"has_symlink"
@@ -413,11 +426,15 @@ let has_symlink = make
 
 let poll_insertion = make
   ~name:"poll_insertion"
-  ~description:"Pass if poll-insertion is enabled"
+  ~description:"Pass if the effective codegen variant inserts polls"
   ~does_something:false
-  (Actions_helpers.predicate (Ocamltest_config.poll_insertion)
-    "poll insertion enabled"
-    "poll insertion not enabled")
+  (fun log env ->
+    Actions_helpers.predicate
+      (Ocaml_flags.effective_codegen_variant_mem env
+         Codegen_variant_name.Poll_insertion)
+      "poll insertion enabled"
+      "poll insertion not enabled"
+      log env)
 
 let setup_build_env = make
   ~name:"setup-build-env"

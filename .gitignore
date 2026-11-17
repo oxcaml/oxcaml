@@ -96,7 +96,6 @@ _profile/
 /ocamlnat
 /dirs-to-ignore.inc
 /*.sexp
-!/build_ocaml_compiler.sexp
 /_install
 /_runtest
 /_opam

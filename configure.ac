@@ -261,7 +261,10 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 AC_ARG_ENABLE([stack_checks],
   [AS_HELP_STRING([--enable-stack-checks],
-    [Enable stack checks])])
+    [use explicit stack-limit checks by default in generated code (instead
+     of guard pages), and select the stack-checks runtime and library
+     variant as the install default (either default can be overridden per
+     invocation with -stack-checks/-no-stack-checks)])])
 
 ## Output variables
 

@@ -32,8 +32,6 @@
         packages = {
           inherit oxcaml;
           inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
-          oxcaml-fp = oxcaml.override { framePointers = true; };
-          oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           ppxlib = oxcaml.mkPpxlibLibs oxcaml;
           jsoo = oxcaml.mkJsooLibs oxcaml;
           jsoo-smoke-test = oxcaml.mkJsooSmokeTest oxcaml;
@@ -44,8 +42,6 @@
         checks = lib.attrsets.filterAttrs (key: drv: !(drv.meta.broken or false)) {
           inherit (self.packages.${system})
             oxcaml
-            oxcaml-fp
-            oxcaml-asan
             ppxlib
             jsoo
             jsoo-smoke-test
@@ -85,29 +81,49 @@
       # What .github/workflows/oxfuzzer.yml fuzzes.
       oxfuzzerGithubActions =
         let
-          # The part of githubActions' matrix for these compiler variants, so
-          # every row is a check the trusted Nix workflow built (and pushed to
-          # the cache) for the commit being fuzzed: a variant that is broken on
-          # a system is missing from self.checks and drops out of both. Each
-          # row is the very derivation the trusted workflow built, so fuzzing
-          # only downloads it.
-          all = nix-github-actions.lib.mkGithubMatrix {
+          # The part of githubActions' matrix for the compiler, so every row
+          # is a check the trusted Nix workflow built (and pushed to the
+          # cache) for the commit being fuzzed: on a system where the
+          # compiler is broken it is missing from self.checks and drops out
+          # of both. Each row is the very derivation the trusted workflow
+          # built, so fuzzing only downloads it.
+          compiler = nix-github-actions.lib.mkGithubMatrix {
             checks = builtins.mapAttrs (
-              _system:
-              nixpkgs.lib.filterAttrs (
-                name: _drv:
-                builtins.elem name [
-                  "oxcaml"
-                  "oxcaml-fp"
-                  "oxcaml-asan"
-                ]
-              )
+              _system: nixpkgs.lib.filterAttrs (name: _drv: name == "oxcaml")
             ) self.githubActions.checks;
-            # Fuzzing is CPU-bound, so use bigger runners than githubActions.
+            # Fuzzing is CPU-bound: runners at least as large as
+            # githubActions'.
             platforms = {
               "x86_64-linux" = "warp-ubuntu-latest-x64-32x";
               "aarch64-linux" = "warp-ubuntu-latest-arm64-32x";
               "aarch64-darwin" = "warp-macos-15-arm64-12x";
+            };
+          };
+
+          # The other codegen variants of that compiler to fuzz, by row
+          # name: the OCAMLPARAM that selects each one when the fuzzed
+          # programs are compiled. Of the systems above, only x86_64-linux
+          # builds them.
+          variants = {
+            oxcaml-fp = "_,frame-pointers=1";
+            oxcaml-asan = "_,asan=1,frame-pointers=1";
+          };
+
+          # The compiler's rows and, after each one whose install serves
+          # the variants, a row per variant. A variant's row names the same
+          # check as the compiler's, so it downloads the same install; the
+          # workflow sets OCAMLPARAM from `ocamlparam`.
+          all = compiler // {
+            matrix = compiler.matrix // {
+              include = builtins.concatMap (
+                row:
+                [ (row // { ocamlparam = ""; }) ]
+                ++ nixpkgs.lib.optionals (row.system == "x86_64-linux") (
+                  nixpkgs.lib.mapAttrsToList (
+                    name: ocamlparam: row // { inherit name ocamlparam; }
+                  ) variants
+                )
+              ) compiler.matrix.include;
             };
           };
 

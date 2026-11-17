@@ -63,6 +63,27 @@ let toplevel_host_codegen_variant_name =
 let toplevel_host_codegen_variant =
   Codegen_variant_name.to_string toplevel_host_codegen_variant_name
 
+(* The codegen variant a test block's native compilations effectively use:
+   every axis flag defaults to the configure default (the default variant),
+   and ocamltest only deviates from that when the [codegen_variant] TSL
+   variable injects a variant's flags (see [codegen_variant_flags];
+   per-test [flags +=] additions are not visible here). *)
+let effective_codegen_variant env =
+  match codegen_variant env with
+  | None -> default_codegen_variant
+  | Some name -> name
+
+(* Per-axis read of the effective variant, for the axis predicates
+   (frame_pointers, stack-checks, poll-insertion, address-sanitizer and
+   their duals): each predicate's meaning is the axis's value in the
+   variant the block actually compiles for, not the raw configure default.
+   An unknown variant name has no axes ([false] for every token); the
+   compile actions reject such names loudly ([codegen_variant_flags]). *)
+let effective_codegen_variant_mem env token =
+  match Codegen_variant_name.of_string (effective_codegen_variant env) with
+  | Some variant -> Codegen_variant_name.mem token variant
+  | None -> false
+
 let codegen_variant_directory name =
   if String.equal name default_codegen_variant
   then Ocaml_directories.stdlib

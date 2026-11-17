@@ -6,14 +6,20 @@
 #
 # When the trusted Nix workflow (nix-github-actions-trusted.yml) succeeds
 # for a push to main, this workflow fuzzes the commit it built. It fuzzes
-# each compiler in the flake's `oxfuzzerGithubActions` matrix (oxcaml,
-# oxcaml-fp and oxcaml-asan, on the systems where they build) in its own
-# job, with its own seed.
+# each row of the flake's `oxfuzzerGithubActions` matrix in its own job,
+# with its own seed: the `oxcaml` compiler on each system where it builds
+# and, on x86_64 Linux, two more codegen variants that the same compiler
+# serves, frame pointers (oxcaml-fp) and AddressSanitizer with frame
+# pointers (oxcaml-asan). A variant's row uses the same compiler as the
+# oxcaml row and selects the variant with OCAMLPARAM: the native code of
+# the fuzzed programs, the libraries and the runtime they link are the
+# variant's, while the compiler itself and the bytecode runtime are the
+# same in every row.
 #
 # The compilers come from the `oxcaml` cachix cache, which the trusted
 # workflow fills and this one only reads. A compiler missing from the
 # cache fails the run. Only a manual run with `build` set builds one,
-# which takes about 15 minutes per row.
+# which takes 15 to 25 minutes per row.
 #
 # Runs for main's tip take turns: a new one waits for the one in progress
 # and replaces any run already waiting. A run is therefore never cut
@@ -83,7 +89,7 @@ on:
         default: ''
       build:
         description: >-
-          Build compilers that are not in the cache, about 15 minutes per
+          Build compilers that are not in the cache, 15 to 25 minutes per
           row, instead of failing
         type: boolean
         default: false
@@ -203,9 +209,14 @@ jobs:
       contents: read
     env:
       FUZZ_SHA: ${{ needs.select.outputs.sha }}
-      # For example githubActions.checks.x86_64-linux."oxcaml-asan".
+      # The compiler's check, for example
+      # githubActions.checks.x86_64-linux.oxcaml.
       ATTR: ${{ matrix.attr }}
       VARIANT: ${{ matrix.name }}
+      # What OCAMLPARAM selects the row's codegen variant with. Empty for
+      # the compiler's default variant, and when the flake of the commit
+      # being fuzzed has no such rows.
+      VARIANT_OCAMLPARAM: ${{ matrix.ocamlparam }}
       SYSTEM: ${{ matrix.system }}
       # Input defaults apply only to manual runs: automatic runs have no
       # inputs at all.
@@ -244,7 +255,7 @@ jobs:
               echo "::error::$VARIANT ($SYSTEM) for $FUZZ_SHA is not in the cache. Only a manual run with the build input set builds it."
               exit 1
             fi
-            echo "::warning::$VARIANT ($SYSTEM) for $FUZZ_SHA is not in the cache, so it is built from source, which takes about 15 minutes."
+            echo "::warning::$VARIANT ($SYSTEM) for $FUZZ_SHA is not in the cache, so it is built from source, which takes 15 to 25 minutes."
           fi
           nix build "${build_flags[@]}" ".#$ATTR"
 
@@ -257,7 +268,10 @@ jobs:
           # summary, to the file below and to this step's summary.
           #
           # stdenv.cc is the C toolchain the compiler was built with and
-          # links with: gcc on Linux, clang on macOS and for ASan.
+          # links with: clang on every system.
+          #
+          # oxfuzzer passes its environment on to the compilers it starts,
+          # so OCAMLPARAM here selects the variant for every case.
           #
           # Each row gets its own seed, since most compiler bugs are not
           # specific to a row. The seed comes from the run ID and not the
@@ -285,7 +299,17 @@ jobs:
             echo
             echo '```'
             echo
+            if [ -n "$VARIANT_OCAMLPARAM" ]; then
+              echo "This row's compilers ran with" \
+                "\`OCAMLPARAM=$VARIANT_OCAMLPARAM\`: export it before" \
+                "running the \`run.bash\` of a saved failure, unless the" \
+                "script sets it itself (those of older commits do not)."
+              echo
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$VARIANT_OCAMLPARAM" ]; then
+            export OCAMLPARAM="$VARIANT_OCAMLPARAM"
+          fi
           exec nix shell --inputs-from . ".#$ATTR.stdenv.cc" nixpkgs#python3 --command \
             python3 tools/oxfuzzer/oxfuzzer.py \
               --install-dir "$RUNNER_TEMP/oxcaml" \

@@ -283,7 +283,7 @@ let iter_module_deps table f =
      runtime axes) are copied from runtime/, so that one variant tree is a
      complete stdlib root for compiling and linking in that mode. When the
      named variant is not in the configure-computed build list (it is the
-     default, its axes do not exist yet, or codegen variants are disabled),
+     default, configure did not select it, or codegen variants are disabled),
      only an empty alias is emitted, keeping every @stdlib_<name>
      well-defined. *)
 (* [@inline never] [@local never]: this must stay the body of a function.
@@ -756,9 +756,9 @@ let () =
   | s when String.starts_with s ~prefix:"stdlib_" ->
      (* "stdlib_<variant name>": emits the build rules for the named
         variant tree when the name is in the configure-computed build
-        list, and an empty @stdlib_<name> alias otherwise (the curated
-        stanza set in stdlib/dune covers names whose axes do not exist
-        yet; see write_stdlib_dune). *)
+        list, and an empty @stdlib_<name> alias otherwise (stdlib/dune has
+        a stanza for every name of the curated set, built or not; see
+        write_stdlib_dune). *)
      let name = String.sub s 7 (String.length s - 7) in
      write_stdlib_dune ~variant:(`Variant name) stdout
   | s -> failwith ("Unknown target " ^ s)

@@ -79,13 +79,20 @@ opam switch with FP (frame pointers) enabled; adjust the version number as neede
     $ opam switch create 4.14.1-fp --packages=ocaml-variants.4.14.1+options,ocaml-option-fp --repos=default
 
 You no longer need a dedicated opam switch (or a separate OxCaml build) to get
-frame pointers: OxCaml selects frame-pointer code generation per invocation.
-Pass `-frame-pointers` to `ocamlopt` (or set `OCAMLPARAM=_,frame-pointers=1`)
-when compiling the code you want to profile; a single OxCaml installation
-serves both variants, with the frame-pointer and non-frame-pointer runtimes
-and libraries installed under `lib/ocaml/variants/`. Configuring OxCaml with
-`--enable-frame-pointers` now only selects which variant is the default.
-(Frame pointers are supported on x86-64 Linux and macOS.)
+frame pointers — or stack checks, poll insertion, or AddressSanitizer: OxCaml
+selects every code-generation axis per invocation. Pass the axis flag to
+`ocamlopt` (`-frame-pointers`, `-stack-checks`, `-enable-poll-insertion`,
+`-asan`; or set the corresponding `OCAMLPARAM` key, e.g.
+`OCAMLPARAM=_,frame-pointers=1`) when compiling the code you want to profile;
+a single OxCaml installation serves all of its built variants, with the
+non-default runtimes and library trees installed under
+`lib/ocaml/variants/<name>` (names are the sorted enabled-axis tokens, e.g.
+`fp`, `fp-sc`, `asan-fp`, and `base` for all-off). The `--enable-*` configure
+options for these axes now only select which variant is the default;
+`--with-codegen-variants=NAME,NAME` picks which non-default variants an
+installation builds, and `--disable-codegen-variants` builds none. (Frame
+pointers are supported on x86-64 Linux and macOS; AddressSanitizer requires
+x86-64 Linux, Clang, and frame pointers.)
 
 Remember to check that the newly installed switch is being used:
 

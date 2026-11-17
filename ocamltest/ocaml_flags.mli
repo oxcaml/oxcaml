@@ -27,6 +27,16 @@ val default_codegen_variant : string
    the variant of the build context they come from. *)
 val toplevel_host_codegen_variant : string
 
+(* The name of the codegen variant a test block's native compilations
+   effectively use: the [codegen_variant] TSL variable when set, the
+   configure-time default otherwise. *)
+val effective_codegen_variant : Environments.t -> string
+
+(* Whether [effective_codegen_variant] enables the given axis ([false] for
+   unknown variant names, which the compile actions reject loudly). *)
+val effective_codegen_variant_mem :
+  Environments.t -> Codegen_variant_name.token -> bool
+
 (* [-nostdlib -I <root>], where <root> honors the [codegen_variant] TSL
    variable: the base standard library, or its variants/<name> subtree when
    a non-default codegen variant is selected. *)
