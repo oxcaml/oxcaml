@@ -47,11 +47,13 @@
     so that probes can address it PC-relatively. A strong definition (e.g. in
     the coverage runtime) takes precedence.
 
-    A probe is the target-specific operation [Arch.trace_pc_guard_operation],
-    implemented for amd64 and arm64. The emitter places the call out of line
-    (see [Emit_sancov]), and it preserves every register. The callback is called
-    like an external function that does not allocate: it must not call into the
-    OCaml runtime.
+    A probe is made of the two target-specific operations of
+    [Arch.trace_pc_guard_operations], implemented for amd64 and arm64: a load of
+    the gate, which is then tested, and a call to the callback in a block of its
+    own, marked as cold. The call is an ordinary instruction that carries the
+    debuginfo of the probe, and it preserves every register (see [Emit_sancov]).
+    The callback is called like an external function that does not allocate: it
+    must not call into the OCaml runtime.
 
     See https://clang.llvm.org/docs/SanitizerCoverage.html *)
 

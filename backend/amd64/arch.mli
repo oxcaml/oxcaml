@@ -117,8 +117,10 @@ type specific_operation =
         addr: addressing_mode;
       }
   | Illvm_intrinsic of string
-  | Itrace_pc_guard of int             (* coverage probe, see
+  | Itrace_pc_guard_gate               (* load of the coverage gate, see
                                           [Cfg_trace_pc_guard] *)
+  | Itrace_pc_guard of int             (* call to the coverage callback,
+                                          preserving all registers *)
 
 and float_operation =
   | Ifloatadd
@@ -199,9 +201,11 @@ val float_cond_and_need_swap
 
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
 
-(** The operation implementing the coverage probe with the given guard index
-    for [-gated-trace-pc-guard], if supported by the target. *)
-val trace_pc_guard_operation : int -> specific_operation option
+(** The operations implementing the coverage probes of [-gated-trace-pc-guard],
+    if supported by the target: the load of the gate into a register, and the
+    call to the callback for the probe with the given index. *)
+val trace_pc_guard_operations
+  : (specific_operation * (int -> specific_operation)) option
 
 (* addressing mode functions *)
 

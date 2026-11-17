@@ -98,10 +98,6 @@ module Env : sig
 
   val contains_calls : t -> bool
 
-  val trace_pc_guard_sites : t -> Emit_sancov.slow_path list
-
-  val add_trace_pc_guard_site : t -> Emit_sancov.slow_path -> unit
-
   val call_gc_sites : t -> gc_call list
 
   val add_call_gc_site : t -> gc_call -> unit
@@ -148,7 +144,6 @@ end = struct
       prologue_required : bool;
       contains_calls : bool;
       mutable call_gc_sites : gc_call list;
-      mutable trace_pc_guard_sites : Emit_sancov.slow_path list;
       mutable local_realloc_sites : local_realloc_call list;
       mutable stack_realloc : stack_realloc option;
       function_name : string;
@@ -166,7 +161,6 @@ end = struct
       prologue_required;
       contains_calls;
       call_gc_sites = [];
-      trace_pc_guard_sites = [];
       local_realloc_sites = [];
       stack_realloc = None;
       function_name;
@@ -193,11 +187,6 @@ end = struct
   let prologue_required t = t.prologue_required
 
   let contains_calls t = t.contains_calls
-
-  let trace_pc_guard_sites t = List.rev t.trace_pc_guard_sites
-
-  let add_trace_pc_guard_site t site =
-    t.trace_pc_guard_sites <- site :: t.trace_pc_guard_sites
 
   let call_gc_sites t = t.call_gc_sites
 
@@ -2106,9 +2095,9 @@ let emit_instr env i =
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
-  | Lop (Specific (Itrace_pc_guard _)) ->
-    Env.add_trace_pc_guard_site env
-      (Emit_sancov.emit_probe ~live:i.live ~dbg:i.dbg)
+  | Lop (Specific Itrace_pc_guard_gate) -> Emit_sancov.emit_gate ~res:i.res.(0)
+  | Lop (Specific (Itrace_pc_guard index)) ->
+    Emit_sancov.emit_call ~live:i.live ~move:(move env) ~index
 
 let emit_instr env i =
   try emit_instr env i
@@ -2154,13 +2143,6 @@ let out_of_line_code_block_sizes env =
   @ List.map
       (fun lr -> measure_instruction_count (fun () -> emit_local_realloc lr))
       (Env.local_realloc_sites env)
-  @ List.map
-      (fun site ->
-        measure_instruction_count (fun () ->
-            Emit_sancov.emit_slow_path ~move:(move env)
-              ~guard:(Emit_sancov.new_guard ~register:false)
-              site))
-      (Env.trace_pc_guard_sites env)
   @
   match Env.stack_realloc env with
   | None -> []
@@ -2276,6 +2258,7 @@ let rec emit_all env i =
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
+  Emit_sancov.reset_function ();
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl
@@ -2306,12 +2289,6 @@ let fundecl fundecl =
   emit_all env fundecl.fun_body;
   List.iter emit_call_gc (Env.call_gc_sites env);
   List.iter emit_local_realloc (Env.local_realloc_sites env);
-  List.iter
-    (fun site ->
-      Emit_sancov.emit_slow_path ~move:(move env)
-        ~guard:(Emit_sancov.new_guard ~register:true)
-        site)
-    (Env.trace_pc_guard_sites env);
   emit_stack_realloc env;
   let num_call_gc_sites_after_relaxation =
     List.length (Env.call_gc_sites env)

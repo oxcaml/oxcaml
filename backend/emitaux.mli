@@ -39,14 +39,6 @@ val emit_debug_info_gen :
 (** Whether [emit_debug_info_gen] emits a source line for this debuginfo. *)
 val has_source_line : Debuginfo.t -> bool
 
-(** Emit a line-table row with line 0, which DWARF defines as "no source line",
-    so that the code that follows is not attributed to the line of the code
-    preceding it. Some assemblers ignore such rows. *)
-val emit_no_source_line_gen :
-  (file_num:int -> file_name:string -> unit) ->
-  (file_num:int -> line:int -> col:int -> ?discriminator:int -> unit -> unit) ->
-  unit
-
 type frame_debuginfo =
   | Dbg_alloc of Cmm.alloc_dbginfo
   | Dbg_raise of Debuginfo.t

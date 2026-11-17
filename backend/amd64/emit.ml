@@ -2633,8 +2633,9 @@ let emit_instr ~first ~last ~fallthrough i =
     assert (equal_reg64 (arg64 i 0) RCX);
     I.rdpmc ();
     emit_combine_edx_eax i.res.(0)
+  | Lop (Specific Itrace_pc_guard_gate) -> Emit_sancov.emit_gate ~res:(res i 0)
   | Lop (Specific (Itrace_pc_guard _)) ->
-    Emit_sancov.emit_probe ~live:i.live ~dbg:i.dbg
+    Emit_sancov.emit_call ~live:i.live ~move ~emit_call
   | Lop (Specific Ilfence) -> I.lfence ()
   | Lop (Specific Isfence) -> I.sfence ()
   | Lop (Specific Imfence) -> I.mfence ()
@@ -2877,7 +2878,6 @@ let fundecl fundecl =
   stack_offset := 0;
   call_gc_sites := [];
   local_realloc_sites := [];
-  Emit_sancov.reset_function ();
   clear_safety_checks ();
   clear_stack_realloc ();
   Stack_class.Tbl.copy_values ~from:fundecl.fun_num_stack_slots
@@ -2919,7 +2919,6 @@ let fundecl fundecl =
   let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
-  Emit_sancov.emit_slow_paths ~move ~emit_call;
   let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();

@@ -38,7 +38,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
          ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
          | Imulsubf | Inegmulsubf | Isqrtf | Ifar_alloc _ | Ifar_stackcheck _
          | Ishiftarith (_, _)
-         | Ibswap _ | Isignext _ | Isimd _ | Itrace_pc_guard _ ))
+         | Ibswap _ | Isignext _ | Isimd _ | Itrace_pc_guard_gate
+         | Itrace_pc_guard _ ))
   | Op
       ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
       | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Const_int _

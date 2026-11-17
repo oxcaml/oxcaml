@@ -33,55 +33,19 @@ module D = Asm_targets.Asm_directives
 module L = Asm_targets.Asm_label
 module S = Asm_targets.Asm_symbol
 
-type slow_path =
-  { lbl : L.t;
-    return_lbl : L.t;
-    guard : L.t;
-    live : Reg.Set.t;
-    dbg : Debuginfo.t
-  }
-
-(* The slow paths of the current function, most recent first. *)
-let slow_paths = ref ([] : slow_path list)
-
-(* The guards of the current unit, one per probe, most recent first. *)
+(* The guards of the current unit, one per call to the callback, most recent
+   first. *)
 let guards = ref ([] : L.t list)
 
-let reset_function () = slow_paths := []
+let reset_unit () = guards := []
 
-let reset_unit () =
-  slow_paths := [];
-  guards := []
-
-let label_arg lbl = sym (L.encode lbl)
-
-(* if (__sancov_should_track) goto slow path. The gate is defined hidden in this
-   unit (see [emit_data]), so it can be addressed PC-relatively, even in
-   position-independent code. *)
-let emit_probe ~live ~dbg =
+(* The gate is defined hidden in this unit (see [emit_data]), so it can be
+   addressed PC-relatively, even in position-independent code. *)
+let emit_gate ~res =
   let gate = S.create_global Cfg_trace_pc_guard.gate in
-  I.cmp (int 0) (mem64_rip QWORD (S.encode gate));
-  let lbl = L.create Text in
-  let return_lbl = L.create Text in
-  I.jne (label_arg lbl);
-  D.define_label return_lbl;
-  let guard = L.create Trace_pc_guards in
-  guards := guard :: !guards;
-  slow_paths := { lbl; return_lbl; guard; live; dbg } :: !slow_paths
+  I.mov (mem64_rip QWORD (S.encode gate)) res
 
-(* The callback records its return address, which lies in the slow path, and
-   coverage tools map that address to a source line. A probe without a source
-   line is given line 0 ("no source line"), so that it is not attributed to the
-   line of the code that precedes the slow path. *)
-let emit_debug_info dbg =
-  let file_emitter ~file_num ~file_name =
-    D.file ~file_num:(Some file_num) ~file_name
-  in
-  if Emitaux.has_source_line dbg
-  then Emitaux.emit_debug_info_gen dbg file_emitter D.loc
-  else Emitaux.emit_no_source_line_gen file_emitter D.loc
-
-(* The slow path calls [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack
+(* Call [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack
    (or, without stack checks, on the current stack, once aligned), as for a C
    call that does not allocate. Unlike such a call, it preserves every register:
    those that are live and that C functions do not preserve are saved in a frame
@@ -92,9 +56,9 @@ let emit_debug_info dbg =
    address pushed by a call to [caml_call_gc], this word lies within the red
    zone that the runtime keeps below the stack frames of OCaml code
    ([Stack_threshold]). *)
-let emit_slow_path ~move ~emit_call t =
-  D.define_label t.lbl;
-  emit_debug_info t.dbg;
+let emit_call ~live ~move ~emit_call =
+  let guard = L.create Trace_pc_guards in
+  guards := guard :: !guards;
   (* The frame is 16-byte aligned, and so is every vector slot, since [move]
      uses aligned moves for [Vec128] and [Valx2] stack slots. [Outgoing] slots
      are addressed relative to the stack pointer, independently of the frame of
@@ -109,7 +73,7 @@ let emit_slow_path ~move ~emit_call t =
           let slot = Reg.create_at_location r.typ (Stack (Outgoing offset)) in
           (r, slot) :: saved, offset + size
         else saved, offset)
-      t.live ([], 0)
+      live ([], 0)
   in
   let frame_size = Misc.align size 16 in
   I.push r13;
@@ -127,17 +91,13 @@ let emit_slow_path ~move ~emit_call t =
       rsp;
   if frame_size > 0 then I.sub (int frame_size) rsp;
   List.iter (fun (r, slot) -> move r slot) saved;
-  I.lea (mem64_rip NONE (L.encode t.guard)) rdi;
+  I.lea (mem64_rip NONE (L.encode guard)) rdi;
   emit_call (Cmm.global_symbol Cfg_trace_pc_guard.callback);
   List.iter (fun (r, slot) -> move slot r) saved;
   I.mov r13 rsp;
   D.cfi_restore_state ();
   I.pop r13;
-  D.cfi_adjust_cfa_offset ~bytes:(-8);
-  I.jmp (label_arg t.return_lbl)
-
-let emit_slow_paths ~move ~emit_call =
-  List.iter (emit_slow_path ~move ~emit_call) (List.rev !slow_paths)
+  D.cfi_adjust_cfa_offset ~bytes:(-8)
 
 (* The constructor of the unit, as emitted by clang: it tells the coverage
    runtime where the guards of this executable or shared object are. All copies

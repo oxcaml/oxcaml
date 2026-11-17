@@ -277,28 +277,99 @@ let probe_dbg (cfg : Cfg.t) (block : Cfg.basic_block) ~is_entry =
     in
     match branch_dbgs with [dbg] -> dbg | [] | _ :: _ :: _ -> cfg.fun_dbg)
 
-(* A probe is a single target-specific operation at the start of the block,
-   whose out-of-line slow path preserves all registers (see
-   [Arch.trace_pc_guard_operation] and the emitter). The emitter gives each
-   probe its own guard. [index] only makes probes distinct, so that
-   [Cfg_merge_blocks] does not merge otherwise identical instrumented blocks; it
-   is unique within the function. *)
-let instrument_block (cfg : Cfg.t) (block : Cfg.basic_block) ~index ~dbg =
+(* A probe to be added at the start of a block. *)
+type probe =
+  { label : Label.t;
+    dbg : Debuginfo.t
+  }
+
+(* A probe splits its block in three:
+
+   - the block itself, which keeps its label, loads the gate and tests it;
+
+   - a cold block calling the callback, which is a single target-specific
+   operation preserving all registers (see [Arch.trace_pc_guard_operations]);
+
+   - a block with the original body and terminator, where both paths join.
+
+   The emitter gives each call its own guard. [index] makes the calls distinct,
+   so that otherwise identical instrumented blocks are not merged; it is unique
+   within the function. All instructions of a probe have its debuginfo, which
+   gives the call its line and its inlined frames. *)
+let instrument_block cfg_with_layout { label; dbg } ~index =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let block = Cfg.get_block_exn cfg label in
+  let gate_op, call_op =
+    match Arch.trace_pc_guard_operations with
+    | None ->
+      Misc.fatal_error "-gated-trace-pc-guard is not supported on this target"
+    | Some (gate_op, call_op) -> gate_op, call_op index
+  in
   let stack_offset =
     match DLL.hd block.body with
     | Some (instr : Cfg.basic Cfg.instruction) -> instr.stack_offset
     | None -> block.terminator.stack_offset
   in
-  match Arch.trace_pc_guard_operation index with
-  | None ->
-    Misc.fatal_error "-gated-trace-pc-guard is not supported on this target"
-  | Some op ->
-    DLL.add_begin block.body
-      (Cfg.make_instruction
-         ~desc:(Op (Specific op) : Cfg.basic)
-         ~arg:[||] ~res:[||] ~dbg ~stack_offset
-         ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-         ())
+  let make_instruction desc ~arg ~res =
+    Cfg.make_instruction ~desc ~arg ~res ~dbg ~stack_offset
+      ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+      ()
+  in
+  let rest_label = Label.new_label () in
+  let call_label = Label.new_label () in
+  let rest : Cfg.basic_block =
+    { start = rest_label;
+      body = DLL.make_empty ();
+      terminator = block.terminator;
+      predecessors = Label.Set.of_list [label; call_label];
+      stack_offset;
+      exn = block.exn;
+      can_raise = block.can_raise;
+      is_trap_handler = false;
+      cold = block.cold
+    }
+  in
+  DLL.transfer ~to_:rest.body ~from:block.body ();
+  Label.Set.iter
+    (fun successor ->
+      let successor = Cfg.get_block_exn cfg successor in
+      successor.predecessors
+        <- Label.Set.add rest_label
+             (Label.Set.remove label successor.predecessors))
+    (Cfg.successor_labels ~normal:true ~exn:true rest);
+  let call : Cfg.basic_block =
+    { start = call_label;
+      body = DLL.make_empty ();
+      terminator =
+        make_instruction (Always rest_label : Cfg.terminator) ~arg:[||] ~res:[||];
+      predecessors = Label.Set.singleton label;
+      stack_offset;
+      exn = None;
+      can_raise = false;
+      is_trap_handler = false;
+      cold = true
+    }
+  in
+  DLL.add_end call.body
+    (make_instruction (Op (Specific call_op) : Cfg.basic) ~arg:[||] ~res:[||]);
+  let gate = Reg.create Int in
+  DLL.add_end block.body
+    (make_instruction
+       (Op (Specific gate_op) : Cfg.basic)
+       ~arg:[||] ~res:[| gate |]);
+  block.terminator
+    <- make_instruction
+         (Truth_test { ifso = call_label; ifnot = rest_label } : Cfg.terminator)
+         ~arg:[| gate |] ~res:[||];
+  block.exn <- None;
+  block.can_raise <- false;
+  Cfg_with_layout.add_block cfg_with_layout rest ~after:label;
+  let last =
+    match DLL.last (Cfg_with_layout.layout cfg_with_layout) with
+    | Some last -> last
+    | None -> Misc.fatal_error "Cfg_trace_pc_guard: empty layout"
+  in
+  Cfg_with_layout.add_block cfg_with_layout call ~after:last
 
 let run cfg_with_infos =
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
@@ -307,20 +378,25 @@ let run cfg_with_infos =
   then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
   let dominators = Cfg_with_infos.dominators cfg_with_infos in
   let post_dominators = Post_dominators.build cfg in
-  (* Blocks are visited in layout order so that probes are numbered
-     deterministically. Adding probes does not change the graph, so the
-     dominator trees remain valid. *)
-  let num_probes = ref 0 in
+  (* Probes are chosen before any is added, since adding one changes the graph.
+     Blocks are visited in layout order so that probes are numbered
+     deterministically. *)
   let entry_label = effective_entry cfg in
-  DLL.iter (Cfg_with_layout.layout cfg_with_layout) ~f:(fun label ->
-      let block = Cfg.get_block_exn cfg label in
-      let is_entry = Label.equal label entry_label in
-      if
-        (not (is_unreachable block))
-        && should_instrument ~dominators ~post_dominators ~is_entry block
-      then (
-        instrument_block cfg block ~index:!num_probes
-          ~dbg:(probe_dbg cfg block ~is_entry);
-        incr num_probes));
+  let probes =
+    DLL.fold_left (Cfg_with_layout.layout cfg_with_layout) ~init:[]
+      ~f:(fun probes label ->
+        let block = Cfg.get_block_exn cfg label in
+        let is_entry = Label.equal label entry_label in
+        if
+          (not (is_unreachable block))
+          && should_instrument ~dominators ~post_dominators ~is_entry block
+        then { label; dbg = probe_dbg cfg block ~is_entry } :: probes
+        else probes)
+  in
+  List.iteri
+    (fun index probe -> instrument_block cfg_with_layout probe ~index)
+    (List.rev probes);
+  if not (Misc.Stdlib.List.is_empty probes)
+  then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
   Cfg_with_infos.invalidate_liveness cfg_with_infos;
   cfg_with_infos

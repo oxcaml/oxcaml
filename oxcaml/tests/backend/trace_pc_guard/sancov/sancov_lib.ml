@@ -64,12 +64,12 @@ struct
 end
 [@@inline never]
 
-let[@inline always] inlined_choice n =
+let[@inline always] hit_inlined n =
   if n > 10 then missed_large () else hit_small ()
 
 let[@inline never] hit_caller n =
-  inlined_choice n;
-  inlined_choice (n - 1)
+  hit_inlined n;
+  hit_inlined (n - 1)
 
 let rec hit_rec n =
   if n <= 0

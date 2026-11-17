@@ -37,27 +37,31 @@ module O = Ast.DSL
 module R = Ast.Reg
 module S = Asm_targets.Asm_symbol
 
-type slow_path =
-  { lbl : L.t;
-    return_lbl : L.t;
-    live : Reg.Set.t;
-    dbg : Debuginfo.t
-  }
-
-(* The guards of the current unit, one per probe, most recent first. *)
+(* The guards of the current unit, one per call to the callback, most recent
+   first. *)
 let guards = ref ([] : L.t list)
 
-let reset_unit () = guards := []
+(* The guards of the current function, by probe index. [Emit] emits each
+   instruction several times, to measure it, and a call must then keep its
+   guard. *)
+let guards_of_function : (int, L.t) Hashtbl.t = Hashtbl.create 16
 
-let new_guard ~register =
-  let guard = L.create Trace_pc_guards in
-  if register then guards := guard :: !guards;
-  guard
+let reset_function () = Hashtbl.reset guards_of_function
+
+let reset_unit () =
+  reset_function ();
+  guards := []
+
+let guard_of_index index =
+  match Hashtbl.find_opt guards_of_function index with
+  | Some guard -> guard
+  | None ->
+    let guard = L.create Trace_pc_guards in
+    Hashtbl.add guards_of_function index guard;
+    guards := guard :: !guards;
+    guard
 
 let macosx = String.equal Config.system "macosx"
-
-let local_label lbl =
-  O.symbol (Ast.Symbol.create_label Same_section_and_unit lbl)
 
 (* Scratch registers of the emitter, which the register allocator does not
    use. *)
@@ -71,40 +75,19 @@ let reg_saved_sp = Proc.phys_reg Int X19
 
 let reg_x_saved_sp = H.reg_x reg_saved_sp
 
-(* if (__sancov_should_track) goto slow path. The gate is defined hidden in this
-   unit (see [emit_data]), so it is addressed directly. The branch to the slow
-   path is unconditional, since a conditional branch might not reach it. *)
-(* CR-someday mshinwell: use a single [cbnz] to the slow path, relying on branch
-   relaxation for slow paths that are out of its range. This would save a taken
-   branch per probe when the gate is off. *)
-let emit_probe ~live ~dbg =
+(* The gate is defined hidden in this unit (see [emit_data]), so it is addressed
+   directly. *)
+let emit_gate ~res =
   let gate = S.create_global Cfg_trace_pc_guard.gate in
-  let lbl = L.create Text in
-  let return_lbl = L.create Text in
   let reloc : [`Twelve] Ast.Symbol.same_unit_or_reloc =
     if macosx then Needs_reloc PAGE_OFF else Needs_reloc LOWER_TWELVE
   in
-  A.ins2 ADRP reg_x_tmp1
+  let res_x = H.reg_x res in
+  A.ins2 ADRP res_x
     (O.symbol (Ast.Symbol.create_symbol (Needs_reloc PAGE) gate));
-  A.ins2 LDR reg_x_tmp1 (H.mem_symbol_reg (R.reg_x 16) ~reloc gate);
-  A.ins2 CBZ reg_x_tmp1 (local_label return_lbl);
-  A.ins1 B (local_label lbl);
-  D.define_label return_lbl;
-  { lbl; return_lbl; live; dbg }
+  A.ins2 LDR res_x (H.mem_symbol_reg (H.gp_reg_of_reg res) ~reloc gate)
 
-(* The callback records its return address, which lies in the slow path, and
-   coverage tools map that address to a source line. A probe without a source
-   line is given line 0 ("no source line"), so that it is not attributed to the
-   line of the code that precedes the slow path. *)
-let emit_debug_info dbg =
-  let file_emitter ~file_num ~file_name =
-    D.file ~file_num:(Some file_num) ~file_name
-  in
-  if Emitaux.has_source_line dbg
-  then Emitaux.emit_debug_info_gen dbg file_emitter D.loc
-  else Emitaux.emit_no_source_line_gen file_emitter D.loc
-
-(* The slow path calls [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack,
+(* Call [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack,
    as for a C call that does not allocate. Unlike such a call, it preserves
    every register: those that are live and that C functions do not preserve are
    saved in a frame on the C stack.
@@ -115,9 +98,8 @@ let emit_debug_info dbg =
    frame. Like the words pushed before a call to [caml_call_realloc_stack],
    these lie within the red zone that the runtime keeps below the stack frames
    of OCaml code ([Stack_threshold]). *)
-let emit_slow_path ~move ~guard t =
-  D.define_label t.lbl;
-  emit_debug_info t.dbg;
+let emit_call ~live ~move ~index =
+  let guard = guard_of_index index in
   (* [Outgoing] slots are addressed relative to the stack pointer, independently
      of the frame of the function. *)
   let saved, size =
@@ -130,7 +112,7 @@ let emit_slow_path ~move ~guard t =
           let slot = Reg.create_at_location r.typ (Stack (Outgoing offset)) in
           (r, slot) :: saved, offset + size
         else saved, offset)
-      t.live ([], 0)
+      live ([], 0)
   in
   let frame_size = Misc.align size 16 in
   A.ins3 (STP X) reg_x_saved_sp O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
@@ -164,8 +146,7 @@ let emit_slow_path ~move ~guard t =
   A.ins_mov_to_sp ~src:reg_x_saved_sp;
   D.cfi_restore_state ();
   A.ins3 (LDP X) reg_x_saved_sp O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
-  D.cfi_adjust_cfa_offset ~bytes:(-16);
-  A.ins1 B (local_label t.return_lbl)
+  D.cfi_adjust_cfa_offset ~bytes:(-16)
 
 (* The constructor of the unit, as emitted by clang: it tells the coverage
    runtime where the guards of this executable or shared object are. All copies

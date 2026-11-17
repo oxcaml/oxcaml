@@ -27,36 +27,26 @@
 
 (** Emission of the coverage probes of [-gated-trace-pc-guard] (see
     [Cfg_trace_pc_guard]). This is the part of the emitter that deals with
-    probes; it is only called from [Emit].
-
-    [Emit] emits each function twice, the first time to measure it, so this
-    module keeps no state for the current function: [Emit] records the slow
-    paths returned by [emit_probe] and passes them to [emit_slow_path]. *)
-
-(** The out-of-line part of a probe. *)
-type slow_path
+    probes; it is only called from [Emit]. *)
 
 (** To be called at the start of each compilation unit. *)
 val reset_unit : unit -> unit
 
-(** Emit the inline part of a probe: a test of the gate and a branch to the
-    returned slow path. [live] is the set of registers live across the probe. No
-    register is clobbered, except the scratch registers of the emitter. *)
-val emit_probe : live:Reg.Set.t -> dbg:Debuginfo.t -> slow_path
+(** To be called at the start of each function. *)
+val reset_function : unit -> unit
 
-(** A guard for [emit_slow_path]. If [register] holds, the guard is added to
-    those of the current unit, for [emit_data]. It must not hold when measuring
-    code. *)
-val new_guard : register:bool -> Asm_targets.Asm_label.t
+(** Emit the load of the gate into [res] ([Itrace_pc_guard_gate]). *)
+val emit_gate : res:Reg.t -> unit
 
-(** Emit a slow path, which calls the callback with the address of [guard],
-    preserving every register. [move] emits a move between a hardware register
-    and an [Outgoing] stack slot. *)
-val emit_slow_path :
-  move:(Reg.t -> Reg.t -> unit) ->
-  guard:Asm_targets.Asm_label.t ->
-  slow_path ->
-  unit
+(** Emit a call to the callback, with the address of the guard of the probe
+    numbered [index] in the current function ([Itrace_pc_guard]). Every register
+    is preserved; [live] is the set of registers live across the call. [move]
+    emits a move between a hardware register and an [Outgoing] stack slot.
+
+    [Emit] emits each instruction several times, the first ones to measure it;
+    all share one guard. *)
+val emit_call :
+  live:Reg.Set.t -> move:(Reg.t -> Reg.t -> unit) -> index:int -> unit
 
 (** Emit the guards of the probes of the current unit, the definition of the
     gate and the constructor that registers the guards, if the unit has any

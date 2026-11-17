@@ -685,12 +685,6 @@ let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
         in
         loc_emitter ~file_num ~line ~col ?discriminator ()
 
-let emit_no_source_line_gen file_emitter loc_emitter =
-  if debug_line_info_enabled ()
-  then
-    let file_num = get_file_num ~file_emitter !Location.input_name in
-    loc_emitter ~file_num ~line:0 ~col:0 ?discriminator:None ()
-
 let binary_backend_available = ref false
 
 let reduce_heap_size ~reset =
