@@ -15,11 +15,15 @@ llvm=$OXCAML_LLVM_BIN
 mkdir -p coverage
 UBSAN_OPTIONS=coverage=1:coverage_dir=coverage ./sancov_test.exe
 
-# Keep the source location and the name of the functions of interest, whatever
-# the name mangling scheme.
+# Keep the functions of interest, with their source location, whatever the name
+# mangling scheme. [sancov] gives a function the least line of its probes, per
+# source file. Probes of inlined code are attributed to the function that they
+# were inlined into, hence the line of [hit_caller]; locations in files other
+# than those of the test, which come from inlined library code, are dropped.
+files='sancov_[a-z]*\.ml\|stubs\.c'
+names='\(hit\|missed\)_[a-z]*'
 filter () {
-  sed -e 's|^.*/||' \
-    -e 's/^\([a-z_.]*:[0-9]*\) .*\(\(hit\|missed\)_[a-z]*\).*/\1 \2/' -e t -e d \
+  sed -n -e 's|^.*/||' -e "s/^\(\($files\):[0-9]*\) .*\($names\).*/\1 \3/p" \
     | LC_ALL=C sort -u
 }
 

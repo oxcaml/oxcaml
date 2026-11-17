@@ -7,12 +7,12 @@ sancov_lib.ml:27 hit_small
 sancov_lib.ml:31 hit_base
 sancov_lib.ml:33 hit_step
 sancov_lib.ml:35 hit_closure
-sancov_lib.ml:39 hit_loop
-sancov_lib.ml:46 hit_search
-sancov_lib.ml:51 hit_classify
-sancov_lib.ml:62 hit_functor
+sancov_lib.ml:40 hit_loop
+sancov_lib.ml:47 hit_search
+sancov_lib.ml:53 hit_classify
+sancov_lib.ml:63 hit_functor
+sancov_lib.ml:68 hit_caller
 sancov_lib.ml:7 hit_even
-sancov_lib.ml:70 hit_caller
 sancov_lib.ml:74 hit_rec
 stubs.c:11 hit_cstub
 not covered:
