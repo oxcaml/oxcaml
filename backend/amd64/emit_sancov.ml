@@ -139,7 +139,51 @@ let emit_slow_path ~move ~emit_call t =
 let emit_slow_paths ~move ~emit_call =
   List.iter (emit_slow_path ~move ~emit_call) (List.rev !slow_paths)
 
-let emit_data ~add_def_symbol =
+(* The constructor of the unit, as emitted by clang: it tells the coverage
+   runtime where the guards of this executable or shared object are. All copies
+   are in one COMDAT group, together with their [.init_array] entries, so the
+   linker keeps a single one. The bounds are hidden, so that they are those of
+   the object being linked. *)
+let emit_constructor ~emit_call =
+  let name = Cfg_trace_pc_guard.constructor in
+  let ctor = S.create_global name in
+  let start = S.create_global Cfg_trace_pc_guard.guards_start in
+  let stop = S.create_global Cfg_trace_pc_guard.guards_stop in
+  let text : Asm_targets.Asm_section.t =
+    Custom
+      { names = [".text." ^ name];
+        flags = Some "axG";
+        args = ["@progbits"; name; "comdat"];
+        is_delayed = false
+      }
+  in
+  D.switch_to_section text;
+  D.hidden start;
+  D.hidden stop;
+  D.weak ctor;
+  D.hidden ctor;
+  D.type_symbol ctor ~ty:Function;
+  D.align ~fill:Nop ~bytes:16;
+  D.define_symbol_label ~section:Text ctor;
+  D.cfi_startproc ();
+  (* Align the stack. *)
+  I.push rax;
+  D.cfi_adjust_cfa_offset ~bytes:8;
+  I.lea (mem64_rip NONE (S.encode start)) rdi;
+  I.lea (mem64_rip NONE (S.encode stop)) (Reg64 RSI);
+  emit_call (Cmm.global_symbol Cfg_trace_pc_guard.init);
+  I.pop rax;
+  D.cfi_adjust_cfa_offset ~bytes:(-8);
+  I.ret ();
+  D.cfi_endproc ();
+  D.size ctor;
+  D.switch_to_section_raw ~names:[".init_array.2"] ~flags:(Some "awG")
+    ~args:["@init_array"; name; "comdat"]
+    ~is_delayed:false;
+  D.align ~fill:Zero ~bytes:8;
+  D.symbol ctor
+
+let emit_data ~add_def_symbol ~emit_call =
   if not (Misc.Stdlib.List.is_empty !guards)
   then (
     D.switch_to_section Trace_pc_guards;
@@ -162,4 +206,5 @@ let emit_data ~add_def_symbol =
     D.align ~fill:Zero ~bytes:8;
     D.define_symbol_label ~section:Trace_pc_guard_gate gate;
     D.int64 0L;
-    D.size gate)
+    D.size gate;
+    emit_constructor ~emit_call)

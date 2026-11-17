@@ -3312,7 +3312,7 @@ let end_assembly () =
     D.switch_to_section Sixtyfour_byte_literals;
     D.align ~fill:Zero ~bytes:64;
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
-  Emit_sancov.emit_data ~add_def_symbol;
+  Emit_sancov.emit_data ~add_def_symbol ~emit_call;
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
   emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");

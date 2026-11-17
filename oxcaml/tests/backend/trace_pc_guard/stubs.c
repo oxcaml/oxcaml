@@ -87,16 +87,6 @@ void __sanitizer_cov_trace_pc_guard(uint32_t *guard)
 #endif
 }
 
-extern uint32_t __start_oxcaml_trace_pc_guards[] __attribute__((weak));
-extern uint32_t __stop_oxcaml_trace_pc_guards[] __attribute__((weak));
-
-__attribute__((constructor)) static void register_guards(void)
-{
-  if (&__start_oxcaml_trace_pc_guards[0] != &__stop_oxcaml_trace_pc_guards[0])
-    __sanitizer_cov_trace_pc_guard_init(__start_oxcaml_trace_pc_guards,
-                                        __stop_oxcaml_trace_pc_guards);
-}
-
 value caml_tpcg_set_gate(value enabled)
 {
   __sancov_should_track = Bool_val(enabled);

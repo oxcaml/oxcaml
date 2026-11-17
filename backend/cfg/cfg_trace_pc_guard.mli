@@ -33,11 +33,12 @@
     Each probe tests the global [__sancov_should_track] and, if it is non-zero,
     calls [__sanitizer_cov_trace_pc_guard(&guard)], where [guard] is a distinct
     32-bit slot of a per-unit array that the emitter places in the
-    [oxcaml_trace_pc_guards] section. The linker concatenates the arrays of all
-    units and provides [__start_oxcaml_trace_pc_guards] and
-    [__stop_oxcaml_trace_pc_guards]. The compiler does not emit a call to
-    [__sanitizer_cov_trace_pc_guard_init]: the coverage runtime has to make it
-    with these bounds. Only ELF targets are supported.
+    [__sancov_guards] section. The linker concatenates the arrays of all units,
+    including those of C code instrumented by clang, and provides
+    [__start___sancov_guards] and [__stop___sancov_guards]. As with clang, every
+    instrumented unit also has a constructor that passes these bounds to
+    [__sanitizer_cov_trace_pc_guard_init]; it is in a COMDAT group, so that it
+    runs once per executable or shared object. Only ELF targets are supported.
 
     As with clang, every instrumented unit defines [__sancov_should_track] as a
     weak, hidden, zero-initialised 64-bit global in the [__sancov_gate] section,
@@ -60,3 +61,15 @@ val gate : string
 
 (** The name of the callback, [__sanitizer_cov_trace_pc_guard]. *)
 val callback : string
+
+(** The name of the function that the constructor calls,
+    [__sanitizer_cov_trace_pc_guard_init]. *)
+val init : string
+
+(** The bounds of the guards, as defined by the linker. *)
+val guards_start : string
+
+val guards_stop : string
+
+(** The name of the constructor and of its COMDAT group, as chosen by clang. *)
+val constructor : string

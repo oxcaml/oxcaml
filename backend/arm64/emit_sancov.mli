@@ -58,6 +58,7 @@ val emit_slow_path :
   slow_path ->
   unit
 
-(** Emit the guards of the probes of the current unit and the definition of the
-    gate, if the unit has any probe. *)
+(** Emit the guards of the probes of the current unit, the definition of the
+    gate and the constructor that registers the guards, if the unit has any
+    probe. *)
 val emit_data : unit -> unit

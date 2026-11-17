@@ -49,7 +49,9 @@ val emit_probe : live:Reg.Set.t -> dbg:Debuginfo.t -> unit
 val emit_slow_paths :
   move:(Reg.t -> Reg.t -> unit) -> emit_call:(Cmm.symbol -> unit) -> unit
 
-(** Emit the guards of the probes of the current unit and the definition of the
-    gate, if the unit has any probe. [add_def_symbol] is called on the name of
-    the gate. *)
-val emit_data : add_def_symbol:(string -> unit) -> unit
+(** Emit the guards of the probes of the current unit, the definition of the
+    gate and the constructor that registers the guards, if the unit has any
+    probe. [add_def_symbol] is called on the name of the gate. [emit_call] emits
+    a call to a C function. *)
+val emit_data :
+  add_def_symbol:(string -> unit) -> emit_call:(Cmm.symbol -> unit) -> unit

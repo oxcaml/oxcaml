@@ -34,6 +34,14 @@ let gate = "__sancov_should_track"
 
 let callback = "__sanitizer_cov_trace_pc_guard"
 
+let init = "__sanitizer_cov_trace_pc_guard_init"
+
+let guards_start = "__start___sancov_guards"
+
+let guards_stop = "__stop___sancov_guards"
+
+let constructor = "sancov.module_ctor_trace_pc_guard"
+
 (* A probe can only record a critical edge if a block is inserted on it.
    Exceptional edges cannot be split, but they still count towards the number of
    successors. *)

@@ -164,6 +164,59 @@ let emit_slow_path ~move ~guard t =
   D.cfi_adjust_cfa_offset ~bytes:(-16);
   A.ins1 B (local_label t.return_lbl)
 
+(* The constructor of the unit, as emitted by clang: it tells the coverage
+   runtime where the guards of this executable or shared object are. All copies
+   are in one COMDAT group, together with their [.init_array] entries, so the
+   linker keeps a single one. The bounds are hidden, so that they are those of
+   the object being linked. *)
+let emit_constructor () =
+  let name = Cfg_trace_pc_guard.constructor in
+  let ctor = S.create_global name in
+  let start = S.create_global Cfg_trace_pc_guard.guards_start in
+  let stop = S.create_global Cfg_trace_pc_guard.guards_stop in
+  let text : Asm_targets.Asm_section.t =
+    Custom
+      { names = [".text." ^ name];
+        flags = Some "axG";
+        args = ["%progbits"; name; "comdat"];
+        is_delayed = false
+      }
+  in
+  D.switch_to_section text;
+  D.hidden start;
+  D.hidden stop;
+  D.weak ctor;
+  D.hidden ctor;
+  D.type_symbol ctor ~ty:Function;
+  D.align ~fill:Nop ~bytes:8;
+  D.define_symbol_label ~section:Text ctor;
+  D.cfi_startproc ();
+  A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
+  D.cfi_adjust_cfa_offset ~bytes:16;
+  D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
+  let load_address reg sym =
+    A.ins2 ADRP reg
+      (O.symbol (Ast.Symbol.create_symbol (Needs_reloc PAGE) sym));
+    A.ins4 ADD_immediate reg reg
+      (O.symbol (Ast.Symbol.create_symbol (Needs_reloc PAGE_OFF) sym))
+      O.optional_none
+  in
+  load_address (H.reg_x (Proc.phys_reg Int X0)) start;
+  load_address (H.reg_x (Proc.phys_reg Int X1)) stop;
+  A.ins1 BL
+    (O.symbol
+       (Ast.Symbol.create_symbol (Needs_reloc CALL26)
+          (S.create_global Cfg_trace_pc_guard.init)));
+  A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
+  A.ins0 RET;
+  D.cfi_endproc ();
+  D.size ctor;
+  D.switch_to_section_raw ~names:[".init_array.2"] ~flags:(Some "awG")
+    ~args:["%init_array"; name; "comdat"]
+    ~is_delayed:false;
+  D.align ~fill:Zero ~bytes:8;
+  D.symbol ctor
+
 let emit_data () =
   if not (Misc.Stdlib.List.is_empty !guards)
   then (
@@ -186,4 +239,5 @@ let emit_data () =
     D.align ~fill:Zero ~bytes:8;
     D.define_symbol_label ~section:Trace_pc_guard_gate gate;
     D.int64 0L;
-    D.size gate)
+    D.size gate;
+    emit_constructor ())
