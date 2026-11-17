@@ -74,19 +74,19 @@ var caml_double_of_float16 = (function () {
 
 //Provides: caml_float16_of_double pure
 var caml_float16_of_double = (function () {
-  // Faithful port of the native runtime's float_to_half_fast3_rtne
-  // (caml_float_to_float16 in runtime/bigarray.c). The double is first
-  // rounded to a float32 (the `(float) x` cast native performs), then to a
-  // float16, each step round-to-nearest-ties-to-even. Rounding the double
-  // straight onto the float16 grid would double-round differently from
-  // native and the wasm runtime on tie cases (e.g. 65519.99999958789 must
-  // give 0x7c00, not 0x7bff).
+  // Port of the native runtime's caml_double_to_float16 (runtime/bigarray.c).
+  // It first rounds to odd so that rounding to float32 and then to float16
+  // gives the same result as rounding straight to float16.
   const buffer = new ArrayBuffer(4);
   const f32 = new Float32Array(buffer);
   const u32 = new Uint32Array(buffer);
   return function (f) {
     f32[0] = f; // round to float32
     let x = u32[0] >>> 0;
+    if ((x & 0x7f800000) !== 0x7f800000 && (x & 1) === 0 && f32[0] !== f) {
+      // finite, even and inexact: move to the odd neighbour nearer to f
+      x = Math.abs(f32[0]) < Math.abs(f) ? x + 1 : x - 1;
+    }
     const sign = x & 0x80000000;
     x = (x ^ sign) >>> 0;
     let o;

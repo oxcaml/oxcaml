@@ -727,8 +727,24 @@
 
    (func $double_to_float16 (export "caml_float16_of_double")
       (param $f f64) (result i32)
-      (local $x i32) (local $sign i32) (local $o i32)
+      (local $x i32) (local $sign i32) (local $o i32) (local $g f64)
       (local.set $x (i32.reinterpret_f32 (f32.demote_f64 (local.get $f))))
+      ;; Round to odd so that rounding to float32 and then to float16
+      ;; gives the same result as rounding straight to float16.
+      (local.set $g (f64.promote_f32 (f32.reinterpret_i32 (local.get $x))))
+      (if (i32.and
+             (i32.and
+                (i32.ne (i32.and (local.get $x) (i32.const 0x7f800000))
+                   (i32.const 0x7f800000))
+                (i32.eqz (i32.and (local.get $x) (i32.const 1))))
+             (f64.ne (local.get $g) (local.get $f)))
+         (then
+            (local.set $x
+               (select
+                  (i32.add (local.get $x) (i32.const 1))
+                  (i32.sub (local.get $x) (i32.const 1))
+                  (f64.lt (f64.abs (local.get $g))
+                     (f64.abs (local.get $f)))))))
       (local.set $sign (i32.and (local.get $x) (i32.const 0x80000000)))
       (local.set $x (i32.xor (local.get $x) (local.get $sign)))
       (if (i32.ge_u (local.get $x) (i32.const 0x47800000))
