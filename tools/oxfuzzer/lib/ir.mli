@@ -231,6 +231,8 @@ module Bin_op : sig
     | Max
     | Min_num
     | Max_num
+    | Unsigned_div
+    | Unsigned_rem
     | Bit_and
     | Bit_or
     | Bit_xor
