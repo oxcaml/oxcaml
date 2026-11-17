@@ -1182,7 +1182,7 @@ let mk_afl_inst_ratio f =
   "Configure percentage of branches instrumented\n\
   \     (advanced, see afl-fuzz docs for AFL_INST_RATIO)"
 
-let mk_trace_pc_guard f =
+let mk_gated_trace_pc_guard f =
   "-gated-trace-pc-guard", Arg.Unit f,
   "Enable coverage instrumentation compatible with\n\
   \     LLVM's -fsanitize-coverage=trace-pc-guard with\n\
@@ -1469,7 +1469,7 @@ module type Optcomp_options = sig
   val _shared : unit -> unit
   val _afl_instrument : unit -> unit
   val _afl_inst_ratio : int -> unit
-  val _trace_pc_guard : unit -> unit
+  val _gated_trace_pc_guard : unit -> unit
   val _function_sections : unit -> unit
   val _save_ir_after : string -> unit
   val _save_ir_before : string -> unit
@@ -1800,7 +1800,7 @@ struct
     mk_no_locs F._no_locs;
     mk_afl_instrument F._afl_instrument;
     mk_afl_inst_ratio F._afl_inst_ratio;
-    mk_trace_pc_guard F._trace_pc_guard;
+    mk_gated_trace_pc_guard F._gated_trace_pc_guard;
     mk_annot F._annot;
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
@@ -2624,7 +2624,7 @@ module Default = struct
     include Compiler
     let _afl_inst_ratio n = afl_inst_ratio := n
     let _afl_instrument = set afl_instrument
-    let _trace_pc_guard = set trace_pc_guard
+    let _gated_trace_pc_guard = set gated_trace_pc_guard
     let _function_sections () =
       assert Config.function_sections;
       Compenv.first_ccopts := ("-ffunction-sections" ::(!Compenv.first_ccopts));

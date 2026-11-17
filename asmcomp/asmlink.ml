@@ -56,7 +56,7 @@ let runtime_lib () =
 (* The startup file contains only generated code (entry point, generic
    functions, tables), which is not worth recording coverage for. *)
 let without_trace_pc_guard f =
-  Misc.protect_refs [Misc.R (Clflags.trace_pc_guard, false)] f
+  Misc.protect_refs [Misc.R (Clflags.gated_trace_pc_guard, false)] f
 
 let named_startup_file () =
   !Clflags.keep_startup_file || !Emitaux.binary_backend_available

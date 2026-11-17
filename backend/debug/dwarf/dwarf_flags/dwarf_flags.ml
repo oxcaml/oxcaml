@@ -185,7 +185,7 @@ let no_dwarf_inlined_frames = ref false
 
 let emit_dwarf_inlined_frames () =
   !dwarf_inlined_frames
-  || (!Clflags.trace_pc_guard && not !no_dwarf_inlined_frames)
+  || (!Clflags.gated_trace_pc_guard && not !no_dwarf_inlined_frames)
 
 let debug_avail_sets = ref false
 

@@ -457,7 +457,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Cfg_with_infos.make
   ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
   ++ (fun cfg_with_infos ->
-  match !Clflags.trace_pc_guard with
+  match !Clflags.gated_trace_pc_guard with
   | false -> cfg_with_infos
   | true ->
     cfg_with_infos
@@ -703,7 +703,7 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
        (empty) temporary file should be deleted. *)
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
-  if !Clflags.llvm_backend && !Clflags.trace_pc_guard
+  if !Clflags.llvm_backend && !Clflags.gated_trace_pc_guard
   then
     Misc.fatal_error "-gated-trace-pc-guard is not supported with -llvm-backend";
   if !Clflags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
