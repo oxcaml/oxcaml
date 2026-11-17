@@ -37,46 +37,49 @@ let is_hard_barrier = function
       false)
   | Ins instr -> is_control_flow instr
 
-(* Directives that do not affect the generated code, and whose presence can
-   depend on whether debugging or unwinding information is emitted. Rules see
-   the instructions on either side of them as adjacent.
+(* Directives that only carry debugging information: source locations,
+   comments, and labels that only delimit DWARF ranges. Rules see the
+   instructions on either side of them as adjacent, so that the generated code
+   does not depend on whether debugging information is emitted. *)
+(* CR-someday mshinwell: this could be extended to CFI directives, whose
+   presence also depends on the configuration, but there are tricky details:
 
-   Three CFI directives are not among them:
+   - [Cfi_startproc] and [Cfi_endproc] delimit functions and must remain
+   barriers.
 
-   - [Cfi_startproc] and [Cfi_endproc] delimit functions. The instructions on
-   either side belong to different functions, so they are not executed one after
-   the other and no rule may combine them (see also [is_hard_barrier]).
+   - a CFI directive describes the state at its position, so a rule that merges
+   or deletes instructions across one must make sure that it still describes
+   the right position.
 
-   - After [Cfi_def_cfa_register], unwinding relies on the value of a register
-   at run time, rather than on a fixed offset from the stack pointer. A rule
-   that looked through it could forward or remove the move that sets up this
-   register, leaving the unwinding information wrong although the code itself
-   would still be correct.
+   - [combine_add_rsp] matches on [Cfi_adjust_cfa_offset] and rewrites it.
 
-   The other CFI directives only record facts that remain true when the
-   instructions around them are rewritten by the rules that look through them:
-   these rules neither move the stack pointer nor change where a register is
-   saved. [combine_add_rsp], which does change the stack pointer, asks to keep
-   them ([keep_cfi]) and rewrites them itself. *)
-let is_transparent_directive ~keep_cfi = function
+   - after [Cfi_def_cfa_register] unwinding relies on the run-time value of a
+   register, and after [Cfi_offset] on the contents of a stack slot. The rules
+   would have to track which register holds the CFA and which slots hold saved
+   registers, and treat these as read: [reg64_is_never_read] knows nothing of
+   them, so [remove_mov_to_dead_register] could forward or remove the move that
+   sets up the CFA register, leaving correct code with wrong unwinding
+   information.
+
+   - [Cfi_remember_state] and [Cfi_restore_state] save and restore all of the
+   above. *)
+let is_debug_directive = function
   | Directive d -> (
     match d with
     | New_label (Label label, _) ->
       Asm_targets.Asm_label.is_dwarf_only_label label
     | Loc _ | File _ | Comment _ | New_line -> true
-    | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
-    | Cfi_remember_state | Cfi_restore_state ->
-      not keep_cfi
     | New_label (Symbol _, _)
-    | Bytes _ | Cfi_startproc | Cfi_endproc | Cfi_def_cfa_register _ | Section _
-    | Align _ | Const _ | Direct_assignment _ | Global _ | Indirect_symbol _
-    | Private_extern _ | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _
-    | Protected _ | Hidden _ | Weak _ | External _ | Reloc _ | Delta_uleb128 _
-      ->
+    | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ | Align _
+    | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
+    | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _ | Const _
+    | Direct_assignment _ | Global _ | Indirect_symbol _ | Private_extern _
+    | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _
+    | Weak _ | External _ | Reloc _ | Delta_uleb128 _ ->
       false)
   | Ins _ -> false
 
-let get_cells ?(keep_cfi = false) cell n =
+let get_cells cell n =
   let rec loop acc remaining current_opt =
     if remaining <= 0
     then List.rev acc
@@ -84,7 +87,7 @@ let get_cells ?(keep_cfi = false) cell n =
       match current_opt with
       | None -> List.rev acc
       | Some current ->
-        if is_transparent_directive ~keep_cfi (DLL.value current)
+        if is_debug_directive (DLL.value current)
         then loop acc remaining (DLL.next current)
         else loop (current :: acc) (remaining - 1) (DLL.next current)
   in

@@ -11,14 +11,10 @@ type rule_result =
 (** Navigation and inspection *)
 
 (** [get_cells cell n] is [cell] followed by the next [n - 1] cells (fewer at
-    the end of the list), ignoring the directives that do not affect the
-    generated code: source locations, comments, labels that only delimit DWARF
-    ranges and, unless [keep_cfi] is set, the CFI directives that describe where
-    the CFA and the saved registers are (but not the one that changes the CFA
-    register). Rules thus apply whether or not debugging information is emitted.
-*)
-val get_cells :
-  ?keep_cfi:bool -> asm_line DLL.cell -> int -> asm_line DLL.cell list
+    the end of the list), ignoring the directives that only carry debugging
+    information: source locations, comments and labels that only delimit DWARF
+    ranges. Rules thus apply whether or not debugging information is emitted. *)
+val get_cells : asm_line DLL.cell -> int -> asm_line DLL.cell list
 
 val is_hard_barrier : asm_line -> bool
 

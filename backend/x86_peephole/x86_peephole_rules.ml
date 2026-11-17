@@ -44,7 +44,7 @@ let peephole_stats_to_counters stats =
    The rewrite does not preserve the flags, so we only apply it when we can
    prove the flags are unobserved. *)
 let combine_add_rsp stats cell =
-  match U.get_cells ~keep_cfi:true cell 4 with
+  match U.get_cells cell 4 with
   | [cell1; cell2; cell3; cell4] -> (
     match
       DLL.value cell1, DLL.value cell2, DLL.value cell3, DLL.value cell4
