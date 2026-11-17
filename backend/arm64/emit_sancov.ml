@@ -152,7 +152,8 @@ let emit_call ~live ~move ~index =
    runtime where the guards of this executable or shared object are. All copies
    are in one COMDAT group, together with their [.init_array] entries, so the
    linker keeps a single one. The bounds are hidden, so that they are those of
-   the object being linked. *)
+   the object being linked, and weak, so that linking does not fail if the
+   linker discards all the guards. *)
 let emit_constructor () =
   let name = Cfg_trace_pc_guard.constructor in
   let ctor = S.create_global name in
@@ -167,7 +168,9 @@ let emit_constructor () =
       }
   in
   D.switch_to_section text;
+  D.weak start;
   D.hidden start;
+  D.weak stop;
   D.hidden stop;
   D.weak ctor;
   D.hidden ctor;

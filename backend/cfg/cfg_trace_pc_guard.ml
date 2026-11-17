@@ -42,12 +42,31 @@ let guards_stop = "__stop___sancov_guards"
 
 let constructor = "sancov.module_ctor_trace_pc_guard"
 
+(* A block containing nothing but an unreachable terminator is never executed:
+   instrumenting it would only add a guard that is never hit. *)
+let is_unreachable (block : Cfg.basic_block) =
+  DLL.is_empty block.body
+  &&
+  match block.terminator.desc with
+  | Invalid { label_after = None; _ } -> true
+  | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
+  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
+  | Call_no_return _
+  | Invalid { label_after = Some _; _ }
+  | Call _ | Prim _ ->
+    false
+
 (* A probe can only record a critical edge if a block is inserted on it.
    Exceptional edges cannot be split, but they still count towards the number of
-   successors. *)
+   successors. As in LLVM, edges to unreachable blocks are left alone. *)
 let split_critical_edges cfg_with_layout =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let critical_edges = Regalloc_rewrite.compute_critical_edges ~all:true cfg in
+  let critical_edges =
+    Cfg_edge.Set.filter
+      (fun { Cfg_edge.src = _; dst } ->
+        not (is_unreachable (Cfg.get_block_exn cfg dst)))
+      (Regalloc_rewrite.compute_critical_edges ~all:true cfg)
+  in
   Cfg_edge.Set.iter
     (fun { Cfg_edge.src; dst } ->
       let (_ : Cfg.basic_block list) =
@@ -224,20 +243,6 @@ let effective_entry (cfg : Cfg.t) =
   | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
   | Invalid _ | Call _ | Prim _ ->
     cfg.entry_label
-
-(* A block containing nothing but an unreachable terminator is never executed:
-   instrumenting it would only add a guard that is never hit. *)
-let is_unreachable (block : Cfg.basic_block) =
-  DLL.is_empty block.body
-  &&
-  match block.terminator.desc with
-  | Invalid { label_after = None; _ } -> true
-  | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _
-  | Invalid { label_after = Some _; _ }
-  | Call _ | Prim _ ->
-    false
 
 (* The debuginfo of the probe of [block]. The callback records its return
    address, which coverage tools map to a source line, so this determines the
