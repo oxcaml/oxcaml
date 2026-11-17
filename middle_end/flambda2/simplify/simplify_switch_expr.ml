@@ -552,8 +552,12 @@ let rebuild_mergeable_argument ~machine_width ~scrutinee ~dbg mergeable_argument
     let module ALK = P.Array_load_kind in
     let element_kind = ALK.kind_of_loaded_value array_load_kind in
     let loaded_kind = KS.kind element_kind in
+    (* The table is data, not code: its fields have no debuginfo, so that
+       identical tables built for different switches remain equal as static
+       constants and can be shared. *)
     let$ switch_block =
-      bound_lookup_table "switch_block" ~element_kind ~array_kind simples dbg
+      bound_lookup_table "switch_block" ~element_kind ~array_kind simples
+        Debuginfo.none
     in
     let$ tagged_scrutinee =
       bound_prim "tagged_scrutinee" K.value
