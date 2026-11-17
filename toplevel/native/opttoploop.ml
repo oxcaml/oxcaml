@@ -120,7 +120,7 @@ let remember phrase_name signature repr =
   List.iteri (fun i sg ->
     match sg with
     | Sig_value  (id, _, _)
-    | Sig_module (id, _, _, _, _)
+    | Sig_module (id, _, _, _, _, _)
     | Sig_typext (id, _, _, _)
     | Sig_class  (id, _, _, _) ->
       remembered := Ident.add id (phrase_name, i, repr) !remembered

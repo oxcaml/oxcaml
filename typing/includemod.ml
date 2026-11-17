@@ -126,7 +126,7 @@ module Error = struct
     | Module_type_declaration of
         (modtype_declaration, module_type_declaration_symptom) diff
     | Module_type of module_type_diff
-    | Visibility of visibility core_diff
+    | Mentionability of mentionability core_diff
 
   and module_type_declaration_symptom =
     | Illegal_permutation of Typedtree.module_coercion
@@ -384,7 +384,8 @@ let item_ident_name =
         else Field_typext
       in
       (id, d.ext_loc, field_desc kind id)
-  | Sig_module(id, _, d, _, _) -> (id, d.md_loc, field_desc Field_module id)
+  | Sig_module(id, _, d, _, _, _) ->
+      (id, d.md_loc, field_desc Field_module id)
   | Sig_modtype(id, d, _) -> (id, d.mtd_loc, field_desc Field_modtype id)
   | Sig_class(id, d, _, _) -> (id, d.cty_loc, field_desc Field_class id)
   | Sig_class_type(id, d, _, _) ->
@@ -396,13 +397,13 @@ let is_runtime_component =
   function
   | Sig_value(_,{val_kind = Val_prim _}, _)
   | Sig_type(_,_,_,_)
-  | Sig_module(_,Mp_absent,_,_,_)
+  | Sig_module(_,Mp_absent,_,_,_,_)
   | Sig_modtype(_,_,_)
   | Sig_class_type(_,_,_,_)
   | Sig_jkind (_,_,_) -> false
   | Sig_value(_,_,_)
   | Sig_typext(_,_,_,_)
-  | Sig_module(_,Mp_present,_,_,_)
+  | Sig_module(_,Mp_present,_,_,_,_)
   | Sig_class(_,_,_,_) -> true
 
 let item_visibility =
@@ -411,11 +412,18 @@ let item_visibility =
   | Sig_value (_, _, vis)
   | Sig_type (_, _, _, vis)
   | Sig_typext (_, _, _, vis)
-  | Sig_module (_, _, _, _, vis)
+  | Sig_module (_, _, _, _, vis, _)
   | Sig_modtype (_, _, vis)
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis) -> vis
   | Sig_jkind (_, _, vis) -> vis
+
+let item_mentionability =
+  let open Subst.Lazy in
+  function
+  | Sig_module (_, _, _, _, _, ment) -> ment
+  | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_modtype _ | Sig_class _
+  | Sig_class_type _ | Sig_jkind _ -> Mentionable
 
 
 (* Print a coercion *)
@@ -496,7 +504,7 @@ let build_component_table pos_rep sg =
       | Hidden ->
           (* do not pair private items. *)
           build_table nb_exported nextpos tbl rem
-      | Exported | Unmentionable ->
+      | Exported ->
           let (id, _loc, name) = item_ident_name item in
           build_table (nb_exported + 1) nextpos
             (FieldMap.add name (id, item, pos_rep pos id) tbl) rem
@@ -931,7 +939,7 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
   let (id_pos_list,_) =
     List.fold_left
       (fun (l,pos) -> function
-          Sig_module (id, Mp_present, _, _, _) ->
+          Sig_module (id, Mp_present, _, _, _, _) ->
             ((id,pos,Tcoerce_none)::l , pos+1)
         | item -> (l, if is_runtime_component item then pos+1 else pos))
       ([], 0) sig1 in
@@ -940,11 +948,7 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
   in
   let exported_len2, runtime_len2 =
     List.fold_left (fun (el, rl) i ->
-      let el =
-        match item_visibility i with
-        | Hidden -> el
-        | Exported | Unmentionable -> el + 1
-      in
+      let el = match item_visibility i with Hidden -> el | Exported -> el + 1 in
       let rl = if is_runtime_component i then rl + 1 else rl in
       el, rl
     ) (0, 0) sig2
@@ -1034,7 +1038,8 @@ and signature_components :
               Shape.Map.add_extcons_proj shape_map id1 orig_shape
             in
             id1, item, (ext1.ext_uid, ext2.ext_uid), shape_map, true
-        | Sig_module(id1, pres1, mty1, _, _), Sig_module(_, pres2, mty2, _, _)
+        | Sig_module(id1, pres1, mty1, _, _, _),
+          Sig_module(_, pres2, mty2, _, _, _)
           -> begin
               let orig_shape =
                 Shape.(proj orig_shape (Item.module_ id1))
@@ -1112,25 +1117,13 @@ and signature_components :
         match item with
         | Error _ -> item
         | Ok _ ->
-          match item_visibility sigi1, item_visibility sigi2 with
-          | Hidden, _ ->
-              (* [build_component_table] never pairs hidden items of [sig1]. *)
-              Misc.fatal_errorf
-                "Includemod.signature_components: hidden item %a was paired"
-                Ident.print id
-          | _, Hidden ->
-              (* [Signature_names.simplify] removes hidden items from every
-                 module type, so they never occur in [sig2]. *)
-              Misc.fatal_errorf
-                "Includemod.signature_components: hidden item %a in the \
-                 expected signature"
-                Ident.print id
-          | (Unmentionable as implementation), (Exported as interface) ->
+          match item_mentionability sigi1, item_mentionability sigi2 with
+          | (Unmentionable as implementation), (Mentionable as interface) ->
               let error =
-                Error.(Visibility (diff implementation interface ()))
+                Error.(Mentionability (diff implementation interface ()))
               in
               Error { error; recoverable = true }
-          | (Exported | Unmentionable), (Exported | Unmentionable) -> item
+          | Mentionable, _ | Unmentionable, Unmentionable -> item
       in
       let deep_modifications = !shape_modified in
       let first =

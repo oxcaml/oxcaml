@@ -400,14 +400,14 @@ let init_shape id modl =
         init_shape_struct (Env.add_type ~check:false id tdecl env) rem
     | Sig_typext (subid, {ext_loc=loc},_,_) :: _ ->
         raise (Initialization_failure (Unsafe {reason=Unsafe_typext;loc;subid}))
-    | Sig_module(id, Mp_present, md, _, vis) :: rem ->
+    | Sig_module(id, Mp_present, md, _, _, ment) :: rem ->
         init_shape_mod id md.md_loc env md.md_type ::
         init_shape_struct (Env.add_module_declaration ~check:false
-                             ~vis id Mp_present md env) rem
-    | Sig_module(id, Mp_absent, md, _, vis) :: rem ->
+                             ~ment id Mp_present md env) rem
+    | Sig_module(id, Mp_absent, md, _, _, ment) :: rem ->
         init_shape_struct
           (Env.add_module_declaration ~check:false
-                             ~vis id Mp_absent md env) rem
+                             ~ment id Mp_absent md env) rem
     | Sig_modtype(id, minfo, _) :: rem ->
         init_shape_struct (Env.add_modtype id minfo env) rem
     | Sig_class _ :: rem ->

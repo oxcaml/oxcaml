@@ -179,9 +179,9 @@ and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
 
 type result = {
   modules : GM.t list;  (** The modules to bundle, for translation. *)
-  module_sigs : (Ident.t * Types.visibility * Types.signature) list;
+  module_sigs : (Ident.t * Types.mentionability * Types.signature) list;
       (** The substituted signatures of [modules] (same order), with their
-          visibility, for the bundle's own signature. *)
+          mentionability, for the bundle's own signature. *)
   params : (GM.Parameter_name.t * Ident.t) list;
 }
 
@@ -221,15 +221,15 @@ let analyze (src_names : CU.Name.Set.t) : result =
   let id_map =
     GM.Name.Map.mapi
       (fun (name : GM.Name.t) (chain : chain) ->
-        let visibility : Types.visibility =
-          if List.is_empty chain then Exported else Unmentionable
+        let ment : Types.mentionability =
+          if List.is_empty chain then Mentionable else Unmentionable
         in
-        (Ident.create_local (GM.Name.to_string name), visibility))
+        (Ident.create_local (GM.Name.to_string name), ment))
       state.module_map
   in
   let subst =
     GM.Name.Map.fold
-      (fun (name : GM.Name.t) (id, _visibility) subst ->
+      (fun (name : GM.Name.t) (id, _ment) subst ->
         Subst.add_module (Ident.create_global name) (Path.Pident id) subst)
       id_map Subst.identity
   in
@@ -249,8 +249,8 @@ let analyze (src_names : CU.Name.Set.t) : result =
            across files. *)
         let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
         let sign = Subst.Lazy.force_signature sign_lazy in
-        let id, visibility = GM.Name.Map.find (GM.to_name gm) id_map in
-        (gm, (id, visibility, sign)))
+        let id, ment = GM.Name.Map.find (GM.to_name gm) id_map in
+        (gm, (id, ment, sign)))
       state.rev_modules
     |> List.split
   in

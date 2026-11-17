@@ -177,7 +177,7 @@ module Runtime_coercion = struct
     | Mty_signature s , [] -> List.rev ctx, s
     | Mty_signature s, Item k :: q ->
         begin match runtime_item k s with
-        | Sig_module (id, _, md,_,_) ->
+        | Sig_module (id, _, md,_,_,_) ->
             find env (Context.Module id :: ctx) q md.md_type
         | _ -> raise Not_found
         end
@@ -306,7 +306,7 @@ module Is_modal = struct
     | Core s -> core_sigitem_symptom s
     | Module_type d -> module_type_symptom d.symptom
     | Module_type_declaration _ -> None
-    | Visibility _ -> None
+    | Mentionability _ -> None
 
   and core_sigitem_symptom = function
     | Value_descriptions d -> value_mismatch d.symptom
@@ -1170,7 +1170,7 @@ and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
         ~ctx:(Context.Module name :: ctx) diff
   | Module_type_declaration diff ->
       module_type_decl ~expansion_token ~env ~before ~ctx name diff
-  | Visibility { got = Unmentionable; expected = Exported; _ } ->
+  | Mentionability { got = Unmentionable; expected = Mentionable; _ } ->
       let printer =
         Fmt.dprintf
           "@[<hv>%a cannot be referenced by name,@ \
@@ -1178,17 +1178,16 @@ and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
           Style.inline_code (Ident.name name)
       in
       dwith_context ctx printer :: before
-  | Visibility { got; expected; _ } ->
-      let describe : Types.visibility -> string = function
-        | Exported -> "exported"
+  | Mentionability { got; expected; _ } ->
+      let describe : Types.mentionability -> string = function
+        | Mentionable -> "mentionable"
         | Unmentionable -> "unmentionable"
-        | Hidden -> "hidden"
       in
       let printer =
         Fmt.dprintf
           "@[<v>@[<hv>%a is %s in the implementation,@ \
            but the interface requires it to be %s@]@,\
-           @{<error>@[<hov 2>Note: this visibility mismatch should not be \
+           @{<error>@[<hov 2>Note: this mentionability mismatch should not be \
            reported.@ If you hit this case, report it to the Jane Street \
            compilers team.@]@}@]"
           Style.inline_code (Ident.name name) (describe got) (describe expected)

@@ -130,11 +130,11 @@ and strengthen_lazy_sig' ~aliasable sg p =
         strengthen_lazy_sig' ~aliasable rem p
   | (Sig_typext _ as sigelt) :: rem ->
       sigelt :: strengthen_lazy_sig' ~aliasable rem p
-  | Sig_module(id, pres, md, rs, vis) :: rem ->
+  | Sig_module(id, pres, md, rs, vis, ment) :: rem ->
       let str =
         strengthen_lazy_decl ~aliasable md (Pdot(p, Ident.name id))
       in
-      Sig_module(id, pres, str, rs, vis)
+      Sig_module(id, pres, str, rs, vis, ment)
       :: strengthen_lazy_sig' ~aliasable rem p
   | Sig_modtype(id, decl, vis) :: rem ->
       let newdecl =
@@ -307,14 +307,14 @@ and expand_paths_lazy_sig paths env sg =
 and expand_paths_lazy_sig_items paths env sg =
   let open Subst.Lazy in
   let expand_item env = function
-    | Sig_module (id,pres,md,rs,vis) ->
+    | Sig_module (id,pres,md,rs,vis,ment) ->
         let md = { md with md_type = expand_paths_lazy paths env md.md_type }
         in
         let env =
-          Env.add_module_declaration_lazy ~update_summary:false ~vis id pres md
-            env
+          Env.add_module_declaration_lazy ~update_summary:false
+            ~ment id pres md env
         in
-        env, Sig_module (id,pres,md,rs,vis)
+        env, Sig_module (id,pres,md,rs,vis,ment)
       | Sig_modtype (id,mtd,vis) ->
           let mt = Option.map (expand_paths_lazy paths env) mtd.mtd_type in
           let mtd = { mtd with mtd_type = mt } in
@@ -370,13 +370,14 @@ let rec sig_make_manifest sg =
     Sig_type(Ident.rename id, newdecl, rs, vis) :: sig_make_manifest rem
   | Sig_typext _ as sigelt :: rem ->
     sigelt :: sig_make_manifest rem
-  | Sig_module(id, pres, md, rs, vis) :: rem ->
+  | Sig_module(id, pres, md, rs, vis, ment) :: rem ->
     let md =
       match md.md_type with
       | Mty_alias _ -> md
       | _ -> {md with md_type = Mty_alias (Pident id)}
     in
-    Sig_module(Ident.rename id, pres, md, rs, vis) :: sig_make_manifest rem
+    Sig_module(Ident.rename id, pres, md, rs, vis, ment)
+    :: sig_make_manifest rem
   | Sig_modtype(id, decl, vis) :: rem ->
     let newdecl =
       {decl with mtd_type =
@@ -405,7 +406,7 @@ let rec make_aliases_absent ~aliased pres mty =
   | Mty_alias _ -> Mp_absent, mty
   | Mty_signature sg ->
       let make_item = function
-        | Sig_module(id, pres, md, rs, priv) ->
+        | Sig_module(id, pres, md, rs, priv, ment) ->
           let pres, md = if aliased
             then Mp_absent, md
             else
@@ -414,7 +415,7 @@ let rec make_aliases_absent ~aliased pres mty =
               in
               pres, { md with md_type }
           in
-          Sig_module(id, pres, md, rs, priv)
+          Sig_module(id, pres, md, rs, priv, ment)
         | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_modtype _
         | Sig_class _ | Sig_class_type _ | Sig_jkind _ as item ->
           item
@@ -551,9 +552,9 @@ and nondep_sig_item env va ids = function
       Sig_type(id, Ctype.nondep_type_decl env ids (va = Co) d, rs, vis)
   | Sig_typext(id, ext, es, vis) ->
       Sig_typext(id, Ctype.nondep_extension_constructor env ids ext, es, vis)
-  | Sig_module(id, pres, md, rs, vis) ->
+  | Sig_module(id, pres, md, rs, vis, ment) ->
       let pres, mty = nondep_mty_with_presence env va ids pres md.md_type in
-      Sig_module(id, pres, {md with md_type = mty}, rs, vis)
+      Sig_module(id, pres, {md with md_type = mty}, rs, vis, ment)
   | Sig_modtype(id, d, vis) ->
       Sig_modtype(id, nondep_modtype_decl env ids d, vis)
   | Sig_class(id, d, rs, vis) ->
@@ -643,13 +644,13 @@ and enrich_item env p = function
     Sig_type(id, decl, rs, priv) ->
       Sig_type(id,
                 enrich_typedecl env (Pdot(p, Ident.name id)) id decl, rs, priv)
-  | Sig_module(id, pres, md, rs, priv) ->
+  | Sig_module(id, pres, md, rs, priv, ment) ->
       Sig_module(id, pres,
                   {md with
                    md_type = enrich_modtype env
                        (Pdot(p, Ident.name id)) md.md_type},
                  rs,
-                 priv)
+                 priv, ment)
   | item -> item
 
 let rec type_and_jkind_paths env p mty =
@@ -667,12 +668,13 @@ and type_and_jkind_paths_sig env p sg =
   | Sig_jkind(id, _decl, _) :: rem ->
     let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
     ~types, ~jkinds:(Pdot(p, Ident.name id) :: jkinds)
-  | Sig_module(id, pres, md, _, vis) :: rem ->
+  | Sig_module(id, pres, md, _, _, ment) :: rem ->
     let ~types:nested_types, ~jkinds:nested_jkinds =
       type_and_jkind_paths env (Pdot(p, Ident.name id)) md.md_type
     in
     let env =
-      Env.add_module_declaration ~check:false ~vis id pres md env
+      Env.add_module_declaration ~check:false ~ment id pres md
+        env
     in
     let ~types:rem_types, ~jkinds:rem_jkinds =
       type_and_jkind_paths_sig env p rem
@@ -703,10 +705,12 @@ and no_code_needed_sig env sg =
       | Val_prim _ -> no_code_needed_sig env rem
       | _ -> false
       end
-  | Sig_module(id, pres, md, _, vis) :: rem ->
+  | Sig_module(id, pres, md, _, _, ment) :: rem ->
       no_code_needed_mod env pres md.md_type &&
       no_code_needed_sig
-        (Env.add_module_declaration ~check:false ~vis id pres md env) rem
+        (Env.add_module_declaration ~check:false ~ment
+           id pres md env)
+        rem
   | (Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _) :: rem ->
       no_code_needed_sig env rem
   | (Sig_typext _ | Sig_class _) :: _ ->
@@ -752,7 +756,7 @@ module Contains_type_or_jkind = struct
         raise (Contains Type)
     | Sig_jkind (_, {jkind_manifest = None; _}, _) ->
         raise (Contains Jkind)
-    | Sig_module (_, _, {md_type = mty}, _, _) ->
+    | Sig_module (_, _, {md_type = mty}, _, _, _) ->
         contains_type_or_jkind env mty
     | Sig_value _
     | Sig_type _
@@ -819,11 +823,11 @@ let collect_arg_paths mty =
     and it_signature_item it si =
       super.it_signature_item it si;
       match si with
-      | Sig_module (id, _, {md_type=Mty_alias p}, _, _) ->
+      | Sig_module (id, _, {md_type=Mty_alias p}, _, _, _) ->
           bindings := Ident.add id p !bindings
-      | Sig_module (id, _, {md_type=Mty_signature sg}, _, _) ->
+      | Sig_module (id, _, {md_type=Mty_signature sg}, _, _, _) ->
           List.iter
-            (function Sig_module (id', _, _, _, _) ->
+            (function Sig_module (id', _, _, _, _, _) ->
                 subst :=
                   Path.Map.add (Pdot (Pident id, Ident.name id')) id' !subst
               | _ -> ())
@@ -875,7 +879,7 @@ let rec remove_aliases_mty env args pres mty =
 and remove_aliases_sig env args sg =
   match sg with
     [] -> []
-  | Sig_module(id, pres, md, rs, priv) :: rem  ->
+  | Sig_module(id, pres, md, rs, priv, ment) :: rem  ->
       let pres, mty =
         match md.md_type with
           Mty_alias p when args.exclude (Alias id) p ->
@@ -884,10 +888,10 @@ and remove_aliases_sig env args sg =
             remove_aliases_mty env args pres mty
       in
       let env =
-        Env.add_module_declaration ~check:false ~vis:priv id pres
+        Env.add_module_declaration ~check:false ~ment id pres
           {md with md_type = mty} env
       in
-      Sig_module(id, pres, {md with md_type = mty} , rs, priv) ::
+      Sig_module(id, pres, {md with md_type = mty} , rs, priv, ment) ::
       remove_aliases_sig env args rem
   | Sig_modtype(id, mtd, priv) :: rem ->
       Sig_modtype(id, mtd, priv) ::

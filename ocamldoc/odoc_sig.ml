@@ -51,7 +51,7 @@ module Signature_search =
           Hashtbl.add table (C (Name.from_ident ident)) signat
       | Types.Sig_class_type (ident, _, _, _) ->
           Hashtbl.add table (CT (Name.from_ident ident)) signat
-      | Types.Sig_module (ident, _, _, _, _) ->
+      | Types.Sig_module (ident, _, _, _, _, _) ->
           Hashtbl.add table (M (Name.from_ident ident)) signat
       | Types.Sig_modtype (ident,_,_) ->
           Hashtbl.add table (MT (Name.from_ident ident)) signat
@@ -90,7 +90,7 @@ module Signature_search =
 
     let search_module table name =
       match Hashtbl.find table (M name) with
-      | (Types.Sig_module (_ident, _, md, _, _)) -> md.Types.md_type
+      | (Types.Sig_module (_ident, _, md, _, _, _)) -> md.Types.md_type
       | _ -> assert false
 
     let search_module_type table name =
