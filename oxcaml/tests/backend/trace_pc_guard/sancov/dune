@@ -23,7 +23,7 @@
    (= %{context_name} "main")
    (<> %{env:OXCAML_LLVM_BIN=} "")))
  (targets sancov_test.output.corrected)
- (deps sancov_test.ml gate.c run.sh)
+ (deps sancov_lib.ml sancov_test.ml stubs.c run.sh)
  (action
   (with-stdout-to
    sancov_test.output.corrected
