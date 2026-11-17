@@ -50,12 +50,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         callee, Argument_to_parameter (Comonadic, { parameter; argument = pp })
       | Argument_to_parameter (Monadic, { parameter; argument }) ->
         argument, Parameter_to_argument (Monadic, { parameter; callee = pp })
-      | Functor_to_parameter loc ->
-        (loc, Functor), Parameter_to_functor (fst pp)
-      | Parameter_to_functor loc ->
-        (loc, Functor_parameter), Functor_to_parameter (fst pp)
-      | Functor_to_application loc ->
-        (loc, Functor), Application_to_functor (fst pp)
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation loc
       | Allocation loc -> pp, Allocation_l loc
@@ -82,12 +76,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         callee, Argument_to_parameter (Monadic, { parameter; argument = pp })
       | Argument_to_parameter (Comonadic, { parameter; argument }) ->
         argument, Parameter_to_argument (Comonadic, { parameter; callee = pp })
-      | Functor_to_parameter loc ->
-        (loc, Functor), Parameter_to_functor (fst pp)
-      | Parameter_to_functor loc ->
-        (loc, Functor_parameter), Functor_to_parameter (fst pp)
-      | Application_to_functor loc ->
-        (loc, Module), Functor_to_application (fst pp)
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation loc
       | Allocation loc -> pp, Allocation_r loc
@@ -111,9 +99,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Close_over (Monadic, x) -> Close_over (Monadic, x)
         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
         | Crossing -> Crossing
-        | Functor_to_parameter p -> Functor_to_parameter p
-        | Parameter_to_functor p -> Parameter_to_functor p
-        | Application_to_functor loc -> Application_to_functor loc
         | Parameter_to_argument (Monadic, x) ->
           Parameter_to_argument (Monadic, x)
         | Argument_to_parameter (Comonadic, x) ->
@@ -133,13 +118,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
-        | Functor_to_parameter p -> Functor_to_parameter p
-        | Parameter_to_functor p -> Parameter_to_functor p
         | Parameter_to_argument (Comonadic, x) ->
           Parameter_to_argument (Comonadic, x)
         | Argument_to_parameter (Monadic, x) ->
           Argument_to_parameter (Monadic, x)
-        | Functor_to_application loc -> Functor_to_application loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation loc -> Allocation loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
@@ -157,8 +139,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
-        | Functor_to_parameter p -> Functor_to_parameter p
-        | Parameter_to_functor p -> Parameter_to_functor p
         | Parameter_to_argument (Comonadic, x) ->
           Parameter_to_argument (Comonadic, x)
         | Parameter_to_argument (Monadic, x) ->
@@ -167,8 +147,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
           Argument_to_parameter (Comonadic, x)
         | Argument_to_parameter (Monadic, x) ->
           Argument_to_parameter (Monadic, x)
-        | Functor_to_application loc -> Functor_to_application loc
-        | Application_to_functor loc -> Application_to_functor loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation_l loc -> Allocation_l loc
         | Allocation loc -> Allocation loc
@@ -197,10 +175,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
           Argument_to_parameter (Comonadic, x)
         | Argument_to_parameter (Monadic, x) ->
           Argument_to_parameter (Monadic, x)
-        | Functor_to_parameter p -> Functor_to_parameter p
-        | Parameter_to_functor p -> Parameter_to_functor p
-        | Functor_to_application loc -> Functor_to_application loc
-        | Application_to_functor loc -> Application_to_functor loc
         | Allocation_l loc -> Allocation_l loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation loc -> Allocation loc
@@ -240,6 +214,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Lpoly_inst -> Lpoly_inst
+        | Template_inst -> Template_inst
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
 
@@ -291,6 +266,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Escape_region x -> Escape_region x
         | Quoted_computation -> Quoted_computation
         | Lpoly_inst -> Lpoly_inst
+        | Template_inst -> Template_inst
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
@@ -320,6 +296,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
         | Lpoly_inst -> Lpoly_inst
+        | Template_inst -> Template_inst
         | Quoted_computation -> Quoted_computation
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
@@ -4733,8 +4710,7 @@ module Report = struct
     | Parameter -> Some (print_article_noun Consonant "parameter")
     | Return -> Some (print_article_noun Consonant "function return")
     | Functor -> Some (print_article_noun Consonant "functor")
-    | Functor_parameter ->
-      Some (print_article_noun Consonant "functor parameter")
+    | Functor_return -> Some (print_article_noun Consonant "functor return")
     | Lazy -> Some (print_article_noun Consonant "lazy expression")
     | Quote -> Some (print_article_noun Consonant "quoted expression")
     | Expression -> Some (print_article_noun Vowel "expression")
@@ -4792,6 +4768,11 @@ module Report = struct
     | Application -> Fmt.dprintf "function applications"
     | Try_with -> Fmt.dprintf "try-with clauses"
     | Generative_functor -> Fmt.dprintf "generative functors"
+    | Generative_functor_application ->
+      Fmt.dprintf "generative functor applications"
+    | Non_template_functor -> Fmt.dprintf "non-template functors"
+    | Non_template_functor_application ->
+      Fmt.dprintf "non-template functor applications"
 
   let print_legacy = function
     | Toplevel -> print_article_noun Consonant "top-level clause"
@@ -4989,7 +4970,7 @@ module Report = struct
     | Module_allocated_on_heap ->
       (match pp_desc with
       | Ident { category = Module; _ }
-      | Functor | Functor_parameter | Module | Structure
+      | Functor | Module | Structure
       | Structure_item (Module, _) ->
         (* if we already said it's a module, we don't need to emphasize it again. *)
         Fmt.pp_print_string ppf "modules always need"
@@ -5019,6 +5000,8 @@ module Report = struct
     | Lpoly_inst ->
       Fmt.pp_print_string ppf
         "it is layout-polymorphic and being instantiated here"
+    | Template_inst ->
+      Fmt.pp_print_string ppf "it is a template functor instantiated here"
     | Spliced _ -> Fmt.fprintf ppf "it is spliced"
     | Contained_by c ->
       let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
@@ -5069,32 +5052,6 @@ module Report = struct
               (print_pp ~definite:true ~capitalize:false),
             pp ))
     | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
-    | Functor_to_parameter loc ->
-      let funct_pp = loc, Functor in
-      print_pinpoint funct_pp
-      |> Option.map (fun print_pp ->
-          ( Fmt.dprintf "shares the staticity of %t"
-              (print_pp ~definite:true ~capitalize:false),
-            funct_pp ))
-    | Parameter_to_functor loc ->
-      let param_pp = loc, Functor_parameter in
-      print_pinpoint param_pp
-      |> Option.map (fun print_pp ->
-          ( Fmt.dprintf "shares the staticity of %t"
-              (print_pp ~definite:true ~capitalize:false),
-            param_pp ))
-    | Functor_to_application loc ->
-      Some
-        ( Fmt.dprintf "is an application of the functor at %a"
-            (Location.Doc.loc ~capitalize_first:false)
-            loc,
-          (loc, Functor) )
-    | Application_to_functor loc ->
-      Some
-        ( Fmt.dprintf "is applied at %a"
-            (Location.Doc.loc ~capitalize_first:false)
-            loc,
-          (loc, Module) )
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
     | Contains_l (_, contains) -> print_contains ~fixpoint contains
@@ -5223,8 +5180,7 @@ module Report = struct
     let fixpoint = equal_mode src obj a b in
     match hint with
     | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
-    | Is_contained_by _ | Functor_to_parameter _ | Parameter_to_functor _
-    | Functor_to_application _ | Application_to_functor _ ->
+    | Is_contained_by _ ->
       (* These morphisms should never be skipped *)
       ~is_skip:false, ~fixpoint
     | Parameter_to_argument _ | Argument_to_parameter _ ->

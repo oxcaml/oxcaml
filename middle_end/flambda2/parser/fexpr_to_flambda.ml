@@ -823,7 +823,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~regalloc_param_attribute:Default_regalloc_params ~cold:false
             ~dbg:Debuginfo.none
             ~fdo_entry_annotation:
-              (Option.value fdo_entry_annotation ~default:Fdo_annotation.empty)
+              (Option.value fdo_entry_annotation
+                 ~default:Fdo_annotation.With_body_hash.empty)
             ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
@@ -958,7 +959,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~args:((List.map (simple env)) args)
         ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
         ~callsite_counter:None ~inlined ~inlining_state ~probe:None
-        ~position:Normal ~relative_history:Inlining_history.Relative.empty
+        ~position:Normal ~yielding:May_yield
+        ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply
   | Invalid -> acc, Flambda.Expr.create_invalid (Message "Invalid from fexpr")

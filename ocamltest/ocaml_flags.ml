@@ -31,11 +31,16 @@ let runtime_variant_flags () = match Ocaml_files.runtime_variant() with
   | Ocaml_files.Debug -> " -runtime-variant d"
   | Ocaml_files.Instrumented -> " -runtime-variant i"
 
+let target_flags = function
+  | Ocaml_backends.Native | Ocaml_backends.Bytecode -> ""
+  | Ocaml_backends.Jsir -> "-target js_of_ocaml"
+
 let runtime_flags env backend c_files =
   let runtime_library_flags = "-I " ^
     Ocaml_directories.runtime in
   let rt_flags = match backend with
     | Ocaml_backends.Native -> runtime_variant_flags ()
+    | Ocaml_backends.Jsir -> ""
     | Ocaml_backends.Bytecode ->
       begin
         if c_files then begin (* custom mode *)

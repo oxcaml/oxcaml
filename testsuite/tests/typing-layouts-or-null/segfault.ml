@@ -1,6 +1,10 @@
 (* TEST
    flags = "-O3 -extension-universe beta";
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
 *)
 
 let[@inline] id f = fun x -> f x;;

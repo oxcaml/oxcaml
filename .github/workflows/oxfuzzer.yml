@@ -2,18 +2,57 @@
 # If you want this functionality, ask for help from a subset of:
 # @jvanburen @glittershark @mshinwell
 #
-# Daily differential fuzzing of main with oxfuzzer (see tools/oxfuzzer).
+# Differential fuzzing of main with oxfuzzer (see tools/oxfuzzer).
 #
-# The compiler under test is the flake's release `oxcaml` package. The
-# Nix workflow builds it for every commit on main and pushes it to
-# the `oxcaml` cachix cache, so this normally downloads it rather than
-# building it. This workflow only reads the cache.
+# When the trusted Nix workflow (nix-github-actions-trusted.yml) succeeds
+# for a push to main, this workflow fuzzes the commit it built. It fuzzes
+# each compiler in the flake's `oxfuzzerGithubActions` matrix (oxcaml,
+# oxcaml-fp and oxcaml-asan, on the systems where they build) in its own
+# job, with its own seed.
+#
+# The compilers come from the `oxcaml` cachix cache, which the trusted
+# workflow fills and this one only reads. A compiler missing from the
+# cache fails the run. Only a manual run with `build` set builds one,
+# which takes about 15 minutes per row.
+#
+# Runs for main's tip take turns: a new one waits for the one in progress
+# and replaces any run already waiting. A run is therefore never cut
+# short, and commits that land close together are skipped. Other runs
+# start right away: manual runs, re-runs, and runs for a commit that was
+# already superseded when its build finished.
+#
+# A manual run fuzzes its branch's tip, or `commit`. `variants` and
+# `systems` pick rows, and `seed` replays an earlier run's cases.
+#
+# This file comes from main's tip (or a manual run's branch), but
+# flake.nix and oxfuzzer.py come from the commit being fuzzed. After a
+# change to the interface between them, one automatic run can fail, and
+# `commit` cannot name a commit from before the change.
 name: oxfuzzer
 
 on:
-  schedule:
-    - cron: '0 8 * * *'
-      timezone: Europe/London
+  # zizmor flags workflow_run because such a run has this repository's
+  # privileges even if a fork's pull request started the run that
+  # triggered it, and this workflow runs code from that run's commit. It
+  # is safe here because:
+  #
+  # - The `if` on `select` lets the jobs run only when a push to this
+  #   repository started the triggering run, which takes write access.
+  #   Keep both of its conditions (a push, and to this repository). The
+  #   `branches` filter below is not enough: a fork's pull request can
+  #   make its copy of the trusted workflow run on pull requests, from a
+  #   branch named main.
+  # - A tag named main passes these checks, but pushing one also takes
+  #   write access, which already allows fuzzing any commit (the `commit`
+  #   input).
+  # - This workflow has only `contents: read`, and uses no secrets or
+  #   artifacts.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    # Must equal the trusted workflow's `name:`, or this never fires.
+    # workflow-run-triggers.yml checks that.
+    workflows: ["Nix Flake Actions (trusted)"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       minutes:
@@ -24,32 +63,161 @@ on:
         description: Stop starting cases after this many failures
         type: number
         default: 5
+      commit:
+        description: >-
+          Commit to fuzz, as a hash, branch or tag (default is the tip of
+          the branch this run is started from)
+        type: string
+        default: ''
+      variants:
+        description: >-
+          Only fuzz the compiler variants this regular expression matches,
+          for example oxcaml-asan (default is all of them)
+        type: string
+        default: ''
+      systems:
+        description: >-
+          Only fuzz the systems this regular expression matches, for
+          example aarch64-.* (default is all of them)
+        type: string
+        default: ''
+      build:
+        description: >-
+          Build compilers that are not in the cache, about 15 minutes per
+          row, instead of failing
+        type: boolean
+        default: false
+      seed:
+        description: >-
+          Seed for every row, to replay cases: the base seed in a row's
+          summary, or a failed case's seed to run that case first (default
+          is a new seed per row)
+        type: string
+        default: ''
 
 permissions: {}
 
+# First attempts of automatic runs for main's tip share a group. With
+# cancel-in-progress off, the run in progress finishes, the newest run
+# waits, and GitHub cancels a run that was already waiting. Every other
+# run gets a group of its own. For a workflow_run run, github.sha is
+# main's tip when the run is created.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: >-
+    oxfuzzer-${{
+    (github.event_name == 'workflow_run' &&
+    github.event.workflow_run.conclusion == 'success' &&
+    github.event.workflow_run.event == 'push' &&
+    github.event.workflow_run.head_repository.full_name == github.repository &&
+    github.event.workflow_run.head_sha == github.sha &&
+    github.run_attempt == '1' &&
+    'main') || github.run_id }}
   cancel-in-progress: false
 
 jobs:
+  select:
+    name: select
+    # Only in the upstream repository. An automatic run also needs a push
+    # to this repository to have started the triggering run (see the
+    # comment on the trigger). Skipping this job skips `oxfuzzer` too.
+    if: >-
+      github.repository == 'oxcaml/oxcaml' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
+    # Normally takes under a minute.
+    timeout-minutes: 15
+    # The same runner as the trusted workflow's nix-matrix job.
+    runs-on: warp-ubuntu-latest-arm64-16x
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.checkout.outputs.commit }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      timeout: ${{ steps.timeout.outputs.minutes }}
+
+    steps:
+      # The commit to fuzz: the one the trusted workflow built, else
+      # `commit`, else this run's own. The oxfuzzer jobs check out the hash
+      # this step outputs, so they all fuzz the same commit. "Re-run all
+      # jobs" looks a branch given as `commit` up again; give a hash to
+      # avoid that.
+      - id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.commit || github.sha }}
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          # Pin to nix 2.33.0, as in nix-github-actions.yml.
+          install_url: https://releases.nixos.org/nix/nix-2.33.0/install
+
+      - id: matrix
+        name: Generate the matrix
+        env:
+          # Regular expressions that must match a row's whole variant and
+          # system. Empty matches every row. The flake reads them.
+          OXFUZZER_VARIANTS: ${{ inputs.variants }}
+          OXFUZZER_SYSTEMS: ${{ inputs.systems }}
+        run: |
+          set -Eeuo pipefail
+          # --impure lets the flake read those two variables.
+          if ! matrix=$(
+            nix eval --impure --json '.#oxfuzzerGithubActions.selected'
+          ); then
+            echo "::error::Could not generate the matrix, or no row matches variants '$OXFUZZER_VARIANTS' and systems '$OXFUZZER_SYSTEMS'."
+            exit 1
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+      # The oxfuzzer jobs' timeout: the fuzzing time, half an hour for
+      # everything else, and half an hour more if they may build. Expressions
+      # cannot add, hence a step.
+      - id: timeout
+        name: Compute the timeout
+        env:
+          MINUTES: ${{ inputs.minutes || 60 }}
+          BUILD: ${{ inputs.build || false }}
+        run: |
+          awk -v minutes="$MINUTES" -v build="$BUILD" 'BEGIN {
+            timeout = minutes + 30 + (build == "true" ? 30 : 0)
+            if (timeout != int(timeout)) timeout = int(timeout) + 1
+            printf "minutes=%d\n", timeout
+          }' >> "$GITHUB_OUTPUT"
+
   oxfuzzer:
-    name: oxfuzzer (x86_64-linux)
-    # Forks inherit the schedule; only fuzz the upstream repository.
-    if: github.repository == 'oxcaml/oxcaml'
-    runs-on: warp-ubuntu-latest-x64-32x
-    # Fuzzing takes MINUTES plus the cases in flight; the rest covers
-    # building the compiler from source when it is not in the cache.
-    timeout-minutes: 300
+    name: oxfuzzer ${{ matrix.name }} (${{ matrix.system }})
+    needs: select
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Rows are independent.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
+    # From the fuzzing time: see the select job. For an automatic run it is
+    # 90 minutes, which also limits how long a stuck run holds up the next
+    # commit.
+    timeout-minutes: ${{ fromJSON(needs.select.outputs.timeout) }}
     permissions:
       contents: read
     env:
-      # Scheduled runs have no inputs.
+      FUZZ_SHA: ${{ needs.select.outputs.sha }}
+      # For example githubActions.checks.x86_64-linux."oxcaml-asan".
+      ATTR: ${{ matrix.attr }}
+      VARIANT: ${{ matrix.name }}
+      SYSTEM: ${{ matrix.system }}
+      # Input defaults apply only to manual runs: automatic runs have no
+      # inputs at all.
       MINUTES: ${{ inputs.minutes || 60 }}
       MAX_FAILURES: ${{ inputs.max_failures || 5 }}
+      BUILD: ${{ inputs.build || false }}
+      SEED: ${{ inputs.seed }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.select.outputs.sha }}
           persist-credentials: false
 
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
@@ -63,57 +231,79 @@ jobs:
           # Public caches are readable without credentials.
           name: oxcaml
 
-      - name: Build the compiler
+      - name: Get the compiler
         run: |
-          if nix build --dry-run .#oxcaml 2>&1 | grep -q 'will be built'; then
-            echo "::warning::.#oxcaml for $GITHUB_SHA is not in the cache, so it is built from source (including its testsuite)."
+          # The link to the compiler goes outside the checkout, where no
+          # path of the repository can be in its way.
+          build_flags=(-L --out-link "$RUNNER_TEMP/oxcaml")
+          if [ "$BUILD" != true ]; then
+            build_flags+=(--max-jobs 0)
           fi
-          nix build -L --out-link result .#oxcaml
+          if nix build --dry-run ".#$ATTR" 2>&1 | grep -q 'will be built'; then
+            if [ "$BUILD" != true ]; then
+              echo "::error::$VARIANT ($SYSTEM) for $FUZZ_SHA is not in the cache. Only a manual run with the build input set builds it."
+              exit 1
+            fi
+            echo "::warning::$VARIANT ($SYSTEM) for $FUZZ_SHA is not in the cache, so it is built from source, which takes about 15 minutes."
+          fi
+          nix build "${build_flags[@]}" ".#$ATTR"
 
       - name: Run oxfuzzer
         run: |
-          # Fail the step if oxfuzzer fails, not just if tee does.
-          set -o pipefail
-          # The compiler links with the C toolchain it was built with.
+          # exec makes oxfuzzer the step's top process (`nix shell
+          # --command` execs too). On cancellation or timeout the runner
+          # signals only that process: SIGINT, SIGTERM 7.5 s later, SIGKILL
+          # 2.5 s after that. oxfuzzer then kills its cases and writes its
+          # summary, to the file below and to this step's summary.
           #
-          # The base seed is the run ID, which is new for every run but stays
-          # the same when a run is re-run, so a re-run fuzzes the same
-          # sequence of cases and can reproduce its failures.
-          nix shell --inputs-from . nixpkgs#stdenv.cc nixpkgs#python3 --command \
+          # stdenv.cc is the C toolchain the compiler was built with and
+          # links with: gcc on Linux, clang on macOS and for ASan.
+          #
+          # Each row gets its own seed, since most compiler bugs are not
+          # specific to a row. The seed comes from the run ID and not the
+          # commit, so fuzzing a commit again tries new cases, while
+          # re-running a run repeats its cases. A manual run's `seed` is
+          # used as it is by every row.
+          seed=${SEED:-$GITHUB_RUN_ID/$VARIANT/$SYSTEM}
+          # The command that fuzzes this row's cases again, for its summary.
+          # --ref picks the workflow file and must be a branch or tag; the
+          # commit to fuzz is the `commit` input.
+          replay=(
+            gh workflow run oxfuzzer.yml
+            --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+            -f "commit=$FUZZ_SHA" -f "seed=$seed"
+            -f "variants=$VARIANT" -f "systems=$SYSTEM"
+          )
+          if [ "$BUILD" = true ]; then
+            replay+=(-f build=true)
+          fi
+          {
+            echo "To replay this row's cases:"
+            echo
+            echo '```sh'
+            printf '%q ' "${replay[@]}"
+            echo
+            echo '```'
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          exec nix shell --inputs-from . ".#$ATTR.stdenv.cc" nixpkgs#python3 --command \
             python3 tools/oxfuzzer/oxfuzzer.py \
-              --install-dir result \
-              -o _oxfuzzer \
+              --install-dir "$RUNNER_TEMP/oxcaml" \
+              -o failures \
               --time-limit-minutes "$MINUTES" \
               --max-failures "$MAX_FAILURES" \
-              --jobs "$(nproc)" \
-              --seed "$GITHUB_RUN_ID" \
-            2>&1 | tee oxfuzzer.log
-
-      - name: Summarize
-        if: always()
-        run: |
-          shopt -s nullglob
-          failures=(_oxfuzzer/seed-*)
-          {
-            echo "## oxfuzzer on $GITHUB_SHA"
-            echo
-            if [ -f oxfuzzer.log ]; then
-              echo '```'
-              grep -E 'passed, .* discarded, ' oxfuzzer.log | tail -n 1
-              grep -E '^oxfuzzer: ' oxfuzzer.log | tail -n 1
-              echo '```'
-            fi
-            for failure in "${failures[@]}"; do
-              echo "- \`${failure#_oxfuzzer/}\`: $(cat "$failure/reason.txt")"
-            done
-          } >> "$GITHUB_STEP_SUMMARY"
+              --jobs 0 \
+              --seed="$seed" \
+              --summary-file oxfuzzer-summary.md
 
       - name: Upload failures
         if: failure() || cancelled()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: oxfuzzer-failures-${{ github.sha }}-${{ github.run_id }}
+          # The attempt keeps a re-run's upload from colliding with an
+          # earlier one.
+          name: oxfuzzer-failures-${{ matrix.name }}-${{ matrix.system }}-${{ needs.select.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            oxfuzzer.log
-            _oxfuzzer/seed-*
+            oxfuzzer-summary.md
+            failures/
           if-no-files-found: ignore

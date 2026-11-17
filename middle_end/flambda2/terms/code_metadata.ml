@@ -39,7 +39,7 @@ type t =
     cost_metrics : Cost_metrics.t;
     inlining_arguments : Inlining_arguments.t;
     dbg : Debuginfo.t;
-    fdo_entry_annotation : Fdo_annotation.t;
+    fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
     is_tupled : bool;
     is_my_closure_used : bool;
     inlining_decision : Function_decl_inlining_decision_type.t;
@@ -162,7 +162,7 @@ type 'a create_type =
   cost_metrics:Cost_metrics.t ->
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
-  fdo_entry_annotation:Fdo_annotation.t ->
+  fdo_entry_annotation:Fdo_annotation.With_body_hash.t ->
   is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
@@ -404,7 +404,7 @@ let [@ocamlformat "disable"] print ppf
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
     Flambda_colours.pop
-    Fdo_annotation.print fdo_entry_annotation
+    Fdo_annotation.With_body_hash.print fdo_entry_annotation
     (if is_tupled
     then Flambda_colours.none
     else Flambda_colours.elide)
@@ -643,7 +643,8 @@ let approx_equal
   && Cost_metrics.equal cost_metrics1 cost_metrics2
   && Inlining_arguments.equal inlining_arguments1 inlining_arguments2
   && Int.equal (Debuginfo.compare dbg1 dbg2) 0
-  && Fdo_annotation.equal fdo_entry_annotation1 fdo_entry_annotation2
+  && Fdo_annotation.With_body_hash.equal fdo_entry_annotation1
+       fdo_entry_annotation2
   && Bool.equal is_tupled1 is_tupled2
   && Bool.equal is_my_closure_used1 is_my_closure_used2
   && Function_decl_inlining_decision_type.equal inlining_decision1

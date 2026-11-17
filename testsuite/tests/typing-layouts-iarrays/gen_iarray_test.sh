@@ -46,6 +46,8 @@ cat > "$OUTPUT" << 'HEADER_EOF'
  }{
    native;
  }{
+   jsir;
+ }{
    flags = "-O3";
    native;
  }{

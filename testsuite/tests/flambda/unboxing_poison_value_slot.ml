@@ -1,6 +1,10 @@
 (* TEST
    flags = "-flambda2-advanced-meet";
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
 *)
 
 (* This test checks for an issue when unboxing closures under variants.

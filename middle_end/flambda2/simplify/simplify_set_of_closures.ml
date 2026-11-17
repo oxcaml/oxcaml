@@ -183,8 +183,6 @@ type simplify_function_body_result =
     dacc_after_body : DA.t;
     free_names_of_code : NO.t;
     return_cont_uses : Continuation_uses.t option;
-    is_my_closure_used : bool;
-    recursive : Recursive.t;
     uacc_after_upwards_traversal : UA.t
   }
 
@@ -246,30 +244,16 @@ let simplify_function_body context ~outer_dacc function_slot_opt
         (DA.continuation_uses_env dacc_after_body)
         return_continuation
     in
-    let free_names_of_body = UA.name_occurrences uacc in
     let body_is_cold = RE.is_cold body in
     let params_and_body =
-      RE.Function_params_and_body.create ~free_names_of_body
-        ~return_continuation ~exn_continuation params ~body ~my_closure
-        ~my_alloc_mode ~my_depth
+      RE.Function_params_and_body.create ~return_continuation ~exn_continuation
+        params ~body ~my_closure ~my_alloc_mode ~my_depth
     in
-    let is_my_closure_used = NO.mem_var free_names_of_body my_closure in
     let previously_free_depth_variables =
       NO.create_variables (C.previously_free_depth_variables context) NM.normal
     in
-    let recursive : Recursive.t =
-      if Name_occurrences.mem_var free_names_of_body my_depth
-      then Recursive
-      else Non_recursive
-    in
     let free_names_of_code =
-      free_names_of_body
-      |> NO.remove_continuation ~continuation:return_continuation
-      |> NO.remove_continuation ~continuation:exn_continuation
-      |> NO.remove_var ~var:my_closure
-      |> NO.diff ~without:(Alloc_mode.For_applications.free_names my_alloc_mode)
-      |> NO.remove_var ~var:my_depth
-      |> NO.diff ~without:(Bound_parameters.free_names params)
+      RE.Function_params_and_body.free_names params_and_body
       |> NO.diff ~without:previously_free_depth_variables
     in
     if
@@ -294,8 +278,6 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       dacc_after_body;
       free_names_of_code;
       return_cont_uses;
-      is_my_closure_used;
-      recursive;
       uacc_after_upwards_traversal = uacc
     }
   | exception Misc.Fatal_error ->
@@ -424,8 +406,6 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         dacc_after_body;
         free_names_of_code;
         return_cont_uses;
-        is_my_closure_used;
-        recursive;
         uacc_after_upwards_traversal
       } =
     Function_params_and_body.pattern_match
@@ -435,12 +415,16 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
            ~closure_bound_names_inside_function ~inlining_arguments
            ~absolute_history code_id code)
   in
+  let recursive = RE.Function_params_and_body.recursive params_and_body in
+  let is_my_closure_used =
+    RE.Function_params_and_body.is_my_closure_used params_and_body
+  in
   let should_resimplify = UA.resimplify uacc_after_upwards_traversal in
   let outer_dacc, lifted_consts_this_function =
     extract_accumulators_from_function outer_dacc ~dacc_after_body
       ~uacc_after_upwards_traversal
   in
-  let cost_metrics = UA.cost_metrics uacc_after_upwards_traversal in
+  let cost_metrics = RE.Function_params_and_body.cost_metrics params_and_body in
   let old_code_id = code_id in
   let code_id, newer_version_of =
     match

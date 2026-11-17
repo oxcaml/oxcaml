@@ -42,16 +42,21 @@ val mark_as_cold : t -> t
 
 val can_be_removed_as_invalid : t -> Are_rebuilding_terms.t -> bool
 
-val term_not_rebuilt : t
+val cost_metrics : t -> Cost_metrics.t
+
+val free_names : t -> Name_occurrences.t
+
+val notify_removed : operation:Removed_operations.t -> t -> t
 
 (** This should only be used by [Expr_builder] to make sure occurrences of
     function slots and value slots are recorded. *)
 val create_let :
   Are_rebuilding_terms.t ->
   Bound_pattern.t ->
-  Named.t ->
+  Named.t Or_null.t (* must not be [Null] if we are rebuilding terms *) ->
   body:t ->
-  free_names_of_body:Name_occurrences.t ->
+  free_names_of_defining_expr:Name_occurrences.t ->
+  cost_metrics_of_defining_expr:Cost_metrics.t ->
   t
 
 val create_apply : Are_rebuilding_terms.t -> is_cold:bool -> Apply.t -> t
@@ -68,7 +73,6 @@ module Function_params_and_body : sig
     exn_continuation:Continuation.t ->
     Bound_parameters.t ->
     body:rebuilt_expr ->
-    free_names_of_body:Name_occurrences.t ->
     my_closure:Variable.t ->
     my_alloc_mode:Alloc_mode.For_applications.t ->
     my_depth:Variable.t ->
@@ -78,27 +82,30 @@ module Function_params_and_body : sig
   val to_function_params_and_body :
     t -> Are_rebuilding_terms.t -> Function_params_and_body.t
 
+  val cost_metrics : t -> Cost_metrics.t
+
+  val free_names : t -> Name_occurrences.t
+
+  val recursive : t -> Recursive.t
+
   val is_my_closure_used : t -> bool
 end
 
 module Continuation_handler : sig
   type t
 
-  val print :
-    cont:Continuation.t ->
-    recursive:Recursive.t ->
-    Format.formatter ->
-    t ->
-    unit
-
   val create :
-    Are_rebuilding_terms.t ->
-    Bound_parameters.t ->
-    handler:rebuilt_expr ->
-    free_names_of_handler:Name_occurrences.t ->
-    is_exn_handler:bool ->
-    is_cold:bool ->
-    t
+    Bound_parameters.t -> handler:rebuilt_expr -> is_exn_handler:bool -> t
+
+  val arity : t -> [> ] Flambda_arity.t
+
+  val is_zero_arity_handler : t -> rebuilt_expr option
+
+  val cost_metrics_of_handler : t -> Cost_metrics.t
+
+  val free_names_of_handler : t -> Name_occurrences.t
+
+  val free_names : t -> Name_occurrences.t
 end
 
 val create_non_recursive_let_cont :
@@ -106,7 +113,6 @@ val create_non_recursive_let_cont :
   Continuation.t ->
   Continuation_handler.t ->
   body:t ->
-  free_names_of_body:Name_occurrences.t ->
   t
 
 val create_non_recursive_let_cont' :
@@ -116,13 +122,6 @@ val create_non_recursive_let_cont' :
   body:t ->
   num_free_occurrences_of_cont_in_body:Num_occurrences.t ->
   is_applied_with_traps:bool ->
-  t
-
-val create_non_recursive_let_cont_without_free_names :
-  Are_rebuilding_terms.t ->
-  Continuation.t ->
-  Continuation_handler.t ->
-  body:t ->
   t
 
 val create_recursive_let_cont :
@@ -140,9 +139,7 @@ val bind_no_simplification :
   Are_rebuilding_terms.t ->
   bindings:(Bound_var.t * Code_size.t * Named.t) list ->
   body:t ->
-  cost_metrics_of_body:Cost_metrics.t ->
-  free_names_of_body:Name_occurrences.t ->
-  t * Cost_metrics.t * Name_occurrences.t
+  t
 
 module Unique_continuation_handlers : sig
   (* Uses the parameters and handler expression to avoid re-opening the name

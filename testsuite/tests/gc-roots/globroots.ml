@@ -1,5 +1,10 @@
 (* TEST
  modules = "globrootsprim.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 module type GLOBREF = sig

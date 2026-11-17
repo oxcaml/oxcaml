@@ -1,6 +1,7 @@
 (* TEST
  { bytecode; }
  { native; }
+ { jsir; }
 *)
 
 module TLS = Domain.Safe.TLS

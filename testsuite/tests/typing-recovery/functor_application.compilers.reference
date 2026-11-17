@@ -1,0 +1,25 @@
+File "functor_application.ml", line 1:
+Error: Multiple errors were encountered
+File "functor_application.ml", line 12, characters 11-25:
+12 | module N = M (struct end)
+                ^^^^^^^^^^^^^^
+  The module M is not a functor, it cannot be applied.
+File "functor_application.ml", line 14, characters 31-38:
+14 | module type S = module type of Unbound (struct end)
+                                    ^^^^^^^
+  Unbound module Unbound
+File "functor_application.ml", line 14, characters 31-51:
+14 | module type S = module type of Unbound (struct end)
+                                    ^^^^^^^^^^^^^^^^^^^^
+  The module Unbound is not a functor, it cannot be applied.
+File "functor_application.ml", line 18, characters 9-13:
+18 | type t = F(M).t
+              ^^^^
+  Modules do not match: sig end is not included in sig type t end
+The type t is required but not provided
+File "functor_application.ml", line 16, characters 18-24:
+  Expected declaration
+File "functor_application.ml", line 20, characters 14-26:
+20 | let x : int = "not an int"
+                   ^^^^^^^^^^^^
+  This constant has type string but an expression was expected of type int

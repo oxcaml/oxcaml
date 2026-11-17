@@ -1,5 +1,10 @@
 (* TEST
  modules = "extent_stubs.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 (* Compaction with heap extents: extent blocks are not moved, but
