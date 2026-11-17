@@ -126,6 +126,8 @@ let tail_call_probability = 2_500
 
 let existing_value_for_wide_argument_probability = 7_500
 
+let reraise_probability = 5_000
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -162,7 +164,8 @@ module Swarm = struct
       closures : bool;
       partial_applications : bool;
       recursive_functions : bool;
-      wide_functions : bool
+      wide_functions : bool;
+      reraises : bool
     }
 
   let create random_state =
@@ -199,7 +202,8 @@ module Swarm = struct
       closures = Random.State.bool random_state;
       partial_applications = Random.State.bool random_state;
       recursive_functions = Random.State.bool random_state;
-      wide_functions = Random.State.bool random_state
+      wide_functions = Random.State.bool random_state;
+      reraises = Random.State.bool random_state
     }
 
   let to_string t =
@@ -231,7 +235,8 @@ module Swarm = struct
       "closures", t.closures;
       "partial_applications", t.partial_applications;
       "recursive_functions", t.recursive_functions;
-      "wide_functions", t.wide_functions ]
+      "wide_functions", t.wide_functions;
+      "reraises", t.reraises ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> List.cons
          (Format.sprintf "  assertions = %s"
