@@ -290,7 +290,8 @@ let instrument_block (cfg : Cfg.t) (block : Cfg.basic_block) ~index ~dbg =
     | None -> block.terminator.stack_offset
   in
   match Arch.trace_pc_guard_operation index with
-  | None -> Misc.fatal_error "-trace-pc-guard is not supported on this target"
+  | None ->
+    Misc.fatal_error "-gated-trace-pc-guard is not supported on this target"
   | Some op ->
     DLL.add_begin block.body
       (Cfg.make_instruction

@@ -1183,9 +1183,11 @@ let mk_afl_inst_ratio f =
   \     (advanced, see afl-fuzz docs for AFL_INST_RATIO)"
 
 let mk_trace_pc_guard f =
-  "-trace-pc-guard", Arg.Unit f,
+  "-gated-trace-pc-guard", Arg.Unit f,
   "Enable coverage instrumentation compatible with\n\
-  \     LLVM's -fsanitize-coverage=trace-pc-guard (the\n\
+  \     LLVM's -fsanitize-coverage=trace-pc-guard with\n\
+  \     gated callbacks: probes only call the callback when\n\
+  \     __sancov_should_track is non-zero (the\n\
   \     __sanitizer_cov_trace_pc_guard callbacks must be\n\
   \     provided at link time)"
 

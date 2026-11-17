@@ -160,7 +160,7 @@ val operation_allocates : specific_operation -> bool
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
 
 (** The operation implementing the coverage probe with the given guard index
-    for [-trace-pc-guard], if supported by the target. *)
+    for [-gated-trace-pc-guard], if supported by the target. *)
 val trace_pc_guard_operation : int -> specific_operation option
 
 (* See `amd64/arch.mli`. *)

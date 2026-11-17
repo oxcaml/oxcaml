@@ -26,8 +26,10 @@
  ******************************************************************************)
 
 (** Edge coverage instrumentation in the style of clang's
-    [-fsanitize-coverage=trace-pc-guard] with gated callbacks (enabled by
-    [-trace-pc-guard]).
+    [-fsanitize-coverage=trace-pc-guard] with gated callbacks, i.e. with
+    [-mllvm -sanitizer-coverage-gated-trace-callbacks] (enabled by
+    [-gated-trace-pc-guard]). Clang's default form, where probes call the
+    callback unconditionally, is not supported.
 
     Critical edges are split, and then probes are added at the start of blocks.
     Each probe tests the global [__sancov_should_track] and, if it is non-zero,

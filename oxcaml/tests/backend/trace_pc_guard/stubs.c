@@ -1,5 +1,5 @@
-/* Coverage callbacks for [-trace-pc-guard], playing the part of the runtime
-   that would normally be provided (e.g. by Antithesis). */
+/* Coverage callbacks for [-gated-trace-pc-guard], playing the part of the
+   runtime that would normally be provided (e.g. by Antithesis). */
 
 #include <stdint.h>
 #include <stdio.h>

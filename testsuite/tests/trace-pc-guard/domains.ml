@@ -1,5 +1,5 @@
 (* TEST
- flags = "-trace-pc-guard";
+ flags = "-gated-trace-pc-guard";
  modules = "domains_stubs.c";
  linux;
  multicore;

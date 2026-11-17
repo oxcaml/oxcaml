@@ -704,7 +704,8 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
   if !Clflags.llvm_backend && !Clflags.trace_pc_guard
-  then Misc.fatal_error "-trace-pc-guard is not supported with -llvm-backend";
+  then
+    Misc.fatal_error "-gated-trace-pc-guard is not supported with -llvm-backend";
   if !Clflags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
   let open_asm_file () =
     if create_asm

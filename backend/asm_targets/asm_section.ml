@@ -283,7 +283,8 @@ let details t first_occurrence =
       [".rodata.str1.1"], Some "aMS", [progbits; "1"]
     (* 1 = characters *)
     | (Trace_pc_guards | Trace_pc_guard_gate), _, MacOS_like ->
-      Misc.fatal_error "-trace-pc-guard is not supported on this target system"
+      Misc.fatal_error
+        "-gated-trace-pc-guard is not supported on this target system"
     | Trace_pc_guards, arch, _ ->
       (* Writable data, named as by clang. The section name is a valid C
          identifier, so that the linker defines [__start___sancov_guards] and

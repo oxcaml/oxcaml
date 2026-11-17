@@ -25,7 +25,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Emission of the coverage probes of [-trace-pc-guard] (see
+(** Emission of the coverage probes of [-gated-trace-pc-guard] (see
     [Cfg_trace_pc_guard]). This is the part of the emitter that deals with
     probes; it is only called from [Emit]. *)
 

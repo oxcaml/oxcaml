@@ -1,5 +1,5 @@
-/* Coverage callbacks for [-trace-pc-guard] that may be called from several
-   domains at once. */
+/* Coverage callbacks for [-gated-trace-pc-guard] that may be called from
+   several domains at once. */
 
 #include <stdatomic.h>
 #include <stddef.h>

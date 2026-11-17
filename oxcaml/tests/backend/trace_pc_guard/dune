@@ -9,7 +9,7 @@
  (modes
   (native exe))
  (ocamlopt_flags
-  (:standard -trace-pc-guard -dcfg-invariants -extension simd_beta))
+  (:standard -gated-trace-pc-guard -dcfg-invariants -extension simd_beta))
  (modules trace_pc_guard)
  (foreign_archives stubs))
 
