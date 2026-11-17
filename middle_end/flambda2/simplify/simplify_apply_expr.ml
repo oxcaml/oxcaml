@@ -214,7 +214,7 @@ let rebuild_apply
     *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
     * in *)
   let apply = if erase_callee then Apply.erase_callee apply else apply in
-  let uacc, expr =
+  let expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id ~is_cold
       (Flambda_arity.unarize_t result_arity)
       apply
