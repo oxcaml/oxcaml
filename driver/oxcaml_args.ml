@@ -2570,8 +2570,13 @@ module Make_debugging_options (F : Debugging_options) = struct
 end
 
 module Debugging_options_impl = struct
-  let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
-  let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+  let dwarf_inlined_frames () =
+    Debugging.dwarf_inlined_frames := true;
+    Debugging.no_dwarf_inlined_frames := false
+
+  let no_dwarf_inlined_frames () =
+    Debugging.dwarf_inlined_frames := false;
+    Debugging.no_dwarf_inlined_frames := true
 
   let gdwarf_version version =
     match version with
@@ -2818,7 +2823,13 @@ module Extra_params = struct
     | "caml-apply-inline-fast-path" ->
         set' Oxcaml_flags.caml_apply_inline_fast_path
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
-    | "gdwarf-inlined-frames" -> set' Debugging.dwarf_inlined_frames
+    | "gdwarf-inlined-frames" ->
+        Compenv.setter ppf
+          (fun b -> not b)
+          name
+          [ Debugging.no_dwarf_inlined_frames ]
+          v;
+        set' Debugging.dwarf_inlined_frames
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gdwarf-may-alter-codegen-experimental" ->
         set' Debugging.gdwarf_may_alter_codegen_experimental

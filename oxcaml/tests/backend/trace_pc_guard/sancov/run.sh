@@ -8,7 +8,7 @@ llvm=$OXCAML_LLVM_BIN
 # clang links the executable, so that it adds the (static) UBSan runtime,
 # which contains the coverage runtime. It also compiles and instruments the
 # C stubs.
-"$ocamlopt" -g -gdwarf-inlined-frames -gated-trace-pc-guard -cc "$llvm/clang -fsanitize=undefined" \
+"$ocamlopt" -g -gated-trace-pc-guard -cc "$llvm/clang -fsanitize=undefined" \
   -ccopt -fsanitize-coverage=trace-pc-guard \
   stubs.c sancov_lib.ml sancov_test.ml -o sancov_test.exe
 
@@ -18,7 +18,8 @@ UBSAN_OPTIONS=coverage=1:coverage_dir=coverage ./sancov_test.exe
 # Keep the functions of interest, with their source location, whatever the name
 # mangling scheme. [sancov] gives a function the least line of its probes, per
 # source file. A probe of inlined code counts for every function among its
-# inlined frames: [hit_inlined] is only ever executed inlined in [hit_caller].
+# inlined frames, which [-gated-trace-pc-guard] makes the compiler describe:
+# [hit_inlined] is only ever executed inlined in [hit_caller].
 # Locations in files other than those of the test, which come from inlined
 # library code, are dropped.
 files='sancov_[a-z]*\.ml\|stubs\.c'

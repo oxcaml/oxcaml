@@ -1189,7 +1189,9 @@ let mk_trace_pc_guard f =
   \     gated callbacks: probes only call the callback when\n\
   \     __sancov_should_track is non-zero (the\n\
   \     __sanitizer_cov_trace_pc_guard callbacks must be\n\
-  \     provided at link time)"
+  \     provided at link time). Implies\n\
+  \     -gdwarf-inlined-frames unless\n\
+  \     -gno-dwarf-inlined-frames is given"
 
 let mk__ f =
   "-", Arg.String f,

@@ -181,6 +181,12 @@ let gdwarf_may_alter_codegen_experimental = ref false
 
 let dwarf_inlined_frames = ref false
 
+let no_dwarf_inlined_frames = ref false
+
+let emit_dwarf_inlined_frames () =
+  !dwarf_inlined_frames
+  || (!Clflags.trace_pc_guard && not !no_dwarf_inlined_frames)
+
 let debug_avail_sets = ref false
 
 let default_gdwarf_compression = "zlib"
@@ -195,7 +201,7 @@ let get_dwarf_compression_flag () =
   match !gdwarf_compression with
   | Some _ as compression -> compression
   | None ->
-    if !dwarf_inlined_frames || not !Clflags.restrict_to_upstream_dwarf
+    if emit_dwarf_inlined_frames () || not !Clflags.restrict_to_upstream_dwarf
     then Some default_gdwarf_compression
     else None
 

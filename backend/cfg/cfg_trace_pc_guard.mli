@@ -55,6 +55,11 @@
     The callback is called like an external function that does not allocate: it
     must not call into the OCaml runtime.
 
+    With [-g], the flag also enables the DWARF description of inlined frames (as
+    [-gdwarf-inlined-frames] does, unless [-gno-dwarf-inlined-frames] is given),
+    so that coverage tools can attribute a probe in inlined code to the function
+    that the code comes from.
+
     See https://clang.llvm.org/docs/SanitizerCoverage.html *)
 
 (** Instrument a function. Must run before register allocation. *)
