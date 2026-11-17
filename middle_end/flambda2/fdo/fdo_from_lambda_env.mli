@@ -27,17 +27,20 @@
  ******************************************************************************)
 
 (** The FDO state of the translation from Lambda (see [Lambda_to_flambda_env]):
-    the identity of the function being translated (see [Fdo_function_naming])
-    and what is needed to name the functions defined in it. *)
+    the identity and body hash of the function being translated (see
+    [Fdo_function_naming] and [Fdo_body_hash]) and what is needed to name the
+    functions defined in it. *)
 
 type t
 
-(** The state for a compilation unit's toplevel code. *)
-val toplevel : Compilation_unit.t -> t
+(** The state for a compilation unit's toplevel code, given its module
+    initializer. *)
+val toplevel : Compilation_unit.t -> Lambda.lambda -> t
 
 (** The state for the body of the given function, defined in the code [t] is
     for. [binder] is the identifier the function is bound to, if any. *)
 val enter_function : t -> binder:Ident.t option -> Lambda.lfunction -> t
 
-(** The counters of the entry edge of the function [t] is for. *)
-val entry_annotation : t -> Fdo_annotation.t
+(** The counters of the entry edge of the function [t] is for, with its body
+    hash. *)
+val entry_annotation : t -> Fdo_annotation.With_body_hash.t

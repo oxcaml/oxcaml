@@ -19,6 +19,9 @@ module L = Lambda
 module P = Flambda_primitive
 module S = Jkind.Sort.Const
 
+(* Transforms that introduce calls or switches change the numbering of FDO
+   counters, which [Fdo_body_hash] must reflect. *)
+
 type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
