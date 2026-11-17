@@ -200,10 +200,43 @@ let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
   let make lhs rhs = Expr.Bin_op { ty; op; lhs; rhs } in
   match op with
   | And | Or -> make lhs rhs
-  | Add | Sub | Mul | Rem | Bit_and | Bit_or | Bit_xor | Shift_left
-  | Shift_right | Shift_right_logical | Eq | Lt | Le | Gt | Ge ->
+  | Div | Rem ->
+    (* Assume right-to-left evaluation rather than binding the operands, so
+       differences in exception order remain observable. *)
+    make lhs rhs
+  | Add | Sub | Mul | Bit_and | Bit_or | Bit_xor | Shift_left | Shift_right
+  | Shift_right_logical | Eq | Lt | Le | Gt | Ge ->
     bind_operand st rhs ~f:(fun rhs ->
         bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
+
+(* Guard integer division and remainder when [Division_by_zero] cannot be
+   caught. Evaluate both operands once, right-to-left, even when the divisor is
+   zero, returning the dividend in that case. *)
+let safe_div_or_rem (st : State.t) (nty : NumberTy.t) op ~lhs ~rhs =
+  let lhs_name = State.fresh st in
+  let rhs_name = State.fresh st in
+  let dividend = Expr.Read (Place.Variable lhs_name) in
+  let divisor = Expr.Read (Place.Variable rhs_name) in
+  let ty = Ty.Number nty in
+  let zero =
+    Expr.Convert
+      { expr = Expr.Const (Number.of_integral_bits nty.base 0L);
+        from = NumberTy.boxed nty.base;
+        to_ = nty
+      }
+  in
+  let body =
+    Expr.If
+      { condition = Expr.Bin_op { ty; op = Eq; lhs = divisor; rhs = zero };
+        if_true = dividend;
+        if_false = Expr.Bin_op { ty; op; lhs = dividend; rhs = divisor }
+      }
+  in
+  Expr.Let
+    { name = rhs_name;
+      expr = rhs;
+      body = Expr.Let { name = lhs_name; expr = lhs; body }
+    }
 
 let assign (st : State.t) ty target expr =
   match st.swarm.assertions with
@@ -328,15 +361,16 @@ let gen_exception (st : State.t) id =
     then Some (gen_record_or_scalar_type ~value_only:true st)
     else None
   in
-  { Exn.id; payload }
+  Exn.Generated { id; payload }
 
 let gen_exceptions (st : State.t) =
   if not st.swarm.exceptions
   then []
   else
-    List.init
-      (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
-      (gen_exception st)
+    Exn.Division_by_zero
+    :: List.init
+         (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
+         (gen_exception st)
 
 let gen_constructor_type (st : State.t) constructor_index =
   let args =
@@ -677,7 +711,7 @@ let can_gen_try (st : State.t) =
 
 let gen_handler (st : State.t) (env : Env.t) ~gen_body (exn : Exn.t) =
   let payload =
-    match exn.payload with
+    match Exn.payload exn with
     | Some ty
       when with_probability st ~probability:Config.payload_binding_probability
       ->
@@ -735,11 +769,15 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
             gen_shift_count st env inner_ty
           | _ -> gen_value st env (Ty.Number inner_ty)
         in
-        Expr.Convert
-          { from = inner_ty;
-            to_ = nty;
-            expr = bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
-          })
+        let expr =
+          match binop with
+          | (Div | Rem)
+            when (not (NumberTy.is_floating_point inner_ty))
+                 && not (Env.can_raise env Exn.Division_by_zero) ->
+            safe_div_or_rem st inner_ty binop ~lhs ~rhs
+          | _ -> bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
+        in
+        Expr.Convert { from = inner_ty; to_ = nty; expr })
   in
   let leaf =
     Gen.weighted st.random_state
@@ -905,7 +943,7 @@ and gen_bool (st : State.t) env =
 
 and gen_raise (st : State.t) (env : Env.t) : Expr.raise =
   let exn = random_element st env.catchable_exceptions in
-  let payload = Option.map (fun ty -> gen_value st env ty) exn.payload in
+  let payload = Option.map (fun ty -> gen_value st env ty) (Exn.payload exn) in
   let notrace =
     with_probability st ~probability:Config.raise_notrace_probability
   in

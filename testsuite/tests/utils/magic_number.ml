@@ -1,7 +1,8 @@
 (* TEST
  include config;
  binary_modules = "config build_path_prefix_map format_doc misc";
- bytecode;
+ { bytecode; }
+ { jsir; }
 *)
 
 open Misc

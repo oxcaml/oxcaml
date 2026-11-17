@@ -1,10 +1,5 @@
 (* TEST
  include stdlib_upstream_compatible;
- {
-   bytecode;
- }{
-   native;
- }
 *)
 
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
@@ -403,54 +398,6 @@ let () =
   assert (unsigned_gt neg_million pos_million = true);
   assert (unsigned_gt pos_million neg_million = false);
 
-  (* Test unsigned div/mod primitives *)
-  let one_e_19_plus_42 = #0x8AC7_2304_89E8_002An in
-  (* = #10_000_000_000_000_000_042n,
-     but we don't have unsigned decimal literals *)
-
-  assert
-    (I.equal
-      (unsigned_div one_e_19_plus_42 #10_000n)
-      #1_000_000_000_000_000n);
-  assert
-    (I.equal
-      (unsigned_div one_e_19_plus_42 (id #10_000n))
-      #1_000_000_000_000_000n);
-  assert
-    (I.equal
-      (unsigned_div (id one_e_19_plus_42) #10_000n)
-      #1_000_000_000_000_000n);
-  assert
-    (I.equal
-      (unsigned_div (id one_e_19_plus_42) (id #10_000n))
-      #1_000_000_000_000_000n);
-  assert (I.equal (unsigned_mod one_e_19_plus_42 #10_000n) #42n);
-  assert (I.equal (unsigned_mod one_e_19_plus_42 (id #10_000n)) #42n);
-  assert (I.equal (unsigned_mod (id one_e_19_plus_42) #10_000n) #42n);
-  assert (I.equal (unsigned_mod (id one_e_19_plus_42) (id #10_000n)) #42n);
-
-  (* Test right-shift optimization *)
-  assert
-    (I.equal
-      (unsigned_div #0xFFFF_FFFF_FFFF_FFFFn #256n)
-      #0xFF_FFFF_FFFF_FFFFn);
-  assert
-    (I.equal
-      (unsigned_div #0xFFFF_FFFF_FFFF_FFFFn (id #256n))
-      #0xFF_FFFF_FFFF_FFFFn);
-  assert
-    (I.equal
-      (unsigned_div (id #0xFFFF_FFFF_FFFF_FFFFn) #256n)
-      #0xFF_FFFF_FFFF_FFFFn);
-  assert
-    (I.equal
-      (unsigned_div (id #0xFFFF_FFFF_FFFF_FFFFn) (id #256n))
-      #0xFF_FFFF_FFFF_FFFFn);
-  assert (I.equal (unsigned_mod #0xFFFF_FFFF_FFFF_FFFFn #256n) #255n);
-  assert (I.equal (unsigned_mod #0xFFFF_FFFF_FFFF_FFFFn (id #256n)) #255n);
-  assert (I.equal (unsigned_mod (id #0xFFFF_FFFF_FFFF_FFFFn) #256n) #255n);
-  assert (I.equal (unsigned_mod (id #0xFFFF_FFFF_FFFF_FFFFn) (id #256n)) #255n);
-
   (* Test div-by-minus-one optimization does not occur *)
   assert (I.equal (unsigned_div #42n minus_one) #0n);
   assert (I.equal (unsigned_div #42n (id minus_one)) #0n);
@@ -461,15 +408,66 @@ let () =
   assert (I.equal (unsigned_mod (id #42n) minus_one) #42n);
   assert (I.equal (unsigned_mod (id #42n) (id minus_one)) #42n);
 
-  (* Test div-by-min-int optimization does not occur *)
-  assert (I.equal (unsigned_div #0x8000_0000_0000_0042n min_int) #1n);
-  assert (I.equal (unsigned_div #0x8000_0000_0000_0042n (id min_int)) #1n);
-  assert (I.equal (unsigned_div (id #0x8000_0000_0000_0042n) min_int) #1n);
-  assert (I.equal (unsigned_div (id #0x8000_0000_0000_0042n) (id min_int)) #1n);
-  assert (I.equal (unsigned_mod #0x8000_0000_0000_0042n min_int) #0x42n);
-  assert (I.equal (unsigned_mod #0x8000_0000_0000_0042n (id min_int)) #0x42n);
-  assert (I.equal (unsigned_mod (id #0x8000_0000_0000_0042n) min_int) #0x42n);
-  assert
-    (I.equal (unsigned_mod (id #0x8000_0000_0000_0042n) (id min_int)) #0x42n);
+  (* The remaining tests need 64-bit nativeints (JavaScript has 32-bit ones) *)
+  if Nativeint.size = 64 then begin
+    (* Test unsigned div/mod primitives *)
+    let one_e_19_plus_42 = #0x8AC7_2304_89E8_002An in
+    (* = #10_000_000_000_000_000_042n,
+       but we don't have unsigned decimal literals *)
+
+    assert
+      (I.equal
+        (unsigned_div one_e_19_plus_42 #10_000n)
+        #1_000_000_000_000_000n);
+    assert
+      (I.equal
+        (unsigned_div one_e_19_plus_42 (id #10_000n))
+        #1_000_000_000_000_000n);
+    assert
+      (I.equal
+        (unsigned_div (id one_e_19_plus_42) #10_000n)
+        #1_000_000_000_000_000n);
+    assert
+      (I.equal
+        (unsigned_div (id one_e_19_plus_42) (id #10_000n))
+        #1_000_000_000_000_000n);
+    assert (I.equal (unsigned_mod one_e_19_plus_42 #10_000n) #42n);
+    assert (I.equal (unsigned_mod one_e_19_plus_42 (id #10_000n)) #42n);
+    assert (I.equal (unsigned_mod (id one_e_19_plus_42) #10_000n) #42n);
+    assert (I.equal (unsigned_mod (id one_e_19_plus_42) (id #10_000n)) #42n);
+
+    (* Test right-shift optimization *)
+    assert
+      (I.equal
+        (unsigned_div #0xFFFF_FFFF_FFFF_FFFFn #256n)
+        #0xFF_FFFF_FFFF_FFFFn);
+    assert
+      (I.equal
+        (unsigned_div #0xFFFF_FFFF_FFFF_FFFFn (id #256n))
+        #0xFF_FFFF_FFFF_FFFFn);
+    assert
+      (I.equal
+        (unsigned_div (id #0xFFFF_FFFF_FFFF_FFFFn) #256n)
+        #0xFF_FFFF_FFFF_FFFFn);
+    assert
+      (I.equal
+        (unsigned_div (id #0xFFFF_FFFF_FFFF_FFFFn) (id #256n))
+        #0xFF_FFFF_FFFF_FFFFn);
+    assert (I.equal (unsigned_mod #0xFFFF_FFFF_FFFF_FFFFn #256n) #255n);
+    assert (I.equal (unsigned_mod #0xFFFF_FFFF_FFFF_FFFFn (id #256n)) #255n);
+    assert (I.equal (unsigned_mod (id #0xFFFF_FFFF_FFFF_FFFFn) #256n) #255n);
+    assert (I.equal (unsigned_mod (id #0xFFFF_FFFF_FFFF_FFFFn) (id #256n)) #255n);
+
+    (* Test div-by-min-int optimization does not occur *)
+    assert (I.equal (unsigned_div #0x8000_0000_0000_0042n min_int) #1n);
+    assert (I.equal (unsigned_div #0x8000_0000_0000_0042n (id min_int)) #1n);
+    assert (I.equal (unsigned_div (id #0x8000_0000_0000_0042n) min_int) #1n);
+    assert (I.equal (unsigned_div (id #0x8000_0000_0000_0042n) (id min_int)) #1n);
+    assert (I.equal (unsigned_mod #0x8000_0000_0000_0042n min_int) #0x42n);
+    assert (I.equal (unsigned_mod #0x8000_0000_0000_0042n (id min_int)) #0x42n);
+    assert (I.equal (unsigned_mod (id #0x8000_0000_0000_0042n) min_int) #0x42n);
+    assert
+      (I.equal (unsigned_mod (id #0x8000_0000_0000_0042n) (id min_int)) #0x42n);
+  end;
 
   ()
