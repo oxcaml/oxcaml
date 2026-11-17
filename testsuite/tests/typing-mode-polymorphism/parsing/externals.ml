@@ -260,6 +260,18 @@ external add_old :
 = <fun>
 |}];;
 
+let x = Int32.of_int 3 in
+Int32.to_int (stack_ (add_old x x));;
+[%%expect{|
+- : int = 6
+|}];;
+
+let x = Int32.of_int 3 in
+Int32.to_int (stack_ (add x x));;
+[%%expect{|
+- : int = 6
+|}];;
+
 external add_indep : int32 @ [< 'm] -> int32 @ [< 'n] -> int32 @ [> 'm]
   = "%int32_add"
 [%%expect{|
