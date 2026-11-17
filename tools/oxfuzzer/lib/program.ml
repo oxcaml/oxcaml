@@ -344,6 +344,7 @@ let rec print_value path ty expr =
     apply
       (qualified_ident "Printf" "printf")
       [Ast_helper.Exp.constant (Ast_helper.Const.string "%S "); expr]
+  | Ty.Arrow _ -> unit_
 
 and print_sum path sum expr =
   let cases =

@@ -27,7 +27,8 @@ module State = struct
       mutable exceptions : Exn.t list;
       mutable variant_types : Ty.variant list;
       mutable matches_remaining : int;
-      mutable tries_remaining : int
+      mutable tries_remaining : int;
+      mutable closure_calls_remaining : int
     }
 
   let create random_state =
@@ -42,7 +43,8 @@ module State = struct
       exceptions = [];
       variant_types = [];
       matches_remaining = Config.max_match_count;
-      tries_remaining = Config.max_try_count
+      tries_remaining = Config.max_try_count;
+      closure_calls_remaining = Config.max_closure_call_count
     }
 
   let fresh t = Fresh.next t.names
@@ -86,6 +88,23 @@ module Env = struct
         }
     in
     { t with loop_variables = loop_variable :: t.loop_variables }
+
+  (* Closures cannot capture mutable variables, which include loop variables.
+     They can be called after the handlers around them have been left, so they
+     must not raise. *)
+  let for_closure t =
+    let is_loop_variable (binding : Binding.t) =
+      List.exists
+        (fun ({ name; _ } : Loop_variable.t) -> Name.equal name binding.name)
+        t.loop_variables
+    in
+    { empty with
+      bindings =
+        List.filter
+          (fun (binding : Binding.t) ->
+            (not binding.is_mutable) && not (is_loop_variable binding))
+          t.bindings
+    }
 end
 
 (* CR-someday xclerc: We should consider changing this to be a monad, which
@@ -441,9 +460,13 @@ let gen_sum_type (st : State.t) =
            Gen.when_ st.swarm.or_null (fun () ->
                Sum.Or_null (gen_or_null_payload_type st)) ) ])
 
-let gen_type (st : State.t) =
+let rec gen_type ?(arrows = true) (st : State.t) =
   gen_type_with_unboxed_tuples st ~leaf:(fun () ->
       if
+        arrows && st.swarm.closures
+        && with_probability st ~probability:Config.closure_probability
+      then gen_arrow_type st
+      else if
         st.swarm.or_null
         && with_probability st ~probability:Config.or_null_probability
       then Ty.Or_null (gen_or_null_payload_type st)
@@ -452,6 +475,21 @@ let gen_type (st : State.t) =
         && with_probability st ~probability:Config.variant_probability
       then Ty.Variant (random_element st st.variant_types)
       else gen_record_or_scalar_type st)
+
+and gen_arrow_type (st : State.t) =
+  let params =
+    List.init
+      (random_int_in_range st ~min:1 ~max:Config.max_closure_param_count)
+      (fun _ -> gen_type ~arrows:false st)
+  in
+  Ty.curry params (gen_type ~arrows:false st)
+
+let gen_inline (st : State.t) : Inline.t =
+  Gen.run_exn
+    (Gen.weighted st.random_state
+       [ 1, Gen.when_ st.swarm.never_inline (fun () -> Inline.Never);
+         1, Gen.when_ st.swarm.always_inline (fun () -> Inline.Always);
+         1, Gen.return Inline.Default ])
 
 let can_convert (st : State.t) from to_ =
   match from, to_ with
@@ -533,7 +571,9 @@ let places (st : State.t) (env : Env.t) ~for_write =
                   { tuple; arity = List.length components; index; name }))
           components
         |> List.concat
-      | Ty.Number _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _ -> []
+      | Ty.Number _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _
+      | Ty.Arrow _ ->
+        []
     in
     here @ children
   in
@@ -703,7 +743,7 @@ let gen_scalar_const (st : State.t) (ty : Ty.t) =
                   Char.chr (Random.State.int st.random_state 256))
           in
           Expr.String_const value)
-    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
+    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ | Arrow _ ->
       Misc.fatal_errorf "gen_scalar_const: expected a scalar type"
   in
   Gen.map const
@@ -832,6 +872,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
                    to_ = nty
                  }) );
          1, gen_fun_call st env (Ty.Number nty);
+         1, gen_closure_call st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
 
@@ -944,14 +985,7 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
               { Env.empty with catchable_exceptions = raises }
               params
           in
-          let inline : Inline.t =
-            let open Inline in
-            Gen.run_exn
-              (Gen.weighted st.random_state
-                 [ 1, Gen.when_ st.swarm.never_inline (fun () -> Never);
-                   1, Gen.when_ st.swarm.always_inline (fun () -> Always);
-                   1, Gen.return Default ])
-          in
+          let inline = gen_inline st in
           let args = gen_arguments params in
           let _callee_env, body = gen_fun_body st callee_env 0 in
           (* CR-someday xclerc: Make sure we use a result that uses as many
@@ -1000,8 +1034,47 @@ and gen_string (st : State.t) env =
        [ 5, leaf;
          2, concat;
          1, gen_fun_call st env Ty.String;
+         1, gen_closure_call st env Ty.String;
          1, gen_try_expr st env Ty.String;
          1, gen_match st env Ty.String ])
+
+(* Calls a function value of [env] whose result can be converted to
+   [result_ty]. *)
+and gen_closure_call (st : State.t) (env : Env.t) result_ty =
+  let functions =
+    List.filter_map
+      (fun (ty, make) ->
+        match Ty.uncurry ty with
+        | (_ :: _ as params), result when can_convert st result result_ty ->
+          Some (params, result, make)
+        | _ -> None)
+      (places st env ~for_write:false)
+  in
+  Gen.when_
+    (st.closure_calls_remaining > 0 && not (List.is_empty functions))
+    (fun () ->
+      st.closure_calls_remaining <- st.closure_calls_remaining - 1;
+      let params, result, make = random_element st functions in
+      let args = List.map (gen_value st env) params in
+      bind_operands st args ~f:(fun args ->
+          convert_value st result result_ty
+            (Expr.Apply { func = Expr.Read (make ()); args })))
+
+and gen_lambda (st : State.t) (env : Env.t) params result_ty =
+  let params =
+    List.map
+      (fun ty -> { Binding.name = State.fresh st; ty; is_mutable = false })
+      params
+  in
+  let inline = gen_inline st in
+  let body_env = List.fold_left Env.extend (Env.for_closure env) params in
+  let body =
+    match gen_existing st body_env result_ty with
+    | Some generate when Random.State.bool st.random_state ->
+      maybe_assert st ~f:generate
+    | Some _ | None -> gen_value st body_env result_ty
+  in
+  Expr.Lambda { params; inline; body; result_ty }
 
 and gen_bool (st : State.t) env =
   let gen_binop op arg_ty gen_arg =
@@ -1031,6 +1104,7 @@ and gen_bool (st : State.t) env =
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or;
          1, gen_fun_call st env Ty.Bool;
+         1, gen_closure_call st env Ty.Bool;
          1, gen_try_expr st env Ty.Bool;
          1, gen_match st env Ty.Bool ])
 
@@ -1047,7 +1121,9 @@ and gen_raise_expr (st : State.t) (env : Env.t) ty =
   let is_value =
     match ty with
     | Ty.Number { unboxed; _ } | Ty.Record { unboxed; _ } -> not unboxed
-    | Ty.Array _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _ -> true
+    | Ty.Array _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _
+    | Ty.Arrow _ ->
+      true
     | Ty.Unboxed_tuple _ -> false
   in
   Gen.when_
@@ -1083,6 +1159,7 @@ and gen_value (st : State.t) env ty =
              [ 3, gen_existing st env ty;
                2, Gen.create (fun () -> gen_array st env element_ty dimensions);
                1, gen_fun_call st env ty;
+               1, gen_closure_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ])
       | Ty.Unboxed_tuple components ->
@@ -1100,6 +1177,7 @@ and gen_value (st : State.t) env ty =
              [ 3, gen_existing st env ty;
                2, construct;
                1, gen_fun_call st env ty;
+               1, gen_closure_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ])
       | Ty.Record record ->
@@ -1129,10 +1207,20 @@ and gen_value (st : State.t) env ty =
                2, construct;
                1, update;
                1, gen_fun_call st env ty;
+               1, gen_closure_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ])
       | Ty.Variant variant -> gen_sum_value st env (Sum.Variant variant)
-      | Ty.Or_null payload -> gen_sum_value st env (Sum.Or_null payload))
+      | Ty.Or_null payload -> gen_sum_value st env (Sum.Or_null payload)
+      | Ty.Arrow _ ->
+        let params, result = Ty.uncurry ty in
+        Gen.run_exn
+          (Gen.weighted st.random_state
+             [ 3, gen_existing st env ty;
+               2, Gen.create (fun () -> gen_lambda st env params result);
+               1, gen_fun_call st env ty;
+               1, gen_try_expr st env ty;
+               1, gen_match st env ty ]))
 
 and gen_sum_value (st : State.t) env sum =
   Gen.run_exn
@@ -1159,7 +1247,8 @@ and gen_sum (st : State.t) env sum =
            Gen.create (fun () ->
                gen_constructor st env sum
                  (random_element st (Sum.constructors sum))) );
-         1, gen_fun_call st env ty ])
+         1, gen_fun_call st env ty;
+         1, gen_closure_call st env ty ])
 
 and gen_match_expr st env sum scrutinee ~branch =
   let cases =

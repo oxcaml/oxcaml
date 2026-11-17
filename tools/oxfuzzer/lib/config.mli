@@ -42,6 +42,10 @@ val max_unboxed_tuple_arity : int
 
 val max_unboxed_tuple_depth : int
 
+val max_closure_param_count : int
+
+val max_closure_call_count : int
+
 val max_probability : int
 
 (* Probabilities out of [max_probability]. *)
@@ -89,6 +93,8 @@ val raise_notrace_probability : int
 
 val callee_raises_probability : int
 
+val closure_probability : int
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -121,7 +127,8 @@ module Swarm : sig
       opaque_initializers : bool;
       opaque_leaves : bool;
       opaque_loop_bounds : bool;
-      exceptions : bool
+      exceptions : bool;
+      closures : bool
     }
 
   val create : Random.State.t -> t

@@ -22,6 +22,8 @@ module Name = struct
       else name
 
   let to_string s = s
+
+  let equal = String.equal
 end
 
 module NumberTy = struct
@@ -162,6 +164,7 @@ module Ty = struct
     | Or_null of t
     | Bool
     | String
+    | Arrow of t * t
 
   and record =
     { id : int; (* Unique record ID. *)
@@ -194,10 +197,23 @@ module Ty = struct
     | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
     | Or_null l, Or_null r -> equal l r
     | Bool, Bool | String, String -> true
+    | Arrow (l, l_result), Arrow (r, r_result) ->
+      equal l r && equal l_result r_result
     | ( ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _
-        | Or_null _ | Bool | String ),
+        | Or_null _ | Bool | String | Arrow _ ),
         _ ) ->
       false
+
+  let curry params result =
+    List.fold_right (fun param result -> Arrow (param, result)) params result
+
+  let rec uncurry = function
+    | Arrow (param, result) ->
+      let params, result = uncurry result in
+      param :: params, result
+    | ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _
+      | Bool | String ) as ty ->
+      [], ty
 
   let variant_name variant = Format.sprintf "variant_%d" variant.variant_id
 
@@ -225,6 +241,8 @@ module Ty = struct
     | Or_null ty -> Ast_helper.Typ.constr (lid "or_null") [to_code ty]
     | Bool -> Ast_helper.Typ.constr (lid "bool") []
     | String -> Ast_helper.Typ.constr (lid "string") []
+    | Arrow (param, result) ->
+      Ast_helper.Typ.arrow Nolabel (to_code param) (to_code result) [] []
 end
 
 module Sum = struct
@@ -371,7 +389,8 @@ module Un_op = struct
       let numeric = [Neg; Abs; Succ; Pred] in
       if NumberTy.is_floating_point nty then numeric else numeric @ [Bit_not]
     | Bool -> [Not]
-    | String | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
+    | String | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _
+    | Arrow _ ->
       Misc.fatal_errorf "Un_op.ops_for_ty: expected a numeric or boolean type"
 
   let to_code ty unop ~arg =
@@ -380,7 +399,7 @@ module Un_op = struct
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
       | Ty.String | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
-      | Ty.Or_null _ ->
+      | Ty.Or_null _ | Ty.Arrow _ ->
         Misc.fatal_errorf "Un_op.to_code: expected a numeric or boolean type"
     in
     let name =
@@ -427,7 +446,7 @@ module Bin_op = struct
     | Number nty ->
       if NumberTy.is_floating_point nty then num_binops else integral_binops
     | Bool | String | Array _ | Unboxed_tuple _ | Record _ | Variant _
-    | Or_null _ ->
+    | Or_null _ | Arrow _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop ~lhs ~rhs =
@@ -437,7 +456,7 @@ module Bin_op = struct
       | Ty.Bool -> "Bool"
       | Ty.String -> "String"
       | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
-      | Ty.Or_null _ ->
+      | Ty.Or_null _ | Ty.Arrow _ ->
         Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
@@ -462,6 +481,30 @@ module Bin_op = struct
     | And -> op "&&" [lhs; rhs]
     | Or -> op "||" [lhs; rhs]
 end
+
+module Inline = struct
+  type t =
+    | Never
+    | Always
+    | Default
+
+  let to_attributes inline =
+    let attribute payload =
+      [ Ast_helper.Attr.mk (loc "inline")
+          (PStr [Ast_helper.Str.eval (ident payload)]) ]
+    in
+    match inline with
+    | Default -> []
+    | Never -> attribute "never"
+    | Always -> attribute "always"
+end
+
+let typed_param ({ name; ty; _ } : Binding.t) =
+  value_param
+    (Ast_helper.Pat.constraint_
+       (Ast_helper.Pat.var (loc (Name.to_string name)))
+       (Some (Ty.to_code ty))
+       [])
 
 module Expr = struct
   (* CR-soon xclerc: Currently this type is constructed manually, but that is a
@@ -541,6 +584,16 @@ module Expr = struct
         { ty : Ty.t;
           body : t;
           handlers : t Handler.t list
+        }
+    | Lambda of
+        { params : Binding.t list;
+          inline : Inline.t;
+          body : t;
+          result_ty : Ty.t
+        }
+    | Apply of
+        { func : t;
+          args : t list
         }
 
   and raise =
@@ -734,6 +787,17 @@ module Expr = struct
       constrain ty
         (Ast_helper.Exp.try_ (to_code body)
            (List.map (Handler.to_case to_code) handlers))
+    | Lambda { params; inline; body; result_ty } ->
+      if List.is_empty params then Misc.fatal_errorf "Lambda: no parameters";
+      let lambda =
+        function_
+          (List.map typed_param params)
+          (constrain result_ty (to_code body))
+      in
+      { lambda with pexp_attributes = Inline.to_attributes inline }
+    | Apply { func; args } ->
+      if List.is_empty args then Misc.fatal_errorf "Apply: no arguments";
+      apply (to_code func) (List.map to_code args)
 
   and raise_to_code { exn; payload; notrace } =
     let payload =
@@ -888,23 +952,6 @@ module Statement = struct
         (List.map (Handler.to_case to_code) handlers)
 end
 
-module Inline = struct
-  type t =
-    | Never
-    | Always
-    | Default
-
-  let to_attributes inline =
-    let attribute payload =
-      [ Ast_helper.Attr.mk (loc "inline")
-          (PStr [Ast_helper.Str.eval (ident payload)]) ]
-    in
-    match inline with
-    | Default -> []
-    | Never -> attribute "never"
-    | Always -> attribute "always"
-end
-
 module Function = struct
   type t =
     { name : Name.t;
@@ -917,17 +964,10 @@ module Function = struct
     }
 
   let to_code { name; params; inline; body; return_ty; result; raises = _ } =
-    let to_param ({ name; ty; _ } : Binding.t) =
-      value_param
-        (Ast_helper.Pat.constraint_
-           (Ast_helper.Pat.var (loc (Name.to_string name)))
-           (Some (Ty.to_code ty))
-           [])
-    in
     let function_params =
       match params with
       | [] -> [value_param (Ast_helper.Pat.construct (lid "()") None)]
-      | _ -> List.map to_param params
+      | _ -> List.map typed_param params
     in
     let body =
       Ast_helper.Exp.sequence (Statement.to_code body)
