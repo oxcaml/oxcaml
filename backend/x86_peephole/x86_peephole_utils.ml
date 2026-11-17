@@ -38,9 +38,26 @@ let is_hard_barrier = function
   | Ins instr -> is_control_flow instr
 
 (* Directives that do not affect the generated code, and whose presence can
-   depend on whether debugging or unwinding information is emitted.
-   [Cfi_def_cfa_register] is not one of them: after it, unwinding relies on the
-   value of a register, so the instructions around it are not rewritten. *)
+   depend on whether debugging or unwinding information is emitted. Rules see
+   the instructions on either side of them as adjacent.
+
+   Three CFI directives are not among them:
+
+   - [Cfi_startproc] and [Cfi_endproc] delimit functions. The instructions on
+   either side belong to different functions, so they are not executed one after
+   the other and no rule may combine them (see also [is_hard_barrier]).
+
+   - After [Cfi_def_cfa_register], unwinding relies on the value of a register
+   at run time, rather than on a fixed offset from the stack pointer. A rule
+   that looked through it could forward or remove the move that sets up this
+   register, leaving the unwinding information wrong although the code itself
+   would still be correct.
+
+   The other CFI directives only record facts that remain true when the
+   instructions around them are rewritten by the rules that look through them:
+   these rules neither move the stack pointer nor change where a register is
+   saved. [combine_add_rsp], which does change the stack pointer, asks to keep
+   them ([keep_cfi]) and rewrites them itself. *)
 let is_transparent_directive ~keep_cfi = function
   | Directive d -> (
     match d with
