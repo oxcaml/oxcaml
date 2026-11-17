@@ -532,6 +532,8 @@ module Bin_op = struct
     | Mul
     | Div
     | Rem
+    | Unsigned_div
+    | Unsigned_rem
     | Bit_and
     | Bit_or
     | Bit_xor
@@ -550,7 +552,14 @@ module Bin_op = struct
 
   let integral_binops =
     num_binops
-    @ [Bit_and; Bit_or; Bit_xor; Shift_left; Shift_right; Shift_right_logical]
+    @ [ Unsigned_div;
+        Unsigned_rem;
+        Bit_and;
+        Bit_or;
+        Bit_xor;
+        Shift_left;
+        Shift_right;
+        Shift_right_logical ]
 
   let ops_for_ty (ty : Ty.t) =
     match ty with
@@ -577,6 +586,8 @@ module Bin_op = struct
     | Mul -> call "mul"
     | Div -> call "div"
     | Rem -> call "rem"
+    | Unsigned_div -> call "unsigned_div"
+    | Unsigned_rem -> call "unsigned_rem"
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
     | Bit_xor -> call "logxor"
