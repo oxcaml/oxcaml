@@ -116,12 +116,13 @@ let run_test_tree log add_msg behavior env ast =
       | exception e ->
         let bt = Printexc.get_backtrace () in
         let line = s.loc.Location.loc_start.Lexing.pos_lnum in
-        let msg = Printf.sprintf "%s %s"
+        Printf.ksprintf
+          (fun msg ->
+            add_msg msg;
+            Actions.Static (Result.fail_with_reason msg))
+          "%s %s"
           (string_of_test_location ~branches line)
           (report_error s.loc e bt)
-        in
-        Printf.ksprintf add_msg "%s" msg;
-        Actions.Static (Result.fail_with_reason msg)
       end
     | Test (_, name, mods) :: rest ->
       let skip_all =
