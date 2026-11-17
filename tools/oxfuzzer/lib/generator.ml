@@ -186,6 +186,16 @@ let random_exceptions (st : State.t) exceptions ~count =
   in
   pick [] exceptions count
 
+let split_at list count =
+  ( List.filteri (fun index _ -> index < count) list,
+    List.filteri (fun index _ -> index >= count) list )
+
+(* [Some prefix] if [types] is [prefix @ suffix] with a nonempty [prefix]. *)
+let split_suffix types ~suffix =
+  let count = List.length types - List.length suffix in
+  let prefix, rest = split_at types count in
+  if count > 0 && List.equal Ty.equal rest suffix then Some prefix else None
+
 let random_int_in_range (st : State.t) ~min ~max =
   Random.State.int_in_range st.random_state ~min ~max
 
@@ -960,18 +970,11 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
     in
     let new_function =
       Gen.create (fun () ->
-          let name = State.reserve_function st in
           let params =
             List.init
               (random_int_in_range st ~min:Config.fun_min_param_count
                  ~max:Config.fun_max_param_count) (fun _ ->
-                { Binding.name = State.fresh st;
-                  ty = gen_type st;
-                  is_mutable =
-                    st.swarm.mutable_bindings
-                    && with_probability st
-                         ~probability:Config.mutable_binding_probability
-                })
+                gen_param st (gen_type st))
           in
           let raises =
             List.filter
@@ -980,33 +983,12 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
                   ~probability:Config.callee_raises_probability)
               caller_env.catchable_exceptions
           in
-          let callee_env =
-            List.fold_left Env.extend
-              { Env.empty with catchable_exceptions = raises }
-              params
+          let (function_ : Function.t) =
+            gen_function st ~params ~return_ty ~raises
           in
-          let inline = gen_inline st in
           let args = gen_arguments params in
-          let _callee_env, body = gen_fun_body st callee_env 0 in
-          (* CR-someday xclerc: Make sure we use a result that uses as many
-             generated variables as possible. Otherwise, most of the function
-             might become dead code, which is a waste of CPU time for
-             fuzzing. *)
-          let result =
-            match gen_existing st callee_env return_ty with
-            | Some generate -> maybe_assert st ~f:generate
-            | None -> gen_value st callee_env return_ty
-          in
-          let function_ =
-            { Function.name; params; inline; body; return_ty; result; raises }
-          in
-          (* Creating a function after its full body was successfully generated
-             ensures that all the functions called by [function_] were already
-             added to [st.top_level_functions]. This means that functions are
-             topologically sorted by construction. *)
-          st.top_level_functions <- function_ :: st.top_level_functions;
           bind_operands st args ~f:(fun args ->
-              Expr.Call_toplevel { fun_name = name; args }))
+              Expr.Call_toplevel { fun_name = function_.name; args }))
     in
     Gen.weighted st.random_state [2, existing_function; 1, new_function]
 
@@ -1038,6 +1020,53 @@ and gen_string (st : State.t) env =
          1, gen_try_expr st env Ty.String;
          1, gen_match st env Ty.String ])
 
+and gen_param (st : State.t) ty =
+  { Binding.name = State.fresh st;
+    ty;
+    is_mutable =
+      st.swarm.mutable_bindings
+      && with_probability st ~probability:Config.mutable_binding_probability
+  }
+
+(* Generates a top-level function and adds it to [st.top_level_functions]. *)
+and gen_function (st : State.t) ~params ~return_ty ~raises =
+  let name = State.reserve_function st in
+  let callee_env =
+    List.fold_left Env.extend
+      { Env.empty with catchable_exceptions = raises }
+      params
+  in
+  let inline = gen_inline st in
+  let _callee_env, body = gen_fun_body st callee_env 0 in
+  (* CR-someday xclerc: Make sure we use a result that uses as many generated
+     variables as possible. Otherwise, most of the function might become dead
+     code, which is a waste of CPU time for fuzzing. *)
+  let result =
+    match gen_existing st callee_env return_ty with
+    | Some generate -> maybe_assert st ~f:generate
+    | None -> gen_value st callee_env return_ty
+  in
+  let function_ =
+    { Function.name; params; inline; body; return_ty; result; raises }
+  in
+  (* Creating a function after its full body was successfully generated ensures
+     that all the functions called by [function_] were already added to
+     [st.top_level_functions]. This means that functions are topologically
+     sorted by construction. *)
+  st.top_level_functions <- function_ :: st.top_level_functions;
+  function_
+
+(* The type of a top-level function as a function value, unless it takes
+   [unit]. *)
+and function_type (function_ : Function.t) =
+  match function_.params with
+  | [] -> None
+  | params ->
+    Some
+      (Ty.curry
+         (List.map (fun (binding : Binding.t) -> binding.ty) params)
+         function_.return_ty)
+
 (* Calls a function value of [env] whose result can be converted to
    [result_ty]. *)
 and gen_closure_call (st : State.t) (env : Env.t) result_ty =
@@ -1050,17 +1079,130 @@ and gen_closure_call (st : State.t) (env : Env.t) result_ty =
         | _ -> None)
       (places st env ~for_write:false)
   in
+  (* Top-level functions returning function values, applied to more arguments
+     than they take. *)
+  let over_applications =
+    if not st.swarm.partial_applications
+    then []
+    else
+      List.filter_map
+        (fun (function_ : Function.t) ->
+          match
+            function_.return_ty, Option.map Ty.uncurry (function_type function_)
+          with
+          | Ty.Arrow _, Some (params, result)
+            when can_convert st result result_ty
+                 && List.for_all (Env.can_raise env) function_.raises ->
+            Some
+              ( params,
+                result,
+                fun args ->
+                  Expr.Call_toplevel { fun_name = function_.name; args } )
+          | _ -> None)
+        st.top_level_functions
+  in
+  let functions =
+    List.map
+      (fun (params, result, make) ->
+        ( params,
+          result,
+          fun args -> Expr.Apply { func = Expr.Read (make ()); args } ))
+      functions
+    @ over_applications
+  in
   Gen.when_
     (st.closure_calls_remaining > 0 && not (List.is_empty functions))
     (fun () ->
       st.closure_calls_remaining <- st.closure_calls_remaining - 1;
-      let params, result, make = random_element st functions in
+      let params, result, apply = random_element st functions in
       let args = List.map (gen_value st env) params in
       bind_operands st args ~f:(fun args ->
-          convert_value st result result_ty
-            (Expr.Apply { func = Expr.Read (make ()); args })))
+          convert_value st result result_ty (apply args)))
+
+(* A function value of type [Ty.curry params result], applying a function value
+   or a top-level function to the arguments before [params]. *)
+and gen_partial_application (st : State.t) (env : Env.t) params result =
+  let prefix ty =
+    let all, all_result = Ty.uncurry ty in
+    if Ty.equal all_result result then split_suffix all ~suffix:params else None
+  in
+  let closures =
+    List.filter_map
+      (fun (ty, make) ->
+        Option.map
+          (fun prefix ->
+            prefix, fun args -> Expr.Apply { func = Expr.Read (make ()); args })
+          (prefix ty))
+      (places st env ~for_write:false)
+  in
+  (* Without all its arguments, a function does not run, and its result cannot
+     raise. *)
+  let can_apply (function_ : Function.t) prefix =
+    if List.compare_lengths prefix function_.params < 0
+    then List.is_empty function_.raises
+    else List.for_all (Env.can_raise env) function_.raises
+  in
+  let functions =
+    List.filter_map
+      (fun (function_ : Function.t) ->
+        match Option.bind (function_type function_) prefix with
+        | Some prefix when can_apply function_ prefix ->
+          Some
+            ( prefix,
+              fun args -> Expr.Call_toplevel { fun_name = function_.name; args }
+            )
+        | Some _ | None -> None)
+      st.top_level_functions
+  in
+  let existing =
+    Gen.when_
+      (not (List.is_empty (closures @ functions)))
+      (fun () ->
+        let prefix, apply = random_element st (closures @ functions) in
+        let args = List.map (gen_value st env) prefix in
+        bind_operands st args ~f:apply)
+  in
+  let new_function =
+    Gen.when_
+      (st.swarm.function_calls
+      && State.can_create_function st ~max:Config.max_function_count)
+      (fun () ->
+        let prefix =
+          List.init
+            (random_int_in_range st ~min:1 ~max:Config.max_closure_param_count)
+            (fun _ -> gen_param st (gen_type ~arrows:false st))
+        in
+        let (function_ : Function.t) =
+          gen_function st
+            ~params:(prefix @ List.map (gen_param st) params)
+            ~return_ty:result ~raises:[]
+        in
+        let args =
+          List.map
+            (fun (binding : Binding.t) -> gen_value st env binding.ty)
+            prefix
+        in
+        bind_operands st args ~f:(fun args ->
+            Expr.Call_toplevel { fun_name = function_.name; args }))
+  in
+  Gen.only_if st.swarm.partial_applications
+    (Gen.weighted st.random_state [2, existing; 1, new_function])
 
 and gen_lambda (st : State.t) (env : Env.t) params result_ty =
+  (* A curried function takes the first parameters and returns a function taking
+     the rest. *)
+  let params, result_ty =
+    let count = List.length params in
+    if
+      st.swarm.partial_applications && count > 1
+      && with_probability st ~probability:Config.curried_lambda_probability
+    then
+      let params, rest =
+        split_at params (random_int_in_range st ~min:1 ~max:(count - 1))
+      in
+      params, Ty.curry rest result_ty
+    else params, result_ty
+  in
   let params =
     List.map
       (fun ty -> { Binding.name = State.fresh st; ty; is_mutable = false })
@@ -1218,6 +1360,7 @@ and gen_value (st : State.t) env ty =
           (Gen.weighted st.random_state
              [ 3, gen_existing st env ty;
                2, Gen.create (fun () -> gen_lambda st env params result);
+               1, gen_partial_application st env params result;
                1, gen_fun_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ]))

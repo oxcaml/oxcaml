@@ -95,6 +95,8 @@ val callee_raises_probability : int
 
 val closure_probability : int
 
+val curried_lambda_probability : int
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -128,7 +130,8 @@ module Swarm : sig
       opaque_leaves : bool;
       opaque_loop_bounds : bool;
       exceptions : bool;
-      closures : bool
+      closures : bool;
+      partial_applications : bool
     }
 
   val create : Random.State.t -> t

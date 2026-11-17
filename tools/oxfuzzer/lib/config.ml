@@ -98,6 +98,8 @@ let callee_raises_probability = 5_000
 
 let closure_probability = 1_500
 
+let curried_lambda_probability = 2_500
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -131,7 +133,8 @@ module Swarm = struct
       opaque_leaves : bool;
       opaque_loop_bounds : bool;
       exceptions : bool;
-      closures : bool
+      closures : bool;
+      partial_applications : bool
     }
 
   let create random_state =
@@ -165,7 +168,8 @@ module Swarm = struct
       opaque_leaves = Random.State.bool random_state;
       opaque_loop_bounds = Random.State.bool random_state;
       exceptions = Random.State.bool random_state;
-      closures = Random.State.bool random_state
+      closures = Random.State.bool random_state;
+      partial_applications = Random.State.bool random_state
     }
 
   let to_string t =
@@ -194,7 +198,8 @@ module Swarm = struct
       "opaque_leaves", t.opaque_leaves;
       "opaque_loop_bounds", t.opaque_loop_bounds;
       "exceptions", t.exceptions;
-      "closures", t.closures ]
+      "closures", t.closures;
+      "partial_applications", t.partial_applications ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> List.cons
          (Format.sprintf "  assertions = %s"
