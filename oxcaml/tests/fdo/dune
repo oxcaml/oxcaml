@@ -299,7 +299,9 @@
   (diff simplify_o3_reaper.output simplify_o3_reaper.output.corrected)))
 
 ; The counters in Cmm: none of the Flambda translated to Cmm is lost, and none
-; is added. [to_cmm.ml] is also compiled with the inline fast path of
+; is added. The Cmm dumps are read from next to the .cmx files, so OCAMLPARAM is
+; cleared: CI's metrics job sets dump-dir in it, which moves them (as in the
+; vectorizer tests). [to_cmm.ml] is also compiled with the inline fast path of
 ; [caml_apply], whose two calls share the counter, and [simplify.ml] at -O3 with
 ; the reaper.
 
@@ -311,54 +313,63 @@
  (action
   (progn
    (run mkdir -p to_cmm_fast_path to_cmm_o3_reaper)
-   (run
-    %{bin:ocamlopt.opt}
-    -c
-    -fdo-counters
-    -fexpr-print-fdo-counters
-    -fexpr-print-branch-annotations
-    -dfexpr-annot-after
-    simplify
-    -dcmm
-    -dump-into-file
-    -color
-    never
-    -o
-    to_cmm.cmx
-    to_cmm.ml)
-   (run
-    %{bin:ocamlopt.opt}
-    -c
-    -caml-apply-inline-fast-path
-    -fdo-counters
-    -fexpr-print-fdo-counters
-    -fexpr-print-branch-annotations
-    -dfexpr-annot-after
-    simplify
-    -dcmm
-    -dump-into-file
-    -color
-    never
-    -o
-    to_cmm_fast_path/to_cmm.cmx
-    to_cmm.ml)
-   (run
-    %{bin:ocamlopt.opt}
-    -c
-    -O3
-    -flambda2-reaper
-    -fdo-counters
-    -fexpr-print-fdo-counters
-    -fexpr-print-branch-annotations
-    -dfexpr-annot-after
-    reaper
-    -dcmm
-    -dump-into-file
-    -color
-    never
-    -o
-    to_cmm_o3_reaper/simplify.cmx
-    simplify.ml)
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -fexpr-print-fdo-counters
+     -fexpr-print-branch-annotations
+     -dfexpr-annot-after
+     simplify
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     to_cmm.cmx
+     to_cmm.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -caml-apply-inline-fast-path
+     -fdo-counters
+     -fexpr-print-fdo-counters
+     -fexpr-print-branch-annotations
+     -dfexpr-annot-after
+     simplify
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     to_cmm_fast_path/to_cmm.cmx
+     to_cmm.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -O3
+     -flambda2-reaper
+     -fdo-counters
+     -fexpr-print-fdo-counters
+     -fexpr-print-branch-annotations
+     -dfexpr-annot-after
+     reaper
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     to_cmm_o3_reaper/simplify.cmx
+     simplify.ml))
    (with-stdout-to
     to_cmm.output.corrected
     (progn
@@ -399,22 +410,25 @@
   (= %{context_name} "main"))
  (action
   (progn
-   (run
-    %{bin:ocamlopt.opt}
-    -c
-    -O3
-    -flambda2-reaper
-    -fdo-counters
-    -fexpr-print-fdo-counters
-    -fexpr-print-branch-annotations
-    -dflambda-heavy-invariants
-    -dfexpr-annot-after
-    reaper
-    -dcmm
-    -dump-into-file
-    -color
-    never
-    to_cmm_reaper.ml)
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -O3
+     -flambda2-reaper
+     -fdo-counters
+     -fexpr-print-fdo-counters
+     -fexpr-print-branch-annotations
+     -dflambda-heavy-invariants
+     -dfexpr-annot-after
+     reaper
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     to_cmm_reaper.ml))
    (with-stdout-to
     to_cmm_reaper.output.corrected
     (progn
