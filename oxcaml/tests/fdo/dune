@@ -315,6 +315,8 @@
     %{bin:ocamlopt.opt}
     -c
     -fdo-counters
+    -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dfexpr-annot-after
     simplify
     -dcmm
@@ -329,6 +331,8 @@
     -c
     -caml-apply-inline-fast-path
     -fdo-counters
+    -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dfexpr-annot-after
     simplify
     -dcmm
@@ -344,6 +348,8 @@
     -O3
     -flambda2-reaper
     -fdo-counters
+    -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dfexpr-annot-after
     reaper
     -dcmm
@@ -399,6 +405,8 @@
     -O3
     -flambda2-reaper
     -fdo-counters
+    -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
     -dflambda-heavy-invariants
     -dfexpr-annot-after
     reaper
