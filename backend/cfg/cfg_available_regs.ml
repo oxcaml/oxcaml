@@ -367,7 +367,8 @@ module Transfer = struct
             | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
             | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
             | Begin_region | End_region | Specific _ | Dls_get | Tls_get
-            | Domain_index | Thread_self_id | Poll | Alloc _ | Pause )
+            | Domain_index | Thread_self_id | Poll | Alloc _ | Pause
+            | Trace_pc_guard_gate | Trace_pc_guard _ )
         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
         | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in

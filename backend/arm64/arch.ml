@@ -90,10 +90,6 @@ type specific_operation =
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
   | Illvm_intrinsic of string
-  | Itrace_pc_guard_gate
-    (* load of the coverage gate, see [Cfg_trace_pc_guard] *)
-  | Itrace_pc_guard of int
-    (* call to the coverage callback, preserving all registers *)
 
 and arith_operation =
     Ishiftadd
@@ -273,10 +269,6 @@ let print_specific_operation printreg op ppf arg =
     Simd.print_operation printreg op ppf arg
   | Illvm_intrinsic name ->
       fprintf ppf "llvm_intrinsic %s" name
-  | Itrace_pc_guard_gate ->
-      fprintf ppf "trace_pc_guard_gate"
-  | Itrace_pc_guard n ->
-      fprintf ppf "trace_pc_guard %d" n
 
 let specific_operation_name : specific_operation -> string = fun op ->
   match op with
@@ -312,8 +304,6 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Isignext _ -> "signext"
   | Isimd _ -> "simd"
   | Illvm_intrinsic _ -> "llvm_intrinsic"
-  | Itrace_pc_guard_gate -> "trace_pc_guard_gate"
-  | Itrace_pc_guard _ -> "trace_pc_guard"
 
 let equal_addressing_mode left right =
   match left, right with
@@ -360,14 +350,11 @@ let equal_specific_operation left right =
   | Isignext left, Isignext right -> Int.equal left right
   | Isimd left, Isimd right -> Simd.equal_operation left right
   | Illvm_intrinsic left, Illvm_intrinsic right -> String.equal left right
-  | Itrace_pc_guard_gate, Itrace_pc_guard_gate -> true
-  | Itrace_pc_guard left, Itrace_pc_guard right -> Int.equal left right
   | (Ifar_alloc _  | Ifar_poll | Ifar_stackcheck _ | Ishiftarith _
     | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
     | Inegmulsubf | Isqrtf | Ibswap _ | Imove8 | Imove16 | Imove32
     | Isignext _ | Isimd _
-    | Illvm_intrinsic _ | Itrace_pc_guard_gate | Itrace_pc_guard _), _ ->
-    false
+    | Illvm_intrinsic _), _ -> false
 
 let isomorphic_specific_operation op1 op2 =
   equal_specific_operation op1 op2
@@ -375,8 +362,7 @@ let isomorphic_specific_operation op1 op2 =
 (* Specific operations that are pure *)
 
 let operation_is_pure : specific_operation -> bool = function
-  | Ifar_alloc _ | Ifar_poll | Ifar_stackcheck _ | Itrace_pc_guard_gate
-  | Itrace_pc_guard _ -> false
+  | Ifar_alloc _ | Ifar_poll | Ifar_stackcheck _ -> false
   | Ishiftarith _ -> true
   | Imuladd -> true
   | Imulsub -> true
@@ -417,7 +403,6 @@ let operation_allocates = function
   | Ishiftarith (_, _)
   | Isignext _
   | Ibswap _
-  | Itrace_pc_guard_gate | Itrace_pc_guard _
   | Isimd _ -> false
   | Illvm_intrinsic _intr ->
       (* Used by the zero_alloc checker that runs before the Llvmize. *)
@@ -434,6 +419,3 @@ let equal_addressing_mode_without_displ (addressing_mode_1: addressing_mode)
 let addressing_offset_in_bytes (_addressing_mode_1: addressing_mode)
       (_addressing_mode_2 : addressing_mode) ~arg_offset_in_bytes:_ _ _ =
   None
-
-let trace_pc_guard_operations =
-  Some (Itrace_pc_guard_gate, fun n -> Itrace_pc_guard n)

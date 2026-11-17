@@ -704,7 +704,8 @@ module Stack_offset_and_exn = struct
         | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
         | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
         | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Thread_self_id | Poll | Pause | Alloc _ )
+        | Domain_index | Thread_self_id | Poll | Pause | Trace_pc_guard_gate
+        | Trace_pc_guard _ | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->

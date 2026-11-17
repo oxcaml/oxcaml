@@ -427,7 +427,8 @@ and emit_expr_op env c op args dbg : result =
   | Basic
       ( Op
           ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-          | Tls_get | Domain_index | Thread_self_id | Poll | Pause | Const_int _
+          | Tls_get | Domain_index | Thread_self_id | Poll | Pause
+          | Trace_pc_guard_gate | Trace_pc_guard _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
           | Load _

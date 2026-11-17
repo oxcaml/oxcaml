@@ -51,7 +51,6 @@ let class_of_operation (op : Operation.t)
       | Imove32
       | Isignext _ -> Op_pure
       | Isimd op -> of_simd_class (Simd.class_of_operation op)
-      | Itrace_pc_guard_gate | Itrace_pc_guard _ -> Op_other
       | Illvm_intrinsic intr ->
         Misc.fatal_errorf "CSE: Unexpected llvm_intrinsic %s: \
                            not using LLVM backend"
@@ -65,6 +64,7 @@ let class_of_operation (op : Operation.t)
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+  | Trace_pc_guard_gate | Trace_pc_guard _
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
   | Thread_self_id
     -> Use_default
@@ -83,6 +83,7 @@ let is_cheap_operation (op : Operation.t)
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+  | Trace_pc_guard_gate | Trace_pc_guard _
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
   | Thread_self_id
     -> Cheap false

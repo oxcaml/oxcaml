@@ -2095,8 +2095,8 @@ let emit_instr env i =
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
-  | Lop (Specific Itrace_pc_guard_gate) -> Emit_sancov.emit_gate ~res:i.res.(0)
-  | Lop (Specific (Itrace_pc_guard index)) ->
+  | Lop Trace_pc_guard_gate -> Emit_sancov.emit_gate ~res:i.res.(0)
+  | Lop (Trace_pc_guard index) ->
     Emit_sancov.emit_call ~live:i.live ~move:(move env) ~index
 
 let emit_instr env i =

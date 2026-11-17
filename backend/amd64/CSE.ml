@@ -37,8 +37,7 @@ let class_of_operation (op : Operation.t)
     | Ioffset_loc(_, _) -> Class (Op_store true)
     | Ifloatarithmem _ -> Class (Op_load Mutable)
     | Ibswap _ -> Use_default
-    | Irdtsc | Irdpmc | Itrace_pc_guard_gate | Itrace_pc_guard _ ->
-      Class Op_other
+    | Irdtsc | Irdpmc -> Class Op_other
     | Ilfence | Imfence ->
       (* A load that follows a load fence must not be satisfied by an equation
          over a load that precedes the fence: that would effectively hoist the
@@ -70,6 +69,7 @@ let class_of_operation (op : Operation.t)
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+  | Trace_pc_guard_gate | Trace_pc_guard _
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
   | Thread_self_id
     -> Use_default

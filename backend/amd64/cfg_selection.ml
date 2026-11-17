@@ -237,15 +237,16 @@ let pseudoregs_for_operation op arg res =
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
       | Istore_int (_, _, _)
-      | Ilfence | Isfence | Imfence | Itrace_pc_guard_gate | Itrace_pc_guard _
+      | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
   | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
   | Const_vec512 _ | Const_mask _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
-  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause | Begin_region
-  | End_region | Poll | Dls_get | Tls_get | Domain_index | Thread_self_id ->
+  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause
+  | Trace_pc_guard_gate | Trace_pc_guard _ | Begin_region | End_region | Poll
+  | Dls_get | Tls_get | Domain_index | Thread_self_id ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"

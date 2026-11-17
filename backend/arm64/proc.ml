@@ -380,6 +380,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+        | Trace_pc_guard_gate | Trace_pc_guard _
         | Begin_region | End_region | Dls_get | Tls_get | Domain_index
         | Thread_self_id)
   | Poptrap _ | Prologue | Epilogue

@@ -701,7 +701,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Alloc _) ->
     destroyed_at_alloc_or_poll
   | Op (Specific Ipackf32) -> [||]
-  | Op (Specific (Itrace_pc_guard_gate | Itrace_pc_guard _)) ->
+  | Op (Trace_pc_guard_gate | Trace_pc_guard _) ->
     (* The call to the coverage callback preserves all registers. *)
     [||]
   | Op (Specific (Isimd op)) ->

@@ -32,11 +32,11 @@
 (** To be called at the start of each compilation unit. *)
 val reset_unit : unit -> unit
 
-(** Emit the load of the gate into [res] ([Itrace_pc_guard_gate]). *)
+(** Emit the load of the gate into [res] ([Trace_pc_guard_gate]). *)
 val emit_gate : res:X86_ast.arg -> unit
 
 (** Emit a call to the callback, with the address of a new guard
-    ([Itrace_pc_guard]). Every register is preserved; [live] is the set of
+    ([Trace_pc_guard]). Every register is preserved; [live] is the set of
     registers live across the call.
 
     [move] emits a move between a hardware register and an [Outgoing] stack

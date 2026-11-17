@@ -336,6 +336,11 @@ type t =
   | Thread_self_id
   | Poll
   | Pause
+  | Trace_pc_guard_gate
+      (** Load of the coverage gate, see [Cfg_trace_pc_guard]. *)
+  | Trace_pc_guard of int
+      (** Call to the coverage callback for the probe with the given index,
+          preserving all registers. *)
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
@@ -384,6 +389,7 @@ let is_pure = function
   | Thread_self_id -> true
   | Poll -> false
   | Pause -> false
+  | Trace_pc_guard_gate | Trace_pc_guard _ -> false
   | Alloc _ -> false
 
 (* The next 2 functions are copied almost as is from asmcomp/printmach.ml
@@ -480,6 +486,8 @@ let dump ppf op =
   | Tls_get -> Format.fprintf ppf "tls_get"
   | Domain_index -> Format.fprintf ppf "domain_index"
   | Thread_self_id -> Format.fprintf ppf "thread_self_id"
+  | Trace_pc_guard_gate -> Format.fprintf ppf "trace_pc_guard_gate"
+  | Trace_pc_guard n -> Format.fprintf ppf "trace_pc_guard %d" n
   | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
   | Alloc { bytes; dbginfo = _; mode = Heap } ->
@@ -622,6 +630,8 @@ let equal left right =
     && Option.equal Backend_var.Provenance.equal left_prov right_prov
   | Dls_get, Dls_get | Tls_get, Tls_get | Poll, Poll | Pause, Pause -> true
   | Domain_index, Domain_index | Thread_self_id, Thread_self_id -> true
+  | Trace_pc_guard_gate, Trace_pc_guard_gate -> true
+  | Trace_pc_guard left, Trace_pc_guard right -> Int.equal left right
   | Int128op left_op, Int128op right_op ->
     equal_int128_operation left_op right_op
   | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
@@ -635,6 +645,7 @@ let equal left right =
       | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
       | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
       | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
-      | Thread_self_id | Poll | Pause | Alloc _ ),
+      | Thread_self_id | Poll | Pause | Trace_pc_guard_gate | Trace_pc_guard _
+      | Alloc _ ),
       _ ) ->
     false

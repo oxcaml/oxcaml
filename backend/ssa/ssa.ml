@@ -542,7 +542,7 @@ module Instruction = struct
       | Specific s -> not (Arch.operation_is_pure s)
       | Name_for_debugger _ -> false
       | Dls_get | Tls_get | Domain_index | Thread_self_id -> false
-      | Poll | Pause -> true
+      | Poll | Pause | Trace_pc_guard_gate | Trace_pc_guard _ -> true
       | Alloc _ -> true)
     | Push_trap _ | Pop_trap _ -> true
 

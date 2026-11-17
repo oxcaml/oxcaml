@@ -2633,8 +2633,8 @@ let emit_instr ~first ~last ~fallthrough i =
     assert (equal_reg64 (arg64 i 0) RCX);
     I.rdpmc ();
     emit_combine_edx_eax i.res.(0)
-  | Lop (Specific Itrace_pc_guard_gate) -> Emit_sancov.emit_gate ~res:(res i 0)
-  | Lop (Specific (Itrace_pc_guard _)) ->
+  | Lop Trace_pc_guard_gate -> Emit_sancov.emit_gate ~res:(res i 0)
+  | Lop (Trace_pc_guard _) ->
     Emit_sancov.emit_call ~live:i.live ~move ~emit_call
   | Lop (Specific Ilfence) -> I.lfence ()
   | Lop (Specific Isfence) -> I.sfence ()

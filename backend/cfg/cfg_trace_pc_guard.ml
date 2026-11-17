@@ -287,8 +287,8 @@ type probe =
 
    - the block itself, which keeps its label, loads the gate and tests it;
 
-   - a cold block calling the callback, which is a single target-specific
-   operation preserving all registers (see [Arch.trace_pc_guard_operations]);
+   - a cold block calling the callback, which is a single operation preserving
+   all registers;
 
    - a block with the original body and terminator, where both paths join.
 
@@ -299,12 +299,6 @@ type probe =
 let instrument_block cfg_with_layout { label; dbg } ~index =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   let block = Cfg.get_block_exn cfg label in
-  let gate_op, call_op =
-    match Arch.trace_pc_guard_operations with
-    | None ->
-      Misc.fatal_error "-gated-trace-pc-guard is not supported on this target"
-    | Some (gate_op, call_op) -> gate_op, call_op index
-  in
   let stack_offset =
     match DLL.hd block.body with
     | Some (instr : Cfg.basic Cfg.instruction) -> instr.stack_offset
@@ -351,11 +345,13 @@ let instrument_block cfg_with_layout { label; dbg } ~index =
     }
   in
   DLL.add_end call.body
-    (make_instruction (Op (Specific call_op) : Cfg.basic) ~arg:[||] ~res:[||]);
+    (make_instruction
+       (Op (Trace_pc_guard index) : Cfg.basic)
+       ~arg:[||] ~res:[||]);
   let gate = Reg.create Int in
   DLL.add_end block.body
     (make_instruction
-       (Op (Specific gate_op) : Cfg.basic)
+       (Op Trace_pc_guard_gate : Cfg.basic)
        ~arg:[||] ~res:[| gate |]);
   block.terminator
     <- make_instruction

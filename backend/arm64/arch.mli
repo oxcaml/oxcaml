@@ -67,10 +67,6 @@ type specific_operation =
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
   | Illvm_intrinsic of string
-  | Itrace_pc_guard_gate
-    (* load of the coverage gate, see [Cfg_trace_pc_guard] *)
-  | Itrace_pc_guard of int
-    (* call to the coverage callback, preserving all registers *)
 
 and arith_operation =
     Ishiftadd
@@ -161,12 +157,6 @@ val operation_allocates : specific_operation -> bool
 (* Specific operations that can raise *)
 
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
-
-(** The operations implementing the coverage probes of [-gated-trace-pc-guard],
-    if supported by the target: the load of the gate into a register, and the
-    call to the callback for the probe with the given index. *)
-val trace_pc_guard_operations
-  : (specific_operation * (int -> specific_operation)) option
 
 (* See `amd64/arch.mli`. *)
 val equal_addressing_mode_without_displ : addressing_mode -> addressing_mode -> bool

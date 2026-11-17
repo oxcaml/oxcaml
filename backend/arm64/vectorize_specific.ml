@@ -23,7 +23,7 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
     create Arbitrary
   | Ishiftarith _ | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
   | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _ | Imove8 | Imove16 | Imove32
-  | Isignext _ | Isimd _ | Itrace_pc_guard_gate | Itrace_pc_guard _ ->
+  | Isignext _ | Isimd _ ->
     (* Conservative. we don't have any specific operations with memory
        operations at the moment. *)
     if Arch.operation_is_pure op then None else create Memory_access.Arbitrary
@@ -36,8 +36,7 @@ let is_seed_store (op : Arch.specific_operation) =
   match op with
   | Ifar_poll | Ifar_alloc _ | Ifar_stackcheck _ | Ishiftarith _ | Imuladd
   | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf
-  | Isqrtf | Ibswap _ | Imove8 | Imove16 | Imove32 | Isignext _ | Isimd _
-  | Itrace_pc_guard_gate | Itrace_pc_guard _ ->
+  | Isqrtf | Ibswap _ | Imove8 | Imove16 | Imove32 | Isignext _ | Isimd _ ->
     None
   | Illvm_intrinsic intr ->
     Misc.fatal_errorf

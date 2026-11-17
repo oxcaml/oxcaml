@@ -309,11 +309,12 @@ let pseudoregs_for_operation op arg res =
       | Imulsubf | Inegmulsubf | Isqrtf | Imove8 | Imove16 | Imove32
       | Ifar_alloc _ | Ifar_stackcheck _
       | Ishiftarith (_, _)
-      | Ibswap _ | Isignext _ | Itrace_pc_guard_gate | Itrace_pc_guard _ )
-  | Move | Spill | Reload | Pause | Begin_region | End_region | Dls_get
-  | Tls_get | Domain_index | Thread_self_id | Poll | Const_int _
-  | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-  | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+      | Ibswap _ | Isignext _ )
+  | Move | Spill | Reload | Pause | Trace_pc_guard_gate | Trace_pc_guard _
+  | Begin_region | End_region | Dls_get | Tls_get | Domain_index
+  | Thread_self_id | Poll | Const_int _ | Const_float32 _ | Const_float _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+  | Const_mask _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Intop _ | Int128op _
   | Intop_imm (_, _)
