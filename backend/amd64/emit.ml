@@ -2068,7 +2068,6 @@ let emit_combine_edx_eax dst =
   (* RDTSC and RDPMC fill the low 32 bits of the result registers. On
      processors that support the Intel 64 architecture, the high-order
      32 bits of each of RAX and RDX are cleared. *)
-  (* Combine edx and eax into a single 64-bit result. *)
   I.sal (int 32) rdx;
   (* Preserve the shifted high half when the destination is rdx. *)
   match reg64 dst with
