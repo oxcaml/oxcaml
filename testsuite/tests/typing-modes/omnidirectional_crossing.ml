@@ -525,13 +525,7 @@ let f (w : (T.t, r) eq option) (c : T.s) =
 type (_, _) eq = Refl : ('a, 'a) eq
 module T : sig type t type s = t end
 type r = { x : int; y : int; }
-Line 19, characters 42-43:
-19 |   match w with None -> c | Some Refl -> { c with x = 0 }
-                                               ^
-Error: This expression has type "T.s" = "r"
-       but an expression was expected of type "r"
-       This instance of "r" is ambiguous:
-       it would escape the scope of its equation
+val f : (T.t, r) eq option -> T.s -> T.s = <fun>
 |}, Principal{|
 type (_, _) eq = Refl : ('a, 'a) eq
 module T : sig type t type s = t end
