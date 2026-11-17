@@ -171,6 +171,7 @@ let wrap_trace_gadt_instances ?force env f x =
 (**** Abbreviations without parameters ****)
 (* Shall reset after generalizing *)
 
+
 let simple_abbrevs = ref Mnil
 
 let proper_abbrevs tl abbrev =
@@ -5381,6 +5382,9 @@ let link_var tr_exn env t1 t2 =
   | Tvar _ -> link_type t1 t2
   | Tivar { ivar = ivar1; _ } -> (
     let t2' = expand_head_ignoring_local_constraints_for tr_exn env t2 in
+    (* Sharing of [simple_abbrevs] is dangerous after a speculative
+       expansion on [t2] to compute its head. *)
+    simple_abbrevs := Mnil;
     let head = Type_head.of_expanded_type env t2' in
     link_type t1 t2;
     match head with
