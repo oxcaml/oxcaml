@@ -35,6 +35,7 @@ val equality :
   unit
 
 val moregen :
+  ?spine:bool ->
   formatter ->
   Out_type.type_or_scheme ->
   Env.t -> Errortrace.moregen_error ->

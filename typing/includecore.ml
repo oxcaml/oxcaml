@@ -618,7 +618,7 @@ let report_value_mismatch ~pp first second env ppf err =
   | Type trace ->
       let msg = Fmt.Doc.msg in
       with_relevant_modes trace (fun () ->
-        Errortrace_report.moregen ppf Type_scheme env trace
+        Errortrace_report.moregen ~spine:true ppf Type_scheme env trace
           (msg "The type")
           (msg "is not compatible with the type"))
   | Zero_alloc e -> Zero_alloc.print_error ppf e
