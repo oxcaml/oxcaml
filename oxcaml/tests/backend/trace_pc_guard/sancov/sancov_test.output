@@ -1,0 +1,4 @@
+covered:
+sancov_test.ml:4 hit_fn
+not covered:
+sancov_test.ml:6 missed_fn

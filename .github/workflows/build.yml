@@ -463,6 +463,12 @@ jobs:
         continue-on-error: true
         run: bash tools/ci/actions/promote-and-capture-diff.sh promote
 
+      - name: Test coverage instrumentation with sancov
+        if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
+        run: make runtest-sancov
+        env:
+          OXCAML_LLVM_BIN: ${{ github.workspace }}/oxcaml-llvm/bin
+
       - name: Build and test OxCaml Llvmize
         if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
         run: |
