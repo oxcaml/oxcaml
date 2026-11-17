@@ -10,7 +10,7 @@ val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 
 let foo x = 42
 [%%expect{|
-val foo : 'a @ 'n -> int @ 'm = <fun>
+val foo : 'a @ 'm -> int @ 'n = <fun>
 |}]
 
 let foo x = id x
@@ -21,8 +21,8 @@ val foo : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
 let foo f x = f x
 [%%expect{|
 val foo :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm] -> 'b @ [< 'n & global]) @ [< global] ->
+  'a @ [< 'm] -> 'b @ [> 'n | dynamic] = <fun>
 |}]
 
 let foo =
@@ -34,7 +34,7 @@ val foo : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
 
 let foo a b = a + b
 [%%expect{|
-val foo : int @ 'n -> int @ 'm -> int @ [> dynamic] = <fun>
+val foo : int @ 'm -> int @ 'n -> int @ [> dynamic] = <fun>
 |}, Principal{|
 val foo : int @ [< global] -> int @ 'm -> int @ [> dynamic] = <fun>
 |}]
@@ -80,15 +80,15 @@ type ('a, 'b) mytype = { x : 'a; y : 'b; }
 let foo x y = { x; y }
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] ->
-  'b @ [< 'm & global] -> ('a, 'b) mytype @ [> 'm | 'n] = <fun>
+  'a @ [< 'm & global] ->
+  'b @ [< 'n & global] -> ('a, 'b) mytype @ [> 'n | 'm] = <fun>
 |}]
 
 let foo x = fun y -> { x; y }
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] ->
-  'b @ [< 'm & global] -> ('a, 'b) mytype @ [> 'm | 'n] = <fun>
+  'a @ [< 'm & global] ->
+  'b @ [< 'n & global] -> ('a, 'b) mytype @ [> 'n | 'm] = <fun>
 |}]
 
 let foo x = { x; y = 42 }
@@ -139,14 +139,14 @@ val dupl : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] = <fun>
 let prod x y = (x, y)
 [%%expect{|
 val prod :
-  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
+  'a @ [< 'm & global] -> 'b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm] =
   <fun>
 |}]
 
 let prod_eta x = fun y -> (x, y)
 [%%expect{|
 val prod_eta :
-  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
+  'a @ [< 'm & global] -> 'b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm] =
   <fun>
 |}]
 
@@ -163,8 +163,8 @@ let foo x = fun y ->
   (x', y')
 [%%expect{|
 val foo :
-  'a @ [< 'n & global many] ->
-  'b @ [< 'm & global many] -> 'a * 'b @ [> 'm | 'n | aliased dynamic] =
+  'a @ [< 'm & global many] ->
+  'b @ [< 'n & global many] -> 'a * 'b @ [> 'n | 'm | aliased dynamic] =
   <fun>
 |}]
 
@@ -190,8 +190,8 @@ val foo : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm | dynamic] = <fun>
 let foo f = fun x -> fun y -> f x y
 [%%expect{|
 val foo :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'o & global] -> 'b @ [< 'n] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm] -> 'b @ [> 'n] -> 'c @ [< 'o & global]) @ [< global] ->
+  'a @ [< 'm & global] -> 'b @ [< 'n] -> 'c @ [> 'o | dynamic] = <fun>
 |}]
 
 let fst x = fun y -> x
@@ -200,7 +200,7 @@ val fst : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
 |}]
 let snd x = fun y -> y
 [%%expect{|
-val snd : 'a @ 'n -> 'b @ [< 'm] -> 'b @ [> 'm] = <fun>
+val snd : 'a @ 'm -> 'b @ [< 'n] -> 'b @ [> 'n] = <fun>
 |}]
 
 let foo x y = ref x
@@ -226,13 +226,13 @@ val foo :
 
 let foo x y z = 42
 [%%expect{|
-val foo : 'a @ [< global] -> 'b @ [< global] -> 'c @ 'n -> int @ 'm = <fun>
+val foo : 'a @ [< global] -> 'b @ [< global] -> 'c @ 'm -> int @ 'n = <fun>
 |}]
 
 let foo x y = (x, y)
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
+  'a @ [< 'm & global] -> 'b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm] =
   <fun>
 |}]
 
@@ -240,7 +240,7 @@ let foo x y z = (y,z)
 [%%expect{|
 val foo :
   'a @ [< global] ->
-  'b @ [< 'n & global] -> 'c @ [< 'm & global] -> 'b * 'c @ [> 'm | 'n] =
+  'b @ [< 'm & global] -> 'c @ [< 'n & global] -> 'b * 'c @ [> 'n | 'm] =
   <fun>
 |}]
 
@@ -280,9 +280,9 @@ val foo : 'a @ [< global unique] -> 'b @ [< 'm & portable] -> 'b @ [> 'm] =
 let foo (x @ local) (y @ unique) (z @ portable) = exclave_ (x, y, z)
 [%%expect{|
 val foo :
-  'a @ [< 'o > local] ->
+  'a @ [< 'm > local] ->
   'b @ [< 'n & unique] ->
-  'c @ [< 'm & portable] -> 'a * 'b * 'c @ [> 'm | 'n | 'o | local] = <fun>
+  'c @ [< 'o & portable] -> 'a * 'b * 'c @ [> 'o | 'n | 'm | local] = <fun>
 |}]
 
 (* middle mode annotations *)
@@ -467,7 +467,7 @@ let unwrap_or default = function
   | Some' x -> x
 [%%expect{|
 val unwrap_or :
-  'a @ [< 'n & global] -> 'a option' @ [< 'm] -> 'a @ [> 'm | 'n | dynamic] =
+  'a @ [< 'm & global] -> 'a option' @ [< 'n] -> 'a @ [> 'n | 'm | dynamic] =
   <fun>
 |}]
 
@@ -479,9 +479,9 @@ let map_left f = function
 [%%expect{|
 type ('a, 'b) either = Left of 'a | Right of 'b
 val map_left :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-  ('a, 'c) either @ [< 'o & 'n & global] ->
-  ('b, 'c) either @ [> 'o | 'm | dynamic] = <fun>
+  ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+  ('a, 'c) either @ [< 'o & 'm & global] ->
+  ('b, 'c) either @ [> 'o | 'n | dynamic] = <fun>
 |}]
 
 (* recursive functions *)
@@ -498,12 +498,12 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many] ->
-  'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
+  ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global many] ->
+  'a list @ [< 'm > dynamic] -> 'b list @ [< global > 'n | dynamic] = <fun>
 |}, Principal{|
 val map :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many > aliased] ->
-  'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
+  ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global many > aliased] ->
+  'a list @ [< 'm > dynamic] -> 'b list @ [< global > 'n | dynamic] = <fun>
 |}]
 
 (* if/then/else *)
@@ -511,12 +511,12 @@ val map :
 let choose b x y = if b then x else y
 [%%expect{|
 val choose :
-  bool @ 'o ->
-  'a @ [< 'n & global] -> 'a @ [< 'm] -> 'a @ [> 'm | 'n | dynamic] = <fun>
+  bool @ 'm ->
+  'a @ [< 'n & global] -> 'a @ [< 'o] -> 'a @ [> 'o | 'n | dynamic] = <fun>
 |}, Principal{|
 val choose :
   bool @ [< global] ->
-  'a @ [< 'n & global] -> 'a @ [< 'm] -> 'a @ [> 'm | 'n | dynamic] = <fun>
+  'a @ [< 'm & global] -> 'a @ [< 'n] -> 'a @ [> 'n | 'm | dynamic] = <fun>
 |}]
 
 (* nested closures *)
@@ -524,7 +524,7 @@ val choose :
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
 val nest :
-  'a @ [< 'm & global] -> unit @ 'p -> unit @ 'o -> unit @ 'n -> 'a @ [> 'm] =
+  'a @ [< 'm & global] -> unit @ 'n -> unit @ 'o -> unit @ 'p -> 'a @ [> 'm] =
   <fun>
 |}]
 
@@ -547,7 +547,7 @@ val swap : 'a * 'b @ [< 'm & global] -> 'b * 'a @ [> 'm] = <fun>
 let both_id x y = (x, y)
 [%%expect{|
 val both_id :
-  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
+  'a @ [< 'm & global] -> 'b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm] =
   <fun>
 |}]
 
@@ -569,8 +569,8 @@ let map_option f = function
   | Some x -> Some (f x)
 [%%expect{|
 val map_option :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a option @ [< 'n] -> 'b option @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+  'a option @ [< 'm] -> 'b option @ [> 'n | dynamic] = <fun>
 |}]
 
 (* Currying over three arguments *)
@@ -578,31 +578,31 @@ val map_option :
 let triple x y z = (x, y, z)
 [%%expect{|
 val triple :
-  'a @ [< 'o & global] ->
+  'a @ [< 'm & global] ->
   'b @ [< 'n & global] ->
-  'c @ [< 'm & global] -> 'a * 'b * 'c @ [> 'm | 'n | 'o] = <fun>
+  'c @ [< 'o & global] -> 'a * 'b * 'c @ [> 'o | 'n | 'm] = <fun>
 |}]
 
 let flip f (x, y) = f (y, x)
 [%%expect{|
 val flip :
-  ('a * 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-  'b * 'a @ [< 'n & global] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a * 'b @ [> 'm] -> 'c @ [< 'n & global]) @ [< global] ->
+  'b * 'a @ [< 'm & global] -> 'c @ [> 'n | dynamic] = <fun>
 |}]
 
 let flip f x y = f y x
 [%%expect{|
 val flip :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-  'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm] -> 'b @ [> 'n] -> 'c @ [< 'o & global]) @ [< global] ->
+  'b @ [< 'n & global] -> 'a @ [< 'm] -> 'c @ [> 'o | dynamic] = <fun>
 |}]
 
 
 let flip f = fun x -> fun y -> f y x
 [%%expect{|
 val flip :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-  'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm] -> 'b @ [> 'n] -> 'c @ [< 'o & global]) @ [< global] ->
+  'b @ [< 'n & global] -> 'a @ [< 'm] -> 'c @ [> 'o | dynamic] = <fun>
 |}]
 
 let stateful x : _ @ stateful = x
@@ -656,7 +656,7 @@ type 'a cell = { mutable v : 'a; }
 val store_and_read :
   'a cell @ [< global uncontended read_write] ->
   'a @ [< global many uncontended forkable unyielding read_write] ->
-  unit @ 'n -> unit @ 'm = <fun>
+  unit @ 'm -> unit @ 'n = <fun>
 |}]
 
 let _ :
@@ -702,15 +702,15 @@ let optional_arg ?(g = fun x y -> x) () = ()
 [%%expect{|
 val optional_arg :
   ?g:('a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm]) @ [< global] ->
-  unit @ 'p -> unit @ 'o = <fun>
+  unit @ 'o -> unit @ 'p = <fun>
 |}]
 
 let shared_curry g = [g; (fun x y -> y)]
 [%%expect{|
 val shared_curry :
-  ('a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)]) @ [< 'o & global] ->
-  ('a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)])
-  list @ [> 'o] = <fun>
+  ('a @ ([< past('m) & global] as 'n) ->
+   ('b @ ([< 'p] as 'q) -> 'b @ ([> 'p] as 'mm0)) @ ([> past('m)] as 'o)) @ [< 'mm1 & global] ->
+  ('a @ 'n -> ('b @ 'q -> 'b @ 'mm0) @ 'o) list @ [> 'mm1] = <fun>
 |}]
 
 let labelled_curry ~g () = ignore (g == (fun x y -> x))
@@ -732,17 +732,18 @@ let curry_edge_to_printed_curry f a b c =
   ignore (f == fun _ (_ : int ref) _ -> ()); f a b c
 [%%expect{|
 val curry_edge_to_printed_curry :
-  ('a @ [< past('m) & global > 'q] ->
+  ('a @ [< past('m) & global > 'n] ->
    (int ref @ [< global > 'p mod many portable forkable unyielding stateless] ->
-    'b @ [> 'o] -> unit @ [< global]) @ [> past('m) | past('n)]) @ [< past('n) & global many uncontended read_write] ->
-  'a @ [< 'q & global] ->
-  int ref @ [< 'p & global] -> 'b @ [< 'o] -> unit @ [> dynamic] = <fun>
+    'b @ [> 'q] -> unit @ [< global]) @ [> past('m) | past('o)]) @ [< past('o) & global many uncontended read_write] ->
+  'a @ [< 'n & global] ->
+  int ref @ [< 'p & global] -> 'b @ [< 'q] -> unit @ [> dynamic] = <fun>
 |}, Principal{|
 val curry_edge_to_printed_curry :
-  ('a @ [< past('m) & global > 'mm0] ->
-   (int ref @ [< global > 'q] -> 'b @ [> 'p] -> unit @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('n) & global many uncontended read_write] ->
-  'a @ [< 'mm0 & global] ->
-  int ref @ [< 'q & global] -> 'b @ [< 'p] -> unit @ [> 'o | dynamic] = <fun>
+  ('a @ [< past('m) & global > 'n] ->
+   (int ref @ [< global > 'p] -> 'b @ [> 'q] -> unit @ [< 'mm0 & global]) @ [> past('m) | past('o)]) @ [< past('o) & global many uncontended read_write] ->
+  'a @ [< 'n & global] ->
+  int ref @ [< 'p & global] -> 'b @ [< 'q] -> unit @ [> 'mm0 | dynamic] =
+  <fun>
 |}]
 
 let curry_acc_mismatch_crash f k a =
@@ -752,10 +753,10 @@ let curry_acc_mismatch_crash f k a =
   ()
 [%%expect{|
 val curry_acc_mismatch_crash :
-  ('a @ [< past('n) & global > 'p] ->
-   ('b @ [< global] -> 'c @ [< 'o] -> 'c @ [> 'o]) @ [< past('m) > past('n)]) @ [< global many uncontended read_write] ->
-  ((unit @ 'mm0 -> unit @ 'q) @ [> past('m)] -> 'd @ 'mm1) @ [< global] ->
-  'a @ [< 'p & global] -> unit @ 'mm2 = <fun>
+  ('a @ [< past('m) & global > 'n] ->
+   ('b @ [< global] -> 'c @ [< 'p] -> 'c @ [> 'p]) @ [< past('o) > past('m)]) @ [< global many uncontended read_write] ->
+  ((unit @ 'q -> unit @ 'mm0) @ [> past('o)] -> 'd @ 'mm1) @ [< global] ->
+  'a @ [< 'n & global] -> unit @ 'mm2 = <fun>
 |}]
 
 let curry_acc_mismatch_imprecise f k a =
@@ -764,10 +765,10 @@ let curry_acc_mismatch_imprecise f k a =
   k (fun () -> let _ = h in ()); ()
 [%%expect{|
 val curry_acc_mismatch_imprecise :
-  ('a @ [< past('n) & global > 'p] ->
-   ('b @ [> local] -> 'c @ [< 'o] -> 'c @ [> 'o]) @ [< past('m) > past('n)]) @ [< global many uncontended read_write] ->
-  ((unit @ 'mm0 -> unit @ 'q) @ [> past('m)] -> 'd @ 'mm1) @ [< global] ->
-  'a @ [< 'p & global] -> unit @ 'mm2 = <fun>
+  ('a @ [< past('m) & global > 'n] ->
+   ('b @ [> local] -> 'c @ [< 'p] -> 'c @ [> 'p]) @ [< past('o) > past('m)]) @ [< global many uncontended read_write] ->
+  ((unit @ 'q -> unit @ 'mm0) @ [> past('o)] -> 'd @ 'mm1) @ [< global] ->
+  'a @ [< 'n & global] -> unit @ 'mm2 = <fun>
 |}]
 
 let empty_heads (x @ local once unforkable yielding)
@@ -777,17 +778,17 @@ let empty_heads (x @ local once unforkable yielding)
 val empty_heads :
   'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
   (a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
-  (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n mod aliased contended immutable] ->
+  (b:int -> 'b @ ([> aliased nonportable stateful dynamic] as 'n)) @ [< 'o mod aliased contended immutable] ->
   (a:int ->
-   (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'n | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
+   (b:int -> 'b @ 'n) @ [> 'o | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
   <fun>
 |}, Principal{|
 val empty_heads :
   'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
   (a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
-  (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n] ->
+  (b:int -> 'b @ ([> aliased nonportable stateful dynamic] as 'n)) @ [< 'o] ->
   (a:int ->
-   (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'n | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
+   (b:int -> 'b @ 'n) @ [> 'o | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
   <fun>
 |}]
 
@@ -803,21 +804,34 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val g :
-             ('a @ [> local] -> 'b @ 'n -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< many uncontended read_write] ->
+             ('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
              unit @ [> dynamic]
          end
        is not included in
          sig val g : ('a -> int) -> unit end
        Values do not match:
          val g :
-           ('a @ [> local] -> 'b @ 'n -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< many uncontended read_write] ->
+           ('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
            unit @ [> dynamic]
        is not included in
          val g : ('a -> int) -> unit
        The type
-         "('a @ [> local] -> 'b @ 'n -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< many uncontended read_write] ->
+         "('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
          unit @ [> dynamic]"
        is not compatible with the type "('a -> int) -> unit"
-       Type "'b @ 'n -> 'c @ [< 'm] -> 'c @ [> 'm]" is not compatible with type
+       Type "'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]" is not compatible with type
          "int"
+|}]
+
+let call_and_return f x = f x, f
+[%%expect{|
+val call_and_return :
+  ('a @ ([> 'm] as 'n) -> 'b @ ([< 'o & global] as 'p)) @ [< past('q) & global many] ->
+  'a @ [< 'm] ->
+  'b * ('a @ 'n -> 'b @ 'p) @ [> 'o | past('q) | aliased dynamic] = <fun>
+|}, Principal{|
+val call_and_return :
+  ('a @ ([> 'm] as 'n) -> 'b @ ([< 'o & global] as 'p)) @ [< 'q & global many] ->
+  'a @ [< 'm] -> 'b * ('a @ 'n -> 'b @ 'p) @ [> 'o | 'q | aliased dynamic] =
+  <fun>
 |}]

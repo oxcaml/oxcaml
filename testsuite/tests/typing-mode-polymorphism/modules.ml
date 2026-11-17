@@ -54,7 +54,7 @@ let unpack_inferred_witness () =
   let _ = M.v l in
   ()
 [%%expect{|
-val unpack_inferred_witness : unit @ 'n -> unit @ 'm = <fun>
+val unpack_inferred_witness : unit @ 'm -> unit @ 'n = <fun>
 |}]
 
 let unpack_annotated_witness () =

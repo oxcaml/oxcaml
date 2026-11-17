@@ -68,7 +68,7 @@ let foo () =
          (function {nlocal = 1} param/1[L][value<int>] : int
            (apply store/0 r/3)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/3))
-val foo : unit @ 'n -> unit @ 'm -> unit @ [> dynamic] = <fun>
+val foo : unit @ 'm -> unit @ 'n -> unit @ [> dynamic] = <fun>
 |}]
 
 let foo () =
@@ -89,7 +89,7 @@ Warning 26 [unused-var]: unused variable "r".
              (setfield_ptr(maybe-stack) 0 r/6 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/4))
 
-val foo : unit @ 'n -> string myref @ [< corrupted write] -> unit @ 'm =
+val foo : unit @ 'm -> string myref @ [< corrupted write] -> unit @ 'n =
   <fun>
 |}]
 
@@ -108,7 +108,7 @@ let foo () =
          (function {nlocal = 1} param/4[L][value<int>] : int
            (apply store/1 r/7)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/5))
-val foo : unit @ 'n -> unit @ 'm -> unit @ [> dynamic] = <fun>
+val foo : unit @ 'm -> unit @ 'n -> unit @ [> dynamic] = <fun>
 |}]
 
 
@@ -165,7 +165,7 @@ let foo () =
      (function {nlocal = 1} param/5[L][value<int>] : stack
        (apply[L] fst_local/0 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/7))
-val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local dynamic] =
+val foo : unit @ 'm -> ('a @ 'n -> int @ [> local]) @ [> local dynamic] =
   <fun>
 |}]
 
@@ -223,8 +223,8 @@ let app f x = f x
   (app/0 = (function {nlocal = 1} f/0[L] x/8[L]? (apply[yielding] f/0 x/8)))
   (apply (field_imm 1 (global Toploop!)) "app" app/0))
 val app :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm] -> 'b @ [< 'n & global]) @ [< global] ->
+  'a @ [< 'm] -> 'b @ [> 'n | dynamic] = <fun>
 |}]
 
 (* Both arguments are yielding: must be [apply[yielding]]. *)
@@ -236,8 +236,8 @@ let app_yielding (f @ yielding) (x @ yielding) = app f x
      (function {nlocal = 1} f/1 x/9[L]? (apply[yielding] app/0 f/1 x/9)))
   (apply (field_imm 1 (global Toploop!)) "app_yielding" app_yielding/0))
 val app_yielding :
-  ('a @ [> 'n | yielding] -> 'b @ [< 'm & global]) @ [< global > yielding] ->
-  'a @ [< 'n > yielding] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'm | yielding] -> 'b @ [< 'n & global]) @ [< global > yielding] ->
+  'a @ [< 'm > yielding] -> 'b @ [> 'n | dynamic] = <fun>
 |}]
 
 (* The value-rec wrapper forwards at the closure's yielding mode, polymorphic
