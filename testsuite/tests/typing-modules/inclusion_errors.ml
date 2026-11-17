@@ -560,8 +560,8 @@ Error: Signature mismatch:
          val f : (module s/1) -> unit
        is not included in
          val f : (module s/2) -> unit
-       The type "(module s/1) -> unit" is not compatible with the type
-         "(module s/2) -> unit"
+       The type "(module s/1) -> ..." is not compatible with the type
+         "(module s/2) -> ..."
        Modules do not match: s/1 is not included in s/2
        Line 6, characters 4-17:
          Definition of module type "s/1"
@@ -588,9 +588,9 @@ Error: Signature mismatch:
          val f : (< m : 'a. 'a * 'b > as 'b) -> unit
        is not included in
          val f : < m : 'b. 'b * < m : 'c. 'c * 'a > as 'a > -> unit
-       The type "(< m : 'a. 'a * 'd > as 'd) -> unit"
+       The type "(< m : 'a. 'a * 'd > as 'd) -> ..."
        is not compatible with the type
-         "< m : 'b. 'b * < m : 'c. 'c * 'e > as 'e > -> unit"
+         "< m : 'b. ... * < m : 'c. 'c * 'e > as 'e > -> ..."
        The method "m" has type "'a. 'a * < m : 'a. 'f > as 'f",
        but the expected method type was "'c. 'c * ('b * < m : 'c. 'g >) as 'g"
        The universal variable "'b" would escape its scope
@@ -618,9 +618,8 @@ Error: Signature mismatch:
          val f : < m : int > -> < m : int >
        is not included in
          val f : s -> s
-       The type "< m : int > -> < m : int >" is not compatible with the type
-         "s -> s"
-       Type "< m : int >" is not compatible with type "s" = "< m : int; .. >"
+       The type "< m : ... > -> ..." is not compatible with the type "s -> ..."
+       Type "< m : ... >" is not compatible with type "s" = "< m : ...; .. >"
        The second object type has an abstract row, it cannot be closed
 |}];;
 
@@ -643,7 +642,7 @@ Error: Signature mismatch:
          val f : 'b -> int
        is not included in
          val f : 'a -> float
-       The type "'a -> int" is not compatible with the type "'a -> float"
+       The type "... -> int" is not compatible with the type "... -> float"
        Type "int" is not compatible with type "float"
 |}]
 
@@ -755,7 +754,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : int -> float
-       The type "int -> int" is not compatible with the type "int -> float"
+       The type "... -> int" is not compatible with the type "... -> float"
        Type "int" is not compatible with type "float"
 |}];;
 
@@ -778,8 +777,8 @@ Error: Signature mismatch:
          val f : int * int -> int * int
        is not included in
          val f : int * float * int -> int -> int
-       The type "int * int -> int * int" is not compatible with the type
-         "int * float * int -> int -> int"
+       The type "int * int -> ..." is not compatible with the type
+         "int * float * int -> ..."
        Type "int * int" is not compatible with type "int * float * int"
 |}];;
 
@@ -802,9 +801,8 @@ Error: Signature mismatch:
          val f : < f : float; m : int > -> < f : float; m : int >
        is not included in
          val f : < m : int; n : float > -> < m : int; n : float >
-       The type "< f : float; m : int > -> < f : float; m : int >"
-       is not compatible with the type
-         "< m : int; n : float > -> < m : int; n : float >"
+       The type "< f : float; m : int > -> ..." is not compatible with the type
+         "< m : int; n : float > -> ..."
        The second object type has no method "f"
 |}];;
 
@@ -827,8 +825,8 @@ Error: Signature mismatch:
          val f : [ `Bar | `Foo ] -> unit
        is not included in
          val f : [ `Foo ] -> unit
-       The type "[ `Bar | `Foo ] -> unit" is not compatible with the type
-         "[ `Foo ] -> unit"
+       The type "[ `Bar | `Foo ] -> ..." is not compatible with the type
+         "[ `Foo ] -> ..."
        The second variant type does not allow tag(s) "`Bar"
 |}];;
 
@@ -851,8 +849,8 @@ Error: Signature mismatch:
          val f : [< `Foo ] -> unit
        is not included in
          val f : [> `Foo ] -> unit
-       The type "[< `Foo ] -> unit" is not compatible with the type
-         "[> `Foo ] -> unit"
+       The type "[< `Foo ] -> ..." is not compatible with the type
+         "[> `Foo ] -> ..."
        The second variant type is open and the first is not
 |}];;
 
@@ -875,8 +873,8 @@ Error: Signature mismatch:
          val f : [< `Foo ] -> unit
        is not included in
          val f : [< `Bar | `Foo ] -> unit
-       The type "[< `Foo ] -> unit" is not compatible with the type
-         "[< `Bar | `Foo ] -> unit"
+       The type "[< `Foo ] -> ..." is not compatible with the type
+         "[< `Bar | `Foo ] -> ..."
        The first variant type does not allow tag(s) "`Bar"
 |}];;
 
@@ -899,8 +897,8 @@ Error: Signature mismatch:
          val f : < m : 'a. [< `Foo ] as 'a > -> unit
        is not included in
          val f : < m : [< `Foo ] > -> unit
-       The type "< m : 'a. [< `Foo ] as 'a > -> unit"
-       is not compatible with the type "< m : [< `Foo ] > -> unit"
+       The type "< m : 'a. [< `Foo ] as 'a > -> ..."
+       is not compatible with the type "< m : [< `Foo ] > -> ..."
        The method "m" has type "'b. [< `Foo ] as 'b",
        but the expected method type was "[< `Foo ]"
 |}];;
@@ -924,8 +922,8 @@ Error: Signature mismatch:
          val f : < m : [ `Foo ] > -> unit
        is not included in
          val f : < m : 'a. [< `Foo ] as 'a > -> unit
-       The type "< m : [ `Foo ] > -> unit" is not compatible with the type
-         "< m : 'a. [< `Foo ] as 'a > -> unit"
+       The type "< m : [ `Foo ] > -> ..." is not compatible with the type
+         "< m : 'a. [< `Foo ] as 'a > -> ..."
        The method "m" has type "[ `Foo ]", but the expected method type was
        "'b. [< `Foo ] as 'b"
 |}];;
@@ -949,8 +947,8 @@ Error: Signature mismatch:
          val f : [< `C of int & float ] -> unit
        is not included in
          val f : [< `C ] -> unit
-       The type "[< `C of & int & float ] -> unit"
-       is not compatible with the type "[< `C ] -> unit"
+       The type "[< `C of & int & float ] -> ..."
+       is not compatible with the type "[< `C ] -> ..."
        Types for tag "`C" are incompatible
 |}];;
 
@@ -973,8 +971,8 @@ Error: Signature mismatch:
          val f : [ `Foo of int ] -> unit
        is not included in
          val f : [ `Foo ] -> unit
-       The type "[ `Foo of int ] -> unit" is not compatible with the type
-         "[ `Foo ] -> unit"
+       The type "[ `Foo of int ] -> ..." is not compatible with the type
+         "[ `Foo ] -> ..."
        Types for tag "`Foo" are incompatible
 |}];;
 
@@ -997,8 +995,8 @@ Error: Signature mismatch:
          val f : [ `Foo ] -> unit
        is not included in
          val f : [ `Foo of int ] -> unit
-       The type "[ `Foo ] -> unit" is not compatible with the type
-         "[ `Foo of int ] -> unit"
+       The type "[ `Foo ] -> ..." is not compatible with the type
+         "[ `Foo of int ] -> ..."
        Types for tag "`Foo" are incompatible
 |}];;
 
@@ -1030,8 +1028,8 @@ Error: Signature mismatch:
          val f : [> `Bar | `Foo ] -> unit
        is not included in
          val f : [< `Bar | `Baz | `Foo ] -> unit
-       The type "[> `Bar | `Foo ] -> unit" is not compatible with the type
-         "[< `Bar | `Baz | `Foo ] -> unit"
+       The type "[> `Bar | `Foo ] -> ..." is not compatible with the type
+         "[< `Bar | `Baz | `Foo ] -> ..."
        The tag "`Foo" is guaranteed to be present in the first variant type,
        but not in the second
 |}];;

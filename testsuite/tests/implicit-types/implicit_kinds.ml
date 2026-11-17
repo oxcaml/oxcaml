@@ -208,7 +208,7 @@ Error: Signature mismatch:
            stateless
        is not included in
          val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
-       The type "'a -> 'a array" is not compatible with the type "'b -> 'b array"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is bits64
          because of the definition of pack at line 5, characters 4-43.
        But the layout of 'a must be a value layout

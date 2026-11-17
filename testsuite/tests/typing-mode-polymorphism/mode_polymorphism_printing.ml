@@ -816,10 +816,10 @@ Error: Signature mismatch:
        is not included in
          val g : ('a -> int) -> unit
        The type
-         "('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
-         unit @ [> dynamic]"
-       is not compatible with the type "('a -> int) -> unit"
-       Type "'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]" is not compatible with type
+         "(... -> 'a @ 'm -> 'b @ [< 'n] -> 'b @ [> 'n]) @ [< many uncontended read_write] ->
+         ..."
+       is not compatible with the type "(... -> int) -> ..."
+       Type "'a @ 'm -> 'b @ [< 'n] -> 'b @ [> 'n]" is not compatible with type
          "int"
 |}]
 

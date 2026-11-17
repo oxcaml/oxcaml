@@ -143,7 +143,7 @@ Error: Signature mismatch:
          external id : ('a : any). 'a s -> 'a s = "%identity" [@@layout_poly]
        is not included in
          external id : ('a : any). 'a s -> 'a s = "%identity"
-       The type "'a s -> 'a s" is not compatible with the type "'b s -> 'b s"
+       The type "'a s -> ..." is not compatible with the type "'b s -> ..."
        The layout of 'a is any
          because of the definition of id at line 3, characters 2-54.
        But the layout of 'a must be representable
@@ -187,8 +187,8 @@ Error: Signature mismatch:
        is not included in
          external id : ('b : any). (t_any, 'b) s -> (t_any, 'b) s
            = "%identity" [@@layout_poly]
-       The type "('a, 'b) s -> ('a, 'b) s" is not compatible with the type
-         "(t_any, 'c) s -> (t_any, 'c) s"
+       The type "('a, ...) s -> ..." is not compatible with the type
+         "(t_any, ...) s -> ..."
        The layout of t_any is any
          because of the definition of t_any at line 2, characters 0-16.
        But the layout of t_any must be representable
@@ -233,9 +233,9 @@ Error: Signature mismatch:
        is not included in
          external id : ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s
            = "%identity" [@@layout_poly]
-       The type "(t_any, 'a) s -> (t_any, 'a) s"
-       is not compatible with the type "('b, 'c) s -> ('b, 'c) s"
-       Type "t_any" is not compatible with type "'b"
+       The type "(t_any, ...) s -> ..." is not compatible with the type
+         "('a, ...) s -> ..."
+       Type "t_any" is not compatible with type "'a"
 |}]
 
 (* together with local_opt *)
@@ -347,7 +347,7 @@ Error: Signature mismatch:
          external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
        is not included in
          val id : ('a : any). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is any
          because of the definition of id at line 2, characters 2-31.
        But the layout of 'a must be representable

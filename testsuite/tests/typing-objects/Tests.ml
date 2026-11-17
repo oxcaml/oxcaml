@@ -713,9 +713,9 @@ Error: Signature mismatch:
          val f : (#c as 'a) -> 'a
        is not included in
          val f : #c -> #c
-       The type "(#c as 'a) -> 'a" is not compatible with the type "#c -> #c"
-       Type "#c as 'a" = "< m : 'a; .. >" is not compatible with type
-         "#c as 'b" = "< m : 'b; .. >"
+       The type "... -> #c" is not compatible with the type "... -> #c"
+       Type "#c as 'a" = "< m : ...; .. >" is not compatible with type
+         "#c as 'b" = "< m : ...; .. >"
        Type "'a" is not compatible with type "'b"
 |}];;
 

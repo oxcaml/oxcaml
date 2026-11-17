@@ -39,8 +39,8 @@ module Style = Misc.Style
 
 type 'a diff = 'a Out_type.diff = Same of 'a | Diff of 'a * 'a
 
-let trees_of_trace mode =
-  List.map (Errortrace.map_diff (trees_of_type_expansion mode))
+let trees_of_trace ?spine mode =
+  List.map (Errortrace.map_diff (trees_of_type_expansion ?spine mode))
 
 let rec trace fst txt ppf = function
   | {Errortrace.got; expected} :: rem ->
@@ -103,12 +103,12 @@ let rec filter_trace = function
       d :: filtered, last
   | _ :: rem -> filter_trace rem
 
-let may_prepare_expansion compact (Errortrace.{ty; expanded} as ty_exp) =
+let may_prepare_expansion ?spine compact (Errortrace.{ty; expanded} as ty_exp) =
   match Types.get_desc expanded with
     Tvariant _ | Tobject _ when compact ->
-      Variable_names.reserve ty;
+      Variable_names.reserve ?spine ty;
       Errortrace.{ty; expanded = ty}
-  | _ -> prepare_expansion ty_exp
+  | _ -> prepare_expansion ?spine ty_exp
 
 let print_path p =
   Fmt.dprintf "%a" !Oprint.out_ident (namespaced_tree_of_path Type p)
@@ -472,16 +472,16 @@ let warn_on_missing_def env ppf t =
       end
   | _ -> ()
 
-let prepare_expansion_head empty_tr = function
+let prepare_expansion_head ?spine empty_tr = function
   | Errortrace.Diff d ->
-      Some (Errortrace.map_diff (may_prepare_expansion empty_tr) d)
+      Some (Errortrace.map_diff (may_prepare_expansion ?spine empty_tr) d)
   | _ -> None
 
-let head_error_printer ~var_jkinds mode txt_got txt_but = function
+let head_error_printer ?spine ~var_jkinds mode txt_got txt_but = function
   | None -> Format_doc.Doc.empty
   | Some d ->
       let d =
-        Errortrace.map_diff (trees_of_type_expansion' ~var_jkinds mode) d
+        Errortrace.map_diff (trees_of_type_expansion' ?spine ~var_jkinds mode) d
       in
       doc_printf "%a@;<1 2>%a@ %a@;<1 2>%a"
         pp_doc txt_got pp_type_expansion d.Errortrace.got
@@ -494,18 +494,38 @@ let warn_on_missing_defs env ppf = function
       warn_on_missing_def env ppf te1;
       warn_on_missing_def env ppf te2
 
+let trace_spine tr =
+  let diffs_of l =
+    List.filter_map (function Errortrace.Diff d -> Some d | _ -> None) l
+  in
+  let rec before_last_explanation = function
+    | [] -> []
+    | Errortrace.Diff _ :: rest -> before_last_explanation rest
+    | _ :: rest -> diffs_of rest
+  in
+  let rev = List.rev tr in
+  let rev_diffs =
+    match before_last_explanation rev with
+    | [] -> diffs_of rev
+    | diffs -> diffs
+  in
+  type_spine (List.rev rev_diffs)
+
 (* [subst] comes out of equality, and is [[]] otherwise *)
-let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
+let error ~spine trace_format mode subst env tr txt1 ppf txt2
+    ty_expect_explanation =
   reset ();
   (* We want to substitute in the opposite order from [Eqtype] *)
   Variable_names.add_subst (List.map (fun (ty1,ty2) -> ty2,ty1) subst);
   let mode_mismatch, tr = split_mode_mismatch tr in
   let tr =
-    prepare_trace
+    Errortrace.map
       (fun ty_exp ->
          Errortrace.{ty_exp with expanded = hide_variant_name ty_exp.expanded})
       tr
   in
+  let spine = if spine then trace_spine tr else None in
+  let tr = prepare_any_trace printing_status tr in
   let jkind_error = match Misc.last tr with
     | Some (Bad_jkind _ | Bad_jkind_sort _ | Unequal_var_jkinds _
            | Unequal_tof_kind_jkinds _) ->
@@ -518,15 +538,19 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
   | (elt :: tr) as full_trace ->
       with_labels (not !Clflags.classic) (fun () ->
       let tr, last = filter_trace tr in
-      let head = prepare_expansion_head (tr=[] && last=None) elt in
-      let tr = List.map (Errortrace.map_diff prepare_expansion) tr in
-      let last = Option.map (Errortrace.map_diff prepare_expansion) last in
-      let head_error =
-        head_error_printer ~var_jkinds:jkind_error mode txt1 txt2 head
-      in
-      let tr = trees_of_trace mode tr in
+      let head = prepare_expansion_head ?spine (tr=[] && last=None) elt in
+      let tr = List.map (Errortrace.map_diff (prepare_expansion ?spine)) tr in
       let last =
-        Option.map (Errortrace.map_diff (trees_of_type_expansion mode)) last in
+        Option.map (Errortrace.map_diff (prepare_expansion ?spine)) last
+      in
+      let head_error =
+        head_error_printer ?spine ~var_jkinds:jkind_error mode txt1 txt2 head
+      in
+      let tr = trees_of_trace ?spine mode tr in
+      let last =
+        Option.map
+          (Errortrace.map_diff (trees_of_type_expansion ?spine mode)) last
+      in
       let mis = mismatch txt1 env full_trace in
       let tr = match mis, last with
         | None, Some elt -> tr @ [elt]
@@ -549,12 +573,12 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
        Ident_conflicts.err_print ppf
     )
 
-let report_error trace_format ppf mode env tr
+let report_error ?(spine = false) trace_format ppf mode env tr
       ?(subst = [])
       ?(type_expected_explanation = Fmt.Doc.empty)
       txt1 txt2 =
   wrap_printing_env ~error:true env (fun () ->
-    error trace_format mode subst env tr txt1 ppf txt2
+    error ~spine trace_format mode subst env tr txt1 ppf txt2
       type_expected_explanation)
 
 let unification
@@ -568,8 +592,8 @@ let equality
     ~subst ?type_expected_explanation:None trace
 
 let moregen
-      ppf mode env ({trace} : Errortrace.moregen_error) =
-  report_error Moregen ppf mode env
+      ?spine ppf mode env ({trace} : Errortrace.moregen_error) =
+  report_error ?spine Moregen ppf mode env
     ?subst:None ?type_expected_explanation:None trace
 
 let comparison ppf mode env = function

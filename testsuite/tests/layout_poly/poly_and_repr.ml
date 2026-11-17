@@ -109,8 +109,8 @@ Error: Signature mismatch:
          val x : ('a. 'a -> unit) -> unit
        is not included in
          val x : ((repr_ 'a). 'a -> unit) -> unit
-       The type "('a. 'a -> unit) -> unit" is not compatible with the type
-         "((repr_ 'a). 'a -> unit) -> unit"
+       The type "('a. 'a -> unit) -> ..." is not compatible with the type
+         "((repr_ 'a). 'a -> unit) -> ..."
        Type "'a -> unit" is not compatible with type "(repr_ 'a0). 'a0 -> unit"
 |}]
 
@@ -134,8 +134,8 @@ Error: Signature mismatch:
          val x : ((repr_ 'a). 'a -> unit) -> unit
        is not included in
          val x : ('a. 'a -> unit) -> unit
-       The type "((repr_ 'a). 'a -> unit) -> unit"
-       is not compatible with the type "('a. 'a -> unit) -> unit"
+       The type "((repr_ 'a). 'a -> unit) -> ..."
+       is not compatible with the type "('a. 'a -> unit) -> ..."
        Type "(repr_ 'a). 'a -> unit" is not compatible with type "'a -> unit"
 |}]
 
@@ -165,8 +165,8 @@ Error: Signature mismatch:
          val f : (repr_ 'a). 'a -> unit
        is not included in
          val f : (repr_ 'b). 'b -> 'b
-       The type "(repr_ 'a). 'a -> unit" is not compatible with the type
-         "(repr_ 'b). 'b -> 'b"
+       The type "(repr_ 'a). ... -> unit" is not compatible with the type
+         "(repr_ 'b). ... -> 'b"
        Type "unit" is not compatible with type "'b"
 |}]
 
@@ -198,8 +198,8 @@ Error: Signature mismatch:
          val f : (repr_ 'a). 'a -> unit
        is not included in
          val f : (repr_ 'b). ('b -> 'b) -> unit
-       The type "(repr_ 'a). 'a -> unit" is not compatible with the type
-         "(repr_ 'b). ('b -> 'b) -> unit"
+       The type "(repr_ 'a). 'a -> ..." is not compatible with the type
+         "(repr_ 'b). ('b -> 'b) -> ..."
        Type "'a" is not compatible with type "'b -> 'b"
 |}]
 
@@ -222,8 +222,8 @@ Error: Signature mismatch:
          val f : (repr_ 'a) (repr_ 'b). 'a -> 'b
        is not included in
          val f : (repr_ 'a) (repr_ 'b). 'b -> 'a
-       The type "(repr_ 'a) (repr_ 'b). 'a -> 'b"
-       is not compatible with the type "(repr_ 'a) (repr_ 'b). 'b -> 'a"
+       The type "(repr_ 'a) (repr_ 'b). 'a -> ..."
+       is not compatible with the type "(repr_ 'a) (repr_ 'b). 'b -> ..."
        Type "'a" is not compatible with type "'b"
 |}]
 

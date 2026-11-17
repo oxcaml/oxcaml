@@ -63,7 +63,7 @@ Error: Signature mismatch:
          val should_not_work : 'a -> unit
        is not included in
          val should_not_work : 'a -> unit
-       The type "'a -> unit" is not compatible with the type "'b -> unit"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of should_not_work at line 6, characters 2-57.
        But the layout of 'a must be a sublayout of value
@@ -164,7 +164,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-40.
        But the layout of 'a must be a sublayout of value
@@ -191,7 +191,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-40.
        But the layout of 'a must be a sublayout of value
@@ -219,7 +219,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.
        But the layout of 'a must be a sublayout of value
@@ -247,7 +247,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.
        But the layout of 'a must be a sublayout of value
@@ -276,7 +276,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.
        But the layout of 'a must be a sublayout of value

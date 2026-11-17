@@ -1187,9 +1187,9 @@ Error: Signature mismatch:
          val f : (< m : 'a. 'a * ('a * 'b) > as 'b) -> unit
        is not included in
          val f : < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) > -> unit
-       The type "(< m : 'a. 'a * ('a * 'd) > as 'd) -> unit"
+       The type "(< m : 'a. 'a * ('a * 'd) > as 'd) -> ..."
        is not compatible with the type
-         "< m : 'b. 'b * ('b * < m : 'c. 'c * 'e > as 'e) > -> unit"
+         "< m : 'b. ... * (... * < m : 'c. 'c * 'e > as 'e) > -> ..."
        The method "m" has type "'a. 'a * ('a * < m : 'a. 'f >) as 'f",
        but the expected method type was "'c. 'c * ('b * < m : 'c. 'g >) as 'g"
        The universal variable "'b" would escape its scope

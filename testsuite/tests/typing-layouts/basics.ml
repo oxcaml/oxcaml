@@ -2024,7 +2024,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : ('a : any). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is any
          because of the definition of f at line 2, characters 2-30.
        But the layout of 'a must be representable
@@ -2080,7 +2080,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : ('a : any). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is any
          because of the definition of f at line 2, characters 2-30.
        But the layout of 'a must be a value layout
@@ -2102,7 +2102,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val f : ('a : float64). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is float64
          because of the definition of f at line 10, characters 2-34.
        But the layout of 'a must be a value layout
@@ -2241,8 +2241,8 @@ Error: Signature mismatch:
          val f : (('a : any). 'a -> unit) -> unit
        is not included in
          val f : ('a. 'a -> unit) -> unit
-       The type "(('a : any). 'a -> unit) -> unit"
-       is not compatible with the type "('a. 'a -> unit) -> unit"
+       The type "(('a : any). 'a -> ...) -> ..."
+       is not compatible with the type "('a. 'a -> ...) -> ..."
        Type "'a" is not compatible with type "'a0"
 |}]
 
@@ -2268,8 +2268,8 @@ Error: Signature mismatch:
          val f : ('a. 'a -> 'a) -> unit
        is not included in
          val f : (('a : any). 'a -> 'a) -> unit
-       The type "('a. 'a -> 'a) -> unit" is not compatible with the type
-         "(('a : any). 'a -> 'a) -> unit"
+       The type "('a. 'a -> ...) -> ..." is not compatible with the type
+         "(('a : any). 'a -> ...) -> ..."
        Type "'a" is not compatible with type "'a0"
 |}]
 

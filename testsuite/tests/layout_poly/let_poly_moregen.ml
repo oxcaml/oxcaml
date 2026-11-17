@@ -33,7 +33,7 @@ Error: Signature mismatch:
          val id : 'a -> 'a
        is not included in
          val poly_ id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -52,7 +52,7 @@ Error: Signature mismatch:
          val id : 'a -> 'a
        is not included in
          val poly_ id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is value
          because of the definition of id at line 4, characters 2-25.
        But the kind of 'a must be a subkind of value
@@ -94,8 +94,8 @@ Error: Signature mismatch:
          val poly_ k : 'a. 'a -> 'b -> 'a
        is not included in
          val poly_ k : 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The type "'c" is layout polymorphic,
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
+       The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
 
@@ -118,9 +118,10 @@ Error: Signature mismatch:
          val poly_ k : 'b. 'a -> 'b -> 'a
        is not included in
          val poly_ k : 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'a -> 'c -> 'a"
-       The type "'c" is layout polymorphic,
-       but "'b" is not layout polymorphic.
+       The type "... -> 'a -> ..." is not compatible with the type
+         "... -> 'b -> ..."
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (module struct
@@ -140,8 +141,8 @@ Error: Signature mismatch:
          val k : 'a -> 'b -> 'a
        is not included in
          val poly_ k : 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The type "'c" is layout polymorphic,
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
+       The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
 
@@ -187,8 +188,8 @@ Error: Signature mismatch:
          val poly_ k : 'a. 'a -> 'b -> 'a
        is not included in
          val poly_ k : 'b. 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The type "'c" is layout polymorphic,
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
+       The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
 
@@ -217,8 +218,8 @@ Error: Signature mismatch:
          val k : 'a -> 'b -> 'a
        is not included in
          val poly_ k : 'b. 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The type "'c" is layout polymorphic,
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
+       The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
 
@@ -272,7 +273,7 @@ Error: Signature mismatch:
              'a -> 'a
        is not included in
          val id : layout_ l l0. ('a : l & l0). 'a -> 'a @@ stateless
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -327,7 +328,7 @@ Error: Signature mismatch:
          val id : 'a -> 'a
        is not included in
          val id : layout_ l l0. ('a : l & l0). 'a -> 'a @@ stateless
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -373,7 +374,7 @@ Error: Signature mismatch:
          val id : layout_ l. ('a : l & value). 'a -> 'a
        is not included in
          val id : layout_ l. ('a : value & l). 'a -> 'a @@ stateless
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value & value_or_null
          because of the definition at line 4, characters 15-42.
        But the layout of 'a must be a sublayout of value_or_null & value
@@ -433,8 +434,7 @@ Error: Signature mismatch:
              'a -> 'a
        is not included in
          val poly_ id : #('a * int) -> #('a * int)
-       The type "'a -> 'a" is not compatible with the type
-         "#('b * int) -> #('b * int)"
+       The type "'a -> ..." is not compatible with the type "#('b * int) -> ..."
        The type "#('b * int)" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -503,7 +503,7 @@ Error: Signature mismatch:
          val id : 'a -> 'a
        is not included in
          val poly_ id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;

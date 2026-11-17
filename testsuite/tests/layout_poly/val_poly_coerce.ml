@@ -499,7 +499,7 @@ Error: Signature mismatch:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
          val poly_ id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -524,7 +524,7 @@ Error: Signature mismatch:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
          val id : layout_ l l0. ('a : l). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -547,7 +547,7 @@ Error: Signature mismatch:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
          val id : layout_ l l0. ('a : l0). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -598,7 +598,7 @@ Error: Signature mismatch:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
          val poly_ id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -640,7 +640,7 @@ Error: Signature mismatch:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
          val id : layout_ l l0. ('a : l0). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -666,7 +666,7 @@ Error: Signature mismatch:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
          val id : layout_ l l0. ('a : l). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;

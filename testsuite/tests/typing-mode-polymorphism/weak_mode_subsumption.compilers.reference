@@ -11,8 +11,8 @@ Error: Signature mismatch:
          val f : string -> int -> int
        is not included in
          val f : string -> int -> int @@ stateless
-       The type string -> int -> int is not compatible with the type
-         string -> int -> int
+       The type ... -> int -> int is not compatible with the type
+         ... -> int -> int
        Type int -> int is not compatible with type int -> int
        The return mode was expected to be static but is dynamic
        File "weak_mode_subsumption.ml", line 19, characters 6-7:

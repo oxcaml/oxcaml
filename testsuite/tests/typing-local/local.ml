@@ -2003,11 +2003,10 @@ Error: Signature mismatch:
        is not included in
          val add : int32 @ local -> int32 @ local -> int32
        The type
-         "int32 @ local forkable unyielding ->
+         "... ->
          int32 @ local forkable unyielding -> int32 @ local forkable
          unyielding"
-       is not compatible with the type
-         "int32 @ local -> int32 @ local -> int32"
+       is not compatible with the type "... -> int32 @ local -> int32"
        Type
          "int32 @ local forkable unyielding -> int32 @ local forkable
          unyielding"
@@ -2043,11 +2042,10 @@ Error: Signature mismatch:
        is not included in
          val add : int32 @ local -> int32 @ local -> int32
        The type
-         "int32 @ local forkable unyielding ->
+         "... ->
          int32 @ local forkable unyielding -> int32 @ local forkable
          unyielding"
-       is not compatible with the type
-         "int32 @ local -> int32 @ local -> int32"
+       is not compatible with the type "... -> int32 @ local -> int32"
        Type
          "int32 @ local forkable unyielding -> int32 @ local forkable
          unyielding"

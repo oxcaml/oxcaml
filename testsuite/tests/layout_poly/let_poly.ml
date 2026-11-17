@@ -120,7 +120,7 @@ Error: Signature mismatch:
          val regular_id : 'a -> 'a
        is not included in
          val poly_ regular_id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}]

@@ -390,10 +390,10 @@ Error: Signature mismatch:
          val f : 'a -> 'b @ local unyielding -> unit
        is not included in
          val f : 'a @ local -> 'b @ local -> unit
-       The type "'a -> 'b @ local unyielding -> unit"
-       is not compatible with the type "'a @ local -> 'b @ local -> unit"
-       Type "'b @ local unyielding -> unit" is not compatible with type
-         "'b @ local -> unit"
+       The type "... -> 'a @ local unyielding -> unit"
+       is not compatible with the type "... -> 'a @ local -> unit"
+       Type "'a @ local unyielding -> unit" is not compatible with type
+         "'a @ local -> unit"
        The argument mode was expected to be "unyielding" but is "yielding"
 |}]
 

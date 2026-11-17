@@ -1512,8 +1512,8 @@ Error: Signature mismatch:
          val f : ('a : any) 'c. 'a box -> 'c
        is not included in
          val f : 'b -> 'c
-       The type "'a box -> 'b" is not compatible with the type "'c -> 'd"
-       Type "'a box" is not compatible with type "'c"
+       The type "'a box -> ..." is not compatible with the type "'b -> ..."
+       Type "'a box" is not compatible with type "'b"
 |}]
 
 (* [box] is covariant *)

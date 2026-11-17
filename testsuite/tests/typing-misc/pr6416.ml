@@ -26,7 +26,7 @@ Error: Signature mismatch:
          val f : t/1 -> unit
        is not included in
          val f : t/2 -> unit
-       The type "t/1 -> unit" is not compatible with the type "t/2 -> unit"
+       The type "t/1 -> ..." is not compatible with the type "t/2 -> ..."
        Type "t/1" is not compatible with type "t/2"
        Line 6, characters 4-14:
          Definition of type "t/1"
@@ -149,13 +149,9 @@ Error: Signature mismatch:
          val f : (module s/1) -> t/2 -> t/1
        is not included in
          val f : (module s/2) -> t/2 -> t/2
-       The type "(module s/1) -> t/2 -> t/1" is not compatible with the type
-         "(module s/2) -> t/2 -> t/2"
+       The type "(module s/1) -> ..." is not compatible with the type
+         "(module s/2) -> ..."
        Modules do not match: s/1 is not included in s/2
-       Line 5, characters 23-33:
-         Definition of type "t/1"
-       Line 3, characters 2-12:
-         Definition of type "t/2"
        Line 5, characters 9-22:
          Definition of module type "s/1"
        Line 2, characters 2-15:
@@ -182,8 +178,8 @@ Error: Signature mismatch:
          val f : a/2 -> 'a -> a/1
        is not included in
          val f : a/2 -> (module a) -> a/2
-       The type "a/2 -> (module a) -> a/1" is not compatible with the type
-         "a/2 -> (module a) -> a/2"
+       The type "... -> ... -> a/1" is not compatible with the type
+         "... -> ... -> a/2"
        Type "a/1" is not compatible with type "a/2"
        Line 5, characters 12-22:
          Definition of type "a/1"
@@ -372,17 +368,12 @@ Error: Signature mismatch:
          val f : t/2 -> t/3 -> t/4 -> t/1
        is not included in
          val f : t/1 -> t/1 -> t/1 -> t/1
-       The type "t/2 -> t/3 -> t/4 -> t/1" is not compatible with the type
-         "t/1 -> t/1 -> t/1 -> t/1"
+       The type "t/2 -> ..." is not compatible with the type "t/1 -> ..."
        Type "t/2" is not compatible with type "t/1"
        Line 4, characters 0-10:
          Definition of type "t/1"
        Line 1, characters 0-10:
          Definition of type "t/2"
-       Line 2, characters 0-10:
-         Definition of type "t/3"
-       Line 3, characters 0-10:
-         Definition of type "t/4"
 |}]
 
 (** Check interaction with no-alias-deps *)
