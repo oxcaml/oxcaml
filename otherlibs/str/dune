@@ -28,8 +28,9 @@
  ))
  (ocamlopt_flags (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags (:standard -linkall))
+ ; OC_CFLAGS_SEXP: see otherlibs/unix/dune.
  (foreign_stubs (language c) (names strstubs)
-  (flags ((:include %{project_root}/oc_cflags.sexp)
+  (flags ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
           (:include %{project_root}/sharedlib_cflags.sexp)
           (:include %{project_root}/oc_cppflags.sexp)))))
 
@@ -57,4 +58,4 @@
  (name codegen-variant-libs)
  (enabled_if
   (and (<> %{context_name} "default") (<> %{context_name} "main")))
- (deps str.cmxa str.a str.cmxs))
+ (deps str.cmxa str.a str.cmxs libstr_stubs.a))

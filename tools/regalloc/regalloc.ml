@@ -427,6 +427,12 @@ let parse_command_line () =
       ( "-disable-poll-insertion",
         Arg.Clear Clflags.poll_insertion,
         "Process IR saved with poll insertion disabled" );
+      ( "-asan",
+        Arg.Set Clflags.address_sanitizer,
+        "Process IR saved with AddressSanitizer enabled" );
+      ( "-no-asan",
+        Arg.Clear Clflags.address_sanitizer,
+        "Process IR saved with AddressSanitizer disabled" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
       ( "-copy-propagation",

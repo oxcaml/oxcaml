@@ -490,9 +490,11 @@ let write_runtime_dune ppf =
      templates), so the default archives need no -D at all, and a variant
      archive's explicit value takes precedence over that resolution (m.h
      only defines what is not already defined).  The flags are appended
-     AFTER the configure-provided flags (command-line order wins).
-     Assembly (.S) files need the macros too (amd64.S and arm64.S include
-     m.h and test WITH_FRAME_POINTERS), hence the separate aspp list. *)
+     AFTER the configure-provided flags so that e.g. on an asan-default
+     configure the appended -fno-sanitize strips the earlier -fsanitize
+     (command-line order wins).  Assembly (.S) files need the macros too
+     (amd64.S and arm64.S include m.h and test WITH_FRAME_POINTERS), hence
+     the separate aspp list. *)
   let codegen_archive_sets =
     match codegen_variant_records () with
     | [] -> []

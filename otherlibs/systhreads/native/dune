@@ -9,7 +9,7 @@
  (name codegen-variant-libs)
  (enabled_if
   (and (<> %{context_name} "default") (<> %{context_name} "main")))
- (deps threadsnat.cmxa threadsnat.a))
+ (deps threadsnat.cmxa threadsnat.a libthreadsnat_stubs.a))
 
 (rule (target sync_posix.h) (action (copy %{dep:../../../runtime/sync_posix.h} %{target})))
 
@@ -25,11 +25,12 @@
  (libraries unix)
  (library_flags -linkall)
  (c_library_flags -lpthread)
+ ; OC_CFLAGS_SEXP: see otherlibs/unix/dune.
  (foreign_stubs
   (language c)
   (names st_stubs)
   (flags
    ((-DNATIVE_CODE)
-    (:include %{project_root}/oc_cflags.sexp)
+    (:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
     (:include %{project_root}/sharedlib_cflags.sexp)
     (:include %{project_root}/oc_cppflags.sexp)))))

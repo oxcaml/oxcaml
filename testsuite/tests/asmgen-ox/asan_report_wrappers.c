@@ -1,7 +1,7 @@
 #include <caml/config.h>
 #include <caml/mlvalues.h>
 
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
 
 #define CREATE_ASAN_REPORT_WRAPPER(memory_access, size) \
 void __asan_report_ ## memory_access ## size ## _noabort(const void* addr); \

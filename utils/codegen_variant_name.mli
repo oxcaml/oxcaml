@@ -30,7 +30,7 @@
     a variant name being the '-'-joined, canonically sorted names of the
     enabled tokens, with the all-off variant spelled "base" (names are
     absolute, independent of the configure default).  Examples: "base",
-    "fp", "poll", "fp-sc", and once further axes exist, "asan-fp".
+    "fp", "poll", "fp-sc", "asan-fp".
 
     This module is dependency-free (no [Clflags]/[Config]/[Misc]): it is the
     single source of the name scheme and of the per-token flag tables, and
@@ -44,6 +44,7 @@
     see codegen_variant_name.ml and the consistency test. *)
 
 type token =
+  | Address_sanitizer
   | Frame_pointers
   | Poll_insertion
   | Stack_checks
@@ -67,12 +68,25 @@ val ocamlopt_flag : token -> enabled:bool -> string
     ("frame-pointers=1"). *)
 val ocamlparam : token -> enabled:bool -> string
 
-(** C-compiler flags for building runtime objects with the token's value;
-    appended after the configure-provided flags so that they override the
-    configure default (command-line order wins). *)
+(** The -D<macro>=1|0 flag pinning the token's axis macro
+    (WITH_FRAME_POINTERS, STACK_CHECKS_ENABLED, WITH_ADDRESS_SANITIZER) for
+    a C compilation, overriding the default that m.h would otherwise
+    resolve it to; empty for tokens without a runtime macro. *)
+val cc_macro_flags : token -> enabled:bool -> string list
+
+(** The C-compiler flags that make the generated machine code itself match
+    the token's value (frame-pointer preservation, sanitizer
+    instrumentation or its removal), as opposed to the macro seen by the
+    preprocessor. *)
+val cc_behavioral_flags : token -> enabled:bool -> string list
+
+(** C-compiler flags for building runtime objects with the token's value:
+    [cc_macro_flags] followed by [cc_behavioral_flags]; appended after the
+    configure-provided flags so that they override the configure default
+    (command-line order wins). *)
 val cc_flags : token -> enabled:bool -> string list
 
-(** Like [cc_flags], for assembly (.S) preprocessing. *)
+(** Like [cc_flags], for assembly (.S) preprocessing: [cc_macro_flags]. *)
 val aspp_flags : token -> enabled:bool -> string list
 
 (** Whether the token changes the runtime: runtime archives are built per

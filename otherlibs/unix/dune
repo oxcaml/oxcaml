@@ -142,7 +142,10 @@
    wait
    write_unix
    )
-   (flags ((:include %{project_root}/oc_cflags.sexp)
+   ; OC_CFLAGS_SEXP lets a codegen-variant context whose asan axis differs
+   ; from the configure default swap the sanitizer flags (see
+   ; VARIANT_ENV_VARS in Makefile.common-ox).
+   (flags ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
            (:include %{project_root}/sharedlib_cflags.sexp)
            (:include %{project_root}/oc_cppflags.sexp)))
  ))
@@ -188,7 +191,7 @@
  (name codegen-variant-libs)
  (enabled_if
   (and (<> %{context_name} "default") (<> %{context_name} "main")))
- (deps unix.cmxa unix.a unix.cmxs))
+ (deps unix.cmxa unix.a unix.cmxs libunix_stubs.a))
 
 (rule
   (targets unix.ml)

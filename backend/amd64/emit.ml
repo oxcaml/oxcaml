@@ -1648,11 +1648,7 @@ end = struct
 
   let[@inline always] emit_sanitize ?dependencies ~instr ~address
       (memory_chunk : Cmm.memory_chunk) memory_access =
-    (* Checking [Config.with_address_sanitizer] is redundant, but we do it
-       because it's a compile-time constant, so it enables the compiler to
-       completely optimize-out the AddressSanitizer code when the compiler was
-       configured without it. *)
-    if Config.with_address_sanitizer && !Arch.is_asan_enabled
+    if !Clflags.address_sanitizer
     then
       match memory_access with
       (* We can elide the ASAN check for stores made to initialize record fields
@@ -1930,7 +1926,7 @@ let to_addr_width loc : X86_ast.data_type =
     NONE
 
 let emit_simd_sanitize ~address ~instr ~loc ~kind =
-  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+  if !Clflags.address_sanitizer
   then
     let chunk : Cmm.memory_chunk option =
       match Simd.loc_memory_width loc with
@@ -2000,9 +1996,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
 (* Only used for instructions that have an implicit memory operand. Explicit
    load/store operations are sanitized automatically by [emit_simd_instr]. *)
 let emit_implicit_simd_sanitize (op : Simd.operation) instr =
-  if
-    Config.with_address_sanitizer && !Arch.is_asan_enabled
-    && Simd.is_memory_operation op
+  if !Clflags.address_sanitizer && Simd.is_memory_operation op
   then
     let simd = Simd.Pseudo_instr.instr op.instr in
     match[@warning "-4"] simd.id with

@@ -249,8 +249,6 @@ let trap_notes = ref true
 (* Emit extension symbols for CPUID startup check  *)
 let arch_check_symbols = ref true
 
-let is_asan_enabled = ref Config.with_address_sanitizer
-
 (* Machine-specific command-line options *)
 
 let command_line_options =
@@ -263,9 +261,8 @@ let command_line_options =
     "-fno-trap-notes", Arg.Clear trap_notes,
       " Do not emit .note.ocaml_eh section with trap handling information";
     "-fno-asan",
-      Arg.Clear is_asan_enabled,
-      " Disable AddressSanitizer. This is only meaningful if the compiler was \
-       built with AddressSanitizer support enabled."
+      Arg.Clear Clflags.address_sanitizer,
+      " Disable AddressSanitizer (deprecated alias of -no-asan)"
   ] @ Extension.args
 
 (* Specific operations for the AMD64 processor *)

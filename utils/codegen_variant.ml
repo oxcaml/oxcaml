@@ -27,19 +27,22 @@
  ******************************************************************************)
 
 type t =
-  { frame_pointers : bool;
+  { address_sanitizer : bool;
+    frame_pointers : bool;
     poll_insertion : bool;
     stack_checks : bool
   }
 
 let flags_variant () =
-  { frame_pointers = !Clflags.frame_pointers;
+  { address_sanitizer = !Clflags.address_sanitizer;
+    frame_pointers = !Clflags.frame_pointers;
     poll_insertion = !Clflags.poll_insertion;
     stack_checks = !Clflags.stack_checks
   }
 
 let default =
-  { frame_pointers = Config.with_frame_pointers;
+  { address_sanitizer = Config.with_address_sanitizer;
+    frame_pointers = Config.with_frame_pointers;
     poll_insertion = Config.poll_insertion;
     stack_checks = not Config.no_stack_checks
   }
@@ -54,13 +57,15 @@ let current () =
   if Clflags.target_is_jsir () then default else flags_variant ()
 
 let equal t1 t2 =
-  Bool.equal t1.frame_pointers t2.frame_pointers
+  Bool.equal t1.address_sanitizer t2.address_sanitizer
+  && Bool.equal t1.frame_pointers t2.frame_pointers
   && Bool.equal t1.poll_insertion t2.poll_insertion
   && Bool.equal t1.stack_checks t2.stack_checks
 
 let is_default t = equal t default
 
 let apply t =
+  Clflags.address_sanitizer := t.address_sanitizer;
   Clflags.frame_pointers := t.frame_pointers;
   Clflags.poll_insertion := t.poll_insertion;
   Clflags.stack_checks := t.stack_checks
@@ -69,12 +74,16 @@ let apply t =
    scheme; each axis stage extends [name]/[of_name] alongside [t]. *)
 let name t =
   Codegen_variant_name.of_tokens
-    ((if t.frame_pointers then [Codegen_variant_name.Frame_pointers] else [])
+    ((if t.address_sanitizer
+     then [Codegen_variant_name.Address_sanitizer]
+     else [])
+    @ (if t.frame_pointers then [Codegen_variant_name.Frame_pointers] else [])
     @ (if t.poll_insertion then [Codegen_variant_name.Poll_insertion] else [])
     @ if t.stack_checks then [Codegen_variant_name.Stack_checks] else [])
 
 let of_name n =
-  { frame_pointers = Codegen_variant_name.(mem Frame_pointers n);
+  { address_sanitizer = Codegen_variant_name.(mem Address_sanitizer n);
+    frame_pointers = Codegen_variant_name.(mem Frame_pointers n);
     poll_insertion = Codegen_variant_name.(mem Poll_insertion n);
     stack_checks = Codegen_variant_name.(mem Stack_checks n)
   }
@@ -101,7 +110,7 @@ type fingerprint = (string * string) list
 let fingerprint t =
   [ "frame_pointers", string_of_bool t.frame_pointers;
     "stack_checks", string_of_bool t.stack_checks;
-    "address_sanitizer", string_of_bool Config.with_address_sanitizer ]
+    "address_sanitizer", string_of_bool t.address_sanitizer ]
 
 let current_fingerprint () = fingerprint (current ())
 

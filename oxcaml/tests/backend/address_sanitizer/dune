@@ -7,35 +7,46 @@
  (flags (:standard -mavx))
  (include_dirs "../../../../runtime"))
 
+;; These tests run with AddressSanitizer instrumentation in the
+;; "main-asan-fp" codegen-variant context: its env ocamlopt_flags carry
+;; -asan -frame-pointers, and its otherlibs (the test's library
+;; dependencies) are themselves built instrumented against the asan-fp
+;; stdlib tree. `make runtest` drives this leg whenever that context
+;; exists — the asan-fp variant is in the configure-computed list, or an
+;; asan-default configure built it as the default variant's own context
+;; (see Makefile.common-ox).
+;;
+;; In the "main" context the executable merely builds UNinstrumented and
+;; skips its checks (the gate writes false): the main context never
+;; carries asan — on an asan-default configure the compiler is built
+;; -no-asan against the asan-off tree, and the test's libraries with it.
+
 (executables
  (names address_sanitizer)
  (modes (native exe))
- (ocamlopt_flags (:standard -extension simd_beta -gdwarf-inlined-frames -fprefetchw \ -fno-asan))
+ (ocamlopt_flags (:standard -extension simd_beta -gdwarf-inlined-frames -fprefetchw \ -fno-asan -no-asan))
  (modules address_sanitizer)
  (libraries stdlib_stable unix str)
  (foreign_archives stubs))
 
-;; These tests are only meaningful when the compiler was built with AddressSanitizer enabled.
-;; This condition is not expressible in "enable_if" clause because dune does not support
-;; %{ocaml-config:with_address_sanitizer} (or any of our other configurable extensions for that matter).
+;; Whether the executable just built is instrumented (per context, see
+;; above). The executable reads the answer from should_run_tests.out and
+;; reduces to a single "Possibly running" line when it is false.
 
 (rule
  (enabled_if (= %{context_name} "main"))
  (targets should_run_tests.out)
- (action
-   (with-accepted-exit-codes 0
-     (bash
-        "if %{bin:ocamlopt.opt} -config | grep -q 'with_address_sanitizer: true' ;
-        then
-           echo true > %{targets}
-        else
-           echo false > %{targets}
-        fi"))))
+ (action (with-stdout-to %{targets} (echo "false\n"))))
+
+(rule
+ (enabled_if (= %{context_name} "main-asan-fp"))
+ (targets should_run_tests.out)
+ (action (with-stdout-to %{targets} (echo "true\n"))))
 
 (rule
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (or (= %{context_name} "main") (= %{context_name} "main-asan-fp"))
     (= %{architecture} "amd64")))
  (targets address_sanitizer.out)
  (deps address_sanitizer.exe should_run_tests.out)
@@ -49,7 +60,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (or (= %{context_name} "main") (= %{context_name} "main-asan-fp"))
    (= %{architecture} "amd64")))
  (action
   (progn

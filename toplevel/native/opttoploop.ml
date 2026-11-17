@@ -80,15 +80,46 @@ external max_domain_count : unit -> int
    rejection.  The cap above 1 implies the host itself is fully polled
    (or ran with an explicit OCAMLRUNPARAM d= override), so under default
    flags this only fires when the phrase flags diverge from the host's
-   build, which the toplevel's default-variant pin already makes rare. *)
+   build, which the toplevel's host-variant pin already makes rare. *)
 let check_poll_insertion_for_in_process_load () =
-  if (not !Clflags.poll_insertion) && max_domain_count () > 1 then
+  (* As in [Compilenv.build_unit_info], the LLVM backend discards [Poll]
+     instructions, so code it compiles is nonpolled even when
+     [Clflags.poll_insertion] is set. *)
+  let phrase_polled =
+    !Clflags.poll_insertion && not !Clflags.llvm_backend
+  in
+  if (not phrase_polled) && max_domain_count () > 1 then
     failwith
       "in-process loading of code compiled without poll insertion is not \
        permitted when the runtime allows more than one domain; enable poll \
        insertion for the evaluated code (-enable-poll-insertion, or \
        poll-insertion=1 in OCAMLPARAM), or run the program with \
        OCAMLRUNPARAM=d=1 to permit the load"
+
+(* The codegen variant this executable was actually built for: the
+   per-context constants baked in by the toplevel_host_variant rule in
+   toplevel/native/dune.  This is not always [Codegen_variant.default]: on
+   an asan-default configure the compiler contexts build asan-off, so the
+   installed ocamlnat's (and expect.opt's) variant is the asan-off flip of
+   the default. *)
+let host_variant : Codegen_variant.t =
+  { address_sanitizer = Toplevel_host_variant.address_sanitizer;
+    frame_pointers = Toplevel_host_variant.frame_pointers;
+    poll_insertion = Toplevel_host_variant.poll_insertion;
+    stack_checks = Toplevel_host_variant.stack_checks
+  }
+
+let check_codegen_variant_for_in_process_load () =
+  let current_variant = Codegen_variant.current () in
+  if not (Codegen_variant.equal current_variant host_variant) then
+    failwith
+      (Printf.sprintf
+         "this executable was built for codegen variant '%s' and cannot \
+          compile and load phrases for variant '%s' into its own image; \
+          adjust the variant-selecting flags to match the variant the \
+          executable was built for"
+         (Codegen_variant.to_string host_variant)
+         (Codegen_variant.to_string current_variant))
 
 let default_lookup sym =
   Dynlink.unsafe_get_global_value ~bytecode_or_asm_symbol:sym
@@ -381,6 +412,13 @@ let default_load ppf (program : Lambda.program) =
   res
 
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
+  (* [prepare] pins ocamlnat's startup to [host_variant], but phrase
+     loading is also reached by embedders that never call [prepare]
+     (expect.opt supplies [initialize_toplevel_env]/[execute_phrase]
+     directly), so the admission check must sit on the shared load path
+     itself: compiled phrases execute in this executable's image and must
+     use the variant it was built for. *)
+  check_codegen_variant_for_in_process_load ();
   check_poll_insertion_for_in_process_load ();
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
@@ -788,6 +826,13 @@ let refill_lexbuf buffer len =
 
 let _ =
   Sys.interactive := true;
+  (* Phrases are compiled into this executable's own image, so the variant
+     flag defaults must describe the variant it was built for rather than
+     the installation default from [Config].  They are set before the load
+     path is first computed because [set_paths] keeps that path's implicit
+     standard-library entry, against which command-line objects such as
+     "str/str.cmxs" are then found: it has to be the host variant's root. *)
+  Codegen_variant.apply host_variant;
   Compmisc.init_path ();
   Clflags.dlcode := true;
   ()
@@ -834,8 +879,11 @@ let set_paths () =
   (* Add whatever -I options have been specified on the command line,
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
-  (* ocamlnat's variant is pinned to the binary's baked default (see
-     [prepare]), so this is the base root in practice. *)
+  (* ocamlnat's variant is pinned to the binary's own build variant (see
+     [host_variant] and [prepare]), so this resolves against that
+     variant's library root.  The -I/-H directories were asked for by the
+     user and get the checked expansion; "+camlp4" is our own optional
+     addition, which must not become an error when that root lacks it. *)
   let expand = Codegen_variant.expand_directory in
   let expand_entry (e : Clflags.visible_include) : Clflags.visible_include =
     { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
@@ -971,14 +1019,19 @@ let preload_objects = ref []
 
 let prepare ppf ?input:_ () =
   (* Compiled phrases are loaded into the toplevel's own image, so they must
-     use the codegen variant the toplevel itself was built for. *)
+     use the codegen variant the toplevel itself was built for (not
+     necessarily the install default; see [host_variant] above).  Once this
+     pin passes, the current flags select [host_variant], so [set_paths]'s
+     [Codegen_variant.expand_directory] resolves the load path against the
+     host variant's library root too. *)
   let current_variant = Codegen_variant.current () in
-  if not (Codegen_variant.is_default current_variant) then
+  if not (Codegen_variant.equal current_variant host_variant) then
     Compenv.fatal
       (Printf.sprintf
          "ocamlnat was built for codegen variant '%s' and cannot compile \
-          phrases for variant '%s'; remove the variant-selecting flags"
-         (Codegen_variant.to_string Codegen_variant.default)
+          phrases for variant '%s'; adjust the variant-selecting flags to \
+          match the variant ocamlnat was built for"
+         (Codegen_variant.to_string host_variant)
          (Codegen_variant.to_string current_variant));
   set_paths ();
   begin try

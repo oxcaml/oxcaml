@@ -96,6 +96,16 @@ let main () =
   let ppf = Format.err_formatter in
   Clflags.set_target Clflags.Target.Native;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+  (* Phrases are compiled into ocamlnat's own image, so the variant flag
+     defaults must describe the variant this binary was actually built for
+     rather than the installation default from [Config] (the two differ in
+     the compiler contexts of an asan-default configure, which build
+     asan-off).  This must precede argument parsing -- not live in
+     [Opttoploop.prepare] -- both so that explicit variant-selecting flags
+     still override the defaults (and are then checked by [prepare]'s
+     host pin), and because a script-file argument invokes [prepare]
+     during parsing. *)
+  Codegen_variant.apply Opttoploop.host_variant;
   let list = ref Options.list in
   begin
     try

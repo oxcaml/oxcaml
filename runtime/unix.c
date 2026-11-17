@@ -505,7 +505,7 @@ void caml_init_os_params(void)
 #ifndef __CYGWIN__
 void caml_plat_mem_name_map(void *mem, size_t length, const char *name)
 {
-#if defined(__linux__) && !defined(WITH_ADDRESS_SANITIZER)
+#if defined(__linux__) && !WITH_ADDRESS_SANITIZER
   if (name) {
     /* On Linux, use PR_SET_VMA_ANON_NAME to name a mapping */
     char buf[80];
@@ -528,7 +528,7 @@ void caml_plat_mem_name_map(void *mem, size_t length, const char *name)
 #endif
 }
 
-#ifndef WITH_ADDRESS_SANITIZER
+#if !WITH_ADDRESS_SANITIZER
 static void* mmap_named(void* addr, size_t length, int prot, int flags,
                         int fd, off_t offset, const char* name)
 {
@@ -543,7 +543,7 @@ static void* mmap_named(void* addr, size_t length, int prot, int flags,
 void *caml_plat_mem_map(uintnat size, uintnat caml_flags, const char* name)
 {
   uintnat alignment = caml_plat_hugepagesize;
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
   return aligned_alloc(alignment, (size + (alignment - 1)) & ~(alignment - 1));
 #else
   uintnat reserve_only = caml_flags & CAML_MAP_RESERVE_ONLY;
@@ -605,7 +605,7 @@ got_mapping:
 #endif
 }
 
-#ifndef WITH_ADDRESS_SANITIZER
+#if !WITH_ADDRESS_SANITIZER
 static void* map_fixed(void* mem, uintnat size, int prot, const char* name)
 {
   if (mmap_named(mem, size, prot, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
@@ -640,7 +640,7 @@ void *caml_plat_mem_map(uintnat size, uintnat flags, const char* name)
   return mem;
 }
 
-#ifndef WITH_ADDRESS_SANITIZER
+#if !WITH_ADDRESS_SANITIZER
 static void* map_fixed(void* mem, uintnat size, int prot, const char* name)
 {
   if (mprotect(mem, size, prot) != 0) {
@@ -655,7 +655,7 @@ static void* map_fixed(void* mem, uintnat size, int prot, const char* name)
 
 void* caml_plat_mem_commit(void* mem, uintnat size, const char* name)
 {
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
   return mem;
 #else
   void* p = map_fixed(mem, size, PROT_READ | PROT_WRITE, name);
@@ -670,7 +670,7 @@ void* caml_plat_mem_commit(void* mem, uintnat size, const char* name)
 
 void caml_plat_mem_decommit(void* mem, uintnat size, const char* name)
 {
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
   /* We don't need the strength of [MADV_DONTNEED]. */
   madvise(mem, size, MADV_FREE);
 #else
@@ -680,7 +680,7 @@ void caml_plat_mem_decommit(void* mem, uintnat size, const char* name)
 
 void caml_plat_mem_unmap(void* mem, uintnat size)
 {
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
   free(mem);
 #else
   if (munmap(mem, size) != 0)

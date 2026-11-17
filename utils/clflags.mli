@@ -314,6 +314,7 @@ val dlcode : bool ref
 val pic_code : bool ref
 val frame_pointers : bool ref
 val stack_checks : bool ref
+val address_sanitizer : bool ref
 val poll_insertion : bool ref
 val runtime_variant : string ref
 val ocamlrunparam : string ref

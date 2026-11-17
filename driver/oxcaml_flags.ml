@@ -661,15 +661,11 @@ let validate_frame_pointers () =
       Compenv.fatal
         "Frame pointers are not supported on this platform; \
          remove -frame-pointers (or frame-pointers=1 in OCAMLPARAM)")
-  else if Config.with_address_sanitizer
-  then
-    Compenv.fatal
-      "AddressSanitizer requires frame pointers; \
-       remove -no-frame-pointers (or frame-pointers=0 in OCAMLPARAM)"
   else if !Clflags.llvm_backend
   then
     (* The LLVM backend's trap-block scheme requires frame pointers,
-       whatever the configure default. *)
+       whatever the configure default (the same absolute edge as the
+       sibling llvm/asan checks below). *)
     Compenv.fatal
       "The LLVM backend requires frame pointers; \
        enable them with -frame-pointers (or frame-pointers=1 in OCAMLPARAM)"
@@ -681,11 +677,12 @@ let validate_frame_pointers () =
 let validate_stack_checks () =
   if !Clflags.stack_checks
   then (
-    if Config.with_address_sanitizer
+    if !Clflags.address_sanitizer
     then
       Compenv.fatal
         "Stack checks together with AddressSanitizer is an untested \
-         combination; remove -stack-checks (or stack-checks=1 in OCAMLPARAM)";
+         combination; disable one of them (-no-stack-checks or -no-asan, or \
+         stack-checks=0 / asan=0 in OCAMLPARAM)";
     if !Clflags.llvm_backend
     then
       Compenv.fatal
@@ -699,11 +696,49 @@ let validate_stack_checks () =
         "Stack checks cannot be disabled on this architecture; \
          remove -no-stack-checks (or stack-checks=0 in OCAMLPARAM)"
 
+(* The platform/toolchain check mirrors the "## Address Sanitizer" case in
+   configure.ac (clang-only: the runtime's report wrappers rely on
+   Clang-only attributes, see runtime/memory.c);
+   [Config.with_address_sanitizer] only provides the default for
+   [Clflags.address_sanitizer]. *)
+let validate_address_sanitizer () =
+  if !Clflags.address_sanitizer
+  then (
+    if not !Clflags.frame_pointers
+    then
+      Compenv.fatal
+        "AddressSanitizer requires frame pointers; add -frame-pointers (or \
+         frame-pointers=1 in OCAMLPARAM) or disable AddressSanitizer with \
+         -no-asan (or asan=0 in OCAMLPARAM)";
+    if !Clflags.llvm_backend
+    then
+      Compenv.fatal
+        "The LLVM backend emits no AddressSanitizer instrumentation; \
+         remove -asan (or asan=1 in OCAMLPARAM) or remove -llvm-backend";
+    if Config.tsan
+    then
+      Compenv.fatal
+        "AddressSanitizer cannot be combined with ThreadSanitizer (the C \
+         compiler rejects -fsanitize=address together with \
+         -fsanitize=thread, and this compiler was configured with \
+         --enable-tsan); remove -asan (or asan=1 in OCAMLPARAM)";
+    match Config.architecture, Config.system, Config.c_compiler_is_clang with
+    | "amd64", "linux", true -> ()
+    | "amd64", "linux", false ->
+      Compenv.fatal
+        "AddressSanitizer requires a compiler configured with Clang as the \
+         C compiler; remove -asan (or asan=1 in OCAMLPARAM)"
+    | _, _, _ ->
+      Compenv.fatal
+        "AddressSanitizer is not supported on this platform; \
+         remove -asan (or asan=1 in OCAMLPARAM)")
+
 (* The whole validation DAG for the per-invocation codegen-variant axes;
    run at the start of native compilation and linking. *)
 let validate_codegen_variant () =
   validate_frame_pointers ();
-  validate_stack_checks ()
+  validate_stack_checks ();
+  validate_address_sanitizer ()
 
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

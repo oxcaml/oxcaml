@@ -16,6 +16,8 @@ endif
 # build, use $ as an ordinary operator, which compilers configured with
 # --enable-syntax-quotations reject by default. Settings before any "_" in
 # OCAMLPARAM are defaults, which command-line flags override.
+# (On an asan-default configure an asan=0 default is prepended below, after
+# Makefile.codegen-variants is included.)
 main_ocamlparam = syntax-quotations=0,_
 ifneq ($(BUILD_OCAMLPARAM),)
 main_ocamlparam = syntax-quotations=0,$(BUILD_OCAMLPARAM)
@@ -39,7 +41,7 @@ define dune_main_context
   ; Findlib packages from outside the build are compiled by other compilers.
   (paths
     (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
-    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/build"))
+    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/$(main_context_stdlib_dir)"))
     (OCAMLPATH ("$(CURDIR)/_build/main/no-findlib-packages"))
     (OCAMLFIND_CONF ("/dev/null")))
   (env (_
@@ -62,13 +64,15 @@ define dune_main_context
     ; this environment also applies to the libraries of
     ; external/ast-dependent-libs.
     (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
-    ; We never want to build the compiler itself with AddressSanitizer enabled.
-    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
+    ; We never want to build the compiler itself with AddressSanitizer
+    ; enabled; on an asan-default configure OCAMLLIB above points at the
+    ; asan-off variant stdlib tree to match (see main_context_stdlib_dir).
+    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -no-asan))
     ; STDLIB_JSIR_OCAMLOPT_FLAGS: for the JSIR builds of the compiler's
     ; libraries (see external/ast-dependent-libs/stdlib-jsir/dune).
     (env-vars
       ("OCAMLPARAM" "$(main_ocamlparam)")
-      ("STDLIB_JSIR_OCAMLOPT_FLAGS" "$(main_ocamlopt_optimization_flags)"))))))
+      ("STDLIB_JSIR_OCAMLOPT_FLAGS" "$(main_ocamlopt_optimization_flags)")$(main_extra_env_vars))))))
 endef
 
 # Codegen-variant library builds. The variant trees we build and install
@@ -83,6 +87,50 @@ endef
 # Makefile.codegen-variants.
 include $(ROOTDIR)/Makefile.codegen-variants
 
+# The stdlib tree the main (compiler-building) context compiles against.
+# The compiler itself is never built with AddressSanitizer (-no-asan in
+# dune_main_context above), so on an asan-default configure it must
+# compile against — and link the runtime archives of — the asan-off
+# variant stdlib tree: the configure flip list guarantees that variant
+# exists (flipping asan off an asan default yields e.g. "fp", since asan
+# forces fp), and gen.ml builds its tree at stdlib/build_<name> in the
+# boot context with the sanitizer flags stripped. On every other
+# configure the default tree serves.
+# The codegen variant the main context actually builds: the configure
+# default, except that on an asan-default configure it is the asan-OFF
+# flip of the default (asan sorts first, so stripping the "asan-" prefix
+# is the flip; the result is never empty because asan forces fp).
+main_context_variant = $(if $(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),asan),$(patsubst asan-%,%,$(CODEGEN_DEFAULT_VARIANT)),$(CODEGEN_DEFAULT_VARIANT))
+main_context_stdlib_dir = $(if $(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),asan),build_$(main_context_variant),build)
+
+# OCAMLPARAM for the main (compiler-building) context: main_ocamlparam
+# above, except that on an asan-default configure a pre-underscore
+# (default; explicit flags win) asan=0 is prepended. It keeps the dune
+# rules that invoke %{ocamlopt} directly (the <lib>__.ml-gen alias
+# modules, dynlink.cmxa), which see neither the env ocamlopt_flags nor
+# their -no-asan, consistent with the context's asan-off OCAMLLIB tree.
+# The same configure also points the main context's C-stub stanzas at the
+# stripped cflags sexp via OC_CFLAGS_SEXP (the variant-context mechanism,
+# see variant_oc_cflags_sexp below): the plain oc_cflags.sexp fallback
+# carries the asan default's -fsanitize flags, which would instrument
+# compiler-internal stubs (e.g. flambda2's float32_stubs) that the
+# context's asan-free Exe links can not resolve.
+ifneq ($(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),asan),)
+main_ocamlparam := asan=0,$(main_ocamlparam)
+main_extra_env_vars := ("OC_CFLAGS_SEXP" "oc_cflags_noasan.sexp")
+else
+main_extra_env_vars :=
+endif
+
+# On an asan-default configure the main context builds the compiler (and
+# everything else it hosts) uninstrumented against the asan-off tree, so
+# the DEFAULT tree's native otherlibs cannot be harvested from it; an
+# additional variant-style context for the default variant itself builds
+# them instrumented against the default (asan) stdlib tree. Empty on
+# every other configure.
+asan_default_context_variant := $(if $(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),asan),$(CODEGEN_DEFAULT_VARIANT),)
+all_variant_context_names := $(codegen_variant_names) $(asan_default_context_variant)
+
 # Each variant context carries its per-axis settings BOTH as ocamlopt flags
 # (env + duneconf/ocamlopt_flags_main-<name>.sexp) and through OCAMLPARAM.
 # The latter is load-bearing: dune compiles the generated library alias
@@ -92,8 +140,19 @@ include $(ROOTDIR)/Makefile.codegen-variants
 # defined-but-empty BUILD_OCAMLPARAM must degrade to the "_" form: OCAMLPARAM
 # values without a "_" separator are rejected and discarded wholesale, which
 # would silently drop the axis settings.
+# A variant context whose asan axis differs from the configure default
+# additionally overrides the C flags its stub stanzas compile with, via the
+# env-var-selected cflags sexp (the mechanism the boot context already
+# uses, see dune-workspace): plain env c_flags would not reach the
+# otherlibs stub stanzas, whose explicit (flags ...) lists carry no
+# :standard. The sexps are generated by the _build/_bootinstall recipe.
+# $(call variant_oc_cflags_sexp,<name>): the sexp file name, or empty when
+# the variant's asan axis matches the default's (plain oc_cflags.sexp
+# already carries the right sanitizer flags then).
+variant_oc_cflags_sexp = $(if $(call codegen_variant_has,$(1),asan),$(if $(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),asan),,oc_cflags_asan.sexp),$(if $(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),asan),oc_cflags_noasan.sexp,))
+
 # $(call VARIANT_ENV_VARS,<name>)
-VARIANT_ENV_VARS = (env-vars ("OCAMLPARAM" "syntax-quotations=0,$(if $(BUILD_OCAMLPARAM),$(BUILD_OCAMLPARAM),_),$(call codegen_variant_ocamlparam,$(1))"))
+VARIANT_ENV_VARS = (env-vars ("OCAMLPARAM" "syntax-quotations=0,$(if $(BUILD_OCAMLPARAM),$(BUILD_OCAMLPARAM),_),$(call codegen_variant_ocamlparam,$(1))")$(if $(call variant_oc_cflags_sexp,$(1)), ("OC_CFLAGS_SEXP" "$(call variant_oc_cflags_sexp,$(1))")))
 
 # $(call dune_variant_context,<name>)
 define dune_variant_context
@@ -105,14 +164,14 @@ define dune_variant_context
   (cms_cmt_dependency cms)
   (paths
     (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
-    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/build_$(1)"))
+    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/$(if $(filter $(1),$(CODEGEN_DEFAULT_VARIANT)),build,build_$(1))"))
     (OCAMLPATH ("$(CURDIR)/_build/main/no-findlib-packages"))
     (OCAMLFIND_CONF ("/dev/null")))
   (env (_
     (binaries (duneconf/ocaml as ocaml))
     (bin_annot_cms true)
     (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
-    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan $(call codegen_variant_ocamlopt_flags,$(1))))
+    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) $(call codegen_variant_ocamlopt_flags,$(1))))
     $(call VARIANT_ENV_VARS,$(1))))))
 endef
 
@@ -160,8 +219,8 @@ compiler: boot-compiler
           testsuite/lib/testing.cm{,x}a \
           @middle_end/flambda2/tests/tools/all \
           $(ocamldir)/tools/dumpobj.bc
-ifneq ($(codegen_variant_names),)
-	for name in $(codegen_variant_names); do \
+ifneq ($(strip $(all_variant_context_names)),)
+	for name in $(all_variant_context_names); do \
 	  $(dune) build --always-show-command-line \
 	    --workspace=duneconf/main-$$name.ws \
 	    @otherlibs/codegen-variant-libs || exit 1; \
@@ -201,6 +260,15 @@ runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out autom
 # gate on compiler-inserted polls (oxcaml/tests/simd/preemption256.ml).
 runtest: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(if $(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),poll),true,false) $(dune) build $(ws_main) $(runtest_targets)
+# The AddressSanitizer backend tests run in the main-asan-fp context
+# whenever it exists — the asan-fp variant is built, or it is an
+# asan-default configure's default-variant context — because their library
+# dependencies must themselves be instrumented, which only that context's
+# otherlibs are (see oxcaml/tests/backend/address_sanitizer/dune).
+ifneq ($(filter asan-fp,$(all_variant_context_names)),)
+	$(dune) build --workspace=duneconf/main-asan-fp.ws \
+	  @oxcaml/tests/backend/address_sanitizer/runtest
+endif
 
 runtest-llvmize: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
@@ -211,8 +279,9 @@ runtest-dwarf: compiler
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
 duneconf/main.ws: export contents = $(dune_main_context)
-$(foreach n,$(codegen_variant_names),$(eval duneconf/main-$(n).ws: export contents = $$(call dune_variant_context,$(n))))
-duneconf/%.ws: Makefile.common-ox $(ROOTDIR)/Makefile.codegen-variants
+$(foreach n,$(all_variant_context_names),$(eval duneconf/main-$(n).ws: export contents = $$(call dune_variant_context,$(n))))
+duneconf/%.ws: Makefile.common-ox $(ROOTDIR)/Makefile.codegen-variants \
+  $(ROOTDIR)/Makefile.config
 	echo "$$contents" > $@
 
 # We need to disable ocaml/otherlibs when compiling with coverage, because we
@@ -242,7 +311,7 @@ dune_config_targets = \
   dune-project
 
 dune_config_targets += \
-  $(foreach n,$(codegen_variant_names),duneconf/main-$(n).ws)
+  $(foreach n,$(all_variant_context_names),duneconf/main-$(n).ws)
 
 _build/_bootinstall: Makefile.config Makefile.common-ox \
   $(ROOTDIR)/Makefile.codegen-variants $(dune_config_targets)
@@ -253,20 +322,30 @@ _build/_bootinstall: Makefile.config Makefile.common-ox \
 # See: https://github.com/ocaml/dune/issues/13225
 	echo '($(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
 	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
-	$(foreach n,$(codegen_variant_names),echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,) $(call codegen_variant_ocamlopt_flags,$(n)))' > duneconf/ocamlopt_flags_main-$(n).sexp; )
+	$(foreach n,$(all_variant_context_names),echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,) $(call codegen_variant_ocamlopt_flags,$(n)))' > duneconf/ocamlopt_flags_main-$(n).sexp; )
 
-# Per-context host-variant constants modules for otherlibs/dynlink (see the
-# dynlink_host_variant rule there): the default variant's values for the
-# default and main contexts, each variant's values for its main-<name>
-# context.
+# Per-context host-variant constants modules for otherlibs/dynlink (see
+# the dynlink_host_variant rule there): the default variant's values for
+# the default context, the variant the main context actually builds for
+# the main context (the asan-off flip of an asan default; the configure
+# default everywhere else — see main_context_variant), and each variant's
+# values for its main-<name> context.
 	echo '$(call codegen_variant_dynlink_consts,$(CODEGEN_DEFAULT_VARIANT))' > duneconf/dynlink_host_variant_default.ml
-	cp duneconf/dynlink_host_variant_default.ml duneconf/dynlink_host_variant_main.ml
-	$(foreach n,$(codegen_variant_names),echo '$(call codegen_variant_dynlink_consts,$(n))' > duneconf/dynlink_host_variant_main-$(n).ml; )
+	echo '$(call codegen_variant_dynlink_consts,$(main_context_variant))' > duneconf/dynlink_host_variant_main.ml
+	$(foreach n,$(all_variant_context_names),echo '$(call codegen_variant_dynlink_consts,$(n))' > duneconf/dynlink_host_variant_main-$(n).ml; )
 	{ for flag in $(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,); do \
 	    echo "$$flag"; \
 	  done > ocamlopt_stdlib_flags.txt; }
 	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
+
+# C-stub cflags for variant contexts whose asan axis differs from the
+# configure default (selected via the OC_CFLAGS_SEXP env var, see
+# VARIANT_ENV_VARS): the asan direction instruments the stubs, the noasan
+# direction strips an asan default's sanitizer flags (appended after
+# OC_CFLAGS: command-line order wins).
+	echo '( $(OC_CFLAGS) -DWITH_ADDRESS_SANITIZER=1 -fsanitize=address -fsanitize-recover=address )' > oc_cflags_asan.sexp
+	echo '( $(OC_CFLAGS) -DWITH_ADDRESS_SANITIZER=0 -fno-sanitize=address -fno-sanitize-recover=address )' > oc_cflags_noasan.sexp
 	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
 	echo '( $(SHAREDLIB_CFLAGS) )' > sharedlib_cflags.sexp
 
@@ -330,21 +409,34 @@ ifneq ($(codegen_variant_names),)
 # lib/ocaml/variants/<name> per built variant, mirroring the base root's
 # shape, so a compile/link for a non-default codegen variant can use it
 # wholesale via -I / as a remapped stdlib root. Rebuilt per variant:
-# native stdlib and otherlibs artifacts (.cmx/.cmxa/.a/.cmxs/std_exit) and
+# native stdlib and otherlibs artifacts (.cmx/.cmxa/.a/.cmxs/std_exit),
 # the variant runtime archives (suffixed by the name's projection onto the
-# runtime axes). Copied from the base root because they are codegen-
+# runtime axes), and the native C stub archives (compiled in the variant
+# context so that a variant whose asan axis differs from the default gets
+# matching sanitizer flags via OC_CFLAGS_SEXP; identical bits otherwise,
+# all stubs being built with -fno-omit-frame-pointer, see configure.ac).
+# Copied from the base root because they are codegen-
 # variant-agnostic: .cmi/.cmt*/.cms*, byte artifacts (.cma/.cmo, byte
-# runtime archives), caml/ headers, C stub archives and stublibs (built
-# once with -fno-omit-frame-pointer, see configure.ac), ld.conf,
+# runtime archives), caml/ headers, byte stub archives and stublibs
+# (bytecode is unaffected by codegen variants), ld.conf,
 # Makefile.config, runtime-launch-info, expunge and the toplevel support
 # files. Deliberately absent: findlib META files, and the compiler-libs/
 # eval/ocaml-jit universe (eval and metaprogramming are unsupported under
 # non-default codegen variants). A final check asserts that the assembled
 # variants/ directory agrees with the configure-computed list (what
 # `ocamlopt -config codegen_variants` will report).
+# On an asan-default configure the loop additionally iterates the default
+# variant itself (asan_default_context_variant) with vroot = the default
+# tree: its native otherlibs come from the main-<default> context (the
+# main context builds them uninstrumented against the asan-off tree, see
+# main_context_stdlib_dir, so they would not match the asan default
+# stdlib).
 	rm -rf _install/lib/ocaml/variants
 	set -e; \
-	for name in $(codegen_variant_names); do \
+	for name in $(codegen_variant_names) $(asan_default_context_variant); do \
+	  if [ "$$name" = "$(CODEGEN_DEFAULT_VARIANT)" ]; then \
+	    vroot=_install/lib/ocaml; \
+	  else \
 	  mkdir -p _install/lib/ocaml/variants/$$name; \
 	  $(cpl) -R _build/default/stdlib/build_$$name/* \
 	    _install/lib/ocaml/variants/$$name/; \
@@ -362,26 +454,36 @@ ifneq ($(codegen_variant_names),)
 	     cp -R $$libdir $$vroot/ ; \
 	   done); \
 	  vroot=_install/lib/ocaml/variants/$$name; \
+	  fi; \
 	  vb=_build/main-$$name/otherlibs; \
 	  cpv() { rm -f "$$1/$$3"; cp "$$2" "$$1/$$3"; }; \
-	  for f in unix.cmxa unix.a unix.cmxs ; do \
+	  for f in unix.cmxa unix.a unix.cmxs libunix_stubs.a ; do \
 	    cpv $$vroot/unix $$vb/unix/$$f $$f; \
 	  done; \
+	  cpv $$vroot $$vb/unix/libunix_stubs.a libunix_stubs_native.a; \
 	  for m in unix unixLabels ; do \
 	    cpv $$vroot/unix $$vb/unix/.unix.objs/native/$$m.cmx $$m.cmx; \
 	  done; \
-	  for f in str.cmxa str.a str.cmxs ; do \
+	  for f in str.cmxa str.a str.cmxs libstr_stubs.a ; do \
 	    cpv $$vroot/str $$vb/str/$$f $$f; \
 	  done; \
+	  cpv $$vroot $$vb/str/libstr_stubs.a libstr_stubs_native.a; \
 	  cpv $$vroot/str $$vb/str/.str.objs/native/str.cmx str.cmx; \
-	  for f in runtime_events.cmxa runtime_events.a runtime_events.cmxs ; do \
+	  for f in runtime_events.cmxa runtime_events.a runtime_events.cmxs \
+	    libruntime_events_stubs.a ; do \
 	    cpv $$vroot/runtime_events $$vb/runtime_events/$$f $$f; \
 	  done; \
+	  cpv $$vroot $$vb/runtime_events/libruntime_events_stubs.a \
+	    libruntime_events_stubs_native.a; \
 	  cpv $$vroot/runtime_events \
 	    $$vb/runtime_events/.runtime_events.objs/native/runtime_events.cmx \
 	    runtime_events.cmx; \
 	  cpv $$vroot/threads $$vb/systhreads/native/threadsnat.cmxa threads.cmxa; \
 	  cpv $$vroot/threads $$vb/systhreads/native/threadsnat.a threads.a; \
+	  cpv $$vroot $$vb/systhreads/native/libthreadsnat_stubs.a \
+	    libthreadsnat_stubs.a; \
+	  cpv $$vroot $$vb/systhreads/native/libthreadsnat_stubs.a \
+	    libthreadsnat_stubs_native.a; \
 	  for m in event thread multicore ; do \
 	    cpv $$vroot/threads \
 	      $$vb/systhreads/native/.threadsnat.objs/native/$$m.cmx $$m.cmx; \
@@ -414,8 +516,10 @@ ifneq ($(codegen_variant_names),)
 	    rm -f $$vroot/$$u/*.cmx; \
 	    cp $$vb/$$u/.$$u.objs/native/*.cmx $$vroot/$$u/; \
 	  done; \
-	  find $$vroot -name META -delete; \
-	  find $$vroot -type d -empty -delete; \
+	  if [ "$$name" != "$(CODEGEN_DEFAULT_VARIANT)" ]; then \
+	    find $$vroot -name META -delete; \
+	    find $$vroot -type d -empty -delete; \
+	  fi; \
 	done
 	@installed=`ls _install/lib/ocaml/variants | sort | tr '\n' ' '`; \
 	configured=`for n in $(codegen_variant_names); do echo $$n; done \

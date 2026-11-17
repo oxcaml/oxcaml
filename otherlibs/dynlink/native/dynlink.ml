@@ -102,8 +102,9 @@ module Native = struct
   let host_codegen_fingerprint =
     Some
       (Codegen_variant.fingerprint
-         { Codegen_variant.frame_pointers =
-             Dynlink_host_variant.frame_pointers;
+         { Codegen_variant.address_sanitizer =
+             Dynlink_host_variant.address_sanitizer;
+           frame_pointers = Dynlink_host_variant.frame_pointers;
            poll_insertion = false;
            stack_checks = Dynlink_host_variant.stack_checks })
   let adapt_filename f = Filename.chop_extension f ^ ".cmxs"
