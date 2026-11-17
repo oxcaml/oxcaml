@@ -166,10 +166,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { mutable s : string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { mutable s : string; } end
-       is not included in
-         sig type t = { mutable s : string @@ local; } end
        Type declarations do not match:
          type t = { mutable s : string; }
        is not included in
@@ -192,10 +188,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { mutable s : string @@ local}
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { mutable s : string @@ local; } end
-       is not included in
-         sig type t = { mutable s : string; } end
        Type declarations do not match:
          type t = { mutable s : string @@ local; }
        is not included in

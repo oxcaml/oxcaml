@@ -77,10 +77,6 @@ Line 3, characters 18-48:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this strengthened module type, the type of "M"
        does not match the underlying type
-       Modules do not match:
-         sig type t1 end
-       is not included in
-         sig type t1 type t2 end
        The type "t2" is required but not provided
 |}]
 
@@ -247,15 +243,6 @@ Lines 9-11, characters 43-5:
 10 |     module N = X
 11 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module N : sig module A : sig type t = X.A.t end end end
-       is not included in
-         sig module N : sig module A = X.A end end
-       In module "N":
-       Modules do not match:
-         sig module A = N.A end
-       is not included in
-         sig module A = X.A end
        In module "N.A":
        Module "X.A" cannot be aliased
 |}]
@@ -278,10 +265,6 @@ Lines 9-11, characters 43-5:
 10 |     module N = X
 11 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module N : (S with X) end
-       is not included in
-         sig module N : (S with X) end
        In module "N":
        Module "X" cannot be aliased
 |}]

@@ -28,10 +28,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) t : immutable_data with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a, 'b) t : immutable_data with 'a end
-       is not included in
-         sig type ('a, 'b) t : immutable_data with 'a @@ portable end
        Type declarations do not match:
          type ('a, 'b) t : immutable_data with 'a
        is not included in
@@ -144,10 +140,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : value mod shared with 'a @@ corrupted
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : value mod shared with 'a end
-       is not included in
-         sig type 'a t : value mod shared end
        Type declarations do not match:
          type 'a t : value mod shared with 'a
        is not included in
@@ -181,13 +173,6 @@ Lines 3-6, characters 6-3:
 5 |     with 'a @@ external64
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('a : value mod external64) t
-             : value mod external_ with 'a @@ external64
-         end
-       is not included in
-         sig type ('a : value mod external64) t : value mod external_ end
        Type declarations do not match:
          type ('a : value mod external64) t
            : value mod external_ with 'a @@ external64
@@ -279,10 +264,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : immutable_data with 'a @@ portable with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : immutable_data with 'a end
-       is not included in
-         sig type 'a t : immutable_data with 'a @@ portable end
        Type declarations do not match:
          type 'a t : immutable_data with 'a
        is not included in
@@ -308,10 +289,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : immutable_data with 'a with 'a @@ portable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : immutable_data with 'a end
-       is not included in
-         sig type 'a t : immutable_data with 'a @@ portable end
        Type declarations do not match:
          type 'a t : immutable_data with 'a
        is not included in
@@ -359,10 +336,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : immutable_data with 'a @@ contended with 'a @@ portable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : immutable_data with 'a end
-       is not included in
-         sig type 'a t : immutable_data with 'a @@ portable contended end
        Type declarations do not match:
          type 'a t : immutable_data with 'a
        is not included in
@@ -414,16 +387,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) t : immutable_data with 'a @@ contended with 'b @@ portable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('a, 'b) t
-             : immutable_data with 'a @@ contended with 'b @@ portable
-         end
-       is not included in
-         sig
-           type ('a, 'b) t
-             : immutable_data with 'a @@ portable with 'b @@ contended
-         end
        Type declarations do not match:
          type ('a, 'b) t
            : immutable_data with 'a @@ contended with 'b @@ portable

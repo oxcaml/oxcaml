@@ -277,10 +277,6 @@ Lines 1-3, characters 59-3:
 2 |   let f (x @ local) = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local] end
-       is not included in
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
        Values do not match:
          val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local]
        is not included in
@@ -299,10 +295,6 @@ Lines 1-3, characters 60-3:
 2 |   let f (x @ unique) = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm & unique] -> 'a @ [> 'm] end
-       is not included in
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
        Values do not match:
          val f : 'a @ [< 'm & unique] -> 'a @ [> 'm]
        is not included in
@@ -321,10 +313,6 @@ Lines 1-3, characters 60-3:
 2 |   let f (x @ global) = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm & global] -> 'a @ [> 'm] end
-       is not included in
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
        Values do not match:
          val f : 'a @ [< 'm & global] -> 'a @ [> 'm]
        is not included in
@@ -344,10 +332,6 @@ Lines 1-3, characters 62-3:
 2 |   let f (x @ portable) = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm & portable] -> 'a @ [> 'm] end
-       is not included in
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
        Values do not match:
          val f : 'a @ [< 'm & portable] -> 'a @ [> 'm]
        is not included in
@@ -389,12 +373,6 @@ Lines 1-3, characters 46-3:
 2 |   let f (x @ local) y = y
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm] end
-       is not included in
-         sig
-           val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
-         end
        Values do not match:
          val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
        is not included in
@@ -417,10 +395,6 @@ Lines 3-5, characters 6-3:
 4 |   let f x = x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] end
-       is not included in
-         sig val f : 'a @ local -> 'a end
        Values do not match:
          val f : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
@@ -444,12 +418,6 @@ Lines 3-5, characters 6-3:
 4 |   let f x = use_portable x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f : 'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
-         end
-       is not included in
-         sig val f : 'a -> 'a end
        Values do not match:
          val f : 'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
        is not included in
@@ -478,10 +446,6 @@ Lines 3-9, characters 6-3:
 8 |     !r
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : int ref val f : unit @ 'm -> int @ [> dynamic] end @ nonportable
-       is not included in
-         sig val f : unit -> int @@ portable end @ nonportable
        Values do not match:
          val f : unit @ 'm -> int @ [> dynamic] (* in a structure at nonportable *)
        is not included in
@@ -500,14 +464,6 @@ Lines 3-9, characters 6-3:
 8 |     !r
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val r : int ref
-           val f :
-             unit @ 'm -> int @ [> aliased nonportable stateful dynamic]
-         end @ nonportable
-       is not included in
-         sig val f : unit -> int @@ portable end @ nonportable
        Values do not match:
          val f : unit @ 'm -> int @ [> aliased nonportable stateful dynamic] (* in a structure at nonportable *)
        is not included in

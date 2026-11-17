@@ -312,10 +312,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) bar += A of float
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a, 'b) bar += A of float end
-       is not included in
-         sig type ('a, 'b) bar += A of int end
        Extension declarations do not match:
          type ('a, 'b) bar += A of float
        is not included in
@@ -338,10 +334,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) bar += A of 'b
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a, 'b) bar += A of 'b end
-       is not included in
-         sig type ('a, 'b) bar += A of 'a end
        Extension declarations do not match:
          type ('a, 'b) bar += A of 'b
        is not included in
@@ -365,10 +357,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('b, 'a) bar = A of 'a
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('b, 'a) bar = A of 'a end
-       is not included in
-         sig type ('a, 'b) bar = A of 'a end
        Type declarations do not match:
          type ('b, 'a) bar = A of 'a
        is not included in
@@ -392,10 +380,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) bar += A : 'd -> ('c, 'd) bar
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a, 'b) bar += A : 'd -> ('c, 'd) bar end
-       is not included in
-         sig type ('a, 'b) bar += A : 'c -> ('c, 'd) bar end
        Extension declarations do not match:
          type ('a, 'b) bar += A : 'd -> ('c, 'd) bar
        is not included in

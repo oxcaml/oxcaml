@@ -278,8 +278,7 @@ let _ =
 Line 4, characters 19-23:
 4 |     let module _ = F(M) in
                        ^^^^
-Error: Modules do not match: sig end @ local is not included in
-       Empty @ global
+Error: Modules do not match: M @ local is not included in Empty @ global
      Got "local" but expected "global".
 |}]
 
@@ -300,7 +299,7 @@ Error: This application of the functor "F" is ill-typed.
          (X : Empty) (Y : Empty) -> ...
        1. Module M matches the expected module type Empty
        2. Modules do not match:
-            N : sig end @ local
+            N @ local
           is not included in
             Empty @ global
           Got "local" but expected "global".
@@ -585,15 +584,6 @@ Line 1, characters 40-41:
 1 | module F (M : SigWithNonmodalModule) = (M : SigWithModalModule)
                                             ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig module M : sig val f : unit -> unit end end @ nonportable
-       is not included in
-         SigWithModalModule @ nonportable
-       In module "M":
-       Modules do not match:
-         sig val f : unit -> unit end @ nonportable
-       is not included in
-         sig val f : unit -> unit @@ portable end @ nonportable
        In module "M":
        Values do not match:
          val f : unit -> unit (* in a structure at nonportable *)
@@ -720,10 +710,6 @@ Lines 7-9, characters 54-5:
 8 |     module N = X.M
 9 |   end...
 Error: Signature mismatch:
-       Modules do not match:
-         sig module N = X.M @@ stateless nonportable end @ nonportable
-       is not included in
-         sig module N = X.M @@ portable end @ nonportable
        In module "N":
        Got "nonportable"
        but expected "portable".
@@ -750,10 +736,6 @@ Lines 9-11, characters 67-5:
 10 |     include (Lib.Sexp : module type of struct include Lib.Sexp end)
 11 |   end...
 Error: Signature mismatch:
-       Modules do not match:
-         sig module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable end @ nonportable
-       is not included in
-         sig module Utf8 = Lib.Sexp.Utf8 @@ portable end @ nonportable
        In module "Utf8":
        Modules do not match:
          (module Lib.Sexp.Utf8) @ nonportable

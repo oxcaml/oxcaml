@@ -1028,10 +1028,6 @@ Lines 3-8, characters 6-3:
 7 |   [@@or_null]
 8 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Nope | Yep of 'a [@@or_null] end
-       is not included in
-         sig type 'a t end
        Type declarations do not match:
          type 'a t = Nope | Yep of 'a [@@or_null]
        is not included in
@@ -1075,10 +1071,6 @@ Lines 5-10, characters 6-3:
  9 |   [@@or_null]
 10 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Nope | Yep of 'a [@@or_null] end
-       is not included in
-         sig type 'a t = Nope | Yep of 'a end
        Type declarations do not match:
          type 'a t = Nope | Yep of 'a [@@or_null]
        is not included in
@@ -1201,12 +1193,6 @@ Lines 3-8, characters 6-3:
 7 |   [@@or_null]
 8 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('a, 'b) second = Bad_null | Bad_payload of 'b [@@or_null]
-         end
-       is not included in
-         sig type ('a, 'b) second : value_or_null non_float end
        Type declarations do not match:
          type ('a, 'b) second = Bad_null | Bad_payload of 'b [@@or_null]
        is not included in
@@ -1237,10 +1223,6 @@ Lines 6-10, characters 6-3:
  9 |     | Yep of 'a
 10 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Nope | Yep of 'a end
-       is not included in
-         sig type 'a t = Nope | Yep of 'a [@@or_null] end
        Type declarations do not match:
          type 'a t = Nope | Yep of 'a
        is not included in
@@ -1477,10 +1459,6 @@ Lines 1-3, characters 47-3:
 2 |   type t = N : t | P : int -> t [@@or_null]
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = N : t | P : int -> t [@@or_null] end
-       is not included in
-         sig type t end
        Type declarations do not match:
          type t = N : t | P : int -> t [@@or_null]
        is not included in
@@ -1602,12 +1580,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = N : nonportable_void -> t | P : int -> t [@@or_null]
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t = N : nonportable_void -> t | P : int -> t [@@or_null]
-         end
-       is not included in
-         sig type t : value_or_null mod portable end
        Type declarations do not match:
          type t = N : nonportable_void -> t | P : int -> t [@@or_null]
        is not included in
@@ -1652,14 +1624,6 @@ Lines 3-8, characters 6-3:
 7 |   [@@or_null]
 8 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('a : any) t =
-               N : ('v : void). 'v -> int t
-             | P : ('b : value mod portable). 'b -> 'b t [@@or_null]
-         end
-       is not included in
-         sig type ('a : any) t : value_or_null mod portable end
        Type declarations do not match:
          type ('a : any) t =
              N : ('v : void). 'v -> int t
@@ -1724,10 +1688,6 @@ Lines 3-5, characters 6-3:
 4 |   type _ t = N : bool t | P : string -> string t [@@or_null]
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type _ t = N : bool t | P : string -> string t [@@or_null] end
-       is not included in
-         sig type _ t = N : int t | P : string -> string t [@@or_null] end
        Type declarations do not match:
          type _ t = N : bool t | P : string -> string t [@@or_null]
        is not included in

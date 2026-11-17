@@ -750,7 +750,6 @@ Line 1, characters 29-36:
 1 | let m : (module S) = (module Choice2)
                                  ^^^^^^^
 Error: Signature mismatch:
-       Modules do not match: sig type t = int32 end is not included in S
        Type declarations do not match:
          type t = int32
        is not included in
@@ -795,10 +794,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t end
-       is not included in
-         sig type ('a : any) t end
        Type declarations do not match:
          type 'a t
        is not included in
@@ -833,10 +828,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a end
-       is not included in
-         sig type ('a : any) t end
        Type declarations do not match:
          type 'a t = 'a
        is not included in
@@ -862,10 +853,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t end
-       is not included in
-         sig type 'a t constraint 'a = int end
        Type declarations do not match:
          type 'a t
        is not included in
@@ -896,10 +883,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a end
-       is not included in
-         sig type ('a : any) t = 'a end
        Type declarations do not match:
          type 'a t = 'a
        is not included in
@@ -938,10 +921,6 @@ Lines 4-7, characters 6-3:
 6 |   type ('a : value) t2 = 'a t
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t type 'a t2 = 'a t end
-       is not included in
-         sig type ('a : any) t2 type ('a : any) t = 'a t2 end
        Type declarations do not match:
          type 'a t2 = 'a t
        is not included in
@@ -975,10 +954,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = Mk of ('a -> 'a)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Mk of ('a -> 'a) end
-       is not included in
-         sig type ('a : any) t = Mk of ('a -> 'a) end
        Type declarations do not match:
          type 'a t = Mk of ('a -> 'a)
        is not included in
@@ -1012,10 +987,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = { x : 'a -> 'a }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = { x : 'a -> 'a; } end
-       is not included in
-         sig type ('a : any) t = { x : 'a -> 'a; } end
        Type declarations do not match:
          type 'a t = { x : 'a -> 'a; }
        is not included in
@@ -1049,10 +1020,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = Mk of { x : 'a -> 'a }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Mk of { x : 'a -> 'a; } end
-       is not included in
-         sig type ('a : any) t = Mk of { x : 'a -> 'a; } end
        Type declarations do not match:
          type 'a t = Mk of { x : 'a -> 'a; }
        is not included in
@@ -1086,10 +1053,6 @@ Lines 3-5, characters 6-3:
 4 |   type _ t = Mk : 'a. 'a -> 'a t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type _ t = Mk : 'a -> 'a t end
-       is not included in
-         sig type (_ : any) t = Mk : 'a -> 'a t end
        Type declarations do not match:
          type _ t = Mk : 'a -> 'a t
        is not included in
@@ -1113,10 +1076,6 @@ Lines 3-5, characters 6-3:
 4 |   type (_ : any) t = Mk : ('a : value). 'a -> 'a t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type (_ : any) t = Mk : 'a -> 'a t end
-       is not included in
-         sig type (_ : any) t = Mk : ('a : immediate). 'a -> 'a t end
        Type declarations do not match:
          type (_ : any) t = Mk : 'a -> 'a t
        is not included in
@@ -1145,10 +1104,6 @@ Lines 3-5, characters 6-3:
 4 |   type (_ : any) t = Mk : ('a : immediate). 'a -> 'a t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type (_ : any) t = Mk : ('a : immediate). 'a -> 'a t end
-       is not included in
-         sig type (_ : any) t = Mk : 'a -> 'a t end
        Type declarations do not match:
          type (_ : any) t = Mk : ('a : immediate). 'a -> 'a t
        is not included in
@@ -1207,10 +1162,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = Mk : ('a : any). ('a -> 'a) -> t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Mk : ('a : any). ('a -> 'a) -> t end
-       is not included in
-         sig type t = Mk : ('a -> 'a) -> t end
        Type declarations do not match:
          type t = Mk : ('a : any). ('a -> 'a) -> t
        is not included in
@@ -1239,10 +1190,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = Mk : ('a : value). ('a -> 'a) -> t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Mk : ('a -> 'a) -> t end
-       is not included in
-         sig type t = Mk : ('a : any). ('a -> 'a) -> t end
        Type declarations do not match:
          type t = Mk : ('a -> 'a) -> t
        is not included in
@@ -1282,10 +1229,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t constraint 'a = ('b : value) -> ('c : value)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t constraint 'a = 'b -> 'c end
-       is not included in
-         sig type 'a t constraint 'a = 'b -> 'c end
        Type declarations do not match:
          type 'a t constraint 'a = 'b -> 'c
        is not included in
@@ -1311,10 +1254,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t constraint 'a = ('b : immediate) -> ('c : immediate)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t constraint 'a = 'b -> 'c end
-       is not included in
-         sig type 'a t constraint 'a = 'b -> 'c end
        Type declarations do not match:
          type 'a t constraint 'a = 'b -> 'c
        is not included in
@@ -1350,10 +1289,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a end
-       is not included in
-         sig type ('a : any) t = private 'a end
        Type declarations do not match:
          type 'a t = 'a
        is not included in
@@ -1387,10 +1322,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = private 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = private 'a end
-       is not included in
-         sig type ('a : any) t = private 'a end
        Type declarations do not match:
          type 'a t = private 'a
        is not included in
@@ -1430,10 +1361,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = 'a iddy
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a iddy end
-       is not included in
-         sig type ('a : any) t = private 'a end
        Type declarations do not match:
          type 'a t = 'a iddy
        is not included in

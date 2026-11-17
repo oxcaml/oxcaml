@@ -138,16 +138,6 @@ Lines 3-5, characters 6-3:
 4 |   external select_and_apply : 'a array -> int -> 'a = "%array_safe_get"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external select_and_apply : 'a array -> int -> 'a
-             = "%array_safe_get"
-         end
-       is not included in
-         sig
-           val select_and_apply : ('a -> 'b) array -> int -> 'a -> 'b
-             [@@zero_alloc]
-         end
        Values do not match:
          external select_and_apply : 'a array -> int -> 'a
            = "%array_safe_get"
@@ -174,16 +164,6 @@ Lines 4-7, characters 6-3:
 6 |   external make : 'a array -> int -> 'a = "%array_safe_get"
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type 'a t = int -> 'a
-           external make : 'a array -> int -> 'a = "%array_safe_get"
-         end
-       is not included in
-         sig
-           type 'a t = int -> 'a
-           val make : 'a array -> 'a t [@@zero_alloc]
-         end
        Values do not match:
          external make : 'a array -> int -> 'a = "%array_safe_get"
        is not included in

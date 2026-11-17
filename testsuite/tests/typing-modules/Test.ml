@@ -72,10 +72,6 @@ Line 2, characters 2-37:
 2 |   struct type +'a t = private int end
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type +'a t = private int end
-       is not included in
-         sig type -'a t = private int end
        Type declarations do not match:
          type +'a t = private int
        is not included in
@@ -137,10 +133,6 @@ Line 1, characters 33-62:
 1 | module M : sig type t += E end = struct type t += E of int end;;
                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t += E of int end
-       is not included in
-         sig type t += E end
        Extension declarations do not match:
          type t += E of int
        is not included in
@@ -158,10 +150,6 @@ Line 1, characters 41-70:
 1 | module M : sig type t += E of char end = struct type t += E of int end;;
                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t += E of int end
-       is not included in
-         sig type t += E of char end
        Extension declarations do not match:
          type t += E of int
        is not included in
@@ -179,10 +167,6 @@ Line 1, characters 40-69:
 1 | module M : sig type t += C of int end = struct type t += E of int end;;
                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t += E of int end
-       is not included in
-         sig type t += C of int end
        The extension constructor "C" is required but not provided
 |}];;
 
@@ -197,10 +181,6 @@ Lines 3-5, characters 6-3:
 4 |   type t += E of int
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t += E of int end
-       is not included in
-         sig type t += E of { x : int; } end
        Extension declarations do not match:
          type t += E of int
        is not included in

@@ -290,10 +290,6 @@ Lines 3-6, characters 6-3:
 5 |   let bar () = let _ = r.a in r.a <- best_bytes ()
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : r val bar : unit -> unit end @ nonportable
-       is not included in
-         sig val bar : unit -> unit @@ portable end @ nonportable
        Values do not match:
          val bar : unit -> unit (* in a structure at nonportable *)
        is not included in
@@ -320,10 +316,6 @@ Lines 3-6, characters 6-3:
 5 |   let bar () = let _ = r.a in ()
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : r val bar : unit -> unit end @ shareable
-       is not included in
-         sig val bar : unit -> unit @@ portable end @ nonportable
        Values do not match:
          val bar : unit -> unit (* in a structure at shareable *)
        is not included in
@@ -350,10 +342,6 @@ Lines 3-6, characters 6-3:
 5 |   let bar () = r.a <- best_bytes ()
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : r val bar : unit -> unit end @ corruptible
-       is not included in
-         sig val bar : unit -> unit @@ portable end @ nonportable
        Values do not match:
          val bar : unit -> unit (* in a structure at corruptible *)
        is not included in

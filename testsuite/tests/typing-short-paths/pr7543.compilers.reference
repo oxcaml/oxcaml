@@ -5,7 +5,6 @@ Line 1, characters 19-20:
 1 | let () = f (module N);;
                        ^
 Error: Signature mismatch:
-       Modules do not match: sig type 'a t = 'a end is not included in S
        Type declarations do not match:
          type 'a t = 'a
        is not included in

@@ -176,15 +176,6 @@ Lines 9-11, characters 41-3:
 10 |   module M = No_modality
 11 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module M = No_modality end
-       is not included in
-         Default_module
-       In module "M":
-       Modules do not match:
-         sig val f : 'a @ portable contended -> unit -> unit end
-       is not included in
-         sig val f : 'a @ portable contended -> unit -> unit @@ portable end
        In module "M":
        Values do not match:
          val f : 'a @ portable contended -> unit -> unit

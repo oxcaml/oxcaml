@@ -929,10 +929,6 @@ Lines 1-3, characters 21-3:
 2 |   type 'a t = float or_null
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = float or_null end
-       is not included in
-         S
        Type declarations do not match:
          type 'a t = float or_null
        is not included in
@@ -986,10 +982,6 @@ Lines 1-3, characters 22-3:
 2 |   type t = float or_null
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = float or_null end
-       is not included in
-         S0
        Type declarations do not match:
          type t = float or_null
        is not included in

@@ -112,10 +112,6 @@ Lines 3-5, characters 6-3:
 4 |   let regular_id x = x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val regular_id : 'a -> 'a end
-       is not included in
-         sig val poly_ regular_id : 'a -> 'a end
        Values do not match:
          val regular_id : 'a -> 'a
        is not included in

@@ -16,10 +16,6 @@ Lines 4-7, characters 6-3:
 6 |     | Foo of float * int
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo of float * int end
-       is not included in
-         sig type t = Foo of int * int end
        Type declarations do not match:
          type t = Foo of float * int
        is not included in
@@ -45,10 +41,6 @@ Lines 4-7, characters 6-3:
 6 |     | Foo of float
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo of float end
-       is not included in
-         sig type t = Foo of int * int end
        Type declarations do not match:
          type t = Foo of float
        is not included in
@@ -74,10 +66,6 @@ Lines 4-7, characters 6-3:
 6 |     | Foo of {x : float; y : int}
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo of { x : float; y : int; } end
-       is not included in
-         sig type t = Foo of { x : int; y : int; } end
        Type declarations do not match:
          type t = Foo of { x : float; y : int; }
        is not included in
@@ -107,10 +95,6 @@ Lines 4-7, characters 6-3:
 6 |     | Foo of float
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo of float end
-       is not included in
-         sig type t = Foo of { x : int; y : int; } end
        Type declarations do not match:
          type t = Foo of float
        is not included in
@@ -136,10 +120,6 @@ Lines 4-7, characters 6-3:
 6 |     | Foo of 'a
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Foo of 'a end
-       is not included in
-         sig type 'a t = Foo : int -> int t end
        Type declarations do not match:
          type 'a t = Foo of 'a
        is not included in
@@ -162,10 +142,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) t = A of 'b
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a, 'b) t = A of 'b end
-       is not included in
-         sig type ('a, 'b) t = A of 'a end
        Type declarations do not match:
          type ('a, 'b) t = A of 'b
        is not included in
@@ -190,10 +166,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('b, 'a) t = A of 'a
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('b, 'a) t = A of 'a end
-       is not included in
-         sig type ('a, 'b) t = A of 'a end
        Type declarations do not match:
          type ('b, 'a) t = A of 'a
        is not included in
@@ -234,10 +206,6 @@ Lines 9-16, characters 6-3:
 15 |     | D
 16 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A | B | Beta | C | D end
-       is not included in
-         sig type t = A | B | C | D end
        Type declarations do not match:
          type t = A | B | Beta | C | D
        is not included in
@@ -267,10 +235,6 @@ Lines 7-12, characters 6-3:
 11 |     | D
 12 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A | B | D end
-       is not included in
-         sig type t = A | B | C | D end
        Type declarations do not match:
          type t = A | B | D
        is not included in
@@ -313,10 +277,6 @@ Lines 10-20, characters 6-3:
 19 |     | Phi
 20 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A | B | Beta | C | D | F | G | Phi end
-       is not included in
-         sig type t = A | B | C | D | E | F | G end
        Type declarations do not match:
          type t = A | B | Beta | C | D | F | G | Phi
        is not included in
@@ -355,10 +315,6 @@ Lines 10-17, characters 6-3:
 16 |     | E
 17 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Alpha | B | C | D | E end
-       is not included in
-         sig type t = A | E | C | D | B end
        Type declarations do not match:
          type t = Alpha | B | C | D | E
        is not included in
@@ -397,10 +353,6 @@ Lines 9-17, characters 6-3:
 16 |     | C
 17 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of float | B | D | E | F | C end
-       is not included in
-         sig type t = A of int | B | C | D | E | F end
        Type declarations do not match:
          type t = A of float | B | D | E | F | C
        is not included in
@@ -425,10 +377,6 @@ Lines 3-5, characters 6-3:
 4 |  type t = A | R | C of int | S | B of float
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A | R | C of int | S | B of float end
-       is not included in
-         sig type t = A | B of int end
        Type declarations do not match:
          type t = A | R | C of int | S | B of float
        is not included in
@@ -454,10 +402,6 @@ Lines 3-5, characters 6-3:
 4 |  type t = A | R | C of float | S | D of int
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A | R | C of float | S | D of int end
-       is not included in
-         sig type t = A | B of int end
        Type declarations do not match:
          type t = A | R | C of float | S | D of int
        is not included in

@@ -281,6 +281,10 @@ let dmodtype mty =
   let tmty = Out_type.tree_of_modtype ~abbrev:true mty in
   Fmt.dprintf "%a" !Oprint.out_module_type tmty
 
+let is_named_modtype : Types.module_type -> bool = function
+  | Mty_ident _ | Mty_alias _ -> true
+  | Mty_signature _ | Mty_functor _ | Mty_strengthen _ -> false
+
 let space ppf () = Fmt.fprintf ppf "@ "
 
 
@@ -587,7 +591,8 @@ module With_shorthand = struct
     | Unit -> Fmt.dprintf "()"
     | Empty_struct ->
         Fmt.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
-    | Named p -> fun ppf -> Printtyp.path ppf p
+    | Named p ->
+        (fun ppf -> Printtyp.path ppf p) |> dthen_mode_l ~is_modal mode
     | Anonymous ->
         let short_mty = modtype { ua with item=mty } in
         pp dmodtype short_mty
@@ -684,9 +689,12 @@ module Functor_suberror = struct
           (With_shorthand.param ~is_modal:None x)
           (With_shorthand.param ~is_modal:None y)
 
-      let diff ~is_modal g e more =
-        let g = With_shorthand.definition ~is_modal g in
-        let e = With_shorthand.definition ~is_modal e in
+      let diff ~condense ~is_modal g e more =
+        let show =
+          if condense then With_shorthand.param else With_shorthand.definition
+        in
+        let g = show ~is_modal g in
+        let e = show ~is_modal e in
         (* Use deprecated_printer to defer evaluation of [more ()] until print
            time. This ensures that conflicts are registered by printing [g] and
            [e] before [print_explanations] is called inside [more ()]. *)
@@ -748,9 +756,17 @@ module Functor_suberror = struct
         (With_shorthand.arg ~is_modal:None x)
         pp_orig_name
 
-    let diff ~is_modal g e more =
-      let g = With_shorthand.definition_of_argument ~is_modal g in
-      let e = With_shorthand.definition ~is_modal e in
+    let diff ~condense ~is_modal g e more =
+      let g =
+        (if condense then With_shorthand.arg
+         else With_shorthand.definition_of_argument)
+          ~is_modal g
+      in
+      let e =
+        (if condense then With_shorthand.param
+         else With_shorthand.definition)
+          ~is_modal e
+      in
       Fmt.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\
          is not included in@ @[%t@]%t"
@@ -764,24 +780,38 @@ module Functor_suberror = struct
     (** Specialized to avoid introducing shorthand names
         for single change difference
     *)
-    let single_diff ~is_modal g e more =
-      let _arg, mty1, (mode1, _) = g.With_shorthand.item in
-      let mty1_with_mode = dmodtype mty1 |> dthen_mode_l ~is_modal mode1 in
-      let mty2_with_mode =
-        match e.With_shorthand.item with
-        | Types.Unit -> Fmt.dprintf "()"
-        | Types.Named(_, mty, mm) ->
-            dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm
+    let single_diff ~condense ~is_modal g e more =
+      let arg, mty1, (mode1, _) = g.With_shorthand.item in
+      let d1 =
+        match condense, (arg : Err.functor_arg_descr) with
+        | false, _ -> Some (dmodtype mty1)
+        | true, Named p -> Some (fun ppf -> Printtyp.path ppf p)
+        | true, (Unit | Empty_struct | Anonymous) ->
+            if is_named_modtype mty1 then Some (dmodtype mty1) else None
       in
-      Fmt.dprintf
-        "Modules do not match:@ @[%t@]@;<1 -2>\
-         is not included in@ @[%t@]%t"
-        mty1_with_mode mty2_with_mode (fun ppf ->
-          Fmt.deprecated_printer (fun fmt ->
-              let rdoc = ref Fmt.Doc.empty in
-              (more ()) (Fmt.formatter rdoc);
-              Fmt.Doc.format fmt !rdoc
-            ) ppf)
+      let d2 =
+        match condense, e.With_shorthand.item with
+        | _, Types.Unit -> Some (Fmt.dprintf "()")
+        | false, Types.Named (_, mty, mm) ->
+            Some (dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm)
+        | true, Types.Named (_, mty, mm) ->
+            if is_named_modtype mty then
+              Some (dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm)
+            else None
+      in
+      match d1, d2 with
+      | Some d1, Some d2 ->
+          let d1 = d1 |> dthen_mode_l ~is_modal mode1 in
+          Some (Fmt.dprintf
+            "Modules do not match:@ @[%t@]@;<1 -2>\
+             is not included in@ @[%t@]%t"
+            d1 d2 (fun ppf ->
+              Fmt.deprecated_printer (fun fmt ->
+                  let rdoc = ref Fmt.Doc.empty in
+                  (more ()) (Fmt.formatter rdoc);
+                  Fmt.Doc.format fmt !rdoc
+                ) ppf))
+      | _ -> None
 
 
     let incompatible = function
@@ -1054,6 +1084,14 @@ let unexpected_functor ~env ~before ~ctx diff =
   in
   dwith_context ctx main :: before
 
+let rec condense_arg ~expansion_token ~functor_params :
+    Err.module_type_symptom -> bool = function
+  | Signature _ | Mode _ | Invalid_module_alias _ -> expansion_token
+  | Functor (Params _) -> expansion_token && functor_params
+  | After_alias_expansion d ->
+      condense_arg ~expansion_token ~functor_params d.symptom
+  | Mt_core _ | Functor (Result _ | Staticity) -> false
+
 let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx
     (diff : _ mdiff) =
   match diff.symptom with
@@ -1064,6 +1102,12 @@ let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx
   | Functor Params d -> (* We jump directly to the functor param error *)
       functor_params ~expansion_token ~env ~before ~ctx d
   | Mode _ -> (* jump directly to the module mode mismatch, without types *)
+      module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx
+        diff.symptom
+  | Signature _
+    when expansion_token
+         && not (is_named_modtype diff.got
+                 && is_named_modtype diff.expected) ->
       module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx
         diff.symptom
   | _ ->
@@ -1232,7 +1276,10 @@ and functor_arg_diff ~expansion_token env (patch: _ Diffing.change) =
           ~ctx:[] mty_diff.symptom
       in
       let is_modal = Is_modal.module_type_symptom mty_diff.symptom in
-      Functor_suberror.Inclusion.diff ~is_modal g e more
+      let condense =
+        condense_arg ~expansion_token ~functor_params:false mty_diff.symptom
+      in
+      Functor_suberror.Inclusion.diff ~condense ~is_modal g e more
 
 let functor_app_diff ~expansion_token env  (patch: _ Diffing.change) =
   match patch with
@@ -1248,7 +1295,10 @@ let functor_app_diff ~expansion_token env  (patch: _ Diffing.change) =
           ~ctx:[] mty_diff.symptom
       in
       let is_modal = Is_modal.module_type_symptom mty_diff.symptom in
-      Functor_suberror.App.diff ~is_modal g e more
+      let condense =
+        condense_arg ~expansion_token ~functor_params:false mty_diff.symptom
+      in
+      Functor_suberror.App.diff ~condense ~is_modal g e more
 
 let module_type_subst ~env id diff =
   match diff.symptom with
@@ -1313,15 +1363,25 @@ let report_apply_error_doc ~loc env (app_name, mty_f, args) =
   | [ _,  Change (_, _, Err.Incompatible_params (i,_)) ] ->
       Location.errorf ~loc ~footnote "%t" (Functor_suberror.App.incompatible i)
   | [ _, Change (g, e,  Err.Mismatch mty_diff) ] ->
-      let more () =
-        subcase_list @@
+      let msgs () =
         module_type_symptom ~eqmode:false ~expansion_token:true
           ~env:{i_env=env; i_subst=Subst.identity} ~before:[]
           ~ctx:[] mty_diff.symptom
       in
       let is_modal = Is_modal.module_type_symptom mty_diff.symptom in
-      Location.errorf ~loc ~footnote "%t"
-        (Functor_suberror.App.single_diff ~is_modal g e more)
+      let condense =
+        condense_arg ~expansion_token:true ~functor_params:true
+          mty_diff.symptom
+      in
+      begin match
+        Functor_suberror.App.single_diff ~condense ~is_modal g e
+          (fun () -> subcase_list (msgs ()))
+      with
+      | Some d -> Location.errorf ~loc ~footnote "%t" d
+      | None ->
+          Location.errorf ~loc ~footnote "@[<v>Signature mismatch:@ %t@]"
+            (coalesce (msgs ()))
+      end
   | _ ->
       let not_functor =
         List.for_all (function _, Diffing.Delete _ -> true | _ -> false) d

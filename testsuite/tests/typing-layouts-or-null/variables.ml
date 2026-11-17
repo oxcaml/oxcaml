@@ -55,10 +55,6 @@ Line 7, characters 6-7:
 7 | end = X
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val should_not_work : 'a -> unit end
-       is not included in
-         sig val should_not_work : 'a -> unit end
        Values do not match:
          val should_not_work : 'a -> unit
        is not included in
@@ -79,10 +75,6 @@ Line 1, characters 73-74:
 1 | module M (X : sig type 'a t end) : sig type ('a : value_or_null) t end = X
                                                                              ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a X.t end
-       is not included in
-         sig type ('a : value_or_null) t end
        Type declarations do not match:
          type 'a t = 'a X.t
        is not included in
@@ -156,10 +148,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (type a) (x : a) = x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
        Values do not match:
          val f : 'a -> 'a
        is not included in
@@ -183,10 +171,6 @@ Lines 3-5, characters 6-3:
 4 |   let f : 'a. 'a -> 'a = fun x -> x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
        Values do not match:
          val f : 'a -> 'a
        is not included in
@@ -211,10 +195,6 @@ Lines 3-5, characters 6-3:
 4 |   let f : type a. a -> a = fun x -> x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
        Values do not match:
          val f : 'a -> 'a
        is not included in
@@ -239,10 +219,6 @@ Lines 3-5, characters 6-3:
 4 |   let f : type a. a -> a = fun x -> x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
        Values do not match:
          val f : 'a -> 'a
        is not included in
@@ -268,10 +244,6 @@ Lines 3-5, characters 6-3:
 4 |   let f : type a. a -> a = fun x -> x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
        Values do not match:
          val f : 'a -> 'a
        is not included in

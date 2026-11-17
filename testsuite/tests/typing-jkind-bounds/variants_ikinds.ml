@@ -924,10 +924,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = Foo of { mutable x : int } | Bar of string
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo of { mutable x : int; } | Bar of string end
-       is not included in
-         sig type t : immutable_data end
        Type declarations do not match:
          type t = Foo of { mutable x : int; } | Bar of string
        is not included in
@@ -950,10 +946,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = Foo of int ref | Bar of string
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo of int ref | Bar of string end
-       is not included in
-         sig type t : immutable_data end
        Type declarations do not match:
          type t = Foo of int ref | Bar of string
        is not included in
@@ -976,10 +968,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = Foo of 'a | Bar of string
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Foo of 'a | Bar of string end
-       is not included in
-         sig type 'a t : immutable_data end
        Type declarations do not match:
          type 'a t = Foo of 'a | Bar of string
        is not included in

@@ -66,40 +66,6 @@ Lines 1-29, characters 15-3:
 28 |     else find_last_satisfying t ~get ~length ~pred:(fun x -> compare x v <= 0)
 29 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val linear_search_first_satisfying :
-             'a @ [< 'm] ->
-             get:('a @ [> 'm] -> 'b @ [> 'n | aliased] -> 'c @ [< 'o]) @ 'p ->
-             lo:'b @ [< 'q & 'n & many uncontended read_write] ->
-             hi:'b @ [< many uncontended read_write] ->
-             pred:('c @ [> 'o | dynamic] -> bool @ 'mm0) @ 'mm1 ->
-             'b option @ [> 'q | local aliased dynamic]
-           val find_first_satisfying :
-             'a @ [< 'm & 'n & many] ->
-             get:('a @ [> 'n | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ 'p ->
-             length:('a @ [> 'm | aliased] -> int @ 'q) @ 'mm0 ->
-             pred:('b @ [> 'o | dynamic] -> bool @ 'mm1) @ 'mm2 ->
-             int option @ [> local aliased dynamic]
-           val find_last_satisfying :
-             'a @ [< 'm & 'n & many] ->
-             pred:('b @ [> 'o | dynamic] -> bool @ 'p) @ 'q ->
-             get:('a @ [> 'n | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ 'mm0 ->
-             length:('a @ [> 'm | aliased] ->
-                     int @ [< many uncontended read_write]) @ [< many] ->
-             int option @ [> local dynamic]
-           val binary_search :
-             'a @ [< 'm & 'n & many] ->
-             length:('a @ [> 'n | aliased] ->
-                     int @ [< many uncontended read_write]) @ [< many > local] ->
-             get:('a @ [> 'm | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ [< many > local] ->
-             compare:('b @ [> 'o | dynamic] ->
-                      'c @ [> 'p | aliased] ->
-                      int @ [< many uncontended read_write]) @ [< many > local] ->
-             'c @ [< 'p & many] -> int option @ [> local aliased dynamic]
-         end
-       is not included in
-         S
        Values do not match:
          val binary_search :
            'a @ [< 'm & 'n & many] ->

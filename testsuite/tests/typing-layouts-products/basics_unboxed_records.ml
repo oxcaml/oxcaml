@@ -211,10 +211,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = #{ i : int }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #{ i : int; } end
-       is not included in
-         sig type t = #{ mutable i : int; } end
        Type declarations do not match:
          type t = #{ i : int; }
        is not included in
@@ -424,10 +420,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = #{ i : int ; a: (<x:'a * 'a> as 'a) }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #{ i : int; a : < x : 'a * 'a > as 'a; } end
-       is not included in
-         sig type t = #{ i : int; a : < x : 'a > as 'a; } end
        Type declarations do not match:
          type t = #{ i : int; a : < x : 'a * 'a > as 'a; }
        is not included in
@@ -457,10 +449,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = #{ s: string; r: string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #{ s : string; r : string; } end
-       is not included in
-         sig type t end
        Type declarations do not match:
          type t = #{ s : string; r : string; }
        is not included in
@@ -632,10 +620,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private #{ x : int; y : bool }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private #{ x : int; y : bool; } end
-       is not included in
-         sig type t = #{ x : int; y : bool; } end
        Type declarations do not match:
          type t = private #{ x : int; y : bool; }
        is not included in
@@ -655,10 +639,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private #{ x : int; y : bool }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private #{ x : int; y : bool; } end
-       is not included in
-         sig type t = #{ x : int; } end
        Type declarations do not match:
          type t = private #{ x : int; y : bool; }
        is not included in
@@ -677,10 +657,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private #{ x : int }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private #{ x : int; } end
-       is not included in
-         sig type t = #{ x : int; y : bool; } end
        Type declarations do not match:
          type t = private #{ x : int; }
        is not included in

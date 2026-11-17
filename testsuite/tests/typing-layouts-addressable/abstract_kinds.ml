@@ -134,10 +134,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : k addressable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : k addressable end
-       is not included in
-         sig type t : any non_null addressable end
        Type declarations do not match:
          type t : k addressable
        is not included in
@@ -175,10 +171,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : k
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : k end
-       is not included in
-         sig type t : k addressable end
        Type declarations do not match:
          type t : k
        is not included in
@@ -200,10 +192,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : k addressable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : k addressable end
-       is not included in
-         sig type t : k end
        Type declarations do not match:
          type t : k addressable
        is not included in
@@ -283,14 +271,6 @@ Lines 1-7, characters 38-3:
 6 |   let mk () = assert false
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k = bits8 type t = int8# val mk : unit -> 'a end
-       is not included in
-         sig
-           kind_ k = bits8
-           type t : bits8 addressable
-           val mk : unit -> t
-         end
        Type declarations do not match:
          type t = int8#
        is not included in
@@ -374,8 +354,7 @@ module Bad = F (M1)
 Line 1, characters 13-19:
 1 | module Bad = F (M1)
                  ^^^^^^
-Error: Modules do not match: sig type t = F(M0).t end is not included in
-       Sk
+Error: Modules do not match: M1 is not included in Sk
      Type declarations do not match:
        type t = F(M0).t
      is not included in

@@ -16,11 +16,7 @@ end = struct
 end
   [%%expect {|
 Line 1:
-Error: Modules do not match:
-         sig type t end
-       is not included in
-         sig type +'a t end
-       Type declarations do not match: type t is not included in type +'a t
+Error: Type declarations do not match: type t is not included in type +'a t
        They have different arities.
 |}]
 
@@ -45,9 +41,9 @@ Error: Modules do not match:
        is not included in
          (X : $T1) -> ...
        Module types do not match:
-         $S1 = sig type y end
+         $S1
        does not include
-         $T1 = sig type x end
+         $T1
        The type "y" is required but not provided
 |}]
 
@@ -59,8 +55,7 @@ and B : S = struct type t end;;
 [%%expect {|
 module type S = sig type 'a t end
 Line 1:
-Error: Modules do not match: sig type t end is not included in S
-       Type declarations do not match: type t is not included in type 'a t
+Error: Type declarations do not match: type t is not included in type 'a t
        They have different arities.
 |}]
 
@@ -73,19 +68,10 @@ and B: sig module type S=sig type 'a t end module M:S end = struct
        end
 [%%expect {|
 Line 1:
-Error: Modules do not match:
-         sig module type S = sig type t end module M : S end
-       is not included in
-         sig module type S = sig type 'a t end module M : S end
-       Module type declarations do not match:
+Error: Module type declarations do not match:
          module type S = sig type t end
        does not match
          module type S = sig type 'a t end
-       At position "module type S = <here>"
-       Module types do not match:
-         sig type t end
-       is not equal to
-         sig type 'a t end
        At position "module type S = <here>"
        Type declarations do not match: type t is not included in type 'a t
        They have different arities.

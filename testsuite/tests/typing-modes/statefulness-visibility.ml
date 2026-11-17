@@ -1581,10 +1581,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
-       is not included in
-         sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ write end
        Values do not match:
          val f : 'a -> 'b @ write -> 'a * 'b @ write
        is not included in
@@ -1609,10 +1605,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ write -> 'a * 'b @ immutable end
-       is not included in
-         sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ read end
        Values do not match:
          val f : 'a -> 'b @ write -> 'a * 'b @ immutable
        is not included in
@@ -1637,10 +1629,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
-       is not included in
-         sig val f : 'a @ read -> 'b @ write -> 'a * 'b end
        Values do not match:
          val f : 'a -> 'b @ write -> 'a * 'b @ write
        is not included in
@@ -1664,10 +1652,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ read -> 'a * 'b @ immutable end
-       is not included in
-         sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ write end
        Values do not match:
          val f : 'a -> 'b @ read -> 'a * 'b @ immutable
        is not included in
@@ -1692,10 +1676,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
-       is not included in
-         sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ read end
        Values do not match:
          val f : 'a -> 'b @ read -> 'a * 'b @ read
        is not included in
@@ -1720,10 +1700,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
-       is not included in
-         sig val f : 'a @ write -> 'b @ read -> 'a * 'b end
        Values do not match:
          val f : 'a -> 'b @ read -> 'a * 'b @ read
        is not included in
@@ -1764,10 +1740,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing end
-       is not included in
-         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing end
        Values do not match:
          val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing
        is not included in
@@ -1790,10 +1762,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b -> 'a * 'b end
-       is not included in
-         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading end
        Values do not match:
          val f : 'a -> 'b -> 'a * 'b
        is not included in
@@ -1817,10 +1785,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing end
-       is not included in
-         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless end
        Values do not match:
          val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
        is not included in
@@ -1845,10 +1809,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b -> 'a * 'b end
-       is not included in
-         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing end
        Values do not match:
          val f : 'a -> 'b -> 'a * 'b
        is not included in
@@ -1872,10 +1832,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading end
-       is not included in
-         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading end
        Values do not match:
          val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading
        is not included in
@@ -1898,10 +1854,6 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
-       is not included in
-         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless end
        Values do not match:
          val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
        is not included in
@@ -1948,10 +1900,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { read = a }, { write = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ read -> 'a read * 'b write @ read end
-       is not included in
-         sig val f : 'a * 'b @ read -> 'a read * 'b write end
        Values do not match:
          val f : 'a * 'b @ read -> 'a read * 'b write @ read
        is not included in
@@ -1978,10 +1926,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { read = a }, { write = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ write -> 'a read * 'b write @ write end
-       is not included in
-         sig val f : 'a * 'b @ write -> 'a read * 'b write end
        Values do not match:
          val f : 'a * 'b @ write -> 'a read * 'b write @ write
        is not included in
@@ -2008,12 +1952,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { read = a }, { write = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f : 'a * 'b @ immutable -> 'a read * 'b write @ immutable
-         end
-       is not included in
-         sig val f : 'a * 'b @ immutable -> 'a read * 'b write end
        Values do not match:
          val f : 'a * 'b @ immutable -> 'a read * 'b write @ immutable
        is not included in
@@ -2061,10 +1999,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
-       is not included in
-         sig val f : 'a * 'b @ reading -> 'a reading * 'b writing end
        Values do not match:
          val f : 'a * 'b @ stateless -> 'a reading * 'b writing
        is not included in
@@ -2087,10 +2021,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
-       is not included in
-         sig val f : 'a * 'b @ writing -> 'a reading * 'b writing end
        Values do not match:
          val f : 'a * 'b @ stateless -> 'a reading * 'b writing
        is not included in
@@ -2113,10 +2043,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
-       is not included in
-         sig val f : 'a * 'b -> 'a reading * 'b writing end
        Values do not match:
          val f : 'a * 'b @ stateless -> 'a reading * 'b writing
        is not included in
@@ -2391,10 +2317,6 @@ Lines 3-6, characters 6-3:
 5 |   let f () = r.contents; r.contents <- ()
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : unit ref val f : unit -> unit end @ stateful
-       is not included in
-         sig val f : unit -> unit @@ stateless end @ stateful
        Values do not match:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
@@ -2425,15 +2347,6 @@ Lines 3-8, characters 6-3:
 7 |   let f () = get (); set ()
 8 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val r : unit ref
-           val get : unit -> unit
-           val set : unit -> unit
-           val f : unit -> unit
-         end @ stateful
-       is not included in
-         sig val f : unit -> unit @@ stateless end @ stateful
        Values do not match:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in

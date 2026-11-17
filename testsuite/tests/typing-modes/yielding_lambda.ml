@@ -713,16 +713,15 @@ module Uf :
 Line 6, characters 19-53:
 6 |     let module R = Uf (struct let f () = yield y end) in
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Modules do not match: sig val f : unit -> unit end @ yielding
-     is not included in sig val f : unit -> unit end @ unyielding
-     Values do not match:
-       val f : unit -> unit (* in a structure at yielding *)
-     is not included in
-       val f : unit -> unit (* in a structure at unyielding *)
-     The first is "yielding"
-       because it closes over the value "y" at line 6, characters 47-48
-       which is "yielding".
-     However, the second is "unyielding".
+Error: Signature mismatch:
+       Values do not match:
+         val f : unit -> unit (* in a structure at yielding *)
+       is not included in
+         val f : unit -> unit (* in a structure at unyielding *)
+       The first is "yielding"
+         because it closes over the value "y" at line 6, characters 47-48
+         which is "yielding".
+       However, the second is "unyielding".
 |}]
 
 (* a functor that is *itself* yielding (it closes over [y]) applied to an

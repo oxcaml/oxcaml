@@ -16,10 +16,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t end
-       is not included in
-         sig type 'a t : immutable_data with 'a end
        Type declarations do not match:
          type 'a t
        is not included in
@@ -47,10 +43,6 @@ Lines 4-7, characters 6-3:
 6 |   type t
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type a type t end
-       is not included in
-         sig type a type t : value mod portable with a end
        Type declarations do not match:
          type t
        is not included in
@@ -154,10 +146,6 @@ Lines 12-14, characters 6-3:
 13 |   type t : value mod portable
 14 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : value mod portable end
-       is not included in
-         sig type t : value mod portable contended with M.t end
        Type declarations do not match:
          type t : value mod portable
        is not included in
@@ -194,10 +182,6 @@ Lines 14-16, characters 6-3:
 15 |   type t : value mod portable
 16 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : value mod portable end
-       is not included in
-         sig type t : value mod portable contended with M.u end
        Type declarations do not match:
          type t : value mod portable
        is not included in
@@ -224,13 +208,6 @@ Lines 4-7, characters 6-3:
 6 |   type t
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type a = [ `a of string | `b ] type t end
-       is not included in
-         sig
-           type a = [ `a of string | `b ]
-           type t : value mod forkable unyielding
-         end
        Type declarations do not match:
          type t
        is not included in
@@ -256,17 +233,6 @@ Lines 4-7, characters 6-3:
 6 |   type 'a t constraint 'a = [< `a of string | `b]
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type 'a u = 'a constraint 'a = [< `a of string | `b ]
-           type 'a t constraint 'a = [< `a of string | `b ]
-         end
-       is not included in
-         sig
-           type 'a u = 'a constraint 'a = [< `a of string | `b ]
-           type 'a t : value mod global with [< `a of string | `b ] u
-             constraint 'a = [< `a of string | `b ]
-         end
        Type declarations do not match:
          type 'a t constraint 'a = [< `a of string | `b ]
        is not included in
@@ -293,17 +259,6 @@ Lines 4-7, characters 6-3:
 6 |   type 'a t constraint 'a = [< `a of (int -> int) | `b]
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type 'a u = 'a constraint 'a = [< `a of int -> int | `b ]
-           type 'a t constraint 'a = [< `a of int -> int | `b ]
-         end
-       is not included in
-         sig
-           type 'a u = 'a constraint 'a = [< `a of int -> int | `b ]
-           type 'a t : value mod portable with [< `a of int -> int | `b ] u
-             constraint 'a = [< `a of int -> int | `b ]
-         end
        Type declarations do not match:
          type 'a t constraint 'a = [< `a of int -> int | `b ]
        is not included in
@@ -330,17 +285,6 @@ Lines 4-7, characters 6-3:
 6 |   type 'a t constraint 'a = [> `a of string | `b]
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type 'a u = 'a constraint 'a = [> `a of string | `b ]
-           type 'a t constraint 'a = [> `a of string | `b ]
-         end
-       is not included in
-         sig
-           type 'a u = 'a constraint 'a = [> `a of string | `b ]
-           type 'a t : value mod portable with [> `a of string | `b ] u
-             constraint 'a = [> `a of string | `b ]
-         end
        Type declarations do not match:
          type 'a t constraint 'a = [> `a of string | `b ]
        is not included in
@@ -368,10 +312,6 @@ Lines 4-7, characters 6-3:
 6 |   type t
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type a = < value : string > type t end
-       is not included in
-         sig type a = < value : string > type t : value mod global with a end
        Type declarations do not match:
          type t
        is not included in
@@ -406,10 +346,6 @@ Lines 4-6, characters 6-3:
 5 |   type t
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t end
-       is not included in
-         sig type t : value mod forkable unyielding end
        Type declarations do not match:
          type t
        is not included in
@@ -434,10 +370,6 @@ Lines 4-6, characters 6-3:
 5 |   type t
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t end
-       is not included in
-         sig type t : value mod portable end
        Type declarations do not match:
          type t
        is not included in
@@ -537,10 +469,6 @@ Lines 7-9, characters 6-3:
 8 |   type t
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t end
-       is not included in
-         sig type t : value mod portable with s end
        Type declarations do not match:
          type t
        is not included in
@@ -565,10 +493,6 @@ Lines 4-6, characters 6-3:
 5 |   type t
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t end
-       is not included in
-         sig type t : value mod portable end
        Type declarations do not match:
          type t
        is not included in
@@ -592,10 +516,6 @@ Lines 4-6, characters 6-3:
 5 |   type t : value mod many
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : value mod many end
-       is not included in
-         sig type t : value mod many portable end
        Type declarations do not match:
          type t : value mod many
        is not included in

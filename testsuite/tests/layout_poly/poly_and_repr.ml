@@ -101,10 +101,6 @@ Lines 3-5, characters 6-3:
 4 |   let x (_ : 'a. 'a -> unit) = ()
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : ('a. 'a -> unit) -> unit end
-       is not included in
-         sig val x : ((repr_ 'a). 'a -> unit) -> unit end
        Values do not match:
          val x : ('a. 'a -> unit) -> unit
        is not included in
@@ -126,10 +122,6 @@ Lines 3-5, characters 6-3:
 4 |   let x (_ : (repr_ 'a). 'a -> unit) = ()
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : ((repr_ 'a). 'a -> unit) -> unit end
-       is not included in
-         sig val x : ('a. 'a -> unit) -> unit end
        Values do not match:
          val x : ((repr_ 'a). 'a -> unit) -> unit
        is not included in
@@ -157,10 +149,6 @@ Line 3, characters 4-5:
 3 |   = X
         ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (repr_ 'a). 'a -> unit end
-       is not included in
-         sig val f : (repr_ 'b). 'b -> 'b end
        Values do not match:
          val f : (repr_ 'a). 'a -> unit
        is not included in
@@ -190,10 +178,6 @@ Line 3, characters 4-5:
 3 |   = X
         ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (repr_ 'a). 'a -> unit end
-       is not included in
-         sig val f : (repr_ 'b). ('b -> 'b) -> unit end
        Values do not match:
          val f : (repr_ 'a). 'a -> unit
        is not included in
@@ -214,10 +198,6 @@ Line 6, characters 4-5:
 6 |   = X
         ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (repr_ 'a) (repr_ 'b). 'a -> 'b end
-       is not included in
-         sig val f : (repr_ 'a) (repr_ 'b). 'b -> 'a end
        Values do not match:
          val f : (repr_ 'a) (repr_ 'b). 'a -> 'b
        is not included in
@@ -248,10 +228,6 @@ Line 3, characters 4-5:
 3 |   = X
         ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (repr_ 'a). 'a -> unit end
-       is not included in
-         sig val f : 'a -> unit end
        Values do not match:
          val f : (repr_ 'a). 'a -> unit
        is not included in

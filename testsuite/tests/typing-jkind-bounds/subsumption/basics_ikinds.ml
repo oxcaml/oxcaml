@@ -41,10 +41,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : immediate with string
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : immutable_data non_pointer end
-       is not included in
-         sig type t : immediate end
        Type declarations do not match:
          type t : immutable_data non_pointer
        is not included in
@@ -104,10 +100,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) t : immutable_data with 'b with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a, 'b) t : immutable_data with 'a with 'b end
-       is not included in
-         sig type ('a, 'b) t : immutable_data with 'a end
        Type declarations do not match:
          type ('a, 'b) t : immutable_data with 'a with 'b
        is not included in
@@ -176,10 +168,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : mutable_data with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : mutable_data with 'a end
-       is not included in
-         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
        Type declarations do not match:
          type 'a t : mutable_data with 'a
        is not included in
@@ -341,10 +329,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a end
-       is not included in
-         sig type 'a t : immutable_data with 'a end
        Type declarations do not match:
          type 'a t = 'a
        is not included in
@@ -463,10 +447,6 @@ Lines 7-11, characters 15-3:
 10 |   type 'a t = 'a t2 t1 * unit t1
 11 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t1 type 'a t2 type 'a t = 'a t2 t1 * unit t1 end
-       is not included in
-         S
        Type declarations do not match:
          type 'a t = 'a t2 t1 * unit t1
        is not included in
@@ -500,10 +480,6 @@ Lines 7-11, characters 15-3:
 10 |   type 'a t = 'a t2 t1
 11 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t1 type 'a t2 type 'a t = 'a t2 t1 end
-       is not included in
-         S
        Type declarations do not match:
          type 'a t = 'a t2 t1
        is not included in

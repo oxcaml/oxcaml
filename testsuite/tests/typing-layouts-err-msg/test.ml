@@ -240,7 +240,6 @@ Lines 7-9, characters 16-3:
 8 |   type 'a t = 'a
 9 | end
 Error: Signature mismatch:
-       Modules do not match: sig type 'a t = 'a end is not included in S2
        Type declarations do not match:
          type 'a t = 'a
        is not included in

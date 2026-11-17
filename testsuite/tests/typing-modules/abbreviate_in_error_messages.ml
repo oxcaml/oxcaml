@@ -32,27 +32,10 @@ end
 Line 24, characters 37-41:
 24 |   module G(F:F)(X:functor() -> S1) = F(X)
                                           ^^^^
-Error: Modules do not match: functor () -> S1 is not included in
-       sig
-         module M1 :
-           sig
-             val a : int
-             val b : int
-             val c : int
-             val d : int
-             val e : int
-           end
-         module M2 :
-           sig val a : int val b : int val c : int val d : int ... end
-         module M3 : sig ... end
-         module M4 : sig ... end
-         module M5 : sig ... end
-         module M6 : sig ... end
-         module M7 : sig ... end
-       end
-     This module should not be a functor, a structure was expected.
-     Moreover, the type of the functor body is incompatible with the expected
-     module type.
+Error: Signature mismatch:
+       This module should not be a functor, a structure was expected.
+       Moreover, the type of the functor body is incompatible with the
+       expected module type.
 |}]
 
 module Depth = struct
@@ -80,17 +63,6 @@ end
 Line 19, characters 52-56:
 19 |   module F(F : F)(X : sig module M : sig end end) = F(X)
                                                          ^^^^
-Error: Modules do not match: sig module M : sig end end is not included in
-       S
-     In module "M":
-     Modules do not match:
-       sig end
-     is not included in
-       sig
-         module N :
-           sig
-             module O : sig module P : sig module Q : sig ... end end end
-           end
-       end
+Error: Modules do not match: X is not included in S
      In module "M": The module "N" is required but not provided
 |}]

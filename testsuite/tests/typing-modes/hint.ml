@@ -69,15 +69,6 @@ Lines 3-9, characters 6-3:
 8 |     let baz () = let _ = bar in ()
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val x : int ref
-           val foo : unit -> unit
-           val bar : unit -> unit
-           val baz : unit -> unit
-         end @ nonportable
-       is not included in
-         sig val baz : unit -> unit @@ portable end @ nonportable
        Values do not match:
          val baz : unit -> unit (* in a structure at nonportable *)
        is not included in

@@ -15,10 +15,10 @@ File "functor_application.ml", line 14, characters 31-51:
 File "functor_application.ml", line 18, characters 9-13:
 18 | type t = F(M).t
               ^^^^
-  Modules do not match: sig end is not included in sig type t end
-The type t is required but not provided
-File "functor_application.ml", line 16, characters 18-24:
-  Expected declaration
+  Signature mismatch:
+  The type t is required but not provided
+  File "functor_application.ml", line 16, characters 18-24:
+    Expected declaration
 File "functor_application.ml", line 20, characters 14-26:
 20 | let x : int = "not an int"
                    ^^^^^^^^^^^^

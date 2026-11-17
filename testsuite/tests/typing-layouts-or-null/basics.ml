@@ -176,10 +176,6 @@ Line 1, characters 75-76:
 1 | module M (X : sig type t : any end) : sig type t : any mod separable end = X
                                                                                ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : any separable end
        Type declarations do not match:
          type t = X.t
        is not included in
@@ -226,10 +222,6 @@ Line 1, characters 73-74:
 1 | module M (X : sig type t : value_or_null end) : sig type t : value end = X
                                                                              ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t end
        Type declarations do not match: type t = X.t is not included in type t
        The layout of the first is value_or_null
          because of the definition of t at line 1, characters 18-40.
@@ -274,10 +266,6 @@ Line 1, characters 85-86:
 1 | module M (X : sig type t : value_or_null end) : sig type t : any mod separable end = X
                                                                                          ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : any separable end
        Type declarations do not match:
          type t = X.t
        is not included in
@@ -341,10 +329,6 @@ Line 1, characters 77-78:
 1 | module M (X : sig type t : any mod separable end) : sig type t : value end = X
                                                                                  ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t end
        Type declarations do not match: type t = X.t is not included in type t
        The layout of the first is any separable
          because of the definition of t at line 1, characters 18-44.
@@ -375,10 +359,6 @@ Line 1, characters 85-86:
 1 | module M (X : sig type t : any mod separable end) : sig type t : value_or_null end = X
                                                                                          ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : value_or_null end
        Type declarations do not match:
          type t = X.t
        is not included in
@@ -412,10 +392,6 @@ Line 1, characters 78-79:
 1 | module M (X : sig type t : any mod separable end) : sig type t : bits64 end = X
                                                                                   ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : bits64 end
        Type declarations do not match:
          type t = X.t
        is not included in

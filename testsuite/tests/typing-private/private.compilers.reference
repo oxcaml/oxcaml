@@ -21,10 +21,6 @@ Line 1, characters 44-46:
 1 | module M4 : sig type t = private M3.t end = M2;; (* fails *)
                                                 ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = M2.t end
-       is not included in
-         sig type t = private M3.t end
        Type declarations do not match:
          type t = M2.t
        is not included in
@@ -34,10 +30,6 @@ Line 1, characters 44-45:
 1 | module M4 : sig type t = private M3.t end = M;; (* fails *)
                                                 ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = < m : int > end
-       is not included in
-         sig type t = private M3.t end
        Type declarations do not match:
          type t = < m : int >
        is not included in
@@ -47,10 +39,6 @@ Line 1, characters 44-46:
 1 | module M4 : sig type t = private M3.t end = M1;; (* might be ok *)
                                                 ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = M1.t end
-       is not included in
-         sig type t = private M3.t end
        Type declarations do not match:
          type t = M1.t
        is not included in
@@ -61,10 +49,6 @@ Line 1, characters 53-55:
 1 | module M6 : sig type t = private < n:int; .. > end = M1;; (* fails *)
                                                          ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = M1.t end
-       is not included in
-         sig type t = private < n : int; .. > end
        Type declarations do not match:
          type t = M1.t
        is not included in
@@ -74,10 +58,6 @@ Line 3, characters 2-51:
 3 |   struct type t = int let f (x : int) = (x : t) end;; (* must fail *)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = int val f : int -> t end
-       is not included in
-         sig type t = private Foobar.t val f : int -> t end
        Type declarations do not match:
          type t = int
        is not included in

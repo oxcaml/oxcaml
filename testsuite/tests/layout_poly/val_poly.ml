@@ -137,10 +137,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val poly_ f : 'a -> 'a end
        Values do not match:
          val f : 'a -> 'a
        is not included in
@@ -173,10 +169,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val poly_ f : 'a -> 'a end
        Values do not match:
          val f : 'a -> 'a
        is not included in
@@ -209,10 +201,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('a : bits64). 'a -> 'a end
-       is not included in
-         sig val poly_ f : 'a -> 'a end
        Values do not match:
          val f : ('a : bits64). 'a -> 'a
        is not included in
@@ -235,10 +223,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ f : 'a -> 'a end
-       is not included in
-         sig val f : ('a : any). 'a -> 'a end
        Values do not match:
          val poly_ f : 'a -> 'a
        is not included in
@@ -389,12 +373,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
-         end
-       is not included in
-         sig val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b end
        Values do not match:
          val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
        is not included in
@@ -428,16 +406,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val bar :
-             layout_ l.
-               ('a : l mod contended) ('b : l mod contended). 'a -> 'b
-         end
-       is not included in
-         sig
-           val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
-         end
        Values do not match:
          val bar :
            layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b

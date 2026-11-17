@@ -13,10 +13,6 @@ Lines 3-5, characters 6-3:
 4 |   let x = false , "not an int"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : bool * string end
-       is not included in
-         sig val x : bool * int end
        Values do not match:
          val x : bool * string
        is not included in
@@ -36,10 +32,6 @@ Lines 3-5, characters 6-3:
 4 |   let f x = x + List.length [0.0, Some true]
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int end
-       is not included in
-         sig val f : int -> (float * string option) list end
        Values do not match:
          val f : int -> int
        is not included in
@@ -61,10 +53,6 @@ Lines 3-5, characters 6-3:
 4 |   let f : ('c list * 'd option  -> int) = assert false
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('c : any) ('d : any). 'c list * 'd option -> int end
-       is not included in
-         sig val f : 'a list * 'b list -> int end
        Values do not match:
          val f : ('c : any) ('d : any). 'c list * 'd option -> int
        is not included in
@@ -85,10 +73,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = bool * float
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = bool * float end
-       is not included in
-         sig type t = int * float end
        Type declarations do not match:
          type t = bool * float
        is not included in

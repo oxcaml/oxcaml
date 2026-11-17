@@ -34,10 +34,6 @@ Lines 3-5, characters 6-3:
 4 |     let f () = (`A : _ @ nonportable)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : unit -> [> `A ] end
-       is not included in
-         sig val f : unit -> [ `A | `B of 'a -> 'a ] @ portable end
        Values do not match:
          val f : unit -> [> `A ]
        is not included in
@@ -73,10 +69,6 @@ Lines 3-5, characters 6-3:
 4 |     let f () = exclave_ 42
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : unit -> int @ local forkable unyielding end
-       is not included in
-         sig val f : unit -> int end
        Values do not match:
          val f : unit -> int @ local forkable unyielding
        is not included in

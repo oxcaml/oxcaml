@@ -20,10 +20,6 @@ Lines 8-10, characters 6-3:
  9 |   class type ct = object end
 10 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class type ct = object  end end
-       is not included in
-         sig class type ct = object val m : string end end
        Class type declarations do not match:
          class type ct = object  end
        does not match
@@ -49,10 +45,6 @@ Lines 5-9, characters 6-3:
 8 |   end
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class virtual c : object method virtual a : string end end
-       is not included in
-         sig class c : object method a : string end end
        Class declarations do not match:
          class virtual c : object method virtual a : string end
        does not match
@@ -76,10 +68,6 @@ Lines 5-7, characters 6-3:
 6 |   class type c = object end
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class type c = object  end end
-       is not included in
-         sig class type ['a] c = object  end end
        Class type declarations do not match:
          class type c = object  end
        does not match
@@ -99,13 +87,6 @@ Lines 3-5, characters 6-3:
 4 |   class ['y, 'x] c  = object method private id (x : 'y) = x + 1 end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           class ['a, 'x] c :
-             object constraint 'a = int method private id : 'a -> int end
-         end
-       is not included in
-         sig class ['x, 'y] c : object  end end
        Class declarations do not match:
          class ['a, 'x] c :
            object constraint 'a = int method private id : 'a -> int end
@@ -126,10 +107,6 @@ Lines 3-5, characters 6-3:
 4 |   class ['a] c = object end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class ['a] c : object  end end
-       is not included in
-         sig class ['a] c : object constraint 'a = int end end
        Class declarations do not match:
          class ['a] c : object  end
        does not match
@@ -149,10 +126,6 @@ Lines 3-5, characters 6-3:
 4 |   class ['a, 'b] c = object end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class ['a, 'b] c : object  end end
-       is not included in
-         sig class ['a, 'b] c : object constraint 'b = int end end
        Class declarations do not match:
          class ['a, 'b] c : object  end
        does not match
@@ -172,10 +145,6 @@ Lines 3-5, characters 6-3:
 4 |   class c (x : float) = object end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class c : float -> object  end end
-       is not included in
-         sig class c : int -> object  end end
        Class declarations do not match:
          class c : float -> object  end
        does not match
@@ -195,10 +164,6 @@ Lines 3-5, characters 6-3:
 4 |   class c (_ : int) (x : float) = object end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class c : int -> float -> object  end end
-       is not included in
-         sig class c : int -> int -> object  end end
        Class declarations do not match:
          class c : int -> float -> object  end
        does not match
@@ -315,10 +280,6 @@ Lines 3-5, characters 6-3:
 4 |   class type c = object method private m: string end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class type c = object method private m : string end end
-       is not included in
-         sig class type c = object method m : string end end
        Class type declarations do not match:
          class type c = object method private m : string end
        does not match

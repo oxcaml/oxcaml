@@ -705,10 +705,6 @@ Lines 1-3, characters 12-3:
 2 |   let f (x : #c) = x
 3 | end......
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (#c as 'a) -> 'a end
-       is not included in
-         sig val f : #c -> #c end
        Values do not match:
          val f : (#c as 'a) -> 'a
        is not included in

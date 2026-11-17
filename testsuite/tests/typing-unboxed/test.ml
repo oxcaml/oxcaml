@@ -120,10 +120,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> (int [@untagged]) = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> (int [@untagged]) = "f" "f_nat" end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> (int [@untagged]) = "f" "f_nat"
        is not included in
@@ -143,10 +139,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : (int [@untagged]) -> int = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : (int [@untagged]) -> int = "f" "f_nat" end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" end
        Values do not match:
          external f : (int [@untagged]) -> int = "f" "f_nat"
        is not included in
@@ -166,10 +158,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : (int [@untagged]) -> int = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : (int [@untagged]) -> int = "f" "f_nat" end
-       is not included in
-         sig external f : int -> int = "a" "a_nat" end
        Values do not match:
          external f : (int [@untagged]) -> int = "f" "f_nat"
        is not included in
@@ -189,10 +177,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : float -> (float [@unboxed]) = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : float -> (float [@unboxed]) = "f" "f_nat" end
-       is not included in
-         sig external f : float -> float = "f" "f_nat" end
        Values do not match:
          external f : float -> (float [@unboxed]) = "f" "f_nat"
        is not included in
@@ -212,10 +196,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : (float [@unboxed]) -> float = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : (float [@unboxed]) -> float = "f" "f_nat" end
-       is not included in
-         sig external f : float -> float = "f" "f_nat" end
        Values do not match:
          external f : (float [@unboxed]) -> float = "f" "f_nat"
        is not included in
@@ -235,10 +215,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : (float [@unboxed]) -> float = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : (float [@unboxed]) -> float = "f" "f_nat" end
-       is not included in
-         sig external f : float -> float = "a" "a_nat" end
        Values do not match:
          external f : (float [@unboxed]) -> float = "f" "f_nat"
        is not included in
@@ -258,10 +234,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int = "f" "f_nat" [@@noalloc]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int = "f" "f_nat" [@@noalloc] end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int = "f" "f_nat" [@@noalloc]
        is not included in
@@ -283,10 +255,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int = "f" "f_nat" end
-       is not included in
-         sig external f : int -> (int [@untagged]) = "f" "f_nat" end
        Values do not match:
          external f : int -> int = "f" "f_nat"
        is not included in
@@ -306,10 +274,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int = "f" "f_nat" end
-       is not included in
-         sig external f : (int [@untagged]) -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int = "f" "f_nat"
        is not included in
@@ -329,10 +293,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int = "a" "a_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int = "a" "a_nat" end
-       is not included in
-         sig external f : (int [@untagged]) -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int = "a" "a_nat"
        is not included in
@@ -352,10 +312,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : float -> float = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : float -> float = "f" "f_nat" end
-       is not included in
-         sig external f : float -> (float [@unboxed]) = "f" "f_nat" end
        Values do not match:
          external f : float -> float = "f" "f_nat"
        is not included in
@@ -375,10 +331,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : float -> float = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : float -> float = "f" "f_nat" end
-       is not included in
-         sig external f : (float [@unboxed]) -> float = "f" "f_nat" end
        Values do not match:
          external f : float -> float = "f" "f_nat"
        is not included in
@@ -398,10 +350,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : float -> float = "a" "a_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : float -> float = "a" "a_nat" end
-       is not included in
-         sig external f : (float [@unboxed]) -> float = "f" "f_nat" end
        Values do not match:
          external f : float -> float = "a" "a_nat"
        is not included in
@@ -421,10 +369,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int = "f" "f_nat"
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int = "f" "f_nat" end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" [@@noalloc] end
        Values do not match:
          external f : int -> int = "f" "f_nat"
        is not included in
@@ -446,10 +390,6 @@ Lines 3-5, characters 6-3:
 4 |   let f x = x + 1
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" end
        Values do not match:
          val f : int -> int
        is not included in
@@ -486,10 +426,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int = "gg" "f_nat"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int = "gg" "f_nat" end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int = "gg" "f_nat"
        is not included in
@@ -509,10 +445,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int = "f" "gg_nat"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int = "f" "gg_nat" end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int = "f" "gg_nat"
        is not included in
@@ -532,10 +464,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int = "gg" "gg_nat"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int = "gg" "gg_nat" end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int = "gg" "gg_nat"
        is not included in
@@ -563,10 +491,6 @@ Lines 4-6, characters 6-3:
 5 |   external f : int -> int -> int = "f" "f_nat"
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int -> int = "f" "f_nat" end
-       is not included in
-         sig external f : int -> int -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int -> int = "f" "f_nat"
        is not included in
@@ -589,13 +513,6 @@ Lines 3-6, characters 6-3:
 5 |   external f : int -> int_int = "f" "f_nat"
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type int_int = int -> int
-           external f : int -> int_int = "f" "f_nat"
-         end
-       is not included in
-         sig external f : int -> int -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int_int = "f" "f_nat"
        is not included in
@@ -617,10 +534,6 @@ Lines 3-5, characters 6-3:
 4 |   external f : int -> int -> int = "f" "f_nat"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig external f : int -> int -> int = "f" "f_nat" end
-       is not included in
-         sig external f : int -> int = "f" "f_nat" end
        Values do not match:
          external f : int -> int -> int = "f" "f_nat"
        is not included in

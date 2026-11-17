@@ -376,10 +376,6 @@ Line 10, characters 16-37:
                      ^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "M.N"
        does not match its original definition in the constrained signature:
-       Modules do not match:
-         sig type t = [ `Foo of t ] end
-       is not included in
-         sig type t = private [ `Foo of M.r ] end
        Type declarations do not match:
          type t = [ `Foo of t ]
        is not included in
@@ -412,10 +408,6 @@ Line 10, characters 16-37:
                      ^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "M.N"
        does not match its original definition in the constrained signature:
-       Modules do not match:
-         sig type t = X.t type s = t end
-       is not included in
-         sig type t = M.r type s end
        Type declarations do not match:
          type t = X.t
        is not included in
@@ -650,7 +642,6 @@ Lines 3-5, characters 17-41:
 5 |                  end) with module X1 = X0
 Error: In this "with" constraint, the new definition of "X1"
        does not match its original definition in the constrained signature:
-       Modules do not match: sig end is not included in sig type t end
        The type "t" is required but not provided
 |}]
 

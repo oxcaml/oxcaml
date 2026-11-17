@@ -138,11 +138,6 @@ Line 4, characters 2-30:
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        At position "module type t = <here>"
-       Module types do not match:
-         sig type t = X of x | Y of y end
-       is not equal to
-         base
-       At position "module type t = <here>"
        Type declarations do not match:
          type t = X of x | Y of y
        is not included in
@@ -578,11 +573,6 @@ Lines 2-5, characters 18-49:
 5 |     end with module type A = sig type t = int end.
 Error: In this "with" constraint, the new definition of "A"
        does not match its original definition in the constrained signature:
-       At position "module type A = <here>"
-       Module types do not match:
-         sig type t = bool end
-       is not equal to
-         sig type t = int end
        At position "module type A = <here>"
        Type declarations do not match:
          type t = bool

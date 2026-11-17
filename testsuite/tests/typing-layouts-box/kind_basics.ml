@@ -505,10 +505,6 @@ Lines 3-5, characters 6-3:
 4 |   kind_ k = any box non_null
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k = any box non_null end
-       is not included in
-         sig kind_ k = any box end
        Kind declarations do not match:
          kind_ k = any box non_null
        is not included in
@@ -559,10 +555,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : value
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t end
-       is not included in
-         sig type t : bits8 box end
        Type declarations do not match:
          type t
        is not included in
@@ -584,10 +576,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : bits8
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 end
-       is not included in
-         sig type t : bits8 box end
        Type declarations do not match:
          type t : bits8
        is not included in
@@ -1034,10 +1022,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : bits16 box
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits16 box end
-       is not included in
-         sig type t : bits8 box end
        Type declarations do not match:
          type t : bits16 box
        is not included in
@@ -1070,10 +1054,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : value & bits16
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : value & bits16 end
-       is not included in
-         sig type t : bits8 box & bits16 end
        Type declarations do not match:
          type t : value & bits16
        is not included in

@@ -249,10 +249,6 @@ Lines 5-7, characters 32-3:
 6 |   let[@zero_alloc opt] f x = x
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc opt] end
-       is not included in
-         S_bad_inc_base
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc opt]
        is not included in
@@ -274,10 +270,6 @@ Lines 5-7, characters 35-3:
 6 |   let[@zero_alloc] f x = x
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc] end
-       is not included in
-         S_bad_inc_strict
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc]
        is not included in
@@ -295,10 +287,6 @@ Lines 1-3, characters 37-3:
 2 |   let[@zero_alloc assume] f x = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc] end
-       is not included in
-         S_bad_inc_strict
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc]
        is not included in
@@ -316,10 +304,6 @@ Lines 1-3, characters 34-3:
 2 |   let[@zero_alloc opt] f x = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc opt] end
-       is not included in
-         S_bad_inc_strict
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc opt]
        is not included in
@@ -337,10 +321,6 @@ Lines 1-3, characters 41-3:
 2 |   let[@zero_alloc strict opt] f x = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc strict opt] end
-       is not included in
-         S_bad_inc_strict
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc strict opt]
        is not included in
@@ -358,10 +338,6 @@ Lines 1-3, characters 41-3:
 2 |   let[@zero_alloc assume never_returns_normally] f x = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc] end
-       is not included in
-         S_bad_inc_strict
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc]
        is not included in
@@ -384,10 +360,6 @@ Lines 5-7, characters 33-3:
 6 |   let[@zero_alloc assume] f x = x
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc] end
-       is not included in
-         S_strict_opt
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc]
        is not included in
@@ -405,10 +377,6 @@ Lines 1-3, characters 30-3:
 2 |   let[@zero_alloc opt] f x = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc opt] end
-       is not included in
-         S_strict_opt
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc opt]
        is not included in
@@ -426,10 +394,6 @@ Lines 1-3, characters 37-3:
 2 |   let[@zero_alloc assume never_returns_normally] f x = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a [@@zero_alloc] end
-       is not included in
-         S_strict_opt
        Values do not match:
          val f : 'a -> 'a [@@zero_alloc]
        is not included in
@@ -549,10 +513,6 @@ Lines 17-19, characters 46-3:
 18 |   let[@zero_alloc] f x = fun y -> x + y
 19 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int -> int [@@zero_alloc arity 1] end
-       is not included in
-         S_arity_int_int
        Values do not match:
          val f : int -> int -> int [@@zero_alloc arity 1]
        is not included in
@@ -598,10 +558,6 @@ Lines 1-3, characters 59-3:
 2 |   let[@zero_alloc] f x = fun y -> x + y
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int -> int [@@zero_alloc arity 1] end
-       is not included in
-         S_alias_explicit_arity_2
        Values do not match:
          val f : int -> int -> int [@@zero_alloc arity 1]
        is not included in
@@ -627,10 +583,6 @@ Lines 5-7, characters 59-3:
 6 |   let[@zero_alloc] f x y = x + y
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int -> int [@@zero_alloc] end
-       is not included in
-         S_alias_explicit_arity_1
        Values do not match:
          val f : int -> int -> int [@@zero_alloc]
        is not included in
@@ -684,10 +636,6 @@ Lines 18-21, characters 32-3:
 20 |   let[@zero_alloc] f x y = x + y
 21 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = int -> int val f : int -> int -> int [@@zero_alloc] end
-       is not included in
-         S_subst
        Values do not match:
          val f : int -> int -> int [@@zero_alloc]
        is not included in
@@ -728,10 +676,6 @@ Lines 13-16, characters 41-3:
 15 |     if x = y+1 then (z,z) else (z,0)
 16 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int -> int -> int * int [@@zero_alloc] end
-       is not included in
-         S_fun_in_fun
        Values do not match:
          val f : int -> int -> int -> int * int [@@zero_alloc]
        is not included in
@@ -873,10 +817,6 @@ Lines 11-13, characters 37-3:
 12 |   let[@zero_alloc opt] f x = x + 3
 13 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int [@@zero_alloc opt] end
-       is not included in
-         S_base_mto
        Values do not match:
          val f : int -> int [@@zero_alloc opt]
        is not included in
@@ -908,10 +848,6 @@ Lines 11-13, characters 41-3:
 12 |   let[@zero_alloc] f x = x + 3
 13 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int [@@zero_alloc] end
-       is not included in
-         S_strict_mto
        Values do not match:
          val f : int -> int [@@zero_alloc]
        is not included in
@@ -977,13 +913,6 @@ Line 14, characters 6-14:
 14 | end = M_infer1
            ^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int [@@zero_alloc] val g : int -> int end
-       is not included in
-         sig
-           val f : int -> int [@@zero_alloc]
-           val g : int -> int [@@zero_alloc]
-         end
        Values do not match:
          val g : int -> int
        is not included in
@@ -1075,10 +1004,6 @@ Line 9, characters 6-25:
 9 | end = M_inf_too_many_args
           ^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = int -> int val f : int -> t end
-       is not included in
-         sig type t val f : int -> t [@@zero_alloc] end
        Values do not match:
          val f : int -> t
        is not included in
@@ -1102,10 +1027,6 @@ Line 7, characters 6-24:
 7 | end = M_inf_too_few_args
           ^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int -> int end
-       is not included in
-         sig val f : int -> int -> int [@@zero_alloc] end
        Values do not match:
          val f : int -> int -> int
        is not included in
@@ -1163,10 +1084,6 @@ Line 1, characters 61-62:
 1 | module F (X : S) : sig val[@zero_alloc] f : int -> int end = X
                                                                  ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int @@ portable end
-       is not included in
-         sig val f : int -> int [@@zero_alloc] end
        Values do not match:
          val f : int -> int @@ portable
        is not included in
@@ -1191,10 +1108,6 @@ Line 7, characters 61-62:
 7 | module F (X : S) : sig val[@zero_alloc] f : int -> int end = X
                                                                  ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int @@ portable end
-       is not included in
-         sig val f : int -> int [@@zero_alloc] end
        Values do not match:
          val f : int -> int @@ portable
        is not included in
@@ -1272,18 +1185,6 @@ Lines 13-19, characters 6-3:
 18 |   module type S_plain2 = S2 with module M2 = Plain2
 19 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module Plain2 : sig val f : int -> int [@@zero_alloc] end
-           module type S_plain2 =
-             sig module M2 : sig val f : int -> int end end
-         end
-       is not included in
-         sig
-           module Plain2 : sig val f : int -> int [@@zero_alloc] end
-           module type S_plain2 =
-             sig module M2 : sig val f : int -> int [@@zero_alloc] end end
-         end
        Module type declarations do not match:
          module type S_plain2 =
            sig module M2 : sig val f : int -> int end end
@@ -1291,16 +1192,6 @@ Error: Signature mismatch:
          module type S_plain2 =
            sig module M2 : sig val f : int -> int [@@zero_alloc] end end
        The first module type is not included in the second
-       At position "module type S_plain2 = <here>"
-       Module types do not match:
-         sig module M2 : sig val f : int -> int end end
-       is not equal to
-         sig module M2 : sig val f : int -> int [@@zero_alloc] end end
-       At position "module type S_plain2 = sig module M2 : <here> end"
-       Modules do not match:
-         sig val f : int -> int end
-       is not included in
-         sig val f : int -> int [@@zero_alloc] end
        At position "module type S_plain2 = sig module M2 : <here> end"
        Values do not match:
          val f : int -> int
@@ -1617,10 +1508,6 @@ Line 1, characters 31-32:
 1 | module F (X : S_all_opt) : S = X
                                    ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int [@@zero_alloc opt] end
-       is not included in
-         S
        Values do not match:
          val f : int -> int [@@zero_alloc opt]
        is not included in
@@ -1689,10 +1576,6 @@ Line 14, characters 39-40:
 14 | module F (X : S_all_ignored) : S_all = X
                                             ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f_warn_one_arg : int -> int end
-       is not included in
-         S_all
        Values do not match:
          val f_warn_one_arg : int -> int
        is not included in

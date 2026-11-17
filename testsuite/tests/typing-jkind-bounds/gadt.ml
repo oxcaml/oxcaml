@@ -571,10 +571,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = P : ('a : immediate). 'a abstract -> t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = P : ('a : immediate). 'a abstract -> t end
-       is not included in
-         sig type t : immutable_data with (type : value) abstract end
        Type declarations do not match:
          type t = P : ('a : immediate). 'a abstract -> t
        is not included in

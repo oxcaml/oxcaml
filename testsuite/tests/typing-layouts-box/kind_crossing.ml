@@ -42,10 +42,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : immediate box
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : immediate box end
-       is not included in
-         sig type t : immediate box mod contended end
        Type declarations do not match:
          type t : immediate box
        is not included in
@@ -68,10 +64,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : immediate box
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : immediate box end
-       is not included in
-         sig type t : immediate box mod external_ end
        Type declarations do not match:
          type t : immediate box
        is not included in

@@ -18,15 +18,6 @@ Line 3, characters 6-18:
 3 | end = Cmi_test_lib
           ^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f_unconstrained_variable : int -> int @@ portable
-           module M_constrained_variable =
-             Cmi_test_lib.M_constrained_variable
-           module M_no_variable = Cmi_test_lib.M_no_variable @@ portable
-         end
-       is not included in
-         sig val f_unconstrained_variable : int -> int [@@zero_alloc] end
        Values do not match:
          val f_unconstrained_variable : int -> int @@ portable
        is not included in
@@ -44,10 +35,6 @@ Line 3, characters 6-41:
 3 | end = Cmi_test_lib.M_constrained_variable
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int @@ portable [@@zero_alloc] end
-       is not included in
-         sig val f : int -> int [@@zero_alloc strict] end
        Values do not match:
          val f : int -> int @@ portable [@@zero_alloc]
        is not included in
@@ -71,10 +58,6 @@ Line 3, characters 6-32:
 3 | end = Cmi_test_lib.M_no_variable
           ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int end
-       is not included in
-         sig val f : int -> int [@@zero_alloc] end
        Values do not match:
          val f : int -> int
        is not included in

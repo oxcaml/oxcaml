@@ -186,13 +186,6 @@ Lines 4-7, characters 6-3:
 6 |   type 'a t = A constraint 'a = <x:'a. 'a -> 'a >
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type x = M.x
-           type 'b t = 'b M.t = A constraint 'b = < x : 'a. 'a -> 'a >
-         end
-       is not included in
-         sig type x type 'b t = A constraint 'b = < x : 'a. 'a -> x > end
        Type declarations do not match:
          type 'b t = 'b M.t = A constraint 'b = < x : 'a. 'a -> 'a >
        is not included in

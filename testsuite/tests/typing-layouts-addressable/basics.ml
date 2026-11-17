@@ -271,10 +271,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : bits8
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 end
-       is not included in
-         sig type t : bits8 addressable end
        Type declarations do not match:
          type t : bits8
        is not included in
@@ -296,10 +292,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : bits8 addressable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 addressable end
-       is not included in
-         sig type t : bits8 end
        Type declarations do not match:
          type t : bits8 addressable
        is not included in
@@ -321,10 +313,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : float64
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : float64 end
-       is not included in
-         sig type t : float64 addressable end
        Type declarations do not match:
          type t : float64
        is not included in
@@ -346,10 +334,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : void addressable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : void addressable end
-       is not included in
-         sig type t : void end
        Type declarations do not match:
          type t : void addressable
        is not included in
@@ -371,10 +355,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : untagged_immediate
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : untagged_immediate end
-       is not included in
-         sig type t : untagged_immediate addressable end
        Type declarations do not match:
          type t : untagged_immediate
        is not included in
@@ -398,10 +378,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : bits8 addressable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 addressable end
-       is not included in
-         sig type t : bits16 addressable end
        Type declarations do not match:
          type t : bits8 addressable
        is not included in
@@ -593,10 +569,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : bits8
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 end
-       is not included in
-         sig type t : any addressable end
        Type declarations do not match:
          type t : bits8
        is not included in
@@ -618,10 +590,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : any
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : any end
-       is not included in
-         sig type t : any addressable end
        Type declarations do not match:
          type t : any
        is not included in
@@ -654,10 +622,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : (bits8 & bits8) addressable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : (bits8 & bits8) addressable end
-       is not included in
-         sig type t : bits8 addressable & bits8 addressable end
        Type declarations do not match:
          type t : (bits8 & bits8) addressable
        is not included in
@@ -680,10 +644,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : bits8 addressable & bits8 addressable
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 addressable & bits8 addressable end
-       is not included in
-         sig type t : (bits8 & bits8) addressable end
        Type declarations do not match:
          type t : bits8 addressable & bits8 addressable
        is not included in

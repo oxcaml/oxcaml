@@ -265,16 +265,6 @@ Lines 3-6, characters 6-3:
 5 |     = "elide_bytecode" "elide_native"
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external f : int -> (w [@elide_void]) -> int -> int
-             = "elide_bytecode" "elide_native"
-         end
-       is not included in
-         sig
-           external f : int -> w -> int -> int = "elide_bytecode"
-             "elide_native"
-         end
        Values do not match:
          external f : int -> (w [@elide_void]) -> int -> int
            = "elide_bytecode" "elide_native"
@@ -298,16 +288,6 @@ Lines 4-7, characters 6-3:
 6 |     = "elide_bytecode" "elide_native"
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external f : w -> (w [@elide_void]) -> int -> int
-             = "elide_bytecode" "elide_native"
-         end
-       is not included in
-         sig
-           external f : (w [@elide_void]) -> w -> int -> int
-             = "elide_bytecode" "elide_native"
-         end
        Values do not match:
          external f : w -> (w [@elide_void]) -> int -> int = "elide_bytecode"
            "elide_native"
