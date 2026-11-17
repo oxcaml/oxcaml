@@ -21,9 +21,8 @@ end
 
 type t
 
-(** [None] if the graph is irreducible, i.e. if it has a cycle that can be
-    entered other than through a block dominating the whole cycle: such cycles
-    are not natural loops. *)
+(** A graph is reducible if every loop has a header: a block that dominates all
+    of the loop's members. Returns [None] if the graph is irreducible. *)
 val compute : finished Ssa.graph -> t option
 
 (** The innermost loop containing the block, if any. *)
