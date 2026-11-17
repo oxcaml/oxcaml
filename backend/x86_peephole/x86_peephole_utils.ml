@@ -37,43 +37,41 @@ let is_hard_barrier = function
       false)
   | Ins instr -> is_control_flow instr
 
-let is_debug_directive = function
+(* Directives that do not affect the generated code, and whose presence can
+   depend on whether debugging or unwinding information is emitted.
+   [Cfi_def_cfa_register] is not one of them: after it, unwinding relies on the
+   value of a register, so the instructions around it are not rewritten. *)
+let is_transparent_directive ~keep_cfi = function
   | Directive d -> (
     match d with
     | New_label (Label label, _) ->
       Asm_targets.Asm_label.is_dwarf_only_label label
     | Loc _ | File _ | Comment _ | New_line -> true
-    | New_label (Symbol _, _)
-    | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ | Align _
     | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
-    | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _ | Const _
-    | Direct_assignment _ | Global _ | Indirect_symbol _ | Private_extern _
-    | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _
-    | Weak _ | External _ | Reloc _ | Delta_uleb128 _ ->
+    | Cfi_remember_state | Cfi_restore_state ->
+      not keep_cfi
+    | New_label (Symbol _, _)
+    | Bytes _ | Cfi_startproc | Cfi_endproc | Cfi_def_cfa_register _ | Section _
+    | Align _ | Const _ | Direct_assignment _ | Global _ | Indirect_symbol _
+    | Private_extern _ | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _
+    | Protected _ | Hidden _ | Weak _ | External _ | Reloc _ | Delta_uleb128 _
+      ->
       false)
   | Ins _ -> false
 
-let next_ignoring_debug_directives cell =
-  let rec loop cell_opt =
-    match cell_opt with
-    | None -> None
-    | Some cell ->
-      if is_debug_directive (DLL.value cell)
-      then loop (DLL.next cell)
-      else Some cell
-  in
-  loop (DLL.next cell)
-
-let get_cells cell n =
+let get_cells ?(keep_cfi = false) cell n =
   let rec loop acc remaining current_opt =
     if remaining <= 0
     then List.rev acc
     else
       match current_opt with
       | None -> List.rev acc
-      | Some current -> loop (current :: acc) (remaining - 1) (DLL.next current)
+      | Some current ->
+        if is_transparent_directive ~keep_cfi (DLL.value current)
+        then loop acc remaining (DLL.next current)
+        else loop (current :: acc) (remaining - 1) (DLL.next current)
   in
-  loop [] n (Some cell)
+  if n <= 0 then [] else loop [cell] (n - 1) (DLL.next cell)
 
 let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
