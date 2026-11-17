@@ -28,14 +28,14 @@
 
 type t =
   { current : Fdo_annotation.t;
-        (* Loose counters in the current region, to be attached onto incoming
+        (* Orphaned counters in the current region, to be attached onto incoming
            edges. *)
     enclosing : Fdo_annotation.t list;
         (* The counters of the enclosing regions as a stack (head is
            innermost). *)
     handlers : Fdo_annotation.t Continuation.Map.t
         (* Counters into a continuation handler. When a handler is translated,
-           this is populated with the counters loose in that handler via
+           this is populated with the counters orphaned in that handler via
            [leave_handler]. Later, if another region jumps into a handler, its
            region also takes over the region counters of the handler. This
            relies on the handler being translated before the jump (see CR
