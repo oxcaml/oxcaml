@@ -16,12 +16,14 @@ mkdir -p coverage
 UBSAN_OPTIONS=coverage=1:coverage_dir=coverage ./sancov_test.exe
 
 # Keep the functions of interest, with their source location, whatever the name
-# mangling scheme. [sancov] gives a function the least line of its probes, per
-# source file. A probe of inlined code counts for every function among its
-# inlined frames, which [-gated-trace-pc-guard] makes the compiler describe:
-# [hit_inlined] is only ever executed inlined in [hit_caller].
-# Locations in files other than those of the test, which come from inlined
-# library code, are dropped.
+# mangling scheme. Locations in files other than those of the test, which come
+# from inlined library code, are dropped.
+#
+# A probe of inlined code counts for every function among its inlined frames,
+# which [-gated-trace-pc-guard] makes the compiler describe: [hit_inlined] is
+# only ever executed inlined in [hit_caller]. [sancov] gives a function the
+# least line of its probes, and it also counts the line of inlined code for the
+# function it was inlined into, hence the line of [hit_caller].
 files='sancov_[a-z]*\.ml\|stubs\.c'
 names='\(hit\|missed\)_[a-z]*'
 filter () {

@@ -11,9 +11,9 @@ sancov_lib.ml:40 hit_loop
 sancov_lib.ml:47 hit_search
 sancov_lib.ml:53 hit_classify
 sancov_lib.ml:63 hit_functor
+sancov_lib.ml:68 hit_caller
 sancov_lib.ml:68 hit_inlined
 sancov_lib.ml:7 hit_even
-sancov_lib.ml:71 hit_caller
 sancov_lib.ml:74 hit_rec
 stubs.c:11 hit_cstub
 not covered:
