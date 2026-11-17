@@ -142,11 +142,21 @@ let eval (expr : 'a expr) =
   Clflags.no_std_include := false;
   (* TODO: Set a bunch of flags to match the initial compile; nopervasives is
      false to ensure Stdlib is available *)
-  (* Refuse before compiling anything: evaluated code is compiled with the
-     current [Clflags.poll_insertion], and JIT-loading non-polled code into
-     a process whose domain cap exceeds 1 would reintroduce the STW-stall
-     hazard the cap's fully-polled derivation excludes (the dynlink
-     equivalent is the Library_not_fully_polled rejection). *)
+  (* Refuse before compiling anything.  Evaluation loads through the JIT
+     directly rather than through [Opttoploop.load_tlambda], so it repeats
+     that function's admission checks: the evaluated code is compiled with
+     the current variant-selecting flags and runs in this executable's
+     image, so those flags must select the frame-pointer, stack-check and
+     AddressSanitizer settings the executable was built for. *)
+  Opttoploop.check_codegen_variant_for_in_process_load ();
+  (* The JIT cannot load the code of the LLVM backend at all: said first, so
+     that the check of poll insertion does not offer a remedy for it. *)
+  Opttoploop.check_backend_for_jit_load ();
+  (* Evaluated code is compiled with the current [Clflags.poll_insertion], and
+     JIT-loading non-polled code into a fully polled process whose domain cap
+     exceeds 1 would reintroduce the STW-stall hazard the cap's fully-polled
+     derivation excludes (the dynlink equivalent is the Library_not_fully_polled
+     rejection). *)
   Opttoploop.check_poll_insertion_for_in_process_load ();
   Location.reset ();
   Env.reset_cache ~preserve_persistent_env:true;

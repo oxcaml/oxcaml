@@ -1,0 +1,1 @@
+ocamlnat is fully polled and may run more than one domain, so it cannot load phrases compiled without poll insertion; do not pass -disable-poll-insertion, or run it with OCAMLRUNPARAM=d=1

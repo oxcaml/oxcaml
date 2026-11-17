@@ -466,6 +466,7 @@ module Data : sig
     ?section:string option ->
     ?align:int option ->
     ?private_:bool ->
+    ?hidden:bool ->
     string ->
     Value.t ->
     t

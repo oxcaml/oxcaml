@@ -31,6 +31,10 @@ val cfg : Cfg_with_layout.t -> unit
 
 val data : Cmm.data_item list -> unit
 
+(** Defines the symbol as one byte of data with hidden visibility: see
+    [Emitaux.emit_hidden_data_symbol]. *)
+val hidden_data_symbol : Cmm.symbol -> unit
+
 val begin_assembly : is_startup:bool -> sourcefile:string option -> unit
 
 val end_assembly : unit -> unit

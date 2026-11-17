@@ -143,3 +143,8 @@ type error =
       }
 
 exception Error of error
+
+(** Whether [Config.standard_library] is itself a library root that serves the
+    given variant (OCAMLLIB naming a variant's tree, say), judged by the codegen
+    fingerprint of the standard library there. *)
+val standard_library_is_built_for : Codegen_variant.t -> bool

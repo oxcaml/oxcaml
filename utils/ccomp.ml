@@ -110,22 +110,87 @@ let compile_file ?output ?(opt="") ?stable_name name =
     else
       ""
   in
-  let codegen_variant_flags =
-    (* C stubs that can call back into OCaml (or allocate) must be compiled
-       with frame pointers to be linked into fp-variant programs (the
-       runtime's stack-reallocation walk requires an unbroken rbp chain).
-       When the configure default is already fp, Config.native_cflags carry
-       these flags, so only non-default fp invocations append them. *)
-    if Clflags.target_is_native ()
-       && !Clflags.frame_pointers
-       && not Config.with_frame_pointers
-    then "-fno-omit-frame-pointer -g"
-    else ""
+  let codegen_variant_flags, codegen_variant_last_flags =
+    (* A .c file given to ocamlopt is compiled for the invocation's codegen
+       variant, so that it matches the image it will be linked into (the
+       per-token tables are the ones the in-tree runtime and stub archives
+       use, Codegen_variant_name via Makefile.codegen-variants):
+
+       - the variant is stated on every compilation
+         (-DCAML_CODEGEN_VARIANT_EXPLICIT plus -D<macro>=1 for exactly the
+         axes that are on), even when it is this compiler's configure
+         default: otherwise the axis macros would come from whichever m.h
+         gets included, and under an OCAMLLIB override that header belongs
+         to another installation whose default need not agree.  The
+         stack/fiber layout macros CAML_INTERNALS stubs derive from the
+         axis macros (First_frame, Stack_padding_word, Stack_guard_stride,
+         ...) must match the enclosing program.  Bytecode compilations
+         state the configure default, which is what the bytecode runtimes
+         (built once) are compiled for.
+
+       The behavioral flags are appended for the axes whose value the
+       command does not already provide.  The configured command
+       (Config.native_cflags) carries the flags of the configure default,
+       so it needs the flags of the axes that differ from the default; a
+       command given with -cc replaces it and carries none, so it also
+       needs the flags of every axis that is on:
+
+       - frame pointers on: -fno-omit-frame-pointer -g, because stubs that
+         can call back into OCaml (or allocate) must preserve the unbroken
+         rbp chain the fp runtime's stack-reallocation walk requires;
+       - asan on: the -fsanitize instrumentation flags, so the stub is
+         instrumented like the rest of the asan image;
+       - asan off (on an asan-default configure): the -fno-sanitize
+         spelling, after everything else on the command line so that it
+         wins (the same direction the non-asan C archives use), or the
+         instrumented object's __asan_* references could not resolve at
+         that invocation's asan-free Exe link.  It comes after the options
+         of -ccopt too: the configured flags turn the instrumentation on,
+         and a build that gives a compiler with -cc commonly gives them
+         again with -ccopt.  The flags of the axes that are on stay
+         before those options, as the configured flags are. *)
+    let axis_value (v : Codegen_variant.t)
+          (token : Codegen_variant_name.token) =
+      match token with
+      | Address_sanitizer -> v.address_sanitizer
+      | Frame_pointers -> v.frame_pointers
+      | Poll_insertion -> v.poll_insertion
+      | Stack_checks -> v.stack_checks
+    in
+    let variant =
+      if Clflags.target_is_native ()
+      then Codegen_variant.current ()
+      else Codegen_variant.default
+    in
+    let macro_flags =
+      Codegen_variant_name.explicit_variant_flag
+      :: List.concat_map
+           (fun token ->
+             Codegen_variant_name.cc_macro_flags token
+               ~enabled:(axis_value variant token))
+           Codegen_variant_name.all_tokens
+    in
+    let behavioral_flags ~of_enabled_axes =
+      let command_is_given = Option.is_some !Clflags.c_compiler in
+      List.concat_map
+        (fun token ->
+          let enabled = axis_value variant token in
+          let default = axis_value Codegen_variant.default token in
+          if Bool.equal enabled of_enabled_axes
+             && ((not (Bool.equal enabled default))
+                || (enabled && command_is_given))
+          then Codegen_variant_name.cc_behavioral_flags token ~enabled
+          else [])
+        Codegen_variant_name.all_tokens
+    in
+    ( String.concat " "
+        (macro_flags @ behavioral_flags ~of_enabled_axes:true),
+      String.concat " " (behavioral_flags ~of_enabled_axes:false) )
   in
   let exit =
     command
       (Printf.sprintf
-         "%s%s %s %s -c %s %s %s %s %s %s%s"
+         "%s%s %s %s -c %s %s %s %s %s %s %s%s"
          (match !Clflags.c_compiler with
           | Some cc -> cc
           | None ->
@@ -142,6 +207,7 @@ let compile_file ?output ?(opt="") ?stable_name name =
          debug_flags
          codegen_variant_flags
          (String.concat " " (List.rev !Clflags.all_ccopts))
+         codegen_variant_last_flags
          (quote_prefixed ~response_files:true "-I"
             (List.map Codegen_variant.expand_directory
                (List.rev_map
@@ -205,6 +271,45 @@ let remove_Wl cclibs =
 
 let call_linker ?(native_toplevel = false) mode output_name files extra =
   Profile.record_call "c-linker" (fun () ->
+    (* AddressSanitizer-instrumented objects reference __asan_* symbols and
+       need the compiler-rt ASan runtime, which the cc driver links into the
+       final EXECUTABLE when given -fsanitize=address.  When the configure
+       default is already asan, Config.mkexe carries the flags; when it is
+       not, or when -cc replaces mkexe, an asan invocation injects them
+       here, for the Exe mode only: Partial links go through the
+       pack linker (ld -r), which rejects cc-driver flags, and Dll/MainDll
+       links never carried the flags (a shared object's __asan_* references
+       resolve from the host executable at dlopen; codegen-fingerprint
+       equality guarantees that host is an asan link).  Consumers of
+       -output-obj / -output-complete-obj must therefore pass
+       -fsanitize=address at their own final link.  (-fsanitize-recover is
+       compile-time-only — inert at link — and kept for symmetry with the
+       compile-side flags.)
+
+       The opposite direction matters too: on an asan-default configure a
+       -no-asan Exe link must NOT inherit mkexe's -fsanitize=address, or the
+       cc driver links the compiler-rt ASan runtime into a program whose
+       objects are entirely uninstrumented — its interposed allocator then
+       leak-checks the process at exit and aborts it (the OCaml runtime
+       frees nothing at exit by design, and the detect_leaks suppression
+       lives in the instrumented runtime archives' __asan_default_options,
+       which such a program does not link).  The -fno-sanitize spelling
+       comes after mkexe's configure-level flags and after the options of
+       -ccopt, which may repeat them, and so wins: the same "order wins"
+       stripping direction the non-asan C archives use. *)
+    let asan_link_flags, no_asan_link_flags =
+      match mode with
+      | Exe
+        when !Clflags.address_sanitizer
+             && ((not Config.with_address_sanitizer)
+                || Option.is_some !Clflags.c_compiler) ->
+        "-fsanitize=address -fsanitize-recover=address", ""
+      | Exe
+        when Config.with_address_sanitizer
+             && not !Clflags.address_sanitizer ->
+        "", "-fno-sanitize=address -fno-sanitize-recover=address"
+      | Exe | Dll | MainDll | Partial -> "", ""
+    in
     let cmd =
       if mode = Partial then
         let (l_prefix, files) =
@@ -220,7 +325,7 @@ let call_linker ?(native_toplevel = false) mode output_name files extra =
           (quote_files ~response_files:true (remove_Wl files))
           extra
       else
-        Printf.sprintf "%s -o %s %s %s %s %s %s %s"
+        Printf.sprintf "%s %s -o %s %s %s %s %s %s %s %s"
           (match !Clflags.c_compiler, mode with
           | Some cc, _ -> cc
           | None, Exe -> Config.mkexe
@@ -228,6 +333,7 @@ let call_linker ?(native_toplevel = false) mode output_name files extra =
           | None, MainDll -> Config.mkmaindll
           | None, Partial -> assert false
           )
+          asan_link_flags
           (Filename.quote output_name)
           ""  (*(Clflags.std_include_flag "-I")*)
           (if native_toplevel then ""
@@ -236,6 +342,7 @@ let call_linker ?(native_toplevel = false) mode output_name files extra =
                (Load_path.get_path_list ()))
           !Clflags.dwarf_c_toolchain_flag
           (String.concat " " (List.rev !Clflags.all_ccopts))
+          no_asan_link_flags
           (quote_files ~response_files:true files)
           extra
     in

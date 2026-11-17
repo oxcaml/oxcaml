@@ -42,20 +42,6 @@ type unit_link_info = Linkenv.unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
-(* Whether [Config.standard_library] is itself a library root that serves
-   [variant] (e.g. OCAMLLIB pointing directly at a variant's tree), judged by
-   the codegen fingerprint in the unit info of the standard library there. The
-   poll-insertion setting of the root does not matter: see
-   [Codegen_variant.selected_tree]. *)
-let standard_library_is_built_for (variant : Codegen_variant.t) =
-  let std_exit = Filename.concat Config.standard_library "std_exit.cmx" in
-  match Compilenv.read_unit_info std_exit with
-  | exception (Compilenv.Error _ | Sys_error _ | End_of_file | Failure _) ->
-    false
-  | info, _crc ->
-    Codegen_variant.equal_fingerprint info.ui_codegen_fingerprint
-      (Codegen_variant.fingerprint variant)
-
 let cached_generic_functions_path () =
   match !Oxcaml_flags.cached_generic_functions_path with
   | Some path ->
@@ -82,19 +68,22 @@ let cached_generic_functions_path () =
       | Some (tree_variant, _root) ->
         Codegen_variant.equal tree_variant variant
         || (not (Codegen_variant.is_default tree_variant))
-        || standard_library_is_built_for variant
+        || Linkenv.standard_library_is_built_for variant
       | None -> false
     in
     if trusted && Sys.file_exists path
     then path
     else if
       (* The root has no tree that serves the selected variant, but it may
-         itself be such a tree: its archive is only used when the root is
-         verifiably built for the fingerprint of the selected variant; the
-         archive of a variant with another fingerprint is never used. *)
+         itself be such a tree. The archive carries no fingerprint that the
+         compiler can read (the linker refuses one generated for other
+         frame-pointer, stack-check or AddressSanitizer settings, through the
+         link-time guard, but less clearly than the error below), so its root's
+         archive is only used when the root is verifiably built for the
+         fingerprint of the selected variant. *)
       Option.is_none tree
       && Sys.file_exists root_archive
-      && standard_library_is_built_for variant
+      && Linkenv.standard_library_is_built_for variant
     then root_archive
     else
       let variant =
@@ -129,8 +118,13 @@ let runtime_lib () =
       | exception Not_found -> false
     in
     (* Blame the codegen variant only when the runtime variant itself exists for
-       the install's default codegen mode. *)
-    if unsuffixed_exists
+       the install's default codegen mode and the installation has no library
+       tree for the selected variant (and is not one itself). With such a tree,
+       what is missing is this file. *)
+    if
+      unsuffixed_exists
+      && Option.is_none (Codegen_variant.selected_tree ())
+      && not (Linkenv.standard_library_is_built_for codegen_variant)
     then
       raise
         (Linkenv.Error
@@ -239,7 +233,14 @@ let emit_code_fully_polled linkenv ~ppf_dump units =
        [ Cmm.Cdefine_symbol
            (Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
               "caml_code_fully_polled");
-         Cmm.Cint (if fully_polled then 1n else 0n) ])
+         Cmm.Cint (if fully_polled then 1n else 0n) ]);
+  (* The object files of units without polls refer to this definition
+     ([Asmgen.emit_unpolled_code_reference]): the linker then refuses one in a
+     program that is fully polled by its unit infos, also when another image of
+     the process defines the symbol. *)
+  if fully_polled
+  then Asmgen.emit_unpolled_code_exclusion ()
+  else Asmgen.emit_unpolled_code_definition ~exported:true
 
 (* With [-gated-trace-pc-guard-define-gate], the startup file defines the gate
    of [Cfg_trace_pc_guard]. This definition takes precedence over the weak ones
@@ -270,6 +271,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   if !Clflags.llvm_backend
   then Llvmize.begin_assembly ~is_startup:true ~sourcefile:sourcefile_for_dwarf
   else Emit.begin_assembly unix;
+  Asmgen.emit_codegen_variant_guard_of_startup ();
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   let name_list = List.flatten (List.map (fun u -> u.defines) units) in
   (* In manual module init mode, entry_point and global_table should be empty *)
@@ -289,8 +291,6 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   compile_phrase (Cmm_helpers.global_table init_name_list);
   let globals_map = Linkenv.make_globals_map linkenv units in
   compile_phrase (Cmm_helpers.globals_map globals_map);
-  compile_phrase
-    (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
   (* CR mshinwell: We should have a separate notion of "backend compilation
      unit" really, since the units here don't correspond to .ml source files. *)
   let system_comp_unit =
@@ -302,7 +302,20 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     then Generic_fns.imported_units cached_gen @ code_comp_units
     else code_comp_units
   in
+  (* The data of every object file whose code is in the code segment table, the
+     cached generic functions included: an object file's reference to the
+     link-time guard is at the start of its data, and a linker that discards
+     unreferenced sections must keep it wherever it keeps the code. *)
+  compile_phrase (Cmm_helpers.data_segment_table code_comp_units);
   compile_phrase (Cmm_helpers.code_segment_table code_comp_units);
+  (* The runtime reads the code segment table and not the data segment table.
+     This word follows the former and belongs to it for a linker that discards
+     unreferenced symbols, which then keeps the latter. *)
+  compile_phrase
+    (Cmm.Cdata
+       [ Cmm.Csymbol_address
+           (Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
+              "caml_data_segments") ]);
   let all_comp_units = startup_comp_unit :: system_comp_unit :: name_list in
   let all_comp_units =
     if !Oxcaml_flags.use_cached_generic_functions
@@ -351,12 +364,35 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   if !Clflags.llvm_backend
   then Llvmize.begin_assembly ~is_startup:true ~sourcefile:sourcefile_for_dwarf
   else Emit.begin_assembly unix;
+  (* A plugin vouches for its units, whose headers tell the loader what they
+     were compiled for. A plugin without units has no such header: it refers to
+     the guard like other generated code, so not with the LLVM backend, and with
+     that reference it can only be opened where the guard is defined. *)
+  (match units with
+  | [] -> Asmgen.emit_codegen_variant_guard_reference ()
+  | _ :: _ -> Asmgen.emit_codegen_variant_guard_definition ());
   emit_ocamlrunparam ~ppf_dump;
   List.iter compile_phrase
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
        (Generic_fns.compile ~cache:false ~shared:true genfns));
   let dynunits = List.map (fun u -> Option.get u.dynunit) units in
   compile_phrase (Cmm_helpers.plugin_header dynunits);
+  (* A plugin whose header says that one of its units has no polls defines, for
+     itself, what the object files of such units refer to. One whose header says
+     that every unit has polls does not, and must not get the definition from
+     anywhere else: the link of the plugin fails on an object file without polls
+     in it. (Where the object format cannot say that, such an object file needs
+     a definition that is visible to the plugin when it is loaded, which a fully
+     polled program does not provide.) A plugin without units says nothing of
+     the object files that it is made of, with or without polls: it does
+     neither, and an object file without polls in it needs a definition that is
+     visible to the plugin when it is loaded. *)
+  (match units with
+  | [] -> ()
+  | _ :: _ ->
+    if List.for_all (fun u -> u.polled) units
+    then Asmgen.emit_unpolled_code_exclusion ()
+    else Asmgen.emit_unpolled_code_definition ~exported:false);
   (* In manual module init mode, global_table should be empty *)
   (* CR mshinwell: why does caml_globals need to be populated in this case?
      Note that the frametables are not registered here; they are done

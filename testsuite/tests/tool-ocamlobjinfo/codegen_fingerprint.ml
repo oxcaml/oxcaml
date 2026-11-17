@@ -1,8 +1,6 @@
 (* TEST
- no-frame_pointers;
- no-stack-checks;
- no-address-sanitizer;
- no-poll-insertion;
+ codegen_variant = "base";
+ variant_available;
  shared-libraries;
  setup-ocamlopt.byte-build-env;
  flags = "-shared";
@@ -16,7 +14,7 @@
 *)
 
 (* Checks that ocamlobjinfo prints the codegen fingerprint recorded in
-   native artifacts.  Gated to configurations where the default variant
-   is known (no frame pointers, no stack checks, no address sanitizer);
-   question.ml covers the rest of the output on all configurations. *)
+   native artifacts.  The reference shows every axis, so the test names
+   its variant, and runs wherever the compiler under test has that
+   variant; question.ml covers the rest of the output for every variant. *)
 let answer () = 42

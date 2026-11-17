@@ -717,7 +717,11 @@ AC_ARG_ENABLE([frame-pointers],
 
 AC_ARG_ENABLE([address-sanitizer],
   [AS_HELP_STRING([--enable-address-sanitizer],
-    [use Address Sanitizer and alter codegen to expose native OCaml operations to ASAN (also enables frame pointers)])])
+    [expose native OCaml operations to AddressSanitizer by default in
+     generated code (also enables frame pointers), and select the
+     asan runtime and library variant as the install default (either
+     default can be overridden per invocation with -asan/-no-asan);
+     requires Clang on x86_64 Linux])])
 
 AC_ARG_ENABLE([codegen-variants],
   [AS_HELP_STRING([--disable-codegen-variants],
@@ -731,7 +735,8 @@ AC_ARG_WITH([codegen-variants],
      to build runtime archives and library trees for (e.g. fp, base);
      an empty list builds none, like --disable-codegen-variants; without
      this option, defaults to the variants obtained by flipping each
-     supported axis from the configure default, plus fp-sc])])
+     supported axis from the configure default (AddressSanitizer brings
+     frame pointers with it), plus fp-sc])])
 
 AC_ARG_ENABLE([cpp-mangling],
   [AS_HELP_STRING([--enable-cpp-mangling],
@@ -3105,16 +3110,64 @@ AS_IF([test x"$enable_frame_pointers" = "xyes" -o x"$enable_address_sanitizer" =
 
 ## Address Sanitizer
 
+dnl Whether the C compiler is Clang, exposed as
+dnl Config.c_compiler_is_clang.  The AddressSanitizer codegen-variant axis
+dnl is Clang-only: the runtime's ASan report wrappers
+dnl (runtime/memory.c) rely on Clang-only attributes (disable_tail_calls
+dnl in particular; gcc merely warns and may emit sibling calls that
+dnl clobber registers the OCaml code generator assumes preserved).
+
+AS_CASE([$ocaml_cc_vendor],
+  [clang-*], [c_compiler_is_clang=true],
+  [c_compiler_is_clang=false])
+AC_SUBST([c_compiler_is_clang])
+
+dnl Whether Address Sanitizer can be used, as the default
+dnl (--enable-address-sanitizer) or in a codegen variant, and if not, why.
+dnl Besides Clang on x86_64 Linux it takes a Clang that can link an Address
+dnl Sanitizer executable: the runtime library that such a link needs
+dnl (libclang_rt.asan, from compiler-rt) may not be installed with the
+dnl compiler, which then accepts -fsanitize=address when it compiles and
+dnl fails when it links.  asan_link_failed says that the link is what is
+dnl missing.
+
+asan_supported=false
+asan_link_failed=false
+asan_unsupported_reason=''
+AS_CASE(["$target,$ocaml_cc_vendor"],
+  [x86_64-*-linux*,clang-*],
+    [AC_MSG_CHECKING(m4_normalize([whether the C compiler can link Address
+       Sanitizer executables]))
+     SAVED_LDFLAGS="$LDFLAGS"
+     LDFLAGS="$LDFLAGS -fsanitize=address -fsanitize-recover=address"
+     AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
+       [asan_supported=true
+        AC_MSG_RESULT([yes])],
+       [asan_link_failed=true
+        asan_unsupported_reason="m4_normalize([the C compiler cannot link
+          an Address Sanitizer executable (see config.log; is the Address
+          Sanitizer runtime library of compiler-rt, libclang_rt.asan,
+          installed?)])"
+        AC_MSG_RESULT([no])])
+     LDFLAGS="$SAVED_LDFLAGS"],
+  [asan_unsupported_reason="m4_normalize([Address Sanitizer requires Clang
+     on x86_64 Linux (the runtime's ASan report wrappers rely on Clang-only
+     attributes)])"])
+
 AS_IF([test x"$enable_address_sanitizer" = "xyes"],
-  [AS_CASE(["$host,$ocaml_cc_vendor"],
-    [x86_64-*-linux*,gcc-*|x86_64-*-linux*,clang-*],
-      [common_cflags="$common_cflags -fsanitize=address -fsanitize-recover=address"
-       oc_ldflags="$oc_ldflags -fsanitize=address -fsanitize-recover=address"
-       address_sanitizer=true
+  [AS_IF([$tsan],
+     [AC_MSG_ERROR(m4_normalize([Address Sanitizer cannot be combined with
+       ThreadSanitizer (the compiler rejects -fsanitize=address together
+       with -fsanitize=thread); configure with at most one of
+       --enable-address-sanitizer and --enable-tsan]))])
+   AS_IF([$asan_supported],
+     [common_cflags="$common_cflags -fsanitize=address -fsanitize-recover=address"
+      oc_ldflags="$oc_ldflags -fsanitize=address -fsanitize-recover=address"
+      address_sanitizer=true
       AC_DEFINE([WITH_ADDRESS_SANITIZER])
       AC_MSG_NOTICE([using Address Sanitizer])],
-    [AC_MSG_ERROR([Address Sanitizer is not supported on this platform])]
-  )],
+     [AC_MSG_ERROR(m4_normalize([--enable-address-sanitizer:
+        $asan_unsupported_reason]))])],
   [AC_MSG_NOTICE([not using Address Sanitizer])
   address_sanitizer=false])
 
@@ -3153,13 +3206,15 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
 ## Codegen variants
 
 dnl The configure-default codegen variant's name: the '-'-joined, sorted
-dnl names of the enabled axis tokens ("fp", "poll", "sc"), or "base" when
-dnl every axis is off. The naming scheme is defined by
+dnl names of the enabled axis tokens ("asan", "fp", "poll", "sc"), or "base"
+dnl when every axis is off. The naming scheme is defined by
 dnl utils/codegen_variant_name.ml, which this must agree with; appending
 dnl the tokens in canonical (sorted-name) order keeps the joined name
 dnl canonical.
 
 codegen_default_tokens=''
+AS_IF([test x"$address_sanitizer" = "xtrue"],
+  [codegen_default_tokens="$codegen_default_tokens asan"])
 AS_IF([test x"$frame_pointers" = "xtrue"],
   [codegen_default_tokens="$codegen_default_tokens fp"])
 AS_IF([test x"$poll_insertion" = "xtrue"],
@@ -3175,21 +3230,31 @@ dnl The space-separated list of NON-default codegen variant names that
 dnl additionally get runtime archives and library trees, so that one
 dnl install can serve several per-invocation codegen configurations.
 dnl Computed by flipping each supported axis from the configure default
-dnl and applying constraint closure in both directions (no closure relates
-dnl the frame-pointer, poll-insertion and stack-checks axes; closure
-dnl arrives with the address-sanitizer axis), then appending the curated
-dnl extras list below.
+dnl and applying constraint closure in both directions (asan ON forces fp
+dnl ON; fp OFF forces asan OFF; asan with sc is rejected), then appending
+dnl the curated extras list below.
 dnl Overridable with --with-codegen-variants=NAME,NAME; emptied by
 dnl --disable-codegen-variants. Silently empty on platforms where frame
-dnl pointers are unsupported, and under Address Sanitizer (ASan forces
-dnl frame pointers, so the base variant may not be built there).
+dnl pointers are unsupported.  asan-variant names additionally require a
+dnl Clang toolchain on x86_64 Linux that can link Address Sanitizer
+dnl executables (asan_supported, from the "## Address Sanitizer" section
+dnl above) and a runtime built without ThreadSanitizer (the compiler
+dnl rejects -fsanitize=address together with -fsanitize=thread): the
+dnl automatic flip list drops them elsewhere, silently unless the link is
+dnl all that is missing, and naming them in --with-codegen-variants is an
+dnl error there.
 
 codegen_variants_supported=false
-AS_IF([test x"$address_sanitizer" = "xfalse"],
-  [AS_CASE([$target],
-    [x86_64-*-linux*|x86_64-*-darwin*],
-     [AS_CASE([$ocaml_cc_vendor],
-        [clang-*|gcc-*], [codegen_variants_supported=true])])])
+AS_CASE([$target],
+  [x86_64-*-linux*|x86_64-*-darwin*],
+   [AS_CASE([$ocaml_cc_vendor],
+      [clang-*|gcc-*], [codegen_variants_supported=true])])
+
+asan_variant_supported=$asan_supported
+dnl ASan cannot be combined with TSan in one process (the compiler rejects
+dnl -fsanitize=address together with the configured -fsanitize=thread), so
+dnl a TSan runtime build gets no asan variants.
+AS_IF([$tsan], [asan_variant_supported=false])
 
 codegen_variants=''
 AS_IF([test x"$enable_codegen_variants" = "xno"],
@@ -3218,9 +3283,19 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
    for name in $with_codegen_variants; do
      IFS=$save_IFS
      AS_CASE([$name],
-       [base|fp|fp-poll|fp-poll-sc|fp-sc|poll|poll-sc|sc], [:],
+       [asan-fp|asan-fp-poll|base|fp|fp-poll|fp-poll-sc|fp-sc|poll|poll-sc|sc],
+         [:],
        [AC_MSG_ERROR(m4_normalize([unknown codegen variant name
          '$name' in --with-codegen-variants]))])
+     AS_CASE([$name],
+       [asan-*],
+         [AS_IF([$tsan],
+            [AC_MSG_ERROR(m4_normalize([--with-codegen-variants: '$name'
+              cannot be combined with --enable-tsan (the compiler rejects
+              -fsanitize=address together with -fsanitize=thread)]))],
+            [test x"$asan_variant_supported" != "xtrue"],
+            [AC_MSG_ERROR(m4_normalize([--with-codegen-variants: '$name'
+              cannot be built: $asan_unsupported_reason]))])])
      AS_IF([test x"$name" = x"$codegen_default_variant"],
        [AC_MSG_NOTICE(m4_normalize([--with-codegen-variants: '$name' is the
          default variant; skipping]))],
@@ -3232,35 +3307,61 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
    IFS=$save_IFS
    codegen_variants=`echo $codegen_variants`],
   [dnl Flip each supported axis from the default, keeping the other axes
-   dnl at their defaults, then append the curated extras: additional
+   dnl at their defaults and applying the constraint closure in both
+   dnl directions (flipping asan ON forces fp ON; flipping fp OFF forces
+   dnl asan OFF; the asan flip is skipped on toolchains without asan
+   dnl support and when it would combine with a stack-checks default, and
+   dnl flipping sc ON under an asan default is likewise skipped: asan with
+   dnl sc is rejected).  Then append the curated extras: additional
    dnl variants deliberately built by default even though no single flip
    dnl produces them.  The only extra today is fp-sc, the one configuration
    dnl that executes the frame-pointer stack-reallocation walk in
    dnl runtime/fiber.c (live only with frame pointers AND stack checks).
    dnl Extras are validated like --with-codegen-variants names, and the
-   dnl default variant and duplicates are dropped.
+   dnl default variant and duplicates are dropped.  Candidate token lists
+   dnl are assembled in canonical (sorted-name) order: asan fp poll sc.
+   AS_IF([test x"$address_sanitizer" = "xtrue"],
+     [asan_default_token=asan], [asan_default_token=''])
    AS_IF([test x"$frame_pointers" = "xtrue"],
-     [fp_default_token=fp; fp_flipped_token=''],
-     [fp_default_token=''; fp_flipped_token=fp])
+     [fp_default_token=fp], [fp_default_token=''])
    AS_IF([test x"$poll_insertion" = "xtrue"],
-     [poll_default_token=poll; poll_flipped_token=''],
-     [poll_default_token=''; poll_flipped_token=poll])
+     [poll_default_token=poll], [poll_default_token=''])
    AS_IF([test x"$stack_checks" = "xtrue"],
-     [sc_default_token=sc; sc_flipped_token=''],
-     [sc_default_token=''; sc_flipped_token=sc])
+     [sc_default_token=sc], [sc_default_token=''])
+   AS_IF([test x"$address_sanitizer" = "xtrue"],
+     [asan_flip_tokens="$fp_default_token $poll_default_token $sc_default_token"],
+     [AS_IF([test x"$asan_variant_supported" = "xtrue" \
+               -a -z "$sc_default_token"],
+        [asan_flip_tokens="asan fp $poll_default_token"],
+        [asan_flip_tokens=skip
+         AS_IF([$tsan || test -n "$sc_default_token"], [:],
+           [$asan_link_failed],
+           [AC_MSG_NOTICE(m4_normalize([not building an Address Sanitizer
+              codegen variant: $asan_unsupported_reason]))])])])
+   AS_IF([test x"$frame_pointers" = "xtrue"],
+     [fp_flip_tokens="$poll_default_token $sc_default_token"],
+     [fp_flip_tokens="fp $poll_default_token $sc_default_token"])
+   AS_IF([test x"$poll_insertion" = "xtrue"],
+     [poll_flip_tokens="$asan_default_token $fp_default_token $sc_default_token"],
+     [poll_flip_tokens="$asan_default_token $fp_default_token poll $sc_default_token"])
+   AS_IF([test x"$stack_checks" = "xtrue"],
+     [sc_flip_tokens="$asan_default_token $fp_default_token $poll_default_token"],
+     [AS_IF([test x"$address_sanitizer" = "xtrue"],
+        [sc_flip_tokens=skip],
+        [sc_flip_tokens="$fp_default_token $poll_default_token sc"])])
    codegen_variant_extras='fp-sc'
    codegen_variant_candidates=''
-   for tokens in "$fp_flipped_token $poll_default_token $sc_default_token" \
-                 "$fp_default_token $poll_flipped_token $sc_default_token" \
-                 "$fp_default_token $poll_default_token $sc_flipped_token"
+   for tokens in "$asan_flip_tokens" "$fp_flip_tokens" \
+                 "$poll_flip_tokens" "$sc_flip_tokens"
    do
+     AS_IF([test x"$tokens" = "xskip"], [continue])
      name=`echo $tokens | tr ' ' '-'`
      AS_IF([test -z "$name"], [name=base])
      codegen_variant_candidates="$codegen_variant_candidates $name"
    done
    for name in $codegen_variant_extras; do
      AS_CASE([$name],
-       [base|fp|fp-poll|fp-poll-sc|fp-sc|poll|poll-sc|sc],
+       [asan-fp|asan-fp-poll|base|fp|fp-poll|fp-poll-sc|fp-sc|poll|poll-sc|sc],
          [codegen_variant_candidates="$codegen_variant_candidates $name"],
        [AC_MSG_ERROR(m4_normalize([unknown codegen variant name '$name'
          in the curated extras list]))])
@@ -3285,9 +3386,12 @@ AS_CASE([" $codegen_variants "],
    dnl the rbp chain to be linked into frame-pointer-variant programs:
    dnl the fp runtime's stack-reallocation walk (runtime/fiber.c) steps
    dnl through every C frame between the c_stack_link and the stub entry.
-   dnl Building all in-tree C stubs with frame pointers is ABI-neutral for
-   dnl non-fp programs and lets one shared stub archive serve both
-   dnl variants.
+   dnl Compiling C stubs with frame pointers is ABI-neutral for non-fp
+   dnl programs, so the configured C flags ask for them: a build system
+   dnl that compiles stubs itself uses these flags whatever variant the
+   dnl program is built for.  (The stubs of the compiler's own libraries
+   dnl are compiled once per variant, with the variant's flags after
+   dnl these.)
    common_cflags="$common_cflags -fno-omit-frame-pointer -g"])
 
 ## CPP mangling

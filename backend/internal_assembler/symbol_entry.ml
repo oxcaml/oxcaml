@@ -97,7 +97,9 @@ let create_symbol (symbol : X86_binary_emitter.symbol) symbol_table sections
   let symbol_entry =
     { st_name = String_table.current_length string_table;
       st_info = (st_binding lsl 4) lor st_type;
-      st_other = if symbol.sy_protected then 3 else 0;
+      st_other =
+        (* STV_HIDDEN, STV_PROTECTED, STV_DEFAULT *)
+        (if symbol.sy_hidden then 2 else if symbol.sy_protected then 3 else 0);
       st_shndx = Section_table.get_sec_idx sections symbol.sy_sec.sec_name;
       st_value = Int64.of_int value;
       st_size = Int64.of_int size;

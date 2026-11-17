@@ -1737,4 +1737,12 @@ OBJECT(CAMLSEP(system,frametable))
         .short  0                     /* no roots here */
         END_OBJECT(CAMLSEP(system,frametable))
 
+/* Like the C object files of the runtime, this one refers to the link-time
+   guard of the codegen variant that it was assembled for: see
+   caml/config.h. */
+#define EXPANDED_G(sym) G(sym)
+        .data
+        .align  3
+        .quad   EXPANDED_G(CAML_CODEGEN_VARIANT_GUARD)
+
         NONEXECSTACK_NOTE

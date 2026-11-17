@@ -203,10 +203,57 @@ let should_use_linscan fd =
 
 let if_emit_do f x = if should_emit () then f x else ()
 
+let emit_data dl =
+  if !Clflags.llvm_backend then Llvmize.data dl else if_emit_do Emit.data dl
+
+(* One word of data that refers to [symbol]. It is emitted directly rather than
+   compiled as a phrase: it is not part of the IR that [-save-ir-after] saves,
+   and emitting from saved IR adds its own. *)
+let emit_link_time_reference symbol =
+  if not !Clflags.llvm_backend
+  then if_emit_do Emit.data [Cmm.Csymbol_address symbol]
+
+let emit_link_time_definition ~hidden symbol =
+  if not hidden
+  then emit_data [Cmm.Cdefine_symbol symbol; Cmm.Cint8 0]
+  else if !Clflags.llvm_backend
+  then Llvmize.hidden_data_symbol symbol
+  else if_emit_do Emitaux.emit_hidden_data_symbol symbol
+
+(* The internal assembler writes every undefined symbol as an ordinary
+   reference, which would make this one a symbol that the link needs. *)
+let emit_link_time_exclusion symbol =
+  let internal_assembler =
+    !Oxcaml_flags.internal_assembler && !Emitaux.binary_backend_available
+  in
+  if not (!Clflags.llvm_backend || internal_assembler)
+  then if_emit_do Emitaux.emit_hidden_weak_reference symbol
+
+let codegen_variant_guard () =
+  Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
+    (Codegen_variant.runtime_guard_symbol (Codegen_variant.flags_variant ()))
+
+let emit_codegen_variant_guard_reference () =
+  emit_link_time_reference (codegen_variant_guard ())
+
+(* For both backends: the runtime reads this word when the program starts
+   (runtime/startup_nat.c). *)
+let emit_codegen_variant_guard_of_startup () =
+  let word =
+    Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
+      "caml_startup_codegen_variant_guard"
+  in
+  emit_data
+    [Cmm.Cdefine_symbol word; Cmm.Csymbol_address (codegen_variant_guard ())]
+
+let emit_codegen_variant_guard_definition () =
+  emit_link_time_definition ~hidden:true (codegen_variant_guard ())
+
 let emit_begin_assembly ~sourcefile unix =
   if !Clflags.llvm_backend
   then Llvmize.begin_assembly ~is_startup:false ~sourcefile
-  else if_emit_do (fun () -> Emit.begin_assembly unix) ()
+  else if_emit_do (fun () -> Emit.begin_assembly unix) ();
+  emit_codegen_variant_guard_reference ()
 
 let emit_end_assembly ~sourcefile () =
   if !Clflags.llvm_backend
@@ -220,8 +267,24 @@ let emit_end_assembly ~sourcefile () =
           raise (Error (Asm_generation (sourcefile, e))))
       ()
 
-let emit_data dl =
-  if !Clflags.llvm_backend then Llvmize.data dl else if_emit_do Emit.data dl
+let unpolled_code_symbol () =
+  Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
+    "caml_code_not_fully_polled"
+
+(* One word of data in the object file of a unit compiled without polls, emitted
+   directly like the reference to the link-time guard. The code of a phrase that
+   a program compiles and loads into itself has none: the program checks the
+   flags that it compiles the phrase with, and there is no object file to
+   mistake for another. Nor has the code of the LLVM backend. *)
+let emit_unpolled_code_reference () =
+  if not (Compilenv.code_has_polls ())
+  then emit_link_time_reference (unpolled_code_symbol ())
+
+let emit_unpolled_code_definition ~exported =
+  emit_link_time_definition ~hidden:(not exported) (unpolled_code_symbol ())
+
+let emit_unpolled_code_exclusion () =
+  emit_link_time_exclusion (unpolled_code_symbol ())
 
 let emit_fundecl f =
   if !Clflags.llvm_backend
@@ -796,6 +859,7 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
       && (!Emitaux.binary_backend_available || Jit_backend.is_registered ()))
     ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
+  if Option.is_none toplevel then emit_unpolled_code_reference ();
   ( make_cmm ()
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cmm
   ++ Profile.record "compile_phrases" (compile_phrases ~ppf_dump)
@@ -865,6 +929,7 @@ let linear_gen_implementation ~ppf_dump unix filename =
   let sourcefile = Some filename in
   Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:false ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
+  emit_unpolled_code_reference ();
   Profile.record "Emit" (List.iter emit_item) linear_unit_info.items;
   emit_end_assembly ~sourcefile ()
 

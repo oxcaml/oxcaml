@@ -7,6 +7,16 @@
  (flags (:standard -mavx))
  (include_dirs "../../../../runtime"))
 
+;; These tests check AddressSanitizer instrumentation, so the executable
+;; removes the -fno-asan that the build contexts compile with (see
+;; Makefile.common-ox). It is then instrumented wherever its context's
+;; codegen variant has AddressSanitizer: in the "main" context when
+;; AddressSanitizer is the configure default, and in the context of a
+;; codegen variant that has it ("main-asan-fp", say), which `make runtest`
+;; also drives for every such variant that is built. In a context whose
+;; variant has no AddressSanitizer the executable builds uninstrumented and
+;; skips its checks.
+
 (executables
  (names address_sanitizer)
  (modes (native exe))
@@ -15,9 +25,12 @@
  (libraries stdlib_stable unix str)
  (foreign_archives stubs))
 
-;; These tests are only meaningful when the compiler was built with AddressSanitizer enabled.
-;; This condition is not expressible in "enable_if" clause because dune does not support
-;; %{ocaml-config:with_address_sanitizer} (or any of our other configurable extensions for that matter).
+;; Whether the executable just built is instrumented (per context, see
+;; above). The executable reads the answer from should_run_tests.out and
+;; reduces to a single "Possibly running" line when it is false.
+;; In the "main" context this is whether AddressSanitizer is the configure
+;; default, which is not expressible in an "enabled_if" clause because dune
+;; does not support %{ocaml-config:with_address_sanitizer}.
 
 (rule
  (enabled_if (= %{context_name} "main"))
@@ -32,10 +45,33 @@
            echo false > %{targets}
         fi"))))
 
+;; In the context of a codegen variant, the answer comes from the constants
+;; that the _build/_bootinstall recipe in Makefile.common-ox generates for
+;; the context (see otherlibs/dynlink/dune).
+
+(rule
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (targets should_run_tests.out)
+ (deps
+  (:variant
+   %{project_root}/duneconf/dynlink_host_variant_%{context_name}.ml))
+ (action
+  (bash
+   "if grep -q 'let address_sanitizer = true' %{variant} ;
+    then
+       echo true > %{targets}
+    elif grep -q 'let address_sanitizer = false' %{variant} ;
+    then
+       echo false > %{targets}
+    else
+       echo 'no address_sanitizer constant in %{variant}' >&2 ; exit 1
+    fi")))
+
 (rule
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")))
  (targets address_sanitizer.out)
  (deps address_sanitizer.exe should_run_tests.out)
@@ -49,7 +85,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (action
   (progn

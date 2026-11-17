@@ -1,0 +1,9 @@
+by name, default setting: the tree of the default setting
+by name: the tree of the other setting
+by name, in one tree: only in the tree of the other setting
+by name, -nostdlib: File not found: which.cmxs
+by name, in the current directory: the current directory
+by name, -nocwd: File not found: here.cmxs
+by path, -nocwd: the current directory
+by name, in +camlp4: the directory for camlp4
+by name, in +camlp4, -nostdlib: File not found: extension.cmxs

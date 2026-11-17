@@ -14,6 +14,10 @@
 #   have;
 # - every unit has the same implementation CRC in both;
 # - every archive and object file defines the same symbols in both.
+# One difference is intended and checked for itself: every object file of a
+# unit of the tree without polls refers to caml_code_not_fully_polled, and
+# no object file of a unit of the tree with polls does. A reference is not
+# a definition, so it is not among the symbols compared.
 # Prints what differs, and "ok" when nothing does. A tool that fails is a
 # difference too.
 
@@ -80,6 +84,38 @@ symbols () {
   done
 }
 
+# usage: marks <tree> <list of files>
+# For every object file of a unit of the list, whether it refers to the
+# symbol of the object files without polls: "<object file> yes" or "no".
+# The object file of a unit is the companion of its .cmx file, or a member
+# of the companion of its .cmxa file: the archives of C code and of
+# generated functions have no .cmxa file and are not looked at. (A file
+# that nm cannot read was reported by [symbols].)
+marks () {
+  grep -E '\.cmxa?$' "$2" | while read -r file; do
+    case $file in
+      *.cmxa)
+        archive=${file%.cmxa}.a
+        [ -f "$1/$archive" ] || continue
+        nm -u "$1/$archive" 2> /dev/null | awk -v archive="$archive" '
+          function show() {
+            if (member != "") print archive "(" member ") " found
+          }
+          /:$/ { show(); member = $0; sub(/:$/, "", member); found = "no" }
+          /caml_code_not_fully_polled$/ { found = "yes" }
+          END { show() }';;
+      *.cmx)
+        object=${file%.cmx}.o
+        [ -f "$1/$object" ] || continue
+        if nm -u "$1/$object" 2> /dev/null \
+             | grep -q 'caml_code_not_fully_polled$'
+        then echo "$object yes"
+        else echo "$object no"
+        fi;;
+    esac
+  done
+}
+
 # usage: differ <description>
 differ () {
   status=failed
@@ -125,5 +161,16 @@ for with in $default $(config codegen_variants); do
       diff "$what.$with" "$what.$without" | head -n 40
     fi
   done
+  marks "$with_tree" files.common > "marks.$with"
+  marks "$without_tree" files.common > "marks.$without"
+  if grep -q ' yes$' "marks.$with"; then
+    differ "are not what they say: object files of $with have no polls:"
+    grep ' yes$' "marks.$with" | head -n 20
+  fi
+  if grep -q ' no$' "marks.$without" || ! [ -s "marks.$without" ]; then
+    differ "are not what they say: object files of $without do not say that \
+they have no polls:"
+    grep ' no$' "marks.$without" | head -n 20
+  fi
 done
 echo $status

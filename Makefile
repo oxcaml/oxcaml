@@ -34,14 +34,18 @@ CLEAN_FILES = \
   duneconf/ast-dependent-libs.ws \
   duneconf/dirs-to-ignore.inc \
   duneconf/ox-extra.inc \
+  duneconf/ocaml \
   natdynlinkops \
   otherlibs/dynlink/natdynlinkops \
   ocamlopt_upstream_flags.sexp \
   ocamlopt_oxcaml_flags.sexp \
+  ocamlopt_stdlib_flags.txt \
   $(wildcard duneconf/ocamlopt_flags_main*.sexp) \
   $(wildcard duneconf/dynlink_host_variant_*.ml) \
   boot_oc_cflags.sexp \
   oc_cflags.sexp \
+  $(wildcard duneconf/oc_cflags_main-*.sexp) \
+  $(wildcard duneconf/stub_macros_main-*.sexp) \
   oc_cppflags.sexp \
   sharedlib_cflags.sexp \
   .rsync-output \

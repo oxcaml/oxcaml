@@ -11,6 +11,8 @@
 (subdir build_sc (dynamic_include ../dune_rules/stdlib_sc.dune))
 (subdir build_poll (dynamic_include ../dune_rules/stdlib_poll.dune))
 (subdir build_asan-fp (dynamic_include ../dune_rules/stdlib_asan-fp.dune))
+(subdir build_asan-fp-poll
+  (dynamic_include ../dune_rules/stdlib_asan-fp-poll.dune))
 (subdir build_fp-poll (dynamic_include ../dune_rules/stdlib_fp-poll.dune))
 (subdir build_fp-poll-sc
   (dynamic_include ../dune_rules/stdlib_fp-poll-sc.dune))
@@ -46,6 +48,10 @@
 (subdir build_asan-fp/caml
   (dynamic_include ../../copy_workaround/headers.dune))
 (subdir build_asan-fp/dynlink
+  (dynamic_include ../../copy_workaround/fake_dynlink.dune))
+(subdir build_asan-fp-poll/caml
+  (dynamic_include ../../copy_workaround/headers.dune))
+(subdir build_asan-fp-poll/dynlink
   (dynamic_include ../../copy_workaround/fake_dynlink.dune))
 (subdir build_fp-poll/caml
   (dynamic_include ../../copy_workaround/headers.dune))

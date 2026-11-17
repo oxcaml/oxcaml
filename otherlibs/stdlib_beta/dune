@@ -28,8 +28,9 @@
    -extension
    small_numbers_beta
    ))
+ ; \ -fno-asan: see otherlibs/unix/dune.
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp) \ -fno-asan))
  (library_flags
   (:standard -linkall)))
 

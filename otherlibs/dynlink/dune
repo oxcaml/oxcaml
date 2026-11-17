@@ -18,10 +18,13 @@
  (action
   (copy %{deps} %{targets})))
 
+; \ -fno-asan, here and in the other libraries of this file: see
+; otherlibs/unix/dune.
 (library
  (name dynlink_internal_byte)
  (wrapped false)
  (modes byte native)
+ (ocamlopt_flags (:standard \ -fno-asan))
  (modules dynlink_internal_byte)
  (libraries dynlink_compilerlibs dynlink_internal_common))
 
@@ -47,6 +50,7 @@
  (name dynlink_internal_native)
  (wrapped false)
  (modes byte native)
+ (ocamlopt_flags (:standard \ -fno-asan))
  (modules dynlink_internal_native dynlink_host_variant)
  (libraries dynlink_compilerlibs dynlink_internal_common))
 
@@ -84,7 +88,7 @@
    -safe-string
    -strict-formats))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp) \ -fno-asan))
  (modules
   binutils
   local_store
@@ -728,6 +732,7 @@
  (name dynlink_internal_common)
  (wrapped false)
  (modes byte native)
+ (ocamlopt_flags (:standard \ -fno-asan))
  (modules dynlink_common dynlink_types dynlink_platform_intf)
  (libraries dynlink_compilerlibs))
 
@@ -737,6 +742,7 @@
  (name dynlink_internal)
  (wrapped false)
  (modes byte native)
+ (ocamlopt_flags (:standard \ -fno-asan))
  (modules dynlink)
  (libraries
   dynlink_compilerlibs

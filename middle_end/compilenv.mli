@@ -78,6 +78,9 @@ val read_unit_info: string -> unit_infos * Digest.t
         (* Read infos and MD5 from a [.cmx] file. *)
 val write_unit_info: unit_infos -> string -> unit
         (* Save the given infos in the given file *)
+val code_has_polls: unit -> bool
+        (* Whether the native code generated for the current unit has
+           polls: poll insertion is on and the backend honors it. *)
 val build_unit_info:
   main_module_block_format:Lambda.main_module_block_format ->
   static_data:Slambda.CU_data.t ->
@@ -120,6 +123,17 @@ type error =
       }
 
 exception Error of error
+
+(** Whether [Config.standard_library] is itself a library root built for the
+    frame-pointer, stack-check and AddressSanitizer settings of the variant,
+    such as a variant's tree that OCAMLLIB names. *)
+val standard_library_is_built_for : Codegen_variant.t -> bool
+
+(** [Codegen_variant.missing_root_hint], except where the library root
+    serves the selected variant ([standard_library_is_built_for]): the note
+    for an error about a file compiled for another variant, when it is
+    imported and when it is linked. *)
+val missing_root_hint : unit -> string option
 
 val report_error: error Format_doc.format_printer
 val report_error_doc: error Format_doc.printer

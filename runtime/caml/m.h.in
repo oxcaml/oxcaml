@@ -73,19 +73,21 @@
 
 /* Codegen-variant axis macros.
 
-   WITH_FRAME_POINTERS and STACK_CHECKS_ENABLED are each defined (to 1)
-   when the corresponding axis is on and left undefined when it is off:
-   test them with #ifdef or defined().
+   WITH_FRAME_POINTERS, STACK_CHECKS_ENABLED and WITH_ADDRESS_SANITIZER are
+   each defined (to 1) when the corresponding axis is on and left undefined
+   when it is off: test them with #ifdef or defined().
 
-   The two templates below record this installation's default variant,
+   The three templates below record this installation's default variant,
    which is what C code compiled against these headers with no further
    flags sees.  A compilation for a specific variant defines
    CAML_CODEGEN_VARIANT_EXPLICIT on the command line together with
    -D<macro> for exactly the axes that are on; the defaults below are then
-   skipped.  The build does so for the variant runtime archives
-   (utils/codegen_variant_name.ml, Makefile.codegen-variants).  Without
-   CAML_CODEGEN_VARIANT_EXPLICIT, a -D<macro> on the command line turns
-   that axis on in addition to the defaults.
+   skipped.  ocamlopt does so for every .c file it compiles, and the build
+   does so for the variant runtime archives and for the C stubs of the
+   variant library trees (utils/codegen_variant_name.ml,
+   Makefile.codegen-variants).  Without CAML_CODEGEN_VARIANT_EXPLICIT, a
+   -D<macro> on the command line turns that axis on in addition to the
+   defaults.
 
    Nothing more is implied: the native stack/frame layout macros derived
    from these in config.h, stack.h and fiber.h additionally require
@@ -95,9 +97,32 @@
 #undef WITH_FRAME_POINTERS
 
 #undef STACK_CHECKS_ENABLED
-#endif
 
 #undef WITH_ADDRESS_SANITIZER
+#endif
+
+/* The link-time guard of the codegen variant: the symbol that a native
+   runtime built for these settings defines, and that native code compiled
+   for them refers to (see runtime/codegen_variant_guard.c).  The names are
+   those of Codegen_variant_name.runtime_guard_symbol in utils/. */
+#if defined(WITH_ADDRESS_SANITIZER) && defined(WITH_FRAME_POINTERS) \
+    && defined(STACK_CHECKS_ENABLED)
+#define CAML_CODEGEN_VARIANT_GUARD caml_runtime_codegen_variant_is_asan_fp_sc
+#elif defined(WITH_ADDRESS_SANITIZER) && defined(WITH_FRAME_POINTERS)
+#define CAML_CODEGEN_VARIANT_GUARD caml_runtime_codegen_variant_is_asan_fp
+#elif defined(WITH_ADDRESS_SANITIZER) && defined(STACK_CHECKS_ENABLED)
+#define CAML_CODEGEN_VARIANT_GUARD caml_runtime_codegen_variant_is_asan_sc
+#elif defined(WITH_ADDRESS_SANITIZER)
+#define CAML_CODEGEN_VARIANT_GUARD caml_runtime_codegen_variant_is_asan
+#elif defined(WITH_FRAME_POINTERS) && defined(STACK_CHECKS_ENABLED)
+#define CAML_CODEGEN_VARIANT_GUARD caml_runtime_codegen_variant_is_fp_sc
+#elif defined(WITH_FRAME_POINTERS)
+#define CAML_CODEGEN_VARIANT_GUARD caml_runtime_codegen_variant_is_fp
+#elif defined(STACK_CHECKS_ENABLED)
+#define CAML_CODEGEN_VARIANT_GUARD caml_runtime_codegen_variant_is_sc
+#else
+#define CAML_CODEGEN_VARIANT_GUARD caml_runtime_codegen_variant_is_base
+#endif
 
 #define NO_NAKED_POINTERS 1
 

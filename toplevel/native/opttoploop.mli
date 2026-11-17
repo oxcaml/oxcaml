@@ -193,13 +193,58 @@ val default_lookup : string -> Obj.t option
 
 (** Fails (with a [Failure] mirroring natdynlink's
     [Library_not_fully_polled] wording) when the current flags would
-    compile a non-polled phrase while the runtime's domain cap exceeds 1:
+    compile a non-polled phrase while the program is fully polled and the
+    runtime's domain cap exceeds 1:
     phrases are compiled in-process, so their polledness is the current
     [Clflags.poll_insertion] rather than a recorded bit, and loading
     non-polled code would falsify the fully-polled property the cap was
-    derived from.  Called by the phrase loader; exposed for other
-    in-process loaders (otherlibs/eval). *)
+    derived from.  Called by the phrase loader and by
+    [Jit.jit_load_program]; exposed for other in-process loaders
+    (otherlibs/eval, which checks before it types the code). *)
 val check_poll_insertion_for_in_process_load : unit -> unit
+
+(** Fails (with a [Failure]) when the current flags select the LLVM
+    backend: for the loaders that go through the JIT, which takes the code
+    from the native backend as it emits it.  They call this before
+    [check_poll_insertion_for_in_process_load], whose message offers
+    remedies that do not make such code loadable.  Called by
+    [Jit.jit_load_program], by otherlibs/eval, and by the phrase loader
+    when a JIT is registered. *)
+val check_backend_for_jit_load : unit -> unit
+
+(** The codegen variant that this executable compiles phrases for by
+    default.  Its whole-program axes (frame pointers, stack checks,
+    AddressSanitizer) are those that this executable's native-toplevel
+    machinery was built for (the per-context constants baked in by the
+    toplevel_host_variant rule in toplevel/native/dune): not always those
+    of [Codegen_variant.default], since a copy of this library built in a
+    codegen-variant context is built for that context's variant.  Poll
+    insertion is a property of each unit: it is on when every unit of
+    the program was compiled with it, so that phrases keep the program
+    fully polled.
+    This module [Codegen_variant.apply]s it when it is initialized, so
+    that the initial load path resolves against the host variant's
+    library root.  Executables that compile and load phrases into their
+    own image should make sure it is still applied before parsing their
+    command line, so that the variant flags default to values the
+    executable can actually load (explicit flags still override, and a
+    remaining mismatch is rejected by the admission check on the phrase
+    load path). *)
+val host_variant : Codegen_variant.t
+
+(** Fails (with a [Failure]) unless the current variant-selecting flags
+    equal [host_variant] on every whole-program axis: code compiled
+    in-process executes in this executable's image and must use the
+    frame-pointer, stack-check and AddressSanitizer settings it was built
+    for.  Fails also unless the target is the native one, which the
+    executable has to set ([Clflags.set_target]): phrases are compiled to
+    native code whatever the target, and the middle end only prepares them
+    for that under the native target.  Poll insertion may differ, within what
+    [check_poll_insertion_for_in_process_load] allows.
+    Called by the phrase loader and by [Jit.jit_load_program]; exposed for
+    other in-process loaders (otherlibs/eval, which does not go through the
+    phrase loader and checks before it types the code). *)
+val check_codegen_variant_for_in_process_load : unit -> unit
 
 (* Internals required by the JIT *)
 

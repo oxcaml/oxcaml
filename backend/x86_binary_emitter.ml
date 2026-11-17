@@ -83,6 +83,7 @@ type symbol = {
   mutable sy_size : int option;
   mutable sy_binding : symbol_binding;
   mutable sy_protected : bool;
+  mutable sy_hidden : bool;
   mutable sy_sec : section;
   mutable sy_pos : int option;
   mutable sy_num : int option; (* position in .symtab *)
@@ -127,6 +128,7 @@ let get_symbol b s =
         sy_pos = None;
         sy_binding = Sy_local;
         sy_protected = false;
+        sy_hidden = false;
         sy_num = None;
         sy_sec = b.sec;
       }
@@ -1683,6 +1685,8 @@ let assemble_line b loc ins =
       (get_symbol b (Asm_symbol.encode sym)).sy_binding <- Sy_weak
     | Directive (D.Protected sym) ->
       (get_symbol b (Asm_symbol.encode sym)).sy_protected <- true
+    | Directive (D.Hidden sym) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_hidden <- true
     | Directive (D.Const {constant = c; comment = _ }) ->
       constant b
               (D.Constant_with_width.constant c)
@@ -1737,7 +1741,7 @@ let assemble_line b loc ins =
           for _ = 1 to n do
             buf_int8 b 0
           done
-    | Directive (D.Hidden _) | Directive D.New_line -> ()
+    | Directive D.New_line -> ()
     | Directive (D.Delta_uleb128 { delta }) ->
       (* An assembly-time constant expression over labels and symbols, e.g. the
          difference of two points in the same section.  Evaluated with the

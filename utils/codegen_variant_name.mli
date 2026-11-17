@@ -30,7 +30,7 @@
     a variant name being the '-'-joined, canonically sorted names of the
     enabled tokens, with the all-off variant spelled "base" (names are
     absolute, independent of the configure default).  Examples: "base",
-    "fp", "poll", "fp-sc", and once further axes exist, "asan-fp".
+    "fp", "poll", "fp-sc", "asan-fp".
 
     This module is dependency-free (no [Clflags]/[Config]/[Misc]): it is the
     single source of the name scheme and of the per-token flag tables, and
@@ -44,6 +44,7 @@
     see codegen_variant_name.ml and the consistency test. *)
 
 type token =
+  | Address_sanitizer
   | Frame_pointers
   | Poll_insertion
   | Stack_checks
@@ -73,14 +74,26 @@ val ocamlparam : token -> enabled:bool -> string
     them for the configure default. *)
 val explicit_variant_flag : string
 
-(** C-compiler flags for building runtime objects with the token's value;
-    appended after the configure-provided flags so that they override the
-    configure default (command-line order wins).  The token's axis macro
-    is defined when the token is enabled and left alone otherwise, which
-    is only meaningful together with [explicit_variant_flag]. *)
+(** The -D<macro>=1 flag defining the token's axis macro
+    (WITH_FRAME_POINTERS, STACK_CHECKS_ENABLED, WITH_ADDRESS_SANITIZER) for
+    a C compilation; empty when the token is disabled (the macro is then
+    left undefined) and for tokens without a runtime macro.  Only
+    meaningful together with [explicit_variant_flag]. *)
+val cc_macro_flags : token -> enabled:bool -> string list
+
+(** The C-compiler flags that make the generated machine code itself match
+    the token's value (frame-pointer preservation, sanitizer
+    instrumentation or its removal), as opposed to the macro seen by the
+    preprocessor. *)
+val cc_behavioral_flags : token -> enabled:bool -> string list
+
+(** C-compiler flags for building runtime objects with the token's value:
+    [cc_macro_flags] followed by [cc_behavioral_flags]; appended after the
+    configure-provided flags so that they override the configure default
+    (command-line order wins). *)
 val cc_flags : token -> enabled:bool -> string list
 
-(** Like [cc_flags], for assembly (.S) preprocessing. *)
+(** Like [cc_flags], for assembly (.S) preprocessing: [cc_macro_flags]. *)
 val aspp_flags : token -> enabled:bool -> string list
 
 (** Whether the token changes the runtime: runtime archives are built per
@@ -120,6 +133,16 @@ val runtime_projection : t -> t
     projection's name with '-' mapped to '_'.  Must agree with the archive
     names emitted by stdlib/dune_rules/gen.ml. *)
 val runtime_archive_suffix : t -> default:t -> string
+
+(** The link-time guard of [t]: the symbol
+    "caml_runtime_codegen_variant_is_" ^ the name of [t]'s runtime
+    projection with '-' mapped to '_' (caml_runtime_codegen_variant_is_base,
+    caml_runtime_codegen_variant_is_fp_sc).  A runtime defines the guard of
+    the axes that it was built for (runtime/codegen_variant_guard.c), and
+    every object file that the native compiler generates for [t] refers to this
+    one, so that the system linker refuses to combine code with a runtime,
+    or with other generated code, built for other runtime axes. *)
+val runtime_guard_symbol : t -> string
 
 (** Absolute per-axis ocamlopt flags for the named variant: one flag per
     supported token, enabled or disabled per membership in [t]. *)

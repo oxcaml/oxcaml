@@ -1,0 +1,6 @@
+File "asan_mismatch.ml", line 1:
+Error: asan_unit.cmx, which contains unit Asan_unit,
+       was compiled with codegen configuration
+       [frame_pointers=true, stack_checks=false, address_sanitizer=true],
+       which is incompatible with this invocation's
+       [frame_pointers=true, stack_checks=false, address_sanitizer=false]

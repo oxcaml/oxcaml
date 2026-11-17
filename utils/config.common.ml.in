@@ -106,6 +106,7 @@ let configuration_variables () =
   p "standard_library" standard_library;
   p "ccomp_type" ccomp_type;
   p "c_compiler" c_compiler;
+  p_bool "c_compiler_is_clang" c_compiler_is_clang;
   p "bytecode_cflags" bytecode_cflags;
   p "ocamlc_cflags" bytecode_cflags;
   p "bytecode_cppflags" bytecode_cppflags;

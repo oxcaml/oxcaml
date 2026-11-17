@@ -802,6 +802,8 @@ let ocaml_ignored_flags =
     "-dslot-offsets";
     "-dump-inlining-paths";
     "-enable-poll-insertion";
+    "-asan";
+    "-no-asan";
     "-fno-asan";
     "-favx512vl";
     "-fno-avx512vl";

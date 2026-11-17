@@ -139,6 +139,7 @@ let make_bundled_cm_file unix ~ppf_dump ~quoted_cmi ~quoted_cmx ~output_name
         ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
         ~sourcefile:sourcefile_for_dwarf;
       Emit.begin_assembly unix;
+      Asmgen.emit_codegen_variant_guard_reference ();
       let bundle_cm name value cont =
         let symbol = Cmm.global_symbol ~ty:Cmm.typ_static_block name in
         let string = Marshal.to_string value [] in

@@ -575,37 +575,51 @@ let destroyed_at_alloc_or_poll =
 
 let destroyed_at_pushtrap = [| r11 |]
 
-let destroyed_at_large_memory_op =
-  if Config.with_address_sanitizer then
-    (* We need a scratch register [r11] to preform the address sanitizer check,
-       and [rdi] might be destroyed in the event we need to call the ASAN error
-       reporting function, since it's a C function accepting a single argument.
-       No other registers are destroyed because the ASAN report wrappers use a
-       special calling convention via the C attribute [__attribute__((preserve_all))]
-       such that all registers except for [r11] are callee-saved, in order to minimize
-       the amount of spilling we need to do. *)
-    [| rdi; r11 |]
-  else
-    [||]
-;;
+(* The AddressSanitizer flag can change between the source files of a
+   single invocation (OCAMLPARAM; see the destroyed_at_c_call comment
+   above), and [destroyed_at_basic] runs on the register-allocation hot
+   path, so both the instrumented and uninstrumented destroyed sets are
+   precomputed (lazily where they depend on other flags) and selected
+   through the flag at each call, allocation-free. *)
 
-let destroyed_at_small_memory_op =
-  if Config.with_address_sanitizer then
-    (* Everything stated above in the comment for [destroyed_at_large_memory_op]
-       applies here too, but in addition we need one more scratch register [r10]
-       in order to compute the additional [SlowPathCheck] for memory accesses that
-       are smaller than one word. *)
-    [| rdi; r10; r11 |]
-  else
-    [||]
-;;
+let destroyed_at_large_memory_op_asan =
+  (* We need a scratch register [r11] to preform the address sanitizer check,
+     and [rdi] might be destroyed in the event we need to call the ASAN error
+     reporting function, since it's a C function accepting a single argument.
+     No other registers are destroyed because the ASAN report wrappers use a
+     special calling convention via the C attribute
+     [__attribute__((preserve_all))] such that all registers except for [r11]
+     are callee-saved, in order to minimize the amount of spilling we need to
+     do. *)
+  [| rdi; r11 |]
 
-let destroyed_at_single_float64_store =
+let destroyed_at_large_memory_op () =
+  if Arch.is_asan_enabled () then destroyed_at_large_memory_op_asan
+  else [||]
+
+let destroyed_at_small_memory_op_asan =
+  (* Everything stated above in the comment for
+     [destroyed_at_large_memory_op_asan] applies here too, but in addition we
+     need one more scratch register [r10] in order to compute the additional
+     [SlowPathCheck] for memory accesses that are smaller than one word. *)
+  [| rdi; r10; r11 |]
+
+let destroyed_at_small_memory_op () =
+  if Arch.is_asan_enabled () then destroyed_at_small_memory_op_asan
+  else [||]
+
+let destroyed_at_single_float64_store_asan =
   lazy ((* To be forced after flags are parsed. *)
-    if Config.with_address_sanitizer then
-      Array.append destroyed_at_small_memory_op (destroy_xmm MM15)
-    else
-      (destroy_xmm MM15))
+    Array.append destroyed_at_small_memory_op_asan (destroy_xmm MM15))
+
+let destroyed_at_single_float64_store_no_asan =
+  lazy ((* To be forced after flags are parsed. *)
+    destroy_xmm MM15)
+
+let destroyed_at_single_float64_store () =
+  if Arch.is_asan_enabled ()
+  then Lazy.force destroyed_at_single_float64_store_asan
+  else Lazy.force destroyed_at_single_float64_store_no_asan
 
 let all_256bit_regs = lazy ((* To be forced after flags are parsed. *)
   []
@@ -667,9 +681,13 @@ let destroyed_rax_rdx = [| rax; rdx |]
 let destroyed_rbp = [| rbp |]
 let destroyed_r10 = [| r10 |]
 
-let destroyed_at_atomic_compare_set =
+let destroyed_at_atomic_compare_set_asan =
   (* CMPXCHG overwrites rax on failure, independently of the boolean result. *)
-  Array.append destroyed_at_small_memory_op destroyed_rax
+  Array.append destroyed_at_small_memory_op_asan destroyed_rax
+
+let destroyed_at_atomic_compare_set () =
+  if Arch.is_asan_enabled () then destroyed_at_atomic_compare_set_asan
+  else destroyed_rax
 
 let may_be_destroyed_by_c_function (r : Reg.t) =
   match r.loc with
@@ -692,7 +710,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Intop (Idiv _ | Imod _)) | Op (Intop_imm ((Idiv _ | Imod _), _)) ->
     destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
-    Lazy.force destroyed_at_single_float64_store
+    destroyed_at_single_float64_store ()
   | Op (Store ((Byte_unsigned | Byte_signed | Sixteen_unsigned |
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
                 Single { reg = Float32 } ), _, _))
@@ -704,9 +722,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op(Intop_atomic
          { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange
               | Compare_exchange; _ }) ->
-    destroyed_at_small_memory_op
+    destroyed_at_small_memory_op ()
   | Op(Intop_atomic { op = Compare_set; _ }) ->
-    destroyed_at_atomic_compare_set
+    destroyed_at_atomic_compare_set ()
   | Op(Store( (Word_int | Word_static_block | Word_code_pointer |
                Word_out_of_heap_data_pointer | Word_mask | Word_val | Double |
                Onetwentyeight_aligned | Onetwentyeight_unaligned |
@@ -721,7 +739,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op(Specific (Istore_int _))
   | Op(Specific (Ifloatarithmem (Float64, _, _)))
   | Op(Specific (Iprefetch _ | Icldemote _)) ->
-    destroyed_at_large_memory_op
+    destroyed_at_large_memory_op ()
   | Op(Intop(Imulh _ | Icomp _) | Intop_imm((Icomp _), _)) ->
     destroyed_rax
   | Op (Specific (Irdtsc | Irdpmc)) ->

@@ -1183,18 +1183,19 @@ module Data = struct
           value : Value.t; (* CR yusumez: check this is actually a constant? *)
           section : string option;
           align : int option;
-          private_ : bool
+          private_ : bool;
+          hidden : bool
         }
     | External of string
 
   let constant ?(section = Some ".data") ?(align = Some Arch.size_addr)
-      ?(private_ = false) name value =
-    Constant { name; value; section; align; private_ }
+      ?(private_ = false) ?(hidden = false) name value =
+    Constant { name; value; section; align; private_; hidden }
 
   let external_ name = External name
 
   let pp_t ppf = function
-    | Constant { name; value; section; align; private_ = _ } ->
+    | Constant { name; value; section; align; private_ = _; hidden } ->
       (* CR yusumez: If private global variables are not referenced anywhere
          directly, LLVM will delete them in the globaldce (dead global
          elimination) pass, so we don't mark anything as private for now. *)
@@ -1207,8 +1208,9 @@ module Data = struct
         pp_print_option (fun ppf align -> fprintf ppf ", align %d" align)
       in
       let ident = Ident.global name in
-      pp_line ppf "%a = global %a%a%a" Ident.pp_t ident Value.pp_t value
-        pp_section section pp_align align
+      pp_line ppf "%a = %sglobal %a%a%a" Ident.pp_t ident
+        (if hidden then "hidden " else "")
+        Value.pp_t value pp_section section pp_align align
     | External name ->
       (* CR yusumez: We don't need that ptr there... *)
       Format.pp_line ppf "%a = external global ptr" Ident.pp_t

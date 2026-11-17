@@ -97,8 +97,8 @@ let error_message = function
     ^ host_fingerprint ^ "]"
   | Library_not_fully_polled { filename; unit_name } ->
     "The unit `" ^ unit_name ^ "' in the dynamic library file `" ^ filename
-    ^ "' was compiled without poll insertion, and this program's runtime \
-      allows more than one domain; rebuild the library with \
+    ^ "' was compiled without poll insertion, and this program is fully \
+      polled and may run more than one domain; rebuild the library with \
       -enable-poll-insertion, or run the program with OCAMLRUNPARAM=d=1 \
       to permit the load"
 

@@ -50,6 +50,7 @@ let make_cached_generic_functions unix ~ppf_dump ~id genfns =
   in
   Compilenv.reset startup_unit_info;
   Emit.begin_assembly unix;
+  Asmgen.emit_codegen_variant_guard_reference ();
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   Profile.record_call "genfns" (fun () ->
     List.iter compile_phrase (
@@ -75,46 +76,96 @@ let cached_generic_functions unix ~ppf_dump ~id output_name genfns =
 let generate filename =
   let unix = (module Unix_for_owee : Compiler_owee.Unix_intf.S) in
   Clflags.set_target Clflags.Target.Native;
+  (* The archive is always emitted by this backend, whatever the environment
+     selects for ordinary compilations. *)
+  Clflags.llvm_backend := false;
   Clflags.use_linscan := true;
   Clflags.function_sections := Config.function_sections;
   Compmisc.init_path ();
   let file_prefix = Filename.remove_extension filename ^ ext_lib in
   let genfns_partitions = Generic_fns.Cache.all () in
   let objects = ref [] in
+  let temporary_files = ref [] in
   Fun.protect
-    ~finally:(fun () -> List.iter remove_file !objects)
+    ~finally:(fun () -> List.iter remove_file !temporary_files)
     (fun () ->
        Hashtbl.iter (fun name partition ->
          let output_name = Filename.temp_file ("cached-generated-" ^ Generic_fns.Partition.to_string name) "" in
+         temporary_files := output_name :: !temporary_files;
          let obj =
            cached_generic_functions
              unix ~ppf_dump:Format.std_formatter ~id:name output_name partition
          in
+         temporary_files := obj :: !temporary_files;
          objects := obj :: !objects
        ) genfns_partitions;
-       ignore (Ccomp.create_archive file_prefix !objects : int))
+       if Ccomp.create_archive file_prefix !objects <> 0
+       then begin
+         remove_file file_prefix;
+         Location.input_name := file_prefix;
+         raise (Linkenv.Error (Archiver_error file_prefix))
+       end)
 
 let arg_usage =
-  Printf.sprintf "%s FILE : Generate an obj file containing cached generatic functions named FILE" Sys.argv.(0)
+  Printf.sprintf
+    "%s [options] FILE : Generate the archive of cached generic functions \
+     FILE (with the extension of archives) for a codegen variant: the one \
+     that -codegen-variant names, whatever the other options and OCAMLPARAM \
+     select, and without that option the one that ocamlopt selects with the \
+     same options and the same OCAMLPARAM. The archive is always emitted by \
+     the native backend: llvm-backend in OCAMLPARAM is not followed"
+    Sys.argv.(0)
+
+(* The variant that -codegen-variant names is the archive to generate (the
+   compiler prints such a command when the archive of a variant is missing):
+   it is applied after everything else, so that neither another option nor
+   the part of OCAMLPARAM that overrides the command line changes it. *)
+let named_codegen_variant = ref None
 
 let set_codegen_variant name =
   match Codegen_variant.of_string name with
-  | Some variant -> Codegen_variant.apply variant
+  | Some variant -> named_codegen_variant := Some variant
   | None ->
     raise (Arg.Bad (Printf.sprintf "unknown codegen variant %S" name))
 
+(* An archive is for one frame-pointer, stack-check and AddressSanitizer
+   setting: its members refer to the link-time guard of that setting
+   ([Asmgen.emit_codegen_variant_guard_reference]), so the linker refuses
+   the archive in a program built for another one.  Without
+   -codegen-variant the setting is selected as for ocamlopt, so that a build
+   that selects its codegen variant with flags or with OCAMLPARAM gets the
+   matching archive by running this tool the same way.  Poll insertion does
+   not change the archive; its options are accepted so that all the flags of
+   a variant can be passed. *)
 let arg_spec =
   [ ( "-codegen-variant",
       Arg.String set_codegen_variant,
       "<name>  Generate the archive for the named codegen variant (e.g. \
-       base or fp)" );
-    (* Per-axis aliases of -codegen-variant. *)
+       base or fp), whatever the other options and OCAMLPARAM select" );
     ( "-frame-pointers",
       Arg.Set Clflags.frame_pointers,
-      " Generate the archive for a frame-pointers codegen variant" );
+      " Generate the archive for code with frame pointers" );
     ( "-no-frame-pointers",
       Arg.Clear Clflags.frame_pointers,
-      " Generate the archive for a no-frame-pointers codegen variant" ) ]
+      " Generate the archive for code without frame pointers" );
+    ( "-stack-checks",
+      Arg.Set Clflags.stack_checks,
+      " Generate the archive for code with stack checks" );
+    ( "-no-stack-checks",
+      Arg.Clear Clflags.stack_checks,
+      " Generate the archive for code without stack checks" );
+    ( "-asan",
+      Arg.Set Clflags.address_sanitizer,
+      " Generate the archive for code with AddressSanitizer" );
+    ( "-no-asan",
+      Arg.Clear Clflags.address_sanitizer,
+      " Generate the archive for code without AddressSanitizer" );
+    ( "-enable-poll-insertion",
+      Arg.Set Clflags.poll_insertion,
+      " Accepted as for ocamlopt; does not change the archive" );
+    ( "-disable-poll-insertion",
+      Arg.Clear Clflags.poll_insertion,
+      " Accepted as for ocamlopt; does not change the archive" ) ]
 
 (* The output file is only recorded during parsing and the generation runs
    once parsing is complete, so the variant flags take effect regardless of
@@ -129,13 +180,21 @@ let set_output_file filename =
 let main () =
   Memtrace.trace_if_requested ~context:"ocamlopt" ();
   (try
+     (* OCAMLPARAM is read as by ocamlopt: what precedes "_" before the
+        options, what follows it after them. *)
+     Compenv.set_extra_params (Some Oxcaml_args.Extra_params.read_param);
+     Compenv.readenv Format.err_formatter Before_args;
      Arg.parse_expand arg_spec set_output_file arg_usage;
+     Compenv.readenv Format.err_formatter Before_link;
+     Option.iter Codegen_variant.apply !named_codegen_variant;
      match !output_file with
      | None ->
        prerr_endline arg_usage;
        exit 2
      | Some filename -> generate filename
-   with exn ->
+   with
+   | Compenv.Exit_with_status status -> exit status
+   | exn ->
      Location.report_exception Format.err_formatter exn;
      exit 2);
   exit 0

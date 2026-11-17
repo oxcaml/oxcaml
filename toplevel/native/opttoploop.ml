@@ -71,6 +71,10 @@ external max_domain_count : unit -> int
   = "caml_sys_exit" "caml_max_domain_count"
   [@@noalloc]
 
+external code_is_fully_polled : unit -> bool
+  = "caml_sys_exit" "caml_code_is_fully_polled"
+  [@@noalloc]
+
 (* The native toplevel and eval compile phrases in-process with the
    current flags, so a phrase's polledness is [!Clflags.poll_insertion]
    at compile time (there is no cmx record to consult).  Loading a
@@ -80,15 +84,90 @@ external max_domain_count : unit -> int
    rejection.  The cap above 1 implies the host itself is fully polled
    (or ran with an explicit OCAMLRUNPARAM d= override), so under default
    flags this only fires when the phrase flags diverge from the host's
-   build, which the toplevel's default-variant pin already makes rare. *)
+   build, which the toplevel's host-variant pin already makes rare. *)
 let check_poll_insertion_for_in_process_load () =
-  if (not !Clflags.poll_insertion) && max_domain_count () > 1 then
+  (* As in [Compilenv.build_unit_info], the LLVM backend discards [Poll]
+     instructions, so code it compiles is nonpolled even when
+     [Clflags.poll_insertion] is set. *)
+  let phrase_polled =
+    !Clflags.poll_insertion && not !Clflags.llvm_backend
+  in
+  if (not phrase_polled) && code_is_fully_polled () && max_domain_count () > 1
+  then
     failwith
-      "in-process loading of code compiled without poll insertion is not \
-       permitted when the runtime allows more than one domain; enable poll \
-       insertion for the evaluated code (-enable-poll-insertion, or \
-       poll-insertion=1 in OCAMLPARAM), or run the program with \
-       OCAMLRUNPARAM=d=1 to permit the load"
+      (if !Clflags.poll_insertion
+       then
+         "in-process loading of code compiled by the LLVM backend, which \
+          inserts no polls, is not permitted in a fully polled program that \
+          may run more than one domain; compile the code to load with the \
+          native backend"
+       else
+         "in-process loading of code compiled without poll insertion is not \
+          permitted in a fully polled program that may run more than one \
+          domain; compile the code to load with poll insertion, which is \
+          the default in such a program, or run the program with \
+          OCAMLRUNPARAM=d=1 to permit the load")
+
+(* The JIT takes the code from the native backend as it emits it. The LLVM
+   backend writes an object file instead, which no setting of the program
+   makes loadable that way: a loader that goes through the JIT refuses it
+   before it checks poll insertion, whose remedies would not help. (The
+   native toplevel without the JIT loads the object files of either
+   backend.) *)
+let check_backend_for_jit_load () =
+  if !Clflags.llvm_backend
+  then
+    failwith
+      "the JIT cannot load code compiled by the LLVM backend; compile the \
+       code to load with the native backend"
+
+(* The codegen variant that this executable compiles phrases for by
+   default.  Its whole-program axes are those that this library was built
+   for: the per-context constants baked in by the toplevel_host_variant
+   rule in toplevel/native/dune.  They are not always those of
+   [Codegen_variant.default]: a copy of this library built in a
+   codegen-variant context is built for that context's variant.  Poll
+   insertion is a property of each unit and has no such constant: phrases
+   get it by default when every unit of the program has it, so that
+   loading them keeps the program fully polled. *)
+let host_variant : Codegen_variant.t =
+  { address_sanitizer = Toplevel_host_variant.address_sanitizer;
+    frame_pointers = Toplevel_host_variant.frame_pointers;
+    poll_insertion = code_is_fully_polled ();
+    stack_checks = Toplevel_host_variant.stack_checks
+  }
+
+(* Whether code compiled for [variant] can be loaded into this executable:
+   the whole-program axes must be the host's.  Poll insertion is checked on
+   its own, against the domain cap
+   ([check_poll_insertion_for_in_process_load]). *)
+let variant_matches_host variant =
+  Codegen_variant.equal_fingerprint
+    (Codegen_variant.fingerprint variant)
+    (Codegen_variant.fingerprint host_variant)
+
+let check_codegen_variant_for_in_process_load () =
+  (* The flags themselves, which are what the backend reads: for
+     [Codegen_variant.current] a JSIR target hides them. *)
+  let current_variant = Codegen_variant.flags_variant () in
+  if not (variant_matches_host current_variant) then
+    failwith
+      (Printf.sprintf
+         "this executable was built for codegen variant '%s' and cannot \
+          compile and load phrases for variant '%s' into its own image; \
+          adjust the variant-selecting flags to match the variant the \
+          executable was built for"
+         (Codegen_variant.to_string host_variant)
+         (Codegen_variant.to_string current_variant));
+  (* Phrases are compiled to native code whatever the target is, but the
+     middle end prepares them for the target: as it does for JSIR under a
+     JSIR target, and not at all under the bytecode one, which is the
+     target until a program sets another. *)
+  if not (Clflags.target_is_native ()) then
+    failwith
+      "this executable compiles phrases to native code and loads them into \
+       its own image, which it can only do for the native target; set that \
+       target (Clflags.set_target) before compiling a phrase"
 
 let default_lookup sym =
   Dynlink.unsafe_get_global_value ~bytecode_or_asm_symbol:sym
@@ -381,6 +460,15 @@ let default_load ppf (program : Lambda.program) =
   res
 
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
+  (* [prepare] pins ocamlnat's startup to [host_variant], but phrase
+     loading is also reached by embedders that never call [prepare]
+     (expect.opt supplies [initialize_toplevel_env]/[execute_phrase]
+     directly), so the admission check must sit on the shared load path
+     itself: compiled phrases execute in this executable's image and must
+     use the variant it was built for. *)
+  check_codegen_variant_for_in_process_load ();
+  (* A registered JIT loads the phrase: see [check_backend_for_jit_load]. *)
+  if Option.is_some !jit then check_backend_for_jit_load ();
   check_poll_insertion_for_in_process_load ();
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
@@ -788,9 +876,31 @@ let refill_lexbuf buffer len =
 
 let _ =
   Sys.interactive := true;
+  (* Phrases are compiled into this executable's own image, so the variant
+     flag defaults must describe the variant it was built for rather than
+     the installation default from [Config].  They are set before the load
+     path is first computed because [set_paths] keeps that path's implicit
+     standard-library entry, against which command-line objects such as
+     "str/str.cmxs" are then found: it has to be a root that serves the host
+     variant. *)
+  Codegen_variant.apply host_variant;
   Compmisc.init_path ();
   Clflags.dlcode := true;
   ()
+
+(* The implicit entries of that first load path: the one for the current
+   directory, which comes first, and the one for the standard library. *)
+let initial_implicit_entries =
+  (match (Load_path.get_paths ()).visible with
+   | [] -> []
+   | first :: _ -> [first.path])
+  @ Clflags.std_include_dir ()
+
+(* The implicit entry of a load path for the current directory, as
+   [Compmisc.init_path] makes it for the interactive loop: none under
+   -nocwd. *)
+let current_directory_entry () : Clflags.include_dir list =
+  if !Clflags.no_cwd then [] else [ { path = ""; cmx_guaranteed = false } ]
 
 let find_ocamlinit () =
   let ocamlinit = ".ocamlinit" in
@@ -834,21 +944,56 @@ let set_paths () =
   (* Add whatever -I options have been specified on the command line,
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
-  (* ocamlnat's variant is pinned to the binary's baked default (see
-     [prepare]), so this is the base root in practice. *)
+  (* ocamlnat's variant is pinned to the binary's own build variant (see
+     [host_variant] and [prepare]), so this resolves against that
+     variant's library root.  The -I/-H directories were asked for by the
+     user and get the checked expansion; "+camlp4" is our own optional
+     addition, which must not become an error when that root lacks it. *)
   let expand = Codegen_variant.expand_directory in
   let expand_entry (e : Clflags.include_dir) : Clflags.include_dir =
     { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
   in
   let include_no_cmx path = { Clflags.path ; cmx_guaranteed = false } in
   let Load_path.{ visible; hidden } = Load_path.get_paths () in
+  (* The implicit entries of the first load path date from before the
+     command line was read, and are made again from the flags. The flags
+     for poll insertion may have selected the other of the two library
+     trees that serve this executable, so that an object given by name on
+     the command line is found where the same object given by path is, and
+     where a directive of the interactive loop finds it; -nocwd and
+     -nostdlib take their entries away, as for a compiler. What remains of
+     the first path is what user code added to it. Each implicit entry is
+     taken out once, by what it was made for: the two can name the same
+     directory. *)
+  let rec without_one path = function
+    | [] -> []
+    | (e : Clflags.include_dir) :: entries ->
+      if String.equal e.path path then entries
+      else e :: without_one path entries
+  in
+  let added =
+    List.fold_left
+      (fun entries path -> without_one path entries)
+      visible initial_implicit_entries
+  in
+  let standard_library =
+    List.map
+      (fun path -> { Clflags.path; cmx_guaranteed = true })
+      (Clflags.std_include_dir ())
+  in
+  let camlp4 =
+    if !Clflags.no_std_include then []
+    else
+      [ include_no_cmx (Codegen_variant.expand_directory_unchecked "+camlp4") ]
+  in
   let visible = List.concat [
-      [ include_no_cmx "" ];
+      current_directory_entry ();
       List.map expand_entry (List.rev !Compenv.first_include_dirs);
       List.map expand_entry (List.rev !Clflags.include_dirs);
       List.map expand_entry (List.rev !Compenv.last_include_dirs);
-      visible;
-      [ include_no_cmx (Codegen_variant.expand_directory_unchecked "+camlp4") ];
+      added;
+      standard_library;
+      camlp4;
     ]
   in
   let hidden = List.concat [
@@ -971,15 +1116,36 @@ let preload_objects = ref []
 
 let prepare ppf ?input:_ () =
   (* Compiled phrases are loaded into the toplevel's own image, so they must
-     use the codegen variant the toplevel itself was built for. *)
-  let current_variant = Codegen_variant.current () in
-  if not (Codegen_variant.is_default current_variant) then
+     use the whole-program axes of the codegen variant the toplevel itself
+     was built for (not necessarily the install default; see [host_variant]
+     above).  Once this pin passes, the current flags select a variant that
+     the library trees of [host_variant] serve, so [set_paths]'s
+     [Codegen_variant.expand_directory] resolves the load path against such
+     a tree too. *)
+  let current_variant = Codegen_variant.flags_variant () in
+  if not (variant_matches_host current_variant) then
     Compenv.fatal
       (Printf.sprintf
          "ocamlnat was built for codegen variant '%s' and cannot compile \
-          phrases for variant '%s'; remove the variant-selecting flags"
-         (Codegen_variant.to_string Codegen_variant.default)
+          phrases for variant '%s'; adjust the variant-selecting flags to \
+          match the variant ocamlnat was built for"
+         (Codegen_variant.to_string host_variant)
          (Codegen_variant.to_string current_variant));
+  (* Poll insertion is not part of that pin, but every phrase would fail
+     the check of its own: say so now, in terms of what ocamlnat was
+     given. *)
+  (try check_poll_insertion_for_in_process_load ()
+   with Failure _ ->
+     Compenv.fatal
+       (if !Clflags.poll_insertion
+        then
+          "ocamlnat is fully polled and may run more than one domain, so it \
+           cannot load phrases compiled by the LLVM backend, which inserts \
+           no polls; do not pass -llvm-backend"
+        else
+          "ocamlnat is fully polled and may run more than one domain, so it \
+           cannot load phrases compiled without poll insertion; do not pass \
+           -disable-poll-insertion, or run it with OCAMLRUNPARAM=d=1"));
   set_paths ();
   begin try
     initialize_toplevel_env ()

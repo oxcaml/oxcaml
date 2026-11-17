@@ -16,7 +16,10 @@
    such trees of the installation under test, the two must hold the same
    units, archives and object files, every unit must have the same
    implementation CRC in both, on its own and in an archive, and the
-   archives and objects must define the same symbols.
+   archives and objects must define the same symbols. What they refer to
+   differs in one symbol, which is checked too: the object files without
+   polls say so by referring to caml_code_not_fully_polled, and the tree
+   with polls must have none.
 
    If this test fails, a unit is missing from one of the trees, or
    something that a .cmx file records, or the name of a symbol, has come

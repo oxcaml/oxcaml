@@ -27,19 +27,22 @@
  ******************************************************************************)
 
 type t =
-  { frame_pointers : bool;
+  { address_sanitizer : bool;
+    frame_pointers : bool;
     poll_insertion : bool;
     stack_checks : bool
   }
 
 let flags_variant () =
-  { frame_pointers = !Clflags.frame_pointers;
+  { address_sanitizer = !Clflags.address_sanitizer;
+    frame_pointers = !Clflags.frame_pointers;
     poll_insertion = !Clflags.poll_insertion;
     stack_checks = !Clflags.stack_checks
   }
 
 let default =
-  { frame_pointers = Config.with_frame_pointers;
+  { address_sanitizer = Config.with_address_sanitizer;
+    frame_pointers = Config.with_frame_pointers;
     poll_insertion = Config.poll_insertion;
     stack_checks = not Config.no_stack_checks
   }
@@ -54,13 +57,15 @@ let current () =
   if Clflags.target_is_jsir () then default else flags_variant ()
 
 let equal t1 t2 =
-  Bool.equal t1.frame_pointers t2.frame_pointers
+  Bool.equal t1.address_sanitizer t2.address_sanitizer
+  && Bool.equal t1.frame_pointers t2.frame_pointers
   && Bool.equal t1.poll_insertion t2.poll_insertion
   && Bool.equal t1.stack_checks t2.stack_checks
 
 let is_default t = equal t default
 
 let apply t =
+  Clflags.address_sanitizer := t.address_sanitizer;
   Clflags.frame_pointers := t.frame_pointers;
   Clflags.poll_insertion := t.poll_insertion;
   Clflags.stack_checks := t.stack_checks
@@ -69,12 +74,16 @@ let apply t =
    scheme; a new axis extends [name]/[of_name] alongside [t]. *)
 let name t =
   Codegen_variant_name.of_tokens
-    ((if t.frame_pointers then [Codegen_variant_name.Frame_pointers] else [])
+    ((if t.address_sanitizer
+     then [Codegen_variant_name.Address_sanitizer]
+     else [])
+    @ (if t.frame_pointers then [Codegen_variant_name.Frame_pointers] else [])
     @ (if t.poll_insertion then [Codegen_variant_name.Poll_insertion] else [])
     @ if t.stack_checks then [Codegen_variant_name.Stack_checks] else [])
 
 let of_name n =
-  { frame_pointers = Codegen_variant_name.(mem Frame_pointers n);
+  { address_sanitizer = Codegen_variant_name.(mem Address_sanitizer n);
+    frame_pointers = Codegen_variant_name.(mem Frame_pointers n);
     poll_insertion = Codegen_variant_name.(mem Poll_insertion n);
     stack_checks = Codegen_variant_name.(mem Stack_checks n)
   }
@@ -85,6 +94,66 @@ let of_string s = Option.map of_name (Codegen_variant_name.of_string s)
 
 let runtime_archive_suffix t =
   Codegen_variant_name.runtime_archive_suffix (name t) ~default:(name default)
+
+let runtime_guard_symbol t = Codegen_variant_name.runtime_guard_symbol (name t)
+
+(* The target checks mirror the cases of configure.ac that decide the
+   default of each axis: "## Frame pointers", the stack-checks case (checks
+   are forced on everywhere but amd64 and arm64) and "## Address Sanitizer"
+   (Clang-only: the runtime's report wrappers rely on Clang-only
+   attributes, see runtime/memory.c).  The [Config] values of the axes only
+   provide the defaults of the flags. *)
+let check_supported t =
+  let frame_pointers_supported =
+    match Config.architecture, Config.system with
+    | "amd64", ("linux" | "macosx") -> true
+    | _, _ -> false
+  in
+  let stack_checks_optional =
+    match Config.architecture with "amd64" | "arm64" -> true | _ -> false
+  in
+  if t.frame_pointers && not frame_pointers_supported
+  then
+    Error
+      "Frame pointers are not supported on this platform; remove \
+       -frame-pointers (or frame-pointers=1 in OCAMLPARAM)"
+  else if t.stack_checks && t.address_sanitizer
+  then
+    Error
+      "Stack checks together with AddressSanitizer is an untested \
+       combination; disable one of them (-no-stack-checks or -no-asan, or \
+       stack-checks=0 / asan=0 in OCAMLPARAM)"
+  else if not (t.stack_checks || stack_checks_optional)
+  then
+    Error
+      "Stack checks cannot be disabled on this architecture; remove \
+       -no-stack-checks (or stack-checks=0 in OCAMLPARAM)"
+  else if not t.address_sanitizer
+  then Ok ()
+  else if not t.frame_pointers
+  then
+    Error
+      "AddressSanitizer requires frame pointers; add -frame-pointers (or \
+       frame-pointers=1 in OCAMLPARAM) or disable AddressSanitizer with \
+       -no-asan (or asan=0 in OCAMLPARAM)"
+  else if Config.tsan
+  then
+    Error
+      "AddressSanitizer cannot be combined with ThreadSanitizer (the C \
+       compiler rejects -fsanitize=address together with \
+       -fsanitize=thread, and this compiler was configured with \
+       --enable-tsan); remove -asan (or asan=1 in OCAMLPARAM)"
+  else
+    match Config.architecture, Config.system, Config.c_compiler_is_clang with
+    | "amd64", "linux", true -> Ok ()
+    | "amd64", "linux", false ->
+      Error
+        "AddressSanitizer requires a compiler configured with Clang as the \
+         C compiler; remove -asan (or asan=1 in OCAMLPARAM)"
+    | _, _, _ ->
+      Error
+        "AddressSanitizer is not supported on this platform; remove -asan \
+         (or asan=1 in OCAMLPARAM)"
 
 (* 4096 is the smallest page size of any supported target; the runtime
    asserts [page_size >= Stack_guard_stride] when allocating a guard-paged
@@ -101,7 +170,7 @@ type fingerprint = (string * string) list
 let fingerprint t =
   [ "frame_pointers", string_of_bool t.frame_pointers;
     "stack_checks", string_of_bool t.stack_checks;
-    "address_sanitizer", string_of_bool Config.with_address_sanitizer ]
+    "address_sanitizer", string_of_bool t.address_sanitizer ]
 
 let current_fingerprint () = fingerprint (current ())
 

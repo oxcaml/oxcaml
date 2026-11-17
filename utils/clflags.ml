@@ -434,6 +434,13 @@ let stack_checks = ref (not Config.no_stack_checks)
                                         (* -[no-]stack-checks *)
 
 (* This ref lives here rather than in [Oxcaml_flags] because it is read by
+   [Codegen_variant] and [Ccomp] (in utils, which cannot depend on the
+   driver libraries).  [Config.with_address_sanitizer] only provides the
+   default. *)
+let address_sanitizer = ref Config.with_address_sanitizer
+                                        (* -[no-]asan *)
+
+(* This ref lives here rather than in [Oxcaml_flags] because it is read by
    [Lambda.primitive_may_allocate] and [Cmm_helpers] (the [Pcpu_relax]
    lowering), which cannot depend on the driver libraries.
    [Config.poll_insertion] only provides the default. *)

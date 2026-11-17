@@ -990,6 +990,33 @@ let emit_data_item actions (d : Cmm.data_item) =
   | Cskip n -> D.space ~bytes:n
   | Calign n -> D.align ~fill:Zero ~bytes:n
 
+let emit_hidden_data_symbol (s : Cmm.symbol) =
+  let module D = Asm_targets.Asm_directives in
+  let sym = symbol_of_cmm_symbol s in
+  D.data ();
+  D.global sym;
+  (match Target_system.assembler () with
+  | GAS_like -> D.hidden sym
+  | MacOS -> D.private_extern sym
+  | MASM -> ());
+  D.define_joint_label_and_symbol ~section:Data sym;
+  D.int8 Numbers.Int8.zero
+
+(* The word of data is what makes every assembler write the declaration to the
+   object file: GNU as leaves out a symbol that is declared and never referred
+   to, where the assembler of LLVM keeps it. *)
+let emit_hidden_weak_reference (s : Cmm.symbol) =
+  let module D = Asm_targets.Asm_directives in
+  let sym = symbol_of_cmm_symbol s in
+  match Target_system.assembler () with
+  | GAS_like ->
+    D.data ();
+    D.align ~fill:Zero ~bytes:8;
+    D.weak sym;
+    D.hidden sym;
+    D.symbol sym
+  | MacOS | MASM -> ()
+
 let reset () =
   reset_debug_info ();
   frame_descriptors := [];

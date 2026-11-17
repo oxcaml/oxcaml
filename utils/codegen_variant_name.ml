@@ -39,19 +39,23 @@
    for every installed variant. *)
 
 type token =
+  | Address_sanitizer
   | Frame_pointers
   | Poll_insertion
   | Stack_checks
 
 (* In canonical (sorted-name) order. *)
-let all_tokens = [Frame_pointers; Poll_insertion; Stack_checks]
+let all_tokens =
+  [Address_sanitizer; Frame_pointers; Poll_insertion; Stack_checks]
 
 let token_name = function
+  | Address_sanitizer -> "asan"
   | Frame_pointers -> "fp"
   | Poll_insertion -> "poll"
   | Stack_checks -> "sc"
 
 let token_of_name = function
+  | "asan" -> Some Address_sanitizer
   | "fp" -> Some Frame_pointers
   | "poll" -> Some Poll_insertion
   | "sc" -> Some Stack_checks
@@ -59,10 +63,12 @@ let token_of_name = function
 
 let equal_token t1 t2 =
   match t1, t2 with
+  | Address_sanitizer, Address_sanitizer -> true
   | Frame_pointers, Frame_pointers -> true
   | Poll_insertion, Poll_insertion -> true
   | Stack_checks, Stack_checks -> true
-  | (Frame_pointers | Poll_insertion | Stack_checks), _ -> false
+  | (Address_sanitizer | Frame_pointers | Poll_insertion | Stack_checks), _ ->
+    false
 
 let compare_token t1 t2 = String.compare (token_name t1) (token_name t2)
 
@@ -77,6 +83,8 @@ let compare_token t1 t2 = String.compare (token_name t1) (token_name t2)
 
 let ocamlopt_flag token ~enabled =
   match token, enabled with
+  | Address_sanitizer, true -> "-asan"
+  | Address_sanitizer, false -> "-no-asan"
   | Frame_pointers, true -> "-frame-pointers"
   | Frame_pointers, false -> "-no-frame-pointers"
   | Poll_insertion, true -> "-enable-poll-insertion"
@@ -87,6 +95,7 @@ let ocamlopt_flag token ~enabled =
 let ocamlparam token ~enabled =
   let value = if enabled then "1" else "0" in
   match token with
+  | Address_sanitizer -> "asan=" ^ value
   | Frame_pointers -> "frame-pointers=" ^ value
   | Poll_insertion -> "poll-insertion=" ^ value
   | Stack_checks -> "stack-checks=" ^ value
@@ -95,26 +104,40 @@ let ocamlparam token ~enabled =
    variant on the command line; m.h then skips the configure defaults. *)
 let explicit_variant_flag = "-DCAML_CODEGEN_VARIANT_EXPLICIT"
 
-(* The macro flags define an axis macro (-D<macro>=1) when the axis is on
-   and say nothing when it is off: with [explicit_variant_flag] on the
-   command line m.h defines none of them itself, so absence means off
-   whatever the configure default is. *)
-let cc_flags token ~enabled =
+(* The cc/aspp macro flags define an axis macro (-D<macro>=1) when the
+   axis is on and say nothing when it is off: with [explicit_variant_flag]
+   on the command line m.h defines none of them itself, so absence means
+   off whatever the configure default is.  The asan -D rides along even
+   though no .S file tests the macro today (same safety margin as the fp
+   precedent). *)
+let cc_macro_flags token ~enabled =
   match token, enabled with
-  | Frame_pointers, true ->
-    ["-DWITH_FRAME_POINTERS=1"; "-fno-omit-frame-pointer"; "-g"]
-  | Frame_pointers, false -> []
-  | Poll_insertion, (true | false) -> []
-  | Stack_checks, true -> ["-DSTACK_CHECKS_ENABLED=1"]
-  | Stack_checks, false -> []
-
-let aspp_flags token ~enabled =
-  match token, enabled with
+  | Address_sanitizer, true -> ["-DWITH_ADDRESS_SANITIZER=1"]
   | Frame_pointers, true -> ["-DWITH_FRAME_POINTERS=1"]
+  | Stack_checks, true -> ["-DSTACK_CHECKS_ENABLED=1"]
+  | Poll_insertion, true -> []
+  | (Address_sanitizer | Frame_pointers | Poll_insertion | Stack_checks),
+    false ->
+    []
+
+(* The -fno-sanitize direction only matters on asan-default configures,
+   where it strips the configure-provided -fsanitize flags (command-line
+   order wins). *)
+let cc_behavioral_flags token ~enabled =
+  match token, enabled with
+  | Address_sanitizer, true ->
+    ["-fsanitize=address"; "-fsanitize-recover=address"]
+  | Address_sanitizer, false ->
+    ["-fno-sanitize=address"; "-fno-sanitize-recover=address"]
+  | Frame_pointers, true -> ["-fno-omit-frame-pointer"; "-g"]
   | Frame_pointers, false -> []
   | Poll_insertion, (true | false) -> []
-  | Stack_checks, true -> ["-DSTACK_CHECKS_ENABLED=1"]
-  | Stack_checks, false -> []
+  | Stack_checks, (true | false) -> []
+
+let cc_flags token ~enabled =
+  cc_macro_flags token ~enabled @ cc_behavioral_flags token ~enabled
+
+let aspp_flags = cc_macro_flags
 
 (* Whether the token changes the runtime (so its archives differ); tokens
    that only affect OCaml code generation share the projection's archives.
@@ -122,6 +145,7 @@ let aspp_flags token ~enabled =
    caml_call_gc machinery present in every runtime build, so the poll
    variant links the archives of its projection onto {fp, sc}. *)
 let is_runtime_axis = function
+  | Address_sanitizer -> true
   | Frame_pointers -> true
   | Poll_insertion -> false
   | Stack_checks -> true
@@ -164,15 +188,21 @@ let of_string s =
 
 let runtime_projection t = List.filter is_runtime_axis t
 
+(* The name of [t]'s runtime projection, spelled as part of an identifier. *)
+let runtime_projection_identifier t =
+  String.map
+    (fun c -> if c = '-' then '_' else c)
+    (to_string (runtime_projection t))
+
 let runtime_archive_suffix t ~default =
-  let projection = runtime_projection t in
-  if equal projection (runtime_projection default)
+  if equal (runtime_projection t) (runtime_projection default)
   then ""
-  else
-    "_"
-    ^ String.map
-        (fun c -> if c = '-' then '_' else c)
-        (to_string projection)
+  else "_" ^ runtime_projection_identifier t
+
+(* runtime/caml/m.h.in spells the same names, for the runtime that defines
+   these symbols: keep the two in step. *)
+let runtime_guard_symbol t =
+  "caml_runtime_codegen_variant_is_" ^ runtime_projection_identifier t
 
 let ocamlopt_flags t =
   List.map (fun token -> ocamlopt_flag token ~enabled:(mem token t)) all_tokens

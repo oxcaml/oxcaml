@@ -189,6 +189,8 @@ let llvm_path = ref None (* -llvm-path *)
 
 let llvm_flags = ref "" (* -llvm-flags *)
 
+let asan_instrumentation = ref true (* -fno-asan *)
+
 let fdo_counters = ref false (* -fdo-counters *)
 
 module Flambda2 = struct
@@ -622,16 +624,17 @@ let get_cached_generic_functions_path () =
     (* Variant-STRICT resolution, deliberately not
        [Codegen_variant.effective_standard_library]: its fallback to the
        default root when no tree of the installation serves the selected
-       variant would silently select the DEFAULT variant's archive — the
-       one compiler-generated native artifact with no fingerprint to catch
-       the mismatch at link.  Resolving into the (possibly absent) variant
-       root instead makes the link-time existence check fail with the
-       established missing-archive error, unless the default root
-       verifiably is a tree that serves the selected variant (see
-       cached_generic_functions_path in asmcomp/asmlink.ml).  The archive of
-       the tree with the other poll-insertion setting will do, like the rest
-       of that tree: generic functions never get polls (see
-       emit_code_fully_polled there). *)
+       variant would select the DEFAULT variant's archive — the one
+       compiler-generated native artifact with no fingerprint that the
+       compiler can read: the mismatch would only be caught by the system
+       linker, as an undefined link-time guard (see asmcomp/asmgen.mli).
+       Resolving into the (possibly absent) variant root instead makes the
+       link-time existence check fail with the established missing-archive
+       error, unless the default root verifiably is a tree that serves the
+       selected variant (see cached_generic_functions_path in
+       asmcomp/asmlink.ml).  The archive of the tree with the other
+       poll-insertion setting will do, like the rest of that tree: generic
+       functions never get polls (see emit_code_fully_polled there). *)
     let root =
       match Codegen_variant.selected_tree () with
       | Some (_variant, root) -> root
@@ -648,61 +651,38 @@ let dissector_max_linker_parallelism = ref Misc.Maybe_bounded.Unbounded
 let manual_module_init = ref false
   (* -[no-]manual-module-init *)
 
-(* The target check mirrors the "## Frame pointers" case in configure.ac;
-   [Config.with_frame_pointers] only provides the default for
-   [Clflags.frame_pointers]. *)
-let validate_frame_pointers () =
-  if !Clflags.frame_pointers
+(* The LLVM backend generates code for some variants only, whatever the
+   configure default: its trap-block scheme requires frame pointers, and it
+   emits neither stack checks nor AddressSanitizer instrumentation. *)
+let validate_llvm_backend () =
+  if !Clflags.llvm_backend
   then (
-    match Config.architecture, Config.system with
-    | "amd64", ("linux" | "macosx") -> ()
-    | _, _ ->
-      Compenv.fatal
-        "Frame pointers are not supported on this platform; \
-         remove -frame-pointers (or frame-pointers=1 in OCAMLPARAM)")
-  else if Config.with_address_sanitizer
-  then
-    Compenv.fatal
-      "AddressSanitizer requires frame pointers; \
-       remove -no-frame-pointers (or frame-pointers=0 in OCAMLPARAM)"
-  else if !Clflags.llvm_backend
-  then
-    (* The LLVM backend's trap-block scheme requires frame pointers,
-       whatever the configure default. *)
-    Compenv.fatal
-      "The LLVM backend requires frame pointers; \
-       enable them with -frame-pointers (or frame-pointers=1 in OCAMLPARAM)"
-
-(* The architecture check mirrors the stack-checks case in configure.ac
-   (checks are forced on everywhere but amd64/arm64);
-   [Config.no_stack_checks] only provides the default for
-   [Clflags.stack_checks]. *)
-let validate_stack_checks () =
-  if !Clflags.stack_checks
-  then (
-    if Config.with_address_sanitizer
+    if not !Clflags.frame_pointers
     then
       Compenv.fatal
-        "Stack checks together with AddressSanitizer is an untested \
-         combination; remove -stack-checks (or stack-checks=1 in OCAMLPARAM)";
-    if !Clflags.llvm_backend
+        "The LLVM backend requires frame pointers; \
+         enable them with -frame-pointers (or frame-pointers=1 in OCAMLPARAM)";
+    if !Clflags.stack_checks
     then
       Compenv.fatal
         "The LLVM backend does not support stack checks; disable them with \
-         -no-stack-checks (or stack-checks=0 in OCAMLPARAM)")
-  else
-    match Config.architecture with
-    | "amd64" | "arm64" -> ()
-    | _ ->
+         -no-stack-checks (or stack-checks=0 in OCAMLPARAM)";
+    if !Clflags.address_sanitizer && !asan_instrumentation
+    then
       Compenv.fatal
-        "Stack checks cannot be disabled on this architecture; \
-         remove -no-stack-checks (or stack-checks=0 in OCAMLPARAM)"
+        "The LLVM backend emits no AddressSanitizer instrumentation; pass \
+         -fno-asan to leave this unit uninstrumented, select a variant \
+         without AddressSanitizer with -no-asan (or asan=0 in OCAMLPARAM), \
+         or remove -llvm-backend")
 
-(* The whole validation DAG for the per-invocation codegen-variant axes;
-   run at the start of native compilation and linking. *)
+(* A JSIR compilation or link ignores the selection ([Codegen_variant.current]
+   is then the default variant), so there is nothing to check for it. *)
 let validate_codegen_variant () =
-  validate_frame_pointers ();
-  validate_stack_checks ()
+  if not (Clflags.target_is_jsir ())
+  then (
+    Result.iter_error Compenv.fatal
+      (Codegen_variant.check_supported (Codegen_variant.current ()));
+    validate_llvm_backend ())
 
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

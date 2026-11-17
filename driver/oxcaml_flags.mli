@@ -162,6 +162,13 @@ val keep_llvmir : bool ref
 val llvm_path : string option ref
 val llvm_flags : string ref
 
+(** Cleared by [-fno-asan], which leaves the unit uninstrumented without
+    changing its codegen variant: an asan-variant unit ([-asan], see
+    [Clflags.address_sanitizer]) still compiles against the asan library
+    tree, records the asan fingerprint and links only into AddressSanitizer
+    programs. *)
+val asan_instrumentation : bool ref
+
 val fdo_counters : bool ref
 
 module Flambda2 : sig
@@ -364,7 +371,11 @@ end
 val opt_flag_handler : Clflags.Opt_flag_handler.t
 
 (** Check that the codegen-variant axis settings of the current invocation
-    ([Clflags.frame_pointers], [Clflags.stack_checks]) are supported on
-    this target and mutually consistent; exits with an error otherwise.
-    Run at the start of native compilation and linking. *)
+    ([Clflags.frame_pointers], [Clflags.stack_checks],
+    [Clflags.address_sanitizer]) are supported on this target and mutually
+    consistent ([Codegen_variant.check_supported]), and that the backend
+    selected for OCaml code can generate code for them; exits with an error
+    otherwise.  Run at the start of the compilation of a unit to native
+    code and of a link; does nothing when the target is JSIR, which ignores
+    the settings. *)
 val validate_codegen_variant : unit -> unit

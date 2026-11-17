@@ -232,10 +232,10 @@ module Make (P : Dynlink_platform_intf.S) = struct
     end
 
   let check_polled filename ui =
-    (* A domain cap above 1 is only sound while every unit polls, and a cap
-       of 1 (also via OCAMLRUNPARAM d=1) permits the load, as the error says:
-       so this is the last check, of a unit that would otherwise load. *)
-    if not (UH.polled ui) && P.max_domain_count () > 1 then begin
+    (* More than one domain in a fully polled program is only sound while
+       every unit polls, and a cap of 1 (also via OCAMLRUNPARAM d=1) permits
+       the load, as the error says: so this check comes last. *)
+    if not (UH.polled ui) && P.requires_polled_code () then begin
       raise (DT.Error (Library_not_fully_polled
         { filename; unit_name = UH.name ui }))
     end

@@ -50,10 +50,10 @@
  (action (write-file %{target} "")))
 
 ;; Codegen-variant stdlib trees, one per name in the closed curated set
-;; {base, fp, sc, poll, asan-fp, fp-poll, fp-poll-sc, fp-sc, poll-sc} (dune
-;; subdir stanzas are static, so the set is enumerated here and in
-;; stdlib/dune even for axes that do not exist yet). These are generated
-;; like stdlib.dune, but gen.exe emits
+;; {base, fp, sc, poll, asan-fp, asan-fp-poll, fp-poll, fp-poll-sc, fp-sc,
+;; poll-sc} (dune subdir stanzas are static, so the set is enumerated here
+;; and in stdlib/dune even for names no configure builds by default).
+;; These are generated like stdlib.dune, but gen.exe emits
 ;; build rules only for names in the configure-computed variant list; every
 ;; other file contains just an empty @stdlib_<name> alias. See the comment
 ;; on write_stdlib_dune in gen.ml.
@@ -129,6 +129,21 @@
 
 (rule
  (target stdlib_asan-fp.dune)
+ (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
+ (action (write-file %{target} "")))
+
+(rule
+ (target stdlib_asan-fp-poll.dune)
+ (enabled_if (and (= %{context_name} default) (<> %{read:../META} "")))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     stdlib_asan-fp-poll
+     %{dep:stdlib_module_deps.txt}))))
+
+(rule
+ (target stdlib_asan-fp-poll.dune)
  (enabled_if (and (= %{context_name} default) (= %{read:../META} "")))
  (action (write-file %{target} "")))
 
@@ -224,6 +239,10 @@
  (action (write-file %{target} "")))
 (rule
  (target stdlib_asan-fp.dune)
+ (enabled_if (<> %{context_name} default))
+ (action (write-file %{target} "")))
+(rule
+ (target stdlib_asan-fp-poll.dune)
  (enabled_if (<> %{context_name} default))
  (action (write-file %{target} "")))
 (rule

@@ -24,6 +24,7 @@ let standard_library_default = {@QS@|@ocaml_libdir@|@QS@}
 
 let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
+let c_compiler_is_clang = @c_compiler_is_clang@
 let c_output_obj = {@QS@|@outputobj@|@QS@}
 let c_has_debug_prefix_map = @cc_has_debug_prefix_map@
 let as_debug_prefix_map_flag = {@QS@|@as_debug_prefix_map_flag@|@QS@}

@@ -35,7 +35,8 @@
     between library trees (see [selected_tree]). *)
 
 type t =
-  { frame_pointers : bool;
+  { address_sanitizer : bool;
+    frame_pointers : bool;
     poll_insertion : bool;
     stack_checks : bool
   }
@@ -46,6 +47,12 @@ type t =
     only in the default library root. *)
 val current : unit -> t
 
+(** The variant that the axis flags select, whatever the target: what the
+    native backend generates code for when it runs.  It differs from
+    [current] when the target is JSIR, so this is the one to compare with
+    the variant of a program that compiles native code for itself. *)
+val flags_variant : unit -> t
+
 (** The variant baked in at configure time. *)
 val default : t
 
@@ -53,9 +60,10 @@ val equal : t -> t -> bool
 
 val is_default : t -> bool
 
-(** Sets every per-invocation axis flag ([Clflags.frame_pointers],
-    [Clflags.poll_insertion], [Clflags.stack_checks]) to [t]'s values, for
-    tools that select a whole variant by name. *)
+(** Sets every per-invocation axis flag ([Clflags.address_sanitizer],
+    [Clflags.frame_pointers], [Clflags.poll_insertion],
+    [Clflags.stack_checks]) to [t]'s values, for tools that select a whole
+    variant by name. *)
 val apply : t -> unit
 
 (** Canonical name encoding absolute axis values ("fp" / "base"); the
@@ -70,6 +78,18 @@ val of_string : string -> t option
     [Codegen_variant_name.runtime_archive_suffix]. *)
 val runtime_archive_suffix : t -> string
 
+(** The link-time guard symbol of [t]; see
+    [Codegen_variant_name.runtime_guard_symbol]. *)
+val runtime_guard_symbol : t -> string
+
+(** Whether native code can be compiled and linked for [t]: [Error message]
+    when this target does not support the value that [t] gives to an axis,
+    or when [t] combines axes that cannot be combined.  The message names
+    the flags and the OCAMLPARAM keys to change.  Only [t] is looked at:
+    what a particular backend requires of the variant is for the driver to
+    check ([Oxcaml_flags.validate_codegen_variant]). *)
+val check_supported : t -> (unit, string) result
+
 (** The stride, in bytes, at which the backend probes large stack frames of
     the variant selected by the current invocation's flags, so that a frame
     big enough to step over a stack's guard page faults in the guard page
@@ -78,12 +98,11 @@ val runtime_archive_suffix : t -> string
     callers must not capture the result at module-initialization time. *)
 val stack_guard_stride : unit -> int
 
-(** The marker recorded in native compilation artifacts.  Besides the
-    per-invocation axes of [t] it includes configure-time settings
-    (address sanitizer) whose mixing across installs must also be
-    rejected.  Poll insertion is deliberately not a key: mixing polled and
-    non-polled units is sound, so polledness is tracked by the separate
-    per-unit [ui_polled] bit ANDed at link time instead of by equality. *)
+(** The marker recorded in native compilation artifacts: the per-invocation
+    whole-program axes of [t].  Poll insertion is deliberately not a key:
+    mixing polled and non-polled units is sound, so polledness is tracked
+    by the separate per-unit [ui_polled] bit ANDed at link time instead of
+    by equality. *)
 type fingerprint = (string * string) list
 
 val fingerprint : t -> fingerprint

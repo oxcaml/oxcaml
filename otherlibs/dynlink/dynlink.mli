@@ -150,10 +150,11 @@ type error = private
   | Library_not_fully_polled of
       { filename : string;
         unit_name : string; }
-    (** In native code, when the host program's runtime allows more than
-        one domain (which requires the host to be fully polled), every
-        loaded unit must have been compiled with poll insertion.  Running
-        the host with [OCAMLRUNPARAM=d=1] permits such loads. *)
+    (** In native code, when the host program is fully polled (every unit
+        in it was compiled with poll insertion) and its runtime allows
+        more than one domain, every loaded unit must have been compiled
+        with poll insertion too.  Running the host with
+        [OCAMLRUNPARAM=d=1] permits such loads. *)
 
 (* CR-someday mshinwell: Consider implementing the check required for
    [Library_file_already_loaded_privately] in bytecode mode.  It might be

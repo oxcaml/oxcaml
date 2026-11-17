@@ -57,6 +57,9 @@ module Native = struct
   external ndl_max_domain_count : unit -> int
     = "caml_sys_exit" "caml_max_domain_count"
     [@@noalloc]
+  external ndl_code_is_fully_polled : unit -> bool
+    = "caml_sys_exit" "caml_code_is_fully_polled"
+    [@@noalloc]
 
   module Unit_header = struct
     type t = dynunit
@@ -102,15 +105,18 @@ module Native = struct
   let host_codegen_fingerprint =
     Some
       (Codegen_variant.fingerprint
-         { Codegen_variant.frame_pointers =
-             Dynlink_host_variant.frame_pointers;
+         { Codegen_variant.address_sanitizer =
+             Dynlink_host_variant.address_sanitizer;
+           frame_pointers = Dynlink_host_variant.frame_pointers;
            poll_insertion = false;
            stack_checks = Dynlink_host_variant.stack_checks })
   let adapt_filename f = Filename.chop_extension f ^ ".cmxs"
 
-  (* The runtime's startup-fixed domain cap (the caml_init_domains
-     snapshot), used by the non-polled-plugin check. *)
-  let max_domain_count () = ndl_max_domain_count ()
+  (* The link-time fully-polled bit and the runtime's startup-fixed domain
+     cap (the caml_init_domains snapshot), for the non-polled-plugin
+     check. *)
+  let requires_polled_code () =
+    ndl_code_is_fully_polled () && ndl_max_domain_count () > 1
 
   let num_globals_inited () = ndl_globals_inited ()
 

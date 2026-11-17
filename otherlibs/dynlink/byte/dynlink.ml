@@ -80,7 +80,7 @@ module Bytecode = struct
   (* Unused: [Unit_header.polled] is always [true], so the
      non-polled-plugin check cannot fire; returning a constant avoids
      binding a native primitive here. *)
-  let max_domain_count () = 1
+  let requires_polled_code () = false
 
   type handle =
     Stdlib.in_channel * filename * Digest.t * Symtable.global_map option

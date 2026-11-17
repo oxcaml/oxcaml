@@ -342,6 +342,10 @@ let lib_ccopts t = t.lib_ccopts
 
 (* Error report *)
 
+let standard_library_is_built_for = Compilenv.standard_library_is_built_for
+
+let missing_root_hint = Compilenv.missing_root_hint
+
 open Format_doc
 
 let report_error ppf = function
@@ -418,8 +422,7 @@ let report_error ppf = function
       Location.Doc.quoted_filename filename CU.print_as_inline_code unit_name
       (Codegen_variant.string_of_fingerprint saved)
       (Codegen_variant.string_of_fingerprint current) (fun ppf ->
-        Option.iter (fprintf ppf "@ (%s)")
-          (Codegen_variant.missing_root_hint ()))
+        Option.iter (fprintf ppf "@ (%s)") (missing_root_hint ()))
   | Codegen_variant_runtime_not_found { filename; variant } ->
     fprintf ppf
       "@[<hov>Cannot find the runtime library %a:@ this installation does not \

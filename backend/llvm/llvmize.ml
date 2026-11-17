@@ -1829,6 +1829,12 @@ let data (ds : Cmm.data_item list) =
   with _ ->
     fail_msg ~name:"data" "error while decoding data items: %a" Printcmm.data ds
 
+let hidden_data_symbol (symbol : Cmm.symbol) =
+  let t = get_current_compilation_unit "hidden_data_symbol" in
+  add_data_def t
+    (LL.Data.constant ~hidden:true symbol.sym_name (V.of_int ~typ:T.i8 0));
+  add_defined_symbol t symbol.sym_name
+
 (* Wrapping up loose ends *)
 
 let define_c_call_wrappers t =

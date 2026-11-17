@@ -38,9 +38,8 @@ module type S = sig
     val codegen_fingerprint : t -> (string * string) list
 
     (** Whether the unit was compiled with poll insertion (always [true]
-        for bytecode).  A native unit without it may only be loaded into
-        a program whose runtime caps domains at 1; see
-        [max_domain_count]. *)
+        for bytecode).  A native unit without it may not be loaded into
+        every program; see [requires_polled_code]. *)
     val polled : t -> bool
   end
 
@@ -52,13 +51,14 @@ module type S = sig
       not match any particular variant (bytecode). *)
   val host_codegen_fingerprint : (string * string) list option
 
-  (** The host runtime's domain cap (max_domains, fixed at startup).
-      Loading a non-polled unit when this exceeds 1 is rejected: the cap
-      above 1 was justified by the program being fully polled, and the
-      load would falsify that.  The bytecode implementation returns 1:
-      bytecode units are always polled, so the check cannot fire and no
-      runtime query is needed. *)
-  val max_domain_count : unit -> int
+  (** Whether the host program is fully polled and its runtime allows more
+      than one domain (max_domains, fixed at startup).  Loading a
+      non-polled unit is then rejected: it would falsify what the domain
+      cap rests on.  A program that is not fully polled has units without
+      polls already, and loads more of them whatever its cap.  The
+      bytecode implementation returns [false]: bytecode units are always
+      polled, so the check cannot fire and no runtime query is needed. *)
+  val requires_polled_code : unit -> bool
 
   val adapt_filename : Dynlink_types.filename -> Dynlink_types.filename
 

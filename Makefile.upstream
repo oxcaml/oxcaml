@@ -1156,6 +1156,7 @@ runtime_BYTECODE_C_SOURCES = \
 runtime_NATIVE_ONLY_C_SOURCES = \
   backtrace_nat \
   clambda_checks \
+  codegen_variant_guard \
   dynlink_nat \
   fail_nat \
   frame_descriptors \

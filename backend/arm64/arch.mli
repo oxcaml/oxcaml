@@ -18,9 +18,12 @@
 (* Specific operations for the ARM processor, 64-bit mode *)
 
 val macosx : bool
-val is_asan_enabled : bool ref
 val feat_cssc : bool ref
 val trap_notes : bool ref
+
+(* Whether the code being compiled is instrumented for AddressSanitizer:
+   the asan codegen variant is selected and [-fno-asan] was not given. *)
+val is_asan_enabled : unit -> bool
 (* Machine-specific command-line options *)
 
 val command_line_options : (string * Arg.spec * string) list

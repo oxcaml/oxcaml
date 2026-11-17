@@ -71,6 +71,8 @@ module type Oxcaml_options = sig
   val no_frame_pointers : unit -> unit
   val stack_checks : unit -> unit
   val no_stack_checks : unit -> unit
+  val asan : unit -> unit
+  val no_asan : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
   val cfg_block_layout : unit -> unit
