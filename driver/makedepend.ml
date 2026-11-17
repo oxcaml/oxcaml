@@ -337,7 +337,7 @@ let read_parse_and_extract parse_function extract_function def ast_kind
       let ast = Pparse.file ~tool_name input_file parse_function ast_kind in
       let bound_vars =
         List.fold_left
-          (fun bv (arg : Clflags.open_arg) ->
+          (fun bv (arg : Clflags.scope_arg) ->
              match arg with
              | Open modname ->
                  let lid =
@@ -351,8 +351,11 @@ let read_parse_and_extract parse_function extract_function def ast_kind
                     not load cmis, so there is nothing to do.  An
                     [Open_cmi] could still reach this list via [OCAMLPARAM],
                     in which case we just skip it. *)
+                 bv
+             | Open_h _ | Expose _ ->
+                 (* Likewise for [-open-h] and [-expose]. *)
                  bv)
-          !module_map ((* PR#7248 *) List.rev !Clflags.open_args)
+          !module_map ((* PR#7248 *) List.rev !Clflags.scope_args)
       in
       let r = extract_function bound_vars ast in
       (!Depend.free_structure_names, r)
@@ -674,7 +677,7 @@ let run_main argv =
         " Output one line per file, regardless of the length";
       "-open", Arg.String
         (fun s ->
-           Clflags.open_args := Clflags.Open s :: !Clflags.open_args),
+           Clflags.scope_args := Clflags.Open s :: !Clflags.scope_args),
         "<module>  Opens the module <module> before typing";
       "-plugin", Arg.String(fun _p -> Clflags.plugin := true),
         "<plugin>  (no longer supported)";

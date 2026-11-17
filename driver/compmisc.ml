@@ -98,7 +98,7 @@ let initial_env () =
   Typemod.initial_env
     ~loc:(Location.in_file "command line")
     ~initially_opened_module
-    ~open_implicit_args:(List.rev !Clflags.open_args)
+    ~scope_args:(List.rev !Clflags.scope_args)
 
 let directory_exists dir =
   Sys.file_exists dir && Sys.is_directory dir

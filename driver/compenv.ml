@@ -370,12 +370,12 @@ let read_one_param ppf position name v =
   | "with-runtime" -> set "with-runtime" [ with_runtime ] v
   | "open" ->
       let names = String.split_on_char ',' v in
-      open_args :=
-        List.rev_append (List.map (fun n -> Open n) names) !open_args
+      scope_args :=
+        List.rev_append (List.map (fun n -> Open n) names) !scope_args
   | "open-cmi" ->
       let names = String.split_on_char ',' v in
-      open_args :=
-        List.rev_append (List.map (fun n -> Open_cmi n) names) !open_args
+      scope_args :=
+        List.rev_append (List.map (fun n -> Open_cmi n) names) !scope_args
   | "cc" -> c_compiler := Some v
 
   | "clambda-checks" -> set "clambda-checks" [ clambda_checks ] v

@@ -143,7 +143,7 @@ val tool_name: unit -> string
     ["ocaml"], ...  Some global variables that reflect command-line
     options are automatically synchronized between the calling tool
     and the ppx preprocessor: {!Clflags.include_dirs},
-    {!Clflags.hidden_include_dirs}, {!Load_path}, {!Clflags.open_args},
+    {!Clflags.hidden_include_dirs}, {!Load_path}, {!Clflags.scope_args},
     {!Clflags.for_package}, {!Clflags.debug}. *)
 
 

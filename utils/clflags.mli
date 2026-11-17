@@ -133,11 +133,14 @@ val classic : bool ref
 val nopervasives : bool ref
 val match_context_rows : int ref
 val safer_matching : bool ref
-type open_arg =
+type scope_arg =
   | Open of string
+  (* CR-soon zqian: [-open-cmi] will be removed. *)
   | Open_cmi of string
+  | Open_h of string
+  | Expose of string * string
 
-val open_args : open_arg list ref
+val scope_args : scope_arg list ref
 val preprocessor : string option ref
 val all_ppx : string list ref
 val absname : bool ref

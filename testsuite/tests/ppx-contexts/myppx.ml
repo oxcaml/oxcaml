@@ -18,12 +18,14 @@ let () =
       Printf.eprintf "load_path: [%s]\n"
         (quote_strings !Config.load_path);
       *)
-      let quote_open_arg : Clflags.open_arg -> string = function
+      let quote_scope_arg : Clflags.scope_arg -> string = function
         | Open s -> Printf.sprintf "Open(%S)" s
         | Open_cmi s -> Printf.sprintf "Open_cmi(%S)" s
+        | Open_h s -> Printf.sprintf "Open_h(%S)" s
+        | Expose (intf, name) -> Printf.sprintf "Expose(%S, %S)" intf name
       in
-      Printf.eprintf "open_args: [%s]\n"
-        (List.map quote_open_arg !Clflags.open_args |> String.concat " ");
+      Printf.eprintf "scope_args: [%s]\n"
+        (List.map quote_scope_arg !Clflags.scope_args |> String.concat " ");
       Printf.eprintf "for_package: %S\n"
         (quote_option !Clflags.for_package);
       Printf.eprintf "use_debug: %B\n"
