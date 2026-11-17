@@ -214,7 +214,8 @@
   (diff simplify.output simplify.output.corrected)))
 
 ; The same at -O3 with the reaper, after the reaper (in a directory of its own,
-; so that the module keeps its name).
+; so that the module keeps its name). Without local value slots, which CI may
+; enable by default and which remove the code of [R.step].
 
 (rule
  (targets simplify_o3_reaper.output.corrected)
@@ -229,6 +230,7 @@
     -c
     -O3
     -flambda2-reaper
+    -no-reaper-local-fields
     -fdo-counters
     -fexpr-print-fdo-counters
     -fexpr-print-branch-annotations
