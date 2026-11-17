@@ -216,17 +216,31 @@ module Target : sig
     | Bytecode
     | Native
     | Js_of_ocaml
+    | Wasm_of_ocaml
+end
+
+module Jsir_target : sig
+  type t =
+    | Js
+    | Wasm
+
+  val program_name : t -> string
 end
 
 val set_target : Target.t -> unit
 val target_is_native : unit -> bool
-val target_is_jsir : unit -> bool
 
-(** The js_of_ocaml invocations of [ocamlopt -target js_of_ocaml] that options
-    can be passed through to, with [-jsoo-opt-<phase>] (and [-jsoo-opt] for all
-    of them):
-    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo];
-    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([-a]);
+(** Whether the target is one of the JSIR targets. *)
+val target_is_jsir : unit -> bool
+val jsir_target : unit -> Jsir_target.t option
+val jsir_target_exn : unit -> Jsir_target.t
+
+(** The invocations of [js_of_ocaml] (or [wasm_of_ocaml] with
+    [-target wasm_of_ocaml]) that options can be passed through to, with
+    [-jsoo-opt-<phase>] (and [-jsoo-opt] for all of them):
+    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo]
+      ([.cmwo]);
+    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([.cmwa]) ([-a]);
     - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
     - [Link]: [js_of_ocaml link], when linking an executable. *)
 module Jsoo_phase : sig
@@ -242,16 +256,25 @@ end
 val jsoo_opts : Jsoo_phase.t -> string list ref
 
 module Jsoo_effects : sig
-  type t = Disabled | Cps | Double_translation
+  type t = Disabled | Cps | Double_translation | Jspi | Native
 
   val all : t list
 
   val to_string : t -> string
 
   val of_string : string -> t option
+
+  (** The values supported by a target, in the order of [all]. *)
+  val supported_by : Jsir_target.t -> t list
+
+  (** The value used when [-jsoo-effects] is not given: [Double_translation]
+      for [Js] and [Jspi] for [Wasm]. *)
+  val default : Jsir_target.t -> t
 end
 
-val jsoo_effects : Jsoo_effects.t ref
+val set_jsoo_effects : Jsoo_effects.t -> unit
+val jsoo_effects : unit -> Jsoo_effects.t option
+
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref

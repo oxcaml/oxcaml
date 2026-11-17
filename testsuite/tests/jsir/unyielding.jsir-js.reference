@@ -21,12 +21,12 @@ Entry point: 0
   v64 = fun(v63){14 ()} [hint:(int)->int never_inline]
   v68 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_app_10"j, v64) 
   v70 = CONST{0}
-  v71 = v13(v70)
+  v71 = v13!(v70)
   branch 15 (v71)
 
 ==== 1 () ====
   v5 = CONST{1}
-  v6 = v57~(v5, v1)
+  v6 = v57!~(v5, v1)
   return v6
 
 ==== 2 () ====
@@ -35,7 +35,7 @@ Entry point: 0
 
 ==== 3 () ====
   v15 = CONST{41}
-  v16 = v8(v15)
+  v16 = v8!(v15)
   branch 4 (v16)
 
 ==== 4 (v14) ====
@@ -56,7 +56,7 @@ Entry point: 0
   return v30
 
 ==== 8 () ====
-  v34 = v21(v29)
+  v34 = v21!(v29)
   return v34
 
 ==== 9 () ====
@@ -69,7 +69,7 @@ Entry point: 0
 
 ==== 11 () ====
   v49 = CONST{1}
-  v50 = v43(v49)
+  v50 = v43!(v49)
   branch 12 (v50)
 
 ==== 12 (v48) ====
@@ -83,22 +83,22 @@ Entry point: 0
 
 ==== 14 () ====
   v65 = CONST{5}
-  v66 = v2(v65)
+  v66 = v2!(v65)
   return v66
 
 ==== 15 (v69) ====
   v73 = CONST{0}
-  v74 = v33(v73)
+  v74 = v33!(v73)
   branch 16 (v74)
 
 ==== 16 (v72) ====
   v77 = fun(v76){18 ()} [hint:(int)->int]
-  v80 = v21~(v77)
+  v80 = v21!~(v77)
   branch 17 (v80)
 
 ==== 17 (v75) ====
   v82 = CONST{0}
-  v83 = v47(v82)
+  v83 = v47!(v82)
   branch 19 (v83)
 
 ==== 18 () ====
@@ -107,7 +107,7 @@ Entry point: 0
 
 ==== 19 (v81) ====
   v85 = CONST{0}
-  v86 = v64(v85)
+  v86 = v64!(v85)
   branch 20 (v86)
 
 ==== 20 (v84) ====

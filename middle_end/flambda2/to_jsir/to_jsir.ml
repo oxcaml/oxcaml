@@ -323,13 +323,7 @@ and apply_expr ~env ~res e =
         let res =
           List.fold_left
             (fun res (i, var) ->
-              let field : Jsir.expr =
-                (* CR-soon selee: [Non_float] is ok for javascript because it
-                   doesn't change anything (see
-                   [js_of_ocaml/compiler/lib/generate.ml]), but will need
-                   changing for WASM. *)
-                Field (return_var, i, Non_float)
-              in
+              let field : Jsir.expr = Field (return_var, i, Non_float) in
               To_jsir_result.add_instr_exn res (Let (var, field)))
             res return_vars
         in
@@ -351,13 +345,15 @@ and apply_expr0 ~env ~res e =
     Misc.fatal_errorf
       "Missing callee for indirect function, method or C call: %a"
       Apply_expr.print e
-  | Some callee, Function _ ->
+  | Some callee, Function { function_call } ->
     let args, res = To_jsir_shared.simples ~env ~res args in
     let f, res = To_jsir_shared.simple ~env ~res callee in
-    (* Setting [exact = false] here is ok - it's more general, and the JSOO
-       simplifier also knows how to change this to [true] if it knows that the
-       argument numbers match up *)
-    apply_fn ~res ~f ~args ~exact:false ~yielding
+    let exact =
+      match function_call with
+      | Direct _ | Indirect_known_arity _ -> true
+      | Indirect_unknown_arity -> false
+    in
+    apply_fn ~res ~f ~args ~exact ~yielding
   | None, Function { function_call = Direct code_id } ->
     let args, res = To_jsir_shared.simples ~env ~res args in
     let ({ closure;
@@ -370,7 +366,7 @@ and apply_expr0 ~env ~res e =
           : To_jsir_env.code_id) =
       To_jsir_env.get_code_id_exn env code_id
     in
-    apply_fn ~res ~f:closure ~args ~exact:false ~yielding
+    apply_fn ~res ~f:closure ~args ~exact:true ~yielding
   | None, Effect effect_ ->
     if List.length args <> 0
     then Misc.fatal_error "Found non-empty argument list for effects";
@@ -523,11 +519,7 @@ and apply_cont0 ~env ~res apply_cont =
                Prim
                  ( Extern ("caml_register_global", None),
                    [ Pv module_symbol;
-                     Pc
-                       (* CR selee: this assumes javascript, WASM needs just
-                          String *)
-                       (NativeString (Jsir.Native_string.of_string module_name))
-                   ] ) ))
+                     Pc (To_jsir_target.name_constant module_name) ] ) ))
       in
       Stop, res
     | (Return | Normal_or_exn) when is_return_continuation ->
@@ -636,26 +628,35 @@ and switch ~env ~res e =
      We assume that the max value isn't too high, and just pad the out-of-domain
      cases to invalid blocks. *)
   assert (min >= 0);
-  let res, arms =
+  (* The out-of-domain cases share a block, which is created when first
+     needed. *)
+  let (res, _invalid_block), arms =
     Array.fold_left_map
-      (fun res i ->
+      (fun (res, invalid_block) i ->
         let arm = Target_ocaml_int.Map.find_opt i arms in
-        let last, res =
+        let last, res, invalid_block =
           match arm with
-          | Some arm -> apply_cont0 ~env ~res (Switch_arm.action arm)
+          | Some arm ->
+            let last, res = apply_cont0 ~env ~res (Switch_arm.action arm) in
+            last, res, invalid_block
           | None ->
-            let res, addr = To_jsir_result.invalid_switch_block res in
-            (Branch (addr, []) : Jsir.last), res
+            let res, addr =
+              match invalid_block with
+              | Some addr -> res, addr
+              | None -> To_jsir_result.new_invalid_switch_block res
+            in
+            (Branch (addr, []) : Jsir.last), res, Some addr
         in
         match (last : Jsir.last) with
-        | Branch cont -> res, cont
+        | Branch cont -> (res, invalid_block), cont
         | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _
           ->
           let res, addr = To_jsir_result.new_block res ~params:[] in
           let res = To_jsir_result.end_block_with_last_exn res last in
-          res, (addr, []))
-      res
-      (Array.init (max + 1) (Target_ocaml_int.of_int Thirty_two_no_gc_tag_bit))
+          (res, invalid_block), (addr, []))
+      (res, None)
+      (Array.init (max + 1)
+         (Target_ocaml_int.of_int (To_jsir_target.machine_width ())))
   in
   let last : Jsir.last =
     match Array.length arms with
@@ -667,20 +668,19 @@ and switch ~env ~res e =
   env, To_jsir_result.end_block_with_last_exn res last
 
 and invalid ~env ~res msg =
+  let var = Jsir.Var.fresh () in
   let res =
     To_jsir_result.add_instr_exn res
       (Let
-         ( Jsir.Var.fresh (),
+         ( var,
            Prim
              ( Extern ("caml_invalid_expr", None),
-               [Pc (NativeString (Jsir.Native_string.of_string msg))] ) ))
+               [Pc (To_jsir_target.name_constant msg)] ) ))
   in
-  env, To_jsir_result.end_block_with_last_exn res Stop
+  env, To_jsir_result.end_block_with_last_exn res (Raise (var, `Normal))
 
 let unit ~offsets:_ ~all_code:_ ~reachable_names flambda_unit =
-  (* As [Config.set_target `JavaScript] does in js_of_ocaml. *)
-  Targetint.set_num_bits 32;
-  Targetnativeint.set_num_bits 32;
+  To_jsir_target.set_num_bits ();
   let env =
     To_jsir_env.create
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)

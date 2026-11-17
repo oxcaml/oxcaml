@@ -208,13 +208,23 @@ let write_stdlib_jsir_sources_dune ppf =
         "(rule (target %s) (action (copy %%{ocaml_where}/%s %%{target})))\n"
         file file))
 
-let write_stdlib_jsir_dune ppf =
+type jsir_target =
+  { program : string; (* the value of -target *)
+    env_var : string; (* where ocamlopt finds [program] *)
+    ext_prefix : string }
+
+let jsir_targets =
+  [ { program = "js_of_ocaml"; env_var = "OXCAML_JS_OF_OCAML";
+      ext_prefix = "cmj" };
+    { program = "wasm_of_ocaml"; env_var = "OXCAML_WASM_OF_OCAML";
+      ext_prefix = "cmw" } ]
+
+let write_stdlib_jsir_dune_for_target ppf jsir_target =
   let src_dir = "../src" and stdlib_dir = "../../stdlib" in
+  let ext suffix = jsir_target.ext_prefix ^ suffix in
   let run_ocamlopt args =
-    sprintf
-      "(setenv OXCAML_JS_OF_OCAML %%{bin:js_of_ocaml} \
-       (run %%{ocamlopt} -target js_of_ocaml %s))"
-      args
+    sprintf "(setenv %s %%{bin:%s} (run %%{ocamlopt} -target %s %s))"
+      jsir_target.env_var jsir_target.program jsir_target.program args
   in
   let installed file = sprintf "%%{ocaml_where}/%s" file in
   let table = module_deps_table Sys.argv.(3) in
@@ -226,7 +236,7 @@ let write_stdlib_jsir_dune ppf =
         installed (target ^ ".cmi")
         :: List.map (fun dep ->
              match Filename.extension dep with
-             | ".cmx" -> Filename.remove_extension dep ^ ".cmjx"
+             | ".cmx" -> Filename.remove_extension dep ^ "." ^ ext "x"
              | ".cmi" -> installed dep
              | s -> failwith ("Unexpected extension " ^ s))
              deps
@@ -234,25 +244,28 @@ let write_stdlib_jsir_dune ppf =
       in
       let action =
         run_ocamlopt
-          (sprintf "%s%s -I %%{ocaml_where} -cmi-file %s -o %s.cmjx -c %%{src}"
+          (sprintf "%s%s -I %%{ocaml_where} -cmi-file %s -o %s.%s -c %%{src}"
              stdlib_flags (pp_flags ~awk_dir:stdlib_dir ~target)
-             (installed (target ^ ".cmi")) target)
+             (installed (target ^ ".cmi")) target (ext "x"))
       in
-      rule ~ppf ~target ~exts:["cmjx"; "cmjo"] ~src ~deps ~action
+      rule ~ppf ~target ~exts:[ext "x"; ext "o"] ~src ~deps ~action
     end);
   let modnames = setting "stdlib_modules" in
   let targets = List.map get_target modnames in
   let action =
     targets
-    |> List.map (fun t -> sprintf "%%{dep:%s.cmjx}" t)
+    |> List.map (fun t -> sprintf "%%{dep:%s.%s}" t (ext "x"))
     |> String.concat " "
-    |> sprintf "-g -nostdlib -a -o stdlib.cmjxa %s"
+    |> sprintf "-g -nostdlib -a -o stdlib.%s %s" (ext "xa")
     |> run_ocamlopt
   in
-  rule ~ppf ~target:"stdlib" ~exts:["cmjxa"; "cmja"]
+  rule ~ppf ~target:"stdlib" ~exts:[ext "xa"; ext "a"]
     ~src:(sprintf "%s/stdlib.ml" src_dir)
-    ~deps:(List.map (fun t -> t ^ ".cmjo") targets)
+    ~deps:(List.map (fun t -> t ^ "." ^ ext "o") targets)
     ~action
+
+let write_stdlib_jsir_dune ppf =
+  List.iter (write_stdlib_jsir_dune_for_target ppf) jsir_targets
 
 (* Generate runtime.dune for the main build, which only needs 'primitives' *)
 let write_primitives_dune ppf =

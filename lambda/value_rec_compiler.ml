@@ -191,10 +191,18 @@ let find_size_of_alloc_prim prim args =
     | _ -> None
   else None
 
-let bytecode_block_size shape =
-  match singleton_product_shape_for_bytecode shape with
-  | Some elements -> Array.length elements
-  | None -> Array.length shape
+let non_native_block_size shape =
+  if Clflags.target_is_jsir () then
+    (* JSIR has one field per flattened, non-void component. *)
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements shape
+        ~print_locality:(fun ppf () -> Format.pp_print_string ppf "()")
+    in
+    Mixed_block_shape.new_block_length shape
+  else
+    match singleton_product_shape_for_bytecode shape with
+    | Some elements -> Array.length elements
+    | None -> Array.length shape
 
 let compute_mixed_block_size shape =
   if Clflags.target_is_native () then
@@ -203,7 +211,7 @@ let compute_mixed_block_size shape =
     let size = Mixed_product_bytes.size_in_words bytes in
     { size; value_prefix_len }
   else
-    let size = bytecode_block_size shape in
+    let size = non_native_block_size shape in
     { size; value_prefix_len = size }
 
 let compute_static_size lam =
@@ -294,14 +302,14 @@ let compute_static_size lam =
               join_sizes action size (compute_expression_size env action))
             size cases)
         Unreachable all_cases
-  (* In native code, void fields are erased, so the runtime block size is the
-     number of value fields only. In bytecode, void fields are kept, so the
-     block size includes all fields. *)
+  (* In native code and JSIR, void fields are erased, so the runtime block
+     size is the number of value fields only. In bytecode, void fields are
+     kept, so the block size includes all fields. *)
   and all_value_mixed_block_size shape =
     if Clflags.target_is_native () then
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
-    else bytecode_block_size shape
+    else non_native_block_size shape
   and uniform_block_size ~tag size =
     if size = 0 then Empty_block { tag } else Regular_block size
   and size_of_primitive env loc p args =

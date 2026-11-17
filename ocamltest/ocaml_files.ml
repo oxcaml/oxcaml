@@ -58,9 +58,19 @@ let js_of_ocaml =
   Filename.make_path
     [Ocaml_directories.srcdir; Filename.mkexe "js_of_ocaml"]
 
-let jsir_available = Sys.file_exists js_of_ocaml
+let wasm_of_ocaml =
+  Filename.make_path
+    [Ocaml_directories.srcdir; Filename.mkexe "wasm_of_ocaml"]
+
+let jsir_js_available = Sys.file_exists js_of_ocaml
+
+let jsir_wasm_available = Sys.file_exists wasm_of_ocaml
 
 let node = Sys.getenv_with_default_value "NODE" "node"
+
+let node_wasm_flags =
+  Sys.getenv_with_default_value "NODE_WASM_FLAGS"
+    "--stack-size=10000 --experimental-wasm-jspi"
 
 let cmpbyt =
   Filename.make_path

@@ -72,13 +72,15 @@ val from_cma :
 
 type jsir_unit =
   { name : string
+  ; target : Code.jsir_target
   ; program : Code.program
   ; info : Unit_info.t
   }
 
-val from_cmj : in_channel -> jsir_unit
-(** Read the unit of a [.cmj] file produced by OxCaml's [ocamlopt -target
-    js_of_ocaml]. The channel must be positioned just after the magic number. *)
+val from_jsir_channel :
+  target:Code.jsir_target -> filename:string -> in_channel -> jsir_unit
+(** Read a JSIR file ([.cmj] or [.cmw]), including its magic number and version.
+    Fails if the unit was not compiled for [target]. *)
 
 val from_channel :
      in_channel

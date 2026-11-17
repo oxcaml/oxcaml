@@ -5,48 +5,60 @@ the compiler by [jsoo_imports/dune](jsoo_imports/dune)). This translation enable
 
 ## Usage
 
-The pass is the code generator of `ocamlopt -target js_of_ocaml` (see [`Jscomp`](../../../optcomp/jscomp.mli)), which works like regular `ocamlopt`:
+The pass is the code generator of `ocamlopt -target js_of_ocaml` and `ocamlopt -target wasm_of_ocaml` (see [`Jscomp`](../../../optcomp/jscomp.mli)), which work like regular `ocamlopt`:
 
 ```
 ocamlopt -target js_of_ocaml -c foo.ml                           # foo.cmi foo.cmjx foo.cmjo
 ocamlopt -target js_of_ocaml -a -o lib.cmjxa foo.cmjx stubs.js   # lib.cmjxa lib.cmja
 ocamlopt -target js_of_ocaml -o prog.js lib.cmjxa main.cmjx      # or a.out.js without -o
+
+ocamlopt -target wasm_of_ocaml -c foo.ml                          # foo.cmi foo.cmwx foo.cmwo
+ocamlopt -target wasm_of_ocaml -a -o lib.cmwxa foo.cmwx stubs.wat  # lib.cmwxa lib.cmwa
+ocamlopt -target wasm_of_ocaml -o prog.js lib.cmwxa main.cmwx     # prog.js prog.assets/
 ```
 
-| Native | js_of_ocaml | Contents |
-|--------|-------------|----------|
-| `.cmx` / `.cmxa` | `.cmjx` / `.cmjxa` | Flambda 2 export information |
-| `.o` / `.a` | `.cmjo` / `.cmja` | JavaScript, produced by `js_of_ocaml compile` / `js_of_ocaml link -a` |
-| `.s` | `.cmj` | The JSIR of a unit, marshaled; deleted unless `-S` is given |
-| startup file | `<exe>.runtime.js` | The output of `js_of_ocaml build-runtime`; deleted unless `-dstartup` is given |
-| C stubs | `.js` stubs | Recorded in `.cmjxa` files and passed to `js_of_ocaml build-runtime` when linking |
+| Native | js_of_ocaml | wasm_of_ocaml | Contents |
+|--------|-------------|---------------|----------|
+| `.cmx` / `.cmxa` | `.cmjx` / `.cmjxa` | `.cmwx` / `.cmwxa` | Flambda 2 export information |
+| `.o` / `.a` | `.cmjo` / `.cmja` | `.cmwo` / `.cmwa` | JavaScript or WebAssembly, produced by `compile` / `link -a` |
+| `.s` | `.cmj` | `.cmw` | The JSIR of a unit, marshaled (the same format, recording the target); deleted unless `-S` is given |
+| startup file | `<exe>.runtime.js` | `<exe>.runtime.wasma` | The output of `build-runtime`; deleted unless `-dstartup` is given |
+| C stubs | `.js` stubs | `.js`, `.wat`, `.wast` and `.wasm` stubs | Recorded in library files and passed to `build-runtime` when linking |
+| executable | `prog.js` | `prog.js` and `prog.assets/` | The output of `link`; the directory holds the WebAssembly code that `prog.js` loads |
 
-The compiler runs the `js_of_ocaml` executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` environment variable is populated.
+The compiler runs the `js_of_ocaml` (`wasm_of_ocaml`) executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` (`OXCAML_WASM_OF_OCAML`) environment variable is populated.
+Every `wasm_of_ocaml` command is given `--enable=portable-int`, as we use 63-bit integers.
 We can print JSIR with `-djsir`, `-g` makes `js_of_ocaml` keep debug information, and `-verbose` shows the `js_of_ocaml` commands.
 C sources and objects and `-ccopt`/`-cclib` are ignored (with a warning under `-verbose`).
 
-Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the `.js` stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc.
+`-jsoo-effects` selects the implementation of effect handlers, passed as `--effects` to `compile` and `build-runtime`: `disabled`, `cps` or `double-translation` (the default) for `js_of_ocaml`, and `disabled`, `cps`, `jspi` (the default) or `native` for `wasm_of_ocaml`.
+Only `jspi` (and `disabled`, which uses the same runtime) has a precompiled `wasm_of_ocaml` runtime for 63-bit integers; with `cps` or `native`, `build-runtime` compiles the runtime from its sources every time an executable is linked, which is slow.
 
+Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. They apply to the same `wasm_of_ocaml` commands. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc., and also `target=` and `jsoo-effects=`.
 
 ## Number representations
-| Flambda kind       | JSIR representation                                                                                                                                                                                                |
-|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Tagged_immediate` | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_immediate`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_int8`       | Untagged 32-bit integer (via `Number`), always kept sign-extended to 8 bits                                                                                                                        |
-| `Naked_int16`      | Untagged 32-bit integer (via `Number`), always kept sign-extended to 16 bits                                                                                                                       |
-| `Naked_nativeint`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_int32`      | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_int64`      | Untagged 64-bit integer (via [`MlInt64`](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/int64.js) )                                                                                                  |
-| `Naked_float32`    | Untagged 64-bit float (via `Number`), where operations are performed in 64-bit precesion then [rounded down](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/float32.js) to the nearest 32-bit result |
-| `Naked_float`      | Untagged 64-bit float (via `Number`)                                                                                                                                                                               |
+The JSIR produced for `-target js_of_ocaml` and `-target wasm_of_ocaml` differs in a few places, chosen by [`To_jsir_target`](to_jsir_target.mli).
+For WebAssembly, we use wasm_of_ocaml's portable integer representation, where integers have the same widths as in native code: Flambda compiles for a 64-bit machine, and `Targetint` and `Targetnativeint` are 63 and 64 bits wide.
 
-Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers are untagged. Similarly, `Box_number` and `Unbox_number` are also identities, since everything is represented as the `Number` type (with the exception of `Naked_int64`, which are just three `Number`s under the hood).
+| Flambda kind       | JavaScript                                                                                                                                                                                       | WebAssembly                                            |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|
+| `Tagged_immediate` | Untagged 32-bit integer (via `Number`)                                                                                                                                                           | Untagged 63-bit integer                                |
+| `Naked_immediate`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                           | Untagged 63-bit integer                                |
+| `Naked_int8`       | Untagged 32-bit integer (via `Number`), always kept sign-extended to 8 bits                                                                                                                      | Untagged 63-bit integer, always kept sign-extended to 8 bits  |
+| `Naked_int16`      | Untagged 32-bit integer (via `Number`), always kept sign-extended to 16 bits                                                                                                                     | Untagged 63-bit integer, always kept sign-extended to 16 bits |
+| `Naked_nativeint`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                           | Boxed 64-bit integer                                   |
+| `Naked_int32`      | Untagged 32-bit integer (via `Number`)                                                                                                                                                           | Boxed 32-bit integer                                   |
+| `Naked_int64`      | Untagged 64-bit integer (via [`MlInt64`](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/int64.js) )                                                                                | Boxed 64-bit integer                                   |
+| `Naked_float32`    | Untagged 64-bit float (via `Number`), where operations are performed in 64-bit precesion then [rounded down](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/float32.js) to the nearest 32-bit result | Boxed 32-bit float                                     |
+| `Naked_float`      | Untagged 64-bit float (via `Number`)                                                                                                                                                             | Boxed 64-bit float                                     |
+
+Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers are untagged. Similarly, `Box_number` and `Unbox_number` are also identities: in JavaScript, everything is represented as the `Number` type (with the exception of `Naked_int64`, which are just three `Number`s under the hood), and in WebAssembly, boxed numbers are structs at the level of JSIR, which wasm_of_ocaml unboxes where it can.
 
 Beware - immediates are 32 bits in JavaScript, instead of 63 or 31!
 
 Smallints (`Naked_int8` and `Naked_int16`) follow the same convention as bytecode and Cmm, where they are stored sign-extended.
 This means that JavaScript stubs receive exactly the same values for `int8#`/`int16#` arguments as they do in bytecode, and must likewise return sign-extended values.
+Conversions between smallints and other integers go through ints (e.g. `caml_int32_of_int`), which are identities in JavaScript.
 
 ## Block indices
 JSIR blocks have the same flattened and reordered layout as native blocks. However, these blocks
@@ -75,9 +87,11 @@ The following are not yet supported in JSIR translation, and will raise an excep
 
 1. SIMD/vector types: `vec128`, `vec256` and `vec512`
 
-### WASM
-The produced JSIR is not suitable for WASM compilation via `wasm_of_ocaml`, despite the two sharing the same IR.
-In particular, there are places within the `to_jsir` code that assumes JavaScript - these are marked with comments.
+### Partial applications of functions of void parameters
+Void parameters are erased in JSIR, so a function all of whose parameters are void is a closure of arity 0.
+When the callee is unknown, the generic application of `js_of_ocaml` and `wasm_of_ocaml` (`caml_call_gen`, `caml_apply0`) cannot tell a partial application supplying only some of its void arguments from a full one, and evaluates the function immediately (native and bytecode defer it).
+For example, given `let[@inline never] g (v : void) (w : void) = print_string "g"; 1` and `let[@inline never] partial2 (k : void -> void -> int) = let p = k (void ()) in print_string "a"; p (void ())`, `print_int (partial2 g)` prints `ga1` instead of `ag1` (and fails at runtime with the JavaScript target).
+Functions with at least one non-void parameter are unaffected.
 
 ## External stub behaviour
 For `external` declarations containing both bytecode and native names, the JSIR pass uses the **bytecode** name for most cases, and such JavaScript stubs are compatible with the existing `js_of_ocaml` stubs.
@@ -96,5 +110,5 @@ The JSIR pass attaches the same hints, computed from Flambda instead (see [`Opti
 | Closure hints | Every `Closure`, from the metadata of its code: the representation of its parameters and result (from the arities), its `inline` attribute (`Available_inline` is `Hint_inline`) and whether it is a functor. |
 | `Hint_unsafe` | String, bytes and bigstring accesses of 16 bits or more (`String_or_bigstring_load`, `Bytes_or_bigstring_set`). Flambda inserts the bounds checks itself, so these accesses are always unsafe and call the unchecked runtime primitives (`caml_string_get16u`, ...), as `js_of_ocaml` does for bytecode accesses with this hint. Signed accesses load the unsigned value and sign-extend it. The runtime only provides the unchecked 16- and 64-bit bigstring accessors for OCaml >= 5.6, so those still call the checked ones. |
 | `Hint_bigarray` | `Bigarray_load`, `Bigarray_set` and byte accesses to bigstrings (`caml_ba_get_raw_unsafe`, `caml_ba_set_raw_unsafe`), giving the kind and layout of the bigarray. |
-| `Hint_int` | Comparisons of unboxed `int64`s. |
+| `Hint_int` | Comparisons of unboxed `int64`s, `int32`s and `nativeint`s. |
 | `Hint_primitive` | Not emitted yet. Bytecode attaches it to the calls of externals whose native name differs from the bytecode one, with that name and the representations of its arguments and result. Flambda does not keep the native name right now, and JSOO does not use this hint yet, so we defer this until later. |
