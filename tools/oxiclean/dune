@@ -1,0 +1,4 @@
+(executable
+ (name oxiclean)
+ (modes byte native)
+ (libraries ocamlfrontend))

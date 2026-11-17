@@ -1,0 +1,26 @@
+{
+  "letBinding": {
+    "bound": {
+      "field": {
+        "block": {"upstreamCompilationUnit": {"path": ["Stdlib"]}},
+        "index": 15
+      }
+    },
+    "body": {
+      "letBinding": {
+        "bound": {
+          "field": {
+            "block": {"upstreamCompilationUnit": {"path": ["Stdlib"]}},
+            "index": 16
+          }
+        },
+        "body": {
+          "block": {
+            "tag": 0,
+            "fields": [{"var": {"deBruijn": 1}}, {"var": {"deBruijn": 0}}]
+          }
+        }
+      }
+    }
+  }
+}

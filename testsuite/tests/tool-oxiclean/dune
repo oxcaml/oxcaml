@@ -1,0 +1,42 @@
+(rule
+ (target repr.ml)
+ (action
+  (copy %{dep:../../../stdlib/repr.ml} repr.ml)))
+
+(rule
+ (target repr.mli)
+ (action
+  (copy %{dep:../../../stdlib/repr.mli} repr.mli)))
+
+(rule
+ (targets repr.cmi repr.cmti repr.cmt)
+ (deps
+  (:src repr.mli repr.ml)
+  (glob_files ../../../stdlib/build/*.cmi))
+ (action
+  (run
+   %{exe:../../../main_native.exe}
+   -I
+   ../../../stdlib/build
+   -bin-annot
+   -stop-after
+   typing
+   -c
+   %{src})))
+
+(rule
+ (targets repr.intf.json repr.impl.json)
+ (deps (glob_files ../../../stdlib/build/*.cmi))
+ (action
+  (run
+   %{exe:../../../tools/oxiclean/oxiclean.exe}
+   %{dep:repr.cmti}
+   %{dep:repr.cmt})))
+
+(rule
+ (alias repr)
+ (deps
+  repr.intf.json
+  repr.impl.json)
+ (action
+  (diff repr.impl.json.expected repr.impl.json)))
