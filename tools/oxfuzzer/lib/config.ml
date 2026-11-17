@@ -70,6 +70,8 @@ let max_effect_count = 6
 
 let max_handle_count = 8
 
+let max_conditional_expression_count = 16
+
 let max_probability = 10_000
 
 (* Probabilities out of [max_probability], conditional on reaching each
@@ -131,6 +133,8 @@ let tail_call_probability = 2_500
 let existing_value_for_wide_argument_probability = 7_500
 
 let reraise_probability = 5_000
+
+let conditional_expression_probability = 500
 
 type assertion_mode =
   | Disabled
