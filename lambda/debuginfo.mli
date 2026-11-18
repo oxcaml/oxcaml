@@ -28,12 +28,9 @@ module Scoped_location : sig
   val equal_scope_item : scope_item -> scope_item -> bool
 
   (* The ordinals for the next anonymous function, module and lazy expression
-     directly under a scope. *)
-  type anonymous_counters = private
-    { next_function : int ref;
-      next_module : int ref;
-      next_lazy : int ref;
-    }
+     directly under a scope. They are only ever advanced by the [enter_*]
+     functions below. *)
+  type anonymous_counters
 
   type scopes = private
     | Empty
