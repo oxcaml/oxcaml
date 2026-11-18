@@ -3,8 +3,14 @@ module Laws_gen_Stdlib = Stdlib
 module Laws_gen_Shape = Shape
 type 'a each = {
   double_grows: 'a ;
-  trivial: 'a }
-let names = { double_grows = "double_grows"; trivial = "trivial" }
+  trivial: 'a ;
+  max_max_comm: 'a }
+let names =
+  {
+    double_grows = "double_grows";
+    trivial = "trivial";
+    max_max_comm = "max_max_comm"
+  }
 let locations =
   {
     double_grows =
@@ -22,11 +28,24 @@ let locations =
         start_col = 0;
         end_line = 34;
         end_col = 21
+      };
+    max_max_comm =
+      {
+        CamlinternalLaw.file = "shape.ml";
+        start_line = 43;
+        start_col = 2;
+        end_line = 43;
+        end_col = 72
       }
   }
-let map { double_grows; trivial } ~f =
-  { double_grows = (f double_grows); trivial = (f trivial) }
-let to_list { double_grows; trivial } = [double_grows; trivial]
+let map { double_grows; trivial; max_max_comm } ~f =
+  {
+    double_grows = (f double_grows);
+    trivial = (f trivial);
+    max_max_comm = (f max_max_comm)
+  }
+let to_list { double_grows; trivial; max_max_comm } =
+  [double_grows; trivial; max_max_comm]
 type double_grows_input =
   | Double_grows_input: {
   x: int } -> double_grows_input 
@@ -35,10 +54,20 @@ type trivial_input =
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
+    module type Max_choices  =
+      sig
+        module X : Laws_gen_Shape.Comparable
+        type max_comm_input =
+          | Max_comm_input: {
+          a: X.t ;
+          b: X.t } -> max_comm_input 
+        val max_comm : max_comm_input Choice.t
+      end
     module type Choices  =
       sig
         val double_grows : double_grows_input Choice.t
         val trivial : trivial_input Choice.t
+        val max : (module Max_choices) Choice.t
       end
     let double_grows ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -101,6 +130,39 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 21
                    }
                }))
+    let max_max_comm ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.max),
+          (fun ((module M)  : (module Max_choices)) ->
+             let module I = (Laws_gen_Shape.Max)(M.X) in
+               Law.Bind
+                 ((Law.Choose M.max_comm),
+                   (fun input ->
+                      Law.Assertion
+                        {
+                          value = input;
+                          source = M.max_comm;
+                          predicate =
+                            (fun
+                               ((M.Max_comm_input { a; b }) :
+                                  M.max_comm_input)
+                               ->
+                               (Laws_gen_Stdlib.(=)
+                                  (M.X.compare (I.max a b) (I.max b a)) 0 : 
+                               bool));
+                          location =
+                            {
+                              CamlinternalLaw.file = "shape.ml";
+                              start_line = 43;
+                              start_col = 39;
+                              end_line = 43;
+                              end_col = 72
+                            }
+                        }))))
     let laws choices =
-      { double_grows = (double_grows choices); trivial = (trivial choices) }
+      {
+        double_grows = (double_grows choices);
+        trivial = (trivial choices);
+        max_max_comm = (max_max_comm choices)
+      }
   end

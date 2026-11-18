@@ -225,6 +225,7 @@ type error =
   | Law_refined_type_variable_kind of
       { variable : string; jkind : jkind_lr }
   | Law_in_recursive_module of { module_name : string; law : string }
+  | Law_in_generative_functor
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t

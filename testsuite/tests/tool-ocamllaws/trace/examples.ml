@@ -25,3 +25,16 @@ law_? modes (g : local_ int -> int) : apply g = apply g
 law_? unboxed (x : float#) : of_unboxed x = of_unboxed x
 law_? alias (x : (int as 'a)) : x = x
 law_? \#type (\#method : int) : \#method = \#method
+
+(* Functors: the laws of a functor are checked under each choice of its
+   parameter. *)
+
+module type Comparable = sig
+  type t
+  val compare : t -> t -> int
+end
+
+module Max (X : Comparable) = struct
+  let max a b = if X.compare a b >= 0 then a else b
+  law_? max_comm (a : X.t) (b : X.t) : X.compare (max a b) (max b a) = 0
+end

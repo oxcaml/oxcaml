@@ -32,3 +32,13 @@ let double x = 2 * x
 
 law_? double_grows (x : int) : x > 0 implies_ double x > x
 law_? trivial : 1 = 1
+
+module type Comparable = sig
+  type t
+  val compare : t -> t -> int
+end
+
+module Max (X : Comparable) = struct
+  let max a b = if X.compare a b >= 0 then a else b
+  law_? max_comm (a : X.t) (b : X.t) : X.compare (max a b) (max b a) = 0
+end

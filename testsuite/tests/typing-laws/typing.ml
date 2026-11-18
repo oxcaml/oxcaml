@@ -358,3 +358,41 @@ end
 [%%expect {|
 module rec Hidden_law : sig val f : int -> int end
 |}]
+
+(* Laws in generative functors are rejected: the laws file names the types
+   of the result of a functor through an application to the choices of a
+   backend, which a generative functor does not permit. *)
+
+module Gen () = struct
+  let x = 1
+  law_? p : x = x
+end
+[%%expect {|
+Line 3, characters 2-17:
+3 |   law_? p : x = x
+      ^^^^^^^^^^^^^^^
+Error: Laws in the body of a generative functor are not supported.
+|}]
+
+module type Gen = functor () -> sig
+  val x : int
+  law_? p : x = x
+end
+[%%expect {|
+Line 3, characters 2-17:
+3 |   law_? p : x = x
+      ^^^^^^^^^^^^^^^
+Error: Laws in the body of a generative functor are not supported.
+|}]
+
+module Nested () = struct
+  module M = struct
+    law_? p : 1 = 1
+  end
+end
+[%%expect {|
+Line 3, characters 4-19:
+3 |     law_? p : 1 = 1
+        ^^^^^^^^^^^^^^^
+Error: Laws in the body of a generative functor are not supported.
+|}]
