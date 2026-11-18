@@ -34,6 +34,7 @@
           inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
           oxcaml-fp = oxcaml.override { framePointers = true; };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
+          oxcaml-no-parallelism = oxcaml.override { multidomain = false; };
           ppxlib = oxcaml.mkPpxlibLibs oxcaml;
           jsoo = oxcaml.mkJsooLibs oxcaml;
           jsoo-smoke-test = oxcaml.mkJsooSmokeTest oxcaml;
@@ -41,18 +42,23 @@
           default = oxcaml;
         };
 
-        checks = lib.attrsets.filterAttrs (key: drv: !(drv.meta.broken or false)) {
-          inherit (self.packages.${system})
-            oxcaml
-            oxcaml-fp
-            oxcaml-asan
-            ppxlib
-            jsoo
-            jsoo-smoke-test
-            installed-libraries
-            merlin
-            ;
-        };
+        checks = lib.attrsets.filterAttrs (key: drv: !(drv.meta.broken or false)) (
+          {
+            inherit (self.packages.${system})
+              oxcaml
+              oxcaml-fp
+              oxcaml-asan
+              ppxlib
+              jsoo
+              jsoo-smoke-test
+              installed-libraries
+              merlin
+              ;
+          }
+          // lib.optionalAttrs (system == "x86_64-linux") {
+            inherit (self.packages.${system}) oxcaml-no-parallelism;
+          }
+        );
 
         formatter = pkgs.nixfmt-tree;
 

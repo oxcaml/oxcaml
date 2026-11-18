@@ -50,6 +50,11 @@ jobs:
             sysdeps: gdb
 
           - name: multidomain (x86_64-linux)
+            config: --enable-poll-insertion --enable-multidomain
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
+          - name: multidomain stack-checks (x86_64-linux)
             config: --enable-stack-checks --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
