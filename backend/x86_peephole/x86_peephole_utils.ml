@@ -69,8 +69,14 @@ let is_hard_barrier = function
    were computed before this pass. A rule that removes or forwards the
    definition of a register across such a label (for example
    [remove_mov_to_dead_register]) can leave a variable described as being in a
-   register that no longer holds it, until that register is next written. The
-   ranges would have to be updated, or computed after this pass. *)
+   register that no longer holds it, until that register is next written.
+
+   This is one case of a more general problem: the ranges are computed on
+   Linear, before the code is final. They should probably be computed on the
+   x86 and arm64 DSLs instead. Operations such as allocation could then be
+   expanded in those representations before the ranges are computed, rather
+   than being opaque to the DWARF analyses, which in some cases makes them
+   invalidate register information prematurely. *)
 let is_debug_directive = function
   | Directive d -> (
     match d with
