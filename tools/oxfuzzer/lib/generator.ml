@@ -1390,7 +1390,8 @@ and gen_let_rec (st : State.t) (env : Env.t) ty =
       in
       let fuel =
         Expr.Const
-          (Number.Int (random_int_in_range st ~min:0 ~max:Config.max_fuel))
+          (Number.Int
+             (random_int_in_range st ~min:0 ~max:Config.max_recursion_fuel))
       in
       let func = Expr.Read (Place.Variable first.name) in
       let call =

@@ -56,8 +56,12 @@ let max_recursive_param_count = 2
 
 let max_recursive_calls = 2
 
-let max_fuel = 3
+let max_recursion_fuel = 3
 
+(* Off by default since this tends to generate tests known to be broken, e.g.
+   [let rec g n x = x + y and h n = n + y in Sys.opaque_identity (g 0)] fails
+   with "let-rec group of [lfunction] declarations have inconsistent alloc
+   modes". *)
 let unused_recursive_functions = false
 
 let max_probability = 10_000
