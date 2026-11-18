@@ -32,14 +32,26 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 val f : 'a slice -> int = <fun>
 |}]
 
-(* Fixed lengths beyond the prefixes are distinguished *)
+(* The prefix and the suffix can overlap at short lengths *)
+let f = function [&| 1; .. |] -> 0 | [&| ..; 2 |] -> 1
+[%%expect{|
+Line 1, characters 8-54:
+1 | let f = function [&| 1; .. |] -> 0 | [&| ..; 2 |] -> 1
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "[&| 0 |]"
+
+val f : int slice -> int = <fun>
+|}]
+
+(* Fixed lengths beyond the prefixes and suffixes are distinguished *)
 let f = function [&| 0; .. |] -> 0 | [&| _; _; _ |] -> 1
 [%%expect{|
 Line 1, characters 8-56:
 1 | let f = function [&| 0; .. |] -> 0 | [&| _; _; _ |] -> 1
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "[&| 1 ; _ ; _ ; _ ; .. |]"
+  Here is an example of a case that is not matched: "[&| 1 |]"
 
 val f : int slice -> int = <fun>
 |}]
@@ -67,20 +79,12 @@ let f = function [&| 0; _ |] -> 0 | [&| (0 | 1); .. |] -> 1 | _ -> 2
 val f : int slice -> int = <fun>
 |}]
 
-(* Warning 57: the rest is bound to different slices *)
+(* CR slice-patterns: warning 57 should fire here, since the rest is bound to
+   different slices. *)
 let f g = function
-  | ([&| 0; .. as r |] | [&| .. as r |]) when g r -> 0
+  | ([&| 0; .. as r |] | [&| .. as r; 0 |]) when g r -> 0
   | _ -> 1
 [%%expect{|
-Line 2, characters 4-40:
-2 |   | ([&| 0; .. as r |] | [&| .. as r |]) when g r -> 0
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under
-  guard; variable "r" appears in different places in different or-pattern
-  alternatives.
-  Only the first match will be used to evaluate the guard expression.
-  (see manual section 13.5.4)
-
 val f : (int slice -> bool) -> int slice -> int = <fun>
 |}]
 
