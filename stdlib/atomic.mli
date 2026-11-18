@@ -64,7 +64,8 @@ external exchange
 (** [compare_and_set r seen v] sets the new value of [r] to [v] only if its
     current value is physically equal to [seen] -- the comparison and the set
     occur atomically. Returns [true] if the comparison succeeded (so the set
-    happened) and [false] otherwise. *)
+    happened) and [false] otherwise. If the comparison fails, the previous
+    value is read non-atomically. *)
 external compare_and_set
   : ('a : value_or_null).
   ('a t [@local_opt]) -> 'a -> 'a -> bool
