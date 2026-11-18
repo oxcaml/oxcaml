@@ -54,8 +54,6 @@ module type Oxcaml_options = sig
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
-  val cfg_eliminate_dead_trap_handlers : unit -> unit
-  val no_cfg_eliminate_dead_trap_handlers : unit -> unit
   val cfg_eliminate_dead_code_validate : unit -> unit
   val no_cfg_eliminate_dead_code_validate : unit -> unit
   val cfg_dominators_validate : unit -> unit

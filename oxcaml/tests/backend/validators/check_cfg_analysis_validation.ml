@@ -155,6 +155,80 @@ let test_unreachable () =
       Cfg_reachability_validate.validate_reachability
         (Cfg_with_infos.cfg cfg_with_infos))
 
+let make_cfg_for_invariants blocks =
+  let cfg = make_cfg blocks |> Cfg_with_infos.cfg in
+  (* The analysis fixtures omit layout and the next instruction id. *)
+  let layout =
+    List.map (fun (block : Block.t) -> block.start) blocks |> DLL.of_list
+  in
+  Cfg.iter_all_instructions cfg
+    { f =
+        (fun instruction ->
+          while
+            InstructionId.compare
+              (InstructionId.get cfg.next_instruction_id)
+              instruction.id
+            <= 0
+          do
+            ignore
+              (InstructionId.get_and_incr cfg.next_instruction_id
+                : InstructionId.t)
+          done)
+    };
+  Cfg_with_layout.create cfg ~layout
+
+let check_invariant_reachability cfg_with_layout ~unreachable =
+  let expected =
+    match unreachable with
+    | [] -> ""
+    | labels ->
+      Format.asprintf
+        "Cfg invariant failed in foo: blocks %a are not reachable from the \
+         entry block"
+        Label.Set.print (Label.Set.of_list labels)
+  in
+  let buffer = Buffer.create 128 in
+  let ppf = Format.formatter_of_buffer buffer in
+  let failed = Cfg_invariants.run ppf cfg_with_layout in
+  Format.pp_print_flush ppf ();
+  let actual = Buffer.contents buffer |> String.trim in
+  let expected_failure = not (String.equal expected "") in
+  if not (Bool.equal failed expected_failure && String.equal actual expected)
+  then
+    failwith
+      (Format.asprintf "Expected invariant errors %S, got %S (failed=%b)"
+         expected actual failed)
+
+let test_invariant_reachable_handler () =
+  let handler = new_label 15 in
+  make_cfg_for_invariants
+    [ block ~exn:handler entry_label
+        (terminator ~arg:[| Proc.loc_exn_bucket |] (Raise Raise_regular));
+      block handler (terminator ~arg:[| Proc.loc_exn_bucket |] Return) ]
+  |> check_invariant_reachability ~unreachable:[]
+
+let test_invariant_dead_handler () =
+  let handler = new_label 16 in
+  let cfg_with_layout =
+    make_cfg_for_invariants
+      [ block entry_label (terminator ~arg:[| Proc.loc_exn_bucket |] Return);
+        block handler (terminator ~arg:[| Proc.loc_exn_bucket |] Return) ]
+  in
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  (Cfg.get_block_exn cfg handler).is_trap_handler <- true;
+  check_invariant_reachability cfg_with_layout ~unreachable:[handler];
+  Cfg_simplify.run cfg_with_layout
+  |> check_invariant_reachability ~unreachable:[]
+
+let test_invariant_dead_cycle () =
+  let left = new_label 17 in
+  let right = new_label 18 in
+  make_cfg_for_invariants
+    [ block entry_label (terminator ~arg:[| Proc.loc_exn_bucket |] Return);
+      block left (terminator (Always right));
+      block right (terminator (Always left)) ]
+  |> check_invariant_reachability ~unreachable:[left; right]
+
 let test_tailcall_self () =
   make_cfg
     [ block entry_label
@@ -172,4 +246,7 @@ let () =
   test_dead_pure_and_impure ();
   test_exception_handler ();
   test_unreachable ();
+  test_invariant_reachable_handler ();
+  test_invariant_dead_handler ();
+  test_invariant_dead_cycle ();
   test_tailcall_self ()
