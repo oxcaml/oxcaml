@@ -75,13 +75,14 @@ type 'cu path_item =
       (** A separator (between destination and source) to track inlining *)
   | Module of string  (** A named module *)
   | Anonymous_module of int
-      (** [struct ... end], numbered among the anonymous items of its scope *)
+      (** [struct ... end], numbered among the anonymous modules of its scope *)
   | Class of string  (** A class definition *)
   | Function of string  (** A named function *)
   | Anonymous_function of int
-      (** [fun ... -> ...], numbered among the anonymous items of its scope *)
+      (** [fun ... -> ...], numbered among the anonymous functions of its scope
+      *)
   | Lazy of int
-      (** [lazy ...], numbered among the anonymous items of its scope *)
+      (** [lazy ...], numbered among the lazy expressions of its scope *)
   | Partial_function of int * int * string option
       (** A partial application at (line, col, file) *)
   | Stamp of int
