@@ -95,7 +95,10 @@ val cache_unit_info: unit_infos -> unit
 
 val require_global: Compilation_unit.t -> unit
         (* Enforce a link dependency of the current compilation
-           unit to the required module *)
+           unit to the required module, without reading its .cmx file *)
+
+val load_global: Compilation_unit.t -> unit
+        (* Read the .cmx file of the given unit, if not read already *)
 
 val read_library_info: string -> library_infos
 

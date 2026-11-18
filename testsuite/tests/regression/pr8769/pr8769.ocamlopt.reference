@@ -1,0 +1,5 @@
+File "nocrypto.cmx", line 1:
+Error: File rng.cmx was compiled without access to the .cmx file
+       for module Nocrypto.Fortuna,
+       which was produced by `ocamlopt -for-pack'. Please recompile rng.cmx
+       with the correct `-I' option so that Nocrypto.Fortuna.cmx is found.

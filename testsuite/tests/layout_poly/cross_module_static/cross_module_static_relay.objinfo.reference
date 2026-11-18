@@ -9,7 +9,7 @@ Interfaces imported:
 	00000000000000000000000000000000	Cross_module_static_lib
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Implementations imported:
-	00000000000000000000000000000000	Cross_module_static_lib
+	--------------------------------	Cross_module_static_lib
 Interfaces used in quotations:
 Implementations used in quotations:
 Flambda 2 unit with export information

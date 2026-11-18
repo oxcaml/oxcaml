@@ -37,6 +37,7 @@ type unit_infos_builder =
   { mutable uib_unit : Compilation_unit.t;
     mutable uib_defines: Compilation_unit.t list;
     mutable uib_imports_cmx: Import_info.t list;
+    mutable uib_required_units: CU.Set.t;
     mutable uib_generic_fns: generic_fns;
     mutable uib_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
     uib_zero_alloc_info: Zero_alloc_info.t;
@@ -66,6 +67,7 @@ let current_unit =
   { uib_unit = CU.dummy;
     uib_defines = [];
     uib_imports_cmx = [];
+    uib_required_units = CU.Set.empty;
     uib_generic_fns = { curry_fun = []; apply_fun = []; send_fun = [] };
     uib_export_info = None;
     uib_zero_alloc_info = Zero_alloc_info.create ();
@@ -90,6 +92,7 @@ let reset unit_info =
   current_unit.uib_unit <- compilation_unit;
   current_unit.uib_defines <- [compilation_unit];
   current_unit.uib_imports_cmx <- [];
+  current_unit.uib_required_units <- CU.Set.empty;
   current_unit.uib_generic_fns <-
     { curry_fun = []; apply_fun = []; send_fun = [] };
   current_unit.uib_export_info <- None;
@@ -330,6 +333,33 @@ let write_unit_info info filename =
   let crc = Digest.file filename in
   Digest.output oc crc)
 
+(* Required units come last, as when their .cmx files were read before
+   everything else. Those whose .cmx files were not read are imported as
+   unloaded, as the current unit does not depend on their contents. *)
+let imports_cmx () =
+  let required = current_unit.uib_required_units in
+  let read_required, others =
+    List.partition
+      (fun import -> CU.Set.mem (Import_info.cu import) required)
+      current_unit.uib_imports_cmx
+  in
+  let required_imports =
+    CU.Set.fold
+      (fun comp_unit imports ->
+        let import =
+          match
+            List.find_opt
+              (fun import -> CU.equal (Import_info.cu import) comp_unit)
+              read_required
+          with
+          | Some import -> import
+          | None -> Import_info.Impl.create_unloaded comp_unit
+        in
+        import :: imports)
+      required []
+  in
+  others @ required_imports
+
 let build_unit_info ~main_module_block_format ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
@@ -346,7 +376,7 @@ let build_unit_info ~main_module_block_format ~static_data =
   { ui_unit = current_unit.uib_unit;
     ui_defines = current_unit.uib_defines;
     ui_imports_cmi = Env.imports();
-    ui_imports_cmx = current_unit.uib_imports_cmx;
+    ui_imports_cmx = imports_cmx ();
     ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
     ui_quoted_cmx = CU.Set.to_list (Env.quoted_impls ());
     ui_format = main_module_block_format;
@@ -373,7 +403,20 @@ let new_const_symbol () =
   |> Symbol.linkage_name
   |> Linkage_name.to_string
 
-let require_global global_ident =
+let require_global comp_unit =
+  if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
+  then ()
+  else
+    let comp_unit =
+      CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ())
+    in
+    (* CR-someday zqian: the linker requires the CRC of the .cmx file of a
+       packed unit from all its importers (see [Linkenv.check_cmx_consistency]),
+       which a required packed unit whose .cmx file is not read lacks. *)
+    current_unit.uib_required_units <-
+      CU.Set.add comp_unit current_unit.uib_required_units
+
+let load_global global_ident =
   if equal_up_to_pack_prefix global_ident current_unit.uib_unit
   then ()
   else
