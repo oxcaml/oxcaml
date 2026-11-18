@@ -68,20 +68,36 @@ module Loop_variable = struct
     }
 end
 
-(* The functions of a set of local recursive functions, as seen from their
-   bodies. Each function takes [fuel] first, and calls between them decrease
-   it. *)
-module Recursion = struct
-  type function_ =
+(* A function bound in an expression, by its name. *)
+module Local_function = struct
+  type t =
     { name : Name.t;
       params : Ty.t list;
       result : Ty.t
     }
+end
 
+(* The functions of a set of local recursive functions, as seen from their
+   bodies. Each function takes [fuel] first, and calls between them decrease
+   it. *)
+module Recursion = struct
   type t =
     { fuel : Name.t;
-      functions : function_ list
+      functions : Local_function.t list
     }
+
+  let fuel_ty = Ty.Number (NumberTy.boxed Int)
+
+  (* The functions that [start] calls, directly or not, and [start]. *)
+  let reachable ~callees start =
+    let rec visit reached = function
+      | [] -> reached
+      | name :: names ->
+        if List.exists (Name.equal name) reached
+        then visit reached names
+        else visit (name :: reached) (callees name @ names)
+    in
+    visit [] [start]
 end
 
 module Env = struct
@@ -215,15 +231,12 @@ let random_exceptions (st : State.t) exceptions ~count =
   in
   pick [] exceptions count
 
-let split_at list count =
-  ( List.filteri (fun index _ -> index < count) list,
-    List.filteri (fun index _ -> index >= count) list )
-
 (* [Some prefix] if [types] is [prefix @ suffix] with a nonempty [prefix]. *)
 let split_suffix types ~suffix =
   let count = List.length types - List.length suffix in
-  let prefix, rest = split_at types count in
-  if count > 0 && List.equal Ty.equal rest suffix then Some prefix else None
+  if count > 0 && List.equal Ty.equal (List.drop count types) suffix
+  then Some (List.take count types)
+  else None
 
 let random_int_in_range (st : State.t) ~min ~max =
   Random.State.int_in_range st.random_state ~min ~max
@@ -1228,10 +1241,8 @@ and gen_lambda (st : State.t) (env : Env.t) params result_ty =
       st.swarm.partial_applications && count > 1
       && with_probability st ~probability:Config.curried_lambda_probability
     then
-      let params, rest =
-        split_at params (random_int_in_range st ~min:1 ~max:(count - 1))
-      in
-      params, Ty.curry rest result_ty
+      let count = random_int_in_range st ~min:1 ~max:(count - 1) in
+      List.take count params, Ty.curry (List.drop count params) result_ty
     else params, result_ty
   in
   let params =
@@ -1257,7 +1268,7 @@ and gen_recursive_call (st : State.t) (env : Env.t) result_ty =
   | Some { fuel; functions } ->
     let functions =
       List.filter
-        (fun ({ result; _ } : Recursion.function_) ->
+        (fun ({ result; _ } : Local_function.t) ->
           can_convert st result result_ty)
         functions
     in
@@ -1265,7 +1276,9 @@ and gen_recursive_call (st : State.t) (env : Env.t) result_ty =
       (st.recursive_calls_remaining > 0 && not (List.is_empty functions))
       (fun () ->
         st.recursive_calls_remaining <- st.recursive_calls_remaining - 1;
-        let { Recursion.name; params; result } = random_element st functions in
+        let { Local_function.name; params; result } =
+          random_element st functions
+        in
         st.recursive_callees <- name :: st.recursive_callees;
         let func =
           maybe_opaque st ~enabled:true
@@ -1274,7 +1287,7 @@ and gen_recursive_call (st : State.t) (env : Env.t) result_ty =
         in
         let fuel =
           Expr.Bin_op
-            { ty = Ty.Number (NumberTy.boxed Int);
+            { ty = Recursion.fuel_ty;
               op = Sub;
               lhs = Expr.Read (Place.Variable fuel);
               rhs = Expr.Const (Number.Int 1)
@@ -1314,115 +1327,95 @@ and gen_let_rec (st : State.t) (env : Env.t) ty =
       let functions =
         List.map
           (fun (params, result) ->
-            { Recursion.name = State.fresh st; params; result })
+            { Local_function.name = State.fresh st; params; result })
           signatures
       in
-      let fuel_ty = Ty.Number (NumberTy.boxed Int) in
-      let gen_function ({ Recursion.params; result; _ } : Recursion.function_) =
-        let fuel = State.fresh st in
-        let params =
-          List.map
-            (fun ty ->
-              { Binding.name = State.fresh st; ty; is_mutable = false })
-            params
-        in
-        let body_env =
-          List.fold_left Env.extend (Env.for_closure env)
-            ({ Binding.name = fuel; ty = fuel_ty; is_mutable = false } :: params)
-        in
-        let base = gen_value st body_env result in
-        let saved_calls = st.recursive_calls_remaining in
-        let saved_callees = st.recursive_callees in
-        st.recursive_calls_remaining <- Config.max_recursive_calls;
-        st.recursive_callees <- [];
-        let step =
-          let env = { body_env with recursion = Some { fuel; functions } } in
-          match gen_recursive_call st env result with
-          | Some generate when Random.State.bool st.random_state -> generate ()
-          | Some _ | None -> gen_value st env result
-        in
-        let callees = st.recursive_callees in
-        st.recursive_calls_remaining <- saved_calls;
-        st.recursive_callees <- saved_callees;
-        let body =
-          Expr.If
-            { condition =
-                Expr.Bin_op
-                  { ty = fuel_ty;
-                    op = Le;
-                    lhs = Expr.Read (Place.Variable fuel);
-                    rhs = Expr.Const (Number.Int 0)
-                  };
-              if_true = base;
-              if_false = step
-            }
-        in
-        ( Expr.Lambda
-            { params =
-                { Binding.name = fuel; ty = fuel_ty; is_mutable = false }
-                :: params;
-              inline = Default;
-              body;
-              result_ty = result
-            },
-          callees )
+      let generated =
+        List.map
+          (fun function_ ->
+            function_, gen_recursive_function st env ~functions function_)
+          functions
       in
-      let lambdas = List.map gen_function functions in
       let first = List.hd functions in
       let callees name =
-        List.concat
-          (List.map2
-             (fun ({ name = caller; _ } : Recursion.function_) (_, callees) ->
-               if Name.equal caller name then callees else [])
-             functions lambdas)
+        List.concat_map
+          (fun (({ name = caller; _ } : Local_function.t), (_, callees)) ->
+            if Name.equal caller name then callees else [])
+          generated
       in
-      let rec reach reached = function
-        | [] -> reached
-        | name :: names ->
-          if List.exists (Name.equal name) reached
-          then reach reached names
-          else reach (name :: reached) (callees name @ names)
-      in
-      let reached = reach [] [first.name] in
-      let is_kept ({ name; _ } : Recursion.function_) =
-        Config.unused_recursive_functions
-        || List.exists (Name.equal name) reached
-      in
-      let fuel =
-        Expr.Const
-          (Number.Int
-             (random_int_in_range st ~min:0 ~max:Config.max_recursion_fuel))
-      in
-      let func = Expr.Read (Place.Variable first.name) in
-      let call =
-        match ty with
-        | Ty.Arrow _ -> Expr.Apply { func; args = [fuel] }
-        | _ ->
-          let partial =
-            (not (List.is_empty first.params))
-            && Random.State.bool st.random_state
-          in
-          let args = List.map (gen_value st env) first.params in
-          bind_operands st args ~f:(fun args ->
-              if partial
-              then
-                (* Apply the closure of a partial application. *)
-                Expr.Apply
-                  { func = Expr.Opaque (Expr.Apply { func; args = [fuel] });
-                    args
-                  }
-              else Expr.Apply { func; args = fuel :: args })
-      in
+      let reached = Recursion.reachable ~callees first.name in
       Expr.Let_rec
         { functions =
             List.filter_map
-              (fun ((function_ : Recursion.function_), (lambda, _)) ->
-                if is_kept function_
-                then Some (function_.name, lambda)
+              (fun (({ name; _ } : Local_function.t), (lambda, _)) ->
+                if
+                  Config.unused_recursive_functions
+                  || List.exists (Name.equal name) reached
+                then Some (name, lambda)
                 else None)
-              (List.combine functions lambdas);
-          body = call
+              generated;
+          body = gen_let_rec_call st env ty first
         })
+
+(* A function of a recursive set, as a [Lambda] taking the fuel first, and the
+   functions of the set that it calls. *)
+and gen_recursive_function (st : State.t) (env : Env.t) ~functions
+    ({ params; result; _ } : Local_function.t) =
+  let binding ty = { Binding.name = State.fresh st; ty; is_mutable = false } in
+  let fuel = binding Recursion.fuel_ty in
+  let params = fuel :: List.map binding params in
+  let body_env = List.fold_left Env.extend (Env.for_closure env) params in
+  let base = gen_value st body_env result in
+  let saved_calls = st.recursive_calls_remaining in
+  let saved_callees = st.recursive_callees in
+  st.recursive_calls_remaining <- Config.max_recursive_calls;
+  st.recursive_callees <- [];
+  let step =
+    let env =
+      { body_env with recursion = Some { fuel = fuel.name; functions } }
+    in
+    match gen_recursive_call st env result with
+    | Some generate when Random.State.bool st.random_state -> generate ()
+    | Some _ | None -> gen_value st env result
+  in
+  let callees = st.recursive_callees in
+  st.recursive_calls_remaining <- saved_calls;
+  st.recursive_callees <- saved_callees;
+  let body =
+    Expr.If
+      { condition =
+          Expr.Bin_op
+            { ty = Recursion.fuel_ty;
+              op = Le;
+              lhs = Expr.Read (Place.Variable fuel.name);
+              rhs = Expr.Const (Number.Int 0)
+            };
+        if_true = base;
+        if_false = step
+      }
+  in
+  Expr.Lambda { params; inline = Default; body; result_ty = result }, callees
+
+(* The call to the first function of a recursive set, of type [ty]. *)
+and gen_let_rec_call (st : State.t) (env : Env.t) ty (first : Local_function.t)
+    =
+  let fuel = random_int_in_range st ~min:0 ~max:Config.max_recursion_fuel in
+  let fuel = Expr.Const (Number.Int fuel) in
+  let func = Expr.Read (Place.Variable first.name) in
+  match ty with
+  | Ty.Arrow _ -> Expr.Apply { func; args = [fuel] }
+  | _ ->
+    let partial =
+      (not (List.is_empty first.params)) && Random.State.bool st.random_state
+    in
+    let args = List.map (gen_value st env) first.params in
+    bind_operands st args ~f:(fun args ->
+        if partial
+        then
+          (* Apply the closure of a partial application. *)
+          Expr.Apply
+            { func = Expr.Opaque (Expr.Apply { func; args = [fuel] }); args }
+        else Expr.Apply { func; args = fuel :: args })
 
 and gen_bool (st : State.t) env =
   let gen_binop op arg_ty gen_arg =
