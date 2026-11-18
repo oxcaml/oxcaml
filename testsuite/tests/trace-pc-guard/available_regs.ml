@@ -3,13 +3,15 @@
  setup-ocamlopt.byte-build-env;
  compile_only = "true";
  flags = "-g -gno-upstream-dwarf -gated-trace-pc-guard -Oclassic -dlinear \
-   -ddebug-avail-sets -dump-into-file -stop-after linearization";
+   -ddebug-avail-sets -stop-after linearization";
  {
+   compiler_output = "${test_build_directory}/not_saved.dump";
    ocamlopt.byte;
    script = "sh ${test_source_directory}/available_regs.sh no";
    script;
  }{
    flags += " -gdwarf-may-alter-codegen";
+   compiler_output = "${test_build_directory}/saved.dump";
    ocamlopt.byte;
    script = "sh ${test_source_directory}/available_regs.sh yes";
    script;

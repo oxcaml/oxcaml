@@ -2,7 +2,7 @@
 
 set -eu
 
-dump=available_regs.cmx.dump
+dump=${compiler_output}
 available_after=$1
 
 fail () {
