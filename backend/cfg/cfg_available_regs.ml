@@ -360,6 +360,32 @@ module Transfer = struct
           in
           dprintf "...avail_after %a\n%!" RD_quotient_set.print avail_after;
           ok avail_across, ok avail_after
+        | Op (Trace_pc_guard _) ->
+          (* The call to the coverage callback preserves the registers that are
+             live across it, so [Proc.destroyed_at_basic] says that it destroys
+             none. It does not preserve the others, which may still be
+             available: those that a C function may clobber become
+             unavailable. *)
+          let not_preserved =
+            RD_quotient_set.filter
+              (fun reg ->
+                let reg = RD.reg reg in
+                Proc.may_be_destroyed_by_c_function reg
+                && not
+                     (Reg.Set.exists
+                        (fun live_reg ->
+                          Reg.same_loc_fatal_on_unknown
+                            ~fatal_message:
+                              "Found Unknown register location, but we should \
+                               now be post-register allocation"
+                            live_reg reg)
+                        instr.live))
+              avail_before
+          in
+          let avail_across = RD_quotient_set.diff avail_before not_preserved in
+          dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
+          dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_across;
+          ok avail_across, ok avail_across
         | Op
             ( Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
             | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
@@ -368,7 +394,7 @@ module Transfer = struct
             | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
             | Begin_region | End_region | Specific _ | Dls_get | Tls_get
             | Domain_index | Thread_self_id | Poll | Alloc _ | Pause
-            | Trace_pc_guard_gate | Trace_pc_guard _ )
+            | Trace_pc_guard_gate )
         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
         | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in
