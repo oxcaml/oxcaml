@@ -45,7 +45,10 @@
     As with clang, every instrumented unit defines [__sancov_should_track] as a
     weak, hidden, zero-initialised 64-bit global in the [__sancov_gate] section,
     so that probes can address it PC-relatively. A strong definition (e.g. in
-    the coverage runtime) takes precedence.
+    the coverage runtime) takes precedence. With
+    [-gated-trace-pc-guard-define-gate], which clang has no equivalent of, the
+    startup file of an executable or shared object has such a definition, also
+    zero-initialised.
 
     A probe is made of two operations, implemented for amd64 and arm64:
     [Trace_pc_guard_gate], a load of the gate, which is then tested, and

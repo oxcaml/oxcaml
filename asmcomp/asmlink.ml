@@ -77,6 +77,26 @@ let emit_ocamlrunparam ~ppf_dump =
            { sym_name = "caml_ocamlrunparam"; sym_global = Global };
          Cmm.Cstring (!Clflags.ocamlrunparam ^ "\000") ])
 
+(* With [-gated-trace-pc-guard-define-gate], the startup file defines the gate
+   of [Cfg_trace_pc_guard]. This definition takes precedence over the weak ones
+   of instrumented units. *)
+let emit_trace_pc_guard_gate () =
+  if !Clflags.gated_trace_pc_guard_define_gate
+  then (
+    if !Clflags.llvm_backend
+    then
+      Misc.fatal_error
+        "-gated-trace-pc-guard-define-gate is not supported with -llvm-backend";
+    let module D = Asm_targets.Asm_directives in
+    let gate = Asm_targets.Asm_symbol.create_global Cfg_trace_pc_guard.gate in
+    D.switch_to_section Trace_pc_guard_gate;
+    D.global gate;
+    D.type_symbol gate ~ty:Object;
+    D.align ~fill:Zero ~bytes:8;
+    D.define_symbol_label ~section:Trace_pc_guard_gate gate;
+    D.int64 0L;
+    D.size gate)
+
 let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
   Location.input_name := "caml_startup";
@@ -153,6 +173,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   in
   compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
+  emit_trace_pc_guard_gate ();
   if !Clflags.llvm_backend
   then Llvmize.end_assembly ()
   else Emit.end_assembly ()
@@ -196,6 +217,7 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
     else []
   in
   compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
+  emit_trace_pc_guard_gate ();
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   (* this is to force a reference to all units, otherwise the linker might drop
      some of them (in case of libraries) *)

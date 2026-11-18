@@ -328,6 +328,9 @@ let read_one_param ppf position name v =
       int_setter ppf "afl-inst-ratio" afl_inst_ratio v
   | "gated-trace-pc-guard" ->
       set "gated-trace-pc-guard" [ Clflags.gated_trace_pc_guard ] v
+  | "gated-trace-pc-guard-define-gate" ->
+      set "gated-trace-pc-guard-define-gate"
+        [ Clflags.gated_trace_pc_guard_define_gate ] v
   | "annot" -> set "annot" [ Clflags.annotations ] v
   | "absname" -> set "absname" [ Clflags.absname ] v
   | "compat-32" -> set "compat-32" [ bytecode_compatible_32 ] v

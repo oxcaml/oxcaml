@@ -1193,6 +1193,12 @@ let mk_gated_trace_pc_guard f =
   \     -gdwarf-inlined-frames unless\n\
   \     -gno-dwarf-inlined-frames is given"
 
+let mk_gated_trace_pc_guard_define_gate f =
+  "-gated-trace-pc-guard-define-gate", Arg.Unit f,
+  "When linking, define __sancov_should_track (the
+  \     gate of -gated-trace-pc-guard) in the startup file,
+  \     as a zero-initialised symbol that is not weak"
+
 let mk__ f =
   "-", Arg.String f,
   "<file>  Treat <file> as a file name (even if it starts with `-')"
@@ -1470,6 +1476,7 @@ module type Optcomp_options = sig
   val _afl_instrument : unit -> unit
   val _afl_inst_ratio : int -> unit
   val _gated_trace_pc_guard : unit -> unit
+  val _gated_trace_pc_guard_define_gate : unit -> unit
   val _function_sections : unit -> unit
   val _save_ir_after : string -> unit
   val _save_ir_before : string -> unit
@@ -1801,6 +1808,7 @@ struct
     mk_afl_instrument F._afl_instrument;
     mk_afl_inst_ratio F._afl_inst_ratio;
     mk_gated_trace_pc_guard F._gated_trace_pc_guard;
+    mk_gated_trace_pc_guard_define_gate F._gated_trace_pc_guard_define_gate;
     mk_annot F._annot;
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
@@ -2625,6 +2633,8 @@ module Default = struct
     let _afl_inst_ratio n = afl_inst_ratio := n
     let _afl_instrument = set afl_instrument
     let _gated_trace_pc_guard = set gated_trace_pc_guard
+    let _gated_trace_pc_guard_define_gate =
+      set gated_trace_pc_guard_define_gate
     let _function_sections () =
       assert Config.function_sections;
       Compenv.first_ccopts := ("-ffunction-sections" ::(!Compenv.first_ccopts));

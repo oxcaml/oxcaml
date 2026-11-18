@@ -721,6 +721,7 @@ let ocaml_ignored_flags =
     "-ddwarf-metrics";
     "-afl-instrument";
     "-gated-trace-pc-guard";
+    "-gated-trace-pc-guard-define-gate";
     "-probes";
     "-no-probes";
     "-probes-optimized";
