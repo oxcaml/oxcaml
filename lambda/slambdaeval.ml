@@ -956,8 +956,8 @@ and eval_prim env loc prim =
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
   | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _
-  | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
-  | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
+  | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pidx_array_advance _
+  | Pwith_stack | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace | Preperform | Pccall _ | Praise _ | Psequand
   | Psequor | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _ | Pstringlength
   | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu | Pbytessetu

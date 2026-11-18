@@ -925,6 +925,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         Blambda.Prim
           (Ccall "caml_deepen_idx_bytecode", [path_prefix; path_suffix])
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pidx_array_advance _ ->
+      (* In bytecode, the first position of the index of an array element is
+         its position in the array *)
+      binary (Ccall "caml_idx_array_advance_bytecode")
     | Pfield_computed _sem -> binary Getvectitem
     | Psetfield (n, _ptr, _init) -> binary (Setfield n)
     | Psetfield_computed (_ptr, _init) -> ternary Setvectitem

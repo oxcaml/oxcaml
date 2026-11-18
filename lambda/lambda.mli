@@ -192,6 +192,10 @@ type primitive =
   | Pmake_idx_array of
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
+  | Pidx_array_advance of array_kind
+    (** [Pidx_array_advance ak] takes the index of an element of an array of
+        kind [ak] and a tagged integer [n], and returns the index of the
+        element [n] positions later *)
   (* Context switches *)
   | Pwith_stack
   | Pwith_stack_preemptible

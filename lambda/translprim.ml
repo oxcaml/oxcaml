@@ -2873,7 +2873,7 @@ let lambda_primitive_needs_event_after = function
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
-  | Pidx_deepen _
+  | Pidx_deepen _ | Pidx_array_advance _
 
   | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Praise _

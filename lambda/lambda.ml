@@ -232,6 +232,7 @@ type primitive =
   | Pmake_idx_array of
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
+  | Pidx_array_advance of array_kind
   (* Context switches *)
   | Pwith_stack
   | Pwith_stack_preemptible
@@ -3152,6 +3153,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmake_idx_mixed_field _
   | Pmake_idx_array _
   | Pidx_deepen _
+  | Pidx_array_advance _
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Punbox _ ->
     if Clflags.target_is_native () then None
@@ -3349,7 +3351,7 @@ let primitive_can_raise prim =
   | Preinterpret_tuple_as_boxed_vector _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
-  | Pidx_deepen _
+  | Pidx_deepen _ | Pidx_array_advance _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
@@ -3703,7 +3705,7 @@ let primitive_result_layout (p : primitive) =
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts
   | Parray_element_size_in_bytes _ -> layout_int
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
-  | Pidx_deepen _ ->
+  | Pidx_deepen _ | Pidx_array_advance _ ->
     Punboxed_or_untagged_integer Unboxed_int64
   | Pfloatfield _ -> layout_boxed_float Boxed_float64
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
