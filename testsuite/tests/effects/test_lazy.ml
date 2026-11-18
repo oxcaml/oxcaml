@@ -2,7 +2,6 @@
    multicore;
    { bytecode; }
    { native; }
-   { jsir; }
 *)
 
 open Effect
