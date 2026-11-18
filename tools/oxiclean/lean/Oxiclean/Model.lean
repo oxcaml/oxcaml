@@ -36,10 +36,6 @@ inductive BinaryScalarOperation : Type where
 structure Immediate : Type where
   bitsAboveLsb : BitVec 63
 
--- Defined separately to allow custom import behavior.
-structure UpstreamCompilationUnit : Type where
-  signature : ModuleType
-
 inductive BlockKind : Type where
   | values
   | bytes
@@ -68,7 +64,7 @@ mutual
         (immediates : List ImmediateSwitchCase)
         (blocks : List BlockSwitchCase)
         (failAction : Option Expr)
-    | upstreamCompilationUnit (compilationUnit : UpstreamCompilationUnit)
+    | upstreamCompilationUnit (signature : ModuleType)
     | val (value : Value)
     | var (deBruijn : Nat)
 

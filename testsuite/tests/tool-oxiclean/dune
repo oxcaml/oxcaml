@@ -109,3 +109,53 @@
    (diff even.impl.json.expected even.impl.json)
    (diff even.intf.json.expected even.intf.json)
    (run lean %{dep:Even.lean}))))
+
+(rule
+ (targets downstream.cmi downstream.cmti downstream.cmt)
+ (deps
+  (:src downstream.mli downstream.ml)
+  even.cmi
+  (glob_files ../../../stdlib/build/*.cmi))
+ (action
+  (run
+   %{exe:../../../main_native.exe}
+   -I
+   ../../../stdlib/build
+   -I
+   .
+   -bin-annot
+   -stop-after
+   typing
+   -c
+   %{src})))
+
+(rule
+ (targets
+  downstream.intf.json
+  downstream.impl.json
+  extracted_oxcaml_downstream.lean)
+ (deps
+  even.cmi
+  (glob_files ../../../stdlib/build/*.cmi))
+ (mode (promote (until-clean) (only *.json)))
+ (action
+  (run
+   %{exe:../../../tools/oxiclean/oxiclean.exe}
+   %{dep:downstream.cmti}
+   %{dep:downstream.cmt})))
+
+(rule
+ (targets extracted_oxcaml_downstream.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  downstream.intf.json
+  downstream.impl.json
+  extracted_oxcaml_even.olean
+  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+ (action
+  (run lean -o %{targets} %{dep:extracted_oxcaml_downstream.lean})))
+
+(rule
+ (alias downstream)
+ (deps extracted_oxcaml_downstream.olean)
+ (action (progn)))

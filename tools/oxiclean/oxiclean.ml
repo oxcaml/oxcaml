@@ -33,7 +33,7 @@ let get_intf_from_cmti (cmti : Cmt_format.cmt_infos)
   end
 
 let get_impl_from_cmt (intf : Typedtree.signature) (cmt : Cmt_format.cmt_infos)
-    : Lambda.lambda =
+    : Compilation_unit.t list * Lambda.lambda =
   let structure : Typedtree.structure =
     begin match cmt.cmt_annots with
     | Implementation structure -> structure
@@ -62,7 +62,7 @@ let get_impl_from_cmt (intf : Typedtree.signature) (cmt : Cmt_format.cmt_infos)
       ~modes:(Includecore.Specific ((mode, None), mode))
       structure.str_type "(inferred signature)" intf.sig_type Shape.dummy_mod
   in
-  let { code = tlambda; _ } : Lambda.program =
+  let { code = tlambda; required_globals; _ } : Lambda.program =
     Translmod.transl_implementation cmt.cmt_modname
       (structure, coercion, None) ~loc:Location.none
   in
@@ -79,7 +79,7 @@ let get_impl_from_cmt (intf : Typedtree.signature) (cmt : Cmt_format.cmt_infos)
       ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
       ~gdwarf_may_alter_codegen:false
   in
-  lambda
+  (Compilation_unit.Set.elements required_globals, lambda)
 
 (* Write [json] to [filename_without_extension], extending it with [suffix]. *)
 let write_json_to_file (filename : string) (json : Json.t) : unit =
@@ -89,9 +89,13 @@ let write_json_to_file (filename : string) (json : Json.t) : unit =
   in
   Out_channel.with_open_text filename write
 
-let lean_file_contents : string =
-  "import Oxiclean.BuildSystem\n\n\
-   _do_not_use_this_outside_automatically_generated_files%\n"
+let lean_file_contents ~(imports : string list) : string =
+  let import (name : string) : string =
+    "import extracted_oxcaml_" ^ String.uncapitalize_ascii name ^ "\n"
+  in
+  "import Oxiclean.BuildSystem\n"
+  ^ String.concat "" (List.map import imports)
+  ^ "\n_do_not_use_this_outside_automatically_generated_files%\n"
 
 (* Handle the user's supplied filenames. *)
 let run ~(cmti_filename : string) ~(cmt_filename : string) : unit =
@@ -103,7 +107,8 @@ let run ~(cmti_filename : string) ~(cmt_filename : string) : unit =
   let cmt = Cmt_format.read_cmt cmt_filename in
   check_from_same_compilation_unit cmti cmt;
   let intf = get_intf_from_cmti cmti in
-  let impl = get_impl_from_cmt intf cmt in
+  let (imports, impl) = get_impl_from_cmt intf cmt in
+  let imports = List.map Compilation_unit.name_as_string imports in
   let intf = Convert.intf intf in
   let impl = Convert.impl impl in
   let filepath = Filename.remove_extension cmt_filename in
@@ -116,7 +121,7 @@ let run ~(cmti_filename : string) ~(cmt_filename : string) : unit =
   Serialize.intf intf |> write_json_to_file intf_filepath;
   Serialize.impl impl |> write_json_to_file impl_filepath;
   Out_channel.with_open_text lean_filepath (fun channel ->
-    Out_channel.output_string channel lean_file_contents)
+    Out_channel.output_string channel (lean_file_contents ~imports))
 
 (* Parse command-line arguments and invoke the main program behavior. *)
 let main () : unit =

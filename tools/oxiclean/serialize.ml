@@ -48,8 +48,8 @@ let rec impl : Model.Expr.t -> Json.t = function
       ; "failAction", option impl failaction
       ]
     |> tag "switch"
-  | UpstreamCompilationUnit { path } ->
-    array string path |> tag "path" |> tag "compilationUnit" |> tag "upstreamCompilationUnit"
+  | UpstreamCompilationUnit { name } ->
+    string name |> tag "name" |> tag "upstreamCompilationUnit"
   | Value { value = v } ->
     value v |> tag "value" |> tag "val"
   | Var { de_bruijn } ->

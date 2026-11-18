@@ -1,7 +1,7 @@
 import Lean
 import Oxiclean.Model
 
-open Oxiclean.Model
+open Oxiclean.Model Lean Elab Command
 
 def BitVec.ofInt? {width : Nat} (i : Int)
     : Except String (BitVec width.succ) := do
@@ -22,6 +22,14 @@ instance : Lean.FromJson UInt8 where
     let n : Nat ← Lean.FromJson.fromJson? json
     let b8 : BitVec 8 ← BitVec.ofNat? n
     return UInt8.ofBitVec b8
+
+def Lean.Expr.mkList (type : Lean.Expr) : List Lean.Expr → Lean.Expr
+  | [] => mkApp (mkConst ``List.nil [.zero]) type
+  | x :: xs => mkApp3 (mkConst ``List.cons [.zero]) type x (mkList type xs)
+
+def Lean.Expr.mkOption (type : Lean.Expr) : Option Lean.Expr → Lean.Expr
+  | .none => mkApp (mkConst ``Option.none [.zero]) type
+  | .some x => mkApp2 (mkConst ``Option.some [.zero]) type x
 
 namespace Oxiclean.BuildSystem
 
@@ -92,20 +100,10 @@ deriving instance Lean.FromJson, Lean.ToExpr, Repr for
   IntegralBinaryScalarOperation
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for BinaryScalarOperation
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for Immediate
-deriving instance Lean.ToExpr, Repr for UpstreamCompilationUnit
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for BlockKind
 
-structure UpstreamCompilationUnitPath : Type where
-  path : List String
-deriving Lean.FromJson
-
-instance : Lean.FromJson UpstreamCompilationUnit where
-  fromJson? json := do
-    let { path := _ } : UpstreamCompilationUnitPath ← Lean.FromJson.fromJson? json
-    throw "TODO"
-
-deriving instance Lean.ToExpr, Repr for
-  Expr, Value, Indirection, Block, BlockContents, ScalarOperation,
+deriving instance Repr for
+  Model.Expr, Value, Indirection, Block, BlockContents, ScalarOperation,
   ImmediateSwitchCase, BlockSwitchCase
 
 -- TODO: remove when https://github.com/leanprover/lean4/pull/14959 is merged
@@ -127,55 +125,69 @@ namespace WorkaroundForPr14959
           (immediates : List ImmediateSwitchCase)
           (blocks : List BlockSwitchCase)
           (failAction : Option Expr)
-      | upstreamCompilationUnit (compilationUnit : UpstreamCompilationUnit)
+      | upstreamCompilationUnit (compilationUnit : String)
       | val (value : Value)
       | var (deBruijn : Nat)
-    deriving Lean.FromJson
+    deriving FromJson
   end Expr
 
-  def Expr.toModel
-      : Expr
-          Model.BlockSwitchCase
-          Model.ImmediateSwitchCase
-          Model.ScalarOperation
-          Model.Value →
-        Model.Expr
-    | .apply func arg => .apply func.toModel arg.toModel
-    | .block tag fields => .block tag (fields.map Expr.toModel)
-    | .field indexInto index => .field indexInto.toModel index
-    | .function body => .function body.toModel
-    | .letBinding bound body => .letBinding bound.toModel body.toModel
-    | .physicalEquality lhs rhs => .physicalEquality lhs.toModel rhs.toModel
-    | .scalarOperation operation => .scalarOperation operation
-    | .switch s ni nb i b .none => .switch s.toModel ni nb i b .none
-    | .switch s ni nb i b (.some f) =>
-      .switch s.toModel ni nb i b (.some f.toModel)
+  def Expr.toTerm
+      : Expr Lean.Expr Lean.Expr Lean.Expr Lean.Expr → Lean.Expr
+    | .apply func arg =>
+      mkApp2 (mkConst ``Model.Expr.apply) func.toTerm arg.toTerm
+    | .block tag fields =>
+      mkApp2 (mkConst ``Model.Expr.block) (toExpr tag)
+        (Lean.Expr.mkList (mkConst ``Model.Expr) (fields.map Expr.toTerm))
+    | .field indexInto index =>
+      mkApp2 (mkConst ``Model.Expr.field) indexInto.toTerm (toExpr index)
+    | .function body => mkApp (mkConst ``Model.Expr.function) body.toTerm
+    | .letBinding bound body =>
+      mkApp2 (mkConst ``Model.Expr.letBinding) bound.toTerm body.toTerm
+    | .physicalEquality lhs rhs =>
+      mkApp2 (mkConst ``Model.Expr.physicalEquality) lhs.toTerm rhs.toTerm
+    | .scalarOperation operation =>
+      mkApp (mkConst ``Model.Expr.scalarOperation) operation
+    | .switch scrutinee nImmediates nBlocks immediates blocks failAction =>
+      mkAppN (mkConst ``Model.Expr.switch)
+        #[ scrutinee.toTerm
+         , toExpr nImmediates
+         , toExpr nBlocks
+         , Lean.Expr.mkList (mkConst ``Model.ImmediateSwitchCase) immediates
+         , Lean.Expr.mkList (mkConst ``Model.BlockSwitchCase) blocks
+         , Lean.Expr.mkOption (mkConst ``Model.Expr)
+             (match failAction with
+              | .none => .none
+              | .some failAction => .some failAction.toTerm)
+         ]
     | .upstreamCompilationUnit compilationUnit =>
-      .upstreamCompilationUnit compilationUnit
-    | .val v => .val v
-    | .var i => .var i
+      mkApp (mkConst ``Model.Expr.upstreamCompilationUnit)
+        (mkConst
+          (`Oxiclean.Extracted ++ .mkSimple compilationUnit ++ `interface))
+    | .val value => mkApp (mkConst ``Model.Expr.val) value
+    | .var deBruijn => mkApp (mkConst ``Model.Expr.var) (toExpr deBruijn)
 
   section Value
     variable (Indirection : Type)
     inductive Value : Type where
       | immediate (imm : Immediate)
       | indirection (ptr : Indirection)
-    deriving Lean.FromJson
+    deriving FromJson
   end Value
 
-  def Value.toModel : Value Model.Indirection → Model.Value
-    | .immediate imm => .immediate imm
-    | .indirection ptr => .indirection ptr
+  def Value.toTerm : Value Lean.Expr → Lean.Expr
+    | .immediate imm => mkApp (mkConst ``Model.Value.immediate) (toExpr imm)
+    | .indirection ptr => mkApp (mkConst ``Model.Value.indirection) ptr
 
   section Indirection
     variable (Block : Type)
     inductive Indirection : Type where
       | noMutableFields (block : Block)
-    deriving Lean.FromJson
+    deriving FromJson
   end Indirection
 
-  def Indirection.toModel : Indirection Model.Block → Model.Indirection
-    | .noMutableFields block => .noMutableFields block
+  def Indirection.toTerm : Indirection Lean.Expr → Lean.Expr
+    | .noMutableFields block =>
+      mkApp (mkConst ``Model.Indirection.noMutableFields) block
 
   section BlockContents
     variable (Expr Value : Type)
@@ -183,16 +195,20 @@ namespace WorkaroundForPr14959
       | values (fields : List Value) : BlockContents
       | bytes (data : List UInt8) : BlockContents
       | closure (body : Expr) : BlockContents
-    deriving Lean.FromJson, Repr
+    deriving FromJson, Repr
   end BlockContents
 
-  def BlockContents.toModel? kind
-      (contents : BlockContents Model.Expr Model.Value)
-      : Except String (Model.BlockContents kind) :=
+  def BlockContents.toTerm? (kind : BlockKind)
+      (contents : BlockContents Lean.Expr Lean.Expr)
+      : Except String Lean.Expr :=
     match kind, contents with
-    | .values, .values fields => return .values fields
-    | .bytes, .bytes data => return .bytes data
-    | .closure, .closure body => return .closure body
+    | .values, .values fields =>
+      return mkApp (mkConst ``Model.BlockContents.values)
+        (Lean.Expr.mkList (mkConst ``Model.Value) fields)
+    | .bytes, .bytes data =>
+      return mkApp (mkConst ``Model.BlockContents.bytes) (toExpr data)
+    | .closure, .closure body =>
+      return mkApp (mkConst ``Model.BlockContents.closure) body
     | .notYetSupported, _ => throw "block kind not yet supported"
     | _, _ => throw s!"block kind mismatch: {repr kind} ≠ {repr contents}"
 
@@ -201,145 +217,121 @@ namespace WorkaroundForPr14959
     structure Block : Type where
       tag : UInt8
       contents : BlockContents Expr Value
-    deriving Lean.FromJson
+    deriving FromJson
   end Block
 
-  def Block.toModel? : Block Model.Expr Model.Value → Except String Model.Block
+  def Block.toTerm? : Block Lean.Expr Lean.Expr → Except String Lean.Expr
     | { tag, contents } => do
-      let contents ← contents.toModel? (BlockKind.ofTag tag)
-      return { tag, contents }
+      let contents ← contents.toTerm? (BlockKind.ofTag tag)
+      return mkApp2 (mkConst ``Model.Block.mk) (toExpr tag) contents
 
   section ScalarOperation
     variable (Expr : Type)
     inductive ScalarOperation : Type where
       | binary (operation : BinaryScalarOperation) (lhs : Expr) (rhs : Expr)
-    deriving Lean.FromJson
+    deriving FromJson
   end ScalarOperation
 
-  def ScalarOperation.toModel
-      : ScalarOperation Model.Expr → Model.ScalarOperation
-    | .binary operation lhs rhs => .binary operation lhs rhs
+  def ScalarOperation.toTerm : ScalarOperation Lean.Expr → Lean.Expr
+    | .binary operation lhs rhs =>
+      mkApp3 (mkConst ``Model.ScalarOperation.binary) (toExpr operation) lhs rhs
 
   section ImmediateSwitchCase
     variable (Expr : Type)
     structure ImmediateSwitchCase : Type where
       immediate : Immediate
       body : Expr
-    deriving Lean.FromJson
+    deriving FromJson
   end ImmediateSwitchCase
 
-  def ImmediateSwitchCase.toModel
-      : ImmediateSwitchCase Model.Expr → Model.ImmediateSwitchCase
-    | { immediate, body } => { immediate, body }
+  def ImmediateSwitchCase.toTerm : ImmediateSwitchCase Lean.Expr → Lean.Expr
+    | { immediate, body } =>
+      mkApp2 (mkConst ``Model.ImmediateSwitchCase.mk) (toExpr immediate) body
 
   section BlockSwitchCase
     variable (Expr : Type)
     structure BlockSwitchCase : Type where
       tag : UInt8
       body : Expr
-    deriving Lean.FromJson
+    deriving FromJson
   end BlockSwitchCase
 
-  def BlockSwitchCase.toModel
-      : BlockSwitchCase Model.Expr → Model.BlockSwitchCase
-    | { tag, body } => { tag, body }
+  def BlockSwitchCase.toTerm : BlockSwitchCase Lean.Expr → Lean.Expr
+    | { tag, body } =>
+      mkApp2 (mkConst ``Model.BlockSwitchCase.mk) (toExpr tag) body
 
   mutual
-    partial def Expr.fromJson? (json : Lean.Json)
-        : Except String Model.Expr := do
+    partial def Expr.fromJson? (json : Json)
+        : Except String Lean.Expr := do
       @instFromJsonExpr
-        Model.BlockSwitchCase
-        Model.ImmediateSwitchCase
-        Model.ScalarOperation
-        Model.Value
+        Lean.Expr
+        Lean.Expr
+        Lean.Expr
+        Lean.Expr
         ⟨BlockSwitchCase.fromJson?⟩
         ⟨ImmediateSwitchCase.fromJson?⟩
         ⟨ScalarOperation.fromJson?⟩
         ⟨Value.fromJson?⟩
       |>.fromJson? json
-      |>.map (·.toModel)
+      |>.map (·.toTerm)
 
-    partial def Value.fromJson? (json : Lean.Json)
-        : Except String Model.Value := do
+    partial def Value.fromJson? (json : Json)
+        : Except String Lean.Expr := do
       @instFromJsonValue
-        Model.Indirection
+        Lean.Expr
         ⟨Indirection.fromJson?⟩
       |>.fromJson? json
-      |>.map (·.toModel)
+      |>.map (·.toTerm)
 
-    partial def Indirection.fromJson? (json : Lean.Json)
-        : Except String Model.Indirection := do
+    partial def Indirection.fromJson? (json : Json)
+        : Except String Lean.Expr := do
       @instFromJsonIndirection
-        Model.Block
+        Lean.Expr
         ⟨Block.fromJson?⟩
       |>.fromJson? json
-      |>.map (·.toModel)
+      |>.map (·.toTerm)
 
-    partial def Block.fromJson? (json : Lean.Json)
-        : Except String Model.Block := do
+    partial def Block.fromJson? (json : Json)
+        : Except String Lean.Expr := do
       @instFromJsonBlock
-        Model.Expr
-        Model.Value
+        Lean.Expr
+        Lean.Expr
         ⟨Expr.fromJson?⟩
         ⟨Value.fromJson?⟩
       |>.fromJson? json
-      >>= Block.toModel?
+      >>= Block.toTerm?
 
-    partial def ScalarOperation.fromJson? (json : Lean.Json)
-        : Except String Model.ScalarOperation := do
+    partial def ScalarOperation.fromJson? (json : Json)
+        : Except String Lean.Expr := do
       @instFromJsonScalarOperation
-        Model.Expr
+        Lean.Expr
         ⟨Expr.fromJson?⟩
       |>.fromJson? json
-      |>.map (·.toModel)
+      |>.map (·.toTerm)
 
-    partial def ImmediateSwitchCase.fromJson? (json : Lean.Json)
-        : Except String Model.ImmediateSwitchCase := do
+    partial def ImmediateSwitchCase.fromJson? (json : Json)
+        : Except String Lean.Expr := do
       @instFromJsonImmediateSwitchCase
-        Model.Expr
+        Lean.Expr
         ⟨Expr.fromJson?⟩
       |>.fromJson? json
-      |>.map (·.toModel)
+      |>.map (·.toTerm)
 
-    partial def BlockSwitchCase.fromJson? (json : Lean.Json)
-        : Except String Model.BlockSwitchCase := do
+    partial def BlockSwitchCase.fromJson? (json : Json)
+        : Except String Lean.Expr := do
       @instFromJsonBlockSwitchCase
-        Model.Expr
+        Lean.Expr
         ⟨Expr.fromJson?⟩
       |>.fromJson? json
-      |>.map (·.toModel)
+      |>.map (·.toTerm)
   end
 end WorkaroundForPr14959
 
-instance : Lean.FromJson Expr where
-  fromJson? := WorkaroundForPr14959.Expr.fromJson?
-
-instance : Lean.FromJson Value where
-  fromJson? := WorkaroundForPr14959.Value.fromJson?
-
-instance : Lean.FromJson Indirection where
-  fromJson? := WorkaroundForPr14959.Indirection.fromJson?
-
-instance : Lean.FromJson Block where
-  fromJson? := WorkaroundForPr14959.Block.fromJson?
-
-instance : Lean.FromJson ScalarOperation where
-  fromJson? := WorkaroundForPr14959.ScalarOperation.fromJson?
-
-instance : Lean.FromJson ImmediateSwitchCase where
-  fromJson? := WorkaroundForPr14959.ImmediateSwitchCase.fromJson?
-
-instance : Lean.FromJson BlockSwitchCase where
-  fromJson? := WorkaroundForPr14959.BlockSwitchCase.fromJson?
-
 end Oxiclean.BuildSystem
 
-open Lean Elab Command
-
-def readJson {α : Type} [FromJson α] (path : System.FilePath) : IO α := do
+def readJson (path : System.FilePath) : IO Json := do
   let fileContents : String ← IO.FS.readFile path
-  let json : Json ← Json.parse fileContents |> IO.ofExcept
-  fromJson? json |> IO.ofExcept
+  Json.parse fileContents |> IO.ofExcept
 
 def addTopLevelDefinition (name : Name) (type : Lean.Expr) (value : Lean.Expr)
     : CoreM Unit :=
@@ -352,12 +344,14 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
     | throwError "{file} is not named `extracted_oxcaml_<unit>.lean`"
   let unit : String := unit.toString
   let ns : Name := `Oxiclean.Extracted ++ .mkSimple unit.capitalize
-  let interface : Oxiclean.Model.ModuleType ←
-    file.withFileName s!"{unit}.intf.json" |> readJson
-  let implementation : Oxiclean.Model.Expr ←
-    file.withFileName s!"{unit}.impl.json" |> readJson
+  let interface : Json ← file.withFileName s!"{unit}.intf.json" |> readJson
+  let implementation : Json ← file.withFileName s!"{unit}.impl.json" |> readJson
+  let interface : Oxiclean.Model.ModuleType ← fromJson? interface |> IO.ofExcept
+  let implementation : Lean.Expr ←
+    Oxiclean.BuildSystem.WorkaroundForPr14959.Expr.fromJson? implementation
+    |> IO.ofExcept
   liftCoreM do
     addTopLevelDefinition (ns ++ `interface)
       (mkConst ``Oxiclean.Model.ModuleType) (toExpr interface)
     addTopLevelDefinition (ns ++ `implementation)
-      (mkConst ``Oxiclean.Model.Expr) (toExpr implementation)
+      (mkConst ``Oxiclean.Model.Expr) implementation

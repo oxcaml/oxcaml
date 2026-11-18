@@ -99,7 +99,7 @@ module rec Expr : sig
         ; failaction : t option
         }
     | UpstreamCompilationUnit of
-        { path : string list
+        { name : string
         }
     | Value of
         { value : Value.t

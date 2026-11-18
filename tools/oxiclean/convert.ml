@@ -97,10 +97,7 @@ and primitive (context : Ident.t list) (args : Lambda.lambda list)
     end
   | Pgetglobal (compilation_unit, _) ->
     UpstreamCompilationUnit
-      { path =
-          Compilation_unit.full_path compilation_unit
-          |> List.map Compilation_unit.Name.to_string
-      }
+      { name = Compilation_unit.name_as_string compilation_unit }
   | Pmakeblock (tag, Immutable, _, _) ->
     Block { tag; fields = List.map (impl_in_scope context) args }
   | Pphys_equal Eq ->
