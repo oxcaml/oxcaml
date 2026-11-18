@@ -1159,12 +1159,13 @@ let value_bindings sub (rec_flag, list) =
 
 let case
   : type k . mapper -> k case -> k case
-  = fun sub {c_lhs; c_guard; c_rhs; c_cont} ->
+  = fun sub {c_lhs; c_guard; c_rhs; c_cont; c_generalized} ->
   {
     c_lhs = sub.pat sub c_lhs;
     c_guard = Option.map (sub.expr sub) c_guard;
     c_rhs = sub.expr sub c_rhs;
-    c_cont
+    c_cont;
+    c_generalized
   }
 
 let value_binding sub x =
@@ -1173,7 +1174,8 @@ let value_binding sub x =
   let vb_expr = sub.expr sub x.vb_expr in
   let vb_attributes = sub.attributes sub x.vb_attributes in
   let vb_rec_kind = x.vb_rec_kind in
-  {vb_loc; vb_pat; vb_expr; vb_attributes; vb_sort = x.vb_sort; vb_rec_kind}
+  {vb_loc; vb_pat; vb_expr; vb_attributes; vb_sort = x.vb_sort; vb_rec_kind;
+   vb_generalized = x.vb_generalized}
 
 let env _sub x = x
 

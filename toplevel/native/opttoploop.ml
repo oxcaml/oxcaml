@@ -463,7 +463,8 @@ let name_expression ~loc ~attrs sort exp =
       vb_rec_kind = Dynamic;
       vb_attributes = attrs;
       vb_loc = loc;
-      vb_sort = sort }
+      vb_sort = sort;
+      vb_generalized = [] }
   in
   let item =
     { str_desc = Tstr_value(Nonrecursive, [vb]);
