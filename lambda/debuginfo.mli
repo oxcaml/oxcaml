@@ -24,6 +24,9 @@ module Scoped_location : sig
     | Sc_method_definition
     | Sc_partial_or_eta_wrapper
     | Sc_lazy
+    | Sc_compiler_generated
+        (** A function the compiler derives from the enclosing one: see
+            [enter_compiler_generated]. *)
 
   val equal_scope_item : scope_item -> scope_item -> bool
 

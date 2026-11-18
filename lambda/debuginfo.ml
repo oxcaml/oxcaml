@@ -28,6 +28,7 @@ module Scoped_location = struct
     | Sc_method_definition
     | Sc_partial_or_eta_wrapper
     | Sc_lazy
+    | Sc_compiler_generated
 
   let equal_scope_item si1 si2 =
     match si1, si2 with
@@ -37,10 +38,11 @@ module Scoped_location = struct
     | Sc_class_definition, Sc_class_definition
     | Sc_method_definition, Sc_method_definition
     | Sc_partial_or_eta_wrapper, Sc_partial_or_eta_wrapper
-    | Sc_lazy, Sc_lazy -> true
+    | Sc_lazy, Sc_lazy
+    | Sc_compiler_generated, Sc_compiler_generated -> true
     | (Sc_anonymous_function | Sc_value_definition | Sc_module_definition
       | Sc_class_definition | Sc_method_definition | Sc_partial_or_eta_wrapper
-      | Sc_lazy), _ -> false
+      | Sc_lazy | Sc_compiler_generated), _ -> false
 
   type anonymous_counters =
     { next_function : int ref;
@@ -221,9 +223,11 @@ module Scoped_location = struct
   (* A function the compiler derives from the function defined by [scopes]:
      see [Structured_mangling.marker_payload]. The string form, which names
      functions in DWARF and assembly output, is left as it is, and so is the
-     zero_alloc assumption, which the derived function's body inherits. *)
+     zero_alloc assumption, which the derived function's body inherits. Its
+     own scope item tells consumers such as FDO that the function is not
+     anonymous: it stands for the function it derives from. *)
   let enter_compiler_generated ~scopes marker =
-    cons scopes Sc_partial_or_eta_wrapper (str scopes) ""
+    cons scopes Sc_compiler_generated (str scopes) ""
       ~assume_zero_alloc:(get_assume_zero_alloc ~scopes)
       (Some (Function (Structured_mangling.marker_payload marker)))
 
