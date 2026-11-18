@@ -1508,7 +1508,7 @@ and gen_perform (st : State.t) (env : Env.t) ty =
    which it can perform. *)
 and gen_handle (st : State.t) (env : Env.t) ty =
   Gen.when_
-    ((not (List.is_empty st.effects)) && st.handles_remaining > 0 && is_value ty)
+    (is_value ty && st.handles_remaining > 0 && not (List.is_empty st.effects))
     (fun () ->
       st.handles_remaining <- st.handles_remaining - 1;
       let eff = random_element st st.effects in
