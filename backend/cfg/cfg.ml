@@ -297,13 +297,7 @@ let iter_blocks_dfs : t -> f:(Label.t -> basic_block -> unit) -> unit =
         (fun succ_label -> iter succ_label)
         (successor_labels ~normal:true ~exn:true block))
   in
-  iter cfg.entry_label;
-  (* note: some block may not have been seen since we currently cannot remove
-     all non-reachable blocks. *)
-  if Label.Set.cardinal !marked <> Label.Tbl.length cfg.blocks
-  then
-    iter_blocks cfg ~f:(fun label block ->
-        if not (Label.Set.mem label !marked) then f label block)
+  iter cfg.entry_label
 
 let fold_blocks t ~f ~init = Label.Tbl.fold f t.blocks init
 
