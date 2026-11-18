@@ -37,18 +37,17 @@
     32-bit slot of a per-unit array that the emitter places in the
     [__sancov_guards] section. The linker concatenates the arrays of all units,
     including those of C code instrumented by clang, and provides
-    [__start___sancov_guards] and [__stop___sancov_guards]. As with clang, every
-    instrumented unit also has a constructor that passes these bounds to
+    [__start___sancov_guards] and [__stop___sancov_guards]. Every instrumented
+    unit also has a constructor that passes these bounds to
     [__sanitizer_cov_trace_pc_guard_init]; it is in a COMDAT group, so that it
     runs once per executable or shared object. Only ELF targets are supported.
 
-    As with clang, every instrumented unit defines [__sancov_should_track] as a
-    weak, hidden, zero-initialised 64-bit global in the [__sancov_gate] section,
-    so that probes can address it PC-relatively. A strong definition (e.g. in
-    the coverage runtime) takes precedence. With
-    [-gated-trace-pc-guard-define-gate], which clang has no equivalent of, the
-    startup file of an executable or shared object has such a definition, also
-    zero-initialised.
+    Every instrumented unit defines [__sancov_should_track] as a weak, hidden,
+    zero-initialised 64-bit global in the [__sancov_gate] section, so that
+    probes can address it PC-relatively. A strong definition (e.g. in the
+    coverage runtime) takes precedence. With
+    [-gated-trace-pc-guard-define-gate], the startup file of an executable or
+    shared object has such a definition, also zero-initialised.
 
     A probe is made of two operations, implemented for amd64 and arm64:
     [Trace_pc_guard_gate], a load of the gate, which is then tested, and
@@ -83,5 +82,7 @@ val guards_start : string
 
 val guards_stop : string
 
-(** The name of the constructor and of its COMDAT group, as chosen by clang. *)
+(** The name of the constructor and of its COMDAT group. It is the one that
+    clang uses, so that the linker keeps a single constructor among those of
+    OCaml and C units. *)
 val constructor : string

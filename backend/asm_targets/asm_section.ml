@@ -286,10 +286,11 @@ let details t first_occurrence =
       Misc.fatal_error
         "-gated-trace-pc-guard is not supported on this target system"
     | Trace_pc_guards, arch, _ ->
-      (* Writable data, named as by clang. The section name is a valid C
-         identifier, so that the linker defines [__start___sancov_guards] and
-         [__stop___sancov_guards] around the concatenation of the guard arrays
-         of all compilation units. *)
+      (* Writable data. The section has the name that clang uses, so that the
+         linker concatenates the guard arrays of all compilation units, C ones
+         included. That name is a valid C identifier, so that the linker defines
+         [__start___sancov_guards] and [__stop___sancov_guards] around the
+         result. *)
       let progbits =
         match arch with
         | ARM | AArch64 -> "%progbits"
@@ -297,7 +298,7 @@ let details t first_occurrence =
       in
       ["__sancov_guards"], Some "aw", [progbits]
     | Trace_pc_guard_gate, arch, _ ->
-      (* Writable data, named as by clang. *)
+      (* Writable data. *)
       let progbits =
         match arch with
         | ARM | AArch64 -> "%progbits"

@@ -58,7 +58,7 @@ let is_unreachable (block : Cfg.basic_block) =
 
 (* A probe can only record a critical edge if a block is inserted on it.
    Exceptional edges cannot be split, but they still count towards the number of
-   successors. As in LLVM, edges to unreachable blocks are left alone. *)
+   successors. Edges to unreachable blocks are left alone. *)
 let split_critical_edges cfg_with_layout =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   let critical_edges =
