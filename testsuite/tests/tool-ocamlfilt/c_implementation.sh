@@ -199,7 +199,23 @@ EOF
     | awk -F "$TAB" '{
         print $1 "\t" ($1 == $2 ? "(unchanged)" : $2 == "" ? "(empty)" : $2)
       }' \
-    | column -t -s "$TAB"
+    | awk -F "$TAB" '
+        # column -t -s TAB, in POSIX awk, as in e2e_table.sh: left-justify
+        # each column to its widest cell, two spaces between columns, last
+        # column unpadded. (column is not in the nix build sandbox.)
+        { nf[NR] = NF
+          for (i = 1; i <= NF; i++) {
+            cell[NR, i] = $i
+            if (length($i) > w[i]) w[i] = length($i)
+          } }
+        END {
+          for (r = 1; r <= NR; r++) {
+            line = ""
+            for (i = 1; i < nf[r]; i++)
+              line = line sprintf("%-" w[i] "s  ", cell[r, i])
+            print line cell[r, nf[r]]
+          }
+        }'
 fi
 
 for obj in "$@"; do
