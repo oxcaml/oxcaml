@@ -1,0 +1,68 @@
+{
+  "letBinding": {
+    "bound": {"function": {"nParams": 1, "body": {"var": {"deBruijn": 0}}}},
+    "body": {
+      "letBinding": {
+        "bound": {
+          "function": {
+            "nParams": 1,
+            "body": {
+              "switch": {
+                "scrutinee": {
+                  "physicalEquality": {
+                    "negated": false,
+                    "lhs": {
+                      "scalarOperation": {
+                        "operation": {
+                          "binary": {
+                            "operation": {"integral": {"operation": "mod"}},
+                            "lhs": {"var": {"deBruijn": 0}},
+                            "rhs": {
+                              "value": {
+                                "value": {"immediate": {"bitsAboveLsb": 2}}
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "value": {"value": {"immediate": {"bitsAboveLsb": 0}}}
+                    }
+                  }
+                },
+                "nConsts": 2,
+                "nBlocks": 0,
+                "consts": [
+                  {
+                    "case": 0,
+                    "bodyIfMatched": {
+                      "value": {"value": {"immediate": {"bitsAboveLsb": 0}}}
+                    }
+                  },
+                  {
+                    "case": 1,
+                    "bodyIfMatched": {
+                      "block": {
+                        "tag": 0,
+                        "fields": [{"var": {"deBruijn": 0}}]
+                      }
+                    }
+                  }
+                ],
+                "blocks": [],
+                "failaction": null
+              }
+            }
+          }
+        },
+        "body": {
+          "block": {
+            "tag": 0,
+            "fields": [{"var": {"deBruijn": 0}}, {"var": {"deBruijn": 1}}]
+          }
+        }
+      }
+    }
+  }
+}

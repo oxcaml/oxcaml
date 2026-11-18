@@ -1,2 +1,2 @@
-val intf : Model.Intf.t -> Json.t
-val impl : Model.Impl.t -> Json.t
+val intf : Model.Type.t -> Json.t
+val impl : Model.Expression.t -> Json.t

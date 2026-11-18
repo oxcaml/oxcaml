@@ -101,7 +101,7 @@ let run ~(cmti_filename : string) ~(cmt_filename : string) : unit =
   let intf = get_intf_from_cmti cmti in
   let impl = get_impl_from_cmt intf cmt in
   let intf = Convert.intf intf in
-  let impl = Convert.impl intf impl in
+  let impl = Convert.impl impl in
   let intf_filepath = Filename.remove_extension cmti_filename ^ ".intf.json" in
   let impl_filepath = Filename.remove_extension cmt_filename ^ ".impl.json" in
   Serialize.intf intf |> write_json_to_file intf_filepath;

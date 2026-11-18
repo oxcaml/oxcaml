@@ -40,3 +40,36 @@
   repr.impl.json)
  (action
   (diff repr.impl.json.expected repr.impl.json)))
+
+(rule
+ (targets even.cmi even.cmti even.cmt)
+ (deps
+  (:src even.mli even.ml)
+  (glob_files ../../../stdlib/build/*.cmi))
+ (action
+  (run
+   %{exe:../../../main_native.exe}
+   -I
+   ../../../stdlib/build
+   -bin-annot
+   -stop-after
+   typing
+   -c
+   %{src})))
+
+(rule
+ (targets even.intf.json even.impl.json)
+ (deps (glob_files ../../../stdlib/build/*.cmi))
+ (action
+  (run
+   %{exe:../../../tools/oxiclean/oxiclean.exe}
+   %{dep:even.cmti}
+   %{dep:even.cmt})))
+
+(rule
+ (alias even)
+ (deps
+  even.intf.json
+  even.impl.json)
+ (action
+  (diff even.impl.json.expected even.impl.json)))
