@@ -37,30 +37,71 @@ module Non_empty_row : sig
   val map_first : ('a -> 'b) -> 'a t -> 'b t
 end
 
-(** Like a list, a slice is either empty or has a first element and a rest, so
-    slice patterns are viewed as chains of cells: a non-empty slice pattern is
-    its first element and the slice pattern for the rest of the slice, which
-    has its other elements. Without elements, [[&| .. |]] is viewed as [_] and
-    [[&| .. as x |]] as [x]. *)
+(** Slice patterns either match slices of an exact length
+    ([[&| p1; ...; pn |]]) or slices of a minimum length
+    ([[&| p1; ...; pk; ..; q1; ...; qm |]]). *)
 module Slice : sig
-  type shape =
-    | Empty
-    | Front of pattern * pattern
-        (** The first element, and a pattern for the rest of the slice *)
+  (** The lengths a slice pattern matches *)
+  type kind =
+    | Closed of int  (** exactly this length *)
+    | Open of { prefix : int; suffix : int }
+        (** at least [prefix + suffix], with a rest between them *)
 
-  type view =
-    | Shape of shape
-    | Rest of slice_rest_var option
-        (** [[&| .. |]] or [[&| .. as x |]] *)
+  (** The element patterns of a slice pattern, without the variable bound by
+      its rest *)
+  type elements =
+    | Elements_closed of pattern list
+    | Elements_open of { prefix : pattern list; suffix : pattern list }
 
-  (** [view p mutability sort elements]: the view of the slice pattern [p]
-      with these fields. Elements after the rest are not supported yet. *)
-  val view : pattern -> mutability -> Jkind.sort -> slice_elements -> view
+  (** Ignores the variable bound by the rest *)
+  val of_typed : slice_elements -> elements
 
-  (** [cons first rest]: the elements of a slice pattern with the first
-      element [first], whose rest is matched by [rest], which is [_], a
-      variable or a slice pattern *)
-  val cons : pattern -> pattern -> slice_elements
+  val to_typed : elements -> slice_elements
+
+  val kind : elements -> kind
+
+  (** All element patterns, in order *)
+  val patterns : elements -> pattern list
+
+  (** The number of element patterns of this kind *)
+  val arity : kind -> int
+
+  (** Inverse of [patterns] *)
+  val of_patterns : kind -> pattern list -> elements
+
+  (** Variable-length patterns are not alone in their signature, so the
+      lengths of a column of slice patterns are split into finitely many
+      classes that behave like constructors, as rustc does.
+
+      Let [F] be the largest fixed length and [P] and [S] the largest prefix
+      and suffix of the variable-length patterns in the column. If
+      [F + 1 >= P + S], increase [P] to [F + 1 - S], and let [L = P + S]. Then
+      all slices of length at least [L] are matched by the same patterns in
+      the column: by none of the fixed-length patterns, and by all of the
+      variable-length patterns, without their prefixes and suffixes
+      overlapping. Hence [split kinds] is [Closed 0], ..., [Closed (L - 1)]
+      and [Open { prefix = P; suffix = S }]. *)
+  val split : kind list -> kind list
+
+  (** [covers d h]: whether a pattern of kind [h] matches all slices of the
+      constructor [d] of a split *)
+  val covers : kind -> kind -> bool
+
+  (** [args d h ps]: the arguments of a pattern of kind [h] with element
+      patterns [ps] for a constructor [d] that it covers: its prefix, then
+      wildcards for the elements between its prefix and suffix, then its
+      suffix. *)
+  val args : kind -> kind -> pattern list -> pattern list
+
+  (** [common_args e1 e2]: the constructors of the split of the lengths of
+      two slice patterns that both cover, with the arguments of both *)
+  val common_args :
+    elements -> elements -> (kind * pattern list * pattern list) list
+
+  (** [missing kinds]: given the constructors of a split that a column
+      contains, a kind of slices that none of them matches, if there is
+      one *)
+  val missing : kind list -> kind option
 end
 
 module Simple : sig
@@ -83,7 +124,7 @@ module Simple : sig
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
-    | `Slice of mutability * Jkind.sort * Slice.shape
+    | `Slice of mutability * Jkind.sort * Slice.elements
     | `Lazy of pattern
   ]
   type pattern = view pattern_data
@@ -130,6 +171,10 @@ module General : sig
         * Jkind.Sort.t
         * Mode.With_regionality.l
         * Types.type_expr
+    | `Slice_rest of
+        mutability * Jkind.sort * pattern list * slice_rest_var * pattern list
+        (** A slice pattern whose rest binds a variable, with its prefix and
+            suffix *)
   ]
   type pattern = view pattern_data
 
@@ -162,9 +207,8 @@ module Head : sig
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
-    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
-        (** [nonempty]: whether its arguments are an element and the rest of
-            the slice, rather than none *)
+    | Slice of { mutability : mutability; sort : Jkind.sort;
+                 kind : Slice.kind }
     | Lazy
 
   type t = desc pattern_data
