@@ -44,6 +44,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       file_name : string;
       crc : Digest.t;
       imports_cmx : Import_info.t list;
+      codegen_fingerprint : Codegen_variant.fingerprint;
+      polled : bool;
       (* for shared libs *)
       dynunit : Cmxs_format.dynunit option
     }
@@ -159,7 +161,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
               dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
               dynu_quoted_cmi = info.ui_quoted_cmi |> Array.of_list;
-              dynu_quoted_cmx = info.ui_quoted_cmx |> Array.of_list
+              dynu_quoted_cmx = info.ui_quoted_cmx |> Array.of_list;
+              dynu_codegen_fingerprint = info.ui_codegen_fingerprint;
+              dynu_polled = info.ui_polled
             }
       in
       let unit =
@@ -168,6 +172,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           defines = info.ui_defines;
           file_name = resolved_pathname;
           imports_cmx = info.ui_imports_cmx;
+          codegen_fingerprint = info.ui_codegen_fingerprint;
+          polled = info.ui_polled;
           dynunit
         }
       in
@@ -304,7 +310,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                         imports_list infos.lib_imports_cmx info.li_imports_cmx
                         |> Array.of_list;
                       dynu_quoted_cmi = quoted_cmi |> Array.of_list;
-                      dynu_quoted_cmx = quoted_cmx |> Array.of_list
+                      dynu_quoted_cmx = quoted_cmx |> Array.of_list;
+                      dynu_codegen_fingerprint = info.li_codegen_fingerprint;
+                      dynu_polled = info.li_polled
                     }
               in
               let imports_cmx =
@@ -316,6 +324,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                   defines = info.li_defines;
                   file_name = resolved_pathname;
                   imports_cmx;
+                  codegen_fingerprint = info.li_codegen_fingerprint;
+                  polled = info.li_polled;
                   dynunit
                 }
               in
@@ -341,6 +351,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     not (String.equal output_name "/dev/null")
 
   let link_shared ~ppf_dump linkenv objfiles output_name =
+    Oxcaml_flags.validate_codegen_variant ();
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
         let genfns = Generic_fns.Tbl.make () in
         let _full_paths, ml_objfiles, units_tolink, _ =
@@ -359,6 +370,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let link ~ppf_dump objfiles output_name =
     let shared = false in
+    Oxcaml_flags.validate_codegen_variant ();
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
         let stdlib = "stdlib" ^ Backend.ext_flambda_lib in
         let stdexit = "std_exit" ^ Backend.ext_flambda_obj in
@@ -513,6 +525,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         defines = u.ui_defines;
         crc;
         imports_cmx = u.ui_imports_cmx;
+        codegen_fingerprint = u.ui_codegen_fingerprint;
+        polled = u.ui_polled;
         dynunit = None
       }
     in

@@ -66,7 +66,21 @@ module Bytecode = struct
         (Symtable.initialized_compunits t.cu_reloc)
 
     let unsafe_module (t : t) = t.cu_primitives <> []
+
+    let codegen_fingerprint (_t : t) = []
+
+    (* Bytecode polls on loop back edges and applications; see
+       bytecomp/bytegen.ml (Kcheck_signals) and runtime/interp.c. *)
+    let polled (_t : t) = true
   end
+
+  (* Bytecode is codegen-variant-independent. *)
+  let host_codegen_fingerprint = None
+
+  (* Unused: [Unit_header.polled] is always [true], so the
+     non-polled-plugin check cannot fire; returning a constant avoids
+     binding a native primitive here. *)
+  let max_domain_count () = 1
 
   type handle =
     Stdlib.in_channel * filename * Digest.t * Symtable.global_map option
@@ -275,6 +289,14 @@ type error = DT.error =
   | Module_already_loaded of string
   | Private_library_cannot_implement_interface of string
   | Library_file_already_loaded_privately of { filename : string; }
+  | Inconsistent_codegen_variant of
+      { filename : string;
+        unit_name : string;
+        unit_fingerprint : string;
+        host_fingerprint : string; }
+  | Library_not_fully_polled of
+      { filename : string;
+        unit_name : string; }
 
 exception Error = DT.Error
 let error_message = DT.error_message

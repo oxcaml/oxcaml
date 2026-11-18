@@ -112,6 +112,12 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of Compilation_unit.t * Compilation_unit.t * string
+  | Inconsistent_codegen_variant of
+      { unit_name : Compilation_unit.t;
+        filename : string;
+        saved : Codegen_variant.fingerprint;
+        current : Codegen_variant.fingerprint;
+      }
 
 exception Error of error
 

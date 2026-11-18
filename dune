@@ -149,6 +149,8 @@
   numbers
   arg_helper
   clflags
+  codegen_variant_name
+  codegen_variant
   debug
   profile
   priority_queue
@@ -467,6 +469,21 @@
    (= %{context_name} "main"))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
+; Codegen-variant contexts (main-<name>, the complement of default/main):
+; the OxCaml flags plus the variant's per-axis flags. The per-context sexps
+; are written by the _build/_bootinstall recipe in Makefile.common-ox.
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (action
+  (copy
+   %{project_root}/duneconf/ocamlopt_flags_%{context_name}.sexp
+   %{targets})))
 
 ; Write empty files in an unconfigured tree
 (rule

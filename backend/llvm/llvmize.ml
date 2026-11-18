@@ -1910,7 +1910,8 @@ let define_auxiliary_functions t =
 (* Interface with the rest of the compiler *)
 
 let init ~output_prefix ~ppf_dump =
-  fail_if_not ~msg:"stack checks not supported" "init" Config.no_stack_checks;
+  fail_if_not ~msg:"stack checks not supported" "init"
+    (not !Clflags.stack_checks);
   let llvmir_filename = output_prefix ^ ".ll" in
   current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 
@@ -1935,7 +1936,7 @@ let invoke_clang_with_llvmir ~output_filename ~input_filename ~extra_flags =
     match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
   in
   let fp_flags =
-    if Config.with_frame_pointers
+    if !Clflags.frame_pointers
     then ["-fno-omit-frame-pointer"]
     else ["-fomit-frame-pointer"; "-momit-leaf-frame-pointer"]
   in

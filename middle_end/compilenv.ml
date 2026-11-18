@@ -30,6 +30,12 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of CU.t * CU.t * string
+  | Inconsistent_codegen_variant of
+      { unit_name : CU.t;
+        filename : string;
+        saved : Codegen_variant.fingerprint;
+        current : Codegen_variant.fingerprint;
+      }
 
 exception Error of error
 
@@ -137,6 +143,8 @@ let read_unit_info filename =
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
       ui_static_data = uir.uir_static_data;
       ui_lto_info = uir.uir_lto_info;
+      ui_codegen_fingerprint = uir.uir_codegen_fingerprint;
+      ui_polled = uir.uir_polled;
       ui_file_sections = sections;
     }
     in
@@ -209,6 +217,13 @@ let get_unit comp_unit =
           let (ui, crc) = read_unit_info filename in
           if not (CU.equal ui.ui_unit comp_unit) then
             raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
+          let current = Codegen_variant.current_fingerprint () in
+          if not (Codegen_variant.equal_fingerprint
+                    ui.ui_codegen_fingerprint current)
+          then
+            raise(Error(Inconsistent_codegen_variant
+              { unit_name = comp_unit; filename;
+                saved = ui.ui_codegen_fingerprint; current }));
           cache_zero_alloc_info ui.ui_zero_alloc_info;
           (Some ui, Some crc)
         with Not_found ->
@@ -320,6 +335,8 @@ let write_unit_info info filename =
     uir_external_symbols = Array.of_list info.ui_external_symbols;
     uir_static_data = info.ui_static_data;
     uir_lto_info = info.ui_lto_info;
+    uir_codegen_fingerprint = info.ui_codegen_fingerprint;
+    uir_polled = info.ui_polled;
     uir_sections_length = total_length;
   } in
   Misc.protect_output_to_file filename (fun oc ->
@@ -358,6 +375,12 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_static_data = static_data;
     ui_external_symbols = current_unit.uib_external_symbols;
     ui_lto_info = current_unit.uib_lto_info;
+    ui_codegen_fingerprint = Codegen_variant.current_fingerprint ();
+    (* The LLVM backend discards [Poll] instructions when lowering CFG to
+       LLVM IR (see [llvmize]), so a unit it compiles is not polled no
+       matter what [Clflags.poll_insertion] says; record it as nonpolled
+       so the link-time AND ([caml_code_fully_polled]) stays sound. *)
+    ui_polled = !Clflags.poll_insertion && not !Clflags.llvm_backend;
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
   }
@@ -398,6 +421,16 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
+  | Inconsistent_codegen_variant { unit_name; filename; saved; current } ->
+      fprintf ppf
+        "%a,@ which contains unit %a,@ was compiled with codegen \
+         configuration@ [%s],@ which is incompatible with this \
+         invocation's@ [%s]"
+        Location.Doc.quoted_filename filename
+        CU.print_as_inline_code unit_name
+        (Codegen_variant.string_of_fingerprint saved)
+        (Codegen_variant.string_of_fingerprint current);
+      Option.iter (fprintf ppf "@ (%s)") (Codegen_variant.missing_root_hint ())
 
 let () =
   Location.register_error_of_exn

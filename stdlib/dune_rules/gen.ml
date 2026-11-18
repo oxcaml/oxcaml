@@ -25,8 +25,10 @@ let fprintf = Printf.fprintf
 module StrTbl = Hashtbl.Make (String)
 module StrSet = Set.Make (String)
 
-(* Parse a file of "key1: val1 val2 val3" lines *)
-let parse_table filename : string list StrTbl.t =
+(* Parse a file of "key1: val1 val2 val3" lines.  A key may appear on
+   several lines (e.g. the per-variant "codegen_variant" records); every
+   occurrence is kept, in file order. *)
+let parse_table filename : string list list StrTbl.t =
   let table = StrTbl.create 10 in
   let process_line s =
     match String.index_opt s ':' with
@@ -38,7 +40,8 @@ let parse_table filename : string list StrTbl.t =
          |> String.split_on_char ' '
          |> List.filter (fun s -> s <> "")
        in
-       StrTbl.replace table key vals
+       let prev = try StrTbl.find table key with Not_found -> [] in
+       StrTbl.replace table key (prev @ [vals])
   in
   In_channel.with_open_text filename (fun ch ->
     while
@@ -70,7 +73,7 @@ let pp_flags ~awk_dir ~target =
   then sprintf " -pp \"awk -f %%{dep:%s/expand_module_aliases.awk}\"" awk_dir
   else ""
 
-let gen_rule ~ppf ~tgt_file ~base ~deps =
+let gen_rule ~ppf ~tgt_file ~base ~deps ~extra_native_flags =
   let ext, annot =
     match Filename.extension tgt_file with
     | ".cmo" -> `Cmo, true
@@ -111,6 +114,11 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
      in
      rule ~ppf ~target ~exts:["cmi";"cmsi";"cmti"] ~src ~deps ~action
   | `Cmx ->
+     let flags =
+       match extra_native_flags with
+       | "" -> flags
+       | extra -> extra ^ " " ^ flags
+     in
      let action =
        sprintf "(run %%{exe:../../boot_ocamlopt.exe} %s -cmi-file %s.cmi \
                  %%{read-lines:../../ocamlopt_stdlib_flags.txt} \
@@ -128,13 +136,94 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
 
 let settings_table = parse_table Sys.argv.(1)
 let setting s =
-  try StrTbl.find settings_table s
-  with Not_found -> failwith ("Missing build_setting " ^ s)
+  match StrTbl.find settings_table s with
+  | [vals] -> vals
+  | _ :: _ :: _ -> failwith ("Duplicated build_setting " ^ s)
+  | [] | exception Not_found -> failwith ("Missing build_setting " ^ s)
+
+(* All the value lines for a key that may legitimately appear on several
+   lines (or not at all). *)
+let multi_setting s =
+  try StrTbl.find settings_table s with Not_found -> []
+
+(* The per-variant build records written by Makefile.upstream, one line per
+   NON-default codegen variant in the configure-computed list:
+     "codegen_variant: <name>|<ocamlopt>|<cc>|<aspp>|<OCAMLPARAM>"
+   gen.ml consumes the flag fields verbatim: the name->flag derivation
+   lives in Makefile.codegen-variants (the Makefile-side encoding of
+   utils/codegen_variant_name.ml's tables).  Because no fingerprint covers
+   the runtime cc/aspp flags (and nothing else would catch OCAMLPARAM
+   drift), every parsed record is asserted against the flags the linked
+   copy of codegen_variant_name.ml derives for the name, failing
+   generation when the two encoders have drifted.  Kept as functions:
+   unconfigured trees have empty values for these keys, and only the code
+   paths that need them may evaluate them. *)
+type codegen_variant_record = {
+  cv_name : Codegen_variant_name.t;
+  cv_ocamlopt_flags : string list;
+  cv_cc_flags : string list;
+  cv_aspp_flags : string list;
+}
+
+let codegen_variant_records () =
+  multi_setting "codegen_variant"
+  |> List.map (fun vals ->
+    let line = String.concat " " vals in
+    match String.split_on_char '|' line with
+    | [name; ocamlopt; cc; aspp; ocamlparam] ->
+       let words s =
+         String.split_on_char ' ' s |> List.filter (fun s -> s <> "")
+       in
+       let name = String.trim name in
+       let cv_name =
+         match Codegen_variant_name.of_string name with
+         | Some n -> n
+         | None ->
+            failwith (sprintf "Invalid codegen variant name %S" name)
+       in
+       let check_drift column expected actual =
+         if not (List.equal String.equal expected actual) then
+           failwith
+             (sprintf
+                "codegen_variant record for %S: %s flags [%s] disagree \
+                 with [%s] from utils/codegen_variant_name.ml; the tables \
+                 in Makefile.codegen-variants have drifted from it"
+                name column
+                (String.concat " " actual)
+                (String.concat " " expected))
+       in
+       check_drift "ocamlopt"
+         (Codegen_variant_name.ocamlopt_flags cv_name) (words ocamlopt);
+       check_drift "cc"
+         (Codegen_variant_name.variant_cc_flags cv_name) (words cc);
+       check_drift "aspp"
+         (Codegen_variant_name.variant_aspp_flags cv_name) (words aspp);
+       check_drift "OCAMLPARAM"
+         [String.concat "," (Codegen_variant_name.ocamlparams cv_name)]
+         [String.trim ocamlparam];
+       { cv_name;
+         cv_ocamlopt_flags = words ocamlopt;
+         cv_cc_flags = words cc;
+         cv_aspp_flags = words aspp }
+    | _ -> failwith ("Malformed codegen_variant record: " ^ line))
+
+let codegen_default_variant () =
+  match setting "codegen_default_variant" with
+  | [name] ->
+     (match Codegen_variant_name.of_string name with
+      | Some n -> n
+      | None ->
+         failwith (sprintf "Invalid codegen_default_variant %S" name))
+  | v ->
+     failwith
+       (sprintf "codegen_default_variant should be a single name, got: %s"
+          (String.concat " " v))
 
 let module_deps_table filename =
   parse_table filename
   |> StrTbl.to_seq
-  |> Seq.map (fun (tgt_file, deps) ->
+  |> Seq.map (fun (tgt_file, deps_lines) ->
+    let deps = List.concat deps_lines in
     let strip s =
       if String.starts_with s ~prefix:"./" then
         String.sub s 2 (String.length s - 2)
@@ -156,36 +245,86 @@ let iter_module_deps table f =
     in
     f ~tgt_file ~base ~deps)
 
-(* Generate rules to build the stdlib (only used in bootstrap build) *)
-let write_stdlib_dune ppf =
+(* Generate rules to build the stdlib (only used in bootstrap build).
+
+   [variant] selects which stdlib tree the rules build:
+   - [`Base]: stdlib/build, the configure-default codegen mode.
+   - [`Variant name]: the sibling stdlib/build_<name> tree serving the named
+     NON-default codegen variant (absolute naming: build_fp is always the
+     frame-pointer tree). Only the native artifacts are rebuilt, by
+     boot_ocamlopt with the variant's per-axis ocamlopt flags (from the
+     codegen_variant build-settings record) prepended to the stdlib flags;
+     the codegen-variant-agnostic byte artifacts (.cmi/.cmo/.cma/...) are
+     copied from build/, and the variant's runtime archives (built by
+     @runtime_variants; suffixed by the variant name's projection onto the
+     runtime axes) are copied from runtime/, so that one variant tree is a
+     complete stdlib root for compiling and linking in that mode. When the
+     named variant is not in the configure-computed build list (it is the
+     default, its axes do not exist yet, or codegen variants are disabled),
+     only an empty alias is emitted, keeping every @stdlib_<name>
+     well-defined. *)
+let write_stdlib_dune ~variant ppf =
+  let alias_name =
+    match variant with
+    | `Base -> "stdlib"
+    | `Variant name -> "stdlib_" ^ name
+  in
+  let record =
+    match variant with
+    | `Base -> None
+    | `Variant name ->
+       List.find_opt
+         (fun r -> String.equal (Codegen_variant_name.to_string r.cv_name) name)
+         (codegen_variant_records ())
+  in
+  let active =
+    match variant with
+    | `Base -> true
+    | `Variant _ -> Option.is_some record
+  in
+  if not active then fprintf ppf "(alias (name %s))\n" alias_name else
+  let extra_native_flags =
+    match record with
+    | None -> ""
+    | Some r -> String.concat " " r.cv_ocamlopt_flags
+  in
+  let native_only = variant <> `Base in
   let table = module_deps_table Sys.argv.(3) in
   iter_module_deps table (fun ~tgt_file ~base ~deps ->
-    gen_rule ~ppf ~tgt_file ~base ~deps);
+    if (not native_only) || Filename.extension tgt_file = ".cmx" then
+      gen_rule ~ppf ~tgt_file ~base ~deps ~extra_native_flags);
   let modnames = setting "stdlib_modules" in
+  let native_flags_prefix =
+    match extra_native_flags with "" -> "" | extra -> extra ^ " "
+  in
   let action =
     modnames
     |> List.map (fun m -> sprintf "%%{dep:%s.cmx}" (get_target m))
     |> String.concat " "
-    |> sprintf "(run %%{exe:../../boot_ocamlopt.exe} -g -nostdlib -a \
+    |> sprintf "(run %%{exe:../../boot_ocamlopt.exe} %s-g -nostdlib -a \
                                                      -o stdlib.cmxa %s)"
+         native_flags_prefix
   in
   rule ~ppf ~target:"stdlib" ~exts:["cmxa";"a"] ~src:"stdlib.ml"
     ~deps:(modnames |> List.map (fun m -> get_target m ^ ".o"))
     ~action;
-  let action =
-    modnames
-    |> List.map (fun m -> sprintf "%%{dep:%s.cmo}" (get_target m))
-    |> String.concat " "
-    |> sprintf "(run %%{exe:../../main_native.exe} -g -nostdlib -a \
-                                                   -o stdlib.cma %s)"
-  in
-  rule ~ppf ~target:"stdlib" ~exts:["cma"] ~src:"stdlib.ml"
-    ~deps:(modnames |> List.map (fun m -> get_target m ^ ".cmo"))
-    ~action;
+  if not native_only then begin
+    let action =
+      modnames
+      |> List.map (fun m -> sprintf "%%{dep:%s.cmo}" (get_target m))
+      |> String.concat " "
+      |> sprintf "(run %%{exe:../../main_native.exe} -g -nostdlib -a \
+                                                     -o stdlib.cma %s)"
+    in
+    rule ~ppf ~target:"stdlib" ~exts:["cma"] ~src:"stdlib.ml"
+      ~deps:(modnames |> List.map (fun m -> get_target m ^ ".cmo"))
+      ~action
+  end;
   copy_files ~ppf "../../runtime/lib{asm,caml}run*.{a,so}";
   copy_files ~ppf "../../Makefile.config";
   copy_files ~ppf "../dune_rules/ld.conf";
-  fprintf ppf "%s\n" {|
+  if not native_only then
+    fprintf ppf "%s\n" {|
   (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
   (alias
     (name stdlib)
@@ -199,6 +338,41 @@ let write_stdlib_dune ppf =
        Makefile.config runtime-launch-info ld.conf
        stdlib/META dynlink/dynlink.cmxa))
   |}
+  else begin
+    (* Byte artifacts are codegen-variant-agnostic: copy them from the
+       default tree. (.ml files are regenerated locally as inputs of the
+       .cmx rules; .cmx/.o/.a/.cmxa are rebuilt with the variant flags
+       above.) *)
+    copy_files ~ppf "../build/*.{cmi,cmti,cmsi,cmo,cms,cmt}";
+    copy_files ~ppf "../build/*.mli";
+    copy_files ~ppf "../build/stdlib.cma";
+    fprintf ppf "%s\n" {|
+  (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
+  |};
+    (* "" when the variant shares the default's runtime archives (its name
+       projects onto the runtime axes like the default's). *)
+    let codegen_suff =
+      match record with
+      | Some r ->
+         Codegen_variant_name.runtime_archive_suffix r.cv_name
+           ~default:(codegen_default_variant ())
+      | None -> assert false
+    in
+    fprintf ppf
+      "(alias\n\
+      \  (name %s)\n\
+      \  (deps\n\
+      \     libcamlrun.a libcamlrund.a libcamlrun_pic.a libcamlrun_shared.so\n\
+      \     libasmrun%s.a libasmrund%s.a libasmrun_pic%s.a\n\
+      \     libasmrun_shared%s.so\n\
+      \     stdlib.cma stdlib.cmxa stdlib.a\n\
+      \     std_exit.cmo std_exit.o std_exit.cmx\n\
+      \     (glob_files *.{mli,cmi,cmti,cmsi,cmo,cms,cmt,cmx})\n\
+      \     (glob_files caml/*.{h,tbl})\n\
+      \     Makefile.config runtime-launch-info ld.conf\n\
+      \     dynlink/dynlink.cmxa))\n"
+      alias_name codegen_suff codegen_suff codegen_suff codegen_suff
+  end
 
 let write_stdlib_jsir_sources_dune ppf =
   setting "stdlib_modules" @ ["std_exit"] |> List.iter (fun m ->
@@ -278,23 +452,88 @@ let write_primitives_dune ppf =
     \ (action (run %%{dep:gen_primitives.sh} primitives %%{deps})))\n"
     (String.concat " " prim_files)
 
+(* The codegen dimension of one native runtime archive set: a name suffix
+   and the extra C/assembler flags its objects are compiled with. *)
+type codegen_archive_set = {
+  cg_suffix : string;
+  cg_cc_flags : string list;
+  cg_aspp_flags : string list;
+}
+
+let default_codegen =
+  { cg_suffix = ""; cg_cc_flags = []; cg_aspp_flags = [] }
+
 (* Generate runtime.dune for the bootstrap build (which builds the runtime) *)
 let write_runtime_dune ppf =
+  (* Codegen-variant dimension of the native runtime archives. THE NAMING
+     RULE LIVES HERE: the unsuffixed archive names (libasmrun.a,
+     libasmrund.a, ...) always serve the configure-time default codegen
+     variant, and a non-default variant's archives are suffixed with
+     "_" ^ the ABSOLUTE name of the variant's projection onto the
+     runtime axes, with '-' mapped to '_' (variants whose projection
+     equals the default's share the default archives). So a
+     no-frame-pointers configure additionally builds libasmrun_fp.a
+     etc., and a --enable-frame-pointers configure builds
+     libasmrun_base.a etc. The names must agree with
+     Codegen_variant.runtime_archive_suffix (utils/codegen_variant.ml,
+     via the copied utils/codegen_variant_name.ml) and with the
+     archive-name composition in asmcomp/asmlink.ml (runtime_lib), which
+     resolves these archives at link time. gen.ml is a standalone
+     generator that cannot depend on compilerlibs, so the configure
+     default and the per-variant flags reach it through build_settings.txt
+     (the codegen_default_variant key and the codegen_variant record
+     lines, written by Makefile.upstream from Makefile.config).
+
+     The per-record cc/aspp flags carry an explicit -D<macro>=1|0 for
+     every axis macro: m.h resolves an axis macro that is absent from the
+     command line to the configure default's value (the <macro>_DEFAULT
+     templates), so the default archives need no -D at all, and a variant
+     archive's explicit value takes precedence over that resolution (m.h
+     only defines what is not already defined).  The flags are appended
+     AFTER the configure-provided flags so that e.g. on an asan-default
+     configure the appended -fno-sanitize strips the earlier -fsanitize
+     (command-line order wins).  Assembly (.S) files need the macros too
+     (amd64.S and arm64.S include m.h and test WITH_FRAME_POINTERS), hence
+     the separate aspp list. *)
+  let codegen_archive_sets =
+    match codegen_variant_records () with
+    | [] -> []
+    | records ->
+       let default = codegen_default_variant () in
+       List.filter_map
+         (fun r ->
+           let suffix =
+             Codegen_variant_name.runtime_archive_suffix r.cv_name ~default
+           in
+           if suffix = "" then None
+           else
+             Some { cg_suffix = suffix;
+                    cg_cc_flags = r.cv_cc_flags;
+                    cg_aspp_flags = r.cv_aspp_flags })
+         records
+       (* One archive set per DISTINCT projection suffix: variants
+          differing only in non-runtime axes share archives (their records
+          carry identical runtime-axis cc/aspp flags by construction). *)
+       |> List.sort_uniq (fun c1 c2 ->
+            String.compare c1.cg_suffix c2.cg_suffix)
+  in
   let variant_suff ~variant =
     match variant with
     | `Normal -> ""
     | `Debug -> "d"
     | `PIC | `Shared -> "_pic"
   in
-  let obj_suff ~variant ~mode =
+  let obj_suff ~variant ~mode ~codegen =
     (match mode with
      | `Byte -> ".b"
      | `Native -> ".n") ^
     variant_suff ~variant ^
+    codegen.cg_suffix ^
     ".o"
   in
-  let obj_name ~variant ~mode src =
-    Filename.(basename src |> remove_extension) ^ obj_suff ~variant ~mode
+  let obj_name ~variant ~mode ~codegen src =
+    Filename.(basename src |> remove_extension)
+    ^ obj_suff ~variant ~mode ~codegen
   in
   let mode_flags ~mode =
     match mode with
@@ -316,13 +555,15 @@ let write_runtime_dune ppf =
   in
 
   (* object files *)
-  let compile_object ~variant ~mode src =
+  let compile_object ~variant ~mode ~codegen src =
     match Filename.extension src with
     | ".c" | ".S" ->
        let cmd =
          match Filename.extension src with
          | ".c" -> setting "cc" @ mode_flags ~mode @ variant_flags ~variant
+                   @ codegen.cg_cc_flags
          | ".S" -> setting "aspp" @ variant_flags ~variant
+                   @ codegen.cg_aspp_flags
          | s -> failwith ("Unknown source type " ^ s)
        in
        fprintf ppf
@@ -330,30 +571,32 @@ let write_runtime_dune ppf =
          \ (target %s)\n\
          \ (deps %s (glob_files caml/*.{h,tbl}) (glob_files *.h))\n\
          \ (action (chdir .. (run %s %s -o %%{target}))))\n"
-         (obj_name ~variant ~mode src)
+         (obj_name ~variant ~mode ~codegen src)
          (Filename.basename src)
          (String.concat " " cmd)
          src
     | s -> failwith ("Unknown source type " ^ s)
   in
 
-  (* library archives *)
-  let archive ~variant ~mode =
+  (* library archives; returns the archive file name *)
+  let archive ~variant ~mode ~codegen =
     let srcs = sources ~variant ~mode in
-    let objs = List.map (obj_name ~variant ~mode) srcs in
+    let objs = List.map (obj_name ~variant ~mode ~codegen) srcs in
     let target, cmd =
       match variant, mode with
       | (`Normal|`Debug|`PIC) as variant, `Byte ->
+         assert (codegen.cg_suffix = "");
          "libcamlrun" ^ variant_suff ~variant ^ ".a",
          setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
       | (`Normal|`Debug|`PIC) as variant, `Native ->
-         "libasmrun" ^ variant_suff ~variant ^ ".a",
+         "libasmrun" ^ variant_suff ~variant ^ codegen.cg_suffix ^ ".a",
          setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
       | `Shared, `Byte ->
+         assert (codegen.cg_suffix = "");
          "libcamlrun_shared.so",
          setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"] @ setting "bytecclibs"
       | `Shared, `Native ->
-         "libasmrun_shared.so",
+         "libasmrun_shared" ^ codegen.cg_suffix ^ ".so",
          setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"]
            @ setting "nativecclibs"
     in
@@ -363,14 +606,30 @@ let write_runtime_dune ppf =
       \ (target %s)\n\
       \ (deps %s)\n\
       \ (action (progn (run rm -f %%{target}) (run %s))))\n"
-      target (String.concat " " objs) (String.concat " " cmd)
+      target (String.concat " " objs) (String.concat " " cmd);
+    target
   in
 
-  [`Byte; `Native] |> List.iter (fun mode ->
-    [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
-      sources ~variant ~mode |> List.iter (compile_object ~variant ~mode));
-    [`Normal; `Debug; `PIC; `Shared] |> List.iter (fun variant ->
-      archive ~variant ~mode));
+  let default_archives =
+    [`Byte; `Native] |> List.concat_map (fun mode ->
+      [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
+        sources ~variant ~mode
+        |> List.iter (compile_object ~variant ~mode ~codegen:default_codegen));
+      [`Normal; `Debug; `PIC; `Shared] |> List.map (fun variant ->
+        archive ~variant ~mode ~codegen:default_codegen))
+  in
+  (* Native archives for the non-default codegen variants. These are
+     deliberately kept out of @runtime_all (and hence out of
+     `make boot-compiler`); they are built by the @runtime_variants alias
+     (hooked into `make compiler`, see Makefile.common-ox). *)
+  let variant_archives =
+    codegen_archive_sets |> List.concat_map (fun codegen ->
+      [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
+        sources ~variant ~mode:`Native
+        |> List.iter (compile_object ~variant ~mode:`Native ~codegen));
+      [`Normal; `Debug; `PIC; `Shared] |> List.map (fun variant ->
+        archive ~variant ~mode:`Native ~codegen))
+  in
 
   (* primitives *)
   write_primitives_dune ppf;
@@ -386,7 +645,8 @@ let write_runtime_dune ppf =
     (String.concat " " prim_files);
 
   (* ocamlrun and ocamlrund *)
-  compile_object ~variant:`Normal ~mode:`Byte "runtime/prims.c";
+  compile_object ~variant:`Normal ~mode:`Byte ~codegen:default_codegen
+    "runtime/prims.c";
   [`Normal; `Debug] |> List.iter (fun variant ->
     let target = "ocamlrun" ^ variant_suff ~variant in
     fprintf ppf
@@ -414,18 +674,33 @@ let write_runtime_dune ppf =
   ))
 |};
 
-  (* aliases *)
-  fprintf ppf "(alias
-    (name runtime_all)
-    (deps ocamlrun ocamlrund (glob_files *.{a,so})))\n";
+  (* aliases. runtime_all must list the default-codegen archives explicitly
+     (not a glob) so that the codegen-variant archives never leak into
+     boot-compiler builds. *)
+  fprintf ppf
+    "(alias\n    (name runtime_all)\n    (deps ocamlrun ocamlrund %s))\n"
+    (String.concat " " default_archives);
+  (match variant_archives with
+   | [] -> fprintf ppf "(alias (name runtime_variants))\n"
+   | archives ->
+      fprintf ppf "(alias (name runtime_variants) (deps %s))\n"
+        (String.concat " " archives));
   fprintf ppf "(alias (name runtime) (deps libasmrun.a))\n";
   fprintf ppf "(alias (name stdlib) (deps (alias runtime_all)))\n"
 
 let () =
   match Sys.argv.(2) with
-  | "stdlib" -> write_stdlib_dune stdout
+  | "stdlib" -> write_stdlib_dune ~variant:`Base stdout
   | "stdlib-jsir-sources" -> write_stdlib_jsir_sources_dune stdout
   | "stdlib-jsir" -> write_stdlib_jsir_dune stdout
   | "runtime" -> write_runtime_dune stdout
   | "primitives" -> write_primitives_dune stdout
+  | s when String.starts_with s ~prefix:"stdlib_" ->
+     (* "stdlib_<variant name>": emits the build rules for the named
+        variant tree when the name is in the configure-computed build
+        list, and an empty @stdlib_<name> alias otherwise (the curated
+        stanza set in stdlib/dune covers names whose axes do not exist
+        yet; see write_stdlib_dune). *)
+     let name = String.sub s 7 (String.length s - 7) in
+     write_stdlib_dune ~variant:(`Variant name) stdout
   | s -> failwith ("Unknown target " ^ s)

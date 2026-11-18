@@ -92,7 +92,7 @@ G(name):
         TYPE_DIRECTIVE(G(name),@object) \
         SIZE_DIRECTIVE(G(name))
 
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
 #define FRAME_POINTER_SIZE   8
 #else
 #define FRAME_POINTER_SIZE   0
@@ -100,7 +100,7 @@ G(name):
 
 #define RETADDR_ENTRY_SIZE   (FRAME_POINTER_SIZE + 8) /* fp? + retaddr */
 
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
 #define ENTER_FUNCTION                      \
         pushq   %rbp; CFI_ADJUST(8); CFI_OFFSET(rbp, -16); \
         movq    %rsp, %rbp;
@@ -390,7 +390,7 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(
    instructions. The offset of the oldest saved rbp in a fiber from the stack
    handler is 48 = 4 words (caml_runstack) + 2 words (rip and rbp).
    */
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
 #define UPDATE_BASE_POINTER(REG)                          \
         leaq    -8(%rsp), %r11;                           \
         movq    %r11, -48(REG)

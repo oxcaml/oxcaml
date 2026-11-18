@@ -19,6 +19,12 @@
 /* This runtime provides some OxCaml-specific features */
 #define OXCAML_RUNTIME 1
 
+/* Every runtime is multidomain-capable. The macro remains defined for
+   compatibility with out-of-tree code that selected multidomain-aware
+   implementations with it; it lives in this public header (reachable
+   from mlvalues.h alone) so that normal external stubs see it. */
+#define MULTIDOMAIN 1
+
 #include "m.h"
 #include "s.h"
 #include "compatibility.h"
@@ -195,8 +201,11 @@ typedef uint64_t uintnat;
 #define Stack_ctx_words (14 + 2)
 #endif
 
-/* Whether to use guard pages for fiber stacks */
-#if !defined(USE_MMAP_MAP_STACK) && defined(NATIVE_CODE) && !defined(STACK_CHECKS_ENABLED)
+/* Whether to use guard pages for fiber stacks.  STACK_CHECKS_ENABLED
+   (like the other codegen-variant axis macros) is always defined, to 1 or
+   0, by m.h when not set on the command line; test it with #if, never
+   #ifdef. */
+#if !defined(USE_MMAP_MAP_STACK) && defined(NATIVE_CODE) && !STACK_CHECKS_ENABLED
 #define STACK_GUARD_PAGES
 #endif
 
@@ -205,14 +214,14 @@ typedef uint64_t uintnat;
    least this large probe for a stack guard page using this
    stride. Zero when there is no guard page to defend (stack checks
    enabled); the compiler then emits no probes. */
-#if !defined(STACK_CHECKS_ENABLED)
+#if !STACK_CHECKS_ENABLED
 #define Stack_guard_stride 4096
 #else
 #define Stack_guard_stride 0
 #endif
 
 /* Whether to offset Stack_high to preserve alignment. */
-#if defined(TARGET_amd64) && !defined(WITH_FRAME_POINTERS)
+#if defined(TARGET_amd64) && !WITH_FRAME_POINTERS
 #define Stack_padding_word 1
 #else
 #define Stack_padding_word 0

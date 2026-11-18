@@ -1,6 +1,6 @@
 #define CAML_NAME_SPACE
 #include <caml/config.h>
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
 #include <dlfcn.h>
 #endif
 #include <caml/memory.h>
@@ -75,7 +75,7 @@ static int cmp_callback(const void* p_a, const void* p_b)
   return Long_val(caml_callback2(*cmp_fn, **a, **b));
 }
 
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
 /* AddressSanitizer provides its own definition of [qsort], which runs the comparator
    function over the entire array in order to detect memory safety issues [1].
    That breaks this test, since the output of the test depends on how many times the

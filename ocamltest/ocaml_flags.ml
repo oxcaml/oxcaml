@@ -15,9 +15,187 @@
 
 (* Flags used in OCaml commands *)
 
-let stdlib =
-  let stdlib_path = Ocaml_directories.stdlib in
+(* The [codegen_variant] TSL variable selects the codegen variant (absolute
+   name, e.g. "base" or "fp"; see utils/codegen_variant_name.ml, copied
+   into ocamltest) that native compilation and linking target.  It swaps
+   the standard-library include path to the variant's library root
+   (<stdlib>/variants/<name>) when the named variant is not the install's
+   configure-time default, and adds the corresponding per-axis compiler
+   flags to native compiler invocations (see [codegen_variant_flags];
+   bytecode compilers do not accept the flags and bytecode is unaffected by
+   codegen variants, but they still use the variant root so that one test
+   block can mix backends). *)
+let codegen_variant env =
+  match Environments.safe_lookup Ocaml_variables.codegen_variant env with
+  | "" -> None
+  | name -> Some name
+
+(* Composed from the copied utils/config.ml, which carries the configure
+   default of every axis (each axis stage adds its [Config] read here). *)
+let compose_codegen_variant ~address_sanitizer =
+  Codegen_variant_name.of_tokens
+    ((if address_sanitizer
+      then [Codegen_variant_name.Address_sanitizer]
+      else [])
+     @ (if Config.with_frame_pointers
+        then [Codegen_variant_name.Frame_pointers]
+        else [])
+     @ (if Config.poll_insertion
+        then [Codegen_variant_name.Poll_insertion]
+        else [])
+     @ (if Config.no_stack_checks
+        then []
+        else [Codegen_variant_name.Stack_checks]))
+
+let default_codegen_variant =
+  Codegen_variant_name.to_string
+    (compose_codegen_variant ~address_sanitizer:Config.with_address_sanitizer)
+
+(* The expect/toplevel tools (expect/expect.opt, ocaml/ocamlnat) compile
+   and load phrases in-process, so what matters for them is the variant
+   the HOST BINARY was built for, not the install default.  Those binaries
+   come from the compiler contexts, which strip AddressSanitizer even on
+   an asan-default configure (the compiler itself stays uninstrumented),
+   so their variant is the configure default with the asan axis forced off
+   (e.g. an 'fp' host on an 'asan-fp'-default install); this mirrors the
+   toplevel_host_variant constants baked into the binaries themselves
+   (toplevel/native/dune). *)
+let toplevel_host_codegen_variant_name =
+  compose_codegen_variant ~address_sanitizer:false
+
+let toplevel_host_codegen_variant =
+  Codegen_variant_name.to_string toplevel_host_codegen_variant_name
+
+(* The codegen variant a test block's native compilations effectively use:
+   every axis flag defaults to the configure default (the default variant),
+   and ocamltest only deviates from that when the [codegen_variant] TSL
+   variable injects a variant's flags (see [codegen_variant_flags];
+   per-test [flags +=] additions are not visible here). *)
+let effective_codegen_variant env =
+  match codegen_variant env with
+  | None -> default_codegen_variant
+  | Some name -> name
+
+(* Per-axis read of the effective variant, for the axis predicates
+   (frame_pointers, stack-checks, poll-insertion, address-sanitizer and
+   their duals): each predicate's meaning is the axis's value in the
+   variant the block actually compiles for, not the raw configure default.
+   An unknown variant name has no axes ([false] for every token); the
+   compile actions reject such names loudly ([codegen_variant_flags]). *)
+let effective_codegen_variant_mem env token =
+  match Codegen_variant_name.of_string (effective_codegen_variant env) with
+  | Some variant -> Codegen_variant_name.mem token variant
+  | None -> false
+
+let codegen_variant_directory name =
+  if String.equal name default_codegen_variant
+  then Ocaml_directories.stdlib
+  else
+    Ocamltest_stdlib.Filename.make_path
+      [Ocaml_directories.stdlib; "variants"; name]
+
+let stdlib env =
+  let stdlib_path =
+    match codegen_variant env with
+    | None -> Ocaml_directories.stdlib
+    | Some name -> codegen_variant_directory name
+  in
   "-nostdlib -I " ^ stdlib_path
+
+(* Like [stdlib], but for in-process expect/toplevel host binaries: a
+   NATIVE host compiles its phrases for [toplevel_host_codegen_variant]
+   (its baked-in flag defaults), so the standard library must come from
+   that variant's root rather than the configure default's.  The only
+   [codegen_variant] selection admitted for a native host is that same
+   variant ([reject_in_process_codegen_variant] in ocaml_actions.ml), so
+   the selection never changes the answer.  Bytecode phrase compilation is
+   unaffected by codegen variants, so bytecode hosts keep [stdlib]'s
+   resolution. *)
+let toplevel_stdlib env ~(backend : Ocaml_backends.t) =
+  match backend with
+  | Bytecode | Jsir_js | Jsir_wasm -> stdlib env
+  | Native ->
+    "-nostdlib -I " ^ codegen_variant_directory toplevel_host_codegen_variant
+
+let codegen_variant_flags env backend =
+  match backend, codegen_variant env with
+  | Ocaml_backends.(Bytecode | Jsir_js | Jsir_wasm), _ | _, None -> ""
+  | Ocaml_backends.Native, Some name ->
+    (match Codegen_variant_name.of_string name with
+     | Some variant ->
+       String.concat " " (Codegen_variant_name.ocamlopt_flags variant)
+     | None ->
+       Printf.ksprintf failwith
+         "unknown codegen_variant %S (expected a variant name such as \
+          \"base\" or \"fp\")" name)
+
+(* Like [codegen_variant_flags], but for modules compiled out-of-process
+   for loading into in-process expect/toplevel host binaries: a native
+   host loads code built for [toplevel_host_codegen_variant] (its own
+   baked-in flag defaults), so the modules must be compiled with that
+   variant's flags rather than the configure default's (they differ on an
+   asan-default configure, where the host binaries are uninstrumented).
+   Bytecode is unaffected by codegen variants, as are the JSIR targets
+   (which have no toplevel).  Mirrors [toplevel_stdlib]. *)
+let toplevel_codegen_variant_flags env (backend : Ocaml_backends.t) =
+  match backend with
+  | Bytecode | Jsir_js | Jsir_wasm -> codegen_variant_flags env backend
+  | Native ->
+    String.concat " "
+      (Codegen_variant_name.ocamlopt_flags toplevel_host_codegen_variant_name)
+
+(* Library modifiers (see ocaml_modifiers.ml, e.g. [include unix]) append
+   default-tree library directories of the form <srcdir>/otherlibs/<lib>.
+   Under a non-default [codegen_variant] such a directory would mix the
+   default tree's artifacts into a variant compilation, so resolve it
+   against the variant's library root instead (the read-time analogue of
+   the [stdlib] remap above) whenever the variant tree provides the
+   library; directories without a variant counterpart, and every directory
+   when the variant is unset or the default, are left unchanged.  The
+   systhreads source directory is named "systhreads", but it installs (and
+   gets variant trees) as "threads". *)
+let library_directory_for_variant name dir =
+  if String.equal name default_codegen_variant then dir
+  else begin
+    let prefix =
+      Ocamltest_stdlib.Filename.make_path
+        [Ocaml_directories.srcdir; "otherlibs"]
+      ^ Filename.dir_sep
+    in
+    if String.starts_with ~prefix dir
+    then begin
+      let rest =
+        String.sub dir (String.length prefix)
+          (String.length dir - String.length prefix)
+      in
+      let rest =
+        if String.equal rest "systhreads" then "threads" else rest
+      in
+      let candidate =
+        Ocamltest_stdlib.Filename.make_path
+          [codegen_variant_directory name; rest]
+      in
+      if Sys.file_exists candidate && Sys.is_directory candidate
+      then candidate
+      else dir
+    end
+    else dir
+  end
+
+let variant_library_directory env dir =
+  match codegen_variant env with
+  | None -> dir
+  | Some name -> library_directory_for_variant name dir
+
+(* Like [variant_library_directory], but for in-process expect/toplevel
+   host binaries: a native host compiles its phrases for
+   [toplevel_host_codegen_variant], so library-modifier directories must
+   resolve against that variant's root too (the companion of the
+   [toplevel_stdlib] remap above). *)
+let toplevel_library_directory env ~(backend : Ocaml_backends.t) dir =
+  match backend with
+  | Bytecode | Jsir_js | Jsir_wasm -> variant_library_directory env dir
+  | Native -> library_directory_for_variant toplevel_host_codegen_variant dir
 
 let include_toplevel_directory =
   "-I " ^ Ocaml_directories.toplevel

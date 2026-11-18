@@ -230,7 +230,7 @@ static int capacity(caml_frame_descrs table) {
  * Under ASan, caml_mem_map is malloc-backed and does not
  * zero its memory, so we use the C heap instead. */
 
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
 
 static frame_descr_entry *alloc_descriptors(intnat capacity)
 {

@@ -32,8 +32,6 @@
         packages = {
           inherit oxcaml;
           inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
-          oxcaml-fp = oxcaml.override { framePointers = true; };
-          oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           ppxlib = oxcaml.mkPpxlibLibs oxcaml;
           jsoo = oxcaml.mkJsooLibs oxcaml;
           jsoo-smoke-test = oxcaml.mkJsooSmokeTest oxcaml;
@@ -44,8 +42,6 @@
         checks = lib.attrsets.filterAttrs (key: drv: !(drv.meta.broken or false)) {
           inherit (self.packages.${system})
             oxcaml
-            oxcaml-fp
-            oxcaml-asan
             ppxlib
             jsoo
             jsoo-smoke-test

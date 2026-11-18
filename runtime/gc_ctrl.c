@@ -603,7 +603,7 @@ CAMLprim value caml_runtime_parameters (value unit)
        /* a was OCaml 4 allocation policy */
        /* b */ (int) Caml_state->backtrace_active,
        /* c */ caml_params->cleanup_on_exit,
-       /* d */ caml_params->max_domains,
+       /* d */ caml_max_domains,
        /* e */ caml_params->runtime_events_log_wsize,
        /* h was OCaml 4 init heap size */
        /* H */ caml_params->use_hugetlb_pages,

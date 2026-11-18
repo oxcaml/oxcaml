@@ -47,3 +47,10 @@
   (META as stdlib_beta/META))
  (section lib)
  (package ocaml))
+
+; Harvested into the codegen-variant trees; see otherlibs/unix/dune.
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (deps stdlib_beta.cmxa stdlib_beta.a stdlib_beta.cmxs))

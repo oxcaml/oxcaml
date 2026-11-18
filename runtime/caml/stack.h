@@ -68,7 +68,7 @@
    See amd64.S and amd64/proc.ml for the indices */
 #define Wosize_gc_regs (13 /* int regs */ + 1 /* Gc_regs_kind */ + (32 * 8) /* simd regs */ + 7 /* mask regs */)
 #define Saved_return_address(sp) *((intnat *)((sp) - 8))
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
 #define First_frame(sp) ((sp) + 16)
 #else
 #define First_frame(sp) ((sp) + 8)

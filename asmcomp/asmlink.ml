@@ -36,20 +36,95 @@ type unit_link_info = Linkenv.unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
+    polled : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
+
+(* Whether [Config.standard_library] is itself a library root built for
+   [variant] (e.g. OCAMLLIB pointing directly at a variant's tree), judged by
+   the unit info of the standard library there: the fingerprint for the enforced
+   axes and the polled bit for poll insertion, which is deliberately not a
+   fingerprint key. *)
+let standard_library_is_built_for (variant : Codegen_variant.t) =
+  let std_exit = Filename.concat Config.standard_library "std_exit.cmx" in
+  match Compilenv.read_unit_info std_exit with
+  | exception (Compilenv.Error _ | Sys_error _ | End_of_file | Failure _) ->
+    false
+  | info, _crc ->
+    Codegen_variant.equal_fingerprint info.ui_codegen_fingerprint
+      (Codegen_variant.fingerprint variant)
+    && Bool.equal info.ui_polled variant.poll_insertion
+
+let cached_generic_functions_path () =
+  match !Oxcaml_flags.cached_generic_functions_path with
+  | Some path ->
+    (* An explicit -cached-generic-functions-path is passed through
+       untouched. *)
+    path
+  | None ->
+    (* The default path points into the selected variant's standard-library
+       root, and installations do not necessarily ship the archive (make
+       installs never do); fail clearly rather than with a linker error. *)
+    let path = Oxcaml_flags.get_cached_generic_functions_path () in
+    let variant = Codegen_variant.current () in
+    let root_archive =
+      Filename.concat Config.standard_library (Filename.basename path)
+    in
+    if Sys.file_exists path
+    then path
+    else if
+      (* The root has no tree for the selected non-default variant, but it may
+         itself be that variant's tree. The archive carries no fingerprint of
+         its own, so its root's archive is only used when the root is verifiably
+         built for the selected variant; a different variant's archive is never
+         used. *)
+      (not (Codegen_variant.is_default variant))
+      && (not (Sys.file_exists (Codegen_variant.variant_root variant)))
+      && Sys.file_exists root_archive
+      && standard_library_is_built_for variant
+    then root_archive
+    else
+      raise
+        (Linkenv.Error
+           (Cached_generic_functions_not_found
+              { filename = path; variant = Codegen_variant.to_string variant }))
 
 let runtime_lib () =
   let variant =
     if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
-  let libname = "libasmrun" ^ variant ^ ext_lib in
+  (* Archives for the install's default codegen variant have unsuffixed names;
+     other variants are suffixed with the projection of the variant name onto
+     the runtime axes. The naming rule is described in stdlib/dune_rules/gen.ml
+     (write_runtime_dune). *)
+  let codegen_variant = Codegen_variant.current () in
+  let codegen_suffix = Codegen_variant.runtime_archive_suffix codegen_variant in
+  let libname = "libasmrun" ^ variant ^ codegen_suffix ^ ext_lib in
   try
     if !Clflags.nopervasives || not !Clflags.with_runtime
     then []
     else [Load_path.find libname]
-  with Not_found -> raise (Linkenv.Error (File_not_found libname))
+  with Not_found ->
+    let unsuffixed_exists =
+      (not (String.equal codegen_suffix ""))
+      &&
+      match Load_path.find ("libasmrun" ^ variant ^ ext_lib) with
+      | (_ : string) -> true
+      | exception Not_found -> false
+    in
+    (* Blame the codegen variant only when the runtime variant itself exists for
+       the install's default codegen mode. *)
+    if unsuffixed_exists
+    then
+      raise
+        (Linkenv.Error
+           (Codegen_variant_runtime_not_found
+              { filename = libname;
+                variant = Codegen_variant.to_string codegen_variant
+              }))
+    else raise (Linkenv.Error (File_not_found libname))
 
 (* Second pass: generate the startup file and link it with everything else *)
 
@@ -71,6 +146,23 @@ let emit_ocamlrunparam ~ppf_dump =
        [ Cmm.Cdefine_symbol
            { sym_name = "caml_ocamlrunparam"; sym_global = Global };
          Cmm.Cstring (!Clflags.ocamlrunparam ^ "\000") ])
+
+(* Whether every OCaml unit being linked was compiled with poll insertion: the
+   AND of the per-unit [polled] bits over [units]. Cached generic functions
+   participate in the link without a [unit_link_info], but they are
+   straight-line code with no loop back edges, so they cannot break the "every
+   loop polls" property the bit stands for. The runtime reads the symbol at
+   startup to pick the default domain cap (see runtime/startup_aux.c); it is
+   emitted only into the main startup object ([make_startup_file], which also
+   serves -output-obj), never into the shared-startup object of a .cmxs, which
+   must not carry a second definition into the host program. *)
+let emit_code_fully_polled ~ppf_dump units =
+  let fully_polled = List.for_all (fun u -> u.polled) units in
+  Asmgen.compile_phrase ~ppf_dump
+    (Cmm.Cdata
+       [ Cmm.Cdefine_symbol
+           { sym_name = "caml_code_fully_polled"; sym_global = Global };
+         Cmm.Cint (if fully_polled then 1n else 0n) ])
 
 let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
@@ -96,6 +188,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     if !Oxcaml_flags.manual_module_init then [] else name_list
   in
   emit_ocamlrunparam ~ppf_dump;
+  emit_code_fully_polled ~ppf_dump units;
   List.iter compile_phrase (Cmm_helpers.entry_point init_name_list);
   List.iter compile_phrase
     (* Emit the GC roots table, for dynlink. *)
@@ -287,7 +380,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
       let file_list_rev = List.map (fun f -> f.Linkenv.path) file_list_rev in
       let file_list_rev =
         if !Oxcaml_flags.use_cached_generic_functions
-        then !Oxcaml_flags.cached_generic_functions_path :: file_list_rev
+        then cached_generic_functions_path () :: file_list_rev
         else file_list_rev
       in
       let files = startup_file :: List.rev file_list_rev in
@@ -448,7 +541,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     then (
       let cached_genfns =
         if !Oxcaml_flags.use_cached_generic_functions
-        then Some !Oxcaml_flags.cached_generic_functions_path
+        then Some (cached_generic_functions_path ())
         else None
       in
       let temp_dir = mk_temp_dir "camldissector" "" in

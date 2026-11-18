@@ -17,11 +17,13 @@
 (library
  (name unix)
  ; Public for the libraries of external/ast-dependent-libs (see
- ; dune-project), in the main context only: in the boot context, other
- ; projects such as merlin get the unix library of the system compiler.
+ ; dune-project), in every context but the boot one (the main context and
+ ; the codegen-variant contexts, which rebuild this library per variant):
+ ; in the boot context, other projects such as merlin get the unix library
+ ; of the system compiler.
  (public_name unix)
  (enabled_if
-  (= %{context_name} main))
+  (<> %{context_name} default))
  (wrapped false)
  (modes byte native)
  (flags
@@ -140,7 +142,10 @@
    wait
    write_unix
    )
-   (flags ((:include %{project_root}/oc_cflags.sexp)
+   ; OC_CFLAGS_SEXP lets a codegen-variant context whose asan axis differs
+   ; from the configure default swap the sanitizer flags (see
+   ; VARIANT_ENV_VARS in Makefile.common-ox).
+   (flags ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
            (:include %{project_root}/sharedlib_cflags.sexp)
            (:include %{project_root}/oc_cppflags.sexp)))
  ))
@@ -175,6 +180,18 @@
 (alias
  (name C-only)
  (deps libunix_stubs.a dllunix_stubs.so))
+
+; Native artifacts harvested into the codegen-variant library trees
+; (lib/ocaml/variants/<name>/) by the _install recipe in Makefile.common-ox.
+; Only enabled in the codegen-variant contexts (the complement of the
+; default and main contexts), which compile with the variant's per-axis
+; flags (see Makefile.common-ox and
+; %{project_root}/duneconf/ocamlopt_flags_main-<name>.sexp).
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (deps unix.cmxa unix.a unix.cmxs libunix_stubs.a))
 
 (rule
   (targets unix.ml)

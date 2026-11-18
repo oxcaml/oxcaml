@@ -36,6 +36,8 @@ type unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
+    polled : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -111,5 +113,27 @@ type error =
   | Archiver_error of string
   | Metaprogramming_not_supported_by_backend of filepath
   | Requires_metaprogramming_without_flag of filepath
+  | Inconsistent_codegen_variant of
+      { unit_name : Compilation_unit.t;
+        filename : filepath;
+        saved : Codegen_variant.fingerprint;
+        current : Codegen_variant.fingerprint
+      }
+    (* The runtime archive for a non-default codegen variant (e.g.
+       libasmrun_fp.a) was not found in the load path. *)
+  | Codegen_variant_runtime_not_found of
+      { filename : filepath;
+        variant : string
+      }
+    (* Programs using eval need compiler-libs, which installations only provide
+       for the default codegen variant. *)
+  | Metaprogramming_not_supported_under_codegen_variant of { variant : string }
+    (* -use-cached-generic-functions was passed without an explicit path and the
+       selected variant's standard-library root has no cached-generic-functions
+       archive. *)
+  | Cached_generic_functions_not_found of
+      { filename : filepath;
+        variant : string
+      }
 
 exception Error of error

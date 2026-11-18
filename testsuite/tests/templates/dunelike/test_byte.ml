@@ -224,6 +224,13 @@
    ocamlc.byte;
 
    {
+     (* Bytecode objinfo output has no "Codegen fingerprint" line, but
+        this file must stay generatable into test_native.ml (whose .cmx
+        flavor of this dump does), so the gate is shared. *)
+     no-frame_pointers;
+     no-stack-checks;
+     no-address-sanitizer;
+     no-poll-insertion;
      program = "-no-approx -no-code main_basic/main_basic__.cmi main_basic/main_basic__.cmo";
      output = "main_basic__.cmo.objinfo.output";
      ocamlobjinfo;
@@ -238,6 +245,13 @@
    ocamlc.byte;
 
    {
+     (* Bytecode objinfo output has no "Codegen fingerprint" line, but
+        this file must stay generatable into test_native.ml (whose .cmx
+        flavor of this dump does), so the gate is shared. *)
+     no-frame_pointers;
+     no-stack-checks;
+     no-address-sanitizer;
+     no-poll-insertion;
      program = "-no-approx -no-code main_basic/main_basic.cmi main_basic/main_basic.cmo";
      output = "main_basic.cmo.objinfo.output";
      ocamlobjinfo;
@@ -431,6 +445,13 @@
    check-ocamlc.byte-output;
 
    {
+     (* Bytecode objinfo output has no "Codegen fingerprint" line, but
+        this file must stay generatable into test_native.ml (whose .cmx
+        flavor of this dump does), so the gate is shared. *)
+     no-frame_pointers;
+     no-stack-checks;
+     no-address-sanitizer;
+     no-poll-insertion;
      program = "-no-approx -no-code main/main.cmi main/main.cmo";
      output = "main.cmo.objinfo.output";
      ocamlobjinfo;

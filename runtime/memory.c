@@ -1126,7 +1126,7 @@ CAMLexport wchar_t* caml_stat_wcsconcat(int n, ...)
 
 #endif
 
-#ifdef WITH_ADDRESS_SANITIZER
+#if WITH_ADDRESS_SANITIZER
 /* Provides reasonable default settings for AddressSanitizer.
    Ideally we'd make this a weak symbol so that user programs
    could easily override it at compile time, but unfortunately that
@@ -1138,7 +1138,7 @@ CAMLexport wchar_t* caml_stat_wcsconcat(int n, ...)
    [ASAN_OPTIONS] environment variable at runtime.
    */
 const char *
-#ifdef __clang___
+#ifdef __clang__
 __attribute__((used, retain))
 #else
 __attribute__((used))

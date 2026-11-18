@@ -156,10 +156,15 @@ let check_archive_ownership t archives =
   checking "native archive ownership";
   (* The compiler links stdlib.cmxa implicitly. *)
   let implicit_stdlib = installed t "lib/ocaml/stdlib.cmxa" in
+  (* Codegen-variant library trees deliberately carry no META files
+     (findlib is out of scope for them), so their archives are not
+     META-referenced by design. *)
+  let variants = installed t "lib/ocaml/variants" in
   let rec check_dir dir =
     Sys.readdir dir |> Array.to_list |> sorted |> List.iter (fun file ->
       let path = Filename.concat dir file in
-      if Sys.is_directory path then check_dir path
+      if Sys.is_directory path then
+        (if path <> variants then check_dir path)
       else if List.exists (Filename.check_suffix path) [".cmxa"; ".cmxs"] &&
               path <> implicit_stdlib &&
               not (Hashtbl.mem archives (Unix.realpath path))

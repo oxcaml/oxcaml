@@ -82,6 +82,10 @@ let caml_ld_library_path =
 let codegen_exit_status = make ("codegen_exit_status",
   "Expected exit status of codegen")
 
+let codegen_variant = make ("codegen_variant",
+  "Codegen variant name (e.g. \"base\" or \"fp\") to compile and link \
+   native code for")
+
 let compare_programs = make ("compare_programs",
   "Set to \"false\" to disable program comparison")
 
@@ -288,6 +292,7 @@ let init () =
     cxx;
     caml_ld_library_path;
     codegen_exit_status;
+    codegen_variant;
     compare_programs;
     compiler_directory_suffix;
     compiler_reference;

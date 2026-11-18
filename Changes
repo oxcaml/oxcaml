@@ -1,6 +1,86 @@
 OCaml 5.4.1
 -----------
 
+### Code generation and optimizations:
+
+* Make every code-generation axis a per-invocation choice against a
+  single installation. `ocamlopt` selects, per invocation: frame pointers
+  (`-frame-pointers`/`-no-frame-pointers`; `OCAMLPARAM` key
+  `frame-pointers`; x86-64 Linux/macOS only), explicit stack-limit checks
+  instead of guard pages (`-stack-checks`/`-no-stack-checks`; key
+  `stack-checks`), poll insertion
+  (`-enable-poll-insertion`/`-disable-poll-insertion`; key
+  `poll-insertion` — this `OCAMLPARAM` key's sense used to be inverted
+  and now means what it says), and AddressSanitizer instrumentation
+  (`-asan`/`-no-asan`; key `asan`; x86-64 Linux with Clang only; requires
+  frame pointers; `-fno-asan` remains as a deprecated alias of
+  `-no-asan`). Codegen variants have absolute names: the `-`-joined,
+  sorted tokens of their enabled axes (`asan`, `fp`, `poll`, `sc`), with
+  the all-off variant named `base`. The stdlib and otherlibs are
+  installed per variant under `lib/ocaml/variants/<name>`; the runtime
+  ships archives per variant name projected onto the runtime axes (poll
+  insertion does not change the runtime), and the compiler selects the
+  matching runtime and library tree per invocation. Native artifacts
+  (`.cmx`/`.cmxa`/`.cmxs`) record a codegen-variant fingerprint (frame
+  pointers, stack checks, AddressSanitizer) whose equality is enforced at
+  compile, link, and `Dynlink.loadfile` time, plus a separate "polled"
+  bit (printed by `ocamlobjinfo`) that `-pack` and the linker AND over
+  their inputs.
+
+  The configure options `--enable-frame-pointers`,
+  `--enable-stack-checks`, `--enable-poll-insertion` and
+  `--enable-address-sanitizer` now only select the installation's
+  default variant (`--enable-address-sanitizer` requires Clang).
+  `ocamlopt -config` reports those defaults under the existing keys —
+  e.g. `with_frame_pointers` now means "frame pointers by default", not
+  "always" — and gains `codegen_variants` (the installed non-default
+  variant names) and `c_compiler_is_clang` lines.
+  `--with-codegen-variants=NAME,NAME` selects which non-default variants
+  to build, and `--disable-codegen-variants` builds none. The
+  `WITH_FRAME_POINTERS`, `STACK_CHECKS_ENABLED` and
+  `WITH_ADDRESS_SANITIZER` macros are now always defined, to `1` or `0`:
+  `m.h` records each configure default in a new `*_DEFAULT` macro
+  (`WITH_FRAME_POINTERS_DEFAULT`, `STACK_CHECKS_ENABLED_DEFAULT`,
+  `WITH_ADDRESS_SANITIZER_DEFAULT`) and resolves the axis macro to it
+  when nothing else has defined it, so out-of-tree C stubs compiled with
+  a bare `cc -I$(ocamlopt -where)` automatically see the install
+  default's values for these three macros. Stubs that inspect native
+  frame internals additionally need `-DNATIVE_CODE` and the `TARGET_*`
+  define for the stack-layout macros derived from them, as before. A
+  stub targeting a non-default variant defines the axis macros (to `1`
+  or `0`) to match the enclosing program; `ocamlopt` itself defines all
+  three on every `.c` file it compiles for native code. Test these
+  macros with `#if`, not `#ifdef`; `-U<macro>` now restores the
+  configure default, whereas `-D<macro>=0` explicitly disables the axis.
+  The LLVM backend still requires
+  frame pointers and rejects stack checks, and `ocamlnat` (and eval)
+  only compile phrases for the codegen variant they were built with.
+  ocamltest gains a `codegen_variant` variable and a `variant_available`
+  predicate keyed off it, and its per-axis codegen predicates
+  (`frame_pointers`, `stack-checks`, `poll-insertion`,
+  `no-address-sanitizer` and their duals) now test the block's effective
+  variant: the `codegen_variant` selection when set, the configure
+  default otherwise.
+
+  The `--enable-multidomain`/`--disable-multidomain` configure axis is
+  deleted: every runtime is multidomain-capable (`Max_domains_max` is
+  4096 everywhere, including the runtime-events consumer), and the
+  domain cap is decided per program at startup. Out-of-tree code that
+  sizes arrays off `Max_domains_max` from the installed headers should
+  heed the value change: it is now `4096` unconditionally, where
+  non-multidomain installs used to define it as `1`. The `MULTIDOMAIN`
+  macro remains defined for compatibility with out-of-tree code. Fully polled
+  native programs — every linked unit compiled with poll insertion —
+  default to the standard cap (128 domains on 64-bit targets); other
+  native programs default to a single domain. `OCAMLRUNPARAM` `d=N`
+  remains an explicit override, and the runtime warns at startup when
+  it raises the cap of a program that is not fully polled. Bytecode
+  always polls, so `ocamlrun` programs can now spawn domains out of the
+  box where `--disable-multidomain` builds used to fail. natdynlink and
+  in-process phrase loading reject code that is not fully polled when
+  the domain cap exceeds 1, naming the `d=1` escape hatch in the error.
+  (Jacob Van Buren)
+
 ### Bug fixes:
 
 - #14010: Fix miscompilation / liveness errors for string operations

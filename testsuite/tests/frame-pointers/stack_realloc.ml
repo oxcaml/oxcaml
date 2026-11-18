@@ -1,17 +1,46 @@
 (* TEST
- frame_pointers;
- readonly_files = "fp_backtrace.c stack_realloc_.c";
- all_modules = "${readonly_files} stack_realloc.ml";
  {
+   codegen_variant = "fp";
+   variant_available;
+   script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
+   script;
+   readonly_files = "fp_backtrace.c stack_realloc_.c";
+   all_modules = "${readonly_files} stack_realloc.ml";
+   compiler_directory_suffix = ".fp";
+   {
  (* NOTE clang on macOS and gcc on Linux are less eager to inline
          certain C functions in the runtime. *)
-   reference = "${test_source_directory}/stack_realloc.arm64.reference";
-   arch_arm64;
-   native;
- } {
-   reference = "${test_source_directory}/stack_realloc.reference";
-   arch_amd64;
-   native;
+     reference = "${test_source_directory}/stack_realloc.arm64.reference";
+     arch_arm64;
+     native;
+   } {
+     reference = "${test_source_directory}/stack_realloc.reference";
+     arch_amd64;
+     native;
+   }
+ }{
+ (* Under fp-sc the fiber actually grows during [consume_stack] (the
+    guard-page variants never reallocate), so this block executes the
+    frame-pointer chain rewrite in caml_try_realloc_stack
+    (runtime/fiber.c) across the C stub's frame: the backtrace below the
+    growth cannot come out identical if the reallocation fails (the fiber
+    is too small for the recursion) or rewrites the chain incorrectly. *)
+   codegen_variant = "fp-sc";
+   variant_available;
+   script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
+   script;
+   readonly_files = "fp_backtrace.c stack_realloc_.c";
+   all_modules = "${readonly_files} stack_realloc.ml";
+   compiler_directory_suffix = ".fp-sc";
+   {
+     reference = "${test_source_directory}/stack_realloc.arm64.reference";
+     arch_arm64;
+     native;
+   } {
+     reference = "${test_source_directory}/stack_realloc.reference";
+     arch_amd64;
+     native;
+   }
  }
 *)
 

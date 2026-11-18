@@ -108,7 +108,6 @@ end
 
 val function_layout : Function_layout.t ref
 val disable_builtin_check : bool ref
-val disable_poll_insertion : bool ref
 val allow_long_frames : bool ref
 val max_long_frames_threshold : int
 val long_frames_threshold : int ref
@@ -138,7 +137,13 @@ val verify_binary_emitter : bool ref
 val gc_timings : bool ref
 
 val use_cached_generic_functions : bool ref
-val cached_generic_functions_path : string ref
+
+(** Set by -cached-generic-functions-path.  When unset, the archive is looked
+    up in the selected codegen variant's standard-library root; use
+    [get_cached_generic_functions_path] to read the resolved path. *)
+val cached_generic_functions_path : string option ref
+
+val get_cached_generic_functions_path : unit -> string
 
 val dissector_assume_lld_without_64_bit_eh_frames : bool ref
 
@@ -353,3 +358,10 @@ module Flambda2 : sig
 end
 
 val opt_flag_handler : Clflags.Opt_flag_handler.t
+
+(** Check that the codegen-variant axis settings of the current invocation
+    ([Clflags.frame_pointers], [Clflags.stack_checks],
+    [Clflags.address_sanitizer]) are supported on this target and mutually
+    consistent; exits with an error otherwise.  Run at the start of native
+    compilation and linking. *)
+val validate_codegen_variant : unit -> unit

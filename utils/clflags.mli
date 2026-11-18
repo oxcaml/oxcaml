@@ -300,11 +300,22 @@ val inline_lifting_benefit : Int_arg_helper.parsed ref
 val default_inline_branch_factor : float
 val inline_branch_factor : Float_arg_helper.parsed ref
 val dont_write_files : bool ref
+
+(** The standard-library root serving the selected codegen variant.  Set by
+    [Codegen_variant] (which this module cannot depend on); defaults to
+    [Config.standard_library].  Read the ref at use time, never at
+    module-initialization time. *)
+val effective_standard_library : (unit -> string) ref
+
 val std_include_flag : string -> string
 val std_include_dir : unit -> string list
 val shared : bool ref
 val dlcode : bool ref
 val pic_code : bool ref
+val frame_pointers : bool ref
+val stack_checks : bool ref
+val address_sanitizer : bool ref
+val poll_insertion : bool ref
 val runtime_variant : string ref
 val ocamlrunparam : string ref
 val with_runtime : bool ref

@@ -2556,7 +2556,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
         Lsend(Public, meth, obj, [], apos, not_alloc_stack,
               loc, layout, Unyielding)
   | Frame_pointers, [] ->
-     (of_bool (Clflags.target_is_native () && Config.with_frame_pointers))
+     (of_bool (Clflags.target_is_native () && !Clflags.frame_pointers))
   | Identity, [arg] -> arg
   | Apply (pos, layout), [func; arg]
   | Revapply (pos, layout), [arg; func] ->

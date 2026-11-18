@@ -42,6 +42,14 @@ type error =
   | Module_already_loaded of string
   | Private_library_cannot_implement_interface of string
   | Library_file_already_loaded_privately of { filename : string; }
+  | Inconsistent_codegen_variant of
+      { filename : string;
+        unit_name : string;
+        unit_fingerprint : string;
+        host_fingerprint : string; }
+  | Library_not_fully_polled of
+      { filename : string;
+        unit_name : string; }
 
 exception Error of error
 

@@ -140,6 +140,20 @@ type error = private
   | Library_file_already_loaded_privately of { filename : string; }
     (** In native code, it is forbidden to dynamically load the same .cmxs
         file more than once in private mode. *)
+  | Inconsistent_codegen_variant of
+      { filename : string;
+        unit_name : string;
+        unit_fingerprint : string;
+        host_fingerprint : string; }
+    (** In native code, a loaded unit must have been compiled for the same
+        codegen configuration (e.g. frame pointers) as the host program. *)
+  | Library_not_fully_polled of
+      { filename : string;
+        unit_name : string; }
+    (** In native code, when the host program's runtime allows more than
+        one domain (which requires the host to be fully polled), every
+        loaded unit must have been compiled with poll insertion.  Running
+        the host with [OCAMLRUNPARAM=d=1] permits such loads. *)
 
 (* CR-someday mshinwell: Consider implementing the check required for
    [Library_file_already_loaded_privately] in bytecode mode.  It might be

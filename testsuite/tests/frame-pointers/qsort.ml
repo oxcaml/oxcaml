@@ -3,7 +3,8 @@
  (* [-D_GNU_SOURCE] is needed when AddressSanitizer support is enabled in order
     for the [dlsym] workaround in [qsort_.c] to work. *)
  flags = "-ccopt -D_GNU_SOURCE";
- frame_pointers;
+ codegen_variant = "fp";
+ variant_available;
  {
    bytecode;
  }{
@@ -27,8 +28,9 @@ let rec recurse n =
 
 let f a b =
   check_frames ();
+  let compared = ref false in
   let cmp_str a b =
-    Printf.printf "Comparing %s <=> %s\n" a b;
+    compared := true;
     let n = recurse 10000 in (* force stack realloc *)
     assert (n = 10000);
     (* check_frames not expected to work here:
@@ -38,6 +40,11 @@ let f a b =
   in
   let a, b = sort2 cmp_str a b in
   check_frames ();
+  (* Which element qsort passes first to the comparator (and how often it
+     calls it) is up to the C library, so only check that the comparator
+     ran and that qsort ordered the elements by its results. *)
+  assert !compared;
+  assert (String.compare a b <= 0);
   Printf.printf "Sorted: %s <= %s\n" a b
 
 let in_finaliser f =

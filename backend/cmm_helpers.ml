@@ -5821,7 +5821,9 @@ let poll ~dbg = return_unit dbg (Cop (Cpoll, [], dbg))
 
 let cpu_relax ~dbg =
   let pause = return_unit dbg (Cop (Cpause, [], dbg)) in
-  if Config.poll_insertion then pause else sequence pause (poll ~dbg)
+  (* Without inserted back-edge polls, spin loops around [Domain.cpu_relax]
+     would never reach a safepoint, so lower it to pause-then-poll. *)
+  if !Clflags.poll_insertion then pause else sequence pause (poll ~dbg)
 
 module Scalar_type = struct
   module Float_width = struct

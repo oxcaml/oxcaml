@@ -409,6 +409,30 @@ let parse_command_line () =
       ( "-linscan-threshold",
         Arg.Set_int linscan_threshold,
         "Select linscan if the number of registers is above the threshold" );
+      ( "-frame-pointers",
+        Arg.Set Clflags.frame_pointers,
+        "Process IR saved with frame pointers enabled" );
+      ( "-no-frame-pointers",
+        Arg.Clear Clflags.frame_pointers,
+        "Process IR saved with frame pointers disabled" );
+      ( "-stack-checks",
+        Arg.Set Clflags.stack_checks,
+        "Process IR saved with stack checks enabled" );
+      ( "-no-stack-checks",
+        Arg.Clear Clflags.stack_checks,
+        "Process IR saved with stack checks disabled" );
+      ( "-enable-poll-insertion",
+        Arg.Set Clflags.poll_insertion,
+        "Process IR saved with poll insertion enabled" );
+      ( "-disable-poll-insertion",
+        Arg.Clear Clflags.poll_insertion,
+        "Process IR saved with poll insertion disabled" );
+      ( "-asan",
+        Arg.Set Clflags.address_sanitizer,
+        "Process IR saved with AddressSanitizer enabled" );
+      ( "-no-asan",
+        Arg.Clear Clflags.address_sanitizer,
+        "Process IR saved with AddressSanitizer disabled" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
       ( "-copy-propagation",

@@ -191,6 +191,39 @@ val register_jit : Jit.t -> unit
 
 val default_lookup : string -> Obj.t option
 
+(** Fails (with a [Failure] mirroring natdynlink's
+    [Library_not_fully_polled] wording) when the current flags would
+    compile a non-polled phrase while the runtime's domain cap exceeds 1:
+    phrases are compiled in-process, so their polledness is the current
+    [Clflags.poll_insertion] rather than a recorded bit, and loading
+    non-polled code would falsify the fully-polled property the cap was
+    derived from.  Called by the phrase loader; exposed for other
+    in-process loaders (otherlibs/eval). *)
+val check_poll_insertion_for_in_process_load : unit -> unit
+
+(** The codegen variant this executable's native-toplevel machinery was
+    built for (the per-context constants baked in by the
+    toplevel_host_variant rule in toplevel/native/dune).  Not always
+    [Codegen_variant.default]: on an asan-default configure the compiler
+    contexts build asan-off, so the installed ocamlnat's (and
+    expect.opt's) variant is the asan-off flip of the default.
+    This module [Codegen_variant.apply]s it when it is initialized, so
+    that the initial load path resolves against the host variant's
+    library root.  Executables that compile and load phrases into their
+    own image should make sure it is still applied before parsing their
+    command line, so that the variant flags default to values the
+    executable can actually load (explicit flags still override, and a
+    remaining mismatch is rejected by the admission check on the phrase
+    load path). *)
+val host_variant : Codegen_variant.t
+
+(** Fails (with a [Failure]) unless the current variant-selecting flags
+    equal [host_variant] on every axis: code compiled in-process executes
+    in this executable's image and must use the variant it was built for.
+    Called by the phrase loader; exposed for other in-process loaders
+    (otherlibs/eval), which do not go through it. *)
+val check_codegen_variant_for_in_process_load : unit -> unit
+
 (* Internals required by the JIT *)
 
 val need_symbol : string -> bool

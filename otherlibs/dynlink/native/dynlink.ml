@@ -54,6 +54,9 @@ module Native = struct
   external ndl_existssym : string -> bool
     = "caml_sys_exit" "caml_natdynlink_existssym"
     [@@noalloc]
+  external ndl_max_domain_count : unit -> int
+    = "caml_sys_exit" "caml_max_domain_count"
+    [@@noalloc]
 
   module Unit_header = struct
     type t = dynunit
@@ -79,12 +82,36 @@ module Native = struct
         t.dynu_defines
 
     let unsafe_module _t = false
+
+    let codegen_fingerprint (t : t) = t.dynu_codegen_fingerprint
+
+    let polled (t : t) = t.dynu_polled
   end
 
   let init () = ()
 
   let is_native = true
+
+  (* The axis values are those this dynlink build was compiled for, which
+     is the host program's codegen variant: dynlink is rebuilt per variant,
+     and each build context bakes its variant's values into the generated
+     [Dynlink_host_variant] module (see otherlibs/dynlink/dune).
+     [poll_insertion] has no baked constant because it is not a fingerprint
+     key (plugin polledness is checked separately, against the runtime's
+     domain cap); the value given here is irrelevant to [fingerprint]. *)
+  let host_codegen_fingerprint =
+    Some
+      (Codegen_variant.fingerprint
+         { Codegen_variant.address_sanitizer =
+             Dynlink_host_variant.address_sanitizer;
+           frame_pointers = Dynlink_host_variant.frame_pointers;
+           poll_insertion = false;
+           stack_checks = Dynlink_host_variant.stack_checks })
   let adapt_filename f = Filename.chop_extension f ^ ".cmxs"
+
+  (* The runtime's startup-fixed domain cap (the caml_init_domains
+     snapshot), used by the non-polled-plugin check. *)
+  let max_domain_count () = ndl_max_domain_count ()
 
   let num_globals_inited () = ndl_globals_inited ()
 
@@ -188,6 +215,14 @@ type error = DT.error =
   | Module_already_loaded of string
   | Private_library_cannot_implement_interface of string
   | Library_file_already_loaded_privately of { filename : string; }
+  | Inconsistent_codegen_variant of
+      { filename : string;
+        unit_name : string;
+        unit_fingerprint : string;
+        host_fingerprint : string; }
+  | Library_not_fully_polled of
+      { filename : string;
+        unit_name : string; }
 
 exception Error = DT.Error
 let error_message = DT.error_message

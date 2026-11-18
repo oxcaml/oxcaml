@@ -221,7 +221,7 @@ let emit_debug_info_linear i =
   | None -> emit_debug_info i.dbg
   | Some { discriminator; dbg } -> emit_debug_info ~discriminator dbg
 
-let fp = Config.with_frame_pointers
+let fp () = !Clflags.frame_pointers
 
 (* Tradeoff between code size and code speed *)
 
@@ -785,15 +785,15 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
        }
        :: !stack_realloc
 
-(* Probe the prospective stack frame at [Domainstate.stack_guard_stride]-byte
-   strides, descending, so that a frame big enough to step over the stack's
+(* Probe the prospective stack frame at [Codegen_variant.stack_guard_stride]-
+   byte strides, descending, so that a frame big enough to step over the stack's
    guard page faults in it instead; the SEGV handler raises [Stack_overflow].
    Used instead of [emit_stack_check] when stack checks are disabled. The probes
    touch but do not change memory. Since a shrink-wrapped prologue may already
    have moved %rsp by up to a page, we start probing at offset zero. We unroll
    up to four strides; beyond that we generate a loop. *)
 let emit_stack_probes ~size_in_bytes ~save_registers =
-  let stride = Domainstate.stack_guard_stride in
+  let stride = Codegen_variant.stack_guard_stride () in
   assert (stride > 0 && size_in_bytes >= stride);
   let full_strides = size_in_bytes / stride in
   let probe ofs = I.or_ (int 0) (mem64 QWORD (-ofs) (Scalar RSP)) in
@@ -1648,11 +1648,7 @@ end = struct
 
   let[@inline always] emit_sanitize ?dependencies ~instr ~address
       (memory_chunk : Cmm.memory_chunk) memory_access =
-    (* Checking [Config.with_address_sanitizer] is redundant, but we do it
-       because it's a compile-time constant, so it enables the compiler to
-       completely optimize-out the AddressSanitizer code when the compiler was
-       configured without it. *)
-    if Config.with_address_sanitizer && !Arch.is_asan_enabled
+    if !Clflags.address_sanitizer
     then
       match memory_access with
       (* We can elide the ASAN check for stores made to initialize record fields
@@ -1930,7 +1926,7 @@ let to_addr_width loc : X86_ast.data_type =
     NONE
 
 let emit_simd_sanitize ~address ~instr ~loc ~kind =
-  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+  if !Clflags.address_sanitizer
   then
     let chunk : Cmm.memory_chunk option =
       match Simd.loc_memory_width loc with
@@ -2000,9 +1996,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
 (* Only used for instructions that have an implicit memory operand. Explicit
    load/store operations are sanitized automatically by [emit_simd_instr]. *)
 let emit_implicit_simd_sanitize (op : Simd.operation) instr =
-  if
-    Config.with_address_sanitizer && !Arch.is_asan_enabled
-    && Simd.is_memory_operation op
+  if !Clflags.address_sanitizer && Simd.is_memory_operation op
   then
     let simd = Simd.Pseudo_instr.instr op.instr in
     match[@warning "-4"] simd.id with
@@ -2065,7 +2059,7 @@ let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
 
 let prologue_stack_offset () =
   assert !frame_required;
-  frame_size () - 8 - if fp then 8 else 0
+  frame_size () - 8 - if fp () then 8 else 0
 
 let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
@@ -2086,7 +2080,7 @@ let emit_instr ~first ~last ~fallthrough i =
        can_place_prologues), the CFA is always rsp+8 here; reset it explicitly
        before the relative adjustments below. *)
     D.cfi_def_cfa_offset ~bytes:8;
-    if fp
+    if fp ()
     then (
       I.push rbp;
       D.cfi_adjust_cfa_offset ~bytes:8;
@@ -2105,14 +2099,14 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       I.add (int n) rsp;
       D.cfi_adjust_cfa_offset ~bytes:(-n));
-    if fp
+    if fp ()
     then (
       I.pop rbp;
       D.cfi_adjust_cfa_offset ~bytes:(-8))
   | Lepilogue_close ->
     (* reset CFA back cause function body may continue *)
     let n = prologue_stack_offset () in
-    let n = if fp then n + 8 else n in
+    let n = if fp () then n + 8 else n in
     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->
@@ -2256,7 +2250,7 @@ let emit_instr ~first ~last ~fallthrough i =
       emit_call (Cmm.global_symbol "caml_c_call");
       record_frame i.live (Dbg_other i.dbg))
     else
-      let switch_stacks = not Config.no_stack_checks in
+      let switch_stacks = !Clflags.stack_checks in
       if switch_stacks
       then (
         I.mov rsp r13;
@@ -2763,7 +2757,7 @@ let emit_instr ~first ~last ~fallthrough i =
     let table = { table_lbl = lbl; elems = jumptbl } in
     jump_tables := table :: !jump_tables
   | Lentertrap ->
-    if fp
+    if fp ()
     then
       let delta =
         frame_size () - 16
@@ -2814,14 +2808,14 @@ let emit_instr ~first ~last ~fallthrough i =
       I.pop r11;
       I.jmp r11)
   | Lstackcheck { max_frame_size_bytes } ->
-    if Config.no_stack_checks
+    if !Clflags.stack_checks
     then
-      emit_stack_probes ~size_in_bytes:max_frame_size_bytes
-        ~save_registers:(not first)
-    else
       emit_stack_check ~size_in_bytes:max_frame_size_bytes
         ~save_registers:(not first)
         ~save_simd:(must_save_simd_regs i.live)
+    else
+      emit_stack_probes ~size_in_bytes:max_frame_size_bytes
+        ~save_registers:(not first)
 
 let emit_instr ~first ~last ~fallthrough i =
   try emit_instr ~first ~last ~fallthrough i with
@@ -2902,7 +2896,7 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
-  if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
+  if !Clflags.stack_checks && String.equal !Clflags.runtime_variant "d"
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
@@ -2926,7 +2920,7 @@ let fundecl fundecl =
     ~gc_jump_pads_start:fun_body_end ~gc_jump_pads_end;
   (if !frame_required
    then
-     let n = frame_size () - 8 - if fp then 8 else 0 in
+     let n = frame_size () - 8 - if fp () then 8 else 0 in
      if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
   (match fun_end_label with
   | Some l ->
@@ -3080,7 +3074,7 @@ let make_stack_loc ~offset n (r : Reg.t) =
    |------------|<-- %rsp at probe site, 16-byte aligned by caller
    | ret        |
    |------------|
-   | fp         | only present when Config.with_frame_pointers is true
+   | fp         | only present when frame pointers are enabled
    |------------|
    | live       | saved live registers
    |------------|
@@ -3156,7 +3150,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   D.align ~fill:Nop ~bytes:16;
   D.define_symbol_label ~section:Text wrap_label;
   D.cfi_startproc ();
-  if fp
+  if fp ()
   then (
     push rbp;
     I.mov rsp rbp);
@@ -3179,20 +3173,20 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
      [loc_arguments] ensures that [loc_offset] is 16-byte aligned.
      All temporaries are 8 bytes long, the return address is already pushed,
      and optionally the frame pointer is already pushed on the stack. *)
-  let wrapper_frame_size k = 8 + (if fp then 8 else 0) + k in
+  let wrapper_frame_size k = 8 + (if fp () then 8 else 0) + k in
   let k = live_offset + aux_offset + tmp_offset + loc_offset in
   assert (k mod 8 = 0);
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if Config.no_stack_checks
+  if !Clflags.stack_checks
   then (
-    if Domainstate.stack_guard_stride > 0 && n >= Domainstate.stack_guard_stride
-    then emit_stack_probes ~size_in_bytes:n ~save_registers:true)
-  else if n >= Stack_check.stack_threshold_size
-  then
-    emit_stack_check ~size_in_bytes:n ~save_registers:true
-      ~save_simd:(must_save_simd_regs p.probe_insn.live);
+    if n >= Stack_check.stack_threshold_size
+    then
+      emit_stack_check ~size_in_bytes:n ~save_registers:true
+        ~save_simd:(must_save_simd_regs p.probe_insn.live))
+  else if n >= Codegen_variant.stack_guard_stride ()
+  then emit_stack_probes ~size_in_bytes:n ~save_registers:true;
   emit_stack_offset n;
   (* Save all live hard registers *)
   let offset = aux_offset + tmp_offset + loc_offset in
@@ -3241,7 +3235,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
      and free stack space. *)
   Array.iteri (fun i reg -> move saved_live.(i) reg) live;
   emit_stack_offset (-n);
-  if fp then pop rbp;
+  if fp () then pop rbp;
   I.ret ();
   D.cfi_endproc ();
   emit_function_type_and_size wrap_label

@@ -125,8 +125,6 @@ end
 let function_layout = ref Function_layout.default   (* -function-layout *)
 
 let disable_builtin_check = ref false   (* -disable-builtin-check *)
-let disable_poll_insertion = ref (not Config.poll_insertion)
-                                        (* -disable-poll-insertion *)
 let allow_long_frames = ref true        (* -no-long-frames *)
 (* Keep the value of [max_long_frames_threshold] in sync with LONG_FRAME_MARKER
    in runtime/roots_nat.c *)
@@ -614,8 +612,33 @@ let opt_flag_handler : Clflags.Opt_flag_handler.t =
   { set_oclassic; set_o2; set_o3; set_o4 }
 
 let use_cached_generic_functions = ref false
-let cached_generic_functions_path =
-  ref (Filename.concat Config.standard_library ("cached-generic-functions" ^ Config.ext_lib))
+
+(* [None] until -cached-generic-functions-path is passed.  The default cannot
+   be computed at module initialization: it depends on the selected codegen
+   variant's standard-library root, and the flags are not parsed yet. *)
+let cached_generic_functions_path = ref None
+
+let get_cached_generic_functions_path () =
+  match !cached_generic_functions_path with
+  | Some path -> path
+  | None ->
+    (* Variant-STRICT resolution, deliberately not
+       [Codegen_variant.effective_standard_library]: its fallback to the
+       default root when a non-default variant's tree is absent would
+       silently select the DEFAULT variant's archive — the one compiler-
+       generated native artifact with no fingerprint to catch the mismatch
+       at link.  Resolving into the (possibly absent) variant root instead
+       makes the link-time existence check fail with the established
+       missing-archive error, unless the default root verifiably is the
+       selected variant's own tree (see cached_generic_functions_path in
+       asmcomp/asmlink.ml). *)
+    let variant = Codegen_variant.current () in
+    let root =
+      if Codegen_variant.is_default variant
+      then Config.standard_library
+      else Codegen_variant.variant_root variant
+    in
+    Filename.concat root ("cached-generic-functions" ^ Config.ext_lib)
 
 let dissector_assume_lld_without_64_bit_eh_frames = ref true
   (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)
@@ -625,6 +648,97 @@ let dissector_max_linker_parallelism = ref Misc.Maybe_bounded.Unbounded
 
 let manual_module_init = ref false
   (* -[no-]manual-module-init *)
+
+(* The target check mirrors the "## Frame pointers" case in configure.ac;
+   [Config.with_frame_pointers] only provides the default for
+   [Clflags.frame_pointers]. *)
+let validate_frame_pointers () =
+  if !Clflags.frame_pointers
+  then (
+    match Config.architecture, Config.system with
+    | "amd64", ("linux" | "macosx") -> ()
+    | _, _ ->
+      Compenv.fatal
+        "Frame pointers are not supported on this platform; \
+         remove -frame-pointers (or frame-pointers=1 in OCAMLPARAM)")
+  else if !Clflags.llvm_backend
+  then
+    (* The LLVM backend's trap-block scheme requires frame pointers,
+       whatever the configure default (the same absolute edge as the
+       sibling llvm/asan checks below). *)
+    Compenv.fatal
+      "The LLVM backend requires frame pointers; \
+       enable them with -frame-pointers (or frame-pointers=1 in OCAMLPARAM)"
+
+(* The architecture check mirrors the stack-checks case in configure.ac
+   (checks are forced on everywhere but amd64/arm64);
+   [Config.no_stack_checks] only provides the default for
+   [Clflags.stack_checks]. *)
+let validate_stack_checks () =
+  if !Clflags.stack_checks
+  then (
+    if !Clflags.address_sanitizer
+    then
+      Compenv.fatal
+        "Stack checks together with AddressSanitizer is an untested \
+         combination; disable one of them (-no-stack-checks or -no-asan, or \
+         stack-checks=0 / asan=0 in OCAMLPARAM)";
+    if !Clflags.llvm_backend
+    then
+      Compenv.fatal
+        "The LLVM backend does not support stack checks; \
+         remove -stack-checks (or stack-checks=1 in OCAMLPARAM)")
+  else
+    match Config.architecture with
+    | "amd64" | "arm64" -> ()
+    | _ ->
+      Compenv.fatal
+        "Stack checks cannot be disabled on this architecture; \
+         remove -no-stack-checks (or stack-checks=0 in OCAMLPARAM)"
+
+(* The platform/toolchain check mirrors the "## Address Sanitizer" case in
+   configure.ac (clang-only: the runtime's report wrappers rely on
+   Clang-only attributes, see runtime/memory.c);
+   [Config.with_address_sanitizer] only provides the default for
+   [Clflags.address_sanitizer]. *)
+let validate_address_sanitizer () =
+  if !Clflags.address_sanitizer
+  then (
+    if not !Clflags.frame_pointers
+    then
+      Compenv.fatal
+        "AddressSanitizer requires frame pointers; add -frame-pointers (or \
+         frame-pointers=1 in OCAMLPARAM) or disable AddressSanitizer with \
+         -no-asan (or asan=0 in OCAMLPARAM)";
+    if !Clflags.llvm_backend
+    then
+      Compenv.fatal
+        "The LLVM backend emits no AddressSanitizer instrumentation; \
+         remove -asan (or asan=1 in OCAMLPARAM) or remove -llvm-backend";
+    if Config.tsan
+    then
+      Compenv.fatal
+        "AddressSanitizer cannot be combined with ThreadSanitizer (the C \
+         compiler rejects -fsanitize=address together with \
+         -fsanitize=thread, and this compiler was configured with \
+         --enable-tsan); remove -asan (or asan=1 in OCAMLPARAM)";
+    match Config.architecture, Config.system, Config.c_compiler_is_clang with
+    | "amd64", "linux", true -> ()
+    | "amd64", "linux", false ->
+      Compenv.fatal
+        "AddressSanitizer requires a compiler configured with Clang as the \
+         C compiler; remove -asan (or asan=1 in OCAMLPARAM)"
+    | _, _, _ ->
+      Compenv.fatal
+        "AddressSanitizer is not supported on this platform; \
+         remove -asan (or asan=1 in OCAMLPARAM)")
+
+(* The whole validation DAG for the per-invocation codegen-variant axes;
+   run at the start of native compilation and linking. *)
+let validate_codegen_variant () =
+  validate_frame_pointers ();
+  validate_stack_checks ();
+  validate_address_sanitizer ()
 
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

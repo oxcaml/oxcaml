@@ -1,0 +1,116 @@
+#**************************************************************************
+#*                                                                        *
+#*                                 OxCaml                                 *
+#*                                                                        *
+#*                     Jacob Van Buren, Jane Street                       *
+#*                                                                        *
+#*   Copyright 2025 Jane Street Group LLC                                 *
+#*                                                                        *
+#*   All rights reserved.  This file is distributed under the terms of    *
+#*   the GNU Lesser General Public License version 2.1, with the          *
+#*   special exception on linking described in the file LICENSE.          *
+#*                                                                        *
+#**************************************************************************
+
+# Codegen-variant name/flag tables shared by Makefile.common-ox (workspace
+# files, OCAMLPARAM fragments, ocamlopt-flag sexps) and Makefile.upstream
+# (the per-variant record lines in build_settings.txt).
+#
+# This is the Makefile-side encoding of the per-token tables in
+# utils/codegen_variant_name.ml, which is the authoritative source of the
+# naming scheme; keep the two in sync.  What catches drift: the P1
+# consistency test keeps the NAMES honest; ocamlopt-flag drift shows up as
+# fingerprint mismatches when the variant trees are built; and the
+# cc/aspp/OCAMLPARAM columns of the build_settings.txt records are
+# asserted against codegen_variant_name.ml's tables by
+# stdlib/dune_rules/gen.ml, which fails generation on disagreement (no
+# fingerprint covers runtime C or assembler flags).
+#
+# Variant names are the '-'-joined, sorted names of the enabled axis tokens
+# ("base" when all are off); $(CODEGEN_VARIANTS) (from Makefile.config) is
+# the space-separated list of non-default variants to build, and
+# $(CODEGEN_DEFAULT_VARIANT) is the configure default's own name.
+
+codegen_variant_names := $(strip $(CODEGEN_VARIANTS))
+
+# Every supported axis token, in canonical (sorted-name) order.
+codegen_tokens := asan fp poll sc
+
+# Per-token tables.
+# The cc/aspp macro columns always use the explicit value form
+# (-D<macro>=1 or -D<macro>=0, never -U and never mere absence): m.h
+# resolves each absent axis macro to the configure default's value (the
+# <macro>_DEFAULT templates), so only an explicit =1|0 can pin a
+# non-default archive, and a -U would re-expose the m.h default rather
+# than turn the axis off.  The asan -D rides along even though no .S file
+# tests the macro today (same safety margin as the fp precedent); the
+# -fno-sanitize direction only matters on asan-default configures, where
+# it strips the configure-provided -fsanitize flags (command-line order
+# wins).
+codegen_token_asan_ocamlopt_on  := -asan
+codegen_token_asan_ocamlopt_off := -no-asan
+codegen_token_asan_param := asan
+codegen_token_asan_cc_on  := -DWITH_ADDRESS_SANITIZER=1 -fsanitize=address -fsanitize-recover=address
+codegen_token_asan_cc_off := -DWITH_ADDRESS_SANITIZER=0 -fno-sanitize=address -fno-sanitize-recover=address
+codegen_token_asan_aspp_on  := -DWITH_ADDRESS_SANITIZER=1
+codegen_token_asan_aspp_off := -DWITH_ADDRESS_SANITIZER=0
+
+codegen_token_fp_ocamlopt_on  := -frame-pointers
+codegen_token_fp_ocamlopt_off := -no-frame-pointers
+codegen_token_fp_param := frame-pointers
+codegen_token_fp_cc_on  := -DWITH_FRAME_POINTERS=1 -fno-omit-frame-pointer -g
+codegen_token_fp_cc_off := -DWITH_FRAME_POINTERS=0
+codegen_token_fp_aspp_on  := -DWITH_FRAME_POINTERS=1
+codegen_token_fp_aspp_off := -DWITH_FRAME_POINTERS=0
+
+# Poll insertion changes only OCaml code generation (not the runtime), so
+# its cc/aspp columns are empty.
+codegen_token_poll_ocamlopt_on  := -enable-poll-insertion
+codegen_token_poll_ocamlopt_off := -disable-poll-insertion
+codegen_token_poll_param := poll-insertion
+codegen_token_poll_cc_on  :=
+codegen_token_poll_cc_off :=
+codegen_token_poll_aspp_on  :=
+codegen_token_poll_aspp_off :=
+
+codegen_token_sc_ocamlopt_on  := -stack-checks
+codegen_token_sc_ocamlopt_off := -no-stack-checks
+codegen_token_sc_param := stack-checks
+codegen_token_sc_cc_on  := -DSTACK_CHECKS_ENABLED=1
+codegen_token_sc_cc_off := -DSTACK_CHECKS_ENABLED=0
+codegen_token_sc_aspp_on  := -DSTACK_CHECKS_ENABLED=1
+codegen_token_sc_aspp_off := -DSTACK_CHECKS_ENABLED=0
+
+# $(call codegen_variant_has,<name>,<token>): <token> if enabled in <name>,
+# empty otherwise ("base" has no tokens).
+codegen_variant_has = $(filter $(2),$(subst -, ,$(1)))
+
+# Absolute per-axis flag lists for variant <name>: one entry per supported
+# token, the enabled or disabled form per membership in the name.
+codegen_variant_ocamlopt_flags = $(strip $(foreach t,$(codegen_tokens),\
+  $(if $(call codegen_variant_has,$(1),$(t)),\
+    $(codegen_token_$(t)_ocamlopt_on),$(codegen_token_$(t)_ocamlopt_off))))
+codegen_variant_cc_flags = $(strip $(foreach t,$(codegen_tokens),\
+  $(if $(call codegen_variant_has,$(1),$(t)),\
+    $(codegen_token_$(t)_cc_on),$(codegen_token_$(t)_cc_off))))
+codegen_variant_aspp_flags = $(strip $(foreach t,$(codegen_tokens),\
+  $(if $(call codegen_variant_has,$(1),$(t)),\
+    $(codegen_token_$(t)_aspp_on),$(codegen_token_$(t)_aspp_off))))
+
+# $(call codegen_variant_ocamlparam,<name>): the comma-joined OCAMLPARAM
+# fragment setting every axis, e.g. "frame-pointers=1".
+codegen_variants_empty :=
+codegen_variants_space := $(codegen_variants_empty) $(codegen_variants_empty)
+codegen_variants_comma := ,
+codegen_variant_ocamlparam = $(subst $(codegen_variants_space),$(codegen_variants_comma),$(strip \
+  $(foreach t,$(codegen_tokens),\
+    $(codegen_token_$(t)_param)=$(if $(call codegen_variant_has,$(1),$(t)),1,0))))
+
+# $(call codegen_variant_dynlink_consts,<name>): the OCaml source of the
+# generated per-context host-variant constants module consumed by
+# otherlibs/dynlink (see the dynlink_host_variant rule in
+# otherlibs/dynlink/dune) and by the native toplevel (the
+# toplevel_host_variant rule in toplevel/native/dune); one let-binding per
+# axis.  Dynlink's fingerprint check only needs the fingerprint axes, but
+# the toplevel pins its whole variant, so poll_insertion is included too.
+codegen_variant_dynlink_consts = (* Generated by Makefile.common-ox; see otherlibs/dynlink/dune and toplevel/native/dune. *) let frame_pointers = $(if $(call codegen_variant_has,$(1),fp),true,false) let stack_checks = $(if $(call codegen_variant_has,$(1),sc),true,false) let address_sanitizer = $(if $(call codegen_variant_has,$(1),asan),true,false) let poll_insertion = $(if $(call codegen_variant_has,$(1),poll),true,false)

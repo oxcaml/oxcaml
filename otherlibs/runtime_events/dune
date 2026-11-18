@@ -14,10 +14,11 @@
 
 (library
  (name runtime_events)
- ; Public in the main context only, like unix (see otherlibs/unix/dune).
+ ; Public outside the boot context only, like unix (see
+ ; otherlibs/unix/dune).
  (public_name runtime_events)
  (enabled_if
-  (= %{context_name} main))
+  (<> %{context_name} default))
  (wrapped false)
  (modes byte native)
  (flags
@@ -29,8 +30,9 @@
    -strict-formats))
  (ocamlopt_flags (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags (:standard -linkall))
+ ; OC_CFLAGS_SEXP: see otherlibs/unix/dune.
  (foreign_stubs (language c) (names runtime_events_consumer)
-  (flags ((:include %{project_root}/oc_cflags.sexp)
+  (flags ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
           (:include %{project_root}/sharedlib_cflags.sexp)
           (:include %{project_root}/oc_cppflags.sexp)))))
 
@@ -57,3 +59,11 @@
 (alias
  (name C-only)
  (deps libruntime_events_stubs.a dllruntime_events_stubs.so))
+
+; Harvested into the codegen-variant trees; see otherlibs/unix/dune.
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (deps runtime_events.cmxa runtime_events.a runtime_events.cmxs
+   libruntime_events_stubs.a))

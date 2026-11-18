@@ -61,6 +61,14 @@ static size_t get_pthreads_stack_size_in_bytes(void)
   return res;
 }
 
+#ifdef NATIVE_CODE
+/* Whether every OCaml unit linked into this program was compiled with
+   poll insertion (the AND of the per-unit bits, computed at link time).
+   Emitted into the startup object; see asmcomp/asmlink.ml
+   (emit_code_fully_polled). */
+extern uintnat caml_code_fully_polled;
+#endif
+
 static void init_startup_params(void)
 {
 #ifndef NATIVE_CODE
@@ -95,7 +103,20 @@ static void init_startup_params(void)
   params.init_custom_minor_max_bsz = Custom_minor_max_bsz_def;
   params.init_major_heap_increment = Heap_chunk_def;
   params.init_max_stack_wsz = Max_stack_def;
-  params.max_domains = Max_domains_def;
+#ifdef NATIVE_CODE
+  params.code_fully_polled = caml_code_fully_polled;
+#else
+  /* Bytecode is inherently fully polled: bytegen emits Kcheck_signals on
+     while/for back edges (bytecomp/bytegen.ml) and function application
+     reaches CHECK_SIGNALS in the interpreter (runtime/interp.c). */
+  params.code_fully_polled = 1;
+#endif
+  /* A program with units compiled without poll insertion may contain
+     non-allocating loops that never reach a safepoint; a domain spinning
+     in one would block every STW rendezvous, hanging the other domains'
+     GC.  Default such programs to a single domain; OCAMLRUNPARAM d=
+     overrides (with a warning, below). */
+  params.max_domains = params.code_fully_polled ? Max_domains_def : 1;
   params.runtime_events_log_wsize = Default_runtime_events_log_wsize;
   params.use_hugetlb_pages = 0;
 
@@ -207,8 +228,8 @@ static void parse_ocamlrunparam(char_os* opt)
   }
   if (params.max_domains > Max_domains_max) {
     /* Silently clamp to the maximum. Don't fatal error: we don't want
-       to kill executables built with a --disable-multidomain compiler
-       if they happen to be passed an otherwise-reasonable value. */
+       to kill executables that are passed an otherwise-reasonable
+       value. */
     params.max_domains = Max_domains_max;
   }
 }

@@ -633,14 +633,30 @@ let auto_include_libs libs alert find_in_dir fn =
   | None -> raise Not_found
 
 let auto_include_otherlibs =
-  (* Ensure directories are only ever scanned once *)
-  let expand = Misc.expand_directory Config.standard_library in
-  let otherlibs =
-    let read_lib lib =
-      lazy (Dir.create (Visible { cmx_guaranteed = true }) (expand ("+" ^ lib)))
-    in
-    List.map (fun lib -> (lib, read_lib lib)) ["dynlink"; "str"; "unix"] in
-  auto_include_libs otherlibs
+  (* The standard-library root cannot be captured at module initialization:
+     it depends on the selected codegen variant, which can change between
+     files via OCAMLPARAM.  This callback fires on every failed load-path
+     lookup, so the directories are memoized keyed by the effective root and
+     rebuilt only when it changes. *)
+  let cache = ref None in
+  let otherlibs () =
+    let root = Codegen_variant.effective_standard_library () in
+    match !cache with
+    | Some (cached_root, dirs) when String.equal cached_root root -> dirs
+    | Some _ | None ->
+      let expand = Misc.expand_directory root in
+      let read_lib lib =
+        lazy
+          (Dir.create (Visible { cmx_guaranteed = true }) (expand ("+" ^ lib)))
+      in
+      let dirs =
+        List.map (fun lib -> (lib, read_lib lib)) ["dynlink"; "str"; "unix"]
+      in
+      cache := Some (root, dirs);
+      dirs
+  in
+  fun alert find_in_dir fn ->
+    auto_include_libs (otherlibs ()) alert find_in_dir fn
 
 let find fn =
   assert (not Config.merlin || Local_store.is_bound ());

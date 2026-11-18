@@ -72,7 +72,7 @@ let cached_generic_functions unix ~ppf_dump ~id output_name genfns =
     );
   )
 
-let main filename =
+let generate filename =
   let unix = (module Unix_for_owee : Compiler_owee.Unix_intf.S) in
   Clflags.set_target Clflags.Target.Native;
   Clflags.use_linscan := true;
@@ -97,9 +97,47 @@ let main filename =
 let arg_usage =
   Printf.sprintf "%s FILE : Generate an obj file containing cached generatic functions named FILE" Sys.argv.(0)
 
+let set_codegen_variant name =
+  match Codegen_variant.of_string name with
+  | Some variant -> Codegen_variant.apply variant
+  | None ->
+    raise (Arg.Bad (Printf.sprintf "unknown codegen variant %S" name))
+
+let arg_spec =
+  [ ( "-codegen-variant",
+      Arg.String set_codegen_variant,
+      "<name>  Generate the archive for the named codegen variant (e.g. \
+       base or fp)" );
+    (* Per-axis aliases of -codegen-variant. *)
+    ( "-frame-pointers",
+      Arg.Set Clflags.frame_pointers,
+      " Generate the archive for a frame-pointers codegen variant" );
+    ( "-no-frame-pointers",
+      Arg.Clear Clflags.frame_pointers,
+      " Generate the archive for a no-frame-pointers codegen variant" ) ]
+
+(* The output file is only recorded during parsing and the generation runs
+   once parsing is complete, so the variant flags take effect regardless of
+   whether they appear before or after FILE. *)
+let output_file = ref None
+
+let set_output_file filename =
+  match !output_file with
+  | None -> output_file := Some filename
+  | Some _ -> raise (Arg.Bad "only one FILE may be given")
+
 let main () =
   Memtrace.trace_if_requested ~context:"ocamlopt" ();
-  Arg.parse_expand [] main arg_usage;
+  (try
+     Arg.parse_expand arg_spec set_output_file arg_usage;
+     match !output_file with
+     | None ->
+       prerr_endline arg_usage;
+       exit 2
+     | Some filename -> generate filename
+   with exn ->
+     Location.report_exception Format.err_formatter exn;
+     exit 2);
   exit 0
 
 let _ = main ()

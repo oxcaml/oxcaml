@@ -22,6 +22,7 @@ ROOTDIR = .
 # general shared definitions in Makefile.common.
 OCAMLLEX ?= $(BOOT_OCAMLLEX)
 include Makefile.common
+include Makefile.codegen-variants
 include Makefile.best_binaries
 
 .PHONY: defaultentry
@@ -1352,6 +1353,8 @@ stdlib/dune_rules/build_settings.txt:
 	echo "cflags.native: $(OC_NATIVE_CFLAGS) $(OC_NATIVE_CPPFLAGS)"; \
 	echo "cflags.debug: -DDEBUG"; \
 	echo "cflags.pic: $(SHAREDLIB_CFLAGS)"; \
+	echo "codegen_default_variant: $(CODEGEN_DEFAULT_VARIANT)"; \
+	$(foreach n,$(codegen_variant_names),echo "codegen_variant: $(n)|$(call codegen_variant_ocamlopt_flags,$(n))|$(call codegen_variant_cc_flags,$(n))|$(call codegen_variant_aspp_flags,$(n))|$(call codegen_variant_ocamlparam,$(n))"; ) \
 	echo "mkexe: $(MKEXE)"; \
 	echo "mkexed: $(MKEXE) $(MKEXEDEBUGFLAG)"; \
 	echo "mkdll: $(MKDLL)"; \

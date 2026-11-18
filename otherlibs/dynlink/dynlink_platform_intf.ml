@@ -32,11 +32,33 @@ module type S = sig
 
     val defined_symbols : t -> string list
     val unsafe_module : t -> bool
+
+    (** Codegen variant the unit was compiled for; compared against
+        [host_codegen_fingerprint] (unused when the latter is [None]). *)
+    val codegen_fingerprint : t -> (string * string) list
+
+    (** Whether the unit was compiled with poll insertion (always [true]
+        for bytecode).  A native unit without it may only be loaded into
+        a program whose runtime caps domains at 1; see
+        [max_domain_count]. *)
+    val polled : t -> bool
   end
 
   val init : unit -> unit
 
   val is_native : bool
+
+  (** Codegen variant of the host program, or [None] if loaded units need
+      not match any particular variant (bytecode). *)
+  val host_codegen_fingerprint : (string * string) list option
+
+  (** The host runtime's domain cap (max_domains, fixed at startup).
+      Loading a non-polled unit when this exceeds 1 is rejected: the cap
+      above 1 was justified by the program being fully polled, and the
+      load would falsify that.  The bytecode implementation returns 1:
+      bytecode units are always polled, so the check cannot fire and no
+      runtime query is needed. *)
+  val max_domain_count : unit -> int
 
   val adapt_filename : Dynlink_types.filename -> Dynlink_types.filename
 

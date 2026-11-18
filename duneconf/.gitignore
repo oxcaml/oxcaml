@@ -1,3 +1,5 @@
 *.ws
 *.inc
 ocaml
+*.sexp
+dynlink_host_variant_*.ml

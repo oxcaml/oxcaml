@@ -49,7 +49,7 @@
 #include "caml/stack.h"
 #include "caml/frame_descriptors.h"
 #endif
-#if defined(USE_MMAP_MAP_STACK) || !defined(STACK_CHECKS_ENABLED)
+#if defined(USE_MMAP_MAP_STACK) || !STACK_CHECKS_ENABLED
 #include <sys/mman.h>
 #endif
 #ifdef __linux__
@@ -1365,7 +1365,7 @@ int caml_try_realloc_stack(asize_t required_space)
       if (link->stack == old_stack) {
         ptrdiff_t delta =
           (char*)Stack_high(new_stack) - (char*)Stack_high(old_stack);
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
         struct stack_frame {
           struct stack_frame* prev;
           void* retaddr;
@@ -1424,7 +1424,7 @@ static void free_stack_memory(struct stack_info* stack)
   caml_atomic_counter_incr(Stack_stat(freed));
   (void)caml_atomic_counter_decr(&stack_count);
   CAML_EV_COUNTER(EV_C_STACK_FREED, stack->size);
-#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
+#if defined(DEBUG) && STACK_CHECKS_ENABLED
   memset(stack, 0x42, (char*)stack->handler - (char*)stack);
 #endif
 #if defined(USE_MMAP_MAP_STACK)
@@ -1544,7 +1544,7 @@ static void stack_release_memory(struct stack_info* stack)
   stack->tls_state = Val_null;
 
   if (cache_bucket != -1) {
-#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
+#if defined(DEBUG) && STACK_CHECKS_ENABLED
     memset(Stack_base(stack), 0x42,
           (Stack_high(stack)-Stack_base(stack))*sizeof(value));
 #endif
@@ -1762,7 +1762,7 @@ static void stack_wake(struct stack_info* idle, struct stack_info* stack,
       *p = *p + delta;
       p = (char**)*p;
     }
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
     /* Relocate chain of frame pointers, starting at [sp] with the frame
        pointer pushed when the stack was suspended (by
        SWITCH_OCAML_STACKS). The chain's last link is rewritten by
@@ -1849,7 +1849,7 @@ static value continuation_wake_stacks(value cont, struct stack_info* idle)
     stack_wake(idle, stack, &reloc);
     if (prev != NULL) {
       Stack_parent(prev) = stack;
-#ifdef WITH_FRAME_POINTERS
+#if WITH_FRAME_POINTERS
       /* The oldest frame pointer saved on [prev] (pushed by the first
          function run on it, under caml_runstack) points into this, its
          parent, stack: relocate it too. The corresponding link of the

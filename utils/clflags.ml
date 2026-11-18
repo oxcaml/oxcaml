@@ -380,12 +380,19 @@ let dont_write_files = ref false        (* set to true under ocamldoc *)
 let insn_sched_default = true
 let insn_sched = ref insn_sched_default (* -[no-]insn-sched *)
 
+(* Overridden by [Codegen_variant] (which this module cannot depend on: it
+   reads [frame_pointers] below) so that the standard library serving the
+   selected codegen variant is used.  Consulted afresh wherever the directory
+   is needed: the selection can change between files via OCAMLPARAM. *)
+let effective_standard_library : (unit -> string) ref =
+  ref (fun () -> Config.standard_library)
+
 let std_include_flag prefix =
   if !no_std_include then ""
-  else (prefix ^ (Filename.quote Config.standard_library))
+  else (prefix ^ (Filename.quote (!effective_standard_library ())))
 
 let std_include_dir () =
-  if !no_std_include then [] else [Config.standard_library]
+  if !no_std_include then [] else [!effective_standard_library ()]
 
 let shared = ref false (* -shared *)
 let dlcode = ref true (* not -nodynlink *)
@@ -393,6 +400,31 @@ let dlcode = ref true (* not -nodynlink *)
 let pic_code = ref (match Config.architecture with (* -fPIC *)
                      | "amd64" | "s390x" -> true
                      | _                 -> false)
+
+(* This ref lives here rather than in [Oxcaml_flags] because it is read by
+   [Translprim], which cannot depend on the driver libraries. *)
+let frame_pointers = ref Config.with_frame_pointers
+                                        (* -[no-]frame-pointers *)
+
+(* This ref lives here rather than in [Oxcaml_flags] because it is read by
+   [Codegen_variant] (in utils, which cannot depend on the driver
+   libraries).  [Config.no_stack_checks] only provides the default. *)
+let stack_checks = ref (not Config.no_stack_checks)
+                                        (* -[no-]stack-checks *)
+
+(* This ref lives here rather than in [Oxcaml_flags] because it is read by
+   [Codegen_variant] and [Ccomp] (in utils, which cannot depend on the
+   driver libraries).  [Config.with_address_sanitizer] only provides the
+   default. *)
+let address_sanitizer = ref Config.with_address_sanitizer
+                                        (* -[no-]asan *)
+
+(* This ref lives here rather than in [Oxcaml_flags] because it is read by
+   [Lambda.primitive_may_allocate] and [Cmm_helpers] (the [Pcpu_relax]
+   lowering), which cannot depend on the driver libraries.
+   [Config.poll_insertion] only provides the default. *)
+let poll_insertion = ref Config.poll_insertion
+                                        (* -{enable,disable}-poll-insertion *)
 
 let runtime_variant = ref ""
 let ocamlrunparam = ref ""
