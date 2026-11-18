@@ -43,8 +43,8 @@ val guard_of_index : int -> Asm_targets.Asm_label.t
 (** Whether the current unit has a guard. *)
 val unit_has_guards : unit -> bool
 
-(** The registers of [live] that a call to the callback must save, each with
-    the [Outgoing] stack slot to save it in, and the size in bytes of the frame
+(** The registers of [live] that a call to the callback must save, each with the
+    [Outgoing] stack slot to save it in, and the size in bytes of the frame
     holding these slots. A slot has the size of its register and is aligned to
     that size, or to 16 bytes if it is larger. The size of the frame is a
     multiple of 16. *)
@@ -59,9 +59,8 @@ val emit_gate_definition : weak:bool -> unit
     guard.
 
     The code of the constructor is aligned to [code_alignment] bytes. Its
-    instructions are emitted by [emit_constructor_body], which must call
-    [init] with the addresses of [start] and [stop] as arguments, and
-    return. *)
+    instructions are emitted by [emit_constructor_body], which must call [init]
+    with the addresses of [start] and [stop] as arguments, and return. *)
 val emit_data :
   code_alignment:int ->
   emit_constructor_body:

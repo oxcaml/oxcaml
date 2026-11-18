@@ -73,10 +73,10 @@ let registers_to_save ~live =
   in
   saved, Misc.align size 16
 
-(* With the weak definition, every instrumented unit has a zero default, which
-   a definition that is not weak (e.g. in the coverage runtime) overrides. Being
-   hidden, it is resolved within the linked object, which lets probes address
-   it directly. *)
+(* With the weak definition, every instrumented unit has a zero default, which a
+   definition that is not weak (e.g. in the coverage runtime) overrides. Being
+   hidden, it is resolved within the linked object, which lets probes address it
+   directly. *)
 let emit_gate_definition ~weak =
   let gate = S.create_global Cfg_trace_pc_guard.gate in
   if weak then D.hidden gate;
@@ -93,12 +93,11 @@ let section_type name =
   | ARM | AArch64 -> "%" ^ name
   | IA32 | X86_64 | POWER | Z | Riscv -> "@" ^ name
 
-(* The constructor of the unit: it tells the coverage
-   runtime where the guards of this executable or shared object are. All copies
-   are in one COMDAT group, together with their [.init_array] entries, so the
-   linker keeps a single one. The bounds are hidden, so that they are those of
-   the object being linked, and weak, so that linking does not fail if the
-   linker discards all the guards. *)
+(* The constructor of the unit: it tells the coverage runtime where the guards
+   of this executable or shared object are. All copies are in one COMDAT group,
+   together with their [.init_array] entries, so the linker keeps a single one.
+   The bounds are hidden, so that they are those of the object being linked, and
+   weak, so that linking does not fail if the linker discards all the guards. *)
 let emit_constructor ~code_alignment ~emit_constructor_body =
   let name = Cfg_trace_pc_guard.constructor in
   let ctor = S.create_global name in

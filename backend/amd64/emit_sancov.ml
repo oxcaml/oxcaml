@@ -45,11 +45,11 @@ let emit_gate ~res =
   let gate = S.create_global Cfg_trace_pc_guard.gate in
   I.mov (mem64_rip QWORD (S.encode gate)) res
 
-(* Call [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack
-   (or, without stack checks, on the current stack, once aligned), as for a C
-   call that does not allocate. Unlike such a call, it preserves every register:
-   those that are live and that C functions do not preserve are saved in a frame
-   on the stack that the callback runs on.
+(* Call [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack (or, without
+   stack checks, on the current stack, once aligned), as for a C call that does
+   not allocate. Unlike such a call, it preserves every register: those that are
+   live and that C functions do not preserve are saved in a frame on the stack
+   that the callback runs on.
 
    [r13] holds the original stack pointer across the call and is the CFA
    register meanwhile. It is first pushed on the current stack. Like the return

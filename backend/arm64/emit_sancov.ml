@@ -50,8 +50,8 @@ let reg_tmp1 = Proc.phys_reg Int X16
 
 let reg_x_tmp1 = H.reg_x reg_tmp1
 
-(* Callee-saved register that holds the original stack pointer during the
-   call, as for external calls that do not allocate. *)
+(* Callee-saved register that holds the original stack pointer during the call,
+   as for external calls that do not allocate. *)
 let reg_saved_sp = Proc.phys_reg Int X19
 
 let reg_x_saved_sp = H.reg_x reg_saved_sp
@@ -68,10 +68,10 @@ let emit_gate ~res =
     (O.symbol (Ast.Symbol.create_symbol (Needs_reloc PAGE) gate));
   A.ins2 LDR res_x (H.mem_symbol_reg (H.gp_reg_of_reg res) ~reloc gate)
 
-(* Call [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack,
-   as for a C call that does not allocate. Unlike such a call, it preserves
-   every register: those that are live and that C functions do not preserve are
-   saved in a frame on the C stack.
+(* Call [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack, as for a C call
+   that does not allocate. Unlike such a call, it preserves every register:
+   those that are live and that C functions do not preserve are saved in a frame
+   on the C stack.
 
    [x19] holds the original stack pointer across the call and is the CFA
    register meanwhile. It is first pushed on the current stack, together with
@@ -85,8 +85,8 @@ let emit_call ~live ~move ~index =
   A.ins3 (STP X) reg_x_saved_sp O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
   D.cfi_adjust_cfa_offset ~bytes:16;
   D.cfi_remember_state ();
-  (* The function may have a frame without having saved the link register in
-     it, so this must refer to the copy just pushed. *)
+  (* The function may have a frame without having saved the link register in it,
+     so this must refer to the copy just pushed. *)
   D.cfi_rel_offset ~reg:(R.gp_encoding R.lr) ~offset:8;
   A.ins_mov_from_sp ~dst:reg_x_saved_sp;
   D.cfi_def_cfa_register
