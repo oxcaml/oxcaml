@@ -32,34 +32,15 @@ module Ast = Arm64_ast.Ast
 module A = Ast.DSL.Acc
 module D = Asm_targets.Asm_directives
 module H = Dsl_helpers
-module L = Asm_targets.Asm_label
 module O = Ast.DSL
 module R = Ast.Reg
 module S = Asm_targets.Asm_symbol
 
-(* The guards of the current unit, one per call to the callback, most recent
-   first. *)
-let guards = ref ([] : L.t list)
+module Common = Emit_sancov_common
 
-(* The guards of the current function, by probe index. [Emit] emits each
-   instruction several times, to measure it, and a call must then keep its
-   guard. *)
-let guards_of_function : (int, L.t) Hashtbl.t = Hashtbl.create 16
+let reset_unit = Common.reset_unit
 
-let reset_function () = Hashtbl.reset guards_of_function
-
-let reset_unit () =
-  reset_function ();
-  guards := []
-
-let guard_of_index index =
-  match Hashtbl.find_opt guards_of_function index with
-  | Some guard -> guard
-  | None ->
-    let guard = L.create Trace_pc_guards in
-    Hashtbl.add guards_of_function index guard;
-    guards := guard :: !guards;
-    guard
+let reset_function = Common.reset_function
 
 let macosx = String.equal Config.system "macosx"
 
@@ -99,22 +80,8 @@ let emit_gate ~res =
    these lie within the red zone that the runtime keeps below the stack frames
    of OCaml code ([Stack_threshold]). *)
 let emit_call ~live ~move ~index =
-  let guard = guard_of_index index in
-  (* [Outgoing] slots are addressed relative to the stack pointer, independently
-     of the frame of the function. *)
-  let saved, size =
-    Reg.Set.fold
-      (fun (r : Reg.t) (saved, offset) ->
-        if Proc.may_be_destroyed_by_c_function r
-        then
-          let size = Select_utils.size_component r.typ in
-          let offset = Misc.align offset size in
-          let slot = Reg.create_at_location r.typ (Stack (Outgoing offset)) in
-          (r, slot) :: saved, offset + size
-        else saved, offset)
-      live ([], 0)
-  in
-  let frame_size = Misc.align size 16 in
+  let guard = Common.guard_of_index index in
+  let saved, frame_size = Common.registers_to_save ~live in
   A.ins3 (STP X) reg_x_saved_sp O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
   D.cfi_adjust_cfa_offset ~bytes:16;
   D.cfi_remember_state ();
@@ -147,36 +114,7 @@ let emit_call ~live ~move ~index =
   A.ins3 (LDP X) reg_x_saved_sp O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
   D.cfi_adjust_cfa_offset ~bytes:(-16)
 
-(* The constructor of the unit, as emitted by clang: it tells the coverage
-   runtime where the guards of this executable or shared object are. All copies
-   are in one COMDAT group, together with their [.init_array] entries, so the
-   linker keeps a single one. The bounds are hidden, so that they are those of
-   the object being linked, and weak, so that linking does not fail if the
-   linker discards all the guards. *)
-let emit_constructor () =
-  let name = Cfg_trace_pc_guard.constructor in
-  let ctor = S.create_global name in
-  let start = S.create_global Cfg_trace_pc_guard.guards_start in
-  let stop = S.create_global Cfg_trace_pc_guard.guards_stop in
-  let text : Asm_targets.Asm_section.t =
-    Custom
-      { names = [".text." ^ name];
-        flags = Some "axG";
-        args = ["%progbits"; name; "comdat"];
-        is_delayed = false
-      }
-  in
-  D.switch_to_section text;
-  D.weak start;
-  D.hidden start;
-  D.weak stop;
-  D.hidden stop;
-  D.weak ctor;
-  D.hidden ctor;
-  D.type_symbol ctor ~ty:Function;
-  D.align ~fill:Nop ~bytes:8;
-  D.define_symbol_label ~section:Text ctor;
-  D.cfi_startproc ();
+let emit_constructor_body ~start ~stop ~init =
   A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
   D.cfi_adjust_cfa_offset ~bytes:16;
   D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
@@ -189,41 +127,8 @@ let emit_constructor () =
   in
   load_address (H.reg_x (Proc.phys_reg Int X0)) start;
   load_address (H.reg_x (Proc.phys_reg Int X1)) stop;
-  A.ins1 BL
-    (O.symbol
-       (Ast.Symbol.create_symbol (Needs_reloc CALL26)
-          (S.create_global Cfg_trace_pc_guard.init)));
+  A.ins1 BL (O.symbol (Ast.Symbol.create_symbol (Needs_reloc CALL26) init));
   A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
-  A.ins0 RET;
-  D.cfi_endproc ();
-  D.size ctor;
-  D.switch_to_section_raw ~names:[".init_array.2"] ~flags:(Some "awG")
-    ~args:["%init_array"; name; "comdat"]
-    ~is_delayed:false;
-  D.align ~fill:Zero ~bytes:8;
-  D.symbol ctor
+  A.ins0 RET
 
-let emit_data () =
-  if not (Misc.Stdlib.List.is_empty !guards)
-  then (
-    D.switch_to_section Trace_pc_guards;
-    D.align ~fill:Zero ~bytes:4;
-    List.iter
-      (fun lbl ->
-        D.define_label lbl;
-        D.int32 0l)
-      (List.rev !guards);
-    (* The gate, defined as by clang: every instrumented unit has a zero
-       default, which a strong definition elsewhere (e.g. in the coverage
-       runtime) overrides. Being hidden, it is resolved within the linked
-       object, which lets probes address it directly. *)
-    let gate = S.create_global Cfg_trace_pc_guard.gate in
-    D.hidden gate;
-    D.type_symbol gate ~ty:Object;
-    D.switch_to_section Trace_pc_guard_gate;
-    D.weak gate;
-    D.align ~fill:Zero ~bytes:8;
-    D.define_symbol_label ~section:Trace_pc_guard_gate gate;
-    D.int64 0L;
-    D.size gate;
-    emit_constructor ())
+let emit_data () = Common.emit_data ~code_alignment:8 ~emit_constructor_body

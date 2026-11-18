@@ -600,6 +600,7 @@
   binary_emitter_helpers
   emit
   emit_sancov
+  emit_sancov_common
   emitaux
   fdo_info
   generic_fns

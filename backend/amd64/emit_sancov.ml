@@ -33,11 +33,11 @@ module D = Asm_targets.Asm_directives
 module L = Asm_targets.Asm_label
 module S = Asm_targets.Asm_symbol
 
-(* The guards of the current unit, one per call to the callback, most recent
-   first. *)
-let guards = ref ([] : L.t list)
+module Common = Emit_sancov_common
 
-let reset_unit () = guards := []
+let reset_unit = Common.reset_unit
+
+let reset_function = Common.reset_function
 
 (* The gate is defined hidden in this unit (see [emit_data]), so it can be
    addressed PC-relatively, even in position-independent code. *)
@@ -56,26 +56,11 @@ let emit_gate ~res =
    address pushed by a call to [caml_call_gc], this word lies within the red
    zone that the runtime keeps below the stack frames of OCaml code
    ([Stack_threshold]). *)
-let emit_call ~live ~move ~emit_call =
-  let guard = L.create Trace_pc_guards in
-  guards := guard :: !guards;
+let emit_call ~live ~move ~emit_call ~index =
+  let guard = Common.guard_of_index index in
   (* The frame is 16-byte aligned, and so is every vector slot, since [move]
-     uses aligned moves for [Vec128] and [Valx2] stack slots. [Outgoing] slots
-     are addressed relative to the stack pointer, independently of the frame of
-     the function. *)
-  let saved, size =
-    Reg.Set.fold
-      (fun (r : Reg.t) (saved, offset) ->
-        if Proc.may_be_destroyed_by_c_function r
-        then
-          let size = Select_utils.size_component r.typ in
-          let offset = Misc.align offset (Int.min size 16) in
-          let slot = Reg.create_at_location r.typ (Stack (Outgoing offset)) in
-          (r, slot) :: saved, offset + size
-        else saved, offset)
-      live ([], 0)
-  in
-  let frame_size = Misc.align size 16 in
+     uses aligned moves for [Vec128] and [Valx2] stack slots. *)
+  let saved, frame_size = Common.registers_to_save ~live in
   I.push r13;
   D.cfi_adjust_cfa_offset ~bytes:8;
   I.mov rsp r13;
@@ -99,36 +84,7 @@ let emit_call ~live ~move ~emit_call =
   I.pop r13;
   D.cfi_adjust_cfa_offset ~bytes:(-8)
 
-(* The constructor of the unit, as emitted by clang: it tells the coverage
-   runtime where the guards of this executable or shared object are. All copies
-   are in one COMDAT group, together with their [.init_array] entries, so the
-   linker keeps a single one. The bounds are hidden, so that they are those of
-   the object being linked, and weak, so that linking does not fail if the
-   linker discards all the guards. *)
-let emit_constructor ~emit_call =
-  let name = Cfg_trace_pc_guard.constructor in
-  let ctor = S.create_global name in
-  let start = S.create_global Cfg_trace_pc_guard.guards_start in
-  let stop = S.create_global Cfg_trace_pc_guard.guards_stop in
-  let text : Asm_targets.Asm_section.t =
-    Custom
-      { names = [".text." ^ name];
-        flags = Some "axG";
-        args = ["@progbits"; name; "comdat"];
-        is_delayed = false
-      }
-  in
-  D.switch_to_section text;
-  D.weak start;
-  D.hidden start;
-  D.weak stop;
-  D.hidden stop;
-  D.weak ctor;
-  D.hidden ctor;
-  D.type_symbol ctor ~ty:Function;
-  D.align ~fill:Nop ~bytes:16;
-  D.define_symbol_label ~section:Text ctor;
-  D.cfi_startproc ();
+let emit_constructor_body ~emit_call ~start ~stop ~init:_ =
   (* Align the stack. *)
   I.push rax;
   D.cfi_adjust_cfa_offset ~bytes:8;
@@ -137,37 +93,9 @@ let emit_constructor ~emit_call =
   emit_call (Cmm.global_symbol Cfg_trace_pc_guard.init);
   I.pop rax;
   D.cfi_adjust_cfa_offset ~bytes:(-8);
-  I.ret ();
-  D.cfi_endproc ();
-  D.size ctor;
-  D.switch_to_section_raw ~names:[".init_array.2"] ~flags:(Some "awG")
-    ~args:["@init_array"; name; "comdat"]
-    ~is_delayed:false;
-  D.align ~fill:Zero ~bytes:8;
-  D.symbol ctor
+  I.ret ()
 
 let emit_data ~add_def_symbol ~emit_call =
-  if not (Misc.Stdlib.List.is_empty !guards)
-  then (
-    D.switch_to_section Trace_pc_guards;
-    D.align ~fill:Zero ~bytes:4;
-    List.iter
-      (fun lbl ->
-        D.define_label lbl;
-        D.int32 0l)
-      (List.rev !guards);
-    (* The gate, defined as by clang: every instrumented unit has a zero
-       default, which a strong definition elsewhere (e.g. in the coverage
-       runtime) overrides. Being hidden, it is resolved within the linked
-       object, which lets probes address it PC-relatively. *)
-    let gate = S.create_global Cfg_trace_pc_guard.gate in
-    add_def_symbol Cfg_trace_pc_guard.gate;
-    D.hidden gate;
-    D.type_symbol gate ~ty:Object;
-    D.switch_to_section Trace_pc_guard_gate;
-    D.weak gate;
-    D.align ~fill:Zero ~bytes:8;
-    D.define_symbol_label ~section:Trace_pc_guard_gate gate;
-    D.int64 0L;
-    D.size gate;
-    emit_constructor ~emit_call)
+  if Common.unit_has_guards () then add_def_symbol Cfg_trace_pc_guard.gate;
+  Common.emit_data ~code_alignment:16
+    ~emit_constructor_body:(emit_constructor_body ~emit_call)

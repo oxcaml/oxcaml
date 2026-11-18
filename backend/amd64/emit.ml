@@ -2634,8 +2634,8 @@ let emit_instr ~first ~last ~fallthrough i =
     I.rdpmc ();
     emit_combine_edx_eax i.res.(0)
   | Lop Trace_pc_guard_gate -> Emit_sancov.emit_gate ~res:(res i 0)
-  | Lop (Trace_pc_guard _) ->
-    Emit_sancov.emit_call ~live:i.live ~move ~emit_call
+  | Lop (Trace_pc_guard index) ->
+    Emit_sancov.emit_call ~live:i.live ~move ~emit_call ~index
   | Lop (Specific Ilfence) -> I.lfence ()
   | Lop (Specific Isfence) -> I.sfence ()
   | Lop (Specific Imfence) -> I.mfence ()
@@ -2866,6 +2866,7 @@ let emit_function_type_and_size fun_sym =
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
+  Emit_sancov.reset_function ();
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl

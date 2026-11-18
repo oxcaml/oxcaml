@@ -1,0 +1,147 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
+[@@@ocaml.warning "+a-40-41-42"]
+
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+module D = Asm_targets.Asm_directives
+module L = Asm_targets.Asm_label
+module S = Asm_targets.Asm_symbol
+
+(* The guards of the current unit, most recent first. *)
+let guards = ref ([] : L.t list)
+
+(* The guards of the current function, by probe index. *)
+let guards_of_function : (int, L.t) Hashtbl.t = Hashtbl.create 16
+
+let reset_function () = Hashtbl.reset guards_of_function
+
+let reset_unit () =
+  reset_function ();
+  guards := []
+
+let guard_of_index index =
+  match Hashtbl.find_opt guards_of_function index with
+  | Some guard -> guard
+  | None ->
+    let guard = L.create Trace_pc_guards in
+    Hashtbl.add guards_of_function index guard;
+    guards := guard :: !guards;
+    guard
+
+let unit_has_guards () = not (Misc.Stdlib.List.is_empty !guards)
+
+(* [Outgoing] slots are addressed relative to the stack pointer, independently
+   of the frame of the function. Every slot is aligned to its size, up to 16
+   bytes. *)
+let registers_to_save ~live =
+  let saved, size =
+    Reg.Set.fold
+      (fun (r : Reg.t) (saved, offset) ->
+        if Proc.may_be_destroyed_by_c_function r
+        then
+          let size = Select_utils.size_component r.typ in
+          let offset = Misc.align offset (Int.min size 16) in
+          let slot = Reg.create_at_location r.typ (Stack (Outgoing offset)) in
+          (r, slot) :: saved, offset + size
+        else saved, offset)
+      live ([], 0)
+  in
+  saved, Misc.align size 16
+
+(* The weak definition is that of clang: every instrumented unit has a zero
+   default, which a definition that is not weak (e.g. in the coverage runtime)
+   overrides. Being hidden, it is resolved within the linked object, which lets
+   probes address it directly. *)
+let emit_gate_definition ~weak =
+  let gate = S.create_global Cfg_trace_pc_guard.gate in
+  if weak then D.hidden gate;
+  D.type_symbol gate ~ty:Object;
+  D.switch_to_section Trace_pc_guard_gate;
+  if weak then D.weak gate else D.global gate;
+  D.align ~fill:Zero ~bytes:8;
+  D.define_symbol_label ~section:Trace_pc_guard_gate gate;
+  D.int64 0L;
+  D.size gate
+
+let section_type name =
+  match Target_system.architecture () with
+  | ARM | AArch64 -> "%" ^ name
+  | IA32 | X86_64 | POWER | Z | Riscv -> "@" ^ name
+
+(* The constructor of the unit, as emitted by clang: it tells the coverage
+   runtime where the guards of this executable or shared object are. All copies
+   are in one COMDAT group, together with their [.init_array] entries, so the
+   linker keeps a single one. The bounds are hidden, so that they are those of
+   the object being linked, and weak, so that linking does not fail if the
+   linker discards all the guards. *)
+let emit_constructor ~code_alignment ~emit_constructor_body =
+  let name = Cfg_trace_pc_guard.constructor in
+  let ctor = S.create_global name in
+  let start = S.create_global Cfg_trace_pc_guard.guards_start in
+  let stop = S.create_global Cfg_trace_pc_guard.guards_stop in
+  let init = S.create_global Cfg_trace_pc_guard.init in
+  let text : Asm_targets.Asm_section.t =
+    Custom
+      { names = [".text." ^ name];
+        flags = Some "axG";
+        args = [section_type "progbits"; name; "comdat"];
+        is_delayed = false
+      }
+  in
+  D.switch_to_section text;
+  D.weak start;
+  D.hidden start;
+  D.weak stop;
+  D.hidden stop;
+  D.weak ctor;
+  D.hidden ctor;
+  D.type_symbol ctor ~ty:Function;
+  D.align ~fill:Nop ~bytes:code_alignment;
+  D.define_symbol_label ~section:Text ctor;
+  D.cfi_startproc ();
+  emit_constructor_body ~start ~stop ~init;
+  D.cfi_endproc ();
+  D.size ctor;
+  D.switch_to_section_raw ~names:[".init_array.2"] ~flags:(Some "awG")
+    ~args:[section_type "init_array"; name; "comdat"]
+    ~is_delayed:false;
+  D.align ~fill:Zero ~bytes:8;
+  D.symbol ctor
+
+let emit_data ~code_alignment ~emit_constructor_body =
+  if unit_has_guards ()
+  then (
+    D.switch_to_section Trace_pc_guards;
+    D.align ~fill:Zero ~bytes:4;
+    List.iter
+      (fun lbl ->
+        D.define_label lbl;
+        D.int32 0l)
+      (List.rev !guards);
+    emit_gate_definition ~weak:true;
+    emit_constructor ~code_alignment ~emit_constructor_body)

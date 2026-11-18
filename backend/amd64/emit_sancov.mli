@@ -32,12 +32,15 @@
 (** To be called at the start of each compilation unit. *)
 val reset_unit : unit -> unit
 
+(** To be called at the start of each function. *)
+val reset_function : unit -> unit
+
 (** Emit the load of the gate into [res] ([Trace_pc_guard_gate]). *)
 val emit_gate : res:X86_ast.arg -> unit
 
-(** Emit a call to the callback, with the address of a new guard
-    ([Trace_pc_guard]). Every register is preserved; [live] is the set of
-    registers live across the call.
+(** Emit a call to the callback, with the address of the guard of the probe
+    numbered [index] in the current function ([Trace_pc_guard]). Every register
+    is preserved; [live] is the set of registers live across the call.
 
     [move] emits a move between a hardware register and an [Outgoing] stack
     slot. [emit_call] emits a call to a C function. *)
@@ -45,6 +48,7 @@ val emit_call :
   live:Reg.Set.t ->
   move:(Reg.t -> Reg.t -> unit) ->
   emit_call:(Cmm.symbol -> unit) ->
+  index:int ->
   unit
 
 (** Emit the guards of the probes of the current unit, the definition of the

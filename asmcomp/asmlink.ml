@@ -87,15 +87,7 @@ let emit_trace_pc_guard_gate () =
     then
       Misc.fatal_error
         "-gated-trace-pc-guard-define-gate is not supported with -llvm-backend";
-    let module D = Asm_targets.Asm_directives in
-    let gate = Asm_targets.Asm_symbol.create_global Cfg_trace_pc_guard.gate in
-    D.switch_to_section Trace_pc_guard_gate;
-    D.global gate;
-    D.type_symbol gate ~ty:Object;
-    D.align ~fill:Zero ~bytes:8;
-    D.define_symbol_label ~section:Trace_pc_guard_gate gate;
-    D.int64 0L;
-    D.size gate)
+    Emit_sancov_common.emit_gate_definition ~weak:false)
 
 let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
