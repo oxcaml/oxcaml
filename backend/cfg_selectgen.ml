@@ -1397,7 +1397,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let term_desc = Cfg.Always (Sub_cfg.start_label sub_body) in
     let phantom_available_before = SU.phantom_vars_from_env env in
-    Sub_cfg.update_exit_terminator sub_cfg term_desc ~phantom_available_before;
+    Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:[||]
+      ~dbg:Debuginfo.none ~phantom_available_before;
     Sub_cfg.join
       ~from:(join_branch r_body sub_body :: sub_handlers)
       ~to_:sub_cfg ~phantom_available_before;
@@ -1454,7 +1455,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
               ~phantom_available_before)
           traps;
-        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label)
+        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label) ~arg:[||]
+          ~dbg:Debuginfo.none
           ~phantom_available_before:(SU.phantom_vars_from_env env);
         SU.set_traps nfail handler.SU.traps_ref env.SU.trap_stack traps;
         Never_returns
@@ -1706,7 +1708,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let term_desc = Cfg.Always (Sub_cfg.start_label s_body) in
-    Sub_cfg.update_exit_terminator sub_cfg term_desc
+    Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:[||]
+      ~dbg:Debuginfo.none
       ~phantom_available_before:(SU.phantom_vars_from_env env);
     let s_handlers =
       List.map

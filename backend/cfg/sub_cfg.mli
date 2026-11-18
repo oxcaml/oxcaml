@@ -116,10 +116,10 @@ val join :
 val join_tail : from:t list -> to_:t -> unit
 
 val update_exit_terminator :
-  ?arg:Reg.t array ->
-  ?dbg:Debuginfo.t ->
   t ->
   Cfg.terminator ->
+  arg:Reg.t array ->
+  dbg:Debuginfo.t ->
   phantom_available_before:Backend_var.Set.t option ->
   unit
 
