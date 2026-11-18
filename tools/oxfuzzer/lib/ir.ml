@@ -731,6 +731,15 @@ module Expr = struct
           body : t;
           resume : t
         }
+    | Let_stack_function of
+        { name : Name.t;
+          lambda : t;
+          body : t
+        }
+    | Apply_stack_function of
+        { name : Name.t;
+          args : t list
+        }
 
   and raise =
     { exn : Exn.t;
@@ -961,6 +970,22 @@ module Expr = struct
                [value_param (Ast_helper.Pat.construct (lid "()") None)]
                (constrain ty (to_code body));
              to_code resume ])
+    | Let_stack_function { name; lambda; body } -> (
+      match lambda with
+      | Lambda _ ->
+        bind name
+          (Ast_helper.Exp.stack (to_code lambda))
+          (fun _ -> to_code body)
+      | _ -> Misc.fatal_errorf "Let_stack_function: expected a function")
+    | Apply_stack_function { name; args } ->
+      if List.is_empty args
+      then Misc.fatal_errorf "Apply_stack_function: no arguments";
+      let application =
+        apply (ident (Name.to_string name)) (List.map to_code args)
+      in
+      { application with
+        pexp_attributes = [Ast_helper.Attr.mk (loc "nontail") (PStr [])]
+      }
 
   and raise_to_code { exn; payload; notrace } =
     let payload =
