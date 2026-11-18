@@ -124,6 +124,8 @@ let wide_function_probability = 1_500
 
 let tail_call_probability = 2_500
 
+let wide_argument_variable_probability = 7_500
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
