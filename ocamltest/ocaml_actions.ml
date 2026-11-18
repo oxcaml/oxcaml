@@ -1385,9 +1385,19 @@ let native_compiler = Actions.make
   ~name:"native-compiler"
   ~description:"Passes if the native compiler is available"
   ~does_something:false
-  (Actions_helpers.predicate Ocamltest_config.native_compiler
-    "native compiler available"
-    "native compiler not available")
+  (fun ppf env ->
+    let pred, env =
+      Actions_helpers.predicate Ocamltest_config.native_compiler
+        "native compiler available"
+        "native compiler not available"
+        ppf env
+    in
+    (* Add an explicit dependency on ocamlopt *)
+    Actions.seq
+      [pred;
+       Task [Check_file_exists {filename=Ocaml_files.ocamlopt;
+                                reason="native compiler available"}]],
+    env)
 
 let native_dynlink = Actions.make
   ~name:"native-dynlink"

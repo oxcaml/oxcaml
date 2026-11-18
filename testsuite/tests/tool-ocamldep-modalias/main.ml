@@ -27,7 +27,7 @@
    commandline = "-depend -as-map lib.ml lib.mli";
    ocamlc.byte;
    commandline = "-depend -map lib.ml -open Lib ${links}";
-   ocamlopt.byte;
+   ocamlc.byte;
    compiler_reference = "${test_source_directory}/depend.mk.reference";
    check-ocamlc.byte-output;
    hasunix;
