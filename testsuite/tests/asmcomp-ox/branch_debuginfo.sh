@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+set -eu
 
 src=${test_source_directory}/branch_debuginfo.ml
 asm=branch_debuginfo.${asmext}
