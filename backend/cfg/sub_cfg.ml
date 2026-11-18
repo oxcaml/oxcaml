@@ -172,7 +172,19 @@ let update_exit_terminator sub_cfg desc ~arg ~dbg ~phantom_available_before =
    used to describe code locations. That of other instructions can also end up
    in frametables (and thus in backtraces), or in the messages of checks such as
    [@zero_alloc] and [@poll error]: [set_block_entry_debuginfo] must not give
-   them one. *)
+   them one.
+
+   The first group is also restricted to what selection emits without a Cmm term
+   to take a debuginfo from, together with constants, which stand for a whole
+   arm such as [then 0]. Moves join the results of arms; trap instructions are
+   grouped with them because they open and close the scope of a handler without
+   computing anything, and do not appear in frametables. [Csel], by contrast,
+   computes a value for a Cmm operation: selection gives it the debuginfo of
+   that operation, as for arithmetic, so one without debuginfo is left that way.
+
+   Among terminators, [Tailcall_self] is implemented as a jump, but is an
+   application in the source: like the other calls it has the debuginfo of its
+   Cmm term and must not receive that of an arm. *)
 
 let basic_only_moves_values (desc : Cfg.basic) =
   match desc with
