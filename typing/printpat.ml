@@ -130,6 +130,27 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
+  | Tpat_slice { mutability; elements; _ } ->
+      let punct = if Types.is_mutable mutability then '|' else ':' in
+      let patterns = List.map (fun v -> `Pattern v) in
+      let items =
+        match elements with
+        | Tslice_closed vs -> patterns vs
+        | Tslice_open { prefix; rest; suffix } ->
+            patterns prefix @ [`Rest rest] @ patterns suffix
+      in
+      let pretty_item ppf = function
+        | `Pattern v -> pretty_val ppf v
+        | `Rest None -> fprintf ppf ".."
+        | `Rest (Some (Tslice_rest_var { id; _ })) ->
+            fprintf ppf ".. as %s" (Ident.name id)
+      in
+      begin match items with
+      | [] -> fprintf ppf "@[[&%c %c]@]" punct punct
+      | _ ->
+          fprintf ppf "@[[&%c %a %c]@]" punct
+            (pretty_list pretty_item " ;") items punct
+      end
   | Tpat_addr (Mutable _, _, v) ->
       fprintf ppf "@[<2>addr_@ %a@]" pretty_arg v
   | Tpat_addr (Immutable, _, v) ->
