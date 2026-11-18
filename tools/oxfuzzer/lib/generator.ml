@@ -1085,7 +1085,10 @@ and gen_arguments (st : State.t) env params =
   List.map
     (fun (binding : Binding.t) ->
       match gen_existing st env binding.ty with
-      | Some generate when wide && Random.State.int st.random_state 4 > 0 ->
+      | Some generate
+        when wide
+             && with_probability st
+                  ~probability:Config.wide_argument_variable_probability ->
         generate ()
       | Some _ | None -> gen_value st env binding.ty)
     params
