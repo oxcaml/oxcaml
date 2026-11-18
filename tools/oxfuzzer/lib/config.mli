@@ -63,6 +63,8 @@ val mutable_field_probability : int
 
 val array_probability : int
 
+val bool_probability : int
+
 val array_literal_probability : int
 
 val bounded_index_probability : int
