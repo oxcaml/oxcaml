@@ -121,11 +121,16 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
         in
         denv, Some is_int.param
     in
-    let denv, const_ctors =
+    let open struct
+      type get_tag_equation =
+        | In_denv
+        | In_extension
+    end in
+    let denv, const_ctors, get_tag_equation =
       match const_ctors with
-      | Zero -> denv, T.bottom K.naked_immediate
+      | Zero -> denv, T.bottom K.naked_immediate, In_denv
       | At_least_one { ctor = Do_not_unbox _; _ } ->
-        denv, T.unknown K.naked_immediate
+        denv, T.unknown K.naked_immediate, In_extension
       | At_least_one { ctor = Unbox (Number (Naked_immediate, ctor_epa)); _ } ->
         let v =
           VB.create ctor_epa.param ctor_epa.param_debug_uid Name_mode.normal
@@ -134,7 +139,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
         let ty =
           T.alias_type_of K.naked_immediate (Simple.var ctor_epa.param)
         in
-        denv, ty
+        denv, ty, In_extension
       | At_least_one
           { ctor =
               Unbox
@@ -176,9 +181,25 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
               block_fields ))
         fields_by_tag
     in
+    let (extensions : T.variant_extensions), denv =
+      match get_tag_equation with
+      | In_denv ->
+        ( No_extensions,
+          DE.map_typing_env denv ~f:(fun tenv ->
+              TE.add_get_tag_relation tenv (Name.var tag.param)
+                ~scrutinee:(Simple.var param_var)) )
+      | In_extension ->
+        ( Ext
+            { when_immediate = TEE.empty;
+              when_block =
+                TEE.add_get_tag_relation TEE.empty (Name.var tag.param)
+                  ~scrutinee:(Simple.var param_var)
+            },
+          denv )
+    in
     let shape =
       T.variant ~machine_width:(DE.machine_width denv) ~const_ctors
-        ~non_const_ctors ~is_int ~get_tag:(Some tag.param)
+        ~non_const_ctors ~is_int ~get_tag:(Some tag.param) ~extensions
         (Alloc_mode.For_types.unknown ())
     in
     let denv = add_equation_on_var denv param_var shape in

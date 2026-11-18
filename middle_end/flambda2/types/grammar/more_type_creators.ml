@@ -280,7 +280,7 @@ let immutable_block_with_size_at_least ~machine_width ~tag ~n ~shape
     ~is_int:None ~get_tag:None ~extensions:No_extensions
 
 let variant ~machine_width ~const_ctors ~non_const_ctors ~is_int ~get_tag
-    alloc_mode =
+    ~extensions alloc_mode =
   let blocks =
     let shape_and_field_tys_by_tag =
       Tag.Scannable.Map.fold
@@ -293,7 +293,7 @@ let variant ~machine_width ~const_ctors ~non_const_ctors ~is_int ~get_tag
       ~shape_and_field_tys_by_tag alloc_mode
   in
   TG.create_variant ~is_unique:false ~immediates:(Known const_ctors)
-    ~blocks:(Known blocks) ~is_int ~get_tag ~extensions:No_extensions
+    ~blocks:(Known blocks) ~is_int ~get_tag ~extensions
 
 let variant_non_null ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
   let blocks =

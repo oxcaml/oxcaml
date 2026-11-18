@@ -158,6 +158,7 @@ val variant :
     (Flambda_kind.Block_shape.t * Type_grammar.t list) Tag.Scannable.Map.t ->
   is_int:Variable.t option ->
   get_tag:Variable.t option ->
+  extensions:Type_grammar.variant_extensions ->
   Alloc_mode.For_types.t ->
   Type_grammar.t
 
