@@ -115,6 +115,7 @@ let emit_call ~live ~move ~index =
   D.cfi_adjust_cfa_offset ~bytes:(-16)
 
 let emit_constructor_body ~start ~stop ~init =
+  D.cfi_remember_state ();
   A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
   D.cfi_adjust_cfa_offset ~bytes:16;
   D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
@@ -129,6 +130,7 @@ let emit_constructor_body ~start ~stop ~init =
   load_address (H.reg_x (Proc.phys_reg Int X1)) stop;
   A.ins1 BL (O.symbol (Ast.Symbol.create_symbol (Needs_reloc CALL26) init));
   A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
+  D.cfi_restore_state ();
   A.ins0 RET
 
 let emit_data () = Common.emit_data ~code_alignment:8 ~emit_constructor_body
