@@ -125,6 +125,22 @@ val update_exit_terminator :
 
 val start_label : t -> Label.t
 
+(** [set_block_entry_debuginfo block dbg] gives the debuginfo [dbg] to the
+    instructions at the start of [block] (terminator included), stopping at the
+    first one that already has a debuginfo. Instructions after that one are left
+    alone: in the line number table they take the location of what precedes them
+    in the block. Only moves, constants, trap instructions, and terminators
+    transferring control within the function or returning from it are given
+    [dbg]: for other instructions a debuginfo is more than a code location. Does
+    nothing if [dbg] is [Debuginfo.none]. *)
+val set_block_entry_debuginfo : Cfg.basic_block -> Debuginfo.t -> unit
+
+(** Like [set_block_entry_debuginfo], on the first non-empty block of [t]. This
+    is used for the arms of [Cmm.Cifthenelse] and [Cmm.Cswitch], whose debuginfo
+    is the location of the entry to the arm. It must be called before [t] is
+    passed to [join] or [join_tail]. *)
+val set_entry_debuginfo : t -> Debuginfo.t -> unit
+
 val mark_as_trap_handler : t -> unit
 
 val dump : t -> unit

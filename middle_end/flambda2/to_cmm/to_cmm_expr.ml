@@ -1157,21 +1157,25 @@ and switch env res switch =
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
     in
+    (* The debuginfo of an arm is that of the code of its [Apply_cont]. There is
+       no such code when the handler is substituted for the [Apply_cont]: the
+       arm is then the code of the handler, which has its own debuginfo (and
+       maybe a different stack of inlined frames). *)
     let arm_dbg =
       let k = Apply_cont.continuation action in
-      let action_dbg = Apply_cont.debuginfo action in
-      if Env.is_exn_handler env k
-      then Env.add_inlined_debuginfo env action_dbg
-      else
+      let handler_is_inlined =
+        (not (Env.is_exn_handler env k))
+        &&
         match Env.get_continuation env k with
-        | Inline _ ->
-          (* The arm is the code of the handler, which has its own debuginfo
-             (and maybe a different stack of inlined frames). *)
-          Debuginfo.none
-        | Return _ | Jump _ ->
-          if Debuginfo.is_none action_dbg
-          then dbg
-          else Env.add_inlined_debuginfo env action_dbg
+        | Inline _ -> true
+        | Return _ | Jump _ -> false
+      in
+      let action_dbg = Apply_cont.debuginfo action in
+      if handler_is_inlined
+      then Debuginfo.none
+      else if Debuginfo.is_none action_dbg
+      then dbg
+      else Env.add_inlined_debuginfo env action_dbg
     in
     ( ( d,
         cmm_action,

@@ -309,10 +309,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       SU.insert_debug env sub_cfg (Op op) dbg rs rd;
       rd
 
-  let insert_const (env : SU.environment) sub_cfg op dbg rd =
-    let dbg = if Debuginfo.is_none dbg then env.branch_dbg else dbg in
-    insert_op_debug env sub_cfg op dbg [||] rd
-
   (* Default instruction selection for stores (of words) *)
 
   let insert_move_extcall_arg env sub_cfg ty_arg src dst dbg =
@@ -543,12 +539,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Use_default -> basic_or_terminator, args)
     | Use_default -> select_operation0 op args dbg ~label_after
 
-  let insert_return (env : SU.environment) sub_cfg (r : _ Or_never_returns.t)
+  let insert_return env sub_cfg (r : _ Or_never_returns.t)
       (traps : Cmm.trap_action list) =
     match r with
     | Never_returns -> ()
     | Ok r ->
-      let dbg = env.branch_dbg in
       List.iter
         (fun trap ->
           let instr_desc =
@@ -565,8 +560,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             ~phantom_available_before)
         traps;
       let loc = Proc.loc_results_return (Reg.typv r) in
-      SU.insert_moves ~dbg env sub_cfg r loc;
-      SU.insert_debug' env sub_cfg Cfg.Return dbg loc [||]
+      SU.insert_moves env sub_cfg r loc;
+      SU.insert' env sub_cfg Cfg.Return loc [||]
 
   (* Buffering of instruction sequences *)
 
@@ -854,30 +849,30 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_int (n, dbg) ->
       let r = Reg.createv Cmm.typ_int in
       let op = SU.make_const_int (Nativeint.of_int n) in
-      Ok (insert_const env sub_cfg op dbg r)
+      Ok (insert_op_debug env sub_cfg op dbg [||] r)
     | Cconst_natint (n, dbg) ->
       let r = Reg.createv Cmm.typ_int in
-      Ok (insert_const env sub_cfg (SU.make_const_int n) dbg r)
+      Ok (insert_op_debug env sub_cfg (SU.make_const_int n) dbg [||] r)
     | Cconst_float32 (n, dbg) ->
       let r = Reg.createv Cmm.typ_float32 in
       let op = SU.make_const_float32 (Int32.bits_of_float n) in
-      Ok (insert_const env sub_cfg op dbg r)
+      Ok (insert_op_debug env sub_cfg op dbg [||] r)
     | Cconst_float (n, dbg) ->
       let r = Reg.createv Cmm.typ_float in
       let op = SU.make_const_float (Int64.bits_of_float n) in
-      Ok (insert_const env sub_cfg op dbg r)
+      Ok (insert_op_debug env sub_cfg op dbg [||] r)
     | Cconst_vec128 (bits, dbg) ->
       let r = Reg.createv Cmm.typ_vec128 in
-      Ok (insert_const env sub_cfg (SU.make_const_vec128 bits) dbg r)
+      Ok (insert_op_debug env sub_cfg (SU.make_const_vec128 bits) dbg [||] r)
     | Cconst_vec256 (bits, dbg) ->
       let r = Reg.createv Cmm.typ_vec256 in
-      Ok (insert_const env sub_cfg (Operation.Const_vec256 bits) dbg r)
+      Ok (insert_op_debug env sub_cfg (Operation.Const_vec256 bits) dbg [||] r)
     | Cconst_vec512 (bits, dbg) ->
       let r = Reg.createv Cmm.typ_vec512 in
-      Ok (insert_const env sub_cfg (Operation.Const_vec512 bits) dbg r)
+      Ok (insert_op_debug env sub_cfg (Operation.Const_vec512 bits) dbg [||] r)
     | Cconst_mask (bits, dbg) ->
       let r = Reg.createv Cmm.typ_mask in
-      Ok (insert_const env sub_cfg (Operation.Const_mask bits) dbg r)
+      Ok (insert_op_debug env sub_cfg (Operation.Const_mask bits) dbg [||] r)
     | Cconst_symbol (n, dbg) ->
       (* Cconst_symbol _ evaluates to a statically-allocated address, so its
          value fits in a typ_int register and is never changed by the GC.
@@ -887,7 +882,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
          in the compilation unit's global roots structure, so adding this
          register to the frame table would be redundant *)
       let r = Reg.createv Cmm.typ_int in
-      Ok (insert_const env sub_cfg (SU.make_const_symbol n) dbg r)
+      Ok (insert_op_debug env sub_cfg (SU.make_const_symbol n) dbg [||] r)
     | Cvar v -> (
       try Ok (SU.env_find v env)
       with Not_found ->
@@ -1230,16 +1225,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let rif, sub_if =
         emit_new_sub_cfg
           ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifso_a))
-          (SU.env_set_branch_dbg env ifso_dbg)
-          eif ~bound_name
+          env eif ~bound_name
       in
       let relse, sub_else =
         emit_new_sub_cfg
           ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifnot_a))
-          (SU.env_set_branch_dbg env ifnot_dbg)
-          eelse ~bound_name
+          env eelse ~bound_name
       in
       let r = SU.join env rif sub_if relse sub_else ~bound_name in
+      Sub_cfg.set_entry_debuginfo sub_if ifso_dbg;
+      Sub_cfg.set_entry_debuginfo sub_else ifnot_dbg;
       let term_desc =
         SU.terminator_of_test cond
           ~label_true:(Sub_cfg.start_label sub_if)
@@ -1261,15 +1256,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases : (Reg.t array Or_never_returns.t * Sub_cfg.t) array =
         Array.map
-          (fun (case, case_dbg, annots) ->
+          (fun (case, _dbg, annots) ->
             emit_new_sub_cfg
               ~is_cold:
                 (Likelihood.is_cold (Branch_annotations.likelihood annots))
-              (SU.env_set_branch_dbg env case_dbg)
-              case ~bound_name)
+              env case ~bound_name)
           ecases
       in
       let r = SU.join_array env sub_cases ~bound_name in
+      Array.iter2
+        (fun (_, sub_case) (_, case_dbg, _) ->
+          Sub_cfg.set_entry_debuginfo sub_case case_dbg)
+        sub_cases ecases;
       let subs = Array.map (fun (_, sub_cfg) -> sub_cfg) sub_cases in
       let term_desc : Cfg.terminator =
         Switch (Array.map (fun idx -> Sub_cfg.start_label subs.(idx)) index)
@@ -1405,8 +1403,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       ~to_:sub_cfg ~phantom_available_before;
     r
 
-  and emit_expr_exit (env : SU.environment) sub_cfg (lbl : Cmm.exit_label) args
-      traps : _ Or_never_returns.t =
+  and emit_expr_exit env sub_cfg (lbl : Cmm.exit_label) args traps :
+      _ Or_never_returns.t =
     match emit_parts_list env sub_cfg args with
     | Never_returns -> Never_returns
     | Ok (simple_list, ext_env) -> (
@@ -1434,9 +1432,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 ->
               ())
           src;
-        let dbg = env.branch_dbg in
-        SU.insert_moves ~dbg env sub_cfg src tmp_regs;
-        SU.insert_moves ~dbg env sub_cfg tmp_regs (Array.concat handler.regs);
+        SU.insert_moves env sub_cfg src tmp_regs;
+        SU.insert_moves env sub_cfg tmp_regs (Array.concat handler.regs);
         assert (Sub_cfg.exit_has_never_terminator sub_cfg);
         List.iter
           (fun trap ->
@@ -1457,7 +1454,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
               ~phantom_available_before)
           traps;
-        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label) ~dbg
+        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label)
           ~phantom_available_before:(SU.phantom_vars_from_env env);
         SU.set_traps nfail handler.SU.traps_ref env.SU.trap_stack traps;
         Never_returns
@@ -1562,15 +1559,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let sub_if =
         emit_tail_new_sub_cfg
           ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifso_a))
-          (SU.env_set_branch_dbg env ifso_dbg)
-          eif
+          env eif
       in
       let sub_else =
         emit_tail_new_sub_cfg
           ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifnot_a))
-          (SU.env_set_branch_dbg env ifnot_dbg)
-          eelse
+          env eelse
       in
+      Sub_cfg.set_entry_debuginfo sub_if ifso_dbg;
+      Sub_cfg.set_entry_debuginfo sub_else ifnot_dbg;
       let term_desc =
         SU.terminator_of_test cond
           ~label_true:(Sub_cfg.start_label sub_if)
@@ -1588,11 +1585,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let sub_cases =
         Array.map
           (fun (case, case_dbg, annots) ->
-            emit_tail_new_sub_cfg
-              ~is_cold:
-                (Likelihood.is_cold (Branch_annotations.likelihood annots))
-              (SU.env_set_branch_dbg env case_dbg)
-              case)
+            let sub_case =
+              emit_tail_new_sub_cfg
+                ~is_cold:
+                  (Likelihood.is_cold (Branch_annotations.likelihood annots))
+                env case
+            in
+            Sub_cfg.set_entry_debuginfo sub_case case_dbg;
+            sub_case)
           ecases
       in
       let term_desc : Cfg.terminator =

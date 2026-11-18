@@ -60,8 +60,7 @@ type environment =
     tailrec_label : Label.t;
     phantom_lets : V.Set.t;
     all_phantom_lets :
-      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref;
-    branch_dbg : Debuginfo.t
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
   }
 
 let env_add ?(mut = Asttypes.Immutable) var regs env =
@@ -106,8 +105,6 @@ let env_find_static_exception id env =
     Misc.fatal_errorf "Not found static exception id=%a" Static_label.format id
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
-
-let env_set_branch_dbg env branch_dbg = { env with branch_dbg }
 
 let dbg_of_test (test : Cmm.expression) dbg =
   if not (Debuginfo.is_none dbg)
@@ -183,8 +180,7 @@ let env_create ~tailrec_label =
     trap_stack = Uncaught;
     tailrec_label;
     phantom_lets = V.Set.empty;
-    all_phantom_lets = ref V.Map.empty;
-    branch_dbg = Debuginfo.none
+    all_phantom_lets = ref V.Map.empty
   }
 
 let env_add_phantom_let var defining_expr env =
@@ -814,16 +810,16 @@ let insert_op_debug' (env : environment) sub_cfg op dbg rs rd =
   Sub_cfg.set_terminator sub_cfg op rs rd dbg ~phantom_available_before;
   rd
 
-let insert_move ?(dbg = Debuginfo.none) env sub_cfg src dst =
+let insert_move env sub_cfg src dst =
   (* This should never be called on regs with incompatible [typ]s, but the
      zero-alloc checker may unconditionally assume the result of
      caml_flambda2_invalid is typ_int. *)
   if not (Reg.same src dst)
-  then insert_debug env sub_cfg (Op Move) dbg [| src |] [| dst |]
+  then insert env sub_cfg (Op Move) [| src |] [| dst |]
 
-let insert_moves ?dbg env sub_cfg src dst =
+let insert_moves env sub_cfg src dst =
   for i = 0 to min (Array.length src) (Array.length dst) - 1 do
-    insert_move ?dbg env sub_cfg src.(i) dst.(i)
+    insert_move env sub_cfg src.(i) dst.(i)
   done
 
 (* Insert moves and stack offsets for function arguments and results *)
