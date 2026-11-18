@@ -592,7 +592,6 @@ let all_predef_exns = [
 let path_match_failure = Pident ident_match_failure
 and path_invalid_argument = Pident ident_invalid_argument
 and path_assert_failure = Pident ident_assert_failure
-and path_failure = Pident ident_failure
 and path_undefined_recursive_module = Pident ident_undefined_recursive_module
 
 let ident_false = ident_create "false"

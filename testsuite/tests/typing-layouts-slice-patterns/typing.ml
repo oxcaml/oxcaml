@@ -174,18 +174,3 @@ Line 3, characters 33-34:
                                      ^
 
 |}]
-
-(***************)
-(* Translation *)
-
-(* CR slice-patterns: Slice patterns are not compiled yet *)
-external make : #(#(int array * int64_u) * nativeint_u) -> int slice =
-  "%identity"
-let f (s : int slice) = match s with [&| x |] -> x | _ -> 0
-let _ = f (make #(#([| 1 |], #0L), #1n))
-[%%expect{|
-external make : #(#(int array * int64_u) * nativeint_u) -> int slice
-  = "%identity"
-val f : int slice -> int = <fun>
-Exception: Failure "Slice patterns are not compiled yet".
-|}]
