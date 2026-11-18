@@ -77,9 +77,12 @@ val callback : string
     [__sanitizer_cov_trace_pc_guard_init]. *)
 val init : string
 
-(** The bounds of the guards, as defined by the linker. *)
+(** The name of the symbol that the linker defines at the start of the guards,
+    [__start___sancov_guards]. *)
 val guards_start : string
 
+(** The name of the symbol that the linker defines at the end of the guards,
+    [__stop___sancov_guards]. *)
 val guards_stop : string
 
 (** The name of the constructor and of its COMDAT group. It is the one that
