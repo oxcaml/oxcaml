@@ -1,0 +1,6 @@
+(executable
+ (name raising_rewriters)
+ (libraries ppxlib))
+
+(cram
+ (deps raising_rewriters.exe))
