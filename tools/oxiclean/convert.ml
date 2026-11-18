@@ -183,17 +183,35 @@ and binary_scalar_operation
 
 let impl = impl_in_scope []
 
-let resolve_type_constr_by_path ~(type_context : Ident.t list)
+module Type_in_context = struct
+  type t =
+    | Id of Ident.t
+    | Poly of Types.type_expr
+
+  let eq (lhs : t) (rhs : t) : bool =
+    match lhs, rhs with
+    | Id lhs, Id rhs -> Ident.equal lhs rhs
+    | Poly lhs, Poly rhs -> Types.eq_type lhs rhs
+    | Id _, Poly _ | Poly _, Id _ -> false
+end
+
+let resolve_type_constr_by_path ~(type_context : Type_in_context.t list)
     : Path.t -> Model.Type.constr = function
-  | p when Path.same p Predef.path_int -> Predef Int
-  | p when Path.same p Predef.path_option -> Predef Option
-  | Pident id ->
-    begin match List.find_index (Ident.equal id) type_context with
-    | Some de_bruijn -> Var { de_bruijn }
-    | None ->
+  | Pident id as p ->
+    if Ident.is_predef id then begin
+      if Path.same p Predef.path_int then Predef Int else
+      if Path.same p Predef.path_option then Predef Option else
+      if Path.same p Predef.path_bool then Predef Bool else
       raise
         (Error.Message
-           (Format.asprintf "variable not in scope: %a" Ident.print id))
+          (Format.sprintf "predef not yet implemented: %s" (Ident.name id)))
+    end else begin
+      match List.find_index (Type_in_context.eq (Id id)) type_context with
+      | Some de_bruijn -> Var { de_bruijn }
+      | None ->
+        raise
+          (Error.Message
+            (Format.asprintf "variable not in scope: %a" Ident.print id))
     end
   | other ->
     raise
@@ -202,7 +220,8 @@ let resolve_type_constr_by_path ~(type_context : Ident.t list)
             "Type constructor path not yet implemented: %a"
             Printtyp.path other))
 
-let rec type_expr ~(type_context : Ident.t list) (t : Types.type_expr) : Model.Type.expr =
+let rec type_expr ~(type_context : Type_in_context.t list) (t : Types.type_expr)
+    : Model.Type.expr =
   match Types.get_desc t with
   | Tarrow (_, domain, codomain, _) ->
     Arrow
@@ -214,13 +233,29 @@ let rec type_expr ~(type_context : Ident.t list) (t : Types.type_expr) : Model.T
       { constr = resolve_type_constr_by_path ~type_context path
       ; args = List.map (type_expr ~type_context) args
       }
-  | Tpoly (t, []) -> type_expr ~type_context t
+  | Tpoly (t, args) -> type_poly ~type_context t args
+  | Tvar _ ->
+    begin match List.find_index (Type_in_context.eq (Poly t)) type_context with
+    | Some de_bruijn -> TypeVar { de_bruijn }
+    | None ->
+      raise
+        (Error.Message
+           (Format.asprintf
+              "type variable not in scope: %a"
+              Printtyp.type_expr t))
+    end
   | _ ->
     raise
       (Error.Message
          (Format.asprintf
             "Type expression not yet implemented: %a"
             Printtyp.type_expr t))
+
+and type_poly ~(type_context : Type_in_context.t list) (t : Types.type_expr)
+    : Types.type_expr list -> Model.Type.expr = function
+  | [] -> type_expr ~type_context t
+  | arg :: args ->
+    Poly { body = type_poly ~type_context:(Poly arg :: type_context) t args }
 
 let module_type : Types.module_type -> Model.Type.t = function
   | other ->
@@ -231,7 +266,7 @@ let module_type : Types.module_type -> Model.Type.t = function
             Printtyp.modtype other))
 
 let rec intf_in_scope
-    ~(type_context : Ident.t list)
+    ~(type_context : Type_in_context.t list)
     ~(module_context : Ident.t list)
     : Types.signature -> Model.Type.t =
   function
@@ -239,7 +274,7 @@ let rec intf_in_scope
   | item :: etc -> item_in_scope ~type_context ~module_context etc item
 
 and item_in_scope
-    ~(type_context : Ident.t list)
+    ~(type_context : Type_in_context.t list)
     ~(module_context : Ident.t list)
     (etc : Types.signature_item list)
     : Types.signature_item -> Model.Type.t =
@@ -251,13 +286,13 @@ and item_in_scope
       }
   | Sig_value (_, { val_type = ty; _ }, _) ->
     Val
-      { ty = type_expr ~type_context ty
+      { ty = Ctype.free_variables ty |> type_poly ~type_context ty
       ; etc = intf_in_scope ~type_context ~module_context etc
       }
   | Sig_type (id, decl, _, _) ->
     Type
       { kind = type_decl_kind ~type_context ~module_context id decl
-      ; etc = intf_in_scope ~type_context:(id :: type_context) ~module_context etc
+      ; etc = intf_in_scope ~type_context:(Id id :: type_context) ~module_context etc
       }
   | other ->
     raise
@@ -267,7 +302,7 @@ and item_in_scope
             Printtyp.signature [other]))
 
 and type_decl_kind
-    ~(type_context : Ident.t list)
+    ~(type_context : Type_in_context.t list)
     ~(module_context : Ident.t list)
     (id : Ident.t)
     (decl: Types.type_declaration)

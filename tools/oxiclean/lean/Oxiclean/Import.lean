@@ -39,6 +39,8 @@ namespace WorkaroundForPr14959
       | arrow (domain : ExprType) (codomain : ExprType)
       | constr (constructor : TypeConstructor) (args : List ExprType)
       | mod (moduleType : ModuleType)
+      | poly (body : ExprType)
+      | var (deBruijn : Nat)
     deriving Lean.FromJson
   end ExprType
 
@@ -46,6 +48,8 @@ namespace WorkaroundForPr14959
     | .arrow domain codomain => .arrow domain.toModel codomain.toModel
     | .constr c args => .constr c (args.map ExprType.toModel)
     | .mod moduleType => .mod moduleType
+    | .poly body => .poly body.toModel
+    | .var deBruijn => .var deBruijn
 
   section ModuleType
     variable (ExprType : Type)
@@ -88,8 +92,17 @@ deriving instance Lean.FromJson, Lean.ToExpr, Repr for
   IntegralBinaryScalarOperation
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for BinaryScalarOperation
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for Immediate
-deriving instance Lean.FromJson, Lean.ToExpr, Repr for UpstreamCompilationUnit
+deriving instance Lean.ToExpr, Repr for UpstreamCompilationUnit
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for BlockKind
+
+structure UpstreamCompilationUnitPath : Type where
+  path : List String
+deriving Lean.FromJson
+
+instance : Lean.FromJson UpstreamCompilationUnit where
+  fromJson? json := do
+    let { path := _ } : UpstreamCompilationUnitPath ← Lean.FromJson.fromJson? json
+    throw "TODO"
 
 deriving instance Lean.ToExpr, Repr for
   Expr, Value, Indirection, Block, BlockContents, ScalarOperation,

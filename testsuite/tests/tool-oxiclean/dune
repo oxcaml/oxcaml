@@ -40,11 +40,14 @@
  (alias repr)
  (deps
   repr.intf.json
-  repr.impl.json)
+  repr.impl.json
+  Repr.lean
+  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
  (action
   (progn
    (diff repr.impl.json.expected repr.impl.json)
-   (diff repr.intf.json.expected repr.intf.json))))
+   (diff repr.intf.json.expected repr.intf.json)
+   (run lean %{dep:Repr.lean}))))
 
 (rule
  (targets even.cmi even.cmti even.cmt)

@@ -1,0 +1,111 @@
+{
+  "val": {
+    "exprType": {
+      "poly": {
+        "body": {
+          "arrow": {
+            "domain": {"var": {"deBruijn": 0}},
+            "codomain": {
+              "arrow": {
+                "domain": {"var": {"deBruijn": 0}},
+                "codomain": {
+                  "constr": {
+                    "constructor": {"predef": {"predef": "bool"}},
+                    "args": []
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "etc": {
+      "val": {
+        "exprType": {
+          "poly": {
+            "body": {
+              "arrow": {
+                "domain": {"var": {"deBruijn": 0}},
+                "codomain": {
+                  "arrow": {
+                    "domain": {"var": {"deBruijn": 0}},
+                    "codomain": {
+                      "constr": {
+                        "constructor": {"predef": {"predef": "bool"}},
+                        "args": []
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "etc": {
+          "val": {
+            "exprType": {
+              "poly": {
+                "body": {
+                  "arrow": {
+                    "domain": {"var": {"deBruijn": 0}},
+                    "codomain": {
+                      "arrow": {
+                        "domain": {"var": {"deBruijn": 0}},
+                        "codomain": {
+                          "constr": {
+                            "constructor": {"predef": {"predef": "int"}},
+                            "args": []
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "etc": {
+              "val": {
+                "exprType": {
+                  "poly": {
+                    "body": {
+                      "arrow": {
+                        "domain": {"var": {"deBruijn": 0}},
+                        "codomain": {
+                          "arrow": {
+                            "domain": {"var": {"deBruijn": 0}},
+                            "codomain": {"var": {"deBruijn": 0}}
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "etc": {
+                  "val": {
+                    "exprType": {
+                      "poly": {
+                        "body": {
+                          "arrow": {
+                            "domain": {"var": {"deBruijn": 0}},
+                            "codomain": {
+                              "arrow": {
+                                "domain": {"var": {"deBruijn": 0}},
+                                "codomain": {"var": {"deBruijn": 0}}
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "etc": "empty"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import Oxiclean.Import
 open Oxiclean.Model
 
-abbrev even := oxiclean% even
+abbrev imported : Oxiclean.Import.InterfaceAndImplementation := oxiclean% even
 
 abbrev interface : ModuleType :=
   let int : ExprType := .constr (.predef .int) []
@@ -30,4 +30,4 @@ abbrev implementation : Expr :=
 
   .letBinding get (.letBinding create (.block 0 [.var 0, .var 1]))
 
-example : even = { interface, implementation } := by rfl
+example : imported = { interface, implementation } := by rfl

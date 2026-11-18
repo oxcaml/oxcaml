@@ -1,6 +1,7 @@
 namespace Oxiclean.Model
 
 inductive PredefinedType : Type where
+  | bool
   | int
   | option
 
@@ -16,6 +17,8 @@ mutual
     | arrow (domain : ExprType) (codomain : ExprType)
     | constr (constructor : TypeConstructor) (args : List ExprType)
     | mod (moduleType : ModuleType)
+    | poly (body : ExprType)
+    | var (deBruijn : Nat)
 
   inductive ModuleType : Type where
     | empty
@@ -99,7 +102,7 @@ end
 
 attribute [pp_nodot]
   -- ExprType
-  ExprType.arrow ExprType.constr ExprType.mod
+  ExprType.arrow ExprType.constr ExprType.mod ExprType.poly ExprType.var
   -- ModuleType
   ModuleType.empty ModuleType.mod ModuleType.ty ModuleType.val
   -- Expr

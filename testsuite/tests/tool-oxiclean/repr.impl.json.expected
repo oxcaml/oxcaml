@@ -2,7 +2,11 @@
   "letBinding": {
     "bound": {
       "field": {
-        "block": {"upstreamCompilationUnit": {"path": ["Stdlib"]}},
+        "indexInto": {
+          "upstreamCompilationUnit": {
+            "compilationUnit": {"path": ["Stdlib"]}
+          }
+        },
         "index": 15
       }
     },
@@ -10,7 +14,11 @@
       "letBinding": {
         "bound": {
           "field": {
-            "block": {"upstreamCompilationUnit": {"path": ["Stdlib"]}},
+            "indexInto": {
+              "upstreamCompilationUnit": {
+                "compilationUnit": {"path": ["Stdlib"]}
+              }
+            },
             "index": 16
           }
         },

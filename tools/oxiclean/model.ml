@@ -23,6 +23,12 @@ module Type = struct
         { constr : constr
         ; args : expr list
         }
+    | Poly of
+        { body : expr
+        }
+    | TypeVar of
+        { de_bruijn : int
+        }
 
   and kind =
     | Abstract
@@ -32,6 +38,7 @@ module Type = struct
     | Var of { de_bruijn : int }
 
   and predef =
+    | Bool
     | Int
     | Option
 end

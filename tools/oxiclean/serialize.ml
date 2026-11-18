@@ -49,7 +49,7 @@ let rec impl : Model.Expr.t -> Json.t = function
       ]
     |> tag "switch"
   | UpstreamCompilationUnit { path } ->
-    array string path |> tag "path" |> tag "upstreamCompilationUnit"
+    array string path |> tag "path" |> tag "compilationUnit" |> tag "upstreamCompilationUnit"
   | Value { value = v } ->
     value v |> tag "value" |> tag "val"
   | Var { de_bruijn } ->
@@ -127,6 +127,7 @@ and integral_binary_scalar_operation
   | Mod -> Json.String "modulo"
 
 let type_predef : Model.Type.predef -> Json.t = function
+  | Bool -> Json.String "bool"
   | Int -> Json.String "int"
   | Option -> Json.String "option"
 
@@ -148,6 +149,14 @@ let rec type_expr : Model.Type.expr -> Json.t = function
       ; "args", array type_expr args
       ]
     |> tag "constr"
+  | Poly { body } ->
+    type_expr body
+    |> tag "body"
+    |> tag "poly"
+  | TypeVar { de_bruijn } ->
+    Json.int de_bruijn
+    |> tag "deBruijn"
+    |> tag "var"
 
 let type_kind : Model.Type.kind -> Json.t = function
   | Abstract -> Json.String "abstract"
