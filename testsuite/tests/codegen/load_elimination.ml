@@ -115,3 +115,118 @@ reload_after_nonaliasing_store:
   leaq  -1(%rax,%rdi), %rax
   ret
 |}]
+
+type cursor = { mutable pos : int; mutable last : int }
+
+(* Instruction selection fuses load-add-store to the same location into a
+   read-modify-write instruction; it is not a [Store], so it records no
+   forwarding equation, and it acts as a store barrier. *)
+(* CR xclerc: see whether we could add a peephole rule to merge the addq
+   instructions. *)
+let bump_twice c =
+  c.pos <- c.pos + 1;
+  c.pos <- c.pos + 1
+[%%expect_asm X86_64{|
+bump_twice:
+  addq  $2, (%rax)
+  addq  $2, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+(* Store-to-load forwarding across machtypes: [p + 1] has machtype [Int],
+   whereas loading [pos] produces a [Val]. The reload of [pos] right after the
+   store to [pos] is replaced by a reinterpret cast from the stored register
+   (which, unlike a move, the register allocator does not coalesce), so only
+   one load of [pos] should remain; the stores are all kept. *)
+let push_two c =
+  let p = c.pos in
+  c.last <- p;
+  c.pos <- p + 1;
+  let q = c.pos in
+  c.last <- q;
+  c.pos <- q + 1
+[%%expect_asm X86_64{|
+push_two:
+  movq  (%rax), %rbx
+  movq  %rbx, 8(%rax)
+  addq  $2, %rbx
+  movq  %rbx, (%rax)
+  movq  %rbx, 8(%rax)
+  addq  $2, %rbx
+  movq  %rbx, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+(* The stored value and the reload both have machtype [Val], even though
+   the store uses [Word_int] and the load uses [Word_val]. *)
+let copy_pos c other =
+  let p = other.pos in
+  c.pos <- p;
+  c.last <- c.pos
+[%%expect_asm X86_64{|
+copy_pos:
+  movq  (%rbx), %rbx
+  movq  %rbx, (%rax)
+  movq  %rbx, 8(%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+external store_bits : int64_u -> int64_u -> unit = "%unsafe_set_ext_ptr"
+external load_value : int64_u -> string = "%unsafe_get_ext_ptr"
+
+type snapshot = { root : string; mutable bits : int64_u }
+
+(* [p] is a writable off-heap word and [raw] is the address of a live string.
+   The load roots the string before allocating [snapshot]. A moving GC may
+   update [rooted], but [raw] must retain the original integer bits: the load
+   of [rooted] may be forwarded from [raw], but through a cast into a distinct
+   register, and the final store must use the register holding [raw]. *)
+let store_load_across_gc p raw =
+  store_bits p raw;
+  let rooted = load_value p in
+  let snapshot = { root = rooted; bits = #0L } in
+  snapshot.bits <- raw;
+  let result = snapshot.bits in
+  #(snapshot, rooted, result)
+[%%expect_asm X86_64{|
+store_load_across_gc:
+  subq  $8, %rsp
+  movq  %rbx, (%rax)
+  movq  %rbx, %rsi
+  subq  $24, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rax
+  movabsq $144115188075857920, %rdi
+  movq  %rdi, -8(%rax)
+  movq  %rsi, (%rax)
+  movq  $0, 8(%rax)
+  movq  %rbx, 8(%rax)
+  movq  %rbx, %rdi
+  movq  %rsi, %rbx
+  addq  $8, %rsp
+  ret
+|}]
+
+external store_int : int64_u -> int -> unit = "%unsafe_set_ext_ptr"
+external load_bits : int64_u -> int64_u = "%unsafe_get_ext_ptr"
+
+(* Forwarding in the other direction: [c.pos] is loaded with [Word_val] into
+   a [Val] register and stored with [Word_int], while the reload produces an
+   [Int]; only one load should remain. *)
+let store_int_load_bits p (c : cursor) =
+  store_int p c.pos;
+  let bits = load_bits p in
+  #(c, bits)
+[%%expect_asm X86_64{|
+store_int_load_bits:
+  movq  (%rbx), %rdi
+  movq  %rdi, (%rax)
+  movq  %rbx, %rax
+  movq  %rdi, %rbx
+  ret
+|}]
