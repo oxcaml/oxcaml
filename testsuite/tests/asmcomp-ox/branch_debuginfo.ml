@@ -2,7 +2,7 @@
  native-compiler;
  no-address-sanitizer;
  setup-ocamlopt.byte-build-env;
- flags = "-g -S";
+ flags = "-g -gupstream-dwarf -S";
  ocamlopt.byte;
  check-ocamlopt.byte-output;
  script = "sh ${test_source_directory}/branch_debuginfo.sh";
@@ -16,6 +16,11 @@
    contain calls: the code after a call does not start with a location.  For
    the same reason the test is not run with AddressSanitizer, which checks the
    load from the table in [lookup] and reports failures with a call.)
+
+   With [-gno-upstream-dwarf] the assembly has further labels, which delimit
+   the ranges of variable locations inside straight-line code and need not be
+   followed by a location: the test does not apply to them, hence
+   [-gupstream-dwarf].
 
    The marks must stay on the lines of the code they follow.  ocamlformat is
    not enabled for this directory. *)
