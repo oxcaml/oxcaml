@@ -1,0 +1,6 @@
+(executable
+ (name test)
+ (libraries ppxlib))
+
+(cram
+ (deps test.exe))

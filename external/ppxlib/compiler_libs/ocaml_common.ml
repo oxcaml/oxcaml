@@ -6,6 +6,7 @@ module Lambda = Lambda
 module Language_extension = Language_extension
 module Location = Location
 module Longident = Longident
+module Misc = Misc
 module Parse = Parse
 module Pprintast = Pprintast
 module Primitive = Primitive
