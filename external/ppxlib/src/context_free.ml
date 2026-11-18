@@ -403,6 +403,12 @@ let handle_attr_replace_once context attrs item base_ctxt : 'a option t =
   | Some (option, errors) -> (option, errors)
   | None -> (None, [])
 
+(* [context] gives the attribute context of the item, if it has one. *)
+let handle_attr_replace_opt context attrs item base_ctxt =
+  match context item with
+  | None -> return None
+  | Some context -> handle_attr_replace_once context attrs item base_ctxt
+
 (* Applies [once] until it returns [None], and tells whether it applied at
    all. Stops as soon as an application reports errors: the offending
    attributes may still be on the item, so applying again could loop. *)
@@ -440,7 +446,7 @@ let handle_attr_replace_sig attrs item base_ctxt =
 let rec map_node_rec attr_context attr_rules ext_context ts super_call loc
     base_ctxt x ~embed_errors =
   handle_attr_replace_fix
-    (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+    (fun x -> handle_attr_replace_opt attr_context attr_rules x base_ctxt)
     x
   >>= fun (_, x) ->
   map_extension_rec attr_context attr_rules ext_context ts super_call loc
@@ -469,21 +475,28 @@ and map_extension_rec attr_context attr_rules ext_context ts super_call loc
           map_node_rec attr_context attr_rules ext_context ts super_call loc
             base_ctxt x ~embed_errors)
 
-let map_context : type a. a EC.t -> a AC.t = function
-  | EC.Class_expr -> AC.Class_expr
-  | EC.Class_field -> AC.Class_field
-  | EC.Class_type -> AC.Class_type
-  | EC.Class_type_field -> AC.Class_type_field
-  | EC.Core_type -> AC.Core_type
-  | EC.Expression -> AC.Expression
-  | EC.Module_expr -> AC.Module_expr
-  | EC.Module_type -> AC.Module_type
-  | EC.Pattern -> AC.Pattern
-  | EC.Signature_item | EC.Structure_item ->
-      assert false
-      (* These can't happen because all the items get handled together in structure and
-         signature processing *)
-  | EC.Ppx_import -> AC.Type_declaration
+let map_context : type a. a EC.t -> a -> a AC.t option =
+ fun ext_context x ->
+  match ext_context with
+  | EC.Class_expr -> Some AC.Class_expr
+  | EC.Class_field -> Some AC.Class_field
+  | EC.Class_type -> Some AC.Class_type
+  | EC.Class_type_field -> Some AC.Class_type_field
+  | EC.Core_type -> Some AC.Core_type
+  | EC.Expression -> Some AC.Expression
+  | EC.Module_expr -> Some AC.Module_expr
+  | EC.Module_type -> Some AC.Module_type
+  | EC.Pattern -> Some AC.Pattern
+  | EC.Signature_item -> (
+      match x.psig_desc with
+      | Psig_extension _ -> Some AC.Psig_extension
+      | _ -> None)
+  | EC.Structure_item -> (
+      match x.pstr_desc with
+      | Pstr_extension _ -> Some AC.Pstr_extension
+      | Pstr_eval _ -> Some AC.Pstr_eval
+      | _ -> None)
+  | EC.Ppx_import -> Some AC.Type_declaration
 
 let map_node attr_rules ext_context ts super_call loc base_ctxt x ~hook
     ~embed_errors =
@@ -492,7 +505,7 @@ let map_node attr_rules ext_context ts super_call loc base_ctxt x ~hook
     Expansion_context.Extension.make ~extension_point_loc:loc ~base:base_ctxt ()
   in
   handle_attr_replace_fix
-    (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+    (fun x -> handle_attr_replace_opt attr_context attr_rules x base_ctxt)
     x
   >>= function
   | true, x ->
@@ -528,7 +541,7 @@ let rec map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l ~hook
   | [] -> return []
   | x :: l -> (
       handle_attr_replace_fix
-        (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+        (fun x -> handle_attr_replace_opt attr_context attr_rules x base_ctxt)
         x
       >>= fun (_, x) ->
       match EC.get_extension ext_context x with
