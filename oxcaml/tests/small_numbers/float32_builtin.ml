@@ -20,7 +20,7 @@ module Poly = struct
     | Compat_32
     | Compression
 
-  external compare : 'a -> 'a -> int = "%compare"
+  let[@inline never] compare x y = Stdlib.compare x y
 
   let[@inline never] eq x y = x = y
 
