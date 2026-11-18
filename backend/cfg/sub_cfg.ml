@@ -199,7 +199,7 @@ let basic_only_moves_values (desc : Cfg.basic) =
       | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
       | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Thread_self_id
-      | Poll | Pause | Alloc _ )
+      | Poll | Pause | Alloc _ | Trace_pc_guard_gate | Trace_pc_guard _ )
   | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
     false
 
