@@ -316,6 +316,11 @@ let pat
   | Tpat_record_unboxed_product (l, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
+  | Tpat_slice { elements = Tslice_closed l; _ } -> List.iter (sub.pat sub) l
+  | Tpat_slice { elements = Tslice_open { prefix; rest; suffix }; _ } ->
+      List.iter (sub.pat sub) prefix;
+      Option.iter (fun (Tslice_rest_var { name; _ }) -> iter_loc sub name) rest;
+      List.iter (sub.pat sub) suffix
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
   | Tpat_deref { name = s; _ } -> iter_loc sub s
   | Tpat_alias_deref { pattern = p; name = s; _ } ->

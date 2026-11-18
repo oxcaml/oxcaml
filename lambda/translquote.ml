@@ -2491,6 +2491,12 @@ let rec with_new_idents_pat pat =
   | Tpat_alias_deref { pattern = pat; id; _ } ->
     with_new_idents_values [id];
     with_new_idents_pat pat
+  | Tpat_slice { elements; _ } ->
+    (match elements with
+    | Tslice_open { rest = Some (Tslice_rest_var { id; _ }); _ } ->
+      with_new_idents_values [id]
+    | Tslice_open { rest = None; _ } | Tslice_closed _ -> ());
+    List.iter with_new_idents_pat (slice_element_patterns elements)
   | Tpat_addr (_, _, pat) | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
@@ -2528,6 +2534,12 @@ let rec without_idents_pat pat =
   | Tpat_alias_deref { pattern = pat; id; _ } ->
     without_idents_values [id];
     without_idents_pat pat
+  | Tpat_slice { elements; _ } ->
+    (match elements with
+    | Tslice_open { rest = Some (Tslice_rest_var { id; _ }); _ } ->
+      without_idents_values [id]
+    | Tslice_open { rest = None; _ } | Tslice_closed _ -> ());
+    List.iter without_idents_pat (slice_element_patterns elements)
   | Tpat_addr (_, _, pat) | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 
@@ -2882,6 +2894,9 @@ and quote_value_pattern ~scopes p =
         match closed with Asttypes.Closed -> true | Asttypes.Open -> false
       in
       Pat.unboxed_record loc lbl_pats closed
+    | Tpat_slice _ ->
+      fatal_errorf "Translquote [at %a]: slice patterns not implemented."
+        Location.print_loc (to_location loc)
     | Tpat_addr (mut, _, pat) ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.addr loc pat (Types.is_mutable mut)
