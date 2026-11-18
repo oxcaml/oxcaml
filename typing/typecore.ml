@@ -269,7 +269,6 @@ type error =
   | Effect_pattern_below_toplevel
   | Deref_pattern_bad_position
   | Deref_pattern_bad_argument
-  | Slice_pattern_suffix
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -4637,11 +4636,6 @@ and type_pat_aux
         | Immutable -> Immutable
       in
       let modalities = Typemode.address_modalities mutability in
-      begin match selements with
-      | Pslice_open { suffix = sp :: _; _ } ->
-          Error.log_and_raise sp.ppat_loc !!penv Slice_pattern_suffix
-      | Pslice_closed _ | Pslice_open { suffix = []; _ } -> ()
-      end;
       let has_elements =
         match selements with
         | Pslice_closed ps -> ps <> []
@@ -14587,10 +14581,6 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[Dereference patterns must bind a variable,@ as in %a.@]"
         Style.inline_code "deref_ x"
-  | Slice_pattern_suffix ->
-      Location.errorf ~loc
-        "@[Elements after the rest of a slice pattern are not supported \
-         yet.@]"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"
