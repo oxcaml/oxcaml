@@ -46,6 +46,53 @@ module Non_empty_row = struct
   let map_first f (p, patl) = (f p, patl)
 end
 
+module Slice = struct
+  type shape =
+    | Empty
+    | Front of pattern * pattern
+
+  type view =
+    | Shape of shape
+    | Rest of slice_rest_var option
+
+  let view p mutability sort elements =
+    let front first elements =
+      let rest =
+        { p with
+          pat_desc = Tpat_slice { mutability; sort; elements };
+          pat_loc =
+            { p.pat_loc with loc_start = first.pat_loc.Location.loc_end;
+                             loc_ghost = true };
+          pat_extra = [];
+          pat_attributes = [] }
+      in
+      Shape (Front (first, rest))
+    in
+    match elements with
+    | Tslice_closed [] -> Shape Empty
+    | Tslice_closed (first :: ps) -> front first (Tslice_closed ps)
+    | Tslice_open ({ prefix = first :: prefix; _ } as o) ->
+        front first (Tslice_open { o with prefix })
+    | Tslice_open { prefix = []; rest; suffix = [] } -> Rest rest
+    | Tslice_open { prefix = []; suffix = _ :: _; _ } ->
+        Misc.fatal_error "Patterns.Slice.view: elements after the rest"
+
+  let cons first rest =
+    match rest.pat_desc with
+    | Tpat_slice { elements = Tslice_closed ps; _ } ->
+        Tslice_closed (first :: ps)
+    | Tpat_slice { elements = Tslice_open o; _ } ->
+        Tslice_open { o with prefix = first :: o.prefix }
+    | Tpat_any -> Tslice_open { prefix = [first]; rest = None; suffix = [] }
+    | Tpat_var { id; name; uid; sort; mode } ->
+        let rest_var =
+          Tslice_rest_var
+            { id; name; uid; sort; mode; type_expr = rest.pat_type }
+        in
+        Tslice_open { prefix = [first]; rest = Some rest_var; suffix = [] }
+    | _ -> Misc.fatal_error "Patterns.Slice.cons"
+end
+
 (* "views" on patterns are polymorphic variants
    that allow to restrict the set of pattern constructors
    statically allowed at a particular place *)
@@ -70,6 +117,7 @@ module Simple = struct
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
+    | `Slice of mutability * Jkind.sort * Slice.shape
     | `Lazy of pattern
   ]
 
@@ -121,7 +169,7 @@ module General = struct
   ]
   type pattern = view pattern_data
 
-  let view_desc = function
+  let view_desc p = function
     | Tpat_any ->
        `Any
     | Tpat_var { id; name = str; uid; sort; mode } ->
@@ -153,6 +201,13 @@ module General = struct
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
     | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
+    | Tpat_slice { mutability; sort; elements } -> begin
+        match Slice.view p mutability sort elements with
+        | Shape shape -> `Slice (mutability, sort, shape)
+        | Rest None -> `Any
+        | Rest (Some (Tslice_rest_var { id; name; uid; sort; mode; _ })) ->
+            `Var (id, name, uid, sort, mode)
+      end
     | Tpat_deref { id; name = str; uid; sort; mode; type_expr = ty } ->
        `Deref (id, str, uid, sort, mode, ty)
     | Tpat_alias_deref
@@ -161,7 +216,7 @@ module General = struct
     | Tpat_lazy p -> `Lazy p
 
   let view p : pattern =
-    { p with pat_desc = view_desc p.pat_desc }
+    { p with pat_desc = view_desc p p.pat_desc }
 
   let erase_desc = function
     | `Any -> Tpat_any
@@ -189,6 +244,10 @@ module General = struct
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
     | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
+    | `Slice (mutability, sort, Slice.Empty) ->
+       Tpat_slice { mutability; sort; elements = Tslice_closed [] }
+    | `Slice (mutability, sort, Slice.Front (first, rest)) ->
+       Tpat_slice { mutability; sort; elements = Slice.cons first rest }
     | `Deref (id, str, uid, sort, mode, ty) ->
        Tpat_deref { id; name = str; uid; sort; mode; type_expr = ty }
     | `Alias_deref (p, id, str, uid, sort, mode, ty) ->
@@ -231,6 +290,7 @@ module Head : sig
           type_row : unit -> row_desc; }
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
     | Lazy
 
   type t = desc pattern_data
@@ -267,6 +327,7 @@ end = struct
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
     | Lazy
 
   type t = desc pattern_data
@@ -311,6 +372,10 @@ end = struct
           Record_unboxed_product (lbls, repr), pats
       | `Addr (mut, arg_sort, p) ->
           Addr (mut, arg_sort), [p]
+      | `Slice (mutability, sort, Slice.Empty) ->
+          Slice { mutability; sort; nonempty = false }, []
+      | `Slice (mutability, sort, Slice.Front (p, rest)) ->
+          Slice { mutability; sort; nonempty = true }, [p; rest]
       | `Lazy p ->
           Lazy, [p]
     in
@@ -331,6 +396,7 @@ end = struct
       | Record_unboxed_product (l, _) -> List.length l
       | Variant { has_arg; _ } -> if has_arg then 1 else 0
       | Addr _ -> 1
+      | Slice { nonempty; _ } -> if nonempty then 2 else 0
       | Lazy -> 1
 
   let to_omega_pattern t =
@@ -339,6 +405,13 @@ end = struct
       match t.pat_desc with
       | Any -> Tpat_any
       | Addr (mut, arg_sort) -> Tpat_addr (mut, arg_sort, omega)
+      | Slice { mutability; sort; nonempty } ->
+          let elements =
+            if nonempty
+            then Tslice_open { prefix = [omega]; rest = None; suffix = [] }
+            else Tslice_closed []
+          in
+          Tpat_slice { mutability; sort; elements }
       | Lazy -> Tpat_lazy omega
       | Constant c -> Tpat_constant c
       | Unboxed_unit -> Tpat_unboxed_unit

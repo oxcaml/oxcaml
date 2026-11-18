@@ -37,6 +37,32 @@ module Non_empty_row : sig
   val map_first : ('a -> 'b) -> 'a t -> 'b t
 end
 
+(** Like a list, a slice is either empty or has a first element and a rest, so
+    slice patterns are viewed as chains of cells: a non-empty slice pattern is
+    its first element and the slice pattern for the rest of the slice, which
+    has its other elements. Without elements, [[&| .. |]] is viewed as [_] and
+    [[&| .. as x |]] as [x]. *)
+module Slice : sig
+  type shape =
+    | Empty
+    | Front of pattern * pattern
+        (** The first element, and a pattern for the rest of the slice *)
+
+  type view =
+    | Shape of shape
+    | Rest of slice_rest_var option
+        (** [[&| .. |]] or [[&| .. as x |]] *)
+
+  (** [view p mutability sort elements]: the view of the slice pattern [p]
+      with these fields. Elements after the rest are not supported yet. *)
+  val view : pattern -> mutability -> Jkind.sort -> slice_elements -> view
+
+  (** [cons first rest]: the elements of a slice pattern with the first
+      element [first], whose rest is matched by [rest], which is [_], a
+      variable or a slice pattern *)
+  val cons : pattern -> pattern -> slice_elements
+end
+
 module Simple : sig
   type view = [
     | `Any
@@ -57,6 +83,7 @@ module Simple : sig
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
+    | `Slice of mutability * Jkind.sort * Slice.shape
     | `Lazy of pattern
   ]
   type pattern = view pattern_data
@@ -135,6 +162,9 @@ module Head : sig
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
+        (** [nonempty]: whether its arguments are an element and the rest of
+            the slice, rather than none *)
     | Lazy
 
   type t = desc pattern_data
