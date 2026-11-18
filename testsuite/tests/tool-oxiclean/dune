@@ -39,7 +39,9 @@
   repr.intf.json
   repr.impl.json)
  (action
-  (diff repr.impl.json.expected repr.impl.json)))
+  (progn
+   (diff repr.impl.json.expected repr.impl.json)
+   (diff repr.intf.json.expected repr.intf.json))))
 
 (rule
  (targets even.cmi even.cmti even.cmt)
@@ -72,4 +74,6 @@
   even.intf.json
   even.impl.json)
  (action
-  (diff even.impl.json.expected even.impl.json)))
+  (progn
+   (diff even.impl.json.expected even.impl.json)
+   (diff even.intf.json.expected even.intf.json))))

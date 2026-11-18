@@ -13,8 +13,6 @@ let option (f : 'a -> Json.t) : 'a option -> Json.t = function
   | None -> Json.Null
   | Some a -> f a
 
-let intf () = Json.Null
-
 let rec impl : Model.Expression.t -> Json.t = function
   | Apply { func; args } ->
     Json.Object
@@ -124,3 +122,50 @@ and integral_binary_scalar_operation
     : Model.Expression.Scalar_operation.Binary.Integral.t -> Json.t =
   function
   | Mod -> Json.String "mod"
+
+let type_predef : Model.Type.predef -> Json.t = function
+  | Int -> Json.String "int"
+  | Option -> Json.String "option"
+
+let type_constr : Model.Type.constr -> Json.t = function
+  | Predef p -> type_predef p |> tag "predef"
+  | Var { de_bruijn } ->
+    Json.int de_bruijn |> tag "deBruijn" |> tag "var"
+
+let rec type_expr : Model.Type.expr -> Json.t = function
+  | Arrow { domain; codomain } ->
+    Json.Object
+      [ "domain", type_expr domain
+      ; "codomain", type_expr codomain
+      ]
+    |> tag "arrow"
+  | Constr { constr; args } ->
+    Json.Object
+      [ "constr", type_constr constr
+      ; "args", array type_expr args
+      ]
+    |> tag "constr"
+
+let type_kind : Model.Type.kind -> Json.t = function
+  | Abstract -> Json.String "abstract"
+
+let rec intf : Model.Type.t -> Json.t = function
+  | EmptyModule -> Json.String "emptyModule"
+  | Module { ty; etc } ->
+    Json.Object
+      [ "ty", intf ty
+      ; "etc", intf etc
+      ]
+    |> tag "mod"
+  | Type { kind; etc } ->
+    Json.Object
+      [ "kind", type_kind kind
+      ; "etc", intf etc
+      ]
+    |> tag "ty"
+  | Val { ty; etc } ->
+    Json.Object
+      [ "ty", type_expr ty
+      ; "etc", intf etc
+      ]
+    |> tag "val"

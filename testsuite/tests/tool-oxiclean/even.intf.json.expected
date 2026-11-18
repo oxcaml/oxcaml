@@ -1,0 +1,39 @@
+{
+  "ty": {
+    "kind": "abstract",
+    "etc": {
+      "val": {
+        "ty": {
+          "arrow": {
+            "domain": {"constr": {"constr": {"predef": "int"}, "args": []}},
+            "codomain": {
+              "constr": {
+                "constr": {"predef": "option"},
+                "args": [
+                  {
+                    "constr": {"constr": {"var": {"deBruijn": 0}}, "args": []}
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "etc": {
+          "val": {
+            "ty": {
+              "arrow": {
+                "domain": {
+                  "constr": {"constr": {"var": {"deBruijn": 0}}, "args": []}
+                },
+                "codomain": {
+                  "constr": {"constr": {"predef": "int"}, "args": []}
+                }
+              }
+            },
+            "etc": "emptyModule"
+          }
+        }
+      }
+    }
+  }
+}

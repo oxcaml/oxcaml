@@ -1,25 +1,23 @@
-let intf _ = ()
-
-let rec impl_in_scope (scope : Ident.t list)
+let rec impl_in_scope (context : Ident.t list)
     : Lambda.lambda -> Model.Expression.t =
   begin function
   | Lapply { ap_func; ap_args } ->
     Apply
-      { func = impl_in_scope scope ap_func
-      ; args = List.map (impl_in_scope scope) ap_args
+      { func = impl_in_scope context ap_func
+      ; args = List.map (impl_in_scope context) ap_args
       }
   | Lconst (c : Lambda.structured_constant) ->
-    Value { value = structured_constant scope c }
+    Value { value = structured_constant c }
   | Lfunction ({ kind = Curried _; body; params; _ } : Lambda.lfunction) ->
-    let scope =
+    let context =
       List.fold_left
         (fun acc ({ name; _ } : Lambda.lparam) -> name :: acc)
-        scope
+        context
         params
     in
     Function
       { n_params = List.length params
-      ; body = impl_in_scope scope body
+      ; body = impl_in_scope context body
       }
   | Lifthenelse (cond, body_if_true, body_if_false, layout) ->
     let equivalent_switch_statement : Lambda.lambda =
@@ -33,24 +31,24 @@ let rec impl_in_scope (scope : Ident.t list)
       in
       Lswitch (cond, cases, Debuginfo.Scoped_location.Loc_unknown, layout)
     in
-    impl_in_scope scope equivalent_switch_statement
+    impl_in_scope context equivalent_switch_statement
   | Llet (_, _, id, _, bound, body) ->
     LetBinding
-      { bound = impl_in_scope scope bound
-      ; body = impl_in_scope (id :: scope) body
+      { bound = impl_in_scope context bound
+      ; body = impl_in_scope (id :: context) body
       }
-  | Lprim (p, args, _) -> primitive scope args p
+  | Lprim (p, args, _) -> primitive context args p
   | Lswitch (scrutinee, cases, _, _) ->
     Switch
-      { scrutinee = impl_in_scope scope scrutinee
+      { scrutinee = impl_in_scope context scrutinee
       ; n_consts = cases.sw_numconsts
       ; n_blocks = cases.sw_numblocks
-      ; consts = List.map (switch_case scope) cases.sw_consts
-      ; blocks = List.map (switch_case scope) cases.sw_blocks
-      ; failaction = Option.map (impl_in_scope scope) cases.sw_failaction
+      ; consts = List.map (switch_case context) cases.sw_consts
+      ; blocks = List.map (switch_case context) cases.sw_blocks
+      ; failaction = Option.map (impl_in_scope context) cases.sw_failaction
       }
   | Lvar id ->
-    begin match List.find_index (Ident.equal id) scope with
+    begin match List.find_index (Ident.equal id) context with
     | Some de_bruijn -> Var { de_bruijn }
     | None ->
       raise
@@ -65,10 +63,9 @@ let rec impl_in_scope (scope : Ident.t list)
             Printlambda.lambda other))
   end
 
-and structured_constant (scope : Ident.t list)
-    : Lambda.structured_constant -> Model.Value.t =
+and structured_constant : Lambda.structured_constant -> Model.Value.t =
   begin function
-  | Const_base c -> constant scope c
+  | Const_base c -> constant c
   | other ->
     raise
       (Error.Message
@@ -77,7 +74,7 @@ and structured_constant (scope : Ident.t list)
             Printlambda.structured_constant other))
   end
 
-and constant (_scope : Ident.t list) : Typedtree.constant -> Model.Value.t =
+and constant : Typedtree.constant -> Model.Value.t =
   begin function
   | Const_int bits_above_lsb -> Immediate { bits_above_lsb }
   | other ->
@@ -89,12 +86,12 @@ and constant (_scope : Ident.t list) : Typedtree.constant -> Model.Value.t =
               (Const_base other : Lambda.structured_constant)))
   end
 
-and primitive (scope : Ident.t list) (args : Lambda.lambda list)
+and primitive (context : Ident.t list) (args : Lambda.lambda list)
     : Lambda.primitive -> Model.Expression.t =
   begin function
   | Pfield (index, _, Reads_agree) ->
     begin match args with
-    | [arg] -> Field { block = impl_in_scope scope arg; index }
+    | [arg] -> Field { block = impl_in_scope context arg; index }
     | [] | _ :: _ :: _ ->
       raise
         (Error.Message
@@ -107,14 +104,14 @@ and primitive (scope : Ident.t list) (args : Lambda.lambda list)
           |> List.map Compilation_unit.Name.to_string
       }
   | Pmakeblock (tag, Immutable, _, _) ->
-    Block { tag; fields = List.map (impl_in_scope scope) args }
+    Block { tag; fields = List.map (impl_in_scope context) args }
   | Pphys_equal negated ->
     begin match args with
     | [lhs; rhs] ->
       PhysicalEquality
         { negated = begin match negated with Eq -> false | Noteq -> true end
-        ; lhs = impl_in_scope scope lhs
-        ; rhs = impl_in_scope scope rhs
+        ; lhs = impl_in_scope context lhs
+        ; rhs = impl_in_scope context rhs
         }
     | [] | [_] | _ :: _ :: _ :: _ ->
       raise
@@ -129,8 +126,8 @@ and primitive (scope : Ident.t list) (args : Lambda.lambda list)
         | [lhs; rhs] ->
           Model.Expression.Scalar_operation.Binary
             { operation = binary_scalar_operation op
-            ; lhs = impl_in_scope scope lhs
-            ; rhs = impl_in_scope scope rhs
+            ; lhs = impl_in_scope context lhs
+            ; rhs = impl_in_scope context rhs
             }
         | [] | [_] | _ :: _ :: _ :: _ ->
           raise
@@ -155,11 +152,11 @@ and primitive (scope : Ident.t list) (args : Lambda.lambda list)
   end
 
 and switch_case
-    (scope : Ident.t list)
+    (context : Ident.t list)
     ((case, body_if_matched) : (int * Lambda.lambda))
     : Model.Expression.switch_case =
   { case
-  ; body_if_matched = impl_in_scope scope body_if_matched
+  ; body_if_matched = impl_in_scope context body_if_matched
   }
 
 and binary_scalar_operation
@@ -188,3 +185,106 @@ and binary_scalar_operation
             Printlambda.primitive (Pscalar (Binary other) : Lambda.primitive)))
 
 let impl = impl_in_scope []
+
+let resolve_type_constr_by_path ~(type_context : Ident.t list)
+    : Path.t -> Model.Type.constr = function
+  | p when Path.same p Predef.path_int -> Predef Int
+  | p when Path.same p Predef.path_option -> Predef Option
+  | Pident id ->
+    begin match List.find_index (Ident.equal id) type_context with
+    | Some de_bruijn -> Var { de_bruijn }
+    | None ->
+      raise
+        (Error.Message
+           (Format.asprintf "variable not in scope: %a" Ident.print id))
+    end
+  | other ->
+    raise
+      (Error.Message
+         (Format.asprintf
+            "Type constructor path not yet implemented: %a"
+            Printtyp.path other))
+
+let rec type_expr ~(type_context : Ident.t list) (t : Types.type_expr) : Model.Type.expr =
+  match Types.get_desc t with
+  | Tarrow (_, domain, codomain, _) ->
+    Arrow
+      { domain = type_expr ~type_context domain
+      ; codomain = type_expr ~type_context codomain
+      }
+  | Tconstr (path, args, _) ->
+    Constr
+      { constr = resolve_type_constr_by_path ~type_context path
+      ; args = List.map (type_expr ~type_context) args
+      }
+  | Tpoly (t, []) -> type_expr ~type_context t
+  | _ ->
+    raise
+      (Error.Message
+         (Format.asprintf
+            "Type expression not yet implemented: %a"
+            Printtyp.type_expr t))
+
+let module_type : Types.module_type -> Model.Type.t = function
+  | other ->
+    raise
+      (Error.Message
+         (Format.asprintf
+            "Module type not yet implemented: %a"
+            Printtyp.modtype other))
+
+let rec intf_in_scope
+    ~(type_context : Ident.t list)
+    ~(module_context : Ident.t list)
+    : Types.signature -> Model.Type.t =
+  function
+  | [] -> EmptyModule
+  | item :: etc -> item_in_scope ~type_context ~module_context etc item
+
+and item_in_scope
+    ~(type_context : Ident.t list)
+    ~(module_context : Ident.t list)
+    (etc : Types.signature_item list)
+    : Types.signature_item -> Model.Type.t =
+  function
+  | Sig_module (id, _, { md_type; _ }, _, _) ->
+    Module
+      { ty = module_type md_type
+      ; etc = intf_in_scope ~type_context ~module_context:(id :: module_context) etc
+      }
+  | Sig_value (_, { val_type = ty; _ }, _) ->
+    Val
+      { ty = type_expr ~type_context ty
+      ; etc = intf_in_scope ~type_context ~module_context etc
+      }
+  | Sig_type (id, decl, _, _) ->
+    Type
+      { kind = type_decl_kind ~type_context ~module_context id decl
+      ; etc = intf_in_scope ~type_context:(id :: type_context) ~module_context etc
+      }
+  | other ->
+    raise
+      (Error.Message
+        (Format.asprintf
+            "Type signature item not yet implemented: %a"
+            Printtyp.signature [other]))
+
+and type_decl_kind
+    ~(type_context : Ident.t list)
+    ~(module_context : Ident.t list)
+    (id : Ident.t)
+    (decl: Types.type_declaration)
+    : Model.Type.kind =
+  match decl.type_kind with
+  | Type_abstract _ -> Abstract
+  | _ ->
+    ignore type_context; (* TODO: REMOVE *)
+    ignore module_context; (* TODO: REMOVE *)
+    raise
+      (Error.Message
+        (Format.asprintf
+            "Type declaration not yet implemented: %a"
+            (Printtyp.type_declaration id) decl))
+
+let intf ({ sig_type; _ } : Typedtree.signature) =
+  intf_in_scope ~type_context:[] ~module_context:[] sig_type

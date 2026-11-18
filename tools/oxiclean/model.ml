@@ -1,5 +1,39 @@
 module Type = struct
-  type t = unit
+  type t =
+    | EmptyModule
+    | Module of
+        { ty : t
+        ; etc : t
+        }
+    | Type of
+        { kind : kind
+        ; etc : t
+        }
+    | Val of
+        { ty : expr
+        ; etc : t
+        }
+
+  and expr =
+    | Arrow of
+        { domain : expr
+        ; codomain : expr
+        }
+    | Constr of
+        { constr : constr
+        ; args : expr list
+        }
+
+  and kind =
+    | Abstract
+
+  and constr =
+    | Predef of predef
+    | Var of { de_bruijn : int }
+
+  and predef =
+    | Int
+    | Option
 end
 
 module rec Expression : sig
