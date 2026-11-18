@@ -72,6 +72,8 @@ let max_handle_count = 8
 
 let max_conditional_expression_count = 16
 
+let max_stack_function_count = 8
+
 let max_probability = 10_000
 
 (* Probabilities out of [max_probability], conditional on reaching each
@@ -174,7 +176,8 @@ module Swarm = struct
       recursive_functions : bool;
       wide_functions : bool;
       reraises : bool;
-      effects : bool
+      effects : bool;
+      stack_functions : bool
     }
 
   let create random_state =
@@ -213,7 +216,8 @@ module Swarm = struct
       recursive_functions = Random.State.bool random_state;
       wide_functions = Random.State.bool random_state;
       reraises = Random.State.bool random_state;
-      effects = Random.State.bool random_state
+      effects = Random.State.bool random_state;
+      stack_functions = Random.State.bool random_state
     }
 
   let to_string t =
@@ -247,7 +251,8 @@ module Swarm = struct
       "recursive_functions", t.recursive_functions;
       "wide_functions", t.wide_functions;
       "reraises", t.reraises;
-      "effects", t.effects ]
+      "effects", t.effects;
+      "stack_functions", t.stack_functions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> List.cons
          (Format.sprintf "  assertions = %s"
