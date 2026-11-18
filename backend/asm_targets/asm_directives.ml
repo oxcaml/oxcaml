@@ -253,6 +253,8 @@ module Directive = struct
         { str : string;
           comment : string option
         }
+    | Arch of string
+    | Arch_extension of string
     | Cfi_adjust_cfa_offset of int
     | Cfi_def_cfa_offset of int
     | Cfi_endproc
@@ -402,6 +404,8 @@ module Directive = struct
         | Some comment -> Printf.sprintf "\t/* %s */" comment
     in
     match t with
+    | Arch arch -> bprintf buf "\t.arch %s" arch
+    | Arch_extension name -> bprintf buf "\t.arch_extension %s" name
     | Align { bytes = n; fill = _ } ->
       (* The flag [fill] is only relevant for the binary
          emitter. On GAS, we can ignore it and just use [.align] in both
@@ -622,6 +626,8 @@ module Directive = struct
     (* The only supported "type" on EXTRN declarations is NEAR. *)
     | Reloc _ -> unsupported "Reloc"
     | Delta_uleb128 _ -> unsupported "Delta_uleb128"
+    | Arch _ -> unsupported "Arch"
+    | Arch_extension _ -> unsupported "Arch_extension"
 
   let print b t =
     match TS.assembler () with
@@ -725,7 +731,7 @@ module Directive = struct
     | Cfi_def_cfa_register _ | Comment _ | Direct_assignment _ | File _
     | Global _ | Indirect_symbol _ | Loc _ | New_label _ | New_line
     | Private_extern _ | Section _ | Size _ | Type _ | Protected _ | Hidden _
-    | Weak _ | External _ | Reloc _ ->
+    | Weak _ | External _ | Reloc _ | Arch _ | Arch_extension _ ->
       offset_in_bytes
 
   let map_new_label f = function[@warning "-4"]
@@ -844,6 +850,10 @@ let global symbol = emit (Global symbol)
 let indirect_symbol symbol = emit (Indirect_symbol symbol)
 
 let private_extern symbol = emit (Private_extern symbol)
+
+let arch arch = emit (Arch arch)
+
+let arch_extension name = emit (Arch_extension name)
 
 let extrn symbol = emit (External symbol)
 
