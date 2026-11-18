@@ -1308,18 +1308,17 @@ let constant_integer i ~suffix :
   | Some 's' ->
     if Language_extension.is_enabled Small_numbers then
     begin
-      try
-        Ok (Int8 (Numbers.Int8.of_int_exn (Misc.Int_literal_converter.int8 i)))
-      with Failure _ -> Error Int8_literal_overflow
+      match Misc.Int_literal_converter.int8 i with
+      | i -> Ok (Int8 (Numbers.Int8.of_int_exn i))
+      | exception Failure _ -> Error Int8_literal_overflow
     end
     else Error (Int8_literal_not_enabled)
   | Some 'S' ->
     if Language_extension.is_enabled Small_numbers then
     begin
-      try
-        Ok (Int16
-              (Numbers.Int16.of_int_exn (Misc.Int_literal_converter.int16 i)))
-      with Failure _ -> Error Int16_literal_overflow
+      match Misc.Int_literal_converter.int16 i with
+      | i -> Ok (Int16 (Numbers.Int16.of_int_exn i))
+      | exception Failure _ -> Error Int16_literal_overflow
     end
     else Error (Int16_literal_not_enabled)
   | Some 'l' ->
