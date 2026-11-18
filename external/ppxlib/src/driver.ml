@@ -21,6 +21,7 @@ let request_print_transformations = ref false
 let use_color = ref true
 let diff_command = ref Options.diff_command
 let pretty = ref false
+let reset_inline_gensym = ref false
 let styler = ref None
 let output_metadata_filename = ref None
 let corrected_suffix = ref ".ppx-corrected"
@@ -238,6 +239,7 @@ module Transform = struct
     let map =
       new Context_free.map_top_down
         rules ~embed_errors ~generated_code_hook:hook ~expect_mismatch_handler
+        ~reset_inline_gensym:!reset_inline_gensym
     in
     let gen_header_and_footer context whole_loc f =
       let header, footer = f whole_loc in
@@ -1363,6 +1365,9 @@ let shared_args =
       " Do not merge context free transformations (better for debugging \
        rewriters). As a result, the context-free transformations are not all \
        applied before all impl and intf." );
+    ( "-reset-inline-gensym",
+      Arg.Set reset_inline_gensym,
+      " Reset generated-name numbering before each inline expectation (default: off)" );
     ("-cookie", Arg.String set_cookie, "NAME=EXPR Set the cookie NAME to EXPR");
     ("--cookie", Arg.String set_cookie, " Same as -cookie");
     ( "-raise-embedded-errors",

@@ -52,7 +52,7 @@ module Clean = Clean
 
 (** {2 Common helper functions} *)
 
-include Common
+include (Common : module type of Common with module Private := Common.Private)
 
 (** {1 Modules from other libraries}
 

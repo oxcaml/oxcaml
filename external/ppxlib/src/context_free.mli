@@ -255,6 +255,8 @@ class map_top_down :
   ?generated_code_hook:
     Generated_code_hook.t (* default: Generated_code_hook.nop *) ->
   ?embed_errors:bool ->
+  ?reset_inline_gensym:
+    bool (* default: false; restart numbering before each inline expectation *) ->
   Rule.t list ->
 object
   inherit Ast_traverse.map_with_expansion_context_and_errors
