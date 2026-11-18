@@ -1,0 +1,1 @@
+let () = Shared.record "forced"

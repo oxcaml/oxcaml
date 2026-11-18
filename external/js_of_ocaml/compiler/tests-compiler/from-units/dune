@@ -1,0 +1,11 @@
+(executable
+ (name driver)
+ (modules driver)
+ (libraries js_of_ocaml-compiler compiler-libs.bytecomp str))
+
+(cram
+ (deps
+  driver.exe
+  array_discriminators.ml
+  runtime.js
+  js_server.js))

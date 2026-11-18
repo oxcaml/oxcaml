@@ -1,0 +1,312 @@
+;; Fixture programs, compiled with $OCAMLC (set by `make jsoo-test`) so that
+;; their compilation unit names and -linkall flags are exactly those of the
+;; sources, then split by the rules below. The check_*.js scripts run the
+;; outputs in Node.
+
+(rule
+ (targets shared.cmo shared.cmi)
+ (deps shared.ml shared.mli (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c shared.mli && ${OCAMLC:-ocamlc} -g -c shared.ml")))
+
+(rule
+ (targets forced.cmo forced.cmi)
+ (deps forced.ml forced.mli shared.cmi (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c forced.mli && ${OCAMLC:-ocamlc} -g -linkall -c forced.ml")))
+
+(rule
+ (targets unused.cmo unused.cmi)
+ (deps unused.ml unused.mli shared.cmi (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c unused.mli && ${OCAMLC:-ocamlc} -g -c unused.ml")))
+
+(rule
+ (targets numeric_buckets.cmo numeric_buckets.cmi)
+ (deps numeric_buckets.ml numeric_buckets.mli (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c numeric_buckets.mli && ${OCAMLC:-ocamlc} -g -c numeric_buckets.ml")))
+
+(rule
+ (targets main.cmo main.cmi)
+ (deps main.ml main.mli shared.cmi numeric_buckets.cmi (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c main.mli && ${OCAMLC:-ocamlc} -g -c main.ml")))
+
+(rule
+ (targets unique.cmo unique.cmi)
+ (deps unique.ml unique.mli shared.cmi (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c unique.mli && ${OCAMLC:-ocamlc} -g -c unique.ml")))
+
+(rule
+ (targets lazy_root.cmo lazy_root.cmi)
+ (deps lazy_root.ml lazy_root.mli shared.cmi unique.cmi (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c lazy_root.mli && ${OCAMLC:-ocamlc} -g -c lazy_root.ml")))
+
+(rule
+ (targets both.cmo both.cmi)
+ (deps both.ml both.mli shared.cmi (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c both.mli && ${OCAMLC:-ocamlc} -g -c both.ml")))
+
+(rule
+ (targets lazy_b.cmo lazy_b.cmi)
+ (deps lazy_b.ml lazy_b.mli shared.cmi both.cmi lazy_root.cmi (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c lazy_b.mli && ${OCAMLC:-ocamlc} -g -c lazy_b.ml")))
+
+(rule
+ (targets lazy_c.cmo lazy_c.cmi)
+ (deps lazy_c.ml lazy_c.mli shared.cmi both.cmi (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c lazy_c.mli && ${OCAMLC:-ocamlc} -g -c lazy_c.ml")))
+
+(rule
+ (targets lazy_fail.cmo lazy_fail.cmi)
+ (deps lazy_fail.ml lazy_fail.mli (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c lazy_fail.mli && ${OCAMLC:-ocamlc} -g -c lazy_fail.ml")))
+
+(rule
+ (targets terminal_main.cmo terminal_main.cmi)
+ (deps terminal_main.ml terminal_main.mli (env_var OCAMLC))
+ (action
+  (system
+   "${OCAMLC:-ocamlc} -c terminal_main.mli && ${OCAMLC:-ocamlc} -g -c terminal_main.ml")))
+
+(rule
+ (target shared.cma)
+ (deps shared.cmo forced.cmo unused.cmo (env_var OCAMLC))
+ (action
+  (system "${OCAMLC:-ocamlc} -a -o shared.cma shared.cmo forced.cmo unused.cmo")))
+
+(rule
+ (target lazy.cma)
+ (deps unique.cmo lazy_root.cmo (env_var OCAMLC))
+ (action
+  (system "${OCAMLC:-ocamlc} -a -o lazy.cma unique.cmo lazy_root.cmo")))
+
+(rule
+ (targets (dir modules-js))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js)
+ (action
+  (run %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js --main Main --root Lazy_root -o modules-js)))
+
+(rule
+ (targets (dir late-js))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js)
+ (action
+  (run %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js --strategy late --main Main --root Lazy_root -o late-js)))
+
+(rule
+ (targets (dir embedded-js))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js fixture.meta)
+ (action
+  (run %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js --strategy late --main Main --root Lazy_root --file fixture.meta:/static/fixture.meta -o embedded-js)))
+
+(rule
+ (targets (dir modules-wasm))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js runtime_stubs.wat)
+ (action
+  (run %{dep:../../bin-wasm_of_ocaml/wasm_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js runtime_stubs.wat --main Main --root Lazy_root -o modules-wasm)))
+
+(rule
+ (targets (dir late-wasm))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js runtime_stubs.wat)
+ (action
+  (run %{dep:../../bin-wasm_of_ocaml/wasm_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma runtime_stubs.js runtime_stubs.wat --strategy late --main Main --root Lazy_root -o late-wasm)))
+
+(rule
+ (targets (dir multi-js))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo runtime_stubs.js)
+ (action
+  (run %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo runtime_stubs.js --strategy late --main Main --root a=Lazy_root --root b=Lazy_b --root c=Lazy_c --require-deferred-unit Lazy_root --require-deferred-unit Lazy_b --require-deferred-unit Lazy_c -o multi-js)))
+
+(rule
+ (targets (dir reverse-js))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo runtime_stubs.js)
+ (action
+  (run %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo runtime_stubs.js --strategy late --main Main --root c=Lazy_c --root b=Lazy_b --root a=Lazy_root -o reverse-js)))
+
+(rule
+ (targets (dir multi-wasm))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo runtime_stubs.js runtime_stubs.wat)
+ (action
+  (run %{dep:../../bin-wasm_of_ocaml/wasm_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo runtime_stubs.js runtime_stubs.wat --strategy late --main Main --root a=Lazy_root --root b=Lazy_b --root c=Lazy_c -o multi-wasm)))
+
+(rule
+ (targets (dir failure-js))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo lazy_fail.cmo runtime_stubs.js)
+ (action
+  (run %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo lazy_fail.cmo runtime_stubs.js --strategy late --main Main --root a=Lazy_fail --root b=Lazy_b --root c=Lazy_c -o failure-js)))
+
+(rule
+ (targets (dir failure-wasm))
+ (deps shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo lazy_fail.cmo runtime_stubs.js runtime_stubs.wat)
+ (action
+  (run %{dep:../../bin-wasm_of_ocaml/wasm_of_ocaml.exe} split shared.cma numeric_buckets.cmo main.cmo lazy.cma both.cmo lazy_b.cmo lazy_c.cmo lazy_fail.cmo runtime_stubs.js runtime_stubs.wat --strategy late --main Main --root a=Lazy_fail --root b=Lazy_b --root c=Lazy_c -o failure-wasm)))
+
+(rule
+ (alias runtest)
+ (deps check.js modules-js)
+ (action
+  (run %{bin:node} check.js modules-js)))
+
+(rule
+ (alias runtest)
+ (deps check.js late-js)
+ (action
+  (run %{bin:node} check.js late-js)))
+
+(rule
+ (alias runtest)
+ (deps check.js embedded-js)
+ (action
+  (run %{bin:node} check.js embedded-js)))
+
+(rule
+ (alias runtest)
+ (deps check_multi.js multi-js reverse-js)
+ (action
+  (run %{bin:node} check_multi.js multi-js reverse-js)))
+
+(rule
+ (alias runtest)
+ (deps check_failing_root.js failure-js)
+ (action
+  (run %{bin:node} check_failing_root.js failure-js)))
+
+(rule
+ (alias runtest)
+ (deps check_wasm.mjs modules-wasm)
+ (action
+  (run %{bin:node} check_wasm.mjs modules-wasm)))
+
+(rule
+ (alias runtest)
+ (deps check_wasm.mjs late-wasm)
+ (action
+  (run %{bin:node} check_wasm.mjs late-wasm)))
+
+(rule
+ (alias runtest)
+ (deps check_multi_wasm.mjs multi-wasm)
+ (action
+  (run %{bin:node} check_multi_wasm.mjs multi-wasm)))
+
+; Embedding files in the runtime does not change the compiled partitions.
+
+(rule
+ (alias runtest)
+ (deps late-js embedded-js)
+ (action
+  (progn
+   (run cmp late-js/main.js embedded-js/main.js)
+   (run cmp late-js/root-Lazy_root.js embedded-js/root-Lazy_root.js))))
+
+; Failure-js also checks that a Wasm split with a failing root compiles.
+
+(rule
+ (alias runtest)
+ (deps failure-wasm)
+ (action
+  (run test -f failure-wasm/root-Lazy_fail.wasm)))
+
+; These scripts run the compiler themselves, on temporary copies of the inputs.
+
+(rule
+ (alias runtest)
+ (deps
+  check_exception_captures.js
+  runtime_stubs.js
+  runtime_stubs.wat
+  (env_var OCAMLC)
+  ../../bin-js_of_ocaml/js_of_ocaml.exe
+  ../../bin-wasm_of_ocaml/wasm_of_ocaml.exe)
+ (action
+  (run
+   %{bin:node}
+   check_exception_captures.js
+   ../../bin-js_of_ocaml/js_of_ocaml.exe
+   ../../bin-wasm_of_ocaml/wasm_of_ocaml.exe)))
+
+(rule
+ (alias runtest)
+ (deps
+  check_terminal_eager.mjs
+  runtime_stubs.js
+  runtime_stubs.wat
+  shared.cma
+  lazy.cma
+  both.cmo
+  lazy_b.cmo
+  lazy_c.cmo
+  terminal_main.cmo
+  ../../bin-js_of_ocaml/js_of_ocaml.exe
+  ../../bin-wasm_of_ocaml/wasm_of_ocaml.exe)
+ (action
+  (run
+   %{bin:node}
+   check_terminal_eager.mjs
+   ../../bin-js_of_ocaml/js_of_ocaml.exe
+   ../../bin-wasm_of_ocaml/wasm_of_ocaml.exe)))
+
+(rule
+ (alias runtest)
+ (deps
+  check_output_paths.js
+  runtime_stubs.js
+  shared.cma
+  numeric_buckets.cmo
+  main.cmo
+  lazy.cma
+  ../../bin-js_of_ocaml/js_of_ocaml.exe)
+ (action
+  (run %{bin:node} check_output_paths.js ../../bin-js_of_ocaml/js_of_ocaml.exe)))
+
+; The outputs only depend on the inputs, not on where the compiler runs.
+
+(rule
+ (alias runtest)
+ (deps
+  check_determinism.sh
+  runtime_stubs.js
+  runtime_stubs.wat
+  shared.cma
+  numeric_buckets.cmo
+  main.cmo
+  lazy.cma
+  ../../bin-js_of_ocaml/js_of_ocaml.exe
+  ../../bin-wasm_of_ocaml/wasm_of_ocaml.exe)
+ (action
+  (run
+   sh
+   check_determinism.sh
+   %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe}
+   %{dep:../../bin-wasm_of_ocaml/wasm_of_ocaml.exe})))
+
+(rule
+ (alias runtest)
+ (deps
+  check_cli.js
+  runtime_stubs.js
+  shared.cma
+  numeric_buckets.cmo
+  main.cmo
+  lazy.cma
+  ../../bin-js_of_ocaml/js_of_ocaml.exe)
+ (action
+  (run %{bin:node} check_cli.js ../../bin-js_of_ocaml/js_of_ocaml.exe)))

@@ -442,6 +442,8 @@ module Ctx = struct
     ; freevars : Code.Var.Set.t Code.Addr.Map.t
     ; in_cps : Effects.in_cps
     ; bool_context : Bool_context.t
+    ; primitives : StringSet.t ref
+          (* The runtime accessors the generated code uses *)
     }
 
   let initial
@@ -469,6 +471,7 @@ module Ctx = struct
     ; freevars
     ; in_cps
     ; bool_context
+    ; primitives = ref StringSet.empty
     }
 end
 
@@ -560,6 +563,7 @@ let float_const f = J.ENum (J.Num.of_float (Int64.float_of_bits f))
 let s_var name = J.EVar (J.ident (Utf8_string.of_string_exn name))
 
 let runtime_fun ctx name =
+  ctx.Ctx.primitives := StringSet.add name !(ctx.Ctx.primitives);
   match ctx.Ctx.exported_runtime with
   | Some (runtime, runtime_needed) ->
       runtime_needed := true;
@@ -2764,6 +2768,11 @@ let compile_program ctx pc =
   if debug () then Format.eprintf "@]@.";
   res
 
+type output =
+  { program : Javascript.program
+  ; primitives : StringSet.t
+  }
+
 let f
     (p : Code.program)
     ~exported_runtime
@@ -2797,9 +2806,9 @@ let f
       trampolined_calls
       share
   in
-  let p = compile_program ctx p.start in
+  let program = compile_program ctx p.start in
   if times () then Format.eprintf "  code gen.: %a@." Timer.print t';
-  p
+  { program; primitives = !(ctx.Ctx.primitives) }
 
 let init () =
   String.Hashtbl.iter

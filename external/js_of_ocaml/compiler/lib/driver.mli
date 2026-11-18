@@ -29,14 +29,31 @@ type optimized_result =
   ; shapes : Shape.t StringMap.t
   }
 
+(** Optimize under the current target and effects configuration, stopping before
+    field-sensitive dead-code elimination, exact-call/effects lowering, and
+    [Generate_closure]. The result remains suitable for graph partitioning and
+    subsequent ordinary compilation. This stage introduces no dead-field sentinel
+    or backend lowering metadata. *)
+val optimize_for_partition : profile:Profile.t -> Code.program -> Code.program
+
 val optimize_for_wasm :
      shapes:bool
   -> profile:Profile.t
   -> Code.program
   -> optimized_result * (Global_flow.state * Global_flow.info)
 
+type output =
+  { sourcemaps : Source_map.info
+  ; shapes : Shape.t StringMap.t
+  ; primitives : StringSet.t
+        (** The runtime accessor names the generated code uses, collected before
+            JavaScript cleanup and runtime linking, for this compilation only. Aliases
+            are resolved (unless the alias is called explicitly) and generated helpers
+            are included; the closure of their runtime dependencies is not. *)
+  }
+
 val f :
-     ?standalone:bool
+  ?standalone:bool
   -> ?wrap_with_fun:[ `Iife | `Anonymous | `Named of string ]
   -> ?profile:Profile.t
   -> ?shapes:bool
@@ -44,10 +61,10 @@ val f :
   -> source_map:bool
   -> formatter:Pretty_print.t
   -> Code.program
-  -> Source_map.info * Shape.t StringMap.t
+  -> output
 
-val f' :
-     ?standalone:bool
+val f' 
+  : ?standalone:bool
   -> ?wrap_with_fun:[ `Iife | `Anonymous | `Named of string ]
   -> ?profile:Profile.t
   -> link:[ `All | `All_from of string list | `Needed | `No ]

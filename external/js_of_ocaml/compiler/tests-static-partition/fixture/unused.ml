@@ -1,0 +1,1 @@
+let () = Shared.record "STATIC_PARTITION_UNUSED_SENTINEL"

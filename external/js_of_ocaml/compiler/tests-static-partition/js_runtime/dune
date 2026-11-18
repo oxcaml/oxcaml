@@ -1,0 +1,15 @@
+(executable
+ (name generate)
+ (libraries js_of_ocaml-compiler jsoo_static_partition))
+
+(rule
+ (target shared.runtime.js)
+ (deps generate.exe runtime_stubs.js always.js revision.txt build_info.sexp)
+ (action
+  (run ./generate.exe)))
+
+(rule
+ (alias runtest)
+ (deps check.js shared.runtime.js revision.txt build_info.sexp)
+ (action
+  (run %{bin:node} check.js)))

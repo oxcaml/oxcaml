@@ -26,6 +26,9 @@
          (func $is_ocaml_portable_int (param (ref eq)) (result i32)))
    ))
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
+   (import "fail" "ocaml_exception" (tag $ocaml_exception (param (ref eq))))
+   (import "fail" "javascript_exception"
+      (tag $javascript_exception (param externref)))
    (import "custom" "caml_is_custom"
       (func $caml_is_custom (param (ref eq)) (result i32)))
    (import "custom" "caml_dup_custom"
@@ -39,6 +42,7 @@
 ))
 
    (type $block (array (mut (ref eq))))
+   (type $split_js_exception (struct (field externref)))
    (type $bytes (array (mut i8)))
    (type $float (struct (field $f f64)))
    (type $float_array (array (mut f64)))
@@ -764,4 +768,39 @@
    (func (export "caml_read_bdsc_section") (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))
 ))
+
+   ;; Runs the code of a deferred root of a split program. [state] records the first
+   ;; exception that escapes a root (field 1: 1 for an OCaml exception, 2 for a
+   ;; JavaScript one; field 2: the exception), which every later root throws again
+   ;; without running. The exception is thrown on as it was caught, so a JavaScript
+   ;; error stays unwrapped.
+   (func (export "caml_jsoo_split_run")
+      (param $vstate (ref eq)) (param $f (ref eq)) (result (ref eq))
+      (local $state (ref $block)) (local $exn (ref eq)) (local $js externref)
+      (local.set $state (ref.cast (ref $block) (local.get $vstate)))
+      (if (ref.eq (array.get $block (local.get $state) (i32.const 1))
+                  (ref.i31 (i32.const 1)))
+         (then
+            (throw $ocaml_exception
+               (array.get $block (local.get $state) (i32.const 2)))))
+      (if (ref.eq (array.get $block (local.get $state) (i32.const 1))
+                  (ref.i31 (i32.const 2)))
+         (then
+            (throw $javascript_exception
+               (struct.get $split_js_exception 0
+                  (ref.cast (ref $split_js_exception)
+                     (array.get $block (local.get $state) (i32.const 2)))))))
+      (try (result (ref eq))
+         (do (call $caml_callback_1 (local.get $f) (ref.i31 (i32.const 0))))
+         (catch $ocaml_exception
+            (local.set $exn)
+            (array.set $block (local.get $state) (i32.const 1) (ref.i31 (i32.const 1)))
+            (array.set $block (local.get $state) (i32.const 2) (local.get $exn))
+            (throw $ocaml_exception (local.get $exn)))
+         (catch $javascript_exception
+            (local.set $js)
+            (array.set $block (local.get $state) (i32.const 1) (ref.i31 (i32.const 2)))
+            (array.set $block (local.get $state) (i32.const 2)
+               (struct.new $split_js_exception (local.get $js)))
+            (throw $javascript_exception (local.get $js)))))
 )

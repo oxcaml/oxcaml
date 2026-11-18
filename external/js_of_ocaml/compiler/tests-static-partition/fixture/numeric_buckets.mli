@@ -1,0 +1,1 @@
+val count : unit -> int

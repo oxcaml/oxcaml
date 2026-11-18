@@ -62,6 +62,59 @@ val from_cmo :
   -> in_channel
   -> one
 
+module Code_unit : sig
+  type t 
+
+  val create : (Ocaml_compiler.Cmo_format.t * in_channel) list -> t
+
+  val empty : t 
+end 
+
+module Deferred_code : sig
+  type t 
+
+  (* Will raise if the input code is empty *)
+  val create : (Ocaml_compiler.Cmo_format.t * in_channel) list -> id:string -> t
+end 
+
+(** Parse eager units in order, keeping [deferred] initializers in marked closures
+    for later partitioning rather than running them at startup.
+
+    Deferred roots behave like eager code that runs them in the order they are loaded.
+    Each runs at most once; loading it again does nothing. Once one raises an exception
+    it doesn't handle, that exception leaves the load as it would leave eager code, no
+    deferred code runs again, and loading any root raises that exception.
+
+    [exported_unit] selects modules to register for lookup by name (default: all).
+    [[]] disables registration, not initialization.
+
+    [dependencies] are units the compiler places itself, following the units each
+    compilation unit requires. A dependency needed by eager code is eager, one needed by a
+    single deferred root belongs to that root, and one nothing needs is dropped. One
+    needed only by several deferred roots is shared deferred code: it is initialized the
+    first time one of those roots runs, at most once. A dependency must not require the
+    eager or deferred units passed explicitly.
+
+    Deferred roots must contain bytecode. Input channels are repositioned, not closed. *)
+val from_units :
+     ?includes:string list
+  -> ?include_cmis:bool
+  -> ?exported_unit:string list
+  -> ?debug:bool
+  -> ?deferred:Deferred_code.t list
+  -> ?dependencies:(Ocaml_compiler.Cmo_format.t * in_channel) list
+  -> Code_unit.t
+  -> one
+
+(** [split_anchor_for_root id] returns the primitive name for root [id].
+    IR calls to that primitive pass a [unit -> unit] initializer closure.
+    The primitive is impure so optimization retains the marker; partitioning
+    must remove the call before code generation. *)
+val split_anchor_for_root : string -> string
+
+(** Recover the root ID from a primitive name, or [None] if it is not a root marker. *)
+val split_anchor_root : string -> string option
+
 val from_cma :
      ?includes:string list
   -> ?include_cmis:bool

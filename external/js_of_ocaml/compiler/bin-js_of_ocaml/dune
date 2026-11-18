@@ -8,6 +8,7 @@
   oxcaml_private_cmdliner
   compiler-libs.common
   js_of_ocaml-compiler.runtime-files
+  jsoo_static_partition
   (select
    findlib_support.ml
    from

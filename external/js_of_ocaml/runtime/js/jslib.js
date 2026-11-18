@@ -259,6 +259,22 @@ function caml_throw_js_exception(exn) {
   throw exn;
 }
 
+//Provides: caml_jsoo_split_run
+//Requires: caml_callback
+// Runs the code of a deferred root of a split program. [state] records the first
+// exception that escapes a root, which every later root throws again without running.
+// The exception is thrown on as it was caught, so a JavaScript error stays unwrapped.
+function caml_jsoo_split_run(state, f) {
+  if (state[1]) throw state[2];
+  try {
+    return caml_callback(f, [0]);
+  } catch (e) {
+    state[1] = 1;
+    state[2] = e;
+    throw e;
+  }
+}
+
 //Provides: caml_js_from_bool const (const)
 function caml_js_from_bool(x) {
   return !!x;

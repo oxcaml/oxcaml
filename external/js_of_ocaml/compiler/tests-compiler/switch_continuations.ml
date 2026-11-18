@@ -16,15 +16,16 @@ let javascript program =
       let deadcode_sentinel = Code.Var.fresh () in
       let program, live_vars = Deadcode.f (Pure_fun.f program) program in
       let js =
-        Generate.f
-          program
-          ~exported_runtime:true
-          ~live_vars
-          ~trampolined_calls:Code.Var.Set.empty
-          ~in_cps:Code.Var.Set.empty
-          ~should_export:false
-          ~warn_on_unhandled_effect:false
-          ~deadcode_sentinel
+        (Generate.f
+           program
+           ~exported_runtime:true
+           ~live_vars
+           ~trampolined_calls:Code.Var.Set.empty
+           ~in_cps:Code.Var.Set.empty
+           ~should_export:false
+           ~warn_on_unhandled_effect:false
+           ~deadcode_sentinel)
+          .Generate.program
         |> Driver.link_and_pack ~standalone:false ~link:`No
         |> Driver.name_variables
       in

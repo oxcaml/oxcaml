@@ -718,19 +718,22 @@ let link_and_pack ?(standalone = true) ?(wrap_with_fun = `Iife) ?(link = `No) p 
   |> pack ~wrap_with_fun ~standalone
   |> check_js
 
+let optimize_for_partition ~profile =
+  Specialize.switches
+  +> specialize_js_once_before
+  +> (match (profile : Profile.t) with
+    | O1 -> o1
+    | O2 -> o2
+    | O3 -> o3)
+  +> specialize_js_once_after
+
 let optimize ~shapes ~profile ~keep_flow_data p =
   let deadcode_sentinel =
     (* If deadcode is disabled, this field is just fresh variable *)
     Code.Var.fresh_n "dummy"
   in
   let opt =
-    Specialize.switches
-    +> specialize_js_once_before
-    +> (match (profile : Profile.t) with
-      | O1 -> o1
-      | O2 -> o2
-      | O3 -> o3)
-    +> specialize_js_once_after
+    optimize_for_partition ~profile
     +> effects_and_exact_calls ~keep_flow_data ~deadcode_sentinel ~shapes profile
     +> map_fst5
          (match Config.target (), Config.effects () with
@@ -757,15 +760,31 @@ let optimize_for_wasm ~shapes ~profile p =
     | Some data -> data
     | None -> Global_flow.f ~fast:false optimized_code.program )
 
+type output =
+  { sourcemaps : Source_map.info
+  ; shapes : Shape.t StringMap.t
+  ; primitives : StringSet.t
+  }
+
 let full ~standalone ~wrap_with_fun ~shapes ~profile ~link ~source_map ~formatter p =
   let optimized_code, _ = optimize ~shapes ~profile ~keep_flow_data:false p in
   let exported_runtime = not standalone in
-  let emit formatter =
-    generate ~exported_runtime ~wrap_with_fun ~warn_on_unhandled_effect:standalone
-    +> link_and_pack ~standalone ~wrap_with_fun ~link
-    +> simplify_js
-    +> name_variables
-    +> output formatter ~source_map ()
+  let emit formatter optimized_code =
+    let { Generate.program; primitives } =
+      generate
+        ~exported_runtime
+        ~wrap_with_fun
+        ~warn_on_unhandled_effect:standalone
+        optimized_code
+    in
+    let sourcemaps =
+      program
+      |> link_and_pack ~standalone ~wrap_with_fun ~link
+      |> simplify_js
+      |> name_variables
+      |> output formatter ~source_map ()
+    in
+    sourcemaps, primitives
   in
   let shapes_v = optimized_code.shapes in
   StringMap.iter
@@ -776,11 +795,20 @@ let full ~standalone ~wrap_with_fun ~shapes ~profile ~link ~source_map ~formatte
           formatter
           (Printf.sprintf "//# shape: %s:%s\n" name (Shape.to_string shape)))
     shapes_v;
-  emit formatter optimized_code, shapes_v
+  let sourcemaps, primitives = emit formatter optimized_code in
+  { sourcemaps; shapes = shapes_v; primitives }
 
 let full_no_source_map ~formatter ~shapes ~standalone ~wrap_with_fun ~profile ~link p =
-  let (_ : Source_map.info * _) =
-    full ~shapes ~standalone ~wrap_with_fun ~profile ~link ~source_map:false ~formatter p
+  let (_ : output) =
+    full
+      ~shapes
+      ~standalone
+      ~wrap_with_fun
+      ~profile
+      ~link
+      ~source_map:false
+      ~formatter
+      p
   in
   ()
 
@@ -795,14 +823,16 @@ let f
     p =
   full ~standalone ~wrap_with_fun ~shapes ~profile ~link ~source_map ~formatter p
 
-let f'
-    ?(standalone = true)
-    ?(wrap_with_fun = `Iife)
-    ?(profile = Profile.O1)
+let f' ?(standalone = true) ?(wrap_with_fun = `Iife) ?(profile = Profile.O1) ~link formatter p
+    =
+  full_no_source_map
+    ~formatter
+    ~shapes:false
+    ~standalone
+    ~wrap_with_fun
+    ~profile
     ~link
-    formatter
-    p =
-  full_no_source_map ~formatter ~shapes:false ~standalone ~wrap_with_fun ~profile ~link p
+    p
 
 let from_string ~prims ~debug s formatter =
   let p = Parse_bytecode.from_string ~prims ~debug s in

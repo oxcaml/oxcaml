@@ -1,0 +1,82 @@
+; Package the splits of ../fixture, then load the packages in Node.
+
+(rule
+ (targets
+  (dir packages))
+ (deps
+  make_packages.sh
+  ../fixture/runtime_stubs.js
+  ../fixture/runtime_stubs.wat
+  ../fixture/modules-wasm
+  ../fixture/late-wasm
+  ../fixture/late-js
+  ../fixture/multi-js
+  ../fixture/multi-wasm)
+ (action
+  (run
+   sh
+   make_packages.sh
+   %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe}
+   %{dep:../../bin-wasm_of_ocaml/wasm_of_ocaml.exe}
+   packages)))
+
+(rule
+ (alias runtest)
+ (deps check_packaging.js packages)
+ (action
+  (progn
+   (run %{bin:node} --experimental-wasm-jspi check_packaging.js packages/raw-modules-wasm-merged success Shared)
+   (run %{bin:node} --experimental-wasm-jspi check_packaging.js packages/raw-modules-wasm-merged fail Shared)
+   (run %{bin:node} --experimental-wasm-jspi check_packaging.js packages/raw-modules-wasm-separate success Shared)
+   (run %{bin:node} --experimental-wasm-jspi check_packaging.js packages/raw-modules-wasm-separate fail Shared)
+   (run %{bin:node} --experimental-wasm-jspi check_packaging.js packages/raw-late-wasm-merged success jsoo:split:bridge)
+   (run %{bin:node} --experimental-wasm-jspi check_packaging.js packages/raw-late-wasm-merged fail jsoo:split:bridge)
+   (run %{bin:node} --experimental-wasm-jspi check_packaging.js packages/raw-late-wasm-separate success jsoo:split:bridge)
+   (run %{bin:node} --experimental-wasm-jspi check_packaging.js packages/raw-late-wasm-separate fail jsoo:split:bridge))))
+
+(rule
+ (alias runtest)
+ (deps check_generated.js packages)
+ (action
+  (progn
+   (run %{bin:node} check_generated.js packages/late-js-a success)
+   (run %{bin:node} check_generated.js packages/late-js-a lazy-fail)
+   (run %{bin:node} check_generated.js packages/late-js-a eager-fail)
+   (run %{bin:node} --experimental-wasm-jspi check_generated.js packages/late-wasm-a success)
+   (run %{bin:node} --experimental-wasm-jspi check_generated.js packages/late-wasm-a lazy-fail)
+   (run %{bin:node} --experimental-wasm-jspi check_generated.js packages/late-wasm-a eager-fail))))
+
+(rule
+ (alias runtest)
+ (deps check_multi_generated.js check_corrupt.js packages)
+ (action
+  (progn
+   (run %{bin:node} check_multi_generated.js packages/multi-js-a success)
+   (run %{bin:node} check_multi_generated.js packages/multi-js-a lazy-fail)
+   (run %{bin:node} check_multi_generated.js packages/multi-js-a eager-fail)
+   (run %{bin:node} check_corrupt.js packages/multi-js-a fetch)
+   (run %{bin:node} check_corrupt.js packages/multi-js-a parse)
+   (run %{bin:node} --experimental-wasm-jspi check_multi_generated.js packages/multi-wasm-a success)
+   (run %{bin:node} --experimental-wasm-jspi check_multi_generated.js packages/multi-wasm-a lazy-fail)
+   (run %{bin:node} --experimental-wasm-jspi check_multi_generated.js packages/multi-wasm-a eager-fail)
+   (run %{bin:node} --experimental-wasm-jspi check_multi_generated.js packages/multi-wasm-a concurrent)
+   (run %{bin:node} --experimental-wasm-jspi check_corrupt.js packages/multi-wasm-a fetch)
+   (run %{bin:node} --experimental-wasm-jspi check_corrupt.js packages/multi-wasm-a parse)
+   (run %{bin:node} --experimental-wasm-jspi check_corrupt.js packages/multi-wasm-a fragment-parse))))
+
+(rule
+ (alias runtest)
+ (deps
+  check_package_cli.js
+  packages
+  ../fixture/runtime_stubs.js
+  ../fixture/modules-js
+  ../fixture/late-js
+  ../fixture/late-wasm
+  ../fixture/multi-wasm)
+ (action
+  (run
+   %{bin:node}
+   check_package_cli.js
+   %{dep:../../bin-js_of_ocaml/js_of_ocaml.exe}
+   %{dep:../../bin-wasm_of_ocaml/wasm_of_ocaml.exe})))

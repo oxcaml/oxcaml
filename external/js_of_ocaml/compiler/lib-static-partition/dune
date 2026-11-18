@@ -1,0 +1,14 @@
+; Static code splitting: partitions a program's compilation units into eager
+; code and independently loaded deferred roots.
+
+(library
+ (name jsoo_static_partition)
+ (libraries
+  js_of_ocaml-compiler
+  js_of_ocaml-compiler.runtime-files
+  jsoo_cmdline
+  oxcaml_private_cmdliner
+  oxcaml_private_yojson
+  unix)
+ (flags
+  (:standard -open Oxcaml_private_cmdliner -open Oxcaml_private_yojson)))
