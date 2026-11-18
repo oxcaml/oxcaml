@@ -41,25 +41,36 @@ type frame_debuginfo =
   | Dbg_raise of Debuginfo.t
   | Dbg_other of Debuginfo.t
 
+(* Where a frame descriptor goes *)
+type frame_descr_section =
+  | Linked of
+      { link_symbol : string;
+        group : string option
+      }
+  (* In a piece linked to the given symbol's section. If that symbol is dropped,
+     so is the whole piece. With a [group], the piece also joins that COMDAT
+     group, so that it is discarded along with a losing copy of the group's
+     code. Under [-frametable-sections] every descriptor is linked; otherwise
+     only those of code in a COMDAT group. *)
+  | Common (* With the rest of the unit's frametable *)
+
+type frame_section =
+  { fds_epoch : int;
+        (* Identifies the text section the return address lives in. A "short"
+           descriptor's delta is the difference between two return-address
+           labels, which is only an assembly-time constant when both labels are
+           in the same section; descriptors whose section differs from the
+           previous one escape. *)
+    fds_descr_section : frame_descr_section
+  }
+
 type frame_descr =
   { fd_lbl : Label.t; (* Return address *)
     fd_frame_size : int; (* Size of stack frame *)
     fd_live_offset : int list; (* Offsets/regs of live addresses *)
     fd_debuginfo : frame_debuginfo; (* Location, if any *)
     fd_long : bool; (* Use 32 instead of 16 bit format. *)
-    fd_section : int;
-        (* Identifies the text section the return address lives in. A "short"
-           descriptor's delta is the difference between two return-address
-           labels, which is only an assembly-time constant when both labels are
-           in the same section; descriptors whose section differs from the
-           previous one escape. *)
-    fd_link_symbol : string option;
-        (* Under [-frametable-sections], the symbol whose section the
-           descriptor's frametable piece is linked to. *)
-    fd_group : string option
-        (* The COMDAT group of the descriptor's code, if any. Its piece must
-           join the group (whether or not [-frametable-sections] is on), so that
-           it is discarded along with a losing copy of the code. *)
+    fd_section : frame_section
   }
 
 let frame_descriptors = ref ([] : frame_descr list)
@@ -121,15 +132,23 @@ let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
   in
   if fd_long && not !Oxcaml_flags.allow_long_frames
   then raise (Error (Stack_frame_too_large frame_size));
+  let fds_descr_section =
+    match !current_link_symbol, !current_group with
+    | Some link_symbol, (Some _ as group) -> Linked { link_symbol; group }
+    | None, Some _ ->
+      Misc.fatal_error "Frame descriptor in a COMDAT group without a piece"
+    | (Some _ | None), None when not !Oxcaml_flags.frametable_sections -> Common
+    | Some link_symbol, None -> Linked { link_symbol; group = None }
+    | None, None ->
+      Misc.fatal_error "Frame descriptor outside a -frametable-sections piece"
+  in
   frame_descriptors
     := { fd_lbl = label;
          fd_frame_size = frame_size;
          fd_live_offset = List.sort_uniq ( - ) live_offset;
          fd_debuginfo = debuginfo;
          fd_long;
-         fd_section = !frame_section_epoch;
-         fd_link_symbol = !current_link_symbol;
-         fd_group = !current_group
+         fd_section = { fds_epoch = !frame_section_epoch; fds_descr_section }
        }
        :: !frame_descriptors
 
@@ -560,6 +579,22 @@ let emit_frames ~debug_strings_section ~code_begin a =
      is emitted), so the prepended list is in decreasing order. Reverse it to
      emit the frame table in increasing return-address order. *)
   let descrs = List.rev !frame_descriptors in
+  (* A unit with code in COMDAT groups uses pieces even without
+     [-frametable-sections]. *)
+  let use_pieces =
+    !Oxcaml_flags.frametable_sections
+    || List.exists
+         (fun fd ->
+           match fd.fd_section.fds_descr_section with
+           | Linked _ -> true
+           | Common -> false)
+         descrs
+  in
+  (* The unit's own piece, linked to [code_begin] to be sure the linker doesn't
+     drop it. *)
+  let unit_piece =
+    Asm_section.Frametable_piece { link_symbol = code_begin; group = None }
+  in
   (* Emit each descriptor preceded by retaddr delta. The first descriptor of the
      frametable, and any descriptor that does not fit the short format, escapes:
      a 0 delta byte followed by the existing normal/long descriptor (which
@@ -575,7 +610,8 @@ let emit_frames ~debug_strings_section ~code_begin a =
     then escape ()
     else
       match prev with
-      | Some prev_fd when prev_fd.fd_section = fd.fd_section -> (
+      | Some prev_fd when prev_fd.fd_section.fds_epoch = fd.fd_section.fds_epoch
+        -> (
         (* Same text section as the previous descriptor, so the delta is an
            assembly-time constant. *)
         match short_encoding fd with
@@ -587,79 +623,62 @@ let emit_frames ~debug_strings_section ~code_begin a =
       | Some _ | None ->
         (* First descriptor of the frametable, or first of a new text section
            (no same-section previous return address for a delta): escape. *)
+        (match fd.fd_section.fds_descr_section with
+        | Common ->
+          (* Leave the piece of any preceding code in a COMDAT group. *)
+          if use_pieces then D.switch_to_section unit_piece
+        | Linked { link_symbol; group } ->
+          D.switch_to_section
+            (Asm_section.Frametable_piece { link_symbol; group }));
         escape ()
   in
-  let use_pieces =
-    !Oxcaml_flags.frametable_sections
-    || List.exists (fun fd -> Option.is_some fd.fd_group) descrs
-  in
-  (if not use_pieces
-   then (
-     a.efa_word (List.length descrs);
-     ignore (List.fold_left emit_descr None descrs))
-   else
-     (* The unit's table is a header: a -1 tag (a count-prefixed table starts
-        with a nonnegative count) and self-relative offsets to the start and end
-        of the pieces section and of the counts section, which the linker merges
-        across all units linked into the executable or shared object. Each run
-        of descriptors with the same link symbol and group goes in a piece
-        linked to that symbol's section, so that the linker drops the piece
-        along with the code, and starts with an escape, so that the pieces can
-        be read in any order. The unit's count of its descriptors and a
-        zero-size piece are linked to [code_begin]; the latter ensures the
-        pieces section, and hence its start and stop symbols, exists. Without
-        [-frametable-sections], only descriptors of code in a COMDAT group get
-        pieces of their own; the rest share the [code_begin] piece. *)
-     let start_and_stop section_name =
-       List.map
-         (fun prefix ->
-           Asm_targets.Asm_symbol.create_global (prefix ^ section_name))
-         ["__start_"; "__stop_"]
-     in
-     let syms =
-       start_and_stop Asm_section.frametable_pieces_section_name
-       @ start_and_stop Asm_section.frametable_counts_section_name
-     in
-     a.efa_word (-1);
-     List.iter D.between_this_and_symbol_32bit_expr syms;
-     List.iter D.hidden syms;
-     D.switch_to_section
-       (Asm_section.Frametable_count { link_symbol = code_begin });
-     a.efa_align Arch.size_addr;
-     a.efa_word (List.length descrs);
-     let switch_to_piece (link_symbol, group) =
-       D.switch_to_section (Asm_section.Frametable_piece { link_symbol; group })
-     in
-     let piece fd =
-       match fd.fd_link_symbol, fd.fd_group with
-       | Some link_symbol, (Some _ as group) -> link_symbol, group
-       | None, Some _ ->
-         Misc.fatal_error "Frame descriptor in a COMDAT group without a piece"
-       | Some link_symbol, None when !Oxcaml_flags.frametable_sections ->
-         link_symbol, None
-       | None, None when !Oxcaml_flags.frametable_sections ->
-         Misc.fatal_error
-           "Frame descriptor outside a -frametable-sections piece"
-       | (Some _ | None), None -> code_begin, None
-     in
-     let same_piece (link_symbol1, group1) (link_symbol2, group2) =
-       String.equal link_symbol1 link_symbol2
-       && Option.equal String.equal group1 group2
-     in
-     switch_to_piece (code_begin, None);
-     ignore
-       (List.fold_left
-          (fun prev fd ->
-            let prev =
-              match prev with
-              | Some prev_fd when same_piece (piece prev_fd) (piece fd) -> prev
-              | Some _ | None ->
-                switch_to_piece (piece fd);
-                None
-            in
-            emit_descr prev fd)
-          None descrs);
-     D.switch_to_section Asm_section.Read_only_data);
+  if not use_pieces
+  then begin
+    a.efa_word (List.length descrs);
+    ignore (List.fold_left emit_descr None descrs)
+  end
+  else begin
+    (* Under [-frametable-sections], or in a unit with code in COMDAT groups,
+       the frametable is in three parts:
+
+       - a header: a -1 tag, then 32-bit self-relative offsets to the start and
+       end of the pieces section and of the counts section;
+
+       - in the pieces section, a piece for each text section, holding the
+       descriptors for that section's code (without the flag, only for each text
+       section in a COMDAT group; the unit's own piece holds the rest);
+
+       - in the counts section, a word holding the number of descriptors.
+
+       The linker merges the pieces of all the units in an executable or shared
+       object into one section, and likewise the counts. *)
+    (* Linked to [code_begin], like the unit's own piece. *)
+    let count_section =
+      Asm_section.Frametable_count { link_symbol = code_begin }
+    in
+    (* The linker defines these at the bounds of each merged section. *)
+    let bounds =
+      List.concat_map
+        (fun section ->
+          [Asm_section.start_symbol section; Asm_section.stop_symbol section])
+        [unit_piece; count_section]
+    in
+    a.efa_word (-1);
+    List.iter D.between_this_and_symbol_32bit_expr bounds;
+    (* Keep each executable or shared object's bounds private to it. *)
+    List.iter D.hidden bounds;
+    (* Must be true as a precondition of this function. *)
+    assert (Asm_section.equal (D.current_section ()) Read_only_data);
+    D.switch_to_section count_section;
+    a.efa_align Arch.size_addr;
+    a.efa_word (List.length descrs);
+    (* Emit the unit's own piece, so that the pieces section, and hence its
+       bounds, exist even if no other piece does. *)
+    D.switch_to_section unit_piece;
+    ignore (List.fold_left emit_descr None descrs);
+    (* Switch back. *)
+    D.switch_to_section Asm_section.Read_only_data
+  end;
   Label_table.iter emit_debuginfo debuginfos;
   (* The name structs are kept near the debuginfo words that reference them (a
      23-bit, 32 MB offset; bit 25 above it flags a suffix-sharing jump word).

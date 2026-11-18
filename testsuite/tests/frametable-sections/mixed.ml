@@ -1,5 +1,5 @@
 (* TEST
- readonly_files = "mixed_lib.ml";
+ readonly_files = "mixed_lib.ml manual_init_driver.c";
  native-compiler;
  frametable_sections;
  unset OCAMLPARAM;
@@ -52,6 +52,25 @@
    program = "${test_build_directory}/entry_section.exe";
    flags = "-g -ccopt -Wl,--gc-sections";
    ocamlopt.byte;
+   run;
+   check-program-output;
+ }{
+   (* Both units use frametable sections, and manual module initialization
+      registers their frametables one at a time. *)
+   setup-ocamlopt.byte-build-env;
+   flags = "-g -function-sections -frametable-sections -manual-module-init";
+   module = "mixed_lib.ml";
+   ocamlopt.byte;
+   module = "mixed.ml";
+   ocamlopt.byte;
+   module = "";
+   all_modules = "mixed_lib.cmx mixed.cmx";
+   program = "manual_init.${objext}";
+   flags = "-g -manual-module-init -output-complete-obj";
+   ocamlopt.byte;
+   script = "${mkexe} -I${ocamlsrcdir}/runtime -o manual_init manual_init.${objext} ${bytecc_libs} manual_init_driver.c";
+   script;
+   program = "./manual_init";
    run;
    check-program-output;
  }

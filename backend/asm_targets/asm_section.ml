@@ -128,11 +128,11 @@ let print ppf t =
     | Note_gnu_stack -> "Note_gnu_stack"
     | Debuginfo_strings -> "Debuginfo_strings"
     | Frametable_piece { link_symbol; group = None } ->
-      Printf.sprintf "(Frametable_piece %s)" link_symbol
+      Printf.sprintf "(Frametable_piece -> %s)" link_symbol
     | Frametable_piece { link_symbol; group = Some group } ->
-      Printf.sprintf "(Frametable_piece %s %s)" link_symbol group
+      Printf.sprintf "(Frametable_piece -> %s in %s)" link_symbol group
     | Frametable_count { link_symbol } ->
-      Printf.sprintf "(Frametable_count %s)" link_symbol
+      Printf.sprintf "(Frametable_count -> %s)" link_symbol
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
@@ -171,10 +171,6 @@ type section_details =
     args : string list;
     is_delayed : bool
   }
-
-let frametable_pieces_section_name = "caml_frametable_pieces"
-
-let frametable_counts_section_name = "caml_frametable_counts"
 
 let progbits (arch : Target_system.architecture) =
   (* "@" starts a comment on ARM *)
@@ -300,16 +296,16 @@ let details t first_occurrence =
       Misc.fatal_error "Frametable sections are only supported on ELF targets"
     (* "ao" = SHF_ALLOC | SHF_LINK_ORDER; the linker drops the section together
        with the section defining [link_symbol]. The names are C identifiers, so
-       the linker defines [__start_] and [__stop_] symbols for them. *)
+       that these sections have start and stop symbols. *)
     | Frametable_piece { link_symbol; group = None }, arch, _ ->
-      [frametable_pieces_section_name], Some "ao", [progbits arch; link_symbol]
+      ["caml_frametable_pieces"], Some "ao", [progbits arch; link_symbol]
     | Frametable_piece { link_symbol; group = Some group }, arch, _ ->
       (* "G" adds SHF_GROUP; GAS wants the linked-to symbol before the group. *)
-      ( [frametable_pieces_section_name],
+      ( ["caml_frametable_pieces"],
         Some "aoG",
         [progbits arch; link_symbol; group; "comdat"] )
     | Frametable_count { link_symbol }, arch, _ ->
-      [frametable_counts_section_name], Some "ao", [progbits arch; link_symbol]
+      ["caml_frametable_counts"], Some "ao", [progbits arch; link_symbol]
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in
@@ -372,3 +368,27 @@ let to_string t =
     details t `First_occurrence
   in
   String.concat " " names
+
+let is_c_identifier name =
+  let is_letter = function
+    | 'A' .. 'Z' | 'a' .. 'z' | '_' -> true
+    | _ -> false
+  in
+  let is_digit = function '0' .. '9' -> true | _ -> false in
+  String.length name > 0
+  && is_letter name.[0]
+  && String.for_all (fun c -> is_letter c || is_digit c) name
+
+let bound_symbol prefix t =
+  let name = to_string t in
+  (* The linker defines the symbol only if C code could refer to it. *)
+  if not (is_c_identifier name)
+  then
+    Misc.fatal_errorf
+      "Section %s has no start and stop symbols: its name is not a C identifier"
+      name;
+  Asm_symbol.create_without_encoding ~visibility:Global (prefix ^ name)
+
+let start_symbol t = bound_symbol "__start_" t
+
+let stop_symbol t = bound_symbol "__stop_" t

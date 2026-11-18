@@ -2437,6 +2437,11 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
+          (* CR-someday lmaurer: The [section] here is in general a lie, but
+             this doesn't matter because
+             [D.between_this_and_label_offset_32bit_expr] happily supports
+             cross-section differences anyway (even though it claims not to). We
+             should fix it. *)
           let lbl = label_to_asm_label ~section:(D.current_section ()) lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
@@ -2448,7 +2453,7 @@ let end_assembly () =
           D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun lbl ->
-          let lbl = label_to_asm_label ~section:(D.current_section ()) lbl in
+          let lbl = label_to_asm_label ~section:Read_only_data lbl in
           D.define_label lbl)
     };
   D.type_symbol ~ty:Object frametable_sym;

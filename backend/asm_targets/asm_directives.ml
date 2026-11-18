@@ -916,11 +916,7 @@ let label_plus_offset ?comment lab ~offset_in_bytes =
 
 let define_label label =
   let lbl_section = Asm_label.section label in
-  let this_section =
-    match !current_section_ref with
-    | None -> not_initialized ()
-    | Some this_section -> this_section
-  in
+  let this_section = current_section () in
   if not (Asm_section.equal lbl_section this_section)
   then
     Misc.fatal_errorf
@@ -1241,15 +1237,12 @@ let between_labels_32_bit_with_offsets ?comment:_comment ~upper ~upper_offset
 
 let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
   let upper_section = Asm_label.section upper in
-  (match !current_section_ref with
-  | None -> not_initialized ()
-  | Some this_section ->
-    if not (Asm_section.equal upper_section this_section)
-    then
-      Misc.fatal_errorf
-        "Label %a in section %a is not in the current section %a"
-        Asm_label.print upper Asm_section.print upper_section Asm_section.print
-        this_section);
+  let this_section = current_section () in
+  if not (Asm_section.equal upper_section this_section)
+  then
+    Misc.fatal_errorf "Label %a in section %a is not in the current section %a"
+      Asm_label.print upper Asm_section.print upper_section Asm_section.print
+      this_section;
   let offset_upper = Targetint.to_int64 offset_upper in
   let offset_const =
     (* [Unsigned_int] so that large offsets (bit-packed record words, biased
