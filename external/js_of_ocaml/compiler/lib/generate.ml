@@ -1702,7 +1702,8 @@ let list_cell ctx x ~tag ~array_or_not a contents ~nested =
                 [ J.EArr chain.elts; tail ]
                 J.N
       in
-      Var.Hashtbl.replace ctx.Ctx.list_chains x { chain with expr };
+      if ctx.Ctx.live.(Var.idx x) = 1
+      then Var.Hashtbl.replace ctx.Ctx.list_chains x { chain with expr };
       expr
   | _ -> nested
 
