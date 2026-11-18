@@ -220,8 +220,8 @@ let mk_I_manifest f =
   \    compiler looks the file up (used as-is, so it must not contain a\n\
   \    directory component), <actual_path> is where this file is in the\n\
   \    filesystem (relative to [$MANIFEST_FILES_ROOT]), and 'x' is an\n\
-  \    optional flag that indicates a cmi file's corresponding cmx files\n\
-  \    are guaranteed to be present. The manifest file passed to the\n\
+  \    optional flag that indicates a cmi file's corresponding cmx file\n\
+  \    is guaranteed to be present. The manifest file passed to the\n\
   \    [-I-manifest] flag should itself be relative to\n\
   \    [$MANIFEST_FILES_ROOT]. When linking, files given on the command\n\
   \    line by their bare names (e.g. 'foo.cmx' or 'lib.cmxa') are also\n\
