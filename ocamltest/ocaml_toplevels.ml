@@ -43,6 +43,7 @@ let toplevel
   ~exit_status_variable:exit_status_variable
   ~reference_variable:reference_variable
   ~output_variable:output_variable
+  ~extra_dependencies:[]
   )
   let backend = backend
   let compiler = compiler

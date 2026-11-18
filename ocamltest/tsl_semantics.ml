@@ -29,18 +29,18 @@ let apply_modifiers env modifiers_name =
   let modifier = Environments.Include name in
   Environments.apply_modifier env modifier
 
-let rec add_to_env decl loc variable_name value env =
-  match (Variables.find_variable variable_name, decl) with
-    | (None, true) ->
-      let newvar = Variables.make (variable_name,"User variable") in
-      Variables.register_variable newvar;
-      add_to_env false loc variable_name value env
-    | (Some variable, false) ->
-      Environments.add variable value env
-    | (None, false) ->
-      raise (Variables.No_such_variable variable_name)
-    | (Some _, true) ->
-      raise (Variables.Variable_already_registered variable_name)
+let add_to_env decl _loc variable_name value env =
+  let variable =
+    match Variables.find_variable variable_name with
+    | Some v -> v
+    | None ->
+       let newvar = Variables.make (variable_name,"User variable") in
+       Variables.register_variable newvar;
+       newvar
+  in
+  if decl && Environments.is_variable_defined variable env then
+    raise (Variables.Variable_already_registered variable_name);
+  Environments.add variable value env
 
 let append_to_env variable_name value env =
   let variable =
