@@ -74,32 +74,16 @@ module Persistent_signature = struct
 
   let load = ref (fun ~allow_hidden ~unit_name ->
     let unit_name = CU.Name.to_string unit_name in
-<<<<<<< Merlin:jk/hx
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | filename, (Visible _ as visibility) ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | _, Hidden
-||||||| Compiler:last-imported
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | filename, (Visible _ as visibility) ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | _, Hidden
-=======
     match
       Load_path.find_normalized_with_include_flags (unit_name ^ ".cmi")
     with
     | filename, include_flags when allow_hidden ->
-      Some { filename; cmi = read_cmi_lazy filename; include_flags }
+      let cmi = Cmi_cache.read filename in
+      Some { filename; cmi; include_flags }
     | filename, ({ visibility = Visible; _ } as include_flags) ->
-      Some { filename; cmi = read_cmi_lazy filename; include_flags }
+      let cmi = Cmi_cache.read filename in
+      Some { filename; cmi; include_flags }
     | _, { visibility = Hidden; _ }
->>>>>>> Compiler:HEAD
     | exception Not_found -> None)
 end
 
@@ -387,7 +371,8 @@ let register_pers_for_short_paths penv modname ps components =
   in
   (* CR parameterized modules: [depends] and [alias_depends] are missing instantiation. *)
   Short_paths.Basis.load (short_paths_basis penv) modname
-    ~depends ~alias_depends desc ps.ps_name_info.pn_import.imp_visibility deprecated
+    ~depends ~alias_depends desc ps.ps_name_info.pn_import.imp_include_flags.visibility
+    deprecated
 (* Reading persistent structures from .cmi files *)
 
 let save_import penv crc modname impl flags filename =
@@ -1076,16 +1061,8 @@ let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
 let read penv modname a =
   read_pers_struct penv true modname a
 
-<<<<<<< Merlin:jk/hx
-let read_cmi_file penv filename =
-  let cmi = Cmi_cache.read filename in
-||||||| Compiler:last-imported
-let read_cmi_file penv filename =
-  let cmi = read_cmi_lazy filename in
-=======
 let read_cmi_file penv ~cmx_guaranteed filename =
-  let cmi = read_cmi_lazy filename in
->>>>>>> Compiler:HEAD
+  let cmi = Cmi_cache.read filename in
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
   add_import penv unit_name;

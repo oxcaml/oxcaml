@@ -1325,41 +1325,9 @@ module PpxContext = struct
             else
               let alert = Location.auto_include_alert in
               Load_path.auto_include_otherlibs alert find_in_dir fn
-<<<<<<< Merlin:jk/hx
           in *)
-          let visible, hidden =
-            get_pair
-              (get_list (get_pair get_string get_bool))
-              (get_list get_string)
-              payload
-          in
-          let visible =
-            List.map
-              (fun (path, cmx_guaranteed) : Clflags.visible_include ->
-                 { path; cmx_guaranteed })
-              visible
-          in
-          Load_path.(init ~auto_include:no_auto_include ~visible ~hidden)
-||||||| Compiler:last-imported
-          in
-          let visible, hidden =
-            get_pair
-              (get_list (get_pair get_string get_bool))
-              (get_list get_string)
-              payload
-          in
-          let visible =
-            List.map
-              (fun (path, cmx_guaranteed) : Clflags.visible_include ->
-                 { path; cmx_guaranteed })
-              visible
-          in
-          Load_path.init ~auto_include ~visible ~hidden
-=======
-          in
           let visible, hidden = get_pair get_load_dirs get_load_dirs payload in
-          Load_path.init ~auto_include ~visible ~hidden
->>>>>>> Compiler:HEAD
+          Load_path.(init ~auto_include:no_auto_include ~visible ~hidden)
       | "open_args" ->
           Clflags.open_args := get_list get_open_arg payload
       | "for_package" ->

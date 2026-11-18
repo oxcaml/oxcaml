@@ -245,13 +245,13 @@ type include_flags =
   { visibility : visibility;
     cmx_guaranteed : bool }
 
-let visibility_eq a b =
-  match a, b with
-  | ( Visible { cmx_guaranteed = cmx_guaranteed_a },
-      Visible { cmx_guaranteed = cmx_guaranteed_b } ) ->
-    Bool.equal cmx_guaranteed_a cmx_guaranteed_b
-  | Hidden, Hidden -> true
-  | Visible _, Hidden | Hidden, Visible _ -> false
+let include_flags_eq
+    { visibility = visibility_a; cmx_guaranteed = cmx_guaranteed_a }
+    { visibility = visibility_b; cmx_guaranteed = cmx_guaranteed_b } =
+  (match visibility_a, visibility_b with
+   | Visible, Visible | Hidden, Hidden -> true
+   | Visible, Hidden | Hidden, Visible -> false)
+  && Bool.equal cmx_guaranteed_a cmx_guaranteed_b
 
 module Dir : sig
   type entry = {
@@ -271,7 +271,7 @@ module Dir : sig
   val find : t -> string -> string option
   val find_normalized : t -> string -> string option
 
-  val check : visibility -> t -> bool
+  val check : include_flags -> t -> bool
 end = struct
   type entry = {
     basename : string;
@@ -281,14 +281,8 @@ end = struct
   type t = {
     path : string;
     files : entry list;
-<<<<<<< Merlin:jk/hx
     file_id : File_id.t;
-    visibility : visibility;
-||||||| Compiler:last-imported
-    visibility : visibility;
-=======
     include_flags : include_flags;
->>>>>>> Compiler:HEAD
   }
 
   let path t = t.path
@@ -320,28 +314,15 @@ end = struct
      following ones. We thus use individual [file_id]s for directory
      invalidation, so that every impacted instance is eventually updated. *)
 
-  let check visibility t =
-    visibility_eq visibility t.visibility && File_id.check (File_id.get t.path) t.file_id
+  let check include_flags t =
+    include_flags_eq include_flags t.include_flags
+    && File_id.check (File_id.get t.path) t.file_id
 
-<<<<<<< Merlin:jk/hx
-  let create visibility path =
-    let files = Array.to_list (Directory_content_cache.read path)
-||||||| Compiler:last-imported
-  let create visibility path =
-    let files = Array.to_list (readdir_compat path)
-=======
   let create include_flags path =
-    let files = Array.to_list (readdir_compat path)
->>>>>>> Compiler:HEAD
+    let files = Array.to_list (Directory_content_cache.read path)
       |> List.map (
         fun basename -> { basename; path = Filename.concat path basename }) in
-<<<<<<< Merlin:jk/hx
-    { path; files; file_id = File_id.get path; visibility }
-||||||| Compiler:last-imported
-    { path; files; visibility }
-=======
-    { path; files; include_flags }
->>>>>>> Compiler:HEAD
+    { path; files; file_id = File_id.get path; include_flags }
 end
 
 (** Stores cached paths to files *)
@@ -580,10 +561,14 @@ let find_uncap_loading_manifests fn_uncap =
       find_in_pending_manifests ~uncap:true fn_uncap)
 
 let init ~auto_include ~visible ~hidden =
-<<<<<<< Merlin:jk/hx
   assert (not Config.merlin || Local_store.is_bound ());
-  let get_new_dirs ~get_visibility ~get_path new_entries old_dirs =
-    let create_dir entry = Dir.create (get_visibility entry) (get_path entry) in
+  let get_new_dirs visibility new_entries old_dirs =
+    let include_flags ({ path = _; cmx_guaranteed } : Clflags.include_dir) =
+      { visibility; cmx_guaranteed }
+    in
+    let create_dir (entry : Clflags.include_dir) =
+      Dir.create (include_flags entry) entry.path
+    in
     let rec create_dirs ~acc = function
       | [] -> Some acc
       | new_entry :: new_rest -> create_dirs ~acc:(create_dir new_entry :: acc) new_rest
@@ -593,25 +578,16 @@ let init ~auto_include ~visible ~hidden =
       | [], [] -> None
       | new_entry :: new_rest, [] -> create_dirs ~acc (new_entry :: new_rest)
       | [], _ :: _ -> Some acc
-      | new_entry :: new_rest, old_dir :: old_rest ->
-        let visibility = get_visibility new_entry in
-        if String.equal (get_path new_entry) (Dir.path old_dir)
-           && Dir.check visibility old_dir
+      | (new_entry : Clflags.include_dir) :: new_rest, old_dir :: old_rest ->
+        if String.equal new_entry.path (Dir.path old_dir)
+           && Dir.check (include_flags new_entry) old_dir
         then process_entries ~acc:(old_dir :: acc) new_rest old_rest
         else create_dirs ~acc (new_entry :: new_rest)
     in
     process_entries ~acc:[] new_entries old_dirs
   in
-  let new_visible =
-    get_new_dirs visible (List.rev !visible_dirs)
-      ~get_visibility:(fun ({ path = _; cmx_guaranteed } : Clflags.visible_include) ->
-        Visible { cmx_guaranteed })
-      ~get_path:(fun ({ path; cmx_guaranteed = _ } : Clflags.visible_include) -> path)
-  in
-  let new_hidden =
-    get_new_dirs hidden (List.rev !hidden_dirs)
-      ~get_visibility:(Fun.const Hidden) ~get_path:Fun.id
-  in
+  let new_visible = get_new_dirs Visible visible (List.rev !visible_dirs) in
+  let new_hidden = get_new_dirs Hidden hidden (List.rev !hidden_dirs) in
   let update =
     match new_visible, new_hidden with
     | None, None -> None
@@ -629,62 +605,6 @@ let init ~auto_include ~visible ~hidden =
     List.iter Path_cache.prepend_add new_visible;
     (*= init_manifests (); *)
     auto_include_callback := auto_include
-||||||| Compiler:last-imported
-  reset ();
-  visible_dirs :=
-    List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
-        Dir.create (Visible { cmx_guaranteed }) path)
-      visible;
-  hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
-  Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !hidden_dirs);
-  Profile.record_call ~accumulate:true "load_hidden_files" (fun () ->
-    List.iter
-      (fun ({ basename; actual_path; cmx_guaranteed }
-             : Clflags.hidden_include_file) ->
-        let actual_path =
-          Dune_manifests_reader.Path.Load_root_relative.of_string actual_path
-          |> Dune_manifests_reader.Path.Load_root_relative.to_cwd_relative
-          |> Dune_manifests_reader.Path.Cwd_relative.to_string
-        in
-        Path_cache.prepend_add_single ~hidden:true ~cmx_guaranteed
-          basename actual_path)
-      !Clflags.hidden_include_files);
-  Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !visible_dirs);
-  init_manifests ();
-  auto_include_callback := auto_include
-=======
-  reset ();
-  let create_dirs visibility includes =
-    List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.include_dir) ->
-        Dir.create { visibility; cmx_guaranteed } path)
-      includes
-  in
-  visible_dirs := create_dirs Visible visible;
-  hidden_dirs := create_dirs Hidden hidden;
-  Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !hidden_dirs);
-  Profile.record_call ~accumulate:true "load_hidden_files" (fun () ->
-    List.iter
-      (fun ({ basename; actual_path; cmx_guaranteed }
-             : Clflags.hidden_include_file) ->
-        let actual_path =
-          Dune_manifests_reader.Path.Load_root_relative.of_string actual_path
-          |> Dune_manifests_reader.Path.Load_root_relative.to_cwd_relative
-          |> Dune_manifests_reader.Path.Cwd_relative.to_string
-        in
-        Path_cache.prepend_add_single
-          { visibility = Hidden; cmx_guaranteed }
-          basename actual_path)
-      !Clflags.hidden_include_files);
-  Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !visible_dirs);
-  init_manifests ();
-  auto_include_callback := auto_include
->>>>>>> Compiler:HEAD
 
 let remove_dir dir =
   assert (not Config.merlin || Local_store.is_bound ());
@@ -788,13 +708,7 @@ let find_normalized_with_include_flags fn =
     (!auto_include_callback Dir.find_normalized fn_uncap,
      { visibility = Visible; cmx_guaranteed = false })
 
-<<<<<<< Merlin:jk/hx
-let find_normalized fn = fst (find_normalized_with_visibility fn)
+let find_normalized fn = fst (find_normalized_with_include_flags fn)
 
 (* Merlin: expose standard reset function *)
 let reset () = reset ()
-||||||| Compiler:last-imported
-let find_normalized fn = fst (find_normalized_with_visibility fn)
-=======
-let find_normalized fn = fst (find_normalized_with_include_flags fn)
->>>>>>> Compiler:HEAD
