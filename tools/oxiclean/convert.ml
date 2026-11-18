@@ -10,7 +10,7 @@ let rec impl_in_scope (scope : Ident.t list)
       }
   | Lconst (c : Lambda.structured_constant) ->
     Value { value = structured_constant scope c }
-  | Lfunction ({ body; params; _ } : Lambda.lfunction) ->
+  | Lfunction ({ kind = Curried _; body; params; _ } : Lambda.lfunction) ->
     let scope =
       List.fold_left
         (fun acc ({ name; _ } : Lambda.lparam) -> name :: acc)
