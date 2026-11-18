@@ -2809,9 +2809,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     in
     (* All unboxed accesses are unused, but we include the below match in case
        we add new unboxed access types *)
-    let _unboxed_access : index unboxed_access -> _ = function
-      | Uaccess_record_unboxed_product_field _ -> UF.unused
-    in
+    let _unboxed_access = function Uaccess_unboxed_field _ -> UF.unused in
     block_access ba
   | Texp_ifthenelse (if_, then_, else_opt) ->
     (* if' is only borrowed, not used; but probably doesn't matter because of

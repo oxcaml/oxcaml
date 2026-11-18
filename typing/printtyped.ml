@@ -1465,26 +1465,17 @@ and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
   line i ppf "%a\n" fmt_longident li;
   pattern (i+1) ppf p;
 
-and block_access : type k. _ -> _ -> k block_access -> _ = fun i ppf -> function
+and block_access i ppf = function
   | Baccess_field (li, _, _) ->
       line i ppf "Baccess_field %a\n" fmt_longident li
   | Baccess_block (mut, index) ->
       line i ppf "Baccess_block %a\n"
         fmt_access_flag mut;
       expression i ppf index
-  | Baccess_tuple_element n ->
-      line i ppf "Baccess_tuple_element %d\n" n
-  | Baccess_address sort ->
-      line i ppf "Baccess_address %a\n" fmt_sort sort
 
-and unboxed_access : type k. _ -> _ -> k unboxed_access -> _ =
-  fun i ppf -> function
-  | Uaccess_record_unboxed_product_field (li, _, _) ->
-      line i ppf "Uaccess_record_unboxed_product_field %a\n" fmt_longident li
-  | Uaccess_unboxed_tuple_element n ->
-      line i ppf "Uaccess_unboxed_tuple_element %d\n" n
-  | Uaccess_record_unboxed_field (li, _, _) ->
-      line i ppf "Uaccess_record_unboxed_field %a\n" fmt_longident li
+and unboxed_access i ppf = function
+  | Uaccess_unboxed_field (li, _, _) ->
+      line i ppf "Uaccess_unboxed_field %a\n" fmt_longident li
 
 and comprehension i ppf {comp_body; comp_clauses} =
   line i ppf "comprehension\n";
