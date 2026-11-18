@@ -96,7 +96,7 @@ let record_form_to_wrong_kind_sort
   | Unboxed_product -> Record_unboxed_product
 
 type type_block_access_result =
-  { ba : index block_access; base_ty: type_expr; el_ty: type_expr }
+  { ba : block_access; base_ty: type_expr; el_ty: type_expr }
 
 type contains_gadt =
   | Contains_gadt
@@ -1066,6 +1066,23 @@ type expected_pat_mode =
 let simple_pat_mode mode =
   { mode = With_regionality.disallow_right mode; tuple_modes = None }
 
+(* Block paths are ways to point into a block, such as by block indices or
+   dereference patterns. Used by [check_block_path]. *)
+type block_path_boxed =
+  | Bpath_boxed_field of Longident.t loc * label_description
+      (* A field of a boxed record *)
+  | Bpath_boxed_tuple_element
+      (* An element of a boxed tuple *)
+  | Bpath_boxed_offset
+      (* Contents of an index or address *)
+
+type block_path_unboxed =
+  | Bpath_unboxed_field :
+      Longident.t loc * _ gen_label_description -> block_path_unboxed
+      (* A field of an unboxed record *)
+  | Bpath_unboxed_tuple_element
+      (* An element of an unboxed tuple *)
+
 (* While type checking patterns, we track some information about the boxed value
    a deref pattern [deref_ x] would refer to in the current pattern. *)
 type deref_position =
@@ -1078,10 +1095,10 @@ type deref_position =
     container_loc : Location.t;
     (* location of the pattern matching the boxed value *)
 
-    base : deref block_access;
+    base : block_path_boxed;
     (* the access into the boxed value *)
 
-    rev_unboxed : deref unboxed_access list;
+    rev_unboxed : block_path_unboxed list;
     (* the unboxed accesses from the boxed value to here, in reverse order *)
   }
 
@@ -1735,14 +1752,8 @@ let check_atomic_loc ~loc ~env label lid =
   | Ok () -> ()
   | Error _ -> Error.log_and_raise loc env (Modalities_on_atomic_field lid)
 
-(* Checks that a block path of kind [kind] is valid to create. Block paths are
-   ways to point into a block, such as by block indices or dereference patterns.
-*)
-let check_block_path
-  : type k. loc:Location.t -> env:Env.t -> block_path_kind ->
-      mutability:Types.mutability -> k block_access -> k unboxed_access list ->
-      unit
-  = fun ~loc ~env kind ~mutability ba uas ->
+(* Checks that a block path of kind [kind] is valid to create *)
+let check_block_path ~loc ~env kind ~mutability ba uas =
   let error (lid : Longident.t loc) err =
     Error.log_and_raise lid.loc env err
   in
@@ -1764,8 +1775,8 @@ let check_block_path
     if (not supported) && is_poly_Tpoly label.lbl_arg then
       error lid (Block_path_polymorphic_field (kind, lid.txt))
   in
-  let check_boxed_access : k block_access -> unit = function
-    | Baccess_field (lid, label, _) ->
+  let check_boxed_access = function
+    | Bpath_boxed_field (lid, label) ->
       let bad_type reason =
         error lid (Block_path_bad_type (kind, reason))
       in
@@ -1800,26 +1811,22 @@ let check_block_path
       | Deref_pattern | Block_index -> ()
       end;
       check_label_access lid label
-    | Baccess_block _ | Baccess_tuple_element _ | Baccess_address _ -> ()
+    | Bpath_boxed_tuple_element | Bpath_boxed_offset -> ()
   in
-  let check_unboxed_access : k unboxed_access -> unit = function
-    | Uaccess_record_unboxed_product_field (lid, label, _) ->
-      check_label_access lid label
-    | Uaccess_record_unboxed_field (lid, label, _) ->
-      check_label_access lid label
-    | Uaccess_unboxed_tuple_element _ -> ()
+  let check_unboxed_access = function
+    | Bpath_unboxed_field (lid, label) -> check_label_access lid label
+    | Bpath_unboxed_tuple_element -> ()
   in
-  let boxed_modality : k block_access -> Modality.Const.t = function
-    | Baccess_field (_, label, _) -> label.lbl_modalities
-    | Baccess_tuple_element _ -> Modality.Const.id
+  let boxed_modality = function
+    | Bpath_boxed_field (_, label) -> label.lbl_modalities
+    | Bpath_boxed_tuple_element -> Modality.Const.id
     (* An index or address points to a position whose modalities were checked
        when it was built. *)
-    | Baccess_block _ | Baccess_address _ -> expected_modality
+    | Bpath_boxed_offset -> expected_modality
   in
-  let unboxed_modality : k unboxed_access -> Modality.Const.t = function
-    | Uaccess_record_unboxed_product_field (_, label, _) -> label.lbl_modalities
-    | Uaccess_record_unboxed_field (_, label, _) -> label.lbl_modalities
-    | Uaccess_unboxed_tuple_element _ -> Modality.Const.id
+  let unboxed_modality = function
+    | Bpath_unboxed_field (_, label) -> label.lbl_modalities
+    | Bpath_unboxed_tuple_element -> Modality.Const.id
   in
   check_boxed_access ba;
   List.iter check_unboxed_access uas;
@@ -3902,22 +3909,21 @@ and type_pat_aux
     in
     let container_mode = pat_mode.mode in
     let pl =
-      List.mapi (fun i ((lbl, t, pat_mode, sort), (_, p)) ->
+      List.map2 (fun (lbl, t, pat_mode, sort) (_, p) ->
         let deref_position =
           if is_unboxed then
             Option.map
-              (deref_position_push_unboxed_access
-                 (Uaccess_unboxed_tuple_element i))
+              (deref_position_push_unboxed_access Bpath_unboxed_tuple_element)
               deref_position
           else
             Some { position_mutability = Immutable;
                    container_mode;
                    container_loc = loc;
-                   base = Baccess_tuple_element i;
+                   base = Bpath_boxed_tuple_element;
                    rev_unboxed = [] }
         in
         lbl, type_pat tps Value ~pat_mode ?deref_position p t sort, sort)
-        (List.combine expected_tys args)
+        expected_tys args
     in
     let elem_tys = List.map (fun (lbl, p, _) -> lbl, p.pat_type) pl in
     let pat_desc, pat_type =
@@ -3962,20 +3968,16 @@ and type_pat_aux
         match pos, record_form, rep with
         | None, Unboxed_product, _ -> None
         | None, Legacy, Record_unboxed -> None
-        | Some pos, Unboxed_product, _ ->
+        | Some pos, Unboxed_product, _ | Some pos, Legacy, Record_unboxed ->
           Some
             (deref_position_push_unboxed_access
-               (Uaccess_record_unboxed_product_field (lid, label, rep)) pos)
-        | Some pos, Legacy, Record_unboxed ->
-          Some
-            (deref_position_push_unboxed_access
-               (Uaccess_record_unboxed_field (lid, label, rep)) pos)
+               (Bpath_unboxed_field (lid, label)) pos)
         | _, Legacy,
           ( Record_inlined _ | Record_boxed | Record_float | Record_ufloat
           | Record_mixed _ | Record_undetermined | Record_variable _ ) ->
           Some { position_mutability = label.lbl_mut; container_mode;
-                 container_loc = loc; base = Baccess_field (lid, label, rep);
-                 rev_unboxed = [] }
+                 container_loc = loc;
+                 base = Bpath_boxed_field (lid, label); rev_unboxed = [] }
         | _, Legacy, Record_dummy _ ->
           Misc.fatal_error
             "Typecore.type_pat_aux: dummy record representation"
@@ -4060,9 +4062,8 @@ and type_pat_aux
       | Some pos -> pos
       | None -> Error.log_and_raise loc !!penv Deref_pattern_bad_position
     in
-    let unboxed = List.rev rev_unboxed in
     check_block_path ~loc ~env:!!penv Deref_pattern
-      ~mutability:position_mutability base unboxed;
+      ~mutability:position_mutability base (List.rev rev_unboxed);
     let ty_addr, addr_sort =
       solve_Ppat_deref !!penv position_mutability expected_ty
     in
@@ -4590,7 +4591,7 @@ and type_pat_aux
       let pat_mode = simple_pat_mode mode in
       let deref_position =
         { position_mutability = mutability; container_mode;
-          container_loc = loc; base = Baccess_address arg_sort;
+          container_loc = loc; base = Bpath_boxed_offset;
           rev_unboxed = [] }
       in
       let p1 = type_pat ~pat_mode ~deref_position tps Value sp1 ty_arg arg_sort
@@ -5981,9 +5982,7 @@ let rec is_nonexpansive exp =
       in
       (* All unboxed accesses are nonexpansive, but we include the below match
          in case we add new unboxed access types *)
-      let _unboxed_access : index unboxed_access -> _ = function
-        | Uaccess_record_unboxed_product_field _ -> true
-      in
+      let _unboxed_access = function Uaccess_unboxed_field _ -> true in
       block_access ba
   | Texp_ifthenelse(_cond, ifso, ifnot) ->
       is_nonexpansive ifso && is_nonexpansive_opt ifnot
@@ -6938,7 +6937,7 @@ let generalize_structure_type_block_access_result
     generalize_structure_exp idx
 
 let generalize_structure_type_unboxed_access_result
-      (el_ty, (Uaccess_record_unboxed_product_field _ : index unboxed_access)) =
+      (el_ty, Uaccess_unboxed_field _) =
   generalize_structure el_ty
 
 let unique_use ~loc ~env mode_l mode_r  =
@@ -8809,7 +8808,18 @@ and type_expect_
         el_ty
         uas
     in
-    check_block_path ~loc ~env Block_index ~mutability:mut ba uas;
+    let path_ba =
+      match ba with
+      | Baccess_field (lid, label, _) -> Bpath_boxed_field (lid, label)
+      | Baccess_block _ -> Bpath_boxed_offset
+    in
+    let path_uas =
+      List.map
+        (fun (Uaccess_unboxed_field (lid, label, _)) ->
+           Bpath_unboxed_field (lid, label))
+        uas
+    in
+    check_block_path ~loc ~env Block_index ~mutability:mut path_ba path_uas;
     let ty = match mut with
       | Immutable -> Predef.type_idx_imm base_ty el_ty
       | Mutable { atomic = Nonatomic; mode = _ } ->
@@ -9950,7 +9960,7 @@ and type_unboxed_access env loc el_ty ua =
         ~why:Field_in_indexed_record
         ~containing_type:el_ty
     in
-    ty_arg, Uaccess_record_unboxed_product_field (lid, label, rep)
+    ty_arg, Uaccess_unboxed_field (lid, label, rep)
 
 and expression_constraint pexp =
   { type_without_constraint = (fun env expected_mode ->

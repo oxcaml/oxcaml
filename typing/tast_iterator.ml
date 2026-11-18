@@ -385,12 +385,12 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       | _, _, Overridden (lid, exp) -> iter_loc_lid sub lid; sub.expr sub exp)
       fields
   in
-  let iter_block_access sub : index block_access -> _ = function
+  let iter_block_access sub = function
     | Baccess_field (lid, _, _) -> iter_loc sub lid
     | Baccess_block (_, idx) -> sub.expr sub idx
   in
-  let iter_unboxed_access sub : index unboxed_access -> _ = function
-    | Uaccess_record_unboxed_product_field (lid, _, _) -> iter_loc sub lid
+  let iter_unboxed_access sub = function
+    | Uaccess_unboxed_field (lid, _, _) -> iter_loc sub lid
   in
   match exp_desc with
   | Texp_ident { lid; _ } -> iter_loc_lid sub lid

@@ -63,9 +63,6 @@ type attributes = attribute list
 type value = Value_pattern
 type computation = Computation_pattern
 
-type index = Index_access
-type deref = Deref_access
-
 type _ pattern_category =
 | Value : value pattern_category
 | Computation : computation pattern_category
@@ -418,7 +415,7 @@ and expression_desc =
       newval : expression;
     }
   | Texp_array of mutability * Jkind.Sort.t * expression list * locality_mode_r
-  | Texp_idx of index block_access * index unboxed_access list
+  | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of mutability * Jkind.sort * comprehension
   | Texp_ifthenelse of expression * expression * expression option
@@ -486,23 +483,15 @@ and meth =
   | Tmeth_val of Ident.t
   | Tmeth_ancestor of Ident.t * Path.t
 
-and 'k block_access =
-  | Baccess_field :
+and block_access =
+  | Baccess_field of
       Longident.t loc * label_description * Types.record_representation
-      -> 'k block_access
-  | Baccess_block : access_flag * expression -> index block_access
-  | Baccess_tuple_element : int -> deref block_access
-  | Baccess_address : Jkind.sort -> deref block_access
+  | Baccess_block of access_flag * expression
 
-and 'k unboxed_access =
-  | Uaccess_record_unboxed_product_field :
+and unboxed_access =
+  | Uaccess_unboxed_field of
       Longident.t loc * unboxed_label_description
       * Types.record_unboxed_product_representation
-      -> 'k unboxed_access
-  | Uaccess_unboxed_tuple_element : int -> deref unboxed_access
-  | Uaccess_record_unboxed_field :
-      Longident.t loc * label_description * Types.record_representation
-      -> deref unboxed_access
 
 and comprehension =
   {
