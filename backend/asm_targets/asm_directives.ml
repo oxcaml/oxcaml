@@ -260,6 +260,10 @@ module Directive = struct
         { reg : int;
           offset : int
         }
+    | Cfi_rel_offset of
+        { reg : int;
+          offset : int
+        }
     | Cfi_startproc
     | Cfi_remember_state
     | Cfi_restore_state
@@ -483,6 +487,8 @@ module Directive = struct
     | Cfi_endproc -> bprintf buf "\t.cfi_endproc"
     | Cfi_offset { reg; offset } ->
       bprintf buf "\t.cfi_offset %d, %d" reg offset
+    | Cfi_rel_offset { reg; offset } ->
+      bprintf buf "\t.cfi_rel_offset %d, %d" reg offset
     | Cfi_startproc -> bprintf buf "\t.cfi_startproc"
     | Cfi_remember_state -> bprintf buf "\t.cfi_remember_state"
     | Cfi_restore_state -> bprintf buf "\t.cfi_restore_state"
@@ -602,6 +608,7 @@ module Directive = struct
     | Cfi_def_cfa_offset _ -> unsupported "Cfi_def_cfa_offset"
     | Cfi_endproc -> unsupported "Cfi_endproc"
     | Cfi_offset _ -> unsupported "Cfi_offset"
+    | Cfi_rel_offset _ -> unsupported "Cfi_rel_offset"
     | Cfi_startproc -> unsupported "Cfi_startproc"
     | Cfi_remember_state -> unsupported "Cfi_remember_state"
     | Cfi_restore_state -> unsupported "Cfi_restore_state"
@@ -721,11 +728,11 @@ module Directive = struct
         "increment_offset_in_bytes: Delta_uleb128 is not supported"
     (* Directives that don't contribute to section size *)
     | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_endproc
-    | Cfi_offset _ | Cfi_startproc | Cfi_remember_state | Cfi_restore_state
-    | Cfi_def_cfa_register _ | Comment _ | Direct_assignment _ | File _
-    | Global _ | Indirect_symbol _ | Loc _ | New_label _ | New_line
-    | Private_extern _ | Section _ | Size _ | Type _ | Protected _ | Hidden _
-    | Weak _ | External _ | Reloc _ ->
+    | Cfi_offset _ | Cfi_rel_offset _ | Cfi_startproc | Cfi_remember_state
+    | Cfi_restore_state | Cfi_def_cfa_register _ | Comment _
+    | Direct_assignment _ | File _ | Global _ | Indirect_symbol _ | Loc _
+    | New_label _ | New_line | Private_extern _ | Section _ | Size _ | Type _
+    | Protected _ | Hidden _ | Weak _ | External _ | Reloc _ ->
       offset_in_bytes
 
   let map_new_label f = function[@warning "-4"]
@@ -815,6 +822,9 @@ let cfi_endproc () = if should_generate_cfi () then emit Cfi_endproc
 let cfi_offset ~reg ~offset =
   if should_generate_cfi () && offset <> 0
   then emit (Cfi_offset { reg; offset })
+
+let cfi_rel_offset ~reg ~offset =
+  if should_generate_cfi () then emit (Cfi_rel_offset { reg; offset })
 
 let cfi_startproc () = if should_generate_cfi () then emit Cfi_startproc
 

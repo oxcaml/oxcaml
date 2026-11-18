@@ -1703,6 +1703,7 @@ let assemble_line b loc ins =
     | Directive (D.Cfi_def_cfa_register _)  -> ()
     | Directive (D.Cfi_def_cfa_offset _) -> ()
     | Directive (D.Cfi_offset _) -> ()
+    | Directive (D.Cfi_rel_offset _) -> ()
     | Directive (D.File _) -> ()
     | Directive (D.Loc _) -> ()
     | Directive (D.Private_extern _) -> assert false
