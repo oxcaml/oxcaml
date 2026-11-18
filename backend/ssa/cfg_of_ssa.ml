@@ -48,9 +48,10 @@ open! Int_replace_polymorphic_compare
 
     Comparisons feeding [Branch]: [collect_fused_comparisons] records, per
     comparison [Op], how many [Branch] terminators will fuse it directly into
-    the CFG test. An Op is emitted into the body only if it has more uses than
-    fused-branch consumers — otherwise [fuse_comparison] splices it directly
-    into the terminator and we drop the body Op. *)
+    the CFG test (only comparisons computed in the branch's own block, see
+    [can_extend_arg_lifetimes]). An Op is emitted into the body only if it has
+    more uses than fused-branch consumers — otherwise [fuse_comparison] splices
+    it directly into the terminator and we drop the body Op. *)
 
 module DLL = Doubly_linked_list
 open Ssa.Export
@@ -155,9 +156,9 @@ let emit_parallel_moves body ~src ~dst =
     emit_moves body ~src:tmp_regs ~dst)
   else emit_moves body ~src ~dst
 
-(** A Branch condition that can be folded into the CFG test terminator,
-    consuming the comparison's args directly. *)
-let fuse_comparison (cond : value) ~true_label ~false_label :
+(** The CFG test terminator equivalent to a Branch condition that is a
+    comparison, consuming the comparison's args directly. *)
+let comparison_test (cond : value) ~true_label ~false_label :
     (Cfg.terminator * value array) option =
   match[@warning "-fragile-match"] cond with
   | Res ({ op = Intop_imm (Icomp Cne, 0); args; _ }, 0) ->
@@ -182,6 +183,43 @@ let fuse_comparison (cond : value) ~true_label ~false_label :
   | Res ({ op = Intop_imm (Iand, 1); args; _ }, 0) ->
     Some (Cfg.Parity_test { ifso = false_label; ifnot = true_label }, args)
   | _ -> None
+
+(* Whether the args of a comparison must not be live past [instr]: they may be
+   local values, which must not be GC roots once their region has ended, or
+   derived pointers, which must not be live across a GC. *)
+let ends_arg_lifetimes (instr : instruction) =
+  match[@warning "-fragile-match"] instr with
+  | Op { op = End_region | Alloc _ | Poll; _ } -> true
+  | Op _ | Push_trap _ | Pop_trap _ -> false
+
+(* Fusing [cond] into the terminator of [block] extends the lifetimes of the
+   comparison's args up to the terminator, so it is only done when [cond] is
+   computed in [block], with no instruction past it ending these lifetimes. *)
+let can_extend_arg_lifetimes (block : block) (cond : value) =
+  match cond with
+  | Block_param _ -> false
+  | Res (cond_op, _) -> (
+    let body = Block.body block in
+    let is_cond_op (instr : instruction) =
+      match instr with
+      | Op op -> Instruction.Id.equal op.id cond_op.id
+      | Push_trap _ | Pop_trap _ -> false
+    in
+    match Array.find_index is_cond_op body with
+    | None -> false
+    | Some index ->
+      let after = index + 1 in
+      not
+        (Array.exists ends_arg_lifetimes
+           (Array.sub body after (Array.length body - after))))
+
+(** A Branch condition of [block] that can be folded into its CFG test
+    terminator. *)
+let fuse_comparison (block : block) (cond : value) ~true_label ~false_label :
+    (Cfg.terminator * value array) option =
+  if can_extend_arg_lifetimes block cond
+  then comparison_test cond ~true_label ~false_label
+  else None
 
 let truncate arr n = if Array.length arr > n then Array.sub arr 0 n else arr
 
@@ -446,7 +484,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       then
         let false_label = label_of env targets.(0) in
         let true_label = label_of env targets.(1) in
-        match fuse_comparison index ~true_label ~false_label with
+        match fuse_comparison block index ~true_label ~false_label with
         | Some (term, args) ->
           make_instr term (Array.map (get_reg env) args) [||] dbg
         | None ->
@@ -592,7 +630,7 @@ let collect_fused_comparisons env =
       | Switch { index; targets } when Array.length targets = 2 -> (
         if
           Option.is_some
-            (fuse_comparison index ~true_label:Label.none
+            (fuse_comparison block index ~true_label:Label.none
                ~false_label:Label.none)
         then
           match index with
