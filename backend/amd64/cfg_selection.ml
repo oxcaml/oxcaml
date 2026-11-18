@@ -184,7 +184,12 @@ let pseudoregs_for_operation op arg res =
   | Intop (Idiv _) -> [| rax; rcx |], [| rax |]
   | Intop (Imod _) -> [| rax; rcx |], [| rdx |]
   | Int128op (Iadd128 | Isub128) ->
-    [| res.(0); res.(1); arg.(2); arg.(3) |], res
+    (* res.(0) will be written before arg.(3) is read, so they must not share a
+       register. *)
+    let high =
+      if Reg.same arg.(0) arg.(3) then Reg.create_with_typ arg.(3) else arg.(3)
+    in
+    [| res.(0); res.(1); arg.(2); high |], res
   | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
   | Floatop (Float64, Icompf cond) ->
     (* We need to temporarily store the result of the comparison in a float
