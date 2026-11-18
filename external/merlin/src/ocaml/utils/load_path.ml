@@ -205,7 +205,8 @@ end = struct
     | [ "file"; basename; location ] ->
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.File { basename; location; cmx_guaranteed = false })
-    | [ "file_x"; basename; location ] ->
+    | [ "file"; basename; location; "x" ]
+      when Filename.extension basename = ".cmi" ->
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.File { basename; location; cmx_guaranteed = true })
     | [ "manifest"; _; location ] ->
@@ -213,6 +214,8 @@ end = struct
          readability, so we discard it here. *)
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.Manifest location)
+    | [ "file" | "manifest"; _; _; "x" ] ->
+      raise (Parse_error ("Only cmi files may be marked cmx_guaranteed"))
     | [] -> None
     | _ -> raise (Parse_error ("Cannot parse manifest file line: " ^ line))
   ;;
