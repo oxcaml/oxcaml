@@ -67,6 +67,15 @@ let new_dwarf_label () =
   incr dwarf_label_counter;
   !dwarf_label_counter
 
+let set_dwarf_label l =
+  if l < !dwarf_label_counter
+  then
+    Misc.fatal_errorf "Cannot set DWARF label counter to %d, it must be >= %d" l
+      !dwarf_label_counter;
+  dwarf_label_counter := l
+
+let cur_dwarf_label () = !dwarf_label_counter
+
 let reset () =
   label_counter := init_label;
   dwarf_label_counter := init_dwarf_label

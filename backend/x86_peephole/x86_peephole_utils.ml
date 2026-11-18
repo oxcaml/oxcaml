@@ -63,6 +63,14 @@ let is_hard_barrier = function
 
    - [Cfi_remember_state] and [Cfi_restore_state] save and restore all of the
    above. *)
+(* CR mshinwell: looking through DWARF-only labels keeps the generated code
+   independent of the debugging information, but those labels delimit the
+   ranges over which variables are described as being in a register, which
+   were computed before this pass. A rule that removes or forwards the
+   definition of a register across such a label (for example
+   [remove_mov_to_dead_register]) can leave a variable described as being in a
+   register that no longer holds it, until that register is next written. The
+   ranges would have to be updated, or computed after this pass. *)
 let is_debug_directive = function
   | Directive d -> (
     match d with

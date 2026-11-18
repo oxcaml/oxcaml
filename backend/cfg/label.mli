@@ -46,6 +46,12 @@ val set_label : t -> unit
 
 val cur_label : unit -> t
 
+(** Like [set_label] and [cur_label], for the labels returned by
+    [new_dwarf_label]. *)
+val set_dwarf_label : t -> unit
+
+val cur_dwarf_label : unit -> t
+
 val reset : unit -> unit
 
 val to_int : t -> int
