@@ -772,9 +772,9 @@ let verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old =
             then (
               Label.Tbl.replace block_eqs new_pred_label merged;
               Queue.add new_pred_label worklist));
-      (* Check entry equations are empty *)
+      (* Check entry equations are empty, even with incoming self tail calls. *)
       if
-        Label.Set.is_empty new_block.predecessors
+        Label.equal new_label (Cfg.entry_label new_cfg)
         && not (Equations.equal start_eqs Equations.empty)
       then (
         Format.fprintf ppf_m "Undischarged equations at entry:@.";
