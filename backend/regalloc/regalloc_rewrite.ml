@@ -349,9 +349,10 @@ let compute_critical_edges : all:bool -> Cfg.t -> Cfg_edge.Set.t =
         let successor_labels =
           Cfg.successor_labels ~normal:true ~exn:false block
         in
-        match
-          Label.Set.cardinal (Cfg.successor_labels ~normal:true ~exn:all block)
-        with
+        let num_exn_successors =
+          match block.exn with Some _ when all -> 1 | Some _ | None -> 0
+        in
+        match Label.Set.cardinal successor_labels + num_exn_successors with
         | 0 | 1 -> critical_edges
         | _ ->
           Label.Set.fold

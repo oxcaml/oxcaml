@@ -74,7 +74,8 @@ val destroyed_at_terminator : Cfg_intf.S.terminator -> Reg.t array
     is unlike the registers destroyed at an external call, which also include
     those used by the code sequence for such calls. The answer may be [true] for
     a register that C functions preserve under some calling conventions of the
-    target. It is [false] for a register that is not in a hardware register. *)
+    target. It is [false] for a register whose location is not a hardware
+    register. *)
 val may_be_destroyed_by_c_function : Reg.t -> bool
 
 val is_destruction_point :

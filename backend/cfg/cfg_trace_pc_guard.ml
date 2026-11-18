@@ -304,11 +304,7 @@ type probe =
 let instrument_block cfg_with_layout { label; dbg } ~index =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   let block = Cfg.get_block_exn cfg label in
-  let stack_offset =
-    match DLL.hd block.body with
-    | Some (instr : Cfg.basic Cfg.instruction) -> instr.stack_offset
-    | None -> block.terminator.stack_offset
-  in
+  let stack_offset = Cfg.first_instruction_stack_offset block in
   let make_instruction desc ~arg ~res =
     Cfg.make_instruction ~desc ~arg ~res ~dbg ~stack_offset
       ~id:(InstructionId.get_and_incr cfg.next_instruction_id)

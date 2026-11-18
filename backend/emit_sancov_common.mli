@@ -45,7 +45,9 @@ val unit_has_guards : unit -> bool
 
 (** The registers of [live] that a call to the callback must save, each with
     the [Outgoing] stack slot to save it in, and the size in bytes of the frame
-    holding these slots, which is a multiple of 16. *)
+    holding these slots. A slot has the size of its register and is aligned to
+    that size, or to 16 bytes if it is larger. The size of the frame is a
+    multiple of 16. *)
 val registers_to_save : live:Reg.Set.t -> (Reg.t * Reg.t) list * int
 
 (** Emit a zero-initialised definition of the gate in its section, either weak

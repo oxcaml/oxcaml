@@ -165,6 +165,11 @@ type section_details =
     is_delayed : bool
   }
 
+let progbits (arch : Target_system.architecture) =
+  match arch with
+  | ARM | AArch64 -> "%progbits"
+  | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
+
 let details t first_occurrence =
   let first_occurrence =
     match first_occurrence with
@@ -275,12 +280,7 @@ let details t first_occurrence =
       ["__TEXT"; "__cstring"], None, ["cstring_literals"]
     | Debuginfo_strings, arch, _ ->
       (* "aMS" = SHF_ALLOC | SHF_MERGE | SHF_STRINGS; de-duped by linker *)
-      let progbits =
-        match arch with
-        | ARM | AArch64 -> "%progbits"
-        | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
-      in
-      [".rodata.str1.1"], Some "aMS", [progbits; "1"]
+      [".rodata.str1.1"], Some "aMS", [progbits arch; "1"]
     (* 1 = characters *)
     | (Trace_pc_guards | Trace_pc_guard_gate), _, MacOS_like ->
       Misc.fatal_error
@@ -291,20 +291,10 @@ let details t first_occurrence =
          included. That name is a valid C identifier, so that the linker defines
          [__start___sancov_guards] and [__stop___sancov_guards] around the
          result. *)
-      let progbits =
-        match arch with
-        | ARM | AArch64 -> "%progbits"
-        | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
-      in
-      ["__sancov_guards"], Some "aw", [progbits]
+      ["__sancov_guards"], Some "aw", [progbits arch]
     | Trace_pc_guard_gate, arch, _ ->
       (* Writable data. *)
-      let progbits =
-        match arch with
-        | ARM | AArch64 -> "%progbits"
-        | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
-      in
-      ["__sancov_gate"], Some "aw", [progbits]
+      ["__sancov_gate"], Some "aw", [progbits arch]
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in

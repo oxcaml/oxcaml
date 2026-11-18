@@ -3,12 +3,13 @@
 set -eu
 
 ocamlopt=$1
-llvm=$OXCAML_LLVM_BIN
+clang=$OXCAML_CLANG
+sancov=$(dirname "$clang")/sancov
 
 # clang links the executable, so that it adds the (static) UBSan runtime,
 # which contains the coverage runtime. It also compiles and instruments the
 # C stubs.
-"$ocamlopt" -g -gated-trace-pc-guard -cc "$llvm/clang -fsanitize=undefined" \
+"$ocamlopt" -g -gated-trace-pc-guard -cc "$clang -fsanitize=undefined" \
   -ccopt -fsanitize-coverage=trace-pc-guard \
   stubs.c sancov_lib.ml sancov_test.ml -o sancov_test.exe
 
@@ -32,7 +33,7 @@ filter () {
 }
 
 echo "covered:"
-"$llvm/sancov" -covered-functions sancov_test.exe coverage/*.sancov | filter
+"$sancov" -covered-functions sancov_test.exe coverage/*.sancov | filter
 echo "not covered:"
-"$llvm/sancov" -not-covered-functions sancov_test.exe coverage/*.sancov \
+"$sancov" -not-covered-functions sancov_test.exe coverage/*.sancov \
   | filter
