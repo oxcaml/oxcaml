@@ -349,9 +349,8 @@ module Eff = struct
 
   let effect_lid = ldot "Effect" "t"
 
-  let deep name =
-    loc (Longident.Ldot (lid "Effect", loc "Deep")) |> fun m ->
-    loc (Longident.Ldot (m, loc name))
+  (* [Effect.Deep.name] *)
+  let deep name = loc (Longident.Ldot (ldot "Effect" "Deep", loc name))
 
   (* [type _ Effect.t += Eff_i : ty -> ty Effect.t] *)
   let declaration ({ ty; _ } as t) =
@@ -365,9 +364,8 @@ module Eff = struct
              ~res:(Ast_helper.Typ.constr effect_lid [ty])
              (loc (constructor_name t)) ])
 
-  (* [let handle_i f = Effect.Deep.try_with f () { effc = fun (type a) (eff : a
-     Effect.t) -> match eff with | Eff_i v -> Some (fun (k : (a, _)
-     continuation) -> continue k v) | _ -> None }] *)
+  (* [let handle_i f = Effect.Deep.try_with f () { effc }], where [effc] resumes
+     the continuation of [Eff_i v] with [v]. *)
   let handler t =
     let a = Ast_helper.Typ.constr (lid "a") [] in
     let continuation =
