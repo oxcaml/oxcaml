@@ -29,11 +29,14 @@
     [Cfg_trace_pc_guard]). This is the part of the emitter that deals with
     probes; it is only called from [Emit]. *)
 
+(** The guards of the probes of a compilation unit. *)
+type t
+
 (** To be called at the start of each compilation unit. *)
-val reset_unit : unit -> unit
+val create : unit -> t
 
 (** To be called at the start of each function. *)
-val reset_function : unit -> unit
+val start_function : t -> unit
 
 (** Emit the load of the gate into [res] ([Trace_pc_guard_gate]). *)
 val emit_gate : res:X86_ast.arg -> unit
@@ -45,15 +48,16 @@ val emit_gate : res:X86_ast.arg -> unit
     [move] emits a move between a hardware register and an [Outgoing] stack
     slot. [emit_call] emits a call to a C function. *)
 val emit_call :
+  t ->
   live:Reg.Set.t ->
   move:(Reg.t -> Reg.t -> unit) ->
   emit_call:(Cmm.symbol -> unit) ->
   index:int ->
   unit
 
-(** Emit the guards of the probes of the current unit, the definition of the
+(** Emit the guards of the probes of the unit, the definition of the
     gate and the constructor that registers the guards, if the unit has any
     probe. [add_def_symbol] is called on the name of the gate. [emit_call] emits
     a call to a C function. *)
 val emit_data :
-  add_def_symbol:(string -> unit) -> emit_call:(Cmm.symbol -> unit) -> unit
+  t -> add_def_symbol:(string -> unit) -> emit_call:(Cmm.symbol -> unit) -> unit

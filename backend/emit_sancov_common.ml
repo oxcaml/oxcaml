@@ -32,28 +32,26 @@ module D = Asm_targets.Asm_directives
 module L = Asm_targets.Asm_label
 module S = Asm_targets.Asm_symbol
 
-(* The guards of the current unit, most recent first. *)
-let guards = ref ([] : L.t list)
+type t =
+  { mutable guards : L.t list;  (** Those of the unit, most recent first. *)
+    guards_of_function : (int, L.t) Hashtbl.t
+        (** Those of the current function, by probe index. *)
+  }
 
-(* The guards of the current function, by probe index. *)
-let guards_of_function : (int, L.t) Hashtbl.t = Hashtbl.create 16
+let create () = { guards = []; guards_of_function = Hashtbl.create 16 }
 
-let reset_function () = Hashtbl.reset guards_of_function
+let start_function t = Hashtbl.reset t.guards_of_function
 
-let reset_unit () =
-  reset_function ();
-  guards := []
-
-let guard_of_index index =
-  match Hashtbl.find_opt guards_of_function index with
+let guard_of_index t index =
+  match Hashtbl.find_opt t.guards_of_function index with
   | Some guard -> guard
   | None ->
     let guard = L.create Trace_pc_guards in
-    Hashtbl.add guards_of_function index guard;
-    guards := guard :: !guards;
+    Hashtbl.add t.guards_of_function index guard;
+    t.guards <- guard :: t.guards;
     guard
 
-let unit_has_guards () = not (Misc.Stdlib.List.is_empty !guards)
+let unit_has_guards t = not (Misc.Stdlib.List.is_empty t.guards)
 
 (* [Outgoing] slots are addressed relative to the stack pointer, independently
    of the frame of the function. Every slot is aligned to its size, up to 16
@@ -116,8 +114,8 @@ let emit_constructor ~code_alignment ~emit_constructor_body =
   D.align ~fill:Zero ~bytes:8;
   D.symbol ctor
 
-let emit_data ~code_alignment ~emit_constructor_body =
-  if unit_has_guards ()
+let emit_data t ~code_alignment ~emit_constructor_body =
+  if unit_has_guards t
   then (
     D.switch_to_section Trace_pc_guards;
     D.align ~fill:Zero ~bytes:4;
@@ -125,6 +123,6 @@ let emit_data ~code_alignment ~emit_constructor_body =
       (fun lbl ->
         D.define_label lbl;
         D.int32 0l)
-      (List.rev !guards);
+      (List.rev t.guards);
     emit_gate_definition ~weak:true;
     emit_constructor ~code_alignment ~emit_constructor_body)

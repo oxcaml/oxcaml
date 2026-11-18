@@ -29,19 +29,22 @@
     (see [Cfg_trace_pc_guard]) that do not depend on the architecture. This
     module is used by [Emit_sancov]. *)
 
+(** The guards of the probes of a compilation unit. *)
+type t
+
 (** To be called at the start of each compilation unit. *)
-val reset_unit : unit -> unit
+val create : unit -> t
 
 (** To be called at the start of each function. *)
-val reset_function : unit -> unit
+val start_function : t -> unit
 
 (** The guard of the probe numbered [index] in the current function. It is
     created on the first call, so that an instruction emitted several times
     keeps its guard. *)
-val guard_of_index : int -> Asm_targets.Asm_label.t
+val guard_of_index : t -> int -> Asm_targets.Asm_label.t
 
-(** Whether the current unit has a guard. *)
-val unit_has_guards : unit -> bool
+(** Whether the unit has a guard. *)
+val unit_has_guards : t -> bool
 
 (** The registers of [live] that a call to the callback must save, each with the
     [Outgoing] stack slot to save it in, and the size in bytes of the frame
@@ -54,7 +57,7 @@ val registers_to_save : live:Reg.Set.t -> (Reg.t * Reg.t) list * int
     and hidden, as in instrumented units, or global. *)
 val emit_gate_definition : weak:bool -> unit
 
-(** Emit the guards of the probes of the current unit, the weak definition of
+(** Emit the guards of the probes of the unit, the weak definition of
     the gate and the constructor that registers the guards, if the unit has any
     guard.
 
@@ -62,6 +65,7 @@ val emit_gate_definition : weak:bool -> unit
     instructions are emitted by [emit_constructor_body], which must call [init]
     with the addresses of [start] and [stop] as arguments, and return. *)
 val emit_data :
+  t ->
   code_alignment:int ->
   emit_constructor_body:
     (start:Asm_targets.Asm_symbol.t ->

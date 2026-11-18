@@ -29,11 +29,14 @@
     [Cfg_trace_pc_guard]). This is the part of the emitter that deals with
     probes; it is only called from [Emit]. *)
 
+(** The guards of the probes of a compilation unit. *)
+type t
+
 (** To be called at the start of each compilation unit. *)
-val reset_unit : unit -> unit
+val create : unit -> t
 
 (** To be called at the start of each function. *)
-val reset_function : unit -> unit
+val start_function : t -> unit
 
 (** Emit the load of the gate into [res] ([Trace_pc_guard_gate]). *)
 val emit_gate : res:Reg.t -> unit
@@ -46,9 +49,9 @@ val emit_gate : res:Reg.t -> unit
     [Emit] emits each instruction several times, the first ones to measure it;
     all share one guard. *)
 val emit_call :
-  live:Reg.Set.t -> move:(Reg.t -> Reg.t -> unit) -> index:int -> unit
+  t -> live:Reg.Set.t -> move:(Reg.t -> Reg.t -> unit) -> index:int -> unit
 
-(** Emit the guards of the probes of the current unit, the definition of the
+(** Emit the guards of the probes of the unit, the definition of the
     gate and the constructor that registers the guards, if the unit has any
     probe. *)
-val emit_data : unit -> unit
+val emit_data : t -> unit

@@ -38,9 +38,11 @@ module S = Asm_targets.Asm_symbol
 
 module Common = Emit_sancov_common
 
-let reset_unit = Common.reset_unit
+type t = Common.t
 
-let reset_function = Common.reset_function
+let create = Common.create
+
+let start_function = Common.start_function
 
 let macosx = String.equal Config.system "macosx"
 
@@ -79,8 +81,8 @@ let emit_gate ~res =
    frame. Like the words pushed before a call to [caml_call_realloc_stack],
    these lie within the red zone that the runtime keeps below the stack frames
    of OCaml code ([Stack_threshold]). *)
-let emit_call ~live ~move ~index =
-  let guard = Common.guard_of_index index in
+let emit_call t ~live ~move ~index =
+  let guard = Common.guard_of_index t index in
   let saved, frame_size = Common.registers_to_save ~live in
   A.ins3 (STP X) reg_x_saved_sp O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
   D.cfi_adjust_cfa_offset ~bytes:16;
@@ -133,4 +135,4 @@ let emit_constructor_body ~start ~stop ~init =
   D.cfi_restore_state ();
   A.ins0 RET
 
-let emit_data () = Common.emit_data ~code_alignment:8 ~emit_constructor_body
+let emit_data t = Common.emit_data t ~code_alignment:8 ~emit_constructor_body

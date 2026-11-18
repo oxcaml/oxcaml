@@ -35,9 +35,11 @@ module S = Asm_targets.Asm_symbol
 
 module Common = Emit_sancov_common
 
-let reset_unit = Common.reset_unit
+type t = Common.t
 
-let reset_function = Common.reset_function
+let create = Common.create
+
+let start_function = Common.start_function
 
 (* The gate is defined hidden in this unit (see [emit_data]), so it can be
    addressed PC-relatively, even in position-independent code. *)
@@ -56,8 +58,8 @@ let emit_gate ~res =
    address pushed by a call to [caml_call_gc], this word lies within the red
    zone that the runtime keeps below the stack frames of OCaml code
    ([Stack_threshold]). *)
-let emit_call ~live ~move ~emit_call ~index =
-  let guard = Common.guard_of_index index in
+let emit_call t ~live ~move ~emit_call ~index =
+  let guard = Common.guard_of_index t index in
   (* The frame is 16-byte aligned, and so is every vector slot, since [move]
      uses aligned moves for [Vec128] and [Valx2] stack slots. *)
   let saved, frame_size = Common.registers_to_save ~live in
@@ -95,7 +97,7 @@ let emit_constructor_body ~emit_call ~start ~stop ~init:_ =
   D.cfi_adjust_cfa_offset ~bytes:(-8);
   I.ret ()
 
-let emit_data ~add_def_symbol ~emit_call =
-  if Common.unit_has_guards () then add_def_symbol Cfg_trace_pc_guard.gate;
-  Common.emit_data ~code_alignment:16
+let emit_data t ~add_def_symbol ~emit_call =
+  if Common.unit_has_guards t then add_def_symbol Cfg_trace_pc_guard.gate;
+  Common.emit_data t ~code_alignment:16
     ~emit_constructor_body:(emit_constructor_body ~emit_call)

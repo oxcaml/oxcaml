@@ -1494,6 +1494,13 @@ let emit_condbranch arg tst lbl =
   | Ioddtest -> A.ins3 TBNZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
   | Ieventest -> A.ins3 TBZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
 
+(* The guards of the coverage probes of the unit *)
+
+(* CR mshinwell: remove this global state. [begin_assembly] should return the
+   state of the emission of the unit, for [fundecl] and [end_assembly] to take
+   as an argument, which requires passing it through [Asmgen]. *)
+let sancov = ref (Emit_sancov.create ())
+
 (* Output the assembly code for an instruction *)
 
 let emit_instr env i =
@@ -2097,7 +2104,7 @@ let emit_instr env i =
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
   | Lop Trace_pc_guard_gate -> Emit_sancov.emit_gate ~res:i.res.(0)
   | Lop (Trace_pc_guard index) ->
-    Emit_sancov.emit_call ~live:i.live ~move:(move env) ~index
+    Emit_sancov.emit_call !sancov ~live:i.live ~move:(move env) ~index
 
 let emit_instr env i =
   try emit_instr env i
@@ -2258,7 +2265,7 @@ let rec emit_all env i =
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
-  Emit_sancov.reset_function ();
+  Emit_sancov.start_function !sancov;
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl
@@ -2338,7 +2345,7 @@ let file_emitter ~file_num ~file_name =
 let begin_assembly _unix =
   reset_debug_info ();
   Probe_emission.reset ();
-  Emit_sancov.reset_unit ();
+  sancov := Emit_sancov.create ();
   A.set_emit_string ~emit_string:Emitaux.emit_string;
   Asm_targets.Asm_label.initialize
     ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
@@ -2385,7 +2392,7 @@ let register_expect_asm_callback (_ : string -> unit) = ()
 let expect_asm_whole_function = ref false
 
 let end_assembly () =
-  Emit_sancov.emit_data ();
+  Emit_sancov.emit_data !sancov;
   let code_end = Cmm_helpers.make_symbol "code_end" in
   let code_end_sym = S.create_global code_end in
   emit_named_text_section code_end;
