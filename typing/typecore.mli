@@ -64,6 +64,7 @@ type pattern_variable_kind =
   | Std_var
   | As_var
   | Deref_var
+  | Slice_rest_var
   | Continuation_var
 
 (** The warning for an unused pattern variable of the given kind *)
@@ -357,6 +358,7 @@ type error =
   | Effect_pattern_below_toplevel
   | Deref_pattern_bad_position
   | Deref_pattern_bad_argument
+  | Slice_pattern_suffix
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
