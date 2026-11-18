@@ -657,6 +657,8 @@ let ocaml_ignored_flags =
     "-no-vectorize";
     "-dvectorize";
     "-dump-into-csv";
+    "-enable-action-trace";
+    "-debug-action-trace";
     "-no-mach-ir";
     "-flambda2-reaper";
     "-no-flambda2-reaper";
