@@ -408,10 +408,20 @@ module Transfer = struct
               anonymous)
             else not_live_across
           in
-          let avail_across = RD_quotient_set.diff avail_before not_preserved in
+          let avail_after = RD_quotient_set.diff avail_before not_preserved in
+          (* Until the call sequence has restored the registers that it saves,
+             no hardware register is known to hold its value: the callback and
+             the sequence itself, which also uses a temporary register that C
+             functions preserve, overwrite them. *)
+          let avail_across =
+            RD_quotient_set.filter
+              (fun reg -> not (Reg.is_reg (RD.reg reg)))
+              avail_after
+          in
           dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
           dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_across;
-          ok avail_across, ok avail_across
+          dprintf "...avail_after %a\n%!" RD_quotient_set.print avail_after;
+          ok avail_across, ok avail_after
         | Op
             ( Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
             | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
