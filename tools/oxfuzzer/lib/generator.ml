@@ -1,5 +1,6 @@
 (* Random generation of the IR, configurable through [Config]. *)
 module Bin_op = Ir.Bin_op
+module Eff = Ir.Eff
 module Binding = Ir.Binding
 module Exn = Ir.Exn
 module Expr = Ir.Expr
@@ -25,13 +26,15 @@ module State = struct
       mutable top_level_functions : Function.t list;
       mutable record_types : Ty.record list;
       mutable exceptions : Exn.t list;
+      mutable effects : Eff.t list;
       mutable variant_types : Ty.variant list;
       mutable matches_remaining : int;
       mutable tries_remaining : int;
       mutable closure_calls_remaining : int;
       mutable let_recs_remaining : int;
       mutable recursive_calls_remaining : int;
-      mutable recursive_callees : Name.t list
+      mutable recursive_callees : Name.t list;
+      mutable handles_remaining : int
     }
 
   let create random_state =
@@ -44,13 +47,15 @@ module State = struct
       top_level_functions = [];
       record_types = [];
       exceptions = [];
+      effects = [];
       variant_types = [];
       matches_remaining = Config.max_match_count;
       tries_remaining = Config.max_try_count;
       closure_calls_remaining = Config.max_closure_call_count;
       let_recs_remaining = Config.max_let_rec_count;
       recursive_calls_remaining = 0;
-      recursive_callees = []
+      recursive_callees = [];
+      handles_remaining = Config.max_handle_count
     }
 
   let fresh t = Fresh.next t.names
@@ -104,14 +109,16 @@ module Env = struct
     { bindings : Binding.t list;
       loop_variables : Loop_variable.t list;
       catchable_exceptions : Exn.t list;
-      recursion : Recursion.t option
+      recursion : Recursion.t option;
+      handled_effects : Eff.t list
     }
 
   let empty =
     { bindings = [];
       loop_variables = [];
       catchable_exceptions = [];
-      recursion = None
+      recursion = None;
+      handled_effects = []
     }
 
   let can_raise t exn = List.exists (Exn.equal exn) t.catchable_exceptions
@@ -135,7 +142,7 @@ module Env = struct
   (* Closures cannot capture mutable variables, which include loop variables.
      They can be called after the handlers around them have been left, so they
      must not raise, nor call the recursive functions around them, which could
-     then be called without a bound. *)
+     then be called without a bound, nor perform effects. *)
   let for_closure t =
     let is_loop_variable (binding : Binding.t) =
       List.exists
@@ -457,6 +464,14 @@ let gen_exceptions (st : State.t) =
     :: List.init
          (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
          (gen_exception st)
+
+let gen_effects (st : State.t) =
+  if not st.swarm.effects
+  then []
+  else
+    List.init (random_int_in_range st ~min:1 ~max:Config.max_effect_count)
+      (fun id ->
+        { Eff.id; ty = Ty.Number (random_number_ty ~value_only:true st) })
 
 let gen_constructor_type (st : State.t) constructor_index =
   let args =
@@ -951,6 +966,8 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
          1, gen_closure_call st env (Ty.Number nty);
          1, gen_recursive_call st env (Ty.Number nty);
          1, gen_let_rec st env (Ty.Number nty);
+         1, gen_perform st env (Ty.Number nty);
+         1, gen_handle st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
 
@@ -1473,6 +1490,40 @@ and gen_let_rec_call (st : State.t) (env : Env.t) ty (first : Local_function.t)
             { func = Expr.Opaque (Expr.Apply { func; args = [fuel] }); args }
         else Expr.Apply { func; args = fuel :: args })
 
+(* Performs an effect handled around the expression. *)
+and gen_perform (st : State.t) (env : Env.t) ty =
+  let effects =
+    List.filter
+      (fun (eff : Eff.t) -> can_convert st eff.ty ty)
+      env.handled_effects
+  in
+  Gen.when_
+    (not (List.is_empty effects))
+    (fun () ->
+      let eff = random_element st effects in
+      convert_value st eff.ty ty
+        (Expr.Perform { eff; arg = gen_value st env eff.ty }))
+
+(* Evaluates an expression, which runs in a function, in a handler of an effect,
+   which it can perform. *)
+and gen_handle (st : State.t) (env : Env.t) ty =
+  Gen.when_
+    ((not (List.is_empty st.effects)) && st.handles_remaining > 0 && is_value ty)
+    (fun () ->
+      st.handles_remaining <- st.handles_remaining - 1;
+      let eff = random_element st st.effects in
+      let body_env =
+        { (Env.for_closure env) with
+          catchable_exceptions = env.catchable_exceptions;
+          handled_effects =
+            eff
+            :: List.filter
+                 (fun other -> not (Eff.equal eff other))
+                 env.handled_effects
+        }
+      in
+      Expr.Handle { eff; ty; body = gen_value st body_env ty })
+
 and gen_bool (st : State.t) env =
   let gen_binop op arg_ty gen_arg =
     Gen.create (fun () ->
@@ -1503,6 +1554,7 @@ and gen_bool (st : State.t) env =
          1, gen_fun_call st env Ty.Bool;
          1, gen_closure_call st env Ty.Bool;
          1, gen_recursive_call st env Ty.Bool;
+         1, gen_handle st env Ty.Bool;
          1, gen_try_expr st env Ty.Bool;
          1, gen_match st env Ty.Bool ])
 
@@ -1860,7 +1912,8 @@ let gen_program (st : State.t) env =
   let env, toplevel_decls = gen_vars env Config.toplevel_var_count in
   let _env, toplevel_statement = gen_fun_body st env 0 in
   Program.create ~swarm:st.swarm ~record_types:st.record_types
-    ~exceptions:st.exceptions ~variant_types:st.variant_types
+    ~exceptions:st.exceptions ~effects:st.effects
+    ~variant_types:st.variant_types
     ~functions:(List.rev st.top_level_functions)
     ~toplevel_decls ~toplevel_statement
 
@@ -1869,4 +1922,5 @@ let generate random =
   state.record_types <- gen_record_types state;
   state.exceptions <- gen_exceptions state;
   state.variant_types <- gen_variant_types state;
+  state.effects <- gen_effects state;
   gen_program state Env.empty
