@@ -375,6 +375,17 @@ let () =
     cmi_deps_of_dir !cmi_dir
     @ List.concat_map (fun d -> d.cmi_deps) library_deps
   in
+  (* The sources of the otherlibs are copied here and compiled by basename, so
+     that they are recorded by their path below the installed standard library
+     directory. Those of compiler-libs are not installed. *)
+  let is_otherlib = Filename.dirname (src_dir ()) = "otherlibs" in
+  let source u = dune_path (Filename.concat (src_dir ()) u.source) in
+  if is_otherlib then
+    List.iter
+      (fun u -> Printf.fprintf ppf "(copy_files %s)\n" (source u))
+      units;
+  let source_dir = "/ocaml/stdlib/" ^ !name ^ "/" in
+  let source_flags = if is_otherlib then ["-directory"; source_dir] else [] in
   let compile_rule target ~unit_name ~src_path ~jsir_cmx_deps ~flags =
     let cmi = cmi_of_unit ~cmi_dir:!cmi_dir unit_name in
     let jsir_cmx = file_of_unit unit_name (ext target "cmx") in
@@ -388,14 +399,15 @@ let () =
         @ List.concat_map (fun d -> d.jsir_cmx_deps target) library_deps)
       ~action:
         (ocamlopt_action target
-           (common_flags @ flags @ include_dirs library_deps
+           (common_flags @ source_flags @ flags @ include_dirs library_deps
            (* -S keeps the JSIR of the unit. *)
-           @ ["-S"; "-cmi-file"; cmi; "-o"; jsir_cmx; "-c"; "-impl"; "%{src}"]))
+           @ [ "-S"; "-jsoo-opt-compile"; "--source-map-inline"; "-cmi-file";
+               cmi; "-o"; jsir_cmx; "-c"; "-impl"; "%{src}" ]))
   in
   let write_rules target =
     List.iter
       (fun u ->
-        let src_path = dune_path (Filename.concat (src_dir ()) u.source) in
+        let src_path = if is_otherlib then u.source else source u in
         if Some u.unit_name = alias
         then
           compile_rule target ~unit_name:u.unit_name ~src_path ~jsir_cmx_deps:[]
@@ -436,7 +448,8 @@ let () =
                file_of_unit u.unit_name (ext target "cm-jsir") ])
            units)
       ~action:
-        (Printf.sprintf "(progn %s %s)" (archive_action [])
+        (Printf.sprintf "(progn %s %s)"
+           (archive_action ["-jsoo-opt-archive"; "--source-map-inline"])
            (archive_action ["-link-jsir"]))
   in
   List.iter write_rules jsir_targets
