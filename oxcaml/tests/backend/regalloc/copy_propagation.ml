@@ -31,9 +31,9 @@ let block label body terminator =
 
 let cfg blocks =
   let cfg =
-    Cfg.create ~fun_name:"copy_propagation_test" ~fun_args:[||]
-      ~fun_codegen_options:[] ~fun_dbg:Debuginfo.none ~fun_contains_calls:false
-      ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
+    Cfg.create ~fun_name:"copy_propagation_test" ~fun_sym_global:Cmm.Global
+      ~fun_args:[||] ~fun_codegen_options:[] ~fun_dbg:Debuginfo.none
+      ~fun_contains_calls:false ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
       ~fun_poll:Lambda.Default_poll ~next_instruction_id:instruction_ids
       ~fun_ret_type:[| Cmm.Int |] ~fun_phantom_lets:Backend_var.Map.empty
       ~allowed_to_be_irreducible:false
