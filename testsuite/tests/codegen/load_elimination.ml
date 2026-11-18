@@ -120,7 +120,8 @@ type cursor = { mutable pos : int; mutable last : int }
 
 (* Instruction selection fuses load-add-store to the same location into a
    read-modify-write instruction; it is not a [Store], so it records no
-   forwarding equation, and it acts as a store barrier. *)
+   forwarding equation, and since it reads memory, dead store elimination
+   must leave both of them alone. *)
 (* CR xclerc: see whether we could add a peephole rule to merge the addq
    instructions. *)
 let bump_twice c =
@@ -138,7 +139,9 @@ bump_twice:
    whereas loading [pos] produces a [Val]. The reload of [pos] right after the
    store to [pos] is replaced by a reinterpret cast from the stored register
    (which, unlike a move, the register allocator does not coalesce), so only
-   one load of [pos] should remain; the stores are all kept. *)
+   one load of [pos] should remain. Dead store elimination then removes the
+   overwritten intermediate stores of [pos] and [last], so only one store of
+   [pos] and one store of [last] should remain. *)
 let push_two c =
   let p = c.pos in
   c.last <- p;
@@ -149,9 +152,7 @@ let push_two c =
 [%%expect_asm X86_64{|
 push_two:
   movq  (%rax), %rbx
-  movq  %rbx, 8(%rax)
   addq  $2, %rbx
-  movq  %rbx, (%rax)
   movq  %rbx, 8(%rax)
   addq  $2, %rbx
   movq  %rbx, (%rax)
