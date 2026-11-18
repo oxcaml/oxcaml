@@ -57,6 +57,11 @@
     called like an external function that does not allocate: it must not call
     into the OCaml runtime.
 
+    The call saves the registers that are live across it. A variable in a
+    register that is no longer live is therefore not shown by a debugger after a
+    probe, unless both [-gno-upstream-dwarf] and [-gdwarf-may-alter-codegen] are
+    given: the call then saves such registers too (see [Cfg_available_regs]).
+
     With [-g], the flag also enables the DWARF description of inlined frames (as
     [-gdwarf-inlined-frames] does, unless [-gno-dwarf-inlined-frames] is given),
     so that coverage tools can attribute a probe in inlined code to the function

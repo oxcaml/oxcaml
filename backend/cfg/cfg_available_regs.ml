@@ -21,6 +21,14 @@ let dprintf fmt =
    codegen is broken when enabled. *)
 let extend_live () = !Dwarf_flags.gdwarf_may_alter_codegen_experimental
 
+(* With [-gno-upstream-dwarf] and [-gdwarf-may-alter-codegen], a coverage probe
+   (see [Cfg_trace_pc_guard]) also saves the registers that are available but
+   not live across its call, so that the variables in them can still be
+   displayed afterwards. *)
+let save_available_regs_across_coverage_probes () =
+  (not !Clflags.restrict_to_upstream_dwarf)
+  && !Dwarf_flags.gdwarf_may_alter_codegen
+
 (* CR mshinwell: The old "all_regs_that_might_be_named" (see git history) seems
    broken, I think a backwards dataflow pass may be necessary to compute this *)
 
@@ -364,9 +372,11 @@ module Transfer = struct
           (* The call to the coverage callback preserves the registers that are
              live across it, so [Proc.destroyed_at_basic] says that it destroys
              none. It does not preserve the others, which may still be
-             available: those that a C function may clobber become
-             unavailable. *)
-          let not_preserved =
+             available. Among those, the registers that a C function may clobber
+             become unavailable; or, if debugging information may alter the
+             generated code, they are added to the live set, which makes the
+             call preserve them. *)
+          let not_live_across =
             RD_quotient_set.filter
               (fun reg ->
                 let reg = RD.reg reg in
@@ -381,6 +391,22 @@ module Transfer = struct
                             live_reg reg)
                         instr.live))
               avail_before
+          in
+          let not_preserved =
+            if save_available_regs_across_coverage_probes ()
+            then (
+              (* Only the registers known to hold a variable are worth
+                 saving. *)
+              let named, anonymous =
+                RD_quotient_set.partition
+                  (fun reg -> Option.is_some (RD.debug_info reg))
+                  not_live_across
+              in
+              RD_quotient_set.iter
+                (fun reg -> instr.live <- Reg.Set.add (RD.reg reg) instr.live)
+                named;
+              anonymous)
+            else not_live_across
           in
           let avail_across = RD_quotient_set.diff avail_before not_preserved in
           dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
