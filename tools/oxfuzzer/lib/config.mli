@@ -62,6 +62,10 @@ val max_recursion_fuel : int
 
 val unused_recursive_functions : bool
 
+val max_effect_count : int
+
+val max_handle_count : int
+
 val max_probability : int
 
 (* Probabilities out of [max_probability]. *)
@@ -160,7 +164,8 @@ module Swarm : sig
       partial_applications : bool;
       recursive_functions : bool;
       wide_functions : bool;
-      reraises : bool
+      reraises : bool;
+      effects : bool
     }
 
   val create : Random.State.t -> t
