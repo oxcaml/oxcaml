@@ -44,6 +44,15 @@ function caml_ba_get_size(dims) {
 
 //Provides: caml_double_of_float16 pure
 var caml_double_of_float16 = (function () {
+  if (globalThis.Float16Array) {
+    var f16 = new globalThis.Float16Array(1);
+    var u16 = new Uint16Array(f16.buffer);
+    return function (bytes) {
+      u16[0] = bytes;
+      return f16[0];
+    };
+  }
+
   var pow = Math.pow;
 
   var EXP_MASK16 = 31; // 2 ** 5 - 1
@@ -74,13 +83,13 @@ var caml_double_of_float16 = (function () {
 
 //Provides: caml_float16_of_double pure
 var caml_float16_of_double = (function () {
-  // Port of the native runtime's caml_double_to_float16 (runtime/bigarray.c).
-  // It first rounds to odd so that rounding to float32 and then to float16
-  // gives the same result as rounding straight to float16.
+  // Rounds to float32, then to float16 (float_to_half_fast3_rtne). The
+  // first step rounds to odd, so that the result is the same as rounding
+  // straight to float16.
   const buffer = new ArrayBuffer(4);
   const f32 = new Float32Array(buffer);
   const u32 = new Uint32Array(buffer);
-  return function (f) {
+  function round(f) {
     f32[0] = f; // round to float32
     let x = u32[0] >>> 0;
     if ((x & 0x7f800000) !== 0x7f800000 && (x & 1) === 0 && f32[0] !== f) {
@@ -103,7 +112,19 @@ var caml_float16_of_double = (function () {
       o = (x + 0xc8000fff + ((x >>> 13) & 1)) >>> 13;
     }
     return (o | (sign >>> 16)) & 0xffff;
-  };
+  }
+  if (globalThis.Float16Array) {
+    // Rounds straight to float16; the bits of a NaN are
+    // implementation-defined, so NaNs still go through [round]
+    const f16 = new globalThis.Float16Array(1);
+    const u16 = new Uint16Array(f16.buffer);
+    return function (f) {
+      if (Number.isNaN(f)) return round(f);
+      f16[0] = f;
+      return u16[0];
+    };
+  }
+  return round;
 })();
 
 //Provides: caml_ba_get_size_per_element
