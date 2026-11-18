@@ -325,7 +325,6 @@ int32_box_unbox_after_call:
   movq  %rbx, %rsi
   call  memcmp@PLT
   movslq %eax, %rax
-  movslq %eax, %rax
   addq  $8, %rsp
   ret
 |}]

@@ -2335,8 +2335,9 @@ let begin_assembly _unix =
   reset_debug_info ();
   Probe_emission.reset ();
   A.set_emit_string ~emit_string:Emitaux.emit_string;
-  Asm_targets.Asm_label.initialize ~new_label:(fun () ->
-      Cmm.new_label () |> Label.to_int);
+  Asm_targets.Asm_label.initialize
+    ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
+    ~new_dwarf_label:(fun () -> Label.new_dwarf_label () |> Label.to_int);
   (* Set up binary emitter if JIT hook is registered or save_binary_sections is
      set *)
   let binary_emitter_callback = Binary_emitter_helpers.begin_emission () in
