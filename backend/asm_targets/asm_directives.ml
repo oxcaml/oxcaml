@@ -819,6 +819,9 @@ let cfi_def_cfa_offset ~bytes =
 
 let cfi_endproc () = if should_generate_cfi () then emit Cfi_endproc
 
+(* CR mshinwell: a zero [offset] is a valid rule (the register is saved at the
+   frame address itself) and should not be dropped. No caller currently passes
+   zero. *)
 let cfi_offset ~reg ~offset =
   if should_generate_cfi () && offset <> 0
   then emit (Cfi_offset { reg; offset })
