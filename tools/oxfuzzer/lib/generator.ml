@@ -116,7 +116,7 @@ module Env = struct
       catchable_exceptions : Exn.t list;
       recursion : Recursion.t option;
       handled_effects : Eff.t list;
-      stack_functions : (Name.t * Ty.t list * Ty.t) list
+      stack_functions : Local_function.t list
           (** Local, so they can only be applied. *)
     }
 
@@ -1238,7 +1238,7 @@ and gen_closure_call (st : State.t) (env : Env.t) result_ty =
   in
   let stack_functions =
     List.filter_map
-      (fun (name, params, result) ->
+      (fun ({ name; params; result } : Local_function.t) ->
         if can_convert st result result_ty
         then
           Some
@@ -1528,7 +1528,8 @@ and gen_let_stack_function (st : State.t) (env : Env.t) ty =
       let lambda = gen_lambda ~curried:false st env params result in
       let env =
         { env with
-          stack_functions = (name, params, result) :: env.stack_functions
+          stack_functions =
+            { Local_function.name; params; result } :: env.stack_functions
         }
       in
       let body =
