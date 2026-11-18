@@ -329,3 +329,9 @@ val never_holds_locally_allocated_values :
 
 val prove_physical_equality :
   Typing_env.t -> Type_grammar.t -> Type_grammar.t -> bool proof_of_property
+
+val prove_relation :
+  Typing_env.t ->
+  Type_grammar.Relation.t ->
+  Type_grammar.t ->
+  Target_ocaml_int.t proof_of_property
