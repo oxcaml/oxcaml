@@ -62,6 +62,11 @@ type t =
       (** The guards of [-gated-trace-pc-guard], see [Cfg_trace_pc_guard] *)
   | Trace_pc_guard_gate
       (** The gate of [-gated-trace-pc-guard], see [Cfg_trace_pc_guard] *)
+  | Trace_pc_guard_constructor
+      (** The code of the constructor that registers the guards of
+          [-gated-trace-pc-guard], see [Cfg_trace_pc_guard] *)
+  | Trace_pc_guard_init_array
+      (** The entry for that constructor in the array of constructors *)
   | Custom of
       { names : string list;
         flags : string option;
@@ -103,6 +108,11 @@ val equal : t -> t -> bool
 val hash : t -> int
 
 module Tbl : Hashtbl.S with type key = t
+
+(** The name of the constructor whose code is in [Trace_pc_guard_constructor].
+    It is also the name of the COMDAT group that this section and
+    [Trace_pc_guard_init_array] are in. *)
+val trace_pc_guard_constructor : string
 
 (** Whether the section holds code. *)
 val section_is_text : t -> bool

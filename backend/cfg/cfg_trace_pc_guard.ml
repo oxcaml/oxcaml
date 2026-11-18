@@ -40,7 +40,7 @@ let guards_start = "__start___sancov_guards"
 
 let guards_stop = "__stop___sancov_guards"
 
-let constructor = "sancov.module_ctor_trace_pc_guard"
+let constructor = Asm_targets.Asm_section.trace_pc_guard_constructor
 
 (* A block containing nothing but an unreachable terminator is never executed:
    instrumenting it would only add a guard that is never hit. *)

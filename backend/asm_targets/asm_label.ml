@@ -116,7 +116,8 @@ let initialize ~new_label ~new_dwarf_label =
          | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables
          | Text | Function_text _ | Stapsdt_base | Stapsdt_note | Probes
          | Note_ocaml_eh | Note_gnu_stack | Debuginfo_strings | Trace_pc_guards
-         | Trace_pc_guard_gate | Custom _ ->
+         | Trace_pc_guard_gate | Trace_pc_guard_constructor
+         | Trace_pc_guard_init_array | Custom _ ->
            create_int section (new_label ())
 
 let create (section : Asm_section.t) = !new_label_ref section

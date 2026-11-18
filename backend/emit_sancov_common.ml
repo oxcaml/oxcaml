@@ -88,31 +88,17 @@ let emit_gate_definition ~weak =
   D.int64 0L;
   D.size gate
 
-let section_type name =
-  match Target_system.architecture () with
-  | ARM | AArch64 -> "%" ^ name
-  | IA32 | X86_64 | POWER | Z | Riscv -> "@" ^ name
-
 (* The constructor of the unit: it tells the coverage runtime where the guards
    of this executable or shared object are. All copies are in one COMDAT group,
    together with their [.init_array] entries, so the linker keeps a single one.
    The bounds are hidden, so that they are those of the object being linked, and
    weak, so that linking does not fail if the linker discards all the guards. *)
 let emit_constructor ~code_alignment ~emit_constructor_body =
-  let name = Cfg_trace_pc_guard.constructor in
-  let ctor = S.create_global name in
+  let ctor = S.create_global Cfg_trace_pc_guard.constructor in
   let start = S.create_global Cfg_trace_pc_guard.guards_start in
   let stop = S.create_global Cfg_trace_pc_guard.guards_stop in
   let init = S.create_global Cfg_trace_pc_guard.init in
-  let text : Asm_targets.Asm_section.t =
-    Custom
-      { names = [".text." ^ name];
-        flags = Some "axG";
-        args = [section_type "progbits"; name; "comdat"];
-        is_delayed = false
-      }
-  in
-  D.switch_to_section text;
+  D.switch_to_section Trace_pc_guard_constructor;
   D.weak start;
   D.hidden start;
   D.weak stop;
@@ -121,14 +107,12 @@ let emit_constructor ~code_alignment ~emit_constructor_body =
   D.hidden ctor;
   D.type_symbol ctor ~ty:Function;
   D.align ~fill:Nop ~bytes:code_alignment;
-  D.define_symbol_label ~section:Text ctor;
+  D.define_symbol_label ~section:Trace_pc_guard_constructor ctor;
   D.cfi_startproc ();
   emit_constructor_body ~start ~stop ~init;
   D.cfi_endproc ();
   D.size ctor;
-  D.switch_to_section_raw ~names:[".init_array.2"] ~flags:(Some "awG")
-    ~args:[section_type "init_array"; name; "comdat"]
-    ~is_delayed:false;
+  D.switch_to_section Trace_pc_guard_init_array;
   D.align ~fill:Zero ~bytes:8;
   D.symbol ctor
 

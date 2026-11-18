@@ -59,6 +59,8 @@ type t =
   | Debuginfo_strings
   | Trace_pc_guards
   | Trace_pc_guard_gate
+  | Trace_pc_guard_constructor
+  | Trace_pc_guard_init_array
   | Custom of
       { names : string list;
         flags : string option;
@@ -92,7 +94,7 @@ let is_delayed = function
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
   | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
   | Note_gnu_stack | Debuginfo_strings | Trace_pc_guards | Trace_pc_guard_gate
-    ->
+  | Trace_pc_guard_constructor | Trace_pc_guard_init_array ->
     false
   | Custom { is_delayed; _ } -> is_delayed
 
@@ -125,6 +127,8 @@ let print ppf t =
     | Note_gnu_stack -> "Note_gnu_stack"
     | Debuginfo_strings -> "Debuginfo_strings"
     | Trace_pc_guards -> "Trace_pc_guards"
+    | Trace_pc_guard_constructor -> "Trace_pc_guard_constructor"
+    | Trace_pc_guard_init_array -> "Trace_pc_guard_init_array"
     | Trace_pc_guard_gate -> "Trace_pc_guard_gate"
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
@@ -146,11 +150,12 @@ module Tbl = Hashtbl.Make (struct
 end)
 
 let section_is_text = function
-  | Text | Function_text _ -> true
+  | Text | Function_text _ | Trace_pc_guard_constructor -> true
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
   | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack
-  | Debuginfo_strings | Trace_pc_guards | Trace_pc_guard_gate ->
+  | Debuginfo_strings | Trace_pc_guards | Trace_pc_guard_gate
+  | Trace_pc_guard_init_array ->
     false
   | Custom { flags; _ } -> (
     (* Check if the section is executable based on flags *)
@@ -165,10 +170,18 @@ type section_details =
     is_delayed : bool
   }
 
-let progbits (arch : Target_system.architecture) =
+(* The type of an ELF section, as written in a [.section] directive. Both the
+   GNU assembler and LLVM's accept [@] and [%] before the type, except that [@]
+   starts a comment on 32-bit ARM; this follows what C compilers emit for each
+   architecture. *)
+let elf_section_type (arch : Target_system.architecture) type_ =
   match arch with
-  | ARM | AArch64 -> "%progbits"
-  | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
+  | ARM | AArch64 -> "%" ^ type_
+  | IA32 | X86_64 | POWER | Z | Riscv -> "@" ^ type_
+
+let progbits arch = elf_section_type arch "progbits"
+
+let trace_pc_guard_constructor = "sancov.module_ctor_trace_pc_guard"
 
 let details t first_occurrence =
   let first_occurrence =
@@ -282,7 +295,10 @@ let details t first_occurrence =
       (* "aMS" = SHF_ALLOC | SHF_MERGE | SHF_STRINGS; de-duped by linker *)
       [".rodata.str1.1"], Some "aMS", [progbits arch; "1"]
     (* 1 = characters *)
-    | (Trace_pc_guards | Trace_pc_guard_gate), _, MacOS_like ->
+    | ( ( Trace_pc_guards | Trace_pc_guard_gate | Trace_pc_guard_constructor
+        | Trace_pc_guard_init_array ),
+        _,
+        MacOS_like ) ->
       Misc.fatal_error
         "-gated-trace-pc-guard is not supported on this target system"
     | Trace_pc_guards, arch, _ ->
@@ -295,6 +311,18 @@ let details t first_occurrence =
     | Trace_pc_guard_gate, arch, _ ->
       (* Writable data. *)
       ["__sancov_gate"], Some "aw", [progbits arch]
+    | Trace_pc_guard_constructor, arch, _ ->
+      (* Code, in a COMDAT group that also has the entry of the constructor in
+         [Trace_pc_guard_init_array]: the linker keeps one copy of the group. *)
+      let group = trace_pc_guard_constructor in
+      [".text." ^ group], Some "axG", [progbits arch; group; "comdat"]
+    | Trace_pc_guard_init_array, arch, _ ->
+      (* An array of constructors of priority 2, in the same group. *)
+      ( [".init_array.2"],
+        Some "awG",
+        [ elf_section_type arch "init_array";
+          trace_pc_guard_constructor;
+          "comdat" ] )
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in
