@@ -433,6 +433,18 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
     | Tpat_addr (mut, _, p) -> Ppat_addr (mutable_ mut, sub.pat sub p)
+    | Tpat_slice { mutability; elements; _ } ->
+        let elements =
+          match elements with
+          | Tslice_closed l -> Pslice_closed (List.map (sub.pat sub) l)
+          | Tslice_open { prefix; rest_var; suffix } ->
+              Pslice_open
+                { prefix = List.map (sub.pat sub) prefix;
+                  rest = Option.map (fun (Tslice_rest_var { name; _ }) -> name)
+                      rest_var;
+                  suffix = List.map (sub.pat sub) suffix }
+        in
+        Ppat_slice (mutable_ mutability, elements)
     | Tpat_deref { pattern = None; name; _ } ->
         Ppat_deref (Pat.var ~loc:name.loc name)
     | Tpat_deref { pattern = Some p; name; _ } ->

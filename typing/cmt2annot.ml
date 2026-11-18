@@ -27,7 +27,12 @@ let variables_iterator scope =
         Stypes.record (Stypes.An_ident (p.pat_loc,
                                         Ident.name id,
                                         Annot.Idef scope))
-    | Tpat_deref { id; name; _ } ->
+    | Tpat_deref { id; name; _ }
+    | Tpat_slice
+        { elements =
+            Tslice_open
+              { rest_var = Some (Tslice_rest_var { id; name; _ }); _ };
+          _ } ->
         Stypes.record (Stypes.An_ident (name.loc,
                                         Ident.name id,
                                         Annot.Idef scope))

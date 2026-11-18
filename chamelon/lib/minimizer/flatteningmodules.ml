@@ -140,6 +140,31 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
             id = create_local (mod_name ^ "_" ^ Ident.name d.id);
             name = { d.name with txt = mod_name ^ "_" ^ d.name.txt }
           }
+      | O (Tpat_slice ({ elements = Tslice_closed l; _ } as s)) ->
+        Tpat_slice
+          { s with
+            elements = Tslice_closed (List.map (replace_in_pat mod_name) l)
+          }
+      | O (Tpat_slice ({ elements = Tslice_open o; _ } as s)) ->
+        let rest_var =
+          Option.map
+            (fun (Tslice_rest_var r) ->
+              Tslice_rest_var
+                { r with
+                  id = create_local (mod_name ^ "_" ^ Ident.name r.id);
+                  name = { r.name with txt = mod_name ^ "_" ^ r.name.txt }
+                })
+            o.rest_var
+        in
+        Tpat_slice
+          { s with
+            elements =
+              Tslice_open
+                { prefix = List.map (replace_in_pat mod_name) o.prefix;
+                  rest_var;
+                  suffix = List.map (replace_in_pat mod_name) o.suffix
+                }
+          }
       | O (Tpat_lazy pat) -> Tpat_lazy (replace_in_pat mod_name pat)
       | O (Tpat_variant (lab, Some p, t)) ->
         Tpat_variant (lab, Some (replace_in_pat mod_name p), t)

@@ -116,6 +116,17 @@ let rec var_from_pat pat_desc acc =
   | O (Tpat_deref { pattern = None; id; _ }) -> id :: acc
   | O (Tpat_deref { pattern = Some pattern; id; _ }) ->
     var_from_pat pattern.pat_desc (id :: acc)
+  | O (Tpat_slice { elements; _ }) ->
+    let acc =
+      match elements with
+      | Tslice_open { rest_var = Some (Tslice_rest_var { id; _ }); _ } ->
+        id :: acc
+      | Tslice_open { rest_var = None; _ } | Tslice_closed _ -> acc
+    in
+    List.fold_left
+      (fun l pat -> var_from_pat pat.pat_desc l)
+      acc
+      (slice_element_patterns elements)
   | O (Tpat_fun_layout { id; _ }) -> id :: acc
   | O
       ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
@@ -208,6 +219,26 @@ let rec rem_in_pat str pat should_remove =
     else
       let pattern = rem_in_pat str pattern should_remove in
       { pat with pat_desc = Tpat_deref { d with pattern = Some pattern } }
+  | O (Tpat_slice s) ->
+    let rem p = rem_in_pat str p should_remove in
+    let elements =
+      match s.elements with
+      | Tslice_closed l -> Tslice_closed (List.map rem l)
+      | Tslice_open { prefix; rest_var; suffix } ->
+        let rest_var =
+          match rest_var with
+          | Some (Tslice_rest_var { id; _ })
+            when (not (is_used_var str id)) && should_remove () ->
+            None
+          | rest_var -> rest_var
+        in
+        Tslice_open
+          { prefix = List.map rem prefix;
+            rest_var;
+            suffix = List.map rem suffix
+          }
+    in
+    { pat with pat_desc = Tpat_slice { s with elements } }
   | O (Tpat_lazy pat) ->
     { pat with pat_desc = Tpat_lazy (rem_in_pat str pat should_remove) }
   | O (Tpat_fun_layout { id; _ }) ->

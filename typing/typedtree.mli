@@ -382,6 +382,14 @@ and 'k pattern_desc =
       value pattern_desc
         (** addr_ P        (flag = Mutable)
             addr_imm_ P    (flag = Immutable) *)
+  | Tpat_slice : {
+      mutability: Types.mutability;
+      sort: Jkind.sort;
+      (** The sort of the elements *)
+      elements: slice_pattern;
+    } -> value pattern_desc
+        (** [&| ... |]    (mutability = Mutable)
+            [&: ... :]    (mutability = Immutable) *)
   | Tpat_deref : {
       pattern: value general_pattern option;
       id: Ident.t;
@@ -421,6 +429,27 @@ and 'k pattern_desc =
             [row_desc] = [Some _] when translating [Ppat_type _],
                          [None] otherwise.
          *)
+
+and slice_pattern =
+  | Tslice_closed of value general_pattern list
+      (** P1; ...; Pn *)
+  | Tslice_open of {
+      prefix: value general_pattern list;
+      rest_var: slice_rest_var option;
+      suffix: value general_pattern list;
+    }
+      (** P1; ...; Pn; ..; Q1; ...; Qm         (rest_var = None)
+          P1; ...; Pn; .. as x; Q1; ...; Qm    (rest_var = Some x) *)
+
+and slice_rest_var =
+  | Tslice_rest_var of {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+      type_expr: Types.type_expr;
+    }
 
 and tpat_value_argument = private value general_pattern
 
@@ -1693,6 +1722,13 @@ val let_bound_idents_with_modes_sorts_and_checks:
   value_binding list
   -> (Ident.t * (Location.t * Mode.With_regionality.l * Jkind.sort) list
               * Zero_alloc.t) list
+
+(** All element patterns of a slice pattern *)
+val slice_element_patterns : slice_pattern -> pattern list
+
+(** Maps the element patterns of a slice pattern *)
+val map_slice_pattern :
+  (pattern -> pattern) -> slice_pattern -> slice_pattern
 
 (** Alpha conversion of patterns *)
 val alpha_pat:
