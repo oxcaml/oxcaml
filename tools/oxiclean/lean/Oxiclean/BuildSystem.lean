@@ -23,7 +23,7 @@ instance : Lean.FromJson UInt8 where
     let b8 : BitVec 8 ← BitVec.ofNat? n
     return UInt8.ofBitVec b8
 
-namespace Oxiclean.Import
+namespace Oxiclean.BuildSystem
 
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for TypeConstructor
@@ -332,11 +332,7 @@ instance : Lean.FromJson ImmediateSwitchCase where
 instance : Lean.FromJson BlockSwitchCase where
   fromJson? := WorkaroundForPr14959.BlockSwitchCase.fromJson?
 
-structure InterfaceAndImplementation : Type where
-  interface : ModuleType
-  implementation : Expr
-
-end Oxiclean.Import
+end Oxiclean.BuildSystem
 
 open Lean Elab Command
 
@@ -345,14 +341,23 @@ def readJson {α : Type} [FromJson α] (path : System.FilePath) : IO α := do
   let json : Json ← Json.parse fileContents |> IO.ofExcept
   fromJson? json |> IO.ofExcept
 
-elab "oxiclean% " name:ident : term => do
-  let filename : String ← getFileName
-  let dir : System.FilePath := System.FilePath.mk filename |>.parent.getD "."
-  let name : String := name.getId.toString
-  let intf : Oxiclean.Model.ModuleType ← dir / s!"{name}.intf.json" |> readJson
-  let impl : Oxiclean.Model.Expr ← dir / s!"{name}.impl.json" |> readJson
-  let intf : Term ← toExpr intf |> Term.exprToSyntax
-  let impl : Term ← toExpr impl |> Term.exprToSyntax
-  let r : TSyntax `term ← `({ interface := $intf, implementation := @$impl })
-  Term.elabTermEnsuringType r
-    (some (mkConst ``Oxiclean.Import.InterfaceAndImplementation))
+def addTopLevelDefinition (name : Name) (type : Lean.Expr) (value : Lean.Expr)
+    : CoreM Unit :=
+  addAndCompile <| .defnDecl
+    { name, levelParams := [], type, value, hints := .abbrev, safety := .safe }
+
+elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
+  let file : System.FilePath := ← getFileName
+  let some unit := file.fileStem >>= (·.dropPrefix? "extracted_oxcaml_")
+    | throwError "{file} is not named `extracted_oxcaml_<unit>.lean`"
+  let unit : String := unit.toString
+  let ns : Name := `Oxiclean.Extracted ++ .mkSimple unit.capitalize
+  let interface : Oxiclean.Model.ModuleType ←
+    file.withFileName s!"{unit}.intf.json" |> readJson
+  let implementation : Oxiclean.Model.Expr ←
+    file.withFileName s!"{unit}.impl.json" |> readJson
+  liftCoreM do
+    addTopLevelDefinition (ns ++ `interface)
+      (mkConst ``Oxiclean.Model.ModuleType) (toExpr interface)
+    addTopLevelDefinition (ns ++ `implementation)
+      (mkConst ``Oxiclean.Model.Expr) (toExpr implementation)

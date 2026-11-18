@@ -1,4 +1,4 @@
-(env (_ (env-vars (LEAN_PATH ../../../tools/oxiclean/lean))))
+(env (_ (env-vars (LEAN_PATH ../../../tools/oxiclean/lean:.))))
 
 (rule
  (target repr.ml)
@@ -27,9 +27,9 @@
    %{src})))
 
 (rule
- (targets repr.intf.json repr.impl.json)
+ (targets repr.intf.json repr.impl.json extracted_oxcaml_repr.lean)
  (deps (glob_files ../../../stdlib/build/*.cmi))
- (mode (promote (until-clean)))
+ (mode (promote (until-clean) (only *.json)))
  (action
   (run
    %{exe:../../../tools/oxiclean/oxiclean.exe}
@@ -37,10 +37,21 @@
    %{dep:repr.cmt})))
 
 (rule
+ (targets extracted_oxcaml_repr.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  repr.intf.json
+  repr.impl.json
+  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+ (action
+  (run lean -o %{targets} %{dep:extracted_oxcaml_repr.lean})))
+
+(rule
  (alias repr)
  (deps
   repr.intf.json
   repr.impl.json
+  extracted_oxcaml_repr.olean
   Repr.lean
   (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
  (action
@@ -66,9 +77,9 @@
    %{src})))
 
 (rule
- (targets even.intf.json even.impl.json)
+ (targets even.intf.json even.impl.json extracted_oxcaml_even.lean)
  (deps (glob_files ../../../stdlib/build/*.cmi))
- (mode (promote (until-clean)))
+ (mode (promote (until-clean) (only *.json)))
  (action
   (run
    %{exe:../../../tools/oxiclean/oxiclean.exe}
@@ -76,10 +87,21 @@
    %{dep:even.cmt})))
 
 (rule
+ (targets extracted_oxcaml_even.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  even.intf.json
+  even.impl.json
+  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+ (action
+  (run lean -o %{targets} %{dep:extracted_oxcaml_even.lean})))
+
+(rule
  (alias even)
  (deps
   even.intf.json
   even.impl.json
+  extracted_oxcaml_even.olean
   Even.lean
   (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
  (action

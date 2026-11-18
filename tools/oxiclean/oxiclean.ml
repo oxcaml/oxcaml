@@ -89,6 +89,10 @@ let write_json_to_file (filename : string) (json : Json.t) : unit =
   in
   Out_channel.with_open_text filename write
 
+let lean_file_contents : string =
+  "import Oxiclean.BuildSystem\n\n\
+   _do_not_use_this_outside_automatically_generated_files%\n"
+
 (* Handle the user's supplied filenames. *)
 let run ~(cmti_filename : string) ~(cmt_filename : string) : unit =
   if Filename.extension cmti_filename <> ".cmti" then
@@ -102,10 +106,17 @@ let run ~(cmti_filename : string) ~(cmt_filename : string) : unit =
   let impl = get_impl_from_cmt intf cmt in
   let intf = Convert.intf intf in
   let impl = Convert.impl impl in
-  let intf_filepath = Filename.remove_extension cmti_filename ^ ".intf.json" in
-  let impl_filepath = Filename.remove_extension cmt_filename ^ ".impl.json" in
+  let filepath = Filename.remove_extension cmt_filename in
+  let intf_filepath = filepath ^ ".intf.json" in
+  let impl_filepath = filepath ^ ".impl.json" in
+  let lean_filepath =
+    "extracted_oxcaml_" ^ (Filename.basename filepath) ^ ".lean"
+    |> Filename.concat (Filename.dirname cmt_filename)
+  in
   Serialize.intf intf |> write_json_to_file intf_filepath;
-  Serialize.impl impl |> write_json_to_file impl_filepath
+  Serialize.impl impl |> write_json_to_file impl_filepath;
+  Out_channel.with_open_text lean_filepath (fun channel ->
+    Out_channel.output_string channel lean_file_contents)
 
 (* Parse command-line arguments and invoke the main program behavior. *)
 let main () : unit =

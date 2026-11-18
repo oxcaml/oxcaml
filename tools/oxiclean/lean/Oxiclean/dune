@@ -15,10 +15,10 @@
    %{dep:Model.lean})))
 
 (rule
- (targets Import.olean)
+ (targets BuildSystem.olean)
  (deps
   (sandbox preserve_file_kind)
-  Import.lean
+  BuildSystem.lean
   Model.olean)
  (action
   (run
@@ -27,4 +27,4 @@
    ..
    -o
    %{targets}
-   %{dep:Import.lean})))
+   %{dep:BuildSystem.lean})))

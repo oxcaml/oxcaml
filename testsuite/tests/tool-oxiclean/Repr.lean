@@ -1,7 +1,5 @@
-import Oxiclean.Import
+import extracted_oxcaml_repr
 open Oxiclean.Model
-
-abbrev imported : Oxiclean.Import.InterfaceAndImplementation := oxiclean% repr
 
 abbrev interface : ModuleType :=
   let int : ExprType := .constr (.predef .int) []
@@ -30,4 +28,5 @@ abbrev implementation : Expr :=
 
   .letBinding get (.letBinding create (.block 0 [.var 0, .var 1]))
 
-example : imported = { interface, implementation } := by rfl
+example : Oxiclean.Extracted.Repr.interface = interface := by rfl
+example : Oxiclean.Extracted.Repr.implementation = implementation := by rfl
