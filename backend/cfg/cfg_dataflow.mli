@@ -44,11 +44,9 @@ module type Forward_S = sig
   (** Perform the dataflow analysis on the passed CFG, returning [OK _] if a
       fix-point has been reached and [Error _] otherwise, where the nested value
       is a map binding each label of the CFG to the domain value at the start of
-      the corresponding block. The map has an entry for every block: entry
-      points are initially bound to [init] (entry points include all trap
-      handlers if [handlers_are_entry_points] is [true]), all other blocks to
-      the domain's [bot] value, and blocks never reached by the analysis keep
-      their initial binding.
+      the corresponding block. The map has an entry for every block: the
+      function entry is initially bound to [init], all other blocks to the
+      domain's [bot] value. Every block is initially queued for processing.
 
       A fix-point is not reached if there is still pending work after
       [max_iteration] (defaulting to [max_int]) have been executed, an iteration
@@ -57,7 +55,6 @@ module type Forward_S = sig
     Cfg.t ->
     ?max_iteration:int ->
     init:domain ->
-    handlers_are_entry_points:bool ->
     context ->
     (domain Label.Tbl.t, unit) result
 end

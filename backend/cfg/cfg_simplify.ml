@@ -74,9 +74,7 @@ end = struct
   let run : Cfg_with_layout.t -> Label.Set.t =
    fun cfg_with_layout ->
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
-    match
-      Dataflow.run cfg ~init:Reachable ~handlers_are_entry_points:false ()
-    with
+    match Dataflow.run cfg ~init:Reachable () with
     | Result.Error _ ->
       Misc.fatal_error
         "Dataflow.run_dead_code: forward analysis did not reach a fix-point"
