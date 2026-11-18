@@ -20,7 +20,19 @@ module Poly = struct
     | Compat_32
     | Compression
 
-  external compare : 'a -> 'a -> int = "%compare"
+  let[@inline never] compare x y = Stdlib.compare x y
+
+  let[@inline never] eq x y = x = y
+
+  let[@inline never] neq x y = x <> y
+
+  let[@inline never] lt x y = x < y
+
+  let[@inline never] le x y = x <= y
+
+  let[@inline never] gt x y = x > y
+
+  let[@inline never] ge x y = x >= y
 
   external seeded_hash_param : int -> int -> int -> 'a -> int = "caml_hash_exn"
   [@@noalloc]
@@ -351,7 +363,14 @@ let () =
   in
   (run [@inlined]) Float32.compare;
   (run [@inlined never]) (fun l r ->
-      Poly.compare (Sys.opaque_identity l) (Sys.opaque_identity r))
+      Poly.compare (Sys.opaque_identity l) (Sys.opaque_identity r));
+  CFloat32.check_float32s (fun f1 f2 ->
+      assert (Poly.eq f1 f2 = CFloat32.eq f1 f2);
+      assert (Poly.neq f1 f2 = CFloat32.neq f1 f2);
+      assert (Poly.lt f1 f2 = CFloat32.lt f1 f2);
+      assert (Poly.le f1 f2 = CFloat32.le f1 f2);
+      assert (Poly.gt f1 f2 = CFloat32.gt f1 f2);
+      assert (Poly.ge f1 f2 = CFloat32.ge f1 f2))
 
 let () =
   (* Hash *)
