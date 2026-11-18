@@ -2250,6 +2250,12 @@ and pattern_match_barrier pat paths : UF.t =
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
   | Tpat_addr _ -> borrow_memory_address ()
+  | Tpat_slice { elements; _ } -> (
+    match slice_element_patterns elements with
+    | [] ->
+      (* no memory access because slices are unboxed *)
+      no_memory_access ()
+    | _ :: _ -> borrow_memory_address ())
   | Tpat_deref _ ->
     (* taking the address of a position does not read it *)
     no_memory_access ()
@@ -2374,6 +2380,26 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
          Note [Loading from addresses]. *)
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
+    | Tpat_slice { mutability; elements; _ } ->
+      (* CR slice-patterns: this is imprecise: all elements of the slice are
+         treated as a load from one address. For instance, in [[&: x ; y :]] we
+         don't track that [x] and [y] are different. *)
+      let base_paths = Paths.with_memory_address paths in
+      let element_paths = Paths.address_load mutability paths in
+      let ext_rest =
+        match elements with
+        | Tslice_open { rest_var = Some (Tslice_rest_var { id; _ }); _ } ->
+          Ienv.Extension.singleton id paths
+        | Tslice_open { rest_var = None; _ } | Tslice_closed _ ->
+          Ienv.Extension.empty
+      in
+      let ext, uf =
+        List.map
+          (fun pat -> pattern_match_single ~base_paths pat element_paths)
+          (slice_element_patterns elements)
+        |> conjuncts_pattern_match
+      in
+      Ienv.Extension.conjunct ext_rest ext, uf
     | Tpat_deref { pattern; id; _ } -> (
       let base_paths = unwrap_base_paths () in
       let ext0 = Ienv.Extension.singleton id base_paths in
