@@ -1,0 +1,30 @@
+(env (_ (env-vars (LEAN_PATH ..))))
+
+(rule
+ (targets Model.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Model.lean)
+ (action
+  (run
+   lean
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Model.lean})))
+
+(rule
+ (targets Import.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Import.lean
+  Model.olean)
+ (action
+  (run
+   lean
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Import.lean})))

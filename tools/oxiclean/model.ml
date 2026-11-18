@@ -36,7 +36,7 @@ module Type = struct
     | Option
 end
 
-module rec Expression : sig
+module rec Expr : sig
   module Scalar_operation : sig
     module Binary : sig
       module Integral : sig
@@ -51,15 +51,15 @@ module rec Expression : sig
     type t =
       | Binary of
           { operation : Binary.t
-          ; lhs : Expression.t
-          ; rhs : Expression.t
+          ; lhs : Expr.t
+          ; rhs : Expr.t
           }
   end
 
   type t =
     | Apply of
         { func : t
-        ; args : t list
+        ; arg : t
         }
     | Block of
         { tag : int
@@ -69,14 +69,15 @@ module rec Expression : sig
         { block : t
         ; index : int
         }
-    | Function of closure
+    | Function of
+        { body : t
+        }
     | LetBinding of
         { bound : t
         ; body : t
         }
     | PhysicalEquality of
-        { negated : bool
-        ; lhs : t
+        { lhs : t
         ; rhs : t
         }
     | ScalarOperation of
@@ -100,16 +101,11 @@ module rec Expression : sig
         { de_bruijn : int
         }
 
-  and closure =
-    { n_params : int
-    ; body : t
-    }
-
   and switch_case =
     { case : int
     ; body_if_matched : t
     }
-end = Expression
+end = Expr
 
 and Value : sig
   type t =
@@ -137,5 +133,7 @@ and Value : sig
     | Bytes of
         { bytes : int list
         }
-    | Closure of Expression.closure
+    | Closure of
+        { body : Expr.t
+        }
 end = Value

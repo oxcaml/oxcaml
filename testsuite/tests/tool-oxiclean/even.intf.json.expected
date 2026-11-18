@@ -3,15 +3,23 @@
     "kind": "abstract",
     "etc": {
       "val": {
-        "ty": {
+        "exprType": {
           "arrow": {
-            "domain": {"constr": {"constr": {"predef": "int"}, "args": []}},
+            "domain": {
+              "constr": {
+                "constructor": {"predef": {"predef": "int"}},
+                "args": []
+              }
+            },
             "codomain": {
               "constr": {
-                "constr": {"predef": "option"},
+                "constructor": {"predef": {"predef": "option"}},
                 "args": [
                   {
-                    "constr": {"constr": {"var": {"deBruijn": 0}}, "args": []}
+                    "constr": {
+                      "constructor": {"var": {"deBruijn": 0}},
+                      "args": []
+                    }
                   }
                 ]
               }
@@ -20,17 +28,23 @@
         },
         "etc": {
           "val": {
-            "ty": {
+            "exprType": {
               "arrow": {
                 "domain": {
-                  "constr": {"constr": {"var": {"deBruijn": 0}}, "args": []}
+                  "constr": {
+                    "constructor": {"var": {"deBruijn": 0}},
+                    "args": []
+                  }
                 },
                 "codomain": {
-                  "constr": {"constr": {"predef": "int"}, "args": []}
+                  "constr": {
+                    "constructor": {"predef": {"predef": "int"}},
+                    "args": []
+                  }
                 }
               }
             },
-            "etc": "emptyModule"
+            "etc": "empty"
           }
         }
       }

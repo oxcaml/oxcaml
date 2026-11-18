@@ -1,25 +1,25 @@
 {
   "letBinding": {
-    "bound": {"function": {"nParams": 1, "body": {"var": {"deBruijn": 0}}}},
+    "bound": {"function": {"body": {"var": {"deBruijn": 0}}}},
     "body": {
       "letBinding": {
         "bound": {
           "function": {
-            "nParams": 1,
             "body": {
               "switch": {
                 "scrutinee": {
                   "physicalEquality": {
-                    "negated": false,
                     "lhs": {
                       "scalarOperation": {
                         "operation": {
                           "binary": {
-                            "operation": {"integral": {"operation": "mod"}},
+                            "operation": {"integral": {"integral": "modulo"}},
                             "lhs": {"var": {"deBruijn": 0}},
                             "rhs": {
-                              "value": {
-                                "value": {"immediate": {"bitsAboveLsb": 2}}
+                              "val": {
+                                "value": {
+                                  "immediate": {"imm": {"bitsAboveLsb": 2}}
+                                }
                               }
                             }
                           }
@@ -27,22 +27,26 @@
                       }
                     },
                     "rhs": {
-                      "value": {"value": {"immediate": {"bitsAboveLsb": 0}}}
+                      "val": {
+                        "value": {"immediate": {"imm": {"bitsAboveLsb": 0}}}
+                      }
                     }
                   }
                 },
-                "nConsts": 2,
+                "nImmediates": 2,
                 "nBlocks": 0,
-                "consts": [
+                "immediates": [
                   {
-                    "case": 0,
-                    "bodyIfMatched": {
-                      "value": {"value": {"immediate": {"bitsAboveLsb": 0}}}
+                    "immediate": {"bitsAboveLsb": 0},
+                    "body": {
+                      "val": {
+                        "value": {"immediate": {"imm": {"bitsAboveLsb": 0}}}
+                      }
                     }
                   },
                   {
-                    "case": 1,
-                    "bodyIfMatched": {
+                    "immediate": {"bitsAboveLsb": 1},
+                    "body": {
                       "block": {
                         "tag": 0,
                         "fields": [{"var": {"deBruijn": 0}}]
@@ -51,7 +55,7 @@
                   }
                 ],
                 "blocks": [],
-                "failaction": null
+                "failAction": null
               }
             }
           }

@@ -4,8 +4,6 @@ let tag (lean_ctor_name : string) (contents : Json.t) : Json.t =
 
 let string (s : string) : Json.t = Json.String s
 
-let bool (b : bool) : Json.t = if b then Json.True else Json.False
-
 let array (f : 'a -> Json.t) (l : 'a list) : Json.t =
   Json.Array (List.map f l)
 
@@ -13,11 +11,11 @@ let option (f : 'a -> Json.t) : 'a option -> Json.t = function
   | None -> Json.Null
   | Some a -> f a
 
-let rec impl : Model.Expression.t -> Json.t = function
-  | Apply { func; args } ->
+let rec impl : Model.Expr.t -> Json.t = function
+  | Apply { func; arg } ->
     Json.Object
       [ "func", impl func
-      ; "args", array impl args
+      ; "arg", impl arg
       ]
     |> tag "apply"
   | Block { tag = i; fields } ->
@@ -28,44 +26,41 @@ let rec impl : Model.Expression.t -> Json.t = function
     |> tag "block"
   | Field { block; index } ->
     Json.Object
-      [ "block", impl block
+      [ "indexInto", impl block
       ; "index", Json.int index
       ]
     |> tag "field"
-  | Function c -> closure c |> tag "function"
+  | Function { body } -> impl body |> tag "body" |> tag "function"
   | LetBinding { bound; body } ->
     Json.Object [ "bound", impl bound; "body", impl body ] |> tag "letBinding"
-  | PhysicalEquality { negated; lhs; rhs } ->
-    Json.Object [ "negated", bool negated; "lhs", impl lhs; "rhs", impl rhs ]
+  | PhysicalEquality { lhs; rhs } ->
+    Json.Object [ "lhs", impl lhs; "rhs", impl rhs ]
     |> tag "physicalEquality"
   | ScalarOperation { operation } ->
     scalar_operation operation |> tag "operation" |> tag "scalarOperation"
   | Switch { scrutinee; n_consts; n_blocks; consts; blocks; failaction } ->
     Json.Object
       [ "scrutinee", impl scrutinee
-      ; "nConsts", Json.int n_consts
+      ; "nImmediates", Json.int n_consts
       ; "nBlocks", Json.int n_blocks
-      ; "consts", array switch_case consts
-      ; "blocks", array switch_case blocks
-      ; "failaction", option impl failaction
+      ; "immediates", array immediate_switch_case consts
+      ; "blocks", array block_switch_case blocks
+      ; "failAction", option impl failaction
       ]
     |> tag "switch"
   | UpstreamCompilationUnit { path } ->
     array string path |> tag "path" |> tag "upstreamCompilationUnit"
   | Value { value = v } ->
-    value v |> tag "value" |> tag "value"
+    value v |> tag "value" |> tag "val"
   | Var { de_bruijn } ->
     Json.int de_bruijn |> tag "deBruijn" |> tag "var"
 
-and closure ({ n_params; body } : Model.Expression.closure) : Json.t =
-  Json.Object
-    [ "nParams", Json.int n_params
-    ; "body", impl body
-    ]
-
 and value : Model.Value.t -> Json.t = function
   | Immediate { bits_above_lsb } ->
-    Json.int bits_above_lsb |> tag "bitsAboveLsb" |> tag "immediate"
+    Json.int bits_above_lsb
+    |> tag "bitsAboveLsb"
+    |> tag "imm"
+    |> tag "immediate"
   | Indirection { indirection } ->
     begin match indirection with
     | Immutable { block } ->
@@ -75,13 +70,13 @@ and value : Model.Value.t -> Json.t = function
           begin match contents with
           | Values { values } ->
             array value values
-            |> tag "values"
+            |> tag "fields"
             |> tag "values"
           | Bytes { bytes } ->
             array Json.int bytes
+            |> tag "data"
             |> tag "bytes"
-            |> tag "bytes"
-          | Closure c -> closure c |> tag "closure"
+          | Closure { body } -> impl body |> tag "body" |> tag "closure"
           end
         in
         Json.Object
@@ -90,18 +85,26 @@ and value : Model.Value.t -> Json.t = function
           ]
       end
       |> tag "block"
-      |> tag "immutable"
+      |> tag "noMutableFields"
     end
-    |> tag "indirection"
+    |> tag "ptr"
     |> tag "indirection"
 
-and switch_case ({ case; body_if_matched } : Model.Expression.switch_case) : Json.t =
+and immediate_switch_case
+    ({ case; body_if_matched } : Model.Expr.switch_case) : Json.t =
   Json.Object
-    [ "case", Json.int case
-    ; "bodyIfMatched", impl body_if_matched
+    [ "immediate", Json.int case |> tag "bitsAboveLsb"
+    ; "body", impl body_if_matched
     ]
 
-and scalar_operation : Model.Expression.Scalar_operation.t -> Json.t = function
+and block_switch_case
+    ({ case; body_if_matched } : Model.Expr.switch_case) : Json.t =
+  Json.Object
+    [ "tag", Json.int case
+    ; "body", impl body_if_matched
+    ]
+
+and scalar_operation : Model.Expr.Scalar_operation.t -> Json.t = function
   | Binary { operation; lhs; rhs } ->
     Json.Object
       [ "operation", binary_scalar_operation operation
@@ -111,24 +114,24 @@ and scalar_operation : Model.Expression.Scalar_operation.t -> Json.t = function
     |> tag "binary"
 
 and binary_scalar_operation
-    : Model.Expression.Scalar_operation.Binary.t -> Json.t =
+    : Model.Expr.Scalar_operation.Binary.t -> Json.t =
   function
   | Integral operation ->
     integral_binary_scalar_operation operation
-    |> tag "operation"
+    |> tag "integral"
     |> tag "integral"
 
 and integral_binary_scalar_operation
-    : Model.Expression.Scalar_operation.Binary.Integral.t -> Json.t =
+    : Model.Expr.Scalar_operation.Binary.Integral.t -> Json.t =
   function
-  | Mod -> Json.String "mod"
+  | Mod -> Json.String "modulo"
 
 let type_predef : Model.Type.predef -> Json.t = function
   | Int -> Json.String "int"
   | Option -> Json.String "option"
 
 let type_constr : Model.Type.constr -> Json.t = function
-  | Predef p -> type_predef p |> tag "predef"
+  | Predef p -> type_predef p |> tag "predef" |> tag "predef"
   | Var { de_bruijn } ->
     Json.int de_bruijn |> tag "deBruijn" |> tag "var"
 
@@ -141,7 +144,7 @@ let rec type_expr : Model.Type.expr -> Json.t = function
     |> tag "arrow"
   | Constr { constr; args } ->
     Json.Object
-      [ "constr", type_constr constr
+      [ "constructor", type_constr constr
       ; "args", array type_expr args
       ]
     |> tag "constr"
@@ -150,10 +153,10 @@ let type_kind : Model.Type.kind -> Json.t = function
   | Abstract -> Json.String "abstract"
 
 let rec intf : Model.Type.t -> Json.t = function
-  | EmptyModule -> Json.String "emptyModule"
+  | EmptyModule -> Json.String "empty"
   | Module { ty; etc } ->
     Json.Object
-      [ "ty", intf ty
+      [ "moduleType", intf ty
       ; "etc", intf etc
       ]
     |> tag "mod"
@@ -165,7 +168,7 @@ let rec intf : Model.Type.t -> Json.t = function
     |> tag "ty"
   | Val { ty; etc } ->
     Json.Object
-      [ "ty", type_expr ty
+      [ "exprType", type_expr ty
       ; "etc", intf etc
       ]
     |> tag "val"

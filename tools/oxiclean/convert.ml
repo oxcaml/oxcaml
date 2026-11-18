@@ -1,24 +1,15 @@
 let rec impl_in_scope (context : Ident.t list)
-    : Lambda.lambda -> Model.Expression.t =
+    : Lambda.lambda -> Model.Expr.t =
   begin function
-  | Lapply { ap_func; ap_args } ->
-    Apply
-      { func = impl_in_scope context ap_func
-      ; args = List.map (impl_in_scope context) ap_args
-      }
+  | Lapply { ap_func; ap_args; _ } ->
+    let fold (func : Model.Expr.t) (arg : Lambda.lambda) : Model.Expr.t =
+      Apply { func; arg = impl_in_scope context arg }
+    in
+    List.fold_left fold (impl_in_scope context ap_func) ap_args
   | Lconst (c : Lambda.structured_constant) ->
     Value { value = structured_constant c }
   | Lfunction ({ kind = Curried _; body; params; _ } : Lambda.lfunction) ->
-    let context =
-      List.fold_left
-        (fun acc ({ name; _ } : Lambda.lparam) -> name :: acc)
-        context
-        params
-    in
-    Function
-      { n_params = List.length params
-      ; body = impl_in_scope context body
-      }
+    lfunction context body params
   | Lifthenelse (cond, body_if_true, body_if_false, layout) ->
     let equivalent_switch_statement : Lambda.lambda =
       let cases : Lambda.lambda_switch =
@@ -63,6 +54,13 @@ let rec impl_in_scope (context : Ident.t list)
             Printlambda.lambda other))
   end
 
+and lfunction (context : Ident.t list) (body : Lambda.lambda)
+    : Lambda.lparam list -> Model.Expr.t =
+  function
+  | [] -> impl_in_scope context body
+  | { name; _ } :: params ->
+    Function { body = lfunction (name :: context) body params }
+
 and structured_constant : Lambda.structured_constant -> Model.Value.t =
   begin function
   | Const_base c -> constant c
@@ -87,7 +85,7 @@ and constant : Typedtree.constant -> Model.Value.t =
   end
 
 and primitive (context : Ident.t list) (args : Lambda.lambda list)
-    : Lambda.primitive -> Model.Expression.t =
+    : Lambda.primitive -> Model.Expr.t =
   begin function
   | Pfield (index, _, Reads_agree) ->
     begin match args with
@@ -105,12 +103,11 @@ and primitive (context : Ident.t list) (args : Lambda.lambda list)
       }
   | Pmakeblock (tag, Immutable, _, _) ->
     Block { tag; fields = List.map (impl_in_scope context) args }
-  | Pphys_equal negated ->
+  | Pphys_equal Eq ->
     begin match args with
     | [lhs; rhs] ->
       PhysicalEquality
-        { negated = begin match negated with Eq -> false | Noteq -> true end
-        ; lhs = impl_in_scope context lhs
+        { lhs = impl_in_scope context lhs
         ; rhs = impl_in_scope context rhs
         }
     | [] | [_] | _ :: _ :: _ :: _ ->
@@ -124,7 +121,7 @@ and primitive (context : Ident.t list) (args : Lambda.lambda list)
       | Binary op ->
         begin match args with
         | [lhs; rhs] ->
-          Model.Expression.Scalar_operation.Binary
+          Model.Expr.Scalar_operation.Binary
             { operation = binary_scalar_operation op
             ; lhs = impl_in_scope context lhs
             ; rhs = impl_in_scope context rhs
@@ -154,20 +151,20 @@ and primitive (context : Ident.t list) (args : Lambda.lambda list)
 and switch_case
     (context : Ident.t list)
     ((case, body_if_matched) : (int * Lambda.lambda))
-    : Model.Expression.switch_case =
+    : Model.Expr.switch_case =
   { case
   ; body_if_matched = impl_in_scope context body_if_matched
   }
 
 and binary_scalar_operation
     : 'a Scalar.Operation.Binary.t ->
-      Model.Expression.Scalar_operation.Binary.t =
+      Model.Expr.Scalar_operation.Binary.t =
   function
   | Integral (Value (Taggable Int), iop) ->
-    Model.Expression.Scalar_operation.Binary.Integral
+    Model.Expr.Scalar_operation.Binary.Integral
       begin match iop with
       | Mod (Safe, Signed) ->
-        Model.Expression.Scalar_operation.Binary.Integral.Mod
+        Model.Expr.Scalar_operation.Binary.Integral.Mod
       | other ->
         raise
           (Error.Message

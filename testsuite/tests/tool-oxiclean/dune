@@ -1,3 +1,5 @@
+(env (_ (env-vars (LEAN_PATH ../../../tools/oxiclean/lean))))
+
 (rule
  (target repr.ml)
  (action
@@ -27,6 +29,7 @@
 (rule
  (targets repr.intf.json repr.impl.json)
  (deps (glob_files ../../../stdlib/build/*.cmi))
+ (mode (promote (until-clean)))
  (action
   (run
    %{exe:../../../tools/oxiclean/oxiclean.exe}
@@ -62,6 +65,7 @@
 (rule
  (targets even.intf.json even.impl.json)
  (deps (glob_files ../../../stdlib/build/*.cmi))
+ (mode (promote (until-clean)))
  (action
   (run
    %{exe:../../../tools/oxiclean/oxiclean.exe}
@@ -72,8 +76,11 @@
  (alias even)
  (deps
   even.intf.json
-  even.impl.json)
+  even.impl.json
+  Even.lean
+  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
  (action
   (progn
    (diff even.impl.json.expected even.impl.json)
-   (diff even.intf.json.expected even.intf.json))))
+   (diff even.intf.json.expected even.intf.json)
+   (run lean %{dep:Even.lean}))))
