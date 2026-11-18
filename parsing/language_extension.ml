@@ -443,6 +443,30 @@ let legacy_default_extensions : extn_pair list =
 
 let extensions : extn_pair list ref = ref legacy_default_extensions
 
+let find_level (type a) (extn : a t) (extns : extn_pair list) : a option =
+  let rec find : extn_pair list -> a option = function
+    | [] -> None
+    | Pair (e, v) :: es -> (
+      match equal_t e extn with Some Refl -> Some v | None -> find es)
+  in
+  find extns
+
+(* The enabled omnidirectionality level, accounting for suppression by
+   [Mode_polymorphism]. *)
+let omnidirectionality_of extns =
+  match find_level Mode_polymorphism extns with
+  | Some level when Maturity.compare level Alpha >= 0 -> None
+  | Some _ | None -> find_level Omnidirectionality extns
+
+(* [omnidirectionality_of !extensions], cached as it is checked on hot paths of
+   the type checker. Only change [extensions] with [set_extensions], to keep
+   this up to date. *)
+let omnidirectionality = ref (omnidirectionality_of !extensions)
+
+let set_extensions extns =
+  extensions := extns;
+  omnidirectionality := omnidirectionality_of extns
+
 let set_worker (type a) (extn : a t) = function
   | Some value ->
     Universe.check (Pair (extn, value));
@@ -456,12 +480,12 @@ let set_worker (type a) (extn : a t) = function
         | Some Refl ->
           Pair (extn, Ops.max v value) :: List.rev_append already_seen es)
     in
-    extensions := update_extensions [] !extensions
+    set_extensions (update_extensions [] !extensions)
   | None ->
-    extensions
-      := List.filter
-           (fun (Pair (extn', _) : extn_pair) -> not (equal extn extn'))
-           !extensions
+    set_extensions
+      (List.filter
+         (fun (Pair (extn', _) : extn_pair) -> not (equal extn extn'))
+         !extensions)
 
 let set extn ~enabled = set_worker extn (if enabled then Some () else None)
 
@@ -473,7 +497,7 @@ let disable extn = set_worker extn None
    [extensions] to. *)
 let with_temporary_extensions f =
   let current_extensions = !extensions in
-  Fun.protect ~finally:(fun () -> extensions := current_extensions) f
+  Fun.protect ~finally:(fun () -> set_extensions current_extensions) f
 
 (* It might make sense to ban [set], [enable], [disable],
    [only_erasable_extensions], and [disallow_extensions] inside [f], but it's
@@ -497,14 +521,14 @@ let enable_of_string_exn extn_name =
 let disable_of_string_exn extn_name =
   match pair_of_string_exn extn_name with Pair (extn, _) -> disable extn
 
-let disable_all () = extensions := []
+let disable_all () = set_extensions []
 
 let unconditionally_enable_maximal_without_checks () =
   let maximal_pair (Pack extn) =
     let (module Ops) = get_level_ops extn in
     Pair (extn, Ops.max_value)
   in
-  extensions := List.map maximal_pair all_extensions
+  set_extensions (List.map maximal_pair all_extensions)
 
 let erasable_extensions_only () =
   Universe.is No_extensions || Universe.is Upstream_compatible
@@ -513,8 +537,8 @@ let set_universe_and_enable_all u =
   Universe.set u;
   (* CR aobrien: pretty sure we can remove [Universe.set] and [Universe.get] *)
   let u = Universe.get () in
-  extensions
-    := with_default_omnidirectionality u (Universe.allowed_extensions_in u)
+  set_extensions
+    (with_default_omnidirectionality u (Universe.allowed_extensions_in u))
 
 let set_universe_and_enable_all_of_string_exn univ_name =
   match Universe.of_string univ_name with
@@ -542,17 +566,33 @@ let suppressed_by_mode_polymorphism (type a) (extn : a t) =
     is_at_least_ignoring_mode_polymorphism Mode_polymorphism Alpha
   | _ -> false
 
-let is_at_least extn value =
+let is_at_least_slow extn value =
   (not (suppressed_by_mode_polymorphism extn))
   && is_at_least_ignoring_mode_polymorphism extn value
 
-let is_enabled extn =
+let is_enabled_slow extn =
   let rec check : extn_pair list -> bool = function
     | [] -> false
     | Pair (e, _) :: _ when equal e extn -> true
     | _ :: es -> check es
   in
   (not (suppressed_by_mode_polymorphism extn)) && check !extensions
+
+(* Omnidirectionality is checked on hot paths of the type checker, so has a
+   fast path that callers can inline. *)
+let[@inline] is_at_least (type a) (extn : a t) (value : a) =
+  match extn with
+  | Omnidirectionality -> (
+    match !omnidirectionality with
+    | None -> false
+    | Some level -> Omnidirectionality.Scheduler_policy.compare level value >= 0
+    )
+  | _ -> is_at_least_slow extn value
+
+let[@inline] is_enabled (type a) (extn : a t) =
+  match extn with
+  | Omnidirectionality -> Option.is_some !omnidirectionality
+  | _ -> is_enabled_slow extn
 
 let get_command_line_string_if_enabled extn =
   let rec find = function
