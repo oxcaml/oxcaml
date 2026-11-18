@@ -84,7 +84,7 @@ let continue continuation args =
   Terminator.Continue
     { continuation; args = Array.map (fun arg -> Terminator.Arg arg) args }
 
-let new_block ?(entry_dbg = Debuginfo.none) env ~params =
+let new_block env ~params ~entry_dbg =
   Block.create env.graph ~params ~cold:env.cold ~handler_dbg:Debuginfo.none
     ~entry_dbg
 
@@ -265,10 +265,10 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       emit env c e2 ~tail
     | Cifthenelse (econd, ifso_dbg, ifso_p, eif, ifnot_dbg, ifnot_p, eelse, dbg)
       ->
-      emit_ifthenelse env c ~tail econd ifso_dbg ifso_p eif ifnot_dbg ifnot_p
-        eelse dbg
+      emit_ifthenelse env c ~tail econd ~ifso_dbg ifso_p eif ~ifnot_dbg ifnot_p
+        eelse ~dbg
     | Cswitch (esel, index, ecases, dbg) ->
-      emit_switch env c ~tail esel index ecases dbg
+      emit_switch env c ~tail esel index ecases ~dbg
     | Ccatch (_, [], e1) -> emit env c e1 ~tail
     | Ccatch (_flag, handlers, body) -> emit_catch env c ~tail handlers body
     (* Leaf expressions *)
@@ -346,7 +346,9 @@ and emit_invalid env c message symbol =
   in
   if current_function_is_check_enabled
   then (
-    let cont_block = new_block env ~params:Cmm.typ_int in
+    let cont_block =
+      new_block env ~params:Cmm.typ_int ~entry_dbg:Debuginfo.none
+    in
     finish_block env c ~dbg:Debuginfo.none
       (Invalid { message; args = arg_instrs; continuation = Some cont_block });
     Cursor.move c ~new_pos:cont_block;
@@ -360,7 +362,7 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     result =
   let may_raise = Cfg.can_raise_terminator new_op in
   let call_returning_to op (ty : Cmm.machtype) : result =
-    let cont_block = new_block env ~params:ty in
+    let cont_block = new_block env ~params:ty ~entry_dbg:Debuginfo.none in
     finish_block env c ~dbg
       (Call
          { op;
@@ -460,8 +462,8 @@ and emit_expr_op env c op args dbg : result =
       Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Printcfg.basic_desc
         basic)
 
-and emit_ifthenelse env c ~tail econd ifso_dbg ifa eif ifnot_dbg elsea eelse dbg
-    : result =
+and emit_ifthenelse env c ~tail econd ~ifso_dbg ifa eif ~ifnot_dbg elsea eelse
+    ~dbg : result =
   let dbg = SU.dbg_of_test econd dbg in
   let cond, earg = Sel.select_condition econd in
   let* rarg = emit env c earg ~tail:false in
@@ -479,7 +481,7 @@ and emit_ifthenelse env c ~tail econd ifso_dbg ifa eif ifnot_dbg elsea eelse dbg
   let r_else = emit else_env else_c eelse ~tail in
   join env c [| r_then, then_c; r_else, else_c |]
 
-and emit_switch env c ~tail esel index ecases dbg : result =
+and emit_switch env c ~tail esel index ecases ~dbg : result =
   let* rsel = emit env c esel ~tail:false in
   let case_blocks =
     Array.map
@@ -599,7 +601,9 @@ and join env c (results : (result * Cursor.t) array) : result =
   match !join_info with
   | None -> Never_returns
   | Some join_types ->
-    let join_block = new_block env ~params:join_types in
+    let join_block =
+      new_block env ~params:join_types ~entry_dbg:Debuginfo.none
+    in
     results
     |> Array.iter (fun ((r, c_branch) : result * Cursor.t) ->
         match r with

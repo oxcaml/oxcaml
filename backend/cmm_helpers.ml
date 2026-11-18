@@ -3564,6 +3564,8 @@ module SArgBlocks = struct
 
   type test = expression
 
+  (* CR-someday xclerc: make this a record (and likewise the type of
+     [StoreExpForSwitch] below). *)
   type act = expression * Debuginfo.t * Branch_annotations.t
 
   (* The module [SArgBlocks] must conform to the signature `Switch.S`. Since we
@@ -3594,7 +3596,7 @@ module SArgBlocks = struct
       dbg,
       Branch_annotations.fork_point [ifso_a; ifnot_a] )
 
-  let make_switch dbg _ arg cases actions =
+  let make_switch dbg (_ : layout) arg cases actions =
     let annots =
       Branch_annotations.fork_point
         (Array.map (fun (_, _, annots) -> annots) actions |> Array.to_list)
@@ -3603,7 +3605,7 @@ module SArgBlocks = struct
 
   let bind arg body = bind_with_annotations "switcher" arg body
 
-  let make_catch _ (handler, _, annots) =
+  let make_catch (_ : layout) (handler, (_ : Debuginfo.t), annots) =
     match handler with
     | Cexit (Lbl i, [], []) -> i, annots, fun e -> e
     | _ ->

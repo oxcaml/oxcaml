@@ -17,7 +17,7 @@ for line in $(grep -n '(\* LINE \*)' "$src" | cut -d: -f1); do
         || fail "no .loc for line $line"
 done
 
-missing=$(awk '
+missing=$(${AWK:-awk} '
   /^\.?L[0-9]+:/ { label = $1; next }
   label == "" { next }
   /^[ \t]*\.loc[ \t]/ { label = ""; next }

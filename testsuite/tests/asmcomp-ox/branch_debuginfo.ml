@@ -15,7 +15,10 @@
    code at every local label starts with a location.  (This file must not
    contain calls: the code after a call does not start with a location.  For
    the same reason the test is not run with AddressSanitizer, which checks the
-   load from the table in [lookup] and reports failures with a call.) *)
+   load from the table in [lookup] and reports failures with a call.)
+
+   The marks must stay on the lines of the code they follow.  ocamlformat is
+   not enabled for this directory. *)
 
 let[@inline never] classify x =
   if x > 3 (* LINE *)
