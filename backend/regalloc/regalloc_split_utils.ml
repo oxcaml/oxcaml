@@ -44,10 +44,6 @@ let log_dominator_tree : Cfg_dominators.dominator_tree -> unit =
   in
   ldt dom_tree
 
-let log_dominator_forest : Cfg_dominators.dominator_tree list -> unit =
- fun dom_forest ->
-  List.iter dom_forest ~f:(fun dom_tree -> log_dominator_tree dom_tree)
-
 let log_substitution : Substitution.t -> unit =
  fun subst ->
   Reg.Tbl.iter
