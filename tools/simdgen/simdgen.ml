@@ -509,6 +509,7 @@ let print_one bind instr =
     | AVX512CD -> "AVX512CD"
     | AVX512BW -> "AVX512BW"
     | AVX512VL -> "AVX512VL"
+    | AVX512_BF16 -> "AVX512_BF16"
   in
   let print_temp : temp -> string = function
     | R8 -> "R8"
@@ -803,6 +804,7 @@ let parse_ext = function
   | "AVX512CD" -> Some AVX512CD
   | "AVX512BW" -> Some AVX512BW
   | "AVX512VL" -> Some AVX512VL
+  | "AVX512_BF16" -> Some AVX512_BF16
   | _ -> None
 
 let parse_ext ext =

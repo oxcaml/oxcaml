@@ -152,6 +152,8 @@ let table () : (string * id t) array =
     "caml_mm256_cvtepu32_ps", Default { arity = 1; imm = No_imm; bind = Instr vcvtudq2ps_Y_Ym256; args = [|Value 0|] };
     "caml_mm256_cvtepu64_pd", Default { arity = 1; imm = No_imm; bind = Instr vcvtuqq2pd_Y_Ym256; args = [|Value 0|] };
     "caml_mm256_cvtepu64_ps", Default { arity = 1; imm = No_imm; bind = Instr vcvtuqq2ps_X_Ym256; args = [|Value 0|] };
+    "caml_mm256_cvtne2ps_pbh", Default { arity = 2; imm = No_imm; bind = Instr vcvtne2ps2bf16_Y_Y_Ym256; args = [|Value 0; Value 1|] };
+    "caml_mm256_cvtneps_pbh", Default { arity = 1; imm = No_imm; bind = Instr vcvtneps2bf16_X_Ym256; args = [|Value 0|] };
     "caml_mm256_cvtpd_epi64", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2qq_Y_Ym256; args = [|Value 0|] };
     "caml_mm256_cvtpd_epu32", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2udq_X_Ym256; args = [|Value 0|] };
     "caml_mm256_cvtpd_epu64", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2uqq_Y_Ym256; args = [|Value 0|] };
@@ -177,6 +179,7 @@ let table () : (string * id t) array =
     "caml_mm256_cvtusepi64_epi32", Default { arity = 1; imm = No_imm; bind = Instr vpmovusqd_Xm128_Y; args = [|Value 0|] };
     "caml_mm256_cvtusepi64_epi8", Default { arity = 1; imm = No_imm; bind = Instr vpmovusqb_Xm32_Y; args = [|Value 0|] };
     "caml_mm256_dbsad_epu8", Default { arity = 2; imm = Imm 255; bind = Instr vdbpsadbw_Y_Y_Ym256; args = [|Value 0; Value 1|] };
+    "caml_mm256_dpbf16_ps", Default { arity = 3; imm = No_imm; bind = Instr vdpbf16ps_Y_Y_Ym256; args = [|Value 0; Value 1; Value 2|] };
     "caml_mm256_extractf32x4_ps", Default { arity = 1; imm = Imm 1; bind = Instr vextractf32x4_Xm128_Y; args = [|Value 0|] };
     "caml_mm256_extractf64x2_pd", Default { arity = 1; imm = Imm 1; bind = Instr vextractf64x2_Xm128_Y; args = [|Value 0|] };
     "caml_mm256_extracti32x4_epi32", Default { arity = 1; imm = Imm 1; bind = Instr vextracti32x4_Xm128_Y; args = [|Value 0|] };
@@ -368,6 +371,8 @@ let table () : (string * id t) array =
     "caml_mm256_mask_cvtepu8_epi16", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbw_Y_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm256_mask_cvtepu8_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbd_Y_Xm64_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm256_mask_cvtepu8_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbq_Y_Xm32_K, false); args = [|Value 0; Value 2; Value 1|] };
+    "caml_mm256_mask_cvtne2ps_pbh", Default { arity = 4; imm = No_imm; bind = Zeroing (vcvtne2ps2bf16_Y_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
+    "caml_mm256_mask_cvtneps_pbh", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtneps2bf16_X_Ym256_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm256_mask_cvtpd_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2dq_X_Ym256_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm256_mask_cvtpd_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2qq_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm256_mask_cvtpd_epu32", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2udq_X_Ym256_K, false); args = [|Value 0; Value 2; Value 1|] };
@@ -415,6 +420,7 @@ let table () : (string * id t) array =
     "caml_mm256_mask_dbsad_epu8", Default { arity = 4; imm = Imm 255; bind = Zeroing (vdbpsadbw_Y_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm256_mask_div_pd", Default { arity = 4; imm = No_imm; bind = Zeroing (vdivpd_Y_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm256_mask_div_ps", Default { arity = 4; imm = No_imm; bind = Zeroing (vdivps_Y_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
+    "caml_mm256_mask_dpbf16_ps", Default { arity = 4; imm = No_imm; bind = Zeroing (vdpbf16ps_Y_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm256_mask_expand_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vpexpandd_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm256_mask_expand_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vpexpandq_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm256_mask_expand_pd", Default { arity = 3; imm = No_imm; bind = Zeroing (vexpandpd_Y_Ym256_K, false); args = [|Value 0; Value 2; Value 1|] };
@@ -713,6 +719,8 @@ let table () : (string * id t) array =
     "caml_mm256_maskz_cvtepu8_epi16", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbw_Y_Xm128_K, true); args = [|Value 1; Value 0|] };
     "caml_mm256_maskz_cvtepu8_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbd_Y_Xm64_K, true); args = [|Value 1; Value 0|] };
     "caml_mm256_maskz_cvtepu8_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbq_Y_Xm32_K, true); args = [|Value 1; Value 0|] };
+    "caml_mm256_maskz_cvtne2ps_pbh", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtne2ps2bf16_Y_Y_Ym256_K, true); args = [|Value 1; Value 2; Value 0|] };
+    "caml_mm256_maskz_cvtneps_pbh", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtneps2bf16_X_Ym256_K, true); args = [|Value 1; Value 0|] };
     "caml_mm256_maskz_cvtpd_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2dq_X_Ym256_K, true); args = [|Value 1; Value 0|] };
     "caml_mm256_maskz_cvtpd_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2qq_Y_Ym256_K, true); args = [|Value 1; Value 0|] };
     "caml_mm256_maskz_cvtpd_epu32", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2udq_X_Ym256_K, true); args = [|Value 1; Value 0|] };
@@ -748,6 +756,7 @@ let table () : (string * id t) array =
     "caml_mm256_maskz_dbsad_epu8", Default { arity = 3; imm = Imm 255; bind = Zeroing (vdbpsadbw_Y_Y_Ym256_K, true); args = [|Value 1; Value 2; Value 0|] };
     "caml_mm256_maskz_div_pd", Default { arity = 3; imm = No_imm; bind = Zeroing (vdivpd_Y_Y_Ym256_K, true); args = [|Value 1; Value 2; Value 0|] };
     "caml_mm256_maskz_div_ps", Default { arity = 3; imm = No_imm; bind = Zeroing (vdivps_Y_Y_Ym256_K, true); args = [|Value 1; Value 2; Value 0|] };
+    "caml_mm256_maskz_dpbf16_ps", Default { arity = 4; imm = No_imm; bind = Zeroing (vdpbf16ps_Y_Y_Ym256_K, true); args = [|Value 1; Value 2; Value 3; Value 0|] };
     "caml_mm256_maskz_expand_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vpexpandd_Y_Ym256_K, true); args = [|Value 1; Value 0|] };
     "caml_mm256_maskz_expand_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vpexpandq_Y_Ym256_K, true); args = [|Value 1; Value 0|] };
     "caml_mm256_maskz_expand_pd", Default { arity = 2; imm = No_imm; bind = Zeroing (vexpandpd_Y_Ym256_K, true); args = [|Value 1; Value 0|] };
@@ -1198,6 +1207,8 @@ let table () : (string * id t) array =
     "caml_mm512_cvtepu8_epi16", Default { arity = 1; imm = No_imm; bind = Instr vpmovzxbw_Z_Ym256; args = [|Value 0|] };
     "caml_mm512_cvtepu8_epi32", Default { arity = 1; imm = No_imm; bind = Instr vpmovzxbd_Z_Xm128; args = [|Value 0|] };
     "caml_mm512_cvtepu8_epi64", Default { arity = 1; imm = No_imm; bind = Instr vpmovzxbq_Z_Xm64; args = [|Value 0|] };
+    "caml_mm512_cvtne2ps_pbh", Default { arity = 2; imm = No_imm; bind = Instr vcvtne2ps2bf16_Z_Z_Zm512; args = [|Value 0; Value 1|] };
+    "caml_mm512_cvtneps_pbh", Default { arity = 1; imm = No_imm; bind = Instr vcvtneps2bf16_Y_Zm512; args = [|Value 0|] };
     "caml_mm512_cvtpd_epi32", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2dq_Y_Zm512; args = [|Value 0|] };
     "caml_mm512_cvtpd_epi64", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2qq_Z_Zm512; args = [|Value 0|] };
     "caml_mm512_cvtpd_epu32", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2udq_Y_Zm512; args = [|Value 0|] };
@@ -1244,6 +1255,7 @@ let table () : (string * id t) array =
     "caml_mm512_div_ps", Default { arity = 2; imm = No_imm; bind = Instr vdivps_Z_Z_Zm512; args = [|Value 0; Value 1|] };
     "caml_mm512_div_round_pd", With_round { arity = 2; bind = Rnd vdivpd_Z_Z_Z; cur = Some (Instr vdivpd_Z_Z_Zm512); args = [|Value 0; Value 1|] };
     "caml_mm512_div_round_ps", With_round { arity = 2; bind = Rnd vdivps_Z_Z_Z; cur = Some (Instr vdivps_Z_Z_Zm512); args = [|Value 0; Value 1|] };
+    "caml_mm512_dpbf16_ps", Default { arity = 3; imm = No_imm; bind = Instr vdpbf16ps_Z_Z_Zm512; args = [|Value 0; Value 1; Value 2|] };
     "caml_mm512_extractf32x4_ps", Default { arity = 1; imm = Imm 3; bind = Instr vextractf32x4_Xm128_Z; args = [|Value 0|] };
     "caml_mm512_extractf32x8_ps", Default { arity = 1; imm = Imm 1; bind = Instr vextractf32x8_Ym256_Z; args = [|Value 0|] };
     "caml_mm512_extractf64x2_pd", Default { arity = 1; imm = Imm 3; bind = Instr vextractf64x2_Xm128_Z; args = [|Value 0|] };
@@ -1552,6 +1564,8 @@ let table () : (string * id t) array =
     "caml_mm512_mask_cvtepu8_epi16", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbw_Z_Ym256_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm512_mask_cvtepu8_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbd_Z_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm512_mask_cvtepu8_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbq_Z_Xm64_K, false); args = [|Value 0; Value 2; Value 1|] };
+    "caml_mm512_mask_cvtne2ps_pbh", Default { arity = 4; imm = No_imm; bind = Zeroing (vcvtne2ps2bf16_Z_Z_Zm512_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
+    "caml_mm512_mask_cvtneps_pbh", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtneps2bf16_Y_Zm512_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm512_mask_cvtpd_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2dq_Y_Zm512_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm512_mask_cvtpd_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2qq_Z_Zm512_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm512_mask_cvtpd_epu32", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2udq_Y_Zm512_K, false); args = [|Value 0; Value 2; Value 1|] };
@@ -1609,6 +1623,7 @@ let table () : (string * id t) array =
     "caml_mm512_mask_div_ps", Default { arity = 4; imm = No_imm; bind = Zeroing (vdivps_Z_Z_Zm512_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm512_mask_div_round_pd", With_round { arity = 4; bind = Rnd_zeroing (vdivpd_Z_Z_Z_K, false); cur = Some (Zeroing (vdivpd_Z_Z_Zm512_K, false)); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm512_mask_div_round_ps", With_round { arity = 4; bind = Rnd_zeroing (vdivps_Z_Z_Z_K, false); cur = Some (Zeroing (vdivps_Z_Z_Zm512_K, false)); args = [|Value 0; Value 2; Value 3; Value 1|] };
+    "caml_mm512_mask_dpbf16_ps", Default { arity = 4; imm = No_imm; bind = Zeroing (vdpbf16ps_Z_Z_Zm512_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm512_mask_expand_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vpexpandd_Z_Zm512_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm512_mask_expand_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vpexpandq_Z_Zm512_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm512_mask_expand_pd", Default { arity = 3; imm = No_imm; bind = Zeroing (vexpandpd_Z_Zm512_K, false); args = [|Value 0; Value 2; Value 1|] };
@@ -1979,6 +1994,8 @@ let table () : (string * id t) array =
     "caml_mm512_maskz_cvtepu8_epi16", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbw_Z_Ym256_K, true); args = [|Value 1; Value 0|] };
     "caml_mm512_maskz_cvtepu8_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbd_Z_Xm128_K, true); args = [|Value 1; Value 0|] };
     "caml_mm512_maskz_cvtepu8_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbq_Z_Xm64_K, true); args = [|Value 1; Value 0|] };
+    "caml_mm512_maskz_cvtne2ps_pbh", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtne2ps2bf16_Z_Z_Zm512_K, true); args = [|Value 1; Value 2; Value 0|] };
+    "caml_mm512_maskz_cvtneps_pbh", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtneps2bf16_Y_Zm512_K, true); args = [|Value 1; Value 0|] };
     "caml_mm512_maskz_cvtpd_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2dq_Y_Zm512_K, true); args = [|Value 1; Value 0|] };
     "caml_mm512_maskz_cvtpd_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2qq_Z_Zm512_K, true); args = [|Value 1; Value 0|] };
     "caml_mm512_maskz_cvtpd_epu32", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2udq_Y_Zm512_K, true); args = [|Value 1; Value 0|] };
@@ -2024,6 +2041,7 @@ let table () : (string * id t) array =
     "caml_mm512_maskz_div_ps", Default { arity = 3; imm = No_imm; bind = Zeroing (vdivps_Z_Z_Zm512_K, true); args = [|Value 1; Value 2; Value 0|] };
     "caml_mm512_maskz_div_round_pd", With_round { arity = 3; bind = Rnd_zeroing (vdivpd_Z_Z_Z_K, true); cur = Some (Zeroing (vdivpd_Z_Z_Zm512_K, true)); args = [|Value 1; Value 2; Value 0|] };
     "caml_mm512_maskz_div_round_ps", With_round { arity = 3; bind = Rnd_zeroing (vdivps_Z_Z_Z_K, true); cur = Some (Zeroing (vdivps_Z_Z_Zm512_K, true)); args = [|Value 1; Value 2; Value 0|] };
+    "caml_mm512_maskz_dpbf16_ps", Default { arity = 4; imm = No_imm; bind = Zeroing (vdpbf16ps_Z_Z_Zm512_K, true); args = [|Value 1; Value 2; Value 3; Value 0|] };
     "caml_mm512_maskz_expand_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vpexpandd_Z_Zm512_K, true); args = [|Value 1; Value 0|] };
     "caml_mm512_maskz_expand_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vpexpandq_Z_Zm512_K, true); args = [|Value 1; Value 0|] };
     "caml_mm512_maskz_expand_pd", Default { arity = 2; imm = No_imm; bind = Zeroing (vexpandpd_Z_Zm512_K, true); args = [|Value 1; Value 0|] };
@@ -2591,6 +2609,8 @@ let table () : (string * id t) array =
     "caml_mm_cvti32_ss", Default { arity = 2; imm = No_imm; bind = Instr vcvtsi2ss_X_X_r32m32; args = [|Value 0; Value 1|] };
     "caml_mm_cvti64_sd", Default { arity = 2; imm = No_imm; bind = Instr vcvtsi2sd_X_X_r64m64; args = [|Value 0; Value 1|] };
     "caml_mm_cvti64_ss", Default { arity = 2; imm = No_imm; bind = Instr vcvtsi2ss_X_X_r64m64; args = [|Value 0; Value 1|] };
+    "caml_mm_cvtne2ps_pbh", Default { arity = 2; imm = No_imm; bind = Instr vcvtne2ps2bf16_X_X_Xm128; args = [|Value 0; Value 1|] };
+    "caml_mm_cvtneps_pbh", Default { arity = 1; imm = No_imm; bind = Instr vcvtneps2bf16_X_Xm128; args = [|Value 0|] };
     "caml_mm_cvtpd_epi64", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2qq_X_Xm128; args = [|Value 0|] };
     "caml_mm_cvtpd_epu32", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2udq_X_Xm128; args = [|Value 0|] };
     "caml_mm_cvtpd_epu64", Default { arity = 1; imm = No_imm; bind = Instr vcvtpd2uqq_X_Xm128; args = [|Value 0|] };
@@ -2650,6 +2670,7 @@ let table () : (string * id t) array =
     "caml_mm_dbsad_epu8", Default { arity = 2; imm = Imm 255; bind = Instr vdbpsadbw_X_X_Xm128; args = [|Value 0; Value 1|] };
     "caml_mm_div_round_sd", With_round { arity = 2; bind = Rnd vdivsd_X_X_X; cur = Some (Instr vdivsd_X_X_Xm64); args = [|Value 0; Value 1|] };
     "caml_mm_div_round_ss", With_round { arity = 2; bind = Rnd vdivss_X_X_X; cur = Some (Instr vdivss_X_X_Xm32); args = [|Value 0; Value 1|] };
+    "caml_mm_dpbf16_ps", Default { arity = 3; imm = No_imm; bind = Instr vdpbf16ps_X_X_Xm128; args = [|Value 0; Value 1; Value 2|] };
     "caml_mm_fixupimm_pd", Default { arity = 3; imm = Imm 255; bind = Instr vfixupimmpd_X_X_Xm128; args = [|Value 0; Value 1; Value 2|] };
     "caml_mm_fixupimm_ps", Default { arity = 3; imm = Imm 255; bind = Instr vfixupimmps_X_X_Xm128; args = [|Value 0; Value 1; Value 2|] };
     "caml_mm_fixupimm_round_sd", With_sae { arity = 3; imm = Imm 255; bind = Sae vfixupimmsd_X_X_X; cur = Some (Instr vfixupimmsd_X_X_Xm64); args = [|Value 0; Value 1; Value 2|] };
@@ -2879,6 +2900,8 @@ let table () : (string * id t) array =
     "caml_mm_mask_cvtepu8_epi16", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbw_X_Xm64_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm_mask_cvtepu8_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbd_X_Xm32_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm_mask_cvtepu8_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vpmovzxbq_X_Xm16_K, false); args = [|Value 0; Value 2; Value 1|] };
+    "caml_mm_mask_cvtne2ps_pbh", Default { arity = 4; imm = No_imm; bind = Zeroing (vcvtne2ps2bf16_X_X_Xm128_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
+    "caml_mm_mask_cvtneps_pbh", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtneps2bf16_X_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm_mask_cvtpd_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2dq_X_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm_mask_cvtpd_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2qq_X_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm_mask_cvtpd_epu32", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtpd2udq_X_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
@@ -2932,6 +2955,7 @@ let table () : (string * id t) array =
     "caml_mm_mask_div_round_ss", With_round { arity = 4; bind = Rnd_zeroing (vdivss_X_X_X_K, false); cur = Some (Zeroing (vdivss_X_X_Xm32_K, false)); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm_mask_div_sd", Default { arity = 4; imm = No_imm; bind = Zeroing (vdivsd_X_X_Xm64_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm_mask_div_ss", Default { arity = 4; imm = No_imm; bind = Zeroing (vdivss_X_X_Xm32_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
+    "caml_mm_mask_dpbf16_ps", Default { arity = 4; imm = No_imm; bind = Zeroing (vdpbf16ps_X_X_Xm128_K, false); args = [|Value 0; Value 2; Value 3; Value 1|] };
     "caml_mm_mask_expand_epi32", Default { arity = 3; imm = No_imm; bind = Zeroing (vpexpandd_X_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm_mask_expand_epi64", Default { arity = 3; imm = No_imm; bind = Zeroing (vpexpandq_X_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
     "caml_mm_mask_expand_pd", Default { arity = 3; imm = No_imm; bind = Zeroing (vexpandpd_X_Xm128_K, false); args = [|Value 0; Value 2; Value 1|] };
@@ -3292,6 +3316,8 @@ let table () : (string * id t) array =
     "caml_mm_maskz_cvtepu8_epi16", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbw_X_Xm64_K, true); args = [|Value 1; Value 0|] };
     "caml_mm_maskz_cvtepu8_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbd_X_Xm32_K, true); args = [|Value 1; Value 0|] };
     "caml_mm_maskz_cvtepu8_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vpmovzxbq_X_Xm16_K, true); args = [|Value 1; Value 0|] };
+    "caml_mm_maskz_cvtne2ps_pbh", Default { arity = 3; imm = No_imm; bind = Zeroing (vcvtne2ps2bf16_X_X_Xm128_K, true); args = [|Value 1; Value 2; Value 0|] };
+    "caml_mm_maskz_cvtneps_pbh", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtneps2bf16_X_Xm128_K, true); args = [|Value 1; Value 0|] };
     "caml_mm_maskz_cvtpd_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2dq_X_Xm128_K, true); args = [|Value 1; Value 0|] };
     "caml_mm_maskz_cvtpd_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2qq_X_Xm128_K, true); args = [|Value 1; Value 0|] };
     "caml_mm_maskz_cvtpd_epu32", Default { arity = 2; imm = No_imm; bind = Zeroing (vcvtpd2udq_X_Xm128_K, true); args = [|Value 1; Value 0|] };
@@ -3333,6 +3359,7 @@ let table () : (string * id t) array =
     "caml_mm_maskz_div_round_ss", With_round { arity = 3; bind = Rnd_zeroing (vdivss_X_X_X_K, true); cur = Some (Zeroing (vdivss_X_X_Xm32_K, true)); args = [|Value 1; Value 2; Value 0|] };
     "caml_mm_maskz_div_sd", Default { arity = 3; imm = No_imm; bind = Zeroing (vdivsd_X_X_Xm64_K, true); args = [|Value 1; Value 2; Value 0|] };
     "caml_mm_maskz_div_ss", Default { arity = 3; imm = No_imm; bind = Zeroing (vdivss_X_X_Xm32_K, true); args = [|Value 1; Value 2; Value 0|] };
+    "caml_mm_maskz_dpbf16_ps", Default { arity = 4; imm = No_imm; bind = Zeroing (vdpbf16ps_X_X_Xm128_K, true); args = [|Value 1; Value 2; Value 3; Value 0|] };
     "caml_mm_maskz_expand_epi32", Default { arity = 2; imm = No_imm; bind = Zeroing (vpexpandd_X_Xm128_K, true); args = [|Value 1; Value 0|] };
     "caml_mm_maskz_expand_epi64", Default { arity = 2; imm = No_imm; bind = Zeroing (vpexpandq_X_Xm128_K, true); args = [|Value 1; Value 0|] };
     "caml_mm_maskz_expand_pd", Default { arity = 2; imm = No_imm; bind = Zeroing (vexpandpd_X_Xm128_K, true); args = [|Value 1; Value 0|] };

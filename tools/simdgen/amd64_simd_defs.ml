@@ -37,6 +37,7 @@ type ext =
   | AVX512BW
   | AVX512VL
   | AES
+  | AVX512_BF16
 
 (* Fixed machine register location *)
 type reg =
@@ -222,11 +223,12 @@ let equal_ext ext0 ext1 =
   | AVX512DQ, AVX512DQ
   | AVX512CD, AVX512CD
   | AVX512BW, AVX512BW
-  | AVX512VL, AVX512VL ->
+  | AVX512VL, AVX512VL
+  | AVX512_BF16, AVX512_BF16 ->
     true
   | ( ( SSE | SSE2 | SSE3 | SSSE3 | SSE4_1 | SSE4_2 | POPCNT | LZCNT | PCLMULQDQ
       | AES | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F | AVX512DQ
-      | AVX512CD | AVX512BW | AVX512VL ),
+      | AVX512CD | AVX512BW | AVX512VL | AVX512_BF16 ),
       _ ) ->
     false
 
@@ -476,6 +478,7 @@ let ext_to_string : ext -> string = function
   | AVX512CD -> "AVX512CD"
   | AVX512BW -> "AVX512BW"
   | AVX512VL -> "AVX512VL"
+  | AVX512_BF16 -> "AVX512_BF16"
 
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "

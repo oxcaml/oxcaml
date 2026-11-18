@@ -87,7 +87,7 @@
  (action
   (progn
    (run clang -c -O2 -fPIC -mavx512f -mavx512vl -mavx512dq -mavx512bw -mavx512cd
-     -I %{workspace_root}/runtime helpers.c gen512_stubs.c)
+     -mavx512bf16 -I %{workspace_root}/runtime helpers.c gen512_stubs.c)
    (run ar rcs %{targets} helpers.o gen512_stubs.o))))
 
 (rule
@@ -129,7 +129,8 @@
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw))
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw
+   -favx512bf16))
  (libraries gen512_helpers)
  (foreign_archives gen512stubs))
 
@@ -143,7 +144,7 @@
    (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw
-   -internal-assembler))
+   -favx512bf16 -internal-assembler))
  (libraries gen512_helpers)
  (foreign_archives gen512stubs))
 

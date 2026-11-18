@@ -42,6 +42,7 @@ module Extension : sig
     | AVX512BW
     | AVX512VL
     | AES
+    | AVX512_BF16
 
   val name : t -> string
 
