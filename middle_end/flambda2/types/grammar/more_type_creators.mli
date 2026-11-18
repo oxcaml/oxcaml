@@ -156,6 +156,8 @@ val variant :
   const_ctors:Type_grammar.t ->
   non_const_ctors:
     (Flambda_kind.Block_shape.t * Type_grammar.t list) Tag.Scannable.Map.t ->
+  is_int:Variable.t option ->
+  get_tag:Variable.t option ->
   Alloc_mode.For_types.t ->
   Type_grammar.t
 

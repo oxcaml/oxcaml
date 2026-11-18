@@ -90,11 +90,6 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
     (* Adapt the denv for the tag *)
     let tag_v = VB.create tag.param tag.param_debug_uid Name_mode.normal in
     let denv = DE.define_extra_variable denv tag_v K.naked_immediate in
-    let denv =
-      DE.map_typing_env denv ~f:(fun tenv ->
-          TE.add_get_tag_relation tenv (Name.var tag.param)
-            ~scrutinee:(Simple.var param_var))
-    in
     let get_tag_prim =
       P.Eligible_for_cse.create_get_tag ~block:(Name.var param_var)
     in
@@ -103,9 +98,9 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
         ~name_mode:Name_mode.normal
     in
     (* Same thing for is_int *)
-    let denv =
+    let denv, is_int =
       match const_ctors with
-      | Zero -> denv
+      | Zero -> denv, None
       | At_least_one { is_int; _ } ->
         let is_int_v =
           VB.create is_int.param is_int.param_debug_uid Name_mode.normal
@@ -124,7 +119,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
           DE.add_cse denv is_int_prim ~bound_to:(Simple.var is_int.param)
             ~name_mode:Name_mode.normal
         in
-        denv
+        denv, Some is_int.param
     in
     let denv, const_ctors =
       match const_ctors with
@@ -183,7 +178,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
     in
     let shape =
       T.variant ~machine_width:(DE.machine_width denv) ~const_ctors
-        ~non_const_ctors
+        ~non_const_ctors ~is_int ~get_tag:(Some tag.param)
         (Alloc_mode.For_types.unknown ())
     in
     let denv = add_equation_on_var denv param_var shape in
