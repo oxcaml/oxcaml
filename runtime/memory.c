@@ -203,7 +203,7 @@ Caml_inline void write_barrier(
      }
      /* this update is creating a new link from major to minor, remember it */
      if (Is_block_and_young(new_val)) {
-       Ref_table_add(&Caml_state->minor_tables->major_ref, Op_val(obj) + field);
+       Ref_table_add(Caml_state->minor_tables.major_ref, Op_val(obj) + field);
      } // TODO: The ref table access above has 3 levels of indirection!
    }
 }
@@ -253,7 +253,8 @@ CAMLexport void caml_alloc_dependent_memory (value v, mlsize_t nbytes)
     Bsize_wsize (Caml_state->minor_heap_wsz) / 100 * caml_custom_minor_ratio;
   if (Is_young (v)){
     Caml_state->stat_minor_dependent_bytes += nbytes;
-    add_to_dependent_table (&Caml_state->minor_tables->dependent, v, nbytes);
+    add_to_dependent_table
+      (Caml_dependent_table(Caml_state->minor_tables.dependent), v, nbytes);
     Caml_state->minor_dependent_bsz += nbytes;
     if (Caml_state->minor_dependent_bsz > max_alloc) {
       caml_request_minor_gc ();
@@ -308,7 +309,7 @@ CAMLexport CAMLweakdef void caml_initialize (volatile value *fp, value val)
 #endif
   *fp = val;
   if (!Is_young((value)fp) && Is_block_and_young (val))
-    Ref_table_add(&Caml_state->minor_tables->major_ref, fp);
+    Ref_table_add(Caml_state->minor_tables.major_ref, fp);
 }
 
 CAMLprim value caml_atomic_make(value v)

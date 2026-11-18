@@ -134,7 +134,7 @@ module F = struct
       if List.exists (function C _ -> true | _ -> false) tasks
       then
         [ "(glob_files %{project_root}/runtime/caml/*.h)";
-          "%{project_root}/runtime/caml/domain_state.tbl" ]
+          "(glob_files %{project_root}/runtime/caml/*.tbl)" ]
       else []
     in
     let targets =

@@ -1,0 +1,39 @@
+#ifndef MINOR_TABLE_BEGIN
+# define MINOR_TABLE_BEGIN(name)
+#endif
+
+#ifndef MINOR_TABLE_FIELD
+# define MINOR_TABLE_FIELD(type, prefix, name) DOMAIN_STATE(type, prefix##name)
+#endif
+
+#ifndef MINOR_TABLE_END
+# define MINOR_TABLE_END(name)
+#endif
+
+MINOR_TABLE_BEGIN(major_ref)
+# define MINOR_TABLE_PREFIX major_ref_
+# define MINOR_TABLE_TYPE value *
+# include "minor_table.tbl"
+MINOR_TABLE_END(major_ref)
+
+MINOR_TABLE_BEGIN(ephe_ref)
+# define MINOR_TABLE_PREFIX ephe_ref_
+# define MINOR_TABLE_TYPE struct caml_ephe_ref_elt
+# include "minor_table.tbl"
+MINOR_TABLE_END(ephe_ref)
+
+MINOR_TABLE_BEGIN(custom)
+# define MINOR_TABLE_PREFIX custom_
+# define MINOR_TABLE_TYPE struct caml_custom_elt
+# include "minor_table.tbl"
+MINOR_TABLE_END(custom)
+
+MINOR_TABLE_BEGIN(dependent)
+# define MINOR_TABLE_PREFIX dependent_
+# define MINOR_TABLE_TYPE struct caml_dependent_elt
+# include "minor_table.tbl"
+MINOR_TABLE_END(dependent)
+
+#undef MINOR_TABLE_END
+#undef MINOR_TABLE_FIELD
+#undef MINOR_TABLE_BEGIN

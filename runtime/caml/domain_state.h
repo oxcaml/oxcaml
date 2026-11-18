@@ -34,6 +34,9 @@ typedef value extra_params_area[NUM_EXTRA_PARAMS];
  * via native code, which is why the indices are important */
 typedef struct {
 #define DOMAIN_STATE(type, name) CAMLalign(8) type name;
+#define MINOR_TABLE_BEGIN(name) struct {
+#define MINOR_TABLE_FIELD(type, prefix, name) DOMAIN_STATE(type, name)
+#define MINOR_TABLE_END(name) } name;
 #include "domain_state.tbl"
 #undef DOMAIN_STATE
 } caml_domain_state;
