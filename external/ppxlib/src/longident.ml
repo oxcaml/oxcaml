@@ -71,6 +71,9 @@ let parse s =
   let par = parentheses (-1) 0 0 (String.length s) s in
   match (s.[0], par) with
   | ('A' .. 'Z' | 'a' .. 'z' | '_'), Ok None -> parse_simple s
+  | _, Ok None
+    when Ocaml_common.Misc.Utf8_lexeme.starts_like_a_valid_identifier s ->
+      parse_simple s
   | _, Ok None -> Lident s (* This is a raw operator, no module path *)
   | _, Error _ -> invalid "unbalanced parenthesis"
   | _, Ok (Some (l, r)) -> (
