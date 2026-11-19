@@ -16,12 +16,15 @@ mutual
 
   inductive ModuleType : Type where
     | signature
-        (moduleTypes : List (Option ModuleType))
-        (types : List TypeDecl)
-        (runtimeValues : List RuntimeValueType)
+        (absent : List ModuleItemAbsentAtRuntime)
+        (present : List ModuleItemPresentAtRuntime)
     | field (within : ModuleStatics) (index : Nat)
 
-  inductive RuntimeValueType : Type where
+  inductive ModuleItemAbsentAtRuntime : Type where
+    | moduleType (moduleTypeDecl : Option ModuleType)
+    | valType (typeDecl : TypeDecl)
+
+  inductive ModuleItemPresentAtRuntime : Type where
     | mod (moduleType : ModuleType)
     | val (valType : ValType)
 

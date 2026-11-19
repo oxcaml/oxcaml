@@ -39,7 +39,8 @@ def upstreamInterface (compilationUnit : String) : Lean.Expr :=
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
 
 deriving instance Repr for
-  ModuleStatics, ModuleType, RuntimeValueType, TypeDecl, ValType, TypeConstr
+  ModuleItemAbsentAtRuntime, ModuleItemPresentAtRuntime, ModuleStatics,
+  ModuleType, TypeDecl, ValType, TypeConstr
 
 -- TODO: remove when https://github.com/leanprover/lean4/pull/14959 is merged
 namespace WorkaroundForPr14959
@@ -70,39 +71,60 @@ namespace WorkaroundForPr14959
       mkApp (mkConst ``Model.TypeConstr.predef) (toExpr predefined)
 
   section ModuleType
-    variable (ModuleTypeDecl RuntimeValueType TypeDecl : Type)
+    variable
+      (ModuleItemAbsentAtRuntime ModuleItemPresentAtRuntime TypeDecl : Type)
     inductive ModuleType : Type where
       | signature
-          (moduleTypes : List ModuleTypeDecl)
-          (types : List TypeDecl)
-          (runtimeValues : List RuntimeValueType)
+          (absent : List ModuleItemAbsentAtRuntime)
+          (present : List ModuleItemPresentAtRuntime)
       | field (within : ModuleStatics) (index : Nat)
     deriving FromJson
   end ModuleType
 
-  def ModuleType.toTerm : ModuleType Lean.Expr Lean.Expr Lean.Expr → Lean.Expr
-    | .signature moduleTypes types runtimeValues =>
-      mkApp3 (mkConst ``Model.ModuleType.signature)
+  def ModuleType.toTerm
+      : ModuleType Lean.Expr Lean.Expr → Lean.Expr
+    | .signature absent present =>
+      mkApp2 (mkConst ``Model.ModuleType.signature)
         (Lean.Expr.mkList
-          (mkApp (mkConst ``Option [.zero]) (mkConst ``Model.ModuleType))
-          moduleTypes)
-        (Lean.Expr.mkList (mkConst ``Model.TypeDecl) types)
-        (Lean.Expr.mkList (mkConst ``Model.RuntimeValueType) runtimeValues)
+          (mkConst ``Model.ModuleItemAbsentAtRuntime)
+          absent)
+        (Lean.Expr.mkList
+          (mkConst ``Model.ModuleItemPresentAtRuntime)
+          present)
     | .field within index =>
       mkApp2 (mkConst ``Model.ModuleType.field) within.toTerm (toExpr index)
 
-  section RuntimeValueType
+  section ModuleItemAbsentAtRuntime
+    variable (ModuleType TypeDecl : Type)
+    inductive ModuleItemAbsentAtRuntime : Type where
+      | moduleType (moduleType : Option ModuleType)
+      | valType (typeDecl : TypeDecl)
+    deriving FromJson
+  end ModuleItemAbsentAtRuntime
+
+  def ModuleItemAbsentAtRuntime.toTerm
+      : ModuleItemAbsentAtRuntime Lean.Expr Lean.Expr → Lean.Expr
+    | .moduleType moduleTypeDecl =>
+      mkApp
+        (mkConst ``Model.ModuleItemAbsentAtRuntime.moduleType)
+        (Lean.Expr.mkOption (mkConst ``Model.ModuleType) moduleTypeDecl)
+    | .valType typeDecl =>
+      mkApp (mkConst ``Model.ModuleItemAbsentAtRuntime.valType) typeDecl
+
+  section ModuleItemPresentAtRuntime
     variable (ModuleType ValType : Type)
-    inductive RuntimeValueType : Type where
+    inductive ModuleItemPresentAtRuntime : Type where
       | mod (moduleType : ModuleType)
       | val (valType : ValType)
     deriving FromJson
-  end RuntimeValueType
+  end ModuleItemPresentAtRuntime
 
-  def RuntimeValueType.toTerm : RuntimeValueType Lean.Expr Lean.Expr → Lean.Expr
+  def ModuleItemPresentAtRuntime.toTerm
+      : ModuleItemPresentAtRuntime Lean.Expr Lean.Expr → Lean.Expr
     | .mod moduleType =>
-      mkApp (mkConst ``Model.RuntimeValueType.mod) moduleType
-    | .val valType => mkApp (mkConst ``Model.RuntimeValueType.val) valType
+      mkApp (mkConst ``Model.ModuleItemPresentAtRuntime.mod) moduleType
+    | .val valType =>
+      mkApp (mkConst ``Model.ModuleItemPresentAtRuntime.val) valType
 
   section TypeDecl
     variable (ValType : Type)
@@ -146,25 +168,24 @@ namespace WorkaroundForPr14959
       @instFromJsonModuleType
         Lean.Expr
         Lean.Expr
+        ⟨ModuleItemAbsentAtRuntime.fromJson?⟩
+        ⟨ModuleItemPresentAtRuntime.fromJson?⟩
+      |>.fromJson? json
+      |>.map (·.toTerm)
+
+    partial def ModuleItemAbsentAtRuntime.fromJson? (json : Json)
+        : Except String Lean.Expr := do
+      @instFromJsonModuleItemAbsentAtRuntime
         Lean.Expr
-        ⟨ModuleTypeDecl.fromJson?⟩
-        ⟨RuntimeValueType.fromJson?⟩
+        Lean.Expr
+        ⟨ModuleType.fromJson?⟩
         ⟨TypeDecl.fromJson?⟩
       |>.fromJson? json
       |>.map (·.toTerm)
 
-    partial def ModuleTypeDecl.fromJson? (json : Json)
+    partial def ModuleItemPresentAtRuntime.fromJson? (json : Json)
         : Except String Lean.Expr := do
-      let moduleType := mkConst ``Model.ModuleType
-      match json with
-      | .null => return Lean.Expr.mkOption moduleType .none
-      | json =>
-        let moduleTypeDecl ← ModuleType.fromJson? json
-        return Lean.Expr.mkOption moduleType (.some moduleTypeDecl)
-
-    partial def RuntimeValueType.fromJson? (json : Json)
-        : Except String Lean.Expr := do
-      @instFromJsonRuntimeValueType
+      @instFromJsonModuleItemPresentAtRuntime
         Lean.Expr
         Lean.Expr
         ⟨ModuleType.fromJson?⟩

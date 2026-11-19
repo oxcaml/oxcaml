@@ -155,11 +155,10 @@ let type_constr : Model.type_constr -> Json.t = function
   | Predef p -> predef p |> tag "predef" |> tag "predef"
 
 let rec module_type : Model.module_type -> Json.t = function
-  | Signature { module_types; types; runtime_values } ->
+  | Signature { absent; present } ->
     Json.Object
-      [ "moduleTypes", array (option module_type) module_types
-      ; "types", array type_decl types
-      ; "runtimeValues", array runtime_value_type runtime_values
+      [ "absent", array module_item_absent_at_runtime absent
+      ; "present", array module_item_present_at_runtime present
       ]
     |> tag "signature"
   | Module_type_field { within; index } ->
@@ -171,7 +170,16 @@ and type_decl ({ manifest; arity } : Model.type_decl) : Json.t =
     ; "arity", Json.int arity
     ]
 
-and runtime_value_type : Model.runtime_value_type -> Json.t = function
+and module_item_absent_at_runtime
+    : Model.module_item_absent_at_runtime -> Json.t = function
+  | Module_type m ->
+    option module_type m
+    |> tag "moduleTypeDecl"
+    |> tag "moduleType"
+  | Val_type t -> type_decl t |> tag "typeDecl" |> tag "valType"
+
+and module_item_present_at_runtime
+    : Model.module_item_present_at_runtime -> Json.t = function
   | Module m -> module_type m |> tag "moduleType" |> tag "mod"
   | Val v -> val_type v |> tag "valType" |> tag "val"
 

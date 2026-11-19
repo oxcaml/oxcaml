@@ -12,9 +12,8 @@ type module_statics =
 
 type module_type =
   | Signature of
-      { module_types : module_type option list
-      ; types : type_decl list
-      ; runtime_values : runtime_value_type list
+      { absent : module_item_absent_at_runtime list
+      ; present : module_item_present_at_runtime list
       }
   | Module_type_field of
       { within : module_statics
@@ -26,7 +25,11 @@ and type_decl =
   ; arity : int
   }
 
-and runtime_value_type =
+and module_item_absent_at_runtime =
+  | Module_type of module_type option
+  | Val_type of type_decl
+
+and module_item_present_at_runtime =
   | Module of module_type (* ...and not just an alias like [module M = N] *)
   | Val of val_type
 

@@ -7,7 +7,7 @@ abbrev interface : ModuleType :=
   let t : ValType := .constr (.field even 0) []
   let t_option : ValType := .constr (.predef .option) [t]
 
-  .signature [] [] [.val t_option]
+  .signature [] [.val t_option]
 
 abbrev implementation : Expr :=
   let even : Expr := .upstreamCompilationUnit Oxiclean.Extracted.Even.interface

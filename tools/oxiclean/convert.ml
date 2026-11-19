@@ -181,27 +181,30 @@ and binary_scalar_operation
 let impl = impl_in_scope []
 
 module Signature_parts = struct
-  type runtime_value =
+  type module_item_absent_at_runtime =
+    | Module_type of Ident.t * Types.modtype_declaration
+    | Val_type of Ident.t * Types.type_declaration
+
+  type module_item_present_at_runtime =
     | Module of Ident.t * Types.module_type
     | Val of Ident.t * Types.type_expr
 
   type t =
-    { module_types : (Ident.t * Types.modtype_declaration) list
-    ; types : (Ident.t * Types.type_declaration) list
-    ; runtime_values : runtime_value list
+    { absent : module_item_absent_at_runtime list
+    ; present : module_item_present_at_runtime list
     }
 
   let push (item : Types.signature_item) (parts : t) : t =
     match item with
     | Sig_modtype (id, decl, _) ->
-      { parts with module_types = (id, decl) :: parts.module_types }
+      { parts with absent = Module_type (id, decl) :: parts.absent }
     | Sig_type (id, decl, _, _) ->
-      { parts with types = (id, decl) :: parts.types }
+      { parts with absent = Val_type (id, decl) :: parts.absent }
     | Sig_value (id, { val_type; val_kind = Val_reg _; _ }, _) ->
-      { parts with runtime_values = Val (id, val_type) :: parts.runtime_values }
+      { parts with present = Val (id, val_type) :: parts.present }
     | Sig_module (id, Mp_present, { md_type; _ }, _, _) ->
       { parts with
-        runtime_values = Module (id, md_type) :: parts.runtime_values
+        present = Module (id, md_type) :: parts.present
       }
     | other ->
       raise
@@ -212,7 +215,7 @@ module Signature_parts = struct
 
   let of_items (items : Types.signature) : t =
     List.fold_right push items
-      { module_types = []; types = []; runtime_values = [] }
+      { absent = []; present = [] }
 
   let of_module_type : Types.module_type -> t = function
     | Mty_signature items -> of_items items
@@ -229,13 +232,21 @@ module Signature_parts = struct
       (fun index -> function
          | Module (id, md_type) when matches id -> Some (index, md_type)
          | Module _ | Val _ -> None)
-      parts.runtime_values
+      parts.present
 
   let find_type (matches : Ident.t -> bool) (parts : t) : int option =
-    List.find_index (fun (id, _) -> matches id) parts.types
+    List.find_index
+      ( function
+        | Val_type (id, _) -> matches id
+        | Module_type _ -> false )
+      parts.absent
 
   let find_module_type (matches : Ident.t -> bool) (parts : t) : int option =
-    List.find_index (fun (id, _) -> matches id) parts.module_types
+    List.find_index
+      ( function
+        | Module_type (id, _) -> matches id
+        | Val_type _ -> false )
+      parts.absent
 end
 
 module Resolve = struct
@@ -250,7 +261,10 @@ module Resolve = struct
     let not_found () =
       raise
         (Error.Message
-           (Format.asprintf "%s not found: %a" what Printtyp.path path))
+           (Format.asprintf
+              "%s could not resolved by path: %a"
+              what
+              Printtyp.path path))
     in
     match path with
     | Pident id ->
@@ -393,18 +407,20 @@ and signature ~(module_vars : Signature_parts.t list) (items : Types.signature)
     : Model.module_type =
   let parts = Signature_parts.of_items items in
   let module_vars = parts :: module_vars in
-  let module_type_decl
-      (_, { mtd_type; _ } : Ident.t * Types.modtype_declaration) =
-    Option.map (module_type ~module_vars) mtd_type
-  in
   Signature
-    { module_types = List.map module_type_decl parts.module_types
-    ; types = List.map (fun (id, decl) -> type_decl ~module_vars id decl) parts.types
-    ; runtime_values = List.map (runtime_value ~module_vars) parts.runtime_values
+    { absent = List.map (module_item_absent_at_runtime ~module_vars) parts.absent
+    ; present = List.map (module_item_present_at_runtime ~module_vars) parts.present
     }
 
-and runtime_value ~(module_vars : Signature_parts.t list)
-    : Signature_parts.runtime_value -> Model.runtime_value_type = function
+and module_item_absent_at_runtime ~(module_vars : Signature_parts.t list)
+    : Signature_parts.module_item_absent_at_runtime ->
+      Model.module_item_absent_at_runtime = function
+  | Module_type (_, m) -> Module_type (Option.map (module_type ~module_vars) m.mtd_type)
+  | Val_type (id, t) ->
+    Val_type (type_decl ~module_vars id t)
+
+and module_item_present_at_runtime ~(module_vars : Signature_parts.t list)
+    : Signature_parts.module_item_present_at_runtime -> Model.module_item_present_at_runtime = function
   | Module (_, md_type) -> Module (module_type ~module_vars md_type)
   | Val (_, ty) ->
     Val (poly ~module_vars ~type_vars:[] ty (Ctype.free_variables ty))

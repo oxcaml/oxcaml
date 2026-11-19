@@ -1,8 +1,7 @@
 {
   "signature": {
-    "moduleTypes": [],
-    "types": [{"manifest": null, "arity": 0}],
-    "runtimeValues": [
+    "absent": [{"valType": {"typeDecl": {"manifest": null, "arity": 0}}}],
+    "present": [
       {
         "val": {
           "valType": {

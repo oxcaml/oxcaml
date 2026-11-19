@@ -8,7 +8,7 @@ abbrev interface : ModuleType :=
   let create : ValType := .arrow int t_option
   let get : ValType := .arrow t int
 
-  .signature [] [{ manifest := none, arity := 0 }] [.val create, .val get]
+  .signature [.valType { manifest := none, arity := 0 }] [.val create, .val get]
 
 abbrev implementation : Expr :=
   let get : Expr := .function (Expr.var 0)

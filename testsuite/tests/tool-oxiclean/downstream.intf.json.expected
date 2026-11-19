@@ -1,8 +1,7 @@
 {
   "signature": {
-    "moduleTypes": [],
-    "types": [],
-    "runtimeValues": [
+    "absent": [],
+    "present": [
       {
         "val": {
           "valType": {
