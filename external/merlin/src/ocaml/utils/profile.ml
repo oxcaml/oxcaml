@@ -51,18 +51,8 @@ module Measure = struct
   let create ?(counters = Counters.create ()) () =
     let minor_words, promoted_words, major_words = Gc.counters () in
     {
-<<<<<<< Merlin:dprofile-Gc.counters
       time = Unix.gettimeofday ();
-      allocated_words = stat.minor_words +. stat.major_words;
-      top_heap_words = stat.top_heap_words;
-||||||| Compiler:last-imported
-      time = gettimeofday ();
-      allocated_words = stat.minor_words +. stat.major_words;
-      top_heap_words = stat.top_heap_words;
-=======
-      time = gettimeofday ();
       allocated_words = minor_words +. major_words -. promoted_words;
->>>>>>> Compiler:HEAD
       counters = counters;
     }
   (* The baseline for the toplevel "other" row: the clock is wall time, so it
