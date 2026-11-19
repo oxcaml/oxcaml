@@ -1026,6 +1026,12 @@ external incr : (int ref[@local_opt]) -> unit @@ portable = "%incr"
 external decr : (int ref[@local_opt]) -> unit @@ portable = "%decr"
 
 module Builtins = struct
+  external rdpmc : int64_u -> int64_u = "" "caml_rdpmc_unboxed"
+    [@@noalloc] [@@builtin]
+
+  external rdtsc : unit -> int64_u = "" "caml_rdtsc_unboxed"
+    [@@noalloc] [@@builtin]
+
   (* Conditional select *)
 
   external select :
