@@ -87,7 +87,8 @@ let these_naked_masks vs = TG.these_naked_masks vs
 
 let any_tagged_immediate =
   TG.create_variant ~is_unique:false ~immediates:Unknown
-    ~blocks:(Known TG.Row_like_for_blocks.bottom) ~extensions:No_extensions
+    ~blocks:(Known TG.Row_like_for_blocks.bottom) ~is_int:None ~get_tag:None
+    ~extensions:No_extensions
 
 let any_tagged_immediate_non_null =
   TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
@@ -109,7 +110,8 @@ let these_tagged_immediates0 imms =
     else
       TG.create_variant ~is_unique:false
         ~immediates:(Known (these_naked_immediates imms))
-        ~blocks:(Known TG.Row_like_for_blocks.bottom) ~extensions:No_extensions
+        ~blocks:(Known TG.Row_like_for_blocks.bottom) ~is_int:None ~get_tag:None
+        ~extensions:No_extensions
 
 let these_tagged_immediates imms = these_tagged_immediates0 imms
 
@@ -213,8 +215,8 @@ let any_boxed_mask_non_null =
 
 let any_block =
   TG.create_variant ~is_unique:false
-    ~immediates:(Known TG.bottom_naked_immediate) ~blocks:Unknown
-    ~extensions:No_extensions
+    ~immediates:(Known TG.bottom_naked_immediate) ~blocks:Unknown ~is_int:None
+    ~get_tag:None ~extensions:No_extensions
 
 let blocks_with_these_tags ~machine_width tags alloc_mode : _ Or_unknown.t =
   if not (Tag.Set.for_all Tag.is_structured_block tags)
@@ -228,7 +230,7 @@ let blocks_with_these_tags ~machine_width tags alloc_mode : _ Or_unknown.t =
     Known
       (TG.create_variant ~is_unique:false
          ~immediates:(Known TG.bottom_naked_immediate) ~blocks:(Known blocks)
-         ~extensions:No_extensions)
+         ~is_int:None ~get_tag:None ~extensions:No_extensions)
 
 let immutable_block ~machine_width ~is_unique tag ~shape alloc_mode ~fields =
   match Target_ocaml_int.of_int_option machine_width (List.length fields) with
@@ -241,7 +243,7 @@ let immutable_block ~machine_width ~is_unique tag ~shape alloc_mode ~fields =
         (Known
            (TG.Row_like_for_blocks.create ~machine_width ~shape
               ~field_tys:fields (Closed tag) alloc_mode))
-      ~extensions:No_extensions
+      ~is_int:None ~get_tag:None ~extensions:No_extensions
 
 let immutable_block_non_null ~machine_width ~is_unique tag ~shape alloc_mode
     ~fields =
@@ -275,9 +277,10 @@ let immutable_block_with_size_at_least ~machine_width ~tag ~n ~shape
          (TG.Row_like_for_blocks.create ~machine_width ~shape ~field_tys
             (Open tag)
             (Alloc_mode.For_types.unknown ())))
-    ~extensions:No_extensions
+    ~is_int:None ~get_tag:None ~extensions:No_extensions
 
-let variant ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
+let variant ~machine_width ~const_ctors ~non_const_ctors ~is_int ~get_tag
+    ~extensions alloc_mode =
   let blocks =
     let shape_and_field_tys_by_tag =
       Tag.Scannable.Map.fold
@@ -290,7 +293,7 @@ let variant ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
       ~shape_and_field_tys_by_tag alloc_mode
   in
   TG.create_variant ~is_unique:false ~immediates:(Known const_ctors)
-    ~blocks:(Known blocks) ~extensions:No_extensions
+    ~blocks:(Known blocks) ~is_int ~get_tag ~extensions
 
 let variant_non_null ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
   let blocks =

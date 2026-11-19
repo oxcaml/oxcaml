@@ -606,10 +606,20 @@ val immutable_block_with_size_at_least :
 
 val mutable_block : Alloc_mode.For_types.t -> t
 
+type variant_extensions =
+  | No_extensions
+  | Ext of
+      { when_immediate : typing_env_extension;
+        when_block : typing_env_extension
+      }
+
 val variant :
   machine_width:Target_system.Machine_width.t ->
   const_ctors:t ->
   non_const_ctors:(Flambda_kind.Block_shape.t * t list) Tag.Scannable.Map.t ->
+  is_int:Variable.t option ->
+  get_tag:Variable.t option ->
+  extensions:variant_extensions ->
   Alloc_mode.For_types.t ->
   t
 
