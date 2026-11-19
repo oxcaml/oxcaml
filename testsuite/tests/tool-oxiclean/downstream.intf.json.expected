@@ -1,0 +1,34 @@
+{
+  "signature": {
+    "moduleTypes": [],
+    "types": [],
+    "runtimeValues": [
+      {
+        "val": {
+          "valType": {
+            "constr": {
+              "constructor": {"predef": {"predef": "option"}},
+              "args": [
+                {
+                  "constr": {
+                    "constructor": {
+                      "field": {
+                        "within": {
+                          "upstreamCompilationUnit": {
+                            "compilationUnit": "Even"
+                          }
+                        },
+                        "index": 0
+                      }
+                    },
+                    "args": []
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

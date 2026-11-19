@@ -1,53 +1,62 @@
 {
-  "ty": {
-    "kind": "abstract",
-    "etc": {
-      "val": {
-        "exprType": {
-          "arrow": {
-            "domain": {
-              "constr": {
-                "constructor": {"predef": {"predef": "int"}},
-                "args": []
-              }
-            },
-            "codomain": {
-              "constr": {
-                "constructor": {"predef": {"predef": "option"}},
-                "args": [
-                  {
-                    "constr": {
-                      "constructor": {"var": {"deBruijn": 0}},
-                      "args": []
+  "signature": {
+    "moduleTypes": [],
+    "types": [{"manifest": null, "arity": 0}],
+    "runtimeValues": [
+      {
+        "val": {
+          "valType": {
+            "arrow": {
+              "domain": {
+                "constr": {
+                  "constructor": {"predef": {"predef": "int"}},
+                  "args": []
+                }
+              },
+              "codomain": {
+                "constr": {
+                  "constructor": {"predef": {"predef": "option"}},
+                  "args": [
+                    {
+                      "constr": {
+                        "constructor": {
+                          "field": {
+                            "within": {"var": {"deBruijn": 0}},
+                            "index": 0
+                          }
+                        },
+                        "args": []
+                      }
                     }
-                  }
-                ]
+                  ]
+                }
               }
             }
           }
-        },
-        "etc": {
-          "val": {
-            "exprType": {
-              "arrow": {
-                "domain": {
-                  "constr": {
-                    "constructor": {"var": {"deBruijn": 0}},
-                    "args": []
-                  }
-                },
-                "codomain": {
-                  "constr": {
-                    "constructor": {"predef": {"predef": "int"}},
-                    "args": []
-                  }
+        }
+      },
+      {
+        "val": {
+          "valType": {
+            "arrow": {
+              "domain": {
+                "constr": {
+                  "constructor": {
+                    "field": {"within": {"var": {"deBruijn": 0}}, "index": 0}
+                  },
+                  "args": []
+                }
+              },
+              "codomain": {
+                "constr": {
+                  "constructor": {"predef": {"predef": "int"}},
+                  "args": []
                 }
               }
-            },
-            "etc": "empty"
+            }
           }
         }
       }
-    }
+    ]
   }
 }

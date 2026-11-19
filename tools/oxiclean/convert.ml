@@ -39,7 +39,7 @@ let rec impl_in_scope (context : Ident.t list)
       ; failaction = Option.map (impl_in_scope context) cases.sw_failaction
       }
   | Lvar id ->
-    begin match List.find_index (Ident.equal id) context with
+    begin match List.find_index (Ident.same id) context with
     | Some de_bruijn -> Var { de_bruijn }
     | None ->
       raise
@@ -89,7 +89,7 @@ and primitive (context : Ident.t list) (args : Lambda.lambda list)
   begin function
   | Pfield (index, _, Reads_agree) ->
     begin match args with
-    | [arg] -> Field { block = impl_in_scope context arg; index }
+    | [arg] -> Field { within = impl_in_scope context arg; index }
     | [] | _ :: _ :: _ ->
       raise
         (Error.Message
@@ -97,7 +97,7 @@ and primitive (context : Ident.t list) (args : Lambda.lambda list)
     end
   | Pgetglobal (compilation_unit, _) ->
     UpstreamCompilationUnit
-      { name = Compilation_unit.name_as_string compilation_unit }
+      { name = Compilation_unit.to_global_name_exn compilation_unit }
   | Pmakeblock (tag, Immutable, _, _) ->
     Block { tag; fields = List.map (impl_in_scope context) args }
   | Pphys_equal Eq ->
@@ -180,60 +180,161 @@ and binary_scalar_operation
 
 let impl = impl_in_scope []
 
-module Type_in_context = struct
+module Signature_parts = struct
+  type runtime_value =
+    | Module of Ident.t * Types.module_type
+    | Val of Ident.t * Types.type_expr
+
   type t =
-    | Id of Ident.t
-    | Poly of Types.type_expr
+    { module_types : (Ident.t * Types.modtype_declaration) list
+    ; types : (Ident.t * Types.type_declaration) list
+    ; runtime_values : runtime_value list
+    }
 
-  let eq (lhs : t) (rhs : t) : bool =
-    match lhs, rhs with
-    | Id lhs, Id rhs -> Ident.equal lhs rhs
-    | Poly lhs, Poly rhs -> Types.eq_type lhs rhs
-    | Id _, Poly _ | Poly _, Id _ -> false
-end
-
-let resolve_type_constr_by_path ~(type_context : Type_in_context.t list)
-    : Path.t -> Model.Type.constr = function
-  | Pident id as p ->
-    if Ident.is_predef id then begin
-      if Path.same p Predef.path_int then Predef Int else
-      if Path.same p Predef.path_option then Predef Option else
-      if Path.same p Predef.path_bool then Predef Bool else
+  let push (item : Types.signature_item) (parts : t) : t =
+    match item with
+    | Sig_modtype (id, decl, _) ->
+      { parts with module_types = (id, decl) :: parts.module_types }
+    | Sig_type (id, decl, _, _) ->
+      { parts with types = (id, decl) :: parts.types }
+    | Sig_value (id, { val_type; val_kind = Val_reg _; _ }, _) ->
+      { parts with runtime_values = Val (id, val_type) :: parts.runtime_values }
+    | Sig_module (id, Mp_present, { md_type; _ }, _, _) ->
+      { parts with
+        runtime_values = Module (id, md_type) :: parts.runtime_values
+      }
+    | other ->
       raise
         (Error.Message
-          (Format.sprintf "predef not yet implemented: %s" (Ident.name id)))
-    end else begin
-      match List.find_index (Type_in_context.eq (Id id)) type_context with
-      | Some de_bruijn -> Var { de_bruijn }
-      | None ->
-        raise
-          (Error.Message
-            (Format.asprintf "variable not in scope: %a" Ident.print id))
-    end
-  | other ->
-    raise
-      (Error.Message
-         (Format.asprintf
-            "Type constructor path not yet implemented: %a"
-            Printtyp.path other))
+           (Format.asprintf
+              "Signature item not yet implemented: %a"
+              Printtyp.signature [other]))
 
-let rec type_expr ~(type_context : Type_in_context.t list) (t : Types.type_expr)
-    : Model.Type.expr =
+  let of_items (items : Types.signature) : t =
+    List.fold_right push items
+      { module_types = []; types = []; runtime_values = [] }
+
+  let of_module_type : Types.module_type -> t = function
+    | Mty_signature items -> of_items items
+    | other ->
+      raise
+        (Error.Message
+           (Format.asprintf
+              "Module type not yet implemented: %a"
+              Printtyp.modtype other))
+
+  let find_module (matches : Ident.t -> bool) (parts : t)
+      : (int * Types.module_type) option =
+    List.find_mapi
+      (fun index -> function
+         | Module (id, md_type) when matches id -> Some (index, md_type)
+         | Module _ | Val _ -> None)
+      parts.runtime_values
+
+  let find_type (matches : Ident.t -> bool) (parts : t) : int option =
+    List.find_index (fun (id, _) -> matches id) parts.types
+
+  let find_module_type (matches : Ident.t -> bool) (parts : t) : int option =
+    List.find_index (fun (id, _) -> matches id) parts.module_types
+end
+
+module Resolve = struct
+  let rec higher_order
+      : 'a.
+        module_vars:Signature_parts.t list ->
+        what:string ->
+        find:((Ident.t -> bool) -> Signature_parts.t -> 'a option) ->
+        path:Path.t ->
+        Model.module_statics * 'a =
+    fun ~module_vars ~what ~find ~path ->
+    let not_found () =
+      raise
+        (Error.Message
+           (Format.asprintf "%s not found: %a" what Printtyp.path path))
+    in
+    match path with
+    | Pident id ->
+      let find_in_module_var de_bruijn module_var =
+        find (Ident.same id) module_var
+        |> Option.map (fun found -> de_bruijn, found)
+      in
+      begin match List.find_mapi find_in_module_var module_vars with
+      | Some (de_bruijn, found) -> Module_var { de_bruijn }, found
+      | None -> not_found ()
+      end
+    | Pdot (module_path, name) ->
+      let within, parts = module_statics ~module_vars module_path in
+      let has_name id = String.equal (Ident.name id) name in
+      begin match find has_name parts with
+      | Some found -> within, found
+      | None -> not_found ()
+      end
+    | other ->
+      raise
+        (Error.Message
+           (Format.asprintf
+              "%s path not yet implemented: %a"
+              what Printtyp.path other))
+
+  and module_statics ~(module_vars : Signature_parts.t list)
+      : Path.t -> Model.module_statics * Signature_parts.t = function
+    | Pident id when Ident.is_global id ->
+      let { md_type; _ } : Types.module_declaration =
+        Env.find_module (Pident id) Env.empty
+      in
+      ( Upstream_compilation_unit { name = Ident.to_global_exn id }
+      , Signature_parts.of_module_type md_type )
+    | path ->
+      let within, (index, md_type) =
+        higher_order ~module_vars ~what:"Module" ~find:Signature_parts.find_module ~path
+      in
+      Module_field { within; index }, Signature_parts.of_module_type md_type
+
+  let type_constr ~(module_vars : Signature_parts.t list)
+      : Path.t -> Model.type_constr = function
+    | Pident id as path when Ident.is_predef id ->
+      if Path.same path Predef.path_int then Predef Int else
+      if Path.same path Predef.path_option then Predef Option else
+      if Path.same path Predef.path_bool then Predef Bool else
+      raise
+        (Error.Message
+           (Format.sprintf "predef not yet implemented: %s" (Ident.name id)))
+    | path ->
+      let within, index =
+        higher_order ~module_vars ~what:"Type" ~find:Signature_parts.find_type ~path
+      in
+      Type_constr_field { within; index }
+
+  let module_type_path ~(module_vars : Signature_parts.t list) (path : Path.t)
+      : Model.module_type =
+    let within, index =
+      higher_order ~module_vars ~what:"Module type" ~find:Signature_parts.find_module_type ~path
+    in
+    Module_type_field { within; index }
+end
+
+let rec val_type
+    ~(module_vars : Signature_parts.t list)
+    ~(type_vars : Types.type_expr list)
+    (t : Types.type_expr)
+    : Model.val_type =
   match Types.get_desc t with
   | Tarrow (_, domain, codomain, _) ->
     Arrow
-      { domain = type_expr ~type_context domain
-      ; codomain = type_expr ~type_context codomain
+      { domain = val_type ~module_vars ~type_vars domain
+      ; codomain = val_type ~module_vars ~type_vars codomain
       }
   | Tconstr (path, args, _) ->
     Constr
-      { constr = resolve_type_constr_by_path ~type_context path
-      ; args = List.map (type_expr ~type_context) args
+      { constr = Resolve.type_constr ~module_vars path
+      ; args = List.map (val_type ~module_vars ~type_vars) args
       }
-  | Tpoly (t, args) -> type_poly ~type_context t args
+  | Tpackage { pack_path; pack_cstrs = [] } ->
+    First_class_module { signature = Resolve.module_type_path ~module_vars pack_path }
+  | Tpoly (body, vars) -> poly ~module_vars ~type_vars body vars
   | Tvar _ ->
-    begin match List.find_index (Type_in_context.eq (Poly t)) type_context with
-    | Some de_bruijn -> TypeVar { de_bruijn }
+    begin match List.find_index (Types.eq_type t) type_vars with
+    | Some de_bruijn -> Type_var { de_bruijn }
     | None ->
       raise
         (Error.Message
@@ -248,13 +349,39 @@ let rec type_expr ~(type_context : Type_in_context.t list) (t : Types.type_expr)
             "Type expression not yet implemented: %a"
             Printtyp.type_expr t))
 
-and type_poly ~(type_context : Type_in_context.t list) (t : Types.type_expr)
-    : Types.type_expr list -> Model.Type.expr = function
-  | [] -> type_expr ~type_context t
-  | arg :: args ->
-    Poly { body = type_poly ~type_context:(Poly arg :: type_context) t args }
+and poly
+    ~(module_vars : Signature_parts.t list)
+    ~(type_vars : Types.type_expr list)
+    (body : Types.type_expr)
+    : Types.type_expr list -> Model.val_type = function
+  | [] -> val_type ~module_vars ~type_vars body
+  | var :: vars ->
+    Poly { body = poly ~module_vars ~type_vars:(var :: type_vars) body vars }
 
-let module_type : Types.module_type -> Model.Type.t = function
+let type_decl
+    ~(module_vars : Signature_parts.t list)
+    (id : Ident.t)
+    (decl : Types.type_declaration)
+    : Model.type_decl =
+  match decl.type_kind, decl.type_private with
+  | Type_abstract _, Public ->
+    { manifest =
+        Option.map
+          (val_type ~module_vars ~type_vars:decl.type_params)
+          decl.type_manifest
+    ; arity = decl.type_arity
+    }
+  | _ ->
+    raise
+      (Error.Message
+         (Format.asprintf
+            "Type declaration not yet implemented: %a"
+            (Printtyp.type_declaration id) decl))
+
+let rec module_type ~(module_vars : Signature_parts.t list)
+    : Types.module_type -> Model.module_type = function
+  | Mty_signature items -> signature ~module_vars items
+  | Mty_ident path -> Resolve.module_type_path ~module_vars path
   | other ->
     raise
       (Error.Message
@@ -262,58 +389,25 @@ let module_type : Types.module_type -> Model.Type.t = function
             "Module type not yet implemented: %a"
             Printtyp.modtype other))
 
-let rec intf_in_scope
-    ~(type_context : Type_in_context.t list)
-    ~(module_context : Ident.t list)
-    : Types.signature -> Model.Type.t =
-  function
-  | [] -> EmptyModule
-  | item :: etc -> item_in_scope ~type_context ~module_context etc item
+and signature ~(module_vars : Signature_parts.t list) (items : Types.signature)
+    : Model.module_type =
+  let parts = Signature_parts.of_items items in
+  let module_vars = parts :: module_vars in
+  let module_type_decl
+      (_, { mtd_type; _ } : Ident.t * Types.modtype_declaration) =
+    Option.map (module_type ~module_vars) mtd_type
+  in
+  Signature
+    { module_types = List.map module_type_decl parts.module_types
+    ; types = List.map (fun (id, decl) -> type_decl ~module_vars id decl) parts.types
+    ; runtime_values = List.map (runtime_value ~module_vars) parts.runtime_values
+    }
 
-and item_in_scope
-    ~(type_context : Type_in_context.t list)
-    ~(module_context : Ident.t list)
-    (etc : Types.signature_item list)
-    : Types.signature_item -> Model.Type.t =
-  function
-  | Sig_module (id, _, { md_type; _ }, _, _) ->
-    Module
-      { ty = module_type md_type
-      ; etc = intf_in_scope ~type_context ~module_context:(id :: module_context) etc
-      }
-  | Sig_value (_, { val_type = ty; _ }, _) ->
-    Val
-      { ty = Ctype.free_variables ty |> type_poly ~type_context ty
-      ; etc = intf_in_scope ~type_context ~module_context etc
-      }
-  | Sig_type (id, decl, _, _) ->
-    Type
-      { kind = type_decl_kind ~type_context ~module_context id decl
-      ; etc = intf_in_scope ~type_context:(Id id :: type_context) ~module_context etc
-      }
-  | other ->
-    raise
-      (Error.Message
-        (Format.asprintf
-            "Type signature item not yet implemented: %a"
-            Printtyp.signature [other]))
+and runtime_value ~(module_vars : Signature_parts.t list)
+    : Signature_parts.runtime_value -> Model.runtime_value_type = function
+  | Module (_, md_type) -> Module (module_type ~module_vars md_type)
+  | Val (_, ty) ->
+    Val (poly ~module_vars ~type_vars:[] ty (Ctype.free_variables ty))
 
-and type_decl_kind
-    ~(type_context : Type_in_context.t list)
-    ~(module_context : Ident.t list)
-    (id : Ident.t)
-    (decl: Types.type_declaration)
-    : Model.Type.kind =
-  match decl.type_kind with
-  | Type_abstract _ -> Abstract
-  | _ ->
-    ignore type_context; (* TODO: REMOVE *)
-    ignore module_context; (* TODO: REMOVE *)
-    raise
-      (Error.Message
-        (Format.asprintf
-            "Type declaration not yet implemented: %a"
-            (Printtyp.type_declaration id) decl))
-
-let intf ({ sig_type; _ } : Typedtree.signature) =
-  intf_in_scope ~type_context:[] ~module_context:[] sig_type
+let intf ({ sig_type; _ } : Typedtree.signature) : Model.module_type =
+  signature ~module_vars:[] sig_type

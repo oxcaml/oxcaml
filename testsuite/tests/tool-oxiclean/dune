@@ -157,5 +157,15 @@
 
 (rule
  (alias downstream)
- (deps extracted_oxcaml_downstream.olean)
- (action (progn)))
+ (deps
+  downstream.intf.json
+  downstream.impl.json
+  extracted_oxcaml_even.olean
+  extracted_oxcaml_downstream.olean
+  Downstream.lean
+  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+ (action
+  (progn
+   (diff downstream.impl.json.expected downstream.impl.json)
+   (diff downstream.intf.json.expected downstream.intf.json)
+   (run lean %{dep:Downstream.lean}))))

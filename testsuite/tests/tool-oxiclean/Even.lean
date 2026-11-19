@@ -2,13 +2,13 @@ import extracted_oxcaml_even
 open Oxiclean.Model
 
 abbrev interface : ModuleType :=
-  let int : ExprType := .constr (.predef .int) []
-  let t : ExprType := .constr (.var 0) []
-  let t_option : ExprType := .constr (.predef .option) [t]
-  let create : ExprType := .arrow int t_option
-  let get : ExprType := .arrow t int
+  let int : ValType := .constr (.predef .int) []
+  let t : ValType := .constr (.field (.var 0) 0) []
+  let t_option : ValType := .constr (.predef .option) [t]
+  let create : ValType := .arrow int t_option
+  let get : ValType := .arrow t int
 
-  .ty .abstract (.val create (.val get .empty))
+  .signature [] [{ manifest := none, arity := 0 }] [.val create, .val get]
 
 abbrev implementation : Expr :=
   let get : Expr := .function (Expr.var 0)

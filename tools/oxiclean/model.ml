@@ -1,47 +1,65 @@
-module Type = struct
-  type t =
-    | EmptyModule
-    | Module of
-        { ty : t
-        ; etc : t
-        }
-    | Type of
-        { kind : kind
-        ; etc : t
-        }
-    | Val of
-        { ty : expr
-        ; etc : t
-        }
+type module_statics =
+  | Upstream_compilation_unit of
+      { name : Global_module.Name.t
+      }
+  | Module_var of
+      { de_bruijn : int
+      }
+  | Module_field of
+      { within : module_statics
+      ; index : int
+      }
 
-  and expr =
-    | Arrow of
-        { domain : expr
-        ; codomain : expr
-        }
-    | Constr of
-        { constr : constr
-        ; args : expr list
-        }
-    | Poly of
-        { body : expr
-        }
-    | TypeVar of
-        { de_bruijn : int
-        }
+type module_type =
+  | Signature of
+      { module_types : module_type option list
+      ; types : type_decl list
+      ; runtime_values : runtime_value_type list
+      }
+  | Module_type_field of
+      { within : module_statics
+      ; index : int
+      }
 
-  and kind =
-    | Abstract
+and type_decl =
+  { manifest : val_type option
+  ; arity : int
+  }
 
-  and constr =
-    | Predef of predef
-    | Var of { de_bruijn : int }
+and runtime_value_type =
+  | Module of module_type (* ...and not just an alias like [module M = N] *)
+  | Val of val_type
 
-  and predef =
-    | Bool
-    | Int
-    | Option
-end
+and val_type =
+  | Arrow of
+      { domain : val_type
+      ; codomain : val_type
+      }
+  | Constr of
+      { constr : type_constr
+      ; args : val_type list
+      }
+  | First_class_module of
+      { signature : module_type
+      }
+  | Poly of
+      { body : val_type
+      }
+  | Type_var of
+      { de_bruijn : int
+      }
+
+and type_constr =
+  | Type_constr_field of
+      { within : module_statics
+      ; index : int
+      }
+  | Predef of predef
+
+and predef =
+  | Bool
+  | Int
+  | Option
 
 module rec Expr : sig
   module Scalar_operation : sig
@@ -73,7 +91,7 @@ module rec Expr : sig
         ; fields : t list
         }
     | Field of
-        { block : t
+        { within : t
         ; index : int
         }
     | Function of
@@ -99,7 +117,7 @@ module rec Expr : sig
         ; failaction : t option
         }
     | UpstreamCompilationUnit of
-        { name : string
+        { name : Global_module.Name.t
         }
     | Value of
         { value : Value.t

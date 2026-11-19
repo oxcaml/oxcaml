@@ -5,26 +5,40 @@ inductive PredefinedType : Type where
   | int
   | option
 
-inductive TypeConstructor : Type where
-  | predef (predef : PredefinedType)
-  | var (deBruijn : Nat)
-
 inductive TypeKind : Type where
   | abstract
 
 mutual
-  inductive ExprType : Type where
-    | arrow (domain : ExprType) (codomain : ExprType)
-    | constr (constructor : TypeConstructor) (args : List ExprType)
-    | mod (moduleType : ModuleType)
-    | poly (body : ExprType)
+  inductive ModuleStatics : Type where
+    | upstreamCompilationUnit (signature : ModuleType)
     | var (deBruijn : Nat)
+    | field (within : ModuleStatics) (index : Nat)
 
   inductive ModuleType : Type where
-    | empty
-    | mod (moduleType : ModuleType) (etc : ModuleType)
-    | ty (kind : TypeKind) (etc : ModuleType)
-    | val (exprType : ExprType) (etc : ModuleType)
+    | signature
+        (moduleTypes : List (Option ModuleType))
+        (types : List TypeDecl)
+        (runtimeValues : List RuntimeValueType)
+    | field (within : ModuleStatics) (index : Nat)
+
+  inductive RuntimeValueType : Type where
+    | mod (moduleType : ModuleType)
+    | val (valType : ValType)
+
+  structure TypeDecl : Type where
+    manifest : Option ValType
+    arity : Nat
+
+  inductive ValType : Type where
+    | arrow (domain : ValType) (codomain : ValType)
+    | constr (constructor : TypeConstr) (args : List ValType)
+    | firstClassModule (signature : ModuleType)
+    | poly (body : ValType)
+    | var (deBruijn : Nat)
+
+  inductive TypeConstr : Type where
+    | field (within : ModuleStatics) (index : Nat)
+    | predef (predef : PredefinedType)
 end
 
 inductive IntegralBinaryScalarOperation : Type where
@@ -97,10 +111,8 @@ mutual
 end
 
 attribute [pp_nodot]
-  -- ExprType
-  ExprType.arrow ExprType.constr ExprType.mod ExprType.poly ExprType.var
-  -- ModuleType
-  ModuleType.empty ModuleType.mod ModuleType.ty ModuleType.val
+  -- ValType
+  ValType.arrow ValType.constr ValType.firstClassModule ValType.poly ValType.var
   -- Expr
   Expr.apply Expr.block Expr.field Expr.function Expr.letBinding
   Expr.physicalEquality Expr.scalarOperation Expr.switch

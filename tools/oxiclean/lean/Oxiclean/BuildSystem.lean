@@ -33,68 +33,162 @@ def Lean.Expr.mkOption (type : Lean.Expr) : Option Lean.Expr → Lean.Expr
 
 namespace Oxiclean.BuildSystem
 
-deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
-deriving instance Lean.FromJson, Lean.ToExpr, Repr for TypeConstructor
-deriving instance Lean.FromJson, Lean.ToExpr, Repr for TypeKind
+def upstreamInterface (compilationUnit : String) : Lean.Expr :=
+  mkConst (`Oxiclean.Extracted ++ .mkSimple compilationUnit ++ `interface)
 
-deriving instance Lean.ToExpr, Repr for ExprType, ModuleType
+deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
+
+deriving instance Repr for
+  ModuleStatics, ModuleType, RuntimeValueType, TypeDecl, ValType, TypeConstr
 
 -- TODO: remove when https://github.com/leanprover/lean4/pull/14959 is merged
 namespace WorkaroundForPr14959
-  section ExprType
-    variable (ModuleType : Type)
-    inductive ExprType : Type where
-      | arrow (domain : ExprType) (codomain : ExprType)
-      | constr (constructor : TypeConstructor) (args : List ExprType)
-      | mod (moduleType : ModuleType)
-      | poly (body : ExprType)
-      | var (deBruijn : Nat)
-    deriving Lean.FromJson
-  end ExprType
+  inductive ModuleStatics : Type where
+    | upstreamCompilationUnit (compilationUnit : String)
+    | var (deBruijn : Nat)
+    | field (within : ModuleStatics) (index : Nat)
+  deriving FromJson
 
-  def ExprType.toModel : ExprType Model.ModuleType → Model.ExprType
-    | .arrow domain codomain => .arrow domain.toModel codomain.toModel
-    | .constr c args => .constr c (args.map ExprType.toModel)
-    | .mod moduleType => .mod moduleType
-    | .poly body => .poly body.toModel
-    | .var deBruijn => .var deBruijn
+  def ModuleStatics.toTerm : ModuleStatics → Lean.Expr
+    | .upstreamCompilationUnit compilationUnit =>
+      mkApp (mkConst ``Model.ModuleStatics.upstreamCompilationUnit)
+        (upstreamInterface compilationUnit)
+    | .var deBruijn =>
+      mkApp (mkConst ``Model.ModuleStatics.var) (toExpr deBruijn)
+    | .field within index =>
+      mkApp2 (mkConst ``Model.ModuleStatics.field) within.toTerm (toExpr index)
+
+  inductive TypeConstr : Type where
+    | field (within : ModuleStatics) (index : Nat)
+    | predef (predef : PredefinedType)
+  deriving FromJson
+
+  def TypeConstr.toTerm : TypeConstr → Lean.Expr
+    | .field within index =>
+      mkApp2 (mkConst ``Model.TypeConstr.field) within.toTerm (toExpr index)
+    | .predef predefined =>
+      mkApp (mkConst ``Model.TypeConstr.predef) (toExpr predefined)
 
   section ModuleType
-    variable (ExprType : Type)
+    variable (ModuleTypeDecl RuntimeValueType TypeDecl : Type)
     inductive ModuleType : Type where
-      | empty
-      | mod (moduleType : ModuleType) (etc : ModuleType)
-      | ty (kind : TypeKind) (etc : ModuleType)
-      | val (exprType : ExprType) (etc : ModuleType)
-    deriving Lean.FromJson
+      | signature
+          (moduleTypes : List ModuleTypeDecl)
+          (types : List TypeDecl)
+          (runtimeValues : List RuntimeValueType)
+      | field (within : ModuleStatics) (index : Nat)
+    deriving FromJson
   end ModuleType
 
-  def ModuleType.toModel : ModuleType Model.ExprType → Model.ModuleType
-    | .empty => .empty
-    | .mod moduleType etc => .mod moduleType.toModel etc.toModel
-    | .ty kind etc => .ty kind etc.toModel
-    | .val exprType etc => .val exprType etc.toModel
+  def ModuleType.toTerm : ModuleType Lean.Expr Lean.Expr Lean.Expr → Lean.Expr
+    | .signature moduleTypes types runtimeValues =>
+      mkApp3 (mkConst ``Model.ModuleType.signature)
+        (Lean.Expr.mkList
+          (mkApp (mkConst ``Option [.zero]) (mkConst ``Model.ModuleType))
+          moduleTypes)
+        (Lean.Expr.mkList (mkConst ``Model.TypeDecl) types)
+        (Lean.Expr.mkList (mkConst ``Model.RuntimeValueType) runtimeValues)
+    | .field within index =>
+      mkApp2 (mkConst ``Model.ModuleType.field) within.toTerm (toExpr index)
+
+  section RuntimeValueType
+    variable (ModuleType ValType : Type)
+    inductive RuntimeValueType : Type where
+      | mod (moduleType : ModuleType)
+      | val (valType : ValType)
+    deriving FromJson
+  end RuntimeValueType
+
+  def RuntimeValueType.toTerm : RuntimeValueType Lean.Expr Lean.Expr → Lean.Expr
+    | .mod moduleType =>
+      mkApp (mkConst ``Model.RuntimeValueType.mod) moduleType
+    | .val valType => mkApp (mkConst ``Model.RuntimeValueType.val) valType
+
+  section TypeDecl
+    variable (ValType : Type)
+    structure TypeDecl : Type where
+      manifest : Option ValType
+      arity : Nat
+    deriving FromJson
+  end TypeDecl
+
+  def TypeDecl.toTerm : TypeDecl Lean.Expr → Lean.Expr
+    | { manifest, arity } =>
+      mkApp2 (mkConst ``Model.TypeDecl.mk)
+        (Lean.Expr.mkOption (mkConst ``Model.ValType) manifest)
+        (toExpr arity)
+
+  section ValType
+    variable (ModuleType : Type)
+    inductive ValType : Type where
+      | arrow (domain : ValType) (codomain : ValType)
+      | constr (constructor : TypeConstr) (args : List ValType)
+      | firstClassModule (signature : ModuleType)
+      | poly (body : ValType)
+      | var (deBruijn : Nat)
+    deriving FromJson
+  end ValType
+
+  def ValType.toTerm : ValType Lean.Expr → Lean.Expr
+    | .arrow domain codomain =>
+      mkApp2 (mkConst ``Model.ValType.arrow) domain.toTerm codomain.toTerm
+    | .constr constructor args =>
+      mkApp2 (mkConst ``Model.ValType.constr) constructor.toTerm
+        (Lean.Expr.mkList (mkConst ``Model.ValType) (args.map ValType.toTerm))
+    | .firstClassModule signature =>
+      mkApp (mkConst ``Model.ValType.firstClassModule) signature
+    | .poly body => mkApp (mkConst ``Model.ValType.poly) body.toTerm
+    | .var deBruijn => mkApp (mkConst ``Model.ValType.var) (toExpr deBruijn)
 
   mutual
-    partial def ModuleType.fromJson? (json : Lean.Json)
-        : Except String Model.ModuleType := do
-      @instFromJsonModuleType Model.ExprType ⟨ExprType.fromJson?⟩
+    partial def ModuleType.fromJson? (json : Json)
+        : Except String Lean.Expr := do
+      @instFromJsonModuleType
+        Lean.Expr
+        Lean.Expr
+        Lean.Expr
+        ⟨ModuleTypeDecl.fromJson?⟩
+        ⟨RuntimeValueType.fromJson?⟩
+        ⟨TypeDecl.fromJson?⟩
       |>.fromJson? json
-      |>.map (·.toModel)
+      |>.map (·.toTerm)
 
-    partial def ExprType.fromJson? (json : Lean.Json)
-        : Except String Model.ExprType := do
-      @instFromJsonExprType Model.ModuleType ⟨ModuleType.fromJson?⟩
+    partial def ModuleTypeDecl.fromJson? (json : Json)
+        : Except String Lean.Expr := do
+      let moduleType := mkConst ``Model.ModuleType
+      match json with
+      | .null => return Lean.Expr.mkOption moduleType .none
+      | json =>
+        let moduleTypeDecl ← ModuleType.fromJson? json
+        return Lean.Expr.mkOption moduleType (.some moduleTypeDecl)
+
+    partial def RuntimeValueType.fromJson? (json : Json)
+        : Except String Lean.Expr := do
+      @instFromJsonRuntimeValueType
+        Lean.Expr
+        Lean.Expr
+        ⟨ModuleType.fromJson?⟩
+        ⟨ValType.fromJson?⟩
       |>.fromJson? json
-      |>.map (·.toModel)
+      |>.map (·.toTerm)
+
+    partial def TypeDecl.fromJson? (json : Json)
+        : Except String Lean.Expr := do
+      @instFromJsonTypeDecl
+        Lean.Expr
+        ⟨ValType.fromJson?⟩
+      |>.fromJson? json
+      |>.map (·.toTerm)
+
+    partial def ValType.fromJson? (json : Json)
+        : Except String Lean.Expr := do
+      @instFromJsonValType
+        Lean.Expr
+        ⟨ModuleType.fromJson?⟩
+      |>.fromJson? json
+      |>.map (·.toTerm)
   end
 end WorkaroundForPr14959
-
-instance : Lean.FromJson ModuleType where
-  fromJson? := WorkaroundForPr14959.ModuleType.fromJson?
-
-instance : Lean.FromJson ExprType where
-  fromJson? := WorkaroundForPr14959.ExprType.fromJson?
 
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for
   IntegralBinaryScalarOperation
@@ -161,8 +255,7 @@ namespace WorkaroundForPr14959
          ]
     | .upstreamCompilationUnit compilationUnit =>
       mkApp (mkConst ``Model.Expr.upstreamCompilationUnit)
-        (mkConst
-          (`Oxiclean.Extracted ++ .mkSimple compilationUnit ++ `interface))
+        (upstreamInterface compilationUnit)
     | .val value => mkApp (mkConst ``Model.Expr.val) value
     | .var deBruijn => mkApp (mkConst ``Model.Expr.var) (toExpr deBruijn)
 
@@ -346,12 +439,14 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
   let ns : Name := `Oxiclean.Extracted ++ .mkSimple unit.capitalize
   let interface : Json ← file.withFileName s!"{unit}.intf.json" |> readJson
   let implementation : Json ← file.withFileName s!"{unit}.impl.json" |> readJson
-  let interface : Oxiclean.Model.ModuleType ← fromJson? interface |> IO.ofExcept
+  let interface : Lean.Expr ←
+    Oxiclean.BuildSystem.WorkaroundForPr14959.ModuleType.fromJson? interface
+    |> IO.ofExcept
   let implementation : Lean.Expr ←
     Oxiclean.BuildSystem.WorkaroundForPr14959.Expr.fromJson? implementation
     |> IO.ofExcept
   liftCoreM do
     addTopLevelDefinition (ns ++ `interface)
-      (mkConst ``Oxiclean.Model.ModuleType) (toExpr interface)
+      (mkConst ``Oxiclean.Model.ModuleType) interface
     addTopLevelDefinition (ns ++ `implementation)
       (mkConst ``Oxiclean.Model.Expr) implementation

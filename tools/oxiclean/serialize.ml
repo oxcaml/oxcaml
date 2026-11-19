@@ -11,6 +11,9 @@ let option (f : 'a -> Json.t) : 'a option -> Json.t = function
   | None -> Json.Null
   | Some a -> f a
 
+let global_module_name (name : Global_module.Name.t) : Json.t =
+  name |> Global_module.Name.to_string |> string
+
 let rec impl : Model.Expr.t -> Json.t = function
   | Apply { func; arg } ->
     Json.Object
@@ -24,9 +27,9 @@ let rec impl : Model.Expr.t -> Json.t = function
       ; "fields", array impl fields
       ]
     |> tag "block"
-  | Field { block; index } ->
+  | Field { within; index } ->
     Json.Object
-      [ "indexInto", impl block
+      [ "indexInto", impl within
       ; "index", Json.int index
       ]
     |> tag "field"
@@ -49,7 +52,9 @@ let rec impl : Model.Expr.t -> Json.t = function
       ]
     |> tag "switch"
   | UpstreamCompilationUnit { name } ->
-    string name |> tag "name" |> tag "upstreamCompilationUnit"
+    global_module_name name
+    |> tag "compilationUnit"
+    |> tag "upstreamCompilationUnit"
   | Value { value = v } ->
     value v |> tag "value" |> tag "val"
   | Var { de_bruijn } ->
@@ -126,58 +131,66 @@ and integral_binary_scalar_operation
   function
   | Mod -> Json.String "modulo"
 
-let type_predef : Model.Type.predef -> Json.t = function
+let predef : Model.predef -> Json.t = function
   | Bool -> Json.String "bool"
   | Int -> Json.String "int"
   | Option -> Json.String "option"
 
-let type_constr : Model.Type.constr -> Json.t = function
-  | Predef p -> type_predef p |> tag "predef" |> tag "predef"
-  | Var { de_bruijn } ->
-    Json.int de_bruijn |> tag "deBruijn" |> tag "var"
+let module_statics_field (within : Json.t) (index : int) : Json.t =
+  Json.Object [ "within", within; "index", Json.int index ] |> tag "field"
 
-let rec type_expr : Model.Type.expr -> Json.t = function
+let rec module_statics : Model.module_statics -> Json.t = function
+  | Upstream_compilation_unit { name } ->
+    global_module_name name
+    |> tag "compilationUnit"
+    |> tag "upstreamCompilationUnit"
+  | Module_var { de_bruijn } ->
+    Json.int de_bruijn |> tag "deBruijn" |> tag "var"
+  | Module_field { within; index } ->
+    module_statics_field (module_statics within) index
+
+let type_constr : Model.type_constr -> Json.t = function
+  | Type_constr_field { within; index } ->
+    module_statics_field (module_statics within) index
+  | Predef p -> predef p |> tag "predef" |> tag "predef"
+
+let rec module_type : Model.module_type -> Json.t = function
+  | Signature { module_types; types; runtime_values } ->
+    Json.Object
+      [ "moduleTypes", array (option module_type) module_types
+      ; "types", array type_decl types
+      ; "runtimeValues", array runtime_value_type runtime_values
+      ]
+    |> tag "signature"
+  | Module_type_field { within; index } ->
+    module_statics_field (module_statics within) index
+
+and type_decl ({ manifest; arity } : Model.type_decl) : Json.t =
+  Json.Object
+    [ "manifest", option val_type manifest
+    ; "arity", Json.int arity
+    ]
+
+and runtime_value_type : Model.runtime_value_type -> Json.t = function
+  | Module m -> module_type m |> tag "moduleType" |> tag "mod"
+  | Val v -> val_type v |> tag "valType" |> tag "val"
+
+and val_type : Model.val_type -> Json.t = function
   | Arrow { domain; codomain } ->
     Json.Object
-      [ "domain", type_expr domain
-      ; "codomain", type_expr codomain
+      [ "domain", val_type domain
+      ; "codomain", val_type codomain
       ]
     |> tag "arrow"
   | Constr { constr; args } ->
     Json.Object
       [ "constructor", type_constr constr
-      ; "args", array type_expr args
+      ; "args", array val_type args
       ]
     |> tag "constr"
-  | Poly { body } ->
-    type_expr body
-    |> tag "body"
-    |> tag "poly"
-  | TypeVar { de_bruijn } ->
-    Json.int de_bruijn
-    |> tag "deBruijn"
-    |> tag "var"
+  | First_class_module { signature } ->
+    module_type signature |> tag "signature" |> tag "firstClassModule"
+  | Poly { body } -> val_type body |> tag "body" |> tag "poly"
+  | Type_var { de_bruijn } -> Json.int de_bruijn |> tag "deBruijn" |> tag "var"
 
-let type_kind : Model.Type.kind -> Json.t = function
-  | Abstract -> Json.String "abstract"
-
-let rec intf : Model.Type.t -> Json.t = function
-  | EmptyModule -> Json.String "empty"
-  | Module { ty; etc } ->
-    Json.Object
-      [ "moduleType", intf ty
-      ; "etc", intf etc
-      ]
-    |> tag "mod"
-  | Type { kind; etc } ->
-    Json.Object
-      [ "kind", type_kind kind
-      ; "etc", intf etc
-      ]
-    |> tag "ty"
-  | Val { ty; etc } ->
-    Json.Object
-      [ "exprType", type_expr ty
-      ; "etc", intf etc
-      ]
-    |> tag "val"
+let intf = module_type

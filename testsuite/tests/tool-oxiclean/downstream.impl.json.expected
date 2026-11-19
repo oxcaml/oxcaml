@@ -1,0 +1,20 @@
+{
+  "letBinding": {
+    "bound": {
+      "apply": {
+        "func": {
+          "field": {
+            "indexInto": {
+              "upstreamCompilationUnit": {"compilationUnit": "Even"}
+            },
+            "index": 0
+          }
+        },
+        "arg": {
+          "val": {"value": {"immediate": {"imm": {"bitsAboveLsb": 3}}}}
+        }
+      }
+    },
+    "body": {"block": {"tag": 0, "fields": [{"var": {"deBruijn": 0}}]}}
+  }
+}
