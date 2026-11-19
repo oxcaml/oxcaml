@@ -134,6 +134,7 @@ static void report_stats(void)
   if ((atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_STATS) != 0) {
     caml_report_gc_stats();
     caml_stack_stats_print();
+    caml_domain_report_stats();
     /* TODO: add other (non-GC) stats reporting here */
   }
 }
