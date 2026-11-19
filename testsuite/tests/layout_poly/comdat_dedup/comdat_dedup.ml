@@ -94,6 +94,7 @@
   program = "${test_build_directory}/comdat_dedup.exe";
   all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
   ocamlopt.byte;
+  arguments = "1 -g";
   run;
  }{
   flags = "-extension layout_poly_alpha -nocwd -Ix . -g -gno-upstream-dwarf";
@@ -117,6 +118,7 @@
   program = "${test_build_directory}/comdat_dedup.exe";
   all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
   ocamlopt.byte;
+  arguments = "1 -g";
   run;
  }{
   function_sections;
@@ -141,6 +143,7 @@
   program = "${test_build_directory}/comdat_dedup.exe";
   all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
   ocamlopt.byte;
+  arguments = "1 -g";
   run;
  }{
   arch_amd64;
@@ -232,10 +235,15 @@
    The test runs the linked program and then shells out to [nm] to inspect
    the symbol table, and to [readelf] to check that nothing outside a COMDAT
    group refers into it by section (which would dangle when a losing copy is
-   discarded, whether or not the linker notices), and that debug information
-   never describes a copy by the shared symbol (the blocks with [-g] vary the
-   kind of DWARF and the code layout). Any further arguments name more object
-   files to check.
+   discarded, whether or not the linker notices). Any further arguments name
+   more object files to check, except for [-g].
+
+   The blocks with [-g], which vary the kind of DWARF and the code layout, pass
+   [-g] to the program to have it also check that debug information never
+   describes a copy by the shared symbol. Other blocks can't check that: a
+   compiler configured with frame pointers emits line numbers even without
+   [-g], from which the assembler may make up debug information of its own that
+   does use the shared symbol.
 
    The internal assembler does not support weak functions, so the
    [-internal-assembler] block (amd64 only) falls back to private copies of
@@ -336,9 +344,9 @@ let is_cohort_global_symbol w =
 
 (* Relocations from outside any group against a section symbol of a cohort
    group. Linkers special-case unwind and debug information, which may. But
-   debug information must not refer to a copy by the shared symbol, or a
-   losing copy's entries would describe the winner. *)
-let bad_relocations obj =
+   the compiler's debug information ([check_debug]) must not refer to a copy by
+   the shared symbol, or a losing copy's entries would describe the winner. *)
+let bad_relocations ~check_debug obj =
   let in_group = group_member_offsets obj in
   let lines =
     output_lines ("readelf -rW " ^ Filename.quote obj) ~out:(obj ^ ".relocs")
@@ -354,9 +362,11 @@ let bad_relocations obj =
           let checking =
             if String.equal name ".rela.eh_frame" || List.mem off in_group
             then None
-            else if String.starts_with ~prefix:".rela.debug_" name
+            else if not (String.starts_with ~prefix:".rela.debug_" name)
+            then Some (name, is_cohort_section_symbol)
+            else if check_debug
             then Some (name, is_cohort_global_symbol)
-            else Some (name, is_cohort_section_symbol)
+            else None
           in
           checking, bad
         | None -> (
@@ -370,11 +380,15 @@ let bad_relocations obj =
 
 let () =
   let dir = Filename.dirname Sys.executable_name in
+  let debug, more_objs =
+    Array.to_list (Array.sub Sys.argv 2 (Array.length Sys.argv - 2))
+    |> List.partition (String.equal "-g")
+  in
   let bad =
     List.concat_map
-      (fun obj -> bad_relocations (Filename.concat dir obj))
-      (["user1.o"; "user2.o"; "user3.o"]
-      @ Array.to_list (Array.sub Sys.argv 2 (Array.length Sys.argv - 2)))
+      (fun obj ->
+        bad_relocations ~check_debug:(debug <> []) (Filename.concat dir obj))
+      (["user1.o"; "user2.o"; "user3.o"] @ more_objs)
   in
   if bad <> []
   then begin
