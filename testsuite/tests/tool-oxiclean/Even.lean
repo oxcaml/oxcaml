@@ -1,4 +1,6 @@
 import extracted_oxcaml_even
+import Oxiclean.Leoization
+open Oxiclean.Leoization
 open Oxiclean.Model
 
 abbrev interface : ModuleType :=
@@ -30,3 +32,6 @@ abbrev implementation : Expr :=
 
 example : Oxiclean.Extracted.Even.interface = interface := by rfl
 example : Oxiclean.Extracted.Even.implementation = implementation := by rfl
+
+abbrev expectedStatics : Type := PUnit × PER Value
+example : Oxiclean.Extracted.Even.interface.statics = expectedStatics := by simp

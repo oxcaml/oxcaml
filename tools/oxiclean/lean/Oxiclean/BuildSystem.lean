@@ -448,9 +448,10 @@ def readJson (path : System.FilePath) : IO Json := do
   Json.parse fileContents |> IO.ofExcept
 
 def addTopLevelDefinition (name : Name) (type : Lean.Expr) (value : Lean.Expr)
-    : CoreM Unit :=
+    : CoreM Unit := do
   addAndCompile <| .defnDecl
     { name, levelParams := [], type, value, hints := .abbrev, safety := .safe }
+  enableRealizationsForConst name
 
 elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
   let file : System.FilePath := ← getFileName
@@ -471,3 +472,5 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
       (mkConst ``Oxiclean.Model.ModuleType) interface
     addTopLevelDefinition (ns ++ `implementation)
       (mkConst ``Oxiclean.Model.Expr) implementation
+  elabCommand (← `(attribute [simp] $(mkIdent (ns ++ `interface))))
+  elabCommand (← `(attribute [simp] $(mkIdent (ns ++ `implementation))))

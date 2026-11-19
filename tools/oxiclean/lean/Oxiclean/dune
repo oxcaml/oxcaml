@@ -28,3 +28,18 @@
    -o
    %{targets}
    %{dep:BuildSystem.lean})))
+
+(rule
+ (targets Leoization.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Leoization.lean
+  Model.olean)
+ (action
+  (run
+   lean
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Leoization.lean})))
