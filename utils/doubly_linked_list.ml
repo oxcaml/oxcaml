@@ -43,6 +43,10 @@ let insert_before cell value =
   let _new_cell : _ cell = insert_and_return_before cell value in
   ()
 
+(* Cells are transient handles allocated by each accessor, so cells must be
+   compared through the node they point at, never physically. *)
+let same_cell (a : _ cell) (b : _ cell) = a.node == b.node
+
 let insert_and_return_after cell value =
   match unattached_node value with
   | Empty -> assert false

@@ -80,6 +80,9 @@ module Reason : sig
             [Branch_relaxation] replaces by branches without counters. *)
 
   val to_string : t -> string
+
+  (** A stable code for the reason, as recorded in the FDO metadata section. *)
+  val to_int : t -> int
 end
 
 (* Simplify also loses some counts by conflating counters rather than dropping

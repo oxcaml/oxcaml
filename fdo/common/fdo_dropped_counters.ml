@@ -58,6 +58,22 @@ module Reason = struct
     | Ssa_self_tail_call_to_jump -> "ssa_self_tail_call_to_jump"
     | Linear_branch_to_jump -> "linear_branch_to_jump"
     | Linear_branch_relaxed -> "linear_branch_relaxed"
+
+  let to_int = function
+    | Inlined_call -> 0
+    | Self_tail_call_to_jump -> 1
+    | Switch_to_single_arm -> 2
+    | Switch_with_identical_arms -> 3
+    | Switch_to_lookup_table -> 4
+    | Cmm_switch_collapsed -> 5
+    | Probe_handler_call -> 6
+    | Cfg_self_tail_call_to_jump -> 7
+    | Cfg_branch_to_jump -> 8
+    | Cfg_blocks_merged -> 9
+    | Linear_branch_to_jump -> 10
+    | Inlined_call_without_counter -> 11
+    | Ssa_self_tail_call_to_jump -> 12
+    | Linear_branch_relaxed -> 13
 end
 
 module Counter_map = Map.Make (Fdo_counter)

@@ -690,6 +690,8 @@ let ocaml_ignored_flags =
     "-llvm-backend";
     "-no-llvm-backend";
     "-fdo-counters";
+    "-fdo-names";
+    "-fdo-dropped-counters";
     "-dfdo-dropped-counters";
     "-ddwarf-types";
     "-ocamlcfg";
