@@ -1,0 +1,15 @@
+(library
+ (name ppx_nested_jkind)
+ (kind ppx_deriver)
+ (modules ppx_nested_jkind)
+ (libraries ppxlib))
+
+(library
+ (name nested_jkind_example)
+ (modules nested_jkind_example)
+ (preprocess
+  (pps ppx_nested_jkind)))
+
+(alias
+ (name runtest)
+ (deps nested_jkind_example.cma))

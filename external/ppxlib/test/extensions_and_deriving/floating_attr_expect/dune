@@ -1,0 +1,8 @@
+(executable
+ (name ppx)
+ (libraries ppxlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
+
+(cram
+ (deps ppx.exe))

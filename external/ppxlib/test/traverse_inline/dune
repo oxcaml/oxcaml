@@ -1,0 +1,8 @@
+(library
+ (name ppxlib_test_traverse_inline)
+ (preprocess
+  (pps ppxlib.traverse)))
+
+(alias
+ (name runtest)
+ (deps ppxlib_test_traverse_inline.cma))

@@ -1,0 +1,8 @@
+(executable
+ (name driver)
+ (libraries ppxlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
+
+(cram
+ (deps driver.exe))
