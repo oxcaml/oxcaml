@@ -66,6 +66,7 @@ type always_dynamic =
   | Generative_functor_application
   | Non_template_functor
   | Non_template_functor_application
+  | Recursive_module
 
 type legacy =
   | Compilation_unit
