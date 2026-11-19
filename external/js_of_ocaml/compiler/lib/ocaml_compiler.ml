@@ -428,39 +428,10 @@ module Cmo_format = struct
 end
 [@@if oxcaml]
 
-(* [.cmj]/[.cmja] files are only produced by the OxCaml JSIR backend. On other
-   compilers, these are placeholders with the same shape. *)
-module Cmj_format = struct
-  type compilation_unit_descr =
-    { cu_name : string
-    ; cu_pos : int
-    ; cu_codesize : int
-    }
-  [@@warning "-unused-field"]
-
-  type library = { lib_units : compilation_unit_descr list }
-
-  let unit_pos (t : compilation_unit_descr) = t.cu_pos
-
-  let units (t : library) = t.lib_units
-end
-[@@if not oxcaml]
-
-module Cmj_format = struct
-  type compilation_unit_descr = Cmj_format.compilation_unit_descr
-
-  type library = Cmj_format.library
-
-  let unit_pos (t : compilation_unit_descr) = t.cu_pos
-
-  let units (t : library) = t.lib_units
-end
-[@@if oxcaml]
-
 module Hint = struct
-  type t = Ocaml_bytecomp.Instruct.optimization_hint
+  type t = Instruct.optimization_hint
 
-  let import_ccall (h : Ocaml_bytecomp.Instruct.ccall_hint) :
+  let import_ccall (h : Instruct.ccall_hint) :
       Optimization_hint.ccall option =
     match h with
     | Hint_unsafe -> Some Hint_unsafe
@@ -541,7 +512,7 @@ module Hint = struct
     | Never_specialise -> Never_specialise
     | Default_specialise -> Default_specialise
 
-  let import_closure_hint (h : Ocaml_bytecomp.Instruct.closure_hint) :
+  let import_closure_hint (h : Instruct.closure_hint) :
       Optimization_hint.closure_hint =
     { params = List.map ~f:import_value_kind h.params
     ; return = import_value_kind h.return

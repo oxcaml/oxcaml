@@ -1,5 +1,10 @@
 (* TEST
  modules = "bigarrcstub.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 open Bigarray

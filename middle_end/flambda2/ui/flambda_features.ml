@@ -31,11 +31,18 @@ type 'a mode =
 
 type any_mode = Mode : _ mode -> any_mode
 
+let lto_support () =
+  !Oxcaml_flags.Flambda2.lto_support |> with_default ~f:(fun d -> d.lto_support)
+
 let classic_mode () =
   !Oxcaml_flags.Flambda2.classic_mode
   |> with_default ~f:(fun d -> d.classic_mode)
 
 let mode () = if classic_mode () then Mode Classic else Mode Normal
+
+(* Ignore classic mode since inlined functions don't get their counters
+   updated. *)
+let fdo_counters () = !Oxcaml_flags.fdo_counters && not (classic_mode ())
 
 let join_points () =
   !Oxcaml_flags.Flambda2.join_points |> with_default ~f:(fun d -> d.join_points)

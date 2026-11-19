@@ -334,7 +334,6 @@ let apply_cont_with_extra_args acc env ccenv ~dbg cont traps args =
       CC.close_apply_cont acc ~dbg ccenv cont traps (args @ extra_args))
 
 let wrap_return_continuation acc env ccenv (apply : IR.apply) =
-  let extra_args = Env.extra_args_for_continuation env apply.continuation in
   let close_current_region_early, region, ghost_region =
     match apply.region_close with
     | Rc_normal | Rc_nontail -> false, apply.region, apply.ghost_region
@@ -354,6 +353,7 @@ let wrap_return_continuation acc env ccenv (apply : IR.apply) =
           Some (Env.Region_stack_element.ghost_region region_stack_elt) ))
   in
   let body acc ccenv continuation =
+    let extra_args = Env.extra_args_for_continuation env continuation in
     match extra_args with
     | [] ->
       CC.close_apply acc ccenv { apply with continuation; region; ghost_region }
@@ -505,7 +505,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         ap_result_layout;
         ap_region_close;
         ap_mode;
-        ap_yielding = _;
+        ap_yielding;
         ap_loc;
         ap_tailcall = _;
         ap_inlined;
@@ -517,7 +517,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     maybe_insert_let_cont "apply_result" ap_result_layout k acc env ccenv
       (fun acc env ccenv k ->
         cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
-          ap_loc ap_inlined ap_probe ap_result_layout k k_exn)
+          ap_yielding ap_loc ap_inlined ap_probe ap_result_layout k k_exn)
   | Lfunction func ->
     let id = Ident.create_local (name_for_function func) in
     let id_duid = Flambda_debug_uid.none in
@@ -525,7 +525,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
        Consider introducing a special debug UID for closures. See #3967. *)
     let dbg = Debuginfo.from_location func.loc in
     let func =
-      cps_function env ~fid:id ~fuid:id_duid
+      cps_function env ~fid:id ~fuid:id_duid ~let_bound:false
         ~recursive:(Non_recursive : Recursive.t)
         func
     in
@@ -875,7 +875,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         let body acc ccenv = cps_tail acc body_env ccenv body k k_exn in
         CC.close_let_cont acc ccenv ~name:continuation ~is_exn_handler:false
           ~params ~recursive ~body ~handler)
-  | Lsend (meth_kind, meth, obj, args, pos, mode, loc, layout, _yielding) ->
+  | Lsend (meth_kind, meth, obj, args, pos, mode, loc, layout, yielding) ->
     cps_non_tail_simple acc env ccenv obj
       (fun acc env ccenv obj _obj_arity ->
         let obj = must_be_singleton_simple obj in
@@ -901,6 +901,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         args = List.flatten args;
                         loc;
                         region_close = pos;
+                        yielding;
                         inlined = Default_inlined;
                         probe = None;
                         mode;
@@ -1204,8 +1205,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
-  | Linstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
@@ -1242,9 +1242,9 @@ and cps_non_tail_var :
           k acc env ccenv var arity))
     k_exn
 
-and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
-    ap_inlined ap_probe ap_return (k : Continuation.t) (k_exn : Continuation.t)
-    : Expr_with_acc.t =
+and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
+    ap_yielding ap_loc ap_inlined ap_probe ap_return (k : Continuation.t)
+    (k_exn : Continuation.t) : Expr_with_acc.t =
   cps_non_tail_list acc env ccenv ap_args
     (fun acc env ccenv args args_arity ->
       cps_non_tail_var "func" acc env ccenv ap_func
@@ -1264,6 +1264,7 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
               args = List.flatten args;
               loc = ap_loc;
               region_close = ap_region_close;
+              yielding = ap_yielding;
               inlined = ap_inlined;
               probe = ap_probe;
               mode = ap_mode;
@@ -1384,15 +1385,24 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
   List.map
     (fun (fun_id, fun_uid, def) ->
       let fuid = Flambda_debug_uid.of_lambda_debug_uid fun_uid in
-      cps_function env ~fid:fun_id ~fuid ~recursive:(recursive fun_id)
+      cps_function env ~fid:fun_id ~fuid ~let_bound:true
+        ~recursive:(recursive fun_id)
         ~precomputed_free_idents:(Ident.Map.find fun_id free_idents)
         def)
     bindings_with_wrappers
 
-and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
+and cps_function env ~fid ~fuid ~let_bound ~(recursive : Recursive.t)
     ?precomputed_free_idents
-    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } :
+    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } as
+     func :
       L.lfunction) : Function_decl.t =
+  let fdo =
+    Option.map
+      (fun fdo ->
+        let binder = if let_bound then Some fid else None in
+        Fdo_from_lambda_env.enter_function fdo ~binder func)
+      (Env.fdo env)
+  in
   let contains_no_escaping_local_allocs =
     match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
   in
@@ -1488,11 +1498,17 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let calling_convention : Function_decl.calling_convention =
     (* CR-someday ncourant: we never unbox parameters or returns of stubs, which
        in particular affects stubs generated by [split_default_wrapper]. *)
+    (* CR-someday vlaviron: the unboxing strategy only works if we can remove
+       obvious pairs of boxing/unboxing, and in classic mode it doesn't always
+       work, so we ignore [@unboxable] attributes. If we want to support them
+       in the future, there is a bit of work to do for the case where the
+       closures are lifted. *)
     let is_a_param_unboxed =
       List.exists (fun (p : Lambda.lparam) -> p.attributes.unbox_param) params
     in
     if
-      attr.stub
+      Flambda_features.classic_mode ()
+      || attr.stub
       || ((not (Option.is_some attr.unbox_return)) && not is_a_param_unboxed)
     then Normal_calling_convention
     else
@@ -1578,7 +1594,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     Env.create ~current_unit:(Env.current_unit env)
       ~machine_width:(Env.machine_width env) ~return_continuation:body_cont
       ~exn_continuation:body_exn_cont ~my_region:my_region_stack_elt
-      ~my_alloc_region
+      ~my_alloc_region ~fdo
   in
   let exn_continuation : IR.exn_continuation =
     { exn_handler = body_exn_cont; extra_args = [] }
@@ -1658,12 +1674,16 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     let ccenv = CCenv.set_not_at_toplevel ccenv in
     cps_tail acc new_env ccenv body body_cont body_exn_cont
   in
+  let fdo_entry_annotation =
+    Option.fold ~none:Fdo_annotation.With_body_hash.empty
+      ~some:Fdo_from_lambda_env.entry_annotation fdo
+  in
   Function_decl.create ~let_rec_ident:(Some fid) ~let_rec_uid:fuid
     ~function_slot ~kind ~params ~params_arity ~removed_params ~return
     ~calling_convention ~return_continuation:body_cont ~exn_continuation
     ~my_region ~my_ghost_region ~my_alloc_region ~body ~attr ~loc
-    ~free_idents_of_body recursive ~closure_alloc_mode:mode
-    ~first_complex_local_param ~result_mode:ret_mode
+    ~fdo_entry_annotation ~free_idents_of_body recursive
+    ~closure_alloc_mode:mode ~first_complex_local_param ~result_mode:ret_mode
 
 and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
     ~scrutinee (k : Continuation.t) (k_exn : Continuation.t) : Expr_with_acc.t =
@@ -1739,8 +1759,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
-        | Linstantiate _ ->
+        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
           Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
@@ -1880,10 +1899,15 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   let toplevel_my_alloc_region =
     Ident.create_local "toplevel_my_alloc_region"
   in
+  let fdo =
+    if Flambda_features.fdo_counters ()
+    then Some (Fdo_from_lambda_env.toplevel compilation_unit lam)
+    else None
+  in
   let env =
     Env.create ~current_unit:compilation_unit ~machine_width
       ~return_continuation ~exn_continuation ~my_region:None
-      ~my_alloc_region:toplevel_my_alloc_region
+      ~my_alloc_region:toplevel_my_alloc_region ~fdo
   in
   let program acc ccenv =
     cps_tail acc env ccenv lam return_continuation exn_continuation

@@ -101,12 +101,7 @@ let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end
 module I = struct
   include I
 
-  exception Extension_disabled of string
-
-  let () =
-    Printexc.register_printer (function
-      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
-      | _ -> None)
+  exception Extension_disabled = Arch.Extension.Disabled
 
   let require_vec256 () =
     if not (Arch.Extension.enabled_vec256 ())
@@ -944,7 +939,8 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
+  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Inot | Iclz | Ictz | Icomp _ ->
+    assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -1955,28 +1951,33 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   assert (res_used = Array.length instr.res);
   (* Gathers require that all args are distinct registers. *)
-  match[@warning "-4"] simd.id with
-  | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
-  | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
-  | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
+  if
+    String.starts_with ~prefix:"vpgather" simd.mnemonic
+    || String.starts_with ~prefix:"vgather" simd.mnemonic
+  then
     let module Set = Reg.UsingLocEquality.Set in
     let set = Array.fold_right Set.add instr.arg Set.empty in
     assert (Set.cardinal set = Array.length instr.arg)
-  | _ -> ()
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
+  | Some R128 -> arg_as_xmm (arg instr i)
+  | Some R256 -> arg_as_ymm (arg instr i)
+  | Some R512 -> arg_as_zmm (arg instr i)
+  | Some R64 | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> res instr i
+  | Some R128 -> arg_as_xmm (res instr i)
+  | Some R256 -> arg_as_ymm (res instr i)
+  | Some R512 -> arg_as_zmm (res instr i)
+  | Some R64 | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -2030,7 +2031,10 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
             let n = num_args_addressing mode in
             let typ = to_addr_width arg.loc in
             let address = addressing mode typ instr idx in
-            emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
+            (* We do not sanitize masked loads and stores, which only access the
+               unmasked elements. *)
+            if not (Simd.instr_expects_mask simd)
+            then emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
             idx + n, address :: args
           | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
       (0, []) simd.args
@@ -2104,11 +2108,11 @@ let emit_simd ?mode (op : Simd.operation) instr =
       emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestz | Vptestz_X | Vptestz_Y ->
+    | Ptestz | Vptestz_X | Vptestz_Y | Kflag Zf ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestc | Vptestc_X | Vptestc_Y ->
+    | Ptestc | Vptestc_X | Vptestc_Y | Kflag Cf ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
@@ -2128,7 +2132,10 @@ let prologue_stack_offset () =
 
 let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  (* A label that only delimits a DWARF range is not a branch target: aligning
+     it would make the generated code depend on debugging information. *)
+  if (not fallthrough) && !fastcode_flag && not is_dwarf_only_label
+  then D.align ~fill:Nop ~bytes:4;
   D.define_label lbl
 
 (* Emit an instruction *)
@@ -2280,7 +2287,23 @@ let emit_instr ~first ~last ~fallthrough i =
     else (
       add_used_symbol func.sym_name;
       emit_jump func)
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; ty_args; _ }) ->
+    (* Fuse each fat-pointer argument, adding its offset register into its base
+       register, as part of emitting the call itself, so no GC safepoint can
+       separate the addition from the call. *)
+    let (_ : int) =
+      List.fold_left
+        (fun k (ty_arg : Cmm.exttype) ->
+          match ty_arg with
+          | XFat_pointer ->
+            I.add (arg i (k + 1)) (arg i k);
+            k + 2
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 ->
+            k + 1
+          | XDummy_int | XDummy_float -> k)
+        0 ty_args
+    in
     add_used_symbol func;
     if stack_ofs > 0
     then (
@@ -2514,6 +2537,7 @@ let emit_instr ~first ~last ~fallthrough i =
     when Reg.equal_location i.arg.(1).loc i.res.(0).loc && Reg.is_reg i.res.(0)
     ->
     I.xor (res32 i 0) (res32 i 0)
+  | Lop (Intop Inot) -> I.not_ (res i 0)
   | Lop (Intop (Idiv { signed = true } | Imod { signed = true })) ->
     I.cqo ();
     I.idiv (arg i 1)
@@ -2763,6 +2787,8 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Dls_get -> I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
   | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
+  | Lop Thread_self_id ->
+    I.mov (domain_field Domainstate.Domain_thread_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
   | Llabel_for_jump_target label ->
@@ -2884,7 +2910,17 @@ let rec emit_all ~first ~fallthrough i =
       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
         Printlinear.instr i;
       raise exn);
-    emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
+    let fallthrough =
+      match i.desc with
+      | Llabel_for_dwarf _ -> fallthrough
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _
+      | Llabel_for_jump_target _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
+        Linear.has_fallthrough i.desc
+    in
+    emit_all ~first:false ~fallthrough i.next
 
 let all_functions = ref []
 
@@ -3012,8 +3048,9 @@ let begin_assembly unix =
   if !Oxcaml_flags.internal_assembler && !Emitaux.binary_backend_available
   then X86_proc.register_internal_assembler (Internal_assembler.assemble unix);
   (* We initialize the new assembly directives. *)
-  Asm_targets.Asm_label.initialize ~new_label:(fun () ->
-      Cmm.new_label () |> Label.to_int);
+  Asm_targets.Asm_label.initialize
+    ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
+    ~new_dwarf_label:(fun () -> Label.new_dwarf_label () |> Label.to_int);
   D.initialize ~big_endian:Arch.big_endian
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments
       (* As a first step, we emit by calling the corresponding x86 emit

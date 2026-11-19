@@ -7,13 +7,7 @@ let nl () = printf "\n"
 
 let supported_versions =
   [
-    (* We use many fewer versions of ppxlib in OxCaml.
-    ("402", "4.02");
-    ("403", "4.03");
-    ("404", "4.04");
-    ("405", "4.05");
-    ("406", "4.06");
-    ("407", "4.07");
+    (* We use many fewer versions of ppxlib internally.
     ("408", "4.08");
     ("409", "4.09");
     ("410", "4.10");

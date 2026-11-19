@@ -3,7 +3,7 @@
  include systhreads;
  hassysthreads;
  target-windows;
- script;
+ config_script;
  {
    output = "${test_build_directory}/program-output";
    stdout = "${output}";

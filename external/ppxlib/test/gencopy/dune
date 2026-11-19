@@ -1,0 +1,3 @@
+(cram
+ (package ppxlib)
+ (deps ../../dev/gencopy/gencopy.exe))

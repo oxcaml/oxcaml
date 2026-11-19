@@ -263,8 +263,11 @@ let import_crcs penv ~source crcs =
     match info with
     | None -> ()
     | Some (kind, crc) ->
-        add_import penv name;
-        Consistbl.check crc_units name kind crc source
+        match Consistbl.find crc_units name with
+        | Some (_, known_crc) when Digest.equal known_crc crc -> ()
+        | _ ->
+          add_import penv name;
+          Consistbl.check crc_units name kind crc source
   in Array.iter import_crc crcs
 
 let check_consistency penv imp =

@@ -71,6 +71,7 @@ type import = private {
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
+  imp_cmi_name : Compilation_unit.Name.t;
 }
 
 val report_error: error Format_doc.format_printer
@@ -265,5 +266,6 @@ val with_cmis : 'a t -> ('b -> 'c) -> 'b -> 'c
 
 val forall :
   found:(Compilation_unit.Name.t -> filepath -> Compilation_unit.Name.t -> bool) ->
+  invalid:(Compilation_unit.Name.t -> filepath -> Compilation_unit.Name.t -> bool) ->
   missing:(Compilation_unit.Name.t -> bool) ->
   'a t -> bool

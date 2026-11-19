@@ -399,15 +399,6 @@ let fetch_on_disk_dirty lnk store loc =
   add_to_cache v lnk ~loc store ~size small_children None;
   small_children
 
-(* Smalls are stored along their parents so they share the same loc *)
-let store_and_loc_of_parent (PLink lnk : parent_link) =
-  match !lnk with
-  | In_cache { store; loc; _ } | On_disk { store; loc; _ } -> (store, loc)
-  | _ ->
-    invalid_arg
-      ("Granular_marshal.fetch_parent: Unexpected parent link "
-     ^ string_of_link lnk)
-
 (** Fetch the parent of a small value in order to read its smalls. If the parent
   has not yet been loaded in memory it will be read from the disk and kept dirty
   because its schema is unknown.*)
@@ -483,6 +474,92 @@ let cache (type a) (module Key : Hashtbl.HashedType with type t = a) =
         lnk := Duplicate original_lnk
       | exception Not_found -> H.add cache key lnk
 
+type materialized_entry = { first_link : Obj.t; mutable reused : bool }
+
+(** [materialize root_schema root_value] replaces every link into another file
+    reachable from [root_value] with an in-memory copy of the pointed-at value. *)
+let materialize root_schema root_value =
+  let seen : (string * int * int, materialized_entry) Hashtbl.t =
+    Hashtbl.create 1024
+  in
+  let assignments = ref [] in
+  let key_of_disk_link : type a. a link -> string * int * int =
+   fun lnk ->
+    match !lnk with
+    | On_disk { store; loc; _ } | In_cache { store; loc; _ } ->
+      (store.filename, loc, -1)
+    | On_disk_small { parent = PLink parent_lnk; small_pos; _ } -> (
+      match !parent_lnk with
+      | In_cache { store; loc; _ } | On_disk { store; loc; _ } ->
+        (store.filename, loc, small_pos)
+      | _ ->
+        invalid_arg
+          ("Granular_marshal.materialize: unexpected parent of small value "
+         ^ string_of_link parent_lnk))
+    | _ ->
+      invalid_arg
+        ("Granular_marshal.materialize: not an on-disk link "
+       ^ string_of_link lnk)
+  in
+  let fetch_clean : type a. a link -> a schema -> a =
+   fun lnk schema ->
+    (match !lnk with
+    | On_disk { store; loc; schema = None } ->
+      lnk := On_disk { store; loc; schema = Some schema }
+    | In_cache { store; schema = None; _ } ->
+      upgrade_reused_link_schema lnk store schema
+    | _ -> ());
+    fetch lnk
+  in
+  let rec iter =
+    { yield =
+        (fun (type a) (lnk : a link) _type_id (schema : a schema) ->
+          visit_link lnk schema)
+    }
+  and visit_link : type a. a link -> a schema -> unit =
+   fun lnk schema ->
+    match !lnk with
+    | In_memory v | In_memory_reused v -> schema iter v
+    | Duplicate original -> (
+      match !original with
+      | On_disk _ | In_cache _ | On_disk_small _ ->
+        let entry = visit_disk_link original schema in
+        entry.reused <- true
+      | _ -> visit_link original schema)
+    | On_disk _ | In_cache _ | On_disk_small _ ->
+      ignore (visit_disk_link lnk schema : materialized_entry)
+    | Serialized _
+    | Serialized_small _
+    | Small _
+    | On_disk_ptr _
+    | On_disk_small_ptr _ ->
+      invalid_arg
+        ("Granular_marshal.materialize: unexpected link " ^ string_of_link lnk)
+  and visit_disk_link : type a. a link -> a schema -> materialized_entry =
+   fun lnk schema ->
+    let key = key_of_disk_link lnk in
+    match Hashtbl.find_opt seen key with
+    | Some entry ->
+      if not (entry.first_link == Obj.repr lnk) then (
+        entry.reused <- true;
+        (* Same file and location, hence same type. *)
+        let first : a link = Obj.obj entry.first_link in
+        assignments := (fun () -> lnk := Duplicate first) :: !assignments);
+      entry
+    | None ->
+      let entry = { first_link = Obj.repr lnk; reused = false } in
+      Hashtbl.add seen key entry;
+      let v = fetch_clean lnk schema in
+      schema iter v;
+      assignments :=
+        (fun () ->
+          lnk := if entry.reused then In_memory_reused v else In_memory v)
+        :: !assignments;
+      entry
+  in
+  root_schema iter root_value;
+  List.iter (fun assign -> assign ()) !assignments
+
 let relativize ~wrt:path =
   let path_segments = Misc.split_path path in
   let rec aux path target =
@@ -496,9 +573,22 @@ let relativize ~wrt:path =
     let target_segments = Misc.split_path target in
     List.fold_left Filename.concat "" (aux path_segments target_segments)
 
-let write ?(flags = []) fd ~filename root_schema root_value =
+module File_kind = struct
+  type t = No_standalone | Standalone
+end
+
+let write ?(flags = []) fd ~filename ~(file_kind : File_kind.t) root_schema
+    root_value =
+  (match file_kind with
+  | Standalone -> materialize root_schema root_value
+  | No_standalone -> ());
   let relativize =
-    relativize ~wrt:Filename.(dirname (concat (Unix.getcwd ()) filename))
+    (* Note: the target path to relativize could look like
+    /abs/olute/../semirelative (due to the Filename.concat in resolve_filename
+    which made the relative path absolute, without canonicalize to drop the
+    olute/..), and further relativize would keep on stacking more dir/../
+    intermediate folders. *)
+    relativize ~wrt:(Filename.dirname (Misc.canonicalize_filename filename))
   in
   let write_id = File_digest.write_delayed fd in
   let write_root_loc = write_string_delayed ~size:ptr_size fd in
@@ -522,6 +612,7 @@ let write ?(flags = []) fd ~filename root_schema root_value =
               lnk := !original_lnk
             | On_disk { store = { filename; id; _ }; loc; _ }
             | In_cache { loc; store = { filename; id; _ }; _ } ->
+              let filename = relativize filename in
               lnk := On_disk_ptr { filename; id; loc }
             | _ ->
               failwith
@@ -537,9 +628,25 @@ let write ?(flags = []) fd ~filename root_schema root_value =
                somewhere in the file. *)
             let filename = relativize filename in
             lnk := On_disk_ptr { filename; id; loc }
-          | On_disk_small { parent; small_pos; _ } ->
-            let { filename; id; _ }, loc = store_and_loc_of_parent parent in
-            let filename = relativize filename in
+          | On_disk_small { parent = PLink parent_lnk; small_pos; _ } ->
+            (* Smalls are stored along their parents so they share the same
+               loc. *)
+            let filename, id, loc =
+              match !parent_lnk with
+              | In_cache { store = { filename; id; _ }; loc; _ }
+              | On_disk { store = { filename; id; _ }; loc; _ } ->
+                (relativize filename, id, loc)
+              | On_disk_ptr { filename; id; loc } ->
+                (* The parent was already visited: its filename is already
+                   relative to the output file. *)
+                (filename, id, loc)
+              | _ ->
+                failwith
+                  (Format.sprintf
+                     "Granular_marshal.write: unexpected parent of small value \
+                      %s"
+                     (string_of_link parent_lnk))
+            in
             lnk := On_disk_small_ptr { filename; id; loc; pos = small_pos })
     }
   and output_and_mark (V v) (small_children : any_val_link list) =
@@ -603,11 +710,7 @@ let write ?(flags = []) fd ~filename root_schema root_value =
 
 let read filename fd root_schema =
   let id = File_digest.read fd in
-  let filename =
-    if Filename.is_relative filename then
-      Filename.concat (Unix.getcwd ()) filename
-    else filename
-  in
+  let filename = Misc.canonicalize_filename filename in
   let store = { filename; id; cache = Cache_cache.read filename } in
   let root_loc = int_of_binstring (really_input_string fd 8) in
   let parent_link =

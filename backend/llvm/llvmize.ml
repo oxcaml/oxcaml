@@ -896,6 +896,10 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
     | Iand -> do_binary And
     | Ior -> do_binary Or
     | Ixor -> do_binary Xor
+    | Inot ->
+      reject_addr_regs i.res "int_op";
+      let arg1 = load_reg_to_temp ~typ:T.i64 t i.arg.(0) in
+      emit_ins t (I.binary Xor ~arg1 ~arg2:(V.of_int ~typ:T.i64 (-1)))
     | Ilsl -> do_binary Shl
     | Ilsr -> do_binary Lshr
     | Iasr -> do_binary Ashr
@@ -1310,6 +1314,10 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     let domain_id_ptr = load_domainstate_addr t Domain_id in
     let domain_id = emit_ins t (I.load ~ptr:domain_id_ptr ~typ:T.i64) in
     store_into_reg t i.res.(0) domain_id
+  | Thread_self_id ->
+    let thread_id_ptr = load_domainstate_addr t Domain_thread_id in
+    let thread_id = emit_ins t (I.load ~ptr:thread_id_ptr ~typ:T.i64) in
+    store_into_reg t i.res.(0) thread_id
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i

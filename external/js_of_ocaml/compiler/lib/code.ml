@@ -552,18 +552,25 @@ module Marshalable_program = struct
     { start; blocks; free_pc }
 end
 
-type cmj_body =
-  { program : Marshalable_program.t
+type jsir_target =
+  | Js
+  | Wasm
+
+type jsir_file =
+  { target : jsir_target
+  ; program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so the OxCaml JSIR backend must communicate it to
             [js_of_ocaml] to keep the two in sync. *)
   ; imported_compilation_units : string list
-        (** Full paths of the compilation units whose symbols [program] fetches
-            from the global symbol table. Needed to fill in [Unit_info.t]. *)
+        (** Full paths of the compilation units that must be linked and
+            initialised before [program]. *)
   ; exported_compilation_unit : string
         (** Full path of the compilation unit [program] defines. Needed to fill
             in [Unit_info.t]. *)
+  ; force_link : bool
+        (** Whether the unit was compiled with [-linkall]. *)
   }
 
 let noloc = No

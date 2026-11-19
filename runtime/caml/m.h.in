@@ -121,6 +121,16 @@
 
 #undef HAS_AVX2
 
+#undef HAS_AVX512F
+
+#undef HAS_AVX512DQ
+
+#undef HAS_AVX512CD
+
+#undef HAS_AVX512BW
+
+#undef HAS_AVX512VL
+
 #undef WITH_NONEXECSTACK_NOTE
 
 /* Define WITH_NONEXECSTACK_NOTE when an explicit ".note.GNU-stack" section

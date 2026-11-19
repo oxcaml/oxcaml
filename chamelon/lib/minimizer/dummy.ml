@@ -63,7 +63,7 @@ let unit_typ =
     ctyp_attributes = []
   }
 
-let default_mode = Typemode.transl_mode_with_locality []
+let default_mode = Typemode.legacy_modes
 
 let a_to_unit =
   { ctyp_desc = Ttyp_arrow (Nolabel, a_typ, default_mode, unit_typ, default_mode);
@@ -94,7 +94,7 @@ let dummy_core_typet : Parsetree.core_type =
 
 let dummy_value_description =
   mk_value_description ~val_type:dummy_type_expr
-    ~val_kind:(Val_reg Jkind.Sort.scannable) ~val_attributes:[]
+    ~val_kind:(Val_reg (Representable Jkind.Sort.scannable)) ~val_attributes:[]
 
 let exp_desc_to_exp ed =
   { exp_desc = ed;

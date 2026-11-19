@@ -29,10 +29,11 @@ particular, updating a mutable reference to a type that is `external_` can skip
 the write barrier (i.e., it does not need a call to `caml_modify`).
 
 Writes of types with non-scanned layouts never require a write barrier. For this
-reason, the layouts `scannable non_pointer`, `bits8`, `bits16`, `bits32`,
+reason, the layouts `value_or_null non_pointer`, `bits8`, `bits16`, `bits32`,
 `bits64`, `float32`, `float64`, `untagged_immediate`, `vec128`, `vec256`,
 `vec512`, `void`, and `word` are all inherently `mod external_`, and the layout
-`scannable non_pointer64` is inherently `mod external64`.
+`value_or_null non_pointer64` is inherently `mod external64`. (So are their
+sublayouts, such as `value non_pointer`, the layout of `immediate`.)
 
 In the future, we plan to make externality a mode, rather than just a property
 of types.

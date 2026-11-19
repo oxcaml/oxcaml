@@ -16,9 +16,9 @@ type _ Effect.t += Suspend : unit Effect.t
 
 module TLS = Domain.Safe.TLS
 
-let k = TLS.new_key (fun () -> ref "init")
-let get () = (TLS.access k (fun r -> { Modes.Global.global = !r })).global
-let set (v : string) = TLS.access k (fun r -> r := v) [@nontail]
+let k = TLS.new_key (fun () -> "init")
+let get () = TLS.get k
+let set (v : string) = TLS.set k v
 
 let depth = 100_000
 

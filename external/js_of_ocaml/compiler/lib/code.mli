@@ -262,21 +262,32 @@ module Marshalable_program : sig
   val to_program : t -> program
 end
 
-type cmj_body =
-  { program : Marshalable_program.t
+(** The target a JSIR file (.cmj or .cmw) was produced for. *)
+type jsir_target =
+  | Js
+  | Wasm
+
+type jsir_file =
+  { target : jsir_target
+  ; program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so the OxCaml JSIR backend must communicate it to
             [js_of_ocaml] to keep the two in sync. *)
   ; imported_compilation_units : string list
-        (** Full paths of the compilation units whose symbols [program] fetches
-            from the global symbol table. Needed to fill in [Unit_info.t]. *)
+        (** Full paths of the compilation units that must be linked, and
+            initialised, before [program]: those whose symbols it fetches from
+            the global symbol table, and those the OCaml source refers to.
+            Needed to fill in [Unit_info.t]. *)
   ; exported_compilation_unit : string
         (** Full path of the compilation unit [program] defines. Needed to fill
             in [Unit_info.t]. *)
+  ; force_link : bool
+        (** Whether the unit was compiled with [-linkall], so must be linked
+            even if nothing requires it. Needed to fill in [Unit_info.t]. *)
   }
-(** Contents of a [.cmj] file produced by the OxCaml JSIR backend (after the
-    magic number), marshaled. *)
+(** Contents of a JSIR file (.cmj or .cmw) produced by the OxCaml JSIR backend
+    (after the magic number), marshaled. *)
 
 module Print : sig
   type xinstr =

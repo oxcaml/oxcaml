@@ -27,7 +27,6 @@
    )* }}} *)
 
 open Merlin_utils.Std
-open Merlin_utils.Std.Result
 
 module Directive = struct
   type include_path =

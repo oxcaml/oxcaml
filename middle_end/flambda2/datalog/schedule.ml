@@ -296,7 +296,7 @@ let print_stats ppf stats =
   Format.fprintf ppf "@]"
 
 type t =
-  | Saturate of Cursor.Incremental.t * rule list
+  | Saturate of Cursor.Incremental.t Lazy.t * rule list
   | Fixpoint of t list
 
 let rec recompile_schedule_for_stats ~stats schedule =
@@ -309,10 +309,12 @@ let rec recompile_schedule_for_stats ~stats schedule =
   | Saturate (_, rules) ->
     List.iter (record_rule ~stats) rules;
     let cursor =
-      Cursor.Incremental.from_rules ~with_stats:true
-        (List.map
-           (fun { rule_id; rule } -> maybe_add_provenance ~stats ~rule_id rule)
-           rules)
+      lazy
+        (Cursor.Incremental.from_rules ~with_stats:true
+           (List.map
+              (fun { rule_id; rule } ->
+                maybe_add_provenance ~stats ~rule_id rule)
+              rules))
     in
     Saturate (cursor, rules)
 
@@ -326,7 +328,9 @@ let fixpoint schedule = Fixpoint schedule
 let saturate rules =
   let rules = List.map create_rule rules in
   Saturate
-    ( Cursor.Incremental.from_rules (List.map (fun { rule; _ } -> rule) rules),
+    ( lazy
+        (Cursor.Incremental.from_rules
+           (List.map (fun { rule; _ } -> rule) rules)),
       rules )
 
 (** Run the evaluation functions in [fns] until reaching a fixpoint. *)
@@ -375,7 +379,8 @@ let run_list_incremental fns ~previous ~diff ~current =
 let rec run_incremental schedule ~previous ~diff ~current =
   match schedule with
   | Saturate (cursor, _rules) ->
-    Cursor.Incremental.seminaive_run cursor ~previous ~diff ~current
+    Cursor.Incremental.seminaive_run (Lazy.force cursor) ~previous ~diff
+      ~current
   | Fixpoint schedules ->
     run_list_incremental
       (List.map run_incremental schedules)
@@ -383,7 +388,7 @@ let rec run_incremental schedule ~previous ~diff ~current =
 
 let rec collect_stats stats = function
   | Saturate (cursor, _) ->
-    Cursor.Incremental.get_and_clear_stats cursor :: stats
+    Cursor.Incremental.get_and_clear_stats (Lazy.force cursor) :: stats
   | Fixpoint schedules -> List.fold_left collect_stats stats schedules
 
 let run ?stats schedule db =

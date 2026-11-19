@@ -228,3 +228,51 @@ module One : sig
 
   val cols : (unit Map.t, t -> Syntax.nil, unit) Syntax.Column.hlist
 end
+
+module type Schema_with_renaming = sig
+  include Datalog.Schema.S with type value = unit
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
+
+module Schemas : sig
+  module N :
+    Schema_with_renaming
+      with type t = unit Code_id_or_name.Map.t
+       and type keys = Code_id_or_name.t -> Datalog.nil
+
+  module NN :
+    Schema_with_renaming
+      with type t = unit Code_id_or_name.Map.t Code_id_or_name.Map.t
+       and type keys = Code_id_or_name.t -> Code_id_or_name.t -> Datalog.nil
+
+  module NNN :
+    Schema_with_renaming
+      with type t =
+        unit Code_id_or_name.Map.t Code_id_or_name.Map.t Code_id_or_name.Map.t
+       and type keys =
+        Code_id_or_name.t ->
+        Code_id_or_name.t ->
+        Code_id_or_name.t ->
+        Datalog.nil
+
+  module NF :
+    Schema_with_renaming
+      with type t = unit Field.Map.t Code_id_or_name.Map.t
+       and type keys = Code_id_or_name.t -> Field.t -> Datalog.nil
+
+  module NFN :
+    Schema_with_renaming
+      with type t = unit Code_id_or_name.Map.t Field.Map.t Code_id_or_name.Map.t
+       and type keys =
+        Code_id_or_name.t -> Field.t -> Code_id_or_name.t -> Datalog.nil
+
+  module NCN :
+    Schema_with_renaming
+      with type t =
+        unit Code_id_or_name.Map.t Cofield.Map.t Code_id_or_name.Map.t
+       and type keys =
+        Code_id_or_name.t -> Cofield.t -> Code_id_or_name.t -> Datalog.nil
+end

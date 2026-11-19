@@ -1,0 +1,196 @@
+let code `fn[recover_sources_from_usages_lib.ml:27,2--17]_1` deleted in
+let code make_c_2 deleted in
+let code `fn[recover_sources_from_usages_lib.ml:33,2--20]_4` deleted in
+let code make_g_5 deleted in
+let code escape_6 deleted in
+let code id_7 deleted in
+let code `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_1` deleted in
+let code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages_lib.ml:27,2--17]_1_1`)
+      `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_2`
+        (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let b =
+    %project_value_slot.[`fn[recover_sources_from_usages_lib.ml:27,2--17]`].[unboxed_field_b]
+      (my_closure)
+  in
+  let int_add = %int_barith.add (10, b) in
+  cont k (int_add)
+in
+let code inline(never) loopify(never) size(13) newer_version_of(make_c_2)
+      make_c_2_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let `fn[recover_sources_from_usages_lib.ml:27,2--17]` =
+    closure `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_2`
+      @`fn[recover_sources_from_usages_lib.ml:27,2--17]` &my_alloc_region
+  with { unboxed_field_b = x }
+  in
+  cont k (`fn[recover_sources_from_usages_lib.ml:27,2--17]`)
+in
+let $camlRecover_sources_from_usages_lib__make_c_2 =
+  closure make_c_2_1 @make_c &toplevel
+in
+let code loopify(never) size(10) newer_version_of(`fn[recover_sources_from_usages_lib.ml:33,2--20]_4`)
+      `fn[recover_sources_from_usages_lib.ml:33,2--20]_4_1`
+        (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let v =
+    %project_value_slot.[`fn[recover_sources_from_usages_lib.ml:33,2--20]`].[v]
+      (my_closure)
+  in
+  apply &my_alloc_region v (0) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      let int_add = %int_barith.add (apply_result, 1) in
+      cont k (int_add)
+in
+let code inline(never) loopify(never) size(19) newer_version_of(make_g_5)
+      make_g_5_1 (v : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let `fn[recover_sources_from_usages_lib.ml:33,2--20]` =
+    closure `fn[recover_sources_from_usages_lib.ml:33,2--20]_4_1`
+      @`fn[recover_sources_from_usages_lib.ml:33,2--20]` &my_alloc_region
+  with { v = v }
+  in
+  cont k (`fn[recover_sources_from_usages_lib.ml:33,2--20]`)
+in
+let $camlRecover_sources_from_usages_lib__make_g_4 =
+  closure make_g_5_1 @make_g &toplevel
+in
+let code inline(never) loopify(never) size(1) newer_version_of(escape_6)
+      escape_6_1 (_x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlRecover_sources_from_usages_lib__escape_5 =
+  closure escape_6_1 @escape &toplevel
+in
+apply direct(make_c_2_1 &toplevel)
+  ($camlRecover_sources_from_usages_lib__make_c_2 : _ -> val)
+    (5)
+    -> k * error
+  where k (c1 : val) =
+    (apply direct(make_c_2_1 &toplevel)
+       ($camlRecover_sources_from_usages_lib__make_c_2 : _ -> val)
+         (6)
+         -> k * error
+       where k (c2 : val) =
+         (apply direct(escape_6_1 &toplevel)
+            ($camlRecover_sources_from_usages_lib__escape_5 : _ -> imm tagged
+             )
+              (c1)
+              -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k
+            where k =
+              ((let Popaque = %opaque (20) in
+                let $`camlRecover_sources_from_usages_lib__fn[recover_sources_from_usages_lib.ml:27,2--17]_6` =
+                  closure
+                    `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_3`
+                    @`fn[recover_sources_from_usages_lib.ml:27,2--17]_1`
+                    &toplevel
+                and code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages_lib.ml:27,2--17]_1_1`)
+                      `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_3`
+                        (param : imm tagged)
+                        my_closure &my_alloc_region my_depth
+                        -> k1 * k2
+                        : imm tagged =
+                  let a =
+                    %project_value_slot.[`fn[recover_sources_from_usages_lib.ml:27,2--17]_1`].[unboxed_field_a]
+                      ($`camlRecover_sources_from_usages_lib__fn[recover_sources_from_usages_lib.ml:27,2--17]_6`)
+                  in
+                  let int_add = %int_barith.add (a, 7) in
+                  cont k1 (int_add)
+                  with { unboxed_field_a = Popaque }
+                in
+                let code loopify(never) size(6) newer_version_of(`fn[recover_sources_from_usages_lib.ml:33,2--20]_4_1`)
+                      `fn[recover_sources_from_usages_lib.ml:33,2--20]_4_2`
+                        (param : imm tagged)
+                        my_closure &my_alloc_region my_depth
+                        -> k1 * k2
+                        : imm tagged =
+                  let a =
+                    %project_value_slot.[`fn[recover_sources_from_usages_lib.ml:27,2--17]_1`].[unboxed_field_a]
+                      ($`camlRecover_sources_from_usages_lib__fn[recover_sources_from_usages_lib.ml:27,2--17]_6`)
+                  in
+                  let int_add = %int_barith.add (a, 7) in
+                  let int_add_1 = %int_barith.add (int_add, 1) in
+                  cont k1 (int_add_1)
+                in
+                let $`camlRecover_sources_from_usages_lib__fn[recover_sources_from_usages_lib.ml:33,2--20]_7` =
+                  closure
+                    `fn[recover_sources_from_usages_lib.ml:33,2--20]_4_2`
+                    @`fn[recover_sources_from_usages_lib.ml:33,2--20]`
+                    &toplevel
+                  with {
+                    v =
+                      $`camlRecover_sources_from_usages_lib__fn[recover_sources_from_usages_lib.ml:27,2--17]_6`
+                  }
+                in
+                apply direct(escape_6_1 &toplevel)
+                  ($camlRecover_sources_from_usages_lib__escape_5
+                   : _ -> imm tagged)
+                    ($`camlRecover_sources_from_usages_lib__fn[recover_sources_from_usages_lib.ml:33,2--20]_7`)
+                    -> k2 * error
+                  where k2 (function_return : imm tagged) =
+                    cont k1
+                  where k1 =
+                    cont k)
+                 where k =
+                   let code inline(never) loopify(never) size(1) newer_version_of(id_7)
+                         id_7_1 (x)
+                           my_closure &my_alloc_region my_depth
+                           -> k * k1 =
+                     cont k (x)
+                   in
+                   let $camlRecover_sources_from_usages_lib__id_8 =
+                     closure id_7_1 @`id` &toplevel
+                   in
+                   ((let Popaque = %opaque (1) in
+                     (let untagged = %untag_imm (Popaque) in
+                      switch untagged
+                        | 0 -> k1
+                        | 1 -> k2)
+                       where k2 =
+                         apply direct(make_g_5_1 &toplevel)
+                           ($camlRecover_sources_from_usages_lib__make_g_4
+                            : _ -> val)
+                             (c1)
+                             -> k * error
+                       where k1 =
+                         (apply direct(make_g_5_1 &toplevel)
+                            ($camlRecover_sources_from_usages_lib__make_g_4
+                             : _ -> val)
+                              (c2)
+                              -> k1 * error
+                            where k1 (apply_result : val) =
+                              apply direct(id_7_1 &toplevel)
+                                ($camlRecover_sources_from_usages_lib__id_8
+                                 : _ -> val)
+                                  (apply_result)
+                                  -> k * error))
+                      where k (o : val) =
+                        (apply
+                                direct(`fn[recover_sources_from_usages_lib.ml:33,2--20]_4_1`
+                                &toplevel) inlined(never)
+                           (o : _ -> imm tagged) (0) -> k2 * error
+                           where k2 (function_return : imm tagged) =
+                             cont k1
+                           where k1 =
+                             cont k
+                           where k =
+                             let $camlRecover_sources_from_usages_lib =
+                               Block 0 ($camlRecover_sources_from_usages_lib__id_8,
+                                        o)
+                             in
+                             cont done ($camlRecover_sources_from_usages_lib))))))

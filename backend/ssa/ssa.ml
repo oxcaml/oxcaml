@@ -530,7 +530,7 @@ module Instruction = struct
       | Begin_region | End_region -> true
       | Specific s -> not (Arch.operation_is_pure s)
       | Name_for_debugger _ -> false
-      | Dls_get | Tls_get | Domain_index -> false
+      | Dls_get | Tls_get | Domain_index | Thread_self_id -> false
       | Poll | Pause -> true
       | Alloc _ -> true)
     | Push_trap _ | Pop_trap _ -> true

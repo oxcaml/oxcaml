@@ -89,9 +89,9 @@ let is_renamed_version_of t t' =
 let free_names { param; kind = _; uid = _ } =
   Name_occurrences.singleton_variable param Name_mode.normal
 
-let apply_renaming { param; kind; uid } renaming =
-  let param = Renaming.apply_variable renaming param in
-  create param kind uid
+let apply_renaming ({ param; kind; uid } as t) renaming =
+  let param' = Renaming.apply_variable renaming param in
+  if param == param' then t else create param' kind uid
 
 let import_and_rename { param; kind; uid } renaming =
   let renaming, param = Renaming.bind_variable renaming param in

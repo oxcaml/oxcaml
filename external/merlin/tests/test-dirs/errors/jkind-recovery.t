@@ -19,24 +19,26 @@ An invalid or_null argument should not cause a second error on Null.
 An invalid list argument should not cause a second error on the function body.
 
   $ errors <<'EOF'
-  > let v = (fun x -> x : float# -> float# list)
+  > type ('a : value_or_null) value_list = 'a list
+  > let v = (fun x -> x : float# -> float# value_list)
   > EOF
   This type float# should be an instance of type ('a : value_or_null)
   The layout of float# is float64
     because it is the unboxed version of the primitive type float.
   But the layout of float# must be a value layout
-    because the type argument of list has layout value_or_null.
+    because of the definition of value_list at file "test.ml", line 1, characters 0-46.
 
 The recovered argument of an external must remain representable.
 
   $ errors <<'EOF'
-  > external f : float# list -> unit = "foo"
+  > type ('a : value_or_null) value_list = 'a list
+  > external f : float# value_list -> unit = "foo"
   > EOF
   This type float# should be an instance of type ('a : value_or_null)
   The layout of float# is float64
     because it is the unboxed version of the primitive type float.
   But the layout of float# must be a value layout
-    because the type argument of list has layout value_or_null.
+    because of the definition of value_list at file "test.ml", line 1, characters 0-46.
 
 Recovery should also work inside a let-in expression.
 

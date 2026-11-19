@@ -124,7 +124,9 @@ let () =
 
 let foo = fun x -> fst ~label1:x
 [%%expect{|
-val foo : 'a @ [< 'm & global] -> label2:'b @ 'n -> 'a @ [> 'm] = <fun>
+val foo :
+  'a @ [< 'm & global] ->
+  (label2:'b @ 'n -> 'a @ [> 'm]) @ [> close('m) | dynamic] = <fun>
 |}]
 
 let foo ?label1 x = x

@@ -61,6 +61,8 @@ type specific_operation =
   | Inegmulsubf   (* floating-point negate, multiply and subtract *)
   | Isqrtf        (* floating-point square root *)
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
+  | Imove8        (* 8-bit integer move *)
+  | Imove16       (* 16-bit integer move *)
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
@@ -113,6 +115,10 @@ val identity_addressing : addressing_mode
 val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
+
+(** [strength_reduce_mul mult] is currently always [None] on arm64. It exists
+    so the cross-architecture peephole optimizer can call it uniformly. *)
+val strength_reduce_mul : int -> specific_operation option
 
 (** [fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta] is used
     by the peephole optimizer to delete an instruction [r := r + delta] that

@@ -44,8 +44,8 @@ let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
     | Simplified_terminator ->
       rebuild_terminator simplified_terminator uacc
         ~after_rebuild:(fun expr uacc ->
-          let uacc = UA.notify_removed ~operation:removed_operations uacc in
           let expr = if is_cold then RE.mark_as_cold expr else expr in
+          let expr = RE.notify_removed ~operation:removed_operations expr in
           after_rebuild expr uacc)
     | Simplified_let (simplified_let, simplified_lets_and_let_conts) ->
       rebuild_lets_and_let_conts simplified_lets_and_let_conts uacc
@@ -152,8 +152,8 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
      required depends on whether we're dealing with a lambda or the whole
      compilation unit. Instead these checks are in [Simplify] or
      [Simplify_set_of_closures]. *)
-  NO.fold_continuations_including_in_trap_actions (UA.name_occurrences uacc)
-    ~init:() ~f:(fun () cont ->
+  NO.fold_continuations_including_in_trap_actions (RE.free_names expr) ~init:()
+    ~f:(fun () cont ->
       if
         (not (Continuation.equal cont return_continuation))
         && not (Continuation.equal cont exn_continuation)

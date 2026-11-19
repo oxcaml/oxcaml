@@ -42,7 +42,6 @@ val x86_peephole_remove_redundant_test : bool ref
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 
-val cfg_eliminate_dead_trap_handlers : bool ref
 val cfg_eliminate_dead_code_validate : bool ref
 val cfg_dominators_validate : bool ref
 val cfg_liveness_validate : bool ref
@@ -155,6 +154,8 @@ val keep_llvmir : bool ref
 val llvm_path : string option ref
 val llvm_flags : string ref
 
+val fdo_counters : bool ref
+
 module Flambda2 : sig
   val debug : bool ref
   val reaper_debug_flags : string list ref
@@ -174,6 +175,7 @@ module Flambda2 : sig
     val reaper_unbox : bool
     val reaper_max_unbox_size : int
     val reaper_change_calling_conventions : bool
+    val lto_support : bool
     val simplify_stubs : bool
     val unicode : bool
     val kind_checks : bool
@@ -198,6 +200,7 @@ module Flambda2 : sig
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    lto_support : bool;
     simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
@@ -221,6 +224,7 @@ module Flambda2 : sig
   val reaper_unbox : bool or_default ref
   val reaper_max_unbox_size : int or_default ref
   val reaper_change_calling_conventions : bool or_default ref
+  val lto_support : bool or_default ref
   val simplify_stubs : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref

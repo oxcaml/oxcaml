@@ -1,0 +1,6 @@
+File "unsupported_too_large_return.ml", line 26, characters 11-15:
+26 | let g () = f ()
+                ^^^^
+Error: The unboxed product return value of the external call to unsupported_too_large_return_stub cannot be compiled:
+       the corresponding C struct (24 bytes) would be returned in memory, since it is larger than 16 bytes and not a homogeneous floating-point or vector aggregate of at most four members.
+       Only unboxed products that C returns in registers are currently supported.

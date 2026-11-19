@@ -1,6 +1,7 @@
 (* TEST
  { bytecode; }
  { native; }
+ { jsir; }
 *)
 
 (* Test that inputting bytes from a closed in_channel triggers an exception *)

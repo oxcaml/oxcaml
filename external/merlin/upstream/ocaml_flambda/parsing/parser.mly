@@ -993,6 +993,8 @@ let maybe_pmod_constraint mode expr =
    string that will not trigger a syntax error; see how [not_expecting]
    is used in the definition of [type_variance]. */
 
+%token ADDR                   "addr_"
+%token ADDR_IMM               "addr_imm_"
 %token AMPERAMPER             "&&"
 %token AMPERSAND              "&"
 %token AND                    "and"
@@ -1046,6 +1048,7 @@ let maybe_pmod_constraint mode expr =
 %token HASHFALSE              "#false"
 %token HASHTRUE               "#true"
 %token IF                     "if"
+%token IMPLIES                "implies_"
 %token IN                     "in"
 %token INCLUDE                "include"
 %token <string> INFIXOP0      "!="   (* just an example *)
@@ -1065,6 +1068,7 @@ let maybe_pmod_constraint mode expr =
 %token KIND                   "kind_"
 %token KIND_OF                "kind_of_"
 %token <string> LABEL         "~label:" (* just an example *)
+%token LAW                    "law_"
 %token LAZY                   "lazy"
 %token LBRACE                 "{"
 %token LBRACELESS             "{<"
@@ -1271,6 +1275,8 @@ The precedences must be listed from low to high.
 %type <Longident.t> parse_mod_longident
 %start parse_any_longident
 %type <Longident.t> parse_any_longident
+%start parse_unprefixed_compilation_unit
+%type <Compilation_unit.t> parse_unprefixed_compilation_unit
 /* END AVOID */
 
 %%
@@ -1676,6 +1682,24 @@ parse_any_longident:
   any_longident EOF
     { $1 }
 ;
+
+parse_unprefixed_compilation_unit:
+  unprefixed_compilation_unit EOF
+    { $1 }
+;
+
+unprefixed_compilation_unit:
+  head = UIDENT args = list(unprefixed_compilation_unit_arg)
+    { let module CU = Compilation_unit in
+      CU.create_instance (CU.create CU.Prefix.empty (CU.Name.of_string head))
+        args }
+;
+
+unprefixed_compilation_unit_arg:
+  LBRACKET param = UIDENT COLON value = unprefixed_compilation_unit RBRACKET
+    { let module CU = Compilation_unit in
+      ({ param = CU.Name.of_string param; value } : CU.argument) }
+;
 /* END AVOID */
 
 (* -------------------------------------------------------------------------- *)
@@ -1848,7 +1872,9 @@ structure_item:
     | floating_attribute
         { Pstr_attribute $1 }
     | jkind_decl
-        { Pstr_jkind $1 })
+        { Pstr_jkind $1 }
+    | law_declaration
+        { Pstr_law $1 })
   | wrap_mkstr_ext(
       primitive_declaration
         { pstr_primitive $1 }
@@ -2135,6 +2161,8 @@ signature_item:
         { Psig_attribute $1 }
      | jkind_decl
         { Psig_jkind $1 }
+     | law_declaration
+        { Psig_law $1 }
     )
     { $1 }
   | wrap_mksig_ext(
@@ -3746,6 +3774,8 @@ pattern_gen:
     | name_tag pattern %prec prec_constr_appl
         { Ppat_variant($1, Some $2) }
     ) { $1 }
+  | addr_pattern_keyword ext_attributes simple_pattern
+      { mkpat_attrs ~loc:$sloc (Ppat_addr ($1, $3)) $2}
   | LAZY ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_lazy $3) $2}
 ;
@@ -4122,7 +4152,7 @@ jkind_desc_gen(self):
       (* LIDENTs here are for modes *)
       let modes =
         List.map
-          (fun {txt; loc} -> {txt = Mode txt; loc})
+          (fun {txt; loc} -> {txt = Pmode txt; loc})
           $3
       in
       Pjk_mod ($1, modes)
@@ -4210,6 +4240,43 @@ jkind_decl:
       let pjkind_loc = make_loc $sloc in
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     }
+;
+
+(* Laws: [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C],
+   where each parameter is [x] or [(x : T)] *)
+
+law_declaration:
+  LAW QUESTION
+  attrs1 = attributes
+  plaw_name = mkrhs(LIDENT)
+  plaw_params = law_param*
+  COLON
+  body = law_body
+  attrs2 = post_item_attributes
+    {
+      let docs = symbol_docs $sloc in
+      let plaw_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
+      let plaw_loc = make_loc $sloc in
+      let plaw_assumptions, plaw_conclusion = body in
+      { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+        plaw_attributes; plaw_loc }
+    }
+;
+
+law_param:
+  | name = mkrhs(LIDENT)
+      { (name, None) }
+  | LPAREN name = mkrhs(LIDENT) COLON ty = core_type RPAREN
+      { (name, Some ty) }
+;
+
+(* [implies_] only separates the clauses of a law. *)
+law_body:
+  | e = expr
+      { ([], e) }
+  | e = expr IMPLIES rest = law_body
+      { let (assumptions, conclusion) = rest in
+        (e :: assumptions, conclusion) }
 ;
 
 %inline type_param_with_jkind:
@@ -4747,7 +4814,7 @@ strict_function_or_labeled_tuple_type:
 /* Legacy mode annotations */
 %inline mode_legacy:
    | LOCAL
-       { mkloc (Mode "local") (make_loc $sloc) }
+       { mkloc (Pmode "local") (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:
@@ -4760,8 +4827,60 @@ strict_function_or_labeled_tuple_type:
 ;
 
 /* New mode annotation, introduced by AT or ATAT */
+%inline mode_const:
+  | LIDENT { mkloc $1 (make_loc $sloc) }
+;
+
+%inline mode_consts:
+  | mode_const+ { $1 }
+;
+
+%inline mode_morph:
+  | LIDENT { mkloc $1 (make_loc $sloc) }
+;
+
+%inline mode_var:
+  | QUOTE ident { mkloc $2 (make_loc $sloc) }
+;
+
+mode_bound_var:
+  | pbound_var = mode_var
+    pbound_mod = iloption(preceded(MOD, mode_consts))
+      { { pbound_morph = None; pbound_var; pbound_mod } }
+  | pbound_morph = mode_morph LPAREN pbound_var = mode_var RPAREN
+    pbound_mod = iloption(preceded(MOD, mode_consts))
+      { { pbound_morph = Some pbound_morph; pbound_var; pbound_mod } }
+;
+
+mode_bound_elem:
+  | v = mode_bound_var
+      { Pbound_var v }
+  | consts = mode_consts
+      { Pbound_const consts }
+;
+
+mode_bound(SEP):
+  | elems = separated_nonempty_list(SEP, mode_bound_elem)
+      { elems }
+;
+
+mode_bounded:
+  | LBRACKETLESS pmode_upper = mode_bound(AMPERSAND) RBRACKET
+      { { pmode_upper; pmode_lower = [] } }
+  | LBRACKETLESS pmode_upper = mode_bound(AMPERSAND) GREATER
+    pmode_lower = mode_bound(BAR) RBRACKET
+      { { pmode_upper; pmode_lower } }
+  | LBRACKETGREATER pmode_lower = mode_bound(BAR) RBRACKET
+      { { pmode_upper = []; pmode_lower } }
+  | LBRACKETGREATER pmode_lower = mode_bound(BAR) LESS
+    pmode_upper = mode_bound(AMPERSAND) RBRACKET
+      { { pmode_upper; pmode_lower } }
+;
+
 %inline mode:
-  | LIDENT { mkloc (Mode $1) (make_loc $sloc) }
+  | LIDENT { mkloc (Pmode $1) (make_loc $sloc) }
+  | v = mode_var { mkloc (Pmode_var v.txt) v.loc }
+  | b = mode_bounded { mkloc (Pmode_bounded b) (make_loc $sloc) }
 ;
 
 %inline mode_expr:
@@ -5371,6 +5490,10 @@ mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
 ;
+%inline addr_pattern_keyword:
+    ADDR                                        { Mutable }
+  | ADDR_IMM                                    { Immutable }
+;
 poly_flag:
     /* empty */                                 { false }
   | POLY                                        { true }
@@ -5448,6 +5571,8 @@ optlabel:
 single_attr_id:
     LIDENT { $1 }
   | UIDENT { $1 }
+  | ADDR { "addr_" }
+  | ADDR_IMM { "addr_imm_" }
   | AND { "and" }
   | AS { "as" }
   | ASSERT { "assert" }

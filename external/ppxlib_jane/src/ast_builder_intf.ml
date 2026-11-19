@@ -42,7 +42,12 @@ module type S = sig
 
   (** Contruct a [value_binding] with modes *)
   val value_binding
-    : (pat:pattern -> expr:expression -> modes:modes -> value_binding) with_loc
+    : (pat:pattern
+       -> expr:expression
+       -> constraint_:value_constraint option
+       -> modes:modes
+       -> value_binding)
+        with_loc
 
   (** Construct a [Pcstr_tuple], a representation for the contents of a tupled variant
       constructor, that attaches the provided modalities to each field. *)
@@ -193,6 +198,13 @@ module type S = sig
        -> expression
        -> expression)
         with_loc
+
+  (** [pexp_function_cases] builds a unary function expression in the shape
+      [function C1 -> E1 | ...]. To create a function with multiple arguments that
+      pattern-matches on the last one, use [add_fun_param] or [add_fun_params] to add more
+      parameters. Alternatively, use [Latest.pexp_function] to provide all parameters at
+      once. *)
+  val pexp_function_cases : (case list -> expression) with_loc
 
   (** [unary_function cases] is [function <cases>]. When used with the Jane Street
       compiler, the function's runtime arity is 1, so the fast path for function

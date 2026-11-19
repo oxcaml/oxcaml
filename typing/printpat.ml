@@ -130,6 +130,10 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
+  | Tpat_addr (Mutable _, _, v) ->
+      fprintf ppf "@[<2>addr_@ %a@]" pretty_arg v
+  | Tpat_addr (Immutable, _, v) ->
+      fprintf ppf "@[<2>addr_imm_@ %a@]" pretty_arg v
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
   | Tpat_alias { pattern = v; id = x; _ } ->
@@ -156,7 +160,9 @@ and pretty_cdr ppf v = match v.pat_desc with
 
 and pretty_arg ppf v = match v.pat_desc with
 | Tpat_construct (_,_,_,_::_,None)
-| Tpat_variant (_, Some _, _) -> fprintf ppf "(%a)" pretty_val v
+| Tpat_variant (_, Some _, _)
+| Tpat_lazy _
+| Tpat_addr _ -> fprintf ppf "(%a)" pretty_val v
 |  _ -> pretty_val ppf v
 
 and pretty_or : type k . _ -> k general_pattern -> _ = fun ppf v ->

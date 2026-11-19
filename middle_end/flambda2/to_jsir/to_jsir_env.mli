@@ -96,14 +96,15 @@ val add_symbol :
     compilation units. *)
 val add_symbol_without_registering : t -> Symbol.t -> Jsir.Var.t -> t
 
-(** Register the given symbol to the global symbol table. Raises if the symbol
-    is not in the environment.
+(** Register the given symbol to the global symbol table, with an [Event] for
+    [loc] before the registration. Raises if the symbol is not in the
+    environment.
 
     Note that calling this function is usually a mistake, as most functions that
     add symbols will automatically call this function. However, it is necessary
     for [add_symbol_without_registering]. *)
 val register_symbol_exn :
-  t -> res:To_jsir_result.t -> Symbol.t -> To_jsir_result.t
+  t -> res:To_jsir_result.t -> ?loc:Parse_info.t -> Symbol.t -> To_jsir_result.t
 
 (** Set [var]/[symbol] to be an alias of [alias_of]. Raises if [alias_of] is
     from the current compilation unit and is not found in the environment. *)
@@ -124,17 +125,30 @@ val add_symbol_alias_of_var_exn :
 type code_id =
   { addr : Jsir.Addr.t;
     params : Jsir.Var.t list;
-    closure : Jsir.Var.t
+    closure : Jsir.Var.t;
+    closure_bound_with_code : bool;
+        (** If [true], [closure] is bound to a closure for this code where the
+            code itself is defined, and every [Set_of_closures] containing this
+            code reuses it. Otherwise, [closure] is bound when translating a
+            [Set_of_closures] containing this code. *)
+    hint : Optimization_hint.closure_hint option;
+        (** The optimisation hint to attach to closures of this code. *)
+    loc : Parse_info.t option
+        (** The source location to attach to closures of this code. *)
   }
 
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block, its
-    parameters, and the JSIR varible corresponding to its closure. *)
+    parameters, the JSIR varible corresponding to its closure, and the hint and
+    location for its closures. *)
 val add_code_id :
   t ->
   Code_id.t ->
   addr:Jsir.Addr.t ->
   params:Jsir.Var.t list ->
   closure:Jsir.Var.t ->
+  closure_bound_with_code:bool ->
+  hint:Optimization_hint.closure_hint option ->
+  loc:Parse_info.t option ->
   t
 
 (** Map a Flambda2 function slot to the corresponding JSIR closure variable. *)
@@ -158,7 +172,9 @@ val get_var_exn : t -> Variable.t -> Jsir.Var.t
 (** Return the JSIR variable for the given Flambda symbol.
 
     If the symbol is from the current compilation unit, we look it up in the
-    environment; otherwise, we fetch from the global symbol table. *)
+    environment; otherwise, we fetch it from the global symbol table (or with
+    [caml_get_global] for module blocks) once, at the start of the entry block,
+    and reuse that variable for every use. *)
 val get_symbol :
   t ->
   res:To_jsir_result.t ->
@@ -169,7 +185,8 @@ val get_symbol_exn :
   t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t * To_jsir_result.t
 
 (** Return the block address, parameter variables and closure variable
-    corresponding to the given [Code_id.t]. *)
+    corresponding to the given [Code_id.t]. Raises if the code ID is not in the
+    environment. *)
 val get_code_id_exn : t -> Code_id.t -> code_id
 
 (** Return the variable corresponding to a function slot. *)

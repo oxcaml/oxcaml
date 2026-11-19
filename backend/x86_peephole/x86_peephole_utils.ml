@@ -13,8 +13,8 @@ let is_control_flow = function
   | J _ | JMP _ | CALL _ | RET | HLT | UD2 -> true
   | LEAVE | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _
   | ADD _ | SUB _ | IMUL _ | MUL _ | IDIV _ | DIV _ | AND _ | OR _ | XOR _
-  | SAL _ | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO
-  | SET _ | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _
+  | SAL _ | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | NOT _ | CDQ
+  | CQO | SET _ | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _
   | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _
   | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE
   | MFENCE | SIMD _ | ADC _ | SBB _ ->
@@ -37,6 +37,62 @@ let is_hard_barrier = function
       false)
   | Ins instr -> is_control_flow instr
 
+(* Directives that only carry debugging information: source locations,
+   comments, and labels that only delimit DWARF ranges. Rules see the
+   instructions on either side of them as adjacent, so that the generated code
+   does not depend on whether debugging information is emitted. *)
+(* CR-someday mshinwell: this could be extended to CFI directives, whose
+   presence also depends on the configuration, but there are tricky details:
+
+   - [Cfi_startproc] and [Cfi_endproc] delimit functions and must remain
+   barriers.
+
+   - a CFI directive describes the state at its position, so a rule that merges
+   or deletes instructions across one must make sure that it still describes
+   the right position.
+
+   - [combine_add_rsp] matches on [Cfi_adjust_cfa_offset] and rewrites it.
+
+   - after [Cfi_def_cfa_register] unwinding relies on the run-time value of a
+   register, and after [Cfi_offset] on the contents of a stack slot. The rules
+   would have to track which register holds the CFA and which slots hold saved
+   registers, and treat these as read: [reg64_is_never_read] knows nothing of
+   them, so [remove_mov_to_dead_register] could forward or remove the move that
+   sets up the CFA register, leaving correct code with wrong unwinding
+   information.
+
+   - [Cfi_remember_state] and [Cfi_restore_state] save and restore all of the
+   above. *)
+(* CR mshinwell: looking through DWARF-only labels keeps the generated code
+   independent of the debugging information, but those labels delimit the
+   ranges over which variables are described as being in a register, which
+   were computed before this pass. A rule that removes or forwards the
+   definition of a register across such a label (for example
+   [remove_mov_to_dead_register]) can leave a variable described as being in a
+   register that no longer holds it, until that register is next written.
+
+   This is one case of a more general problem: the ranges are computed on
+   Linear, before the code is final. They should probably be computed on the
+   x86 and arm64 DSLs instead. Operations such as allocation could then be
+   expanded in those representations before the ranges are computed, rather
+   than being opaque to the DWARF analyses, which in some cases makes them
+   invalidate register information prematurely. *)
+let is_debug_directive = function
+  | Directive d -> (
+    match d with
+    | New_label (Label label, _) ->
+      Asm_targets.Asm_label.is_dwarf_only_label label
+    | Loc _ | File _ | Comment _ | New_line -> true
+    | New_label (Symbol _, _)
+    | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ | Align _
+    | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
+    | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _ | Const _
+    | Direct_assignment _ | Global _ | Indirect_symbol _ | Private_extern _
+    | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _
+    | Weak _ | External _ | Reloc _ | Delta_uleb128 _ ->
+      false)
+  | Ins _ -> false
+
 let get_cells cell n =
   let rec loop acc remaining current_opt =
     if remaining <= 0
@@ -44,9 +100,12 @@ let get_cells cell n =
     else
       match current_opt with
       | None -> List.rev acc
-      | Some current -> loop (current :: acc) (remaining - 1) (DLL.next current)
+      | Some current ->
+        if is_debug_directive (DLL.value current)
+        then loop acc remaining (DLL.next current)
+        else loop (current :: acc) (remaining - 1) (DLL.next current)
   in
-  loop [] n (Some cell)
+  if n <= 0 then [] else loop [cell] (n - 1) (DLL.next cell)
 
 let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
@@ -110,6 +169,7 @@ let writes_to_reg64 target = function
   | INC dst
   | DEC dst
   | NEG dst
+  | NOT dst
   | BSWAP dst
   | SET (_, dst)
   | IMUL (_, Some dst)
@@ -180,7 +240,8 @@ let reads_from_reg64 target = function
   | BSR (src, dst)
   | CMOV (_, src, dst) ->
     arg_contains_reg64 target src || arg_contains_reg64 target dst
-  | INC dst | DEC dst | NEG dst | BSWAP dst -> arg_contains_reg64 target dst
+  | INC dst | DEC dst | NEG dst | NOT dst | BSWAP dst ->
+    arg_contains_reg64 target dst
   | IMUL (op1, Some op2)
   | XCHG (op1, op2)
   | LOCK_XADD (op1, op2)
@@ -266,7 +327,7 @@ let flags_never_observed start_cell =
         (* Instructions that don't touch the flags. *)
         | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ
         | CQO | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | RDTSC
-        | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE ->
+        | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE | NOT _ ->
           loop (DLL.next cell)))
   in
   loop (DLL.next start_cell)
@@ -279,7 +340,7 @@ let maybe_writes_flags = function
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
   | SET _ | CMOV _ | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE
-  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE ->
+  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE | NOT _ ->
     false
   | J _ | JMP _ | CALL _ | RET | HLT | UD2 ->
     (* These are all control flow operations, there is no point in assuming

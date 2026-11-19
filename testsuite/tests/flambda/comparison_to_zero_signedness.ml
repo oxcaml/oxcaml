@@ -1,6 +1,10 @@
 (* TEST
  flambda2;
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 (* [(compare x y) u< 0] should not be optimized to [x < y]. See PR#6497. *)

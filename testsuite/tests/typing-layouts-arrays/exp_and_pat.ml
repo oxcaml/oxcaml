@@ -8,6 +8,9 @@
    native;
  }{
    flags = "-extension comprehensions -extension layouts_alpha";
+   jsir;
+ }{
+   flags = "-extension comprehensions -extension layouts_alpha";
    bytecode;
  }{
    flags = "-extension comprehensions -extension layouts_beta";
