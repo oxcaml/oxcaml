@@ -2502,11 +2502,7 @@ module Oxcaml_options_impl = struct
   (* Bundle of experimental codegen optimizations enabled by
      [-experimental-optimizations]. *)
   let experimental_optimizations () =
-    cfg_prologue_shrink_wrap ();
-    cfg_prologue_validate ();
     x86_peephole_optimize ();
-    regalloc_param "SPLIT_AROUND_LOOPS:on";
-    regalloc_param "AFFINITY:on";
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
