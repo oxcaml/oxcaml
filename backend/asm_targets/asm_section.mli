@@ -58,13 +58,14 @@ type t =
   | Note_ocaml_eh
   | Note_gnu_stack
   | Debuginfo_strings  (** Mergeable string section for debuginfo strings *)
-  | Frametable_piece of { link_symbol : string }
+  | Frametable_piece of
+      { unit_symbol : string;
+        link_symbol : string
+      }
       (** Frame descriptors linked (SHF_LINK_ORDER) to the section defining the
-          already-encoded [link_symbol], for [-frametable-sections] (ELF only)
-      *)
-  | Frametable_count of { link_symbol : string }
-      (** A unit's count of its frame descriptors, linked like a
-          [Frametable_piece] *)
+          already-encoded [link_symbol], for [-frametable-sections] (ELF only).
+          [unit_symbol] names the section after the compilation unit: it must be
+          a C identifier that no other unit has. *)
   | Custom of
       { names : string list;
         flags : string option;

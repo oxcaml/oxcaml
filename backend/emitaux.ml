@@ -569,8 +569,13 @@ let emit_frames ~debug_strings_section ~code_begin a =
      is emitted), so the prepended list is in decreasing order. Reverse it to
      emit the frame table in increasing return-address order. *)
   let descrs = List.rev !frame_descriptors in
-  let switch_to_piece link_symbol =
-    D.switch_to_section (Asm_section.Frametable_piece { link_symbol })
+  (* Under [-frametable-sections], the unit's pieces go in a section of their
+     own, whose name must be a C identifier (see [Asm_section.start_symbol]). *)
+  let unit_symbol =
+    Structured_mangling.mangle_ident (Current_unit.get_cu_exn ()) []
+  in
+  let piece link_symbol =
+    Asm_section.Frametable_piece { unit_symbol; link_symbol }
   in
   (* Emit each descriptor preceded by retaddr delta. The first descriptor of the
      frametable, and any descriptor that does not fit the short format, escapes:
@@ -602,7 +607,7 @@ let emit_frames ~debug_strings_section ~code_begin a =
            (no same-section previous return address for a delta): escape. *)
         (match fd.fd_section.fds_descr_section with
         | Common -> ()
-        | Linked { link_symbol } -> switch_to_piece link_symbol);
+        | Linked { link_symbol } -> D.switch_to_section (piece link_symbol));
         escape ()
   in
   if not !Oxcaml_flags.frametable_sections
@@ -611,41 +616,29 @@ let emit_frames ~debug_strings_section ~code_begin a =
     ignore (List.fold_left emit_descr None descrs)
   end
   else begin
-    (* Under [-frametable-sections], the frametable is in three parts:
+    (* Under [-frametable-sections], the frametable is in two parts:
 
-       - a header: a -1 tag, then 32-bit self-relative offsets to the start and
-       end of the pieces section and of the counts section;
+       - a header: a -1 tag, the number of descriptors, then 32-bit
+       self-relative offsets to the start and end of the unit's pieces section;
 
        - in the pieces section, a piece for each text section, holding the
-       descriptors for that section's code;
+       descriptors for that section's code.
 
-       - in the counts section, a word holding the number of descriptors.
-
-       The linker merges the pieces of all the units in an executable or shared
-       object into one section, and likewise the counts. *)
-    (* Link both to [code_begin] to be sure the linker doesn't drop them. *)
-    let empty_piece =
-      Asm_section.Frametable_piece { link_symbol = code_begin }
-    in
-    let count_section =
-      Asm_section.Frametable_count { link_symbol = code_begin }
-    in
-    (* The linker defines these at the bounds of each merged section. *)
+       The linker merges the unit's pieces into one section, without those for
+       any code that it drops. *)
+    (* Link it to [code_begin] to be sure the linker doesn't drop it. *)
+    let empty_piece = piece code_begin in
+    (* The linker defines these at the bounds of the merged section. *)
     let bounds =
-      List.concat_map
-        (fun section ->
-          [Asm_section.start_symbol section; Asm_section.stop_symbol section])
-        [empty_piece; count_section]
+      [Asm_section.start_symbol empty_piece; Asm_section.stop_symbol empty_piece]
     in
     a.efa_word (-1);
+    a.efa_word (List.length descrs);
     List.iter D.between_this_and_symbol_32bit_expr bounds;
     (* Keep each executable or shared object's bounds private to it. *)
     List.iter D.hidden bounds;
     (* Must be true as a precondition of this function. *)
     assert (Asm_section.equal (D.current_section ()) Read_only_data);
-    D.switch_to_section count_section;
-    a.efa_align Arch.size_addr;
-    a.efa_word (List.length descrs);
     (* Emit the empty piece, so that the pieces section, and hence its bounds,
        exist even if no other piece does. *)
     D.switch_to_section empty_piece;

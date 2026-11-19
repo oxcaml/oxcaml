@@ -8,7 +8,9 @@ ${program}
 asm=${test_build_directory}/sections.s
 obj=${test_build_directory}/sections.o
 
-piece='\.section[[:space:]]+caml_frametable_pieces,"ao",[@%]progbits,'
+# The unit's pieces section, named for the unit
+section=caml_frametable_pieces_CamlU8Sections
+piece='\.section[[:space:]]+'"$section"',"ao",[@%]progbits,'
 
 count () {
   grep -c -E "$1" "$asm"
@@ -28,34 +30,36 @@ echo "plain pieces: $plain"
 # Exactly one piece linked to code_begin, which keeps the section alive.
 echo "code_begin pieces: $(count "${piece}camlSections__code_begin\$")"
 
-# Exactly one count, also linked to code_begin.
-echo "counts: $(count 'caml_frametable_counts,')"
-echo "code_begin counts: $(count \
-  '\.section[[:space:]]+caml_frametable_counts,"ao",[@%]progbits,camlSections__code_begin$')"
-
-# The unit's frametable symbol names a header: the -1 tag, then the offsets
-# to the start and end of the pieces section and of the counts section.
-n=$(awk '
+# The unit's frametable symbol names a header: the -1 tag, the number of
+# descriptors, then the offsets to the start and end of the pieces section.
+n=$(awk -v section="$section" '
   hdr == 1 && $NF == "-1" { hdr = 2; next }
-  hdr == 2 && /__start_caml_frametable_pieces/ { hdr = 3; next }
-  hdr == 3 && /__stop_caml_frametable_pieces/ { hdr = 4; next }
-  hdr == 4 && /__start_caml_frametable_counts/ { hdr = 5; next }
-  hdr == 5 && /__stop_caml_frametable_counts/ { n++ }
+  hdr == 2 && $NF ~ /^[1-9][0-9]*$/ { hdr = 3; next }
+  hdr == 3 && index($0, "__start_" section) { hdr = 4; next }
+  hdr == 4 && index($0, "__stop_" section) { n++ }
   { hdr = (/^camlSections__frametable:/) ? 1 : 0 }
   END { print n + 0 }' "$asm")
 echo "headers: $n"
 
+# [No_frames] has no descriptors, so its pieces section is empty.
+n=$(awk '
+  hdr == 1 && $NF == "-1" { hdr = 2; next }
+  hdr == 2 { print $NF }
+  { hdr = (/^camlNo_frames__frametable:/) ? 1 : 0 }' \
+  "${test_build_directory}/no_frames.s")
+echo "descriptors in No_frames: $n"
+
 # The start and stop symbols are hidden, so that each executable or shared
 # object refers to its own sections.
-echo "hidden: $(count '\.hidden[[:space:]]+__(start|stop)_caml_frametable_(pieces|counts)$')"
+echo "hidden: $(count '\.hidden[[:space:]]+__(start|stop)_'"$section"'$')"
 
-# In the object file, every caml_frametable_pieces section is link-order
-# (flag L) and linked to a text section.
-readelf -S -W "$obj" | sed 's/\[ */[/' | awk '
+# In the object file, every piece is link-order (flag L) and linked to a text
+# section.
+readelf -S -W "$obj" | sed 's/\[ */[/' | awk -v section="$section" '
   $1 ~ /^\[[0-9]+\]$/ {
     idx = substr($1, 2, length($1) - 2)
     name[idx] = $2
-    if ($2 == "caml_frametable_pieces") { n++; flags[n] = $8; link[n] = $9 }
+    if ($2 == section) { n++; flags[n] = $8; link[n] = $9 }
   }
   END {
     bad = 0
