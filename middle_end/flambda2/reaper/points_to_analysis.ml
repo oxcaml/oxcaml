@@ -530,11 +530,14 @@ module Datalog_schedule = struct
          constructor ~base relation ~from;
          when1 is_local relation ]
        ==> escaping_field relation from);
+      (* When reading a local field from a [any_source] base, mark the block as
+         [has_usage], to make sure we transfer the local fields through [use]
+         relations. See the [local_fields_through_use.ml] test. *)
       (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
        [ any_source base;
          rev_accessor ~base relation ~to_;
          when1 is_local relation ]
-       ==> reading_field relation to_) ]
+       ==> and_ [reading_field relation to_; has_usage base]) ]
 
   let zero_alloc_rules =
     [ (let$ [from; to_] = ["from"; "to_"] in
