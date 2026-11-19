@@ -795,6 +795,8 @@ let ocaml_ignored_flags =
     "-fno-avx512cd";
     "-favx512dq";
     "-fno-avx512dq";
+    "-favx512bf16";
+    "-fno-avx512bf16";
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
