@@ -1157,11 +1157,31 @@ and switch env res switch =
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
     in
+    (* The debuginfo of an arm is that of the code of its [Apply_cont]. There is
+       no such code when the handler is substituted for the [Apply_cont]: the
+       arm is then the code of the handler, which has its own debuginfo (and
+       maybe a different stack of inlined frames). *)
+    let arm_dbg =
+      let k = Apply_cont.continuation action in
+      let handler_is_inlined =
+        (not (Env.is_exn_handler env k))
+        &&
+        match Env.get_continuation env k with
+        | Inline _ -> true
+        | Return _ | Jump _ -> false
+      in
+      let action_dbg = Apply_cont.debuginfo action in
+      if handler_is_inlined
+      then Debuginfo.none
+      else if Debuginfo.is_none action_dbg
+      then dbg
+      else Env.add_inlined_debuginfo env action_dbg
+    in
     ( ( d,
         cmm_action,
         action_free_vars,
         action_symbol_inits,
-        Env.add_inlined_debuginfo env (Apply_cont.debuginfo action),
+        arm_dbg,
         Switch_arm.annotations arm ),
       res )
   in
@@ -1235,7 +1255,7 @@ and switch env res switch =
                   cmm_action,
                   action_free_vars,
                   action_symbol_inits,
-                  _dbg,
+                  arm_dbg,
                   annotations ),
                 res ) =
             make_arm ~must_tag_discriminant env res (discriminant, action)
@@ -1252,7 +1272,7 @@ and switch env res switch =
             Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
           let free_vars = Backend_var.Set.union free_vars action_free_vars in
-          cases.(i) <- Some (cmm_action, annotations);
+          cases.(i) <- Some (cmm_action, arm_dbg, annotations);
           index.(d) <- i;
           i + 1, res, free_vars, symbol_inits)
         arms
@@ -1266,7 +1286,7 @@ and switch env res switch =
         let unreachable, res =
           C.invalid res ~message:"unreachable switch case"
         in
-        cases.(n) <- Some (unreachable, Branch_annotations.cold);
+        cases.(n) <- Some (unreachable, dbg, Branch_annotations.cold);
         cases, res
     in
     (* CR-someday poechsel: Put a more precise value kind here *)

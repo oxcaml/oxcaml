@@ -286,12 +286,16 @@ module Block : sig
 
   (** Create a new block with parameters of the given types. [handler_dbg] is
       the [Cmm.Ccatch] handler's [dbg] for blocks that are handlers, and
-      [Debuginfo.none] otherwise (see [handler_dbg]). *)
+      [Debuginfo.none] otherwise (see [handler_dbg]). [entry_dbg] is the
+      debuginfo of the arm of a [Cmm.Cifthenelse] or [Cmm.Cswitch] for blocks
+      that start such an arm, and [Debuginfo.none] otherwise (see [entry_dbg]).
+  *)
   val create :
     under_construction graph ->
     params:Cmm.machtype ->
     cold:bool ->
     handler_dbg:Debuginfo.t ->
+    entry_dbg:Debuginfo.t ->
     under_construction t
 
   val create_with_names :
@@ -299,6 +303,7 @@ module Block : sig
     params:(Cmm.machtype_component * Backend_var.t option) array ->
     cold:bool ->
     handler_dbg:Debuginfo.t ->
+    entry_dbg:Debuginfo.t ->
     under_construction t
 
   val equal : 'g t -> 'g t -> bool
@@ -372,6 +377,12 @@ module Block : sig
       the entry of a trap handler, matching [Cfg_selectgen.setup_catch_handler].
   *)
   val handler_dbg : finished t -> Debuginfo.t
+
+  (** The debuginfo of the arm of a [Cmm.Cifthenelse] or [Cmm.Cswitch] that
+      starts at this block (passed at block creation). [Cfg_of_ssa] gives it to
+      the instructions at the start of the block that have no debuginfo of their
+      own, matching [Cfg_selectgen]. *)
+  val entry_dbg : finished t -> Debuginfo.t
 end
 
 module Cursor : sig

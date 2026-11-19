@@ -340,12 +340,16 @@ let instr_cfg_with_layout :
              from block %a to block %a: %s"
             Label.format src Label.format dst reason
         in
+        (* The poll is not given the debuginfo of the terminator: whether the
+           terminator has one depends on the optimisation mode, and the message
+           for [@poll error] would vary accordingly. *)
         let poll =
           { after.terminator with
             Cfg.id = next_instruction_id ();
             Cfg.desc = Cfg.Op Poll;
             Cfg.arg = [||];
-            Cfg.res = [||]
+            Cfg.res = [||];
+            Cfg.dbg = Debuginfo.none
           }
         in
         (* The arguments of a call are moved into their calling-convention
