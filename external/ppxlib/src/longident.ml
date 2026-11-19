@@ -68,15 +68,13 @@ let parse s =
     invalid_arg (Printf.sprintf "Ppxlib.Longident.parse(%s): %S" variant s)
   in
   if String.length s < 1 then invalid "empty string";
-  let par = parentheses (-1) 0 0 (String.length s) s in
-  match (s.[0], par) with
-  | ('A' .. 'Z' | 'a' .. 'z' | '_'), Ok None -> parse_simple s
-  | _, Ok None
-    when Ocaml_common.Misc.Utf8_lexeme.starts_like_a_valid_identifier s ->
-      parse_simple s
-  | _, Ok None -> Lident s (* This is a raw operator, no module path *)
-  | _, Error _ -> invalid "unbalanced parenthesis"
-  | _, Ok (Some (l, r)) -> (
+  match parentheses (-1) 0 0 (String.length s) s with
+  | Ok None ->
+      if Ocaml_common.Misc.Utf8_lexeme.starts_like_a_valid_identifier s then
+        parse_simple s
+      else Lident s (* This is a raw operator, no module path *)
+  | Error _ -> invalid "unbalanced parenthesis"
+  | Ok (Some (l, r)) -> (
       if Int.(r <> String.length s - 1) then
         invalid "right parenthesis misplaced";
       let group =
