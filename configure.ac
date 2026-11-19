@@ -444,6 +444,7 @@ AC_SUBST([align_int64])
 AC_SUBST([flat_float_array])
 AC_SUBST([function_sections])
 AC_SUBST([frametable_sections])
+AC_SUBST([link_order_group_syntax])
 AC_SUBST([oxcaml_dwarf_flags_for_compiler])
 AC_SUBST([assembly_flag_for_compiler])
 AC_SUBST([probes])
@@ -3057,6 +3058,10 @@ AS_IF([$native_compiler],
     [amd64,linux|amd64,freebsd|amd64,netbsd|amd64,openbsd|amd64,gnu \
       |arm64,linux|arm64,freebsd|arm64,netbsd|arm64,openbsd],
     [OCAML_AS_HAS_LINK_ORDER_SECTIONS])])
+
+## Can frame descriptors join COMDAT groups (needed for weak functions)
+link_order_group_syntax=None
+AS_IF([$frametable_sections], [OCAML_AS_LINK_ORDER_GROUP_SYNTAX])
 
 dnl Prefer llvm-objcopy. If llvm-objcopy is not found, use objcopy.
 dnl GNU objcopy 2.35.2 sometimes modifies .relro_padding and .init_array

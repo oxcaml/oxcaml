@@ -70,6 +70,12 @@ let align_int64 = @align_int64@
 
 let function_sections = @function_sections@
 let frametable_sections = @frametable_sections@
+
+type link_order_group_syntax =
+  | Link_symbol_first
+  | Group_first
+
+let link_order_group_syntax = @link_order_group_syntax@
 let probes = @probes@
 let afl_instrument = @afl@
 let stack_allocation = @stack_allocation@

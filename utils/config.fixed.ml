@@ -64,6 +64,12 @@ let align_double = true
 let align_int64 = true
 let function_sections = false
 let frametable_sections = false
+
+type link_order_group_syntax =
+  | Link_symbol_first
+  | Group_first
+
+let link_order_group_syntax = None
 let afl_instrument = false
 let native_compiler = false
 let tsan = false

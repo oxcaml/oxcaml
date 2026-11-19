@@ -300,10 +300,16 @@ let details t first_occurrence =
     | Frametable_piece { link_symbol; group = None }, arch, _ ->
       ["caml_frametable_pieces"], Some "ao", [progbits arch; link_symbol]
     | Frametable_piece { link_symbol; group = Some group }, arch, _ ->
-      (* "G" adds SHF_GROUP; GAS wants the linked-to symbol before the group. *)
-      ( ["caml_frametable_pieces"],
-        Some "aoG",
-        [progbits arch; link_symbol; group; "comdat"] )
+      (* "G" adds SHF_GROUP. *)
+      let args =
+        match Config.link_order_group_syntax with
+        | Some Link_symbol_first -> [link_symbol; group; "comdat"]
+        | Some Group_first -> [group; "comdat"; link_symbol]
+        | None ->
+          Misc.fatal_error
+            "The assembler does not support frametable pieces in groups"
+      in
+      ["caml_frametable_pieces"], Some "aoG", progbits arch :: args
     | Frametable_count { link_symbol }, arch, _ ->
       ["caml_frametable_counts"], Some "ao", [progbits arch; link_symbol]
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args

@@ -175,8 +175,9 @@ let verify_binary_emitter = ref false
 
 let weak_functions_supported () =
   (* A weak function's frame descriptors go in a frametable piece in its group,
-     which needs what [-frametable-sections] needs (see [Optmaindriver]). *)
-  Config.frametable_sections
+     which needs what [-frametable-sections] needs (see [Optmaindriver]) and an
+     assembler that accepts such a piece. *)
+  Option.is_some Config.link_order_group_syntax
   && (not !Clflags.llvm_backend)
   && (not !internal_assembler)
   && not !verify_binary_emitter
