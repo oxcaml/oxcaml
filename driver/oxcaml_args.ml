@@ -392,6 +392,13 @@ let mk_function_layout f =
     Printf.sprintf " Order of functions in the generated assembly (default: %s)"
       default )
 
+let mk_fp_contract f =
+  ( "-fp-contract",
+    Arg.Symbol ([ "on"; "off" ], f),
+    " Allow (on) or forbid (off) contracting floating-point expressions into \
+     fused operations that round only once, where available, e.g. a \
+     multiplication and an addition into a fused multiply-add (default: on)" )
+
 let mk_name_mangling_scheme f =
   ( "-name-mangling-scheme",
     Arg.Symbol ([ "flat"; "structured" ], f),
@@ -1515,6 +1522,7 @@ module type Oxcaml_options = sig
   val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
   val function_layout : string -> unit
+  val fp_contract : string -> unit
   val name_mangling_scheme : string -> unit
   val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
@@ -1734,6 +1742,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_zero_alloc_checker_details_extra;
       mk_zero_alloc_checker_join F.zero_alloc_checker_join;
       mk_function_layout F.function_layout;
+      mk_fp_contract F.fp_contract;
       mk_name_mangling_scheme F.name_mangling_scheme;
       mk_disable_builtin_check F.disable_builtin_check;
       mk_disable_poll_insertion F.disable_poll_insertion;
@@ -2165,6 +2174,12 @@ module Oxcaml_options_impl = struct
     match Oxcaml_flags.Function_layout.of_string s with
     | None -> () (* this should not occur as we use Arg.Symbol *)
     | Some layout -> Oxcaml_flags.function_layout := layout
+
+  let fp_contract s =
+    match s with
+    | "on" -> Oxcaml_flags.fp_contract := true
+    | "off" -> Oxcaml_flags.fp_contract := false
+    | _ -> () (* this should not occur as we use Arg.Symbol *)
 
   let name_mangling_scheme s =
     let scheme : Config.name_mangling_scheme option =
@@ -2759,6 +2774,17 @@ module Extra_params = struct
             Oxcaml_flags.function_layout := layout;
             true
         | None ->
+            raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
+        )
+    | "fp-contract" -> (
+        match v with
+        | "on" ->
+            Oxcaml_flags.fp_contract := true;
+            true
+        | "off" ->
+            Oxcaml_flags.fp_contract := false;
+            true
+        | _ ->
             raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
         )
     | "name-mangling-scheme" -> (
