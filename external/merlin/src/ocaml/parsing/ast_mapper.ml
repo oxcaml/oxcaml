@@ -1340,19 +1340,9 @@ module PpxContext = struct
               Load_path.auto_include_otherlibs alert find_in_dir fn
           in *)
           let visible, hidden = get_pair get_load_dirs get_load_dirs payload in
-<<<<<<< Merlin:remap-per-mod
           Load_path.(init ~auto_include:no_auto_include ~visible ~hidden)
-      | "open_args" ->
-          Clflags.open_args := get_list get_open_arg payload
-||||||| Compiler:last-imported
-          Load_path.init ~auto_include ~visible ~hidden
-      | "open_args" ->
-          Clflags.open_args := get_list get_open_arg payload
-=======
-          Load_path.init ~auto_include ~visible ~hidden
       | "scope_args" ->
           Clflags.scope_args := get_list get_scope_arg payload
->>>>>>> Compiler:HEAD
       | "for_package" ->
           Clflags.for_package := get_option get_string payload
       | "debug" ->
