@@ -80,6 +80,7 @@ let table () : (string * id t) array =
     "caml_mm256_broadcast_i32x2", Default { arity = 1; imm = No_imm; bind = Instr vbroadcasti32x2_Y_Xm64; args = [|Value 0|] };
     "caml_mm256_broadcastmb_epi64", Default { arity = 1; imm = No_imm; bind = Instr vpbroadcastmb2q_Y_K; args = [|Value 0|] };
     "caml_mm256_broadcastmw_epi32", Default { arity = 1; imm = No_imm; bind = Instr vpbroadcastmw2d_Y_K; args = [|Value 0|] };
+    "caml_mm256_clmulepi64_epi128", Default { arity = 2; imm = Imm 255; bind = Instr vpclmulqdq_Y_Y_Ym256; args = [|Value 0; Value 1|] };
     "caml_mm256_cmp_epi16_mask", Default { arity = 2; imm = Imm 7; bind = Instr vpcmpw_K_Y_Ym256; args = [|Value 0; Value 1|] };
     "caml_mm256_cmp_epi32_mask", Default { arity = 2; imm = Imm 7; bind = Instr vpcmpd_K_Y_Ym256; args = [|Value 0; Value 1|] };
     "caml_mm256_cmp_epi64_mask", Default { arity = 2; imm = Imm 7; bind = Instr vpcmpq_K_Y_Ym256; args = [|Value 0; Value 1|] };
@@ -1085,6 +1086,7 @@ let table () : (string * id t) array =
     "caml_mm512_broadcastw_epi16", Default { arity = 1; imm = No_imm; bind = Instr vpbroadcastw_Z_Xm16; args = [|Value 0|] };
     "caml_mm512_bslli_epi128", Default { arity = 1; imm = Imm 255; bind = Instr vpslldq_Z_Zm512; args = [|Value 0|] };
     "caml_mm512_bsrli_epi128", Default { arity = 1; imm = Imm 255; bind = Instr vpsrldq_Z_Zm512; args = [|Value 0|] };
+    "caml_mm512_clmulepi64_epi128", Default { arity = 2; imm = Imm 255; bind = Instr vpclmulqdq_Z_Z_Zm512; args = [|Value 0; Value 1|] };
     "caml_mm512_cmp_epi16_mask", Default { arity = 2; imm = Imm 7; bind = Instr vpcmpw_K_Z_Zm512; args = [|Value 0; Value 1|] };
     "caml_mm512_cmp_epi32_mask", Default { arity = 2; imm = Imm 7; bind = Instr vpcmpd_K_Z_Zm512; args = [|Value 0; Value 1|] };
     "caml_mm512_cmp_epi64_mask", Default { arity = 2; imm = Imm 7; bind = Instr vpcmpq_K_Z_Zm512; args = [|Value 0; Value 1|] };

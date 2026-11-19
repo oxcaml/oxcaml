@@ -53,6 +53,13 @@ intnat test_has_avx512_bf16(intnat unused)
   return __get_cpuid_count(7, 1, &eax, &ebx, &ecx, &edx) && (eax & (1u << 5));
 }
 
+intnat test_has_vpclmulqdq(intnat unused)
+{
+  unsigned int eax, ebx, ecx, edx;
+  (void)unused;
+  return __get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx) && (ecx & (1u << 10));
+}
+
 #ifdef ARCH_AVX512
 #include <immintrin.h>
 

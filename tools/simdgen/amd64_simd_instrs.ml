@@ -2695,7 +2695,9 @@ type id =
   | Vpbroadcastw_Z_Xm16_K
   | Vpbroadcastw_Z_r32
   | Vpbroadcastw_Z_r32_K
-  | Vpclmulqdq
+  | Vpclmulqdq_X_X_Xm128
+  | Vpclmulqdq_Y_Y_Ym256
+  | Vpclmulqdq_Z_Z_Zm512
   | Vpcmpb_K_X_Xm128
   | Vpcmpb_K_X_Xm128_K
   | Vpcmpb_K_Y_Ym256
@@ -29105,14 +29107,32 @@ let vpbroadcastw_Z_r32_K ~z = {
   ; mnemonic = "vpbroadcastw"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 123 }
 }
-let vpclmulqdq = {
-    id = Vpclmulqdq
+let vpclmulqdq_X_X_Xm128 = {
+    id = Vpclmulqdq_X_X_Xm128
   ; ext = [|PCLMULQDQ;AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "vpclmulqdq"
   ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 68 }
+}
+let vpclmulqdq_Y_Y_Ym256 = {
+    id = Vpclmulqdq_Y_Y_Ym256
+  ; ext = [|VPCLMULQDQ;AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpclmulqdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 68 }
+}
+let vpclmulqdq_Z_Z_Zm512 = {
+    id = Vpclmulqdq_Z_Z_Zm512
+  ; ext = [|AVX512F;VPCLMULQDQ|]
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpclmulqdq"
+  ; enc = { prefix = Evex { evex_m = Vexm_0F3A; evex_w = false; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = false; evex_z = false }; rm_reg = Reg; opcode = 68 }
 }
 let vpcmpb_K_X_Xm128 = {
     id = Vpcmpb_K_X_Xm128

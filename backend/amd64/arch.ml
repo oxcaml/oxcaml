@@ -41,6 +41,7 @@ module Extension = struct
       | AVX512VL
       | AES
       | AVX512_BF16
+      | VPCLMULQDQ
 
     let rank = function
       | POPCNT -> 0
@@ -65,6 +66,7 @@ module Extension = struct
       | AVX512VL -> 19
       | AES -> 20
       | AVX512_BF16 -> 21
+      | VPCLMULQDQ -> 22
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -95,6 +97,7 @@ module Extension = struct
     | AVX512BW -> "AVX512BW"
     | AVX512VL -> "AVX512VL"
     | AVX512_BF16 -> "AVX512BF16"
+    | VPCLMULQDQ -> "VPCLMULQDQ"
 
   let generation = function
     | POPCNT -> "Nehalem+"
@@ -118,6 +121,7 @@ module Extension = struct
     | AVX512BW -> "SkylakeXeon+"
     | AVX512VL -> "SkylakeXeon+"
     | AVX512_BF16 -> "Cooperlake+"
+    | VPCLMULQDQ -> "Icelake+"
 
   let enabled_by_default = function
     (* Extension defaults follow configure-time CPU detection.
@@ -142,13 +146,14 @@ module Extension = struct
     | AVX512BW -> Config.has_avx512bw
     | AVX512VL -> Config.has_avx512vl
     | AVX512_BF16 -> Config.has_avx512bf16
+    | VPCLMULQDQ -> Config.has_vpclmulqdq
     | PREFETCHW | PREFETCHWT1 -> false
 
   let all =
     Set.of_list
       [ POPCNT; LZCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2;
         CLMUL; BMI; BMI2; AVX; AVX2; F16C; FMA; AVX512F; AVX512DQ; AVX512CD;
-        AVX512BW; AVX512VL; AES; AVX512_BF16 ]
+        AVX512BW; AVX512VL; AES; AVX512_BF16; VPCLMULQDQ ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -168,10 +173,13 @@ module Extension = struct
     | AVX512F, AVX512VL
     | AVX512VL, AVX512F
     | AVX512F, AVX512_BF16
+    | CLMUL, VPCLMULQDQ
+    | AVX, VPCLMULQDQ
     | BMI, BMI2 -> true
     | (POPCNT | LZCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 |
        SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F |
-       AVX512DQ | AVX512CD | AVX512BW | AVX512VL | AES | AVX512_BF16), _
+       AVX512DQ | AVX512CD | AVX512BW | AVX512VL | AES | AVX512_BF16 |
+       VPCLMULQDQ), _
        -> false
 
   let rec fix set less =
@@ -246,6 +254,7 @@ module Extension = struct
       | AVX512BW -> enabled AVX512BW
       | AVX512VL -> enabled AVX512VL
       | AVX512_BF16 -> enabled AVX512_BF16
+      | VPCLMULQDQ -> enabled VPCLMULQDQ
     in
     Array.for_all enabled instr.ext
 end
