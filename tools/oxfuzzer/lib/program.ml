@@ -517,7 +517,9 @@ let to_code
     opens
     @ record_declarations record_types
     @ List.filter_map Exn.to_code exceptions
-    (* [Effect.perform] is unsafe on Js_of_ocaml only. *)
+    (* [Effect.perform] is unsafe on Js_of_ocaml, and any use of it gives a
+       warning since the compiler doesn't know in advance whether we're
+       compiling to JS. We don't fuzz JSOO, so we suppress that warning here. *)
     @ (if List.is_empty effects
        then []
        else
