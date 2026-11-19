@@ -52,3 +52,4 @@ utils/target_system.ml* merlin-exclude
 utils/terminfo.ml* merlin-exclude
 utils/id_counter.ml merlin-exclude
 utils/id_counter.mli merlin-exclude
+utils/header_bits.ml.c merlin-exclude
