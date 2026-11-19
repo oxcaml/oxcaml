@@ -96,9 +96,9 @@ end
    address computation).  A few old cores (e.g. Cortex-A53, Cortex-A72) are
    slower with a release store and instead use a [dmb ishld; str] barrier.
 
-   [configure] selects the barrier by default by setting [Config.model] to
-   "arm64_barrier".  The default can be overridden on the command line. *)
-let store_release = ref (String.compare Config.model "arm64_barrier" <> 0)
+   [configure] selects the default in [Config.arm64_default_store_release].
+   The default can be overridden on the command line. *)
+let store_release = ref Config.arm64_default_store_release
 
 (* Emit elf notes with trap handling information. *)
 let trap_notes = ref true

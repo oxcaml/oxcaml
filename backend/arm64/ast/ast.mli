@@ -1084,12 +1084,6 @@ module Instruction_name : sig
            )
            t
     | LDAR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
-    | STLR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
-    | STLUR :
-        ( pair,
-          [`Reg of [`GP of [< `X | `W]]]
-          * [`Mem of [`Offset_nine_signed_unscaled]] )
-        t
     | LDP :
         ('w1, 'w2) LDP_STP_width.t
         -> ( triple,
@@ -1370,6 +1364,12 @@ module Instruction_name : sig
         ( pair,
           [`Reg of [`GP of [< `X | `W | `LR]]] * [`Mem of Addressing_mode.single]
         )
+        t
+    | STLR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
+    | STLUR :
+        ( pair,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Mem of [`Offset_nine_signed_unscaled]] )
         t
     | STRB :
         (pair, [`Reg of [`GP of [< `W]]] * [`Mem of Addressing_mode.single]) t

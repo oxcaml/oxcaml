@@ -194,6 +194,10 @@ val architecture: string
 val model: string
 (** Name of processor submodel for the native-code compiler *)
 
+val arm64_default_store_release: bool
+(** Whether arm64 assignment stores default to a store-release (stlr/stlur)
+    rather than a [dmb ishld; str] barrier *)
+
 val system: string
 (** Name of operating system for the native-code compiler *)
 
