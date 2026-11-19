@@ -477,15 +477,12 @@ type ('a : any) fields_256 = 'a pair pair pair pair pair pair pair pair
 type ('a : any) large_record = { fields : 'a fields_256; flat : float#; }
 |}]
 
-(* This record has too many value fields. *)
+(* This record has many value fields (more than were once allowed). *)
 let set_flat_value (r : string large_record) =
   let poly_ set_flat r = { r with flat = #2.0 } in
   set_flat r
 [%%expect{|
-Line 2, characters 25-47:
-2 |   let poly_ set_flat r = { r with flat = #2.0 } in
-                             ^^^^^^^^^^^^^^^^^^^^^^
-Error: Mixed blocks may contain at most 254 value fields prior to the flat suffix, but this one contains 256.
+val set_flat_value : string large_record -> string large_record = <fun>
 |}]
 
 (* This one doesn't have any value fields.*)

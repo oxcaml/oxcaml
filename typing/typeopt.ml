@@ -1242,7 +1242,6 @@ let assert_mixed_product_support_for_lambda_shape loc kind shape =
   let counts = Mixed_product_bytes.count (Product shape) in
   if not (Mixed_product_bytes.all_value counts) then
     Typedecl.assert_mixed_product_support loc kind
-      ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
 
 let refine_mixed_block_element env loc ty mbe =
   try

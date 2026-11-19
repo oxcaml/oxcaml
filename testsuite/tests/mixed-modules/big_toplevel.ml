@@ -1,19 +1,14 @@
 (* TEST
  flambda2;
  {
-   setup-ocamlc.opt-build-env;
-   ocamlc_opt_exit_status = "2";
-   ocamlc.opt;
-   check-ocamlc.opt-output;
+   native;
  }{
-   setup-ocamlopt.opt-build-env;
-   ocamlopt_opt_exit_status = "2";
-   ocamlopt.opt;
-   check-ocamlopt.opt-output;
+   bytecode;
  }
 *)
 
-(* Won't compile because the scannable prefix is too big *)
+(* The scannable prefix is bigger than was once allowed: in native code, the
+   module block has a layout block. *)
 let f_0 = #42.0
 let a_0 = "a"
 let a_1 = "a"
@@ -272,3 +267,11 @@ let a_253 = "a"
 let a_254 = "a"
 let a_255 = "a"
 let a_256 = "a"
+
+external float_of_float_u : float# -> float = "%box_float"
+
+let () =
+  Gc.full_major ();
+  assert (float_of_float_u (Sys.opaque_identity f_0) = 42.0);
+  assert (String.equal (Sys.opaque_identity a_0) "a");
+  assert (String.equal (Sys.opaque_identity a_256) "a")

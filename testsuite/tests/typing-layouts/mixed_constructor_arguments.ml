@@ -446,7 +446,8 @@ and ('a : float64, 'b : immediate, 'ptr) t_cstr2 =
     A of 'ptr * 'a * 'a t_float * 'b * 'b t_imm
 |}];;
 
-(* There is a cap on the number of fields in the scannable prefix. *)
+(* There was once a cap (254) on the number of fields in the scannable prefix.
+   These exceed it. *)
 type ptr = string
 type t_cstr_capped =
   A of
@@ -485,18 +486,31 @@ type t_cstr_capped =
     float#
 [%%expect{|
 type ptr = string
-Lines 3-36, characters 2-10:
- 3 | ..A of
- 4 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
- 5 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
- 6 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
- 7 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
-...
-33 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
-34 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
-35 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr *
-36 |     float#
-Error: Mixed constructors may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+type t_cstr_capped =
+    A of ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * float#
 |}];;
 
 type t_cstr_capped_reordered =
@@ -535,18 +549,31 @@ type t_cstr_capped_reordered =
     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
     ptr * ptr * ptr * ptr * ptr * ptr * ptr
 [%%expect{|
-Lines 2-35, characters 2-43:
- 2 | ..A of
- 3 |     float# *
- 4 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
- 5 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
- 6 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
-...
-32 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
-33 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
-34 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
-35 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr
-Error: Mixed constructors may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+type t_cstr_capped_reordered =
+    A of float# * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
+      ptr * ptr * ptr * ptr
 |}];;
 
 type t_cstr_capped_record = A of {
@@ -579,18 +606,45 @@ type t_cstr_capped_record = A of {
  unboxed:float#
  }
 [%%expect{|
-Lines 1-29, characters 28-2:
- 1 | ............................A of {
- 2 |  a0:ptr; a1:ptr; a2:ptr; a3:ptr; a4:ptr; a5:ptr; a6:ptr; a7:ptr; a8:ptr; a9:ptr;
- 3 |  b0:ptr; b1:ptr; b2:ptr; b3:ptr; b4:ptr; b5:ptr; b6:ptr; b7:ptr; b8:ptr; b9:ptr;
- 4 |  c0:ptr; c1:ptr; c2:ptr; c3:ptr; c4:ptr; c5:ptr; c6:ptr; c7:ptr; c8:ptr; c9:ptr;
- 5 |  d0:ptr; d1:ptr; d2:ptr; d3:ptr; d4:ptr; d5:ptr; d6:ptr; d7:ptr; d8:ptr; d9:ptr;
-...
-26 |  y0:ptr; y1:ptr; y2:ptr; y3:ptr; y4:ptr; y5:ptr; y6:ptr; y7:ptr; y8:ptr; y9:ptr;
-27 |  z0:ptr; z1:ptr; z2:ptr; z3:ptr; z4:ptr;
-28 |  unboxed:float#
-29 |  }
-Error: Mixed inline record arguments to constructors may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+type t_cstr_capped_record =
+    A of { a0 : ptr; a1 : ptr; a2 : ptr; a3 : ptr; a4 : ptr; a5 : ptr;
+      a6 : ptr; a7 : ptr; a8 : ptr; a9 : ptr; b0 : ptr; b1 : ptr; b2 : ptr;
+      b3 : ptr; b4 : ptr; b5 : ptr; b6 : ptr; b7 : ptr; b8 : ptr; b9 : ptr;
+      c0 : ptr; c1 : ptr; c2 : ptr; c3 : ptr; c4 : ptr; c5 : ptr; c6 : ptr;
+      c7 : ptr; c8 : ptr; c9 : ptr; d0 : ptr; d1 : ptr; d2 : ptr; d3 : ptr;
+      d4 : ptr; d5 : ptr; d6 : ptr; d7 : ptr; d8 : ptr; d9 : ptr; e0 : ptr;
+      e1 : ptr; e2 : ptr; e3 : ptr; e4 : ptr; e5 : ptr; e6 : ptr; e7 : ptr;
+      e8 : ptr; e9 : ptr; f0 : ptr; f1 : ptr; f2 : ptr; f3 : ptr; f4 : ptr;
+      f5 : ptr; f6 : ptr; f7 : ptr; f8 : ptr; f9 : ptr; g0 : ptr; g1 : ptr;
+      g2 : ptr; g3 : ptr; g4 : ptr; g5 : ptr; g6 : ptr; g7 : ptr; g8 : ptr;
+      g9 : ptr; h0 : ptr; h1 : ptr; h2 : ptr; h3 : ptr; h4 : ptr; h5 : ptr;
+      h6 : ptr; h7 : ptr; h8 : ptr; h9 : ptr; i0 : ptr; i1 : ptr; i2 : ptr;
+      i3 : ptr; i4 : ptr; i5 : ptr; i6 : ptr; i7 : ptr; i8 : ptr; i9 : ptr;
+      j0 : ptr; j1 : ptr; j2 : ptr; j3 : ptr; j4 : ptr; j5 : ptr; j6 : ptr;
+      j7 : ptr; j8 : ptr; j9 : ptr; k0 : ptr; k1 : ptr; k2 : ptr; k3 : ptr;
+      k4 : ptr; k5 : ptr; k6 : ptr; k7 : ptr; k8 : ptr; k9 : ptr; l0 : ptr;
+      l1 : ptr; l2 : ptr; l3 : ptr; l4 : ptr; l5 : ptr; l6 : ptr; l7 : ptr;
+      l8 : ptr; l9 : ptr; m0 : ptr; m1 : ptr; m2 : ptr; m3 : ptr; m4 : ptr;
+      m5 : ptr; m6 : ptr; m7 : ptr; m8 : ptr; m9 : ptr; n0 : ptr; n1 : ptr;
+      n2 : ptr; n3 : ptr; n4 : ptr; n5 : ptr; n6 : ptr; n7 : ptr; n8 : ptr;
+      n9 : ptr; o0 : ptr; o1 : ptr; o2 : ptr; o3 : ptr; o4 : ptr; o5 : ptr;
+      o6 : ptr; o7 : ptr; o8 : ptr; o9 : ptr; p0 : ptr; p1 : ptr; p2 : ptr;
+      p3 : ptr; p4 : ptr; p5 : ptr; p6 : ptr; p7 : ptr; p8 : ptr; p9 : ptr;
+      q0 : ptr; q1 : ptr; q2 : ptr; q3 : ptr; q4 : ptr; q5 : ptr; q6 : ptr;
+      q7 : ptr; q8 : ptr; q9 : ptr; r0 : ptr; r1 : ptr; r2 : ptr; r3 : ptr;
+      r4 : ptr; r5 : ptr; r6 : ptr; r7 : ptr; r8 : ptr; r9 : ptr; s0 : ptr;
+      s1 : ptr; s2 : ptr; s3 : ptr; s4 : ptr; s5 : ptr; s6 : ptr; s7 : ptr;
+      s8 : ptr; s9 : ptr; t0 : ptr; t1 : ptr; t2 : ptr; t3 : ptr; t4 : ptr;
+      t5 : ptr; t6 : ptr; t7 : ptr; t8 : ptr; t9 : ptr; u0 : ptr; u1 : ptr;
+      u2 : ptr; u3 : ptr; u4 : ptr; u5 : ptr; u6 : ptr; u7 : ptr; u8 : ptr;
+      u9 : ptr; v0 : ptr; v1 : ptr; v2 : ptr; v3 : ptr; v4 : ptr; v5 : ptr;
+      v6 : ptr; v7 : ptr; v8 : ptr; v9 : ptr; w0 : ptr; w1 : ptr; w2 : ptr;
+      w3 : ptr; w4 : ptr; w5 : ptr; w6 : ptr; w7 : ptr; w8 : ptr; w9 : ptr;
+      x0 : ptr; x1 : ptr; x2 : ptr; x3 : ptr; x4 : ptr; x5 : ptr; x6 : ptr;
+      x7 : ptr; x8 : ptr; x9 : ptr; y0 : ptr; y1 : ptr; y2 : ptr; y3 : ptr;
+      y4 : ptr; y5 : ptr; y6 : ptr; y7 : ptr; y8 : ptr; y9 : ptr; z0 : ptr;
+      z1 : ptr; z2 : ptr; z3 : ptr; z4 : ptr; unboxed : float#;
+    }
 |}];;
 
 type t_cstr_capped_record_reordered = A of {
@@ -623,18 +677,45 @@ type t_cstr_capped_record_reordered = A of {
  z0:ptr; z1:ptr; z2:ptr; z3:ptr; z4:ptr;
  }
 [%%expect{|
-Lines 1-29, characters 38-2:
- 1 | ......................................A of {
- 2 |  unboxed:float#;
- 3 |  a0:ptr; a1:ptr; a2:ptr; a3:ptr; a4:ptr; a5:ptr; a6:ptr; a7:ptr; a8:ptr; a9:ptr;
- 4 |  b0:ptr; b1:ptr; b2:ptr; b3:ptr; b4:ptr; b5:ptr; b6:ptr; b7:ptr; b8:ptr; b9:ptr;
- 5 |  c0:ptr; c1:ptr; c2:ptr; c3:ptr; c4:ptr; c5:ptr; c6:ptr; c7:ptr; c8:ptr; c9:ptr;
-...
-26 |  x0:ptr; x1:ptr; x2:ptr; x3:ptr; x4:ptr; x5:ptr; x6:ptr; x7:ptr; x8:ptr; x9:ptr;
-27 |  y0:ptr; y1:ptr; y2:ptr; y3:ptr; y4:ptr; y5:ptr; y6:ptr; y7:ptr; y8:ptr; y9:ptr;
-28 |  z0:ptr; z1:ptr; z2:ptr; z3:ptr; z4:ptr;
-29 |  }
-Error: Mixed inline record arguments to constructors may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+type t_cstr_capped_record_reordered =
+    A of { unboxed : float#; a0 : ptr; a1 : ptr; a2 : ptr; a3 : ptr;
+      a4 : ptr; a5 : ptr; a6 : ptr; a7 : ptr; a8 : ptr; a9 : ptr; b0 : ptr;
+      b1 : ptr; b2 : ptr; b3 : ptr; b4 : ptr; b5 : ptr; b6 : ptr; b7 : ptr;
+      b8 : ptr; b9 : ptr; c0 : ptr; c1 : ptr; c2 : ptr; c3 : ptr; c4 : ptr;
+      c5 : ptr; c6 : ptr; c7 : ptr; c8 : ptr; c9 : ptr; d0 : ptr; d1 : ptr;
+      d2 : ptr; d3 : ptr; d4 : ptr; d5 : ptr; d6 : ptr; d7 : ptr; d8 : ptr;
+      d9 : ptr; e0 : ptr; e1 : ptr; e2 : ptr; e3 : ptr; e4 : ptr; e5 : ptr;
+      e6 : ptr; e7 : ptr; e8 : ptr; e9 : ptr; f0 : ptr; f1 : ptr; f2 : ptr;
+      f3 : ptr; f4 : ptr; f5 : ptr; f6 : ptr; f7 : ptr; f8 : ptr; f9 : ptr;
+      g0 : ptr; g1 : ptr; g2 : ptr; g3 : ptr; g4 : ptr; g5 : ptr; g6 : ptr;
+      g7 : ptr; g8 : ptr; g9 : ptr; h0 : ptr; h1 : ptr; h2 : ptr; h3 : ptr;
+      h4 : ptr; h5 : ptr; h6 : ptr; h7 : ptr; h8 : ptr; h9 : ptr; i0 : ptr;
+      i1 : ptr; i2 : ptr; i3 : ptr; i4 : ptr; i5 : ptr; i6 : ptr; i7 : ptr;
+      i8 : ptr; i9 : ptr; j0 : ptr; j1 : ptr; j2 : ptr; j3 : ptr; j4 : ptr;
+      j5 : ptr; j6 : ptr; j7 : ptr; j8 : ptr; j9 : ptr; k0 : ptr; k1 : ptr;
+      k2 : ptr; k3 : ptr; k4 : ptr; k5 : ptr; k6 : ptr; k7 : ptr; k8 : ptr;
+      k9 : ptr; l0 : ptr; l1 : ptr; l2 : ptr; l3 : ptr; l4 : ptr; l5 : ptr;
+      l6 : ptr; l7 : ptr; l8 : ptr; l9 : ptr; m0 : ptr; m1 : ptr; m2 : ptr;
+      m3 : ptr; m4 : ptr; m5 : ptr; m6 : ptr; m7 : ptr; m8 : ptr; m9 : ptr;
+      n0 : ptr; n1 : ptr; n2 : ptr; n3 : ptr; n4 : ptr; n5 : ptr; n6 : ptr;
+      n7 : ptr; n8 : ptr; n9 : ptr; o0 : ptr; o1 : ptr; o2 : ptr; o3 : ptr;
+      o4 : ptr; o5 : ptr; o6 : ptr; o7 : ptr; o8 : ptr; o9 : ptr; p0 : ptr;
+      p1 : ptr; p2 : ptr; p3 : ptr; p4 : ptr; p5 : ptr; p6 : ptr; p7 : ptr;
+      p8 : ptr; p9 : ptr; q0 : ptr; q1 : ptr; q2 : ptr; q3 : ptr; q4 : ptr;
+      q5 : ptr; q6 : ptr; q7 : ptr; q8 : ptr; q9 : ptr; r0 : ptr; r1 : ptr;
+      r2 : ptr; r3 : ptr; r4 : ptr; r5 : ptr; r6 : ptr; r7 : ptr; r8 : ptr;
+      r9 : ptr; s0 : ptr; s1 : ptr; s2 : ptr; s3 : ptr; s4 : ptr; s5 : ptr;
+      s6 : ptr; s7 : ptr; s8 : ptr; s9 : ptr; t0 : ptr; t1 : ptr; t2 : ptr;
+      t3 : ptr; t4 : ptr; t5 : ptr; t6 : ptr; t7 : ptr; t8 : ptr; t9 : ptr;
+      u0 : ptr; u1 : ptr; u2 : ptr; u3 : ptr; u4 : ptr; u5 : ptr; u6 : ptr;
+      u7 : ptr; u8 : ptr; u9 : ptr; v0 : ptr; v1 : ptr; v2 : ptr; v3 : ptr;
+      v4 : ptr; v5 : ptr; v6 : ptr; v7 : ptr; v8 : ptr; v9 : ptr; w0 : ptr;
+      w1 : ptr; w2 : ptr; w3 : ptr; w4 : ptr; w5 : ptr; w6 : ptr; w7 : ptr;
+      w8 : ptr; w9 : ptr; x0 : ptr; x1 : ptr; x2 : ptr; x3 : ptr; x4 : ptr;
+      x5 : ptr; x6 : ptr; x7 : ptr; x8 : ptr; x9 : ptr; y0 : ptr; y1 : ptr;
+      y2 : ptr; y3 : ptr; y4 : ptr; y5 : ptr; y6 : ptr; y7 : ptr; y8 : ptr;
+      y9 : ptr; z0 : ptr; z1 : ptr; z2 : ptr; z3 : ptr; z4 : ptr;
+    }
 |}]
 
 type t_ext +=
@@ -684,7 +765,8 @@ Lines 2-35, characters 2-16:
 33 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
 34 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr *
 35 |     int * float#
-Error: Mixed constructors may contain at most 254 value fields prior to the flat suffix, but this one contains 256.
+Error: Extensible types can't have fields of unboxed type.
+       Consider wrapping the unboxed fields in a record.
 |}];;
 
 type t_ext +=
@@ -734,7 +816,8 @@ Lines 2-35, characters 2-43:
 33 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
 34 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
 35 |     ptr * ptr * ptr * ptr * ptr * ptr * ptr
-Error: Mixed constructors may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+Error: Extensible types can't have fields of unboxed type.
+       Consider wrapping the unboxed fields in a record.
 |}];;
 
 (* GADT syntax *)

@@ -70,11 +70,6 @@ end
 type mixed_product_violation =
   | Runtime_support_not_enabled of Mixed_product_kind.t
   | Extension_constructor
-  | Value_prefix_too_long of
-      { value_prefix_len : int;
-        max_value_prefix_len : int;
-        mixed_product_kind : Mixed_product_kind.t;
-      }
   | Insufficient_level of
       { required_layouts_level : Language_extension.maturity;
         mixed_product_kind : Mixed_product_kind.t;
@@ -1958,33 +1953,17 @@ let update_constructor_arguments_sorts env cd_args =
     let lbls, jkinds = update_label_sorts env lbls |> List.split in
     Types.Cstr_record lbls, false, jkinds, Some [| Jkind.Sort.Const.scannable |]
 
-let assert_mixed_product_support =
-  (* These two constants duplicate Header_bits.reserved_bits and
-     Header_bits.scan_mask_bits - 1: typing can't yet depend on that
-     generated module because Merlin doesn't vendor it. The layout-word
-     header formats will lift the prefix limit and need the dependency
-     anyway; both literals should be replaced then. *)
-  let required_reserved_header_bits = 22 in
-  (* The value prefix must end within the header's 16-bit inline scan
-     mask. Larger prefixes return with the layout-word header
-     formats. *)
-  let max_value_prefix_len = 15 in
-  fun loc mixed_product_kind ~value_prefix_len ->
-    let required_layouts_level = Language_extension.Stable in
-    if not (Language_extension.is_at_least Layouts required_layouts_level) then
-      Error.log_and_raise loc
-        (Illegal_mixed_product
-           (Insufficient_level
-              { required_layouts_level; mixed_product_kind }));
-    if Config.reserved_header_bits < required_reserved_header_bits then
-      Error.log_and_raise loc
-        (Illegal_mixed_product
-           (Runtime_support_not_enabled mixed_product_kind));
-    if value_prefix_len > max_value_prefix_len then
-      Error.log_and_raise loc
-        (Illegal_mixed_product
-           (Value_prefix_too_long
-              { value_prefix_len; max_value_prefix_len; mixed_product_kind }))
+let assert_mixed_product_support loc mixed_product_kind =
+  let required_layouts_level = Language_extension.Stable in
+  if not (Language_extension.is_at_least Layouts required_layouts_level) then
+    Error.log_and_raise loc
+      (Illegal_mixed_product
+         (Insufficient_level
+            { required_layouts_level; mixed_product_kind }));
+  if Config.reserved_header_bits < Header_bits.reserved_bits then
+    Error.log_and_raise loc
+      (Illegal_mixed_product
+         (Runtime_support_not_enabled mixed_product_kind))
 
 (* Records and variants with a field or constructor argument of kind [any] get a
    variable representation, as oxcaml/oxcaml#5461. We gate this by extension. *)
@@ -2111,13 +2090,11 @@ module Element_repr = struct
     match shape with
     | `Not_mixed -> ()
     | `Mixed shape ->
-      (* All-value/void shapes will compile to uniform blocks, so the
-         scannable prefix length limit doesn't apply. *)
+      (* All-value/void shapes will compile to uniform blocks, so don't need
+         support for mixed blocks. *)
       let mpb = Mixed_product_bytes.count_types_shape shape in
       if not (Mixed_product_bytes.all_value mpb)
-      then
-        assert_mixed_product_support loc kind
-          ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb)
+      then assert_mixed_product_support loc kind
 
   type unrepresentable_element =
     Unrepresentable_element of int
@@ -2297,7 +2274,7 @@ let compute_record_repr
           reprs
         |> Array.of_list
       in
-      assert_mixed_product_support loc Record ~value_prefix_len:0;
+      assert_mixed_product_support loc Record;
       Ok (Record_mixed shape)
     else
       mixed_record ()
@@ -6129,13 +6106,6 @@ let report_error ~loc = function
           Location.errorf ~loc
             "Extensible types can't have fields of unboxed type.@ Consider \
              wrapping the unboxed fields in a record."
-      | Value_prefix_too_long
-          { value_prefix_len; max_value_prefix_len; mixed_product_kind } ->
-          Location.errorf ~loc
-            "Mixed %s may contain at most %d value fields prior to the\
-            \ flat suffix, but this one contains %d."
-            (Mixed_product_kind.to_plural_string mixed_product_kind)
-            max_value_prefix_len value_prefix_len
       | Insufficient_level { required_layouts_level; mixed_product_kind } -> (
         let hint =
           [Location.msg
