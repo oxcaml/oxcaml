@@ -22,7 +22,7 @@ to_cmm.cmx.dump:
   entry: "To_cmm.method_call":0 body_hash:ea4a8317
   call: "To_cmm.method_call":0:ea4a8317:0:call
   entry: "To_cmm.loop":0 body_hash:ffb5c364
-  branch: "To_cmm.loop":0:ffb5c364:0:branch(2) "To_cmm.loop":0:ffb5c364:1:call
+  branch: "To_cmm.loop":0:ffb5c364:0:branch(2)
   call: "To_cmm.loop":0:ffb5c364:2:call
   branch: "To_cmm.loop":0:ffb5c364:0:branch(1)
 only in to_cmm_fast_path/to_cmm.simplify.fl:
@@ -51,7 +51,7 @@ to_cmm_fast_path/to_cmm.cmx.dump:
   entry: "To_cmm.method_call":0 body_hash:ea4a8317
   call: "To_cmm.method_call":0:ea4a8317:0:call
   entry: "To_cmm.loop":0 body_hash:ffb5c364
-  branch: "To_cmm.loop":0:ffb5c364:0:branch(2) "To_cmm.loop":0:ffb5c364:1:call
+  branch: "To_cmm.loop":0:ffb5c364:0:branch(2)
   call: "To_cmm.loop":0:ffb5c364:2:call
   branch: "To_cmm.loop":0:ffb5c364:0:branch(1)
 only in to_cmm_o3_reaper/simplify.reaper.fl:

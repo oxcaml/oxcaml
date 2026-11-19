@@ -26,8 +26,7 @@ type t =
        [Symbol.t], e.g. module entry point names. *)
     module_symbol : Symbol.t;
     module_symbol_defined : bool;
-    invalid_message_symbols : Symbol.t String.Map.t;
-    fdo_region_counters : Fdo_to_cmm_region_counters.t
+    invalid_message_symbols : Symbol.t String.Map.t
   }
 
 let create ~module_symbol ~reachable_names =
@@ -39,8 +38,7 @@ let create ~module_symbol ~reachable_names =
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
-    invalid_message_symbols = String.Map.empty;
-    fdo_region_counters = Fdo_to_cmm_region_counters.empty
+    invalid_message_symbols = String.Map.empty
   }
 
 (* Symbol handling
@@ -99,11 +97,6 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
   else Cmm.global_symbol ~ty:Cmm.typ_code_pointer sym_name
 
 (* *)
-
-let fdo_region_counters t = t.fdo_region_counters
-
-let map_fdo_region_counters t f =
-  { t with fdo_region_counters = f t.fdo_region_counters }
 
 let check_for_module_symbol t symbol =
   if Symbol.equal symbol t.module_symbol

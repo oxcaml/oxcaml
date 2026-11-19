@@ -2,8 +2,8 @@
    [Cmm_helpers.transl_switch_clambda]. Each switch has a counter per case:
    those of the cases that keep an edge must be on it, and those of the cases
    that lose it (because the switch, or a cluster of it, became a table lookup)
-   must be on the edge into the lookup, or returned to be put on the edges into
-   the switch. No counter may be lost. *)
+   must be on the edge into the lookup, or dropped if there is none (see
+   [Fdo_dropped_counters]). No counter may be lost. *)
 
 let () =
   Env.set_current_unit
@@ -66,21 +66,22 @@ let print_counters title counters =
 let test name ~index cases =
   let scrutinee = Cmm.Cvar (Backend_var.create_local "x") in
   let cases = Array.mapi (fun arm case -> case, annots arm) cases in
-  let { Cmm_helpers.switch_expr = expr; fdo_counters_into_switch } =
-    Cmm_helpers.transl_switch_clambda dbg scrutinee index cases
-  in
+  Fdo_dropped_counters.reset ();
+  let expr = Cmm_helpers.transl_switch_clambda dbg scrutinee index cases in
   let on_edges = edge_counters expr in
-  let residual = Fdo_annotation.to_list fdo_counters_into_switch in
+  let dropped =
+    Fdo_dropped_counters.registered ()
+    |> Fdo_dropped_counters.to_list |> List.map fst
+  in
   let lost =
     List.filter
       (fun arm ->
-        not
-          (List.exists (Fdo_counter.equal (counter arm)) (on_edges @ residual)))
+        not (List.exists (Fdo_counter.equal (counter arm)) (on_edges @ dropped)))
       (List.init (Array.length cases) Fun.id)
   in
   Format.printf "%s:@.%a@." name Printcmm.expression expr;
   print_counters "on edges" on_edges;
-  print_counters "returned" residual;
+  print_counters "dropped" dropped;
   print_counters "lost" (List.map counter lost);
   Format.printf "@."
 
@@ -93,7 +94,7 @@ let () =
     ~index:
       (Array.init 20 (fun v -> if v < 10 then 0 else if v < 19 then 1 else 2))
     (Array.sub exits 0 3);
-  (* Constants: a table lookup, whose counters are all returned. *)
+  (* Constants: a table lookup, whose counters are all dropped. *)
   test "lookup" ~index:[| 0; 1; 2; 3 |]
     [| constant 1; constant 5; constant 2; constant 8 |];
   (* Constant arguments to the same handler: a table lookup too. *)
@@ -112,6 +113,6 @@ let () =
       (Array.init 25 (fun v -> if v < 4 then v else if v < 24 then 4 else 5))
     [| constant 1; constant 5; constant 2; constant 8; exit l []; constant 9 |];
   (* All the values go to the same handler: no edges are left, all the counters
-     are returned. *)
+     are dropped. *)
   let l = Lambda.next_raise_count () in
   test "single case" ~index:[| 0; 1; 2 |] [| exit l []; exit l []; exit l [] |]

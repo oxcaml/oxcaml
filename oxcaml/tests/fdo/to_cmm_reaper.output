@@ -1,25 +1,17 @@
 only in to_cmm_reaper.reaper.fl:
+  "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(1)
+  "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(2)
+  "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(3)
+  "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(4)
 only in to_cmm_reaper.cmx.dump:
 to_cmm_reaper.cmx.dump:
   entry: "To_cmm_reaper.side":0 body_hash:00000000
   entry: "To_cmm_reaper.g":0 body_hash:3371523c
   call: "To_cmm_reaper.g":0:3371523c:0:call
-  entry: "To_cmm_reaper.at_entry":0 "To_cmm_reaper.at_entry":0:5f59ba30:0:branch(4) "To_cmm_reaper.at_entry":0:5f59ba30:0:branch(3) "To_cmm_reaper.at_entry":0:5f59ba30:0:branch(2) "To_cmm_reaper.at_entry":0:5f59ba30:0:branch(1) body_hash:5f59ba30
-  call: "To_cmm_reaper.at_entry":0:5f59ba30:1:call
-  entry: "To_cmm_reaper.in_join":0 body_hash:abf6b353
-  branch: "To_cmm_reaper.in_join":0:abf6b353:0:branch(1) "To_cmm_reaper.in_join":0:abf6b353:3:branch(4) "To_cmm_reaper.in_join":0:abf6b353:3:branch(3) "To_cmm_reaper.in_join":0:abf6b353:3:branch(2) "To_cmm_reaper.in_join":0:abf6b353:3:branch(1)
-  call: "To_cmm_reaper.in_join":0:abf6b353:1:call
-  branch: "To_cmm_reaper.in_join":0:abf6b353:0:branch(2) "To_cmm_reaper.in_join":0:abf6b353:3:branch(4) "To_cmm_reaper.in_join":0:abf6b353:3:branch(3) "To_cmm_reaper.in_join":0:abf6b353:3:branch(2) "To_cmm_reaper.in_join":0:abf6b353:3:branch(1)
-  call: "To_cmm_reaper.in_join":0:abf6b353:2:call
-  call: "To_cmm_reaper.in_join":0:abf6b353:4:call
-  entry: "To_cmm_reaper.in_exn_handler":0 body_hash:f7cf1990
-  branch: "To_cmm_reaper.in_exn_handler":0:f7cf1990:0:branch(1)
-  call: "To_cmm_reaper.in_exn_handler":0:f7cf1990:1:call
-  branch: "To_cmm_reaper.in_exn_handler":0:f7cf1990:0:branch(2) "To_cmm_reaper.in_exn_handler":0:f7cf1990:2:branch(4) "To_cmm_reaper.in_exn_handler":0:f7cf1990:2:branch(3) "To_cmm_reaper.in_exn_handler":0:f7cf1990:2:branch(2) "To_cmm_reaper.in_exn_handler":0:f7cf1990:2:branch(1)
-  call: "To_cmm_reaper.in_exn_handler":0:f7cf1990:3:call
-  entry: "To_cmm_reaper.in_loop":0 body_hash:6510bc3a
-  branch: "To_cmm_reaper.in_loop":0:6510bc3a:0:branch(2) "To_cmm_reaper.in_loop":0:6510bc3a:1:branch(4) "To_cmm_reaper.in_loop":0:6510bc3a:1:branch(3) "To_cmm_reaper.in_loop":0:6510bc3a:1:branch(2) "To_cmm_reaper.in_loop":0:6510bc3a:1:branch(1)
-  call: "To_cmm_reaper.in_loop":0:6510bc3a:2:call
-  branch: "To_cmm_reaper.in_loop":0:6510bc3a:3:branch(2)
-  branch: "To_cmm_reaper.in_loop":0:6510bc3a:3:branch(1)
-  branch: "To_cmm_reaper.in_loop":0:6510bc3a:0:branch(1)
+  entry: "To_cmm_reaper.collapsed":0 body_hash:5f59ba30
+  call: "To_cmm_reaper.collapsed":0:5f59ba30:1:call
+dropped in to_cmm_reaper.cmx.dump:
+  cmm_switch_collapsed: "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(1)
+  cmm_switch_collapsed: "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(2)
+  cmm_switch_collapsed: "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(3)
+  cmm_switch_collapsed: "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(4)

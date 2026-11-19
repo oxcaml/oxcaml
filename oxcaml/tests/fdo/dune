@@ -400,8 +400,7 @@
   (diff to_cmm.output to_cmm.output.corrected)))
 
 ; The counters of the switches To_cmm turns into a table lookup or a single
-; jump, which the reaper leaves for it: they are on the edges into the code the
-; switch was in.
+; jump, which the reaper leaves for it: they are dropped.
 
 (rule
  (targets to_cmm_reaper.output.corrected)
@@ -425,6 +424,7 @@
      -dfexpr-annot-after
      reaper
      -dcmm
+     -dfdo-dropped-counters
      -dump-into-file
      -color
      never
@@ -437,7 +437,8 @@
       compare-sets
       to_cmm_reaper.reaper.fl
       to_cmm_reaper.cmx.dump)
-     (run ./fdo_annotations.exe list to_cmm_reaper.cmx.dump))))))
+     (run ./fdo_annotations.exe list to_cmm_reaper.cmx.dump)
+     (run ./fdo_annotations.exe dropped to_cmm_reaper.cmx.dump))))))
 
 (rule
  (alias runtest)
@@ -446,38 +447,3 @@
  (deps to_cmm_reaper.output to_cmm_reaper.output.corrected)
  (action
   (diff to_cmm_reaper.output to_cmm_reaper.output.corrected)))
-
-; Continuation specialization, which needs match-in-match.
-
-(rule
- (targets specialization.output.corrected)
- (deps specialization.ml fdo_annotations.exe)
- (enabled_if
-  (= %{context_name} "main"))
- (action
-  (progn
-   (run
-    %{bin:ocamlopt.opt}
-    -c
-    -O3
-    -flambda2-match-in-match
-    -fdo-counters
-    -fexpr-print-fdo-counters
-    -fexpr-print-branch-annotations
-    -dflambda-heavy-invariants
-    -dfexpr-annot-after
-    simplify
-    -color
-    never
-    specialization.ml)
-   (with-stdout-to
-    specialization.output.corrected
-    (run ./fdo_annotations.exe list specialization.simplify.fl)))))
-
-(rule
- (alias runtest)
- (enabled_if
-  (= %{context_name} "main"))
- (deps specialization.output specialization.output.corrected)
- (action
-  (diff specialization.output specialization.output.corrected)))

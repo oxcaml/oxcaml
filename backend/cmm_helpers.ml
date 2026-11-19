@@ -3675,11 +3675,6 @@ end)
 
 module SwitcherBlocks = Switch.Make (SArgBlocks)
 
-type transl_switch_clambda_result =
-  { switch_expr : expression;
-    fdo_counters_into_switch : Fdo_annotation.t
-  }
-
 let transl_switch_clambda loc arg index cases =
   let store = StoreExpForSwitch.mk_store () in
   let index = Array.map (fun j -> store.Switch.act_store j cases.(j)) index in
@@ -3712,9 +3707,11 @@ let transl_switch_clambda loc arg index cases =
             (0, n_index - 1)
             a (Array.of_list inters) store)
   in
-  { switch_expr = case;
-    fdo_counters_into_switch = Branch_annotations.fdo_annotation annots
-  }
+  (* The counters that end up on the edge into the switch are those of the cases
+     that no edge of the result has. *)
+  Fdo_dropped_counters.register ~reason:Cmm_switch_collapsed
+    (Branch_annotations.fdo_annotation annots);
+  case
 
 let split_arity_for_apply arity args =
   (* Decides whether a caml_applyN needs to be split. If N <= max_arity, then
