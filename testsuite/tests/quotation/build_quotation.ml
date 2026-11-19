@@ -391,6 +391,18 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 <[fun (x as deref_ a, _) -> (x, a)]>
 |}];;
 
+<[ fun ((_ as deref_ a), _) -> a ]>;;
+[%%expect {|
+- : <[$('a) * $('b) -> $('a) addr_imm]> expr = <[fun (_ as deref_ a, _) -> a
+]>
+|}];;
+
+<[ fun (((_ : int) as deref_ a), _) -> a ]>;;
+[%%expect {|
+- : <[int * $('a) -> int addr_imm]> expr =
+<[fun ((_ : int) as deref_ a, _) -> a]>
+|}];;
+
 <[ fun f x d -> match f x with | res -> res | exception e -> d ]>;;
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) -> $('b) -> $('b)]> expr =
