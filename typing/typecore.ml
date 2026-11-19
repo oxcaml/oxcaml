@@ -1073,8 +1073,13 @@ type block_path_boxed =
       (* A field of a boxed record *)
   | Bpath_boxed_tuple_element
       (* An element of a boxed tuple *)
-  | Bpath_boxed_offset
-      (* Contents of an index or address *)
+  | Bpath_boxed_offset of Types.mutability
+      (* Contents of an index or address of this mutability *)
+
+let block_path_boxed_mutability = function
+  | Bpath_boxed_field (_, label) -> label.lbl_mut
+  | Bpath_boxed_tuple_element -> Immutable
+  | Bpath_boxed_offset mutability -> mutability
 
 type block_path_unboxed =
   | Bpath_unboxed_field :
@@ -1086,10 +1091,7 @@ type block_path_unboxed =
 (* While type checking patterns, we track some information about the boxed value
    a deref pattern [deref_ x] would refer to in the current pattern. *)
 type deref_position =
-  { position_mutability : Types.mutability;
-    (* mutability of the position *)
-
-    container_mode : With_regionality.l;
+  { container_mode : With_regionality.l;
     (* mode of the boxed value *)
 
     container_loc : Location.t;
@@ -1753,14 +1755,10 @@ let check_atomic_loc ~loc ~env label lid =
   | Error _ -> Error.log_and_raise loc env (Modalities_on_atomic_field lid)
 
 (* Checks that a block path of kind [kind] is valid to create *)
-let check_block_path ~loc ~env kind ~mutability ba uas =
+let check_block_path ~loc ~env kind ba uas =
+  let mutability = block_path_boxed_mutability ba in
   let error (lid : Longident.t loc) err =
     Error.log_and_raise lid.loc env err
-  in
-  (* The expected modality of the overall access. The composition of the
-     modalities along the path must be exactly this modality. *)
-  let expected_modality =
-    Typemode.block_path_expected_modalities mutability
   in
   let check_label_access lid (label : _ gen_label_description) =
     (* Mutable paths to polymorphic fields would allow writing
@@ -1811,7 +1809,7 @@ let check_block_path ~loc ~env kind ~mutability ba uas =
       | Deref_pattern | Block_index -> ()
       end;
       check_label_access lid label
-    | Bpath_boxed_tuple_element | Bpath_boxed_offset -> ()
+    | Bpath_boxed_tuple_element | Bpath_boxed_offset _ -> ()
   in
   let check_unboxed_access = function
     | Bpath_unboxed_field (lid, label) -> check_label_access lid label
@@ -1820,9 +1818,8 @@ let check_block_path ~loc ~env kind ~mutability ba uas =
   let boxed_modality = function
     | Bpath_boxed_field (_, label) -> label.lbl_modalities
     | Bpath_boxed_tuple_element -> Modality.Const.id
-    (* An index or address points to a position whose modalities were checked
-       when it was built. *)
-    | Bpath_boxed_offset -> expected_modality
+    | Bpath_boxed_offset mutability ->
+      Typemode.block_path_expected_modalities mutability
   in
   let unboxed_modality = function
     | Bpath_unboxed_field (_, label) -> label.lbl_modalities
@@ -1836,7 +1833,12 @@ let check_block_path ~loc ~env kind ~mutability ba uas =
          Modality.Const.concat modality ~then_:(unboxed_modality ua))
       (boxed_modality ba) uas
   in
-  match Modality.Const.equate modality expected_modality with
+  (* The composition of the modalities along the path must be exactly the
+     expected modality of the overall access. *)
+  match
+    Modality.Const.equate modality
+      (Typemode.block_path_expected_modalities mutability)
+  with
   | Ok () -> ()
   | Error err ->
     Error.log_and_raise loc env
@@ -3917,8 +3919,7 @@ and type_pat_aux
               (deref_position_push_unboxed_access Bpath_unboxed_tuple_element)
               deref_position
           else
-            Some { position_mutability = Immutable;
-                   container_mode;
+            Some { container_mode;
                    container_loc = loc;
                    base = Bpath_boxed_tuple_element;
                    rev_unboxed = [] }
@@ -3976,8 +3977,7 @@ and type_pat_aux
         | _, Legacy,
           ( Record_inlined _ | Record_boxed | Record_float | Record_ufloat
           | Record_mixed _ | Record_undetermined | Record_variable _ ) ->
-          Some { position_mutability = label.lbl_mut; container_mode;
-                 container_loc = loc;
+          Some { container_mode; container_loc = loc;
                  base = Bpath_boxed_field (lid, label); rev_unboxed = [] }
         | _, Legacy, Record_dummy _ ->
           Misc.fatal_error
@@ -4062,16 +4062,15 @@ and type_pat_aux
         (fun sp1 -> type_pat tps Value ?deref_position sp1 expected_ty sort)
         sp1
     in
-    let { position_mutability; container_mode; container_loc; base;
-          rev_unboxed } =
+    let { container_mode; container_loc; base; rev_unboxed } =
       match deref_position with
       | Some pos -> pos
       | None -> Error.log_and_raise loc !!penv Deref_pattern_bad_position
     in
-    check_block_path ~loc ~env:!!penv Deref_pattern
-      ~mutability:position_mutability base (List.rev rev_unboxed);
+    check_block_path ~loc ~env:!!penv Deref_pattern base
+      (List.rev rev_unboxed);
     let ty_addr, addr_sort =
-      solve_Ppat_deref !!penv position_mutability expected_ty
+      solve_Ppat_deref !!penv (block_path_boxed_mutability base) expected_ty
     in
     let is_contained_by : Mode.Hint.is_contained_by =
       { containing = Derived_address; container = (container_loc, Pattern) }
@@ -4607,9 +4606,8 @@ and type_pat_aux
       let container_mode = pat_mode.mode in
       let pat_mode = simple_pat_mode mode in
       let deref_position =
-        { position_mutability = mutability; container_mode;
-          container_loc = loc; base = Bpath_boxed_offset;
-          rev_unboxed = [] }
+        { container_mode; container_loc = loc;
+          base = Bpath_boxed_offset mutability; rev_unboxed = [] }
       in
       let p1 = type_pat ~pat_mode ~deref_position tps Value sp1 ty_arg arg_sort
       in
@@ -8801,7 +8799,7 @@ and type_expect_
     let path_ba =
       match ba with
       | Baccess_field (lid, label, _) -> Bpath_boxed_field (lid, label)
-      | Baccess_block _ -> Bpath_boxed_offset
+      | Baccess_block _ -> Bpath_boxed_offset mut
     in
     let path_uas =
       List.map
@@ -8809,7 +8807,7 @@ and type_expect_
            Bpath_unboxed_field (lid, label))
         uas
     in
-    check_block_path ~loc ~env Block_index ~mutability:mut path_ba path_uas;
+    check_block_path ~loc ~env Block_index path_ba path_uas;
     let ty = match mut with
       | Immutable -> Predef.type_idx_imm base_ty el_ty
       | Mutable { atomic = Nonatomic; mode = _ } ->
