@@ -1754,9 +1754,7 @@ let emit_instr env i =
           else if ofs = 0
           then A.ins2 STLR (H.reg_x src) (H.mem (H.gp_reg_of_reg base))
           else (
-            if ofs >= 0
-            then emit_addimm reg_x_tmp1 (H.reg_x base) ofs
-            else emit_subimm reg_x_tmp1 (H.reg_x base) (-ofs);
+            emit_addimm reg_x_tmp1 (H.reg_x base) ofs;
             A.ins2 STLR (H.reg_x src) (H.mem reg_tmp1_base))
         | false, _ | _, Ibased _ ->
           A.ins0 (DMB ISHLD);

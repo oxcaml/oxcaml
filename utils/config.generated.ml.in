@@ -78,6 +78,7 @@ let native_compiler = @native_compiler@
 
 let architecture = {@QS@|@arch@|@QS@}
 let model = {@QS@|@model@|@QS@}
+let arm64_default_store_release = "@arm64_default_store_release@" = "yes"
 let system = {@QS@|@system@|@QS@}
 let target_os_type = {@QS@|@target_os_type@|@QS@}
 
