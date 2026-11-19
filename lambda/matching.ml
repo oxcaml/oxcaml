@@ -353,11 +353,11 @@ end = struct
           | `Or _ as or_view -> stop orpat or_view
           | other_view -> continue orpat other_view
         )
-      | `Deref (id, _, uid, _, _, _) ->
+      | `Deref (None, id, _, uid, _, _, _) ->
           aux
             ( ({ p with pat_desc = `Any }, patl),
               bind_address (id, uid) deref_address action )
-      | `Alias_deref (sub_p, id, _, uid, _, _, _) ->
+      | `Deref (Some sub_p, id, _, uid, _, _, _) ->
           aux
             ( (General.view sub_p, patl),
               bind_address (id, uid) deref_address action )
@@ -463,7 +463,7 @@ end = struct
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
       | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-      | `Deref _ | `Alias_deref _ ->
+      | `Deref _ ->
           fatal_error
             "Matching.explode_or_pat: dereference pattern under or-pattern"
       | #view as view ->
@@ -721,9 +721,9 @@ end = struct
           match p.pat_desc with
           | `Or (p1, p2, _) ->
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
-          | `Alias (p, _, _, _, _, _, _) | `Alias_deref (p, _, _, _, _, _, _) ->
+          | `Alias (p, _, _, _, _, _, _) | `Deref (Some p, _, _, _, _, _, _) ->
               filter_rec ((left, p, right) :: rem)
-          | `Var _ | `Deref _ ->
+          | `Var _ | `Deref (None, _, _, _, _, _, _) ->
               filter_rec ((left, Patterns.omega, right) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
@@ -866,9 +866,9 @@ end = struct
       | (p, ps) :: rem -> (
           let p = General.view p in
           match p.pat_desc with
-          | `Alias (p, _, _, _, _, _, _) | `Alias_deref (p, _, _, _, _, _, _) ->
+          | `Alias (p, _, _, _, _, _, _) | `Deref (Some p, _, _, _, _, _, _) ->
               filter_rec ((p, ps) :: rem)
-          | `Var _ | `Deref _ ->
+          | `Var _ | `Deref (None, _, _, _, _, _, _) ->
               filter_rec ((Patterns.omega, ps) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
@@ -1602,10 +1602,10 @@ let is_or p =
 let rec omega_like p =
   match p.pat_desc with
   | Tpat_any
-  | Tpat_var _ ->
+  | Tpat_var _
+  | Tpat_deref { pattern = None; _ } ->
       true
-  | Tpat_deref _ -> true
-  | Tpat_alias { pattern = p; _ } | Tpat_alias_deref { pattern = p; _ } ->
+  | Tpat_alias { pattern = p; _ } | Tpat_deref { pattern = Some p; _ } ->
       omega_like p
   | Tpat_or (p1, p2, _) -> omega_like p1 || omega_like p2
   | _ -> false
@@ -4831,7 +4831,7 @@ let root_arg arg binding_kind sort layout =
    a position inside that element, rather than inside another block *)
 let rec derefs_tuple_element (p : pattern) =
   match p.pat_desc with
-  | Tpat_deref _ | Tpat_alias_deref _ -> true
+  | Tpat_deref _ -> true
   | Tpat_alias { pattern = p; _ } -> derefs_tuple_element p
   | Tpat_or (p1, p2, _) -> derefs_tuple_element p1 || derefs_tuple_element p2
   | Tpat_unboxed_tuple ps ->

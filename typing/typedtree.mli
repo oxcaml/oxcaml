@@ -386,6 +386,7 @@ and 'k pattern_desc =
         (** addr_ P        (flag = Mutable)
             addr_imm_ P    (flag = Immutable) *)
   | Tpat_deref : {
+      pattern: value general_pattern option;
       id: Ident.t;
       name: string loc;
       uid: Uid.t;
@@ -393,17 +394,8 @@ and 'k pattern_desc =
       mode: Mode.With_regionality.l;
       type_expr: Types.type_expr;
     } -> value pattern_desc
-        (** deref_ x *)
-  | Tpat_alias_deref : {
-      pattern: value general_pattern;
-      id: Ident.t;
-      name: string loc;
-      uid: Uid.t;
-      sort: Jkind_types.Sort.t;
-      mode: Mode.With_regionality.l;
-      type_expr: Types.type_expr;
-    } -> value pattern_desc
-        (** P as deref_ x *)
+        (** deref_ x         (pattern = None)
+            P as deref_ x    (pattern = Some P) *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)

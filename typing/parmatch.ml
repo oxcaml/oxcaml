@@ -357,12 +357,12 @@ module Compat
 
   let rec compat p q = match p.pat_desc,q.pat_desc with
 (* Variables and dereference patterns match any value *)
-  | ((Tpat_any|Tpat_var _|Tpat_deref _),_)
-  | (_,(Tpat_any|Tpat_var _|Tpat_deref _)) -> true
+  | ((Tpat_any|Tpat_var _|Tpat_deref { pattern = None; _ }),_)
+  | (_,(Tpat_any|Tpat_var _|Tpat_deref { pattern = None; _ })) -> true
 (* Structural induction *)
-  | (Tpat_alias { pattern = p; _ } | Tpat_alias_deref { pattern = p; _ }),_ ->
+  | (Tpat_alias { pattern = p; _ } | Tpat_deref { pattern = Some p; _ }),_ ->
       compat p q
-  | _,(Tpat_alias { pattern = q; _ } | Tpat_alias_deref { pattern = q; _ }) ->
+  | _,(Tpat_alias { pattern = q; _ } | Tpat_deref { pattern = Some q; _ }) ->
       compat p q
   | Tpat_or (p1,p2,_),_ ->
       (compat p1 q || compat p2 q)
@@ -701,7 +701,7 @@ let set_args q r = match q with
     q::r (* case any is used in matching.ml *)
 | {pat_desc =
      (Tpat_var _ | Tpat_fun_layout _ | Tpat_alias _ | Tpat_deref _
-     | Tpat_alias_deref _ | Tpat_or _); _} ->
+     | Tpat_or _); _} ->
     fatal_error "Parmatch.set_args"
 
 (* Given a matrix of non-empty rows
@@ -1334,7 +1334,7 @@ let build_other ext env =
 let rec has_instance p = match p.pat_desc with
   | Tpat_variant (l,_,r) when is_absent l r -> false
   | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_unboxed_unit
-  | Tpat_fun_layout _ | Tpat_deref _
+  | Tpat_fun_layout _ | Tpat_deref { pattern = None; _ }
   | Tpat_unboxed_bool _ | Tpat_variant (_,None,_) -> true
   | Tpat_alias { pattern = p; _ } | Tpat_variant (_,Some p,_) -> has_instance p
   | Tpat_or (p1,p2,_) -> has_instance p1 || has_instance p2
@@ -1348,7 +1348,7 @@ let rec has_instance p = match p.pat_desc with
   | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_record_unboxed_product (lps,_,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
-  | Tpat_addr (_, _, p) | Tpat_alias_deref { pattern = p; _ } | Tpat_lazy p
+  | Tpat_addr (_, _, p) | Tpat_deref { pattern = Some p; _ } | Tpat_lazy p
     -> has_instance p
 
 and has_instances = function
@@ -1799,7 +1799,7 @@ let is_var_column rs =
 (* Standard or-args for left-to-right matching *)
 let rec or_args p = match p.pat_desc with
 | Tpat_or (p1,p2,_) -> p1,p2
-| Tpat_alias { pattern = p; _ } | Tpat_alias_deref { pattern = p; _ } ->
+| Tpat_alias { pattern = p; _ } | Tpat_deref { pattern = Some p; _ } ->
     or_args p
 | _                 -> assert false
 
@@ -1979,10 +1979,10 @@ and every_both pss qs q1 q2 =
 (* le_pat p q  means, forall V,  V matches q implies V matches p *)
 let rec le_pat p q =
   match (p.pat_desc, q.pat_desc) with
-  | (Tpat_var _|Tpat_any|Tpat_deref _),_ -> true
-  | (Tpat_alias { pattern = p; _ } | Tpat_alias_deref { pattern = p; _ }), _ ->
+  | (Tpat_var _|Tpat_any|Tpat_deref { pattern = None; _ }),_ -> true
+  | (Tpat_alias { pattern = p; _ } | Tpat_deref { pattern = Some p; _ }), _ ->
       le_pat p q
-  | _, (Tpat_alias { pattern = q; _ } | Tpat_alias_deref { pattern = q; _ }) ->
+  | _, (Tpat_alias { pattern = q; _ } | Tpat_deref { pattern = Some q; _ }) ->
       le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
   | Tpat_construct(_,c1,_,ps,_), Tpat_construct(_,c2,_,qs,_) ->
@@ -2039,12 +2039,12 @@ let get_mins le ps =
 *)
 
 let rec lub p q = match p.pat_desc,q.pat_desc with
-| (Tpat_alias { pattern = p; _ } | Tpat_alias_deref { pattern = p; _ }),_ ->
+| (Tpat_alias { pattern = p; _ } | Tpat_deref { pattern = Some p; _ }),_ ->
     lub p q
-| _,(Tpat_alias { pattern = q; _ } | Tpat_alias_deref { pattern = q; _ }) ->
+| _,(Tpat_alias { pattern = q; _ } | Tpat_deref { pattern = Some q; _ }) ->
     lub p q
-| (Tpat_any|Tpat_var _|Tpat_deref _),_ -> q
-| _,(Tpat_any|Tpat_var _|Tpat_deref _) -> p
+| (Tpat_any|Tpat_var _|Tpat_deref { pattern = None; _ }),_ -> q
+| _,(Tpat_any|Tpat_var _|Tpat_deref { pattern = None; _ }) -> p
 | Tpat_or (p1,p2,_),_     -> orlub p1 p2 q
 | _,Tpat_or (q1,q2,_)     -> orlub q1 q2 p (* Thanks god, lub is commutative *)
 | Tpat_constant c1, Tpat_constant c2 when const_compare c1 c2 = 0 -> p
@@ -2264,7 +2264,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
       (if extendable_path path then add_path path r else r)
       ps
 | Tpat_any|Tpat_var _|Tpat_constant _|Tpat_unboxed_unit|Tpat_unboxed_bool _
-| Tpat_fun_layout _ | Tpat_deref _
+| Tpat_fun_layout _ | Tpat_deref { pattern = None; _ }
 | Tpat_variant (_,None,_) -> r
 | Tpat_tuple ps
 | Tpat_unboxed_tuple ps ->
@@ -2282,7 +2282,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
       (fun r (_, _, p) -> collect_paths_from_pat r p)
       r lps
 | Tpat_variant (_, Some p, _) | Tpat_alias { pattern = p; _ }
-| Tpat_alias_deref { pattern = p; _ } ->
+| Tpat_deref { pattern = Some p; _ } ->
     collect_paths_from_pat r p
 | Tpat_or (p1,p2,_) ->
     collect_paths_from_pat (collect_paths_from_pat r p1) p2
@@ -2410,7 +2410,7 @@ let inactive ~partial pat =
         | Tpat_any | Tpat_var _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
         | Tpat_variant (_, None, _) | Tpat_fun_layout _
         (* Binding an address reads nothing *)
-        | Tpat_deref _
+        | Tpat_deref { pattern = None; _ }
         -> true
         | Tpat_constant c -> begin
             match c with
@@ -2432,7 +2432,7 @@ let inactive ~partial pat =
         | Tpat_array (Immutable, _, ps) ->
             List.for_all (fun p -> loop p) ps
         | Tpat_alias { pattern = p; _ } | Tpat_variant (_, Some p, _)
-        | Tpat_addr (Immutable, _, p) | Tpat_alias_deref { pattern = p; _ } ->
+        | Tpat_addr (Immutable, _, p) | Tpat_deref { pattern = Some p; _ } ->
             loop p
         | Tpat_record (ldps,_,_) ->
             List.for_all
@@ -2569,9 +2569,9 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
       simpl head_bound_variables varsets p1 ps
         (simpl head_bound_variables varsets p2 ps k)
     (* Dereference patterns bind the address at the head *)
-    | `Deref (id, _, _, _, _, _) ->
+    | `Deref (None, id, _, _, _, _, _) ->
       simpl (Ident.Set.add id head_bound_variables) varsets Patterns.omega ps k
-    | `Alias_deref (p, id, _, _, _, _, _) ->
+    | `Deref (Some p, id, _, _, _, _, _) ->
       simpl (Ident.Set.add id head_bound_variables) varsets p ps k
     | #Patterns.Simple.view as view ->
       add_column (Patterns.Head.deconstruct { p with pat_desc = view })

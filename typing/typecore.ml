@@ -2362,7 +2362,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
     ty, mode
   in
   match p.pat_desc with
-    Tpat_alias { pattern = p1; _ } | Tpat_alias_deref { pattern = p1; _ } ->
+    Tpat_alias { pattern = p1; _ } | Tpat_deref { pattern = Some p1; _ } ->
      build_as_type_and_mode env p1 ~mode
   | Tpat_tuple pl ->
       let labeled_tyl =
@@ -2438,7 +2438,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
           ty, mode
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
-  | Tpat_any | Tpat_var _ | Tpat_fun_layout _ | Tpat_deref _
+  | Tpat_any | Tpat_var _ | Tpat_fun_layout _
+  | Tpat_deref { pattern = None; _ }
   | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
       p.pat_type, mode
 
@@ -4053,7 +4054,12 @@ and type_pat_aux
      accepted if the ['a addr] is at least read. Similarly, [deref_] on
      a mutable field should be allowed in records at [write], [immutable]
      or [contended]. *)
-  let type_deref ~attrs name =
+  let type_deref ~attrs sp1 name =
+    let q =
+      Option.map
+        (fun sp1 -> type_pat tps Value ?deref_position sp1 expected_ty sort)
+        sp1
+    in
     let { position_mutability; container_mode; container_loc; base;
           rev_unboxed } =
       match deref_position with
@@ -4076,7 +4082,18 @@ and type_pat_aux
       enter_variable ~pv_kind:Deref_var tps name.loc name mode
         ~kind:(Val_reg addr_sort) type_expr attrs addr_sort
     in
-    id, uid, addr_sort, mode, type_expr
+    let pat_type =
+      match q with
+      | None -> instance expected_ty
+      | Some q -> q.pat_type
+    in
+    rvp { pat_desc = Tpat_deref { pattern = q; id; name; uid;
+                                  sort = addr_sort; mode; type_expr };
+          pat_loc = loc; pat_extra=[];
+          pat_type;
+          pat_attributes = sp.ppat_attributes;
+          pat_env = !!penv;
+          pat_unique_barrier = Unique_barrier.not_computed () }
   in
   match sp.ppat_desc with
     Ppat_any ->
@@ -4665,31 +4682,12 @@ and type_pat_aux
       (* CR address-patterns: print a more informative error when the argument
          is a pattern that [as deref_ x] would accept. *)
       begin match sp1.ppat_desc with
-      | Ppat_var name ->
-          let id, uid, sort, mode, type_expr =
-            type_deref ~attrs:sp1.ppat_attributes name
-          in
-          rvp { pat_desc = Tpat_deref { id; name; uid; sort; mode; type_expr };
-                pat_loc = loc; pat_extra=[];
-                pat_type = instance expected_ty;
-                pat_attributes = sp.ppat_attributes;
-                pat_env = !!penv;
-                pat_unique_barrier = Unique_barrier.not_computed () }
+      | Ppat_var name -> type_deref ~attrs:sp1.ppat_attributes None name
       | _ ->
           Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument
       end
   | Ppat_alias_deref (sp1, name) ->
-      let q = type_pat tps Value ?deref_position sp1 expected_ty sort in
-      let id, uid, sort, mode, type_expr =
-        type_deref ~attrs:sp.ppat_attributes name
-      in
-      rvp { pat_desc = Tpat_alias_deref { pattern = q; id; name; uid;
-                                          sort; mode; type_expr };
-            pat_loc = loc; pat_extra=[];
-            pat_type = q.pat_type;
-            pat_attributes = sp.ppat_attributes;
-            pat_env = !!penv;
-            pat_unique_barrier = Unique_barrier.not_computed () }
+      type_deref ~attrs:sp.ppat_attributes (Some sp1) name
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -5105,7 +5103,8 @@ let rec check_counter_example_pat
           in
           check_rec ~info:(decrease 5) tp expected_ty k
       end
-  | Tpat_alias { pattern = p; _ } -> check_rec ~info p expected_ty k
+  | Tpat_alias { pattern = p; _ } | Tpat_deref { pattern = Some p; _ } ->
+      check_rec ~info p expected_ty k
   | Tpat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       k @@
@@ -5223,8 +5222,7 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_alias_deref { pattern = p; _ } -> check_rec ~info p expected_ty k
-  | Tpat_deref _ ->
+  | Tpat_deref { pattern = None; _ } ->
       (* CR address-patterns: deref patterns aren't always refuted. E.g. this
          case is rejected:
          {[

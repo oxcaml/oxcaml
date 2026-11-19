@@ -1555,7 +1555,6 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_array _ -> true
     | Tpat_addr _ -> true
     | Tpat_deref _ -> true
-    | Tpat_alias_deref _ -> true
     | Tpat_lazy _ -> true
     | Tpat_value pat -> is_destructuring_pattern (pat :> pattern)
     | Tpat_exception _ -> false
