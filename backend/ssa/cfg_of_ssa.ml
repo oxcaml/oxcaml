@@ -235,30 +235,31 @@ type visit =
 
 (* Whether the args can stay live from the end of [def_block] to the terminator
    of [branch_block], which [def_block] strictly dominates. The blocks in
-   between are those reached backwards from [branch_block] before [def_block].
-   Calls are GC points, and so are cycles, which may get a poll from
-   [Cfg_polling]. *)
+   between are those reached backwards from [branch_block] before
+   [def_block]. *)
 let path_keeps_args_live hazards ~def_block ~branch_block =
   let visits = Block.Tbl.create 16 in
+  (* Calls are GC points *)
+  let check_call block = not (hazards.gc && has_call_terminator block) in
   let rec keeps_args_live block =
     Block.equal block def_block
     ||
     match Block.Tbl.find_opt visits block with
-    | Some Visiting -> not hazards.gc
+    | Some Visiting ->
+      (* Cycles may get a poll from [Cfg_polling] so count as GC points *)
+      not hazards.gc
     | Some Visited -> true
     | None ->
       Block.Tbl.replace visits block Visiting;
       let result =
         (not (Array.exists (is_hazard hazards) (Block.body block)))
-        && (Block.equal block branch_block
-           || not (hazards.gc && has_call_terminator block))
+        && (Block.equal block branch_block || check_call block)
         && List.for_all keeps_args_live (Block.predecessors block)
       in
       Block.Tbl.replace visits block Visited;
       result
   in
-  (not (hazards.gc && has_call_terminator def_block))
-  && keeps_args_live branch_block
+  check_call def_block && keeps_args_live branch_block
 
 let can_keep_args_live args ~def_block ~(cond_op : finished Instruction.op_data)
     ~branch_block =
