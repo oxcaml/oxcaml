@@ -87,6 +87,8 @@ val ids_for_export_map :
   'map ->
   t
 
+val ids_for_export_symbol_set : Symbol.Set.t -> t
+
 val ids_for_export_name_set : Name.Set.t -> t
 
 val ids_for_export_code_id_set : Code_id.Set.t -> t

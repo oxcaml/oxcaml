@@ -17,9 +17,19 @@ module PTA = Points_to_analysis
 module UA = Unboxing_analysis
 module Schemas = Datalog_helpers.Schemas
 
+(* The identifiers that the tables of a solution have data about. *)
+type coverage =
+  | All_identifiers
+  | Identifiers_of_unit of
+      { compilation_unit : Compilation_unit.t;
+        foreign_symbols : Symbol.Set.t
+      }
+
 module Solution = struct
   type 'f t =
     { analysis_scope : Analysis_scope.t;
+      coverage : coverage;
+      exported_symbols : Symbol.Set.t;
       has_usage : Schemas.N.t;
       has_source : Schemas.N.t;
       field_of_constructor_is_used : Schemas.NF.t;
@@ -38,6 +48,8 @@ module Solution = struct
 
   let ids_for_export
       { analysis_scope = _;
+        coverage;
+        exported_symbols;
         has_usage;
         has_source;
         field_of_constructor_is_used;
@@ -53,7 +65,12 @@ module Solution = struct
       } =
     (* Slots are not hashconsed, so the offsets need no renaming. *)
     Ids_for_export.union_list
-      [ Schemas.N.ids_for_export has_usage;
+      [ (match coverage with
+         | All_identifiers -> Ids_for_export.empty
+         | Identifiers_of_unit { compilation_unit = _; foreign_symbols } ->
+           Ids_for_export.ids_for_export_symbol_set foreign_symbols);
+        Ids_for_export.ids_for_export_symbol_set exported_symbols;
+        Schemas.N.ids_for_export has_usage;
         Schemas.N.ids_for_export has_source;
         Schemas.NF.ids_for_export field_of_constructor_is_used;
         Ids_for_export.ids_for_export_code_id_or_name_map Ids_for_export.no_ids
@@ -79,6 +96,8 @@ module Solution = struct
 
   let apply_renaming
       { analysis_scope;
+        coverage;
+        exported_symbols;
         has_usage;
         has_source;
         field_of_constructor_is_used;
@@ -92,7 +111,18 @@ module Solution = struct
         types_rewrite_context = Without_types;
         final_typing_env = Without_types
       } renaming =
+    let coverage =
+      match coverage with
+      | All_identifiers -> All_identifiers
+      | Identifiers_of_unit { compilation_unit; foreign_symbols } ->
+        Identifiers_of_unit
+          { compilation_unit;
+            foreign_symbols = Renaming.apply_symbol_set renaming foreign_symbols
+          }
+    in
     { analysis_scope;
+      coverage;
+      exported_symbols = Renaming.apply_symbol_set renaming exported_symbols;
       has_usage = Schemas.N.apply_renaming has_usage renaming;
       has_source = Schemas.N.apply_renaming has_source renaming;
       field_of_constructor_is_used =
@@ -198,24 +228,12 @@ let rewrite_kind_with_subkind (type f)
     Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
   | Without_types -> fun _ -> Types_rewriter.erase_subkind
 
-let solve (type f) (problem : f Traverse.Problem.t)
-    ~(analysis_scope : Analysis_scope.t) : f Solution.t =
-  let { Traverse.Problem.deps;
-        delayed_deps;
-        code_deps;
-        applications;
-        all_sets_of_closures;
-        final_typing_env;
-        module_symbol;
-        free_names;
-        toplevel_return
-      } =
-    problem
-  in
-  (match analysis_scope with
-  | Current_unit -> Global_flow_graph.add_any_usage deps toplevel_return
-  | Lto_participants _ -> ());
-  Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps delayed_deps;
+(* [deps] must have its delayed dependencies resolved. The database is returned
+   to answer further queries. *)
+let solve0 (type f) deps ~analysis_scope ~code_deps ~applications ~free_names
+    ~(all_sets_of_closures : (f, _) Traverse.With_types.t)
+    ~(final_typing_env : (f, typing_env) Traverse.With_types.t)
+    ~(module_symbol : (f, Symbol.t) Traverse.With_types.t) : f Solution.t =
   let unboxing = fixpoint deps ~analysis_scope in
   let db = unboxing.db in
   let ~directly_called, ~known_masks, ~unknown_masks =
@@ -253,6 +271,8 @@ let solve (type f) (problem : f Traverse.Problem.t)
            final_typing_env)
   in
   { analysis_scope;
+    coverage = All_identifiers;
+    exported_symbols = Symbol.Set.empty;
     has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
     has_source = Datalog.get_table PTA.Relations.has_source_tbl db;
     field_of_constructor_is_used =
@@ -268,19 +288,294 @@ let solve (type f) (problem : f Traverse.Problem.t)
     final_typing_env
   }
 
+let solve_single (problem : _ Traverse.Problem.t) =
+  let { Traverse.Problem.deps;
+        delayed_deps;
+        code_deps;
+        applications;
+        all_sets_of_closures;
+        final_typing_env;
+        module_symbol;
+        free_names;
+        toplevel_return
+      } =
+    problem
+  in
+  Global_flow_graph.add_any_usage deps toplevel_return;
+  Traverse_acc.resolve_delayed_deps deps ~analysis_scope:Current_unit ~code_deps
+    delayed_deps;
+  solve0 deps ~analysis_scope:Current_unit ~code_deps ~applications ~free_names
+    ~all_sets_of_closures ~final_typing_env ~module_symbol
+
+(* The offsets in [solved] of the given slots. The slots without offsets are
+   skipped. *)
+let offsets_of_slots solved ~function_slots ~value_slots =
+  let offsets =
+    Function_slot.Set.fold
+      (fun function_slot offsets ->
+        match Exported_offsets.function_slot_offset solved function_slot with
+        | Some info ->
+          Exported_offsets.add_function_slot_offset offsets function_slot info
+        | None -> offsets)
+      function_slots Exported_offsets.empty
+  in
+  Value_slot.Set.fold
+    (fun value_slot offsets ->
+      match Exported_offsets.value_slot_offset solved value_slot with
+      | Some info ->
+        Exported_offsets.add_value_slot_offset offsets value_slot info
+      | None -> offsets)
+    value_slots offsets
+
+(* A whole-program solution is restricted to what the rebuild of each unit
+   needs. The rebuild only queries the tables about the identifiers of its unit
+   and about the symbols of other units occurring in its code, which the
+   traversal records as imported symbols.
+
+   [restrictor map] returns a function restricting [map] to the identifiers of a
+   compilation unit and to the given symbols of other units. The table is split
+   by compilation unit once, so that restricting it for every unit takes linear
+   time. *)
+let restrictor map =
+  let parts =
+    Code_id_or_name.Map.fold
+      (fun id value parts ->
+        Compilation_unit.Map.update
+          (Code_id_or_name.compilation_unit id)
+          (fun part ->
+            Some
+              (Code_id_or_name.Map.add id value
+                 (Option.value part ~default:Code_id_or_name.Map.empty)))
+          parts)
+      map Compilation_unit.Map.empty
+  in
+  fun ~compilation_unit ~foreign_symbols ->
+    Symbol.Set.fold
+      (fun symbol restricted ->
+        let id = Code_id_or_name.symbol symbol in
+        match Code_id_or_name.Map.find_opt id map with
+        | None -> restricted
+        | Some value -> Code_id_or_name.Map.add id value restricted)
+      foreign_symbols
+      (Option.value
+         (Compilation_unit.Map.find_opt compilation_unit parts)
+         ~default:Code_id_or_name.Map.empty)
+
+(* The code ids whose code changes the rebuild of a unit reads: those of its
+   code, those it calls directly or puts in sets of closures, and those that its
+   calls may be turned into direct calls to. *)
+let code_ids_used_by_rebuild (problem : _ Traverse.Problem.t) ~directly_called =
+  Code_id_or_name.Map.fold
+    (fun _callee (targets : _ Or_unknown.t) code_ids ->
+      match targets with
+      | Unknown -> code_ids
+      | Known targets -> Code_id.Set.union targets code_ids)
+    directly_called
+    (Code_id.Set.union
+       (Code_id.Map.keys problem.code_deps)
+       (Traverse_acc.code_ids_of_delayed_deps problem.delayed_deps))
+
+(* The slots that a rebuilt unit may contain: those of its code before the
+   rebuild, and those introduced by the changes of representation it reads. *)
+let slots_used_by_rebuild (problem : _ Traverse.Problem.t)
+    ~changed_representation =
+  Code_id_or_name.Map.fold
+    (fun _ ((repr : UA.Changed_representation.t), _)
+         (function_slots, value_slots) ->
+      match repr with
+      | Block_representation _ -> function_slots, value_slots
+      | Closure_representation (fields, function_slot_rewrites, _) ->
+        ( Function_slot.Map.fold
+            (fun _ function_slot function_slots ->
+              Function_slot.Set.add function_slot function_slots)
+            function_slot_rewrites function_slots,
+          UA.Unboxed_fields.fold_with_kind
+            (fun _kind value_slot value_slots ->
+              Value_slot.Set.add value_slot value_slots)
+            fields value_slots ))
+    changed_representation
+    ( Name_occurrences.all_function_slots_at_normal_mode problem.free_names,
+      Name_occurrences.all_value_slots_at_normal_mode problem.free_names )
+
+let restrict_to_units (solution : [`Without_types] Solution.t) problems
+    ~exported_symbols =
+  let restrict_has_usage = restrictor solution.has_usage in
+  let restrict_has_source = restrictor solution.has_source in
+  let restrict_field_of_constructor_is_used =
+    restrictor solution.field_of_constructor_is_used
+  in
+  let restrict_directly_called = restrictor solution.directly_called in
+  let restrict_known_masks = restrictor solution.known_masks in
+  let restrict_unknown_masks = restrictor solution.unknown_masks in
+  let restrict_unboxed_fields = restrictor solution.unboxed_fields in
+  let restrict_changed_representation =
+    restrictor solution.changed_representation
+  in
+  let { Slot_offsets.used_value_slots; exported_offsets } =
+    solution.slot_offsets
+  in
+  List.map
+    (fun (compilation_unit, (problem : _ Traverse.Problem.t)) ->
+      let foreign_symbols =
+        Traverse_acc.imported_symbols problem.delayed_deps
+      in
+      let directly_called =
+        restrict_directly_called ~compilation_unit ~foreign_symbols
+      in
+      let changed_representation =
+        restrict_changed_representation ~compilation_unit ~foreign_symbols
+      in
+      let function_slots, value_slots =
+        slots_used_by_rebuild problem ~changed_representation
+      in
+      let restricted : [`Without_types] Solution.t =
+        { analysis_scope = solution.analysis_scope;
+          coverage = Identifiers_of_unit { compilation_unit; foreign_symbols };
+          exported_symbols =
+            Option.value
+              (Compilation_unit.Map.find_opt compilation_unit exported_symbols)
+              ~default:Symbol.Set.empty;
+          has_usage = restrict_has_usage ~compilation_unit ~foreign_symbols;
+          has_source = restrict_has_source ~compilation_unit ~foreign_symbols;
+          field_of_constructor_is_used =
+            restrict_field_of_constructor_is_used ~compilation_unit
+              ~foreign_symbols;
+          directly_called;
+          known_masks = restrict_known_masks ~compilation_unit ~foreign_symbols;
+          unknown_masks =
+            restrict_unknown_masks ~compilation_unit ~foreign_symbols;
+          unboxed_fields =
+            restrict_unboxed_fields ~compilation_unit ~foreign_symbols;
+          changed_representation;
+          code_changes =
+            UA.restrict_code_changes solution.code_changes
+              (code_ids_used_by_rebuild problem ~directly_called);
+          slot_offsets =
+            { Slot_offsets.used_value_slots =
+                Value_slot.Set.inter used_value_slots value_slots;
+              exported_offsets =
+                offsets_of_slots exported_offsets ~function_slots ~value_slots
+            };
+          types_rewrite_context = Without_types;
+          final_typing_env = Without_types
+        }
+      in
+      compilation_unit, restricted)
+    problems
+
+let solve_whole_program
+    (problems : (Compilation_unit.t * [`Without_types] Traverse.Problem.t) list)
+    =
+  let deps =
+    match problems with
+    | [] -> Global_flow_graph.create ()
+    | (_, first) :: rest ->
+      List.fold_left
+        (fun deps (_, (problem : _ Traverse.Problem.t)) ->
+          Global_flow_graph.union deps problem.deps)
+        first.deps rest
+  in
+  let code_deps =
+    List.fold_left
+      (fun code_deps (_, (problem : _ Traverse.Problem.t)) ->
+        Code_id.Map.disjoint_union code_deps problem.code_deps)
+      Code_id.Map.empty problems
+  in
+  let applications =
+    List.fold_left
+      (fun applications (_, (problem : _ Traverse.Problem.t)) ->
+        Traverse_acc.Applications.union applications problem.applications)
+      Traverse_acc.Applications.empty problems
+  in
+  let free_names =
+    List.fold_left
+      (fun free_names (_, (problem : _ Traverse.Problem.t)) ->
+        Name_occurrences.union free_names problem.free_names)
+      Name_occurrences.empty problems
+  in
+  let analysis_scope =
+    Analysis_scope.Lto_participants
+      (List.fold_left
+         (fun scope (compilation_unit, _) ->
+           Compilation_unit.Set.add compilation_unit scope)
+         Compilation_unit.Set.empty problems)
+  in
+  (* The symbols of each participant that other participants refer to, which
+     must remain global when it is rebuilt. *)
+  let exported_symbols =
+    List.fold_left
+      (fun exported_symbols (_, (problem : _ Traverse.Problem.t)) ->
+        Symbol.Set.fold
+          (fun symbol exported_symbols ->
+            let compilation_unit = Symbol.compilation_unit symbol in
+            if Analysis_scope.contains_unit analysis_scope compilation_unit
+            then
+              Compilation_unit.Map.update compilation_unit
+                (fun symbols ->
+                  Some
+                    (Symbol.Set.add symbol
+                       (Option.value symbols ~default:Symbol.Set.empty)))
+                exported_symbols
+            else exported_symbols)
+          (Traverse_acc.imported_symbols problem.delayed_deps)
+          exported_symbols)
+      Compilation_unit.Map.empty problems
+  in
+  List.iter
+    (fun (_, (problem : _ Traverse.Problem.t)) ->
+      Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps
+        problem.delayed_deps)
+    problems;
+  let solution =
+    solve0 deps ~analysis_scope ~code_deps ~applications ~free_names
+      ~all_sets_of_closures:Without_types ~final_typing_env:Without_types
+      ~module_symbol:Without_types
+  in
+  restrict_to_units solution problems ~exported_symbols
+
+(* Look up [id] in a table of [solution]. In a solution restricted to a unit,
+   the absence of an identifier outside the restriction is not an answer, so
+   looking it up is a fatal error. *)
+let find_in_table (solution : _ Solution.t) table ~table_name id =
+  match Code_id_or_name.Map.find_opt id table with
+  | Some _ as data -> data
+  | None -> (
+    match solution.coverage with
+    | All_identifiers -> None
+    | Identifiers_of_unit { compilation_unit; foreign_symbols } ->
+      let covered =
+        Compilation_unit.equal
+          (Code_id_or_name.compilation_unit id)
+          compilation_unit
+        || Code_id_or_name.pattern_match id
+             ~symbol:(fun symbol -> Symbol.Set.mem symbol foreign_symbols)
+             ~var:(fun _ -> false)
+             ~code_id:(fun _ -> false)
+      in
+      if not covered
+      then
+        Misc.fatal_errorf
+          "Analysis: the solution for unit %a has no %s data about %a"
+          (Format_doc.compat Compilation_unit.print)
+          compilation_unit table_name Code_id_or_name.print id;
+      None)
+
 let get_unboxed_fields (solution : _ Solution.t) cn =
-  Code_id_or_name.Map.find_opt cn solution.unboxed_fields
+  find_in_table solution solution.unboxed_fields ~table_name:"unboxing" cn
 
 let get_changed_representation (solution : _ Solution.t) cn =
   Option.map fst
-    (Code_id_or_name.Map.find_opt cn solution.changed_representation)
+    (find_in_table solution solution.changed_representation
+       ~table_name:"representation" cn)
 
 let has_use (solution : _ Solution.t) v =
-  Code_id_or_name.Map.mem v solution.has_usage
+  Option.is_some
+    (find_in_table solution solution.has_usage ~table_name:"usage" v)
 
 let field_used (solution : _ Solution.t) v f =
   match
-    Code_id_or_name.Map.find_opt v solution.field_of_constructor_is_used
+    find_in_table solution solution.field_of_constructor_is_used
+      ~table_name:"field usage" v
   with
   | None -> false
   | Some fields -> Field.Map.mem f fields
@@ -325,7 +620,8 @@ let arguments_used_by_unknown_arity_call (solution : _ Solution.t) callee args =
   apply_groups masks args
 
 let has_source (solution : _ Solution.t) v =
-  Code_id_or_name.Map.mem v solution.has_source
+  Option.is_some
+    (find_in_table solution solution.has_source ~table_name:"source" v)
 
 let get_calling_convention_change (solution : _ Solution.t) code_id =
   Unboxing_analysis.get_calling_convention_change solution.code_changes
@@ -345,3 +641,5 @@ let rewrite_kind_with_subkind (solution : _ Solution.t) =
   rewrite_kind_with_subkind solution.types_rewrite_context
 
 let final_typing_env (solution : _ Solution.t) = solution.final_typing_env
+
+let exported_symbols (solution : _ Solution.t) = solution.exported_symbols

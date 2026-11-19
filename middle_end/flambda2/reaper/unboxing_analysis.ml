@@ -1272,3 +1272,11 @@ let find_code_metadata t ~analysis_scope code_id =
         Code_id.print code_id
     else None
   | Some code_change -> Some code_change.code_metadata
+
+let restrict_code_changes t code_ids =
+  Code_id.Set.fold
+    (fun code_id restricted ->
+      match Code_id.Map.find_opt code_id t with
+      | None -> restricted
+      | Some code_change -> Code_id.Map.add code_id code_change restricted)
+    code_ids Code_id.Map.empty

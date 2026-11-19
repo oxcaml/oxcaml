@@ -521,8 +521,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
   let default acc =
     Name_occurrences.fold_names
       ~f:(fun () free_name ->
-        default_bp (fun to_ ->
-            Acc.add_use_dep acc ~to_ ~from:(Code_id_or_name.name free_name)))
+        let from = Acc.simple_to_node acc ~denv (Simple.name free_name) in
+        default_bp (fun to_ -> Acc.add_use_dep acc ~to_ ~from))
       ~init:()
       (Named.free_names defining_expr)
   in
