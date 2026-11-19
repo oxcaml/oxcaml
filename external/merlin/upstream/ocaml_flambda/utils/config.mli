@@ -434,6 +434,9 @@ val has_avx512vl : bool
 val has_avx512bf16 : bool
 (* Whether the compiler was configured on a machine with AVX512_BF16 *)
 
+val has_vpclmulqdq : bool
+(* Whether the compiler was configured on a machine with VPCLMULQDQ *)
+
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)
 
