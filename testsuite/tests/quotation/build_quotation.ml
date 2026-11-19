@@ -393,8 +393,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 
 <[ fun ((_ as deref_ a), _) -> a ]>;;
 [%%expect {|
-- : <[$('a) * $('b) -> $('a) addr_imm]> expr = <[fun (_ as deref_ a, _) -> a
-]>
+- : <[$('a) * $('b) -> $('a) addr_imm]> expr = <[fun (deref_ (a), _) -> a]>
 |}];;
 
 <[ fun (((_ : int) as deref_ a), _) -> a ]>;;

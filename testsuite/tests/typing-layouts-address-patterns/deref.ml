@@ -964,11 +964,7 @@ let refute_deref_gadt (x : string refute_gadt * unit) =
   match x with (deref_ _y, ()) -> .
 [%%expect{|
 type _ refute_gadt = Refute_int : int refute_gadt
-Line 3, characters 15-30:
-3 |   match x with (deref_ _y, ()) -> .
-                   ^^^^^^^^^^^^^^^
-Error: This match case could not be refuted.
-       Here is an example of a value that would reach it: "(deref_ _y, ())"
+val refute_deref_gadt : string refute_gadt * unit -> 'a = <fun>
 |}]
 
 let unreachable_deref_gadt (x : string refute_gadt * bool) =
@@ -976,6 +972,12 @@ let unreachable_deref_gadt (x : string refute_gadt * bool) =
   | (_, true) -> 0
   | (deref_ _y, false) -> 1
 [%%expect{|
+Line 4, characters 4-22:
+4 |   | (deref_ _y, false) -> 1
+        ^^^^^^^^^^^^^^^^^^
+Warning 56 [unreachable-case]: this match case is unreachable.
+  Consider replacing it with a refutation case "<pat> -> ."
+
 val unreachable_deref_gadt : string refute_gadt * bool -> int = <fun>
 |}]
 
@@ -986,8 +988,7 @@ Line 2, characters 11-32:
 2 |   function addr_imm_ (deref_ _a) -> .
                ^^^^^^^^^^^^^^^^^^^^^
 Error: This match case could not be refuted.
-       Here is an example of a value that would reach it:
-       "addr_imm_ (deref_ _a)"
+       Here is an example of a value that would reach it: "addr_imm_ _"
 |}]
 
 type refute_r = { refute_b : bool }
@@ -999,8 +1000,7 @@ Line 3, characters 11-35:
 3 |   function { refute_b = deref_ _a } -> .
                ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This match case could not be refuted.
-       Here is an example of a value that would reach it:
-       "{refute_b=deref_ _a}"
+       Here is an example of a value that would reach it: "{ _ }"
 |}]
 
 let exh_tuple x = match x with (deref_ _a, 0) -> 1 | (0, 1) -> 2

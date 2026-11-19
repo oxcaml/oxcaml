@@ -433,9 +433,13 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
     | Tpat_addr (mut, _, p) -> Ppat_addr (mutable_ mut, sub.pat sub p)
-    | Tpat_deref { name; _ } ->
+    (* [deref_ x] is typed as [_ as deref_ x] *)
+    | Tpat_deref
+        { pattern =
+            { pat_desc = Tpat_any; pat_extra = []; pat_attributes = []; _ };
+          name; _ } ->
         Ppat_deref (Pat.var ~loc:name.loc name)
-    | Tpat_alias_deref { pattern = p; name; _ } ->
+    | Tpat_deref { pattern = p; name; _ } ->
         Ppat_alias_deref (sub.pat sub p, name)
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
 

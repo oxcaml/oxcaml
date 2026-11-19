@@ -134,9 +134,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[<2>addr_@ %a@]" pretty_arg v
   | Tpat_addr (Immutable, _, v) ->
       fprintf ppf "@[<2>addr_imm_@ %a@]" pretty_arg v
-  | Tpat_deref { id = x; _ } ->
-      fprintf ppf "@[<2>deref_@ %s@]" (Ident.name x)
-  | Tpat_alias_deref { pattern = v; id = x; _ } ->
+  | Tpat_deref { pattern = v; id = x; _ } ->
       fprintf ppf "@[(%a@ as deref_ %s)@]" pretty_val v (Ident.name x)
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
@@ -166,8 +164,7 @@ and pretty_arg ppf v = match v.pat_desc with
 | Tpat_construct (_,_,_,_::_,None)
 | Tpat_variant (_, Some _, _)
 | Tpat_lazy _
-| Tpat_addr _
-| Tpat_deref _ -> fprintf ppf "(%a)" pretty_val v
+| Tpat_addr _ -> fprintf ppf "(%a)" pretty_val v
 |  _ -> pretty_val ppf v
 
 and pretty_or : type k . _ -> k general_pattern -> _ = fun ppf v ->
