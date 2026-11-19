@@ -33,5 +33,8 @@ abbrev implementation : Expr :=
 example : Oxiclean.Extracted.Even.interface = interface := by rfl
 example : Oxiclean.Extracted.Even.implementation = implementation := by rfl
 
-abbrev expectedStatics : Type := PUnit × PER Value
-example : Oxiclean.Extracted.Even.interface.statics = expectedStatics := by simp
+abbrev expectedStatics : Type :=
+  Statics.ModuleItem
+    (Statics.TypeDeclaration Statics.AbstractType)
+    Statics.ModuleEnd
+example : Oxiclean.Extracted.Even.interface.statics = expectedStatics := by rfl
