@@ -269,7 +269,6 @@ type error =
   | Effect_pattern_below_toplevel
   | Deref_pattern_bad_position
   | Deref_pattern_bad_argument
-  | Slice_pattern_rest
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -4642,10 +4641,6 @@ and type_pat_aux
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_slice (mut, selements) ->
-      begin match selements with
-      | Pslice_open _ -> Error.log_and_raise loc !!penv Slice_pattern_rest
-      | Pslice_closed _ -> ()
-      end;
       let ty_arg, arg_sort = solve_Ppat_slice loc penv mut expected_ty in
       let mutability =
         match mut with
@@ -14575,9 +14570,6 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[Dereference patterns must bind a variable,@ as in %a.@]"
         Style.inline_code "deref_ x"
-  | Slice_pattern_rest ->
-      Location.errorf ~loc
-        "@[Rests in slice patterns are not supported yet.@]"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"
