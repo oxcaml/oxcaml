@@ -43,7 +43,9 @@ module Annotation = struct
       contents : string
     }
 
-  let to_string { kind; contents } = Kind.to_string kind ^ ": " ^ contents
+  let to_string { kind; contents } =
+    let contents = if String.equal contents "" then "<none>" else contents in
+    Kind.to_string kind ^ ": " ^ contents
 end
 
 (* The index just after the string literal starting at [i]. *)

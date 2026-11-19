@@ -5,10 +5,12 @@
  (wrapped true)
  (instrumentation
   (backend bisect_ppx))
+ (flags
+  (:standard -open Flambda2_numbers))
  (ocamlopt_flags
   (:standard
    (:include %{project_root}/ocamlopt_flags.sexp)
    -O3
    -open
    Int_replace_polymorphic_compare))
- (libraries ocamlfrontend))
+ (libraries ocamlfrontend flambda2_numbers))
