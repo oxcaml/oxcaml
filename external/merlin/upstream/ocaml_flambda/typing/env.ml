@@ -5506,6 +5506,9 @@ let report_lookup_error_doc loc env = function
                 "To project an unboxed record field, use %a instead of %a."
                 (Style.as_inline_code print_projection) (".#", lid)
                 (Style.as_inline_code print_projection) (".", lid) ]
+          | Legacy, Mutation ->
+            [ Location.msg
+                "Only mutable fields of boxed records can be mutated." ]
           | _ -> [])
        | None -> []
      in

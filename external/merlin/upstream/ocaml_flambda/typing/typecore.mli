@@ -397,6 +397,8 @@ type error =
       wrong_kind_context * Data_types.record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of
       Data_types.record_form_packed * type_expr
+  | Unboxed_label_assignment of
+      { lid : Longident.t; mutability : mutability }
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_path_bad_type of block_path_kind * block_path_bad_type_reason
