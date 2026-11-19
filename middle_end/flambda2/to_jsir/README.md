@@ -8,20 +8,20 @@ the compiler by [jsoo_imports/dune](jsoo_imports/dune)). This translation enable
 The pass is the code generator of `ocamlopt -target js_of_ocaml` and `ocamlopt -target wasm_of_ocaml` (see [`Jscomp`](../../../optcomp/jscomp.mli)), which work like regular `ocamlopt`:
 
 ```
-ocamlopt -target js_of_ocaml -c foo.ml                           # foo.cmi foo.cmjx foo.cmjo
-ocamlopt -target js_of_ocaml -a -o lib.cmjxa foo.cmjx stubs.js   # lib.cmjxa lib.cmja
-ocamlopt -target js_of_ocaml -o prog.js lib.cmjxa main.cmjx      # or a.out.js without -o
+ocamlopt -target js_of_ocaml -c foo.ml                               # foo.cmi foo.cmx-js foo.cmo-js
+ocamlopt -target js_of_ocaml -a -o lib.cmxa-js foo.cmx-js stubs.js   # lib.cmxa-js lib.cma-js
+ocamlopt -target js_of_ocaml -o prog.js lib.cmxa-js main.cmx-js      # or a.out.js without -o
 
-ocamlopt -target wasm_of_ocaml -c foo.ml                          # foo.cmi foo.cmwx foo.cmwo
-ocamlopt -target wasm_of_ocaml -a -o lib.cmwxa foo.cmwx stubs.wat  # lib.cmwxa lib.cmwa
-ocamlopt -target wasm_of_ocaml -o prog.js lib.cmwxa main.cmwx     # prog.js prog.assets/
+ocamlopt -target wasm_of_ocaml -c foo.ml                                    # foo.cmi foo.cmx-wasm foo.cmo-wasm
+ocamlopt -target wasm_of_ocaml -a -o lib.cmxa-wasm foo.cmx-wasm stubs.wat   # lib.cmxa-wasm lib.cma-wasm
+ocamlopt -target wasm_of_ocaml -o prog.js lib.cmxa-wasm main.cmx-wasm       # prog.js prog.assets/
 ```
 
 | Native | js_of_ocaml | wasm_of_ocaml | Contents |
 |--------|-------------|---------------|----------|
-| `.cmx` / `.cmxa` | `.cmjx` / `.cmjxa` | `.cmwx` / `.cmwxa` | Flambda 2 export information |
-| `.o` / `.a` | `.cmjo` / `.cmja` | `.cmwo` / `.cmwa` | JavaScript or WebAssembly, produced by `compile` / `link -a` |
-| `.s` | `.cmj` | `.cmw` | The JSIR of a unit, marshaled (the same format, recording the target); deleted unless `-S` is given |
+| `.cmx` / `.cmxa` | `.cmx-js` / `.cmxa-js` | `.cmx-wasm` / `.cmxa-wasm` | Flambda 2 export information |
+| `.o` / `.a` | `.cmo-js` / `.cma-js` | `.cmo-wasm` / `.cma-wasm` | JavaScript or WebAssembly, produced by `compile` / `link -a` |
+| `.s` | `.cm-jsir-js` | `.cm-jsir-wasm` | The JSIR of a unit, marshaled (the same format, recording the target); deleted unless `-S` is given |
 | startup file | `<exe>.runtime.js` | `<exe>.runtime.wasma` | The output of `build-runtime`; deleted unless `-dstartup` is given |
 | C stubs | `.js` stubs | `.js`, `.wat`, `.wast` and `.wasm` stubs | Recorded in library files and passed to `build-runtime` when linking |
 | executable | `prog.js` | `prog.js` and `prog.assets/` | The output of `link`; the directory holds the WebAssembly code that `prog.js` loads |

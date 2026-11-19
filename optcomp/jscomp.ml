@@ -147,19 +147,19 @@ type extensions =
 
 let extensions : Clflags.Jsir_target.t -> extensions = function
   | Js ->
-    { obj = ".cmjo";
-      lib = ".cmja";
-      flambda_obj = ".cmjx";
-      flambda_lib = ".cmjxa";
-      ir = ".cmj";
+    { obj = ".cmo-js";
+      lib = ".cma-js";
+      flambda_obj = ".cmx-js";
+      flambda_lib = ".cmxa-js";
+      ir = ".cm-jsir-js";
       runtime = ".runtime.js"
     }
   | Wasm ->
-    { obj = ".cmwo";
-      lib = ".cmwa";
-      flambda_obj = ".cmwx";
-      flambda_lib = ".cmwxa";
-      ir = ".cmw";
+    { obj = ".cmo-wasm";
+      lib = ".cma-wasm";
+      flambda_obj = ".cmx-wasm";
+      flambda_lib = ".cmxa-wasm";
+      ir = ".cm-jsir-wasm";
       runtime = ".runtime.wasma"
     }
 

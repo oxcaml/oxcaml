@@ -79,7 +79,7 @@ type jsir_unit =
 
 val from_jsir_channel :
   target:Code.jsir_target -> filename:string -> in_channel -> jsir_unit
-(** Read a JSIR file ([.cmj] or [.cmw]), including its magic number and version.
+(** Read a JSIR file ([.cm-jsir-js] or [.cm-jsir-wasm]), including its magic number and version.
     Fails if the unit was not compiled for [target]. *)
 
 val from_channel :

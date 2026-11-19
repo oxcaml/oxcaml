@@ -130,9 +130,9 @@ let unit_b =
 
 let%expect_test "Parse_bytecode.from_jsir_channel" =
   with_temp_dir ~f:(fun () ->
-      write_jsir_file "a.cmj" unit_a;
+      write_jsir_file "a.cm-jsir-js" unit_a;
       Code.Var.reset ();
-      let unit = read_jsir_file "a.cmj" in
+      let unit = read_jsir_file "a.cm-jsir-js" in
       print_unit unit;
       (* Fresh variables do not collide with the variables of the unit. *)
       Printf.printf "last_var: %d\n" unit_a.last_var;
@@ -153,10 +153,11 @@ let%expect_test "Parse_bytecode.from_jsir_channel" =
 let%expect_test
     "Parse_bytecode.from_jsir_channel keeps fresh variables disjoint across units" =
   with_temp_dir ~f:(fun () ->
-      write_jsir_file "a.cmj" unit_a;
-      write_jsir_file "b.cmj" unit_b;
+      write_jsir_file "a.cm-jsir-js" unit_a;
+      write_jsir_file "b.cm-jsir-js" unit_b;
       Code.Var.reset ();
-      List.iter [ "a.cmj"; "b.cmj" ] ~f:(fun file -> print_unit (read_jsir_file file));
+      List.iter [ "a.cm-jsir-js"; "b.cm-jsir-js" ] ~f:(fun file ->
+          print_unit (read_jsir_file file));
       (* Fresh variables do not collide with the variables of any unit. *)
       Printf.printf "last_var: %d, %d\n" unit_a.last_var unit_b.last_var;
       Printf.printf "fresh: %d\n" (Code.Var.idx (Code.Var.fresh ())));
@@ -202,8 +203,8 @@ function jsir_test_unused() {
 
 let setup () =
   Filetype.write_js ~name:"stubs.js" (Filetype.js_text_of_string stubs) |> ignore;
-  write_jsir_file "a.cmj" unit_a;
-  write_jsir_file "b.cmj" unit_b;
+  write_jsir_file "a.cm-jsir-js" unit_a;
+  write_jsir_file "b.cm-jsir-js" unit_b;
   js_of_ocaml [ "build-runtime"; "-o"; "runtime.js" ] |> print_string
 
 (* [filter] selects the lines of the program's output to print. *)
@@ -221,8 +222,8 @@ let print_unit_infos file =
 let%expect_test "JSIR file without --include-runtime" =
   with_temp_dir ~f:(fun () ->
       setup ();
-      js_of_ocaml [ "stubs.js"; "a.cmj"; "-o"; "a.js" ] |> print_string;
-      js_of_ocaml [ "b.cmj"; "-o"; "b.js" ] |> print_string;
+      js_of_ocaml [ "stubs.js"; "a.cm-jsir-js"; "-o"; "a.js" ] |> print_string;
+      js_of_ocaml [ "b.cm-jsir-js"; "-o"; "b.js" ] |> print_string;
       print_unit_infos "a.js";
       print_unit_infos "b.js";
       (* The stubs are not part of the output, so the program fails. Only the
@@ -240,9 +241,9 @@ let%expect_test "JSIR file without --include-runtime" =
 let%expect_test "JSIR file with --include-runtime" =
   with_temp_dir ~f:(fun () ->
       setup ();
-      js_of_ocaml [ "--include-runtime"; "stubs.js"; "a.cmj"; "-o"; "a.js" ]
+      js_of_ocaml [ "--include-runtime"; "stubs.js"; "a.cm-jsir-js"; "-o"; "a.js" ]
       |> print_string;
-      js_of_ocaml [ "b.cmj"; "-o"; "b.js" ] |> print_string;
+      js_of_ocaml [ "b.cm-jsir-js"; "-o"; "b.js" ] |> print_string;
       print_unit_infos "a.js";
       print_unit_infos "b.js";
       link_and_run [ "a.js"; "b.js" ]);
@@ -275,12 +276,12 @@ let print_errors output =
 let%expect_test "js_of_ocaml rejects units compiled for wasm_of_ocaml" =
   with_temp_dir ~f:(fun () ->
       let unit = jsir_file ~target:Code.Wasm ~name:"W" ~imports:[] (fun ~fresh:_ -> []) in
-      write_jsir_file "w.cmw" unit;
-      write_jsir_file "w.cmj" unit;
-      print_errors (js_of_ocaml ~fail:false [ "w.cmw"; "-o"; "w.js" ]);
-      print_errors (js_of_ocaml ~fail:false [ "w.cmj"; "-o"; "w.js" ]));
+      write_jsir_file "w.cm-jsir-wasm" unit;
+      write_jsir_file "w.cm-jsir-js" unit;
+      print_errors (js_of_ocaml ~fail:false [ "w.cm-jsir-wasm"; "-o"; "w.js" ]);
+      print_errors (js_of_ocaml ~fail:false [ "w.cm-jsir-js"; "-o"; "w.js" ]));
   [%expect
     {|
-    Error: w.cmw was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
-    Error: w.cmj was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
+    Error: w.cm-jsir-wasm was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
+    Error: w.cm-jsir-js was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
     |}]

@@ -428,8 +428,8 @@
  (section lib_root)
  (files
   (glob_files_rec
-   (build/*.{cmjx,cmjxa,cmja} with_prefix ocaml))
-  (build/std_exit.cmjo as ocaml/std_exit.cmjo)))
+   (build/*.{cmx-js,cmxa-js,cma-js} with_prefix ocaml))
+  (build/std_exit.cmo-js as ocaml/std_exit.cmo-js)))
 
 (install
  (package stdlib-wasm)
@@ -437,5 +437,5 @@
  (section lib_root)
  (files
   (glob_files_rec
-   (build/*.{cmwx,cmwxa,cmwa} with_prefix ocaml))
-  (build/std_exit.cmwo as ocaml/std_exit.cmwo)))
+   (build/*.{cmx-wasm,cmxa-wasm,cma-wasm} with_prefix ocaml))
+  (build/std_exit.cmo-wasm as ocaml/std_exit.cmo-wasm)))
