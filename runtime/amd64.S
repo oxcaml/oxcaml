@@ -1178,7 +1178,8 @@ CFI_STARTPROC
         CFI_SIGNAL_FRAME
         ENTER_FUNCTION
 LBL(caml_raise_exn):
-        testq   $1, Caml_state(backtrace_active)
+        LEA_VAR(caml_backtrace_active, %rdi)
+        testq   $1, (%rdi)
         jne   LBL(116)
         CFI_REMEMBER_STATE
         RESTORE_EXN_HANDLER_OCAML
@@ -1226,7 +1227,8 @@ END_FUNCTION(caml_tsan_exit_on_raise_asm)
 FUNCTION(caml_reraise_exn)
 CFI_STARTPROC
         ENTER_FUNCTION
-        testq   $1, Caml_state(backtrace_active)
+        LEA_VAR(caml_backtrace_active, %rdi)
+        testq   $1, (%rdi)
         jne   LBL(117)
         RESTORE_EXN_HANDLER_OCAML
         ret

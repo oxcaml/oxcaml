@@ -114,20 +114,21 @@ static void default_fatal_uncaught_exception(value exn, const char *msg2)
 {
   char * msg;
   const value * at_exit;
-  int saved_backtrace_active, saved_backtrace_pos;
+  int saved_backtrace_pos;
+  intnat saved_backtrace_active;
 
   /* Build a string representation of the exception */
   msg = caml_format_exception(exn);
   /* Perform "at_exit" processing, ignoring all exceptions that may
      be triggered by this */
-  saved_backtrace_active = Caml_state->backtrace_active;
+  saved_backtrace_active = caml_backtrace_active;
   saved_backtrace_pos = Caml_state->backtrace_pos;
-  Caml_state->backtrace_active = 0;
+  caml_backtrace_active = 0;
   at_exit = caml_named_value("Pervasives.do_at_exit");
   /* In the event of an asynchronous exception occurring, it will still get
      caught here, because of the semantics of [caml_callback_exn]. */
   if (at_exit != NULL) caml_callback_res(*at_exit, Val_unit);
-  Caml_state->backtrace_active = saved_backtrace_active;
+  caml_backtrace_active = saved_backtrace_active;
   Caml_state->backtrace_pos = saved_backtrace_pos;
   /* Display the uncaught exception */
   if (msg2)
@@ -136,7 +137,7 @@ static void default_fatal_uncaught_exception(value exn, const char *msg2)
     fprintf(stderr, "Fatal error: exception %s\n", msg);
   caml_stat_free(msg);
   /* Display the backtrace if available */
-  if (!DEBUGGER_IN_USE && Caml_state->backtrace_active)
+  if (!DEBUGGER_IN_USE && caml_backtrace_active)
     caml_print_exception_backtrace();
 }
 

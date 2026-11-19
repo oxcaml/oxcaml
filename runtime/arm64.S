@@ -1021,7 +1021,8 @@ L(trap_handler):
 FUNCTION(caml_raise_exn)
         CFI_STARTPROC
     /* Test if backtrace is active */
-        ldr     TMP, Caml_state(backtrace_active)
+        ADDRGLOBAL(TMP, caml_backtrace_active)
+        ldr     TMP, [TMP]
         cbnz    TMP, 2f
 1:
         JUMP_TO_TRAP_PTR
@@ -1047,7 +1048,8 @@ END_FUNCTION(caml_raise_exn)
 
 FUNCTION(caml_reraise_exn)
         CFI_STARTPROC
-        ldr     TMP, Caml_state(backtrace_active)
+        ADDRGLOBAL(TMP, caml_backtrace_active)
+        ldr     TMP, [TMP]
         cbnz    TMP, L(caml_reraise_exn_stash)
         JUMP_TO_TRAP_PTR
         CFI_ENDPROC

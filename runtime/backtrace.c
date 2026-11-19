@@ -27,11 +27,14 @@
 #include "caml/fail.h"
 #include "caml/startup.h"
 
+CAMLexport atomic_intnat caml_backtrace_active = 0;
+
 /* Start or stop the backtrace machinery */
-CAMLexport void caml_record_backtraces(int flag)
+CAMLexport void caml_record_backtraces(int flag_int)
 {
-  if (flag != Caml_state->backtrace_active) {
-    Caml_state->backtrace_active = flag;
+  intnat flag = !!flag_int;
+  if (flag != caml_backtrace_active) {
+    caml_backtrace_active = flag;
     Caml_state->backtrace_pos = 0;
     caml_modify_generational_global_root(&Caml_state->backtrace_last_exn,
                                          Val_unit);
@@ -48,7 +51,7 @@ CAMLprim value caml_record_backtrace(value flag)
 /* Return the status of the backtrace machinery */
 CAMLprim value caml_backtrace_status(value vunit)
 {
-  return Val_bool(Caml_state->backtrace_active);
+  return Val_int(caml_backtrace_active);
 }
 
 /* Print location information -- same behavior as in Printexc
@@ -164,7 +167,7 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
      if the finalizer raises then catches an exception).  We choose to ignore
      any such finalizer backtraces and return the original one. */
 
-  if (!Caml_state->backtrace_active ||
+  if (!caml_backtrace_active ||
       Caml_state->backtrace_buffer == NULL ||
       Caml_state->backtrace_pos == 0) {
     res = caml_alloc(0, 0);
