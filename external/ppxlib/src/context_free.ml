@@ -224,11 +224,6 @@ module Rule = struct
       T (Attr_replace kind, T { name; attributes; expand })
   end
 
-  module Attribute_list = Attr_multiple_replace.Attribute_list
-  module Parsed_payload_list = Attr_multiple_replace.Parsed_payload_list
-
-  let attr_multiple_replace = Attr_multiple_replace.attr_multiple_replace
-
   let attr_str_type_decl attribute expand =
     T (Attr_str_type_decl, T { attribute; expand; expect = false })
 

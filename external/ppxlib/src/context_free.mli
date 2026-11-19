@@ -96,27 +96,6 @@ module Rule : sig
         because not all the attributes are necessarily present on the item.*)
   end
 
-  (** Aliases of the contents of {!Attr_multiple_replace}. *)
-
-  module Attribute_list : sig
-    type ('a, 'b) t = ('a, 'b) Attr_multiple_replace.Attribute_list.t =
-      | [] : ('a, unit) t
-      | ( :: ) : ('a, 'b) Attribute.t * ('a, 'c) t -> ('a, 'b * 'c) t
-  end
-
-  module Parsed_payload_list : sig
-    type 'a t = 'a Attr_multiple_replace.Parsed_payload_list.t =
-      | [] : unit t
-      | ( :: ) : 'a option * 'b t -> ('a * 'b) t
-  end
-
-  val attr_multiple_replace :
-    string ->
-    'a Extension.Context.t ->
-    ('a, 'list) Attribute_list.t ->
-    (ctxt:Expansion_context.Base.t -> 'a -> 'list Parsed_payload_list.t -> 'a) ->
-    t
-
   type ('a, 'b, 'c) attr_group_inline =
     ('b, 'c) Attribute.t ->
     (ctxt:Expansion_context.Deriver.t ->
