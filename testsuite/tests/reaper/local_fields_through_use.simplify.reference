@@ -1,0 +1,51 @@
+let code ignore_0 deleted in
+let code f_2 deleted in
+let code h_3 deleted in
+let code g_1 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(ignore_0)
+      ignore_0_1 (_x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlLocal_fields_through_use__ignore_2 =
+  closure ignore_0_1 @ignore &toplevel
+in
+let code loopify(never) size(7) newer_version_of(h_3)
+      h_3_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let a = %project_value_slot.[h].[a] (my_closure) in
+  let f' = %array_load (a, 0) in
+  let n = %project_value_slot.[f].[n] (f') in
+  apply direct(ignore_0_1 &my_alloc_region)
+    ($camlLocal_fields_through_use__ignore_2 : _ -> imm tagged) (n) -> k * k1
+in
+let code inline(always) loopify(never) size(2) newer_version_of(f_2)
+      f_2_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let n = %project_value_slot.[f].[n] (my_closure) in
+  cont k (n)
+in
+let code inline(never) loopify(never) size(33) newer_version_of(g_1)
+      g_1_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let f = closure f_2_1 @f &my_alloc_region with { n = n } in
+  let a = %array.my_alloc_region (f) in
+  let h = closure h_3_1 @h &my_alloc_region
+  with { ignore = $camlLocal_fields_through_use__ignore_2; a = a }
+  in
+  cont k (h)
+in
+let $camlLocal_fields_through_use__g_3 = closure g_1_1 @g &toplevel in
+let $camlLocal_fields_through_use =
+  Block 0 ($camlLocal_fields_through_use__ignore_2,
+           $camlLocal_fields_through_use__g_3)
+in
+cont done ($camlLocal_fields_through_use)
