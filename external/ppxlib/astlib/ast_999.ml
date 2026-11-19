@@ -713,7 +713,9 @@ module Parsetree = struct
        This field only affects the interpretation of [ret_type_constraint], while the
        latter is translated in [typecore] to [Pexp_constraint] to contrain the mode of the
        function.
-
+       (* TODO: This field is not failthful representation of the user syntax, and
+       complicates [pprintast]. It should be removed and their functionality should be
+       moved to [pvb_modes]. *)
     *)
     ret_mode_annotations : modes;
     (** The mode annotation placed on a function's body, e.g.

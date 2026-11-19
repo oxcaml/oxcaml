@@ -1204,6 +1204,8 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
       in
       loop st ~in_generated_code:false
 
+    (* TODO: unify code once [signature] and [structure] becomes
+    symmetric again. *)
     method! signature_items base_ctxt psg_items =
       let convert_exn = exn_to_sigi in
       let rec with_extra_items item ~extra_items ~expect_items ~rest

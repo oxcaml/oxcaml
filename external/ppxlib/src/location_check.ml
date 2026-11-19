@@ -104,6 +104,7 @@ let reloc_pmty_functors x =
     | Pmty_functor (Unit, initial_res, modes) ->
         let res = aux initial_res in
         if res == initial_res then x
+          (* TODO: need to handle [modes] as well   *)
         else { x with pmty_desc = Pmty_functor (Unit, res, modes) }
     | Pmty_functor (Named (id, mty, m0), initial_res, m1) ->
         let res = aux initial_res in
