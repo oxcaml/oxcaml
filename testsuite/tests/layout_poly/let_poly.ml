@@ -112,15 +112,8 @@ Lines 3-5, characters 6-3:
 4 |   let regular_id x = x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val regular_id : 'a -> 'a end
-       is not included in
-         sig val poly_ regular_id : 'a -> 'a end
-       Values do not match:
-         val regular_id : 'a -> 'a
-       is not included in
-         val poly_ regular_id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "regular_id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}]

@@ -184,14 +184,7 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : 'a eval end
-       is not included in
-         sig val x : 'b list end
-       Values do not match:
-         val x : 'a eval
-       is not included in
-         val x : 'b list
+       The value "x" does not match its expected declaration
        The type "'a eval" is not compatible with the type "'b list"
 |}]
 
@@ -206,11 +199,7 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : 'a eval end
-       is not included in
-         sig val x : 'b end
-       Values do not match: val x : 'a eval is not included in val x : 'b
+       The value "x" does not match its expected declaration
        The type "'a eval" is not compatible with the type "'b"
 |}]
 
@@ -225,10 +214,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : int end
-       is not included in
-         sig val x : 'a eval end
-       Values do not match: val x : int is not included in val x : 'a eval
+       The value "x" does not match its expected declaration
        The type "int" is not compatible with the type "'a eval"
 |}]

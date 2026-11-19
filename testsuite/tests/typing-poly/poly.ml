@@ -1177,19 +1177,10 @@ Line 3, characters 2-64:
 3 | = struct let f (x : <m : 'a. 'a * ('a * 'foo)> as 'foo) = () end;;
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (< m : 'a. 'a * ('a * 'b) > as 'b) -> unit end
-       is not included in
-         sig
-           val f : < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) > -> unit
-         end
-       Values do not match:
-         val f : (< m : 'a. 'a * ('a * 'b) > as 'b) -> unit
-       is not included in
-         val f : < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) > -> unit
-       The type "(< m : 'a. 'a * ('a * 'd) > as 'd) -> unit"
+       The value "f" does not match its expected declaration
+       The type "(< m : 'a. 'a * ('a * 'd) > as 'd) -> ..."
        is not compatible with the type
-         "< m : 'b. 'b * ('b * < m : 'c. 'c * 'e > as 'e) > -> unit"
+         "< m : 'b. ... * (... * < m : 'c. 'c * 'e > as 'e) > -> ..."
        The method "m" has type "'a. 'a * ('a * < m : 'a. 'f >) as 'f",
        but the expected method type was "'c. 'c * ('b * < m : 'c. 'g >) as 'g"
        The universal variable "'b" would escape its scope

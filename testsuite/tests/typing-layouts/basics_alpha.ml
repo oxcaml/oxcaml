@@ -689,18 +689,7 @@ Lines 3-9, characters 6-3:
 8 |   let x = f (assert false)
 9 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('a : immediate) t = 'a
-           val f : ('a : immediate). 'a t -> 'a
-           val x : ('a : immediate). 'a
-         end
-       is not included in
-         sig val x : string end
-       Values do not match:
-         val x : ('a : immediate). 'a
-       is not included in
-         val x : string
+       The value "x" does not match its expected declaration
        The type "('a : immediate)" is not compatible with the type "string"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -732,18 +721,7 @@ Lines 3-9, characters 6-3:
 8 |   let x = f (assert false)
 9 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('a : immediate) t = 'a
-           val f : ('a : immediate). 'a t -> 'a t
-           val x : ('a : immediate). 'a t
-         end
-       is not included in
-         sig val x : string end
-       Values do not match:
-         val x : ('a : immediate). 'a t
-       is not included in
-         val x : string
+       The value "x" does not match its expected declaration
        The type "'a t" = "('a : immediate)" is not compatible with the type
          "string"
        The layout of string is value non_float

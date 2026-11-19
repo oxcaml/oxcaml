@@ -13,15 +13,8 @@ Lines 3-5, characters 6-3:
 4 |   let x = false , "not an int"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : bool * string end
-       is not included in
-         sig val x : bool * int end
-       Values do not match:
-         val x : bool * string
-       is not included in
-         val x : bool * int
-       The type "bool * string" is not compatible with the type "bool * int"
+       The value "x" does not match its expected declaration
+       The type "... * string" is not compatible with the type "... * int"
        Type "string" is not compatible with type "int"
 |}]
 
@@ -36,16 +29,9 @@ Lines 3-5, characters 6-3:
 4 |   let f x = x + List.length [0.0, Some true]
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int end
-       is not included in
-         sig val f : int -> (float * string option) list end
-       Values do not match:
-         val f : int -> int
-       is not included in
-         val f : int -> (float * string option) list
-       The type "int -> int" is not compatible with the type
-         "int -> (float * string option) list"
+       The value "f" does not match its expected declaration
+       The type "... -> int" is not compatible with the type
+         "... -> (float * string option) list"
        Type "int" is not compatible with type "(float * string option) list"
 |}]
 
@@ -61,17 +47,10 @@ Lines 3-5, characters 6-3:
 4 |   let f : ('c list * 'd option  -> int) = assert false
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('c : any) ('d : any). 'c list * 'd option -> int end
-       is not included in
-         sig val f : 'a list * 'b list -> int end
-       Values do not match:
-         val f : ('c : any) ('d : any). 'c list * 'd option -> int
-       is not included in
-         val f : 'a list * 'b list -> int
-       The type "'a list * 'b option -> int" is not compatible with the type
-         "'a list * 'c list -> int"
-       Type "'b option" is not compatible with type "'c list"
+       The value "f" does not match its expected declaration
+       The type "... * 'a option -> ..." is not compatible with the type
+         "... * 'b list -> ..."
+       Type "'a option" is not compatible with type "'b list"
 |}]
 
 module T : sig
@@ -85,10 +64,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = bool * float
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = bool * float end
-       is not included in
-         sig type t = int * float end
        Type declarations do not match:
          type t = bool * float
        is not included in

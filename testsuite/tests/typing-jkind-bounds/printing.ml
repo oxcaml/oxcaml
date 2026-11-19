@@ -103,10 +103,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = Foo of 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Foo of 'a end
-       is not included in
-         sig type t : immutable_data end
        Type declarations do not match:
          type 'a t = Foo of 'a
        is not included in
@@ -125,10 +121,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = Foo of 'a @@ contended many
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Foo of 'a @@ many contended end
-       is not included in
-         sig type 'a t : immutable_data end
        Type declarations do not match:
          type 'a t = Foo of 'a @@ many contended
        is not included in
@@ -160,10 +152,6 @@ Lines 4-7, characters 6-3:
 6 |     type t = Foo of a | Bar of a @@ contended
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type a type t = Foo of a | Bar of a @@ contended end
-       is not included in
-         sig type a type t : immutable_data with a @@ portable end
        Type declarations do not match:
          type t = Foo of a | Bar of a @@ contended
        is not included in
@@ -278,10 +266,6 @@ Lines 3-5, characters 6-3:
 4 |   type t : value mod contended
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : value mod contended end
-       is not included in
-         sig type t : value mod portable end
        Type declarations do not match:
          type t : value mod contended
        is not included in
@@ -303,10 +287,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : value mod contended with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : value mod contended with 'a end
-       is not included in
-         sig type 'a t : value mod portable with 'a end
        Type declarations do not match:
          type 'a t : value mod contended with 'a
        is not included in
@@ -329,10 +309,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : value mod contended with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : value mod contended with 'a end
-       is not included in
-         sig type 'a t : value mod portable contended with 'a end
        Type declarations do not match:
          type 'a t : value mod contended with 'a
        is not included in
@@ -355,10 +331,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : value mod portable with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : value mod portable with 'a end
-       is not included in
-         sig type 'a t : value mod portable end
        Type declarations do not match:
          type 'a t : value mod portable with 'a
        is not included in
@@ -380,10 +352,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : mutable_data with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : mutable_data with 'a end
-       is not included in
-         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
        Type declarations do not match:
          type 'a t : mutable_data with 'a
        is not included in
@@ -411,10 +379,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : value mod portable with 'a @@ portable with 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : value mod portable with 'a end
-       is not included in
-         sig type 'a t : value mod portable end
        Type declarations do not match:
          type 'a t : value mod portable with 'a
        is not included in
@@ -438,10 +402,6 @@ Lines 4-6, characters 6-3:
 5 |   type 'a t : immutable_data with 'a t_mutable
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : immutable_data with 'a t_mutable end
-       is not included in
-         sig type 'a t : immutable_data with 'a end
        Type declarations do not match:
          type 'a t : immutable_data with 'a t_mutable
        is not included in
@@ -463,10 +423,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : immutable_data with 'a ref
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
-       is not included in
-         sig type 'a t : immutable_data with 'a end
        Type declarations do not match:
          type 'a t : mutable_data with 'a @@ forkable unyielding many
        is not included in

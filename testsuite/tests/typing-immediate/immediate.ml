@@ -215,10 +215,6 @@ Lines 1-3, characters 42-3:
 2 |   type t = string
 3 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = string end
-       is not included in
-         sig type t : immediate end
        Type declarations do not match:
          type t = string
        is not included in
@@ -239,7 +235,6 @@ Line 1, characters 23-49:
 1 | module M_invalid : S = struct type t = string end;;
                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match: sig type t = string end is not included in S
        Type declarations do not match:
          type t = string
        is not included in
@@ -258,19 +253,18 @@ module FM_invalid = F (struct type t = string end);;
 Line 1, characters 20-50:
 1 | module FM_invalid = F (struct type t = string end);;
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Modules do not match: sig type t = string end is not included in
-       S
-     Type declarations do not match:
-       type t = string
-     is not included in
-       type t : immediate
-     The layout of the first is value non_float
-       because it is the primitive type string.
-     But the layout of the first must be a sublayout of value non_pointer
-       because of the definition of t at line 1, characters 20-40.
-     Note: The layout of immediate is value non_pointer.
-     Note: The kinds mutable_data, immutable_data, and sync_data have
-     the layout value non_float.
+Error: Signature mismatch:
+       Type declarations do not match:
+         type t = string
+       is not included in
+         type t : immediate
+       The layout of the first is value non_float
+         because it is the primitive type string.
+       But the layout of the first must be a sublayout of value non_pointer
+         because of the definition of t at line 1, characters 20-40.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}];;
 
 (* Can't use a non-immediate type even if mutually recursive *)

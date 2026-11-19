@@ -141,10 +141,6 @@ Lines 1-3, characters 17-3:
 2 |   type t = { mutable x : int }
 3 | end......
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { mutable x : int; } end
-       is not included in
-         sig type t = { mutable x : int [@atomic]; } end
        Type declarations do not match:
          type t = { mutable x : int; }
        is not included in
@@ -168,10 +164,6 @@ Lines 1-3, characters 17-3:
 2 |   type t = { mutable x : int [@atomic] }
 3 | end......
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { mutable x : int [@atomic]; } end
-       is not included in
-         sig type t = { mutable x : int; } end
        Type declarations do not match:
          type t = { mutable x : int [@atomic]; }
        is not included in

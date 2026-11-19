@@ -94,7 +94,6 @@ Line 1, characters 26-32:
 1 | module PR6566' : PR6566 = PR6566;;
                               ^^^^^^
 Error: Signature mismatch:
-       Modules do not match: sig type t = int end is not included in PR6566
        Type declarations do not match:
          type t = int
        is not included in

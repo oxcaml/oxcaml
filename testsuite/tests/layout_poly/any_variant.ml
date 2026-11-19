@@ -34,14 +34,7 @@ Lines 3-7, characters 6-3:
 6 |     | Some x -> f x
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ map_or : ('a -> 'b) -> 'b -> 'a t -> 'b end
-       is not included in
-         sig val map_or : int end
-       Values do not match:
-         val poly_ map_or : ('a -> 'b) -> 'b -> 'a t -> 'b
-       is not included in
-         val map_or : int
+       The value "map_or" does not match its expected declaration
        The type "('a -> 'b) -> 'b -> 'a t -> 'b"
        is not compatible with the type "int"
 |}]

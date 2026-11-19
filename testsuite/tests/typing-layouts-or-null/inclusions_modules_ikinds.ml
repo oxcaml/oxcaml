@@ -12,10 +12,6 @@ Lines 1-3, characters 37-3:
 2 |   type t : value_or_null
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : value_or_null end
-       is not included in
-         sig type t end
        Type declarations do not match:
          type t : value_or_null
        is not included in
@@ -36,10 +32,6 @@ Lines 1-3, characters 49-3:
 2 |   type t : any
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : any end
-       is not included in
-         sig type t : any separable end
        Type declarations do not match:
          type t : any
        is not included in
@@ -58,10 +50,6 @@ Line 1, characters 74-75:
 1 | module M1 (X : sig type t : value_or_null end) : sig type t : value end = X
                                                                               ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t end
        Type declarations do not match: type t = X.t is not included in type t
        The layout of the first is value_or_null
          because of the definition of t at line 1, characters 19-41.
@@ -77,10 +65,6 @@ Line 1, characters 76-77:
 1 | module M2 (X : sig type t : any end) : sig type t : any mod separable end = X
                                                                                 ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : any separable end
        Type declarations do not match:
          type t = X.t
        is not included in
@@ -98,10 +82,6 @@ Line 1, characters 79-80:
 1 | module M3 (X : sig type t : value end) : sig type t : value mod portable end = X
                                                                                    ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : value mod portable end
        Type declarations do not match:
          type t = X.t
        is not included in

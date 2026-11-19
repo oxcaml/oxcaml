@@ -434,20 +434,8 @@ Lines 5-9, characters 6-3:
 8 |   let illegal = id
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t = unit -> unit
-           val illegal : 'a @ [< 'm] -> 'a @ [> 'm]
-         end
-       is not included in
-         sig type t val illegal : t -> t @ portable end
-       Values do not match:
-         val illegal : 'a @ [< 'm] -> 'a @ [> 'm]
-       is not included in
-         val illegal : t -> t @ portable
-       The type
-         "t @ [< 'm > nonportable stateful dynamic] ->
-         t @ [> 'm | nonportable stateful dynamic]"
+       The value "illegal" does not match its expected declaration
+       The type "t @ [< 'm] -> t @ [> 'm | nonportable stateful dynamic]"
        is not compatible with the type "t -> t @ portable"
        The return mode was expected to be "portable" but is "nonportable"
 |}]
@@ -801,26 +789,10 @@ Lines 1-3, characters 63-3:
 2 |   let g f = ignore (f == (fun (x @ local) y z -> z))
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val g :
-             ('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
-             unit @ [> dynamic]
-         end
-       is not included in
-         sig val g : ('a -> int) -> unit end
-       Values do not match:
-         val g :
-           ('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
-           unit @ [> dynamic]
-       is not included in
-         val g : ('a -> int) -> unit
-       The type
-         "('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
-         unit @ [> dynamic]"
-       is not compatible with the type "('a -> int) -> unit"
-       Type "'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]" is not compatible with type
-         "int"
+       The value "g" does not match its expected declaration
+       The type "(... -> 'a -> 'b -> 'b) -> ..."
+       is not compatible with the type "(... -> int) -> ..."
+       Type "'a -> 'b -> 'b" is not compatible with type "int"
 |}]
 
 let call_and_return f x = f x, f

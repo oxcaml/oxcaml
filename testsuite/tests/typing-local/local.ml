@@ -1633,10 +1633,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { foo : string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { foo : string; } end
-       is not included in
-         sig type t = { foo : string @@ global; } end
        Type declarations do not match:
          type t = { foo : string; }
        is not included in
@@ -1659,10 +1655,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { global_ foo : string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { foo : string @@ global; } end
-       is not included in
-         sig type t = { foo : string; } end
        Type declarations do not match:
          type t = { foo : string @@ global; }
        is not included in
@@ -1687,10 +1679,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = #{ foo : string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #{ foo : string; } end
-       is not included in
-         sig type t = #{ foo : string @@ global; } end
        Type declarations do not match:
          type t = #{ foo : string; }
        is not included in
@@ -1713,10 +1701,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = #{ global_ foo : string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #{ foo : string @@ global; } end
-       is not included in
-         sig type t = #{ foo : string; } end
        Type declarations do not match:
          type t = #{ foo : string @@ global; }
        is not included in
@@ -1986,28 +1970,12 @@ Line 2, characters 2-32:
 2 |   struct let add = Int32.add end
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val add :
-             int32 @ local forkable unyielding ->
-             int32 @ local forkable unyielding -> int32 @ local forkable
-             unyielding
-         end
-       is not included in
-         sig val add : int32 @ local -> int32 @ local -> int32 end
-       Values do not match:
-         val add :
-           int32 @ local forkable unyielding ->
-           int32 @ local forkable unyielding -> int32 @ local forkable
-           unyielding
-       is not included in
-         val add : int32 @ local -> int32 @ local -> int32
+       The value "add" does not match its expected declaration
        The type
-         "int32 @ local forkable unyielding ->
+         "... ->
          int32 @ local forkable unyielding -> int32 @ local forkable
          unyielding"
-       is not compatible with the type
-         "int32 @ local -> int32 @ local -> int32"
+       is not compatible with the type "... -> int32 @ local -> int32"
        Type
          "int32 @ local forkable unyielding -> int32 @ local forkable
          unyielding"
@@ -2028,26 +1996,12 @@ Line 3, characters 2-7:
 3 |   Opt32
       ^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external add :
-             (int32 [@local_opt]) ->
-             (int32 [@local_opt]) -> (int32 [@local_opt]) = "%int32_add"
-         end
-       is not included in
-         sig val add : int32 @ local -> int32 @ local -> int32 end
-       Values do not match:
-         external add :
-           (int32 [@local_opt]) ->
-           (int32 [@local_opt]) -> (int32 [@local_opt]) = "%int32_add"
-       is not included in
-         val add : int32 @ local -> int32 @ local -> int32
+       The value "add" does not match its expected declaration
        The type
-         "int32 @ local forkable unyielding ->
+         "... ->
          int32 @ local forkable unyielding -> int32 @ local forkable
          unyielding"
-       is not compatible with the type
-         "int32 @ local -> int32 @ local -> int32"
+       is not compatible with the type "... -> int32 @ local -> int32"
        Type
          "int32 @ local forkable unyielding -> int32 @ local forkable
          unyielding"
@@ -2365,14 +2319,7 @@ Line 3, characters 6-7:
 3 | end = X;;
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val foo : float -> string end
-       is not included in
-         sig val foo : float @ local -> string end
-       Values do not match:
-         val foo : float -> string
-       is not included in
-         val foo : float @ local -> string
+       The value "foo" does not match its expected declaration
        The type "float -> string" is not compatible with the type
          "float @ local -> string"
        The argument mode was expected to be "global"
@@ -2387,14 +2334,7 @@ Line 3, characters 6-7:
 3 | end = X;;
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val foo : float -> string @ local end
-       is not included in
-         sig val foo : float -> string end
-       Values do not match:
-         val foo : float -> string @ local
-       is not included in
-         val foo : float -> string
+       The value "foo" does not match its expected declaration
        The type "float -> string @ local" is not compatible with the type
          "float -> string"
        The return mode was expected to be "global" but is "local"
@@ -2408,14 +2348,7 @@ Line 3, characters 6-7:
 3 | end = X;;
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val foo : float @ local -> float -> string end
-       is not included in
-         sig val foo : float -> float -> string end
-       Values do not match:
-         val foo : float @ local -> float -> string
-       is not included in
-         val foo : float -> float -> string
+       The value "foo" does not match its expected declaration
        The type "float @ local -> float -> string"
        is not compatible with the type "float -> float -> string"
        The return mode was expected to be "global"
@@ -2457,14 +2390,7 @@ Line 8, characters 6-7:
 8 | end = X;;
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val foo : (float -> string) inv end
-       is not included in
-         sig val foo : (float -> string @ local) inv end
-       Values do not match:
-         val foo : (float -> string) inv
-       is not included in
-         val foo : (float -> string @ local) inv
+       The value "foo" does not match its expected declaration
        The type "(float -> string) inv" is not compatible with the type
          "(float -> string @ local) inv"
        Type "float -> string" is not compatible with type
@@ -2489,14 +2415,7 @@ Line 3, characters 6-7:
 3 | end = X;;
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val foo : (float -> string) contra end
-       is not included in
-         sig val foo : (float -> string @ local) contra end
-       Values do not match:
-         val foo : (float -> string) contra
-       is not included in
-         val foo : (float -> string @ local) contra
+       The value "foo" does not match its expected declaration
        The type "(float -> string) contra" is not compatible with the type
          "(float -> string @ local) contra"
        Type "float -> string" is not compatible with type
@@ -2521,14 +2440,7 @@ Line 3, characters 6-7:
 3 | end = X;;
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val foo : (float -> string @ local) inv end
-       is not included in
-         sig val foo : (float -> string) inv end
-       Values do not match:
-         val foo : (float -> string @ local) inv
-       is not included in
-         val foo : (float -> string) inv
+       The value "foo" does not match its expected declaration
        The type "(float -> string @ local) inv" is not compatible with the type
          "(float -> string) inv"
        Type "float -> string @ local" is not compatible with type
@@ -2544,14 +2456,7 @@ Line 3, characters 6-7:
 3 | end = X;;
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val foo : (float -> string @ local) co end
-       is not included in
-         sig val foo : (float -> string) co end
-       Values do not match:
-         val foo : (float -> string @ local) co
-       is not included in
-         val foo : (float -> string) co
+       The value "foo" does not match its expected declaration
        The type "(float -> string @ local) co" is not compatible with the type
          "(float -> string) co"
        Type "float -> string @ local" is not compatible with type
@@ -2594,10 +2499,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = Bar of int * string
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Bar of int * string end
-       is not included in
-         sig type t = Bar of int * string @@ global end
        Type declarations do not match:
          type t = Bar of int * string
        is not included in
@@ -2622,10 +2523,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = Bar of int * global_ string
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Bar of int * string @@ global end
-       is not included in
-         sig type t = Bar of int * string end
        Type declarations do not match:
          type t = Bar of int * string @@ global
        is not included in
@@ -2881,17 +2778,7 @@ Lines 3-6, characters 6-3:
 5 |   let f x = exclave_ g x
 6 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val g : 'a -> 'b -> string @ local
-           val f : 'a -> ('b -> string @ local) @ local forkable unyielding
-         end
-       is not included in
-         sig val f : string -> string -> string @ local end
-       Values do not match:
-         val f : 'a -> ('b -> string @ local) @ local forkable unyielding
-       is not included in
-         val f : string -> string -> string @ local
+       The value "f" does not match its expected declaration
        The type
          "string -> (string -> string @ local) @ local forkable unyielding"
        is not compatible with the type "string -> string -> string @ local"

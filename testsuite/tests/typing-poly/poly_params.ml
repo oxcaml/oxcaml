@@ -348,13 +348,9 @@ Line 1, characters 59-60:
 1 | module Foo (X : sig val f : p1 end) : sig val f : p2 end = X
                                                                ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : p1 end
-       is not included in
-         sig val f : p2 end
-       Values do not match: val f : p1 is not included in val f : p2
-       The type "p1" = "('a. 'a -> 'a) -> int" is not compatible with the type
-         "p2" = "('a 'b. 'a -> 'b) -> int"
+       The value "f" does not match its expected declaration
+       The type "p1" = "('a. ... -> 'a) -> ..." is not compatible with the type
+         "p2" = "('a 'b. ... -> 'b) -> ..."
        Type "'a" is not compatible with type "'b"
 |}];;
 
@@ -392,13 +388,9 @@ Line 1, characters 59-60:
 1 | module Foo (X : sig val f : p1 end) : sig val f : p2 end = X
                                                                ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : p1 end
-       is not included in
-         sig val f : p2 end
-       Values do not match: val f : p1 is not included in val f : p2
-       The type "p1" = "(bool -> bool) -> int" is not compatible with the type
-         "p2" = "('a. 'a -> 'a) -> int"
+       The value "f" does not match its expected declaration
+       The type "p1" = "(bool -> ...) -> ..." is not compatible with the type
+         "p2" = "('a. 'a -> ...) -> ..."
        Type "bool" is not compatible with type "'a"
 |}];;
 

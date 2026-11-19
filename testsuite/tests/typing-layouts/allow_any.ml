@@ -230,13 +230,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { mutable x : int }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { mutable x : int; } end
-       is not included in
-         sig
-           type t : value non_float mod contended = { mutable x : int; }
-           [@@unsafe_allow_any_mode_crossing]
-         end
        Type declarations do not match:
          type t = { mutable x : int; }
        is not included in
@@ -267,10 +260,6 @@ Line 9, characters 12-13:
 9 | module _ = (M : S)
                 ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = M.t = { mutable x : int; } end
-       is not included in
-         S
        Type declarations do not match:
          type t = M.t = { mutable x : int; }
        is not included in
@@ -306,19 +295,6 @@ Lines 4-7, characters 6-3:
 6 |   [@@unsafe_allow_any_mode_crossing]
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t
-             : value non_float mod portable contended = {
-             mutable x : int;
-           }
-           [@@unsafe_allow_any_mode_crossing]
-         end
-       is not included in
-         sig
-           type t : value non_float mod contended = { mutable x : int; }
-           [@@unsafe_allow_any_mode_crossing]
-         end
        Type declarations do not match:
          type t
            : value non_float mod portable contended = {
