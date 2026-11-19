@@ -42,8 +42,8 @@ module Counters = struct
     |> Printf.sprintf "[%s]"
 end
 
-external time_include_children: bool -> float = "caml_sys_time_include_children"
-let cpu_time () = time_include_children true
+external gettimeofday : unit -> (float [@unboxed])
+  = "caml_sys_gettimeofday" "caml_sys_gettimeofday_unboxed" [@@noalloc]
 
 
 module Measure = struct
@@ -56,12 +56,15 @@ module Measure = struct
   let create ?(counters = Counters.create ()) () =
     let stat = Gc.quick_stat () in
     {
-      time = cpu_time ();
+      time = gettimeofday ();
       allocated_words = stat.minor_words +. stat.major_words;
       top_heap_words = stat.top_heap_words;
       counters = counters;
     }
   let zero = { time = 0.; allocated_words = 0.; top_heap_words = 0; counters = Counters.create () }
+  (* The baseline for the toplevel "other" row: the clock is wall time, so it
+     cannot be taken to have started at zero *)
+  let initial = create ()
 end
 
 module Measure_diff = struct
@@ -385,7 +388,7 @@ let output_columns output_rows_f columns ~timings_precision =
        | Some v -> v
        | None -> Measure.zero
      in
-     let total = Measure_diff.of_diff Measure.zero (Measure.create ()) in
+     let total = Measure_diff.of_diff Measure.initial (Measure.create ()) in
      output_rows_f (rows_of_hierarchy !hierarchy total initial_measure columns timings_precision)
 
 let print ppf =
