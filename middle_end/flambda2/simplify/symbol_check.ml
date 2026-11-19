@@ -27,14 +27,6 @@ module Env = struct
     let symbols_used_but_not_defined =
       Symbol.Set.diff used_symbols env.defined_symbols
     in
-    let current_compilation_unit =
-      match Env.get_current_unit () with
-      | None ->
-        Misc.fatal_errorf
-          "Missing current compilation unit; this is needed for the symbol \
-           check"
-      | Some unit_info -> Unit_info.modname unit_info
-    in
     Symbol.Set.iter
       (fun symbol ->
         (* Symbols from other compilation units (or external symbols, or predef
