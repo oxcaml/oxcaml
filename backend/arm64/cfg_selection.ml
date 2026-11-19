@@ -213,8 +213,8 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     then Use_default
     else
       match[@ocaml.warning "-fragile-match"] args with
-      | [arg; Cop (Cmulf Float64, args, _)]
-      | [Cop (Cmulf Float64, args, _); arg] ->
+      | [arg; Cop (Cmulf Float64, args, _)] | [Cop (Cmulf Float64, args, _); arg]
+        ->
         Rewritten (specific Imuladdf, arg :: args)
       | _ -> Use_default)
   | Csubf Float64 -> (
