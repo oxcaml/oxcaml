@@ -121,6 +121,8 @@ end
 
 let function_layout = ref Function_layout.default   (* -function-layout *)
 
+let fp_contract = ref true              (* -fp-contract *)
+
 let disable_builtin_check = ref false   (* -disable-builtin-check *)
 let disable_poll_insertion = ref (not Config.poll_insertion)
                                         (* -disable-poll-insertion *)

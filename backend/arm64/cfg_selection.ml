@@ -206,7 +206,10 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     match[@ocaml.warning "-fragile-match"] args with
     | [Cop (Cmulf Float64, args, _)] -> Rewritten (specific Inegmulf, args)
     | _ -> Use_default)
-  (* Recognize floating-point multiply and add/sub *)
+  (* Recognize floating-point multiply and add/sub. These fused operations round
+     only once, so may change the output. *)
+  | (Caddf Float64 | Csubf Float64) when not !Oxcaml_flags.fp_contract ->
+    Use_default
   | Caddf Float64 -> (
     match[@ocaml.warning "-fragile-match"] args with
     | [arg; Cop (Cmulf Float64, args, _)] | [Cop (Cmulf Float64, args, _); arg]
