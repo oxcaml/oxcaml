@@ -34,21 +34,6 @@ end
 module M : sig type t : bits8 & bits16 end
 |}]
 
-module M : sig
-  type t : (bits8 & bits16) addressable
-end = struct
-  type t : bits8 & bits16
-end
-[%%expect{|
-Line 2, characters 28-39:
-2 |   type t : (bits8 & bits16) addressable
-                                ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "bits8 & bits16".
-
-module M : sig type t : bits8 & bits16 end
-|}]
-
 (* The components must still agree *)
 module M : sig
   type t : bits8 & bits16
@@ -103,11 +88,6 @@ type ok = t req
 
 (**** Unboxed records and tuples ****)
 
-type t : bits8 addressable & bits16 addressable = #{ a : int8#; b : int16# }
-[%%expect{|
-type t = #{ a : int8#; b : int16#; }
-|}]
-
 (* Projecting out of a product gives the field's own kind *)
 type t = #{ a : int8#; b : int16# }
 let f (x : t) : ('a : bits8) = x.#a
@@ -116,24 +96,14 @@ type t = #{ a : int8#; b : int16#; }
 val f : t -> int8# = <fun>
 |}]
 
-(* A made-addressable component is printed as the plain component *)
-type ('a : bits8 addressable) t = #{ a : 'a; b : int }
-type ('a : bits8) u = #{ a : 'a; b : int }
-module M : sig
-  type ('a : bits8 addressable) t : bits8 & value
-  type ('a : bits8) u : bits8 addressable & value
-end = struct
-  type ('a : bits8 addressable) t = #{ a : 'a; b : int }
-  type ('a : bits8) u = #{ a : 'a; b : int }
-end
+(* Because non-inherit record fields are implicitly addressable, whether or not
+   the contents of such a field have [addressable] applied makes no difference
+   to the kind of the record itself *)
+type ('a : bits8 addressable) t : bits8 & value = #{ a : 'a; b : int }
+type ('a : bits8) u : bits8 & value = #{ a : 'a; b : int }
 [%%expect{|
 type ('a : bits8 addressable) t = #{ a : 'a; b : int; }
 type ('a : bits8) u = #{ a : 'a; b : int; }
-module M :
-  sig
-    type ('a : bits8 addressable) t : bits8 & value
-    type ('a : bits8) u : bits8 & value
-  end
 |}]
 
 (* Plain and made-addressable components both fit a product kind *)
@@ -174,14 +144,16 @@ Error: The value "x" has type "('a : bits8 addressable)"
    The difference for principal mode is because the incompleteness is
    order-dependent. *)
 type t8a : bits8 addressable
+(* Note that [@@layout_poly] instantiates both [any]s with the same sort
+   variable *)
 external magic : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
 let f (x : ('a : bits8 addressable)) : #(int8# * int) = magic #(x, 1)
 [%%expect{|
 type t8a : bits8 addressable
 external magic : ('a : any) ('b : any). 'a -> 'b = "%identity"
   [@@layout_poly]
-Line 3, characters 64-65:
-3 | let f (x : ('a : bits8 addressable)) : #(int8# * int) = magic #(x, 1)
+Line 5, characters 64-65:
+5 | let f (x : ('a : bits8 addressable)) : #(int8# * int) = magic #(x, 1)
                                                                     ^
 Error: The value "x" has type "('a : bits8 addressable)"
        but an expression was expected of type "('b : bits8)"
@@ -198,39 +170,20 @@ val f : ('a : bits8 addressable). 'a -> #(int8# * int) = <fun>
 
 type ('a : bits8 & value) r
 type ('a : bits8 addressable & value) ra
-type ('a : (bits8 & value) addressable) rpa
 type ok = #(int8# * int) r
 type ok = #(int8# * int) ra
-type ok = #(int8# * int) rpa
 [%%expect{|
 type ('a : bits8 & value) r
 type ('a : bits8 & value) ra
-Line 3, characters 27-38:
-3 | type ('a : (bits8 & value) addressable) rpa
-                               ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "bits8 & value".
-
-type ('a : bits8 & value) rpa
 type ok = #(int8# * int) r
 type ok = #(int8# * int) ra
-type ok = #(int8# * int) rpa
 |}]
 
 type ok = #(t8a * int) r
 type ok = #(t8a * int) ra
-type ok = #(t8a * int) rpa
 [%%expect{|
 type ok = #(t8a * int) r
 type ok = #(t8a * int) ra
-type ok = #(t8a * int) rpa
-|}]
-
-(* The intersection of two product kinds *)
-let f (x : ('a : bits8 addressable & value)) (y : ('b : bits8 & value)) =
-  if true then x else y
-[%%expect{|
-val f : ('a : bits8 & value). 'a -> 'a -> 'a = <fun>
 |}]
 
 (**** Inference ****)

@@ -2694,6 +2694,25 @@ module Const = struct
               | Pjk_inherit inner -> inner, Id
               | _ -> annot, Addressable
             in
+            (* If this component isn't under an [inherit], it may have a
+               technically-redundant [addressable], like in
+               [bits8 addressable & bits8].
+
+               However, we choose not to warn in this case, as it is less
+               "obviously wrong" than writing e.g. [bits8 addressable
+               addressable] or (more contentiously) [value addressable].
+
+               The broader principle is that users should be able to write kind
+               annotations that follow the structure of their types without too
+               much extra thought. For example, for some kind [k], it would be
+               nice if the following never warns:
+               {[
+                 type ('a : k) t : k & k = #{ x : 'a; y : 'a }
+               ]}
+
+               Yet if we warned for redundant [addressable]s under a product,
+               this would warn for e.g. [k := bits8 addressable].
+            *)
             let { base; mod_bounds; with_bounds } =
               of_user_written_annotation_unchecked_level ~use_abstract_jkinds
                 ~warn env context annot

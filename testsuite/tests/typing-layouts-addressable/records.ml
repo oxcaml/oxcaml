@@ -192,7 +192,8 @@ Error: This type "int8# t" should be an instance of type "('a : bits8)"
          because of the definition of req8 at line 2, characters 0-22.
 |}]
 
-(* Inferring the field's kind from the record's kind picks the plain kind *)
+(* Incomplete - type variables whose kind might be [k] or [k addressable] are
+   arbitrarily chosen to be [k] (here, [bits8]). *)
 let f (x : 'a t) = (x : ('b : bits8 addressable))
 [%%expect{|
 val f : ('a : bits8). 'a t -> 'a t = <fun>
@@ -218,6 +219,7 @@ external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
 val f : 'a t -> 'a t = <fun>
 |}]
 
+(* This function can be used to require that an expression is addressable *)
 external id_addressable : ('a : any addressable). 'a -> 'a = "%identity"
   [@@layout_poly]
 let f (x : 'a t) = id_addressable x
