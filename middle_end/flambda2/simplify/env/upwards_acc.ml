@@ -33,8 +33,8 @@ type t =
   }
 
 let [@ocamlformat "disable"] print ppf
-      { uenv; creation_dacc = _; lifted_constants; name_occurrences;
-        all_code = _; cost_metrics; slot_offsets; flow_result;
+      { uenv; creation_dacc = _; lifted_constants;
+        all_code = _; slot_offsets; flow_result;
         fdo_region_counters = _; resimplify;
       } =
   Format.fprintf ppf "@[<hov 1>(\

@@ -118,7 +118,7 @@ let to_expr t are_rebuilding =
        [UA.do_not_rebuild_terms] is set"
   else to_expr0 t
 
-let descr t = Expr.descr t.expr
+let descr t = Expr.descr (to_expr0 t)
 
 let to_apply_cont t =
   match descr t with
