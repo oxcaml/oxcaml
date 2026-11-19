@@ -49,17 +49,12 @@ end
 
 type 'a t = 'a Cell.t Union_find.t
 
-module Change = struct
-  type t = Union_find of Union_find.Change.t
-
-  let undo = function Union_find change -> Union_find.Change.undo change
-end
-
+module Change = Union_find.Change
 module Log = With_backtracking.Make (Change)
 
 let set_log log =
   Log.set_log log;
-  Union_find.set_log (fun change -> log (Change.Union_find change))
+  Union_find.set_log log
 
 let cell (t : 'a t) : 'a Cell.t = Union_find.get t
 
