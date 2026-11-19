@@ -17,8 +17,6 @@
 open! Flambda.Import
 module Env = To_cmm_env
 module Ece = Effects_and_coeffects
-module R = To_cmm_result
-module FRC = Fdo_to_cmm_region_counters
 
 module C = struct
   include Cmm_helpers
@@ -167,7 +165,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         res,
         Ece.all )
     | Some { name; enabled_at_init } ->
-      (* CR yusumez: The counter of the call of a probe handler is dropped. *)
+      Fdo_dropped_counters.register ~reason:Probe_handler_call
+        (Fdo_annotation.of_list (Option.to_list callsite_counter));
       assert (Flambda_arity.cardinal_unarized return_arity = 0);
       ( C.probe ~dbg ~name ~handler_code_linkage_name:code_sym.sym_name ~args
           ~enabled_at_init,
@@ -748,7 +747,7 @@ and let_cont_not_inlined env res k handler body =
   let is_exn_handler = Continuation_handler.is_exn_handler handler in
   let is_cold = Continuation_handler.is_cold handler in
   let vars, arity, handler, free_vars_of_handler, handler_symbol_inits, res =
-    continuation_handler env res k handler
+    continuation_handler env res handler
   in
   let catch_id, env =
     Env.add_jump_cont env k ~param_types:(List.map snd vars)
@@ -860,7 +859,7 @@ and let_cont_rec env res invariant_params conts body =
     Continuation.Lmap.fold
       (fun k handler (conts_to_handlers, res) ->
         let vars, _arity, handler, free_vars_of_handler, symbol_inits, res =
-          continuation_handler env res k handler
+          continuation_handler env res handler
         in
         (* It should be an flambda2 invariant that symbols are bound at
            top-level, and the handler of a loop is clearly not top-level *)
@@ -898,17 +897,13 @@ and let_cont_rec env res invariant_params conts body =
   let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
   cmm, free_vars, symbol_inits, res
 
-and continuation_handler env res k handler =
+and continuation_handler env res handler =
   Continuation_handler.pattern_match' handler
     ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
       let arity = Bound_parameters.arity params in
       let env, vars = C.continuation_bound_parameters env params in
-      let res = R.map_fdo_region_counters res FRC.enter_region in
       let expr, free_vars_of_handler, symbol_inits, res =
         expr env res handler
-      in
-      let res =
-        R.map_fdo_region_counters res (fun fdo -> FRC.leave_handler fdo k)
       in
       let expr, free_vars_of_handler, symbol_inits =
         Env.place_symbol_inits ~params:vars expr free_vars_of_handler
@@ -971,9 +966,6 @@ and apply_expr env res apply =
       (* Case 2 *)
       let wrap, _, res =
         Env.flush_delayed_lets ~mode:Flush_everything env res
-      in
-      let res =
-        R.map_fdo_region_counters res (fun fdo -> FRC.jump_to_handler fdo k)
       in
       let cmm, free_vars, symbol_inits =
         wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty
@@ -1053,20 +1045,13 @@ and apply_cont env res apply_cont =
   let k = Apply_cont.continuation apply_cont in
   let args = Apply_cont.args apply_cont in
   if Env.is_exn_handler env k
-  then
-    let res =
-      R.map_fdo_region_counters res (fun fdo -> FRC.jump_to_handler fdo k)
-    in
-    translate_raise ~dbg_with_inlined env res apply_cont k args
+  then translate_raise ~dbg_with_inlined env res apply_cont k args
   else
     match Env.get_continuation env k with
     | Return { param_types } ->
       translate_jump_to_return_continuation ~dbg_with_inlined env res apply_cont
         k param_types args
     | Jump { param_types; cont } ->
-      let res =
-        R.map_fdo_region_counters res (fun fdo -> FRC.jump_to_handler fdo k)
-      in
       translate_jump_to_continuation ~dbg_with_inlined env res apply_cont
         param_types cont args
     | Inline
@@ -1173,7 +1158,6 @@ and switch env res switch =
   let make_arm ~must_tag_discriminant env res (d, arm) =
     let d = prepare_discriminant ~must_tag:must_tag_discriminant d in
     let action = Switch_arm.action arm in
-    let res = R.map_fdo_region_counters res FRC.enter_region in
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
     in
@@ -1196,13 +1180,6 @@ and switch env res switch =
       else if Debuginfo.is_none action_dbg
       then dbg
       else Env.add_inlined_debuginfo env action_dbg
-    in
-    let region_counters = FRC.region_counters (R.fdo_region_counters res) in
-    let res = R.map_fdo_region_counters res FRC.leave_region in
-    let annotations =
-      Switch_arm.annotations arm
-      |> Branch_annotations.map_fdo_annotation ~f:(fun fdo_annotation ->
-          Fdo_annotation.combine fdo_annotation region_counters)
     in
     ( ( d,
         cmm_action,
@@ -1317,14 +1294,8 @@ and switch env res switch =
         cases, res
     in
     (* CR-someday poechsel: Put a more precise value kind here *)
-    let { C.switch_expr; fdo_counters_into_switch } =
+    let expr =
       C.transl_switch_clambda dbg scrutinee index (Array.map Option.get cases)
     in
-    let res =
-      R.map_fdo_region_counters res (fun fdo ->
-          FRC.add_counters fdo fdo_counters_into_switch)
-    in
-    let cmm, free_vars, symbol_inits =
-      wrap switch_expr free_vars symbol_inits
-    in
+    let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res

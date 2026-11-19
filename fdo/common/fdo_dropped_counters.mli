@@ -50,6 +50,10 @@ module Reason : sig
         (** Counters of a switch whose arms all jump to the same action. *)
     | Switch_to_lookup_table
         (** Counters of a switch lowered to a lookup table. *)
+    | Cmm_switch_collapsed
+        (** The counters of the cases of a switch that the translation to Cmm
+            turns into a table lookup or a single case. *)
+    | Probe_handler_call  (** The counter of the call of a probe handler. *)
 
   val to_string : t -> string
 end

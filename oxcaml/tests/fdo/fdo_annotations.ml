@@ -13,7 +13,10 @@
 
    - [compare-sets <dump a> <dump b>] prints the counters in the annotations of
    only one of the dumps, which can also be Cmm dumps (as written with
-   [-fdo-counters -dcmm]). *)
+   [-fdo-counters -dcmm]).
+
+   - [dropped <dump>] prints the dropped counters of the dump (as written with
+   [-dfdo-dropped-counters]). *)
 
 (* CR yusumez: This is done to not dump the entire fexpr. I still find this a
    bit sad. *)
@@ -275,13 +278,26 @@ let compare_sets a b =
   print_lines ("only in " ^ a ^ ":") (only_in ca cb);
   print_lines ("only in " ^ b ^ ":") (only_in cb ca)
 
+(* The dropped counters are the last thing a compilation dumps. *)
+let dropped file =
+  let header = "*** FDO dropped counters" in
+  let rec after_header = function
+    | [] -> []
+    | line :: lines ->
+      if String.equal line header then lines else after_header lines
+  in
+  In_channel.with_open_text file In_channel.input_lines
+  |> after_header
+  |> print_lines ("dropped in " ^ file ^ ":")
+
 let () =
   match Sys.argv with
   | [| _; "list"; file |] -> list file
+  | [| _; "dropped"; file |] -> dropped file
   | [| _; "compare-entries"; a; b |] -> compare_entries a b
   | [| _; "compare-counters"; a; b |] -> compare_counters a b
   | [| _; "compare-sets"; a; b |] -> compare_sets a b
   | _ ->
     failwith
-      "usage: fdo_annotations (list <dump> | (compare-entries | \
+      "usage: fdo_annotations ((list | dropped) <dump> | (compare-entries | \
        compare-counters | compare-sets) <dump a> <dump b>)"

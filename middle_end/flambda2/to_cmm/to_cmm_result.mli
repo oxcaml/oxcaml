@@ -59,13 +59,6 @@ val add_gc_roots : t -> Symbol.t list -> t
 (** Register a function that has been translated to Cmm. *)
 val add_function : t -> Cmm.fundecl -> t
 
-(** The FDO counters that lost their edges (see [Fdo_to_cmm_region_counters]).
-*)
-val fdo_region_counters : t -> Fdo_to_cmm_region_counters.t
-
-val map_fdo_region_counters :
-  t -> (Fdo_to_cmm_region_counters.t -> Fdo_to_cmm_region_counters.t) -> t
-
 (** Record the given symbol as having been defined. This is used to keep track
     of whether the module block symbol for the current unit has been defined. *)
 val check_for_module_symbol : t -> Symbol.t -> t
