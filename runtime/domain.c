@@ -821,10 +821,10 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->local_roots = NULL;
 
+  domain_state->backtrace_pos = 0;
   domain_state->backtrace_buffer = NULL;
   /* This call may fail, but fatally so we don't need an error path */
   domain_root_register(&domain_state->backtrace_last_exn, Val_unit);
-  domain_state->backtrace_active = 0;
 
   domain_state->local_sp = 0;
   domain_state->local_top = NULL;
@@ -844,7 +844,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->parser_trace = 0;
 
-  if (caml_params->backtrace_enabled) {
+  if (domain_state->unique_id == 0 && caml_params->backtrace_enabled) {
     caml_record_backtraces(1);
   }
 

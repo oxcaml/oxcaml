@@ -33,6 +33,7 @@
         EXTRN  caml_raise_unhandled_effect: NEAR
         EXTRN  caml_raise_continuation_already_resumed: NEAR
         EXTRN  caml_free_stack: NEAR
+        EXTRN  caml_backtrace_active: NEAR
 
 ; Load caml/domain_state.tbl (via domain_state.inc, to remove C-style comments)
         domain_curr_field = 0
@@ -460,7 +461,7 @@ L108:
         PUBLIC  caml_raise_exn
         ALIGN   4
 caml_raise_exn:
-        test    qword ptr Caml_state(backtrace_active), 1
+        test    qword ptr caml_backtrace_active, 1
         jne     L110
         RESTORE_EXN_HANDLER_OCAML
         ret
@@ -482,7 +483,7 @@ L117:
         PUBLIC  caml_reraise_exn
         ALIGN   4
 caml_reraise_exn:
-        test     qword ptr Caml_state(backtrace_active), 1
+        test    qword ptr caml_backtrace_active, 1
         jne     L117
         RESTORE_EXN_HANDLER_OCAML
         ret

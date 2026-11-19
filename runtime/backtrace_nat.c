@@ -70,6 +70,7 @@ frame_descr * caml_next_frame_descriptor
 
 int caml_alloc_backtrace_buffer(void){
   CAMLassert(Caml_state->backtrace_pos == 0);
+  CAMLassert(Caml_state->backtrace_buffer == NULL);
   Caml_state->backtrace_buffer =
     caml_stat_alloc_noexc(BACKTRACE_BUFFER_SIZE * sizeof(backtrace_slot));
   if (Caml_state->backtrace_buffer == NULL) return -1;
