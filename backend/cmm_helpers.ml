@@ -1194,6 +1194,9 @@ let mk_not_untagged dbg cmm =
     (* 0 -> 1, 1 -> 0 *)
     Cop (Cxor, [c; Cconst_int (1, dbg)], dbg)
 
+let is_xor_with_one cmm =
+  match cmm with Cop (Cxor, [c; Cconst_int (1, _)], _) -> Some c | _ -> None
+
 (** Whether two expressions are known to denote the same machine word. Only
     variables and constants are recognised, so that evaluating one of the two
     expressions instead of both is equivalent. *)

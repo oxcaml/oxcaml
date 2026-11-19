@@ -26,9 +26,8 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
         where k2 =
           let Pfield = %block_load.[`0`] (fix) in
           let prim_1 = %int_comp.ne (Pfield, -784100624) in
-          switch prim_1
-            | 0 -> k1 (1i)
-            | 1 -> k1 (0i))
+          let not_scrutinee = %boolean_not.`imm` (prim_1) in
+          cont k1 (not_scrutinee))
        where k1 (naked_immediate : imm) =
          (switch naked_immediate
             | 0 -> k1
@@ -41,9 +40,8 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                   where k2 =
                     let Pfield = %block_load.[`0`] (fix) in
                     let prim_1 = %int_comp.ne (Pfield, 237833689) in
-                    switch prim_1
-                      | 0 -> k1 (1i)
-                      | 1 -> k1 (0i))
+                    let not_scrutinee = %boolean_not.`imm` (prim_1) in
+                    cont k1 (not_scrutinee))
                  where k1 (naked_immediate_1 : imm) =
                    (switch naked_immediate_1
                       | 0 -> k1
@@ -64,9 +62,10 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                    let prim_2 =
                                      %int_comp.ne (variant, 906850200)
                                    in
-                                   switch prim_2
-                                     | 0 -> k1 (1i)
-                                     | 1 -> k1 (0i)))
+                                   let not_scrutinee =
+                                     %boolean_not.`imm` (prim_2)
+                                   in
+                                   cont k1 (not_scrutinee)))
                            where k1 (naked_immediate_2 : imm) =
                              (switch naked_immediate_2
                                 | 0 -> k1

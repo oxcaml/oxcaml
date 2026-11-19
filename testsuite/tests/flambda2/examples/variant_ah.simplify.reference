@@ -14,14 +14,13 @@ let code inline(always) loopify(never) size(18) newer_version_of(maybe_0)
       cont k (Pmakeblock)
 in
 let $camlVariant_ah__maybe_1 = closure maybe_0_1 @maybe &toplevel in
-let code loopify(never) size(33) newer_version_of(shouldn't_alloc_1)
+let code loopify(never) size(25) newer_version_of(shouldn't_alloc_1)
       shouldn't_alloc_1_1 (f : val, g : val, b : imm tagged, x)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
   (let untagged = %untag_imm (b) in
-   switch untagged
-     | 0 -> k2 (1i, poison.val.variant_unboxing_field)
-     | 1 -> k2 (0i, x))
+   let not_scrutinee = %boolean_not.`imm` (untagged) in
+   cont k2 (not_scrutinee, x))
     where k2 (is_int : imm, unboxed_field_0_0) =
       (switch is_int
          | 0 -> k2
