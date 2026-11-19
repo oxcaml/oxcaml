@@ -74,7 +74,7 @@ let fmt_constant f x =
   | Const_int (i) -> fprintf f "Const_int %d" i
   | Const_char (c) -> fprintf f "Const_char %02x" (Char.code c)
   | Const_untagged_char (c) ->
-      fprintf f "Const_untagged_char %02x" (c land 0xff)
+      fprintf f "Const_untagged_char %02x" (Numbers.Int8.to_int c land 0xff)
   | Const_string (s, strloc, None) ->
       fprintf f "Const_string(%S,%a,None)" s fmt_location strloc
   | Const_string (s, strloc, Some delim) ->
@@ -83,17 +83,21 @@ let fmt_constant f x =
   | Const_float32 (s) -> fprintf f "Const_float32 %s" s;
   | Const_unboxed_float (s) -> fprintf f "Const_unboxed_float %s" s
   | Const_unboxed_float32 (s) -> fprintf f "Const_unboxed_float32 %s" s
-  | Const_int8 (i) -> fprintf f "Const_int8 %d" i
-  | Const_int16 (i) -> fprintf f "Const_int16 %d" i
+  | Const_int8 (i) -> fprintf f "Const_int8 %d" (Numbers.Int8.to_int i)
+  | Const_int16 (i) -> fprintf f "Const_int16 %d" (Numbers.Int16.to_int i)
   | Const_int32 (i) -> fprintf f "Const_int32 %ld" i
   | Const_int64 (i) -> fprintf f "Const_int64 %Ld" i
-  | Const_nativeint (i) -> fprintf f "Const_nativeint %nd" i
+  | Const_nativeint (i) ->
+      fprintf f "Const_nativeint %s" (Targetint.to_string i)
   | Const_untagged_int (i) -> fprintf f "Const_untagged_int %d" i
-  | Const_untagged_int8 (i) -> fprintf f "Const_untagged_int8 %d" i
-  | Const_untagged_int16 (i) -> fprintf f "Const_untagged_int16 %d" i
+  | Const_untagged_int8 (i) ->
+      fprintf f "Const_untagged_int8 %d" (Numbers.Int8.to_int i)
+  | Const_untagged_int16 (i) ->
+      fprintf f "Const_untagged_int16 %d" (Numbers.Int16.to_int i)
   | Const_unboxed_int32 (i) -> fprintf f "Const_unboxed_int32 %ld" i
   | Const_unboxed_int64 (i) -> fprintf f "Const_unboxed_int64 %Ld" i
-  | Const_unboxed_nativeint (i) -> fprintf f "Const_unboxed_nativeint %nd" i
+  | Const_unboxed_nativeint (i) ->
+      fprintf f "Const_unboxed_nativeint %s" (Targetint.to_string i)
 
 let fmt_bool f x =
   match x with
