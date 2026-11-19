@@ -8,7 +8,7 @@
  flags = "-extension layout_poly_alpha -as-argument-for Static_param";
  module = "dynamic_arg.mli";
  compiler_output = "dynamic_arg.output";
- ocamlc_byte_exit_status = "0";
+ ocamlc_byte_exit_status = "2";
  ocamlc.byte;
  compiler_reference = "static_param_dynamic_arg_test.reference";
  check-ocamlc.byte-output;

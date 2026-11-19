@@ -704,21 +704,6 @@ and acknowledge_new_pers_name penv check global_name global import =
   let pn_sign =
     let signature, staticity = sign.sign in
     let mode = Mode.With_regionality.disallow_right (mode_pers_mod staticity) in
-    let mode =
-      match import.imp_visibility with
-      | Visible { cmx_guaranteed = true } ->
-        mode
-      | Visible { cmx_guaranteed = false } | Hidden ->
-        (* Without a guaranteed [.cmx], the unit is not available for
-           compile-time evaluation, so its staticity is forced to [Dynamic]
-           regardless of what the [.cmi] claims. *)
-        Mode.With_regionality.join
-          [ mode;
-            Mode.With_regionality.min_with_monadic Staticity
-              (Mode.Staticity.of_const
-                 ~hint:(Cmx_not_guaranteed import.imp_impl)
-                 Mode.Staticity.Dynamic) ]
-    in
     signature, mode
   in
   let pn = { pn_import = import;
@@ -839,7 +824,23 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   let {persistent_structures; locals_bound_to_runtime_parameters; _} = penv in
   let import = pers_name.pn_import in
   let global = pers_name.pn_global in
-  let (_, mode) as sign = pers_name.pn_sign in
+  let signature, mode = pers_name.pn_sign in
+  let mode =
+    match import.imp_visibility with
+    | Visible { cmx_guaranteed = true } ->
+      mode
+    | Visible { cmx_guaranteed = false } | Hidden ->
+      (* Without a guaranteed [.cmx], the unit is not available for
+         compile-time evaluation, so its staticity is forced to [Dynamic]
+         regardless of what the [.cmi] claims. *)
+      Mode.With_regionality.join
+        [ mode;
+          Mode.With_regionality.min_with_monadic Staticity
+            (Mode.Staticity.of_const
+               ~hint:(Cmx_not_guaranteed import.imp_impl)
+               Mode.Staticity.Dynamic) ]
+  in
+  let sign = signature, mode in
   let is_param = import.imp_is_param in
   let impl = import.imp_impl in
   let filename = import.imp_filename in
