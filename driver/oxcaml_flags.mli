@@ -107,10 +107,10 @@ end
 
 val function_layout : Function_layout.t ref
 
-(** Whether the backend may contract floating-point expressions into fused
+(** Whether the backend may fuse floating-point operations into single
     operations that round only once, e.g. a multiplication and an addition
     into a fused multiply-add. *)
-val fp_contract : bool ref
+val float_op_fusion : bool ref
 
 val disable_builtin_check : bool ref
 val disable_poll_insertion : bool ref

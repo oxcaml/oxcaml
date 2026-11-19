@@ -1,20 +1,20 @@
 (* TEST
  {
-   flags = "-fp-contract off";
+   flags = "-float-op-fusion off";
    native;
  }{
    arch_amd64;
    {
-     flags = "-fp-contract on";
+     flags = "-float-op-fusion on";
      native;
    }{
      native;
    }
  }{
    arch_arm64;
-   reference = "${test_source_directory}/fp_contract.arm64.reference";
+   reference = "${test_source_directory}/float_op_fusion.arm64.reference";
    {
-     flags = "-fp-contract on";
+     flags = "-float-op-fusion on";
      native;
    }{
      native;
@@ -22,10 +22,10 @@
  }
 *)
 
-(* [-fp-contract] controls whether floating-point expressions may be contracted
-   into fused operations that round only once. It is on by default, but only
-   arm64 performs contractions (into fused multiply-add/sub, tested here),
-   hence its separate reference file.
+(* [-float-op-fusion] controls whether floating-point operations may be fused
+   into single operations that round only once. It is on by default, but only
+   arm64 performs such fusion (into fused multiply-add/sub, tested here), hence
+   its separate reference file.
 
    [a *. b] is exactly [1 - 2^-60], which rounds to [1.0]. Adding or
    subtracting [1.0] therefore gives zero if the product is rounded first, and

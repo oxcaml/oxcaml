@@ -208,7 +208,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     | _ -> Use_default)
   (* Recognize floating-point multiply and add/sub. These fused operations round
      only once, so may change the output. *)
-  | (Caddf Float64 | Csubf Float64) when not !Oxcaml_flags.fp_contract ->
+  | (Caddf Float64 | Csubf Float64) when not !Oxcaml_flags.float_op_fusion ->
     Use_default
   | Caddf Float64 -> (
     match[@ocaml.warning "-fragile-match"] args with

@@ -897,7 +897,7 @@ let ocaml_ignored_parametrized_flags =
     "-cached-generic-functions-path";
     "-gdwarf-max-function-complexity";
     "-function-layout";
-    "-fp-contract";
+    "-float-op-fusion";
     "-cfg-stack-checks-threshold";
     "-zero-alloc-checker-details-cutoff";
     "-zero-alloc-checker-join";
