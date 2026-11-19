@@ -1081,8 +1081,6 @@ and gen_arguments (st : State.t) env params =
       | Some _ | None -> gen_value st env binding.ty)
     params
 
-(* A call to an existing top-level function in tail position: its result is not
-   converted. *)
 and gen_tail_call (st : State.t) (env : Env.t) return_ty =
   let functions =
     List.filter
