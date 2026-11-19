@@ -1800,130 +1800,113 @@ let upon_shape_later = Defined_later.Fun.create ~name:"Ctype.upon_shape"
 let upon_shape env ty ~run ~default =
   Defined_later.Fun.get upon_shape_later env ty ~run ~default
 
-let scheduler_later = Defined_later.Fun.create ~name:"Ctype.scheduler"
-
-let scheduler () = Defined_later.Fun.get scheduler_later ()
-
 module Placeholder = struct
   (** A solver variable that stands for the kind of a type variable, until it is
       linked to a non-variable type or defaulted. *)
   type t =
     { type_var : Types.type_expr;
-      ldd_var : Ldd.var;
-      resolved : unit Ivar.t
-          (** Filled once [ldd_var] is solved *and* every placeholder it depends
-              on is resolved. *)
+      ldd_var : Ldd.var
     }
 
-  let create type_var =
-    { type_var;
-      ldd_var = Ldd.new_var ();
-      resolved = Ivar.create ~in_global_pool:false ()
-    }
-
-  let upon_resolved t ~run =
-    Ivar.upon t.resolved ~scheduler:(scheduler ()) ~run ~cancel:(fun () ->
-        Misc.fatal_error "Ikind.Placeholder.upon_resolved: cancelled")
-
-  let upon_resolved_all ts ~run =
-    let rec loop ts =
-      match ts with
-      | [] -> run ()
-      | t :: ts -> upon_resolved t ~run:(fun () -> loop ts)
-    in
-    loop ts
+  let create type_var = { type_var; ldd_var = Ldd.new_var () }
 
   module Ctx = struct
-    (** The placeholders of one [upon_crossing_of_type], by solver variable.
-        Only reachable from pending handlers, so collected once the crossing is
-        known.
+    (** The placeholders of [kind_with_placeholders].
 
-        Not backtracked: an entry only says which placeholder a solver variable
-        belongs to, which stays true. A placeholder created in a backtracked
-        snapshot becomes unreachable from any kind, so its entry is never looked
-        up again. *)
-    type nonrec t = { by_ldd_var_tbl : (Ldd.Var_id.t, t) Hashtbl.t }
+        Not backtracked: [t] is only valid while within a given
+        [upon_crossing_of_type]. Callers must [take ()] the context before
+        returning.
 
-    let create () = { by_ldd_var_tbl = Hashtbl.create 8 }
+        We use a [list] in place of a [Hashtbl.t] since the number of
+        placeholders is usually small. *)
+    type nonrec t = t list
 
-    let add t p = Hashtbl.add t.by_ldd_var_tbl (Ldd.var_id p.ldd_var) p
+    let t : t ref = ref []
 
-    let find_by_ldd_var t ldd_var =
-      match Hashtbl.find_opt t.by_ldd_var_tbl (Ldd.var_id ldd_var) with
-      | Some t -> t
-      | None -> Misc.fatal_error "Ikind.Placeholder.Ctx.find_by_ldd_var"
+    let[@inline always] reset () = t := []
 
-    let dependencies_of_kind t kind =
-      let deps = ref [] in
-      kind
-      |> Ldd.iter_unsolved_vars (fun var ->
-          deps := find_by_ldd_var t var :: !deps);
-      !deps
+    let take () =
+      let placeholders = !t in
+      t := [];
+      placeholders
+
+    let find_or_add_placeholder type_var =
+      let rec loop type_var = function
+        | [] ->
+          let p = create type_var in
+          t := p :: !t;
+          p
+        | p :: ps ->
+          if Types.eq_type type_var p.type_var then p else loop type_var ps
+      in
+      loop type_var !t
   end
-
-  let solve t kind ~deps =
-    Ldd.solve_lfp t.ldd_var kind;
-    upon_resolved_all deps ~run:(fun () ->
-        match Ivar.fill t.resolved () ~scheduler:(scheduler ()) with
-        | Ok -> ()
-        | Already_full () ->
-          Misc.fatal_error "Ikind.Placeholder.solve: resolved twice")
 end
 
-(* [kind_with_placeholders env pctx ty] is [(kind, deps)]: [ty]'s kind with
-   each unsolved type variable's kind replaced by a placeholder, and the
-   placeholders (of this or nested calls, registered in [pctx]) that [kind]
-   still mentions. The crossing is known once all of [deps] are resolved. *)
-let rec kind_with_placeholders env pctx (ty : Types.type_expr) =
-  (* Placeholders created by [kind]. They are not reused by other calls:
-     this call may run in a snapshot that is later backtracked. Throwing
-     away the placeholders avoids the complexity of undo operations on [pctx]. *)
-  let created = Btype.TypeHash.create 4 in
-  let kind_of_var type_var =
-    let p : Placeholder.t =
-      match Btype.TypeHash.find_opt created type_var with
-      | Some p -> p
-      | None ->
-        let p = Placeholder.create type_var in
-        Placeholder.Ctx.add pctx p;
-        Btype.TypeHash.add created type_var p;
-        p
-    in
-    Ldd.node_of_var p.ldd_var
-  in
-  let ctx =
-    create_ctx ~mode:(Solver.Round_up_except_vars kind_of_var) ~env:(Some env)
-  in
-  let kind = Solver.normalize (Solver.kind ~use_tables:false ctx ty) in
-  (* Only solve new placeholders once [kind] is computed: solving turns
-     their type variables into [Tivar]s, and a handler may run immediately and
-     re-enter the solver. Dependencies are computed afterwards, as such a
-     handler may already have solved some placeholders. *)
-  Btype.TypeHash.iter (fun _ p -> solve_placeholder env pctx p) created;
-  kind, Placeholder.Ctx.dependencies_of_kind pctx kind
+let placeholder_kind_of_var type_var =
+  Ldd.node_of_var (Placeholder.Ctx.find_or_add_placeholder type_var).ldd_var
 
-and solve_placeholder env pctx (p : Placeholder.t) =
-  let type_var = p.type_var in
-  let run _ =
-    let kind, deps = kind_with_placeholders env pctx type_var in
-    Placeholder.solve p kind ~deps
-  in
-  let default () =
-    let kind = rounded_up_kind env type_var in
-    Placeholder.solve p kind ~deps:[]
-  in
-  upon_shape env type_var ~run ~default
+let round_up_except_placeholders =
+  Solver.Round_up_except_vars placeholder_kind_of_var
+
+(* [kind_with_placeholders env ty] is [ty]'s kind with each unsolved type
+   variable's kind replaced by a new placeholder. The caller must take those
+   placeholders with [Placeholder.Ctx.take_placeholders] straight away. They
+   are not registered or solved yet. *)
+let kind_with_placeholders env (ty : Types.type_expr) =
+  Placeholder.Ctx.reset ();
+  let ctx = create_ctx ~mode:round_up_except_placeholders ~env:(Some env) in
+  Solver.normalize (Solver.kind ~use_tables:false ctx ty)
+
+let crossing_of_kind kind = Axis_lattice.to_mode_crossing (Ldd.round_up kind)
+
+let rec when_crossing_known env ~kind ~(placeholders : Placeholder.t list)
+    ~known =
+  match placeholders with
+  | [] -> known (crossing_of_kind kind)
+  | p :: placeholders ->
+    let solve kind_of_p ~new_placeholders =
+      Ldd.solve_lfp p.ldd_var kind_of_p;
+      when_crossing_known env ~kind
+        ~placeholders:(List.rev_append new_placeholders placeholders)
+        ~known
+    in
+    let[@inline always] default () =
+      solve (rounded_up_kind env p.type_var) ~new_placeholders:[]
+    in
+    (* Because we don't have guards of type variables, a placeholder
+       variable may be generalized *before* we solve the placeholder.
+
+       In this case, it is consistent to default it with lazy defaulting. *)
+    if Types.get_level p.type_var = Btype.generic_level
+    then default ()
+    else
+      upon_shape env p.type_var
+        ~run:(fun _ ->
+          let kind_of_p = kind_with_placeholders env p.type_var in
+          solve kind_of_p ~new_placeholders:(Placeholder.Ctx.take ()))
+        ~default
 
 let upon_crossing_of_type env (ty : Types.type_expr) ~cross ~later =
-  let crossing kind = Axis_lattice.to_mode_crossing (Ldd.round_up kind) in
-  let pctx = Placeholder.Ctx.create () in
-  match kind_with_placeholders env pctx ty with
-  | kind, [] -> cross (crossing kind)
-  | kind, deps ->
-    let result, ~run = later () in
-    Placeholder.upon_resolved_all deps ~run:(fun () ->
-        run (cross (crossing kind)));
-    result
+  let kind = kind_with_placeholders env ty in
+  match Placeholder.Ctx.take () with
+  | [] -> cross (crossing_of_kind kind)
+  | _ :: _ as placeholders -> (
+    (* Fast-path optimization: if the crossing is immediately known,
+       we can return [cross crossing] instead of allocating a temporary
+       mode variable via [later ()]. *)
+    let known_now = ref None in
+    let run_later = ref None in
+    when_crossing_known env ~kind ~placeholders ~known:(fun crossing ->
+        match !run_later with
+        | None -> known_now := Some crossing
+        | Some run -> run (cross crossing));
+    match !known_now with
+    | Some crossing -> cross crossing
+    | None ->
+      let result, ~run = later () in
+      run_later := Some run;
+      result)
 
 type sub_or_intersect = Jkind.sub_or_intersect
 
