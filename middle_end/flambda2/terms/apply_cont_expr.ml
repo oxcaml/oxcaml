@@ -97,7 +97,9 @@ include Container_types.Make (struct
       then c
       else
         let c = Option.compare Trap_action.compare trap_action1 trap_action2 in
-        if c <> 0 then c else Debuginfo.compare dbg1 dbg2
+        if c <> 0 || not !Dwarf_flags.gdwarf_may_alter_codegen
+        then c
+        else Debuginfo.compare dbg1 dbg2
 
   let equal t1 t2 = compare t1 t2 = 0
 end)
