@@ -213,13 +213,15 @@ let write_stdlib_jsir_sources_dune ppf =
 type jsir_target =
   { program : string; (* the value of -target *)
     env_var : string; (* where ocamlopt finds [program] *)
-    ext_suffix : string }
+    ext_suffix : string;
+    compile_flags : string }
 
 let jsir_targets =
   [ { program = "js_of_ocaml"; env_var = "OXCAML_JS_OF_OCAML";
-      ext_suffix = "js" };
+      ext_suffix = "js"; compile_flags = "" };
+    (* wasm_of_ocaml only writes the names of functions with --pretty. *)
     { program = "wasm_of_ocaml"; env_var = "OXCAML_WASM_OF_OCAML";
-      ext_suffix = "wasm" } ]
+      ext_suffix = "wasm"; compile_flags = " -jsoo-opt-compile --pretty" } ]
 
 let write_stdlib_jsir_dune_for_target ppf jsir_target =
   let src_dir = "../src" and stdlib_dir = "../../stdlib" in
@@ -254,11 +256,12 @@ let write_stdlib_jsir_dune_for_target ppf jsir_target =
         sprintf "(chdir %s %s)" src_dir
           (run_ocamlopt
              (sprintf
-                "%s%s -S -jsoo-opt-compile --source-map-inline \
+                "%s%s -S -jsoo-opt-compile --source-map-inline%s \
                  -I ../build -I %%{ocaml_where} -cmi-file %s \
                  -o ../build/%s.%s -c %%{src}"
                 (stdlib_flags ~directory:source_dir)
                 (pp_flags ~awk_dir:stdlib_dir ~target)
+                jsir_target.compile_flags
                 (installed (target ^ ".cmi")) target (ext "cmx")))
       in
       rule ~ppf ~target ~exts:[ext "cmx"; ext "cmo"; ext "cm-jsir"] ~src ~deps
