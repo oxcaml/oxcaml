@@ -30,7 +30,7 @@ Line 1, characters 0-31:
 1 | type t : bits8 = #{ a : int8# }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t" is bits8 addressable
-         because it is an unboxed record.
+         because it is an unboxed record, which makes its fields addressable.
        But the layout of type "t" must be a sublayout of bits8
          because of the annotation on the declaration of the type t.
 |}]
@@ -52,7 +52,7 @@ Line 1, characters 0-30:
 1 | type t : void = #{ u : unit# }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t" is void addressable
-         because it is an unboxed record.
+         because it is an unboxed record, which makes its fields addressable.
        But the layout of type "t" must be a sublayout of void
          because of the annotation on the declaration of the type t.
 |}]
@@ -150,7 +150,7 @@ Line 1, characters 11-13:
                ^^
 Error: This type "r#" should be an instance of type "('a : bits8)"
        The layout of r# is bits8 addressable
-         because it is an unboxed record.
+         because it is an unboxed record, which makes its fields addressable.
        But the layout of r# must be a sublayout of bits8
          because of the definition of req8 at line 2, characters 0-22.
 |}]

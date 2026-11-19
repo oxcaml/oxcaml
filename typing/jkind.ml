@@ -3925,6 +3925,8 @@ module Format_history = struct
       = function
     | Unboxed_tuple -> fprintf ppf "it is an unboxed tuple"
     | Unboxed_record -> fprintf ppf "it is an unboxed record"
+    | Unboxed_record_making_field_addressable ->
+      fprintf ppf "it is an unboxed record, which makes its fields addressable"
 
   let format_creation_reason ppf ~layout_or_kind :
       History.creation_reason -> unit = function
@@ -4680,6 +4682,19 @@ module Unboxed_field_transformation = struct
 end
 
 let product_of_fields ~why fields layouts =
+  let why : History.product_creation_reason =
+    match (why : History.product_creation_reason), fields, layouts with
+    | ( Unboxed_record,
+        [(_, ({ operator = Addressable; _ } : Unboxed_field_transformation.t))],
+        [layout] )
+      when not (Layout.is_surely_addressable layout) ->
+      Unboxed_record_making_field_addressable
+    | ( ( Unboxed_tuple | Unboxed_record
+        | Unboxed_record_making_field_addressable ),
+        _,
+        _ ) ->
+      why
+  in
   let layouts =
     List.map2
       (fun (_, (wrapping : Unboxed_field_transformation.t)) layout ->
@@ -5310,6 +5325,8 @@ module Debug_printers = struct
     function
     | Unboxed_tuple -> fprintf ppf "Unboxed_tuple"
     | Unboxed_record -> fprintf ppf "Unboxed_record"
+    | Unboxed_record_making_field_addressable ->
+      fprintf ppf "Unboxed_record_making_field_addressable"
 
   let creation_reason ppf : History.creation_reason -> unit = function
     | Annotated (ctx, loc) ->

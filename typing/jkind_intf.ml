@@ -538,6 +538,9 @@ module History = struct
   type product_creation_reason =
     | Unboxed_tuple
     | Unboxed_record
+    | Unboxed_record_making_field_addressable
+        (** An unboxed record whose sole field is not [inherit] and does not
+            already have an addressable layout *)
 
   type creation_reason =
     | Annotated : ('l * 'r) annotation_context * Location.t -> creation_reason
