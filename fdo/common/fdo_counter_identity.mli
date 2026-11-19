@@ -120,9 +120,10 @@ module Position : sig
   val create_call :
     function_:Function.t -> body_hash:Body_hash.t -> index:int -> t
 
-  (** The [index]th call evaluated in the [let] or [module] binding [binder] of
-      a structure in the given function (the unit's toplevel code, a functor
-      body, or a function with a [let module]), independent of any body. *)
+  (** The [index]th call evaluated in the [module] binding [binder] of a
+      structure in the given function (the unit's toplevel code, a functor body,
+      or a function with a [let module]), independent of any body. Calls in
+      [let] bindings are interior positions. *)
   val create_module_level_call :
     function_:Function.t -> binder:Name.t -> index:int -> t
 

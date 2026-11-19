@@ -84,10 +84,11 @@ let module_level_call_binding (loc : Lambda.scoped_location) =
       let is_compilation_unit =
         match prev with Empty -> true | Cons _ -> false
       in
-      (* Treat calls without a binding of its own (e.g. in a toplevel [let () =
-         ...] [include F (X)] or [module _ = F (X)]) as interior positions.
-         These have no stable binders to anchor to. *)
-      if String.equal name "" || is_compilation_unit
+      if
+        String.equal name "" (* as in [let module _ = ...] *)
+        || is_compilation_unit
+        (* as in [let () = ...], [include F (X)] or [module _ = F (X)], etc.
+           which live in the toplevel *)
       then None
       else
         Some
@@ -111,7 +112,10 @@ let call t loc =
     | Some path ->
       (* Multiple calls can have the same binder, e.g. [module M = F (G (X))] *)
       (* CR-someday yusumez: No body hash guards these indices, so e.g. swapping
-         [F] and [G] above swaps their counters. *)
+         [F] and [G] above swaps their counters. Shadowing bindings of a module
+         (e.g. [module M = F (X)] then [module M = G (M)]) also share their
+         binder, so inserting a call in the first shifts the counters of the
+         second. Telling them apart needs [Translmod] to mark the bindings. *)
       let index =
         Option.value (String.Tbl.find_opt t.module_call_indices path) ~default:0
       in
@@ -155,6 +159,11 @@ end
    below. This can drift from what the actual translation does. Consider hooks
    that [cps_switch] calls for the shape it chooses. *)
 
+(* CR yusumez: Simplify drops the counters of arms it merges into a single jump
+   (the [Mergeable] arms of [Simplify_switch_expr], e.g. when all the cases of a
+   side share an action), and [Side] doesn't predict this, so they don't go on
+   the dispatch either. *)
+
 (* The constant or the block side of a [Lambda] switch. A switch with both
    translates to a switch per side behind the dispatch on whether the scrutinee
    is an immediate. A side whose discriminants all go to one arm becomes a jump
@@ -168,9 +177,13 @@ module Side = struct
     }
 
   let create ~cases ~num ~has_default ~counter ~failaction =
+    let case_set = List.map fst cases |> Numeric_types.Int.Set.of_list in
     let counters : Switch_counters.t =
       { case =
-          (fun n -> if List.mem_assoc n cases then counter n else failaction);
+          (fun n ->
+            if Numeric_types.Int.Set.mem n case_set
+            then counter n
+            else failaction);
         failaction
       }
     in
