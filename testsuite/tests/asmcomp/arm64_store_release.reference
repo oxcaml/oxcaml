@@ -1,0 +1,4 @@
+has_dmb_ishld=no
+value_store_uses_stlr=yes
+bytes_store_barrier_free=yes
+bigarray_store_barrier_free=yes

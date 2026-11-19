@@ -1,0 +1,31 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# first, run the program to make sure it doesn't crash
+${program}
+
+# now check the assembly produced during compilation: non-value 64-bit stores
+# (Bytes/Bigarray/Buffer data) carry no memory-model barrier, while a value
+# store keeps the store-release.  Attribute each instruction to the function it
+# appears in and report per-function presence.
+asm=${test_build_directory}/arm64_store_release.s
+awk '
+/__store_bytes_.*code:/    { c = "bytes";    next }
+/__store_bigarray_.*code:/ { c = "bigarray"; next }
+/__store_buffer_.*code:/   { c = "buffer";   next }
+/__store_value_.*code:/    { c = "value";    next }
+/_code:/                   { c = "other";    next }
+/dmb[[:space:]]+ishld/      { dmb[c] = 1 }
+/[[:space:]]stlr[[:space:]]/ { stlr[c] = 1 }
+END {
+  any_dmb = dmb["bytes"] || dmb["bigarray"] || dmb["buffer"] \
+            || dmb["value"] || dmb["other"]
+  print "has_dmb_ishld=" (any_dmb ? "yes" : "no")
+  print "value_store_uses_stlr=" (stlr["value"] ? "yes" : "no")
+  print "bytes_store_barrier_free=" \
+    ((dmb["bytes"] || stlr["bytes"]) ? "no" : "yes")
+  print "bigarray_store_barrier_free=" \
+    ((dmb["bigarray"] || stlr["bigarray"]) ? "no" : "yes")
+}
+' "$asm"
