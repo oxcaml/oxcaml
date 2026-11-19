@@ -3,7 +3,7 @@ import Oxiclean.Leoization
 open Oxiclean.Leoization
 open Oxiclean.Model
 
-abbrev interface : ModuleType :=
+abbrev expectedInterface : ModuleType :=
   let int : ValType := .constr (.predef .int) []
   let t : ValType := .constr (.field (.var 0) 0) []
   let t_option : ValType := .constr (.predef .option) [t]
@@ -12,7 +12,7 @@ abbrev interface : ModuleType :=
 
   .signature [.valType { manifest := none, arity := 0 }] [.val create, .val get]
 
-abbrev implementation : Expr :=
+abbrev expectedImplementation : Expr :=
   let get : Expr := .function (Expr.var 0)
   let intMod : BinaryScalarOperation := .integral .modulo
   let immZero : Immediate := { bitsAboveLsb := 0#63 }
@@ -30,11 +30,22 @@ abbrev implementation : Expr :=
 
   .letBinding get (.letBinding create (.block 0 [.var 0, .var 1]))
 
-example : Oxiclean.Extracted.Even.interface = interface := by rfl
-example : Oxiclean.Extracted.Even.implementation = implementation := by rfl
+example : Oxiclean.Extracted.Even.interface = expectedInterface := by rfl
+example : Oxiclean.Extracted.Even.implementation = expectedImplementation := by rfl
 
 abbrev expectedStatics : Type :=
   Statics.ModuleItem
     (Statics.TypeDeclaration Statics.AbstractType)
     Statics.ModuleEnd
+
 example : Oxiclean.Extracted.Even.interface.statics = expectedStatics := by rfl
+
+abbrev userDefinedStatics : expectedStatics :=
+  { item :=
+      { typeDeclaration :=
+          { abstractTypeRelation :=
+              PER.always
+          }
+      }
+  , tail := {}
+  }
