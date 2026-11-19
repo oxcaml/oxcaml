@@ -1,7 +1,8 @@
 (** Union-find with union by rank, path compression, and backtracking.
 
     Each equivalence class carries a value, stored at its root. Every mutation
-    (including path compression) is reported to the change log installed by
+    (including path compression) of a node created before the latest snapshot
+    (see {!With_backtracking.Stamp}) is reported to the change log installed by
     [set_log], so that it can be undone with [Change.undo]. Each application of
     [Make] has its own log. Values should be immutable for undoing to fully
     restore a class. *)
