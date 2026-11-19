@@ -901,6 +901,7 @@ let ocaml_ignored_parametrized_flags =
     "-zero-alloc-checker-details-cutoff";
     "-zero-alloc-checker-join";
     "-dgranularity";
+    "-dprofile-level";
     "-flambda2-expert-cont-lifting-budget";
     "-vectorize-max-block-size";
     "-save-ir-before";
