@@ -86,11 +86,12 @@ val mutable_unboxing_result : t -> Flow_types.Mutable_unboxing_result.t
 
 val set_resimplify : t -> t
 
-(** The orphaned FDO counters kept track of so far. *)
-val fdo_region_counters : t -> Fdo_region_counters.t
+(** The FDO counters dropped so far, including those of the downwards traversal
+    (see [Downwards_acc.fdo_dropped_counters]). *)
+val fdo_dropped_counters : t -> Fdo_dropped_counters.t
 
-val map_fdo_region_counters :
-  t -> f:(Fdo_region_counters.t -> Fdo_region_counters.t) -> t
+val add_dropped_fdo_counters :
+  t -> reason:Fdo_dropped_counters.Reason.t -> Fdo_annotation.t -> t
 
 val resimplify : t -> bool
 

@@ -26,59 +26,52 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** An [Fdo_region_counters.t] keeps track of orphaned FDO counters: those whose
-    instruction Simplify removes while the code they count stays. This includes:
+(** FDO counters that the compiler drops: those whose edge or instruction an
+    optimization removes while the code they count stays, such as the entry
+    counter of an inlined function. No instruction is left to measure a dropped
+    counter, so its count is unknown rather than zero.
 
-    * The entry counters of the callee of an inlined call
+    Counters are dropped along with the reason, and registered for the
+    compilation unit so that the loss can be reported. *)
 
-    * The counter of a self tail call turned into a jump
-
-    * The counters of the arms of a switch that collapses into a single jump.
-
-    A [Region.t] is a stretch of straight-line control flow: a function body or
-    a continuation handler, up to its terminator. Orphaned counters are attached
-    to the edges into their [Region.t].
-
-    The counters are recorded during the downward traversal and when rebuilding.
-    They are read when rebuilding a switch arm, before its target can change,
-    and for the function entry when the whole body has been rebuilt. An arm
-    therefore misses the counters recorded after it was rebuilt.
-
-    The counters Simplify loses or miscounts are listed at the end of
-    fdo_region_counters.ml. *)
-
-module Region : sig
+module Reason : sig
   type t =
-    | Function_entry of Code_id.t
-    | Handler of Continuation.t
+    | Inlined_call
+        (** The entry counters of a function, where a call to it is inlined. *)
+    | Self_tail_call_to_jump
+        (** The counter of a self tail call that becomes a jump. *)
+    | Switch_to_single_arm
+        (** The counters of the only arm of a switch that can be taken. *)
+    | Switch_with_identical_arms
+        (** The counters of the arms of a switch that all do the same. *)
+    | Switch_to_lookup_table
+        (** The counters of the arms of a switch that becomes a table lookup. *)
+
+  val to_string : t -> string
 end
 
+(** A set of dropped counters, each with the reason it was first dropped for. *)
 type t
 
 val empty : t
 
-(** The given counters are orphaned in [region]. *)
-val add_counters : t -> Region.t -> Fdo_annotation.t -> t
+val add : t -> reason:Reason.t -> Fdo_annotation.t -> t
 
-(** [region] continues into the handler of [cont], by the use [use_id] (for
-    which [cont] may have been specialized). *)
-val add_successor :
-  t -> Region.t -> Continuation.t -> use_id:Apply_cont_rewrite_id.t -> t
+val union : t -> t -> t
 
-(** The counters to attach to a continuation with use [use_id] (for which [cont]
-    may have been specialized). *)
-val counters_into_handler :
-  t ->
-  specialization_map:Continuation.t Continuation_callsite_map.t ->
-  Continuation.t ->
-  use_id:Apply_cont_rewrite_id.t ->
-  Fdo_annotation.t
+(** In the order of the counters. *)
+val to_list : t -> (Fdo_counter.t * Reason.t) list
 
-(** The entry annotation of the code with the given code id, with the counters
-    to attach to its entry edge. *)
-val entry_annotation :
-  t ->
-  specialization_map:Continuation.t Continuation_callsite_map.t ->
-  Code_id.t ->
-  Fdo_annotation.With_body_hash.t ->
-  Fdo_annotation.With_body_hash.t
+(** One counter per line, with its reason. *)
+val print : Format.formatter -> t -> unit
+
+(** {2 The counters dropped in the current compilation unit} *)
+
+val register : reason:Reason.t -> Fdo_annotation.t -> unit
+
+val register_all : t -> unit
+
+val registered : unit -> t
+
+(** To be called before compiling a unit. *)
+val reset : unit -> unit

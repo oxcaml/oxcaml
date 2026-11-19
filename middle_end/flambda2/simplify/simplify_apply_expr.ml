@@ -26,7 +26,7 @@ let fail_if_probe apply =
        always be direct applications of an OCaml function:@ %a"
       Apply.print apply
 
-let record_free_names_of_apply_as_used apply ~use_id ~exn_cont_use_id data_flow
+let record_free_names_of_apply_as_used0 apply ~use_id ~exn_cont_use_id data_flow
     =
   let data_flow =
     Flow.Acc.add_used_in_current_handler
@@ -44,14 +44,9 @@ let record_free_names_of_apply_as_used apply ~use_id ~exn_cont_use_id data_flow
     ~exn_cont:(exn_cont_use_id, exn_cont)
     ~result_cont ~result_arity:(Apply.return_arity apply) data_flow
 
-let record_non_inlined_apply dacc ~use_id ~exn_cont_use_id apply =
-  let dacc =
-    match Apply.continuation apply, use_id with
-    | Return k, Some use_id -> DA.add_fdo_region_successor dacc k ~use_id
-    | Return _, None | Never_returns, _ -> dacc
-  in
+let record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply =
   DA.map_flow_acc dacc
-    ~f:(record_free_names_of_apply_as_used ~use_id ~exn_cont_use_id apply)
+    ~f:(record_free_names_of_apply_as_used0 ~use_id ~exn_cont_use_id apply)
 
 let loopify_decision_for_call dacc apply =
   let denv = DA.denv dacc in
@@ -112,9 +107,8 @@ let simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up =
   simplify_expr (dacc_for_terms_built_from_apply dacc) expr ~down_to_up
 
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
-  (* The call becomes a jump, which runs as often: its counter is preserved. *)
   let dacc =
-    DA.add_orphaned_fdo_counters dacc
+    DA.add_dropped_fdo_counters dacc ~reason:Self_tail_call_to_jump
       (Fdo_annotation.of_list (Option.to_list (Apply.callsite_counter apply)))
   in
   Simplify_apply_cont_expr.simplify_apply_cont
@@ -441,7 +435,9 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
                ~machine_width:(DE.machine_width (DA.denv dacc)))
       in
       let apply = Apply.with_continuation apply result_continuation in
-      let dacc = record_non_inlined_apply dacc ~use_id ~exn_cont_use_id apply in
+      let dacc =
+        record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
+      in
       let expr =
         (* CR-someday bclement: it's not clear that either of the [result_arity]
            from the callee's code metadata or the [apply]'s [return_arity] is
@@ -997,7 +993,9 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
       (Inlined_attribute.with_use_info (Apply.inlined apply)
          Unused_because_function_unknown)
   in
-  let dacc = record_non_inlined_apply ~use_id ~exn_cont_use_id dacc apply in
+  let dacc =
+    record_free_names_of_apply_as_used ~use_id ~exn_cont_use_id dacc apply
+  in
   down_to_up dacc
     (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
 
@@ -1414,7 +1412,8 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
            ~machine_width:(DE.machine_width (DA.denv dacc)))
   in
   let dacc =
-    record_non_inlined_apply dacc ~use_id:(Some use_id) ~exn_cont_use_id apply
+    record_free_names_of_apply_as_used dacc ~use_id:(Some use_id)
+      ~exn_cont_use_id apply
   in
   down_to_up dacc
     (SE.simplified_apply apply ~use_id:(Some use_id) ~exn_cont_use_id
@@ -1473,7 +1472,9 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
              (Exn_continuation.arity (Apply.exn_continuation apply))
              ~machine_width:(DE.machine_width (DA.denv dacc)))
     in
-    let dacc = record_non_inlined_apply dacc ~use_id ~exn_cont_use_id apply in
+    let dacc =
+      record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
+    in
     down_to_up dacc
       (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
   | Invalid ->
@@ -1539,7 +1540,9 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
            (Exn_continuation.arity (Apply.exn_continuation apply))
            ~machine_width:(DE.machine_width (DA.denv dacc)))
   in
-  let dacc = record_non_inlined_apply dacc ~use_id ~exn_cont_use_id apply in
+  let dacc =
+    record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
+  in
   down_to_up dacc
     (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
 

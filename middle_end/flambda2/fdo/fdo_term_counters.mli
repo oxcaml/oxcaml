@@ -39,7 +39,7 @@ val map_counters_of_code :
 val calls_without_counter : Code.t -> int
 
 (** The entry counters of [code] inlined at the call corresponding to
-    [callsite_counter]. *)
+    [callsite_counter]: none if the call has no counter. *)
 val of_inlined_call :
   callsite_counter:Fdo_counter.t option -> Code.t -> Fdo_annotation.t
 

@@ -99,6 +99,7 @@ let (pass_to_cfg : Cfg_format.cfg_unit_info Compiler_pass_map.t) =
 
 let reset () =
   Zero_alloc_checker.reset_unit_info ();
+  Fdo_dropped_counters.reset ();
   start_from_emit := false;
   Compiler_pass_map.iter
     (fun pass (cfg_unit_info : Cfg_format.cfg_unit_info) ->
@@ -746,6 +747,11 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
       Misc.try_finally
         (fun () ->
           gen ();
+          if !Oxcaml_flags.dump_fdo_dropped_counters
+          then
+            Format.fprintf ppf_dump "*** FDO dropped counters@.%a"
+              Fdo_dropped_counters.print
+              (Fdo_dropped_counters.registered ());
           Zero_alloc_checker.record_unit_info ppf_dump;
           Compiler_hooks.execute Compiler_hooks.Check_allocations
             Zero_alloc_checker.iter_witnesses;

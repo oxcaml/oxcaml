@@ -167,7 +167,10 @@ let of_inlined_call ~callsite_counter code =
     Fdo_annotation.With_body_hash.annotation (Code.fdo_entry_annotation code)
   in
   match callsite_counter with
-  | None -> entry_counters
+  | None ->
+    (* Without a counter the call gives the body no inlining context: the entry
+       counters would be those of the function itself. *)
+    Fdo_annotation.empty
   | Some at ->
     Fdo_annotation.map
       (fun counter -> Fdo_counter.inline counter ~at)

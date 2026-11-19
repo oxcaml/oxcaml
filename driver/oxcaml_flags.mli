@@ -159,6 +159,8 @@ val llvm_flags : string ref
 
 val fdo_counters : bool ref
 
+val dump_fdo_dropped_counters : bool ref
+
 module Flambda2 : sig
   val debug : bool ref
   val reaper_debug_flags : string list ref
