@@ -1182,6 +1182,18 @@ let mk_not dbg cmm =
     (* 1 -> 3, 3 -> 1 *)
     Cop (Cxor, [Cconst_int (2, dbg); c], dbg)
 
+let mk_not_untagged dbg cmm =
+  match cmm with
+  | Cop (Ccmpi cmp, args, dbg') ->
+    Cop (Ccmpi (negate_integer_comparison cmp), args, dbg')
+  | Cop (Ccmpf (w, cmp), args, dbg') ->
+    Cop (Ccmpf (w, negate_float_comparison cmp), args, dbg')
+  | Cconst_int (0, _) -> Cconst_int (1, dbg)
+  | Cconst_int (1, _) -> Cconst_int (0, dbg)
+  | c ->
+    (* 0 -> 1, 1 -> 0 *)
+    Cop (Cxor, [c; Cconst_int (1, dbg)], dbg)
+
 (** Whether two expressions are known to denote the same machine word. Only
     variables and constants are recognised, so that evaluating one of the two
     expressions instead of both is equivalent. *)

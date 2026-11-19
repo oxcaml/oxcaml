@@ -535,7 +535,7 @@ let rebuild_mergeable_argument ~machine_width ~scrutinee mergeable_argument k =
     let$ tagged_scrutinee = bound_tagged_scrutinee scrutinee dbg in
     let$ not_scrutinee =
       bound_prim "not_scrutinee" K.value
-        (P.Unary (Boolean_not, tagged_scrutinee))
+        (P.Unary (Boolean_not Tagged_bool, tagged_scrutinee))
         dbg
     in
     k not_scrutinee

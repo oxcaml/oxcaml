@@ -421,7 +421,7 @@ let unary_prim_size ~machine_width prim =
   | Int_arith (kind, op) -> unary_int_prim_size ~machine_width kind op
   | Float_arith _ -> 2
   | Num_conv { src; dst } -> arith_conversion_size ~machine_width src dst
-  | Boolean_not -> 1
+  | Boolean_not _ -> 1
   | Reinterpret_boxed_vector -> 0
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
