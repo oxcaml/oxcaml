@@ -118,6 +118,13 @@ val invalid :
 val layout_block :
   To_cmm_result.t -> words:nativeint list -> Cmm.symbol * To_cmm_result.t
 
+(** The symbol of the layout block for mixed blocks of the given shape, if they
+    have a layout word. *)
+val mixed_block_layout :
+  To_cmm_result.t ->
+  Flambda_kind.Mixed_block_shape.t ->
+  Cmm.symbol option * To_cmm_result.t
+
 module Update_kind : sig
   type t
 

@@ -119,23 +119,26 @@ let mixed_block_kinds shape =
   in
   value_prefix @ flat_suffix
 
-let make_block ~dbg kind alloc_mode args =
+let make_block ~dbg res kind alloc_mode args =
   check_alloc_fields args;
   let mode = C.alloc_mode_for_allocations_to_cmm alloc_mode in
   match (kind : P.Block_kind.t) with
   | Values (tag, _) ->
     let tag = Tag.Scannable.to_int tag in
-    C.make_alloc ~mode dbg ~tag args
+    res, C.make_alloc ~mode dbg ~tag args
   | Naked_floats ->
     let tag = Tag.to_int Tag.double_array_tag in
-    C.make_float_alloc ~mode dbg ~tag args
+    res, C.make_float_alloc ~mode dbg ~tag args
   | Mixed (tag, shape) ->
     let value_prefix_size = K.Mixed_block_shape.value_prefix_size shape in
     let args_memory_chunks =
       List.map C.memory_chunk_of_kind (mixed_block_kinds shape)
     in
     let tag = Tag.Scannable.to_int tag in
-    C.make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks
+    let layout, res = To_cmm_shared.mixed_block_layout res shape in
+    ( res,
+      C.make_mixed_alloc ~mode dbg ~tag ~value_prefix_size ~layout args
+        args_memory_chunks )
 
 let memory_chunk_of_flat_suffix_element :
     K.flat_suffix_element -> Cmm.memory_chunk = function
@@ -150,10 +153,18 @@ let memory_chunk_of_flat_suffix_element :
   | Naked_mask -> Word_mask
   | Naked_int64 | Naked_nativeint | Naked_immediate -> Word_int
 
+(* The offset in words of field [field] of a block: for a mixed block, this
+   allows for wider fields before it and for any layout word. *)
+let mixed_field_offset (kind : P.Block_access_kind.t) field =
+  match kind with
+  | Mixed { shape; _ } ->
+    Flambda_kind.Mixed_block_shape.offset_in_words shape field
+  | Values _ | Naked_floats _ -> field
+
 let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
     ~block ~field =
   let mutability = Mutability.to_asttypes mutability in
-  let field = Target_ocaml_int.to_int field in
+  let field = mixed_field_offset kind (Target_ocaml_int.to_int field) in
   let get_field_computed immediate_or_pointer =
     let index = C.int_const dbg field in
     C.get_field_computed immediate_or_pointer mutability ~block ~index dbg
@@ -170,17 +181,16 @@ let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
   | Values { field_kind = Immediate; _ } ->
     get_field_computed Immediate
   | Naked_floats _ -> get_field_unboxed Double ~offset_in_words:field
-  | Mixed { field_kind = Flat_suffix field_kind; shape; _ } ->
+  | Mixed { field_kind = Flat_suffix field_kind; _ } ->
     get_field_unboxed
       (memory_chunk_of_flat_suffix_element field_kind)
-      ~offset_in_words:
-        (Flambda_kind.Mixed_block_shape.offset_in_words shape field)
+      ~offset_in_words:field
 
 let block_set ~dbg (kind : P.Block_access_kind.t) (init : P.Init_or_assign.t)
     ~block ~field ~new_value =
   C.return_unit dbg
     (let init_or_assign = P.Init_or_assign.to_lambda init in
-     let field = Target_ocaml_int.to_int field in
+     let field = mixed_field_offset kind (Target_ocaml_int.to_int field) in
      let setfield_computed is_ptr =
        let index = C.int_const dbg field in
        C.setfield_computed is_ptr init_or_assign block index new_value dbg
@@ -195,15 +205,10 @@ let block_set ~dbg (kind : P.Block_access_kind.t) (init : P.Init_or_assign.t)
      | Naked_floats _ ->
        let index = C.int_const dbg field in
        C.float_array_set block index new_value dbg
-     | Mixed { field_kind = Flat_suffix field_kind; shape; _ } ->
-       let index_in_words =
-         Flambda_kind.Mixed_block_shape.offset_in_words shape field
-       in
+     | Mixed { field_kind = Flat_suffix field_kind; _ } ->
        C.set_field_unboxed ~dbg
          (memory_chunk_of_flat_suffix_element field_kind)
-         block
-         ~index_in_words:(C.int_const dbg index_in_words)
-         new_value)
+         block ~index_in_words:(C.int_const dbg field) new_value)
 
 (* Array creation and access. For these functions, [index] is a tagged
    integer. *)
@@ -238,7 +243,8 @@ let make_non_scannable_unboxed_product_array ~dbg kind mode args =
         mem_chunks_per_non_unarized_element.(index))
       args
   in
-  C.make_mixed_alloc ~mode dbg ~tag:0 ~value_prefix_size:0 args mem_chunks
+  C.make_mixed_alloc ~mode dbg ~tag:0 ~value_prefix_size:0 ~layout:None args
+    mem_chunks
 
 let make_array ~dbg kind alloc_mode args =
   check_alloc_fields args;
@@ -1454,18 +1460,18 @@ let quaternary_primitive _env dbg f (_x_simple : Simple.t option)
       (atomic_offset offset_units y)
       ~old_value:z ~new_value:w
 
-let variadic_primitive _env dbg f args =
+let variadic_primitive _env res dbg f args =
   match (f : P.variadic_primitive) with
   | Begin_region { ghost = false } | Begin_try_region { ghost = false } ->
-    C.beginregion ~dbg
+    res, C.beginregion ~dbg
   | Begin_region { ghost = true } | Begin_try_region { ghost = true } ->
-    C.int ~dbg 0
+    res, C.int ~dbg 0
   | Make_block (kind, _mut, alloc_mode) ->
     (* CR alloc_regions: propagate alloc_regions to CMM. *)
-    make_block ~dbg kind alloc_mode args
+    make_block ~dbg res kind alloc_mode args
   | Make_array (kind, _mut, alloc_mode) ->
     (* CR alloc_regions: propagate alloc_regions to CMM. *)
-    make_array ~dbg kind alloc_mode args
+    res, make_array ~dbg kind alloc_mode args
 
 let arg ?consider_inlining_effectful_expressions ~dbg env res simple =
   C.simple ?consider_inlining_effectful_expressions ~dbg env res simple
@@ -1519,7 +1525,7 @@ let trans_prim : To_cmm_env.t To_cmm_env.trans_prim =
         None, res, cmm);
     variadic =
       (fun env res dbg prim args ->
-        let cmm = variadic_primitive env dbg prim args in
+        let res, cmm = variadic_primitive env res dbg prim args in
         None, res, cmm)
   }
 
@@ -1620,7 +1626,7 @@ let prim_simple env res dbg p =
     let args, free_vars, env, res, effs =
       arg_list ?consider_inlining_effectful_expressions ~dbg env res l
     in
-    let expr = variadic_primitive env dbg variadic args in
+    let res, expr = variadic_primitive env res dbg variadic args in
     Env.simple expr free_vars, None, env, res, effs
 
 let prim_complex env res dbg p =

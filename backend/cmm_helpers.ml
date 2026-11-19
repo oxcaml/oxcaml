@@ -200,14 +200,24 @@ type t =
      need to be mixed block because they can make use of the startenv to skip
      the unboxed part of the environment. *)
   | Mixed_block of { scannable_prefix : int }
-(* Mixed blocks, that need special header to specify the length of the scannable
-   prefix. *)
+  (* Mixed blocks, that need special header to specify the length of the
+     scannable prefix. *)
+  | Mixed_block_with_layout_block of { layout : Cmm.symbol }
+(* Mixed blocks whose scannable prefix is too long for the header. Their first
+   word, the layout word, points to the static layout block [layout], which says
+   which of the following words are scannable. *)
 
 module Mixed_block_support : sig
   val assert_mixed_block_support : unit -> unit
 
+  val max_scannable_prefix : int
+
   val make_header :
     Nativeint.t -> scannable_prefix:int -> wosize:int -> Nativeint.t
+
+  val layout_block_reserved : int
+
+  val make_header_with_layout_block : Nativeint.t -> Nativeint.t
 
   val layout_words : unscannable:bool array -> Nativeint.t list
 end = struct
@@ -215,9 +225,8 @@ end = struct
 
   let required_addr_size_bits = 64
 
-  (* The prefix must end within the header's inline scan mask; larger prefixes
-     return with the layout-word formats. typedecl.ml enforces this limit with a
-     proper error. *)
+  (* The prefix must end within the header's inline scan mask; blocks with
+     larger prefixes have a layout block. *)
   let max_scannable_prefix = Header_bits.scan_mask_bits - 1
 
   let max_header =
@@ -278,6 +287,24 @@ end = struct
          Header_bits.scan_mask_shift)
       header
 
+  (* The external (11) format: no scan mask or repeat in the header. *)
+  let layout_block_reserved =
+    Header_bits.format_external
+    lsl (Header_bits.format_shift - Header_bits.scan_mask_shift)
+
+  let make_header_with_layout_block header =
+    assert_mixed_block_support ();
+    if header > max_header
+    then
+      Misc.fatal_errorf
+        "Header too big for the mixed block encoding to be added (%nd > %nd)"
+        header max_header;
+    Nativeint.add
+      (Nativeint.shift_left
+         (Nativeint.of_int layout_block_reserved)
+         Header_bits.scan_mask_shift)
+      header
+
   (* The scan words of a layout block, for a block whose user word [i] is
      unscannable iff [unscannable.(i)]. Each scan word has a mask for the next
      [Header_bits.layout_word_mask_bits] user words (1 = unscannable); the last
@@ -335,6 +362,9 @@ end
 
 let mixed_block_layout_words = Mixed_block_support.layout_words
 
+let mixed_block_has_layout_block ~value_prefix_size =
+  value_prefix_size > Mixed_block_support.max_scannable_prefix
+
 (* CR mshinwell: update to use NOT_MARKABLE terminology *)
 let block_header ?(block_kind = Regular_block) tag sz =
   let hdr =
@@ -346,6 +376,8 @@ let block_header ?(block_kind = Regular_block) tag sz =
   | Regular_block -> hdr
   | Mixed_block { scannable_prefix } ->
     Mixed_block_support.make_header hdr ~scannable_prefix ~wosize:sz
+  | Mixed_block_with_layout_block { layout = _ } ->
+    Mixed_block_support.make_header_with_layout_block hdr
 
 (* Static data corresponding to "value"s must be marked black in case we are in
    no-naked-pointers mode. See [caml_darken] and the code below that emits
@@ -365,6 +397,11 @@ let black_mixed_block_header tag sz ~scannable_prefix_len =
 
 let white_mixed_block_header tag sz ~scannable_prefix_len =
   mixed_block_header tag sz ~scannable_prefix_len ~color:0n
+
+let black_mixed_block_header_with_layout_block tag sz ~layout =
+  Nativeint.logor
+    (block_header tag sz ~block_kind:(Mixed_block_with_layout_block { layout }))
+    caml_black
 
 let local_block_header ?block_kind tag sz =
   Nativeint.logor (block_header ?block_kind tag sz) caml_local
@@ -2816,6 +2853,12 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
       | Local -> local_block_header ~block_kind tag wordsize
       | Heap -> block_header ~block_kind tag wordsize
     in
+    let args =
+      match block_kind with
+      | Regular_block | Mixed_block _ -> args
+      | Mixed_block_with_layout_block { layout } ->
+        Cconst_symbol (layout, dbg) :: args
+    in
     Cop (Calloc (mode, alloc_block_kind), Cconst_natint (hdr, dbg) :: args, dbg)
   else
     let id = V.create_local "*alloc*" in
@@ -2832,12 +2875,24 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
           "To_cmm_helpers.make_alloc_generic: mismatched list sizes between \
            fields and memory chunks"
     in
-    let caml_alloc_func, caml_alloc_args =
+    let int arg = Cconst_int (arg, dbg) in
+    (* The runtime stores any layout word, so the fields start after it. *)
+    let caml_alloc_func, caml_alloc_args, first_field =
       match block_kind with
-      | Regular_block -> "caml_alloc_shr_check_gc", [wordsize; tag]
+      | Regular_block -> "caml_alloc_shr_check_gc", [int wordsize; int tag], 0
       | Mixed_block { scannable_prefix } ->
         Mixed_block_support.assert_mixed_block_support ();
-        "caml_alloc_mixed_shr_check_gc", [wordsize; tag; scannable_prefix]
+        ( "caml_alloc_mixed_shr_check_gc",
+          [int wordsize; int tag; int scannable_prefix],
+          0 )
+      | Mixed_block_with_layout_block { layout } ->
+        Mixed_block_support.assert_mixed_block_support ();
+        ( "caml_alloc_shr_layout_check_gc",
+          [ int wordsize;
+            int tag;
+            int Mixed_block_support.layout_block_reserved;
+            Cconst_symbol (layout, dbg) ],
+          1 )
     in
     Clet
       ( VP.create id,
@@ -2852,9 +2907,9 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
                 coeffects = Has_coeffects;
                 ty_args = []
               },
-            List.map (fun arg -> Cconst_int (arg, dbg)) caml_alloc_args,
+            caml_alloc_args,
             dbg ),
-        fill_fields 0 args args_memory_chunks )
+        fill_fields first_field args args_memory_chunks )
 
 let make_alloc ~mode dbg ~tag args =
   make_alloc_generic ~block_kind:Regular_block ~mode dbg tag (List.length args)
@@ -2878,7 +2933,8 @@ let make_closure_alloc ~mode dbg ~tag args args_memory_chunks =
   make_alloc_generic ~block_kind:Regular_block ~mode dbg tag size args
     ~alloc_block_kind:Alloc_block_kind_closure args_memory_chunks
 
-let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
+let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size ~layout args
+    args_memory_chunks =
   let size =
     List.fold_left
       (fun ofs memory_chunk ->
@@ -2921,10 +2977,19 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           | Word_val -> error "the flat suffix of a mixed block")
       0 args_memory_chunks
   in
-  make_alloc_generic
-    ~block_kind:(Mixed_block { scannable_prefix = value_prefix_size })
-    ~alloc_block_kind:Alloc_block_kind_other ~mode dbg tag size args
-    args_memory_chunks
+  let block_kind, size =
+    match layout with
+    | None -> Mixed_block { scannable_prefix = value_prefix_size }, size
+    | Some layout ->
+      if not (mixed_block_has_layout_block ~value_prefix_size)
+      then
+        Misc.fatal_errorf
+          "Layout block given for a mixed block with a value prefix of %d"
+          value_prefix_size;
+      Mixed_block_with_layout_block { layout }, size + 1
+  in
+  make_alloc_generic ~block_kind ~alloc_block_kind:Alloc_block_kind_other ~mode
+    dbg tag size args args_memory_chunks
 
 (* Record application and currying functions *)
 

@@ -411,6 +411,19 @@ let layout_block res ~words =
   in
   To_cmm_result.symbol res layout_sym, res
 
+let mixed_block_layout res shape =
+  let module MBS = Flambda_kind.Mixed_block_shape in
+  if MBS.has_layout_word shape
+  then
+    let value_prefix_size = MBS.value_prefix_size shape in
+    let unscannable =
+      Array.init (MBS.size_in_words shape) (fun i -> i >= value_prefix_size)
+    in
+    let words = Cmm_helpers.mixed_block_layout_words ~unscannable in
+    let layout, res = layout_block res ~words in
+    Some layout, res
+  else None, res
+
 module Update_kind = struct
   type kind =
     | Pointer

@@ -114,6 +114,15 @@ val black_mixed_block_header :
     requires. *)
 val mixed_block_layout_words : unscannable:bool array -> nativeint list
 
+(** Whether a mixed block with this many values before its flat suffix needs a
+    layout block. *)
+val mixed_block_has_layout_block : value_prefix_size:int -> bool
+
+(** The header of a static mixed block of [sz] words, the first being its layout
+    word, pointing to [layout]. *)
+val black_mixed_block_header_with_layout_block :
+  int -> int -> layout:Cmm.symbol -> nativeint
+
 val black_closure_header : int -> nativeint
 
 (** Infix header at the given offset *)
@@ -476,6 +485,7 @@ val make_mixed_alloc :
   Debuginfo.t ->
   tag:int ->
   value_prefix_size:int ->
+  layout:Cmm.symbol option ->
   expression list ->
   memory_chunk list ->
   expression

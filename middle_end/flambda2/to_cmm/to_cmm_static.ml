@@ -365,20 +365,34 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
         Symbol.print s);
     let sym = R.symbol res s in
     let res = R.check_for_module_symbol res s in
-    let field_kinds, header =
+    let res, field_kinds, header, layout_word =
       let tag = Tag.Scannable.to_int tag in
       let num_fields = List.length fields in
       match shape with
       | Value_only ->
-        ( List.init num_fields (fun _ -> Flambda_kind.value),
-          C.black_block_header tag num_fields )
-      | Mixed_record shape ->
-        ( MBS.field_kinds shape |> Array.to_list,
-          C.black_mixed_block_header tag (MBS.size_in_words shape)
-            ~scannable_prefix_len:(MBS.value_prefix_size shape) )
+        ( res,
+          List.init num_fields (fun _ -> Flambda_kind.value),
+          C.black_block_header tag num_fields,
+          [] )
+      | Mixed_record shape -> (
+        let field_kinds = MBS.field_kinds shape |> Array.to_list in
+        let size = MBS.size_in_words shape in
+        match To_cmm_shared.mixed_block_layout res shape with
+        | None, res ->
+          ( res,
+            field_kinds,
+            C.black_mixed_block_header tag size
+              ~scannable_prefix_len:(MBS.value_prefix_size shape),
+            [] )
+        | Some layout, res ->
+          ( res,
+            field_kinds,
+            C.black_mixed_block_header_with_layout_block tag (size + 1) ~layout,
+            [C.symbol_address layout] ))
     in
     let static_fields =
-      Misc.Stdlib.List.concat_map2 (static_field res) fields field_kinds
+      layout_word
+      @ Misc.Stdlib.List.concat_map2 (static_field res) fields field_kinds
     in
     let block = C.emit_block sym header static_fields in
     let update_kinds =
@@ -408,7 +422,7 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
         value_prefix @ flat_suffix
     in
     let env, res, updates =
-      static_block_updates sym env res updates 0
+      static_block_updates sym env res updates (List.length layout_word)
         (List.combine fields update_kinds)
     in
     env, R.set_data res block, updates

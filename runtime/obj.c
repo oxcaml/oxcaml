@@ -393,18 +393,23 @@ struct queue_chunk {
 };
 
 #ifdef NATIVE_CODE
-/* The number of scannable words at the start of block [v], which has
+/* The number of scannable fields at the start of block [v], which has
    header [hd]: its scannable prefix, while the compiler lays mixed
-   blocks out that way. */
+   blocks out that way. Any layout word is not a field. */
 static mlsize_t scannable_prefix_len(value v, header_t hd)
 {
-  mlsize_t len = 0;
+  mlsize_t first = Has_layout_word_hd(hd) ? 1 : 0;
+  mlsize_t next = first; /* the block index of the next prefix word */
   caml_block_scan bs;
   mlsize_t i;
 
   caml_block_scan_init(&bs, v, hd);
-  while (caml_block_scan_next(&bs, &i) && i == len) ++ len;
-  return len;
+  while (caml_block_scan_next(&bs, &i)) {
+    if (i < first) continue; /* a scannable layout word */
+    if (i != next) break;
+    ++ next;
+  }
+  return next - first;
 }
 #endif
 
@@ -455,9 +460,46 @@ CAMLprim value caml_alloc_dummy_float (value size)
   return caml_alloc(wosize, Double_array_tag);
 }
 
-/* [size] is a [value] representing the total size of the block in words (not
-   necessarily the number of fields). [scannable_size] is a [value] representing
-   the length of the prefix of fields that contains pointer values.
+#ifdef NATIVE_CODE
+/* Allocate a layout block for blocks of [wosize] words (not counting
+   their layout word), of which the first [scannable_wosize] are
+   scannable. This must be the layout block which the compiler emits
+   for that shape (see [Mixed_block_support.layout_words] in
+   cmm_helpers.ml): as few scan words as possible, the last having a
+   repeat only if the scan masks don't reach the end of the block. */
+static value alloc_prefix_layout_block(mlsize_t wosize,
+                                       mlsize_t scannable_wosize)
+{
+  /* Scan words to hold the whole mask, or to reach past the end of
+     the prefix so that the last mask bit can repeat. */
+  mlsize_t exact = (wosize - 1) / LAYOUT_WORD_MASK_BITS + 1;
+  mlsize_t repeating = scannable_wosize / LAYOUT_WORD_MASK_BITS + 1;
+  mlsize_t words = repeating < exact ? repeating : exact;
+  value layout = caml_alloc_shr(words, Abstract_tag);
+
+  for (mlsize_t j = 0; j < words; j++) {
+    /* The number of scannable words which this scan word's mask covers. */
+    mlsize_t start = j * LAYOUT_WORD_MASK_BITS;
+    mlsize_t scannable = 0;
+    if (scannable_wosize > start) {
+      scannable = scannable_wosize - start;
+      if (scannable > LAYOUT_WORD_MASK_BITS) scannable = LAYOUT_WORD_MASK_BITS;
+    }
+    Field(layout, j) = (value)(Low_bits_mask(LAYOUT_WORD_MASK_BITS)
+                               & ~Low_bits_mask(scannable));
+  }
+  if (repeating < exact) {
+    Field(layout, words - 1) |=
+      (value)((uintnat)1 << LAYOUT_WORD_REPEAT_SHIFT);
+  }
+  return layout;
+}
+#endif
+
+/* [size] is a [value] representing the number of words taken by the
+   block's fields (not necessarily the number of fields).
+   [scannable_size] is a [value] representing the length of the prefix
+   of fields that contains pointer values.
 */
 CAMLprim value caml_alloc_dummy_mixed (value size, value scannable_size)
 {
@@ -471,6 +513,17 @@ CAMLprim value caml_alloc_dummy_mixed (value size, value scannable_size)
      stored flat, taking up 1 word).
   */
   static_assert(Double_wosize == 1, "");
+  if (scannable_wosize >= HEADER_SCAN_MASK_BITS && scannable_wosize < wosize) {
+    /* The prefix is too long for the header's scan mask, so the block
+       starts with a layout word, as the compiler's blocks of this
+       shape do. [caml_update_dummy] replaces this layout block with
+       the compiler's. */
+    layout_t layout =
+      (layout_t)alloc_prefix_layout_block(wosize, scannable_wosize);
+    reserved_t reserved =
+      Reserved_hd((header_t)HEADER_FORMAT_EXTERNAL << HEADER_FORMAT_SHIFT);
+    return caml_alloc_with_layout(wosize + 1, 0, reserved, layout);
+  }
   reserved_t reserved =
     Reserved_mixed_block_scannable_wosize_native(scannable_wosize, wosize);
 #else
