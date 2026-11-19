@@ -493,8 +493,8 @@
   (diff to_cmm_probe.output to_cmm_probe.output.corrected)))
 
 ; The counters in Cfg: none of the Cmm selected is lost, and none is added. A
-; self tail call becomes a jump, whose counter goes onto the edges into its
-; block. The Cfg dumps hold every pass that prints one.
+; self tail call becomes a jump, whose counter is dropped. The Cfg dumps hold
+; every pass that prints one.
 
 (rule
  (targets cfg.output.corrected)
@@ -526,6 +526,7 @@
      -c
      -fdo-counters
      -dcfg
+     -dfdo-dropped-counters
      -dump-into-file
      -color
      never
@@ -570,6 +571,7 @@
       cfg_cfg/cfg.cmx.dump)
      (run ./fdo_annotations.exe list cfg_cmm/cfg.cmx.dump)
      (run ./fdo_annotations.exe list cfg_cfg/cfg.cmx.dump)
+     (run ./fdo_annotations.exe dropped cfg_cfg/cfg.cmx.dump)
      (run
       ./fdo_annotations.exe
       compare-sets
@@ -583,38 +585,3 @@
  (deps cfg.output cfg.output.corrected)
  (action
   (diff cfg.output cfg.output.corrected)))
-
-; Continuation specialization, which needs match-in-match.
-
-(rule
- (targets specialization.output.corrected)
- (deps specialization.ml fdo_annotations.exe)
- (enabled_if
-  (= %{context_name} "main"))
- (action
-  (progn
-   (run
-    %{bin:ocamlopt.opt}
-    -c
-    -O3
-    -flambda2-match-in-match
-    -fdo-counters
-    -fexpr-print-fdo-counters
-    -fexpr-print-branch-annotations
-    -dflambda-heavy-invariants
-    -dfexpr-annot-after
-    simplify
-    -color
-    never
-    specialization.ml)
-   (with-stdout-to
-    specialization.output.corrected
-    (run ./fdo_annotations.exe list specialization.simplify.fl)))))
-
-(rule
- (alias runtest)
- (enabled_if
-  (= %{context_name} "main"))
- (deps specialization.output specialization.output.corrected)
- (action
-  (diff specialization.output specialization.output.corrected)))

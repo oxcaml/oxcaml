@@ -48,15 +48,12 @@ type environment =
     tailrec_label : Label.t;
     phantom_lets : V.Set.t;
     all_phantom_lets :
-      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref;
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
         (** Accumulates every phantom let encountered in the current function
             (unlike [phantom_lets], which is scoped). The [ref] is created
             afresh by [env_create], once per function, and shared between all
             environments derived from that environment; it is read at the end of
             function construction by [phantom_lets_for_fundecl]. *)
-    orphaned_fdo_counters : Cfg.Orphaned_counters.t
-        (** Shared like [all_phantom_lets], and attached once the function's CFG
-            is complete. *)
   }
 
 val env_create : tailrec_label:Label.t -> environment

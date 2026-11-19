@@ -32,15 +32,11 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 module S = struct
-  (** A successor of a branching terminator, with the FDO counters of the edge
-      to it. Transformations that redirect or rearrange successors keep the
-      counters with the edge they describe. *)
   type successor =
     { target : Label.t;
       fdo_annotation : Fdo_annotation.t
     }
 
-  (** [callsite_counter] is the FDO counter of the call site. *)
   type func_call_operation =
     | Indirect of
         { callees : Cmm.symbol list option;

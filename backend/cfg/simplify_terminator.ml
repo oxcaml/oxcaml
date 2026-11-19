@@ -39,11 +39,11 @@ let counters_of_edges_to label successors =
   |> Fdo_annotation.union
 
 (* The unconditional jump to [label] replacing the terminator of [block], whose
-   control flow was [from]'s. The edges of [from] to [label] are now the jump,
-   so their counters are orphaned in [block]. *)
-let always (block : C.basic_block) ~orphaned ~(from : C.terminator) label :
+   control flow was [from]'s. The edges of [from] to [label] are now the jump:
+   their counters are dropped. *)
+let always (block : C.basic_block) ~(from : C.terminator) label :
     C.terminator C.instruction =
-  C.Orphaned_counters.add orphaned block.start
+  Fdo_dropped_counters.register ~reason:Cfg_branch_to_jump
     (counters_of_edges_to label (C.branch_successors from));
   { block.terminator with desc = Always label; arg = [||]; res = [||] }
 
@@ -61,8 +61,7 @@ let merge_arms (successors : C.successor array) ~target ~first ~last :
   in
   { target; fdo_annotation }
 
-let simplify_switch (block : C.basic_block) ~orphaned
-    (successors : C.successor array) =
+let simplify_switch (block : C.basic_block) (successors : C.successor array) =
   let labels = Array.map (fun (s : C.successor) -> s.target) successors in
   let len = Array.length labels in
   if len < 1
@@ -84,7 +83,7 @@ let simplify_switch (block : C.basic_block) ~orphaned
   match labels_with_counts with
   | [(l, _)] ->
     (* All labels are the same and equal to l *)
-    block.terminator <- always block ~orphaned ~from:block.terminator.desc l
+    block.terminator <- always block ~from:block.terminator.desc l
   | [(l0, n); (ln, k)] ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(n) ln);
@@ -502,7 +501,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     ->
     None
 
-let block_known_values (cfg : Cfg.t) (block : C.basic_block) ~orphaned
+let block_known_values (cfg : Cfg.t) (block : C.basic_block)
     ~(is_after_regalloc : bool) ~(allowed_to_be_irreducible : bool) : bool =
   if
     !Oxcaml_flags.cfg_value_propagation
@@ -512,8 +511,7 @@ let block_known_values (cfg : Cfg.t) (block : C.basic_block) ~orphaned
     match evaluate_terminator known_values block.terminator with
     | None -> false
     | Some succ ->
-      block.terminator
-        <- always block ~orphaned ~from:block.terminator.desc succ;
+      block.terminator <- always block ~from:block.terminator.desc succ;
       true)
   else false
 
@@ -535,7 +533,7 @@ let block_known_values (cfg : Cfg.t) (block : C.basic_block) ~orphaned
    order. Also, for linear to cfg and back will be harder to generate exactly
    the same layout. Also, how do we map execution counts about branches onto
    this terminator? *)
-let block (cfg : C.t) (block : C.basic_block) ~orphaned : bool =
+let block (cfg : C.t) (block : C.basic_block) : bool =
   let is_after_regalloc = cfg.register_locations_are_set in
   match block.terminator.desc with
   | Always successor_label ->
@@ -565,7 +563,7 @@ let block (cfg : C.t) (block : C.basic_block) ~orphaned : bool =
       match new_successor with
       | Some succ ->
         block.terminator
-          <- always block ~orphaned ~from:successor_block.terminator.desc succ;
+          <- always block ~from:successor_block.terminator.desc succ;
         true
       | None -> (
         if
@@ -602,30 +600,29 @@ let block (cfg : C.t) (block : C.basic_block) ~orphaned : bool =
     if Label.Set.cardinal labels = 1
     then (
       let l = Label.Set.min_elt labels in
-      block.terminator <- always block ~orphaned ~from:block.terminator.desc l;
+      block.terminator <- always block ~from:block.terminator.desc l;
       false)
     else
-      block_known_values cfg block ~orphaned ~is_after_regalloc
+      block_known_values cfg block ~is_after_regalloc
         ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
   | Switch successors ->
     let shortcircuit =
-      block_known_values cfg block ~orphaned ~is_after_regalloc
+      block_known_values cfg block ~is_after_regalloc
         ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
     in
     if shortcircuit
     then true
     else (
-      simplify_switch block ~orphaned successors;
+      simplify_switch block successors;
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
   | External_call_no_return _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let run cfg =
-  let orphaned = C.Orphaned_counters.create () in
   let registration_needed =
     C.fold_blocks cfg ~init:false ~f:(fun _ b registration_needed ->
-        let shortcircuit = block cfg b ~orphaned in
+        let shortcircuit = block cfg b in
         registration_needed || shortcircuit)
   in
   if registration_needed
@@ -635,5 +632,4 @@ let run cfg =
        first set all to empty. *)
     C.iter_blocks cfg ~f:(fun _label block ->
         block.predecessors <- Label.Set.empty);
-    Cfg.register_predecessors_for_all_blocks cfg);
-  C.Orphaned_counters.attach orphaned cfg
+    Cfg.register_predecessors_for_all_blocks cfg)

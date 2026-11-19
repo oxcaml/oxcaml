@@ -1539,13 +1539,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Direct { sym = func; callsite_counter }
         when String.equal func.sym_name !SU.current_function_name
              && SU.trap_stack_is_empty env ->
-        (* The call becomes a jump, which leaves its counter orphaned. *)
-        Option.iter
-          (fun counter ->
-            Cfg.Orphaned_counters.add env.SU.orphaned_fdo_counters
-              (Sub_cfg.exit_label sub_cfg)
-              (Fdo_annotation.singleton counter))
-          callsite_counter;
+        (* The call becomes a jump. *)
+        Fdo_dropped_counters.register ~reason:Cfg_self_tail_call_to_jump
+          (Fdo_annotation.of_list (Option.to_list callsite_counter));
         let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
         let loc_arg =
           assert (stack_ofs >= 0);
@@ -1870,7 +1866,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
        `Cfg.register_predecessors_for_all_blocks`. *)
     SU.Stack_offset_and_exn.update_cfg cfg;
     Cfg.register_predecessors_for_all_blocks cfg;
-    Cfg.Orphaned_counters.attach env.SU.orphaned_fdo_counters cfg;
     (* Delete prologue_poll instruction if not needed *)
     let delete_prologue_poll =
       (* CR mshinwell/xclerc: find a neater way of doing this rather than making

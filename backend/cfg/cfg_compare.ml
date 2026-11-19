@@ -871,15 +871,11 @@ let compare ~old_cfg ~new_cfg ppf =
     then
       Format.fprintf ppf_m "fun_dbg mismatch: old=%a new=%a@."
         Debuginfo.print_compact old_fun_dbg Debuginfo.print_compact new_fun_dbg;
-    (* CR-someday yusumez: the SSA pipeline has no FDO counters on edges and
-       calls, so it misses the counters that become entry counters in
-       [Cfg_selectgen]. Only the body hashes are compared. *)
     if
       not
-        (Option.equal Fdo_counter.Body_hash.equal
-           (Fdo_annotation.With_body_hash.body_hash old_fun_fdo_entry_annotation)
-           (Fdo_annotation.With_body_hash.body_hash new_fun_fdo_entry_annotation))
-    then Format.fprintf ppf_m "fun_fdo_entry_annotation body hash mismatch@.";
+        (Fdo_annotation.With_body_hash.equal old_fun_fdo_entry_annotation
+           new_fun_fdo_entry_annotation)
+    then Format.fprintf ppf_m "fun_fdo_entry_annotation mismatch@.";
     if Stdlib.( <> ) old_fun_poll new_fun_poll
     then Format.fprintf ppf_m "fun_poll mismatch@.";
     if not (Cmm.equal_machtype old_fun_ret_type new_fun_ret_type)

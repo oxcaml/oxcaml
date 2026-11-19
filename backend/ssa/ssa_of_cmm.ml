@@ -46,6 +46,10 @@ open Ssa.Export
 
 type block = under_construction Block.t
 
+(* CR-someday yusumez: SSA doesn't carry the FDO counters of edges and calls. *)
+let drop_fdo_counters annotation =
+  Fdo_dropped_counters.register ~reason:Not_carried_through_ssa annotation
+
 type value = under_construction Ssa.Value.t
 
 type result = value array Or_never_returns.t
@@ -386,9 +390,11 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Never_returns
   in
   match new_op with
-  | Call { op = Direct { sym; callsite_counter = _ }; _ } ->
+  | Call { op = Direct { sym; callsite_counter }; _ } ->
+    drop_fdo_counters (Fdo_annotation.of_list (Option.to_list callsite_counter));
     call_returning_to (Direct sym) ty
-  | Call { op = Indirect { callees = candidates; callsite_counter = _ }; _ } ->
+  | Call { op = Indirect { callees = candidates; callsite_counter }; _ } ->
+    drop_fdo_counters (Fdo_annotation.of_list (Option.to_list callsite_counter));
     call_returning_to (Indirect candidates) ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
     call_returning_to (External ext_call) ty_res
@@ -477,6 +483,8 @@ and emit_expr_op env c ~tail op args dbg : result =
 and emit_ifthenelse env c ~tail econd ~ifso_dbg ifa eif ~ifnot_dbg elsea eelse
     ~dbg : result =
   let dbg = SU.dbg_of_test econd dbg in
+  drop_fdo_counters (Branch_annotations.fdo_annotation ifa);
+  drop_fdo_counters (Branch_annotations.fdo_annotation elsea);
   let cond, earg = Sel.select_condition econd in
   let* rarg = emit env c earg ~tail:false in
   let then_env = if branch_is_cold ifa then { env with cold = true } else env in
@@ -498,6 +506,7 @@ and emit_switch env c ~tail esel index ecases ~dbg : result =
   let case_blocks =
     Array.map
       (fun (_case_expr, case_dbg, annots) ->
+        drop_fdo_counters (Branch_annotations.fdo_annotation annots);
         let env =
           if branch_is_cold annots then { env with cold = true } else env
         in

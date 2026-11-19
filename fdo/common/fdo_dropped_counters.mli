@@ -54,6 +54,19 @@ module Reason : sig
         (** The counters of the cases of a switch that the translation to Cmm
             turns into a table lookup or a single case. *)
     | Probe_handler_call  (** The counter of the call of a probe handler. *)
+    | Cfg_self_tail_call_to_jump
+        (** The counter of a self tail call that instruction selection turns
+            into a jump. *)
+    | Cfg_branch_to_jump
+        (** The counters of the edges of a branch that a jump replaces because
+            its outcome is known. When the jump is that of a predecessor, the
+            branch keeps its counters if other code still reaches it, but they
+            miss the executions of that predecessor. *)
+    | Cfg_blocks_merged
+        (** The counters of a block that is merged into an identical one. *)
+    | Not_carried_through_ssa
+        (** The counters of the edges and calls of a function compiled through
+            SSA, which does not carry them. *)
 
   val to_string : t -> string
 end

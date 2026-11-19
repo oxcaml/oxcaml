@@ -127,7 +127,7 @@ type t =
     fun_args : Reg.t array;
     fun_codegen_options : codegen_option list;
     fun_dbg : Debuginfo.t;
-    mutable fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
+    fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
     entry_label : Label.t;
     fun_contains_calls : bool;
     (* CR-someday gyorsh: compute locally. *)
@@ -185,21 +185,27 @@ let branch_successors (terminator : terminator) =
     ->
     []
 
-(* The successors of a branching terminator transformed by [f]. *)
-let map_branch_successors (terminator : terminator) ~f : terminator =
-  match terminator with
-  | Parity_test { ifso; ifnot } ->
-    Parity_test { ifso = f ifso; ifnot = f ifnot }
-  | Truth_test { ifso; ifnot } -> Truth_test { ifso = f ifso; ifnot = f ifnot }
-  | Int_test { lt; eq; gt; is_signed; imm } ->
-    Int_test { lt = f lt; eq = f eq; gt = f gt; is_signed; imm }
-  | Float_test { lt; eq; gt; uo; width } ->
-    Float_test { lt = f lt; eq = f eq; gt = f gt; uo = f uo; width }
-  | Switch successors -> Switch (Array.map f successors)
-  | ( Never | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-    | Call_no_return _ | External_call_no_return _ | Invalid _ | Call _ | Prim _
-      ) as terminator ->
-    terminator
+let callsite_counter (op : func_call_operation) =
+  match op with
+  | Indirect { callees = _; callsite_counter }
+  | Direct { sym = _; callsite_counter } ->
+    callsite_counter
+
+let fdo_counters_of_terminator (terminator : terminator) =
+  let of_call =
+    match terminator with
+    | Call { op; label_after = _ } | Tailcall_func op | Call_no_return op ->
+      Option.to_list (callsite_counter op)
+    | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+    | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+    | External_call_no_return _ | Prim _ | Invalid _ ->
+      []
+  in
+  Fdo_annotation.union
+    (Fdo_annotation.of_list of_call
+    :: List.map
+         (fun (successor : successor) -> successor.fdo_annotation)
+         (branch_successors terminator))
 
 let successor_labels_normal ti =
   match ti.desc with
@@ -393,77 +399,6 @@ let register_predecessors_for_all_blocks (t : t) =
             <- Label.Set.add label target_block.predecessors)
         targets)
     t.blocks
-
-let add_to_branch_edges (block : basic_block) ~target annotation =
-  let add_if_to_target successor =
-    if Label.equal successor.target target
-    then
-      { successor with
-        fdo_annotation =
-          Fdo_annotation.combine successor.fdo_annotation annotation
-      }
-    else successor
-  in
-  block.terminator
-    <- { block.terminator with
-         desc = map_branch_successors block.terminator.desc ~f:add_if_to_target
-       }
-
-(* CR yusumez: As in Simplify (see [Fdo_region_counters]), the edges into a
-   region don't include the jumps without counters, such as a [Tailcall_self]
-   back to the loop it is in, so the counters orphaned there miss those
-   traversals. *)
-let add_orphaned_counters t label annotation =
-  let module Entry = Fdo_annotation.With_body_hash in
-  (* [visited] stops the walk on loops of unconditional edges. *)
-  let rec add_to_edges_into label visited =
-    if Label.Set.mem label visited
-    then visited
-    else (
-      if Label.equal label t.entry_label
-      then
-        t.fun_fdo_entry_annotation
-          <- Entry.with_annotation t.fun_fdo_entry_annotation
-               (Fdo_annotation.combine
-                  (Entry.annotation t.fun_fdo_entry_annotation)
-                  annotation);
-      Label.Set.fold
-        (fun pred_label visited ->
-          add_to_edges_from pred_label ~target:label visited)
-        (get_block_exn t label).predecessors
-        (Label.Set.add label visited))
-  and add_to_edges_from pred_label ~target visited =
-    let pred = get_block_exn t pred_label in
-    if not (Label.Set.mem target (successor_labels_normal pred.terminator))
-    then visited
-    else
-      match pred.terminator.desc with
-      | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Switch _ ->
-        add_to_branch_edges pred ~target annotation;
-        visited
-      | Always _ | Tailcall_self _ | Call _ | Prim _ | Invalid _ ->
-        (* Everything that enters [pred] continues into [target]. *)
-        add_to_edges_into pred_label visited
-      | Never | Return | Raise _ | Tailcall_func _ | Call_no_return _
-      | External_call_no_return _ ->
-        visited
-  in
-  if not (Fdo_annotation.is_empty annotation)
-  then ignore (add_to_edges_into label Label.Set.empty : Label.Set.t)
-
-module Orphaned_counters = struct
-  type t = (Label.t * Fdo_annotation.t) list ref
-
-  let create () : t = ref []
-
-  let add t label annotation = t := (label, annotation) :: !t
-
-  let attach t cfg =
-    List.iter
-      (fun (label, annotation) -> add_orphaned_counters cfg label annotation)
-      (List.rev !t);
-    t := []
-end
 
 let can_raise_terminator (i : terminator) =
   match i with
@@ -879,7 +814,7 @@ let equal_basic left right =
       _ ) ->
     false
 
-(* The FDO counters don't affect code generation. *)
+(* Ignore FDO counters for equality checks. *)
 let equal_successor left right = Label.equal left.target right.target
 
 let equal_bool_test ({ ifso = left_ifso; ifnot = left_ifnot } : bool_test)

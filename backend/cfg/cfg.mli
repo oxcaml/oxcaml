@@ -134,7 +134,7 @@ type t =
     fun_codegen_options : codegen_option list;
         (** Code generation options passed from Cmm. *)
     fun_dbg : Debuginfo.t;  (** Dwarf debug info for function entry. *)
-    mutable fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
+    fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
         (** The FDO counters of the function's entry edge, and the body hash its
             interior counters were numbered with. *)
     entry_label : Label.t;
@@ -202,6 +202,9 @@ val branch_successors : terminator -> successor list
 (** A successor with the given FDO counters (none by default). *)
 val successor : ?fdo_annotation:Fdo_annotation.t -> Label.t -> successor
 
+(** The FDO counters of the edges and of the call of a terminator. *)
+val fdo_counters_of_terminator : terminator -> Fdo_annotation.t
+
 val replace_successor_labels :
   t -> normal:bool -> exn:bool -> basic_block -> f:(Label.t -> Label.t) -> unit
 
@@ -253,27 +256,6 @@ val fold_all_instructions : t -> f:'a instruction_folder -> init:'a -> 'a
    added so that the caller has to explicitly decide whether or not to clear the
    sets before registration . *)
 val register_predecessors_for_all_blocks : t -> unit
-
-(** FDO counters whose edge or instruction is removed while the code they count
-    stays, e.g. that of a self tail call turned into a jump. As in
-    [Fdo_region_counters], they are attached to the edges into the region of the
-    block that code is in: the branch edges to it or to a predecessor that
-    continues into it unconditionally, and the function entry if it leads there.
-*)
-module Orphaned_counters : sig
-  type cfg := t
-
-  type t
-
-  val create : unit -> t
-
-  (** [add t label annotation]: [annotation] is orphaned in the block [label].
-  *)
-  val add : t -> Label.t -> Fdo_annotation.t -> unit
-
-  (** Attach the counters added so far. Requires up-to-date predecessors. *)
-  val attach : t -> cfg -> unit
-end
 
 (* CR-someday gyorsh: Current version of cfg is a half-way house in terms of its
    exception handling. It has a lot of redundancy and the result of the

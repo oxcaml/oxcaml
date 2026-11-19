@@ -60,8 +60,7 @@ type environment =
     tailrec_label : Label.t;
     phantom_lets : V.Set.t;
     all_phantom_lets :
-      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref;
-    orphaned_fdo_counters : Cfg.Orphaned_counters.t
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
   }
 
 let env_add ?(mut = Asttypes.Immutable) var regs env =
@@ -181,8 +180,7 @@ let env_create ~tailrec_label =
     trap_stack = Uncaught;
     tailrec_label;
     phantom_lets = V.Set.empty;
-    all_phantom_lets = ref V.Map.empty;
-    orphaned_fdo_counters = Cfg.Orphaned_counters.create ()
+    all_phantom_lets = ref V.Map.empty
   }
 
 let env_add_phantom_let var defining_expr env =
