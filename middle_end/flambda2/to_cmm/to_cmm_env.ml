@@ -1060,7 +1060,7 @@ let split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of
   bind_variable_with_decision env res var ~inline ~defining_expr
     ~effects_and_coeffects_of_defining_expr:effs
 
-let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
+let add_alias0 env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
   let num_occurrences_of_var : Num_occurrences.t =
     let var = Bound_var.var var in
@@ -1093,6 +1093,19 @@ let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
       ~free_vars_of_defining_expr:free_vars
       ~effects_and_coeffects_of_defining_expr:effs
       ~num_normal_occurrences_of_bound_vars
+
+let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
+  let extra_info = Variable.Map.find_opt alias_of env.vars_extra in
+  let env, res =
+    add_alias0 env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars
+  in
+  match extra_info with
+  | None -> env, res
+  | Some extra_info ->
+    let vars_extra =
+      Variable.Map.add (Bound_var.var var) extra_info env.vars_extra
+    in
+    { env with vars_extra }, res
 
 (* Flushing delayed bindings *)
 
