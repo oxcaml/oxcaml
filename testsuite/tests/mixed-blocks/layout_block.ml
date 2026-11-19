@@ -3,9 +3,17 @@
  {
    native;
  }{
+   flags += " -runtime-variant d";
+   ocamlrunparam += ",V=1";
+   native;
+ }{
    bytecode;
  }
 *)
+
+(* The second native run is on the debug runtime, verifying the heap at
+   each major collection: that checks the form of every layout block,
+   including those the runtime builds for recursive values. *)
 
 (* Mixed blocks with more than fifteen values before their flat fields.
    In native code such a block starts with a layout word, pointing to a
@@ -267,6 +275,34 @@ let test_rec_long () =
          && float_of_float_u d.df = float_of_int (k + 1)))
     ds
 
+(* [Obj.size] counts fields only. [Obj.reachable_words] counts the block's
+   header and layout word too, and the layout block, which blocks of the
+   same shape share. *)
+type w =
+  { w0 : int; w1 : int; w2 : int; w3 : int; w4 : int; w5 : int; w6 : int;
+    w7 : int; w8 : int; w9 : int; w10 : int; w11 : int; w12 : int;
+    w13 : int; w14 : int; w15 : int;
+    wf : float# }
+
+let[@inline never] make_w n =
+  { w0 = n; w1 = n; w2 = n; w3 = n; w4 = n; w5 = n; w6 = n; w7 = n; w8 = n;
+    w9 = n; w10 = n; w11 = n; w12 = n; w13 = n; w14 = n; w15 = n;
+    wf = float_u_of_float (float_of_int n) }
+
+let test_sizes () =
+  match Sys.backend_type with
+  | Bytecode | Other _ -> ()
+  | Native ->
+    let a = Obj.repr (make_w (Sys.opaque_identity 1)) in
+    let b = Obj.repr (make_w (Sys.opaque_identity 2)) in
+    check "sizes: size" (Obj.size a = 17);
+    (* header, layout word and 17 fields; the layout block's header and
+       one scan word *)
+    check "sizes: reachable" (Obj.reachable_words a = 19 + 2);
+    let unique, shared = Obj.uniquely_reachable_words [| a; b |] in
+    check "sizes: uniquely reachable"
+      (unique.(0) = 19 && unique.(1) = 19 && shared = 2)
+
 (* A block too large for the minor heap. *)
 type big =
   { b0 : string; b1 : string; b2 : string; b3 : string; b4 : string;
@@ -311,5 +347,6 @@ let () =
   test_idx ();
   test_rec ();
   test_rec_long ();
+  test_sizes ();
   test_big ();
   if !failures = 0 then print_endline "ok"
