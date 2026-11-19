@@ -48,10 +48,10 @@ open! Int_replace_polymorphic_compare
 
     Comparisons feeding [Branch]: [collect_fused_comparisons] records, per
     comparison [Op], how many [Branch] terminators will fuse it directly into
-    the CFG test (only comparisons computed in the branch's own block, see
-    [can_extend_arg_lifetimes]). An Op is emitted into the body only if it has
-    more uses than fused-branch consumers — otherwise [fuse_comparison] splices
-    it directly into the terminator and we drop the body Op. *)
+    the CFG test (only when that is safe, see [can_keep_args_live]). An Op is
+    emitted into the body only if it has more uses than fused-branch consumers —
+    otherwise [fuse_comparison] splices it directly into the terminator and we
+    drop the body Op. *)
 
 module DLL = Doubly_linked_list
 open Ssa.Export
@@ -74,10 +74,12 @@ type env =
     block_labels : Label.t Block.Tbl.t;
     call_result_locs : Reg.t array Block.Tbl.t;
     call_stack_ofs : int Block.Tbl.t;
-    fused_comparison_ops : (finished, int) Instruction.Id.Tbl.t
+    fused_comparison_ops : (finished, int) Instruction.Id.Tbl.t;
         (* Comparison ops that will be fused into the block terminator and
            should therefore not be emitted into the block body. The map counts
            how often a comparison has been fused. *)
+    fused_branches : unit Block.Tbl.t
+        (* The blocks whose branch is fused with its comparison. *)
   }
 
 let create_env ssa_graph =
@@ -87,7 +89,8 @@ let create_env ssa_graph =
     block_labels = Block.Tbl.create 64;
     call_result_locs = Block.Tbl.create 16;
     call_stack_ofs = Block.Tbl.create 16;
-    fused_comparison_ops = Instruction.Id.Tbl.create 16
+    fused_comparison_ops = Instruction.Id.Tbl.create 16;
+    fused_branches = Block.Tbl.create 16
   }
 
 let label_of env (blk : block) =
@@ -184,40 +187,92 @@ let comparison_test (cond : value) ~true_label ~false_label :
     Some (Cfg.Parity_test { ifso = false_label; ifnot = true_label }, args)
   | _ -> None
 
-(* Whether the args of a comparison must not be live past [instr]: they may be
-   local values, which must not be GC roots once their region has ended, or
-   derived pointers, which must not be live across a GC. *)
-let ends_arg_lifetimes (instr : instruction) =
+(* Fusing a comparison into a branch keeps the comparison's args live until the
+   branch. Values may be local, and must not be GC roots once their region has
+   ended. Derived pointers must not be live across a GC. *)
+type hazards =
+  { end_region : bool;
+    gc : bool
+  }
+
+let hazards_of_args (args : value array) =
+  Array.fold_left
+    (fun hazards (arg : value) : hazards ->
+      match Value.typ arg with
+      | Val | Valx2 -> { hazards with end_region = true }
+      | Addr -> { hazards with gc = true }
+      | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> hazards)
+    { end_region = false; gc = false }
+    args
+
+let is_hazard hazards (instr : instruction) =
   match[@warning "-fragile-match"] instr with
-  | Op { op = End_region | Alloc _ | Poll; _ } -> true
+  | Op { op = End_region; _ } -> hazards.end_region
+  | Op { op = Alloc _ | Poll; _ } -> hazards.gc
   | Op _ | Push_trap _ | Pop_trap _ -> false
 
-(* Fusing [cond] into the terminator of [block] extends the lifetimes of the
-   comparison's args up to the terminator, so it is only done when [cond] is
-   computed in [block], with no instruction past it ending these lifetimes. *)
-let can_extend_arg_lifetimes (block : block) (cond : value) =
-  match cond with
-  | Block_param _ -> false
-  | Res (cond_op, _) -> (
-    let body = Block.body block in
-    let is_cond_op (instr : instruction) =
-      match instr with
-      | Op op -> Instruction.Id.equal op.id cond_op.id
-      | Push_trap _ | Pop_trap _ -> false
-    in
-    match Array.find_index is_cond_op body with
-    | None -> false
-    | Some index ->
-      let after = index + 1 in
-      not
-        (Array.exists ends_arg_lifetimes
-           (Array.sub body after (Array.length body - after))))
+let has_call_terminator (block : block) =
+  match Block.terminator block with
+  | Call _ -> true
+  | Continue _ | Switch _ | Invalid _ -> false
+
+let body_after (block : block) (op : finished Instruction.op_data) =
+  let body = Block.body block in
+  let is_op (instr : instruction) =
+    match instr with
+    | Op other -> Instruction.Id.equal other.id op.id
+    | Push_trap _ | Pop_trap _ -> false
+  in
+  match Array.find_index is_op body with
+  | None -> Misc.fatal_error "Cfg_of_ssa.body_after: op not in block"
+  | Some index ->
+    let after = index + 1 in
+    Array.sub body after (Array.length body - after)
+
+type visit =
+  | Visiting
+  | Visited
+
+(* Whether the args can stay live from the end of [def_block] to the terminator
+   of [branch_block], which [def_block] strictly dominates. The blocks in
+   between are those reached backwards from [branch_block] before [def_block].
+   Calls are GC points, and so are cycles, which may get a poll from
+   [Cfg_polling]. *)
+let path_keeps_args_live hazards ~def_block ~branch_block =
+  let visits = Block.Tbl.create 16 in
+  let rec keeps_args_live block =
+    Block.equal block def_block
+    ||
+    match Block.Tbl.find_opt visits block with
+    | Some Visiting -> not hazards.gc
+    | Some Visited -> true
+    | None ->
+      Block.Tbl.replace visits block Visiting;
+      let result =
+        (not (Array.exists (is_hazard hazards) (Block.body block)))
+        && (Block.equal block branch_block
+           || not (hazards.gc && has_call_terminator block))
+        && List.for_all keeps_args_live (Block.predecessors block)
+      in
+      Block.Tbl.replace visits block Visited;
+      result
+  in
+  (not (hazards.gc && has_call_terminator def_block))
+  && keeps_args_live branch_block
+
+let can_keep_args_live args ~def_block ~(cond_op : finished Instruction.op_data)
+    ~branch_block =
+  let hazards = hazards_of_args args in
+  (not (hazards.end_region || hazards.gc))
+  || (not (Array.exists (is_hazard hazards) (body_after def_block cond_op)))
+     && (Block.equal def_block branch_block
+        || path_keeps_args_live hazards ~def_block ~branch_block)
 
 (** A Branch condition of [block] that can be folded into its CFG test
     terminator. *)
-let fuse_comparison (block : block) (cond : value) ~true_label ~false_label :
-    (Cfg.terminator * value array) option =
-  if can_extend_arg_lifetimes block cond
+let fuse_comparison env (block : block) (cond : value) ~true_label ~false_label
+    : (Cfg.terminator * value array) option =
+  if Block.Tbl.mem env.fused_branches block
   then comparison_test cond ~true_label ~false_label
   else None
 
@@ -484,7 +539,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       then
         let false_label = label_of env targets.(0) in
         let true_label = label_of env targets.(1) in
-        match fuse_comparison block index ~true_label ~false_label with
+        match fuse_comparison env block index ~true_label ~false_label with
         | Some (term, args) ->
           make_instr term (Array.map (get_reg env) args) [||] dbg
         | None ->
@@ -624,22 +679,40 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
     terminator consumes the comparison's args directly, so the comparison itself
     is no longer needed (provided no other consumer references it). *)
 let collect_fused_comparisons env =
+  let op_blocks = Instruction.Id.Tbl.create 256 in
+  List.iter
+    (fun (block : block) ->
+      Array.iter
+        (fun (instr : instruction) ->
+          match instr with
+          | Op op -> Instruction.Id.Tbl.replace op_blocks op.id block
+          | Push_trap _ | Pop_trap _ -> ())
+        (Block.body block))
+    (Ssa.blocks env.ssa_graph);
+  let can_fuse (block : block) (index : value) =
+    match
+      ( index,
+        comparison_test index ~true_label:Label.none ~false_label:Label.none )
+    with
+    | Res (cond_op, _), Some (_, args) ->
+      can_keep_args_live args
+        ~def_block:(Instruction.Id.Tbl.find op_blocks cond_op.id)
+        ~cond_op ~branch_block:block
+    | (Res _ | Block_param _), _ -> false
+  in
   List.iter
     (fun (block : block) ->
       match Block.terminator block with
-      | Switch { index; targets } when Array.length targets = 2 -> (
-        if
-          Option.is_some
-            (fuse_comparison block index ~true_label:Label.none
-               ~false_label:Label.none)
-        then
-          match index with
-          | Res ({ id; _ }, _) ->
-            Instruction.Id.Tbl.replace env.fused_comparison_ops id
-              (1
-              + (Instruction.Id.Tbl.find_opt env.fused_comparison_ops id
-                |> Option.value ~default:0))
-          | Block_param _ -> assert false)
+      | Switch { index; targets }
+        when Array.length targets = 2 && can_fuse block index -> (
+        Block.Tbl.replace env.fused_branches block ();
+        match index with
+        | Res ({ id; _ }, _) ->
+          Instruction.Id.Tbl.replace env.fused_comparison_ops id
+            (1
+            + (Instruction.Id.Tbl.find_opt env.fused_comparison_ops id
+              |> Option.value ~default:0))
+        | Block_param _ -> assert false)
       | Switch _ | Continue _ | Call _ | Invalid _ -> ())
     (Ssa.blocks env.ssa_graph)
 
