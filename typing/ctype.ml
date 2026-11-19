@@ -6865,8 +6865,7 @@ let crossing_of_ty env ?modalities ty =
   | Some m -> Crossing.modality m crossing
 
 let () =
-  Defined_later.Fun.define_exn Ikind.upon_shape_later upon_shape;
-  Defined_later.Fun.define_exn Ikind.scheduler_later scheduler
+  Defined_later.Fun.define_exn Ikind.upon_shape_later upon_shape
 
 let upon_crossing env ?modalities ty ~cross ~later =
   if Language_extension.is_enabled Omnidirectionality && !Clflags.ikinds
