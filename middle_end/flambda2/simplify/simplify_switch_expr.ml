@@ -79,26 +79,8 @@ let find_all_aliases env arg =
       | None -> find_all_aliases ())
     arg
 
-(* The orphaned counters of the handler the arm leads to go onto the arm. Done
-   here before the arm's target can change. *)
-let attach_fdo_region_counters uacc ~use_id action annotations =
-  let orphaned =
-    Fdo_region_counters.counters_into_handler
-      (UA.fdo_region_counters uacc)
-      ~specialization_map:(UA.specialization_map uacc)
-      (AC.continuation action) ~use_id
-  in
-  if Fdo_annotation.is_empty orphaned
-  then annotations
-  else
-    Branch_annotations.map_fdo_annotation annotations ~f:(fun fdo_annotation ->
-        Fdo_annotation.combine fdo_annotation orphaned)
-
 let rebuild_arm uacc arm (action, ~annotations, use_id, arity, env_at_use)
     (new_let_conts, arms, (mergeable_arms : mergeable_arms)) =
-  let annotations =
-    attach_fdo_region_counters uacc ~use_id action annotations
-  in
   let action =
     Simplify_common.clear_demoted_trap_action_and_patch_unused_exn_bucket uacc
       action
@@ -777,8 +759,7 @@ let rebuild_switch
       scrutinee_ty;
       shareable_constants;
       typing_env_before_switch;
-      cse_before_switch;
-      fdo_region
+      cse_before_switch
     } uacc ~after_rebuild =
   let machine_width = TE.machine_width typing_env_before_switch in
   let new_let_conts, arms, mergeable_arms =
@@ -815,7 +796,7 @@ let rebuild_switch
            should not count them in the number of removed operations: these
            branches wouldn't have been taken during execution anyway. *)
         let expr, uacc =
-          EB.create_switch uacc ~condition_dbg ~scrutinee ~arms ~fdo_region
+          EB.create_switch uacc ~condition_dbg ~scrutinee ~arms
         in
         if
           Flambda_features.check_invariants ()
@@ -831,8 +812,10 @@ let rebuild_switch
       in
       match switch_merged with
       | Some (dest, args) ->
+        (* The result is computed from the scrutinee without branching. *)
         let uacc =
-          EB.add_orphaned_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
+          UA.add_dropped_fdo_counters uacc ~reason:Switch_to_lookup_table
+            (Fdo_term_counters.of_switch_arms arms)
         in
         (* CR bclement: should use a single unboxed product lookup table *)
         let rec rebuild_merged_switch mergeable_args args_rev =
@@ -1078,10 +1061,9 @@ let simplify_switch dacc switch ~down_to_up =
     (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let dacc = DA.with_denv dacc denv_at_use in
-    (* The arm's edge disappears with the switch, but the code it leads to runs
-       as often: its counters are preserved in the current region *)
+    (* The arm's edge disappears with the switch. *)
     let dacc =
-      DA.add_orphaned_fdo_counters dacc
+      DA.add_dropped_fdo_counters dacc ~reason:Switch_to_single_arm
         (DE.inline_fdo_annotation denv_at_use
            (Branch_annotations.fdo_annotation (Switch_arm.annotations arm)))
     in
@@ -1120,5 +1102,4 @@ let simplify_switch dacc switch ~down_to_up =
     let cse_before_switch = DE.cse (DA.denv dacc_before_switch) in
     down_to_up dacc
       (SE.simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-         ~shareable_constants ~typing_env_before_switch ~cse_before_switch
-         ~fdo_region:(DE.fdo_region (DA.denv dacc_before_switch)))
+         ~shareable_constants ~typing_env_before_switch ~cse_before_switch)

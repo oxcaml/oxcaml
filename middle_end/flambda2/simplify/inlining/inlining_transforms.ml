@@ -143,10 +143,9 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   | Maybe_alloc_stack _, Not_alloc_stack (* This is allowed by subtyping *)
   | Maybe_alloc_stack _, Maybe_alloc_stack
   | Not_alloc_stack _, Not_alloc_stack ->
-    (* The callsite FDO counter of an inlined apply is orphaned, so save it
-       here. *)
+    (* No instruction is left to count the entries of the inlined function. *)
     let dacc =
-      DA.add_orphaned_fdo_counters dacc
+      DA.add_dropped_fdo_counters dacc ~reason:Inlined_call
         (Fdo_term_counters.of_inlined_call
            ~callsite_counter:(Apply.callsite_counter apply)
            code)

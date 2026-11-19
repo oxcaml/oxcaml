@@ -31,7 +31,8 @@
 
 type t
 
-(** At the unit toplevel. *)
+(** At the unit toplevel, or for terms whose counters are already in the current
+    copy context. *)
 val none : t
 
 val enter_set_of_closures : t -> inlined_debuginfo:Inlined_debuginfo.t -> t
@@ -39,13 +40,7 @@ val enter_set_of_closures : t -> inlined_debuginfo:Inlined_debuginfo.t -> t
 (** For the body of an inlined function. The call site's counter already carries
     the copy context of the function the call is in. *)
 val enter_inlined_apply :
-  t -> called_code:Code.t -> callsite_counter:Fdo_counter.t option -> t
-
-(** [t] with the copy context and stub callsite counter of [from]. *)
-val with_copy_context_of : t -> from:t -> t
-
-(** Also clears the stub callsite counter. *)
-val clear_copy_context : t -> t
+  called_code:Code.t -> callsite_counter:Fdo_counter.t option -> t
 
 (** If we are in the body of an inlined stub, this returns the counter of the
     call it was inlined at. The calls of the stub with no counter of their own
@@ -61,10 +56,3 @@ val stub_callsite_counter : t -> Fdo_counter.t option
     once per copy, before its code is simplified. *)
 val specialize_counters_of_copied_code :
   t -> inlined_debuginfo:Inlined_debuginfo.t -> Code.t -> Code.t
-
-(** The region (see [Fdo_region_counters]) being traversed: [None] in the unit
-    toplevel outside of continuation handlers, or when FDO counters are
-    disabled. *)
-val region : t -> Fdo_region_counters.Region.t option
-
-val set_region : t -> Fdo_region_counters.Region.t -> t

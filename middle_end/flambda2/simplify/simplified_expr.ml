@@ -117,9 +117,7 @@ and simplified_switch =
     scrutinee_ty : T.t;
     shareable_constants : Symbol.t Static_const.Map.t;
     typing_env_before_switch : TE.t;
-    cse_before_switch : CSE.t;
-    fdo_region : Fdo_region_counters.Region.t option
-        (* The region the switch is in (see [Fdo_region_counters]). *)
+    cse_before_switch : CSE.t
   }
 
 let notify_removed ~operation t =
@@ -171,8 +169,7 @@ let simplified_apply_cont apply_cont ~args ~rewrite_id =
   simplified_terminator (Simplified_apply_cont { apply_cont; args; rewrite_id })
 
 let simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-    ~shareable_constants ~typing_env_before_switch ~cse_before_switch
-    ~fdo_region =
+    ~shareable_constants ~typing_env_before_switch ~cse_before_switch =
   simplified_terminator
     (Simplified_switch
        { arms;
@@ -181,8 +178,7 @@ let simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
          scrutinee_ty;
          shareable_constants;
          typing_env_before_switch;
-         cse_before_switch;
-         fdo_region
+         cse_before_switch
        })
 
 let simplified_invalid invalid =

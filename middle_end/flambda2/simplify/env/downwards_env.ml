@@ -673,15 +673,12 @@ let set_inlining_arguments arguments t =
    when mixing code compiled in classic and Simplify modes *)
 
 let set_inlined_debuginfo t ~from =
-  { t with
-    inlined_debuginfo = from.inlined_debuginfo;
-    fdo = Fdo_downwards_env.with_copy_context_of t.fdo ~from:from.fdo
-  }
+  { t with inlined_debuginfo = from.inlined_debuginfo; fdo = from.fdo }
 
 let clear_inlined_debuginfo t =
   { t with
     inlined_debuginfo = Inlined_debuginfo.none;
-    fdo = Fdo_downwards_env.clear_copy_context t.fdo
+    fdo = Fdo_downwards_env.none
   }
 
 let inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
@@ -724,11 +721,6 @@ let specialize_fdo_counters_of_copied_code t code =
     ~inlined_debuginfo:t.inlined_debuginfo code
 
 let fdo_stub_callsite_counter t = Fdo_downwards_env.stub_callsite_counter t.fdo
-
-let fdo_region t = Fdo_downwards_env.region t.fdo
-
-let set_fdo_region t region =
-  { t with fdo = Fdo_downwards_env.set_region t.fdo region }
 
 let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   let arguments =
@@ -773,7 +765,7 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   { t with
     inlined_debuginfo;
     fdo =
-      Fdo_downwards_env.enter_inlined_apply t.fdo ~called_code
+      Fdo_downwards_env.enter_inlined_apply ~called_code
         ~callsite_counter:(Apply.callsite_counter apply);
     inlined_attribute_to_forward;
     inlining_state;

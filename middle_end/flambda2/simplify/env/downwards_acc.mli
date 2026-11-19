@@ -44,19 +44,16 @@ val with_flow_acc : Flow.Acc.t -> t -> t
 (** Map the dataflow analysis accumulator of the given dacc. *)
 val map_flow_acc : t -> f:(Flow.Acc.t -> Flow.Acc.t) -> t
 
-(** The orphaned FDO counters so far. *)
-val fdo_region_counters : t -> Fdo_region_counters.t
+(** The FDO counters dropped so far (see [Fdo_dropped_counters]). They are kept
+    here rather than registered directly, so that those of a traversal whose
+    result is discarded (e.g. speculative inlining) are discarded with it. *)
+val fdo_dropped_counters : t -> Fdo_dropped_counters.t
 
-val with_fdo_region_counters : t -> Fdo_region_counters.t -> t
+(** The counters must already be in the current inlining context. *)
+val add_dropped_fdo_counters :
+  t -> reason:Fdo_dropped_counters.Reason.t -> Fdo_annotation.t -> t
 
-(** Add the orphaned counters of an instruction to the region being traversed
-    They must already be in the current inlining context. *)
-val add_orphaned_fdo_counters : t -> Fdo_annotation.t -> t
-
-(** The region being traversed continues into the handler of the given
-    continuation, by the given use. *)
-val add_fdo_region_successor :
-  t -> Continuation.t -> use_id:Apply_cont_rewrite_id.t -> t
+val add_all_dropped_fdo_counters : t -> Fdo_dropped_counters.t -> t
 
 include Continuation_uses_env_intf.S with type t := t
 

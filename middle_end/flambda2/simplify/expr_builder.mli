@@ -79,16 +79,7 @@ val create_switch :
   condition_dbg:Debuginfo.t ->
   scrutinee:Simple.t ->
   arms:Switch_arm.t Target_ocaml_int.Map.t ->
-  fdo_region:Fdo_region_counters.Region.t option ->
   Rebuilt_expr.t * Upwards_acc.t
-
-(** Given a switch that collapses into a single jump, add its orphaned FDO
-    counters to [fdo_region]. *)
-val add_orphaned_fdo_counters_of_collapsed_switch :
-  Upwards_acc.t ->
-  fdo_region:Fdo_region_counters.Region.t option ->
-  Switch_arm.t Target_ocaml_int.Map.t ->
-  Upwards_acc.t
 
 type new_let_cont =
   { cont : Continuation.t;

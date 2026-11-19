@@ -171,11 +171,6 @@ val specialize_fdo_counters_of_copied_code : t -> Code.t -> Code.t
 (** See [Fdo_downwards_env.stub_callsite_counter]. *)
 val fdo_stub_callsite_counter : t -> Fdo_counter.t option
 
-(** See [Fdo_downwards_env.region]. *)
-val fdo_region : t -> Fdo_region_counters.Region.t option
-
-val set_fdo_region : t -> Fdo_region_counters.Region.t -> t
-
 val round : t -> int
 
 val set_inlining_state : t -> Inlining_state.t -> t

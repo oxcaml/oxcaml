@@ -40,7 +40,6 @@ let dacc_inside_function context ~outer_dacc ~resimplifying ~params ~my_closure
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
   in
-  let denv = DE.set_fdo_region denv (Function_entry code_id) in
   (* The previous run renamed the FDO counters of the sets of closures met in
      the body. *)
   let denv = if resimplifying then DE.clear_inlined_debuginfo denv else denv in
@@ -177,6 +176,9 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     |> DA.with_shareable_constants ~shareable_constants
     |> DA.with_slot_offsets ~slot_offsets
     |> DA.with_code_age_relation ~code_age_relation
+    |> fun outer_dacc ->
+    DA.add_all_dropped_fdo_counters outer_dacc
+      (UA.fdo_dropped_counters uacc_after_upwards_traversal)
   in
   outer_dacc, lifted_consts_this_function
 
@@ -505,13 +507,6 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
       else DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code)
     in
     let cold = Code.cold code || body_is_cold in
-    let fdo_entry_annotation =
-      Fdo_region_counters.entry_annotation
-        (UA.fdo_region_counters uacc_after_upwards_traversal)
-        ~specialization_map:(UA.specialization_map uacc_after_upwards_traversal)
-        old_code_id
-        (Code.fdo_entry_annotation code)
-    in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
@@ -525,7 +520,8 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
-      ~inlining_arguments ~dbg ~fdo_entry_annotation
+      ~inlining_arguments ~dbg
+      ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
       ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
       ~absolute_history ~relative_history ~loopify
   in
