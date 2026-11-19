@@ -39,9 +39,7 @@ module Env = struct
       (fun symbol ->
         (* Symbols from other compilation units (or external symbols, or predef
            symbols) will not have their definition seen *)
-        if
-          Compilation_unit.equal current_compilation_unit
-            (Symbol.compilation_unit symbol)
+        if Current_unit.is_current (Symbol.compilation_unit symbol)
         then
           Misc.fatal_errorf
             "The following symbol is used but not defined:@ %a@\n\
