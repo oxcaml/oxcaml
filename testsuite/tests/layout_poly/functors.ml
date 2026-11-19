@@ -637,6 +637,28 @@ Error: The module is "dynamic" because recursive modules are always dynamic.
        However, the module highlighted is expected to be "static".
 |}]
 
+(* An unsafe recursive module is evaluated directly, not through
+   CamlinternalMod, but it must be dynamic like every recursive module. [M16] is
+   unsafe because of [k]. *)
+let x16 =
+  let module Recursive = struct
+    module rec M16 : sig
+      val id : layout_ l. ('a : l). 'a -> 'a
+      val k : int
+    end @ static = struct
+      let poly_ id x = x
+      let k = 1
+    end
+  end in
+  Recursive.M16.id 7
+[%%expect{|
+Line 3, characters 15-18:
+3 |     module rec M16 : sig
+                   ^^^
+Error: The module is "dynamic" because recursive modules are always dynamic.
+       However, the module highlighted is expected to be "static".
+|}]
+
 (* Recursive first-class functor *)
 module type F =
   functor (X : sig end @ static) -> sig
