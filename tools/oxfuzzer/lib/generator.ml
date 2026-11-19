@@ -243,7 +243,6 @@ let split_suffix types ~suffix =
   then Some (List.take count types)
   else None
 
-(* [raise] can only be given a value type. *)
 let is_value ty =
   match ty with
   | Ty.Number { unboxed; _ } | Ty.Record { unboxed; _ } -> not unboxed
@@ -850,8 +849,6 @@ let can_gen_try (st : State.t) =
   st.swarm.exceptions && st.tries_remaining > 0
   && not (List.is_empty st.exceptions)
 
-(* With [can_reraise], a handler can raise the exception it caught again, if
-   [env] can catch it. *)
 let gen_handler (st : State.t) (env : Env.t) ~gen_body ~can_reraise
     (exn : Exn.t) =
   let payload =
