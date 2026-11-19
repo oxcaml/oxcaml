@@ -1345,8 +1345,14 @@ let find_canonical_in_target_env t canonical_in_target_env kind =
   | Existential_for_these_canonicals simples ->
     Joined_envs.find_simples_in_joined_envs t.joined_envs simples kind
 
-let inverse_relation_is_valid_in_all_joined_envs ?where_scrutinee_has_type t var
-    relation ~scrutinee ~meet_expanded_head =
+(** Checks that the relation [var = relation(scrutinee)] is valid in all the
+    joined environments.
+
+    If a [scrutinee_shape] is provided, the relation only needs to be valid when
+    the [scrutinee] is compatible with that shape. In that case, the relation
+    can only be added to an appropriate extension on the scrutinee. *)
+let inverse_relation_is_valid_in_all_joined_envs ?scrutinee_shape t var relation
+    ~scrutinee ~meet_expanded_head =
   match
     definition_of_var_in_target_env t (Variable_in_target_env.create var)
   with
@@ -1382,15 +1388,18 @@ let inverse_relation_is_valid_in_all_joined_envs ?where_scrutinee_has_type t var
             false
           | Ok scrutinee_in_this_env -> (
             let filtered_env : _ Or_bottom.t =
-              match where_scrutinee_has_type with
+              match scrutinee_shape with
               | None -> Ok env
-              | Some prover ->
+              | Some shape ->
                 ME.use_meet_env_strict ~meet_expanded_head env ~f:(fun env ->
                     ME.add_equation_on_simple ~meet_expanded_head env
-                      scrutinee_in_this_env prover)
+                      scrutinee_in_this_env shape)
             in
             match filtered_env with
-            | Bottom -> true
+            | Bottom ->
+              (* The scrutinee cannot have the right shape: skip this
+                 environment. *)
+              true
             | Ok env -> (
               match Expand_head.expand_head env (ty :> TG.t) |> ET.descr with
               | Unknown | Bottom -> false
@@ -1553,7 +1562,7 @@ let recover_inverse_relations t inverse_relations name ty ~meet_expanded_head =
         | Some get_tag_var
           when inverse_relation_is_valid_in_all_joined_envs t get_tag_var
                  TG.Relation.get_tag ~scrutinee:name ~meet_expanded_head
-                 ~where_scrutinee_has_type:MTC.any_block ->
+                 ~scrutinee_shape:MTC.any_block ->
           let when_immediate, when_block =
             match extensions with
             | No_extensions -> TEE.empty, TEE.empty
