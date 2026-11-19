@@ -152,7 +152,7 @@ module Check = struct
       handlers res
 
   and apply_expr env res e =
-    List.iter (Env.check_simple env) (Apply.args e);
+    Env.check_uses env (Apply.free_names e);
     let res =
       match Apply.continuation e with
       | Never_returns -> res
