@@ -42,22 +42,41 @@ external tag : t @ contended -> int @@ portable = "caml_obj_tag" [@@noalloc]
    restriction is likely not respected by callees of this module. *)
 external size : t @ contended -> int @@ portable = "%obj_size"
 external opaque_identity_contended : 'a @ contended -> 'a @ contended @@ portable = "%opaque"
-let [@inline always] size t = size (opaque_identity_contended t)
+external get_header : t @ contended -> nativeint @@ portable = "%get_header"
+external nativeint_lsr : nativeint -> int -> nativeint @@ portable
+  = "%nativeint_lsr"
+external nativeint_to_int : nativeint -> int @@ portable = "%nativeint_to_int"
+(* The number of words before a block's first field. In native code, a block
+   starts with a layout word if the top bit of its header is set. *)
+let [@inline always] layout_word_size t =
+  match Sys.backend_type with
+  | Native ->
+    nativeint_to_int (nativeint_lsr (get_header t) (Sys.word_size - 1))
+  | Bytecode | Other _ -> 0
+let [@inline always] size t =
+  let t = opaque_identity_contended t in
+  size t - layout_word_size t
 external reachable_words : t -> int @@ portable = "caml_obj_reachable_words"
 external uniquely_reachable_words : t array -> int array * int @@ portable = "caml_obj_uniquely_reachable_words"
 external field : t -> int -> t @@ portable = "%obj_field"
-let [@inline always] field t index = field (Sys.opaque_identity t) index
+let [@inline always] field t index =
+  let t = Sys.opaque_identity t in
+  field t (index + layout_word_size t)
 external field_contended : t @ contended -> int -> t @ contended @@ portable = "%obj_field"
-let [@inline always] field_contended t index = field_contended (opaque_identity_contended t) index
+let [@inline always] field_contended t index =
+  let t = opaque_identity_contended t in
+  field_contended t (index + layout_word_size t)
 external set_field : t -> int -> t -> unit @@ portable = "%obj_set_field"
 let [@inline always] set_field t index new_value =
-  set_field (Sys.opaque_identity t) index new_value
+  let t = Sys.opaque_identity t in
+  set_field t (index + layout_word_size t) new_value
 external floatarray_get : floatarray -> int -> float @@ portable = "caml_floatarray_get"
 external floatarray_set :
     floatarray -> int -> float -> unit @@ portable = "caml_floatarray_set"
-let [@inline always] double_field x i = floatarray_get (obj x : floatarray) i
+let [@inline always] double_field x i =
+  floatarray_get (obj x : floatarray) (i + layout_word_size x)
 let [@inline always] set_double_field x i v =
-  floatarray_set (obj x : floatarray) i v
+  floatarray_set (obj x : floatarray) (i + layout_word_size x) v
 external box_int64 : int64_u -> int64 @@ portable = "%box_int64"
 external unbox_int64 : int64 -> int64_u @@ portable = "%unbox_int64"
 external unsafe_get_int64_field : t -> int64_u -> int64_u @@ portable
@@ -72,7 +91,7 @@ external set_raw_field_bytecode : t -> int -> raw_data -> unit @@ portable
 let [@inline always] raw_field t i =
   (match Sys.backend_type with
   | Native ->
-    let byte_offset = Int64.mul (Int64.of_int i) 8L in
+    let byte_offset = Int64.mul (Int64.of_int (i + layout_word_size t)) 8L in
     Int64.to_nativeint
       (box_int64 (unsafe_get_int64_field t (unbox_int64 byte_offset)))
   | Bytecode | Other _ ->
@@ -81,7 +100,7 @@ let [@inline always] raw_field t i =
 let [@inline always] set_raw_field t i v =
   (match Sys.backend_type with
   | Native ->
-    let byte_offset = Int64.mul (Int64.of_int i) 8L in
+    let byte_offset = Int64.mul (Int64.of_int (i + layout_word_size t)) 8L in
     unsafe_set_int64_field t
       (unbox_int64 byte_offset)
       (unbox_int64 (Int64.of_nativeint v))
@@ -251,4 +270,3 @@ module Uniform_or_mixed = struct
     then invalid_arg "Uniform_or_mixed.mixed_scannable_prefix_len_exn";
     t - 1
 end
-
