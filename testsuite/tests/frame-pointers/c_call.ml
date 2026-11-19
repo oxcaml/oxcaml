@@ -2,7 +2,15 @@
  frame_pointers;
  readonly_files = "fp_backtrace.c c_call_.c";
  all_modules = "${readonly_files} c_call.ml";
- native;
+ {
+   arch_amd64;
+   native;
+ } {
+   (* caml_c_call also pushes a frame record on the C stack *)
+   arch_arm64;
+   reference = "${test_source_directory}/c_call.arm64.reference";
+   native;
+ }
 *)
 
 (* Force -O3 to ensure the "_code" symbols are present (see the

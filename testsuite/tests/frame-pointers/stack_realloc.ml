@@ -1,18 +1,30 @@
 (* TEST
- frame_pointers;
- readonly_files = "fp_backtrace.c stack_realloc_.c";
- all_modules = "${readonly_files} stack_realloc.ml";
- {
- (* NOTE clang on macOS and gcc on Linux are less eager to inline
-         certain C functions in the runtime. *)
-   reference = "${test_source_directory}/stack_realloc.arm64.reference";
-   arch_arm64;
-   native;
- } {
-   reference = "${test_source_directory}/stack_realloc.reference";
-   arch_amd64;
-   native;
- }
+   frame_pointers;
+   readonly_files = "fp_backtrace.c stack_realloc_.c";
+   all_modules = "${readonly_files} stack_realloc.ml";
+   (* The debug runtime checks the frame pointers rewritten by
+      caml_try_realloc_stack. *)
+   flags = "-runtime-variant=d";
+   (* On arm64, caml_c_call appears twice as it also pushes a frame
+      record on the C stack.
+      TODO ocaml#14545 and ocaml#13762 tidy up the ocamltest language
+           in this case. not-macos really implies Linux with gcc and
+           macos implies clang on arm64. *)
+   {
+     arch_amd64;
+     native;
+   } {
+     arch_arm64;
+     not-macos;
+     reference = "${test_source_directory}/stack_realloc.arm64.reference";
+     native;
+   } {
+     arch_arm64;
+     macos;
+     reference = "${test_source_directory}/stack_realloc.macos.reference";
+     native;
+   }
+
 *)
 
 open Effect
