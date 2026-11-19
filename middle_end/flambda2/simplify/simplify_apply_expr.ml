@@ -95,8 +95,8 @@ let loopify_decision_for_call dacc apply =
         then DE.loopify_state denv
         else Loopify_state.do_not_loopify)
 
-(* For simplifying terms built from the simplified [apply]. Every
-   [Debuginfo.t] in such terms must derive from [Apply.dbg apply], which
+(* For simplifying terms built from the simplified [apply]. Every [Debuginfo.t]
+   in such terms must derive from [Apply.dbg apply], which
    [simplify_apply_shared] has already rewritten with the current inlining
    context: simplifying them with that context again would add its frames a
    second time. *)
