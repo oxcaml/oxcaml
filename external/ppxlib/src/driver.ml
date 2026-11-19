@@ -1069,6 +1069,8 @@ end
 
 let process_ast (ast : Intf_or_impl.t) ~input_name ~tool_name ~hook
     ~expect_mismatch_handler ~embed_errors =
+  (* If we shouldn't continue after an exception, don't embed errors inside the
+     rewriters: let the first exception escape, then catch it later below. *)
   let stop = embed_errors && not Options.continue_after_exception in
   let embed_errors = embed_errors && not stop in
   match ast with
