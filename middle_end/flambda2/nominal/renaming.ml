@@ -444,3 +444,7 @@ let apply_code_id_or_name_map rename_value renaming map =
   apply_map ~fold:Code_id_or_name.Map.fold ~add:Code_id_or_name.Map.add
     ~empty:Code_id_or_name.Map.empty ~rename_key:apply_code_id_or_name
     ~rename_value renaming map
+
+let apply_field_map rename_value renaming map =
+  apply_map ~fold:Field.Map.fold ~add:Field.Map.add ~empty:Field.Map.empty
+    ~rename_key:apply_field ~rename_value renaming map
