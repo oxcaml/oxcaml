@@ -1981,19 +1981,11 @@ val f : 'a ref -> #('a * 'a addr * 'a) = <fun>
 let f = function
   | [&| |] -> 0
   | [&| x |] -> x
-  | [&| x; y; |] -> x + y
-  | _ -> 0
-let g = function [&: :] -> 0 | [&: x :] -> x | _ -> 0
+  | [&| x; .. as _r; y; |] -> x + y
+let g = function [&: :] -> 0 | [&: ..; x :] -> x
+let h (s : int slice) = match s with [&| .. |] -> 0
 [%%expect{|
 val f : int slice -> int = <fun>
 val g : int slice_imm -> int = <fun>
-|}]
-
-(* Rests are parsed, but not supported yet *)
-let h (s : int slice) = match s with [&| x; .. as _r; y |] -> x + y | _ -> 0
-[%%expect{|
-Line 1, characters 37-58:
-1 | let h (s : int slice) = match s with [&| x; .. as _r; y |] -> x + y | _ -> 0
-                                         ^^^^^^^^^^^^^^^^^^^^^
-Error: Rests in slice patterns are not supported yet.
+val h : int slice -> int = <fun>
 |}]

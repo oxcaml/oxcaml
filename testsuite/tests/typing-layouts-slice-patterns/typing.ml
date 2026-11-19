@@ -5,6 +5,14 @@
 (****************************************)
 (* Basic typechecking of slice patterns *)
 
+(* The rest of a slice pattern is a slice of the same type *)
+let f = function [&| x; .. as r; y |] -> #(x, r, y) | _ -> assert false
+let f_imm = function [&: x; .. as r; y :] -> #(x, r, y) | _ -> assert false
+[%%expect{|
+val f : 'a slice -> #('a * 'a slice * 'a) = <fun>
+val f_imm : 'a slice_imm -> #('a * 'a slice_imm * 'a) = <fun>
+|}]
+
 (* [[&| ... |]] only matches mutable slices *)
 let bad (s : int slice_imm) = match s with [&| _ |] -> () | _ -> ()
 [%%expect{|
@@ -15,13 +23,22 @@ Error: This pattern matches values of type "'a slice"
        but a pattern was expected which matches values of type "int slice_imm"
 |}]
 
-(* Slice patterns with a rest are not supported yet *)
-let bad = function [&| x; .. |] -> x | _ -> assert false
+(* The rest can be bound on both sides of an or-pattern, at different
+   positions *)
+let f = function [&| 0; .. as r |] | [&| .. as r; 0 |] -> r | _ -> assert false
 [%%expect{|
-Line 1, characters 19-31:
-1 | let bad = function [&| x; .. |] -> x | _ -> assert false
-                       ^^^^^^^^^^^^
-Error: Rests in slice patterns are not supported yet.
+val f : int slice -> int slice = <fun>
+|}]
+
+(* An unused variable bound by a rest is reported like an unused alias *)
+let unused_rest (s : int slice) = match s with [&| x; .. as r |] -> x | _ -> 0
+[%%expect{|
+Line 1, characters 60-61:
+1 | let unused_rest (s : int slice) = match s with [&| x; .. as r |] -> x | _ -> 0
+                                                                ^
+Warning 26 [unused-var]: unused variable "r".
+
+val unused_rest : int slice -> int = <fun>
 |}]
 
 (***********)
@@ -97,6 +114,13 @@ let ok (s : string slice_imm @ unique) =
 val ok : string slice_imm @ unique -> unit = <fun>
 |}]
 
+(* The rest has the mode of the slice *)
+let ok (s : string slice @ unique) =
+  match s with [&| .. as r |] -> consume_slice r
+[%%expect{|
+val ok : string slice @ unique -> unit = <fun>
+|}]
+
 (* Reading the elements of a mutable slice requires [read] *)
 let bad (s : int slice @ write) =
   match s with [&| _ |] -> () | _ -> ()
@@ -127,4 +151,24 @@ let f (s : ur slice) =
 [%%expect{|
 type ur = #{ i : int; s : string; }
 val f : ur slice -> int addr = <fun>
+|}]
+
+(**************)
+(* Uniqueness *)
+
+(* CR slice-patterns: The uniqueness analysis doesn't distinguish the elements
+   and the rest of a slice yet. *)
+let imprecise (s : string slice_imm @ unique) =
+  match s with
+  | [&: x; .. as r :] -> consume x; consume_slice_imm r
+  | _ -> ()
+[%%expect{|
+Line 3, characters 54-55:
+3 |   | [&: x; .. as r :] -> consume x; consume_slice_imm r
+                                                          ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 33-34:
+3 |   | [&: x; .. as r :] -> consume x; consume_slice_imm r
+                                     ^
+
 |}]
