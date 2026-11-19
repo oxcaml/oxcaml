@@ -24,7 +24,7 @@ type simplify_result =
     unit : Flambda_unit.t
   }
 
-let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
+let run ~ppf_dump ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let return_continuation = FU.return_continuation unit in
   let exn_continuation = FU.exn_continuation unit in
   let toplevel_my_alloc_region = FU.toplevel_my_alloc_region unit in
@@ -41,7 +41,8 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
      remark for the cmx contents) *)
   let dacc = DA.create denv code_slot_offsets Continuation_uses_env.empty in
   let body, uacc =
-    Simplify_expr.simplify_toplevel dacc (FU.body unit) ~return_continuation
+    Simplify_expr.simplify_toplevel dacc (FU.body unit) ~ppf_dump
+      ~return_continuation
       ~return_arity:(Flambda_arity.create_singletons [K.With_subkind.any_value])
       ~exn_continuation
   in

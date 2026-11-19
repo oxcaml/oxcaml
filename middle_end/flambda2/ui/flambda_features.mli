@@ -129,6 +129,8 @@ val dump_slot_offsets : unit -> bool
 
 val dump_flow : unit -> bool
 
+val dump_simplified : unit -> bool
+
 val dump_simplify : unit -> bool
 
 val dump_reaper : unit -> bool

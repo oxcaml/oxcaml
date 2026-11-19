@@ -120,6 +120,208 @@ and simplified_switch =
     cse_before_switch : CSE.t
   }
 
+let print_conf_removed_operations = ref false
+
+let print_elide pp ppf x =
+  Format.fprintf ppf "%t{%a}%t" Flambda_colours.elide pp x Flambda_colours.pop
+
+let print_flag ppf (b, name) =
+  if b then print_elide Format.pp_print_string ppf name
+
+let print_flags ppf l =
+  List.iter (print_flag ppf) l;
+  if List.exists fst l then Format.pp_print_space ppf ()
+
+let print_skip ~if_:b pp ppf x = if b then () else pp ppf x
+
+let rec print ppf
+    { simplified_lets_and_let_conts;
+      simplified_terminator;
+      removed_operations;
+      is_cold
+    } =
+  Format.fprintf ppf "@[<hv>%a%a%a%a@]" print_flag (is_cold, "cold")
+    print_removed_operations removed_operations print_lets_and_let_conts
+    simplified_lets_and_let_conts print_terminator simplified_terminator
+
+and print_rewrite_id_exn ppf id =
+  Format.fprintf ppf "%t{exn:%a}%t" Flambda_colours.elide
+    Apply_cont_rewrite_id.print id Flambda_colours.pop
+
+and print_toplevel ppf toplevel =
+  if toplevel
+  then Format.fprintf ppf "%t{top}%t" Flambda_colours.elide Flambda_colours.pop
+  else ()
+
+and print_removed_operations ppf removed_operations =
+  if not !print_conf_removed_operations
+  then ()
+  else begin
+    Format.fprintf ppf "removed_operations: [@[<hov>%a@]]@ "
+      Removed_operations.print removed_operations
+  end
+
+and print_lets_and_let_conts ppf = function
+  | Simplified_terminator -> ()
+  | Simplified_let (let_expr, body) -> print_let_expr ppf ~body let_expr
+  | Simplified_let_cont (let_cont, body) -> print_let_cont ppf ~body let_cont
+
+and print_let_expr ~body ppf
+    { bindings_to_place;
+      removed_operations = _;
+      lifted_constants_from_defining_expr;
+      at_unit_toplevel = _;
+      closure_info = _;
+      rewrite_id
+    } =
+  Format.fprintf ppf "@[<hv 2>let%a@ %a%a@;<1 -2>in@]@\n"
+    (print_elide Named_rewrite_id.print)
+    rewrite_id print_lifted_constants lifted_constants_from_defining_expr
+    print_bindings_to_place bindings_to_place;
+  print_lets_and_let_conts ppf body
+
+and print_lifted_constants ppf lcs =
+  LCS.fold lcs ~init:() ~f:(fun () lc ->
+      let bound = Lifted_constant.bound_static lc in
+      Format.fprintf ppf "%a@ " Bound_static.print bound)
+
+and print_bindings_to_place ppf = function
+  | [] ->
+    Format.fprintf ppf "%t{empty}%t" Flambda_colours.elide Flambda_colours.pop
+  | _ :: _ as l ->
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
+      print_binding_to_place ppf l
+
+and print_binding_to_place ppf binding =
+  match (binding : Simplified_named.binding_to_place) with
+  | Delete_binding { original_defining_expr = _ } ->
+    Format.fprintf ppf "%t<deleted_binding>%t" Flambda_colours.elide
+      Flambda_colours.pop
+  | Keep_binding
+      { let_bound; simplified_defining_expr; original_defining_expr = _ } ->
+    Format.fprintf ppf "%a = %a" Bound_pattern.print let_bound
+      Simplified_named.print simplified_defining_expr
+
+and print_let_cont ~body ppf
+    { at_unit_toplevel;
+      handlers_from_the_outside_to_the_inside = handlers;
+      original_invariant_params;
+      invariant_extra_params
+    } =
+  Format.fprintf ppf "@[<hv 2>let_cont%a@ %a@;<1 -2>in@]@\n" print_toplevel
+    at_unit_toplevel
+    (print_handlers ~original_invariant_params ~invariant_extra_params)
+    handlers;
+  print_lets_and_let_conts ppf body
+
+and print_handlers ~original_invariant_params ~invariant_extra_params ppf =
+  function
+  | [] ->
+    Format.fprintf ppf "%t{empty}%t" Flambda_colours.elide Flambda_colours.pop
+  | _ :: _ as l ->
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
+      (print_handler_group ~original_invariant_params ~invariant_extra_params)
+      ppf l
+
+and print_handler_group ~original_invariant_params ~invariant_extra_params ppf =
+  function
+  | Recursive { simplified_continuation_handlers } ->
+    print_recursive_handlers ~original_invariant_params ~invariant_extra_params
+      ppf simplified_continuation_handlers
+  | Non_recursive { cont; handler; is_single_inlinable_use } ->
+    print_one_handler ~original_invariant_params ~invariant_extra_params ppf
+      (cont, handler, is_single_inlinable_use, ~recursive:false)
+
+and print_recursive_handlers ~original_invariant_params ~invariant_extra_params
+    ppf map =
+  Continuation.Map.iter
+    (fun cont handler ->
+      Format.fprintf ppf "%a@ "
+        (print_one_handler ~original_invariant_params ~invariant_extra_params)
+        (cont, handler, false, ~recursive:true))
+    map
+
+and print_one_handler ~original_invariant_params ~invariant_extra_params ppf
+    (cont, handler, is_single_inlinable_use, ~recursive) =
+  let { params;
+        simplified_handler;
+        is_exn_handler;
+        is_cold;
+        extra_params_and_args;
+        invariant_extra_params_and_args = _;
+        rewrite_ids = _
+      } =
+    handler
+  in
+  let extra_params = EPA.extra_params extra_params_and_args in
+  Format.fprintf ppf "@[<hov 2>%a%s%a@[<hv>%a@,%a@,%a@,%a@] =@ %a@]" print_flags
+    [is_single_inlinable_use, "single"; is_exn_handler, "exn"; is_cold, "cold"]
+    (if recursive then "rec " else "")
+    Continuation.print cont
+    (print_skip ~if_:(not recursive) (print_cont_params ~extra:false))
+    original_invariant_params
+    (print_skip ~if_:(not recursive) (print_cont_params ~extra:true))
+    invariant_extra_params
+    (print_cont_params ~extra:false)
+    params
+    (print_cont_params ~extra:true)
+    extra_params print simplified_handler
+
+and print_cont_params ~extra ppf bound_params =
+  let sep_begin, sep_end = if extra then "{", "}" else "(", ")" in
+  Format.fprintf ppf "%s%a%s" sep_begin Bound_parameters.print bound_params
+    sep_end
+
+and print_terminator ppf terminator : unit =
+  match terminator with
+  | Simplified_apply apply_expr -> print_apply_expr ppf apply_expr
+  | Simplified_apply_cont apply_cont -> print_apply_cont ppf apply_cont
+  | Simplified_switch switch -> print_switch ppf switch
+  | Simplified_invalid invalid -> print_invalid ppf invalid
+
+and print_apply_expr ppf
+    { apply; use_id; exn_cont_use_id; result_arity = _; is_cold } =
+  Format.fprintf ppf "%a%a%a%a" print_flag (is_cold, "cold")
+    (Format.pp_print_option (print_elide Apply_cont_rewrite_id.print))
+    use_id print_rewrite_id_exn exn_cont_use_id Apply.print apply
+
+and print_apply_cont ppf { apply_cont; args; rewrite_id } =
+  Format.fprintf ppf "%a%a"
+    (print_elide Apply_cont_rewrite_id.print)
+    rewrite_id Apply_cont.print
+    (Apply_cont.update_args apply_cont ~args)
+
+and print_switch ppf
+    { arms;
+      scrutinee;
+      scrutinee_ty = _;
+      condition_dbg;
+      shareable_constants = _;
+      typing_env_before_switch = _;
+      cse_before_switch = _
+    } =
+  Format.fprintf ppf "@[<v 0>(%tswitch%t %a%s%t%a%t@ @[<v 0>%a@])@]"
+    Flambda_colours.expr_keyword Flambda_colours.pop Simple.print scrutinee
+    (if Debuginfo.is_none condition_dbg then "" else " ")
+    Flambda_colours.debuginfo Debuginfo.print_compact condition_dbg
+    Flambda_colours.pop print_switch_arms arms
+
+and print_switch_arms ppf arms =
+  Target_ocaml_int.Map.iter (print_switch_arm ppf) arms
+
+and print_switch_arm ppf discr
+    (apply_cont, ~annotations:_, rewrite_id, _arity, _typing_env) =
+  Format.fprintf ppf "| %a -> %a%a" Target_ocaml_int.print discr
+    (print_elide Apply_cont_rewrite_id.print)
+    rewrite_id Apply_cont_expr.print apply_cont
+
+and print_invalid ppf invalid =
+  Format.fprintf ppf "@[<hov 1>(%tinvalid%t@ %s@]"
+    Flambda_colours.invalid_keyword Flambda_colours.pop
+    (Flambda.Invalid.to_string invalid)
+
 let notify_removed ~operation t =
   { t with
     removed_operations = Removed_operations.( + ) operation t.removed_operations

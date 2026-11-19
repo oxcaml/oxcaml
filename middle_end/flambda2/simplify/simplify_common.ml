@@ -37,6 +37,7 @@ type 'a expr_simplifier =
 type simplify_toplevel =
   Downwards_acc.t ->
   Expr.t ->
+  ppf_dump:Format.formatter ->
   return_continuation:Continuation.t ->
   return_arity:[`Complex] Flambda_arity.t ->
   exn_continuation:Continuation.t ->
