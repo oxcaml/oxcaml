@@ -351,6 +351,8 @@ module Jsoo_effects = struct
     | Wasm -> Jspi
 end
 
+let link_jsir = ref false               (* -link-jsir *)
+
 let jsoo_effects_flag = ref (None : Jsoo_effects.t option) (* -jsoo-effects *)
 
 let set_jsoo_effects effects = jsoo_effects_flag := Some effects

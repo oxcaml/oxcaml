@@ -556,6 +556,16 @@ type jsir_target =
   | Js
   | Wasm
 
+module Linkage_name = struct
+  type t = string
+
+  let of_string t = t
+
+  let to_string t = t
+
+  module Hashtbl = String.Hashtbl
+end
+
 type jsir_file =
   { target : jsir_target
   ; program : Marshalable_program.t
@@ -571,6 +581,13 @@ type jsir_file =
             in [Unit_info.t]. *)
   ; force_link : bool
         (** Whether the unit was compiled with [-linkall]. *)
+  ; symbol_imports : (Var.t * Linkage_name.t) list
+        (** The variables bound at the start of the entry block of [program]
+            to the symbols of other compilation units, with the linkage names
+            of those symbols. *)
+  ; symbol_exports : (Linkage_name.t * Var.t) list
+        (** The symbols of this unit that other compilation units may fetch,
+            by linkage name, with the variables holding their values. *)
   }
 
 let noloc = No

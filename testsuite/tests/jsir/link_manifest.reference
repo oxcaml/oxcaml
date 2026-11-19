@@ -1,0 +1,3 @@
+init a
+init b
+main: a b

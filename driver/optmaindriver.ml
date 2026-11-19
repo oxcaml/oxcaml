@@ -107,7 +107,9 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
                 (Clflags.Jsir_target.program_name target)
                 supported_effects)
          | Some _ | None -> ());
-        Jscomp.make target ~lambda_to_jsir:Flambda2.lambda_to_jsir
+        Jscomp.make target ~link_jsir:!Clflags.link_jsir
+          ~lambda_to_jsir:Flambda2.lambda_to_jsir
+          ~jsir_linker:Flambda2.link_jsir
       | None -> Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
     in
     begin try

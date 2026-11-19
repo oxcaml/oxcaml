@@ -428,8 +428,9 @@
  (section lib_root)
  (files
   (glob_files_rec
-   (build/*.{cmx-js,cmxa-js,cma-js} with_prefix ocaml))
-  (build/std_exit.cmo-js as ocaml/std_exit.cmo-js)))
+   (build/*.{cmx-js,cmxa-js,cma-js,cma-jsir-js} with_prefix ocaml))
+  (build/std_exit.cmo-js as ocaml/std_exit.cmo-js)
+  (build/std_exit.cm-jsir-js as ocaml/std_exit.cm-jsir-js)))
 
 (install
  (package stdlib-wasm)
@@ -437,5 +438,6 @@
  (section lib_root)
  (files
   (glob_files_rec
-   (build/*.{cmx-wasm,cmxa-wasm,cma-wasm} with_prefix ocaml))
-  (build/std_exit.cmo-wasm as ocaml/std_exit.cmo-wasm)))
+   (build/*.{cmx-wasm,cmxa-wasm,cma-wasm,cma-jsir-wasm} with_prefix ocaml))
+  (build/std_exit.cmo-wasm as ocaml/std_exit.cmo-wasm)
+  (build/std_exit.cm-jsir-wasm as ocaml/std_exit.cm-jsir-wasm)))

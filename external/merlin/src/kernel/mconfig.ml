@@ -821,7 +821,8 @@ let ocaml_ignored_flags =
     "-flambda2-simplify-stubs";
     "-stubs-forward-inlining";
     "-no-stubs-forward-inlining";
-    "-djsir"
+    "-djsir";
+    "-link-jsir"
   ]
 
 let ocaml_ignored_parametrized_flags =

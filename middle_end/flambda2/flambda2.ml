@@ -453,11 +453,30 @@ let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
         ~machine_width:(Flambda2_to_jsir.To_jsir_target.machine_width ())
         program
     in
-    let { Flambda2_to_jsir.To_jsir_result.program; imported_compilation_units }
-        =
+    let { Flambda2_to_jsir.To_jsir_result.program;
+          imported_compilation_units;
+          symbol_imports;
+          symbol_exports
+        } =
       Flambda2_to_jsir.To_jsir.unit ~offsets ~all_code ~reachable_names flambda
     in
+    let linkage_name symbol =
+      Flambda2_identifiers.Symbol.linkage_name_as_string symbol
+      |> Jsoo_imports.Code.Linkage_name.of_string
+    in
+    let symbol_imports =
+      List.map (fun (var, symbol) -> var, linkage_name symbol) symbol_imports
+    in
+    let symbol_exports =
+      List.map (fun (symbol, var) -> linkage_name symbol, var) symbol_exports
+    in
     if not keep_symbol_tables then reset_symbol_tables ();
-    { Optcomp_intf.program; imported_compilation_units }
+    { Optcomp_intf.program;
+      imported_compilation_units;
+      symbol_imports;
+      symbol_exports
+    }
   in
   Profile.record_call "flambda2" run
+
+let link_jsir = Flambda2_to_jsir.Jsir_linker.link

@@ -1412,6 +1412,12 @@ let mk_jsoo_effects f =
     Printf.sprintf " Effect handlers backend: %s; %s" (doc_for_target Js)
       (doc_for_target Wasm) )
 
+let mk_link_jsir f =
+  ( "-link-jsir",
+    Arg.Unit f,
+    " Link the units of an executable as JSIR, into one program that \
+     js_of_ocaml or wasm_of_ocaml compiles as a whole. " )
+
 let mk_djsir f =
   ( "-djsir",
     Arg.Unit f,
@@ -1646,6 +1652,7 @@ module type Oxcaml_options = sig
   val target : Clflags.Target.t -> unit
   val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
   val jsoo_effects : Clflags.Jsoo_effects.t -> unit
+  val link_jsir : unit -> unit
   val djsir : unit -> unit
   val x : string -> unit
 end
@@ -1895,6 +1902,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cached_generic_functions_path F.cached_generic_functions_path;
       mk_target F.target;
       mk_jsoo_effects F.jsoo_effects;
+      mk_link_jsir F.link_jsir;
       mk_djsir F.djsir;
       mk_x F.x;
     ]
@@ -2487,6 +2495,7 @@ module Oxcaml_options_impl = struct
   let target = Clflags.set_target
   let jsoo_opt = Compenv.add_first_jsoo_opt
   let jsoo_effects = Clflags.set_jsoo_effects
+  let link_jsir () = Clflags.link_jsir := true
   let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
 
@@ -2976,6 +2985,16 @@ module Extra_params = struct
               "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml, \
                wasm_of_ocaml)"
               v)
+    | "link-jsir" ->
+        let link_jsir = Compenv.check_bool ppf name v in
+        (match position with
+        | Compenv.Before_args -> Clflags.link_jsir := link_jsir
+        | Compenv.Before_compile _ | Compenv.Before_link ->
+            (* The backend has been chosen by then, and with it the
+               extensions of the object files. *)
+            Compenv.fatal
+              "OCAMLPARAM: link-jsir must be given before the _ separator");
+        true
     | "jsoo-effects" -> (
         match Clflags.Jsoo_effects.of_string v with
         | Some effects ->
