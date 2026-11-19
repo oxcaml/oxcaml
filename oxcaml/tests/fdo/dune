@@ -820,9 +820,9 @@
  (action
   (diff ssa.output ssa.output.corrected)))
 
-; The counters in Linear: none of the Cmm is lost through the Cfg passes, and
-; none is added. A conditional branch has the counters of its taken edge and of
-; its fallthrough edge.
+; The counters in Linear: none of the Cmm is lost through the Cfg passes apart
+; from the dropped ones, and none is added. A conditional branch has the
+; counters of its taken edge and of its fallthrough edge.
 
 (rule
  (targets linear.output.corrected)

@@ -40,6 +40,7 @@ module Reason = struct
     | Cfg_branch_to_jump
     | Cfg_blocks_merged
     | Ssa_self_tail_call_to_jump
+    | Linear_branch_to_jump
 
   let to_string = function
     | Inlined_call -> "inlined_call"
@@ -54,6 +55,7 @@ module Reason = struct
     | Cfg_branch_to_jump -> "cfg_branch_to_jump"
     | Cfg_blocks_merged -> "cfg_blocks_merged"
     | Ssa_self_tail_call_to_jump -> "ssa_self_tail_call_to_jump"
+    | Linear_branch_to_jump -> "linear_branch_to_jump"
 end
 
 module Counter_map = Map.Make (Fdo_counter)

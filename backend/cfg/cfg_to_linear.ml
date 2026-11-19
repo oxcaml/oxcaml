@@ -204,9 +204,38 @@ let attach_fdo_annotations (terminator : Cfg.terminator) ~next_label
     ([], Control_after.Falls_through)
   |> fst
 
-(* CR-someday yusumez: The FDO counters of a branching terminator are dropped
-   when it is linearized to an unconditional jump or a fallthrough, which
-   [Simplify_terminator] avoids (see [Cfg.Orphaned_counters]). *)
+(* The FDO counters on the edges of an instruction of the linearization of a
+   terminator. *)
+let fdo_annotations_of_desc (desc : L.instruction_desc) =
+  let of_successor (successor : L.successor) = successor.fdo_annotation in
+  match[@ocaml.warning "-4"] desc with
+  | Lcondbranch { taken; fallthrough_annotation; test = _ } ->
+    [of_successor taken; fallthrough_annotation]
+  | Lcondbranch3 { lt; eq; gt; fallthrough_annotation } ->
+    fallthrough_annotation
+    :: List.filter_map (Option.map of_successor) [lt; eq; gt]
+  | Lswitch successors -> List.map of_successor (Array.to_list successors)
+  | _ -> []
+
+(* The counters of the edges of [terminator] that no instruction of its
+   linearization has are dropped: it became an unconditional jump or a
+   fallthrough, which [Simplify_terminator] mostly avoids. *)
+let drop_fdo_counters_without_edge (terminator : Cfg.terminator)
+    (desc_list : L.instruction_desc list) =
+  let kept =
+    List.concat_map fdo_annotations_of_desc desc_list
+    |> Fdo_annotation.union |> Fdo_annotation.to_list
+  in
+  let dropped =
+    Cfg.branch_successors terminator
+    |> List.map (fun (successor : Cfg.successor) -> successor.fdo_annotation)
+    |> Fdo_annotation.union |> Fdo_annotation.to_list
+    |> List.filter (fun counter ->
+        not (List.exists (Fdo_counter.equal counter) kept))
+  in
+  Fdo_dropped_counters.register ~reason:Linear_branch_to_jump
+    (Fdo_annotation.of_list dropped)
+
 let linearize_terminator (func : string)
     (terminator : Cfg.terminator Cfg.instruction)
     ~(next : Linear_utils.labelled_insn) ~has_epilogue :
@@ -465,6 +494,7 @@ let linearize_terminator (func : string)
   let desc_list =
     attach_fdo_annotations terminator.desc ~next_label:next.label desc_list
   in
+  drop_fdo_counters_without_edge terminator.desc desc_list;
   let desc_list =
     match has_epilogue with
     | true ->
