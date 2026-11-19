@@ -152,7 +152,8 @@ let should_ignore loc attrs =
   (* If the filename changed, then there were line directives, and the locations
      are all messed up. *)
   (not (stayed_in_the_same_file loc.loc_start.pos_fname))
-  || (* Ignore things explicitly marked. *)
+  ||
+  (* Ignore things explicitly marked. *)
   List.exists
     ~f:(fun attr ->
       String.equal attr.attr_name.txt
@@ -187,8 +188,8 @@ let do_check ~node_name node_loc childrens_locs siblings_locs =
        outside of this node's.@.Child %s found at:@ %a"
       node_name
       ((match String.unsafe_get child_name 0 with
-       | 'a' | 'e' | 'i' | 'o' | 'u' -> "n "
-       | _ -> " ")
+         | 'a' | 'e' | 'i' | 'o' | 'u' -> "n "
+         | _ -> " ")
       ^ child_name)
       child_name Location.print child_loc
 
@@ -224,7 +225,17 @@ let enforce_invariants fname =
 
     method! binding_op x siblings_locs =
       let childrens_locs = super#binding_op x Non_intersecting_ranges.empty in
-      do_check ~node_name:"binding operator" x.pbop_loc childrens_locs
+      (* A binding operator's location overlaps the adjacent parts of the [let*]
+         expression, so don't treat it as a range of its own. *)
+      do_check ~node_name:"binding operator"
+        { x.pbop_loc with loc_ghost = true }
+        childrens_locs siblings_locs
+
+    method! jkind_annotation x siblings_locs =
+      let childrens_locs =
+        super#jkind_annotation x Non_intersecting_ranges.empty
+      in
+      do_check ~node_name:"jkind annotation" x.pjka_loc childrens_locs
         siblings_locs
 
     method! value_description x siblings_locs =

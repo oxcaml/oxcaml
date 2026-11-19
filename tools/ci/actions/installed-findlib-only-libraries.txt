@@ -1,3 +1,4 @@
 # Findlib umbrella packages; Dune lists only their child libraries.
-ocaml-compiler-libs
+js_of_ocaml-compiler.private
 ppxlib_ast
+ppxlib_ast.private

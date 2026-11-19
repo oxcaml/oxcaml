@@ -41,3 +41,7 @@ val dominator_tree_for_entry_point : t -> dominator_tree
     from [doms] in a breadth-first manner (iterating over a whole tree of the
     forest before moving to the next tree), applying [f] to visited nodes. *)
 val iter_breadth_dominator_forest : t -> f:(Label.t -> unit) -> unit
+
+module For_testing : sig
+  val doms : t -> Label.t Label.Tbl.t
+end

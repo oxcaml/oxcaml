@@ -1182,6 +1182,7 @@ module Ast = struct
     | PatArray of pattern list
     | PatOr of pattern * pattern
     | PatConstraint of pattern * core_type * modes
+    | PatAddr of pattern * bool
     | PatLazy of pattern
     | PatAnyModule
     | PatUnpack of Var.Module.t
@@ -1521,6 +1522,10 @@ module Ast = struct
       maybe_parens with_parens fmt (fun fmt () ->
           pp fmt "%a@ :@ %a%a" (print_pat env) pat (print_core_type env) ty
             print_mode_constraint modes)
+    | PatAddr (pat, mutable_) ->
+      pp fmt "%s@ (%a)"
+        (if mutable_ then "addr_" else "addr_imm_")
+        (print_pat env) pat
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
     | PatUnpack v -> pp fmt "(module@ %a)" (Var.Module.print env) v
@@ -1639,9 +1644,12 @@ module Ast = struct
     | TypeAny -> pp fmt "_"
     | TypeVar v -> Var.Type_var.print env fmt v
     | TypeArrow (arg_label, ty1, ms1, ty2, ms2) ->
+      let print_return_type =
+        if ms2 = [] then print_core_type else print_core_type_with_parens
+      in
       pp fmt "%a%a%a@ ->@ %a%a" print_arrow_arg_lab arg_label
         (print_core_type_with_arrow env)
-        ty1 print_mode_constraint ms1 (print_core_type env) ty2
+        ty1 print_mode_constraint ms1 (print_return_type env) ty2
         print_mode_constraint ms2
     | TypeTuple ts ->
       pp fmt "%a"
@@ -2262,6 +2270,10 @@ module Pat = struct
   let or_ t1 t2 =
     let+ p1, p2 = join t1 t2 in
     Ast.PatOr (p1, p2)
+
+  let addr t mutable_ =
+    let+ p = t in
+    Ast.PatAddr (p, mutable_)
 
   let lazy_ t =
     let+ p = t in

@@ -14,7 +14,7 @@
  (name jsoo_testsuite_oxcaml)
  (modules test_ugeint test_marshal_float32)
  (libraries unix compiler-libs.common js_of_ocaml-compiler)
- (enabled_if %{oxcaml_supported})
+ (enabled_if %{ocaml-config:ox})
  (inline_tests
   (modes js wasm best))
  (preprocess
@@ -26,11 +26,11 @@
  ; passes its assertions but no longer exercises the UGEINT code path
  ; in [parse_bytecode.ml], and the regression coverage is gone.
  (alias runtest)
- (enabled_if %{oxcaml_supported})
+ (enabled_if %{ocaml-config:ox})
  (deps ugeint_bytecode_probe.ml)
  (action
   (bash
-   "ocamlc %{deps} -o probe.bc && dumpobj probe.bc | grep -qE '^[[:space:]]*[0-9]+[[:space:]]+UGEINT'")))
+   "ocamlc %{deps} -o probe.bc && %{bin:dumpobj.opt} probe.bc | grep -qE '^[[:space:]]*[0-9]+[[:space:]]+UGEINT'")))
 
 (library
  ; The #2300 regression has to digest a >2 GiB input, which takes far longer

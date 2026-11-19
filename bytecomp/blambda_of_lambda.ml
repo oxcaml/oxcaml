@@ -374,8 +374,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
-  | Linstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
@@ -977,7 +976,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          into inline records are disallowed. *)
       | Record_boxed | Record_float | Record_ufloat | Record_unboxed ->
         unary (Ccall "caml_obj_dup"))
-    | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
+    | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_apply_arity
     | Pperform -> context_switch Perform ~arity:1
     | Poffsetref n -> unary (Offsetref n)
     | Pstringlength -> unary (Ccall "caml_ml_string_length")
@@ -1137,6 +1136,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ptls_get -> unary (Ccall "caml_domain_tls_get")
     | Pdomain_index -> unary (Ccall "caml_ml_domain_index")
+    | Pthread_self_id -> unary (Ccall "caml_ml_thread_self_id")
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")

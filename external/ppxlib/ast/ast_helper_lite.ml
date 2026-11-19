@@ -86,14 +86,7 @@ module Typ = struct
   let constr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_constr (a, b))
   let object_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_object (a, b))
   let class_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_class (a, b))
-  let alias ?loc ?attrs a b =
-    let alias_loc =
-      match loc with
-      | None -> !default_loc
-      | Some alias_loc -> alias_loc
-    in
-    mk ?loc ?attrs
-      (Ptyp_alias (a, Some { txt = b; loc = { alias_loc with loc_ghost = true } }, None))
+  let alias ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_alias (a, Some b, None))
   let variant ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_variant (a, b, c))
   let poly ?loc ?attrs a b =
     let a = List.map (fun a -> a, None) a in
@@ -230,11 +223,12 @@ module Exp = struct
          ( [ { pparam_loc = loc; pparam_desc = Pparam_val (a, b, c) } ]
          , {mode_annotations = []; ret_type_constraint = None; ret_mode_annotations = []}
          , Pfunction_body d ))
-  let function_ ?(loc = !default_loc) ?attrs a =
+  let function_ ?(loc = !default_loc) ?attrs ?loc_location a =
+    let loc_location = match loc_location with Some l -> l | None -> loc in
     mk ~loc ?attrs (Pexp_function
       ( []
       , {mode_annotations = []; ret_type_constraint = None; ret_mode_annotations = []}
-      , Pfunction_cases (a, loc, [])))
+      , Pfunction_cases (a, loc_location, [])))
   let apply ?loc ?attrs a b = mk ?loc ?attrs (Pexp_apply (a, b))
   let match_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_match (a, b))
   let try_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_try (a, b))
@@ -471,8 +465,10 @@ module Incl = struct
 end
 
 module Vb = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) pat expr =
-    { pvb_is_poly = false; pvb_pat = pat; pvb_expr = expr; pvb_modes = []; pvb_attributes = attrs; pvb_loc = loc }
+  let mk ?(loc = !default_loc) ?(attrs = []) ?value_constraint pat expr =
+    { pvb_is_poly = false; pvb_pat = pat; pvb_expr = expr;
+      pvb_constraint = value_constraint; pvb_modes = [];
+      pvb_attributes = attrs; pvb_loc = loc }
 end
 
 module Ci = struct
@@ -487,6 +483,17 @@ module Ci = struct
       pci_loc = loc;
     }
 end
+
+let constructor ?(loc = !default_loc) ?(attrs = []) ?(vars = [])
+    ?(args = Pcstr_tuple []) ?res name =
+  {
+    pcd_name = name;
+    pcd_vars = vars;
+    pcd_args = args;
+    pcd_res = res;
+    pcd_loc = loc;
+    pcd_attributes = attrs;
+  }
 
 module Type = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(params = []) ?(cstrs = [])

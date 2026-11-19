@@ -1,8 +1,8 @@
-(** Interaction with the driver, such as getting/seeting cookies, adding
+(** Interaction with the driver, such as getting/setting cookies, adding
     arguments.
 
-    The relevant part in the manual is {{!driver.driver_execution} the section
-    on its execution}. *)
+    The relevant part in the manual is
+    {{!driver.driver_execution} the section on its execution}. *)
 
 open Import
 
@@ -149,7 +149,7 @@ val register_code_transformation :
   impl:(structure -> structure) ->
   intf:(signature -> signature) ->
   unit
-  [@@deprecated "[since 2015-11] use register_transformation instead"]
+[@@deprecated "[since 2015-11] use register_transformation instead"]
 (** Same as:
 
     {[
@@ -227,6 +227,7 @@ end)
     end) : sig
   val set : T.t -> unit
 end
+[@@ocaml.warning "-67"]
 
 val standalone : unit -> unit
 (** Suitable for -pp and also usable as a standalone command line tool.
@@ -256,3 +257,11 @@ val disable_location_check : unit -> unit
     command line. This can be used to programmatically parse PPX flags when using the
     driver as a library (e.g., in toplevel_expect_test). *)
 val parse_additional_flags : prog:string -> flags:string list -> unit
+val load_input :
+  kind:Utils.Kind.t ->
+  input_name:string ->
+  relocate:bool ->
+  string ->
+  ( string * Utils.Ast_io.input_version * Utils.Intf_or_impl.t,
+    Location.Error.t * Utils.Ast_io.input_version )
+  result

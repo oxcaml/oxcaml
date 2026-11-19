@@ -1,0 +1,27 @@
+(let
+  (even_variant/0 =
+     (function {nlocal = 0} t/1[value<int>] : int
+       (catch
+         (if (%int_notequal t/1 1) (if (%int_greaterequal t/1 3) (exit 3) 1)
+           (exit 3))
+        with (3) 0)))
+  (makeblock 0 even_variant/0))
+(data global "camlSwitch_num_occurrences__gc_roots": int 0)
+(data
+ int 1792
+ global "camlSwitch_num_occurrences":
+ addr G:"camlSwitch_num_occurrences__even_variant_1")
+(data
+ int 3063
+ global "camlSwitch_num_occurrences__even_variant_1":
+ addr G:"camlSwitch_num_occurrences__even_variant_0_1_code"
+ int 108086391056891909)
+(function{switch_num_occurrences.ml:28,17-106}
+ camlSwitch_num_occurrences__even_variant_0_1_code (t/2: int) : int
+ (if (!= t/2 3) (+ (<< (<s t/2 7) 1) 1) 1) )
+
+(function no_cse reduce_code_size linscan camlSwitch_num_occurrences__entry
+     () : val
+ (catch (exit 6 G:"camlSwitch_num_occurrences") with(6 *ret*/0: val) 1) )
+
+(data)

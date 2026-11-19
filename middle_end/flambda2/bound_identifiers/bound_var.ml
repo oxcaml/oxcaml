@@ -51,7 +51,8 @@ let is_renamed_version_of t t' =
   && Variable.is_renamed_version_of t.var t'.var
 
 let apply_renaming t renaming =
-  with_var t (Renaming.apply_variable renaming t.var)
+  let var' = Renaming.apply_variable renaming t.var in
+  if t.var == var' then t else with_var t var'
 
 let free_names t = Name_occurrences.singleton_variable t.var t.name_mode
 

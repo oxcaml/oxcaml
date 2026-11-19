@@ -11,6 +11,27 @@ type quoted_attributes = {
          attributes are placed on, e.g. pexp_attributes. *)
 }
 
+let coalesce_arity_expr (input : expression) super =
+  match input with
+  | { pexp_desc = Pexp_function _ | Pexp_newtype _; pexp_loc = loc; _ } ->
+      let ppxlib_coalesce_arity =
+        Ldot
+          ( Ldot (Ldot (Lident "Ppxlib", "Ast_builder"), "Default"),
+            "coalesce_arity" )
+      in
+      pexp_apply ~loc
+        (pexp_ident ~loc { txt = ppxlib_coalesce_arity; loc })
+        [ (Nolabel, super input) ]
+  | exp -> super exp
+
+(* Produce a pattern that matches on the maximum arity of a function *)
+let coalesce_arity_pat (input : expression) super =
+  match input with
+  | { pexp_desc = Pexp_function _; pexp_loc = _loc; _ } as exp ->
+      let c = Ast_builder.Default.coalesce_arity exp in
+      super c
+  | e -> super e
+
 module Make (M : sig
   type result
 
@@ -33,11 +54,7 @@ module Make (M : sig
   val location : location -> result
   val location_stack : (location -> result) option
   val attributes : (location -> result) option
-
-  (* This is called on the result of evaluating the lifter on an expression.
-     We special case some expressions in OxCaml to support syntactic
-     function arity. See the comment on the generated call to [coalesce_fun_arity]. *)
-  val on_expression : expression -> result -> result
+  val coalesce : (expression -> (expression -> result) -> result) option
 
   class std_lifters : location -> [result] Ppxlib_traverse_builtins.std_lifters
 end) =
@@ -73,8 +90,8 @@ struct
         | Some f -> f loc
 
       method! expression e =
-        match e.pexp_desc with
-        | Pexp_extension (({ txt = "e"; _ }, _) as ext) ->
+        match (M.coalesce, e.pexp_desc) with
+        | _, Pexp_extension (({ txt = "e"; _ }, _) as ext) ->
             let attributes =
               {
                 quoted_attributes = e.pexp_attributes;
@@ -82,8 +99,8 @@ struct
               }
             in
             M.cast self ext (Some attributes) ~type_name:"expression"
-        | _ ->
-            M.on_expression e (super#expression e)
+        | Some f, _ -> f e super#expression
+        | None, _ -> super#expression e
 
       method! pattern p =
         match p.ppat_desc with
@@ -155,6 +172,7 @@ module Expr = Make (struct
   let location loc = evar ~loc:{ loc with loc_ghost = true } "loc"
   let location_stack = None
   let attributes = None
+  let coalesce = Some coalesce_arity_expr
 
   class std_lifters = Ppxlib_metaquot_lifters.expression_lifters
 
@@ -223,45 +241,6 @@ module Expr = Make (struct
         pexp_extension ~loc:(loc_of_extension ext)
           (Location.error_extensionf ~loc:(loc_of_extension ext)
              "expression expected")
-
-  (* In expressions, convert:
-
-     {[
-       [%expr fun P -> [%e y]]
-     ]}
-
-     to:
-
-     {[
-       Ppxlib_jane.Ast_builder.Default.coalesce_fun_arity [%expr fun P -> [%e y]]
-     ]}
-
-     and similarly with newtypes:
-
-     {[
-       [%expr fun (type a) -> [%e y]]
-     ]}
-
-     In this example, this makes the arity of the resulting expression equal to
-     [1 + arity(y)] instead of [1].
-
-     This notion of "arity" is introduced in an OxCaml compiler change
-     and upstream in (most likely) OCaml 5.2.
-  *)
-  let on_expression (input_expression : expression) (lifted : result) =
-    match input_expression.pexp_desc with
-    | Pexp_function _ | Pexp_newtype _ ->
-      let loc = input_expression.pexp_loc in
-      let fun_binding =
-        Ldot
-          ( Ldot (Ldot (Lident "Ppxlib_jane", "Ast_builder") ,"Default")
-          , "coalesce_fun_arity" )
-      in
-      pexp_apply
-        ~loc
-        (pexp_ident ~loc { txt = fun_binding; loc })
-        [ Nolabel, lifted ]
-    | _ -> lifted
 end)
 
 module Patt = Make (struct
@@ -273,6 +252,7 @@ module Patt = Make (struct
     Some (fun loc -> ppat_any ~loc:{ loc with loc_ghost = true })
 
   let attributes = Some (fun loc -> ppat_any ~loc:{ loc with loc_ghost = true })
+  let coalesce = Some coalesce_arity_pat
 
   class std_lifters = Ppxlib_metaquot_lifters.pattern_lifters
 
@@ -295,9 +275,6 @@ module Patt = Make (struct
           ppat_extension ~loc:(loc_of_extension ext)
             (Location.error_extensionf ~loc:(loc_of_extension ext)
                "pattern expected"))
-
-
-  let on_expression _ pat = pat
 end)
 
 let () =

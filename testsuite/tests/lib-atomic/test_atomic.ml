@@ -1,4 +1,14 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   flags = "-regalloc irc";
+   native;
+ }{
+   flags = "-O3 -regalloc irc";
+   native;
+ }
+*)
 
 let r = Atomic.make 1
 let () = assert (Atomic.get r = 1)
@@ -51,6 +61,56 @@ let () = assert (Atomic.Loc.get [%atomic.loc r.contents] = 1)
 let () = assert ((Atomic.Loc.set [%atomic.loc r.contents] 5; Atomic.get r) = 5)
 
 let () = assert ((Atomic.Loc.incr [%atomic.loc r.contents]; Atomic.get r) = 6)
+
+(* A failed CAS must not overwrite an expected value used by a later CAS.
+   Keep the two operations together, with no calls between them. *)
+
+let[@inline never] cas_twice (a : int Atomic.t) expected =
+  let first = Atomic.compare_and_set a expected 0 in
+  let second = Atomic.compare_and_set a expected 0 in
+  first, second
+
+let[@inline never] cas_bool_twice (a : bool Atomic.t) expected =
+  let first = Atomic.compare_and_set a expected true in
+  let second = Atomic.compare_and_set a expected true in
+  first, second
+
+type atomic_record = { mutable field : int [@atomic] }
+
+let[@inline never] cas_field_twice a expected =
+  let first = Atomic.Loc.compare_and_set [%atomic.loc a.field] expected 0 in
+  let second = Atomic.Loc.compare_and_set [%atomic.loc a.field] expected 0 in
+  first, second
+
+let[@inline never] cas_loop (a : int Atomic.t) expected last =
+  let successes = ref 0 in
+  for _ = 0 to last do
+    if Atomic.compare_and_set a expected 0 then incr successes;
+    Atomic.incr a
+  done;
+  !successes
+
+let () =
+  let a = Atomic.make (Sys.opaque_identity 5) in
+  assert (cas_twice a (Sys.opaque_identity 2) = (false, false));
+  assert (Atomic.get a = 5);
+  assert (cas_twice a (Sys.opaque_identity 5) = (true, false));
+  assert (Atomic.get a = 0)
+
+let () =
+  let a = Atomic.make (Sys.opaque_identity true) in
+  assert (cas_bool_twice a (Sys.opaque_identity false) = (false, false));
+  assert (Atomic.get a)
+
+let () =
+  let a = { field = Sys.opaque_identity 5 } in
+  assert (cas_field_twice a (Sys.opaque_identity 2) = (false, false));
+  assert (a.field = 5)
+
+let () =
+  let a = Atomic.make (Sys.opaque_identity 3) in
+  assert (cas_loop a (Sys.opaque_identity 4) (Sys.opaque_identity 3) = 1);
+  assert (Atomic.get a = 3)
 
 (* Test primitives with non-immediate types *)
 

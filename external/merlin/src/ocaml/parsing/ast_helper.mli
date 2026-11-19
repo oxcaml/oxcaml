@@ -152,6 +152,7 @@ module Pat:
     val constraint_: ?loc:loc -> ?attrs:attrs -> pattern -> core_type option
                      -> mode with_loc list -> pattern
     val type_: ?loc:loc -> ?attrs:attrs -> lid -> pattern
+    val addr: ?loc:loc -> ?attrs:attrs -> mutable_flag -> pattern -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
     val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> pattern
     val open_: ?loc:loc -> ?attrs:attrs  -> lid -> pattern -> pattern
@@ -372,6 +373,7 @@ module Sig:
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> signature_item
     val attribute: ?loc:loc -> attribute -> signature_item
     val jkind: ?loc:loc -> jkind_declaration -> signature_item
+    val law: ?loc:loc -> law_declaration -> signature_item
     val text: text -> signature_item list
   end
 
@@ -401,6 +403,7 @@ module Str:
     val include_: ?loc:loc -> include_declaration -> structure_item
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> structure_item
     val jkind: ?loc:loc -> jkind_declaration -> structure_item
+    val law: ?loc:loc -> law_declaration -> structure_item
     val attribute: ?loc:loc -> attribute -> structure_item
     val text: text -> structure_item list
   end

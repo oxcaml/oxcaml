@@ -33,11 +33,22 @@ module type S = sig
 
   val name : t -> string
 
+  (** The stamp making this slot unique within its compilation unit. *)
+  val stamp : t -> int
+
   val canonical_name : t -> string
 
   val payload : t -> payload
 
   val rename : t -> t
+
+  type stamp_state
+
+  val export_stamp_state : unit -> stamp_state
+
+  val restore_stamp_state : stamp_state -> unit
+
+  val merge_stamp_state : stamp_state -> stamp_state -> stamp_state
 end
 
 module Make (P : sig

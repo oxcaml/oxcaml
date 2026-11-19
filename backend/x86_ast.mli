@@ -157,6 +157,7 @@ type instruction =
   | MOVZX of arg * arg
   | NEG of arg
   | NOP
+  | NOT of arg
   | OR of arg * arg
   | PAUSE
   | POP of arg

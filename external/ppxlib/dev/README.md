@@ -1,3 +1,14 @@
+## gencopy
+
+`gencopy` is a script used to generate identity migrations. When adding support
+for a new version of ocaml, it's used to generate the copy functions for each
+compiler types. It simply generates identity copies so this likely won't compile
+because it does not account for changes in the parsetree type. Once you have
+those identity migrations, you should be able to follow the compilation errors
+to find out which part need proper migrations.
+
+The tool is further documented [here](gencopy/README.md).
+
 ## rev-deps.sh
 
 You can use this script to fetch ppxlib's rev-deps and clone them locally to test them

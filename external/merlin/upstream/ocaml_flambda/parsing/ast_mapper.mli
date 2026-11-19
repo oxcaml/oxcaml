@@ -59,6 +59,9 @@ type mapper = {
   attribute: mapper -> attribute -> attribute;
   attributes: mapper -> attribute list -> attribute list;
   modes : mapper -> modes -> modes;
+  mode : mapper -> mode Location.loc -> mode Location.loc;
+  mode_bound : mapper -> mode_bound -> mode_bound;
+  mode_bound_var : mapper -> mode_bound_var -> mode_bound_var;
   modalities : mapper -> modalities -> modalities;
   binding_op: mapper -> binding_op -> binding_op;
   case: mapper -> case -> case;
@@ -95,6 +98,7 @@ type mapper = {
   jkind_annotation: mapper -> jkind_annotation -> jkind_annotation;
   jkind_declaration: mapper -> jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> label_declaration -> label_declaration;
+  law_declaration: mapper -> law_declaration -> law_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> module_binding -> module_binding;
   module_declaration: mapper -> module_declaration -> module_declaration;

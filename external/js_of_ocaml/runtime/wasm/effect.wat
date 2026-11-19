@@ -205,10 +205,13 @@
             (field $cont_resolver externref))))
 
    (func $invoke_promise_resolver (param $p (ref $pair)) (param $k (ref eq))
-      (return_call $resume_fiber
-         (struct.get $cont_resume $cont_resolver
-            (ref.cast (ref $cont_resume) (local.get $k)))
-         (local.get $p)))
+     ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+     ;; tail call cross
+      (return
+         (call $resume_fiber
+            (struct.get $cont_resume $cont_resolver
+               (ref.cast (ref $cont_resume) (local.get $k)))
+            (local.get $p))))
 
    (func $apply_continuation (param $cont_resolver (ref extern)) (param $v (ref eq))
       (local $t (ref $thunk))
@@ -249,7 +252,9 @@
             (field $next (mut (ref null $fiber))))))
 
    (func $initial_cont (param $p (ref $pair)) (param (ref eq))
-      (return_call $start_fiber (local.get $p)))
+      ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+      ;; tail call cross
+      (return (call $start_fiber (local.get $p))))
 
    (global $initial_cont_closure (ref $continuation) (struct.new $continuation (ref.func $initial_cont)))
 

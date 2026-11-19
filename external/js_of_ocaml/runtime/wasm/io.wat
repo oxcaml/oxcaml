@@ -419,7 +419,9 @@
 
    (func $get_fd_offset_unchecked (export "get_fd_offset_unchecked")
       (param $fd i32) (result (ref null $fd_offset))
-      (return_call $map_get (call $get_fd_offsets) (local.get $fd)))
+     ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+     ;; tail call cross
+      (return (call $map_get (call $get_fd_offsets) (local.get $fd))))
 
    (func $get_fd_offset (param $fd i32) (result (ref $fd_offset))
       (local $res (ref null $fd_offset))
@@ -1059,9 +1061,12 @@
          (then (return_call $caml_refill (local.get $ch))))
       (struct.set $channel $curr (local.get $ch)
          (i32.add (local.get $curr) (i32.const 1)))
-      (return_call $dv_get_ui8
-         (struct.get $channel $buffer_view (local.get $ch))
-         (local.get $curr)))
+      (return
+         ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+         ;; tail call cross
+         (call $dv_get_ui8
+            (struct.get $channel $buffer_view (local.get $ch))
+            (local.get $curr))))
 
    (func (export "caml_ml_input_char")
       (param $ch (ref eq)) (result (ref eq))

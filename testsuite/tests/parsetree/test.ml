@@ -1,6 +1,13 @@
 (* TEST
  include ocamlcommon;
  readonly_files = "source.ml source_jane_street.ml source_known_broken.ml";
+ {
+   bytecode;
+ }{
+   native;
+ }{
+   jsir;
+ }
 *)
 
 (* (c) Alain Frisch / Lexifi *)

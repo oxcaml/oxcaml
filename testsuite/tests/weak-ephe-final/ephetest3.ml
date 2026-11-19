@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
 
 (** This test weak table by application to the memoization of collatz
     (also known as syracuse) algorithm suite computation *)

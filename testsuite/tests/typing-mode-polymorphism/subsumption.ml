@@ -15,14 +15,14 @@ module M :
     val id : 'a @ [< 'm] -> 'a @ [> 'm]
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm]
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic]
+      ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+      ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+      'c @ [< 'o] -> 'b @ [> 'n | dynamic]
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p]
+      'a @ [< 'm & global] ->
+      'b @ [< 'n & global] ->
+      'c @ [< 'o & global] ->
+      'd @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm]
   end
 |}]
 
@@ -33,14 +33,14 @@ module M_self :
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
+      ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+      ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+      'c @ [< 'o] -> 'b @ [> 'n | dynamic] @@ stateless
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
+      'a @ [< 'm & global] ->
+      'b @ [< 'n & global] ->
+      'c @ [< 'o & global] ->
+      'd @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm] @@
       stateless
   end
 |}]
@@ -57,14 +57,14 @@ module M_restruct :
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
+      ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+      ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+      'c @ [< 'o] -> 'b @ [> 'n | dynamic] @@ stateless
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
+      'a @ [< 'm & global] ->
+      'b @ [< 'n & global] ->
+      'c @ [< 'o & global] ->
+      'd @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm] @@
       stateless
   end
 |}]
@@ -78,14 +78,14 @@ module type S =
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
+      ('a @ [> 'm | dynamic] -> 'b @ [< 'n & global]) @ [< global] ->
+      ('c @ [> 'o] -> 'a @ [< 'm & global]) @ [< global] ->
+      'c @ [< 'o] -> 'b @ [> 'n | dynamic] @@ stateless
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
+      'a @ [< 'm & global] ->
+      'b @ [< 'n & global] ->
+      'c @ [< 'o & global] ->
+      'd @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm] @@
       stateless
   end
 module M_via_sig : S
@@ -132,7 +132,7 @@ module Bounded :
     val local_arg : 'a @ [> local] -> unit @ 'm
     val two_axes : 'a @ [< 'm & global] -> 'b @ [< unique] -> 'a @ [> 'm]
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased]
-    val tick : unit -> int @ [> aliased stateful dynamic]
+    val tick : unit -> int @ [> aliased nonportable stateful dynamic]
   end
 |}]
 
@@ -161,7 +161,7 @@ module Bounded_self :
       stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
       stateless
-    val tick : unit -> int @ [> aliased stateful dynamic]
+    val tick : unit -> int @ [> aliased nonportable stateful dynamic]
   end
 |}]
 
@@ -202,7 +202,7 @@ module Bounded_restruct :
       stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
       stateless
-    val tick : unit -> int @ [> aliased stateful dynamic]
+    val tick : unit -> int @ [> aliased nonportable stateful dynamic]
   end
 |}]
 
@@ -373,7 +373,8 @@ let keep = Good_client.f 1
 [%%expect{|
 module Good_client :
   sig val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless end
-val keep : '_weak1 -> '_weak1 @ [> aliased stateful dynamic] = <fun>
+val keep : '_weak1 -> '_weak1 @ [> aliased nonportable stateful dynamic] =
+  <fun>
 |}]
 
 (* Without subsumption, the following inclusion is wrongly accepted and the
@@ -399,9 +400,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
        The type
-         "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
+         "'a @ [> past('m) | local] -> 'b @ [< 'n > past('o)] -> 'b @ [> 'n]"
        is not compatible with the type
-         "'a @ [< past('o) & global] -> 'b @ [< 'p & past('n)] -> 'b @ [> 'p]"
+         "'a @ [< past('m) & global] -> 'b @ [< 'p & past('o)] -> 'b @ [> 'p]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -425,8 +426,8 @@ Error: Signature mismatch:
        is not included in
          val f : 'a @ local -> 'a
        The type
-         "'a @ [< 'm > local aliased stateful dynamic] ->
-         'a @ [> 'm | local aliased stateful dynamic]"
+         "'a @ [< 'm > local aliased nonportable unforkable yielding stateful dynamic] ->
+         'a @ [> 'm | local aliased nonportable unforkable yielding stateful dynamic]"
        is not compatible with the type "'a @ local -> 'a"
        The return mode was expected to be "global"
        because it crosses with something but is "local"
@@ -502,12 +503,13 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val r : int ref
-           val f : unit @ 'm -> int @ [> aliased stateful dynamic]
+           val f :
+             unit @ 'm -> int @ [> aliased nonportable stateful dynamic]
          end @ nonportable
        is not included in
          sig val f : unit -> int @@ portable end @ nonportable
        Values do not match:
-         val f : unit @ 'm -> int @ [> aliased stateful dynamic] (* in a structure at nonportable *)
+         val f : unit @ 'm -> int @ [> aliased nonportable stateful dynamic] (* in a structure at nonportable *)
        is not included in
          val f : unit -> int @@ portable (* in a structure at nonportable *)
        The first is "nonportable"

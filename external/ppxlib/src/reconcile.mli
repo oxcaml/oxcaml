@@ -34,4 +34,5 @@ val reconcile :
   output:string option ->
   input_name:string ->
   target:target ->
+  use_compiler_pprint:bool ->
   unit

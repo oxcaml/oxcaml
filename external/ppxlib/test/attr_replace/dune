@@ -1,0 +1,11 @@
+(executable
+ (name driver)
+ (modules driver)
+ (libraries ppxlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
+
+(cram
+ (enabled_if
+  (>= %{ocaml_version} "4.10.0"))
+ (deps driver.exe))

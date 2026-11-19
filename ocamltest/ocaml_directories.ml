@@ -18,19 +18,27 @@
 open Ocamltest_stdlib
 
 let srcdir =
-  Sys.getenv_with_default_value "OCAMLSRCDIR" Ocamltest_config.ocamlsrcdir
+  if Options.no_ocamlsrcdir then "@OCAML@"
+  else Sys.getenv_with_default_value "OCAMLSRCDIR" Ocamltest_config.ocamlsrcdir
 
-let stdlib =
-  Filename.make_path [srcdir; "stdlib"]
+let startup_directory = Sys.getcwd ()
 
-let libunix =
-  Filename.make_path [srcdir; "otherlibs"; "unix"]
+let srcdir_path p =
+  match Options.file_override (String.concat "/" p) with
+  | Some p ->
+     if Filename.is_relative p then
+       Filename.concat startup_directory p
+     else
+       p
+  | None ->
+     Filename.make_path (srcdir :: p)
 
-let toplevel =
-  Filename.make_path [srcdir; "toplevel"]
+let stdlib = srcdir_path ["stdlib"]
 
-let runtime =
-  Filename.make_path [srcdir; "runtime"]
+let libunix = srcdir_path ["otherlibs"; "unix"]
 
-let tools =
-  Filename.make_path [srcdir; "tools"]
+let toplevel = srcdir_path ["toplevel"]
+
+let runtime = srcdir_path ["runtime"]
+
+let tools = srcdir_path ["tools"]

@@ -67,7 +67,32 @@ type location_stack = Location.t list
 type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
 
-type mode = | Mode of string [@@unboxed]
+type mode_const = string
+type mode_var = string
+type mode_morph = string
+
+type mode =
+  | Pmode of mode_const
+  | Pmode_var of mode_var
+  | Pmode_bounded of mode_bounded
+
+and mode_bounded =
+  { pmode_upper : mode_bound;
+    pmode_lower : mode_bound;
+  }
+
+and mode_bound = mode_bound_elem list
+
+and mode_bound_elem =
+  | Pbound_var of mode_bound_var
+  | Pbound_const of mode_const loc list
+
+and mode_bound_var =
+  { pbound_morph : mode_morph loc option;
+    pbound_var : mode_var loc;
+    pbound_mod : mode_const loc list;
+  }
+
 type modes = mode loc list
 
 type include_kind = Structure | Functor
@@ -368,6 +393,11 @@ and pattern_desc =
           - [(P @ modes)] when [tyopt] is [None]
          *)
   | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
+  | Ppat_addr of mutable_flag * pattern
+      (** [Ppat_addr(flag, P)] represents:
+          - [addr_ P]     when [flag] is [Mutable]
+          - [addr_imm_ P] when [flag] is [Immutable]
+       *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
   | Ppat_unpack of string option loc
       (** [Ppat_unpack(s)] represents:
@@ -906,6 +936,18 @@ and jkind_declaration =
   }
   (** [kind_ name] or [kind_ name = k] *)
 
+and law_declaration =
+  {
+    plaw_name : string loc;
+    plaw_params : (string loc * core_type option) list;
+    plaw_assumptions : expression list;
+    plaw_conclusion : expression;
+    plaw_attributes : attributes;
+    plaw_loc : Location.t
+  }
+  (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C], where
+      each parameter [pi] is [x] or [(x : T)] *)
+
 
 (** {1 Class language} *)
 (** {2 Type expressions for the class language} *)
@@ -1169,6 +1211,7 @@ and signature_item_desc =
   | Psig_attribute of attribute  (** [[\@\@\@id]] *)
   | Psig_extension of extension * attributes  (** [[%%id]] *)
   | Psig_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
+  | Psig_law of law_declaration (** [law_? name x (y : T) : A implies_ C] *)
 
 and module_declaration =
     {
@@ -1344,6 +1387,7 @@ and structure_item_desc =
   | Pstr_attribute of attribute  (** [[\@\@\@id]] *)
   | Pstr_extension of extension * attributes  (** [[%%id]] *)
   | Pstr_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
+  | Pstr_law of law_declaration (** [law_? name x (y : T) : A implies_ C] *)
 
 and value_constraint =
   | Pvc_constraint of {

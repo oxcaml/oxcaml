@@ -17,5 +17,7 @@
     (with-accepted-exit-codes
      2
      (run node %{test} unregister)))
-   (run cat)))
+   ; Downstream: in OxCaml's workspace, source paths start with the path of
+   ; js_of_ocaml in it.
+   (run sed "s|external/ast-dependent-libs/js_of_ocaml/||g")))
  (libraries))

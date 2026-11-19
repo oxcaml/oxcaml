@@ -556,7 +556,9 @@
 
    (func (export "unix_times") (export "caml_unix_times")
       (param (ref eq)) (result (ref eq))
-      (return_call $times))
+      ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+      ;; tail call cross
+      (return (call $times)))
 ))
 
 (@if $wasi

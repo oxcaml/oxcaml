@@ -3,20 +3,12 @@
 *)
 
 (* Non-representable [val] in signature *)
-(* CR layouts: lift this restriction *)
 module type S = sig
   type t : any
   val x : t
 end
 [%%expect{|
-Line 3, characters 10-11:
-3 |   val x : t
-              ^
-Error: The type of a module-level value must have a representable layout.
-       The layout of type t is any
-         because of the definition of t at line 2, characters 2-14.
-       But the layout of type t must be representable
-         because it's the type of something in a signature.
+module type S = sig type t : any val x : t end
 |}]
 
 

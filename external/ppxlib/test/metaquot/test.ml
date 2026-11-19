@@ -2,9 +2,9 @@ let loc = Ppxlib.Location.none
 [%%expect{|
 val loc : Warnings.loc =
   {Ppxlib.Location.loc_start =
-    {Lexing.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0; pos_cnum = -1};
+    {Lexing.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1};
    loc_end =
-    {Lexing.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0; pos_cnum = -1};
+    {Lexing.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1};
    loc_ghost = true}
 |}]
 
@@ -18,19 +18,19 @@ let _ = [%expr ()]
    ({Ppxlib_ast.Ast.txt = Ppxlib_ast.Ast.Lident "()";
      loc =
       {Ppxlib_ast.Ast.loc_start =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_end =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_ghost = true}},
    None);
  pexp_loc =
   {Ppxlib_ast.Ast.loc_start =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_end =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_ghost = true};
  pexp_loc_stack = []; pexp_attributes = []}
@@ -44,19 +44,19 @@ let _ = [%pat? ()]
    ({Ppxlib_ast.Ast.txt = Ppxlib_ast.Ast.Lident "()";
      loc =
       {Ppxlib_ast.Ast.loc_start =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_end =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_ghost = true}},
    None);
  ppat_loc =
   {Ppxlib_ast.Ast.loc_start =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_end =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_ghost = true};
  ppat_loc_stack = []; ppat_attributes = []}
@@ -70,19 +70,19 @@ let _ = [%type: unit]
    ({Ppxlib_ast.Ast.txt = Ppxlib_ast.Ast.Lident "unit";
      loc =
       {Ppxlib_ast.Ast.loc_start =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_end =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_ghost = true}},
    []);
  ptyp_loc =
   {Ppxlib_ast.Ast.loc_start =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_end =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_ghost = true};
  ptyp_loc_stack = []; ptyp_attributes = []}
@@ -97,10 +97,10 @@ let _ = [%stri let _ = ()]
       {Ppxlib_ast.Ast.ppat_desc = Ppxlib_ast.Ast.Ppat_any;
        ppat_loc =
         {Ppxlib_ast.Ast.loc_start =
-          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
            pos_cnum = -1};
          loc_end =
-          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
            pos_cnum = -1};
          loc_ghost = true};
        ppat_loc_stack = []; ppat_attributes = []};
@@ -110,37 +110,37 @@ let _ = [%stri let _ = ()]
          ({Ppxlib_ast.Ast.txt = Ppxlib_ast.Ast.Lident "()";
            loc =
             {Ppxlib_ast.Ast.loc_start =
-              {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1;
+              {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0;
                pos_bol = 0; pos_cnum = -1};
              loc_end =
-              {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1;
+              {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0;
                pos_bol = 0; pos_cnum = -1};
              loc_ghost = true}},
          None);
        pexp_loc =
         {Ppxlib_ast.Ast.loc_start =
-          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
            pos_cnum = -1};
          loc_end =
-          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
            pos_cnum = -1};
          loc_ghost = true};
        pexp_loc_stack = []; pexp_attributes = []};
-     pvb_attributes = [];
+     pvb_constraint = None; pvb_attributes = [];
      pvb_loc =
       {Ppxlib_ast.Ast.loc_start =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_end =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_ghost = true}}]);
  pstr_loc =
   {Ppxlib_ast.Ast.loc_start =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_end =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_ghost = true}}
 |}]
@@ -156,36 +156,36 @@ let _ = [%sigi: include S]
         {Ppxlib_ast.Ast.txt = Ppxlib_ast.Ast.Lident "S";
          loc =
           {Ppxlib_ast.Ast.loc_start =
-            {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+            {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
              pos_cnum = -1};
            loc_end =
-            {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+            {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
              pos_cnum = -1};
            loc_ghost = true}};
       pmty_loc =
        {Ppxlib_ast.Ast.loc_start =
-         {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+         {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
           pos_cnum = -1};
         loc_end =
-         {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+         {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
           pos_cnum = -1};
         loc_ghost = true};
       pmty_attributes = []};
     pincl_loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true};
     pincl_attributes = []};
  psig_loc =
   {Ppxlib_ast.Ast.loc_start =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_end =
-    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+    {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
      pos_cnum = -1};
    loc_ghost = true}}
 |}]
@@ -199,10 +199,10 @@ let _ = [%str let _ = ()]
        {Ppxlib_ast.Ast.ppat_desc = Ppxlib_ast.Ast.Ppat_any;
         ppat_loc =
          {Ppxlib_ast.Ast.loc_start =
-           {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+           {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
             pos_cnum = -1};
           loc_end =
-           {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+           {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
             pos_cnum = -1};
           loc_ghost = true};
         ppat_loc_stack = []; ppat_attributes = []};
@@ -212,37 +212,37 @@ let _ = [%str let _ = ()]
           ({Ppxlib_ast.Ast.txt = Ppxlib_ast.Ast.Lident "()";
             loc =
              {Ppxlib_ast.Ast.loc_start =
-               {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1;
+               {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0;
                 pos_bol = 0; pos_cnum = -1};
               loc_end =
-               {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1;
+               {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0;
                 pos_bol = 0; pos_cnum = -1};
               loc_ghost = true}},
           None);
         pexp_loc =
          {Ppxlib_ast.Ast.loc_start =
-           {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+           {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
             pos_cnum = -1};
           loc_end =
-           {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+           {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
             pos_cnum = -1};
           loc_ghost = true};
         pexp_loc_stack = []; pexp_attributes = []};
-      pvb_attributes = [];
+      pvb_constraint = None; pvb_attributes = [];
       pvb_loc =
        {Ppxlib_ast.Ast.loc_start =
-         {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+         {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
           pos_cnum = -1};
         loc_end =
-         {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+         {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
           pos_cnum = -1};
         loc_ghost = true}}]);
   pstr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}}]
 |}]
@@ -258,36 +258,36 @@ let _ = [%sig: include S]
          {Ppxlib_ast.Ast.txt = Ppxlib_ast.Ast.Lident "S";
           loc =
            {Ppxlib_ast.Ast.loc_start =
-             {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+             {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
               pos_cnum = -1};
             loc_end =
-             {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+             {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
               pos_cnum = -1};
             loc_ghost = true}};
        pmty_loc =
         {Ppxlib_ast.Ast.loc_start =
-          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
            pos_cnum = -1};
          loc_end =
-          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+          {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
            pos_cnum = -1};
          loc_ghost = true};
        pmty_attributes = []};
      pincl_loc =
       {Ppxlib_ast.Ast.loc_start =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_end =
-        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+        {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
          pos_cnum = -1};
        loc_ghost = true};
      pincl_attributes = []};
   psig_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}}]
 |}]
@@ -303,38 +303,38 @@ let _ =
    {Ppxlib_ast.Ast.txt = "attr1";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}};
  {Ppxlib_ast.Ast.attr_name =
    {Ppxlib_ast.Ast.txt = "attr2";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}}]
 |}]
@@ -348,38 +348,38 @@ let _ =
    {Ppxlib_ast.Ast.txt = "attr1";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}};
  {Ppxlib_ast.Ast.attr_name =
    {Ppxlib_ast.Ast.txt = "attr2";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}}]
 |}]
@@ -393,38 +393,38 @@ let _ =
    {Ppxlib_ast.Ast.txt = "attr1";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}};
  {Ppxlib_ast.Ast.attr_name =
    {Ppxlib_ast.Ast.txt = "attr2";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}}]
 |}]
@@ -443,38 +443,38 @@ let _ =
    {Ppxlib_ast.Ast.txt = "attr1";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}};
  {Ppxlib_ast.Ast.attr_name =
    {Ppxlib_ast.Ast.txt = "attr2";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}}]
 |}]
@@ -493,38 +493,38 @@ let _ =
    {Ppxlib_ast.Ast.txt = "attr1";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}};
  {Ppxlib_ast.Ast.attr_name =
    {Ppxlib_ast.Ast.txt = "attr2";
     loc =
      {Ppxlib_ast.Ast.loc_start =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_end =
-       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+       {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
         pos_cnum = -1};
       loc_ghost = true}};
   attr_payload = Ppxlib_ast.Ast.PStr [];
   attr_loc =
    {Ppxlib_ast.Ast.loc_start =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_end =
-     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 1; pos_bol = 0;
+     {Ppxlib_ast.Ast.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
       pos_cnum = -1};
     loc_ghost = true}}]
 |}]
@@ -532,73 +532,134 @@ let _ =
 (* mistyped escapes (not producing ASTs at all) *)
 
 let _ = [%expr [%e ()]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 19-21:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.expression
 |}]
+[%%expect_in >= 5.3 {|
+Line _, characters 19-21:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.expression
+|}]
 
 let _ = [%pat? [%p ()]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 19-21:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.pattern
 |}]
+[%%expect_in >= 5.3 {|
+Line _, characters 19-21:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.pattern
+|}]
 
 let _ = [%type: [%t ()]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 20-22:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.core_type
 |}]
+[%%expect_in >= 5.3 {|
+Line _, characters 20-22:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.core_type
+|}]
 
 let _ = [%stri [%%i ()]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 20-22:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.structure_item
 |}]
+[%%expect_in >= 5.3 {|
+Line _, characters 20-22:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.structure_item
+|}]
 
 let _ = [%sigi: [%%i ()]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 21-23:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.signature_item
+|}]
+[%%expect_in >= 5.3 {|
+Line _, characters 21-23:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.signature_item
 |}]
 
 (* mistyped escapes (not producing ASTs at all) with attributes *)
 
 let _ = [%expr [%e ()] [@attr]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 19-21:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.expression
 |}]
+[%%expect_in >= 5.3 {|
+Line _, characters 19-21:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.expression
+|}]
 
 let _ = [%pat? [%p ()] [@attr]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 19-21:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.pattern
 |}]
+[%%expect_in >= 5.3 {|
+Line _, characters 19-21:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.pattern
+|}]
 
 let _ = [%type: [%t ()] [@attr]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 20-22:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.core_type
 |}]
+[%%expect_in >= 5.3 {|
+Line _, characters 20-22:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.core_type
+|}]
 
 let _ = [%stri module M = [%m ()] [@attr]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 30-32:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.module_expr
 |}]
+[%%expect_in >= 5.3 {|
+Line _, characters 30-32:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.module_expr
+|}]
 
 let _ = [%sigi: module type M = [%m ()] [@attr]]
-[%%expect{|
+[%%expect_in <= 5.2 {|
 Line _, characters 36-38:
 Error: This expression should not be a unit literal, the expected type is
        Ppxlib_ast.Ast.module_type
+|}]
+[%%expect_in >= 5.3 {|
+Line _, characters 36-38:
+Error: This expression should not be a unit literal, the expected type is
+       Ppxlib.module_type
+|}]
+
+(* Coalescing arguments from [fun x -> fun y -> fun z -> ...] to
+   [fun x y z -> ...] *)
+let _ =
+  let e = [%expr fun z -> x + y + z] in
+  let f = [%expr fun y -> [%e e]] in
+  let func = [%expr fun x -> [%e f]] in
+  Format.asprintf "%a" Astlib.Pprintast.expression func
+[%%expect{|
+- : string = "fun x y z -> (x + y) + z"
 |}]

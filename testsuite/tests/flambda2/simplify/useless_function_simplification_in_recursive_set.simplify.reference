@@ -1,0 +1,61 @@
+let code g_1 deleted in
+let code h_2 deleted in
+let code make_0 deleted in
+let code loopify(never) size(1) newer_version_of(g_1)
+      g_1_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let code rec loopify(never) size(7) newer_version_of(h_2)
+      h_2_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  let x = %project_value_slot.[h].[x] (my_closure) in
+  let g = %project_function_slot.[h].[g] (my_closure) in
+  apply direct(g_1_1 &my_alloc_region)
+    (g ~ depth my_depth -> succ my_depth : _ -> imm tagged) (0) -> k2 * k1
+    where k2 (param_1 : imm tagged) =
+      cont k (x)
+in
+let code inline(always) loopify(never) size(20) newer_version_of(make_0)
+      make_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 : val =
+  let g = closure g_1_1 @g &my_alloc_region
+  and h = closure h_2_1 @h &my_alloc_region
+  with { x = x }
+  in
+  cont k (h)
+in
+let $camlUseless_function_simplification_in_recursive_set__make_1 =
+  closure make_0_1 @make &toplevel
+in
+let code loopify(never) size(1) newer_version_of(g_1_1)
+      g_1_2 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlUseless_function_simplification_in_recursive_set__g_2 =
+  closure g_1_2 @g &toplevel
+and $camlUseless_function_simplification_in_recursive_set__h_3 =
+  closure h_2_2 @h &toplevel
+and code rec loopify(never) size(5) newer_version_of(h_2_1)
+      h_2_2 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  apply direct(g_1_2 &my_alloc_region) inlining_state(depth(1))
+    ($camlUseless_function_simplification_in_recursive_set__g_2 ~ depth my_depth -> succ my_depth
+     : _ -> imm tagged)
+      (0)
+      -> k2 * k1
+    where k2 (param_1 : imm tagged) =
+      cont k (0)
+  with { x = 0 }
+in
+let $camlUseless_function_simplification_in_recursive_set =
+  Block 0 ($camlUseless_function_simplification_in_recursive_set__make_1,
+           $camlUseless_function_simplification_in_recursive_set__h_3)
+in
+cont done ($camlUseless_function_simplification_in_recursive_set)

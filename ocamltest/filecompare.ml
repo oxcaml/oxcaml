@@ -24,8 +24,9 @@ type result =
   | Error of string * int
 
 type ignore = {bytes: int; lines: int}
+
 type tool =
-  |  External of {
+  | External of {
                    tool_name : string;
                    tool_flags : string;
                    result_of_exitcode : string -> int -> result
@@ -219,7 +220,11 @@ let compare_files ?(tool = default_comparison_tool) files =
                                  files.reference_filename files.output_filename
 
 let check_file ?(tool = default_comparison_tool) files =
-  if Sys.file_exists files.reference_filename
+  if not (Sys.file_exists files.output_filename)
+  then
+    Error
+      (Printf.sprintf "Expected an output file %s" files.output_filename, 127)
+  else if Sys.file_exists files.reference_filename
   then compare_files ~tool:tool files
   else begin
     if Sys.file_is_empty files.output_filename

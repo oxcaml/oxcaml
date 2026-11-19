@@ -66,9 +66,9 @@ end) = struct
   let source tbl name = thd3 (Module_name.Tbl.find tbl name)
 
   let find t name =
-    match Module_name.Tbl.find t name with
-    | exception Not_found -> None
-    | (data, crc, _) -> Some (data, crc)
+    match Module_name.Tbl.find_opt t name with
+    | None -> None
+    | Some (data, crc, _) -> Some (data, crc)
 
   let extract l tbl =
     let l = List.sort_uniq Module_name.compare l in

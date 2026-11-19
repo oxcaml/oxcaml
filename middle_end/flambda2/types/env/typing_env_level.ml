@@ -179,19 +179,11 @@ let concat ~earlier:(t1 : t) ~later:(t2 : t) =
 
 let ids_for_export t =
   let variables = Variable.Map.keys t.defined_vars in
-  let ids = Ids_for_export.create ~variables () in
-  let equation name ty ids =
-    let ids = Ids_for_export.union ids (TG.ids_for_export ty) in
-    Ids_for_export.add_name ids name
-  in
-  let ids = Name.Map.fold equation t.equations ids in
-  let symbol_projection var proj ids =
-    let ids =
-      Ids_for_export.union ids (Symbol_projection.ids_for_export proj)
-    in
-    Ids_for_export.add_variable ids var
-  in
-  Variable.Map.fold symbol_projection t.symbol_projections ids
+  Ids_for_export.union_list
+    [ Ids_for_export.create ~variables ();
+      Ids_for_export.ids_for_export_name_map TG.ids_for_export t.equations;
+      Ids_for_export.ids_for_export_variable_map
+        Symbol_projection.ids_for_export t.symbol_projections ]
 
 let as_extension_without_bindings
     ({ defined_vars; binding_times; equations; symbol_projections } as t) =

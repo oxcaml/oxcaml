@@ -6,8 +6,8 @@
  native;
 *)
 
-(* Measure the rates at which the major GC marks and sweeps, and the compactor
-   compacts.
+(* Measure the rates at which the major GC marks and sweeps, the minor GC
+   promotes, and the compactor compacts.
 
    Build a live heap of mixed structure, then churn it, while consuming my own
    runtime-events stream, accumulating time spent inside EV_MAJOR_SWEEP and
@@ -31,6 +31,7 @@ let usage =
   "usage: gcrate [LIVE-GIB [SECONDS [SEED]]]\n\
    \n\
    Estimates the rates at which the OCaml major GC marks and sweeps,\n\
+   the minor GC evacuates survivors,\n\
    and the compactor compacts. Builds LIVE-GIB GiB of live\n\
    mixed-structure heap, churns it for SECONDS seconds (default 300),\n\
    and then compacts twice, drops the roots, and compacts one more time.\n\
@@ -75,6 +76,7 @@ let variant_factor =
 let min_mark_rate = 10e6 *. variant_factor
 let min_sweep_rate = 40e6 *. variant_factor
 let min_compact_rate = 2e6 *. variant_factor (* live words / compact time *)
+let min_promote_rate = 2e6 *. variant_factor (* promoted words / minor time *)
 
 (* ---------------- runtime-events consumption ---------------- *)
 
@@ -286,6 +288,18 @@ let redirect_stderr_to path =
 let restore_stderr () =
   flush stderr;
   Unix.dup2 saved_stderr Unix.stderr
+
+(* System load (1/5/15 min), for judging interference from other work on
+   the machine.  Linux-only; reports "n/a" elsewhere. *)
+let loadavg () =
+  match open_in "/proc/loadavg" with
+  | exception Sys_error _ -> "n/a"
+  | ic ->
+    let line = try input_line ic with End_of_file -> "" in
+    close_in ic;
+    (match String.split_on_char ' ' line with
+     | a :: b :: c :: _ -> Printf.sprintf "%s/%s/%s" a b c
+     | _ -> "n/a")
 
 (* Disable auto-compaction: Gc.full_major runs its last cycle with
    Compaction_auto, which fires once the roots are dropped and would compact
@@ -548,6 +562,7 @@ let () =
   reset_tallies ();
   set_verbose 4;
   let wall0 = Unix.gettimeofday () in
+  let load0 = loadavg () in
   let cpu0 = Sys.time () in
   let iters = ref 0 in
   let sink = ref 0 in
@@ -595,12 +610,17 @@ let () =
   set_verbose 0;
   poll ();
   let wall1 = Unix.gettimeofday () in
+  let load1 = loadavg () in
   let cpu1 = Sys.time () in
   let stat1 = Gc.quick_stat () in
   restore_stderr ();
   let w = parse_gclog log_path in
   let sweep_spans, sweep_ns = span RE.EV_MAJOR_SWEEP in
   let mark_spans, mark_ns = span RE.EV_MAJOR_MARK in
+  let minor_spans, minor_ns = span RE.EV_MINOR in
+  let minor_allocated =
+    int_of_float (stat1.minor_words -. stat0.minor_words) in
+  let promoted = int_of_float (stat1.promoted_words -. stat0.promoted_words) in
   let log_total = w.sweep + w.mark + w.ephe_mark + w.ephe_sweep in
   let ev_total =
     match Hashtbl.find_opt counter_total RE.EV_C_MAJOR_SLICE_WORK_DONE with
@@ -618,6 +638,7 @@ let () =
   Array.fill slots 0 nslots Leaf;
   Array.fill recs 0 nslots None;
   let c3 = measure_compaction "emptied" c2.heap_after in
+  let load2 = loadavg () in
   set_verbose 0;
   restore_stderr ();
   if manual then begin
@@ -629,6 +650,8 @@ let () =
     Printf.printf "META churn: wall=%.3f cpu=%.3f iters=%d sink=%d \
                    lost_events=%d\n"
       (wall1 -. wall0) (cpu1 -. cpu0) !iters !sink churn_lost;
+    Printf.printf "META loadavg: churn %s -> %s, after compaction %s\n"
+      load0 load1 load2;
     report_stat "stat0" stat0;
     report_stat "stat1" stat1;
     report_tallies churn_tallies;
@@ -639,6 +662,17 @@ let () =
       log_total ev_total;
     report_rate "sweep" w.sweep sweep_ns;
     report_rate "mark" w.mark mark_ns;
+    Printf.printf
+      "minor: %d collections in %.3f s (mean pause %.0f us), %d words \
+       allocated, %d promoted (%.1f%% survival)\n"
+      minor_spans (secs minor_ns)
+      (if minor_spans = 0 then 0.
+       else secs minor_ns *. 1e6 /. float_of_int minor_spans)
+      minor_allocated promoted
+      (if minor_allocated = 0 then 0.
+       else 100. *. float_of_int promoted /. float_of_int minor_allocated);
+    report_rate "promotion (minor live evacuation)" promoted minor_ns;
+    report_rate "minor absorption (allocated/pause)" minor_allocated minor_ns;
     if w.mark > 0 && mark_ns > 0 && sweep_ns > 0 then
       Printf.printf
         "sweep/mark rate ratio: %.2f (runtime assumes \
@@ -684,6 +718,14 @@ let () =
       (rate w.mark mark_ns >= min_mark_rate)
       (Printf.sprintf "%.1f Mwords/s < %.1f" (rate w.mark mark_ns /. 1e6)
          (min_mark_rate /. 1e6));
+    check "minor collections measured"
+      (minor_spans >= 10 && minor_ns > 0 && promoted > 0)
+      (Printf.sprintf "spans=%d ns=%d promoted=%d" minor_spans minor_ns
+         promoted);
+    check "promotion rate"
+      (rate promoted minor_ns >= min_promote_rate)
+      (Printf.sprintf "%.1f Mwords/s < %.1f" (rate promoted minor_ns /. 1e6)
+         (min_promote_rate /. 1e6));
     check "compaction runs"
       (c1.runs = 1 && c2.runs = 1 && c3.runs = 1
        && c1.heap_after < c1.heap_before

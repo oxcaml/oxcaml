@@ -6,8 +6,8 @@
 
 (tests
  (names test)
- (build_if %{oxcaml_supported})
- (libraries stdlib_upstream_compatible)
+ (build_if %{ocaml-config:ox})
+ (libraries ocaml.stdlib_upstream_compatible)
  (modes js wasm)
  (preprocess
   (pps ppx_optcomp_light)))

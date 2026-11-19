@@ -15,6 +15,6 @@
 (tests
  (names ext_ptr_bytecode idx_atomic
   block_indices_using_atomic_ptr_primitives ext_ptr_atomic_bytecode)
- (build_if %{oxcaml_supported})
- (libraries stdlib_stable stdlib_upstream_compatible)
+ (build_if %{ocaml-config:ox})
+ (libraries ocaml.stdlib_stable ocaml.stdlib_upstream_compatible)
  (modes byte js wasm))

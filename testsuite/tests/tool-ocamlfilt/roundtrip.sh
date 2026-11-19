@@ -1,6 +1,6 @@
 #!/bin/sh
 # Test that identifier encoding and decoding correctly round-trip
-OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
+OCAMLFILT="${ocamlfilt}"
 
 check_roundtrip () {
   input=$1

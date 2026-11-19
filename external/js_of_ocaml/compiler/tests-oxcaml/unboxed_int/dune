@@ -6,6 +6,6 @@
 
 (tests
  (names array_indexing stringlike_indexing small_int_stringlike)
- (build_if %{oxcaml_supported})
- (libraries stdlib_stable stdlib_upstream_compatible)
+ (build_if %{ocaml-config:ox})
+ (libraries ocaml.stdlib_stable ocaml.stdlib_upstream_compatible)
  (modes js wasm))

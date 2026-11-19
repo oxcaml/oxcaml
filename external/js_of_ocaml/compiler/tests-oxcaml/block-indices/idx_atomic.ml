@@ -190,7 +190,7 @@ end
 (* test reading/writing from record with void fields *)
 
 module Void = struct
-  [@@@warning "-214"]
+  [@@@warning "-214-69"]
   type t = { x: unit#; mutable y: string [@atomic]; z: unit# }
 
   let () =

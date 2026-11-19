@@ -25,6 +25,7 @@ module type Tool = sig
   val output_variable : Variables.t
   val reference_filename_suffix : Environments.t -> string
   val reference_file : Environments.t -> string -> string
+  val extra_dependencies : string list
 end
 
 type tool = (module Tool)
@@ -37,6 +38,7 @@ val tool :
   exit_status_variable : Variables.t ->
   reference_variable : Variables.t ->
   output_variable : Variables.t ->
+  extra_dependencies:string list ->
   tool
 
 val expected_exit_status : Environments.t -> tool -> int

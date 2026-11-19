@@ -174,9 +174,33 @@ let modality i ppf modality =
 let modalities i ppf modalities =
   List.iter (fun m -> modality i ppf m) modalities
 
-let mode i ppf mode =
-  line i ppf "mode %a\n" fmt_string_loc
-    (Location.map (fun (Mode x) -> x) mode)
+let mode_bound_var i ppf { pbound_morph; pbound_var; pbound_mod } =
+  line i ppf "mode_bound_var\n";
+  option (i+1) string_loc ppf pbound_morph;
+  string_loc (i+1) ppf pbound_var;
+  list (i+1) string_loc ppf pbound_mod
+
+let mode_bound_elem i ppf = function
+  | Pbound_var v -> mode_bound_var i ppf v
+  | Pbound_const cs -> list i string_loc ppf cs
+
+let mode_bound i ppf elems =
+  list i mode_bound_elem ppf elems
+
+let mode i ppf (mode : mode loc) =
+  match mode.txt with
+  | Pmode x ->
+    line i ppf "mode %a\n" fmt_string_loc { mode with txt = x }
+  | Pmode_var v ->
+    line i ppf "mode %a\n" fmt_location mode.loc;
+    line (i+1) ppf "Pmode_var \"%s\"\n" v
+  | Pmode_bounded { pmode_upper; pmode_lower } ->
+    line i ppf "mode %a\n" fmt_location mode.loc;
+    line (i+1) ppf "Pmode_bounded\n";
+    line (i+2) ppf "pmode_upper\n";
+    mode_bound (i+3) ppf pmode_upper;
+    line (i+2) ppf "pmode_lower\n";
+    mode_bound (i+3) ppf pmode_lower
 
 let modes i ppf modes =
   List.iter (fun m -> mode i ppf m) modes
@@ -341,6 +365,9 @@ and pattern i ppf x =
       line i ppf "Ppat_or\n";
       pattern i ppf p1;
       pattern i ppf p2;
+  | Ppat_addr (mut, p) ->
+      line i ppf "Ppat_addr %a\n" fmt_mutable_flag mut;
+      pattern i ppf p;
   | Ppat_lazy p ->
       line i ppf "Ppat_lazy\n";
       pattern i ppf p;
@@ -700,6 +727,24 @@ and jkind_declaration i ppf
   let i = i+1 in
   line i ppf "pjkind_manifest =\n";
   option (i+1) jkind_annotation ppf pjkind_manifest
+
+and law_declaration i ppf
+      { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+        plaw_attributes; plaw_loc } =
+  line i ppf "law_declaration %a %a\n" fmt_string_loc plaw_name
+       fmt_location plaw_loc;
+  attributes i ppf plaw_attributes;
+  let i = i+1 in
+  line i ppf "plaw_params =\n";
+  list (i+1) string_loc_x_core_type_option ppf plaw_params;
+  line i ppf "plaw_assumptions =\n";
+  list (i+1) expression ppf plaw_assumptions;
+  line i ppf "plaw_conclusion =\n";
+  expression (i+1) ppf plaw_conclusion
+
+and string_loc_x_core_type_option i ppf (s, ty) =
+  string_loc i ppf s;
+  option (i+1) core_type ppf ty
 
 and attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.attr_name.txt;
@@ -1066,6 +1111,9 @@ and signature_item i ppf x =
   | Psig_jkind jd ->
       line i ppf "Psig_jkind";
       jkind_declaration i ppf jd
+  | Psig_law ld ->
+      line i ppf "Psig_law";
+      law_declaration i ppf ld
   )
 
 and modtype_declaration i ppf = function
@@ -1214,6 +1262,9 @@ and structure_item i ppf x =
   | Pstr_jkind jd ->
       line i ppf "Pstr_kind";
       jkind_declaration i ppf jd
+  | Pstr_law ld ->
+      line i ppf "Pstr_law";
+      law_declaration i ppf ld
   )
 
 and module_declaration i ppf pmd =

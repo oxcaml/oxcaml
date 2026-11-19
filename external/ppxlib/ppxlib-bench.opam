@@ -12,8 +12,8 @@ homepage: "https://github.com/ocaml-ppx/ppxlib"
 doc: "https://ocaml-ppx.github.io/ppxlib/"
 bug-reports: "https://github.com/ocaml-ppx/ppxlib/issues"
 depends: [
-  "dune" {>= "2.7"}
-  "ocaml" {>= "4.04.1"}
+  "dune" {>= "3.8"}
+  "ocaml" {>= "4.10.0"}
   "ppxlib" {= version}
   "base"
   "yojson"

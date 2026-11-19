@@ -13,14 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module NN = Datalog.Schema.Relation2 (Code_id_or_name) (Code_id_or_name)
-module NFN =
-  Datalog.Schema.Relation3 (Code_id_or_name) (Field) (Code_id_or_name)
-module NCN =
-  Datalog.Schema.Relation3 (Code_id_or_name) (Cofield) (Code_id_or_name)
-module NNN =
-  Datalog.Schema.Relation3 (Code_id_or_name) (Code_id_or_name) (Code_id_or_name)
-module N = Datalog.Schema.Relation1 (Code_id_or_name)
+open Datalog_helpers.Schemas
 
 type graph =
   { mutable alias : NN.t;
@@ -226,3 +219,49 @@ let add_code_id_my_closure t code_id my_closure =
     <- NN.add_or_replace
          [Code_id_or_name.code_id code_id; Code_id_or_name.var my_closure]
          () t.code_id_my_closure
+
+let ids_for_export
+    { alias;
+      use;
+      accessor;
+      constructor;
+      argument;
+      parameter;
+      propagate;
+      alias_if_any_source;
+      any_usage;
+      any_source;
+      any_source_if_used;
+      zero_alloc_source;
+      code_id_my_closure
+    } =
+  Ids_for_export.union_list
+    [ NN.ids_for_export alias;
+      NN.ids_for_export use;
+      NFN.ids_for_export accessor;
+      NFN.ids_for_export constructor;
+      NCN.ids_for_export argument;
+      NCN.ids_for_export parameter;
+      NNN.ids_for_export propagate;
+      NNN.ids_for_export alias_if_any_source;
+      N.ids_for_export any_usage;
+      N.ids_for_export any_source;
+      NN.ids_for_export any_source_if_used;
+      N.ids_for_export zero_alloc_source;
+      NN.ids_for_export code_id_my_closure ]
+
+let apply_renaming graph renaming =
+  { alias = NN.apply_renaming graph.alias renaming;
+    use = NN.apply_renaming graph.use renaming;
+    accessor = NFN.apply_renaming graph.accessor renaming;
+    constructor = NFN.apply_renaming graph.constructor renaming;
+    argument = NCN.apply_renaming graph.argument renaming;
+    parameter = NCN.apply_renaming graph.parameter renaming;
+    propagate = NNN.apply_renaming graph.propagate renaming;
+    alias_if_any_source = NNN.apply_renaming graph.alias_if_any_source renaming;
+    any_usage = N.apply_renaming graph.any_usage renaming;
+    any_source = N.apply_renaming graph.any_source renaming;
+    any_source_if_used = NN.apply_renaming graph.any_source_if_used renaming;
+    zero_alloc_source = N.apply_renaming graph.zero_alloc_source renaming;
+    code_id_my_closure = NN.apply_renaming graph.code_id_my_closure renaming
+  }

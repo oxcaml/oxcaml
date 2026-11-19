@@ -41,8 +41,8 @@ val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
 
 (*
 val refine_mixed_block_element :
-  Env.t -> Location.t -> Types.type_expr -> unit Lambda.mixed_block_element
-  -> unit Lambda.mixed_block_element
+  Env.t -> Location.t -> Types.type_expr -> 'a Lambda.mixed_block_element
+  -> 'a Lambda.mixed_block_element
 *)
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function

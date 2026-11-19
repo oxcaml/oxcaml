@@ -197,6 +197,11 @@
          (ref.func $int32_dup)))
    ))
 
+   (func (export "boxed_nativeint_to_i64") (param $v (ref eq)) (result i64)
+      (@if $portable-int
+      (@then (call $Int64_val (local.get $v)))
+      (@else (i64.extend_i32_s (call $Int32_val (local.get $v))))))
+
 
    (@if $portable-int
    (@then

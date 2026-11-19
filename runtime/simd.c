@@ -24,6 +24,7 @@
 
 #define Max_unboxed_vec128_array_wosize    (Max_array_wosize / Words_per_vec128)
 #define Max_unboxed_vec256_array_wosize    (Max_array_wosize / Words_per_vec256)
+#define Max_unboxed_vec512_array_wosize    (Max_array_wosize / Words_per_vec512)
 
 CAMLprim value caml_simd_bytecode_not_supported(void) {
   caml_fatal_error("SIMD is not supported in bytecode mode.");
@@ -122,4 +123,51 @@ CAMLprim value caml_make_local_unboxed_vec256_vect(value len)
 
 CAMLprim value caml_make_unboxed_vec256_vect_bytecode(value len) {
   caml_failwith("256-bit SIMD is not supported on this platform.");
+}
+
+
+CAMLprim value caml_unboxed_vec512_vect_blit(value a1, value ofs1, value a2,
+                                             value ofs2, value n) {
+    /* See memory model [MM] notes in memory.c */
+    atomic_thread_fence(memory_order_acquire);
+    memmove((uintnat *)a2 + Long_val(ofs2) * Words_per_vec512,
+            (uintnat *)a1 + Long_val(ofs1) * Words_per_vec512,
+            Long_val(n) * sizeof(uintnat) * Words_per_vec512);
+    return Val_unit;
+}
+
+static value caml_make_unboxed_vec512_vect0(value len, int local)
+{
+  mlsize_t num_elements = Long_val(len);
+  if (num_elements > Max_unboxed_vec512_array_wosize)
+    caml_invalid_argument("Array.make");
+
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
+  mlsize_t num_fields = num_elements * Words_per_vec512;
+
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+
+  if (local)
+    return caml_alloc_local_reserved(num_fields, Unboxed_vec512_array_tag, reserved);
+  else
+    return caml_alloc_with_reserved(num_fields, Unboxed_vec512_array_tag, reserved);
+}
+
+CAMLprim value caml_make_unboxed_vec512_vect(value len)
+{
+  return caml_make_unboxed_vec512_vect0(len, 0);
+}
+
+CAMLprim value caml_make_local_unboxed_vec512_vect(value len)
+{
+  return caml_make_unboxed_vec512_vect0(len, 1);
+}
+
+CAMLprim value caml_make_unboxed_vec512_vect_bytecode(value len) {
+  caml_failwith("512-bit SIMD is not supported on this platform.");
 }

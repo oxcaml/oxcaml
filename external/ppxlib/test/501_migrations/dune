@@ -14,6 +14,7 @@
  (modules compare_on))
 
 (cram
+ (package ppxlib)
  (enabled_if
   (and
    (>= %{ocaml_version} "5.1.0~alpha2")
@@ -22,12 +23,14 @@
  (deps identity_driver.exe compare_on.exe))
 
 (cram
+ (package ppxlib)
  (enabled_if
   (= %{ocaml_version} "5.0.0"))
  (applies_to reverse_migrations)
  (deps reverse_migrations.exe compare_on.exe))
 
 (cram
+ (package ppxlib)
  (enabled_if
   (and
    (>= %{ocaml_version} "5.0.0")

@@ -1,0 +1,29 @@
+File "mode_errors.ml", line 1:
+Error: Multiple errors were encountered
+File "mode_errors.ml", line 13, characters 4-5:
+13 | let x = stack_ (1, 2)
+         ^
+  The expression is local because it is stack_-allocated.
+  However, the expression highlighted is expected to be global
+    because it is the value x in the structure at file "mode_errors.ml", lines 13-30, characters 0-19
+    which is expected to be global
+    because modules always need to be allocated on the heap.
+File "mode_errors.ml", line 16, characters 35-36:
+16 | let f (x @ local) = ref (fun () -> x)
+                                        ^
+  The value x is local to the parent region
+  but is expected to be global
+    because it is used inside the function at file "mode_errors.ml", line 16, characters 24-37
+    which is expected to be global.
+File "mode_errors.ml", line 21, characters 8-9:
+21 |     let y @ local = stack_ (ref 1)
+             ^
+  The expression is local
+  but is expected to be global
+    because it is the value y in the structure at file "mode_errors.ml", line 21, characters 4-34
+    which is expected to be global
+    because modules always need to be allocated on the heap.
+File "mode_errors.ml", line 30, characters 17-19:
+30 | let t : string = 10
+                      ^^
+  The constant 10 has type int but an expression was expected of type string

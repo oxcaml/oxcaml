@@ -28,6 +28,64 @@ module Context = struct
     | Floating_attribute Signature_item -> Pprintast.signature_item
     | Floating_attribute Class_field -> Pprintast.class_field
     | Floating_attribute Class_type_field -> Pprintast.class_type_field
+
+  let compiler_printer : type a. a t -> Stdlib.Format.formatter -> a -> unit =
+   fun ctx ppf a ->
+    let open Extension.Context in
+    let open Attribute.Floating.Context in
+    let module Ppxlib_to_compiler = Convert (Js) (Compiler_version) in
+    match ctx with
+    | Extension Class_expr ->
+        Astlib.Compiler_pprintast.class_expr ppf
+          (Ppxlib_to_compiler.copy_class_expr a)
+    | Extension Class_field ->
+        Astlib.Compiler_pprintast.class_field ppf
+          (Ppxlib_to_compiler.copy_class_field a)
+    | Extension Class_type ->
+        Astlib.Compiler_pprintast.class_type ppf
+          (Ppxlib_to_compiler.copy_class_type a)
+    | Extension Class_type_field ->
+        Astlib.Compiler_pprintast.class_type_field ppf
+          (Ppxlib_to_compiler.copy_class_type_field a)
+    | Extension Core_type ->
+        paren Astlib.Compiler_pprintast.core_type ppf
+          (Ppxlib_to_compiler.copy_core_type a)
+    | Extension Expression ->
+        paren Astlib.Compiler_pprintast.expression ppf
+          (Ppxlib_to_compiler.copy_expression a)
+    | Extension Module_expr ->
+        Astlib.Compiler_pprintast.module_expr ppf
+          (Ppxlib_to_compiler.copy_module_expr a)
+    | Extension Module_type ->
+        Astlib.Compiler_pprintast.module_type ppf
+          (Ppxlib_to_compiler.copy_module_type a)
+    | Extension Pattern ->
+        paren Astlib.Compiler_pprintast.pattern ppf
+          (Ppxlib_to_compiler.copy_pattern a)
+    | Extension Signature_item ->
+        Astlib.Compiler_pprintast.signature_item ppf
+          (Ppxlib_to_compiler.copy_signature_item a)
+    | Extension Structure_item ->
+        Astlib.Compiler_pprintast.structure_item ppf
+          (Ppxlib_to_compiler.copy_structure_item a)
+    | Extension Ppx_import ->
+        let stri_a =
+          { pstr_desc = Pstr_type (Recursive, [ a ]); pstr_loc = Location.none }
+        in
+        Astlib.Compiler_pprintast.structure_item ppf
+          (Ppxlib_to_compiler.copy_structure_item stri_a)
+    | Floating_attribute Structure_item ->
+        Astlib.Compiler_pprintast.structure_item ppf
+          (Ppxlib_to_compiler.copy_structure_item a)
+    | Floating_attribute Signature_item ->
+        Astlib.Compiler_pprintast.signature_item ppf
+          (Ppxlib_to_compiler.copy_signature_item a)
+    | Floating_attribute Class_field ->
+        Astlib.Compiler_pprintast.class_field ppf
+          (Ppxlib_to_compiler.copy_class_field a)
+    | Floating_attribute Class_type_field ->
+        Astlib.Compiler_pprintast.class_type_field ppf
+          (Ppxlib_to_compiler.copy_class_type_field a)
 end
 
 module Replacement = struct
@@ -44,12 +102,15 @@ module Replacement = struct
 
   let make_text ~start ~stop ~repl () = { start; stop; data = Text repl }
 
-  let text block =
+  let text ~use_compiler_pprint block =
     match block.data with
     | Text s -> s
     | Values (context, generated) ->
         let s =
-          let printer = Context.printer context in
+          let printer =
+            if use_compiler_pprint then Context.compiler_printer context
+            else Context.printer context
+          in
           match generated with
           | Single x -> Stdlib.Format.asprintf "%a" printer x
           | Many l ->
@@ -189,7 +250,7 @@ let with_output ~styler ~(kind : Kind.t) fn ~f =
         Stdlib.exit 1)
 
 let reconcile ?styler (repls : Replacements.t) ~kind ~contents ~input_filename
-    ~output ~input_name ~target =
+    ~output ~input_name ~target ~use_compiler_pprint =
   let repls = Replacements.check_and_sort ~input_filename ~input_name repls in
   let output_name = match output with None -> "<stdout>" | Some fn -> fn in
   with_output output ~styler ~kind ~f:(fun oc ->
@@ -230,7 +291,20 @@ let reconcile ?styler (repls : Replacements.t) ~kind ~contents ~input_filename
               copy_input pos ~up_to:repl.start.pos_cnum ~line ~last_is_text
                 ~is_text
             in
-            let s = Replacement.text repl in
+            let s =
+              try Replacement.text ~use_compiler_pprint repl
+              with Astlib.Compiler_pprintast.Unavailable ->
+                let loc =
+                  {
+                    (Location.in_file input_filename) with
+                    loc_start = repl.start;
+                    loc_end = repl.stop;
+                  }
+                in
+                Location.raise_errorf ~loc
+                  "Ppxlib.Reconcile: Cannot print this AST fragment using the \
+                   compiler printers with OCaml < 4.14"
+            in
             let line =
               match target with
               | Output Using_line_directives ->
@@ -255,7 +329,7 @@ let reconcile ?styler (repls : Replacements.t) ~kind ~contents ~input_filename
             if pos.pos_cnum < repl.start.pos_cnum then
               end_consecutive_repls line pos repls ~last_is_text
             else
-              let s = Replacement.text repl in
+              let s = Replacement.text ~use_compiler_pprint repl in
               output_string oc s;
               let line = line + count_newlines s in
               let last_is_text =

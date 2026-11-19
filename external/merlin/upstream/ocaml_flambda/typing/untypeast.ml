@@ -223,8 +223,10 @@ let structure_item sub item =
 let modalities_of_val_modal_info = function
   | Valmi_sig_value modalities -> Typemode.untransl_modalities modalities
   | Valmi_str_primitive modes ->
-      let modality_of_mode { txt = Mode mode; loc } =
-        { txt = Modality mode; loc }
+      let modality_of_mode = function
+        | { txt = Pmode mode; loc } -> { txt = Modality mode; loc }
+        | { txt = Pmode_var _ | Pmode_bounded _; _ } ->
+            Misc.fatal_error "Untypeast.modality_of_mode: non-constant mode"
       in
       List.map modality_of_mode (Typemode.untransl_mode modes)
 
@@ -432,6 +434,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
+    | Tpat_addr (mut, _, p) -> Ppat_addr (mutable_ mut, sub.pat sub p)
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
 
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)

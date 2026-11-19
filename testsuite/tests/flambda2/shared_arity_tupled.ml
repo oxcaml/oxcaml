@@ -1,7 +1,11 @@
 (* TEST
  ocamlopt_flags = "-O3";
  flambda2;
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 let f1 (x, (y1, y2)) = 
   let () = () in

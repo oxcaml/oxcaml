@@ -15,7 +15,6 @@ endif
 
 boot_ocamlc = main_native.exe
 boot_ocamlopt = optmain_native.exe
-boot_ocamlj = boot_ocamlj.exe
 boot_ocamlmklib = tools/ocamlmklib.exe
 boot_ocamldep = tools/ocamldep.exe
 boot_ocamlobjinfo = tools/objinfo.exe

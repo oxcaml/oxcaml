@@ -1,5 +1,20 @@
 (* TEST
  ocamllex_flags = "-q";
+ setup-ocamlopt.opt-build-env;
+
+ src = "${ocamlsrcdir}/utils/warnings.ml";
+ dst = "warnings.ml";
+ copy;
+
+ script = "${ocamlrun} ${ocamlc_byte} -warn-help";
+ stdout = "warn-help.out";
+ script;
+ stdout = "${output}";
+
+ ocamlopt.opt;
+ check-ocamlopt.opt-output;
+ run;
+ check-program-output;
 *)
 
 {
@@ -32,12 +47,9 @@ and mnemonics = parse
   { [] }
 
 {
-let ocamlsrcdir = Sys.getenv "ocamlsrcdir"
-
-let ocamlrun = Sys.getenv "ocamlrun"
 
 let constructors =
-  let ic = open_in Filename.(concat ocamlsrcdir (concat "utils" "warnings.ml")) in
+  let ic = open_in "warnings.ml" in
   Fun.protect ~finally:(fun () -> close_in_noerr ic)
     (fun () ->
        let lexbuf = Lexing.from_channel ic in
@@ -46,14 +58,7 @@ let constructors =
     )
 
 let mnemonics =
-  let stdout = "warn-help.out" in
-  let n =
-    Sys.command
-      Filename.(quote_command ~stdout
-                  ocamlrun [concat ocamlsrcdir "ocamlc"; "-warn-help"])
-  in
-  assert (n = 0);
-  let ic = open_in stdout in
+  let ic = open_in "warn-help.out" in
   Fun.protect ~finally:(fun () -> close_in_noerr ic)
     (fun () ->
        let lexbuf = Lexing.from_channel ic in

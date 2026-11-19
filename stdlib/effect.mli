@@ -82,14 +82,16 @@ module Deep : sig
   (** [continue k x] resumes the continuation [k] by passing [x] to [k].
 
       @raise Continuation_already_resumed if the continuation has already been
-      resumed. *)
+      resumed.
+      @raise Out_of_fibers if insufficient stacks are available. *)
 
   val discontinue: ('a, 'b) continuation -> exn -> 'b
   (** [discontinue k e] resumes the continuation [k] by raising the
       exception [e] in [k].
 
       @raise Continuation_already_resumed if the continuation has already been
-      resumed. *)
+      resumed.
+      @raise Out_of_fibers if insufficient stacks are available. *)
 
   val discontinue_with_backtrace:
     ('a, 'b) continuation -> exn -> Printexc.raw_backtrace -> 'b
@@ -98,7 +100,8 @@ module Deep : sig
       exception.
 
       @raise Continuation_already_resumed if the continuation has already been
-      resumed. *)
+      resumed.
+      @raise Out_of_fibers if insufficient stacks are available. *)
 
   type ('a,'b) handler =
     { retc: 'a -> 'b;
@@ -296,6 +299,7 @@ module Shallow : sig
 
       @raise Continuation_already_resumed if the continuation has already been
       resumed.
+      @raise Out_of_fibers if insufficient stacks are available.
    *)
 
   val discontinue_with : ('c,'a) continuation -> exn -> ('a,'b) handler -> 'b
@@ -304,6 +308,7 @@ module Shallow : sig
 
       @raise Continuation_already_resumed if the continuation has already been
       resumed.
+      @raise Out_of_fibers if insufficient stacks are available.
    *)
 
   val discontinue_with_backtrace :
@@ -315,6 +320,7 @@ module Shallow : sig
 
       @raise Continuation_already_resumed if the continuation has already been
       resumed.
+      @raise Out_of_fibers if insufficient stacks are available.
    *)
 
   module Safe : sig
@@ -337,15 +343,18 @@ module Shallow : sig
       val continue_with
         :  Handler.t @ local
         -> ('c,'a) continuation -> 'c -> ('a,'b) handler -> 'b
+      (** @raise Out_of_fibers if insufficient stacks are available. *)
 
       val discontinue_with
         :  Handler.t @ local
         -> ('c,'a) continuation -> exn -> ('a,'b) handler -> 'b
+      (** @raise Out_of_fibers if insufficient stacks are available. *)
 
       val discontinue_with_backtrace
         :  Handler.t @ local
         -> ('a,'b) continuation -> exn -> Printexc.raw_backtrace
         -> ('b,'c) handler -> 'c
+      (** @raise Out_of_fibers if insufficient stacks are available. *)
     end
   end
 
@@ -392,6 +401,7 @@ module Shallow : sig
 
         @raise Continuation_already_resumed if the continuation has already been
         resumed.
+        @raise Out_of_fibers if insufficient stacks are available.
     *)
 
     val discontinue_with : ('c,'a) continuation -> exn -> ('a,'b) handler -> 'b
@@ -400,6 +410,7 @@ module Shallow : sig
 
         @raise Continuation_already_resumed if the continuation has already been
         resumed.
+        @raise Out_of_fibers if insufficient stacks are available.
     *)
 
     val discontinue_with_backtrace : ('a,'b) continuation -> exn ->
@@ -410,6 +421,7 @@ module Shallow : sig
 
         @raise Continuation_already_resumed if the continuation has already been
         resumed.
+        @raise Out_of_fibers if insufficient stacks are available.
     *)
 
     module Safe : sig
@@ -439,6 +451,7 @@ module Shallow : sig
 
             @raise Continuation_already_resumed if the continuation has already
             been resumed.
+            @raise Out_of_fibers if insufficient stacks are available.
         *)
 
         val discontinue_with
@@ -449,6 +462,7 @@ module Shallow : sig
 
             @raise Continuation_already_resumed if the continuation has already
             been resumed.
+            @raise Out_of_fibers if insufficient stacks are available.
         *)
 
         val discontinue_with_backtrace
@@ -462,6 +476,7 @@ module Shallow : sig
 
             @raise Continuation_already_resumed if the continuation has already
             been resumed.
+            @raise Out_of_fibers if insufficient stacks are available.
         *)
       end
     end

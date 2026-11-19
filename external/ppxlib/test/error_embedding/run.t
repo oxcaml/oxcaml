@@ -75,3 +75,40 @@ Error nodes are generated when dependent derivers are not applied.
       let _ = "derived_string"
       let _ = "derived_string"
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
+
+Flag `-raise-embedded-errors` raises the first embedded error in the AST.
+
+  $ echo "let () = ()" > embedded_error.ml
+  $ echo "module T = struct [%%ocaml.error \"error 1\"] end" >> embedded_error.ml
+  $ echo "[%%ocaml.error \"error 2\"]" >> embedded_error.ml
+  $ ./extender.exe embedded_error.ml -raise-embedded-errors
+  File "embedded_error.ml", line 2, characters 21-32:
+  2 | module T = struct [%%ocaml.error "error 1"] end
+                           ^^^^^^^^^^^
+  Error: error 1
+  [1]
+
+Undeprecated `[@@@deriving.end]` runs just fine.
+
+  $ echo "type t [@@deriving_inline a_string] [@@@deriving.end]" > embedded_error.ml
+  $ ./deriver.exe embedded_error.ml -diff-cmd "diff -u --label source --label derived"
+  type t[@@deriving_inline a_string]
+  [@@@deriving.end ]
+  --- source
+  +++ derived
+  @@ -1 +1,4 @@
+  -type t [@@deriving_inline a_string] [@@@deriving.end]
+  +type t [@@deriving_inline a_string] 
+  +let _ = fun (_ : t) -> ()
+  +let _ = "derived_string"
+  +[@@@deriving.end]
+  [1]
+
+Deprecated `[@@@deriving.end]` produces an error.
+
+  $ echo "type t [@@deriving_inline a_string] [@@@deriving.end]" > embedded_error.ml
+  $ ./deriver.exe embedded_error.ml -allow-deriving-end false
+  [%%ocaml.error
+    "ppxlib: [@@@deriving.end] is deprecated, please use [@@@ppxlib.inline.end]. If you need the deprecated attribute temporarily, pass [-allow-deriving-end] to the ppx driver)."]
+  type t[@@deriving_inline a_string]
+  [@@@deriving.end ]

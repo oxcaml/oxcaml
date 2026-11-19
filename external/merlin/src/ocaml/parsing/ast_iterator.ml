@@ -28,6 +28,9 @@ type iterator = {
   attribute: iterator -> attribute -> unit;
   attributes: iterator -> attribute list -> unit;
   modes : iterator -> modes -> unit;
+  mode : iterator -> mode Location.loc -> unit;
+  mode_bound : iterator -> mode_bound -> unit;
+  mode_bound_var : iterator -> mode_bound_var -> unit;
   modalities : iterator -> modalities -> unit;
   binding_op: iterator -> binding_op -> unit;
   case: iterator -> case -> unit;
@@ -51,6 +54,7 @@ type iterator = {
   jkind_annotation: iterator -> jkind_annotation -> unit;
   jkind_declaration: iterator -> jkind_declaration -> unit;
   label_declaration: iterator -> label_declaration -> unit;
+  law_declaration: iterator -> law_declaration -> unit;
   location: iterator -> Location.t -> unit;
   module_binding: iterator -> module_binding -> unit;
   module_declaration: iterator -> module_declaration -> unit;
@@ -365,6 +369,7 @@ module MT = struct
         sub.extension sub x
     | Psig_attribute x -> sub.attribute sub x
     | Psig_jkind x -> sub.jkind_declaration sub x
+    | Psig_law x -> sub.law_declaration sub x
 end
 
 
@@ -417,6 +422,7 @@ module M = struct
         sub.attributes sub attrs; sub.extension sub x
     | Pstr_attribute x -> sub.attribute sub x
     | Pstr_jkind x -> sub.jkind_declaration sub x
+    | Pstr_law x -> sub.law_declaration sub x
 end
 
 module E = struct
@@ -628,6 +634,7 @@ module P = struct
     | Ppat_constraint (p, t, m) ->
         sub.pat sub p; Option.iter (sub.typ sub) t; sub.modes sub m;
     | Ppat_type s -> iter_loc_lid sub s
+    | Ppat_addr (_mut, p) -> sub.pat sub p
     | Ppat_lazy p -> sub.pat sub p
     | Ppat_unpack s -> iter_loc sub s
     | Ppat_effect (p1,p2) -> sub.pat sub p1; sub.pat sub p2
@@ -868,7 +875,30 @@ let default_iterator =
 
     (* Location inside a mode expression needs to be traversed. *)
     modes = (fun this m ->
-      List.iter (iter_loc this) m
+      List.iter (this.mode this) m
+    );
+
+    mode = (fun this { txt; loc } ->
+      (match txt with
+       | Pmode _ | Pmode_var _ -> ()
+       | Pmode_bounded { pmode_upper; pmode_lower } ->
+         this.mode_bound this pmode_upper;
+         this.mode_bound this pmode_lower);
+      this.location this loc
+    );
+
+    mode_bound = (fun this elems ->
+      List.iter
+        (function
+          | Pbound_var v -> this.mode_bound_var this v
+          | Pbound_const cs -> List.iter (iter_loc this) cs)
+        elems
+    );
+
+    mode_bound_var = (fun this { pbound_morph; pbound_var; pbound_mod } ->
+      Option.iter (iter_loc this) pbound_morph;
+      iter_loc this pbound_var;
+      List.iter (iter_loc this) pbound_mod
     );
 
     modalities = (fun this m ->
@@ -909,6 +939,20 @@ let default_iterator =
          Option.iter (this.jkind_annotation this) pjkind_manifest;
          this.attributes this pjkind_attributes;
          this.location this pjkind_loc
+      );
+
+    law_declaration =
+      (fun this { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+                  plaw_attributes; plaw_loc } ->
+         iter_loc this plaw_name;
+         List.iter
+           (fun (name, ty) ->
+              iter_loc this name; Option.iter (this.typ this) ty)
+           plaw_params;
+         List.iter (this.expr this) plaw_assumptions;
+         this.expr this plaw_conclusion;
+         this.attributes this plaw_attributes;
+         this.location this plaw_loc
       );
 
     directive_argument =

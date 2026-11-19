@@ -15,7 +15,11 @@
 
 external spawn_thread : (unit -> unit) -> unit = "spawn_thread"
 
-let passed () = Printf.printf "passed\n"
+let main_thread_id = Thread.self_id ()
+
+let passed () =
+  assert (Thread.self_id () <> main_thread_id);
+  Printf.printf "passed\n"
 
 let _ =
   spawn_thread (passed);

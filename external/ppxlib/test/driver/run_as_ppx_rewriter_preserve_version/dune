@@ -9,6 +9,7 @@
  (modules print_magic_number))
 
 (cram
+ (package ppxlib)
  (enabled_if
   (or
    (= %{system} linux)

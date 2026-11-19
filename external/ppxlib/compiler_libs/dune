@@ -1,0 +1,32 @@
+; Downstream: replaces the ocaml-compiler-libs package. Its users refer to the
+; compiler-libs modules they shadow with modules of their own through
+; Ocaml_common, which they see through -open Oxcaml_private_compiler_libs.
+; Ocaml_shadow is as in ocaml-compiler-libs.
+(library
+ (name oxcaml_private_compiler_libs)
+ (public_name ppxlib_ast.private.compiler_libs)
+ (flags
+  (:standard -w -49))
+ (libraries compiler-libs.common))
+
+(rule
+ (targets ocaml_shadow.ml)
+ (enabled_if
+  (<> %{context_name} main))
+ (action
+  (run %{exe:gen/gen.exe} -o %{targets} %{ocaml_where}/compiler-libs)))
+
+; In the main context of the OxCaml compiler's own build, from the
+; compiler-libs directory of its installation.
+(rule
+ (targets ocaml_shadow.ml)
+ (enabled_if
+  (= %{context_name} main))
+ (deps
+  (glob_files %{workspace_root}/../install/main/lib/ocaml/compiler-libs/*.cmi))
+ (action
+  (run
+   %{exe:gen/gen.exe}
+   -o
+   %{targets}
+   %{workspace_root}/../install/main/lib/ocaml/compiler-libs)))

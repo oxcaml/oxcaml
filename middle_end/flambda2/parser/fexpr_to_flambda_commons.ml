@@ -145,7 +145,8 @@ let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
   | Some code_id -> code_id
   | None ->
     let c =
-      Code_id.create ~name ~debug:Debuginfo.none (Current_unit.get_cu_exn ())
+      Code_id.create ~name ~slot_stamp:None ~debug:Debuginfo.none
+        (Current_unit.get_cu_exn ())
     in
     DM.add env.code_ids name c;
     c

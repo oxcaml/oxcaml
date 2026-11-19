@@ -1568,6 +1568,14 @@ module Instruction_name = struct
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
     | NOP : (singleton, unit) t
+    | ORN_shifted_register :
+        ( quad,
+          [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Optional of [`Shift of [< `Lsl | `Lsr | `Asr] * [`Six]] option]
+        )
+        t
     | ORR_immediate :
         ( triple,
           [`Reg of [`GP of [< `X]]]
@@ -2048,6 +2056,7 @@ module Instruction_name = struct
         | MVN_vector -> "mvn"
         | NEG_vector -> "neg"
         | NOP -> "nop"
+        | ORN_shifted_register -> "orn"
         | ORR_immediate | ORR_shifted_register | ORR_vector -> "orr"
         | RBIT -> "rbit"
         | RET -> "ret"
@@ -2453,6 +2462,11 @@ module Instruction_name = struct
       | ORR_immediate ->
         let (Triple (rd, rs, bitmask)) = ops in
         [| o rd; o rs; o bitmask |]
+      | ORN_shifted_register -> (
+        let (Quad (rd, rs, reg, shift_opt)) = ops in
+        match shift_opt with
+        | Optional None -> [| o rd; o rs; o reg |]
+        | Optional (Some shift) -> [| o rd; o rs; o reg; o shift |])
       | ORR_shifted_register -> (
         let (Quad (rd, rs, reg, shift_opt)) = ops in
         match shift_opt with
@@ -2687,17 +2701,17 @@ module Instruction = struct
     | FRSQRTE_vector | FSQRT | FSQRT_vector | FSUB | FSUB_vector | INS _
     | INS_V _ | LDAR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH | LDRSW
     | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
-    | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
-    | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
-    | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector | SMIN_vector
-    | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector
-    | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR
-    | STRB | STRH | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register
-    | SUB_immediate | SUB_shifted_register | SUB_vector | SXTL _ | TST
-    | UADDLP_vector | UBFM | UMAX_vector | UMIN_vector | UMOV _ | UMULH
-    | UMULL2_vector _ | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _
-    | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1
-    | ZIP2 ->
+    | MUL_vector | MVN_vector | NEG_vector | NOP | ORN_shifted_register
+    | ORR_immediate | ORR_shifted_register | ORR_vector | RBIT | RET | REV
+    | REV16 | SBFM | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector
+    | SMIN_vector | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _
+    | SQADD_vector | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR
+    | STP _ | STR | STRB | STRH | STR_simd_and_fp | SUBS_immediate
+    | SUBS_shifted_register | SUB_immediate | SUB_shifted_register | SUB_vector
+    | SXTL _ | TST | UADDLP_vector | UBFM | UMAX_vector | UMIN_vector | UMOV _
+    | UMULH | UMULL2_vector _ | UMULL_vector _ | UQADD_vector | UQSUB_vector
+    | UQXTN _ | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD
+    | ZIP1 | ZIP2 ->
       None
 end
 
@@ -3080,6 +3094,8 @@ module DSL = struct
       let ins4 name (a, b, c, d) = ins4 name a b c d
     end
 
+    let is_32bit (Reg r : [`Reg of [`GP of _]] Operand.t) = Reg.gp_sf r = 0
+
     (* Instructions that are expanded into others *)
     let ins_mul rd rn rm = ins MADD (Quad (rd, rn, rm, reg_op Reg.xzr))
 
@@ -3124,8 +3140,7 @@ module DSL = struct
 
     (* CMP <Rn|SP>, #<imm>{, <shift>} -> SUBS ZR, <Rn|SP>, #<imm>{, <shift>} *)
     let ins_cmp rn imm shift_opt =
-      let is_32bit = match rn with Operand.Reg r -> Reg.gp_sf r = 0 in
-      if is_32bit
+      if is_32bit rn
       then ins SUBS_immediate (Quad (wzr, rn, imm, shift_opt))
       else ins SUBS_immediate (Quad (xzr, rn, imm, shift_opt))
 
@@ -3169,5 +3184,12 @@ module DSL = struct
     (* MOV <Xd>, #<imm16> -> MOVZ <Xd>, #<imm16>, LSL #0 MOV <Wd>, #<imm16> ->
        MOVZ <Wd>, #<imm16>, LSL #0 *)
     let ins_mov_imm rd imm16 = ins MOVZ (Triple (rd, imm16, Optional None))
+
+    (* MVN <Xd>, <Xm> -> ORN <Xd>, XZR, <Xm> *)
+    (* MVN <Wd>, <Wm> -> ORN <Wd>, WZR, <Wm> *)
+    let ins_mvn rd rm =
+      if is_32bit rd
+      then ins ORN_shifted_register (Quad (rd, wzr, rm, Optional None))
+      else ins ORN_shifted_register (Quad (rd, xzr, rm, Optional None))
   end
 end

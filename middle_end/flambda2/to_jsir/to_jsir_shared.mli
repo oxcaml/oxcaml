@@ -44,6 +44,11 @@ val bind_expr_to_var' :
   Jsir.expr ->
   Jsir.Var.t * To_jsir_env.t * To_jsir_result.t
 
+type expr_binding =
+  { bound_var : Jsir.Var.t;
+    defining_expr : Jsir.expr
+  }
+
 (** Convert various integer types into a [Jsir.constant]. *)
 val target_ocaml_int_to_jsir_const : Target_ocaml_int.t -> Jsir.constant
 
@@ -83,6 +88,13 @@ val simples :
     in the environment, and return the variables in order *)
 val bound_parameters :
   env:To_jsir_env.t -> Bound_parameters.t -> Jsir.Var.t list * To_jsir_env.t
+
+(** The optimisation hint for a closure of code with metadata [code_metadata],
+    whose JSIR parameters are [params]. *)
+val closure_hint :
+  Code_metadata.t ->
+  params:Jsir.Var.t list ->
+  Optimization_hint.closure_hint option
 
 (** Make a new block. *)
 val block :

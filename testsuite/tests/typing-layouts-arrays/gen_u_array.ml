@@ -64,10 +64,11 @@ module type S = sig
     t -> int -> t -> int -> int ->
       unit
 
-  (* val to_list : t -> element_arg list
+  (* val to_list : t -> element_t list
   *
-  * val of_list : element_arg list -> t *)
-  (* CR layouts v5: Unboxed values can't be in list yet *)
+  * val of_list : element_t list -> t *)
+  (* CR layouts: Lists can now hold unboxed values, but [Make] still can't
+     implement these (see [S0.element_arg]). *)
 
   (** {1 Iterators} *)
 
@@ -133,12 +134,13 @@ module type S = sig
 
   (** {1 Arrays and Sequences} *)
 
-  (* val to_seq : t -> element_arg Seq.t
+  (* val to_seq : t -> element_t Seq.t
   *
-  * val to_seqi : t -> (int * element_arg) Seq.t
+  * val to_seqi : t -> (int * element_t) Seq.t
   *
-  * val of_seq : element_arg Seq.t -> t *)
-  (* CR layouts v5: Unboxed [Seq.t] not yet supported *)
+  * val of_seq : element_t Seq.t -> t *)
+  (* CR layouts: [Seq.t] can now hold unboxed values, but [Make] still can't
+     implement these (see [S0.element_arg]). *)
   (**/**)
 end
 

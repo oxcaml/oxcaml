@@ -18,7 +18,6 @@ depends: [
   "num" {with-test}
   "out-channel-redirect" {with-test}
   "ppxlib" {>= "0.33"}
-  "ocaml-compiler-libs" {>= "v0.12.4"}
   "re" {with-test}
   "cmdliner" {>= "2.0"}
   "sedlex" {>= "3.3"}

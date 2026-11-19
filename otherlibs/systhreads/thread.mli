@@ -66,6 +66,9 @@ val id : t -> int
    is an integer that identifies uniquely the thread.
    It can be used to build data structures indexed by threads. *)
 
+val self_id : unit -> int
+(** Equivalent to [id (self ())], but faster. *)
+
 val set_current_thread_name : string -> unit
 (** Set the thread's name. This should be called from within the thread
     function. Setting thread name is available on most systems.
@@ -225,6 +228,14 @@ module TLS : sig @@ portable
    -> (unit -> 'a) @ portable
    -> 'a key
    (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
+
+   val get : ('a : value mod portable). 'a key -> 'a @ contended
+   (** Like {!DLS.get}, but reads the value for the current thread.
+       Raises [Failure] if the key is borrowed by {!access}. *)
+
+   val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
+   (** Like {!DLS.set}, but sets the value for the current thread.
+       Raises [Failure] if the key is borrowed by {!access}. *)
 
    val access
       : ('b : value_or_null).

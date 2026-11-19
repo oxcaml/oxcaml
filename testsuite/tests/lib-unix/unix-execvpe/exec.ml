@@ -1,9 +1,8 @@
 (* TEST
  unset FOO;
  include unix;
- script = "sh ${test_source_directory}/has-execvpe.sh";
  hasunix;
- script;
+ not-windows;
  {
    bytecode;
  }{

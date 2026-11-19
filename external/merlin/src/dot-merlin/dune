@@ -3,9 +3,13 @@
  (name dot_merlin_reader)
  (public_name dot-merlin-reader)
  (libraries
-  findlib
   merlin-lib.utils
   merlin-lib.ocaml_utils
   merlin-lib.dot_protocol
   str
   unix))
+
+(rule
+ (targets standard_library.ml)
+ (action
+  (write-file %{targets} "let path = {|%{ocaml-config:standard_library}|}")))

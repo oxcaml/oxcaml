@@ -81,7 +81,10 @@ intnat caml_float32_compare_unboxed(float f, float g)
 
 static int float32_cmp(value v1, value v2)
 {
-  return caml_float32_compare_unboxed(Float32_val(v1), Float32_val(v2));
+  float f = Float32_val(v1);
+  float g = Float32_val(v2);
+  if (f != f || g != g) Caml_state->compare_unordered = 1;
+  return caml_float32_compare_unboxed(f, g);
 }
 
 static intnat float32_hash(value v)

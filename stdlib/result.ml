@@ -17,14 +17,14 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
-type ('a : value_or_null, 'e : value_or_null) t = ('a, 'e) result = Ok of 'a | Error of 'e
+type ('a : any, 'e : any) t = ('a, 'e) result = Ok of 'a | Error of 'e
 
 let ok v = Ok v
 let error e = Error e
-let value r ~default = match r with Ok v -> v | Error _ -> default
-let get_ok = function Ok v -> v | Error _ -> invalid_arg "result is Error _"
+let value r ~default = match r with Ok v -> v | _ -> default
+let get_ok = function Ok v -> v | _ -> invalid_arg "result is Error _"
 let get_ok' = function Ok v -> v | Error e -> invalid_arg e
-let get_error = function Error e -> e | Ok _ -> invalid_arg "result is Ok _"
+let get_error = function Error e -> e | _ -> invalid_arg "result is Ok _"
 let error_to_failure = function Ok v -> v | Error e -> failwith e
 let bind r f = match r with Ok v -> f v | Error _ as e -> e
 let join = function Ok r -> r | Error _ as e -> e
@@ -37,10 +37,10 @@ let product r0 r1 = match r0, r1 with
 let map_error f = function Error e -> Error (f e) | Ok _ as v -> v
 let fold ~ok ~error = function Ok v -> ok v | Error e -> error e
 let retract = function Ok v -> v | Error v -> v
-let iter f = function Ok v -> f v | Error _ -> ()
-let iter_error f = function Error e -> f e | Ok _ -> ()
-let is_ok = function Ok _ -> true | Error _ -> false
-let is_error = function Error _ -> true | Ok _ -> false
+let iter f = function Ok v -> f v | _ -> ()
+let iter_error f = function Error e -> f e | _ -> ()
+let is_ok = function Ok _ -> true | _ -> false
+let is_error = function Error _ -> true | _ -> false
 
 let equal ~ok ~error r0 r1 = match r0, r1 with
 | Ok v0, Ok v1 -> ok v0 v1
@@ -53,9 +53,9 @@ let compare ~ok ~error r0 r1 = match r0, r1 with
 | Ok _, Error _ -> -1
 | Error _, Ok _ -> 1
 
-let to_option = function Ok v -> Some v | Error _ -> None
-let to_list = function Ok v -> [v] | Error _ -> []
-let to_seq = function Ok v -> Seq.return v | Error _ -> Seq.empty
+let to_option = function Ok v -> Some v | _ -> None
+let to_list = function Ok v -> [v] | _ -> []
+let to_seq = function Ok v -> Seq.return v | _ -> Seq.empty
 
 module Syntax = struct
   let ( let* ) = bind

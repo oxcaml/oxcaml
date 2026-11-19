@@ -214,4 +214,48 @@ double vector_and_then_stack_floats512(
     return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7;
 }
 
+// Unboxed products containing masks (extcall512_mask.ml)
+typedef struct { __mmask64 m; int64_t i; } extcall512_mask_i64;
+typedef struct { int64_t i; __mmask64 m; } extcall512_i64_mask;
+
+extcall512_mask_i64 extcall512_ret_mask_i64(int64_t m, int64_t i)
+{
+    extcall512_mask_i64 res = { (__mmask64)m, i };
+    return res;
+}
+
+extcall512_i64_mask extcall512_ret_i64_mask(int64_t i, int64_t m)
+{
+    extcall512_i64_mask res = { i, (__mmask64)m };
+    return res;
+}
+
+int64_t extcall512_sum_mask_i64(extcall512_mask_i64 p)
+{
+    return (int64_t)p.m + 2 * p.i;
+}
+
+int64_t extcall512_sum_i64_mask(extcall512_i64_mask p)
+{
+    return p.i + 2 * (int64_t)p.m;
+}
+
+typedef struct { int64_t a; int64_t b; } extcall512_i64_i64;
+
+int64_t extcall512_i64x5_mask_i64(int64_t a0, int64_t a1, int64_t a2,
+                                  int64_t a3, int64_t a4,
+                                  extcall512_mask_i64 p)
+{
+    return a0 + 2 * a1 + 4 * a2 + 8 * a3 + 16 * a4 + 32 * (int64_t)p.m
+        + 64 * p.i;
+}
+
+int64_t extcall512_i64x4_mask_pair(int64_t a0, int64_t a1, int64_t a2,
+                                   int64_t a3, __mmask64 m,
+                                   extcall512_i64_i64 p)
+{
+    return a0 + 2 * a1 + 4 * a2 + 8 * a3 + 16 * (int64_t)m + 32 * p.a
+        + 64 * p.b;
+}
+
 #endif /* ARCH_AVX512 */

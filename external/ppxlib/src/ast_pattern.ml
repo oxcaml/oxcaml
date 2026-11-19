@@ -223,8 +223,8 @@ let ptyp_var l = ptyp_var l drop
 
 let type_declaration = type_declaration ~jkind_annotation:drop
 
-let value_binding ~pat ~expr =
-  value_binding ~pat ~expr ~modes:drop ~is_poly:drop
+let value_binding ~pat ~expr ~constraint_ =
+  value_binding ~pat ~expr ~constraint_ ~modes:drop ~is_poly:drop
 
 let value_description ~name ~type_ ~prim =
   value_description ~name ~type_ ~modalities:drop ~prim ~poly:drop
@@ -277,15 +277,11 @@ let no_label t = cst Asttypes.Nolabel ~to_string:(fun _ -> "Nolabel") ** t
 let ebool t = pexp_construct (lident (bool' t)) none
 let pbool t = ppat_construct (lident (bool' t)) none
 
-let pexp_function cases =
-  pexp_function nil
+let pexp_function params constraint_ body =
+  pexp_function params
     (function_constraint ~mode_annotations:nil ~ret_mode_annotations:nil
-      ~ret_type_constraint:none)
-    (pfunction_cases cases
-       drop
-       (T (fun _ _ attrs k ->
-            Common.assert_no_attributes attrs;
-            k)))
+      ~ret_type_constraint:constraint_)
+    body
 
 let extension (T f1) (T f2) =
   T
@@ -326,3 +322,47 @@ let esequence (T f) =
 
 let of_func f = T f
 let to_func (T f) = f
+
+let ptyp_labeled_tuple (T f0) =
+  T
+    (fun ctx _loc x k ->
+      let loc = x.ptyp_loc in
+      match x.ptyp_desc with
+      | Ptyp_tuple l when List.exists l ~f:(fun (lbl, _) -> Option.is_some lbl)
+        ->
+          ctx.matched <- ctx.matched + 1;
+          f0 ctx loc l k
+      | _ -> fail loc "labeled tuple")
+
+let pexp_labeled_tuple (T f0) =
+  T
+    (fun ctx _loc x k ->
+      let loc = x.pexp_loc in
+      match x.pexp_desc with
+      | Pexp_tuple l when List.exists l ~f:(fun (lbl, _) -> Option.is_some lbl)
+        ->
+          ctx.matched <- ctx.matched + 1;
+          f0 ctx loc l k
+      | _ -> fail loc "labeled tuple")
+
+let ppat_labeled_tuple (T f0) =
+  T
+    (fun ctx _loc x k ->
+      let loc = x.ppat_loc in
+      match x.ppat_desc with
+      | Ppat_tuple (l, flag)
+        when List.exists l ~f:(fun (lbl, _) -> Option.is_some lbl)
+             || match flag with Open -> true | Closed -> false ->
+          ctx.matched <- ctx.matched + 1;
+          f0 ctx loc (l, flag) k
+      | _ -> fail loc "labeled tuple")
+
+let pexp_hole =
+  T
+    (fun ctx _loc x k ->
+      let loc = x.pexp_loc in
+      match x.pexp_desc with
+      | Pexp_hole ->
+          ctx.matched <- ctx.matched + 1;
+          k
+      | _ -> fail loc "expression hole")

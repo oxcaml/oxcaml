@@ -287,6 +287,42 @@
  (action
   (diff empty.expected strings512_mask.out)))
 
+(executable
+ (name extcall512_mask)
+ (modules extcall512_mask)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (deps avx512_available.exe extcall512_mask.exe)
+ (action
+  (with-outputs-to
+   extcall512_mask.out
+   (run bash -c "if ./avx512_available.exe; then ./extcall512_mask.exe; fi"))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected extcall512_mask.out)))
+
 (rule
  (alias runtest)
  (enabled_if
@@ -663,6 +699,52 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
+  (copy extcall512_mask.ml extcall512_mask_nodynlink.ml)))
+
+(executable
+ (name extcall512_mask_nodynlink)
+ (modules extcall512_mask_nodynlink)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (deps avx512_available.exe extcall512_mask_nodynlink.exe)
+ (action
+  (with-outputs-to
+   extcall512_mask_nodynlink.out
+   (run bash -c "if ./avx512_available.exe; then ./extcall512_mask_nodynlink.exe; fi"))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected extcall512_mask_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
   (copy basic512.ml basic512_internal_assembler.ml)))
 
 (executable
@@ -1022,3 +1104,95 @@
     (<> %{system} macosx)))
  (action
   (diff empty.expected strings512_mask_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (copy extcall512_mask.ml extcall512_mask_internal_assembler.ml)))
+
+(executable
+ (name extcall512_mask_internal_assembler)
+ (modules extcall512_mask_internal_assembler)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (deps avx512_available.exe extcall512_mask_internal_assembler.exe)
+ (action
+  (with-outputs-to
+   extcall512_mask_internal_assembler.out
+   (run bash -c "if ./avx512_available.exe; then ./extcall512_mask_internal_assembler.exe; fi"))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected extcall512_mask_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (copy extcall512_mask.ml extcall512_mask_flambda2_reaper__reaper_local_fields.ml)))
+
+(executable
+ (name extcall512_mask_flambda2_reaper__reaper_local_fields)
+ (modules extcall512_mask_flambda2_reaper__reaper_local_fields)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -flambda2-reaper -reaper-local-fields))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (deps avx512_available.exe extcall512_mask_flambda2_reaper__reaper_local_fields.exe)
+ (action
+  (with-outputs-to
+   extcall512_mask_flambda2_reaper__reaper_local_fields.out
+   (run bash -c "if ./avx512_available.exe; then ./extcall512_mask_flambda2_reaper__reaper_local_fields.exe; fi"))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected extcall512_mask_flambda2_reaper__reaper_local_fields.out)))

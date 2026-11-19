@@ -7,7 +7,7 @@
   (wasm_of_ocaml
    ; dynlink not compiling
    (enabled_if
-    (not %{oxcaml_supported}))
+    (not %{ocaml-config:ox}))
    (compilation_mode separate))))
 
 (test

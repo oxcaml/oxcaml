@@ -21,75 +21,92 @@ let assert_no_attributes ~path ~prefix =
     (fqn_longident' path (prefix ^ "attributes"))
 
 let gen_combinator_for_constructor ?wrapper path ~prefix ~exhaustive cd =
-  match cd.pcd_args with
-  | Pcstr_record _ ->
-
-      None
-  | Pcstr_tuple cd_args ->
-      let args = List.mapi cd_args ~f:(fun i _ -> sprintf "x%d" i) in
-      let funcs = List.mapi cd_args ~f:(fun i _ -> sprintf "f%d" i) in
-      let pat =
-        Pat.construct
-          (Loc.mk (fqn_longident path cd.pcd_name.txt))
-          (match args with
-          | [] -> None
-          | [ x ] -> Some (pvar x)
-          | _ -> Some (Pat.tuple (List.map args ~f:pvar)))
-      in
-      let exp, needs_loc =
-        apply_parsers funcs (List.map args ~f:evar)
-          (List.map cd_args ~f:(fun ca -> ca.pca_type))
-      in
-      let expected = without_prefix ~prefix cd.pcd_name.txt in
-      let body =
-        if exhaustive
-        then
+  let exp, pat, _args, funcs, needs_loc =
+    match cd.pcd_args with
+    | Pcstr_record r ->
+        let args = List.map ~f:(fun p -> sprintf "%s" p.pld_name.txt) r in
+        let funcs = List.map ~f:(fun p -> sprintf "f%s" p.pld_name.txt) r in
+        let typs = List.map ~f:(fun p -> p.pld_type) r in
+        let pat =
+          Pat.construct
+            (Loc.mk (fqn_longident path cd.pcd_name.txt))
+            (match args with
+            | [] -> None
+            | [ x ] -> Some (pvar x)
+            | _ ->
+                Some
+                  (Pat.record
+                     (List.map r ~f:(fun v ->
+                          ( { loc = v.pld_loc; txt = Lident v.pld_name.txt },
+                            pvar v.pld_name.txt )))
+                     Closed))
+        in
+        let exp, needs_loc = apply_parsers funcs (List.map args ~f:evar) typs in
+        (exp, pat, args, funcs, needs_loc)
+    | Pcstr_tuple cd_args ->
+        let args = List.mapi cd_args ~f:(fun i _ -> sprintf "x%d" i) in
+        let funcs = List.mapi cd_args ~f:(fun i _ -> sprintf "f%d" i) in
+        let pat =
+          Pat.construct
+            (Loc.mk (fqn_longident path cd.pcd_name.txt))
+            (match args with
+            | [] -> None
+            | [ x ] -> Some (pvar x)
+            | _ -> Some (Pat.tuple (List.map args ~f:pvar)))
+        in
+        let exp, needs_loc =
+          apply_parsers funcs (List.map args ~f:evar)
+            (List.map cd_args ~f:(fun ca -> ca.pca_type))
+        in
+        (exp, pat, args, funcs, needs_loc)
+  in
+  let expected = without_prefix ~prefix cd.pcd_name.txt in
+  let body =
+    if exhaustive then
+      M.expr
+        {|match x with
+          | %a -> ctx.matched <- ctx.matched + 1; %a|}
+        A.patt pat A.expr exp
+    else
+      M.expr
+        {|match x with
+          | %a -> ctx.matched <- ctx.matched + 1; %a
+          | _ -> fail loc %S|}
+        A.patt pat A.expr exp expected
+  in
+  let body =
+    match wrapper with
+    | None -> body
+    | Some (path, prefix, has_attrs) ->
+        let body =
           M.expr
-            {|match x with
-            | %a -> ctx.matched <- ctx.matched + 1; %a|}
-            A.patt pat A.expr exp
-        else
-          M.expr
-            {|match x with
-            | %a -> ctx.matched <- ctx.matched + 1; %a
-            | _ -> fail loc %S|}
-            A.patt pat A.expr exp expected
-      in
-      let body =
-        match wrapper with
-        | None -> body
-        | Some (path, prefix, has_attrs) ->
-            let body =
-              M.expr
-                {|let loc = x.%a in
+            {|let loc = x.%a in
               let x = x.%a in
               %a|}
-                A.id
-                (fqn_longident' path (prefix ^ "loc"))
-                A.id
-                (fqn_longident' path (prefix ^ "desc"))
-                A.expr body
-            in
-            if has_attrs then
-              Exp.sequence (assert_no_attributes ~path ~prefix) body
-            else body
-      in
-      let body =
-        let loc =
-          match wrapper with
-          | Some _ -> M.patt "_loc"
-          | None -> M.patt (if needs_loc || not exhaustive then "loc" else "_loc")
+            A.id
+            (fqn_longident' path (prefix ^ "loc"))
+            A.id
+            (fqn_longident' path (prefix ^ "desc"))
+            A.expr body
         in
-        M.expr "T (fun ctx %a x k -> %a)" A.patt loc A.expr body
-      in
-      let body =
-        List.fold_right funcs ~init:body ~f:(fun func acc ->
-            M.expr "fun (T %a) -> %a" A.patt (pvar func) A.expr acc)
-      in
-      Some (
-        M.stri "let %a = %a" A.patt
-          (pvar (function_name_of_id ~prefix cd.pcd_name.txt))
-          A.expr body)
+        if has_attrs then Exp.sequence (assert_no_attributes ~path ~prefix) body
+        else body
+  in
+  let body =
+    let loc =
+      match wrapper with
+      | Some _ -> M.patt "_loc"
+      | None -> M.patt (if needs_loc || not exhaustive then "loc" else "_loc")
+    in
+    M.expr "T (fun ctx %a x k -> %a)" A.patt loc A.expr body
+  in
+  let body =
+    List.fold_right funcs ~init:body ~f:(fun func acc ->
+        M.expr "fun (T %a) -> %a" A.patt (pvar func) A.expr acc)
+  in
+  M.stri "let %a = %a" A.patt
+    (pvar (function_name_of_id ~prefix cd.pcd_name.txt))
+    A.expr body
 
 let gen_combinator_for_record path ~prefix ~has_attrs lds =
   let fields = List.map lds ~f:(fun ld -> fqn_longident path ld.pld_name.txt) in
@@ -113,9 +130,10 @@ let gen_combinator_for_record path ~prefix ~has_attrs lds =
   in
   let body =
     List.fold_right funcs ~init:body ~f:(fun func acc ->
-      Ppxlib_jane.Ast_builder.Default.add_fun_param
-        ~loc:!Ast_helper.default_loc
-        (Labelled func) None (M.patt "T %a" A.patt (pvar func)) acc)
+        Ppxlib_jane.Ast_builder.Default.add_fun_param
+          ~loc:!Ast_helper.default_loc (Labelled func) None
+          (M.patt "T %a" A.patt (pvar func))
+          acc)
   in
   M.stri "let %a = %a" A.patt (pvar (function_name_of_path path)) A.expr body
 
@@ -159,9 +177,9 @@ let gen_td ?wrapper path td =
         in
         let exhaustive = List.length cds = 1 in
         let items =
-          List.filter_map cds ~f:(fun cd ->
-              gen_combinator_for_constructor
-                ?wrapper path ~prefix ~exhaustive cd)
+          List.map cds ~f:(fun cd ->
+              gen_combinator_for_constructor ?wrapper path ~prefix ~exhaustive
+                cd)
         in
         match wrapper with
         | Some (_, prefix, has_attrs) ->
@@ -233,10 +251,10 @@ let generate filename =
     List.filter types_with_wrapped ~f:(fun (path, _, _) ->
         not (List.mem path ~set:wrapped))
     |> List.map ~f:(fun (path, td, wrapped) ->
-           match wrapped with
-           | None -> (path, td, None)
-           | Some (prefix, has_attrs, p) ->
-               (path, td, Some (prefix, has_attrs, p, List.assoc p types)))
+        match wrapped with
+        | None -> (path, td, None)
+        | Some (prefix, has_attrs, p) ->
+            (path, td, Some (prefix, has_attrs, p, List.assoc p types)))
   in
   (*  let all_types = List.map fst types in*)
   let types = List.sort types ~cmp:(fun (a, _, _) (b, _, _) -> compare a b) in
@@ -263,7 +281,4 @@ let usage = Printf.sprintf "%s [options] <.ml files>\n" Sys.argv.(0)
 let () =
   let fns = ref [] in
   Arg.parse (Arg.align args) (fun fn -> fns := fn :: !fns) usage;
-  try List.iter (List.rev !fns) ~f:generate
-  with exn ->
-    Astlib.Location.report_exception Format.err_formatter exn;
-    exit 2
+  List.iter (List.rev !fns) ~f:generate

@@ -1,0 +1,6 @@
+File "unsupported_too_large_arg.ml", line 18, characters 11-29:
+18 | let g () = f #(#1L, #2L, #3L)
+                ^^^^^^^^^^^^^^^^^^
+Error: The unboxed product argument of the external call to unsupported_too_large_arg_stub cannot be compiled:
+       the corresponding C struct (24 bytes) would be passed by reference, since it is larger than 16 bytes and not a homogeneous floating-point or vector aggregate of at most four members.
+       Only unboxed product arguments that C passes by value are currently supported.

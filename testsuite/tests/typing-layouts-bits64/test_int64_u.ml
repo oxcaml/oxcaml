@@ -1,5 +1,12 @@
 (* TEST
  include stdlib_upstream_compatible;
+ {
+   bytecode;
+ }{
+   native;
+ }{
+   jsir;
+ }
 *)
 
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"

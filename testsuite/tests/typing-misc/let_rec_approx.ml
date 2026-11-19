@@ -40,3 +40,24 @@ Line 1, characters 36-37:
                                         ^
 Error: Unbound constructor "A"
 |}]
+
+(* A single [_] argument stands for all the parameters of a multi-parameter
+   type, in return annotations as well as in binding annotations. *)
+module N = struct type ('a, 'b) t = A of 'a | B of 'b end
+
+let rec f () : (_, _) N.t = match f () with A x -> N.A x | B x -> N.B x
+[%%expect{|
+module N : sig type ('a, 'b) t = A of 'a | B of 'b end
+val f : unit -> ('a, 'b) N.t = <fun>
+|}]
+
+let rec f () : _ N.t = match f () with A x -> N.A x | B x -> N.B x
+[%%expect{|
+val f : unit -> ('a, 'b) N.t = <fun>
+|}]
+
+let rec f : unit -> _ N.t = fun () ->
+  match f () with A x -> N.A x | B x -> N.B x
+[%%expect{|
+val f : unit -> ('a, 'b) N.t = <fun>
+|}]

@@ -1,0 +1,40 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any
+# source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+name: scrutiny
+
+on:
+  pull_request:
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check scrutiny
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # A merge group's base may be more than one commit behind its head.
+          fetch-depth: 0
+
+      # CR-someday xclerc for xclerc: Consider running the checker's unit tests.
+      - name: Check experimental feature metadata
+        env:
+          # PR checkouts use the synthetic merge commit: its first parent is
+          # the target commit. Merge groups provide their comparison base.
+          BASE_REV: >-
+            ${{ github.event_name == 'pull_request' && 'HEAD^1' ||
+                github.event.merge_group.base_sha }}
+        run: python3 scrutiny/check.py --base "$BASE_REV"

@@ -47,8 +47,21 @@ module Location = Location
 module Longident = Longident
 module Parse = Parse
 module Pprintast = Pprintast
+module Compiler_pprintast = struct
+  include Ocaml_common.Pprintast
+
+  exception Unavailable
+
+  (*IF_NOT_AT_LEAST 414 let class_field _fmt _t = raise Unavailable *)
+  (*IF_NOT_AT_LEAST 414 let class_type_field _fmt _t = raise Unavailable *)
+  (*IF_NOT_AT_LEAST 414 let class_expr _fmt _t = raise Unavailable *)
+  (*IF_NOT_AT_LEAST 414 let class_type _fmt _t = raise Unavailable *)
+  (*IF_NOT_AT_LEAST 414 let module_type _fmt _t = raise Unavailable *)
+  (*IF_NOT_AT_LEAST 414 let module_expr _fmt _t = raise Unavailable *)
+end
+
+module Clean = Clean
 
 let init_error_reporting_style_using_env_vars () =
-  (*IF_AT_LEAST 408 Ocaml_common.Location.read_clflags_from_env () *)
-  (*IF_NOT_AT_LEAST 408 () *)
+  Ocaml_common.Location.read_clflags_from_env ()
 (** Adjust the reporting style of error messages to the environment variables OCAML_COLOR and OCAML_ERROR_STYLE. *)

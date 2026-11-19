@@ -18,11 +18,25 @@ module Id = Table_by_int_id.Id
 
 let continuation_flags = 0
 
-let next_stamp =
-  let next_stamp = ref 0 in
-  fun () ->
-    incr next_stamp;
-    !next_stamp
+let previous_stamp = ref 0
+
+let next_stamp () =
+  incr previous_stamp;
+  !previous_stamp
+
+type stamp_state = int
+
+let export_stamp_state () = !previous_stamp
+
+let restore_stamp_state state =
+  if !previous_stamp = 0
+  then previous_stamp := state
+  else
+    Misc.fatal_errorf
+      "Restoring continuation stamp state would overwrite modified value %d"
+      !previous_stamp
+
+let merge_stamp_state state1 state2 = Int.max state1 state2
 
 module Sort = struct
   type t =

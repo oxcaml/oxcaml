@@ -52,6 +52,9 @@ extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
 extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
 extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
 uintnat caml_measure_frametables = 0; /* see frame_descriptors.c */
+/* Test-only override for the size of systhreads' Multicore domain table
+   (see otherlibs/systhreads/multicore.ml). */
+uintnat caml_override_max_domains = 0;
 
 /* runtime config parameters set with caml_gc_set */
 extern atomic_uintnat caml_major_heap_increment; /* percent or words; see shared_heap.c */
@@ -464,8 +467,12 @@ static struct gc_tweak gc_tweaks[] = {
   { "nohugepage_stacks", &caml_nohugepage_stacks, 0 },
   { "enable_segv_handler", &caml_enable_segv_handler, 0 },
   { "cache_stacks_per_class", &caml_cache_stacks_per_class, 0 },
+  { "max_guarded_stacks", &caml_max_guarded_stacks, 0 },
+  { "idle_stacks", &caml_idle_stacks, 0 },
   { "tick_use_usleep", &caml_tick_use_usleep, 0 },
   { "measure_frametables", &caml_measure_frametables, 0 },
+  { "override_max_domains_test_only_not_for_prod",
+    &caml_override_max_domains, 0 },
 };
 
 enum {N_GC_TWEAKS = sizeof(gc_tweaks)/sizeof(gc_tweaks[0])};

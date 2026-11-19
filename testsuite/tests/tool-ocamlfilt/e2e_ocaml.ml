@@ -1,5 +1,5 @@
 (* TEST
- native-compiler;
+ native-compiler; setup-ocamlfilt;
  {
    compiler_directory_suffix = ".structured";
    setup-ocamlopt.byte-build-env;

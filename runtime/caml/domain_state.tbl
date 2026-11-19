@@ -192,6 +192,11 @@ DOMAIN_STATE(value, dls_state)
 DOMAIN_STATE(value, tls_state)
 /* Caches the [tls_state] of the nearest enclosing preemptable fiber. */
 
+DOMAIN_STATE(value, thread_id)
+/* The id of the thread running on this domain, as a tagged integer.
+   Unique across all domains and threads. Equal to [Thread.id (Thread.self ())]
+   when systhreads is in use. */
+
 /* How much external memory is currenty held by the minor heap. */
 DOMAIN_STATE(uintnat, minor_dependent_bsz)
 

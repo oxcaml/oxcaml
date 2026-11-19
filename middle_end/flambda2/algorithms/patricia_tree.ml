@@ -189,6 +189,11 @@ module type Tree = sig
     val of_func : 'a is_value -> (key -> 'a -> 'b) -> ('a, 'b) t
 
     val call : ('a, 'b) t -> key -> 'a -> 'b
+
+    (* Same as [call] followed by applying the result, but performs a single
+       (full) application. Necessary because flambda2 does not merge successive
+       applications together. *)
+    val call2 : ('a, 'b -> 'c) t -> key -> 'a -> 'b -> 'c
   end
 
   (* CR bclement: This module (and the modules below) are used as workarounds to
@@ -315,6 +320,8 @@ module Set0 = struct
       (f [@inlined hint]) key ()
 
     let[@inline always] call f key _ = f key
+
+    let[@inline always] call2 f key _ x = f key x
   end
 
   module Merge_callback = struct
@@ -427,6 +434,8 @@ module Map0 = struct
     type ('a, 'b) t = key -> 'a -> 'b
 
     let[@inline always] call f i d = f i d
+
+    let[@inline always] call2 f i d x = f i d x
 
     let[@inline always] of_func Any f = f
   end
@@ -1432,7 +1441,7 @@ end = struct
 
   let rec unsigned_fold f t acc =
     match tree_descr t with
-    | Leaf l -> Callback.call f (leaf_key l) (leaf_datum l) acc
+    | Leaf l -> Callback.call2 f (leaf_key l) (leaf_datum l) acc
     | Branch b -> unsigned_fold f (branch1 b) (unsigned_fold f (branch0 b) acc)
 
   let fold f t acc =
@@ -1440,7 +1449,7 @@ end = struct
     | Empty -> acc
     | Non_empty tree -> (
       match tree_descr tree with
-      | Leaf l -> Callback.call f (leaf_key l) (leaf_datum l) acc
+      | Leaf l -> Callback.call2 f (leaf_key l) (leaf_datum l) acc
       | Branch b ->
         let t0, t1 = order_branches' b in
         unsigned_fold f t1 (unsigned_fold f t0 acc))

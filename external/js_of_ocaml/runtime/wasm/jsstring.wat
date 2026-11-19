@@ -105,12 +105,15 @@
 
    (func (export "jsstring_compare")
       (param $s anyref) (param $s' anyref) (result i32)
-      (return_call $compare_strings
-         (extern.convert_any (local.get $s))
-         (extern.convert_any (local.get $s'))))
+      ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+      ;; tail call cross
+      (return
+         (call $compare_strings
+            (extern.convert_any (local.get $s))
+            (extern.convert_any (local.get $s')))))
 
    (func (export "jsstring_test") (param $s anyref) (result i32)
-      (return_call $is_string (extern.convert_any (local.get $s))))
+      (return (call $is_string (extern.convert_any (local.get $s)))))
 
    (export "jsstring_hash" (func $hash_string))
 
@@ -156,8 +159,11 @@
    (func (export "bytes_of_jsstring") (param $s anyref) (result (ref $bytes))
       (if (global.get $text_converters_available)
          (then
-            (return_call $encodeStringToUTF8Array
-               (extern.convert_any (local.get $s)))))
+            ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+            ;; tail call cross
+            (return
+               (call $encodeStringToUTF8Array
+                  (extern.convert_any (local.get $s))))))
       (return_call $string_of_jsstring_fallback (local.get $s)))
 
    ;; Fallback implementation of string conversion functions
@@ -185,7 +191,10 @@
          (then
             (call $write_to_buffer
                (local.get $s) (local.get $pos) (local.get $len))
-            (return_call $read_string (local.get $len))))
+
+            ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+            ;; tail call cross
+            (return (call $read_string (local.get $len)))))
       (call $write_to_buffer
          (local.get $s) (local.get $pos) (global.get $buffer_size))
       (local.set $s'

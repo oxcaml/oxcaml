@@ -956,6 +956,18 @@ File "implementation: LETOP BACKQUOTE UIDENT WITH", line 1, characters 14-18:
 Error: Syntax error
 File "implementation: LETOP HASH WITH", line 1, characters 7-11:
 Error: Syntax error
+File "implementation: LETOP ADDR LBRACKETAT AND RBRACKET ASSERT", line 1, characters 20-26:
+Error: Syntax error
+File "implementation: LETOP ADDR PERCENT AND WHILE", line 1, characters 17-22:
+Error: Syntax error
+File "implementation: LETOP ADDR WITH", line 1, characters 11-15:
+Error: Syntax error
+File "implementation: LETOP ADDR_IMM LBRACKETAT AND RBRACKET ASSERT", line 1, characters 24-30:
+Error: Syntax error
+File "implementation: LETOP ADDR_IMM PERCENT AND WHILE", line 1, characters 21-26:
+Error: Syntax error
+File "implementation: LETOP ADDR_IMM WITH", line 1, characters 15-19:
+Error: Syntax error
 File "implementation: LETOP LAZY LBRACKETAT AND RBRACKET ASSERT", line 1, characters 19-25:
 Error: Syntax error
 File "implementation: LETOP LAZY PERCENT AND WHILE", line 1, characters 16-21:

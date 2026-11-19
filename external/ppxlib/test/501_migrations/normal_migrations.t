@@ -61,49 +61,11 @@ Tests for the Parsetree change for type constraints in value bindings
   [1]
 
 
-Here might be a problem in the upward migration: the 5.1.0 parser parses the constraint as a pattern constraint.
-However, the upward migration makes a value binding constraint out of it.
+There used to be a problem in the upward migration to 5.1.0: the 5.1.0 parser parses the constraint as a pattern constraint.
+However, the upward migration makes a value binding constraint out of it. Since the internal AST was bumped to 5.2.0, this is no longer an issue.
   $ echo "let ((x,y) : (int*int)) = (assert false: int * int)" > file.ml
   $ ./compare_on.exe file.ml ./identity_driver.exe | grep -v "without_migrations" | grep -v "with_migrations"
-  @@ -6,20 +6,18 @@
-  -        pattern (file.ml[1,0+4]..[1,0+23])
-  -          Ppat_constraint
-  -          pattern (file.ml[1,0+5]..[1,0+10])
-  -            Ppat_tuple
-  -            [
-  -              pattern (file.ml[1,0+6]..[1,0+7])
-  -                Ppat_var "x" (file.ml[1,0+6]..[1,0+7])
-  -              pattern (file.ml[1,0+8]..[1,0+9])
-  -                Ppat_var "y" (file.ml[1,0+8]..[1,0+9])
-  -            ]
-  -          core_type (file.ml[1,0+14]..[1,0+21])
-  -            Ptyp_tuple
-  -            [
-  -              core_type (file.ml[1,0+14]..[1,0+17])
-  -                Ptyp_constr "int" (file.ml[1,0+14]..[1,0+17])
-  -                []
-  -              core_type (file.ml[1,0+18]..[1,0+21])
-  -                Ptyp_constr "int" (file.ml[1,0+18]..[1,0+21])
-  -                []
-  -            ]
-  +        pattern (file.ml[1,0+5]..[1,0+10])
-  +          Ppat_tuple
-  +          [
-  +            pattern (file.ml[1,0+6]..[1,0+7])
-  +              Ppat_var "x" (file.ml[1,0+6]..[1,0+7])
-  +            pattern (file.ml[1,0+8]..[1,0+9])
-  +              Ppat_var "y" (file.ml[1,0+8]..[1,0+9])
-  +          ]
-  +        core_type (file.ml[1,0+14]..[1,0+21])
-  +          Ptyp_tuple
-  +          [
-  +            core_type (file.ml[1,0+14]..[1,0+17])
-  +              Ptyp_constr "int" (file.ml[1,0+14]..[1,0+17])
-  +              []
-  +            core_type (file.ml[1,0+18]..[1,0+21])
-  +              Ptyp_constr "int" (file.ml[1,0+18]..[1,0+21])
-  +              []
-  +          ]
+  [1]
 
   $ echo "let f: type a. a option -> _ = assert false" > file.ml
   $ ./compare_on.exe file.ml ./identity_driver.exe | grep -v "without_migrations" | grep -v "with_migrations"

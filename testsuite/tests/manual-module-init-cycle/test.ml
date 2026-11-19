@@ -10,7 +10,7 @@
 
    (* Compile the C stubs *)
    module = "";
-   script = "${cc} ${cflags} -I${ocamlsrcdir}/runtime -c cycle_stubs.c -o cycle_stubs.${objext}";
+   script = "${cc} ${cflags} -I${runtime} -c cycle_stubs.c -o cycle_stubs.${objext}";
    script;
 
    (* Create complete object with module *)
@@ -20,7 +20,7 @@
    ocamlopt.byte;
 
    (* Link with C driver and stubs *)
-   script = "${mkexe} -I${ocamlsrcdir}/runtime -o test_driver test_modules.${objext} cycle_stubs.${objext} ${bytecc_libs} driver.c";
+   script = "${mkexe} -I${runtime} -o test_driver test_modules.${objext} cycle_stubs.${objext} ${bytecc_libs} driver.c";
    script;
 
    (* Run the test - cycle is detected and caught as an exception *)

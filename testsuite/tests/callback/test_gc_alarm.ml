@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
 
 let success () = exit 0
 let failure () = failwith "The end was reached without triggering the GC alarm"

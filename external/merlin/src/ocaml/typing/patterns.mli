@@ -56,6 +56,7 @@ module Simple : sig
         (Longident.t loc * unboxed_label_description * pattern) list
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
+    | `Addr of mutability * Jkind.sort * pattern
     | `Lazy of pattern
   ]
   type pattern = view pattern_data
@@ -78,7 +79,6 @@ module General : sig
         Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.With_regionality.l
     | `Fun_layout of Ident.t * string loc * Uid.t
                    * Jkind.Sort.t * Mode.With_regionality.l * Types.Lpoly.t
-                   * locality_mode_r
     | `Alias of
         pattern
         * Ident.t
@@ -118,6 +118,7 @@ module Head : sig
           (* the row of the type may evolve if [close_variant] is called,
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
+    | Addr of mutability * Jkind.sort
     | Lazy
 
   type t = desc pattern_data

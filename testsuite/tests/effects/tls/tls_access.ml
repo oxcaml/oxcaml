@@ -7,9 +7,9 @@
 *)
 
 (* [Domain.Safe.TLS.access] gives the current TLS owner uncontended access to
-   its value. While [f] runs, the key's slot holds a sentinel, so accessing or
-   splitting that key again raises. See [tls_access_interrupt.ml] for an
-   access from an interrupt. *)
+   its value. While [f] runs, the key's slot holds a sentinel, so accessing,
+   getting, setting, or splitting that key again raises. See
+   [tls_access_interrupt.ml] for an access from an interrupt. *)
 
 open Effect
 open Effect.Deep
@@ -68,6 +68,31 @@ let () =
   fails (fun () ->
     TLS.access k (fun _ -> TLS.access k (fun _ -> ()) [@nontail]) [@nontail]);
   assert (read k = 2);
+
+  (* [get] and [set] reject borrowed slots, preserving their values. *)
+  assert (TLS.get ki = 0);
+  TLS.set ki 10;
+  fails (fun () ->
+    TLS.access ki (fun _ -> ignore (TLS.get ki)) [@nontail]);
+  assert (TLS.get ki = 10);
+  fails (fun () ->
+    TLS.access ki (fun _ -> TLS.set ki 20) [@nontail]);
+  assert (TLS.get ki = 10);
+
+  (* Other keys can be read and written, even when this grows the state.
+     Catching a failed [set] must leave the slot borrowed until [access]
+     returns. *)
+  TLS.access ki (fun x ->
+    let keys = Array.init 100 (fun _ -> TLS.new_key (fun () -> -1)) in
+    Array.iteri (fun i k -> TLS.set k i) keys;
+    Array.iteri (fun i k -> assert (i = TLS.get k)) keys;
+    fails (fun () -> TLS.set ki 20);
+    fails (fun () -> ignore (TLS.get ki));
+    fails (fun () -> TLS.access ki (fun _ -> ()) [@nontail]);
+    assert (x = 10));
+  assert (TLS.get ki = 10);
+  TLS.set ki 30;
+  assert (TLS.get ki = 30);
 
   (* The slot is restored when [f] raises. *)
   (match TLS.access k (fun _ -> raise Boom) with

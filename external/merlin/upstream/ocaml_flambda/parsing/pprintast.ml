@@ -430,8 +430,38 @@ let string_loc ppf x = fprintf ppf "%s" x.txt
 let string_quot f x = pp f "`%a" ident_of_name x
 
 (* new mode and modality syntax *)
-let mode f { txt = Mode s; _ } =
-  pp_print_string f s
+let mode_consts f consts =
+  pp_print_list ~pp_sep:(fun f () -> pp f " ") string_loc f consts
+
+let mode_bound_var f { pbound_morph; pbound_var; pbound_mod } =
+  (match pbound_morph with
+   | None -> pp f "'%s" pbound_var.txt
+   | Some m -> pp f "%s('%s)" m.txt pbound_var.txt);
+  match pbound_mod with
+  | [] -> ()
+  | _ :: _ -> pp f " mod %a" mode_consts pbound_mod
+
+let mode_bound_elem f = function
+  | Pbound_var v -> mode_bound_var f v
+  | Pbound_const cs -> mode_consts f cs
+
+let mode_bound sep f elems =
+  pp_print_list ~pp_sep:(fun f () -> pp f "%s" sep) mode_bound_elem f elems
+
+let mode f { txt; _ } =
+  match txt with
+  | Pmode s -> pp_print_string f s
+  | Pmode_var v -> pp f "'%s" v
+  | Pmode_bounded { pmode_upper = []; pmode_lower = [] } ->
+      pp f "[]"
+  | Pmode_bounded { pmode_upper; pmode_lower = [] } ->
+      pp f "[< %a]" (mode_bound " & ") pmode_upper
+  | Pmode_bounded { pmode_upper = []; pmode_lower } ->
+      pp f "[> %a]" (mode_bound " | ") pmode_lower
+  | Pmode_bounded { pmode_upper; pmode_lower } ->
+      pp f "[< %a > %a]"
+        (mode_bound " & ") pmode_upper
+        (mode_bound " | ") pmode_lower
 
 let modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") mode f m
@@ -848,6 +878,9 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_variant (l,None) ->  pp f "`%a" ident_of_name l
     | Ppat_constraint (p, ct, _) ->
         pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) (Option.get ct)
+    | Ppat_addr (mut, p) ->
+        let kw = match mut with Mutable -> "addr_" | Immutable -> "addr_imm_" in
+        pp f "@[<2>(%s@;%a)@]" kw (simple_pattern ctxt) p
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
     | Ppat_exception p ->
@@ -1555,6 +1588,25 @@ and jkind_def ctxt f jd =
     (jkind_declaration ctxt) jd
     (item_attributes ctxt) jd.pjkind_attributes
 
+(* Each clause of a law is parsed as an [expr] (not a [seq_expr]), so
+   sequences and [let]s are parenthesized the same way as under [;]. *)
+and law_clause ctxt f e = expression (under_semi ctxt) f e
+
+and law_def ctxt f ld =
+  let law_param f (name, ty) =
+    match ty with
+    | None -> pp f "@;%a" ident_of_name name.txt
+    | Some ty -> pp f "@;(%a :@ %a)" ident_of_name name.txt (core_type ctxt) ty
+  in
+  let clause = law_clause ctxt in
+  let assumption f e = pp f "%a implies_@ " clause e in
+  pp f "@[<2>law_?@ %a%a :@ %a%a@]%a"
+    ident_of_name ld.plaw_name.txt
+    (list law_param ~sep:"") ld.plaw_params
+    (list assumption ~sep:"") ld.plaw_assumptions
+    clause ld.plaw_conclusion
+    (item_attributes ctxt) ld.plaw_attributes
+
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
   | [] -> module_type ctxt f mty
@@ -1755,6 +1807,8 @@ and signature_item ctxt f x : unit =
       item_attributes ctxt f a
   | Psig_jkind kd ->
       jkind_def ctxt f kd
+  | Psig_law ld ->
+      law_def ctxt f ld
 
 and module_expr ctxt f x =
   if x.pmod_attributes <> [] then
@@ -2111,6 +2165,8 @@ and structure_item ctxt f x =
       item_attributes ctxt f a
   | Pstr_jkind jd ->
       jkind_def ctxt f jd
+  | Pstr_law ld ->
+      law_def ctxt f ld
 
 (* Don't just use [core_type] because we do not want parens around params
    with jkind annotations *)

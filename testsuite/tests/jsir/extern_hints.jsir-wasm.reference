@@ -1,0 +1,970 @@
+Entry point: 0
+
+==== 0 () ====
+  v4 = "caml_get_global_predef"("Invalid_argument") 
+  v10 = "caml_get_global_predef"("Assert_failure") 
+  v1 = CONST{"\001\002\003\004\005\006\007\b\128\255"}
+  v2 = CONST{"index out of bounds"}
+  v3 = imm{tag=0; 0 = v4; 1 = v2}
+  v5 = CONST{"extern_hints.ml"}
+  v7 = CONST{2}
+  v8 = CONST{89}
+  v6 = imm{tag=0; 0 = v5; 1 = v8; 2 = v7}
+  v9 = imm{tag=0; 0 = v10; 1 = v6}
+  v12 = CONST{2}
+  v13 = CONST{90}
+  v11 = imm{tag=0; 0 = v5; 1 = v13; 2 = v12}
+  v14 = imm{tag=0; 0 = v10; 1 = v11}
+  v16 = CONST{2}
+  v17 = CONST{91}
+  v15 = imm{tag=0; 0 = v5; 1 = v17; 2 = v16}
+  v18 = imm{tag=0; 0 = v10; 1 = v15}
+  v20 = CONST{2}
+  v21 = CONST{92}
+  v19 = imm{tag=0; 0 = v5; 1 = v21; 2 = v20}
+  v22 = imm{tag=0; 0 = v10; 1 = v19}
+  v24 = CONST{2}
+  v25 = CONST{93}
+  v23 = imm{tag=0; 0 = v5; 1 = v25; 2 = v24}
+  v26 = imm{tag=0; 0 = v10; 1 = v23}
+  v27 = CONST{"\000\000\128?"}
+  v29 = CONST{2}
+  v30 = CONST{96}
+  v28 = imm{tag=0; 0 = v5; 1 = v30; 2 = v29}
+  v31 = imm{tag=0; 0 = v10; 1 = v28}
+  v33 = CONST{2}
+  v34 = CONST{101}
+  v32 = imm{tag=0; 0 = v5; 1 = v34; 2 = v33}
+  v35 = imm{tag=0; 0 = v10; 1 = v32}
+  v37 = CONST{2}
+  v38 = CONST{103}
+  v36 = imm{tag=0; 0 = v5; 1 = v38; 2 = v37}
+  v39 = imm{tag=0; 0 = v10; 1 = v36}
+  v41 = CONST{2}
+  v42 = CONST{104}
+  v40 = imm{tag=0; 0 = v5; 1 = v42; 2 = v41}
+  v43 = imm{tag=0; 0 = v10; 1 = v40}
+  v45 = CONST{2}
+  v46 = CONST{106}
+  v44 = imm{tag=0; 0 = v5; 1 = v46; 2 = v45}
+  v47 = imm{tag=0; 0 = v10; 1 = v44}
+  v49 = CONST{2}
+  v50 = CONST{108}
+  v48 = imm{tag=0; 0 = v5; 1 = v50; 2 = v49}
+  v51 = imm{tag=0; 0 = v10; 1 = v48}
+  v53 = CONST{2}
+  v54 = CONST{110}
+  v52 = imm{tag=0; 0 = v5; 1 = v54; 2 = v53}
+  v55 = imm{tag=0; 0 = v10; 1 = v52}
+  v57 = CONST{2}
+  v58 = CONST{116}
+  v56 = imm{tag=0; 0 = v5; 1 = v58; 2 = v57}
+  v59 = imm{tag=0; 0 = v10; 1 = v56}
+  v61 = CONST{2}
+  v62 = CONST{118}
+  v60 = imm{tag=0; 0 = v5; 1 = v62; 2 = v61}
+  v63 = imm{tag=0; 0 = v10; 1 = v60}
+  v65 = CONST{2}
+  v66 = CONST{119}
+  v64 = imm{tag=0; 0 = v5; 1 = v66; 2 = v65}
+  v67 = imm{tag=0; 0 = v10; 1 = v64}
+  v69 = CONST{2}
+  v70 = CONST{121}
+  v68 = imm{tag=0; 0 = v5; 1 = v70; 2 = v69}
+  v71 = imm{tag=0; 0 = v10; 1 = v68}
+  v73 = CONST{2}
+  v74 = CONST{123}
+  v72 = imm{tag=0; 0 = v5; 1 = v74; 2 = v73}
+  v75 = imm{tag=0; 0 = v10; 1 = v72}
+  v77 = CONST{2}
+  v78 = CONST{125}
+  v76 = imm{tag=0; 0 = v5; 1 = v78; 2 = v77}
+  v79 = imm{tag=0; 0 = v10; 1 = v76}
+  v81 = CONST{2}
+  v82 = CONST{131}
+  v80 = imm{tag=0; 0 = v5; 1 = v82; 2 = v81}
+  v83 = imm{tag=0; 0 = v10; 1 = v80}
+  v85 = CONST{2}
+  v86 = CONST{135}
+  v84 = imm{tag=0; 0 = v5; 1 = v86; 2 = v85}
+  v87 = imm{tag=0; 0 = v10; 1 = v84}
+  v88 = CONST{5L}
+  v89 = CONST{7L}
+  v91 = CONST{2}
+  v92 = CONST{140}
+  v90 = imm{tag=0; 0 = v5; 1 = v92; 2 = v91}
+  v93 = imm{tag=0; 0 = v10; 1 = v90}
+  v95 = CONST{2}
+  v96 = CONST{141}
+  v94 = imm{tag=0; 0 = v5; 1 = v96; 2 = v95}
+  v97 = imm{tag=0; 0 = v10; 1 = v94}
+  v99 = CONST{2}
+  v100 = CONST{142}
+  v98 = imm{tag=0; 0 = v5; 1 = v100; 2 = v99}
+  v101 = imm{tag=0; 0 = v10; 1 = v98}
+  v103 = CONST{2}
+  v104 = CONST{143}
+  v102 = imm{tag=0; 0 = v5; 1 = v104; 2 = v103}
+  v105 = imm{tag=0; 0 = v10; 1 = v102}
+  v107 = CONST{2}
+  v108 = CONST{144}
+  v106 = imm{tag=0; 0 = v5; 1 = v108; 2 = v107}
+  v109 = imm{tag=0; 0 = v10; 1 = v106}
+  v111 = CONST{2}
+  v112 = CONST{145}
+  v110 = imm{tag=0; 0 = v5; 1 = v112; 2 = v111}
+  v113 = imm{tag=0; 0 = v10; 1 = v110}
+  v115 = CONST{2}
+  v116 = CONST{152}
+  v114 = imm{tag=0; 0 = v5; 1 = v116; 2 = v115}
+  v117 = imm{tag=0; 0 = v10; 1 = v114}
+  v119 = CONST{2}
+  v120 = CONST{153}
+  v118 = imm{tag=0; 0 = v5; 1 = v120; 2 = v119}
+  v121 = imm{tag=0; 0 = v10; 1 = v118}
+  v123 = CONST{2}
+  v124 = CONST{154}
+  v122 = imm{tag=0; 0 = v5; 1 = v124; 2 = v123}
+  v125 = imm{tag=0; 0 = v10; 1 = v122}
+  v126 = CONST{16}
+  v128 = CONST{2}
+  v129 = CONST{157}
+  v127 = imm{tag=0; 0 = v5; 1 = v129; 2 = v128}
+  v130 = imm{tag=0; 0 = v10; 1 = v127}
+  v131 = CONST{3.7}
+  v133 = CONST{2}
+  v134 = CONST{158}
+  v132 = imm{tag=0; 0 = v5; 1 = v134; 2 = v133}
+  v135 = imm{tag=0; 0 = v10; 1 = v132}
+  v137 = fun(v136){1 ()} [hint:(int)->int never_inline]
+  v201 = "caml_register_symbol"("Extern_hints", "camlExtern_hints__string_loads_83", v137) 
+  v203 = fun(v202){26 ()} [hint:(int)->int never_inline]
+  v291 = "caml_register_symbol"("Extern_hints", "camlExtern_hints__bytes_accesses_84", v203) 
+  v293 = fun(v292){60 ()} [hint:(int)->int never_inline]
+  v440 = "caml_register_symbol"("Extern_hints", "camlExtern_hints__bigstring_accesses_85", v293) 
+  v442 = fun(v441){96 ()} [hint:(int)->int never_inline]
+  v479 = "caml_register_symbol"("Extern_hints", "camlExtern_hints__bigarray_accesses_86", v442) 
+  v481 = fun(v480){111 ()} [hint:(int)->int never_inline]
+  v490 = "caml_register_symbol"("Extern_hints", "camlExtern_hints__int64_comparisons_87", v481) 
+  v492 = fun(v491){124 ()} [hint:(value)->int never_inline]
+  v495 = "caml_register_symbol"("Extern_hints", "camlExtern_hints__generic_length_88", v492) 
+  v497 = fun(v496){125 ()} [hint:(int)->int never_inline]
+  v514 = "caml_register_symbol"("Extern_hints", "camlExtern_hints__array_lengths_89", v497) 
+  v516 = fun(v515){133 ()} [hint:(int)->int never_inline]
+  v525 = "caml_register_symbol"("Extern_hints", "camlExtern_hints__unboxed_externals_90", v516) 
+  v527 = CONST{0}
+  v528 = v137!(v527)
+  branch 142 (v528)
+
+==== 1 () ====
+  v140 = "caml_ml_string_length"(v1) 
+  v141 = "caml_nativeint_of_int"(v140) 
+  v142 = "caml_nativeint_sub"(v141, 1)
+  v143 = "caml_nativeint_shift_right"(v142, 63)
+  v144 = "caml_nativeint_xor"(v143, -1)
+  v145 = "caml_nativeint_and"(v144, v142)
+  v146 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v147 = "caml_nativeint_xor"(v145, -9223372036854775808)
+  v148 = "caml_lessthan"(v146, v147) [hint:nativeint]
+  if v148 then 4 (v141) else 3 ()
+
+==== 2 (v138) ====
+  v151 = "caml_nativeint_xor"(8, -9223372036854775808)
+  v152 = "caml_nativeint_xor"(v138, -9223372036854775808)
+  v153 = "caml_lessthan"(v151, v152) [hint:nativeint]
+  if v153 then 8 () else 7 ()
+
+==== 3 () ====
+  raise v3
+
+==== 4 (v139) ====
+  v149 = "caml_string_get16u"(v1, 0) [hint:unsafe]
+  v150 = v149 === 513
+  if v150 then 2 (v139) else 5 ()
+
+==== 5 () ====
+  raise v9
+
+==== 6 () ====
+  v158 = "caml_nativeint_sub"(v138, 1)
+  v159 = "caml_nativeint_shift_right"(v158, 63)
+  v160 = "caml_nativeint_xor"(v159, -1)
+  v161 = "caml_nativeint_and"(v160, v158)
+  v162 = "caml_nativeint_xor"(8, -9223372036854775808)
+  v163 = "caml_nativeint_xor"(v161, -9223372036854775808)
+  v164 = "caml_lessthan"(v162, v163) [hint:nativeint]
+  if v164 then 12 () else 11 ()
+
+==== 7 () ====
+  raise v3
+
+==== 8 () ====
+  v154 = "caml_string_unsafe_get"(v1, 8)
+  v155 = v154 << 55
+  v156 = v155 >> 55
+  v157 = v156 === -128
+  if v157 then 6 () else 9 ()
+
+==== 9 () ====
+  raise v14
+
+==== 10 () ====
+  v169 = "caml_nativeint_sub"(v138, 3)
+  v170 = "caml_nativeint_shift_right"(v169, 63)
+  v171 = "caml_nativeint_xor"(v170, -1)
+  v172 = "caml_nativeint_and"(v171, v169)
+  v173 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v174 = "caml_nativeint_xor"(v172, -9223372036854775808)
+  v175 = "caml_lessthan"(v173, v174) [hint:nativeint]
+  if v175 then 16 () else 15 ()
+
+==== 11 () ====
+  raise v3
+
+==== 12 () ====
+  v165 = "caml_string_get16u"(v1, 8) [hint:unsafe]
+  v166 = v165 << 47
+  v167 = v166 >> 47
+  v168 = v167 === -128
+  if v168 then 10 () else 13 ()
+
+==== 13 () ====
+  raise v18
+
+==== 14 () ====
+  v178 = "caml_nativeint_sub"(v138, 7)
+  v179 = "caml_nativeint_shift_right"(v178, 63)
+  v180 = "caml_nativeint_xor"(v179, -1)
+  v181 = "caml_nativeint_and"(v180, v178)
+  v182 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v183 = "caml_nativeint_xor"(v181, -9223372036854775808)
+  v184 = "caml_lessthan"(v182, v183) [hint:nativeint]
+  if v184 then 20 () else 19 ()
+
+==== 15 () ====
+  raise v3
+
+==== 16 () ====
+  v176 = "caml_string_get32u"(v1, 0) [hint:unsafe]
+  v177 = "caml_equal"(v176, 67305985l) [hint:int32]
+  if v177 then 14 () else 17 ()
+
+==== 17 () ====
+  raise v22
+
+==== 18 () ====
+  v187 = "caml_ml_string_length"(v27) 
+  v188 = "caml_nativeint_of_int"(v187) 
+  v189 = "caml_nativeint_sub"(v188, 3)
+  v190 = "caml_nativeint_shift_right"(v189, 63)
+  v191 = "caml_nativeint_xor"(v190, -1)
+  v192 = "caml_nativeint_and"(v191, v189)
+  v193 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v194 = "caml_nativeint_xor"(v192, -9223372036854775808)
+  v195 = "caml_lessthan"(v193, v194) [hint:nativeint]
+  if v195 then 23 () else 22 ()
+
+==== 19 () ====
+  raise v3
+
+==== 20 () ====
+  v185 = "caml_string_get64u"(v1, 0) [hint:unsafe]
+  v186 = "caml_equal"(v185, 578437695752307201L) [hint:int64]
+  if v186 then 18 () else 21 ()
+
+==== 21 () ====
+  raise v26
+
+==== 22 () ====
+  raise v3
+
+==== 23 () ====
+  v196 = "caml_string_getf32u"(v27, 0) [hint:unsafe]
+  v197 = "caml_float_of_float32"(v196) 
+  v198 = "caml_eq_float"(v197, 1)
+  v199 = CONST{0}
+  if v198 then 25 () else 24 ()
+
+==== 24 () ====
+  raise v31
+
+==== 25 () ====
+  return v199
+
+==== 26 () ====
+  v205 = "caml_create_bytes"(8) 
+  branch 27 (v205)
+
+==== 27 (v204) ====
+  v207 = "caml_ml_string_length"(v204) 
+  v208 = "caml_nativeint_of_int"(v207) 
+  v209 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v210 = "caml_nativeint_xor"(v208, -9223372036854775808)
+  v211 = "caml_lessthan"(v209, v210) [hint:nativeint]
+  if v211 then 29 (v208) else 28 ()
+
+==== 28 () ====
+  raise v3
+
+==== 29 (v206) ====
+  v212 = "caml_bytes_unsafe_set"(v204, 0, -16) 
+  v213 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v214 = "caml_nativeint_xor"(v206, -9223372036854775808)
+  v215 = "caml_lessthan"(v213, v214) [hint:nativeint]
+  if v215 then 32 () else 31 ()
+
+==== 30 () ====
+  v222 = "caml_nativeint_sub"(v206, 1)
+  v223 = "caml_nativeint_shift_right"(v222, 63)
+  v224 = "caml_nativeint_xor"(v223, -1)
+  v225 = "caml_nativeint_and"(v224, v222)
+  v226 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v227 = "caml_nativeint_xor"(v225, -9223372036854775808)
+  v228 = "caml_lessthan"(v226, v227) [hint:nativeint]
+  if v228 then 35 (v222, v223) else 34 ()
+
+==== 31 () ====
+  raise v3
+
+==== 32 () ====
+  v216 = "caml_bytes_unsafe_get"(v204, 0)
+  v217 = v216 << 55
+  v218 = v217 >> 55
+  v219 = v218 === -16
+  if v219 then 30 () else 33 ()
+
+==== 33 () ====
+  raise v35
+
+==== 34 () ====
+  raise v3
+
+==== 35 (v221, v220) ====
+  v229 = "caml_bytes_set16u"(v204, 0, -2)  [hint:unsafe]
+  v232 = "caml_nativeint_xor"(v220, -1)
+  v233 = "caml_nativeint_and"(v232, v221)
+  v234 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v235 = "caml_nativeint_xor"(v233, -9223372036854775808)
+  v236 = "caml_lessthan"(v234, v235) [hint:nativeint]
+  if v236 then 38 (v233) else 37 ()
+
+==== 36 (v230) ====
+  v239 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v240 = "caml_nativeint_xor"(v230, -9223372036854775808)
+  v241 = "caml_lessthan"(v239, v240) [hint:nativeint]
+  if v241 then 42 () else 41 ()
+
+==== 37 () ====
+  raise v3
+
+==== 38 (v231) ====
+  v237 = "caml_bytes_get16u"(v204, 0) [hint:unsafe]
+  v238 = v237 === 65534
+  if v238 then 36 (v231) else 39 ()
+
+==== 39 () ====
+  raise v39
+
+==== 40 () ====
+  v248 = "caml_nativeint_sub"(v206, 3)
+  v249 = "caml_nativeint_shift_right"(v248, 63)
+  v250 = "caml_nativeint_xor"(v249, -1)
+  v251 = "caml_nativeint_and"(v250, v248)
+  v252 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v253 = "caml_nativeint_xor"(v251, -9223372036854775808)
+  v254 = "caml_lessthan"(v252, v253) [hint:nativeint]
+  if v254 then 45 (v248, v249) else 44 ()
+
+==== 41 () ====
+  raise v3
+
+==== 42 () ====
+  v242 = "caml_bytes_get16u"(v204, 0) [hint:unsafe]
+  v243 = v242 << 47
+  v244 = v243 >> 47
+  v245 = v244 === -2
+  if v245 then 40 () else 43 ()
+
+==== 43 () ====
+  raise v43
+
+==== 44 () ====
+  raise v3
+
+==== 45 (v247, v246) ====
+  v255 = "caml_bytes_set32u"(v204, 0, 305419896l)  [hint:unsafe]
+  v258 = "caml_nativeint_xor"(v246, -1)
+  v259 = "caml_nativeint_and"(v258, v247)
+  v260 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v261 = "caml_nativeint_xor"(v259, -9223372036854775808)
+  v262 = "caml_lessthan"(v260, v261) [hint:nativeint]
+  if v262 then 48 (v259) else 47 ()
+
+==== 46 (v256) ====
+  v265 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v266 = "caml_nativeint_xor"(v256, -9223372036854775808)
+  v267 = "caml_lessthan"(v265, v266) [hint:nativeint]
+  if v267 then 51 () else 50 ()
+
+==== 47 () ====
+  raise v3
+
+==== 48 (v257) ====
+  v263 = "caml_bytes_get32u"(v204, 0) [hint:unsafe]
+  v264 = "caml_equal"(v263, 305419896l) [hint:int32]
+  if v264 then 46 (v257) else 49 ()
+
+==== 49 () ====
+  raise v47
+
+==== 50 () ====
+  raise v3
+
+==== 51 () ====
+  v268 = "caml_bytes_setf32u"(v204, 0, 1.5)  [hint:unsafe]
+  v269 = "caml_bytes_getf32u"(v204, 0) [hint:unsafe]
+  v270 = "caml_float_of_float32"(v269) 
+  v271 = "caml_eq_float"(v270, 1.5)
+  if v271 then 52 () else 53 ()
+
+==== 52 () ====
+  v274 = "caml_nativeint_sub"(v206, 7)
+  v275 = "caml_nativeint_shift_right"(v274, 63)
+  v276 = "caml_nativeint_xor"(v275, -1)
+  v277 = "caml_nativeint_and"(v276, v274)
+  v278 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v279 = "caml_nativeint_xor"(v277, -9223372036854775808)
+  v280 = "caml_lessthan"(v278, v279) [hint:nativeint]
+  if v280 then 55 (v274, v275) else 54 ()
+
+==== 53 () ====
+  raise v51
+
+==== 54 () ====
+  raise v3
+
+==== 55 (v273, v272) ====
+  v281 = "caml_bytes_set64u"(v204, 0, 72623859790382856L)  [hint:unsafe]
+  v282 = "caml_nativeint_xor"(v272, -1)
+  v283 = "caml_nativeint_and"(v282, v273)
+  v284 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v285 = "caml_nativeint_xor"(v283, -9223372036854775808)
+  v286 = "caml_lessthan"(v284, v285) [hint:nativeint]
+  if v286 then 57 () else 56 ()
+
+==== 56 () ====
+  raise v3
+
+==== 57 () ====
+  v287 = "caml_bytes_get64u"(v204, 0) [hint:unsafe]
+  v288 = "caml_equal"(v287, 72623859790382856L) [hint:int64]
+  v289 = CONST{0}
+  if v288 then 59 () else 58 ()
+
+==== 58 () ====
+  raise v55
+
+==== 59 () ====
+  return v289
+
+==== 60 () ====
+  v294 = CONST{8}
+  v295 = {tag=0; 0 = v294}
+  v297 = "caml_ba_create"(12, 0, v295) 
+  branch 61 (v297)
+
+==== 61 (v296) ====
+  v298 = "caml_ba_dim"(v296, 0)
+  v299 = "caml_nativeint_of_int"(v298) 
+  v300 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v301 = "caml_nativeint_xor"(v299, -9223372036854775808)
+  v302 = "caml_lessthan"(v300, v301) [hint:nativeint]
+  if v302 then 63 () else 62 ()
+
+==== 62 () ====
+  raise v3
+
+==== 63 () ====
+  v303 = "caml_ba_set_raw_unsafe"(v296, 0, -16)  [hint:unsafe/uint8/C]
+  v304 = "caml_ba_dim"(v296, 0)
+  v305 = "caml_nativeint_of_int"(v304) 
+  v306 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v307 = "caml_nativeint_xor"(v305, -9223372036854775808)
+  v308 = "caml_lessthan"(v306, v307) [hint:nativeint]
+  if v308 then 66 () else 65 ()
+
+==== 64 () ====
+  v313 = "caml_ba_dim"(v296, 0)
+  v314 = "caml_nativeint_of_int"(v313) 
+  v315 = "caml_nativeint_sub"(v314, 1)
+  v316 = "caml_ba_dim"(v296, 0)
+  v317 = "caml_nativeint_of_int"(v316) 
+  v318 = "caml_nativeint_sub"(v317, 1)
+  v319 = "caml_nativeint_shift_right"(v318, 63)
+  v320 = "caml_nativeint_xor"(v319, -1)
+  v321 = "caml_nativeint_and"(v320, v315)
+  v322 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v323 = "caml_nativeint_xor"(v321, -9223372036854775808)
+  v324 = "caml_lessthan"(v322, v323) [hint:nativeint]
+  if v324 then 69 () else 68 ()
+
+==== 65 () ====
+  raise v3
+
+==== 66 () ====
+  v309 = "caml_ba_get_raw_unsafe"(v296, 0) [hint:unsafe/uint8/C]
+  v310 = v309 << 55
+  v311 = v310 >> 55
+  v312 = v311 === -16
+  if v312 then 64 () else 67 ()
+
+==== 67 () ====
+  raise v59
+
+==== 68 () ====
+  raise v3
+
+==== 69 () ====
+  v325 = "caml_ba_uint8_set16"(v296, 0, -2) 
+  v326 = "caml_ba_dim"(v296, 0)
+  v327 = "caml_nativeint_of_int"(v326) 
+  v328 = "caml_nativeint_sub"(v327, 1)
+  v329 = "caml_ba_dim"(v296, 0)
+  v330 = "caml_nativeint_of_int"(v329) 
+  v331 = "caml_nativeint_sub"(v330, 1)
+  v332 = "caml_nativeint_shift_right"(v331, 63)
+  v333 = "caml_nativeint_xor"(v332, -1)
+  v334 = "caml_nativeint_and"(v333, v328)
+  v335 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v336 = "caml_nativeint_xor"(v334, -9223372036854775808)
+  v337 = "caml_lessthan"(v335, v336) [hint:nativeint]
+  if v337 then 72 () else 71 ()
+
+==== 70 () ====
+  v340 = "caml_ba_dim"(v296, 0)
+  v341 = "caml_nativeint_of_int"(v340) 
+  v342 = "caml_nativeint_sub"(v341, 1)
+  v343 = "caml_ba_dim"(v296, 0)
+  v344 = "caml_nativeint_of_int"(v343) 
+  v345 = "caml_nativeint_sub"(v344, 1)
+  v346 = "caml_nativeint_shift_right"(v345, 63)
+  v347 = "caml_nativeint_xor"(v346, -1)
+  v348 = "caml_nativeint_and"(v347, v342)
+  v349 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v350 = "caml_nativeint_xor"(v348, -9223372036854775808)
+  v351 = "caml_lessthan"(v349, v350) [hint:nativeint]
+  if v351 then 76 () else 75 ()
+
+==== 71 () ====
+  raise v3
+
+==== 72 () ====
+  v338 = "caml_ba_uint8_get16"(v296, 0)
+  v339 = v338 === 65534
+  if v339 then 70 () else 73 ()
+
+==== 73 () ====
+  raise v63
+
+==== 74 () ====
+  v356 = "caml_ba_dim"(v296, 0)
+  v357 = "caml_nativeint_of_int"(v356) 
+  v358 = "caml_nativeint_sub"(v357, 3)
+  v359 = "caml_ba_dim"(v296, 0)
+  v360 = "caml_nativeint_of_int"(v359) 
+  v361 = "caml_nativeint_sub"(v360, 3)
+  v362 = "caml_nativeint_shift_right"(v361, 63)
+  v363 = "caml_nativeint_xor"(v362, -1)
+  v364 = "caml_nativeint_and"(v363, v358)
+  v365 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v366 = "caml_nativeint_xor"(v364, -9223372036854775808)
+  v367 = "caml_lessthan"(v365, v366) [hint:nativeint]
+  if v367 then 79 () else 78 ()
+
+==== 75 () ====
+  raise v3
+
+==== 76 () ====
+  v352 = "caml_ba_uint8_get16"(v296, 0)
+  v353 = v352 << 47
+  v354 = v353 >> 47
+  v355 = v354 === -2
+  if v355 then 74 () else 77 ()
+
+==== 77 () ====
+  raise v67
+
+==== 78 () ====
+  raise v3
+
+==== 79 () ====
+  v368 = "caml_ba_uint8_set32u"(v296, 0, 305419896l)  [hint:unsafe]
+  v369 = "caml_ba_dim"(v296, 0)
+  v370 = "caml_nativeint_of_int"(v369) 
+  v371 = "caml_nativeint_sub"(v370, 3)
+  v372 = "caml_ba_dim"(v296, 0)
+  v373 = "caml_nativeint_of_int"(v372) 
+  v374 = "caml_nativeint_sub"(v373, 3)
+  v375 = "caml_nativeint_shift_right"(v374, 63)
+  v376 = "caml_nativeint_xor"(v375, -1)
+  v377 = "caml_nativeint_and"(v376, v371)
+  v378 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v379 = "caml_nativeint_xor"(v377, -9223372036854775808)
+  v380 = "caml_lessthan"(v378, v379) [hint:nativeint]
+  if v380 then 82 () else 81 ()
+
+==== 80 () ====
+  v383 = "caml_ba_dim"(v296, 0)
+  v384 = "caml_nativeint_of_int"(v383) 
+  v385 = "caml_nativeint_sub"(v384, 3)
+  v386 = "caml_ba_dim"(v296, 0)
+  v387 = "caml_nativeint_of_int"(v386) 
+  v388 = "caml_nativeint_sub"(v387, 3)
+  v389 = "caml_nativeint_shift_right"(v388, 63)
+  v390 = "caml_nativeint_xor"(v389, -1)
+  v391 = "caml_nativeint_and"(v390, v385)
+  v392 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v393 = "caml_nativeint_xor"(v391, -9223372036854775808)
+  v394 = "caml_lessthan"(v392, v393) [hint:nativeint]
+  if v394 then 85 () else 84 ()
+
+==== 81 () ====
+  raise v3
+
+==== 82 () ====
+  v381 = "caml_ba_uint8_get32u"(v296, 0) [hint:unsafe]
+  v382 = "caml_equal"(v381, 305419896l) [hint:int32]
+  if v382 then 80 () else 83 ()
+
+==== 83 () ====
+  raise v71
+
+==== 84 () ====
+  raise v3
+
+==== 85 () ====
+  v395 = "caml_ba_uint8_setf32u"(v296, 0, 1.5)  [hint:unsafe]
+  v396 = "caml_ba_dim"(v296, 0)
+  v397 = "caml_nativeint_of_int"(v396) 
+  v398 = "caml_nativeint_sub"(v397, 3)
+  v399 = "caml_ba_dim"(v296, 0)
+  v400 = "caml_nativeint_of_int"(v399) 
+  v401 = "caml_nativeint_sub"(v400, 3)
+  v402 = "caml_nativeint_shift_right"(v401, 63)
+  v403 = "caml_nativeint_xor"(v402, -1)
+  v404 = "caml_nativeint_and"(v403, v398)
+  v405 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v406 = "caml_nativeint_xor"(v404, -9223372036854775808)
+  v407 = "caml_lessthan"(v405, v406) [hint:nativeint]
+  if v407 then 88 () else 87 ()
+
+==== 86 () ====
+  v411 = "caml_ba_dim"(v296, 0)
+  v412 = "caml_nativeint_of_int"(v411) 
+  v413 = "caml_nativeint_sub"(v412, 7)
+  v414 = "caml_ba_dim"(v296, 0)
+  v415 = "caml_nativeint_of_int"(v414) 
+  v416 = "caml_nativeint_sub"(v415, 7)
+  v417 = "caml_nativeint_shift_right"(v416, 63)
+  v418 = "caml_nativeint_xor"(v417, -1)
+  v419 = "caml_nativeint_and"(v418, v413)
+  v420 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v421 = "caml_nativeint_xor"(v419, -9223372036854775808)
+  v422 = "caml_lessthan"(v420, v421) [hint:nativeint]
+  if v422 then 91 () else 90 ()
+
+==== 87 () ====
+  raise v3
+
+==== 88 () ====
+  v408 = "caml_ba_uint8_getf32u"(v296, 0) [hint:unsafe]
+  v409 = "caml_float_of_float32"(v408) 
+  v410 = "caml_eq_float"(v409, 1.5)
+  if v410 then 86 () else 89 ()
+
+==== 89 () ====
+  raise v75
+
+==== 90 () ====
+  raise v3
+
+==== 91 () ====
+  v423 = "caml_ba_uint8_set64"(v296, 0, 72623859790382856L) 
+  v424 = "caml_ba_dim"(v296, 0)
+  v425 = "caml_nativeint_of_int"(v424) 
+  v426 = "caml_nativeint_sub"(v425, 7)
+  v427 = "caml_ba_dim"(v296, 0)
+  v428 = "caml_nativeint_of_int"(v427) 
+  v429 = "caml_nativeint_sub"(v428, 7)
+  v430 = "caml_nativeint_shift_right"(v429, 63)
+  v431 = "caml_nativeint_xor"(v430, -1)
+  v432 = "caml_nativeint_and"(v431, v426)
+  v433 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v434 = "caml_nativeint_xor"(v432, -9223372036854775808)
+  v435 = "caml_lessthan"(v433, v434) [hint:nativeint]
+  if v435 then 93 () else 92 ()
+
+==== 92 () ====
+  raise v3
+
+==== 93 () ====
+  v436 = "caml_ba_uint8_get64"(v296, 0)
+  v437 = "caml_equal"(v436, 72623859790382856L) [hint:int64]
+  v438 = CONST{0}
+  if v437 then 95 () else 94 ()
+
+==== 94 () ====
+  raise v79
+
+==== 95 () ====
+  return v438
+
+==== 96 () ====
+  v443 = CONST{4}
+  v444 = {tag=0; 0 = v443}
+  v446 = "caml_ba_create"(1, 0, v444) 
+  branch 97 (v446)
+
+==== 97 (v445) ====
+  v447 = "caml_ba_dim"(v445, 0)
+  v448 = "caml_nativeint_of_int"(v447) 
+  v449 = "caml_nativeint_xor"(2, -9223372036854775808)
+  v450 = "caml_nativeint_xor"(v448, -9223372036854775808)
+  v451 = "caml_lessthan"(v449, v450) [hint:nativeint]
+  if v451 then 99 () else 98 ()
+
+==== 98 () ====
+  raise v3
+
+==== 99 () ====
+  v452 = "caml_ba_set_raw_unsafe"(v445, 2, 3.5)  [hint:unsafe/float64/C]
+  v453 = "caml_ba_dim"(v445, 0)
+  v454 = "caml_nativeint_of_int"(v453) 
+  v455 = "caml_nativeint_xor"(2, -9223372036854775808)
+  v456 = "caml_nativeint_xor"(v454, -9223372036854775808)
+  v457 = "caml_lessthan"(v455, v456) [hint:nativeint]
+  if v457 then 102 () else 101 ()
+
+==== 100 () ====
+  v460 = CONST{4}
+  v461 = {tag=0; 0 = v460}
+  v463 = "caml_ba_create"(6, 1, v461) 
+  branch 104 (v463)
+
+==== 101 () ====
+  raise v3
+
+==== 102 () ====
+  v458 = "caml_ba_get_raw_unsafe"(v445, 2) [hint:unsafe/float64/C]
+  v459 = "caml_eq_float"(v458, 3.5)
+  if v459 then 100 () else 103 ()
+
+==== 103 () ====
+  raise v83
+
+==== 104 (v462) ====
+  v464 = "caml_ba_dim"(v462, 0)
+  v465 = "caml_nativeint_of_int"(v464) 
+  v466 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v467 = "caml_nativeint_xor"(v465, -9223372036854775808)
+  v468 = "caml_lessthan"(v466, v467) [hint:nativeint]
+  if v468 then 106 () else 105 ()
+
+==== 105 () ====
+  raise v3
+
+==== 106 () ====
+  v469 = "caml_ba_set_raw_unsafe"(v462, 0, 42l)  [hint:unsafe/int32/Fortran]
+  v470 = "caml_ba_dim"(v462, 0)
+  v471 = "caml_nativeint_of_int"(v470) 
+  v472 = "caml_nativeint_xor"(0, -9223372036854775808)
+  v473 = "caml_nativeint_xor"(v471, -9223372036854775808)
+  v474 = "caml_lessthan"(v472, v473) [hint:nativeint]
+  if v474 then 108 () else 107 ()
+
+==== 107 () ====
+  raise v3
+
+==== 108 () ====
+  v475 = "caml_ba_get_raw_unsafe"(v462, 0) [hint:unsafe/int32/Fortran]
+  v476 = "caml_equal"(v475, 42l) [hint:int32]
+  v477 = CONST{0}
+  if v476 then 110 () else 109 ()
+
+==== 109 () ====
+  raise v87
+
+==== 110 () ====
+  return v477
+
+==== 111 () ====
+  v482 = "caml_lessthan"(v88, v89) [hint:int64]
+  if v482 then 112 () else 113 ()
+
+==== 112 () ====
+  v483 = "caml_lessequal"(v88, v89) [hint:int64]
+  if v483 then 114 () else 115 ()
+
+==== 113 () ====
+  raise v93
+
+==== 114 () ====
+  v484 = "caml_lessthan"(v88, v89) [hint:int64]
+  if v484 then 116 () else 117 ()
+
+==== 115 () ====
+  raise v97
+
+==== 116 () ====
+  v485 = "caml_lessequal"(v88, v89) [hint:int64]
+  if v485 then 118 () else 119 ()
+
+==== 117 () ====
+  raise v101
+
+==== 118 () ====
+  v486 = "caml_equal"(v88, v89) [hint:int64]
+  if v486 then 121 () else 120 ()
+
+==== 119 () ====
+  raise v105
+
+==== 120 () ====
+  v487 = "caml_notequal"(v88, v89) [hint:int64]
+  v488 = CONST{0}
+  if v487 then 123 () else 122 ()
+
+==== 121 () ====
+  raise v109
+
+==== 122 () ====
+  raise v113
+
+==== 123 () ====
+  return v488
+
+==== 124 () ====
+  v493 = v491.length [hint:generic]
+  return v493
+
+==== 125 () ====
+  v498 = CONST{2}
+  v499 = CONST{1}
+  v500 = {tag=254; 0 = v499; 1 = v498}
+  v501 = CONST{3}
+  v502 = CONST{2}
+  v503 = CONST{1}
+  v504 = {tag=0; 0 = v503; 1 = v502; 2 = v501}
+  v505 = v500.length [hint:float]
+  v506 = v505 === 2
+  if v506 then 126 () else 127 ()
+
+==== 126 () ====
+  v507 = v504.length [hint:value]
+  v508 = v507 === 3
+  if v508 then 128 () else 129 ()
+
+==== 127 () ====
+  raise v117
+
+==== 128 () ====
+  v510 = v492!(v504)
+  branch 130 (v510)
+
+==== 129 () ====
+  raise v121
+
+==== 130 (v509) ====
+  v511 = v509 === 3
+  v512 = CONST{0}
+  if v511 then 132 () else 131 ()
+
+==== 131 () ====
+  raise v125
+
+==== 132 () ====
+  return v512
+
+==== 133 () ====
+  v518 = "caml_sqrt_float"(v126) 
+  branch 135 (v518)
+
+==== 134 () ====
+  v521 = "caml_int32_of_float"(v131) 
+  branch 137 (v521)
+
+==== 135 (v517) ====
+  v519 = "caml_eq_float"(v517, 4)
+  if v519 then 134 () else 136 ()
+
+==== 136 () ====
+  raise v130
+
+==== 137 (v520) ====
+  v522 = "caml_equal"(v520, 3l) [hint:int32]
+  v523 = CONST{0}
+  if v522 then 139 () else 138 ()
+
+==== 138 () ====
+  raise v135
+
+==== 139 () ====
+  return v523
+
+==== 140 () ====
+  v547 = imm{tag=0; 0 = v137; 1 = v203; 2 = v293; 3 = v442; 4 = v481; 5 = v492; 6 = v497; 7 = v516}
+  v548 = "caml_register_global"(v547, "Extern_hints")
+  stop
+
+==== 141 () ====
+  v530 = CONST{0}
+  v531 = v203!(v530)
+  branch 144 (v531)
+
+==== 142 (v526) ====
+  branch 141 ()
+
+==== 143 () ====
+  v533 = CONST{0}
+  v534 = v293!(v533)
+  branch 146 (v534)
+
+==== 144 (v529) ====
+  branch 143 ()
+
+==== 145 () ====
+  v536 = CONST{0}
+  v537 = v442!(v536)
+  branch 148 (v537)
+
+==== 146 (v532) ====
+  branch 145 ()
+
+==== 147 () ====
+  v539 = CONST{0}
+  v540 = v481!(v539)
+  branch 150 (v540)
+
+==== 148 (v535) ====
+  branch 147 ()
+
+==== 149 () ====
+  v542 = CONST{0}
+  v543 = v497!(v542)
+  branch 152 (v543)
+
+==== 150 (v538) ====
+  branch 149 ()
+
+==== 151 () ====
+  v545 = CONST{0}
+  v546 = v516!(v545)
+  branch 153 (v546)
+
+==== 152 (v541) ====
+  branch 151 ()
+
+==== 153 (v544) ====
+  branch 140 ()
+
+

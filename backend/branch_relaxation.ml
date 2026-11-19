@@ -92,9 +92,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
         || opt_branch_overflows map pc lbl2 max_branch_offset
       | Lop
           ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-          | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
-          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+          | Dls_get | Tls_get | Domain_index | Thread_self_id | Const_int _
+          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
+          | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)
@@ -229,8 +230,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
           | Lop
               ( Move | Spill | Reload | Opaque | Pause | Begin_region
-              | End_region | Dls_get | Tls_get | Domain_index | Const_int _
-              | Const_float32 _ | Const_float _ | Const_symbol _
+              | End_region | Dls_get | Tls_get | Domain_index | Thread_self_id
+              | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
               | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
               | Stackoffset _ | Load _
               | Store (_, _, _)

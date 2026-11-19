@@ -19,6 +19,9 @@ module L = Lambda
 module P = Flambda_primitive
 module S = Jkind.Sort.Const
 
+(* Transforms that introduce calls or switches change the numbering of FDO
+   counters, which [Fdo_body_hash] must reflect. *)
+
 type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
@@ -132,46 +135,116 @@ let rec_catch_for_for_loop env loc ident duid start stop
   let first_test : L.lambda =
     L.icmp cmp L.int (Lvar start_ident) (Lvar stop_ident) ~loc
   in
-  (* Naked int64 scalar type — the loop counter uses naked int64 to gain one
-     extra bit of range, avoiding overflow on increment/decrement. *)
-  let naked_int64_scalar : _ Scalar.Integral.t =
-    Scalar.naked
-      (Scalar.Integral.Width.Boxable (Int64 Scalar.Any_locality_mode))
+  (* On targets where naked int64s are expensive (i.e. JavaScript), the counter
+     is a tagged int, and we test for the end of the loop before incrementing
+     (resp. decrementing) it, so that it cannot overflow when the bound is
+     [max_int] (resp. [min_int]). *)
+  let loop_with_tagged_counter () : L.lambda =
+    let continue_test : L.lambda =
+      L.icmp Cne L.int (Lvar ident) (Lvar stop_ident) ~loc
+    in
+    let next_value_of_counter : L.lambda =
+      match dir with
+      | Upto -> L.succ L.int (Lvar ident) ~loc
+      | Downto -> L.pred L.int (Lvar ident) ~loc
+    in
+    Lstaticcatch
+      ( Lstaticraise (cont, [Lvar start_ident]),
+        (cont, [ident, duid, L.layout_int]),
+        Lsequence
+          ( body,
+            Lifthenelse
+              ( continue_test,
+                Lstaticraise (cont, [next_value_of_counter]),
+                L.lambda_unit,
+                L.layout_unit ) ),
+        Same_region,
+        L.layout_unit )
   in
-  let layout_naked_int64 : L.layout =
-    Punboxed_or_untagged_integer Unboxed_int64
-  in
-  let start_naked = Ident.create_local "for_start_naked" in
-  let stop_naked = Ident.create_local "for_stop_naked" in
-  let counter_naked = Ident.create_local "for_counter_naked" in
-  let next_naked = Ident.create_local "for_next_naked" in
-  let tagged_to_naked_int64 arg =
-    L.static_cast
-      ~src:(Scalar.ignore_locality (Scalar.integral L.int))
-      ~dst:(Scalar.integral naked_int64_scalar)
-      arg ~loc
-  in
-  let naked_int64_to_tagged arg =
-    L.static_cast
-      ~src:(Scalar.ignore_locality (Scalar.integral naked_int64_scalar))
-      ~dst:(Scalar.integral L.int) arg ~loc
-  in
-  let next_value_of_counter : L.lambda =
-    match dir with
-    | Upto -> L.succ naked_int64_scalar (Lvar counter_naked) ~loc
-    | Downto -> L.pred naked_int64_scalar (Lvar counter_naked) ~loc
-  in
-  let continue_test : L.lambda =
-    L.icmp cmp
-      (Scalar.Integral.ignore_locality naked_int64_scalar)
-      (Lvar next_naked) (Lvar stop_naked) ~loc
-  in
-  let lam : L.lambda =
+  let loop_with_naked_int64_counter () : L.lambda =
+    (* Naked int64 scalar type — the loop counter uses naked int64 to gain one
+       extra bit of range, avoiding overflow on increment/decrement. *)
+    let naked_int64_scalar : _ Scalar.Integral.t =
+      Scalar.naked
+        (Scalar.Integral.Width.Boxable (Int64 Scalar.Any_locality_mode))
+    in
+    let layout_naked_int64 : L.layout =
+      Punboxed_or_untagged_integer Unboxed_int64
+    in
+    let start_naked = Ident.create_local "for_start_naked" in
+    let stop_naked = Ident.create_local "for_stop_naked" in
+    let counter_naked = Ident.create_local "for_counter_naked" in
+    let next_naked = Ident.create_local "for_next_naked" in
+    let tagged_to_naked_int64 arg =
+      L.static_cast
+        ~src:(Scalar.ignore_locality (Scalar.integral L.int))
+        ~dst:(Scalar.integral naked_int64_scalar)
+        arg ~loc
+    in
+    let naked_int64_to_tagged arg =
+      L.static_cast
+        ~src:(Scalar.ignore_locality (Scalar.integral naked_int64_scalar))
+        ~dst:(Scalar.integral L.int) arg ~loc
+    in
+    let next_value_of_counter : L.lambda =
+      match dir with
+      | Upto -> L.succ naked_int64_scalar (Lvar counter_naked) ~loc
+      | Downto -> L.pred naked_int64_scalar (Lvar counter_naked) ~loc
+    in
+    let continue_test : L.lambda =
+      L.icmp cmp
+        (Scalar.Integral.ignore_locality naked_int64_scalar)
+        (Lvar next_naked) (Lvar stop_naked) ~loc
+    in
     (* The loop counter operates on naked int64 values, avoiding overflow when
        incrementing past max_int or decrementing past min_int, since tagged ints
        fit in 63 bits but we operate in 64. This enables us to avoid the problem
        of having two branch instructions (one conditional and one unconditional)
        at the end of "for" loops. *)
+    Llet
+      ( Strict,
+        layout_naked_int64,
+        start_naked,
+        Lambda.debug_uid_none,
+        tagged_to_naked_int64 (Lvar start_ident),
+        Llet
+          ( Strict,
+            layout_naked_int64,
+            stop_naked,
+            Lambda.debug_uid_none,
+            tagged_to_naked_int64 (Lvar stop_ident),
+            Lstaticcatch
+              ( Lstaticraise (cont, [Lvar start_naked]),
+                ( cont,
+                  [counter_naked, Lambda.debug_uid_none, layout_naked_int64] ),
+                Llet
+                  ( Strict,
+                    L.layout_int,
+                    ident,
+                    duid,
+                    naked_int64_to_tagged (Lvar counter_naked),
+                    Lsequence
+                      ( body,
+                        Llet
+                          ( Strict,
+                            layout_naked_int64,
+                            next_naked,
+                            Lambda.debug_uid_none,
+                            next_value_of_counter,
+                            Lifthenelse
+                              ( continue_test,
+                                Lstaticraise (cont, [Lvar next_naked]),
+                                L.lambda_unit,
+                                L.layout_unit ) ) ) ),
+                Same_region,
+                L.layout_unit ) ) )
+  in
+  let loop : L.lambda =
+    if Clflags.target_is_jsir ()
+    then loop_with_tagged_counter ()
+    else loop_with_naked_int64_counter ()
+  in
+  let lam : L.lambda =
     Llet
       ( Strict,
         L.layout_int,
@@ -184,50 +257,7 @@ let rec_catch_for_for_loop env loc ident duid start stop
             stop_ident,
             stop_ident_duid,
             stop,
-            Lifthenelse
-              ( first_test,
-                Llet
-                  ( Strict,
-                    layout_naked_int64,
-                    start_naked,
-                    Lambda.debug_uid_none,
-                    tagged_to_naked_int64 (Lvar start_ident),
-                    Llet
-                      ( Strict,
-                        layout_naked_int64,
-                        stop_naked,
-                        Lambda.debug_uid_none,
-                        tagged_to_naked_int64 (Lvar stop_ident),
-                        Lstaticcatch
-                          ( Lstaticraise (cont, [Lvar start_naked]),
-                            ( cont,
-                              [ ( counter_naked,
-                                  Lambda.debug_uid_none,
-                                  layout_naked_int64 ) ] ),
-                            Llet
-                              ( Strict,
-                                L.layout_int,
-                                ident,
-                                duid,
-                                naked_int64_to_tagged (Lvar counter_naked),
-                                Lsequence
-                                  ( body,
-                                    Llet
-                                      ( Strict,
-                                        layout_naked_int64,
-                                        next_naked,
-                                        Lambda.debug_uid_none,
-                                        next_value_of_counter,
-                                        Lifthenelse
-                                          ( continue_test,
-                                            Lstaticraise
-                                              (cont, [Lvar next_naked]),
-                                            L.lambda_unit,
-                                            L.layout_unit ) ) ) ),
-                            Same_region,
-                            L.layout_unit ) ) ),
-                L.lambda_unit,
-                L.layout_unit ) ) )
+            Lifthenelse (first_test, loop, L.lambda_unit, L.layout_unit) ) )
   in
   env, lam
 
@@ -997,6 +1027,10 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
                  idx,
                  Lsequence (store_low, store_high) ) ) ))
 
+(* CR mshinwell: this predicate does not look inside unboxed (or [@unpacked])
+   products, so their vec256 components escape the splitting below and hit a
+   fatal error in the arm64 backend. The transform cannot split products, so
+   either implement that or raise a proper error here. *)
 let ccall_involves_vec256 (desc : L.external_call_description) =
   let repr_vec256 = function[@warning "-4"]
     | _, L.Unboxed_vector Boxed_vec256 | _, L.Same_as_ocaml_repr (Base Vec256)

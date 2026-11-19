@@ -34,4 +34,12 @@
  (action
   (with-stdout-to
    %{targets}
-   (system "diff %{deps}; true"))))
+   (pipe-stdout
+    (with-accepted-exit-codes
+     (or 0 1)
+     (run diff -U0 --label shim_oxcaml.mli --label shim_upstream.mli %{deps}))
+    (run
+     sed
+     -e "1,2s/^.../&&/"
+     -e "3,$s/^[+-]/&|/"
+     -e "s/^@@.*/@|============================================================/")))))

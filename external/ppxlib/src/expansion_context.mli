@@ -130,5 +130,6 @@ module Deriver : sig
 
   val make :
     derived_item_loc:Location.t -> inline:bool -> base:Base.t -> unit -> t
-  (** Build a new expansion context with the given item location and code path *)
+  (** Build a new expansion context with the given item location and code path
+  *)
 end

@@ -22,7 +22,8 @@ type ('a, 'b, 'c) t = ('a, 'b, 'c) Ast_pattern0.t
 
 val parse :
   ('a, 'b, 'c) t -> Location.t -> ?on_error:(unit -> 'c) -> 'a -> 'b -> 'c
-(** Matches a value against a pattern. Raise a located error in case of failure. *)
+(** Matches a value against a pattern. Raise a located error in case of failure.
+*)
 
 val parse_res :
   ('a, 'b, 'c) t ->
@@ -207,7 +208,8 @@ val type_declaration :
 val value_binding
   :  pat:(pattern, 'a, 'b) t
   -> expr:(expression, 'b, 'c) t
-  -> (value_binding, 'a, 'c) t
+  -> constraint_:(value_constraint option, 'c, 'd) t
+  -> (value_binding, 'a, 'd) t
 
 val value_description
   :  name:(string, 'a, 'b) t
@@ -263,7 +265,11 @@ val pint64 : (int64, 'a, 'b) t -> (pattern, 'a, 'b) t
 val pnativeint : (nativeint, 'a, 'b) t -> (pattern, 'a, 'b) t
 val single_expr_payload : (expression, 'a, 'b) t -> (payload, 'a, 'b) t
 
-val pexp_function : (case list, 'a, 'b) t -> (expression, 'a, 'b) t
+val pexp_function
+  :  (function_param list, 'a, 'b) t
+  -> (type_constraint option, 'b, 'c) t
+  -> (function_body, 'c, 'd) t
+  -> (expression, 'a, 'd) t
 
 val no_label :
   (expression, 'a, 'b) t -> (Asttypes.arg_label * expression, 'a, 'b) t
@@ -288,3 +294,40 @@ type context
 
 val of_func : (context -> Location.t -> 'a -> 'b -> 'c) -> ('a, 'b, 'c) t
 val to_func : ('a, 'b, 'c) t -> context -> Location.t -> 'a -> 'b -> 'c
+
+val fail : Location.t -> string -> _
+(** Call from [of_func]'s argument when the pattern does not match. The string
+    should describe the expected shape of the AST where the match failed. *)
+
+(** {2:future-asts Compat functions for future AST nodes}
+
+    Upstream ppxlib provides these functions to match over encodings of AST
+    nodes that its own AST cannot represent. The OxCaml AST represents them
+    directly. *)
+
+val ptyp_labeled_tuple :
+  ((string option * core_type) list, 'a, 'b) t -> (core_type, 'a, 'b) t
+(** Match over an OCaml 5.4 labeled tuple type.
+
+    It will fail on a regular tuple type and as a consequence, if it matches, at
+    least one type in the tuple is guaranteed to be labeled. *)
+
+val pexp_labeled_tuple :
+  ((string option * expression) list, 'a, 'b) t -> (expression, 'a, 'b) t
+(** Match over an OCaml 5.4 labeled tuple expression.
+
+    It will fail on a regular tuple expression and as a consequence, if it
+    matches, at least one expression in the tuple is guaranteed to be labeled.
+*)
+
+val ppat_labeled_tuple :
+  ((string option * pattern) list * closed_flag, 'a, 'b) t ->
+  (pattern, 'a, 'b) t
+(** Match over an OCaml 5.4 labeled tuple pattern.
+
+    It will fail on a regular tuple expression and as a consequence, if it
+    matches, either at least one pattern in the tuple is guaranteed to be
+    labeled or the flag to be [Open]. *)
+
+val pexp_hole : (expression, 'a, 'a) t
+(** Match over an OCaml 5.6 expression hole. *)

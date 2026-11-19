@@ -65,4 +65,10 @@ let _ =
 (* TEST
  flags = "-g";
  ocamlrunparam += ",b=1";
+ readonly_files = "sanitize-backtrace.sh";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)

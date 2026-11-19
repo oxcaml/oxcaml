@@ -271,8 +271,8 @@ let merge_index ~store_shapes ~into index =
     Hashtbl.add_seq into.cu_shape (Hashtbl.to_seq index.cu_shape);
   { into with defs; approximated; stats; related_uids_store; related_uids }
 
-let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
-    ~do_not_use_cmt_loadpath files =
+let from_files ~store_shapes ~file_kind ~output_file ~root ~rewrite_root
+    ~build_path ~do_not_use_cmt_loadpath files =
   Log.debug "Debug log is enabled";
   let initial_index =
     { defs = Uid_map.empty ();
@@ -323,7 +323,7 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
     if store_shapes then final_index
     else { final_index with cu_shape = Hashtbl.create 0 }
   in
-  write ~file:output_file final_index
+  write ~file_kind ~file:output_file final_index
 
 let gather_shapes ~output_file files =
   let initial_index =
@@ -353,4 +353,4 @@ let gather_shapes ~output_file files =
         | Some index -> merge_index ~store_shapes:true index ~into)
       initial_index files
   in
-  write ~file:output_file final_index
+  write ~file_kind:Standalone ~file:output_file final_index

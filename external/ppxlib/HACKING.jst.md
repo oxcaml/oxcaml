@@ -23,3 +23,19 @@ This may be useful for upstream maintainers to see the changes done in this repo
 1. `git fetch ocaml-ppx-ppxlib`
 2. `export PPXLIB_UPSTREAM_REV="$(git rev-parse ocaml-ppx-ppxlib/main)"`
 3. `git cherry -v "$PPXLIB_UPSTREAM_REV" "$(git subtree split --ignore-joins --prefix=external/ppxlib)"`
+
+## Shared dependencies
+
+Unlike js_of_ocaml's dependencies (see `external/js_of_ocaml/HACKING.jst.md`),
+ppx_derivers and sexp_type are not private to this project: both are shipped
+as their own public packages, built from the nix-provided sources that the
+top-level Makefile links into `external/ast-dependent-libs/deps/`.
+
+ppx_derivers is the registry through which ppxlib's `Deriving` and
+ppx_deriving see each other's derivers when they are linked into the same
+driver: `Ppx_derivers.deriver` is an extensible type, and each framework
+ignores the derivers it doesn't own. That only works with a single copy of it,
+so it has to be the one users' ppx_deriving builds on.
+
+sexp_type's type appears in ppxlib's interface (`Stdppx.Sexp.t`), and has to
+be the same as the one users' sexplib0 builds on.

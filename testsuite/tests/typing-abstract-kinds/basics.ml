@@ -1881,32 +1881,366 @@ val foo : ('a : any). 'a id -> 'a id = <fun>
 
 let cell = ref (None : (_ : any) id option)
 
-(* When G is applied to an anonymous argument, nondep will copy the weak type
-   variable in its output, but this test confirms that the subsequent inclusion
-   check unifies it back with the original. *)
 module G (X : sig kind_ ka end) = struct
   let c = (cell : (_ : X.ka) id option ref)
 end
-
-module A = G (struct kind_ ka = value end)
-module B = G (struct kind_ ka = value end)
 [%%expect{|
 val cell : '_weak1 id option ref = {contents = None}
-module G :
-  functor (X : sig kind_ ka end) -> sig val c : '_weak1 id option ref end
-module A : sig val c : '_weak1 id option ref end
-module B : sig val c : '_weak1 id option ref end
+Line 4, characters 11-15:
+4 |   let c = (cell : (_ : X.ka) id option ref)
+               ^^^^
+Error: The value "cell" has type "'weak1 id option ref"
+       but an expression was expected of type "'a id option ref"
+       The kind constructor "X.ka" would escape its scope
 |}]
 
-let () = A.c := (None : int id option)
-let () = B.c := (None : bool id option)
+(*******************************************************************)
+(* Test: A kind that escapes its scope is replaced by its expansion *)
+
+let cell_manifest = ref (None : (_ : any) id option)
+
+module G_manifest (X : sig end) = struct
+  kind_ k = immediate
+  let c = (cell_manifest : (_ : k) id option ref)
+end
 [%%expect{|
-Line 2, characters 16-39:
-2 | let () = B.c := (None : bool id option)
-                    ^^^^^^^^^^^^^^^^^^^^^^^
+val cell_manifest : '_weak2 id option ref = {contents = None}
+module G_manifest :
+  functor (X : sig end) ->
+    sig kind_ k = immediate val c : '_weak2 id option ref end
+|}]
+
+(* [k] is out of scope here, so the kind of [cell_manifest]'s variable should
+   be [immediate]. *)
+let require_immediate (_ : ('a : immediate) id option ref) = ()
+let () = require_immediate cell_manifest
+[%%expect{|
+val require_immediate : ('a : immediate). 'a id option ref -> unit = <fun>
+|}]
+
+module A_manifest = G_manifest (struct end)
+module B_manifest = G_manifest (struct end)
+let () = A_manifest.c := (None : int id option)
+let () = B_manifest.c := (None : bool id option)
+[%%expect{|
+module A_manifest : sig kind_ k = immediate val c : '_weak2 id option ref end
+module B_manifest : sig kind_ k = immediate val c : '_weak2 id option ref end
+Line 4, characters 25-48:
+4 | let () = B_manifest.c := (None : bool id option)
+                             ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "bool id option"
        but an expression was expected of type "int id option"
        Type "bool" is not compatible with type "int"
+|}]
+
+(* Modal bounds are preserved -- expanding [k] should lead to an error *)
+type ('a : any) id = 'a
+let cell_p = ref (None : (_ : any) id option)
+module G_p (X : sig end) = struct
+  kind_ k = value mod portable
+  let c = (cell_p : (_ : k) id option ref)
+end
+let () = cell_p := (None : (int -> int) id option)
+[%%expect{|
+type ('a : any) id = 'a
+val cell_p : '_weak3 id option ref = {contents = None}
+module G_p :
+  functor (X : sig end) ->
+    sig kind_ k = value mod portable val c : '_weak4 id option ref end
+Line 7, characters 19-50:
+7 | let () = cell_p := (None : (int -> int) id option)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "(int -> int) id option"
+       but an expression was expected of type "'weak4 id id option"
+       Type "(int -> int) id" = "int -> int" is not compatible with type
+         "'weak4 id id" = "'weak4"
+       The kind of int -> int is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of int -> int must be a subkind of value mod portable
+         because of the annotation on the wildcard _ at line 5, characters 20-27.
+|}, Principal{|
+type ('a : any) id = 'a
+val cell_p : '_weak3 id option ref = {contents = None}
+module G_p :
+  functor (X : sig end) ->
+    sig kind_ k = value mod portable val c : '_weak4 id option ref end
+Line 7, characters 19-50:
+7 | let () = cell_p := (None : (int -> int) id option)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "(int -> int) id option"
+       but an expression was expected of type "'weak4 id id id option"
+       Type "(int -> int) id" = "int -> int" is not compatible with type
+         "'weak4 id id id" = "'weak4"
+       The kind of int -> int is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of int -> int must be a subkind of value mod portable
+         because of the annotation on the wildcard _ at line 5, characters 20-27.
+|}]
+
+(************************************************************************)
+(* Test: Refining the kind of an outer variable can't make a kind escape *)
+
+let cell_refine = ref (None : (_ : any) id option)
+
+(* Unification gives [cell_refine]'s variable the kind of the inner variable,
+   rather than lowering the level of the inner variable. *)
+module G_refine (X : sig kind_ ka end) = struct
+  let () = cell_refine := (None : (_ : X.ka) id option)
+  let c = cell_refine
+end
+module K_refine = struct kind_ ka = value end
+module A_refine = G_refine (K_refine)
+module B_refine = G_refine (K_refine)
+let () = A_refine.c := (None : int id option)
+let () = B_refine.c := (None : bool id option)
+[%%expect{|
+val cell_refine : '_weak5 id option ref = {contents = None}
+Line 6, characters 26-55:
+6 |   let () = cell_refine := (None : (_ : X.ka) id option)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a option"
+       but an expression was expected of type "'weak5 id option"
+       Type "'a" is not compatible with type "'weak5 id" = "'weak5"
+       The kind constructor "X.ka" would escape its scope
+|}]
+
+let f_refine (x : (_ : any) id option ref) =
+  let module G (X : sig kind_ ka end) = struct
+    let () = x := (None : (_ : X.ka) id option)
+  end in
+  ()
+[%%expect{|
+Line 3, characters 18-47:
+3 |     let () = x := (None : (_ : X.ka) id option)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a option"
+       but an expression was expected of type "'b id option"
+       Type "'a" is not compatible with type "'b id" = "'b"
+       The kind constructor "X.ka" would escape its scope
+|}]
+
+(*************************************************************************)
+(* Test: Non-generalizable variables in the type of a module can't have its
+   local kinds *)
+
+let x_letmodule =
+  let module M = struct
+    kind_ k
+    let r = ref (None : (_ : k) id option)
+  end in
+  M.r
+[%%expect{|
+Lines 2-6, characters 2-5:
+2 | ..let module M = struct
+3 |     kind_ k
+4 |     let r = ref (None : (_ : k) id option)
+5 |   end in
+6 |   M.r
+Error: The type of this module,
+       sig kind_ k val r : '_weak6 id option ref end,
+       contains a non-generalized variable "'_weak6" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}]
+
+(* [k] has a manifest, so the variable can be given its expansion, and [r] and
+   [get] must keep sharing it. *)
+module M_manifest_local = struct
+  kind_ k = value
+  let r = ref (None : (_ : k) id option)
+  let get () = !r
+end
+let () = M_manifest_local.r := (None : int id option)
+let (_ : bool id option) = M_manifest_local.get ()
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module M_manifest_local = struct
+2 |   kind_ k = value
+3 |   let r = ref (None : (_ : k) id option)
+4 |   let get () = !r
+5 | end
+Error: The type of this module,
+       sig
+         kind_ k = value
+         val r : '_weak7 id option ref
+         val get : unit -> '_weak7 id option
+       end, contains a non-generalized variable "'_weak7" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}]
+
+module M_abstract_local = struct
+  kind_ k
+  type t : k
+  let r = ref (None : (_ : k) id option)
+end
+let () = M_abstract_local.r := (None : M_abstract_local.t id option)
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module M_abstract_local = struct
+2 |   kind_ k
+3 |   type t : k
+4 |   let r = ref (None : (_ : k) id option)
+5 | end
+Error: The type of this module,
+       sig kind_ k type t : k val r : '_weak8 id option ref end,
+       contains a non-generalized variable "'_weak8" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}]
+
+module G_local (X : sig kind_ ka end) = struct
+  let c = ref (None : (_ : X.ka) id option)
+  let get () = !c
+end
+module K_local = struct kind_ ka = value end
+module A_local = G_local (K_local)
+let () = A_local.c := (None : int id option)
+let (_ : bool id option) = A_local.get ()
+module M_include_functor = struct
+  kind_ ka = value
+  include functor G_local
+end
+let () = M_include_functor.c := (None : int id option)
+let (_ : bool id option) = M_include_functor.get ()
+[%%expect{|
+Lines 1-4, characters 0-3:
+1 | module G_local (X : sig kind_ ka end) = struct
+2 |   let c = ref (None : (_ : X.ka) id option)
+3 |   let get () = !c
+4 | end
+Error: The type of this module,
+       functor (X : sig kind_ ka end) ->
+         sig
+           val c : '_weak9 id option ref
+           val get : unit -> '_weak9 id option
+         end,
+       contains a non-generalized variable "'_weak9" of kind "X.ka".
+       The kind constructor "X.ka" would escape its scope.
+|}]
+
+module type Empty = sig end
+let p_package =
+  (module struct
+    kind_ k
+    let r = ref (None : (_ : k) id option)
+  end : Empty)
+[%%expect{|
+module type Empty = sig end
+Lines 3-6, characters 10-5:
+3 | ..........struct
+4 |     kind_ k
+5 |     let r = ref (None : (_ : k) id option)
+6 |   end.........
+Error: The type of this module,
+       sig kind_ k val r : '_weak10 id option ref end,
+       contains a non-generalized variable "'_weak10" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}]
+
+(*********************************************************************)
+(* Test: Applying an anonymous functor doesn't split a weak variable *)
+
+(* Unlike the tests above, no kind escapes its scope here, so the scope checks
+   won't fix this one and it will probably need an additional fix. Applying the
+   functor substitutes [K_anon] for [X] in its result, and [Subst] copies the
+   weak variable separately for [c] and [get]. *)
+module K_anon = struct kind_ ka = value end
+module A_anon =
+  (functor (X : sig kind_ ka end) -> struct
+    let c = ref (None : (_ : X.ka) id option)
+    let get () = !c
+  end) (K_anon)
+let () = A_anon.c := (None : int id option)
+let (_ : bool id option) = A_anon.get ()
+[%%expect{|
+module K_anon : sig kind_ ka = value end
+>> Fatal error: Subst.typexp: weak variable copy
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* As above, but with an anonymous argument. *)
+module A_anon_arg =
+  (functor (X : sig kind_ ka end) -> struct
+    let c = ref (None : (_ : X.ka) id option)
+    let get () = !c
+  end) (struct kind_ ka = value end)
+let () = A_anon_arg.c := (None : int id option)
+let (_ : bool id option) = A_anon_arg.get ()
+[%%expect{|
+>> Fatal error: Ctype.nondep_type_rec: weak variable copy
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* As above, but with an [include functor] application. *)
+module M_include_anon_functor = struct
+  kind_ ka = value
+  include functor (functor (X : sig kind_ ka end) -> struct
+    let c = ref (None : (_ : X.ka) id option)
+    let get () = !c
+  end)
+end
+let () = M_include_anon_functor.c := (None : int id option)
+let (_ : bool id option) = M_include_anon_functor.get ()
+[%%expect{|
+>> Fatal error: Ctype.nondep_type_rec: weak variable copy
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Universal variables are never weak, so these examples should succeed. *)
+type ('a : any) id = 'a
+
+module G_u (X : sig kind_ ka end) = struct
+  let c = ref None
+  let () = c := Some (fun (_ : ('a : X.ka). 'a id -> unit) -> ())
+end
+[%%expect{|
+type ('a : any) id = 'a
+module G_u :
+  functor (X : sig kind_ ka end) ->
+    sig val c : ((('a : X.ka). 'a id -> unit) -> unit) option ref end
+|}]
+
+module A_u = G_u (struct kind_ ka = value end)
+[%%expect{|
+module A_u : sig val c : (('a. 'a id -> unit) -> unit) option ref end
+|}]
+
+module K_u = struct kind_ ka = value end
+module B_u = G_u (K_u)
+[%%expect{|
+module K_u : sig kind_ ka = value end
+module B_u : sig val c : (('a. 'a id -> unit) -> unit) option ref end
+|}]
+
+(****************************************************)
+(* Test: Kinds of universal variables cannot escape *)
+
+module type S = sig kind_ k type t : k end
+type ('a : any) id
+[%%expect{|
+module type S = sig kind_ k type t : k end
+type ('a : any) id
+|}]
+
+let f (module M : S) (x : ('a : M.k). 'a id -> unit) = ()
+[%%expect{|
+Line 1, characters 22-51:
+1 | let f (module M : S) (x : ('a : M.k). 'a id -> unit) = ()
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "('a : M.k). 'a id -> unit"
+       but a pattern was expected which matches values of type "'b"
+       The kind constructor "M.k" would escape its scope
+|}]
+
+let f (module M : S) (x : (type : M.k) id) = ()
+[%%expect{|
+Line 1, characters 21-42:
+1 | let f (module M : S) (x : (type : M.k) id) = ()
+                         ^^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "(type : M.k) id"
+       but a pattern was expected which matches values of type "'a"
+       The kind constructor "M.k" would escape its scope
 |}]
 
 (*****************************************************)
@@ -1989,4 +2323,50 @@ module AppG : sig type t end
 type u = AppG.t
 [%%expect{|
 type u = AppG.t
+|}]
+
+(***************************************************)
+(* Test: kind abbreviations in signature inclusion *)
+
+(* The two kinds only differ in mod bounds, which should be rejected by module
+   inclusion check, through the abbreviation. *)
+
+kind_ portable_value = value mod portable
+
+module type Portable_id = sig
+  val id : ('a : portable_value). 'a -> 'a
+end
+
+module type Value_id = sig
+  val id : ('a : value). 'a -> 'a
+end
+
+module Bad_widen (X : Portable_id) : Value_id = X
+[%%expect{|
+kind_ portable_value = value mod portable
+module type Portable_id =
+  sig val id : ('a : value mod portable). 'a -> 'a end
+module type Value_id = sig val id : 'a -> 'a end
+Line 11, characters 48-49:
+11 | module Bad_widen (X : Portable_id) : Value_id = X
+                                                     ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val id : ('a : value mod portable). 'a -> 'a end
+       is not included in
+         Value_id
+       Values do not match:
+         val id : ('a : value mod portable). 'a -> 'a
+       is not included in
+         val id : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The kind of 'a is value
+         because of the definition of id at line 8, characters 2-33.
+       But the kind of 'a must be a subkind of value mod portable
+         because of the definition of id at line 4, characters 2-42.
+|}]
+
+module Ok_narrow (X : Value_id) : Portable_id = X
+[%%expect{|
+module Ok_narrow : functor (X : Value_id) -> Portable_id
 |}]

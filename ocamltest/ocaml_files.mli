@@ -24,6 +24,8 @@ val runtime_variant : unit -> runtime_variant
 
 val ocamlrun : string
 
+val ocamlrun_sys : string
+
 val ocamlc : string
 
 val ocaml : string
@@ -35,6 +37,25 @@ val ocamlopt : string
 val ocamlopt_dot_opt : string
 
 val ocamlnat : string
+
+val js_of_ocaml : string
+
+val wasm_of_ocaml : string
+
+(** Whether [js_of_ocaml] is installed, so that programs can be compiled with
+    [ocamlopt -target js_of_ocaml] *)
+val jsir_js_available : bool
+
+(** Whether [wasm_of_ocaml] is installed, so that programs can be compiled
+    with [ocamlopt -target wasm_of_ocaml] *)
+val jsir_wasm_available : bool
+
+(** The JavaScript engine used to run JSIR programs ($NODE, or node) *)
+val node : string
+
+(** The flags passed to [node] to run wasm_of_ocaml programs
+    ($NODE_WASM_FLAGS) *)
+val node_wasm_flags : string
 
 val cmpbyt : string
 
@@ -50,6 +71,7 @@ val ocamldoc : string
 val ocamldebug : string
 val ocamlobjinfo : string
 val ocamlmklib : string
+val ocamlfilt : string
 val codegen : string
 
 val fexprc : string

@@ -13,3 +13,7 @@ val flatten : t -> string list
 
 val parse : string -> t
 (** Parse a string into a long identifier built upon [Lident] and [Ldot]. *)
+
+val to_compiler : t -> Ocaml_common.Longident.t
+
+val from_compiler : Ocaml_common.Longident.t -> t

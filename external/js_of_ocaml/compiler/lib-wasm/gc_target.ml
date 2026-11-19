@@ -234,16 +234,27 @@ module Type = struct
     register_type (Printf.sprintf "function_%d" n) (fun () ->
         return { supertype = None; final = true; typ = W.Func (func_type n) })
 
-  let closure_common_fields ~cps =
-    let* fun_ty = function_type ~cps 1 in
-    return
-      [ { W.mut = false; typ = W.Value (Ref { nullable = false; typ = Type fun_ty }) } ]
+  let ref_field ty =
+    { W.mut = false; typ = W.Value (Ref { nullable = false; typ = Type ty }) }
+
+  let code_pointer_fields ~cps arity =
+    match arity with
+    | 0 ->
+        let* fun_ty = function_type ~cps 0 in
+        return [ ref_field fun_ty ]
+    | 1 ->
+        let* fun_ty = function_type ~cps 1 in
+        return [ ref_field fun_ty ]
+    | _ ->
+        let* fun_ty = function_type ~cps 1 in
+        let* fun_ty' = function_type ~cps arity in
+        return [ ref_field fun_ty; ref_field fun_ty' ]
 
   let closure_type_1 ~cps =
     register_type
       (if cps then "cps_closure" else "closure")
       (fun () ->
-        let* fields = closure_common_fields ~cps in
+        let* fields = code_pointer_fields ~cps 1 in
         return { supertype = None; final = false; typ = W.Struct fields })
 
   let closure_last_arg_type ~cps =
@@ -251,7 +262,7 @@ module Type = struct
       (if cps then "cps_closure_last_arg" else "closure_last_arg")
       (fun () ->
         let* cl_typ = closure_type_1 ~cps in
-        let* fields = closure_common_fields ~cps in
+        let* fields = code_pointer_fields ~cps 1 in
         return { supertype = Some cl_typ; final = false; typ = W.Struct fields })
 
   let closure_type ~usage ~cps arity =
@@ -265,17 +276,8 @@ module Type = struct
       register_type
         (if cps then "cps_closure_0" else "closure_0")
         (fun () ->
-          let* fun_ty' = function_type ~cps arity in
-          return
-            { supertype = None
-            ; final = false
-            ; typ =
-                W.Struct
-                  [ { mut = false
-                    ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                    }
-                  ]
-            })
+          let* fields = code_pointer_fields ~cps arity in
+          return { supertype = None; final = false; typ = W.Struct fields })
     else
       register_type
         (if cps
@@ -283,19 +285,8 @@ module Type = struct
          else Printf.sprintf "closure_%d" arity)
         (fun () ->
           let* cl_typ = closure_type_1 ~cps in
-          let* common = closure_common_fields ~cps in
-          let* fun_ty' = function_type ~cps arity in
-          return
-            { supertype = Some cl_typ
-            ; final = false
-            ; typ =
-                W.Struct
-                  (common
-                  @ [ { mut = false
-                      ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                      }
-                    ])
-            })
+          let* fields = code_pointer_fields ~cps arity in
+          return { supertype = Some cl_typ; final = false; typ = W.Struct fields })
 
   let empty_closure_type () =
     register_type "empty_closure" (fun () ->
@@ -329,28 +320,11 @@ module Type = struct
             { supertype = None; final = true; typ = W.Struct (make_env_type env_type) }
         else
           let* cl_typ = closure_type ~usage:`Alloc ~cps arity in
-          let* common = closure_common_fields ~cps in
-          let* fun_ty' = function_type ~cps arity in
+          let* code_pointers = code_pointer_fields ~cps arity in
           return
             { supertype = Some cl_typ
             ; final = true
-            ; typ =
-                W.Struct
-                  ((if arity = 1
-                    then common
-                    else if arity = 0
-                    then
-                      [ { mut = false
-                        ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                        }
-                      ]
-                    else
-                      common
-                      @ [ { mut = false
-                          ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                          }
-                        ])
-                  @ make_env_type env_type)
+            ; typ = W.Struct (code_pointers @ make_env_type env_type)
             })
 
   let rec_env_type ~function_count ~env_type_id ~env_type =
@@ -396,21 +370,13 @@ module Type = struct
             }
         else
           let* cl_typ = closure_type ~usage:`Alloc ~cps arity in
-          let* common = closure_common_fields ~cps in
-          let* fun_ty' = function_type ~cps arity in
+          let* code_pointers = code_pointer_fields ~cps arity in
           return
             { supertype = Some cl_typ
             ; final = true
             ; typ =
                 W.Struct
-                  ((if arity = 1
-                    then common
-                    else
-                      common
-                      @ [ { mut = false
-                          ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                          }
-                        ])
+                  (code_pointers
                   @ [ { W.mut = false
                       ; typ = W.Value (Ref { nullable = false; typ = Type env_ty })
                       }
@@ -424,7 +390,7 @@ module Type = struct
        else Printf.sprintf "curry_%d_%d" arity m)
       (fun () ->
         let* cl_typ = closure_type ~usage:(if m = 2 then `Alloc else `Access) ~cps 1 in
-        let* common = closure_common_fields ~cps in
+        let* common = code_pointer_fields ~cps 1 in
         let* cl_ty =
           if m = arity
           then closure_type ~usage:`Alloc ~cps arity
@@ -451,21 +417,13 @@ module Type = struct
       (fun () ->
         let* cl_typ = closure_type ~cps ~usage:`Alloc arity in
         let* cl_typ' = closure_type ~cps ~usage:`Access arity in
-        let* common = closure_common_fields ~cps in
-        let* fun_ty' = function_type ~cps arity in
+        let* code_pointers = code_pointer_fields ~cps arity in
         return
           { supertype = Some cl_typ
           ; final = true
           ; typ =
               W.Struct
-                ((if arity = 1
-                  then common
-                  else
-                    common
-                    @ [ { mut = false
-                        ; typ = Value (Ref { nullable = false; typ = Type fun_ty' })
-                        }
-                      ])
+                (code_pointers
                 @ [ { W.mut = true
                     ; typ = W.Value (Ref { nullable = true; typ = Type cl_typ' })
                     }
@@ -1694,9 +1652,9 @@ module Closure = struct
     let* curry_fun = if arity > 1 then need_curry_fun ~cps ~arity else return dummy_fun in
     let* cl_typ = Type.closure_type ~usage:`Alloc ~cps arity in
     let closure_contents =
-      if arity = 1
-      then [ W.RefFunc dummy_fun; RefNull (Type cl_typ) ]
-      else [ RefFunc curry_fun; RefFunc dummy_fun; RefNull (Type cl_typ) ]
+      match arity with
+      | 0 | 1 -> [ W.RefFunc dummy_fun; RefNull (Type cl_typ) ]
+      | _ -> [ RefFunc curry_fun; RefFunc dummy_fun; RefNull (Type cl_typ) ]
     in
     return (W.StructNew (ty, closure_contents))
 end
@@ -1843,6 +1801,11 @@ module Bigarray = struct
     let* little_endian = little_endian () in
     let* f =
       register_import
+        (* TODO: remove [~allow_tail_call:false] once a long term fix is released in Safari 27 *)
+        (* We don't allow tail calls here to avoid an iOS 27.2 bug that fails on
+           tail calls across wasm modules and js/wasm modules.
+           These bindings in particular would cross wasm to js. *)
+        ~allow_tail_call:false
         ~import_module:(if Config.Flag.wasi () then "env" else "bindings")
         ~name
         (Fun
@@ -1926,6 +1889,8 @@ module Bigarray = struct
     let* little_endian = little_endian () in
     let* f =
       register_import
+        (* TODO: remove [~allow_tail_call:false] once a long term fix is released in Safari 27 *)
+        ~allow_tail_call:false
         ~import_module:(if Config.Flag.wasi () then "env" else "bindings")
         ~name
         (Fun
@@ -2017,6 +1982,18 @@ module Bigarray = struct
       (let* () = instrs in
        set_at_offset ~kind ta ofs v)
       Value.unit
+
+  (* The offset is used twice for complex numbers, so it is bound first. *)
+  let get_raw ~kind ta ~offset =
+    let ofs = Code.Var.fresh () in
+    seq (store ~typ:I32 ofs offset) (get_at_offset ~kind ta (load ofs))
+
+  let set_raw ~kind ta ~offset v =
+    let ofs = Code.Var.fresh () in
+    seq
+      (let* () = store ~typ:I32 ofs offset in
+       set_at_offset ~kind ta (load ofs) v)
+      Value.unit
 end
 
 module JavaScript = struct
@@ -2026,6 +2003,8 @@ module JavaScript = struct
     let* f =
       let* unit = unit_name in
       register_import
+        (* TODO: remove [~allow_tail_call:false] once a long term fix is released in Safari 27 *)
+        ~allow_tail_call:false
         ~import_module:
           (match unit with
           | None -> "fragments"

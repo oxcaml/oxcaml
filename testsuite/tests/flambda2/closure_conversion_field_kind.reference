@@ -1,0 +1,7 @@
+inline record: Match_failure
+unknown field: Match_failure
+scalar: 0
+compatible record: 3
+compatible int: 42
+value to float: 2
+compatible float: 3

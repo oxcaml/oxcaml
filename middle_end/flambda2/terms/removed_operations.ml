@@ -24,6 +24,7 @@ type t =
     branch : int;
     (* CR-someday pchambart: branch : t list; *)
     direct_call_of_indirect : int;
+    updated_direct_call : int;
     specialized_poly_compare : int;
     requested_inline : int
         (* Benefit to compensate the size of functions marked for inlining *)
@@ -35,6 +36,7 @@ let zero =
     prim = 0;
     branch = 0;
     direct_call_of_indirect = 0;
+    updated_direct_call = 0;
     specialized_poly_compare = 0;
     requested_inline = 0
   }
@@ -66,18 +68,22 @@ let branch = { zero with branch = 1 }
 
 let direct_call_of_indirect = { zero with direct_call_of_indirect = 1 }
 
+let updated_direct_call = { zero with updated_direct_call = 1 }
+
 let specialized_poly_compare = { zero with specialized_poly_compare = 1 }
 
 let [@ocamlformat "disable"] print ppf b =
   Format.fprintf ppf "@[call: %i@ alloc: %i@ \
                       prim: %i@ branch: %i@ \
-                      direct: %i@ poly_cmp: %i@ \
+                      direct: %i@ updated: %i@ \
+                      poly_cmp: %i@ \
                       requested: %i@]"
     b.call
     b.alloc
     b.prim
     b.branch
     b.direct_call_of_indirect
+    b.updated_direct_call
     b.specialized_poly_compare
     b.requested_inline
 
@@ -88,6 +94,7 @@ let ( + ) t1 t2 =
     branch = t1.branch + t2.branch;
     direct_call_of_indirect =
       t1.direct_call_of_indirect + t2.direct_call_of_indirect;
+    updated_direct_call = t1.updated_direct_call + t2.updated_direct_call;
     specialized_poly_compare =
       t1.specialized_poly_compare + t2.specialized_poly_compare;
     requested_inline = t1.requested_inline + t2.requested_inline
@@ -109,6 +116,7 @@ let equal
       prim = prim1;
       branch = branch1;
       direct_call_of_indirect = direct_call_of_indirect1;
+      updated_direct_call = updated_direct_call1;
       specialized_poly_compare = specialized_poly_compare1;
       requested_inline = requested_inline1
     }
@@ -117,11 +125,13 @@ let equal
       prim = prim2;
       branch = branch2;
       direct_call_of_indirect = direct_call_of_indirect2;
+      updated_direct_call = updated_direct_call2;
       specialized_poly_compare = specialized_poly_compare2;
       requested_inline = requested_inline2
     } =
   Int.equal call1 call2 && Int.equal alloc1 alloc2 && Int.equal prim1 prim2
   && Int.equal branch1 branch2
   && Int.equal direct_call_of_indirect1 direct_call_of_indirect2
+  && Int.equal updated_direct_call1 updated_direct_call2
   && Int.equal specialized_poly_compare1 specialized_poly_compare2
   && Int.equal requested_inline1 requested_inline2

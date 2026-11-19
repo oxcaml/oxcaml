@@ -259,7 +259,7 @@ end = struct
       | `Any -> stop p `Any
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
-      | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | `Alias (sub_p, id, _, duid, sort, _, _) ->
           aux
             ( (General.view sub_p, patl),
@@ -281,7 +281,8 @@ end = struct
           | other_view -> continue orpat other_view
         )
       | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
-        | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Lazy _ )
+        | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
+        | `Lazy _ )
         as view -> stop p view
     in
     aux cl
@@ -337,6 +338,7 @@ end = struct
           `Record_unboxed_product (List.map (alpha_field env) fields, r,
                                    closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
+      | `Addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, alpha_pat env p)
       | `Lazy p -> `Lazy (alpha_pat env p)
     in
     { p with pat_desc }
@@ -379,7 +381,7 @@ end = struct
             { p with pat_desc =
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
-      | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -472,9 +474,9 @@ let matcher discr (p : Simple.pattern) rem =
   let open Patterns.Head in
   match (discr.pat_desc, ph.pat_desc) with
   | Any, _ -> rem
-  | ( ( Constant _ | Construct _ | Variant _ | Lazy | Array _ | Record _
-      | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _ | Tuple _
-      | Unboxed_tuple _ ), Any ) ->
+  | ( ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
+      | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
+      | Unboxed_bool _ | Tuple _ | Unboxed_tuple _ ), Any ) ->
       omegas @ rem
   | Constant cst, Constant cst' -> yesif (const_compare cst cst' = 0)
   | Construct (cstr, _, _), Construct (cstr', _, _) ->
@@ -500,10 +502,11 @@ let matcher discr (p : Simple.pattern) rem =
   | Record_unboxed_product (l, _), Record_unboxed_product (l', _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
+  | Addr (mut1, _), Addr (mut2, _) -> yesif (mut1 = mut2)
   | Lazy, Lazy -> yes ()
-  | ( Constant _ | Construct _ | Variant _ | Lazy | Array _ | Record _
-    | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _ | Tuple _
-    | Unboxed_tuple _), _ -> no ()
+  | ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
+    | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
+    | Unboxed_bool _ | Tuple _ | Unboxed_tuple _), _ -> no ()
 
 let ncols = function
   | [] -> 0
@@ -636,7 +639,7 @@ end = struct
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
-          | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher head p right with
@@ -779,7 +782,7 @@ end = struct
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
-          | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -1478,6 +1481,12 @@ let can_group discr pat =
   | Variant _, Variant _
   | Lazy, Lazy ->
       true
+  | Addr (mut1, _), Addr (mut2, _) -> mut1 = mut2
+  | Addr _, Any ->
+      (* [addr_ _] and [_] can be grouped together: this might cause [Pget_ptr]
+         to be executed even in the [_] branch. That's okay because addresses
+         are always safe to read. *)
+      true
   | ( _,
       ( Any
       | Constant
@@ -1490,7 +1499,8 @@ let can_group discr pat =
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
           | Const_untagged_int _ | Const_unboxed_nativeint _ )
       | Construct _ | Unboxed_unit | Unboxed_bool _ | Tuple _ | Unboxed_tuple _
-      | Record _ | Record_unboxed_product _ | Array _ | Variant _ | Lazy ) ) ->
+      | Record _ | Record_unboxed_product _ | Array _ | Variant _ | Addr _
+      | Lazy ) ) ->
       false
 
 let is_or p =
@@ -2487,6 +2497,48 @@ let divide_lazy ~scopes head ctx pm =
     get_pat_args_lazy
     head ctx pm
 
+(* Matching against an address pattern *)
+
+let get_pat_args_addr p rem =
+  match p with
+  | { pat_desc = Tpat_any } -> Patterns.omega :: rem
+  | { pat_desc = Tpat_addr (_, _, arg) } -> arg :: rem
+  | _ -> assert false
+
+let get_expr_args_addr ~scopes head { arg; mut; _ } rem =
+  let loc = head_loc ~scopes head in
+  let addr_mut, sort =
+    match head.pat_desc with
+    | Patterns.Head.Addr (addr_mut, sort) ->
+        addr_mut, Jkind.Sort.default_for_transl_and_get sort
+    | _ -> assert false
+  in
+  let layout = Typeopt.layout_of_sort head.pat_loc sort in
+  let mut_flag : Asttypes.mutable_flag =
+    if Types.is_mutable addr_mut then Mutable else Immutable
+  in
+  let ubr = Translmode.transl_unique_barrier head.pat_unique_barrier in
+  let load_flag : Asttypes.mutable_flag =
+    match ubr with
+    | Must_stay_here -> Mutable
+    | May_be_pushed_down -> mut_flag
+  in
+  {
+    arg = Lprim (Pget_ptr (layout, load_flag), [ arg ], loc);
+    binding_kind =
+      add_barrier_to_let_kind ubr
+        (if Types.is_mutable addr_mut then StrictOpt else Alias);
+    mut = compose_mut mut mut_flag;
+    sort;
+    layout;
+  } :: rem
+
+let divide_addr ~scopes head ctx pm =
+  divide_line (Context.specialize head)
+    (get_expr_args_addr ~scopes)
+    get_pat_args_addr
+    head ctx pm
+
 (* Matching against a tuple pattern *)
 
 let get_pat_args_tuple arity p rem =
@@ -2681,12 +2733,9 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
         Lprim (Punboxed_product_field (pos, lbl_layouts), [ arg ], loc)
       in
       let binding_kind, mut =
-        if Types.is_mutable lbl.lbl_mut then
-          fatal_error
-            ("Matching.get_expr_args_record_unboxed_product: "
-             ^ "unboxed record labels are never mutable")
-        else
-          Alias, compose_mut mut Immutable
+        (* CR mutable-kinds: This is only sound currently because we cannot
+           mutate mutable fields of unboxed records. *)
+        Alias, compose_mut mut Immutable
       in
       let lbl_sort =
         Jkind.Sort.default_for_transl_and_get
@@ -4499,6 +4548,10 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_test
             (divide_array ~scopes kind)
             (combine_array value_kind ploc arg kind arg_partial)
+      | Addr _ ->
+          compile_no_test
+            (divide_addr ~scopes ph)
+            Context.combine
       | Lazy ->
           compile_no_test
             (divide_lazy ~scopes ph)
@@ -4746,8 +4799,6 @@ let rec map_return f = function
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
-  | Lsplice _ as lam ->
-      fatal_error_invalid_constructor lam
 
 (* The 'opt' reference indicates if the optimization is worthy.
 
@@ -4814,33 +4865,18 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_fun_layout { id; uid = duid; lpoly; env_locality_mode; _ }
+  | Tpat_fun_layout { id; uid = duid; lpoly; _ }
       when not (List.is_empty (Lpoly.get_exn lpoly)) ->
     assert (mutable_flag == Asttypes.Immutable);
     let kind_params =
-      List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
+      List.map Layout_ident.of_sort_var (Lpoly.get_exn lpoly)
     in
-    let env_locality_mode =
-      Translmode.transl_typed_locality_mode_r env_locality_mode
-    in
-    let param =
+    let ktmpl_body =
       match param with
       | Lfunction lfun -> lfun
       | _ -> Misc.fatal_error "let poly_ definitions must be functions"
     in
-    let ktmpl_body, ktmpl_env =
-      Lambda.extract_free_var_env param
-        ~layout_of_ident:(Typeopt.layout_of_ident pat.pat_env)
-    in
-    let f =
-      Lkindtemplate
-        { ktmpl_params = kind_params;
-          ktmpl_body;
-          ktmpl_env;
-          ktmpl_env_mode = env_locality_mode;
-          ktmpl_loc = Scoped_location.of_location ~scopes loc;
-        }
-    in
+    let f = Lkindtemplate { ktmpl_params = kind_params; ktmpl_body } in
     Llet (Strict, layout_block, id, duid, f, body)
   | Tpat_var { id; uid = duid; _ }
   | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ }
@@ -4910,6 +4946,7 @@ let flatten_simple_pattern size (p : Simple.pattern) =
   | `Variant _
   | `Record _
   | `Record_unboxed_product _
+  | `Addr _
   | `Lazy _
   | `Construct _
   | `Constant _

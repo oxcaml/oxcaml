@@ -25,6 +25,7 @@ let () =
 
 (* TEST
  flags = "-g";
+ readonly_files = "sanitize-backtrace.sh";
  {
    no-flambda;
    native;

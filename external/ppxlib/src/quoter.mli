@@ -5,8 +5,9 @@
     to refer to the expression it was created from. This way it is impossible
     for quoted fragments to refer to newly introduced expressions.
 
-    For more information, see the {{!"good-practices".quoting} section on
-    quoting} in the good practices section. *)
+    For more information, see the
+    {{!"good-practices".quoting} section on quoting} in the good practices
+    section. *)
 
 open Import
 

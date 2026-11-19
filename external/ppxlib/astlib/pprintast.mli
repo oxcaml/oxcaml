@@ -26,6 +26,9 @@ val pattern : Format.formatter -> Parsetree.pattern -> unit
 val signature : Format.formatter -> Parsetree.signature -> unit
 val structure : Format.formatter -> Parsetree.structure -> unit
 val string_of_structure : Parsetree.structure -> string
+val binding : Format.formatter -> Parsetree.value_binding -> unit
+val longident : Format.formatter -> Longident.t -> unit
+val payload : Format.formatter -> Parsetree.payload -> unit
 
 (* Added in the ppxlib copy *)
 val class_expr : Format.formatter -> Parsetree.class_expr -> unit

@@ -38,7 +38,7 @@
  (build_if
   (and
    (>= %{ocaml_version} 5.2)
-   (not %{oxcaml_supported})
+   (not %{ocaml-config:ox})
    (<> %{env:JSOO_TEST_ENGINE=node} wasi))))
 
 (tests

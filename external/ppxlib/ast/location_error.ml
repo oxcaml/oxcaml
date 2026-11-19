@@ -47,23 +47,29 @@ let raise error = raise (Astlib.Location.Error error)
 let of_extension (extension : Ast.extension) =
   let open Parsetree in
   let parse_msg = function
-    | { pstr_desc =
-          Pstr_eval ({ pexp_desc = Pexp_constant (Pconst_string (msg, _, _)); _ }, [])
-      ; _
-      } -> msg
+    | {
+        pstr_desc =
+          Pstr_eval
+            ({ pexp_desc = Pexp_constant (Pconst_string (msg, _, _)); _ }, []);
+        _;
+      } ->
+        msg
     | _ -> "ppxlib: failed to extract message in ocaml.error"
   in
   let parse_sub_msg = function
-    | { pstr_desc =
-          Pstr_extension (({ txt = "error" | "ocaml.error"; loc }, PStr [ msg ]), [])
-      ; _
-      } -> loc, parse_msg msg
-    | { pstr_loc = loc; _ } -> loc, "ppxlib: failed to parse ocaml.error sub messages"
+    | {
+        pstr_desc =
+          Pstr_extension
+            (({ txt = "error" | "ocaml.error"; loc }, PStr [ msg ]), []);
+        _;
+      } ->
+        (loc, parse_msg msg)
+    | { pstr_loc = loc; _ } ->
+        (loc, "ppxlib: failed to parse ocaml.error sub messages")
   in
   match extension with
   | { txt = "error" | "ocaml.error"; loc }, PStr (main :: sub) ->
-    let main = parse_msg main in
-    let sub = List.map parse_sub_msg sub in
-    Some (make ~loc main ~sub)
+      let main = parse_msg main in
+      let sub = List.map parse_sub_msg sub in
+      Some (make ~loc main ~sub)
   | _ -> None
-;;

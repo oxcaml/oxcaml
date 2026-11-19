@@ -63,6 +63,11 @@ let simplify_nullary_primitive dacc original_prim (prim : P.nullary_primitive)
     let ty = T.any_naked_immediate in
     let dacc = DA.add_variable dacc result_var ty in
     Simplify_primitive_result.create named ~try_reify:false dacc
+  | Thread_self_id ->
+    let named = Named.create_prim original_prim dbg in
+    let ty = T.any_tagged_immediate in
+    let dacc = DA.add_variable dacc result_var ty in
+    Simplify_primitive_result.create named ~try_reify:false dacc
   | Poll ->
     let named = Named.create_prim original_prim dbg in
     let machine_width = DE.machine_width (DA.denv dacc) in

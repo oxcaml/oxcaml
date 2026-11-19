@@ -5,10 +5,10 @@
  (libraries
   jsoo_cmdline
   wasm_of_ocaml-compiler
-  cmdliner
+  oxcaml_private_cmdliner
   compiler-libs.common
   js_of_ocaml-compiler.runtime-files
-  yojson
+  oxcaml_private_yojson
   unix
   (select
    findlib_support.ml
@@ -20,7 +20,12 @@
   byte
   (best exe))
  (flags
-  (:standard -safe-string)))
+  (:standard
+   -safe-string
+   -open
+   Oxcaml_private_cmdliner
+   -open
+   Oxcaml_private_yojson)))
 
 (rule
  (target runtime_files.ml)

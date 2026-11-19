@@ -413,7 +413,9 @@
 ))
 
 
+   ;; There are no systhreads, so each domain has a single thread.
    (func (export "caml_ml_domain_id") (export "caml_ml_domain_index")
+      (export "caml_ml_thread_self_id")
       (param (ref eq)) (result (ref eq))
       (ref.i31 (global.get $caml_domain_id)))
 

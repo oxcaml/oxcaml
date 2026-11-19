@@ -2638,11 +2638,12 @@ end = struct
         | Const_mask _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior
-              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ ),
+              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz
+              | Icomp _ ),
               _ )
         | Intop
             ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
-            | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ )
+            | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz | Icomp _ )
         | Int128op (Iadd128 | Isub128 | Imul64 _)
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
@@ -2679,7 +2680,7 @@ end = struct
           in
           transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
-        | Dls_get | Tls_get | Domain_index -> next
+        | Dls_get | Tls_get | Domain_index | Thread_self_id -> next
 
       let basic next (i : Cfg.basic Cfg.instruction) t : (domain, error) result
           =

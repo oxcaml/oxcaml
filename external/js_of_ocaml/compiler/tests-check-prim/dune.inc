@@ -3,7 +3,7 @@
  (deps main.bc)
  (mode
   (promote (until-clean)))
- (enabled_if (and (>= %{ocaml_version} 5.4)(< %{ocaml_version} 5.5)(not %{oxcaml_supported})))
+ (enabled_if (and (>= %{ocaml_version} 5.4)(< %{ocaml_version} 5.5)(not %{ocaml-config:ox})))
  (action
   (with-stdout-to
    %{targets}
@@ -19,7 +19,7 @@
  (deps unix.bc)
  (mode
   (promote (until-clean)))
- (enabled_if (and (>= %{ocaml_version} 5.4)(< %{ocaml_version} 5.5)(= %{os_type} Win32)(not %{oxcaml_supported})))
+ (enabled_if (and (>= %{ocaml_version} 5.4)(< %{ocaml_version} 5.5)(= %{os_type} Win32)(not %{ocaml-config:ox})))
  (action
   (with-stdout-to
    %{targets}
@@ -35,7 +35,7 @@
  (deps unix.bc)
  (mode
   (promote (until-clean)))
- (enabled_if (and (>= %{ocaml_version} 5.4)(< %{ocaml_version} 5.5)(= %{os_type} Unix)(not %{oxcaml_supported})))
+ (enabled_if (and (>= %{ocaml_version} 5.4)(< %{ocaml_version} 5.5)(= %{os_type} Unix)(not %{ocaml-config:ox})))
  (action
   (with-stdout-to
    %{targets}
@@ -51,7 +51,7 @@
  (deps main.bc)
  (mode
   (promote (until-clean)))
- (enabled_if (and (>= %{ocaml_version} 5.2)(< %{ocaml_version} 5.3)%{oxcaml_supported}))
+ (enabled_if (and (>= %{ocaml_version} 5.2)(< %{ocaml_version} 5.3)%{ocaml-config:ox}))
  (action
   (with-stdout-to
    %{targets}
@@ -67,7 +67,7 @@
  (deps unix.bc)
  (mode
   (promote (until-clean)))
- (enabled_if (and (>= %{ocaml_version} 5.2)(< %{ocaml_version} 5.3)(= %{os_type} Win32)%{oxcaml_supported}))
+ (enabled_if (and (>= %{ocaml_version} 5.2)(< %{ocaml_version} 5.3)(= %{os_type} Win32)%{ocaml-config:ox}))
  (action
   (with-stdout-to
    %{targets}
@@ -83,7 +83,7 @@
  (deps unix.bc)
  (mode
   (promote (until-clean)))
- (enabled_if (and (>= %{ocaml_version} 5.2)(< %{ocaml_version} 5.3)(= %{os_type} Unix)%{oxcaml_supported}))
+ (enabled_if (and (>= %{ocaml_version} 5.2)(< %{ocaml_version} 5.3)(= %{os_type} Unix)%{ocaml-config:ox}))
  (action
   (with-stdout-to
    %{targets}

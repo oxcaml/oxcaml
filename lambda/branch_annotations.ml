@@ -26,20 +26,38 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type t = { likelihood : Likelihood.t } [@@unboxed]
+type t =
+  { likelihood : Likelihood.t;
+    fdo_annotation : Fdo_annotation.t
+  }
 
-let from_likelihood likelihood = { likelihood }
+let create ~likelihood ~fdo_annotation = { likelihood; fdo_annotation }
+
+let from_likelihood likelihood =
+  { likelihood; fdo_annotation = Fdo_annotation.empty }
 
 let default = from_likelihood Likelihood.default
 
 let cold = from_likelihood Likelihood.cold
 
-let likelihood { likelihood } = likelihood
+let likelihood { likelihood; _ } = likelihood
 
-let with_likelihood _ likelihood = { likelihood }
+let with_likelihood t likelihood = { t with likelihood }
 
-let sum_list annots =
-  Likelihood.sum_list (List.map likelihood annots) |> from_likelihood
+let fdo_annotation { fdo_annotation; _ } = fdo_annotation
 
-let add { likelihood = likelihood1 } { likelihood = likelihood2 } =
-  from_likelihood (Likelihood.sum_list [likelihood1 ;likelihood2])
+let with_fdo_annotation t fdo_annotation = { t with fdo_annotation }
+
+let sum_likelihoods annots = Likelihood.sum_list (List.map likelihood annots)
+
+(* The merged branch is taken whenever one of the given branches would be, so
+   its likelihood is the sum of theirs, and it carries all their FDO
+   counters. *)
+let join_point annots =
+  create ~likelihood:(sum_likelihoods annots)
+    ~fdo_annotation:(Fdo_annotation.union (List.map fdo_annotation annots))
+
+(* The likelihood is the sum, as for a merge, but the edge carries no FDO
+   counters: they are counted on the edges below it, and counting them here too
+   would count them twice (see [Fdo_annotation]). *)
+let fork_point annots = from_likelihood (sum_likelihoods annots)

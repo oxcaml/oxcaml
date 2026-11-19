@@ -744,6 +744,9 @@ let enter_inlined_apply =
 let domain_index =
   D.(nullary "%domain_index" ~params:param0 (fun _env () -> P.Domain_index))
 
+let thread_self_id =
+  D.(nullary "%thread_self_id" ~params:param0 (fun _env () -> P.Thread_self_id))
+
 let dls_get = D.(nullary "%dls_get" ~params:param0 (fun _env () -> P.Dls_get))
 
 let tls_get = D.(nullary "%tls_get" ~params:param0 (fun _env () -> P.Tls_get))
@@ -1360,6 +1363,7 @@ module OfFlambda = struct
     | Enter_inlined_apply { dbg = _; inlined_attribute = _ } ->
       enter_inlined_apply env ()
     | Domain_index -> domain_index env ()
+    | Thread_self_id -> thread_self_id env ()
     | Dls_get -> dls_get env ()
     | Tls_get -> tls_get env ()
     | Poll -> poll env ()

@@ -2,6 +2,7 @@
 
 (library
  (name flambda2_floats)
+ (public_name compiler-libs.internal.flambda2_floats)
  (wrapped true)
  (instrumentation
   (backend bisect_ppx))

@@ -52,10 +52,6 @@ val bigarray_specialize_kind_and_layout :
 val layout :
   Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
 
-(* Find the layout of an ident in the given environment. Returns [None] if the
-   ident refers to a primitive. *)
-val layout_of_ident : Env.t -> Ident.t -> Lambda.layout option
-
 (* These translate a type system sort to a lambda layout.  The function [layout]
    gives a more precise result---this should only be used when the kind is
    needed for compilation but the precise Lambda.layout isn't needed for
@@ -91,8 +87,8 @@ val transl_mixed_block_element :
   -> unit Lambda.mixed_block_element
 
 val refine_mixed_block_element :
-  Env.t -> Location.t -> Types.type_expr -> unit Lambda.mixed_block_element
-  -> unit Lambda.mixed_block_element
+  Env.t -> Location.t -> Types.type_expr -> 'a Lambda.mixed_block_element
+  -> 'a Lambda.mixed_block_element
 
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function

@@ -1,13 +1,17 @@
 (* TEST
  stack-allocation;
  flambda2;
- setup-ocamlopt.byte-build-env;
- unset OCAMLPARAM;
- ocamlopt.byte with dump-simplify;
- check-ocamlopt.byte-output;
- check-fexpr-dump;
- run;
- check-program-output;
+ {
+   setup-ocamlopt.byte-build-env;
+   unset OCAMLPARAM;
+   ocamlopt.byte with dump-simplify;
+   check-ocamlopt.byte-output;
+   check-fexpr-dump;
+   run;
+   check-program-output;
+ }{
+   jsir;
+ }
 *)
 
 let[@unboxable] ret_local : unit -> float @ local = fun () -> exclave_ 1.0

@@ -6,4 +6,3 @@
 ulimit -n 32
 
 ${program} 2>&1 | ${test_source_directory}/sanitize-backtrace.sh > ${output}
-echo 'exit_status="'$?'"' > ${ocamltest_response}

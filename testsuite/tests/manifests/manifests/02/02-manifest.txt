@@ -1,1 +1,1 @@
-file bar/bar.cmi 01/bar
+file bar.cmi 01/bar

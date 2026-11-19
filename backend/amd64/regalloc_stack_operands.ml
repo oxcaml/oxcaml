@@ -161,7 +161,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
           { id =
               ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
               | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X
-              | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y );
+              | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y
+              | Kflag _ );
             instr
           } ->
         instr
@@ -255,6 +256,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     May_still_have_spilled_registers
   | Op (Intop (Ilsl | Ilsr | Iasr)) ->
     may_use_stack_operand_for_result map instr ~num_args:2
+  | Op (Intop Inot)
   | Op (Intop_imm ((Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)) ->
     may_use_stack_operand_for_result map instr ~num_args:1
   | Op (Csel _) (* CR gyorsh: optimize *)
@@ -271,8 +273,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       | Const_float _ | Const_float32 _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
       | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Begin_region
-      | End_region | Dls_get | Tls_get | Domain_index | Poll | Pause | Alloc _
-        )
+      | End_region | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll
+      | Pause | Alloc _ )
   | Op
       (Reinterpret_cast
          (Int_of_value | Value_of_int | Mask_of_int64 | Int64_of_mask))
@@ -286,7 +288,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue ->
     (* no rewrite *)
     May_still_have_spilled_registers
-  | Op (Intop_imm ((Ipopcnt | Iclz | Ictz), _))
+  | Op (Intop_imm ((Ipopcnt | Inot | Iclz | Ictz), _))
   | Stack_check _
   | Op (Specific (Illvm_intrinsic _)) ->
     (* should not happen *)

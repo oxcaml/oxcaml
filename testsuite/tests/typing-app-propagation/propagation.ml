@@ -557,11 +557,11 @@ Line 3, characters 53-54:
 3 |     fold ~init:(Ok []) ~f:(fun _ -> if true then Ok [f] else Error 0))
                                                          ^
 Error: The value "f" has type "int -> int" but an expression was expected of type
-         "('a : value_or_null mod portable contended)"
+         "('a : any mod portable contended)"
        The kind of int -> int is value non_float mod aliased immutable
          because it's a function type.
        But the kind of int -> int must be a subkind of
-           value_or_null mod portable contended
+           any mod portable contended
          because of the definition of portable at line 2, characters 4-12.
 |}, Principal{|
 Line 3, characters 4-69:

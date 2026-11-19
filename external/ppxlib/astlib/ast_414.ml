@@ -16,7 +16,6 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
-
 module Asttypes = struct
   type constant (*IF_CURRENT = Asttypes.constant *) =
       Const_int of int
@@ -114,7 +113,32 @@ module Parsetree = struct
   type modality (*IF_CURRENT = Parsetree.modality *) = | Modality of string [@@unboxed]
   type modalities = modality loc list
 
-  type mode (*IF_CURRENT = Parsetree.mode *)= | Mode of string [@@unboxed]
+  type mode_const = string
+  type mode_var = string
+  type mode_morph = string
+
+  type mode (*IF_CURRENT = Parsetree.mode *) =
+    | Pmode of mode_const
+    | Pmode_var of mode_var
+    | Pmode_bounded of mode_bounded
+
+  and mode_bounded (*IF_CURRENT = Parsetree.mode_bounded *) =
+    { pmode_upper : mode_bound;
+      pmode_lower : mode_bound;
+    }
+
+  and mode_bound = mode_bound_elem list
+
+  and mode_bound_elem (*IF_CURRENT = Parsetree.mode_bound_elem *) =
+    | Pbound_var of mode_bound_var
+    | Pbound_const of mode_const loc list
+
+  and mode_bound_var (*IF_CURRENT = Parsetree.mode_bound_var *) =
+    { pbound_morph : mode_morph loc option;
+      pbound_var : mode_var loc;
+      pbound_mod : mode_const loc list;
+    }
+
   type modes = mode loc list
 
   type include_kind (*IF_CURRENT = Parsetree.include_kind *) =
@@ -388,6 +412,11 @@ module Parsetree = struct
             - [(P @ modes)] when [tyopt] is [None]
            *)
     | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
+    | Ppat_addr of mutable_flag * pattern
+        (** [Ppat_addr(flag, P)] represents:
+            - [addr_ P]     when [flag] is [Mutable]
+            - [addr_imm_ P] when [flag] is [Immutable]
+         *)
     | Ppat_lazy of pattern  (** Pattern [lazy P] *)
     | Ppat_unpack of string option loc
         (** [Ppat_unpack(s)] represents:
@@ -688,9 +717,9 @@ module Parsetree = struct
     | Baccess_field of Longident.t loc
         (** [.foo] *)
     | Baccess_block of access_flag * expression
-        (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
-            (usually followed by unboxed accesses, to deepen the index).
-        *)
+        (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)],
+            [.idx_atomic(E)] (usually followed by unboxed accesses,
+            to deepen the index). *)
 
   and unboxed_access (*IF_CURRENT = Parsetree.unboxed_access *) =
     | Uaccess_unboxed_field of Longident.t loc
@@ -918,6 +947,17 @@ module Parsetree = struct
       pjkind_attributes : attributes;
       pjkind_loc : Location.t
     }
+
+  and law_declaration (*IF_CURRENT = Parsetree.law_declaration *) =
+    {
+      plaw_name : string loc;
+      plaw_params : (string loc * core_type option) list;
+      plaw_assumptions : expression list;
+      plaw_conclusion : expression;
+      plaw_attributes : attributes;
+      plaw_loc : Location.t
+    }
+    (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C] *)
 
 
   (** {1 Class language} *)
@@ -1181,6 +1221,8 @@ module Parsetree = struct
     | Psig_extension of extension * attributes  (** [[%%id]] *)
     | Psig_jkind of jkind_declaration
         (** [kind_abbrev_ name = k] *)
+    | Psig_law of law_declaration
+        (** [law_? name x (y : T) : A implies_ C] *)
 
   and module_declaration (*IF_CURRENT = Parsetree.module_declaration *) =
     {
@@ -1290,6 +1332,7 @@ module Parsetree = struct
     | Pmod_functor of functor_parameter * module_expr
         (** [functor(X : MT1) -> ME] *)
     | Pmod_apply of module_expr * module_expr  (** [ME1(ME2)] *)
+    | Pmod_apply_unit of module_expr (** [ME1()] *)
     | Pmod_constraint of module_expr * module_type option * modes  (** [(ME : MT)] *)
     | Pmod_unpack of expression  (** [(val E)] *)
     | Pmod_extension of extension  (** [[%id]] *)
@@ -1343,12 +1386,22 @@ module Parsetree = struct
     | Pstr_extension of extension * attributes  (** [[%%id]] *)
     | Pstr_jkind of jkind_declaration
         (** [kind_abbrev_ name = k] *)
+    | Pstr_law of law_declaration
+        (** [law_? name x (y : T) : A implies_ C] *)
+
+  and value_constraint (*IF_CURRENT = Parsetree.value_constraint *) =
+    | Pvc_constraint of {
+      locally_abstract_univars:string loc list;
+      typ:core_type;
+      }
+    | Pvc_coercion of {ground:core_type option; coercion:core_type }
 
   and value_binding (*IF_CURRENT = Parsetree.value_binding *) =
     {
       pvb_is_poly: bool; (** [let poly_ ] *)
       pvb_pat: pattern;
       pvb_expr: expression;
+      pvb_constraint: value_constraint option;
       pvb_modes: modes;
       pvb_attributes: attributes;
       pvb_loc: Location.t;

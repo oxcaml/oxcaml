@@ -51,6 +51,9 @@ module Extension : sig
   val enabled_vec256 : unit -> bool
   val enabled_vec512 : unit -> bool
   val enabled_instruction : Amd64_simd_instrs.instr -> bool
+
+  (* Raised when the code being compiled requires a disabled extension. *)
+  exception Disabled of string
 end
 
 val trap_notes : bool ref
@@ -154,6 +157,9 @@ val identity_addressing : addressing_mode
 val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
+
+(* Strength-reduce [x * mult] into a single [lea] for [mult] in {3, 5, 9}. *)
+val strength_reduce_mul : int -> specific_operation option
 
 (** [fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta] is used
     by the peephole optimizer to delete an instruction [r := r + delta] that
