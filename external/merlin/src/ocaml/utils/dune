@@ -4,3 +4,7 @@
   (libraries merlin_utils str unix)
   (modules :standard \ linkdeps)
   (flags :standard -open Merlin_utils))
+
+; [Header_bits] is generated in the compiler from runtime/caml/header_bits.h;
+; use the compiler's copy, so that the header layout has a single source.
+(copy_files %{workspace_root}/utils/header_bits.ml)

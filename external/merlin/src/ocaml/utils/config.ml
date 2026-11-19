@@ -46,7 +46,7 @@ let interface_suffix = ref ".mli"
 let max_tag = 245
 let flat_float_array = false
 
-let reserved_header_bits = 8
+let reserved_header_bits = Header_bits.reserved_bits
 let syntax_quotations = true
 
 let merlin = true
