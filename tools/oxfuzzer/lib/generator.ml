@@ -1503,7 +1503,6 @@ and gen_let_rec_call (st : State.t) (env : Env.t) ty (first : Local_function.t)
             { func = Expr.Opaque (Expr.Apply { func; args = [fuel] }); args }
         else Expr.Apply { func; args = fuel :: args })
 
-(* Performs an effect handled around the expression. *)
 and gen_perform (st : State.t) (env : Env.t) ty =
   let effects =
     List.filter
@@ -1517,8 +1516,6 @@ and gen_perform (st : State.t) (env : Env.t) ty =
       convert_value st eff.ty ty
         (Expr.Perform { eff; arg = gen_value st env eff.ty }))
 
-(* Evaluates an expression, which runs in a function, in a handler of an effect,
-   which it can perform. *)
 and gen_handle (st : State.t) (env : Env.t) ty =
   Gen.when_
     (is_value ty && st.handles_remaining > 0 && not (List.is_empty st.effects))
