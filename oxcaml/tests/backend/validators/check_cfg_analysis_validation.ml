@@ -44,7 +44,8 @@ let test_diamond () =
     [ block entry_label
         (terminator
            ~arg:[| int.(0) |]
-           (Truth_test { ifso = left; ifnot = right }));
+           (Truth_test
+              { ifso = Cfg.successor left; ifnot = Cfg.successor right }));
       block left (terminator (Always join));
       block right (terminator (Always join));
       block join (terminator ~arg:[| int.(0) |] Return) ]
@@ -61,11 +62,15 @@ let test_nested_loops () =
       block outer_header
         (terminator
            ~arg:[| int.(0) |]
-           (Truth_test { ifso = inner_header; ifnot = exit }));
+           (Truth_test
+              { ifso = Cfg.successor inner_header; ifnot = Cfg.successor exit }));
       block inner_header
         (terminator
            ~arg:[| int.(1) |]
-           (Truth_test { ifso = inner_body; ifnot = outer_latch }));
+           (Truth_test
+              { ifso = Cfg.successor inner_body;
+                ifnot = Cfg.successor outer_latch
+              }));
       block inner_body (terminator (Always inner_header));
       block outer_latch (terminator (Always outer_header));
       block exit (terminator ~arg:[| int.(0) |] Return) ]
@@ -79,13 +84,15 @@ let test_irreducible () =
     [ block entry_label
         (terminator
            ~arg:[| int.(0) |]
-           (Truth_test { ifso = left; ifnot = right }));
+           (Truth_test
+              { ifso = Cfg.successor left; ifnot = Cfg.successor right }));
       block left (terminator (Always join));
       block right (terminator (Always join));
       block join
         (terminator
            ~arg:[| int.(1) |]
-           (Truth_test { ifso = left; ifnot = right })) ]
+           (Truth_test
+              { ifso = Cfg.successor left; ifnot = Cfg.successor right })) ]
   |> validate
 
 let test_reachable () =
