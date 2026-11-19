@@ -68,7 +68,6 @@ module Loop_variable = struct
     }
 end
 
-(* A function bound in an expression, by its name. *)
 module Local_function = struct
   type t =
     { name : Name.t;
@@ -77,12 +76,12 @@ module Local_function = struct
     }
 end
 
-(* The functions of a set of local recursive functions, as seen from their
-   bodies. Each function takes [fuel] first, and calls between them decrease
-   it. *)
+(* The functions of a set of local recursive functions. *)
 module Recursion = struct
   type t =
     { fuel : Name.t;
+          (* Each function takes this as an argument, and calls between them
+             decrease it to ensure termination. *)
       functions : Local_function.t list
     }
 
@@ -231,18 +230,18 @@ let random_exceptions (st : State.t) exceptions ~count =
   in
   pick [] exceptions count
 
+let random_int_in_range (st : State.t) ~min ~max =
+  Random.State.int_in_range st.random_state ~min ~max
+
+let with_probability (st : State.t) ~probability =
+  Random.State.int st.random_state Config.max_probability < probability
+
 (* [Some prefix] if [types] is [prefix @ suffix] with a nonempty [prefix]. *)
 let split_suffix types ~suffix =
   let count = List.length types - List.length suffix in
   if count > 0 && List.equal Ty.equal (List.drop count types) suffix
   then Some (List.take count types)
   else None
-
-let random_int_in_range (st : State.t) ~min ~max =
-  Random.State.int_in_range st.random_state ~min ~max
-
-let with_probability (st : State.t) ~probability =
-  Random.State.int st.random_state Config.max_probability < probability
 
 let maybe_assert (st : State.t) ~f =
   match st.swarm.assertions with
@@ -1123,8 +1122,6 @@ and gen_closure_call (st : State.t) (env : Env.t) result_ty =
         | _ -> None)
       (places st env ~for_write:false)
   in
-  (* Top-level functions returning function values, applied to more arguments
-     than they take. *)
   let over_applications =
     if not st.swarm.partial_applications
     then []
@@ -1260,8 +1257,6 @@ and gen_lambda (st : State.t) (env : Env.t) params result_ty =
   in
   Expr.Lambda { params; inline; body; result_ty }
 
-(* Calls a function of the recursive set whose body is being generated, with
-   less fuel. *)
 and gen_recursive_call (st : State.t) (env : Env.t) result_ty =
   match env.recursion with
   | None -> Gen.unavailable
@@ -1357,8 +1352,6 @@ and gen_let_rec (st : State.t) (env : Env.t) ty =
           body = gen_let_rec_call st env ty first
         })
 
-(* A function of a recursive set, as a [Lambda] taking the fuel first, and the
-   functions of the set that it calls. *)
 and gen_recursive_function (st : State.t) (env : Env.t) ~functions
     ({ params; result; _ } : Local_function.t) =
   let binding ty = { Binding.name = State.fresh st; ty; is_mutable = false } in
@@ -1396,7 +1389,6 @@ and gen_recursive_function (st : State.t) (env : Env.t) ~functions
   in
   Expr.Lambda { params; inline = Default; body; result_ty = result }, callees
 
-(* The call to the first function of a recursive set, of type [ty]. *)
 and gen_let_rec_call (st : State.t) (env : Env.t) ty (first : Local_function.t)
     =
   let fuel = random_int_in_range st ~min:0 ~max:Config.max_recursion_fuel in
@@ -1412,7 +1404,6 @@ and gen_let_rec_call (st : State.t) (env : Env.t) ty (first : Local_function.t)
     bind_operands st args ~f:(fun args ->
         if partial
         then
-          (* Apply the closure of a partial application. *)
           Expr.Apply
             { func = Expr.Opaque (Expr.Apply { func; args = [fuel] }); args }
         else Expr.Apply { func; args = fuel :: args })
