@@ -441,10 +441,6 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms ~fdo_region =
       let uacc =
         add_orphaned_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
       in
-      let uacc =
-        UA.add_free_names uacc (Apply_cont.free_names action)
-        |> UA.notify_added ~code_size:(Code_size.apply_cont action)
-      in
       let is_cold =
         UE.is_cold_continuation (UA.uenv uacc) (Apply_cont.continuation action)
       in
@@ -482,26 +478,10 @@ type new_let_cont =
     handler : RE.Continuation_handler.t
   }
 
-let bind_let_cont (uacc : UA.t) (body : RE.t)
-    { cont; handler; free_names_of_handler; cost_metrics_of_handler } =
-  let free_names_of_body = UA.name_occurrences uacc in
-  let expr =
-    RE.create_non_recursive_let_cont
-      (UA.are_rebuilding_terms uacc)
-      cont handler ~body ~free_names_of_body
-  in
-  let name_occurrences =
-    Name_occurrences.remove_continuation
-      (Name_occurrences.union free_names_of_body free_names_of_handler)
-      ~continuation:cont
-  in
-  let uacc =
-    UA.with_name_occurrences uacc ~name_occurrences
-    |> UA.add_cost_metrics
-         (Cost_metrics.increase_due_to_let_cont_non_recursive
-            ~cost_metrics_of_handler)
-  in
-  uacc, expr
+let bind_let_cont (uacc : UA.t) (body : RE.t) { cont; handler } =
+  RE.create_non_recursive_let_cont
+    (UA.are_rebuilding_terms uacc)
+    cont handler ~body
 
 let bind_let_conts uacc ~body new_handlers =
   ListLabels.fold_left new_handlers ~init:body ~f:(fun body new_let_cont ->

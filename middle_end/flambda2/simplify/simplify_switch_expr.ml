@@ -832,9 +832,6 @@ let rebuild_switch
       match switch_merged with
       | Some (dest, args) ->
         let uacc =
-          UA.notify_removed ~operation:Removed_operations.branch uacc
-        in
-        let uacc =
           EB.add_orphaned_fdo_counters_of_collapsed_switch uacc ~fdo_region arms
         in
         (* CR bclement: should use a single unboxed product lookup table *)
