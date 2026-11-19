@@ -211,9 +211,10 @@ let all_coherent column =
     | Variant _, Variant _
     | Lazy, Lazy -> true
     | Addr (mut1, _), Addr (mut2, _) -> mut1 = mut2
+    | Slice { mutability = m1; _ }, Slice { mutability = m2; _ } -> m1 = m2
     | ( Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _
       | Unboxed_tuple _ | Record _ | Record_unboxed_product _ | Array _
-      | Variant _ | Addr _ | Lazy ), _ -> false
+      | Variant _ | Addr _ | Slice _ | Lazy ), _ -> false
   in
   match
     List.find
@@ -397,6 +398,11 @@ module Compat
       am1 = am2 &&
       List.length ps = List.length qs &&
       compats ps qs
+  | Tpat_slice { mutability = m1; elements = e1; _ },
+    Tpat_slice { mutability = m2; elements = e2; _ } ->
+      m1 = m2 &&
+      Patterns.Slice.shape e1 = Patterns.Slice.shape e2 &&
+      compats (slice_element_patterns e1) (slice_element_patterns e2)
   | Tpat_fun_layout _, _
   | Tpat_constant _, _
   | Tpat_unboxed_unit, _
@@ -408,6 +414,7 @@ module Compat
   | Tpat_record (_, _, _), _
   | Tpat_record_unboxed_product (_, _, _), _
   | Tpat_array (_, _, _), _
+  | Tpat_slice _, _
   | Tpat_addr (_, _, _), _
   | Tpat_lazy _, _ ->
       false
@@ -474,6 +481,8 @@ let simple_match d h =
       t1 = t2
   | Constant c1, Constant c2 -> const_compare c1 c2 = 0
   | Addr (mut1, _), Addr (mut2, _) -> mut1 = mut2
+  | Slice { mutability = m1; shape = k1; _ },
+    Slice { mutability = m2; shape = k2; _ } -> m1 = m2 && k1 = k2
   | Lazy, Lazy -> true
   | Record _, Record _ -> true
   | Record_unboxed_product _, Record_unboxed_product _ -> true
@@ -485,7 +494,7 @@ let simple_match d h =
       lbls1 lbls2
   | Array (am1, _, len1), Array (am2, _, len2) -> am1 = am2 && len1 = len2
   | _, Any -> true
-  | ( Construct _ | Variant _ | Constant _ | Addr _ | Lazy
+  | ( Construct _ | Variant _ | Constant _ | Addr _ | Slice _ | Lazy
     | Record _ | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _
     | Tuple _ | Unboxed_tuple _ | Array _ | Any), _ -> false
 
@@ -529,6 +538,7 @@ let simple_match_args discr head args =
   | Unboxed_tuple _
   | Array _
   | Addr _
+  | Slice _
   | Lazy -> args
   | Record (lbls, _) ->
     extract_fields (record_arg discr) (List.combine lbls args)
@@ -543,6 +553,7 @@ let simple_match_args discr head args =
       | Record (lbls, _) -> omega_list lbls
       | Record_unboxed_product (lbls, _) -> omega_list lbls
       | Array (_, _, len) -> Patterns.omegas len
+      | Slice _ -> Patterns.omegas (Patterns.Head.arity discr)
       | Tuple lbls -> omega_list lbls
       | Unboxed_tuple lbls -> omega_list lbls
       | Variant { has_arg = false }
@@ -612,7 +623,7 @@ let discr_pat q pss =
         in
         refine_pat d rows
       | Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Variant _
-      | Array _ -> acc
+      | Array _ | Slice _ -> acc
   in
   let q, _ = deconstruct q in
   match q.pat_desc with
@@ -697,6 +708,18 @@ let set_args q r = match q with
     let args,rest = read_args omegas r in
     make_pat
       (Tpat_array (am, arg_sort, args)) q.pat_type q.pat_env :: rest
+| {pat_desc = Tpat_slice s} ->
+    let elements, rest =
+      match s.elements with
+      | Tslice_closed omegas ->
+          let args, rest = read_args omegas r in
+          Tslice_closed args, rest
+      | Tslice_open { prefix; rest_var; suffix } ->
+          let prefix, r = read_args prefix r in
+          let suffix, rest = read_args suffix r in
+          Tslice_open { prefix; rest_var; suffix }, rest
+    in
+    make_pat (Tpat_slice { s with elements }) q.pat_type q.pat_env :: rest
 | {pat_desc=Tpat_constant _|Tpat_any|Tpat_unboxed_unit|Tpat_unboxed_bool _} ->
     q::r (* case any is used in matching.ml *)
 | {pat_desc =
@@ -958,6 +981,7 @@ let full_match closing env =  match env with
       List.length env = 0x1_00_00
   | Constant _
   | Array _ -> false
+  | Slice _ -> false
   | Tuple _
   | Unboxed_tuple _
   | Record _
@@ -980,7 +1004,7 @@ let should_extend ext env = match ext with
       | Construct ({cstr_tag=Extension _}, _, _) -> false
       | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _ | Unboxed_tuple _
       | Variant _ | Record _ | Record_unboxed_product _
-      | Array _ | Addr _ | Lazy -> false
+      | Array _ | Slice _ | Addr _ | Lazy -> false
       | Any -> assert false
       end
 end
@@ -1316,6 +1340,17 @@ let build_other ext env =
             0.0 (fun f -> f +. 1.0) d env
       | Constant Const_float32 _
       | Constant Const_unboxed_float32 _ -> raise_matched_float32 ()
+      | Slice s ->
+          let has_length n (head, _) =
+            match head.pat_desc with
+            | Slice { shape = Closed m; _ } -> m = n
+            | _ -> false
+          in
+          let rec missing n =
+            if List.exists (has_length n) env then missing (n + 1) else n
+          in
+          Patterns.Head.to_omega_pattern
+            { d with pat_desc = Slice { s with shape = Closed (missing 0) } }
       | Array (am, arg_sort, _) ->
           let all_lengths =
             List.map
@@ -1348,6 +1383,8 @@ let rec has_instance p = match p.pat_desc with
   | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_record_unboxed_product (lps,_,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
+  | Tpat_slice { elements; _ } ->
+      has_instances (slice_element_patterns elements)
   | Tpat_addr (_, _, p) | Tpat_deref { pattern = Some p; _ } | Tpat_lazy p
     -> has_instance p
 
@@ -2083,6 +2120,15 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
         let rs = lubs ps qs in
         make_pat (Tpat_array (am1, arg_sort, rs))
           p.pat_type p.pat_env
+| Tpat_slice s1, Tpat_slice s2
+      when s1.mutability = s2.mutability
+        && Patterns.Slice.(shape s1.elements = shape s2.elements) ->
+    let rs =
+      lubs (slice_element_patterns s1.elements)
+        (slice_element_patterns s2.elements)
+    in
+    let elements = Patterns.Slice.(of_patterns (shape s1.elements) rs) in
+    make_pat (Tpat_slice { s1 with elements }) p.pat_type p.pat_env
 | _,_  ->
     raise Empty
 
@@ -2271,6 +2317,8 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
     List.fold_left (fun r (_, p, _) -> collect_paths_from_pat r p) r ps
 | Tpat_array (_, _, ps) ->
     List.fold_left collect_paths_from_pat r ps
+| Tpat_slice { elements; _ } ->
+    List.fold_left collect_paths_from_pat r (slice_element_patterns elements)
 | Tpat_construct (_, {cstr_tag=Extension _}, _, ps, _)->
     List.fold_left collect_paths_from_pat r (List.map snd ps)
 | Tpat_record (lps,_,_) ->
@@ -2407,6 +2455,11 @@ let inactive ~partial pat =
         | Tpat_lazy _ | Tpat_addr (Mutable _, _, _)
         | Tpat_array (Mutable _, _, _) ->
           false
+        | Tpat_slice { mutability = Mutable _; elements; _ } ->
+          (* Matching on the length doesn't read mutable memory *)
+          slice_element_patterns elements = []
+        | Tpat_slice { mutability = Immutable; elements; _ } ->
+          List.for_all loop (slice_element_patterns elements)
         | Tpat_any | Tpat_var _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
         | Tpat_variant (_, None, _) | Tpat_fun_layout _
         (* Binding an address reads nothing *)
