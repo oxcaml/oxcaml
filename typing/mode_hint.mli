@@ -58,6 +58,7 @@ type mutable_part =
   | Record_field of string
   | Array_elements
   | Address_contents
+  | Slice_elements
 
 type always_dynamic =
   | Application
@@ -94,6 +95,7 @@ type containing =
   | Record of string * modality
   | Array of modality
   | Address of modality
+  | Slice of modality
   | Derived_address
       (** An address into the container, as bound by a dereference pattern *)
   | Constructor of string * modality

@@ -269,7 +269,7 @@ type error =
   | Effect_pattern_below_toplevel
   | Deref_pattern_bad_position
   | Deref_pattern_bad_argument
-  | Slice_pattern_unsupported
+  | Slice_pattern_rest
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -1075,7 +1075,7 @@ type block_path_boxed =
   | Bpath_boxed_tuple_element
       (* An element of a boxed tuple *)
   | Bpath_boxed_offset of Types.mutability
-      (* Contents of an index or address of this mutability *)
+      (* Contents of an index, address or slice of this mutability *)
 
 let block_path_boxed_mutability = function
   | Bpath_boxed_field (_, label) -> label.lbl_mut
@@ -2034,11 +2034,13 @@ type pattern_variable_kind =
   | Std_var
   | As_var
   | Deref_var
+  | Slice_rest_var
   | Continuation_var
 
 let unused_variable_warning pv_kind name : Warnings.t =
   match pv_kind with
-  | As_var | Deref_var -> Unused_var { name; mutated = false }
+  | As_var | Deref_var | Slice_rest_var ->
+    Unused_var { name; mutated = false }
   | Std_var | Continuation_var -> Unused_var_strict { name; mutated = false }
 
 type pattern_variable =
@@ -2450,7 +2452,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
   | Tpat_deref { pattern = None; _ }
-  | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
+  | Tpat_array _ | Tpat_slice _ | Tpat_addr _ | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -2879,6 +2881,21 @@ let solve_Ppat_addr loc env (mutability : mutable_flag) expected_ty =
   unify_pat_types_penv loc env (addr_type ty_arg)
     (generic_instance expected_ty);
   ty_arg, arg_sort
+
+let solve_Ppat_slice loc env (mutability : mutable_flag) expected_ty =
+  let slice_type =
+    match mutability with
+    | Mutable -> Predef.type_slice
+    | Immutable -> Predef.type_slice_imm
+  in
+  let jkind, elt_sort =
+    Jkind.of_new_sort_var ~why:Slice_element
+      ~level:(Ctype.get_current_level ())
+  in
+  let ty_elt = newgenvar jkind in
+  unify_pat_types_penv loc env (slice_type ty_elt)
+    (generic_instance expected_ty);
+  ty_elt, elt_sort
 
 let solve_Ppat_deref env (mutability : Types.mutability) expected_ty =
   let addr_type =
@@ -4624,7 +4641,69 @@ and type_pat_aux
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
-  | Ppat_slice _ -> Error.log_and_raise loc !!penv Slice_pattern_unsupported
+  | Ppat_slice (mut, selements) ->
+      begin match selements with
+      | Pslice_open _ -> Error.log_and_raise loc !!penv Slice_pattern_rest
+      | Pslice_closed _ -> ()
+      end;
+      let ty_arg, arg_sort = solve_Ppat_slice loc penv mut expected_ty in
+      let mutability =
+        match mut with
+        | Mutable -> Mutable {
+          mode = With_regionality.Comonadic.legacy;
+          atomic = Nonatomic
+        }
+        | Immutable -> Immutable
+      in
+      let modalities = Typemode.address_modalities mutability in
+      let has_elements =
+        match selements with
+        | Pslice_closed ps -> ps <> []
+        | Pslice_open { prefix; suffix; _ } -> prefix <> [] || suffix <> []
+      in
+      if has_elements then
+        check_project_mutability ~loc ~env:!!penv Slice_elements mutability
+          pat_mode.mode;
+      let is_contained_by : Mode.Hint.is_contained_by =
+        { containing = Slice Modality; container = (loc, Pattern) }
+      in
+      let mode =
+        apply_left_is_contained_by is_contained_by ~modalities pat_mode.mode
+      in
+      let container_mode = pat_mode.mode in
+      let pat_mode = simple_pat_mode mode in
+      let deref_position =
+        { container_mode; container_loc = loc;
+          base = Bpath_boxed_offset mutability; rev_unboxed = [] }
+      in
+      let type_element sp =
+        type_pat ~pat_mode ~deref_position tps Value sp ty_arg arg_sort
+      in
+      let type_rest_var name =
+        let type_expr = instance expected_ty in
+        let mode = cross_left !!penv expected_ty container_mode in
+        let id, uid =
+          enter_variable ~pv_kind:Slice_rest_var tps name.loc name mode
+            ~kind:(Val_reg sort) type_expr [] sort
+        in
+        Tslice_rest_var { id; name; uid; sort; mode; type_expr }
+      in
+      let elements =
+        match selements with
+        | Pslice_closed ps -> Tslice_closed (List.map type_element ps)
+        | Pslice_open { prefix; rest; suffix } ->
+            let prefix = List.map type_element prefix in
+            let rest_var = Option.map type_rest_var rest in
+            let suffix = List.map type_element suffix in
+            Tslice_open { prefix; rest_var; suffix }
+      in
+      rvp {
+        pat_desc = Tpat_slice { mutability; sort = arg_sort; elements };
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance expected_ty;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
       (* Pretend separate = true *)
       let type_modes = Typemode.transl_mode_with_locality ms in
@@ -5230,6 +5309,29 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
+  | Tpat_slice { mutability; sort = original_arg_sort; elements } ->
+      let mut : mutable_flag =
+        match mutability with
+        | Mutable _ -> Mutable
+        | Immutable -> Immutable
+      in
+      let ty_arg, arg_sort = solve_Ppat_slice loc penv mut expected_ty in
+      assert (
+        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort
+        |> Result.is_ok);
+      let check_elements = map_fold_cont (fun p -> check_rec p ty_arg) in
+      begin match elements with
+      | Tslice_closed ps ->
+          check_elements ps (fun ps ->
+            mkp k (Tpat_slice { mutability; sort = arg_sort;
+                                elements = Tslice_closed ps }))
+      | Tslice_open { prefix; rest_var; suffix } ->
+          check_elements prefix (fun prefix ->
+            check_elements suffix (fun suffix ->
+              mkp k (Tpat_slice { mutability; sort = arg_sort;
+                                  elements = Tslice_open
+                                      { prefix; rest_var; suffix } })))
+      end
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
@@ -14473,8 +14575,9 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[Dereference patterns must bind a variable,@ as in %a.@]"
         Style.inline_code "deref_ x"
-  | Slice_pattern_unsupported ->
-      Location.errorf ~loc "@[Slice patterns are not supported yet.@]"
+  | Slice_pattern_rest ->
+      Location.errorf ~loc
+        "@[Rests in slice patterns are not supported yet.@]"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"
