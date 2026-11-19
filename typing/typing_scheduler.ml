@@ -14,22 +14,32 @@ module Monitor = struct
   (* When omnidirectionality is disabled, jobs just raise normally. *)
   let disabled = { goto = raise; frames = [] }
 
-  let current_ref : t option ref = Local_store.s_ref None
+  let none = { goto = raise; frames = [] }
+
+  let current_ref : t ref = Local_store.s_ref none
 
   let current () =
-    match !current_ref with
-    | Some t -> t
-    | None ->
-      if not (Language_extension.is_enabled Omnidirectionality)
-      then disabled
-      else
-        Misc.fatal_error
-          "Typing_scheduler.Monitor.current: current only defined under a root"
+    let t = !current_ref in
+    if not (Repr.phys_equal t none)
+    then t
+    else if not (Language_extension.is_enabled Omnidirectionality)
+    then disabled
+    else
+      Misc.fatal_error
+        "Typing_scheduler.Monitor.current: current only defined under a root"
 
   let with_current t body =
     let saved = !current_ref in
-    current_ref := Some t;
-    Fun.protect body ~finally:(fun () -> current_ref := saved)
+    current_ref := t;
+    (* This is [Fun.protect] inlined (no closures) *)
+    match body () with
+    | result ->
+      current_ref := saved;
+      result
+    | exception exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      current_ref := saved;
+      Printexc.raise_with_backtrace exn bt
 
   let try_ body ~with_ =
     try
