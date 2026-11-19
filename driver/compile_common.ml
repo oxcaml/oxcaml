@@ -108,13 +108,7 @@ let typecheck_intf info ast =
           (Printtyp.printed_signature
              (Unit_info.original_source_file info.target))
           sg);
-  let modes =
-    let modalities = tsg.Typedtree.sig_modalities in
-    let staticity = Typemod.staticity_of_modalities modalities in
-    let mode = Persistent_env.mode_pers_mod staticity in
-    Includecore.Specific ((mode, None), mode)
-  in
-  ignore (Includemod.signatures info.env ~mark:true ~modes sg sg);
+  Includemod.mark_signature_items_used sg;
   Typecore.force_delayed_checks ();
   Builtin_attributes.warn_unused ();
   Warnings.check_fatal ();
