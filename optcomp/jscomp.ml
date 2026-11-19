@@ -434,7 +434,7 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
       in
       let program =
         Profile.record_call "jsir_link" (fun () ->
-            jsir_linker ~register_globals:!Clflags.link_everything files)
+            jsir_linker ~register_globals:false files)
       in
       let imported_compilation_units =
         List.fold_left
@@ -463,7 +463,7 @@ let make (target : Clflags.Jsir_target.t) ~link_jsir
                ~first_var:0 program);
           Profile.record_call program_name (fun () ->
               run ~target "compile" ~phase:Compile ~input_left_in:ir_file
-                (linkall_args () @ ["-o"; output_name] @ stubs () @ [ir_file]));
+                (["-o"; output_name] @ stubs () @ [ir_file]));
           if not !Clflags.keep_asm_file then Misc.remove_file ir_file)
 
     let link _linkenv objfiles output_name ~cached_genfns_imports:_ ~genfns:_
