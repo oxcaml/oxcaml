@@ -427,81 +427,19 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
 let type_open_ ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
   Env.open_signature ~loc ~used_slot ~toplevel ovf lid env
 
-<<<<<<< Merlin:remap-per-mod
-let initial_env ~loc ~initially_opened_module ~open_implicit_args =
-  let env = Lazy.force Env.initial in
-  let open_module env m =
-    let open Asttypes in
-    let lexbuf = Lexing.from_string m in
-    let txt =
-      Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
-      Ocaml_preprocess.Parse.simple_module_path lexbuf
-    in
-    try
-      let _, _, newenv = type_open_ Override env loc {txt;loc} in
-      newenv
-    with
-      (Typetexp.Error.In_context _
-      | Magic_numbers.Cmi.Error _
-      | Env.Error.In_context _
-      | Persistent_env.Error _) as exn when !Clflags.typing_recovery ->
-        (* Handles errors when the file is empty (but the context is
-           incorrect). If the error has already been logged, it will
-           be overwritten by the final set. *)
-        Typing_recovery.log_or_raise exn;
-        env
-  in
-  let process_open_arg env (arg : Clflags.open_arg) =
-    match arg with
-    | Open m -> open_module env m
-    | Open_cmi cmi ->
-        let _, env = Env.open_pers_signature_cmi cmi env in
-        env
-||||||| Compiler:last-imported
-let initial_env ~loc ~initially_opened_module ~open_implicit_args =
-  let env = Lazy.force Env.initial in
-  let open_module env m =
-    let open Asttypes in
-    let lexbuf = Lexing.from_string m in
-    let txt =
-      Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
-      Parse.simple_module_path lexbuf
-    in
-    try
-      let _, _, newenv = type_open_ Override env loc {txt;loc} in
-      newenv
-    with
-      (Typetexp.Error.In_context _
-      | Cmi_format.Error _
-      | Env.Error.In_context _
-      | Persistent_env.Error _) as exn when !Clflags.typing_recovery ->
-        (* Handles errors when the file is empty (but the context is
-           incorrect). If the error has already been logged, it will
-           be overwritten by the final set. *)
-        Typing_recovery.log_or_raise exn;
-        env
-  in
-  let process_open_arg env (arg : Clflags.open_arg) =
-    match arg with
-    | Open m -> open_module env m
-    | Open_cmi cmi ->
-        let _, env = Env.open_pers_signature_cmi cmi env in
-        env
-=======
 let open_scope_module ~loc env m =
   let open Asttypes in
   let lexbuf = Lexing.from_string m in
   let txt =
     Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
-    Parse.simple_module_path lexbuf
->>>>>>> Compiler:HEAD
+    Ocaml_preprocess.Parse.simple_module_path lexbuf
   in
   try
     let _, _, newenv = type_open_ Override env loc {txt;loc} in
     newenv
   with
     (Typetexp.Error.In_context _
-    | Cmi_format.Error _
+    | Magic_numbers.Cmi.Error _
     | Env.Error.In_context _
     | Persistent_env.Error _) as exn when !Clflags.typing_recovery ->
       (* Handles errors when the file is empty (but the context is

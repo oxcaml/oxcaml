@@ -31,11 +31,13 @@ val typing_recovery      : bool ref
 val nopervasives         : bool ref
 val strict_formats       : bool ref
 val syntax_quotations    : bool ref
-type open_arg =
+type scope_arg =
   | Open of string
   | Open_cmi of string
+  | Open_h of string
+  | Expose of string * string
 
-val open_args            : open_arg list ref
+val scope_args            : scope_arg list ref
 val parameters           : string list ref
 val as_parameter         : bool ref
 val as_argument_for      : string option ref
