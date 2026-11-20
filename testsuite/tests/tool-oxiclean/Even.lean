@@ -44,8 +44,21 @@ abbrev userDefinedStatics : expectedStatics :=
   { item :=
       { typeDeclaration :=
           { abstractTypeRelation :=
-              PER.always
+              PER.refinedImmediate (fun bitsAboveLsb => bitsAboveLsb[0] = false)
           }
       }
   , tail := {}
   }
+
+def expectedRelation (_ _ : Value) : Prop := True
+
+/-
+example :
+    ∀ lhs rhs,
+    Oxiclean.Extracted.Even.interface.structuralRelation
+      userDefinedStatics
+      lhs
+      rhs ↔
+    expectedRelation lhs rhs := by
+  sorry
+-/
