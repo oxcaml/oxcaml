@@ -8571,7 +8571,7 @@ and type_expect_
           (mk_expected ~explanation:While_loop_conditional Predef.type_bool)
       in
       let body_env = Env.add_region_lock env in
-      let (loop_label, has_break, body_env) = Env.add_loop_label body_env in
+      let (wh_label, has_break, body_env) = Env.add_loop_label body_env in
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
       let wh_body, wh_body_sort =
         type_statement ~explanation:While_loop_body
@@ -8585,7 +8585,7 @@ and type_expect_
       in
       rue {
         exp_desc =
-          Texp_while {wh_cond; wh_body; wh_body_sort; loop_label};
+          Texp_while {wh_cond; wh_body; wh_body_sort; wh_label};
         exp_loc = loc; exp_extra = [];
         exp_type;
         exp_attributes = sexp.pexp_attributes;
@@ -8607,7 +8607,7 @@ and type_expect_
         type_for_loop_index ~loc ~env ~param
       in
       let new_env = Env.add_region_lock new_env in
-      let (loop_label, _, new_env) = Env.add_loop_label new_env in
+      let (for_label, _, new_env) = Env.add_loop_label new_env in
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
       let for_body, for_body_sort =
         type_statement ~explanation:For_loop_body ~position new_env sbody
@@ -8615,7 +8615,7 @@ and type_expect_
       rue {
         exp_desc = Texp_for {for_id; for_debug_uid = for_uid; for_pat = param;
                              for_from; for_to; for_dir = dir;
-                             for_body; for_body_sort; loop_label };
+                             for_body; for_body_sort; for_label };
         exp_loc = loc; exp_extra = [];
         exp_type = instance Predef.type_unit;
         exp_attributes = sexp.pexp_attributes;

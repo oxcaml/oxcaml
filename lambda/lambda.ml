@@ -1407,7 +1407,7 @@ and lambda_event_kind =
 type transl_ctx =
   {
     scopes: Debuginfo.Scoped_location.scopes;
-    label_map : static_label Ident.Map.t
+    enclosing_loops : static_label Ident.Map.t
   }
 
 let rec try_to_find_location lam =

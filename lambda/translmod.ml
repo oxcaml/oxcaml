@@ -1243,7 +1243,7 @@ let transl_implementation compilation_unit impl ~loc =
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
-  let transl_ctx = { scopes; label_map = Ident.Map.empty  } in
+  let transl_ctx = { scopes; enclosing_loops = Ident.Map.empty  } in
   let body, repr =
     Translobj.transl_label_init (fun () ->
       transl_implementation_module ~loc ~transl_ctx compilation_unit impl)
@@ -1501,7 +1501,7 @@ let transl_toplevel_item_and_close ~transl_ctx itm =
           in expr, ()))
 
 let transl_toplevel_definition str =
-  let transl_ctx = { scopes = empty_scopes; label_map = Ident.Map.empty } in
+  let transl_ctx = { scopes = empty_scopes; enclosing_loops = Ident.Map.empty } in
   reset_labels ();
   Translprim.clear_used_primitives ();
   make_sequence
