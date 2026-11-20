@@ -1265,6 +1265,26 @@ CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
   return unimplemented_ext_ptr();
 }
 
+CAMLprim value caml_idx_array_advance_bytecode(value idx, value n)
+{
+  CAMLparam2 (idx, n);
+  CAMLlocal1 (res);
+  mlsize_t depth = Wosize_val(idx);
+  // return an invalid index if [idx] has no positions
+  if (depth == 0) {
+    res = caml_alloc_small(1, 1);
+    Field(res, 0) = Val_long(1);
+    CAMLreturn (res);
+  }
+  res = caml_alloc(depth, Tag_val(idx));
+  for (mlsize_t i = 0; i < depth - 1; i++) {
+    Store_field(res, i, Field(idx, i));
+  }
+  Store_field(res, depth - 1,
+              Val_long(Long_val(Field(idx, depth - 1)) + Long_val(n)));
+  CAMLreturn (res);
+}
+
 /* Concatenates idx_prefix and idx_suffix */
 CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
   CAMLparam2 (idx_prefix, idx_suffix);
