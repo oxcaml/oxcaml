@@ -17,7 +17,7 @@ inductive ModuleStatics : Type where
 
 mutual
   universe u
-  variable (AbstractType : Type u)
+  variable (AbstractTypeConstructor : (arity : Nat) → Type u)
 
   inductive ModuleType : Type u where
     | signature
@@ -35,11 +35,13 @@ mutual
 
   structure TypeDecl : Type u where
     arity : Nat
-    manifest : TypeManifest
+    manifest : TypeManifest arity
 
-  inductive TypeManifest : Type u where
-    | abstract (abstractType : AbstractType)
-    | manifest (definition : ValType)
+  inductive TypeManifest : (arity : Nat) → Type u where
+    | abstract {arity}
+        (abstractType : AbstractTypeConstructor arity)
+        : TypeManifest arity
+    | manifest {arity} (definition : ValType) : TypeManifest arity
 
   inductive ValType : Type u where
     | arrow (domain : ValType) (codomain : ValType)
@@ -54,16 +56,16 @@ mutual
 end
 
 /-- Sentinel used to denote that abstract types are left undefined. -/
-inductive Parametric : Type where
+inductive Parametric (arity : Nat) : Type 0 where
   | parametric
 
 mutual
   universe u
-  variable (AbstractType : Type u)
+  variable (AbstractTypeConstructor : (arity : Nat) → Type u)
 
   @[simp]
   def ModuleType.parameterize
-      : ModuleType AbstractType -> ModuleType Parametric
+      : ModuleType AbstractTypeConstructor -> ModuleType Parametric
     | .signature absent present =>
       .signature
         (absent.map (·.parameterize))
@@ -72,7 +74,7 @@ mutual
 
   @[simp]
   def ModuleItemAbsentAtRuntime.parameterize
-      : ModuleItemAbsentAtRuntime AbstractType ->
+      : ModuleItemAbsentAtRuntime AbstractTypeConstructor ->
         ModuleItemAbsentAtRuntime Parametric
     | .moduleType .none => .moduleType .none
     | .moduleType (.some m) => .moduleType (.some m.parameterize)
@@ -80,25 +82,26 @@ mutual
 
   @[simp]
   def ModuleItemPresentAtRuntime.parameterize
-      : ModuleItemPresentAtRuntime AbstractType ->
+      : ModuleItemPresentAtRuntime AbstractTypeConstructor ->
       ModuleItemPresentAtRuntime Parametric
     | .mod moduleType => .mod moduleType.parameterize
     | .val valType => .val valType.parameterize
 
   @[simp]
   def TypeDecl.parameterize
-      : TypeDecl AbstractType -> TypeDecl Parametric
+      : TypeDecl AbstractTypeConstructor -> TypeDecl Parametric
     | { arity, manifest } => { arity, manifest := manifest.parameterize }
 
   @[simp]
-  def TypeManifest.parameterize
-      : TypeManifest AbstractType -> TypeManifest Parametric
+  def TypeManifest.parameterize {arity}
+      : TypeManifest AbstractTypeConstructor arity ->
+        TypeManifest Parametric arity
     | .abstract _ => .abstract .parametric
     | .manifest definition => .manifest definition.parameterize
 
   @[simp]
   def ValType.parameterize
-      : ValType AbstractType -> ValType Parametric
+      : ValType AbstractTypeConstructor -> ValType Parametric
     | .arrow domain codomain => .arrow domain.parameterize codomain.parameterize
     | .constr c args => .constr c.parameterize (args.map (·.parameterize))
     | .firstClassModule signature => .firstClassModule signature.parameterize
@@ -107,7 +110,7 @@ mutual
 
   @[simp]
   def TypeConstr.parameterize
-      : TypeConstr AbstractType -> TypeConstr Parametric
+      : TypeConstr AbstractTypeConstructor -> TypeConstr Parametric
     | .field within index => .field within index
     | .predef predef => .predef predef
 end

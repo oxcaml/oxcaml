@@ -37,10 +37,6 @@ deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
 
 deriving instance Repr for ModuleStatics
 
-deriving instance Repr for
-  ModuleItemAbsentAtRuntime, ModuleItemPresentAtRuntime, ModuleType, TypeDecl,
-  ValType, TypeConstr
-
 def parametric (name : Name) : Lean.Expr :=
   mkApp (mkConst name [.zero]) (mkConst ``Model.Parametric)
 
@@ -148,14 +144,16 @@ namespace WorkaroundForPr14959
 
   def TypeDecl.toTerm : TypeDecl Lean.Expr → Lean.Expr
     | { manifest, arity } =>
+      let arity := toExpr arity
       let manifest := match manifest with
         | .none =>
-          mkApp
+          mkApp2
             (parametric ``Model.TypeManifest.abstract)
-            (mkConst ``Model.Parametric.parametric)
+            arity
+            (mkApp (mkConst ``Model.Parametric.parametric) arity)
         | .some definition =>
-          mkApp (parametric ``Model.TypeManifest.manifest) definition
-      mkApp2 (parametric ``Model.TypeDecl.mk) (toExpr arity) manifest
+          mkApp2 (parametric ``Model.TypeManifest.manifest) arity definition
+      mkApp2 (parametric ``Model.TypeDecl.mk) arity manifest
 
   section ValType
     variable (ModuleType : Type)

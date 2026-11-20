@@ -135,25 +135,70 @@ namespace PER
     transitive
       | .refinedImm r, .refinedImm _ => .refinedImm r
 
-  inductive ModuleRuntimeBlock (valuesRelation : PER (List Value))
+  inductive Boolean : Value → Value → Prop where
+    | false
+        : Boolean
+            (.immediate { bitsAboveLsb := 0 })
+            (.immediate { bitsAboveLsb := 0 })
+    | true
+        : Boolean
+            (.immediate { bitsAboveLsb := 1 })
+            (.immediate { bitsAboveLsb := 1 })
+
+  def boolean : PER Value where
+    eq := Boolean
+    symmetric
+      | .false => .false
+      | .true => .true
+    transitive
+      | .false, .false => .false
+      | .true, .true => .true
+
+  inductive OxCamlOption (ifSome : PER Value) : Value → Value → Prop where
+    | none
+        : OxCamlOption ifSome
+            (.immediate { bitsAboveLsb := 0 })
+            (.immediate { bitsAboveLsb := 0 })
+    | some
+        {lhs rhs : Value}
+        (relatedValuesInSome : ifSome.eq lhs rhs)
+        : OxCamlOption ifSome
+            (.indirection
+              (.noMutableFields { tag := 0, contents := .values [lhs] }))
+            (.indirection
+              (.noMutableFields { tag := 0, contents := .values [rhs] }))
+
+  def option (ifSome : PER Value) : PER Value where
+    eq := OxCamlOption ifSome
+    symmetric
+      | .none => .none
+      | .some s => .some (ifSome.symmetric s)
+    transitive
+      | .none, .none => .none
+      | .some ab, .some bc => .some (ifSome.transitive ab bc)
+
+  inductive ModuleRuntimeBlock (relationOnValuesInTheBlock : PER (List Value))
       : Value → Value → Prop where
     | moduleRuntimeBlock
         {lhs rhs}
-        (valuesSatisfyRelation : valuesRelation.eq lhs rhs)
-        : ModuleRuntimeBlock valuesRelation
+        (valuesSatisfyRelation : relationOnValuesInTheBlock.eq lhs rhs)
+        : ModuleRuntimeBlock relationOnValuesInTheBlock
             (.indirection (.noMutableFields
               { tag := 0, contents := .values lhs }))
             (.indirection (.noMutableFields
               { tag := 0, contents := .values rhs }))
 
-  def moduleRuntimeBlock (valuesRelation : PER (List Value)) : PER Value where
-    eq := ModuleRuntimeBlock valuesRelation
+  def moduleRuntimeBlock
+      (relationOnValuesInTheBlock : PER (List Value))
+      : PER Value where
+    eq := ModuleRuntimeBlock relationOnValuesInTheBlock
     symmetric
       | .moduleRuntimeBlock valuesSatisfyRelation =>
-        .moduleRuntimeBlock (valuesRelation.symmetric valuesSatisfyRelation)
+        .moduleRuntimeBlock
+          (relationOnValuesInTheBlock.symmetric valuesSatisfyRelation)
     transitive
       | .moduleRuntimeBlock ab, .moduleRuntimeBlock bc =>
-        .moduleRuntimeBlock (valuesRelation.transitive ab bc)
+        .moduleRuntimeBlock (relationOnValuesInTheBlock.transitive ab bc)
 
   inductive Cons {α} (headRelation : PER α) (tailRelation : PER (List α))
       : List α → List α → Prop where
@@ -235,53 +280,98 @@ end Oxiclean.Leoization
 
 open Oxiclean.Leoization
 
+def SemanticTypeConstructor : (arity : Nat) → Type 0
+  | .zero => PER Value
+  | .succ pred => PER Value → SemanticTypeConstructor pred
+
 @[simp]
 def Oxiclean.Model.ModuleType.validWrtExtraction
-    (userSuppliedRefinedSignature : ModuleType (PER Value))
+    (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
     (extractedParametricSignature : ModuleType Parametric)
     : Prop :=
   userSuppliedRefinedSignature.parameterize = extractedParametricSignature
 
+@[simp]
+def Oxiclean.Model.PredefinedType.structuralRelation
+    : PredefinedType → (arity : Nat) × SemanticTypeConstructor arity
+  | .int => ⟨0, PER.immediate⟩
+  | .bool => ⟨0, PER.boolean⟩
+  /- CR-soon wsturgeon: `PER.option` needs a layout as well. -/
+  | .option => ⟨1, PER.option⟩
+
+inductive SemanticTypeConstructor.ArityMismatch : Type 0 where
+  | arityMismatch
+
+@[simp]
+def SemanticTypeConstructor.instantiatedWithArguments?
+    : {arity : Nat} →
+      SemanticTypeConstructor arity →
+      List (PER Value) →
+      Except SemanticTypeConstructor.ArityMismatch (PER Value)
+  | .zero, (relation : PER Value), args =>
+    match args with
+    | [] => .ok relation
+    | _ :: _ => .error .arityMismatch
+  | .succ _, (relation : PER Value → SemanticTypeConstructor _), args =>
+    match args with
+    | [] => .error .arityMismatch
+    | head :: tail => relation head |>.instantiatedWithArguments? tail
+
 mutual
   @[simp]
-  def Oxiclean.Model.ModuleType.structuralRelationInScope
+  def Oxiclean.Model.ModuleType.structuralRelationInScope?
       {Step} [S : StepRelation Step]
-      (context : List (ModuleType (PER Value)))
-      (userSuppliedRefinedSignature : ModuleType (PER Value))
-      : PER Value :=
+      (context : List (ModuleType SemanticTypeConstructor))
+      (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
+      : Except SemanticTypeConstructor.ArityMismatch (PER Value) :=
     match userSuppliedRefinedSignature with
-    | .signature absent present =>
-      present.foldr
-        (fun item : ModuleItemPresentAtRuntime (PER Value) =>
-          PER.cons
-            (@item.structuralRelationInScope Step S
-              (userSuppliedRefinedSignature :: context)))
-        PER.emptyList
-      |> PER.moduleRuntimeBlock
-    | _ => sorry
+    | .signature absent present => do
+      let relationOnValuesInTheBlock ←
+        present.foldrM
+          (fun item tail => do
+            let head ←
+              @item.structuralRelationInScope? Step S
+                (userSuppliedRefinedSignature :: context)
+            .ok (PER.cons head tail))
+          PER.emptyList
+      .ok (PER.moduleRuntimeBlock relationOnValuesInTheBlock)
+    | .field within index => sorry
 
   @[simp]
-  def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope
+  def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope?
       {Step} [S : StepRelation Step]
-      (context : List (ModuleType (PER Value)))
-      : ModuleItemPresentAtRuntime (PER Value) → PER Value
-    | .mod m => @m.structuralRelationInScope Step S context
-    | .val v => @v.structuralRelationInScope Step S context
+      (context : List (ModuleType SemanticTypeConstructor))
+      : ModuleItemPresentAtRuntime SemanticTypeConstructor →
+        Except SemanticTypeConstructor.ArityMismatch (PER Value)
+    | .mod m => @m.structuralRelationInScope? Step S context
+    | .val v => @v.structuralRelationInScope? Step S context
 
   @[simp]
-  def Oxiclean.Model.ValType.structuralRelationInScope
+  def Oxiclean.Model.ValType.structuralRelationInScope?
       {Step} [S : StepRelation Step]
-      (context : List (ModuleType (PER Value)))
-      : ValType (PER Value) → PER Value
-    | .arrow domain codomain =>
-      @PER.closure Step S
-        (@domain.structuralRelationInScope Step S context)
-        (@codomain.structuralRelationInScope Step S context)
-    | _ => sorry
+      (context : List (ModuleType SemanticTypeConstructor))
+      : ValType SemanticTypeConstructor →
+        Except SemanticTypeConstructor.ArityMismatch (PER Value)
+    | .arrow domain codomain => do
+      let domain ← @domain.structuralRelationInScope? Step S context
+      let codomain ← @codomain.structuralRelationInScope? Step S context
+      .ok (@PER.closure Step S domain codomain)
+    | .constr c args =>
+      match c with
+      | .field within index => sorry
+      | .predef p => do
+        let ⟨arity, ctor⟩ := p.structuralRelation
+        let args ← args.mapM (@·.structuralRelationInScope? Step S context)
+        ctor.instantiatedWithArguments? args
+    | .firstClassModule signature =>
+      @signature.structuralRelationInScope? Step S context
+    | .poly body => sorry
+    | .var deBruijn => sorry
 end
 
 @[simp]
-def Oxiclean.Model.ModuleType.structuralRelation
+def Oxiclean.Model.ModuleType.structuralRelation?
       {Step} [S : StepRelation Step]
-    : ModuleType (PER Value) → PER Value :=
-  (@·.structuralRelationInScope Step S [])
+    : ModuleType SemanticTypeConstructor →
+      Except SemanticTypeConstructor.ArityMismatch (PER Value) :=
+  (@·.structuralRelationInScope? Step S [])

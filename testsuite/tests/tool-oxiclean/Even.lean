@@ -43,12 +43,12 @@ example : Oxiclean.Extracted.Even.implementation = expectedImplementation := by 
 def evenImmediates : PER Value :=
   PER.refinedImmediate (fun bits : BitVec 63 => bits[0] = false)
 
-abbrev refinedInterface : ModuleType (PER Value) :=
-  let int : ValType (PER Value) := .constr (.predef .int) []
-  let t : ValType (PER Value) := .constr (.field (.var 0) 0) []
-  let t_option : ValType (PER Value) := .constr (.predef .option) [t]
-  let create : ValType (PER Value) := .arrow int t_option
-  let get : ValType (PER Value) := .arrow t int
+abbrev refinedInterface : ModuleType SemanticTypeConstructor :=
+  let int : ValType _ := .constr (.predef .int) []
+  let t : ValType _ := .constr (.field (.var 0) 0) []
+  let t_option : ValType _ := .constr (.predef .option) [t]
+  let create : ValType _ := .arrow int t_option
+  let get : ValType _ := .arrow t int
 
   .signature
     [.valType { manifest := .abstract evenImmediates, arity := 0 }]
@@ -62,6 +62,6 @@ abbrev expectedRelation {Step} [StepRelation Step] : PER Value :=
   PER.always
 
 example {Step} [S : StepRelation Step]
-    : @refinedInterface.structuralRelation Step S =
-      @expectedRelation Step S := by
+    : @refinedInterface.structuralRelation? Step S =
+      .ok (@expectedRelation Step S) := by
   simp
