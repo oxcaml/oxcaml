@@ -222,6 +222,8 @@ module Bin_op : sig
     | Mul
     | Div
     | Rem
+    | Unsigned_div
+    | Unsigned_rem
     | Bit_and
     | Bit_or
     | Bit_xor
