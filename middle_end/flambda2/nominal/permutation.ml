@@ -57,10 +57,10 @@ module Make (N : Container_types.S) = struct
           forwards))
 
   let apply t n =
-    match N.Map.find n t.forwards with exception Not_found -> n | n -> n
+    match N.Map.find_opt n t.forwards with None -> n | Some n -> n
 
   let apply_backwards t n =
-    match N.Map.find n t.backwards with exception Not_found -> n | n -> n
+    match N.Map.find_opt n t.backwards with None -> n | Some n -> n
 
   let add_to_map n1 n2 map =
     if N.equal n1 n2 then N.Map.remove n1 map else N.Map.add n1 n2 map
