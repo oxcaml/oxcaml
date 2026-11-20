@@ -224,21 +224,7 @@ let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
 let oper_result_type = function
   | Capply { result_type = ty; _ } -> ty
   | Cextcall { ty; ty_args = _; alloc = _; func = _; _ } -> ty
-  | Cload { memory_chunk; _ } -> (
-    match memory_chunk with
-    | Word_val -> typ_val
-    | Word_static_block -> typ_static_block
-    | Word_code_pointer -> typ_code_pointer
-    | Word_out_of_heap_data_pointer -> typ_out_of_heap_data_pointer
-    | Word_mask -> typ_mask
-    | Single { reg = Float64 } | Double -> typ_float
-    | Single { reg = Float32 } -> typ_float32
-    | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
-    | Twofiftysix_aligned | Twofiftysix_unaligned -> typ_vec256
-    | Fivetwelve_aligned | Fivetwelve_unaligned -> typ_vec512
-    | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int ->
-      typ_int)
+  | Cload { memory_chunk; _ } -> machtype_of_memory_chunk memory_chunk
   | Calloc _ -> typ_val
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
