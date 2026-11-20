@@ -42,6 +42,15 @@ Error: This definition has type "'b slice -> unit" which is less general than
          in a slice pattern.
 |}]
 
+(* As for arrays, void elements aren't supported yet *)
+let bad (s : unit# slice) = match s with [&| _ |] -> () | _ -> ()
+[%%expect{|
+Line 1, characters 41-49:
+1 | let bad (s : unit# slice) = match s with [&| _ |] -> () | _ -> ()
+                                             ^^^^^^^^
+Error: Types whose layout contains [void] are not yet supported in arrays.
+|}]
+
 (*********)
 (* Modes *)
 
