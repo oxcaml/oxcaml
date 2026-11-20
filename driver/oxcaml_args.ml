@@ -1220,6 +1220,18 @@ let mk_dfexpr_to f =
     Arg.String f,
     "<file> Like -dfexpr but dumps to given file (Flambda 2 only)" )
 
+let mk_fexpr_print_branch_annotations f =
+  ( "-fexpr-print-branch-annotations",
+    Arg.Unit f,
+    " Print the branch annotations of switch arms in fexpr\n\
+    \     (Flambda 2 only)" )
+
+let mk_fexpr_print_fdo_counters f =
+  ( "-fexpr-print-fdo-counters",
+    Arg.Unit f,
+    " Print the FDO annotations of function entries and call sites in fexpr\n\
+    \     (Flambda 2 only)" )
+
 let mk_dslot_offsets f =
   ("-dslot-offsets", Arg.Unit f, " Dump closure offsets (Flambda 2 only)")
 
@@ -1642,6 +1654,8 @@ module type Oxcaml_options = sig
   val dfexpr_after : string -> unit
   val dfexpr_annot : unit -> unit
   val dfexpr_annot_after : string -> unit
+  val fexpr_print_branch_annotations : unit -> unit
+  val fexpr_print_fdo_counters : unit -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
@@ -1893,6 +1907,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr_after F.dfexpr_after;
       mk_dfexpr_annot F.dfexpr_annot;
       mk_dfexpr_annot_after F.dfexpr_annot_after;
+      mk_fexpr_print_branch_annotations F.fexpr_print_branch_annotations;
+      mk_fexpr_print_fdo_counters F.fexpr_print_fdo_counters;
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
       mk_dflow F.dflow;
@@ -2480,6 +2496,10 @@ module Oxcaml_options_impl = struct
   let dfexpr_annot_after pass =
     Flambda2.Dump.fexpr_annot_after := pass :: !Flambda2.Dump.fexpr_annot_after
 
+  let fexpr_print_branch_annotations =
+    set' Flambda2.Dump.fexpr_print_branch_annotations
+
+  let fexpr_print_fdo_counters = set' Flambda2.Dump.fexpr_print_fdo_counters
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
   let dfreshen = set' Flambda2.Dump.freshen
   let dflow = set' Flambda2.Dump.flow

@@ -769,6 +769,8 @@ let ocaml_ignored_flags =
     "-no-manual-module-init";
     "-dfexpr-annot";
     "-dfexpr-annot-after";
+    "-fexpr-print-branch-annotations";
+    "-fexpr-print-fdo-counters";
     "-linscan";
     "-clambda-checks";
     "-dasm-comments";
