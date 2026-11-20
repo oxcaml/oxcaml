@@ -304,8 +304,7 @@ let package_object_files ~ppf_dump files target coercion =
     in
     let import_info_for_the_pack_itself =
       let crc = Env.crc_of_unit packed_compilation_unit_name in
-      Import_info.create packed_compilation_unit_name
-        ~crc_with_unit:(Some (packed_compilation_unit, crc))
+      Import_info.create packed_compilation_unit_name ~crc:(Some crc)
     in
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)

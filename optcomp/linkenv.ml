@@ -33,7 +33,7 @@ type objfile_to_link =
     units : Compilation_unit.t list
   }
 
-module Cmi_consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
+module Cmi_consistbl = Consistbl.Make (CU.Name) (Unit)
 module Cmx_consistbl = Consistbl.Make (CU) (Unit)
 
 type error =
@@ -111,12 +111,11 @@ let check_cmi_consistency t file_name cmis =
     Array.iter
       (fun import ->
         let name = Import_info.name import in
-        let info = Import_info.Intf.info import in
+        let crco = Import_info.Intf.crc import in
         CU.Name.Tbl.replace t.interfaces name ();
-        match info with
+        match crco with
         | None -> ()
-        | Some (kind, crc) ->
-          Cmi_consistbl.check t.crc_interfaces name kind crc file_name)
+        | Some crc -> Cmi_consistbl.check t.crc_interfaces name () crc file_name)
       cmis
   with
   | Cmi_consistbl.Inconsistency
@@ -161,8 +160,8 @@ let check_consistency t ~unit cmis cmxs =
 let extract_crc_interfaces t =
   CU.Name.Tbl.fold
     (fun name () crcs ->
-      let crc_with_unit = Cmi_consistbl.find t.crc_interfaces name in
-      Import_info.Intf.create name crc_with_unit :: crcs)
+      let crc = Cmi_consistbl.find t.crc_interfaces name in
+      Import_info.Intf.create name ~crc:(Option.map snd crc) :: crcs)
     t.interfaces []
 
 let extract_crc_implementations t =

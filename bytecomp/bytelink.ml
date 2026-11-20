@@ -168,7 +168,7 @@ let scan_file ldeps obj_name tolink =
 
 (* Consistency check between interfaces *)
 
-module Consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
+module Consistbl = Consistbl.Make (CU.Name) (Unit)
 
 let crc_interfaces = Consistbl.create ()
 let interfaces = ref ([] : CU.Name.t list)
@@ -178,12 +178,12 @@ let check_consistency file_name cu =
     Array.iter
       (fun import ->
         let name = Import_info.name import in
-        let info = Import_info.Intf.info import in
+        let crco = Import_info.Intf.crc import in
         interfaces := name :: !interfaces;
-        match info with
+        match crco with
           None -> ()
-        | Some (kind, crc) ->
-            Consistbl.check crc_interfaces name kind crc file_name)
+        | Some crc ->
+            Consistbl.check crc_interfaces name () crc file_name)
       cu.cu_imports
   with Consistbl.Inconsistency {
       unit_name = name;
@@ -194,8 +194,8 @@ let check_consistency file_name cu =
 
 let extract_crc_interfaces () =
   Consistbl.extract !interfaces crc_interfaces
-  |> List.map (fun (name, crc_with_unit) ->
-       Import_info.Intf.create name crc_with_unit)
+  |> List.map (fun (name, crc) ->
+       Import_info.Intf.create name ~crc:(Option.map snd crc))
 
 let clear_crc_interfaces () =
   Consistbl.clear crc_interfaces;

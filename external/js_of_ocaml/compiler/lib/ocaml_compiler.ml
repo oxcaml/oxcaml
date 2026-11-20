@@ -323,9 +323,7 @@ module Import_info = struct
   type table = t array
 
   let make name crc =
-    Import_info.create
-      (Compilation_unit.Name.of_string name)
-      ~crc_with_unit:(Option.map ~f:(fun c -> Compilation_unit.of_string name, c) crc)
+    Import_info.create (Compilation_unit.Name.of_string name) ~crc
 
   let to_list = Array.to_list
 

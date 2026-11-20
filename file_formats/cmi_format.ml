@@ -245,13 +245,7 @@ let output_cmi filename oc cmi =
     };
   flush oc;
   let crc = Digest.file filename in
-  let my_info =
-    match cmi.cmi_kind with
-    | Normal { cmi_impl } ->
-      Import_info.Intf.create_normal cmi.cmi_name cmi_impl ~crc
-    | Parameter ->
-      Import_info.Intf.create_parameter cmi.cmi_name ~crc
-  in
+  let my_info = Import_info.Intf.create_loaded cmi.cmi_name ~crc in
   let crcs = Array.append [| my_info |] cmi.cmi_crcs in
   output_value oc (crcs : crcs);
   output_value oc (cmi.cmi_flags : flags);
