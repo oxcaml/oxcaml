@@ -111,8 +111,8 @@ val ge_component : machtype_component -> machtype_component -> bool
 (** Version of [ge_component] that doesn't raise for incomparable components. *)
 val ge_component_bool : machtype_component -> machtype_component -> bool
 
-(** A variant of [machtype] used to describe arguments to external C functions
-*)
+(** A variant of [machtype] used to describe arguments to external C functions.
+    [XMask] and [XVec128/256/512] are not supported on Win64. *)
 type exttype =
   | XInt  (**r OCaml value, word-sized integer *)
   | XInt8  (**r 8-bit integer *)
