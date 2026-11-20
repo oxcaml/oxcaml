@@ -321,6 +321,7 @@ let rec translate_clauses ~transl_exp ~transl_ctx ~loc ~comprehension_body
   | [] -> comprehension_body ~accumulator
 
 let comprehension ~transl_exp ~transl_ctx ~loc { comp_body; comp_clauses } =
+  let transl_ctx = clear_enclosing_loops ~transl_ctx in
   let rev_comprehension =
     translate_clauses ~transl_exp ~transl_ctx ~loc
       ~comprehension_body:(fun ~accumulator ->

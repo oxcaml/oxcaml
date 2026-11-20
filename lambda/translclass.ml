@@ -515,6 +515,7 @@ let rec build_object_init_0
       build_object_init_0
         ~transl_ctx cl_table params cl copy_env subst_env top ids
   | _ ->
+      let transl_ctx = clear_enclosing_loops ~transl_ctx in
       let self = Ident.create_local "self" in
       let self_duid = Lambda.debug_uid_none in
       let env = Ident.create_local "env" in
@@ -901,6 +902,7 @@ let rec transl_class_rebind_0 ~transl_ctx (self:Ident.t) self_debug_uid obj_init
 
 let transl_class_rebind ~transl_ctx cl vf =
   try
+    let transl_ctx = clear_enclosing_loops ~transl_ctx in
     let obj_init = Ident.create_local "obj_init"
     and obj_init_duid = Lambda.debug_uid_none
     and self = Ident.create_local "self"

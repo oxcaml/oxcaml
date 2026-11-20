@@ -1364,11 +1364,27 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
+module Loop_label_map = struct
+  type t = static_label Ident.Map.t
+
+  let empty = Ident.Map.empty
+
+  let add = Ident.Map.add
+
+  let find id t =
+    match Ident.Map.find_opt id t with
+    | Some x -> x
+    | None -> fatal_error "Loop_label_map.find: missing label"
+end
+
 type transl_ctx =
   {
     scopes: Debuginfo.Scoped_location.scopes;
-    enclosing_loops : static_label Ident.Map.t
+    enclosing_loops : Loop_label_map.t
   }
+
+let clear_enclosing_loops ~transl_ctx =
+  { transl_ctx with enclosing_loops = Loop_label_map.empty }
 
 let rec try_to_find_location lam =
   (* This is very much best-effort and may overshoot, but will still likely be
