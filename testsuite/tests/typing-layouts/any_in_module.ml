@@ -910,3 +910,20 @@ end
 [%%expect{|
 module type S = sig module type T = sig val y : int @@ stateless end end
 |}]
+
+(* Regression test: aliasable strengthening turns submodules into aliases,
+   which does not require the enclosing module to be representable. A functor
+   parameter is not aliasable, so the functor case needs a nested module. *)
+
+module M : sig
+  type t : any
+  val x : t
+  module O : sig end
+end = struct
+  type t = int
+  let x = 0
+  module O = struct end
+end
+[%%expect{|
+module M : sig type t : any val x : t module O : sig end end
+|}]
