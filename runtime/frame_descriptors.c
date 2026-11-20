@@ -159,18 +159,52 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
 typedef struct {
   const unsigned char *next; /* points at the next descriptor's delta byte */
   uintnat retaddr;           /* running absolute return address */
-  intnat remaining;          /* descriptors left to yield */
+  bool has_pieces;           /* as for the table: selects the union's field */
+  union {
+    const unsigned char *end_of_pieces; /* if [has_pieces] */
+    intnat remaining; /* descriptors left to yield, if count-prefixed */
+  };
 } frametable_iter;
+
+static bool has_pieces(intnat *tbl)
+{
+  return tbl[0] == FRAMETABLE_SECTIONS_TAG;
+}
+
+/* [tbl] must have pieces */
+static const caml_frametable_sections_header *pieces_header(intnat *tbl)
+{
+  CAMLassert(has_pieces(tbl));
+  return (const caml_frametable_sections_header *)tbl;
+}
+
+/* The address that a header's [_rel] field points to */
+static const unsigned char *rel_target(const int32_t *field)
+{
+  return (const unsigned char *)field + *field;
+}
 
 static void frametable_iter_start(frametable_iter *it, intnat *tbl)
 {
-  it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
-  it->next = (const unsigned char *)(tbl + 1);
+  it->has_pieces = has_pieces(tbl);
+  if (it->has_pieces) {
+    const caml_frametable_sections_header *h = pieces_header(tbl);
+    it->next = rel_target(&h->pieces_start_rel);
+    it->end_of_pieces = rel_target(&h->pieces_stop_rel);
+  } else {
+    it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
+    it->next = (const unsigned char *)(tbl + 1);
+  }
   it->retaddr = 0;
 }
 
+static bool frametable_iter_more(frametable_iter *it)
+{
+  return it->has_pieces ? it->next < it->end_of_pieces : it->remaining > 0;
+}
+
 /* Yield the next descriptor body and its absolute return address. Must
-   only be called while [it->remaining > 0]. */
+   only be called while [frametable_iter_more(it)]. */
 Caml_inline frame_descr *frametable_iter_next(frametable_iter *it,
                                               uintnat *retaddr_out)
 {
@@ -195,15 +229,25 @@ Caml_inline frame_descr *frametable_iter_next(frametable_iter *it,
   struct frame_descr_decoded dec;
   decode_frame_descr(d, &dec);
   it->next = dec.end;
-  it->remaining--;
+  if (!it->has_pieces) it->remaining--;
   *retaddr_out = it->retaddr;
   return d;
+}
+
+/* The number of descriptors that [tbl] accounts for in the hashtable. Under
+   -frametable-sections this is an upper bound, since the linker may have
+   dropped pieces. If the excess ever makes the hashtable too big, the
+   hashtable could instead grow as it is filled, which would need no count. */
+static intnat frametable_num_descr(intnat *tbl)
+{
+  return has_pieces(tbl) ? pieces_header(tbl)->num_descr
+                         : (intnat)caml_read_unaligned_uintnat(tbl);
 }
 
 static intnat count_descriptors(caml_frametable_list *list) {
   intnat num_descr = 0;
   iter_list(list,cur) {
-    num_descr += (intnat)caml_read_unaligned_uintnat(cur->frametable);
+    num_descr += frametable_num_descr(cur->frametable);
   }
   return num_descr;
 }
@@ -288,7 +332,8 @@ Caml_inline void insert_entry(frame_descr_entry *descriptors, uintnat mask,
    by which time the slot's cache line has usually arrived. */
 #define FILL_PREFETCH_DISTANCE 16
 
-static void fill_hashtable(
+/* Returns the number of descriptors inserted */
+static uintnat fill_hashtable(
   caml_frame_descrs *table, caml_frametable_list *new_frametables)
 {
   frame_descr_entry *descriptors = table->descriptors;
@@ -302,7 +347,7 @@ static void fill_hashtable(
   iter_list(new_frametables,cur) {
     frametable_iter it;
     frametable_iter_start(&it, (intnat *) cur->frametable);
-    while (it.remaining > 0) {
+    while (frametable_iter_more(&it)) {
       uintnat retaddr;
       frame_descr *fd = frametable_iter_next(&it, &retaddr);
       uintnat hash = Hash_retaddr(retaddr, mask);
@@ -324,6 +369,16 @@ static void fill_hashtable(
     insert_entry(descriptors, mask,
                  slot->retaddr, slot->hash, slot->fd);
   }
+  return n;
+}
+
+/* The hashtable is sized from the counts, so it cannot hold more */
+static void check_count(uintnat inserted, intnat counted)
+{
+  if (inserted > (uintnat)counted)
+    caml_fatal_error("more frame descriptors (%" ARCH_INTNAT_PRINTF_FORMAT
+                     "u) than counted (%" ARCH_INTNAT_PRINTF_FORMAT "d)",
+                     inserted, counted);
 }
 
 static void remove_entry(caml_frame_descrs *table, uintnat retaddr,
@@ -364,13 +419,12 @@ static void clean_frame_descriptors(caml_frame_descrs *table)
   while (cur != NULL) {
     frametable_iter it;
     frametable_iter_start(&it, (intnat *) cur->frametable);
-    intnat len = it.remaining;
-    while (it.remaining > 0) {
+    while (frametable_iter_more(&it)) {
       uintnat retaddr;
       frame_descr *d = frametable_iter_next(&it, &retaddr);
       remove_entry(table, retaddr, d);
     }
-    decrease += len;
+    decrease += frametable_num_descr(cur->frametable);
     rem = cur;
     cur = cur->next;
     caml_stat_free(rem);
@@ -1062,7 +1116,7 @@ static void add_descriptor_to_stats(frame_descr *d,
         p += (uintnat)(*p) + 1;
       }
       for (uint32_t i = 0; i < dec->num_debuginfo; ++i) {
-        uint32_t offset = caml_read_unaligned_uint32(p);
+        int32_t offset = caml_read_unaligned_int32(p);
         if (offset) { /* there may be invalid debuginfo slots */
           caml_debuginfo_measure((debuginfo)(p + offset));
         }
@@ -1082,17 +1136,18 @@ static void add_frametable_to_stats(intnat *frametable,
                                     struct frametable_stats *stats)
 {
   ++ stats->frametables;
-  if (!stats->min_descr ||
-      ((unsigned char*)frametable < stats->min_descr)) {
-    stats->min_descr = (unsigned char*)frametable;
-  }
-  if (!stats->max_descr ||
-      ((unsigned char*)frametable > stats->max_descr)) {
-    stats->max_descr = (unsigned char*)(frametable+1);
-  }
   frametable_iter it;
   frametable_iter_start(&it, frametable);
-  while (it.remaining > 0) {
+  /* Pieces are away from their header, in the pieces section */
+  unsigned char *start =
+    it.has_pieces ? (unsigned char *)it.next : (unsigned char *)frametable;
+  if (!stats->min_descr || (start < stats->min_descr)) {
+    stats->min_descr = start;
+  }
+  if (!stats->max_descr || (start > stats->max_descr)) {
+    stats->max_descr = (unsigned char *)it.next;
+  }
+  while (frametable_iter_more(&it)) {
     uintnat retaddr;
     frame_descr *d = frametable_iter_next(&it, &retaddr);
     struct frame_descr_decoded dec;
@@ -1150,13 +1205,13 @@ static void add_frame_descriptors(
 
     table->descriptors = alloc_descriptors(tblsize);
 
-    fill_hashtable(table, new_frametables);
+    check_count(fill_hashtable(table, new_frametables), num_descr);
     if (caml_measure_frametables) {
       report_frametables_stats(new_frametables);
     }
   } else {
     table->num_descr += increase;
-    fill_hashtable(table, new_frametables);
+    check_count(fill_hashtable(table, new_frametables), increase);
     if (caml_measure_frametables) {
       report_frametables_stats(new_frametables);
     }

@@ -1,0 +1,9 @@
+2 105 10
+function pieces: some
+plain pieces: 0
+code_begin pieces: 1
+headers: 1
+descriptors in No_frames: 0
+hidden: 2
+object pieces: some
+unlinked object pieces: 0

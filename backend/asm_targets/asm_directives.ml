@@ -36,10 +36,13 @@ let emit_assembly_comments_ref = ref None
 let not_initialized () =
   Misc.fatal_error "[Asm_directives.initialize] has not been called"
 
-let current_section_is_text () =
+let current_section () =
   match !current_section_ref with
   | None -> not_initialized ()
-  | Some section -> Asm_section.section_is_text section
+  | Some section -> section
+
+let current_section_is_text () =
+  Asm_section.section_is_text (current_section ())
 
 let emit_comments () =
   let emit_assembly_comments =
@@ -913,11 +916,7 @@ let label_plus_offset ?comment lab ~offset_in_bytes =
 
 let define_label label =
   let lbl_section = Asm_label.section label in
-  let this_section =
-    match !current_section_ref with
-    | None -> not_initialized ()
-    | Some this_section -> this_section
-  in
+  let this_section = current_section () in
   if not (Asm_section.equal lbl_section this_section)
   then
     Misc.fatal_errorf
@@ -1238,15 +1237,12 @@ let between_labels_32_bit_with_offsets ?comment:_comment ~upper ~upper_offset
 
 let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
   let upper_section = Asm_label.section upper in
-  (match !current_section_ref with
-  | None -> not_initialized ()
-  | Some this_section ->
-    if not (Asm_section.equal upper_section this_section)
-    then
-      Misc.fatal_errorf
-        "Label %a in section %a is not in the current section %a"
-        Asm_label.print upper Asm_section.print upper_section Asm_section.print
-        this_section);
+  let this_section = current_section () in
+  if not (Asm_section.equal upper_section this_section)
+  then
+    Misc.fatal_errorf "Label %a in section %a is not in the current section %a"
+      Asm_label.print upper Asm_section.print upper_section Asm_section.print
+      this_section;
   let offset_upper = Targetint.to_int64 offset_upper in
   let offset_const =
     (* [Unsigned_int] so that large offsets (bit-packed record words, biased
@@ -1257,6 +1253,9 @@ let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
   in
   let expr = Add (Sub (Label upper, This), offset_const) in
   const expr Thirty_two
+
+let between_this_and_symbol_32bit_expr upper =
+  const (Sub (Symbol upper, This)) Thirty_two
 
 let between_symbol_in_current_unit_and_label_offset0 ~upper ~lower ~offset_upper
     ~const_for_width =

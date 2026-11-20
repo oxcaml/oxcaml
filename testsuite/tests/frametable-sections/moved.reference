@@ -1,0 +1,6 @@
+caught Boom 3
+Raised at Moved.hot in file "moved.ml", line 32, characters 32-62
+Called from Moved.hot in file "moved.ml", line 34, characters 7-43
+Called from Moved.hot in file "moved.ml", line 34, characters 7-43
+Called from Moved.hot in file "moved.ml", line 34, characters 7-43
+Called from Moved in file "moved.ml", line 38, characters 13-23
