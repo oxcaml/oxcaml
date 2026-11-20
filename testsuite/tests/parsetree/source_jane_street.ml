@@ -1967,6 +1967,14 @@ Line 1, characters 0-28:
 Error: Laws are not supported yet.
 |}]
 
+law_? with_types (type a (b : value_or_null)) (x : a) (y : b) : true
+[%%expect{|
+Line 1, characters 0-68:
+1 | law_? with_types (type a (b : value_or_null)) (x : a) (y : b) : true
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws are not supported yet.
+|}]
+
 (* Laws in every structure and signature position. *)
 
 module M = struct

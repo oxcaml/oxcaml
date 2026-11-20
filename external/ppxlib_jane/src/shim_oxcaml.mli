@@ -185,6 +185,7 @@ type nonrec law_flag = law_flag =
 type nonrec law_declaration = law_declaration =
   { plaw_flag : law_flag
   ; plaw_name : string loc
+  ; plaw_newtypes : (string loc * jkind_annotation option) list
   ; plaw_params : (string loc * core_type option) list
   ; plaw_assumptions : expression list
   ; plaw_conclusion : expression

@@ -33,6 +33,10 @@ law_? foo ~x : true;;
 
 law_? foo _ : true;;
 
+(* Types come before the parameters. *)
+
+law_? foo (x : int) (type a) : true;;
+
 (* Without a space before the colon, [?name:] is an optional label. *)
 
 law_?foo: true;;

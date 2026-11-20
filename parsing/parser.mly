@@ -3699,6 +3699,13 @@ newtype: (* : string with_loc * jkind_annotation option *)
   | LPAREN name=mkrhs(LIDENT) COLON jkind=jkind_annotation RPAREN
       { name, Some jkind }
 
+(* [(type a (b : k))] or [(type a : k)] *)
+%inline newtype_group: (* : (string with_loc * jkind_annotation option) list *)
+  | LPAREN TYPE newtypes=newtypes RPAREN
+      { newtypes }
+  | LPAREN TYPE name=mkrhs(LIDENT) COLON jkind=jkind_annotation RPAREN
+      { [ (name, Some jkind) ] }
+
 /* Patterns */
 
 (* Whereas [pattern] is an arbitrary pattern, [pattern_no_exn] is a pattern
@@ -3764,13 +3771,9 @@ pattern_gen:
   | mkpat(
       mkrhs(constr_longident) pattern %prec prec_constr_appl
         { Ppat_construct($1, Some ([], $2)) }
-    | constr=mkrhs(constr_longident) LPAREN TYPE newtypes=newtypes RPAREN
+    | constr=mkrhs(constr_longident) newtypes=newtype_group
         pat=simple_pattern
         { Ppat_construct(constr, Some (newtypes, pat)) }
-    | constr=mkrhs(constr_longident)
-        LPAREN TYPE ty=mkrhs(LIDENT) COLON jkind=jkind_annotation RPAREN
-        pat=simple_pattern
-        { Ppat_construct(constr, Some ([(ty,Some jkind)], pat)) }
     | name_tag pattern %prec prec_constr_appl
         { Ppat_variant($1, Some $2) }
     ) { $1 }
@@ -4242,7 +4245,8 @@ jkind_decl:
     }
 ;
 
-(* Laws: [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C]
+(* Laws: [law_? name (type a1 ... am) p1 ... pn
+           : A1 implies_ ... implies_ Ak implies_ C]
    (testable) or [law_ name ...] (provable), where each parameter is [x] or
    [(x : T)] *)
 
@@ -4250,7 +4254,7 @@ law_declaration:
   plaw_flag = law_flag
   attrs1 = attributes
   plaw_name = mkrhs(LIDENT)
-  plaw_params = law_param*
+  params = law_params
   COLON
   body = law_body
   attrs2 = post_item_attributes
@@ -4259,14 +4263,23 @@ law_declaration:
       let plaw_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
       let plaw_loc = make_loc $sloc in
       let plaw_assumptions, plaw_conclusion = body in
-      { plaw_flag; plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-        plaw_attributes; plaw_loc }
+      let plaw_newtypes, plaw_params = params in
+      { plaw_flag; plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+        plaw_conclusion; plaw_attributes; plaw_loc }
     }
 ;
 
 law_flag:
   | LAW QUESTION { Testable }
   | LAW { Provable }
+;
+
+law_params:
+  | params = law_param*
+      { ([], params) }
+  | newtypes = newtype_group rest = law_params
+      { let (newtypes', params) = rest in
+        (newtypes @ newtypes', params) }
 ;
 
 law_param:
