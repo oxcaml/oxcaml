@@ -925,3 +925,25 @@ end
 [%%expect{|
 module rec M : sig val f : int -> int end
 |}]
+
+(* Regression test: typing identifiers in signature contexts does not force
+   addresses unnecessarily. *)
+
+module M = struct
+  let x = 42
+end
+
+module F(M : sig val x : int end) = M
+[%%expect{|
+module M : sig val x : int end
+module F : functor (M : sig val x : int end) -> sig val x : int end
+|}]
+
+module type S = sig
+  open F (M)
+  module type T = module type of struct let y = x end
+end
+[%%expect{|
+Uncaught exception: Not_found
+
+|}]
