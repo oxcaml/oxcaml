@@ -95,8 +95,20 @@ let loopify_decision_for_call dacc apply =
         then DE.loopify_state denv
         else Loopify_state.do_not_loopify)
 
+(* For simplifying terms built from the simplified [apply]. Every [Debuginfo.t]
+   in such terms must derive from [Apply.dbg apply], which
+   [simplify_apply_shared] has already rewritten with the current inlining
+   context: simplifying them with that context again would add its frames a
+   second time. *)
+let dacc_for_terms_built_from_apply dacc =
+  DA.map_denv dacc ~f:DE.clear_inlined_debuginfo
+
+let simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up =
+  simplify_expr (dacc_for_terms_built_from_apply dacc) expr ~down_to_up
+
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
-  Simplify_apply_cont_expr.simplify_apply_cont dacc
+  Simplify_apply_cont_expr.simplify_apply_cont
+    (dacc_for_terms_built_from_apply dacc)
     (Apply_cont_expr.create self_cont ~args:(Apply.args apply)
        ~dbg:(Apply.dbg apply))
     ~down_to_up
@@ -179,7 +191,7 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
         |> Expr.create_let)
       vars_and_fields apply_expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let update_direct_call_benefit expr ~(original_call : Call_kind.Function_call.t)
     ~callee's_code_metadata =
@@ -684,6 +696,10 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           (* The full application also receives the remaining parameters, which
              may be yielding even if the partial application itself cannot
              yield. *)
+          (* CR yusumez: [dbg] is already in the current inlining context.
+             Inlining the wrapper at one of its applications adds the context of
+             that application on top: the backtrace shows the frames of where
+             the closure was built, with the inlined frames they share twice. *)
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
@@ -862,7 +878,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
     let expr = SE.notify_removed ~operation:Removed_operations.call expr in
     down_to_up dacc expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     ~(original_call : Call_kind.Function_call.t) ~callee's_code_id
@@ -882,7 +898,7 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     in
     down_to_up dacc expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let replace_apply_by_invalid dacc ~down_to_up reason =
   down_to_up dacc (SE.simplified_invalid reason)
@@ -1410,7 +1426,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     let down_to_up dacc expr =
       down_to_up dacc (SE.notify_removed ~operation expr)
     in
-    simplify_expr dacc expr ~down_to_up
+    simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
   | Unchanged { return_types } ->
     let dacc, use_id =
       match Apply.continuation apply with

@@ -670,6 +670,9 @@ let set_inlining_arguments arguments t =
 let set_inlined_debuginfo t ~from =
   { t with inlined_debuginfo = from.inlined_debuginfo }
 
+let clear_inlined_debuginfo t =
+  { t with inlined_debuginfo = Inlined_debuginfo.none }
+
 let inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
     ~inlined_attribute =
   match (inlined_attribute : Inlined_attribute.t) with
