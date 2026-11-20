@@ -530,14 +530,12 @@ type unary_primitive =
           which only ever receive environments created by its definition.
 
           Simplify records the type of the environment here, as the type of
-          [template_key] (which is exported, for other units' instantiations),
-          simplifies the code of the instantiations using it, and removes this
-          primitive. The type describes the environments created by this
-          definition only, so Simplify must simplify the definition once: it
-          must never copy it before simplifying it (see [Template_definitions]).
-          In classic mode, closure conversion does the same with the
-          approximation of the environment, and doesn't create this primitive.
-      *)
+          [template_key], simplifies the code of the instantiations using it,
+          and removes this primitive. The type describes the environments
+          created by this definition only, so Simplify must simplify the
+          definition once: it must never copy it before simplifying it (see
+          [Template_definitions]). In classic mode, closure conversion doesn't
+          create this primitive. *)
 
 (** Whether a comparison is to yield a boolean result, as given by a particular
     comparison operator, or whether it is to behave in the manner of "compare"

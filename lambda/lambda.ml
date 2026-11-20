@@ -2743,18 +2743,6 @@ let build_renaming_subst idmap =
 let rename idmap lam = (build_renaming_subst idmap).subst_lambda lam
 
 let duplicate_function ?(rename = Ident.Map.empty) lfun =
-  let rec check_no_template_definition lam =
-    match lam with
-    | Lprim (Ptemplate_env { template; _ }, _, _) ->
-        (* CR layout poly: give the copy a fresh template, with its own copies
-           of the template's instantiations, instead. *)
-        Misc.fatal_errorf
-          "Lambda.duplicate_function: the definition of template %a cannot \
-           be duplicated"
-          (Format_doc.compat Template_id.print) template
-    | _ -> iter_head_constructor check_no_template_definition lam
-  in
-  check_no_template_definition lfun.body;
   (build_substs
      (fun _ _ env -> env)
      ~freshen_bound_variables:true

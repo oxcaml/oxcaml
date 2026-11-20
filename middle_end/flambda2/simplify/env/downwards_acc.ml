@@ -291,8 +291,6 @@ let define_template t template_key env_type =
         env_types = Symbol.Map.add template_key env_type templates.env_types
       })
 
-let template_env_types t = t.templates.env_types
-
 let templates_defined_since t earlier =
   (* Templates are only ever added. *)
   Symbol.Map.cardinal t.templates.env_types
