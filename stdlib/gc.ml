@@ -220,21 +220,32 @@ module Tweak = struct
   external list_active : unit -> (string * int) list = "caml_gc_tweak_list_active"
 end
 
-type suspended_collection_work = int
-(* Note: we do not currently expose this type outside the module,
-   because it could plausibly change in the future. In particular,
-   currently the runtime only track major allocations during ramp-up
-   work, but there are other sources of GC pressure, such as custom
-   block allocation, that could be tracked as well and should probably
-   be tracked separately. This suggests that the type of suspended work
-   could become a record of integers instead of one integer.
+module Ramp = struct
+  type work = int * int
+  (* Major-heap words and bytes of dependent (off-heap) memory, which the
+     GC paces differently. Keep in sync with the RAMP_WORK_FIELD_* indices
+     in runtime/gc_ctrl.c.
 
-   On the other hand, it would be nice to let users, say, smooth out
-   suspended work by splitting it in N smaller parts to be ramped down
-   separately. This would be possible by exposing the type as int, or
-   possibly by defining a division/splitting function for the abstract
-   type.
-*)
+     Note: we do not currently expose this type outside the module,
+     because it could plausibly change in the future.
+
+     On the other hand, it would be nice to let users, say, smooth out
+     suspended work by splitting it in N smaller parts to be ramped down
+     separately. This would be possible by defining a division/splitting
+     function for the abstract type.
+  *)
+
+  let zero = (0, 0)
+
+  let add (words1, dependent_bytes1) (words2, dependent_bytes2) =
+    (words1 + words2, dependent_bytes1 + dependent_bytes2)
+
+  external up : (unit -> 'a) -> 'a * work @@ portable = "caml_ml_gc_ramp_up"
+
+  external down : work -> unit @@ portable = "caml_ml_gc_ramp_down"
+end
+
+type suspended_collection_work = Ramp.work
 
 external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work @@ portable
   = "caml_ml_gc_ramp_up"

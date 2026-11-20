@@ -128,6 +128,13 @@ DOMAIN_STATE(intnat, current_ramp_up_allocated_words_diff)
    in [caml_update_major_allocated_words].)
 */
 
+DOMAIN_STATE(uintnat, allocated_dependent_bytes_suspended)
+DOMAIN_STATE(uintnat, allocated_dependent_bytes_resumed)
+DOMAIN_STATE(intnat, current_ramp_up_dependent_bytes_diff)
+/* The counterparts, for [allocated_dependent_bytes], of
+   [allocated_words_suspended], [allocated_words_resumed] and
+   [current_ramp_up_allocated_words_diff]. */
+
 DOMAIN_STATE(uintnat, minor_words_at_last_slice)
 /* Number of minor heap words allocated before the latest slice */
 

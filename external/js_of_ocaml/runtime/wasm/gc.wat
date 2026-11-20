@@ -152,7 +152,14 @@
    (func (export "caml_ml_gc_ramp_up") (param $f (ref eq)) (result (ref eq))
       (array.new_fixed $block 3 (ref.i31 (i32.const 0))
          (call $caml_callback_1 (local.get $f) (ref.i31 (i32.const 0)))
-         (ref.i31 (i32.const 0))))
+         (@if $oxcaml
+         (@then
+            ;; In OxCaml the suspended work is a pair:
+            ;; (words, dependent bytes).
+            (array.new_fixed $block 3 (ref.i31 (i32.const 0))
+               (ref.i31 (i32.const 0)) (ref.i31 (i32.const 0))))
+         (@else
+            (ref.i31 (i32.const 0))))))
 
    (func (export "caml_ml_gc_ramp_down") (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))
