@@ -23,13 +23,7 @@ let array_fold_left_filter_map f init array =
   ans, new_array
 
 let name_in_subst (name : Global_module.Name.t) subst =
-  match name with
-  | { head; args = [] } ->
-    (* Not generally okay to just convert to a parameter name, but we're only doing this
-       to check whether there happens to be a parameter with this name in the subst *)
-    let head_as_param_name = head |> Global_module.Parameter_name.of_string in
-    Global_module.Parameter_name.Map.mem head_as_param_name subst
-  | _ -> false
+  Global_module.Name.find_in_parameter_map name subst |> Option.is_some
 
 let subst t (args : (Global_module.Parameter_name.t * Global_module.t) list) =
   let { sign = sign, staticity; bound_globals } = t in
