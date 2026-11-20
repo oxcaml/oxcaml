@@ -1,5 +1,6 @@
-import Oxiclean.Model
+import Oxiclean.Reduction
 open Oxiclean.Model
+open Oxiclean.Reduction
 
 namespace Oxiclean.Leoization
 
@@ -31,6 +32,80 @@ namespace PER
     transitive ab bc := match ab, bc with
       | ⟨ab, pa, _⟩, ⟨bc, _, pc⟩ => ⟨per.transitive ab bc, pa, pc⟩
 
+  /--
+  Wherever the first function is defined (even if nondeterministic),
+  the second function can produce the same result.
+  -/
+  @[simp]
+  def atLeastAsDefinedAs {α : Type a} {β : Type b}
+      (domain : PER α) (codomain : PER β)
+      (reference maybeMoreDefined : α → β → Prop)
+      : Prop :=
+    ∀ lhs rhs : α, domain.eq lhs rhs →
+    ∀ lhs', reference lhs lhs' →
+    ∃ rhs', maybeMoreDefined rhs rhs' ∧ codomain.eq lhs' rhs'
+
+  inductive Extensionality {α : Type a} {β : Type b}
+      (domain : PER α)
+      (codomain : PER β)
+      : (α → β → Prop) → (α → β → Prop) → Prop where
+    | extensionality {f g : α → β → Prop}
+        (fAtLeastAsDefinedAsG : atLeastAsDefinedAs domain codomain f g)
+        (gAtLeastAsDefinedAsF : atLeastAsDefinedAs domain codomain g f)
+        : Extensionality domain codomain f g
+
+  def extensionality {α : Type a} {β : Type b}
+      (domain : PER α)
+      (codomain : PER β)
+      : PER (α → β → Prop) where
+    eq := Extensionality domain codomain
+    symmetric
+      | .extensionality hf hg => .extensionality hg hf
+    transitive {a b c}
+      | .extensionality ab ba, .extensionality bc cb => by
+        simp at *; constructor <;> intro lhs rhs e lhs' al
+        · obtain ⟨tmp', bTmp, eTmp⟩ := ab lhs rhs e lhs' al
+          obtain ⟨rhs', br, e'⟩ :=
+            bc rhs rhs (domain.transitive (domain.symmetric e) e) tmp' bTmp
+          exact ⟨rhs', ⟨br, codomain.transitive eTmp e'⟩⟩
+        · obtain ⟨tmp', bTmp, eTmp⟩ := cb lhs rhs e lhs' al
+          obtain ⟨rhs', br, e'⟩ :=
+            ba rhs rhs (domain.transitive (domain.symmetric e) e) tmp' bTmp
+          exact ⟨rhs', ⟨br, codomain.transitive eTmp e'⟩⟩
+
+  inductive Closure {Step} [S : StepRelation Step]
+      (domain : PER Value)
+      (codomain : PER Value)
+      : Value → Value → Prop where
+    | closure {f g : Expr}
+        (extensionality :
+          (extensionality domain codomain).eq
+            (@Reduce Step S (f.substitute ·) ·)
+            (@Reduce Step S (g.substitute ·) ·))
+        : Closure domain codomain
+            (.indirection
+              (.noMutableFields { tag := 247, contents := .closure f }))
+            (.indirection
+              (.noMutableFields { tag := 247, contents := .closure g }))
+
+  def closure {Step} [S : StepRelation Step]
+      (domain : PER Value)
+      (codomain : PER Value)
+      : PER Value where
+    eq := @Closure Step S domain codomain
+    symmetric := sorry
+    transitive := sorry
+
+  inductive EmptyList {α} : List α → List α → Prop where
+    | emptyList : EmptyList [] []
+
+  def emptyList : PER (List α) where
+    eq := EmptyList
+    symmetric
+      | .emptyList => .emptyList
+    transitive
+      | .emptyList, .emptyList => .emptyList
+
   inductive Immediate : Value → Value → Prop where
     | imm {bitsAboveLsb : BitVec 63}
         : Immediate (.immediate { bitsAboveLsb }) (.immediate { bitsAboveLsb })
@@ -39,7 +114,7 @@ namespace PER
     eq := Immediate
     symmetric
       | .imm => .imm
-    transitive ab bc := match ab, bc with
+    transitive
       | .imm, .imm => .imm
 
   inductive RefinedImmediate (condition : BitVec 63 → Prop)
@@ -53,7 +128,7 @@ namespace PER
     eq := RefinedImmediate condition
     symmetric
       | .refinedImm r => .refinedImm r
-    transitive ab bc := match ab, bc with
+    transitive
       | .refinedImm r, .refinedImm _ => .refinedImm r
 
   inductive ModuleRuntimeBlock (valuesRelation : PER (List Value))
@@ -72,36 +147,34 @@ namespace PER
     symmetric
       | .moduleRuntimeBlock valuesSatisfyRelation =>
         .moduleRuntimeBlock (valuesRelation.symmetric valuesSatisfyRelation)
-    transitive ab bc := match ab, bc with
+    transitive
       | .moduleRuntimeBlock ab, .moduleRuntimeBlock bc =>
         .moduleRuntimeBlock (valuesRelation.transitive ab bc)
 
-  inductive ValueInBlock
-      (headRelation : PER Value)
-      (tailRelation : PER (List Value))
-      : List Value → List Value → Prop where
-    | valueInBlock
+  inductive Cons {α} (headRelation : PER α) (tailRelation : PER (List α))
+      : List α → List α → Prop where
+    | cons
         {lhsHead rhsHead}
         (headSatisfiesRelation : headRelation.eq lhsHead rhsHead)
         {lhsTail rhsTail}
         (tailSatisfiesRelation : tailRelation.eq lhsTail rhsTail)
-        : ValueInBlock
+        : Cons
             headRelation
             tailRelation
             (lhsHead :: lhsTail)
             (rhsHead :: rhsTail)
 
-  def valueInBlock (headRelation : PER Value) (tailRelation : PER (List Value))
-      : PER (List Value) where
-    eq := ValueInBlock headRelation tailRelation
+  def cons {α} (headRelation : PER α) (tailRelation : PER (List α))
+      : PER (List α) where
+    eq := Cons headRelation tailRelation
     symmetric
-      | .valueInBlock headSatisfiesRelation tailSatisfiesRelation =>
-        .valueInBlock
+      | .cons headSatisfiesRelation tailSatisfiesRelation =>
+        .cons
           (headRelation.symmetric headSatisfiesRelation)
           (tailRelation.symmetric tailSatisfiesRelation)
-    transitive ab bc := match ab, bc with
-      | .valueInBlock abHead abTail, .valueInBlock bcHead bcTail =>
-        .valueInBlock
+    transitive
+      | .cons abHead abTail, .cons bcHead bcTail =>
+        .cons
           (headRelation.transitive abHead bcHead)
           (tailRelation.transitive abTail bcTail)
 end PER
@@ -155,3 +228,47 @@ namespace Statics
 end Statics
 
 end Oxiclean.Leoization
+
+open Oxiclean.Leoization
+
+def Oxiclean.Model.ModuleType.validWrtExtraction
+    (userSuppliedRefinedSignature : ModuleType (PER Value))
+    (extractedParametricSignature : ModuleType Parametric)
+    : Prop :=
+  userSuppliedRefinedSignature.parameterize = extractedParametricSignature
+
+mutual
+  def Oxiclean.Model.ModuleType.structuralRelationInScope
+      (context : List (ModuleType (PER Value)))
+      (userSuppliedRefinedSignature : ModuleType (PER Value))
+      : PER Value :=
+    match userSuppliedRefinedSignature with
+    | .signature absent present =>
+      present.foldr
+        (fun item : ModuleItemPresentAtRuntime (PER Value) =>
+          PER.cons
+            (item.structuralRelationInScope
+              (userSuppliedRefinedSignature :: context)))
+        PER.emptyList
+      |> PER.moduleRuntimeBlock
+    | _ => sorry
+
+  def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope
+      (context : List (ModuleType (PER Value)))
+      : ModuleItemPresentAtRuntime (PER Value) → PER Value
+    | .mod m => m.structuralRelationInScope context
+    | .val v => v.structuralRelationInScope context
+
+  def Oxiclean.Model.ValType.structuralRelationInScope
+      (context : List (ModuleType (PER Value)))
+      : ValType (PER Value) → PER Value
+    | .arrow domain codomain =>
+      PER.closure
+        (domain.structuralRelationInScope context)
+        (codomain.structuralRelationInScope context)
+    | _ => sorry
+end
+
+def Oxiclean.Model.ModuleType.structuralRelation
+    : ModuleType (PER Value) → PER Value :=
+  (·.structuralRelationInScope [])
