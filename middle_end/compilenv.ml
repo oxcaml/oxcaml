@@ -30,6 +30,11 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of CU.t * CU.t * string
+  | Recorded_cmx_unavailable of
+      { unit : CU.t;
+        cmx_path : Misc.filepath;
+        filename : Misc.filepath option;
+      }
 
 exception Error of error
 
@@ -50,8 +55,17 @@ type unit_infos_builder =
 
 module Infos_table = CU.Tbl
 
-let global_infos_table =
-  (Infos_table.create 17 : unit_infos option Infos_table.t)
+(* What is known of the .cmx file of a unit looked up so far. *)
+type cached_unit =
+  | Opaque
+  | Missing_from_load_path
+      (* Not found in the load path, which is only searched without a recorded
+         location: a lookup with one retries it. *)
+  | Found of unit_infos * Misc.filepath option
+      (* The description read, with the location to record on the identifiers
+         read from it, if any (see [CU.Found]). *)
+
+let global_infos_table = (Infos_table.create 17 : cached_unit Infos_table.t)
 
 let reset_info_tables () =
   Infos_table.reset global_infos_table
@@ -170,16 +184,45 @@ let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
   && List.equal equal_args (CU.instance_arguments cu1) (CU.instance_arguments cu2)
 
-let get_export_info infos =
+let export_info_of_unit infos ~cmx_path =
   Option.map
     (fun export_info ->
       Profile.record_call ~accumulate:true "cmx_from_raw" (fun () ->
       Flambda2_cmx.Flambda_cmx_format.from_raw
         ~sections:infos.ui_file_sections
+        ~cmx_path
         export_info))
     infos.ui_export_info
 
-let get_unit comp_unit =
+let get_export_info infos =
+  export_info_of_unit infos ~cmx_path:None
+
+let recorded_cmx_path ~cmx_path =
+  if !Clflags.use_persistent_deps then cmx_path else None
+
+(* The file to read the .cmx of [comp_unit] from, with its location relative to
+   the manifest files root when known. A recorded location is authoritative:
+   the .cmx is loaded from there without consulting the load path, and failing
+   that is an error rather than a reason to search the load path. *)
+let locate_cmx comp_unit ~cmx_path ~extension =
+  match recorded_cmx_path ~cmx_path with
+  | Some cmx_path ->
+    let filename = Load_path.resolve_manifest_location cmx_path in
+    begin match filename with
+    | Some filename when Sys.file_exists filename ->
+      Some (filename, Some cmx_path)
+    | Some _ | None ->
+      raise (Error (Recorded_cmx_unavailable
+                      { unit = comp_unit; cmx_path; filename }))
+    end
+  | None ->
+    let basename = CU.base_filename comp_unit ^ "." ^ extension in
+    match Load_path.find_normalized_with_origin basename with
+    | { path; manifest_location; visibility = _ } ->
+      Some (path, manifest_location)
+    | exception Not_found -> None
+
+let get_unit comp_unit ~cmx_path =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.uib_unit);
@@ -190,11 +233,14 @@ let get_unit comp_unit =
   then
     Misc.fatal_error
       "get_unit: unable to get unit_info for current unit";
-  try
-    Infos_table.find global_infos_table comp_unit
-  with Not_found ->
-    let (infos, crc) =
-      if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
+  match Infos_table.find global_infos_table comp_unit with
+  | Found (ui, cmx_path) -> Some (ui, cmx_path)
+  | Opaque -> None
+  | Missing_from_load_path when Option.is_none (recorded_cmx_path ~cmx_path) ->
+    None
+  | Missing_from_load_path | exception Not_found ->
+    let (cached, crc) =
+      if Env.is_imported_opaque (CU.name comp_unit) then (Opaque, None)
       else begin
         let missing_extension =
           match Clflags.jsir_target () with
@@ -202,48 +248,62 @@ let get_unit comp_unit =
           | Some Js -> "cmjx"
           | Some Wasm -> "cmwx"
         in
-        try
-          let filename =
-            Load_path.find_normalized
-              (CU.base_filename comp_unit ^ "." ^ missing_extension) in
+        match locate_cmx comp_unit ~cmx_path ~extension:missing_extension with
+        | Some (filename, manifest_location) ->
           let (ui, crc) = read_unit_info filename in
           if not (CU.equal ui.ui_unit comp_unit) then
             raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
           cache_zero_alloc_info ui.ui_zero_alloc_info;
-          (Some ui, Some crc)
-        with Not_found ->
+          (* Under -persistent-deps, where the .cmx was found is recorded on
+             the identifiers read from it, so that the users of the current
+             unit's .cmx load it from there. *)
+          let cmx_path =
+            if !Clflags.persistent_deps then manifest_location else None
+          in
+          (Found (ui, cmx_path), Some crc)
+        | None ->
           let warn =
             Warnings.No_cmx_file
               { missing_extension
               ; module_name = CU.full_path_as_string comp_unit }
           in
           Location.prerr_warning Location.none warn;
-          (None, None)
+          (Missing_from_load_path, None)
         end
     in
     let import = Import_info.create_normal comp_unit ~crc in
-    current_unit.uib_imports_cmx <- import :: current_unit.uib_imports_cmx;
-    Infos_table.add global_infos_table comp_unit infos;
-    infos
+    current_unit.uib_imports_cmx <-
+      (* A retry replaces the entry added by the miss it retries. *)
+      import
+      :: List.filter
+           (fun old -> not (CU.equal (Import_info.cu old) comp_unit))
+           current_unit.uib_imports_cmx;
+    Infos_table.replace global_infos_table comp_unit cached;
+    match cached with
+    | Found (ui, cmx_path) -> Some (ui, cmx_path)
+    | Opaque | Missing_from_load_path -> None
 
-let get_unit_export_info comp_unit =
-  Option.bind (get_unit comp_unit) get_export_info
+let get_unit_export_info found =
+  Option.bind
+    (get_unit (CU.Found.unit found) ~cmx_path:(CU.Found.cmx_path found))
+    (fun (infos, cmx_path) -> export_info_of_unit infos ~cmx_path)
 
 let get_static_data comp_unit =
   Option.map
-    (fun ui ->
+    (fun (ui, _cmx_path) ->
       Slambda.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
-    (get_unit comp_unit)
+    (get_unit comp_unit ~cmx_path:None)
 
-let which_cmx_file comp_unit =
-  CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ())
+let which_cmx_file found =
+  CU.Found.which_cmx_file found ~accessed_by:(Current_unit.get_cu_exn ())
 
-let get_global_export_info comp_unit =
-  get_unit_export_info (which_cmx_file comp_unit)
+let get_global_export_info found =
+  get_unit_export_info (which_cmx_file found)
 
 let cache_unit_info ui =
   cache_zero_alloc_info ui.ui_zero_alloc_info;
-  Infos_table.add global_infos_table ui.ui_unit (Some ui)
+  Infos_table.add global_infos_table ui.ui_unit
+    (Found (ui, None))
 
 (* Exporting cross-module information *)
 
@@ -373,8 +433,18 @@ let new_const_symbol () =
   |> Symbol.linkage_name
   |> Linkage_name.to_string
 
-let require_global global_ident =
-  if equal_up_to_pack_prefix global_ident current_unit.uib_unit
+let require_global comp_unit =
+  if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
+  then ()
+  else
+    ignore
+      (get_unit
+         (CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ()))
+         ~cmx_path:None
+       : (unit_infos * Misc.filepath option) option)
+
+let load_global global_ident =
+  if equal_up_to_pack_prefix (CU.Found.unit global_ident) current_unit.uib_unit
   then ()
   else
     ignore
@@ -398,6 +468,20 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
+  | Recorded_cmx_unavailable { unit; cmx_path; filename } ->
+      fprintf ppf
+        "@[<hov>The compilation unit description for %a@ was recorded at %a@ \
+         relative to the manifest files root,@ but %t.@]"
+        CU.print_as_inline_code unit
+        Location.Doc.quoted_filename cmx_path
+        (fun ppf ->
+           match filename with
+           | None ->
+               fprintf ppf "no manifest files root is set@ (%a)"
+                 Misc.Style.inline_code "MANIFEST_FILES_ROOT"
+           | Some filename ->
+               fprintf ppf "%a@ does not exist"
+                 Location.Doc.quoted_filename filename)
 
 let () =
   Location.register_error_of_exn

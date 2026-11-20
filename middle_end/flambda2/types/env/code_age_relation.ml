@@ -38,10 +38,16 @@ let rec has_older_version_in t ~resolver id candidates : _ Or_unknown.t =
       if Compilation_unit.equal comp_unit (Current_unit.get_cu_exn ())
       then Known false
       else
-        match resolver comp_unit with
-        | exception _ ->
-          Misc.fatal_errorf "Exception in resolver@ Backtrace is: %s"
-            (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
+        match resolver (Code_id.get_found_compilation_unit id) with
+        | exception exn -> (
+          let backtrace = Printexc.get_raw_backtrace () in
+          (* Errors meant for the user, such as a .cmx file that cannot be read,
+             are reported as such. *)
+          match Location.error_of_exn exn with
+          | Some _ -> raise exn
+          | None ->
+            Misc.fatal_errorf "Exception in resolver@ Backtrace is: %s"
+              (Printexc.raw_backtrace_to_string backtrace))
         | None -> Unknown
         | Some t -> (
           (* Inlining the base case, so that we do not recursively loop in case

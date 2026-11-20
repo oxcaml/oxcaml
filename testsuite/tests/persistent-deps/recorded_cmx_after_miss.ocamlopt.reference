@@ -1,0 +1,8 @@
+File "_none_", line 1:
+Warning 58 [no-cmx-file]: no cmx file was found in path for module A, and its
+  interface was not compiled with -opaque
+
+File "libc/c8.ml", line 1:
+Error: The compilation unit description for A was recorded at liba/a.cmx
+       relative to the manifest files root, but nowhere/liba/a.cmx
+       does not exist.

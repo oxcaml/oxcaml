@@ -38,13 +38,16 @@ val current_sections : unit -> File_sections.Builder.t
 
 val get_export_info : unit_infos -> Flambda2_cmx.Flambda_cmx_format.t option
 
-val get_global_export_info : Compilation_unit.t
+val get_global_export_info : Compilation_unit.Found.t
   -> Flambda2_cmx.Flambda_cmx_format.t option
         (* Means of getting the export info found in the
-           .cmx file of the given unit. *)
+           .cmx file of the given unit. The .cmx file is read from the
+           location recorded on the unit, if any (see
+           [Compilation_unit.Found]), and otherwise searched for in the
+           load path. *)
 
 val get_unit_export_info
-  : Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
+  : Compilation_unit.Found.t -> Flambda2_cmx.Flambda_cmx_format.t option
 
 val get_static_data :
   Compilation_unit.t -> Slambda.CU_data.t option
@@ -97,6 +100,9 @@ val require_global: Compilation_unit.t -> unit
         (* Enforce a link dependency of the current compilation
            unit to the required module *)
 
+val load_global: Compilation_unit.Found.t -> unit
+        (* Read the .cmx file of the given unit, if not read already *)
+
 val read_library_info: string -> library_infos
 
 val record_external_symbols : unit -> unit
@@ -112,6 +118,15 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of Compilation_unit.t * Compilation_unit.t * string
+  | Recorded_cmx_unavailable of
+      { unit : Compilation_unit.t;
+        cmx_path : Misc.filepath;
+        filename : Misc.filepath option;
+      }
+    (* [cmx_path] is the location recorded for [unit]'s .cmx file by a .cmx
+       file loaded earlier (see [Compilation_unit.Found]), which could not be
+       resolved against the manifest files root ([filename = None]) or
+       resolved to a file that does not exist. *)
 
 exception Error of error
 

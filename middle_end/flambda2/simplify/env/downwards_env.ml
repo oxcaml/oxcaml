@@ -24,7 +24,7 @@ module LCS = Lifted_constant_state
 module LC = Lifted_constant
 
 type resolver =
-  Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
+  Compilation_unit.Found.t -> Flambda2_types.Typing_env.Serializable.t option
 
 type get_imported_code = unit -> Exported_code.t
 
@@ -569,7 +569,7 @@ let find_code_metadata_exn t id =
       (* Sometimes the metadata is not properly reexported; try to force loading
          it. *)
       let (_ : TE.Serializable.t option) =
-        TE.resolver t.typing_env (Code_id.get_compilation_unit id)
+        TE.resolver t.typing_env (Code_id.get_found_compilation_unit id)
       in
       Code_or_metadata.code_metadata
         (Exported_code.find_exn (t.get_imported_code ()) id))
@@ -583,7 +583,7 @@ let find_code_exn t id =
        sure that we will have access to the actual code (assuming the .cmx isn't
        missing). *)
     let (_ : TE.Serializable.t option) =
-      TE.resolver t.typing_env (Code_id.get_compilation_unit id)
+      TE.resolver t.typing_env (Code_id.get_found_compilation_unit id)
     in
     Exported_code.find_exn (t.get_imported_code ()) id
 
