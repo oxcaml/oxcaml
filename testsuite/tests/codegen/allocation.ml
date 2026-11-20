@@ -88,3 +88,48 @@ spill_slot_lifetime.get_one:
   vmovsd <hidden PC-relative offset>(%rip), %xmm0
   ret
 |}]
+
+external opaque_local : ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
+
+(* Keep enough arguments live to put the local allocation result in r10.
+   The slow path must reload its offset after the potentially clobbering PLT. *)
+let local_alloc_plt a b c d e f g h i j =
+  let pair = opaque_local (stack_ (a, b)) in
+  let x, y = pair in
+  x + y + a + b + c + d + e + f + g + h + i + j
+[%%expect_asm_full X86_64{|
+local_alloc_plt:
+  subq  $8, %rsp
+  movq  64(%r14), %rbp
+  movq  64(%r14), %r10
+  subq  $24, %r10
+  movq  %r10, 64(%r14)
+  cmpq  80(%r14), %r10
+  jl    .L1
+.L0:
+  addq  72(%r14), %r10
+  addq  $8, %r10
+  movq  $2816, -8(%r10)
+  movq  %rax, (%r10)
+  movq  %rbx, 8(%r10)
+  movq  8(%r10), %r11
+  movq  (%r10), %r10
+  addq  %r11, %r10
+  addq  %r10, %rax
+  addq  %rbx, %rax
+  addq  %rdi, %rax
+  addq  %rsi, %rax
+  addq  %rdx, %rax
+  addq  %rcx, %rax
+  addq  %r8, %rax
+  addq  %r9, %rax
+  addq  %r12, %rax
+  leaq  -11(%rax,%r13), %rax
+  movq  %rbp, 64(%r14)
+  addq  $8, %rsp
+  ret
+.L1:
+  call  caml_call_local_realloc@PLT
+  movq  64(%r14), %r10
+  jmp   .L0
+|}]
