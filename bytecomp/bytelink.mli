@@ -37,6 +37,8 @@ type error =
   | Wrong_object_name of filepath
   | Symbol_error of filepath * Symtable.error
   | Inconsistent_import of Compilation_unit.Name.t * filepath * filepath
+  | Pending_imports of filepath * Compilation_unit.Name.t
+  | Recorded_cmi_not_found of Compilation_unit.Name.t * filepath
   | Custom_runtime
   | File_exists of filepath
   | Cannot_open_dll of filepath

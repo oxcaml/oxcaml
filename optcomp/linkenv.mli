@@ -104,6 +104,8 @@ type error =
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
   | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
+  | Pending_imports of filepath * Compilation_unit.Name.t
+  | Recorded_cmi_not_found of Compilation_unit.Name.t * filepath
   | Inconsistent_implementation of Compilation_unit.t * filepath * filepath
   | Multiple_definition of Compilation_unit.Name.t * filepath * filepath
   | Missing_cmx of filepath * Compilation_unit.t

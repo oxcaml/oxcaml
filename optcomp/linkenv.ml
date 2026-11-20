@@ -45,6 +45,8 @@ type error =
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
   | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
+  | Pending_imports of filepath * Compilation_unit.Name.t
+  | Recorded_cmi_not_found of Compilation_unit.Name.t * filepath
   | Inconsistent_implementation of Compilation_unit.t * filepath * filepath
   | Multiple_definition of Compilation_unit.Name.t * filepath * filepath
   | Missing_cmx of filepath * Compilation_unit.t
@@ -61,6 +63,7 @@ type t =
     mutable implementations : CU.Set.t;
     mutable cmx_required : CU.Set.t;
     interfaces : unit CU.Name.Tbl.t;
+    loaded_pending_imports : unit CU.Name.Tbl.t;
     implementations_defined : string CU.Tbl.t;
     mutable quoted_cmi : CU.Name.Set.t;
     mutable quoted_cmx : CU.Set.t;
@@ -82,6 +85,7 @@ let create () =
     implementations = CU.Set.empty;
     cmx_required = CU.Set.empty;
     interfaces = CU.Name.Tbl.create 100;
+    loaded_pending_imports = CU.Name.Tbl.create 17;
     implementations_defined = CU.Tbl.create 100;
     quoted_cmi;
     quoted_cmx;
@@ -106,17 +110,37 @@ let get_quoted_cmx t = t.quoted_cmx
 
 (* Consistency check between interfaces and implementations: *)
 
+let rec check_interface t ~source import =
+  let name = Import_info.name import in
+  let crco = Import_info.Intf.crc import in
+  CU.Name.Tbl.replace t.interfaces name ();
+  (match crco with
+  | None -> ()
+  | Some crc -> Cmi_consistbl.check t.crc_interfaces name () crc source);
+  (* An import with a recorded location leaves the imports of its .cmi to be
+     checked here. *)
+  match
+    Compilation_unit_intf.Found.cmi_path (Import_info.Intf.found import)
+  with
+  | None -> ()
+  | Some _ when CU.Name.Tbl.mem t.loaded_pending_imports name -> ()
+  | Some cmi_path ->
+    if not !Clflags.use_persistent_deps
+    then raise (Error (Pending_imports (source, name)));
+    CU.Name.Tbl.add t.loaded_pending_imports name ();
+    let source =
+      match Load_path.resolve_manifest_location cmi_path with
+      | Some filename when Sys.file_exists filename -> filename
+      | Some _ | None -> raise (Error (Recorded_cmi_not_found (name, cmi_path)))
+    in
+    let cmi = Cmi_format.read_cmi_lazy source in
+    let self = Compilation_unit_intf.Found.without_cmi_path name in
+    check_interface t ~source
+      (Import_info.Intf.create_loaded self ~crc:cmi.cmi_crc);
+    Array.iter (check_interface t ~source) cmi.cmi_crcs
+
 let check_cmi_consistency t file_name cmis =
-  try
-    Array.iter
-      (fun import ->
-        let name = Import_info.name import in
-        let crco = Import_info.Intf.crc import in
-        CU.Name.Tbl.replace t.interfaces name ();
-        match crco with
-        | None -> ()
-        | Some crc -> Cmi_consistbl.check t.crc_interfaces name () crc file_name)
-      cmis
+  try Array.iter (check_interface t ~source:file_name) cmis
   with
   | Cmi_consistbl.Inconsistency
       { unit_name = name; inconsistent_source = user; original_source = auth }
@@ -281,6 +305,17 @@ let report_error ppf = function
        %a@]"
       Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
       CU.Name.print_as_inline_code intf
+  | Pending_imports (file, intf) ->
+    fprintf ppf
+      "@[<hov>%a@ leaves the imports of interface %a@ to be checked,@ which \
+       requires %a@]"
+      Location.Doc.quoted_filename file CU.Name.print_as_inline_code intf
+      Misc.Style.inline_code "-use-persistent-deps"
+  | Recorded_cmi_not_found (intf, cmi_path) ->
+    fprintf ppf
+      "@[<hov>The compiled interface for %a@ was recorded at %a@ relative to \
+       the manifest files root,@ where it cannot be found@]"
+      CU.Name.print_as_inline_code intf Location.Doc.quoted_filename cmi_path
   | Inconsistent_implementation (intf, file1, file2) ->
     fprintf ppf
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over \

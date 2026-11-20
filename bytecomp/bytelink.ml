@@ -36,6 +36,8 @@ type error =
   | Wrong_object_name of filepath
   | Symbol_error of filepath * Symtable.error
   | Inconsistent_import of CU.Name.t * filepath * filepath
+  | Pending_imports of filepath * CU.Name.t
+  | Recorded_cmi_not_found of CU.Name.t * filepath
   | Custom_runtime
   | File_exists of filepath
   | Cannot_open_dll of filepath
@@ -172,19 +174,40 @@ module Consistbl = Consistbl.Make (CU.Name) (Unit)
 
 let crc_interfaces = Consistbl.create ()
 let interfaces = ref ([] : CU.Name.t list)
+let loaded_pending_imports = CU.Name.Tbl.create 17
+
+let rec check_interface ~source import =
+  let name = Import_info.name import in
+  let crco = Import_info.Intf.crc import in
+  interfaces := name :: !interfaces;
+  begin match crco with
+    None -> ()
+  | Some crc -> Consistbl.check crc_interfaces name () crc source
+  end;
+  (* An import with a recorded location leaves the imports of its .cmi to be
+     checked here. *)
+  match
+    Compilation_unit_intf.Found.cmi_path (Import_info.Intf.found import)
+  with
+  | None -> ()
+  | Some _ when CU.Name.Tbl.mem loaded_pending_imports name -> ()
+  | Some cmi_path ->
+    if not !Clflags.use_persistent_deps
+    then raise (Error (Pending_imports (source, name)));
+    CU.Name.Tbl.add loaded_pending_imports name ();
+    let source =
+      match Load_path.resolve_manifest_location cmi_path with
+      | Some filename when Sys.file_exists filename -> filename
+      | Some _ | None -> raise (Error (Recorded_cmi_not_found (name, cmi_path)))
+    in
+    let cmi = Cmi_format.read_cmi_lazy source in
+    let self = Compilation_unit_intf.Found.without_cmi_path name in
+    check_interface ~source
+      (Import_info.Intf.create_loaded self ~crc:cmi.cmi_crc);
+    Array.iter (check_interface ~source) cmi.cmi_crcs
 
 let check_consistency file_name cu =
-  try
-    Array.iter
-      (fun import ->
-        let name = Import_info.name import in
-        let crco = Import_info.Intf.crc import in
-        interfaces := name :: !interfaces;
-        match crco with
-          None -> ()
-        | Some crc ->
-            Consistbl.check crc_interfaces name () crc file_name)
-      cu.cu_imports
+  try Array.iter (check_interface ~source:file_name) cu.cu_imports
   with Consistbl.Inconsistency {
       unit_name = name;
       inconsistent_source = user;
@@ -199,7 +222,8 @@ let extract_crc_interfaces () =
 
 let clear_crc_interfaces () =
   Consistbl.clear crc_interfaces;
-  interfaces := []
+  interfaces := [];
+  CU.Name.Tbl.reset loaded_pending_imports
 
 (* Record compilation events *)
 
@@ -918,6 +942,17 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
         CU.Name.print_as_inline_code intf
+  | Pending_imports (file, intf) ->
+      fprintf ppf
+        "@[<hov>%a@ leaves the imports of interface %a@ to be checked,@ which \
+         requires %a@]"
+        Location.Doc.quoted_filename file CU.Name.print_as_inline_code intf
+        Style.inline_code "-use-persistent-deps"
+  | Recorded_cmi_not_found (intf, cmi_path) ->
+      fprintf ppf
+        "@[<hov>The compiled interface for %a@ was recorded at %a@ relative to \
+         the manifest files root,@ where it cannot be found@]"
+        CU.Name.print_as_inline_code intf Location.Doc.quoted_filename cmi_path
   | Custom_runtime ->
       fprintf ppf "Error while building custom runtime system"
   | File_exists file ->
