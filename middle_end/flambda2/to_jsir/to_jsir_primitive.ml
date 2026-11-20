@@ -252,7 +252,9 @@ let field_index_of_byte_offset ~env ~res offset =
       use_prim0 ~env ~res (Extern ("caml_int64_hi32", None)) [offset]
     in
     let high, env, res =
-      use_prim0 ~env ~res (Extern ("%int_lsl", None)) [Pv high; int_const 29]
+      use_prim0 ~env ~res
+        (Extern ("%int_lsl", None))
+        [Pv high; int_const (Targetint.num_bits () - 3)]
     in
     use_prim0 ~env ~res (Extern ("%int_or", None)) [Pv index; Pv high]
 
