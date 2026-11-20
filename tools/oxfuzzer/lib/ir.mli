@@ -80,7 +80,7 @@ module Ty : sig
     | Or_null of t
     | Bool
     | String
-    | Arrow of t * t  (** [Arrow (param, result)] is [param -> result]. *)
+    | Arrow of t * t
 
   and record =
     { id : int;
