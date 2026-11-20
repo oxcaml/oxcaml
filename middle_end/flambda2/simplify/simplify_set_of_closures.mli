@@ -45,17 +45,10 @@ val simplify_lifted_sets_of_closures :
   simplify_function_body:Simplify_common.simplify_function_body ->
   Bound_static.t * Rebuilt_static_const.Group.t * Downwards_acc.t
 
-val simplify_static_stub_function :
-  Downwards_acc.t ->
-  Code.t ->
-  all_code:Code.t Code_id.Map.t ->
-  simplify_function_body:Simplify_common.simplify_function_body ->
-  Rebuilt_static_const.t * Downwards_acc.t
-
-(** Simplify code that has no closure (see
-    [Simplify_set_of_closures_context.create_for_code_without_closure]), keeping
-    its code ID. *)
-val simplify_code_without_closure :
+(** Simplify code where it is bound, keeping its code ID, rather than at the
+    definition of a set of closures (see
+    [Simplify_set_of_closures_context.create_for_code_where_bound]). *)
+val simplify_code_where_bound :
   Downwards_acc.t ->
   Code.t ->
   all_code:Code.t Code_id.Map.t ->

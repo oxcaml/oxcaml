@@ -43,3 +43,14 @@ end;;
 module Id : sig val poly_ id : 'a -> 'a end
 - : int * float = (42, 3.14)
 |}];;
+
+(* [@unboxable] is ignored for the code of instantiations, which has no closure
+   for the unboxed version of the function. Native-only because only the native
+   backend unboxes. *)
+let (a, b) =
+  let[@unboxable] poly_ first (x [@unboxable] : float) _ : float = x in
+  (first 1.0 "a", first 2.0 #3.0)
+[%%expect {|
+val a : float = 1.
+val b : float = 2.
+|}]

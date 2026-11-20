@@ -131,11 +131,9 @@ module Env : sig
 
   val clear_local_bindings : t -> t
 
-  (** Identifiers bound to [Lambda.Lcode] are declared, with the code ID of the
-      code and an approximation of a closure of it (although no such closure
-      exists) giving only its metadata, before any of them is closed: the code
-      of an instantiation can be closed after code that calls it. They may only
-      be called. *)
+  (** Declare an identifier bound to [Lambda.Lcode], with the code ID of its
+      code and an approximation giving only the code's metadata, so that calls
+      to it can be closed before the code itself. *)
   val declare_lcode :
     t ->
     Ident.t ->
