@@ -35,9 +35,16 @@ type 'sg cmi_infos_generic = {
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg * Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
+    cmi_crc : Digest.t;
+      (* The crc of the interface itself; [dummy_crc] until it is written,
+         and ignored by [output_cmi]. *)
     cmi_crcs : Import_info.t array;
+      (* The crcs of the imported interfaces. *)
     cmi_flags : pers_flags list;
 }
+
+(* A placeholder for the [cmi_crc] of an interface not written yet. *)
+val dummy_crc : Digest.t
 
 type cmi_infos_lazy = Subst.Lazy.signature cmi_infos_generic
 type cmi_infos = Types.signature cmi_infos_generic

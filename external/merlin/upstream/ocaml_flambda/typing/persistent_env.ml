@@ -21,7 +21,7 @@ open Cmi_format
 
 module CU = Compilation_unit
 module CUI = Compilation_unit_intf
-module Consistbl = Consistbl.Make (CU.Name) (Unit)
+module Consistbl = Consistbl.Make (CUI.Found) (Unit)
 module Style = Misc.Style
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
@@ -142,6 +142,7 @@ type import = {
   imp_manifest_location : filepath;
   imp_uid : Shape.Uid.t;
   imp_visibility: Load_path.visibility;
+  imp_crc : Digest.t;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
 }
@@ -202,6 +203,8 @@ type 'a t = {
   quoted_intfs: CU.Name.Set.t ref;
   quoted_impls: CU.Set.t ref;
   param_imports : Param_set.t ref;
+  (* An interface recorded with a location has its imports left pending (see
+     [Import_info.Intf.create_loaded]). *)
   crc_units: Consistbl.t;
   can_load_cmis: can_load_cmis ref;
 }
@@ -298,29 +301,38 @@ let register_parameter ({param_imports; _} as penv) modname =
   end;
   param_imports := Param_set.add modname !param_imports
 
-let import_crcs penv ~source crcs =
+(* A recorded location is passed on without loading the .cmi. If the interface
+   is already known without one, its imports have been checked already. *)
+let import_crc penv ~source found crc =
   let {crc_units; _} = penv in
-  let import_crc import_info =
-    let name = Import_info.Intf.name import_info in
-    let crco = Import_info.Intf.crc import_info in
-    match crco with
-    | None -> ()
-    | Some crc ->
-        match Consistbl.find crc_units name with
-        | Some ((), known_crc) when Digest.equal known_crc crc -> ()
-        | _ ->
-          add_import penv name;
-          Consistbl.check crc_units name () crc source
-  in Array.iter import_crc crcs
+  match Consistbl.find crc_units found with
+  | Some ((), known_crc) when Digest.equal known_crc crc -> ()
+  | _ ->
+    add_import penv (CUI.Found.intf found);
+    Consistbl.check crc_units found () crc source
 
-let check_consistency penv imp =
-  try import_crcs penv ~source:imp.imp_filename imp.imp_crcs
+let import_crcs penv ~source crcs =
+  Array.iter
+    (fun import_info ->
+       Option.iter
+         (import_crc penv ~source (Import_info.Intf.found import_info))
+         (Import_info.Intf.crc import_info))
+    crcs
+
+(* An interface with a location to record is checked by its crc only, and its
+   imports are left pending; otherwise its imports are checked too. *)
+let check_consistency penv modname imp =
+  let source = imp.imp_filename in
+  try
+    let cmi_path = cmi_path_to_record imp in
+    import_crc penv ~source (CUI.Found.create modname ~cmi_path) imp.imp_crc;
+    if String.equal cmi_path "" then import_crcs penv ~source imp.imp_crcs
   with Consistbl.Inconsistency {
       unit_name = name;
       inconsistent_source = source;
       original_source = auth;
     } ->
-    error (Inconsistent_import(name, auth, source))
+    error (Inconsistent_import(CUI.Found.intf name, auth, source))
 
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
@@ -363,7 +375,8 @@ let save_import penv crc modname flags filename =
         | Alerts _ -> ()
         | Opaque -> register_import_as_opaque penv modname)
     flags;
-  Consistbl.check crc_units modname () crc filename;
+  Consistbl.check crc_units (CUI.Found.without_cmi_path modname) () crc
+    filename;
   add_import penv modname
 
 (* Add an import to the hash table. Checks that we are allowed to access
@@ -376,6 +389,7 @@ let acknowledge_import penv ~check modname pers_sig =
   let found_name = cmi.cmi_name in
   let kind = cmi.cmi_kind in
   let params = cmi.cmi_params in
+  let crc = cmi.cmi_crc in
   let crcs = cmi.cmi_crcs in
   let flags = cmi.cmi_flags in
   let sign = Signature_with_global_bindings.read_from_cmi cmi in
@@ -432,11 +446,12 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_manifest_location = Option.value manifest_location ~default:"";
       imp_uid = uid;
       imp_visibility = visibility;
+      imp_crc = crc;
       imp_crcs = crcs;
       imp_flags = flags;
     }
   in
-  if check then check_consistency penv import;
+  if check then check_consistency penv modname import;
   CUI.Tbl.add imports modname (Found import);
   import
 
@@ -777,7 +792,9 @@ and acknowledge_new_pers_name penv check global_name global import =
              pn_global = global;
              pn_sign;
            } in
-  if check then check_consistency penv import;
+  if check then
+    check_consistency penv
+      (CUI.Found.intf global_name.Global_module.Name.head) import;
   Global_module.Name.Tbl.add persistent_names global_name pn;
   remember_global penv global ~precision:Exact ~mentioned_by:Current;
   pn
@@ -1108,28 +1125,27 @@ let check ~allow_hidden penv f ~loc name =
   end
 
 let crc_of_unit penv name =
-  match Consistbl.find penv.crc_units name with
+  match Consistbl.find penv.crc_units (CUI.Found.without_cmi_path name) with
   | Some ((), crc) -> crc
   | None ->
     let import =
       find_import ~allow_hidden:true penv ~check:true
         (CUI.Found.without_cmi_path name)
     in
-    match Array.find_opt (Import_info.Intf.has_name ~name) import.imp_crcs with
-    | None -> assert false
-    | Some import_info ->
-      match Import_info.crc import_info with
-      | None -> assert false
-      | Some crc -> crc
+    import.imp_crc
 
 let imports {imported_units; crc_units; _} =
   let imports =
-    Consistbl.extract (CU.Name.Set.elements !imported_units)
+    Consistbl.extract
+      (List.map CUI.Found.without_cmi_path
+         (CU.Name.Set.elements !imported_units))
       crc_units
   in
   List.map
-    (fun (cu_name, crc) ->
-       Import_info.Intf.create cu_name ~crc:(Option.map snd crc))
+    (fun (found, crc) ->
+       match crc with
+       | None -> Import_info.Intf.create_alias (CUI.Found.intf found)
+       | Some ((), crc) -> Import_info.Intf.create_loaded found ~crc)
     imports
 
 let require_intf_for_quote {quoted_intfs; _} name =
@@ -1241,6 +1257,7 @@ let make_cmi penv modname kind sign alerts =
     cmi_globals = globals;
     cmi_sign = sign;
     cmi_params = params;
+    cmi_crc = Cmi_format.dummy_crc;
     cmi_crcs = Array.of_list crcs;
     cmi_flags = flags
   }
