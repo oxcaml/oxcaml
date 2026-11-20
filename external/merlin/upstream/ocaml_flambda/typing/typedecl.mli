@@ -158,16 +158,11 @@ module Mixed_product_kind : sig
 end
 
 val assert_mixed_product_support :
-  Warnings.loc -> Mixed_product_kind.t -> value_prefix_len:int -> unit
+  Warnings.loc -> Mixed_product_kind.t -> unit
 
 type mixed_product_violation =
   | Runtime_support_not_enabled of Mixed_product_kind.t
   | Extension_constructor
-  | Value_prefix_too_long of
-      { value_prefix_len : int;
-        max_value_prefix_len : int;
-        mixed_product_kind : Mixed_product_kind.t;
-      }
   | Insufficient_level of
       { required_layouts_level : Language_extension.maturity;
         mixed_product_kind : Mixed_product_kind.t;

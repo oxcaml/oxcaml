@@ -34,6 +34,7 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/reverse.h"
+#include "caml/scan_mask.h"
 #include "caml/shared_heap.h"
 
 /* Flags affecting marshaling */
@@ -1446,24 +1447,45 @@ intnat reachable_words_once(struct caml_extern_state *s,
           }
         }
         if (Scannable_tag(tag)) {
-          /* i is the position of the first field to traverse recursively,
-             and j is the position of the last such field.
-           */
-          uintnat i =
-            tag == Closure_tag ? Start_env_closinfo(Closinfo_val(v)) : 0;
-          uintnat j = Scannable_wosize_hd(hd);
-          if (i < j) {
-            if (i < j - 1) {
-              /* Remember that we need to count fields i + 1 ... j - 1 */
-              sp++;
-              if (sp >= s->extern_stack_limit)
-                sp = extern_resize_stack(s, sp);
-              sp->v = &Field(v, i + 1);
-              sp->count = j - i - 1;
+          if (Has_scan_mask_hd(hd)) {
+            /* A block with a scan mask: its scannable words need not be
+               contiguous, so remember each one separately. */
+            caml_block_scan bs;
+            mlsize_t first;
+            caml_block_scan_init(&bs, v, hd);
+            if (caml_block_scan_next(&bs, &first)) {
+              mlsize_t k;
+              while (caml_block_scan_next(&bs, &k)) {
+                sp++;
+                if (sp >= s->extern_stack_limit)
+                  sp = extern_resize_stack(s, sp);
+                sp->v = &Field(v, k);
+                sp->count = 1;
+              }
+              /* Continue with the first */
+              v = Field(v, first);
+              continue;
             }
-            /* Continue with field i */
-            v = Field(v, i);
-            continue;
+          } else {
+            /* i is the position of the first field to traverse recursively,
+               and j is the position of the last such field.
+             */
+            uintnat i =
+              tag == Closure_tag ? Start_env_closinfo(Closinfo_val(v)) : 0;
+            uintnat j = Wosize_hd(hd);
+            if (i < j) {
+              if (i < j - 1) {
+                /* Remember that we need to count fields i + 1 ... j - 1 */
+                sp++;
+                if (sp >= s->extern_stack_limit)
+                  sp = extern_resize_stack(s, sp);
+                sp->v = &Field(v, i + 1);
+                sp->count = j - i - 1;
+              }
+              /* Continue with field i */
+              v = Field(v, i);
+              continue;
+            }
           }
         }
       }

@@ -68,6 +68,11 @@ val add_invalid_message_symbol : t -> Symbol.t -> message:string -> t
 
 val invalid_message_symbol : t -> message:string -> Symbol.t option
 
+(** Caching of symbols of static layout blocks, by their scan words. *)
+val add_layout_block_symbol : t -> Symbol.t -> words:nativeint list -> t
+
+val layout_block_symbol : t -> words:nativeint list -> Symbol.t option
+
 type result = private
   { data_items : Cmm.phrase list;
     gc_roots : Cmm.symbol list;

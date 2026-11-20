@@ -743,7 +743,8 @@ type ('a : any) pair = #('a * 'a)
 type ('a : any) fields_256 = 'a pair pair pair pair pair pair pair pair
 |}]
 
-(* This module has too many value fields before the flat suffix. *)
+(* This module has many value fields before the flat suffix (more than were
+   once allowed). *)
 let with_unboxed_float =
   let poly_ make_large_module x =
     let module M = struct
@@ -763,18 +764,7 @@ let with_unboxed_float =
   in
   to_float (make_large_module #42.5)
 [%%expect {|
-Lines 3-15, characters 19-7:
- 3 | ...................struct
- 4 |       let padding : int fields_256 =
- 5 |         let p = #(0, 0) in
- 6 |         let p = #(p, p) in
- 7 |         let p = #(p, p) in
-...
-12 |         let p = #(p, p) in
-13 |         p
-14 |       let k = x
-15 |     end...
-Error: Mixed blocks may contain at most 254 value fields prior to the flat suffix, but this one contains 256.
+val with_unboxed_float : float = 42.5
 |}]
 
 (* This module is all values, so it is a uniform block. *)

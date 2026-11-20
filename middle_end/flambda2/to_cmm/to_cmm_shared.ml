@@ -392,6 +392,38 @@ let invalid res ~message =
   let cmm_symbol = To_cmm_result.symbol res message_sym in
   Cmm.Cinvalid { message; symbol = cmm_symbol }, res
 
+let layout_block res ~words =
+  let layout_sym, res =
+    match To_cmm_result.layout_block_symbol res ~words with
+    | None ->
+      let layout_sym =
+        Symbol.manufacture (Current_unit.get_cu_exn ()) "layout"
+      in
+      let res =
+        Cmm_helpers.emit_layout_block
+          (To_cmm_result.symbol res layout_sym)
+          words []
+        |> To_cmm_result.add_archive_data_items res
+      in
+      let res = To_cmm_result.add_layout_block_symbol res layout_sym ~words in
+      layout_sym, res
+    | Some layout_sym -> layout_sym, res
+  in
+  To_cmm_result.symbol res layout_sym, res
+
+let mixed_block_layout res shape =
+  let module MBS = Flambda_kind.Mixed_block_shape in
+  if MBS.has_layout_word shape
+  then
+    let value_prefix_size = MBS.value_prefix_size shape in
+    let unscannable =
+      Array.init (MBS.size_in_words shape) (fun i -> i >= value_prefix_size)
+    in
+    let words = Cmm_helpers.mixed_block_layout_words ~unscannable in
+    let layout, res = layout_block res ~words in
+    Some layout, res
+  else None, res
+
 module Update_kind = struct
   type kind =
     | Pointer

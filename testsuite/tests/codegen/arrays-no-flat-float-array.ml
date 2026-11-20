@@ -39,8 +39,8 @@ push:
   movq  %rax, %r12
   movq  %rdi, %rsi
   movq  -8(%rbx), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
+  salq  $22, %rax
+  shrq  $31, %rax
   cmpq  %rax, %r12
   jae   .L0
   leaq  -4(%rbx,%r12,4), %rdi
@@ -309,8 +309,8 @@ let int_length (a : int array) = Array.length a
 [%%expect_asm X86_64{|
 int_length:
   movq  -8(%rax), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
+  salq  $22, %rax
+  shrq  $31, %rax
   orq   $1, %rax
   ret
 |}]
@@ -319,8 +319,8 @@ let poly_length (a : 'a array) = Array.length a
 [%%expect_asm X86_64{|
 poly_length:
   movq  -8(%rax), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
+  salq  $22, %rax
+  shrq  $31, %rax
   orq   $1, %rax
   ret
 |}]
@@ -333,8 +333,8 @@ int32_length:
   movzbq -8(%rax), %rbx
   andl  $1, %ebx
   movq  -8(%rax), %rax
-  salq  $8, %rax
-  shrq  $18, %rax
+  salq  $22, %rax
+  shrq  $32, %rax
   salq  $1, %rax
   subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
@@ -345,8 +345,8 @@ let int64_length (a : int64_u array) = Array.length a
 [%%expect_asm X86_64{|
 int64_length:
   movq  -8(%rax), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
+  salq  $22, %rax
+  shrq  $31, %rax
   orq   $1, %rax
   ret
 |}]
@@ -355,8 +355,8 @@ let float_length (a : float# array) = Array.length a
 [%%expect_asm X86_64{|
 float_length:
   movq  -8(%rax), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
+  salq  $22, %rax
+  shrq  $31, %rax
   orq   $1, %rax
   ret
 |}]
@@ -367,8 +367,8 @@ float32_length:
   movzbq -8(%rax), %rbx
   andl  $1, %ebx
   movq  -8(%rax), %rax
-  salq  $8, %rax
-  shrq  $18, %rax
+  salq  $22, %rax
+  shrq  $32, %rax
   salq  $1, %rax
   subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
@@ -381,8 +381,8 @@ int16_length:
   movzbq -8(%rax), %rbx
   andl  $3, %ebx
   movq  -8(%rax), %rax
-  salq  $8, %rax
-  shrq  $18, %rax
+  salq  $22, %rax
+  shrq  $32, %rax
   salq  $2, %rax
   subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
@@ -395,8 +395,8 @@ int8_length:
   movzbq -8(%rax), %rbx
   andl  $7, %ebx
   movq  -8(%rax), %rax
-  salq  $8, %rax
-  shrq  $18, %rax
+  salq  $22, %rax
+  shrq  $32, %rax
   salq  $3, %rax
   subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
@@ -410,8 +410,8 @@ let int_safe_get (a : int array) (i : int) =
 [%%expect_asm X86_64{|
 int_safe_get:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
@@ -431,8 +431,8 @@ ref_safe_set:
   subq  $8, %rsp
   movq  %rdi, %rsi
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   leaq  -4(%rax,%rbx,4), %rdi
@@ -452,8 +452,8 @@ let poly_safe_get (a : 'a array) (i : int) =
 [%%expect_asm X86_64{|
 poly_safe_get:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
@@ -473,8 +473,8 @@ poly_safe_set:
   subq  $8, %rsp
   movq  %rdi, %rsi
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   leaq  -4(%rax,%rbx,4), %rdi
@@ -495,8 +495,8 @@ let int64_safe_get (a : int64_u array) (i : int) =
 [%%expect_asm X86_64{|
 int64_safe_get:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
@@ -514,8 +514,8 @@ let float_safe_get (a : float# array) (i : int) =
 [%%expect_asm X86_64{|
 float_safe_get:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   vmovsd -4(%rax,%rbx,4), %xmm0
@@ -533,8 +533,8 @@ let float_safe_get_plain (a : float array) (i : int) =
 [%%expect_asm X86_64{|
 float_safe_get_plain:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
@@ -555,8 +555,8 @@ int32_safe_get:
   movzbq -8(%rax), %rdi
   andl  $1, %edi
   movq  -8(%rax), %rsi
-  salq  $8, %rsi
-  shrq  $18, %rsi
+  salq  $22, %rsi
+  shrq  $32, %rsi
   salq  $1, %rsi
   subq  %rdi, %rsi
   salq  $1, %rsi

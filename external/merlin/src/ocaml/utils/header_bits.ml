@@ -1,0 +1,21 @@
+let tag_bits = 8
+let color_bits = 2
+let wosize_bits = 32
+let format_bits = 2
+let repeat_bits = 4
+let scan_mask_bits = 16
+let reserved_bits =
+  2 + 4 + 16
+let color_shift = 8
+let wosize_shift = (8 + 2)
+let scan_mask_shift = ((8 + 2) + 32)
+let repeat_shift = (((8 + 2) + 32) + 16)
+let format_shift = ((((8 + 2) + 32) + 16) + 4)
+let format_legacy = 0
+let format_inline = 1
+let format_extended = 2
+let format_external = 3
+let layout_word_mask_bits = 58
+let layout_word_repeat_bits = 6
+let layout_word_repeat_shift = 58
+let layout_word_repeat_max = 58
