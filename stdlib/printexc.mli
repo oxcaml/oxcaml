@@ -73,10 +73,10 @@ val get_backtrace: unit -> string
     @since 3.11
 *)
 
-val record_backtrace: bool -> unit
+val record_backtrace: bool -> unit @@ nonportable
 (** [Printexc.record_backtrace b] turns recording of exception backtraces
-    on (if [b = true]) or off (if [b = false]).  Initially, backtraces
-    are not recorded, unless the [b] flag is given to the program
+    on (if [b = true]) or off (if [b = false]) globally.  Initially,
+    backtraces are not recorded, unless the [b] flag is given to the program
     through the [OCAMLRUNPARAM] variable.
     @since 3.11
 *)
@@ -434,6 +434,13 @@ module Safe : sig
 
       The provided closure must be [portable] as exception handlers may be called from
       any domain, not just the one that it's registered on. *)
+end
+
+module Racy : sig
+  val record_backtrace: bool -> unit
+  (** Portable alias of [Printexc.record_backtrace]. This still modifies a
+      single global flag and can produce unexpected results with multiple
+      domains, threads, and fibers. *)
 end
 
 (**/**)
