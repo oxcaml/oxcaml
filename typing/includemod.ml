@@ -436,8 +436,9 @@ let rec print_coercion ppf c =
       pr "@[<2>struct@ %a@ %a@]"
         (print_list print_coercion2) pos_cc_list
         (print_list print_coercion3) id_pos_list
-  | Tcoerce_functor (inp, out, _) ->
-      pr "@[<2>functor@ (%a)@ (%a)@]"
+  | Tcoerce_functor (inp, out, _, staticity) ->
+      pr "@[<2>%sfunctor@ (%a)@ (%a)@]"
+        (match staticity with Static -> "template_" | Dynamic -> "")
         print_coercion inp
         print_coercion out
   | Tcoerce_primitive {pc_desc; pc_env = _; pc_type}  ->
@@ -814,10 +815,6 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
           in
           Ok (Tcoerce_none, final_shape)
       | Ok cc_arg, Ok (cc_res, final_res_shape) ->
-          if not (staticity = Mode.Staticity.Dynamic) then
-            Misc.fatal_errorf
-              "Includemod.try_modtypes: template functor coercion at %a"
-              Location.print_loc_in_lowercase loc;
           let final_shape =
             if final_res_shape == res_shape
             then orig_shape
@@ -843,7 +840,7 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
               (Yielding.join (funct_yielding :: param_yielding))
           in
           Ok
-            (Tcoerce_functor(cc_arg, cc_res, application_yielding),
+            (Tcoerce_functor(cc_arg, cc_res, application_yielding, staticity),
              final_shape)
       | _, Error {Error.symptom = Error.Functor Error.Params res; _} ->
           let got = Error.cons_arg (force_functor_parameter param1) res.got in

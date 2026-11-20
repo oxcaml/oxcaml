@@ -208,7 +208,24 @@ let c1 =
   let module R = U (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
->> Fatal error: Includemod.try_modtypes: template functor coercion at line 6, characters 68-73
+val c1 : int = 4
+|}]
+
+module type T = functor (Y : S @ static) -> sig val i : int end
+[%%expect{|
+module type T = functor (Y : S @ static) -> sig val i : int end
+|}]
+
+(* Curried application of a template functor that returns a template
+   functor, coerced through a curried template functor type. *)
+let c2 =
+  let module G (Y : S @ static) = struct let i = Y.y let extra = 0 end in
+  let module F (X : S @ static) = G in
+  let module H = (F : functor (X : S @ static) -> T @ static) in
+  let module R = H (struct let y = 1 end) (struct let y = 2 end) in
+  R.i
+[%%expect{|
+>> Fatal error: Slambda eval doesn't support partial or over application of functors.
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -418,9 +435,7 @@ let _ =
   let module M = M.F (struct end) in
   M.j
 [%%expect{|
->> Fatal error: Includemod.try_modtypes: template functor coercion at lines 4-6, characters 8-5
-Uncaught exception: Misc.Fatal_error
-
+- : int = 2
 |}]
 
 (* Captured values of several layouts at once. *)
