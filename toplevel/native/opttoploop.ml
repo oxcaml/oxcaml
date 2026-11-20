@@ -503,7 +503,7 @@ let execute_phrase print_outcome ppf phr =
       let str, sg', newenv, coercion =
         (* A monitor root covering the inclusion check and delayed checks
            too, which run after [type_toplevel_phrase] returns. *)
-        Scheduler.Monitor.root @@ fun () ->
+        Typing_scheduler.Monitor.root @@ fun () ->
         Typecore.reset_delayed_checks ();
         let (str, sg, names, _shape, newenv) =
           Typemod.type_toplevel_phrase oldenv oldsig sstr
