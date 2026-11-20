@@ -1,7 +1,6 @@
 (* TEST
  readonly_files = "main.c";
  arguments = "-DINT_FLOAT -DFUN=is_even main.c";
- flags = "-dcmm-no-check-machtypes";
  asmgen;
 *)
 
@@ -9,9 +8,9 @@
 ("format_even": string "even %d\n\000")
 
 (function "force_spill" (a:int) 0)
-(function "force_spill_float" (f:float) 0.0)
+(function "force_spill_float" (f:float) : float 0.0)
 
-(function "is_even" (b:int)
+(function "is_even" (b:int) : float
   (catch (exit even b 0.0)
    with (odd v:val f:float)
      (if (== v 0) f
