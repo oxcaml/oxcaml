@@ -57,8 +57,9 @@ This is a convention specific to JSIR, and as such normal debuggers will not be 
 
 `-g` does not change the `js_of_ocaml` commands: what `js_of_ocaml` does with this information is chosen with `-jsoo-opt`, for example `--source-map`, `--pretty`, or `--debuginfo` (which puts the locations in comments in the generated JavaScript).
 
-The separate-compilation archives shipped with the compiler contain inline maps.
 The WebAssembly archive of the standard library is compiled with `--pretty`, so that its functions have names in stack traces.
+
+The separate-compilation archives shipped with the compiler contain inline maps.
 A link that requests a map includes their mappings and available source text; a link without maps discards them.
 `--source-map-no-source` is a compile option: it does not strip text already embedded in an archive.
 The JSIR of these libraries records a source as `/oxcaml/stdlib/` followed by its path below the standard library directory. `ocamlopt` runs `js_of_ocaml` with a `BUILD_PATH_PREFIX_MAP` entry from that prefix to the standard library directory, so `js_of_ocaml` reads the sources that are installed there, and names them by the recorded path in source maps. Sources that are not installed, such as those of `Sys`, `unix`, `str` and compiler-libs, have no text in the map of a `-link-jsir` link.
