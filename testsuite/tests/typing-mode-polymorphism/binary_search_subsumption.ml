@@ -117,25 +117,17 @@ Error: Signature mismatch:
            get:('t -> int -> 'elt) @ local ->
            compare:('elt -> 'key -> int) @ local -> 'key -> int option
        The type
-         "'a @ [< 'm & 'n & global many uncontended forkable unyielding read_write] ->
-         length:('a @ [< global many uncontended forkable unyielding read_write > 'n | aliased] ->
-                 int @ [< many uncontended read_write > dynamic]) @ [< many > local] ->
-         get:('a @ [< global many uncontended forkable unyielding read_write > 'm | aliased] ->
-              (int @ [> aliased] ->
-               'b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic]) @ [> local nonportable unforkable yielding stateful dynamic]) @ [< many > local] ->
-         compare:('b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                  ('c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                   int @ [< many uncontended read_write > dynamic]) @ [> local nonportable unforkable yielding stateful dynamic]) @ [< many > local] ->
-         'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+         "... ->
+         length:... ->
+         get:... ->
+         compare:... ->
+         'a @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
          int option @ [> local aliased dynamic]"
        is not compatible with the type
-         "'a ->
-         length:('a -> int) @ local ->
-         get:('a -> int -> 'b) @ local ->
-         compare:('b -> 'c -> int) @ local -> 'c -> int option"
+         "... -> length:... -> get:... -> compare:... -> 'a -> int option"
        Type
-         "'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+         "'a @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
          int option @ [> local aliased dynamic]"
-       is not compatible with type "'c -> int option"
+       is not compatible with type "'a -> int option"
        The return mode was expected to be "global" but is "local"
 |}]

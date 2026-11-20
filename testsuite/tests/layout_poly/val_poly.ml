@@ -145,7 +145,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val poly_ f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 4, characters 2-39.
        But the layout of 'a must be a sublayout of value
@@ -181,7 +181,7 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val poly_ f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is value
          because of the definition of f at line 4, characters 2-58.
        But the kind of 'a must be a subkind of value
@@ -217,7 +217,7 @@ Error: Signature mismatch:
          val f : ('a : bits64). 'a -> 'a
        is not included in
          val poly_ f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is bits64
          because of the definition of f at line 4, characters 2-39.
        But the kind of 'a must be a subkind of bits64
@@ -243,7 +243,7 @@ Error: Signature mismatch:
          val poly_ f : 'a -> 'a
        is not included in
          val f : ('a : any). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is any
          because of the definition of f at line 4, characters 2-30.
        But the layout of 'a must be a value layout
@@ -399,7 +399,7 @@ Error: Signature mismatch:
          val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
        is not included in
          val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b
-       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is <genvar>
          because of the definition of bar at line 4, characters 2-50.
        But the kind of 'a must be a subkind of <genvar> mod contended
@@ -443,7 +443,7 @@ Error: Signature mismatch:
            layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b
        is not included in
          val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
-       The type "'a -> 'b" is not compatible with the type "'a -> 'c"
+       The type "... -> 'a" is not compatible with the type "... -> 'b"
        The kind of 'a is <genvar>
          because of the definition of bar at line 4, characters 2-64.
        But the kind of 'a must be a subkind of <genvar> mod contended

@@ -48,6 +48,10 @@ val wrap_printing_env: error:bool -> Env.t -> (unit -> 'a) -> 'a
 (** [with_labels false] disable labels in function types *)
 val with_labels: bool -> (unit -> 'a) -> 'a
 
+type spine
+
+val type_spine: Errortrace.expanded_type Errortrace.diff list -> spine option
+
 (** {1 Printing idents and paths } *)
 
 val ident_name: Shape.Sig_component_kind.t option -> Ident.t -> out_name
@@ -128,10 +132,12 @@ val type_expr_with_reserved_names: type_expr printer
 
 type 'a diff = Same of 'a | Diff of 'a * 'a
 val trees_of_type_expansion:
-  type_or_scheme -> Errortrace.expanded_type -> out_type diff
+  ?spine:spine -> type_or_scheme -> Errortrace.expanded_type -> out_type diff
 val trees_of_type_expansion':
-  var_jkinds:bool -> type_or_scheme -> Errortrace.expanded_type -> out_type diff
-val prepare_expansion: Errortrace.expanded_type -> Errortrace.expanded_type
+  ?spine:spine -> var_jkinds:bool -> type_or_scheme ->
+  Errortrace.expanded_type -> out_type diff
+val prepare_expansion:
+  ?spine:spine -> Errortrace.expanded_type -> Errortrace.expanded_type
 val pp_type_expansion: out_type diff printer
 val hide_variant_name: Types.type_expr -> Types.type_expr
 
@@ -285,7 +291,7 @@ module Variable_names: sig
   (** [reserve ty] registers the variable names appearing in [ty]. It also
       registers the mode variable names appearing in [ty], and finds all
       the constraints between them. *)
-  val reserve: type_expr -> unit
+  val reserve: ?spine:spine -> type_expr -> unit
 end
 
 (** Register internal typechecker names ([$0],[$a]) appearing in the

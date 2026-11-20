@@ -1617,11 +1617,10 @@ Error: Signature mismatch:
          val f : 'a -> 'b @ write -> 'a * 'b @ immutable
        is not included in
          val f : 'a @ read -> 'b @ write -> 'a * 'b @ read
-       The type "'a -> 'b @ write -> 'a * 'b @ immutable"
-       is not compatible with the type
-         "'a @ read -> 'b @ write -> 'a * 'b @ read"
-       Type "'b @ write -> 'a * 'b @ immutable" is not compatible with type
-         "'b @ write -> 'a * 'b @ read"
+       The type "... -> 'a @ write -> 'b * 'a @ immutable"
+       is not compatible with the type "... -> 'a @ write -> 'b * 'a @ read"
+       Type "'a @ write -> 'b * 'a @ immutable" is not compatible with type
+         "'a @ write -> 'b * 'a @ read"
        The return mode was expected to be "read" or "read_write" but is "write"
 |}]
 
@@ -1645,10 +1644,10 @@ Error: Signature mismatch:
          val f : 'a -> 'b @ write -> 'a * 'b @ write
        is not included in
          val f : 'a @ read -> 'b @ write -> 'a * 'b
-       The type "'a -> 'b @ write -> 'a * 'b @ write"
-       is not compatible with the type "'a @ read -> 'b @ write -> 'a * 'b"
-       Type "'b @ write -> 'a * 'b @ write" is not compatible with type
-         "'b @ write -> 'a * 'b"
+       The type "... -> 'a @ write -> 'b * 'a @ write"
+       is not compatible with the type "... -> 'a @ write -> 'b * 'a"
+       Type "'a @ write -> 'b * 'a @ write" is not compatible with type
+         "'a @ write -> 'b * 'a"
        The return mode was expected to be "read_write" but is "write"
 |}]
 
@@ -1672,11 +1671,10 @@ Error: Signature mismatch:
          val f : 'a -> 'b @ read -> 'a * 'b @ immutable
        is not included in
          val f : 'a @ write -> 'b @ read -> 'a * 'b @ write
-       The type "'a -> 'b @ read -> 'a * 'b @ immutable"
-       is not compatible with the type
-         "'a @ write -> 'b @ read -> 'a * 'b @ write"
-       Type "'b @ read -> 'a * 'b @ immutable" is not compatible with type
-         "'b @ read -> 'a * 'b @ write"
+       The type "... -> 'a @ read -> 'b * 'a @ immutable"
+       is not compatible with the type "... -> 'a @ read -> 'b * 'a @ write"
+       Type "'a @ read -> 'b * 'a @ immutable" is not compatible with type
+         "'a @ read -> 'b * 'a @ write"
        The return mode was expected to be "write" or "read_write" but is "read"
 |}]
 
@@ -1728,10 +1726,10 @@ Error: Signature mismatch:
          val f : 'a -> 'b @ read -> 'a * 'b @ read
        is not included in
          val f : 'a @ write -> 'b @ read -> 'a * 'b
-       The type "'a -> 'b @ read -> 'a * 'b @ read"
-       is not compatible with the type "'a @ write -> 'b @ read -> 'a * 'b"
-       Type "'b @ read -> 'a * 'b @ read" is not compatible with type
-         "'b @ read -> 'a * 'b"
+       The type "... -> 'a @ read -> 'b * 'a @ read"
+       is not compatible with the type "... -> 'a @ read -> 'b * 'a"
+       Type "'a @ read -> 'b * 'a @ read" is not compatible with type
+         "'a @ read -> 'b * 'a"
        The return mode was expected to be "read_write" but is "read"
 |}]
 
@@ -1798,10 +1796,10 @@ Error: Signature mismatch:
          val f : 'a -> 'b -> 'a * 'b
        is not included in
          val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading
-       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
-         "'a @ reading -> 'b @ writing -> 'a * 'b @ reading"
-       Type "'b -> 'a * 'b" is not compatible with type
-         "'b @ writing -> 'a * 'b @ reading"
+       The type "... -> 'a -> 'b * 'a" is not compatible with the type
+         "... -> 'a @ writing -> 'b * 'a @ reading"
+       Type "'a -> 'b * 'a" is not compatible with type
+         "'a @ writing -> 'b * 'a @ reading"
        The return mode was expected to be "reading" but is "writing"
 |}]
 
@@ -1825,11 +1823,11 @@ Error: Signature mismatch:
          val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
        is not included in
          val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless
-       The type "'a @ writing -> 'b @ writing -> 'a * 'b @ writing"
+       The type "... -> 'a @ writing -> 'b * 'a @ writing"
        is not compatible with the type
-         "'a @ reading -> 'b @ writing -> 'a * 'b @ stateless"
-       Type "'b @ writing -> 'a * 'b @ writing" is not compatible with type
-         "'b @ writing -> 'a * 'b @ stateless"
+         "... -> 'a @ writing -> 'b * 'a @ stateless"
+       Type "'a @ writing -> 'b * 'a @ writing" is not compatible with type
+         "'a @ writing -> 'b * 'a @ stateless"
        The return mode was expected to be "stateless" but is "writing"
 |}]
 
@@ -1853,10 +1851,10 @@ Error: Signature mismatch:
          val f : 'a -> 'b -> 'a * 'b
        is not included in
          val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing
-       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
-         "'a @ writing -> 'b @ reading -> 'a * 'b @ writing"
-       Type "'b -> 'a * 'b" is not compatible with type
-         "'b @ reading -> 'a * 'b @ writing"
+       The type "... -> 'a -> 'b * 'a" is not compatible with the type
+         "... -> 'a @ reading -> 'b * 'a @ writing"
+       Type "'a -> 'b * 'a" is not compatible with type
+         "'a @ reading -> 'b * 'a @ writing"
        The return mode was expected to be "writing" but is "reading"
 |}]
 
@@ -1906,11 +1904,11 @@ Error: Signature mismatch:
          val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
        is not included in
          val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless
-       The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
+       The type "... -> 'a @ reading -> 'b * 'a @ reading"
        is not compatible with the type
-         "'a @ writing -> 'b @ reading -> 'a * 'b @ stateless"
-       Type "'b @ reading -> 'a * 'b @ reading" is not compatible with type
-         "'b @ reading -> 'a * 'b @ stateless"
+         "... -> 'a @ reading -> 'b * 'a @ stateless"
+       Type "'a @ reading -> 'b * 'a @ reading" is not compatible with type
+         "'a @ reading -> 'b * 'a @ stateless"
        The return mode was expected to be "stateless" but is "reading"
 |}]
 
