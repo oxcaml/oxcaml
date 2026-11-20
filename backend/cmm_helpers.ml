@@ -3617,11 +3617,12 @@ module SArgBlocks = struct
   (* The FDO counters of the actions of a collapsed switch have no edges of
      their own, so they move to the edge into the switch. *)
   let make_switch dbg (_ : layout) arg cases actions =
-    let actions_annots = Array.to_list (Array.map (fun (_, _, annots -> annots)) actions) in
-    let actions = Array.map (fun (expr, annots) -> expr, dbg, annots) actions in
+    let annots =
+      Array.map (fun (_, _, annots) -> annots) actions |> Array.to_list
+    in
     match make_switch arg cases actions dbg with
-    | Branching expr -> expr, dbg, Branch_annotations.fork_point actions_annots
-    | Collapsed expr -> expr, dbg, Branch_annotations.join_point actions_annots
+    | Branching expr -> expr, dbg, Branch_annotations.fork_point annots
+    | Collapsed expr -> expr, dbg, Branch_annotations.join_point annots
 
   let bind arg body = bind_with_annotations "switcher" arg body
 
@@ -3694,11 +3695,9 @@ let transl_switch_clambda loc arg index cases =
       this_act := act)
   done;
   inters := (0, !this_high, !this_act) :: !inters;
-  let case, annots =
+  let case, _, annots =
     match !inters with
     | [_] -> (
-      (* All the values select the first stored case, which has the annotations
-         of all the cases stored with it. *)
       match (store.Switch.act_get_shared ()).(0) with
       | Single case | Shared case -> case)
     | inters ->
