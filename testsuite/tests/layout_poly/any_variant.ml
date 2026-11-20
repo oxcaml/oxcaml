@@ -452,9 +452,9 @@ let () =
 |}]
 
 
-type ('a : any) node = { payload : 'a; next : 'a node }
+type ('a : any) node = { payload : 'a; mutable next : 'a node }
 [%%expect{|
-type ('a : any) node = { payload : 'a; next : 'a node; }
+type ('a : any) node = { payload : 'a; mutable next : 'a node; }
 |}]
 
 (* Recursive preallocation still requires a concrete size before evaluation. *)

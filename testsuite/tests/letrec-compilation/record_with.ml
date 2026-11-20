@@ -5,7 +5,7 @@
 *)
 
 type t = {
-  self : t;
+  mutable self : t;
   t0 : int;
   t1 : int;
   t2 : int;

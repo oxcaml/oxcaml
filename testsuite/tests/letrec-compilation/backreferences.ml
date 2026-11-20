@@ -3,7 +3,7 @@
 (* testing backreferences; some compilation scheme may handle
    differently recursive references to a mutually-recursive RHS
    depending on whether it is before or after in the bindings list *)
-type t = { x : t; y : t; z : t }
+type t = { mutable x : t; mutable y : t; mutable z : t }
 
 let test =
   let rec x = { x; y; z }

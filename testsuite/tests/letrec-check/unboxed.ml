@@ -9,7 +9,10 @@ type r = R of r list [@@unboxed]
 let rec a = R [a];;
 [%%expect{|
 type r = R of r list [@@unboxed]
-val a : r = R [<cycle>]
+Line 2, characters 12-17:
+2 | let rec a = R [a];;
+                ^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 
@@ -50,7 +53,13 @@ let rec a =
 [%%expect{|
 type a = { a : b; }
 and b = X of a | Y
-val a : a = {a = X <cycle>}
+Lines 5-9, characters 2-10:
+5 | ..{a=
+6 |     (if Sys.opaque_identity true then
+7 |        X a
+8 |      else
+9 |        Y)}..
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 type a = {a: b }[@@unboxed]
@@ -90,7 +99,13 @@ let rec d =
      else
        W);;
 [%%expect{|
-val d : d = D (V <cycle>)
+Lines 2-6, characters 2-9:
+2 | ..D
+3 |     (if Sys.opaque_identity true then
+4 |        V d
+5 |      else
+6 |        W)..
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 type d = D of e [@@unboxed]
