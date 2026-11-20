@@ -96,7 +96,8 @@ Caml_inline int sync_mutex_unlock(sync_mutex m)
 
    For now we only have this on linux because it directly uses the linux futex
    syscalls. */
-#if defined(__linux__) && defined(__GNU_LIBRARY__) && defined(__GLIBC__) && defined(__GLIBC_MINOR__)
+#if defined(__linux__) && defined(__GNU_LIBRARY__) && \
+    defined(__GLIBC__) && defined(__GLIBC_MINOR__)
 static int custom_condvar_init(custom_condvar * cv)
 {
   cv->counter = 0;
@@ -112,7 +113,8 @@ static int custom_condvar_wait(custom_condvar * cv, pthread_mutex_t * mutex)
 {
   unsigned old_count = cv->counter;
   pthread_mutex_unlock(mutex);
-  syscall(SYS_futex, &cv->counter, FUTEX_WAIT_PRIVATE, old_count, NULL, NULL, 0);
+  syscall(SYS_futex, &cv->counter, FUTEX_WAIT_PRIVATE, old_count,
+          NULL, NULL, 0);
   pthread_mutex_lock(mutex);
   return 0;
 }

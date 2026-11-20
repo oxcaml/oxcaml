@@ -116,7 +116,8 @@ value caml_do_pending_actions_flags_exn(int flags);
 value caml_do_pending_actions_exn(void);
 caml_result caml_process_pending_actions_with_root_flags_res
   (value extra_root, int flags);
-value caml_process_pending_actions_with_root_flags (value extra_root, int flags);
+value caml_process_pending_actions_with_root_flags
+  (value extra_root, int flags);
 value caml_process_pending_actions_with_root_flags_exn
   (value extra_root, int flags);
 value caml_process_pending_actions_with_root_exn (value extra_root);

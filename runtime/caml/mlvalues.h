@@ -362,8 +362,8 @@ CAMLno_tsan_for_perf Caml_inline header_t Hd_val(value val)
 #define Bhsize_wosize(sz) (Bsize_wsize (Whsize_wosize (sz)))
 #define Bhsize_bosize(sz) ((sz) + sizeof (header_t))
 
-/* Note that Allocated_wosize_val and the other macros that read headers will not
-   be optimized by common subexpression elimination, because of the
+/* Note that Allocated_wosize_val and the other macros that read headers
+   will not be optimized by common subexpression elimination, because of the
    atomic header loads.  It is best to bind the results of such macros
    to variables if they will be tested repeatedly, e.g. as the end condition
    in a for-loop.
