@@ -32,7 +32,7 @@ let run ~ppf_dump ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let resolver = Flambda_cmx.load_cmx_file_contents cmx_loader in
   let get_imported_code = Flambda_cmx.get_imported_code cmx_loader in
   let denv =
-    DE.create ~round ~machine_width ~resolver ~get_imported_code
+    DE.create ~ppf_dump ~round ~machine_width ~resolver ~get_imported_code
       ~propagating_float_consts:(Flambda_features.float_const_prop ())
       ~unit_toplevel_return_continuation:return_continuation
       ~unit_toplevel_exn_continuation:exn_continuation ~toplevel_my_alloc_region
@@ -41,8 +41,7 @@ let run ~ppf_dump ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
      remark for the cmx contents) *)
   let dacc = DA.create denv code_slot_offsets Continuation_uses_env.empty in
   let body, uacc =
-    Simplify_expr.simplify_toplevel dacc (FU.body unit) ~ppf_dump
-      ~return_continuation
+    Simplify_expr.simplify_toplevel dacc (FU.body unit) ~return_continuation
       ~return_arity:(Flambda_arity.create_singletons [K.With_subkind.any_value])
       ~exn_continuation
   in

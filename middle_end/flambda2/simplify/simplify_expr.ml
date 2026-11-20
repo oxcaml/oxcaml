@@ -60,7 +60,7 @@ let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
   in
   rebuild_lets_and_let_conts simplified_lets_and_let_conts uacc ~after_rebuild
 
-let simplify_toplevel_common ?ppf_dump dacc simplify ~params ~implicit_params
+let simplify_toplevel_common dacc simplify ~params ~implicit_params
     ~return_continuation ~return_arity ~exn_continuation =
   (* The usage analysis needs a continuation whose handler holds the toplevel
      code of the function. Since such a continuation does not exist, we create a
@@ -83,12 +83,24 @@ let simplify_toplevel_common ?ppf_dump dacc simplify ~params ~implicit_params
       (Flambda_arity.create [Singleton K.With_subkind.any_value])
   in
   let expr, dacc = simplify dacc ~down_to_up:(fun dacc expr -> expr, dacc) in
-  Option.iter
-    (fun ppf ->
-      Flambda_dump.if_enabled ~header:"During Simplify" ppf
-        (Flambda_features.dump_simplified ())
-        ~f:Simplified_expr.print expr)
-    ppf_dump;
+  let header =
+    match DE.closure_info (DA.denv dacc) with
+    | Not_in_a_closure -> "During Simplify (toplevel)"
+    | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
+      "During Simplify (??)"
+    | Closure
+        { code_id;
+          return_continuation = _;
+          exn_continuation = _;
+          my_closure = _;
+          my_alloc_region = _
+        } ->
+      Format.asprintf "During Simplify of %a" Code_id.print code_id
+  in
+  Flambda_dump.if_enabled ~header
+    (DE.ppf_dump (DA.denv dacc))
+    (Flambda_features.dump_simplified ())
+    ~f:Simplified_expr.print expr;
   let expr, uacc =
     let dacc =
       DA.map_flow_acc dacc ~f:(Flow.Acc.exit_continuation dummy_toplevel_cont)
@@ -227,11 +239,11 @@ and[@inline always] simplify_let dacc let_expr ~down_to_up =
   Simplify_let_expr.simplify_let ~simplify_expr ~simplify_function_body dacc
     let_expr ~down_to_up
 
-let simplify_toplevel dacc expr ~ppf_dump ~return_continuation ~return_arity
+let simplify_toplevel dacc expr ~return_continuation ~return_arity
     ~exn_continuation =
   let params = Bound_parameters.empty in
   let implicit_params = Bound_parameters.empty in
   simplify_toplevel_common dacc
     (fun dacc -> simplify_expr dacc expr)
-    ~ppf_dump ~params ~implicit_params ~return_continuation ~return_arity
+    ~params ~implicit_params ~return_continuation ~return_arity
     ~exn_continuation

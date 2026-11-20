@@ -133,8 +133,6 @@ let print_flags ppf l =
   List.iter (print_flag ppf) l;
   if List.exists fst l then Format.pp_print_space ppf ()
 
-let print_skip ~if_:b pp ppf x = if b then () else pp ppf x
-
 let rec print ppf
     { simplified_lets_and_let_conts;
       simplified_terminator;
@@ -198,12 +196,12 @@ and print_lifted_constants ppf lcs =
             let symbols =
               Function_slot.Lmap.data closure_symbols_with_types |> List.map fst
             in
-            Format.fprintf ppf "@[<hov 2>%a =@ %a@]@\n"
+            Format.fprintf ppf "@[<hv 2>%a =@ %a@]@\n"
               print_set_of_closures_symbols symbols Rebuilt_static_const.print
               expr
           | Block_like
               { symbol; typing_env = _; ty = _; symbol_projections = _ } ->
-            Format.fprintf ppf "@[<hov 2>%a = @ %a@]@\n" Symbol.print symbol
+            Format.fprintf ppf "@[<hv 2>%a = @ %a@]@\n" Symbol.print symbol
               Rebuilt_static_const.print expr)
         defs)
 
@@ -230,7 +228,7 @@ and print_binding_to_place ppf binding =
       Flambda_colours.pop
   | Keep_binding
       { let_bound; simplified_defining_expr; original_defining_expr = _ } ->
-    Format.fprintf ppf "%a = %a" Bound_pattern.print let_bound
+    Format.fprintf ppf "@[<hv 2>%a =@ %a@]" Bound_pattern.print let_bound
       Simplified_named.print simplified_defining_expr
 
 and print_let_cont ~body ppf
@@ -286,20 +284,25 @@ and print_one_handler ~original_invariant_params ~invariant_extra_params ppf
     handler
   in
   let extra_params = EPA.extra_params extra_params_and_args in
-  Format.fprintf ppf "@[<hov 2>%a%s%a@[<hv>%a@,%a@,%a@,%a@] =@ %a@]" print_flags
+  Format.fprintf ppf "@[<hov 2>%a%s%a@[<hv>%a@] =@ %a@]" print_flags
     [is_single_inlinable_use, "single"; is_exn_handler, "exn"; is_cold, "cold"]
     (if recursive then "rec " else "")
-    Continuation.print cont
-    (print_skip ~if_:(not recursive) (print_cont_params ~extra:false))
-    original_invariant_params
-    (print_skip ~if_:(not recursive) (print_cont_params ~extra:true))
-    invariant_extra_params
-    (print_cont_params ~extra:false)
-    params
-    (print_cont_params ~extra:true)
-    extra_params print simplified_handler
+    Continuation.print cont print_cont_params_lists
+    (if recursive
+     then
+       [ ~extra:false, original_invariant_params;
+         ~extra:true, invariant_extra_params;
+         ~extra:false, params;
+         ~extra:true, extra_params ]
+     else [~extra:false, params; ~extra:true, extra_params])
+    print simplified_handler
 
-and print_cont_params ~extra ppf bound_params =
+and print_cont_params_lists ppf l =
+  Format.pp_print_list
+    ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
+    print_cont_params ppf l
+
+and print_cont_params ppf (~extra, bound_params) =
   let sep_begin, sep_end = if extra then "{", "}" else "(", ")" in
   Format.fprintf ppf "%s%a%s" sep_begin Bound_parameters.print bound_params
     sep_end
@@ -332,7 +335,7 @@ and print_switch ppf
       typing_env_before_switch = _;
       cse_before_switch = _
     } =
-  Format.fprintf ppf "@[<v 0>(%tswitch%t %a%s%t%a%t@ @[<v 0>%a@])@]"
+  Format.fprintf ppf "@[<v 0>%tswitch%t %a%s%t%a%t@ %a@]"
     Flambda_colours.expr_keyword Flambda_colours.pop Simple.print scrutinee
     (if Debuginfo.is_none condition_dbg then "" else " ")
     Flambda_colours.debuginfo Debuginfo.print_compact condition_dbg
@@ -343,7 +346,7 @@ and print_switch_arms ppf arms =
 
 and print_switch_arm ppf discr
     (apply_cont, ~annotations:_, rewrite_id, _arity, _typing_env) =
-  Format.fprintf ppf "| %a -> %a%a" Target_ocaml_int.print discr
+  Format.fprintf ppf "| %a -> @[<hov>%a%a@]@," Target_ocaml_int.print discr
     (print_elide Apply_cont_rewrite_id.print)
     rewrite_id Apply_cont_expr.print apply_cont
 
