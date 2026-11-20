@@ -1,0 +1,5 @@
+File "libx/m.ml", line 1, characters 26-27:
+1 | let () = print_int (X.v + Z.v)
+                              ^
+Error: The files libx/x.cmi and libz_alt/z.cmi make inconsistent assumptions
+       over interface Z

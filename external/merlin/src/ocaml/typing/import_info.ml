@@ -13,9 +13,10 @@
 (**************************************************************************)
 
 module CU = Compilation_unit
+module CUI = Compilation_unit_intf
 
 type intf =
-  | Loaded of CU.Name.t * Digest.t
+  | Loaded of CUI.Found.t * Digest.t
   | Alias of CU.Name.t
 
 type impl =
@@ -34,7 +35,7 @@ let create name ~crc =
      cares should use the [Impl] API. *)
   match crc with
   | None -> Intf (Alias name)
-  | Some crc -> Intf (Loaded (name, crc))
+  | Some crc -> Intf (Loaded (CUI.Found.without_cmi_path name, crc))
 
 let create_normal cu ~crc =
   match crc with
@@ -44,17 +45,18 @@ let create_normal cu ~crc =
 let name t =
   match t with
   | Impl (Loaded (cu, _) | Unloaded cu) -> CU.name cu
-  | Intf (Loaded (name, _) | Alias name) -> name
+  | Intf (Loaded (found, _)) -> CUI.Found.intf found
+  | Intf (Alias name) -> name
 
 let cu t =
   match t with
   | Impl (Loaded (cu, _) | Unloaded cu) -> cu
-  | Intf (Loaded (name, _) | Alias name) ->
+  | Intf (Loaded _ | Alias _) ->
     Misc.fatal_errorf
       "Cannot extract [Compilation_unit.t] from interface [Import_info.t] (for \
        unit %a)"
       (Format_doc.compat CU.Name.print)
-      name
+      (name t)
 
 let crc t =
   match t with
@@ -68,7 +70,8 @@ let has_name t ~name:name' = CU.Name.equal (name t) name'
 let dummy = Intf (Alias CU.Name.dummy)
 
 let print_intf ppf = function
-  | (Loaded (name, _) | Alias name : intf) -> CU.Name.print ppf name
+  | (Loaded (found, _) : intf) -> CUI.Found.print ppf found
+  | Alias name -> CU.Name.print ppf name
 
 let print_impl ppf = function
   | (Loaded (cu, _) | Unloaded cu : impl) -> CU.print ppf cu
@@ -82,7 +85,7 @@ module Intf = struct
      #1746). *)
   type nonrec t = t
 
-  let create_loaded name ~crc = Intf (Loaded (name, crc))
+  let create_loaded found ~crc = Intf (Loaded (found, crc))
 
   let create_alias name = Intf (Alias name)
 
@@ -95,7 +98,12 @@ module Intf = struct
       Misc.fatal_errorf_doc "Expected an [Import_info.Impl.t] but found %a"
         CU.print cu
 
-  let name t = match expect_intf t with Loaded (name, _) | Alias name -> name
+  let found t =
+    match expect_intf t with
+    | Loaded (found, _) -> found
+    | Alias name -> CUI.Found.without_cmi_path name
+
+  let name t = CUI.Found.intf (found t)
 
   let crc t =
     match expect_intf t with Loaded (_, crc) -> Some crc | Alias _ -> None

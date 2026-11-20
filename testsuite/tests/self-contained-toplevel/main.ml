@@ -35,6 +35,7 @@ let () =
           cmi_params;
           cmi_sign = (cmi_sign, cmi_staticity);
           cmi_globals;
+          cmi_crc;
           cmi_crcs;
           cmi_flags
         } =
@@ -46,6 +47,7 @@ let () =
           cmi_params;
           cmi_sign = (Subst.Lazy.of_signature cmi_sign, cmi_staticity);
           cmi_globals;
+          cmi_crc;
           cmi_crcs;
           cmi_flags
         }

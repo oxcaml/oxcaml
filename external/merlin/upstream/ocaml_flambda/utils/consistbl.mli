@@ -60,7 +60,8 @@ end) : sig
     Module_name.t list -> t -> (Module_name.t * (Data.t * Digest.t) option) list
         (* [extract tbl names] returns an associative list mapping each string
            in [names] to the data and CRC associated with it in [tbl]. If no CRC
-           is associated with a name then it is mapped to [None]. *)
+           is associated with a name then it is mapped to [None]; otherwise the
+           name is returned as it was given to [check]. *)
 
   val extract_map :
     Module_name.Set.t -> t -> (Data.t * Digest.t) option Module_name.Map.t

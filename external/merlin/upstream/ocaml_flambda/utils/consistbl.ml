@@ -26,7 +26,9 @@ module Make (Module_name : sig
 end) (Data : sig
   type t
 end) = struct
-  type t = (Data.t * Digest.t * filepath) Module_name.Tbl.t
+  (* The name is stored as given to [check], which matters for names whose
+     equality ignores some of their contents. *)
+  type t = (Module_name.t * Data.t * Digest.t * filepath) Module_name.Tbl.t
 
   let create () = Module_name.Tbl.create 13
 
@@ -43,7 +45,7 @@ end) = struct
   exception Not_available of Module_name.t
 
   let check_ tbl name data crc source =
-    let (old_data, old_crc, old_source) = Module_name.Tbl.find tbl name in
+    let (_, old_data, old_crc, old_source) = Module_name.Tbl.find tbl name in
     if not (Digest.equal crc old_crc)
     then raise(Inconsistency {
         unit_name = name;
@@ -56,23 +58,30 @@ end) = struct
   let check tbl name data crc source =
     try check_ tbl name data crc source
     with Not_found ->
-      Module_name.Tbl.add tbl name (data, crc, source)
+      Module_name.Tbl.add tbl name (name, data, crc, source)
 
   let check_noadd tbl name data crc source =
     try check_ tbl name data crc source
     with Not_found ->
       raise (Not_available name)
 
-  let source tbl name = thd3 (Module_name.Tbl.find tbl name)
+  let source tbl name =
+    let (_, _, _, source) = Module_name.Tbl.find tbl name in
+    source
 
   let find t name =
     match Module_name.Tbl.find_opt t name with
     | None -> None
-    | Some (data, crc, _) -> Some (data, crc)
+    | Some (_, data, crc, _) -> Some (data, crc)
 
   let extract l tbl =
     let l = List.sort_uniq Module_name.compare l in
-    List.fold_left (fun assc name -> (name, find tbl name) :: assc) [] l
+    List.fold_left
+      (fun assc name ->
+        match Module_name.Tbl.find_opt tbl name with
+        | None -> (name, None) :: assc
+        | Some (name, data, crc, _) -> (name, Some (data, crc)) :: assc)
+      [] l
 
   let extract_map mod_names tbl =
     Module_name.Set.fold

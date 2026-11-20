@@ -221,7 +221,8 @@ let check_consistency ppf filename cu =
     } ->
     fprintf ppf "@[<hv 0>The files %s@ and %s@ \
                  disagree over interface %a@]@."
-            user auth (Format_doc.compat Compilation_unit.Name.print) name;
+            user auth
+            (Format_doc.compat Compilation_unit_intf.Found.print) name;
     raise Load_failed
 
 (* This is basically Dynlink.Bytecode.run with no digest *)

@@ -55,17 +55,22 @@ val print : Format_doc.formatter -> t -> unit
 module Intf : sig
   type nonrec t = t
 
-  (** The import info for an interface whose .cmi we loaded. *)
-  val create_loaded : CU.Name.t -> crc:Digest.t -> t
+  (** The import info for an interface whose .cmi we loaded. If [found] has a
+      recorded location, the consistency of the imports of that .cmi is left to
+      be checked by the users of this import, ultimately the linker. *)
+  val create_loaded : Compilation_unit_intf.Found.t -> crc:Digest.t -> t
 
   (** The import info for an interface we mention but never loaded, such as the
       target of a module alias. *)
   val create_alias : CU.Name.t -> t
 
-  (** [create name ~crc] is [create_loaded] if [crc] is [Some] and
-      [create_alias] if [crc] is [None]. Useful when [crc] is coming out of
-      [Consistbl]. *)
+  (** [create name ~crc] is [create_loaded] (without a recorded location) if
+      [crc] is [Some] and [create_alias] if [crc] is [None]. Useful when [crc]
+      is coming out of [Consistbl]. *)
   val create : CU.Name.t -> crc:Digest.t option -> t
+
+  (** Without a recorded location for an alias. *)
+  val found : t -> Compilation_unit_intf.Found.t
 
   val name : t -> CU.Name.t
 

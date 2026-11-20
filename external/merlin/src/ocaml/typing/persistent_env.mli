@@ -19,7 +19,7 @@ open Misc
 module CUI := Compilation_unit_intf
 
 module Consistbl : module type of struct
-  include Consistbl.Make (Compilation_unit.Name) (Unit)
+  include Consistbl.Make (Compilation_unit_intf.Found) (Unit)
 end
 
 type error =
@@ -75,6 +75,7 @@ type import = private {
   imp_manifest_location : filepath;
   imp_uid : Shape.Uid.t;
   imp_visibility: Load_path.visibility;
+  imp_crc : Digest.t;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
   imp_cmi_name : Compilation_unit.Name.t;

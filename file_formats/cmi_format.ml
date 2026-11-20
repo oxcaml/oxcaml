@@ -41,7 +41,8 @@ exception Error of error
   - data block (serialized bits of signature)
   - compilation unit name
   - serialized signature with offsets into data block in wrapped positions
-  - crcs
+  - crc of the above
+  - crcs of the imported interfaces
   - flags
 
   The serialized signature contains only the top level, with wrapped (cf. Types)
@@ -74,12 +75,15 @@ type 'sg cmi_infos_generic = {
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg * Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
+    cmi_crc : Digest.t;
     cmi_crcs : crcs;
     cmi_flags : flags;
 }
 
 type cmi_infos_lazy = Subst.Lazy.signature cmi_infos_generic
 type cmi_infos = Types.signature cmi_infos_generic
+
+let dummy_crc = String.make 16 '\000'
 
 let force_cmi_infos cmi =
   let sign, staticity = cmi.cmi_sign in
@@ -173,6 +177,7 @@ let input_cmi_lazy ic =
       header_sign = (sign, staticity);
       header_params = params;
     } = (input_value ic : header) in
+  let crc = (input_value ic : Digest.t) in
   let crcs = (input_value ic : crcs) in
   let flags = (input_value ic : flags) in
   (* CR ocaml 5 compressed-marshal mshinwell: upstream uses [Compression] *)
@@ -182,6 +187,7 @@ let input_cmi_lazy ic =
       cmi_globals = globals;
       cmi_sign = (deserialize data sign, staticity);
       cmi_params = params;
+      cmi_crc = crc;
       cmi_crcs = crcs;
       cmi_flags = flags;
     }
@@ -245,9 +251,8 @@ let output_cmi filename oc cmi =
     };
   flush oc;
   let crc = Digest.file filename in
-  let my_info = Import_info.Intf.create_loaded cmi.cmi_name ~crc in
-  let crcs = Array.append [| my_info |] cmi.cmi_crcs in
-  output_value oc (crcs : crcs);
+  output_value oc (crc : Digest.t);
+  output_value oc (cmi.cmi_crcs : crcs);
   output_value oc (cmi.cmi_flags : flags);
   crc
 
