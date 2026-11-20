@@ -15,5 +15,8 @@ abbrev implementation : Expr :=
 
   .letBinding (.apply create three) (.block 0 [.var 0])
 
+abbrev dependencies : List ModuleType := [Oxiclean.Extracted.Even.interface]
+
+example : Oxiclean.Extracted.Downstream.dependencies = dependencies := by rfl
 example : Oxiclean.Extracted.Downstream.interface = interface := by rfl
 example : Oxiclean.Extracted.Downstream.implementation = implementation := by rfl

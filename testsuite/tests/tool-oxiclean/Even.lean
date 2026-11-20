@@ -30,6 +30,9 @@ abbrev expectedImplementation : Expr :=
 
   .letBinding get (.letBinding create (.block 0 [.var 0, .var 1]))
 
+abbrev dependencies : List ModuleType := []
+
+example : Oxiclean.Extracted.Even.dependencies = dependencies := by rfl
 example : Oxiclean.Extracted.Even.interface = expectedInterface := by rfl
 example : Oxiclean.Extracted.Even.implementation = expectedImplementation := by rfl
 

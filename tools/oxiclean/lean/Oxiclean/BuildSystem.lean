@@ -520,14 +520,26 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
       dependencyNames
       implementation
     |> IO.ofExcept
+  let dependencies : Lean.Expr :=
+    (dependencyNames.map fun name =>
+      mkConst (`Oxiclean.Extracted ++ .mkSimple name ++ `interface))
+    |> Lean.Expr.mkList (mkConst ``Oxiclean.Model.ModuleType)
   liftCoreM do
+    addTopLevelDefinition (prefixComponents ++ `dependencies)
+      (mkApp
+        (mkConst ``List [Level.zero])
+        (mkConst ``Oxiclean.Model.ModuleType))
+      dependencies
     addTopLevelDefinition (prefixComponents ++ `interface)
       (mkConst ``Oxiclean.Model.ModuleType) interface
     addTopLevelDefinition (prefixComponents ++ `implementation)
       (mkConst ``Oxiclean.Model.Expr) implementation
+  let simpDeps ←
+    `(attribute [simp] $(mkIdent (prefixComponents ++ `dependencies)))
   let simpIntf ←
     `(attribute [simp] $(mkIdent (prefixComponents ++ `interface)))
   let simpImpl ←
     `(attribute [simp] $(mkIdent (prefixComponents ++ `implementation)))
+  elabCommand simpDeps
   elabCommand simpIntf
   elabCommand simpImpl
