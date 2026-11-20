@@ -40,8 +40,12 @@ let tlambda_to_bytecode i tlambda =
     (fun { Lambda.code = tlambda; required_globals;
            main_module_block_format }  ->
        Builtin_attributes.warn_unused ();
+       let tlambda =
+         print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda tlambda
+       in
+       if Clflags.(should_stop_after Compiler_pass.Transl) then None
+       else
        tlambda
-       |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
        |> Slambda.eval
             ~cu_static_data:(fun _ ->
               Misc.fatal_errorf
@@ -61,7 +65,7 @@ let tlambda_to_bytecode i tlambda =
        |> Bytegen.compile_implementation i.module_name
        |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
        |> fun bytecode ->
-          bytecode, required_globals, main_module_block_format
+          Some (bytecode, required_globals, main_module_block_format)
     )
 
 let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
@@ -88,9 +92,11 @@ let emit_bytecode i
     )
 
 let emit_lambda_program info program =
-  let bytecode = tlambda_to_bytecode info program in
-  if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
-  then emit_bytecode info bytecode
+  match tlambda_to_bytecode info program with
+  | Some bytecode
+    when not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda) ->
+    emit_bytecode info bytecode
+  | Some _ | None -> ()
 
 type starting_point =
   | Parsing
@@ -116,8 +122,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
   match start_from with
   | Parsing ->
     let backend info typed =
-      let bytecode = to_bytecode info typed in
-      emit_bytecode info bytecode
+      Option.iter (emit_bytecode info) (to_bytecode info typed)
     in
     Compile_common.implementation
       ~hook_parse_tree:Fun.id
@@ -136,8 +141,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       Translmod.transl_instance info.module_name ~runtime_args
         ~main_module_block_repr
     in
-    let bytecode = tlambda_to_bytecode info impl in
-    emit_bytecode info bytecode
+    Option.iter (emit_bytecode info) (tlambda_to_bytecode info impl)
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in
