@@ -3647,9 +3647,6 @@ let close_lcode acc env ~lcode ~template decl =
 let close_lcodes acc env lcodes =
   List.fold_left
     (fun acc (lcode, template, decl) ->
-      (* Simplify will simplify the code of an instantiation of one of the
-         unit's templates at the template's definition, using the type of its
-         environments. *)
       close_lcode acc env ~lcode ~template decl)
     acc lcodes
 

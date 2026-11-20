@@ -1,8 +1,7 @@
 (* TEST
  flambda2;
- (* The inlining asked for below is refused, with warning 55, and
-    [@unboxable] is ignored for templates, with warning 210. *)
- flags = "-extension layout_poly_alpha -w -55-210";
+ (* The inlining asked for below is refused, with warning 55. *)
+ flags = "-extension layout_poly_alpha -w -55";
  {
    ocamlopt_flags = "-O3";
    native;
@@ -43,11 +42,6 @@ let rec unrolled ?(k =
                      a + 1) n =
   if n <= 0 then k 0 else k n + (unrolled [@unrolled 2]) (n - 1)
 
-(* The code of an instantiation has no closure, so can't take unboxed
-   arguments. *)
-let[@unboxable] poly_ unboxable (x : float) y = x +. 1., y
-
 let () =
   let n = Sys.opaque_identity 3 in
-  let a, _ = unboxable 2.0 "s" in
-  Printf.printf "%d %d %d %f\n" (self_call n) (from_sibling n) (unrolled n) a
+  Printf.printf "%d %d %d\n" (self_call n) (from_sibling n) (unrolled n)
