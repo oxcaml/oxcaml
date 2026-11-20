@@ -1177,10 +1177,14 @@ module PpxContext = struct
     | Some x -> Exp.construct (lid "Some") (Some (f x))
     | None   -> Exp.construct (lid "None") None
 
-  let make_open_arg (arg : Clflags.open_arg) =
+  let make_scope_arg (arg : Clflags.scope_arg) =
     match arg with
     | Open s -> Exp.construct (lid "Open") (Some (make_string s))
     | Open_cmi s -> Exp.construct (lid "Open_cmi") (Some (make_string s))
+    | Open_h s -> Exp.construct (lid "Open_h") (Some (make_string s))
+    | Expose (intf, name) ->
+        Exp.construct (lid "Expose")
+          (Some (make_pair make_string make_string (intf, name)))
 
   let get_cookies () =
     lid "cookies",
@@ -1216,8 +1220,8 @@ module PpxContext = struct
             (make_list (make_pair make_string make_bool))
             (make_list make_string)
             (visible_load_dir_pairs visible, hidden);
-        lid "open_args",
-          make_list make_open_arg !Clflags.open_args;
+        lid "scope_args",
+          make_list make_scope_arg !Clflags.scope_args;
         lid "for_package",  make_option make_string !Clflags.for_package;
         lid "debug",        make_bool !Clflags.debug;
         lid "use_threads",  make_bool false;
@@ -1283,7 +1287,7 @@ module PpxContext = struct
             None
         | _ -> raise_errorf "Internal error: invalid [@@@ocaml.ppx.context \
                              { %s }] option syntax" name
-      and get_open_arg = function
+      and get_scope_arg = function
         | { pexp_desc =
               Pexp_construct ({ txt = Longident.Lident "Open" }, Some exp) } ->
             Clflags.Open (get_string exp)
@@ -1291,8 +1295,17 @@ module PpxContext = struct
               Pexp_construct
                 ({ txt = Longident.Lident "Open_cmi" }, Some exp) } ->
             Clflags.Open_cmi (get_string exp)
+        | { pexp_desc =
+              Pexp_construct
+                ({ txt = Longident.Lident "Open_h" }, Some exp) } ->
+            Clflags.Open_h (get_string exp)
+        | { pexp_desc =
+              Pexp_construct
+                ({ txt = Longident.Lident "Expose" },
+                 Some { pexp_desc = Pexp_tuple [None, orig; None, name] }) } ->
+            Clflags.Expose (get_string orig, get_string name)
         | _ -> raise_errorf "Internal error: invalid [@@@ocaml.ppx.context \
-                             { %s }] open_arg syntax" name
+                             { %s }] scope_arg syntax" name
       in
       match name with
       | "tool_name" ->
@@ -1326,9 +1339,19 @@ module PpxContext = struct
                  { path; cmx_guaranteed })
               visible
           in
+<<<<<<< Merlin:remap-per-mod
           Load_path.(init ~auto_include:no_auto_include ~visible ~hidden)
       | "open_args" ->
           Clflags.open_args := get_list get_open_arg payload
+||||||| Compiler:last-imported
+          Load_path.init ~auto_include ~visible ~hidden
+      | "open_args" ->
+          Clflags.open_args := get_list get_open_arg payload
+=======
+          Load_path.init ~auto_include ~visible ~hidden
+      | "scope_args" ->
+          Clflags.scope_args := get_list get_scope_arg payload
+>>>>>>> Compiler:HEAD
       | "for_package" ->
           Clflags.for_package := get_option get_string payload
       | "debug" ->

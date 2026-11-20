@@ -427,6 +427,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
 let type_open_ ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
   Env.open_signature ~loc ~used_slot ~toplevel ovf lid env
 
+<<<<<<< Merlin:remap-per-mod
 let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let env = Lazy.force Env.initial in
   let open_module env m =
@@ -456,7 +457,74 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
     | Open_cmi cmi ->
         let _, env = Env.open_pers_signature_cmi cmi env in
         env
+||||||| Compiler:last-imported
+let initial_env ~loc ~initially_opened_module ~open_implicit_args =
+  let env = Lazy.force Env.initial in
+  let open_module env m =
+    let open Asttypes in
+    let lexbuf = Lexing.from_string m in
+    let txt =
+      Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
+      Parse.simple_module_path lexbuf
+    in
+    try
+      let _, _, newenv = type_open_ Override env loc {txt;loc} in
+      newenv
+    with
+      (Typetexp.Error.In_context _
+      | Cmi_format.Error _
+      | Env.Error.In_context _
+      | Persistent_env.Error _) as exn when !Clflags.typing_recovery ->
+        (* Handles errors when the file is empty (but the context is
+           incorrect). If the error has already been logged, it will
+           be overwritten by the final set. *)
+        Typing_recovery.log_or_raise exn;
+        env
   in
+  let process_open_arg env (arg : Clflags.open_arg) =
+    match arg with
+    | Open m -> open_module env m
+    | Open_cmi cmi ->
+        let _, env = Env.open_pers_signature_cmi cmi env in
+        env
+=======
+let open_scope_module ~loc env m =
+  let open Asttypes in
+  let lexbuf = Lexing.from_string m in
+  let txt =
+    Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
+    Parse.simple_module_path lexbuf
+>>>>>>> Compiler:HEAD
+  in
+  try
+    let _, _, newenv = type_open_ Override env loc {txt;loc} in
+    newenv
+  with
+    (Typetexp.Error.In_context _
+    | Cmi_format.Error _
+    | Env.Error.In_context _
+    | Persistent_env.Error _) as exn when !Clflags.typing_recovery ->
+      (* Handles errors when the file is empty (but the context is
+         incorrect). If the error has already been logged, it will
+         be overwritten by the final set. *)
+      Typing_recovery.log_or_raise exn;
+      env
+
+let process_scope_arg ~loc env (arg : Clflags.scope_arg) =
+  match arg with
+  | Open m -> open_scope_module ~loc env m
+  | Open_cmi cmi ->
+      let _, env = Env.open_pers_signature_cmi cmi env in
+      env
+  | Open_h intf ->
+      Env.open_hidden_module (Compilation_unit.Name.of_string intf) env
+  | Expose (intf, name) ->
+      Env.expose_module name (Compilation_unit.Name.of_string intf) env
+
+let initial_env ~loc ~initially_opened_module ~scope_args =
+  let env = Lazy.force Env.initial in
+  let open_module = open_scope_module ~loc in
+  let process_scope_arg = process_scope_arg ~loc in
   let add_units env units =
     String.Set.fold
       (fun name env ->
@@ -502,8 +570,9 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let env = add_units env units_from_filenames in
   (* Process [-open] and [-open-cmi] in command-line order, so an [-open]
      can refer to a module brought into scope by an earlier [-open-cmi]
-     (and vice-versa: a later [-open-cmi] shadows an earlier [-open]). *)
-  List.fold_left process_open_arg env open_implicit_args
+     (and vice-versa: a later [-open-cmi] shadows an earlier [-open]).
+     Likewise for [-open-h] and [-expose]. *)
+  List.fold_left process_scope_arg env scope_args
 
 let type_open_descr ?used_slot ?toplevel env sod =
   let (path, _, newenv) =
