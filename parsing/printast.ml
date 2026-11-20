@@ -526,7 +526,7 @@ and expression i ppf x =
       line i ppf "Pexp_borrow\n";
       expression i ppf e
   | Pexp_break ->
-    line i ppf "Pexp_break"
+    line i ppf "Pexp_break\n"
 
 and block_access i ppf = function
   | Baccess_field lid ->

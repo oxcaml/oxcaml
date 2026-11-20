@@ -4822,8 +4822,9 @@ let find_class_index id env = find_index_tbl id env.classes
 let find_cltype_index id env = find_index_tbl id env.cltypes
 
 let find_loop_label_exn loc env =
-  let name = "*loop*" in
-  match IdTbl.find_name_and_locks wrap_value ~mark:false name env.values with
+  match
+    IdTbl.find_name_and_locks wrap_value ~mark:false loop_str env.values
+  with
   | Ok (path, locks, Val_bound vda) ->
     let _, locks = partition_locks locks in
     walk_locks_for_break ~loc ~env locks;
