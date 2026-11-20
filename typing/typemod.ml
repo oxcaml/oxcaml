@@ -3655,7 +3655,6 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
     if alias && aliasable then
       (Env.add_required_global path env; md)
     else begin
-      Env.check_module_path_representable ~loc:lid.loc path env;
       let mty = Mtype.find_type_of_module
           ~strengthen ~aliasable env path
       in

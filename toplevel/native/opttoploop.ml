@@ -202,7 +202,7 @@ let rec eval_address = function
       end
 
 let eval_path find env path =
-  match find path env with
+  match find ~loc:Location.none path env with
   | addr -> eval_address addr
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))

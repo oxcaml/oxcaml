@@ -2469,7 +2469,9 @@ let rec transl_address loc = function
       Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
 
 let transl_path find loc env path =
-  match find path env with
+  match
+    find ~loc:(Debuginfo.Scoped_location.to_location loc) path env
+  with
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))
   | addr -> transl_address loc addr

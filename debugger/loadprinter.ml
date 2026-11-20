@@ -83,7 +83,7 @@ let rec eval_address = function
     (* We can ignore [_field_sorts] since the debugger runs only bytecode *)
 
 let eval_value_path env path =
-  match Env.find_value_address path env with
+  match Env.find_value_address ~loc:Location.none path env with
   | addr -> eval_address addr
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))

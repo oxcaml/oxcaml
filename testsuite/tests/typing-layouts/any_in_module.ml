@@ -23,44 +23,12 @@ module M : S = struct
   let y = 43
 end
 
-let x = M.x
+let y = M.y
 [%%expect{|
 module M : S
 Line 7, characters 8-11:
-7 | let x = M.x
+7 | let y = M.y
             ^^^
-Error: This path projects from a module that contains unrepresentable items.
-Line 3, characters 2-11:
-3 |   val x : t
-      ^^^^^^^^^
-  "x" is not representable.
-  The layout of t is any
-    because of the definition of t at line 2, characters 2-14.
-  But the layout of t must be representable
-    because it's the type of an item in a module being projected from.
-|}]
-
-let y = M.y
-[%%expect{|
-Line 1, characters 8-11:
-1 | let y = M.y
-            ^^^
-Error: This path projects from a module that contains unrepresentable items.
-Line 3, characters 2-11:
-3 |   val x : t
-      ^^^^^^^^^
-  "x" is not representable.
-  The layout of t is any
-    because of the definition of t at line 2, characters 2-14.
-  But the layout of t must be representable
-    because it's the type of an item in a module being projected from.
-|}]
-
-let f (module M : S) = M.x
-[%%expect{|
-Line 1, characters 23-26:
-1 | let f (module M : S) = M.x
-                           ^^^
 Error: This path projects from a module that contains unrepresentable items.
 Line 3, characters 2-11:
 3 |   val x : t
@@ -89,11 +57,6 @@ Line 3, characters 2-11:
 |}]
 
 (* We can project out of the module if we know [t]'s layout. *)
-let f (type a : value) (module M : S with type t = a) = M.x
-[%%expect{|
-val f : (module S with type t = 'a) -> 'a = <fun>
-|}]
-
 let f (type a : value) (module M : S with type t = a) = M.y
 [%%expect{|
 val f : (module S with type t = 'a) -> int = <fun>
@@ -851,17 +814,18 @@ module type S = sig
   kind_ k
   type t : k
   val x : t
+  val y : int
 end
 [%%expect{|
-module type S = sig kind_ k type t : k val x : t end
+module type S = sig kind_ k type t : k val x : t val y : int end
 |}]
 
 module F(M : S) = struct
-  let f () = M.x
+  let f () = M.y
 end
 [%%expect{|
 Line 2, characters 13-16:
-2 |   let f () = M.x
+2 |   let f () = M.y
                  ^^^
 Error: This path projects from a module that contains unrepresentable items.
 Line 4, characters 2-11:
@@ -875,12 +839,12 @@ Line 4, characters 2-11:
 |}]
 
 module F(M : S with kind_ k = value) = struct
-  let f () = M.x
+  let f () = M.y
 end
 [%%expect{|
 module F :
-  functor (M : sig kind_ k = value type t val x : t end) ->
-    sig val f : unit -> M.t end
+  functor (M : sig kind_ k = value type t val x : t val y : int end) ->
+    sig val f : unit -> int end
 |}]
 
 (* Interaction with GADTs *)
@@ -944,6 +908,5 @@ module type S = sig
   module type T = module type of struct let y = x end
 end
 [%%expect{|
-Uncaught exception: Not_found
-
+module type S = sig module type T = sig val y : int @@ stateless end end
 |}]

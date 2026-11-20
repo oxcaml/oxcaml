@@ -1028,7 +1028,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Extension p -> p
             | _ -> raise Not_found
         in
-        let addr = Env.find_constructor_address path env in
+        let addr = Env.find_constructor_address ~loc:Location.none path env in
         (* Make sure this is the right exception and not an homonym,
            by evaluating the exception found and comparing with the
            identifier contained in the exception bucket *)
