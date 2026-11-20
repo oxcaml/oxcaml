@@ -1122,7 +1122,7 @@ and lfunction = private
 (** [Lcode (code, body)] binds [code_name] in [body] to the code of an
     instantiation of a template, created by slambda evaluation. Its only
     free variables are the names of other instantiations' code. The names bound
-    bt this may only occur as the function of an [Lapply]. *)
+    by this may only occur as the function of an [Lapply]. *)
 and lcode =
   { code_name : Ident.t;
     code_debug_uid : debug_uid;
