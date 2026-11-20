@@ -35,9 +35,14 @@ namespace Oxiclean.BuildSystem
 
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
 
+deriving instance Repr for ModuleStatics
+
 deriving instance Repr for
-  ModuleItemAbsentAtRuntime, ModuleItemPresentAtRuntime, ModuleStatics,
-  ModuleType, TypeDecl, ValType, TypeConstr
+  ModuleItemAbsentAtRuntime, ModuleItemPresentAtRuntime, ModuleType, TypeDecl,
+  ValType, TypeConstr
+
+def parametric (name : Name) : Lean.Expr :=
+  mkApp (mkConst name [.zero]) (mkConst ``Model.Parametric)
 
 -- TODO: remove when https://github.com/leanprover/lean4/pull/14959 is merged
 namespace WorkaroundForPr14959
@@ -71,9 +76,9 @@ namespace WorkaroundForPr14959
       : TypeConstr → Except String Lean.Expr
     | .field within index => do
       let within ← within.toTerm? dependencyNames
-      pure (mkApp2 (mkConst ``Model.TypeConstr.field) within (toExpr index))
+      pure (mkApp2 (parametric ``Model.TypeConstr.field) within (toExpr index))
     | .predef predefined =>
-      pure (mkApp (mkConst ``Model.TypeConstr.predef) (toExpr predefined))
+      pure (mkApp (parametric ``Model.TypeConstr.predef) (toExpr predefined))
 
   section ModuleType
     variable
@@ -89,17 +94,17 @@ namespace WorkaroundForPr14959
   def ModuleType.toTerm? (dependencyNames : List String)
       : ModuleType Lean.Expr Lean.Expr → Except String Lean.Expr
     | .signature absent present =>
-      mkApp2 (mkConst ``Model.ModuleType.signature)
+      mkApp2 (parametric ``Model.ModuleType.signature)
         (Lean.Expr.mkList
-          (mkConst ``Model.ModuleItemAbsentAtRuntime)
+          (parametric ``Model.ModuleItemAbsentAtRuntime)
           absent)
         (Lean.Expr.mkList
-          (mkConst ``Model.ModuleItemPresentAtRuntime)
+          (parametric ``Model.ModuleItemPresentAtRuntime)
           present)
       |> pure
     | .field within index => do
       let within ← within.toTerm? dependencyNames
-      pure (mkApp2 (mkConst ``Model.ModuleType.field) within (toExpr index))
+      pure (mkApp2 (parametric ``Model.ModuleType.field) within (toExpr index))
 
   section ModuleItemAbsentAtRuntime
     variable (ModuleType TypeDecl : Type)
@@ -113,10 +118,10 @@ namespace WorkaroundForPr14959
       : ModuleItemAbsentAtRuntime Lean.Expr Lean.Expr → Lean.Expr
     | .moduleType moduleTypeDecl =>
       mkApp
-        (mkConst ``Model.ModuleItemAbsentAtRuntime.moduleType)
-        (Lean.Expr.mkOption (mkConst ``Model.ModuleType) moduleTypeDecl)
+        (parametric ``Model.ModuleItemAbsentAtRuntime.moduleType)
+        (Lean.Expr.mkOption (parametric ``Model.ModuleType) moduleTypeDecl)
     | .valType typeDecl =>
-      mkApp (mkConst ``Model.ModuleItemAbsentAtRuntime.valType) typeDecl
+      mkApp (parametric ``Model.ModuleItemAbsentAtRuntime.valType) typeDecl
 
   section ModuleItemPresentAtRuntime
     variable (ModuleType ValType : Type)
@@ -129,9 +134,9 @@ namespace WorkaroundForPr14959
   def ModuleItemPresentAtRuntime.toTerm
       : ModuleItemPresentAtRuntime Lean.Expr Lean.Expr → Lean.Expr
     | .mod moduleType =>
-      mkApp (mkConst ``Model.ModuleItemPresentAtRuntime.mod) moduleType
+      mkApp (parametric ``Model.ModuleItemPresentAtRuntime.mod) moduleType
     | .val valType =>
-      mkApp (mkConst ``Model.ModuleItemPresentAtRuntime.val) valType
+      mkApp (parametric ``Model.ModuleItemPresentAtRuntime.val) valType
 
   section TypeDecl
     variable (ValType : Type)
@@ -143,9 +148,14 @@ namespace WorkaroundForPr14959
 
   def TypeDecl.toTerm : TypeDecl Lean.Expr → Lean.Expr
     | { manifest, arity } =>
-      mkApp2 (mkConst ``Model.TypeDecl.mk)
-        (Lean.Expr.mkOption (mkConst ``Model.ValType) manifest)
-        (toExpr arity)
+      let manifest := match manifest with
+        | .none =>
+          mkApp
+            (parametric ``Model.TypeManifest.abstract)
+            (mkConst ``Model.Parametric.parametric)
+        | .some definition =>
+          mkApp (parametric ``Model.TypeManifest.manifest) definition
+      mkApp2 (parametric ``Model.TypeDecl.mk) (toExpr arity) manifest
 
   section ValType
     variable (ModuleType : Type)
@@ -163,20 +173,20 @@ namespace WorkaroundForPr14959
     | .arrow domain codomain => do
       let domain ← domain.toTerm? dependencyNames
       let codomain ← codomain.toTerm? dependencyNames
-      pure (mkApp2 (mkConst ``Model.ValType.arrow) domain codomain)
+      pure (mkApp2 (parametric ``Model.ValType.arrow) domain codomain)
     | .constr constructor args => do
       let constructor ← constructor.toTerm? dependencyNames
       let args ← args.mapM (·.toTerm? dependencyNames)
-      mkApp2 (mkConst ``Model.ValType.constr) constructor
-        (Lean.Expr.mkList (mkConst ``Model.ValType) args)
+      mkApp2 (parametric ``Model.ValType.constr) constructor
+        (Lean.Expr.mkList (parametric ``Model.ValType) args)
       |> pure
     | .firstClassModule signature =>
-      pure (mkApp (mkConst ``Model.ValType.firstClassModule) signature)
+      pure (mkApp (parametric ``Model.ValType.firstClassModule) signature)
     | .poly body => do
       let body ← body.toTerm? dependencyNames
-      pure (mkApp (mkConst ``Model.ValType.poly) body)
+      pure (mkApp (parametric ``Model.ValType.poly) body)
     | .var deBruijn =>
-      pure (mkApp (mkConst ``Model.ValType.var) (toExpr deBruijn))
+      pure (mkApp (parametric ``Model.ValType.var) (toExpr deBruijn))
 
   mutual
     partial def ModuleType.fromJson?
@@ -484,8 +494,6 @@ namespace WorkaroundForPr14959
   end
 end WorkaroundForPr14959
 
-end Oxiclean.BuildSystem
-
 def readJson (path : System.FilePath) : IO Json := do
   let fileContents : String ← IO.FS.readFile path
   Json.parse fileContents |> IO.ofExcept
@@ -511,29 +519,29 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
   let interface : Json ← file.withFileName s!"{unit}.intf.json" |> readJson
   let implementation : Json ← file.withFileName s!"{unit}.impl.json" |> readJson
   let interface : Lean.Expr ←
-    Oxiclean.BuildSystem.WorkaroundForPr14959.ModuleType.fromJson?
+    WorkaroundForPr14959.ModuleType.fromJson?
       dependencyNames
       interface
     |> IO.ofExcept
   let implementation : Lean.Expr ←
-    Oxiclean.BuildSystem.WorkaroundForPr14959.Expr.fromJson?
+    WorkaroundForPr14959.Expr.fromJson?
       dependencyNames
       implementation
     |> IO.ofExcept
   let dependencies : Lean.Expr :=
     (dependencyNames.map fun name =>
       mkConst (`Oxiclean.Extracted ++ .mkSimple name ++ `interface))
-    |> Lean.Expr.mkList (mkConst ``Oxiclean.Model.ModuleType)
+    |> Lean.Expr.mkList (parametric ``Model.ModuleType)
   liftCoreM do
     addTopLevelDefinition (prefixComponents ++ `dependencies)
       (mkApp
         (mkConst ``List [Level.zero])
-        (mkConst ``Oxiclean.Model.ModuleType))
+        (parametric ``Model.ModuleType))
       dependencies
     addTopLevelDefinition (prefixComponents ++ `interface)
-      (mkConst ``Oxiclean.Model.ModuleType) interface
+      (parametric ``Model.ModuleType) interface
     addTopLevelDefinition (prefixComponents ++ `implementation)
-      (mkConst ``Oxiclean.Model.Expr) implementation
+      (mkConst ``Model.Expr) implementation
   let simpDeps ←
     `(attribute [simp] $(mkIdent (prefixComponents ++ `dependencies)))
   let simpIntf ←
@@ -543,3 +551,5 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
   elabCommand simpDeps
   elabCommand simpIntf
   elabCommand simpImpl
+
+end Oxiclean.BuildSystem
