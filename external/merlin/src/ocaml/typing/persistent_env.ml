@@ -21,8 +21,7 @@ open Cmi_format
 
 module CU = Compilation_unit
 module CUI = Compilation_unit_intf
-module Consistbl_data = Import_info.Intf.Nonalias.Kind
-module Consistbl = Consistbl.Make (CU.Name) (Consistbl_data)
+module Consistbl = Consistbl.Make (CU.Name) (Unit)
 module Style = Misc.Style
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
@@ -31,8 +30,6 @@ type error =
   | Illegal_renaming of CU.Name.t * CU.Name.t * filepath
   | Inconsistent_import of CU.Name.t * filepath * filepath
   | Need_recursive_types of CU.Name.t
-  | Inconsistent_package_declaration_between_imports of
-      filepath * CU.t * CU.t
   | Direct_reference_from_wrong_package of
       CU.t * filepath * CU.Prefix.t
   | Illegal_import_of_parameter of Global_module.Name.t * filepath
@@ -317,15 +314,15 @@ let import_crcs penv ~source crcs =
   let {crc_units; _} = penv in
   let import_crc import_info =
     let name = Import_info.Intf.name import_info in
-    let info = Import_info.Intf.info import_info in
-    match info with
+    let crco = Import_info.Intf.crc import_info in
+    match crco with
     | None -> ()
-    | Some (kind, crc) ->
+    | Some crc ->
         match Consistbl.find crc_units name with
-        | Some (_, known_crc) when Digest.equal known_crc crc -> ()
+        | Some ((), known_crc) when Digest.equal known_crc crc -> ()
         | _ ->
           add_import penv name;
-          Consistbl.check crc_units name kind crc source
+          Consistbl.check crc_units name () crc source
   in Array.iter import_crc crcs
 
 let check_consistency penv imp =
@@ -334,16 +331,8 @@ let check_consistency penv imp =
       unit_name = name;
       inconsistent_source = source;
       original_source = auth;
-      inconsistent_data = source_kind;
-      original_data = auth_kind;
     } ->
-    match source_kind, auth_kind with
-    | Normal source_unit, Normal auth_unit
-      when not (CU.equal source_unit auth_unit) ->
-        error (Inconsistent_package_declaration_between_imports(
-            imp.imp_filename, auth_unit, source_unit))
-    | (Normal _ | Parameter), _ ->
-      error (Inconsistent_import(name, auth, source))
+    error (Inconsistent_import(name, auth, source))
 
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
@@ -419,7 +408,7 @@ let register_pers_for_short_paths penv modname ps components =
     ~depends ~alias_depends desc ps.ps_name_info.pn_import.imp_visibility deprecated
 (* Reading persistent structures from .cmi files *)
 
-let save_import penv crc modname impl flags filename =
+let save_import penv crc modname flags filename =
   let {crc_units; _} = penv in
   List.iter
     (function
@@ -427,7 +416,7 @@ let save_import penv crc modname impl flags filename =
         | Alerts _ -> ()
         | Opaque -> register_import_as_opaque penv modname)
     flags;
-  Consistbl.check crc_units modname impl crc filename;
+  Consistbl.check crc_units modname () crc filename;
   add_import penv modname
 
 (* Add an import to the hash table. Checks that we are allowed to access
@@ -1089,9 +1078,6 @@ let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
             Format_doc.doc_printf
               "%a uses recursive types"
               CU.Name.print_as_inline_code name
-        | Inconsistent_package_declaration_between_imports _ ->
-            (* Can't be raised by [find_pers_struct ~check:false] *)
-            assert false
         | Direct_reference_from_wrong_package (unit, _filename, prefix) ->
             Format_doc.doc_printf "%a is inaccessible from %a"
               CU.print_as_inline_code unit
@@ -1187,7 +1173,7 @@ let check ~allow_hidden penv f1 f2 ~loc name =
 
 let crc_of_unit penv name =
   match Consistbl.find penv.crc_units name with
-  | Some (_impl, crc) -> crc
+  | Some ((), crc) -> crc
   | None ->
     let import =
       find_import ~allow_hidden:true penv ~check:true
@@ -1205,7 +1191,9 @@ let imports {imported_units; crc_units; _} =
     Consistbl.extract (CU.Name.Set.elements !imported_units)
       crc_units
   in
-  List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
+  List.map
+    (fun (cu_name, crc) ->
+       Import_info.Intf.create cu_name ~crc:(Option.map snd crc))
     imports
 
 let require_intf_for_quote {quoted_intfs; _} name =
@@ -1326,7 +1314,6 @@ let save_cmi penv psig =
   Misc.try_finally (fun () ->
       let {
         cmi_name = modname;
-        cmi_kind = kind;
         cmi_flags = flags;
       } = cmi in
       let crc =
@@ -1335,12 +1322,7 @@ let save_cmi penv psig =
           (fun temp_filename oc -> output_cmi temp_filename oc cmi) in
       (* Enter signature in consistbl so that imports() and crc_of_unit() will
          also return its crc *)
-      let data : Import_info.Intf.Nonalias.Kind.t =
-        match kind with
-        | Normal { cmi_impl } -> Normal cmi_impl
-        | Parameter -> Parameter
-      in
-      save_import penv crc modname data flags filename
+      save_import penv crc modname flags filename
     )
     ~exceptionally:(fun () -> remove_file filename)
 
@@ -1365,12 +1347,6 @@ let report_error_doc ppf =
          The compilation flag %a is required@]"
         CU.Name.print_as_inline_code import
         Style.inline_code "-rectypes"
-  | Inconsistent_package_declaration_between_imports (filename, unit1, unit2) ->
-      fprintf ppf
-        "@[<hov>The file %s@ is imported both as %a@ and as %a.@]"
-        filename
-        CU.print_as_inline_code unit1
-        CU.print_as_inline_code unit2
   | Direct_reference_from_wrong_package(unit, filename, prefix) ->
       fprintf ppf
         "@[<hov>Invalid reference to %a (in file %s) from %a.@ %s]"
