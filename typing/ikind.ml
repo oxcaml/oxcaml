@@ -2040,9 +2040,11 @@ let round_up_except_placeholders =
   Solver.Round_up_except_vars placeholder_kind_of_var
 
 (* [kind_with_placeholders env ty] is [ty]'s kind with each unsolved type
-   variable's kind replaced by a new placeholder. The caller must take those
-   placeholders with [Placeholder.Ctx.take_placeholders] straight away. They
-   are not registered or solved yet. *)
+   variable's kind replaced by a new placeholder.
+
+   Safety: The caller must take those placeholders with
+   [Placeholder.Ctx.take_placeholders] straight away. They are not registered
+   or solved yet. *)
 let kind_with_placeholders env (ty : Types.type_expr) =
   Placeholder.Ctx.reset ();
   let ctx = create_ctx ~mode:round_up_except_placeholders ~env:(Some env) in
@@ -2050,53 +2052,103 @@ let kind_with_placeholders env (ty : Types.type_expr) =
 
 let crossing_of_kind kind = Axis_lattice.to_mode_crossing (Ldd.round_up kind)
 
-let rec when_crossing_known env ~kind ~(placeholders : Placeholder.t list)
-    ~known =
-  match placeholders with
-  | [] -> known (crossing_of_kind kind)
-  | p :: placeholders ->
-    let solve kind_of_p ~new_placeholders =
-      Ldd.solve_lfp p.ldd_var kind_of_p;
-      when_crossing_known env ~kind
-        ~placeholders:(List.rev_append new_placeholders placeholders)
-        ~known
-    in
-    let[@inline always] default () =
-      solve (rounded_up_kind env p.type_var) ~new_placeholders:[]
-    in
-    (* Because we don't have guards of type variables, a placeholder
-       variable may be generalized *before* we solve the placeholder.
+let rec when_crossing_of_kind_known env ~kind
+    ~(placeholders : Placeholder.t list) ~known =
+  let crossing = crossing_of_kind kind in
+  if
+    Mode.Crossing.equal crossing
+      (Axis_lattice.to_mode_crossing (Ldd.round_down kind))
+  then
+    (* Crossing is monotone in placeholders. *)
+    known crossing
+  else
+    match placeholders with
+    | [] -> known crossing
+    | p :: placeholders ->
+      let[@inline always] solve kind_of_p ~new_placeholders =
+        Ldd.solve_lfp p.ldd_var kind_of_p;
+        when_crossing_of_kind_known env ~kind
+          ~placeholders:(List.rev_append new_placeholders placeholders)
+          ~known
+      in
+      let[@inline always] default () =
+        solve (rounded_up_kind env p.type_var) ~new_placeholders:[]
+      in
+      (* Because we don't have guards of type variables, a placeholder
+         variable may be generalized *before* we solve the placeholder.
 
-       In this case, it is consistent to default it with lazy defaulting. *)
-    if Types.get_level p.type_var = Btype.generic_level
-    then default ()
-    else
-      upon_shape env p.type_var
-        ~run:(fun _ ->
-          let kind_of_p = kind_with_placeholders env p.type_var in
-          solve kind_of_p ~new_placeholders:(Placeholder.Ctx.take ()))
-        ~default
+         In this case, it is consistent to default it with lazy defaulting. *)
+      if Types.get_level p.type_var = Btype.generic_level
+      then default ()
+      else
+        upon_shape env p.type_var
+          ~run:(fun _ ->
+            let kind_of_p = kind_with_placeholders env p.type_var in
+            solve kind_of_p ~new_placeholders:(Placeholder.Ctx.take ()))
+          ~default
 
-let upon_crossing_of_type env (ty : Types.type_expr) ~cross ~later =
+(* Like [when_crossing_of_kind_known], but avoids allocating a result via
+   [later] (i.e. a mode variable) *)
+let[@inline always] when_crossing_of_kind_known_eager env ~kind ~placeholders
+    ~known ~later =
+  let known_now = ref None in
+  let run_later = ref None in
+  when_crossing_of_kind_known env ~kind ~placeholders ~known:(fun crossing ->
+      match !run_later with
+      | None -> known_now := Some crossing
+      | Some run -> run (known crossing));
+  match !known_now with
+  | Some crossing -> known crossing
+  | None ->
+    let result, ~run = later () in
+    run_later := Some run;
+    result
+
+let[@inline always] when_crossing_of_type_known env ty ~known
+    ~when_crossing_of_kind_known =
   let kind = kind_with_placeholders env ty in
   match Placeholder.Ctx.take () with
-  | [] -> cross (crossing_of_kind kind)
-  | _ :: _ as placeholders -> (
-    (* Fast-path optimization: if the crossing is immediately known,
-       we can return [cross crossing] instead of allocating a temporary
-       mode variable via [later ()]. *)
-    let known_now = ref None in
-    let run_later = ref None in
-    when_crossing_known env ~kind ~placeholders ~known:(fun crossing ->
-        match !run_later with
-        | None -> known_now := Some crossing
-        | Some run -> run (cross crossing));
-    match !known_now with
-    | Some crossing -> cross crossing
-    | None ->
-      let result, ~run = later () in
-      run_later := Some run;
-      result)
+  | [] -> known (crossing_of_kind kind)
+  | _ :: _ as placeholders ->
+    when_crossing_of_kind_known env ~kind ~placeholders ~known
+
+(* An unconstrained variable is one whose jkind bounds no axis. Thus, its modal
+   kind is exactly that of whatever it is eventually unified with. *)
+let is_unconstrained_var (ty : Types.type_expr) =
+  match Types.get_desc ty with
+  | Tvar { jkind; _ } | Tivar { jkind; _ } -> (
+    Types.get_level ty <> Btype.generic_level
+    &&
+    match jkind.jkind with
+    | { base = Layout layout; mod_bounds; with_bounds = No_with_bounds } ->
+      Axis_lattice.equal
+        (Axis_lattice.meet_externality
+           (Jkind.Layout.implied_externality layout)
+           (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
+        Axis_lattice.top
+    | { base = Layout _ | Kconstr _; _ } -> false)
+  | _ -> false
+
+(* For an unconstrained [ty], we delay immediately instead of allocating
+   a placeholder via [kind_with_placeholders]. *)
+let upon_crossing_of_type_fast env ty ~cross ~later =
+  let result, ~run = later () in
+  let known crossing = run (cross crossing) in
+  upon_shape env ty
+    ~run:(fun _ ->
+      when_crossing_of_type_known env ty ~known ~when_crossing_of_kind_known)
+    ~default:(fun () -> known (crossing_of_type env ty));
+  result
+
+let upon_crossing_of_type_slow env ty ~cross ~later =
+  when_crossing_of_type_known env ty ~known:cross
+    ~when_crossing_of_kind_known:(fun env ~kind ~placeholders ~known ->
+      when_crossing_of_kind_known_eager env ~kind ~placeholders ~known ~later)
+
+let upon_crossing_of_type env (ty : Types.type_expr) ~cross ~later =
+  if is_unconstrained_var ty
+  then upon_crossing_of_type_fast env ty ~cross ~later
+  else upon_crossing_of_type_slow env ty ~cross ~later
 
 type sub_or_intersect = Jkind.sub_or_intersect
 
