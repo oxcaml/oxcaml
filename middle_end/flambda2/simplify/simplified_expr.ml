@@ -120,7 +120,8 @@ and simplified_switch =
     cse_before_switch : CSE.t
   }
 
-let print_conf_removed_operations = ref false
+let print_conf_removed_operations =
+  Oxcaml_args.Extra_options.bool __LOC__ "dsimplified-removed-operations"
 
 let print_elide pp ppf x =
   Format.fprintf ppf "%t{%a}%t" Flambda_colours.elide pp x Flambda_colours.pop
@@ -154,7 +155,7 @@ and print_toplevel ppf toplevel =
   else ()
 
 and print_removed_operations ppf removed_operations =
-  if not !print_conf_removed_operations
+  if not (print_conf_removed_operations ())
   then ()
   else begin
     Format.fprintf ppf "removed_operations: [@[<hov>%a@]]@ "
