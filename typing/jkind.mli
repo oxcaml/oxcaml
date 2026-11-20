@@ -813,22 +813,25 @@ val apply_modality_r :
 (** Given the kind [k] of a type, the kind of that type made addressable (or
     left as is, for [Id]). *)
 val apply_operator_l :
-  Jkind_types.Kind_operator.t -> ('l * 'r) Types.jkind -> ('l * 'r) Types.jkind
+  Jkind_types.Kind_operator.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
 (** Constrain a kind to be addressable, filling sort variables as needed:
     [k < k addressable]. Fails when it is not. *)
-val constrain_below_addressable : Env.t -> 'd Types.jkind -> (unit, unit) result
+val constrain_below_addressable :
+  Env.t -> (allowed * 'r) Types.jkind -> (unit, unit) result
 
 (** Constrain a kind to have an addressable kind below it, filling sort
     variables as needed: [k addressable < k]. Fails when it has none. *)
-val constrain_above_addressable : Env.t -> 'd Types.jkind -> (unit, unit) result
+val constrain_above_addressable :
+  Env.t -> ('l * allowed) Types.jkind -> (unit, unit) result
 
 (** Try to apply the right adjoint of [addressable]. I.e.:
 
     Given some kind [k], try to produce some kind [k'] such that constraints
     like [l addressable < k] can be reduced to [l < k'] (where the latter
     implies the former). *)
-val apply_addressable_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
+val apply_addressable_r :
+  Env.t -> ('l * allowed) Types.jkind -> (Types.jkind_r, unit) result
 
 (** Whether the kind is known to be addressable. *)
 val is_surely_addressable : Env.t -> 'd Types.jkind -> bool

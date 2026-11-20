@@ -3387,16 +3387,17 @@ let apply_or_null_l env jkind =
     | None -> Error ())
 
 let apply_operator_l (operator : Jkind_types.Kind_operator.t) jkind =
-  match operator with
-  | Id -> jkind
-  | Addressable ->
-    let base =
-      match jkind.jkind.base with
-      | Layout l -> Layout (Layout.addressable l)
-      | Kconstr (p, sa, op) ->
-        Kconstr (p, sa, Jkind_types.Kind_operator.compose op Addressable)
-    in
-    { jkind with jkind = { jkind.jkind with base } }
+  (match operator with
+    | Id -> jkind
+    | Addressable ->
+      let base =
+        match jkind.jkind.base with
+        | Layout l -> Layout (Layout.addressable l)
+        | Kconstr (p, sa, op) ->
+          Kconstr (p, sa, Jkind_types.Kind_operator.compose op Addressable)
+      in
+      { jkind with jkind = { jkind.jkind with base } })
+  |> disallow_right
 
 let constrain_addressable_with ~constrain env jkind =
   match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
@@ -3415,6 +3416,7 @@ let constrain_above_addressable env jkind =
 let apply_addressable_r env jkind =
   let jkind =
     { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+    |> disallow_left
   in
   match jkind.jkind.base with
   | Layout l -> (
