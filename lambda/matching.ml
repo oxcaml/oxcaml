@@ -289,10 +289,26 @@ let slice_element_address ~loc ~array_kind slice index_kind n =
   in
   Lprim (Pmake_unboxed_product address_layouts, [ field 0; idx ], loc)
 
-(* CR slice-patterns: bind the variables bound by the rests of slice
-   patterns *)
-let fatal_slice_rest () =
-  fatal_error "Matching: rests of slice patterns are not bound yet"
+(* The slice of [slice] without its first [prefix] and last [suffix]
+   elements *)
+let sub_slice ~loc ~array_kind slice ~prefix ~suffix =
+  Lprim
+    ( Pmake_unboxed_product slice_layouts,
+      [ slice_element_address ~loc ~array_kind slice Ptagged_int_index
+          (Lconst (const_int prefix));
+        Lprim
+          ( Pscalar (Binary (Integral (slice_length_scalar, Sub))),
+            [ slice_field ~loc 1 slice;
+              const_scalar slice_length_scalar (prefix + suffix) ],
+            loc ) ],
+      loc )
+
+(* The rest of a slice pattern [p], with a prefix and a suffix of the given
+   lengths, of the slice [arg] *)
+let slice_rest (p : _ pattern_data) arg ~prefix ~suffix =
+  let loc = Scoped_location.Loc_unknown in
+  let array_kind = Typeopt.slice_type_kind p.pat_env p.pat_loc p.pat_type in
+  sub_slice ~loc ~array_kind arg ~prefix ~suffix
 
 module General = struct
   include Patterns.General
@@ -406,7 +422,18 @@ end = struct
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
         | `Slice _ | `Lazy _ )
         as view -> stop p view
-      | `Slice_rest _ -> fatal_slice_rest ()
+      | `Slice_rest
+          (mutability, sort, prefix, Tslice_rest_var { id; uid; _ }, suffix) ->
+          let rest =
+            slice_rest p arg ~prefix:(List.length prefix)
+              ~suffix:(List.length suffix)
+          in
+          let elements = Tslice_open { prefix; rest_var = None; suffix } in
+          aux
+            ( ({ p with pat_desc = `Slice (mutability, sort, elements) }, patl),
+              bind_with_layout Alias
+                (id, uid, Punboxed_product slice_layouts)
+                rest action )
     in
     aux cl
 end
@@ -500,7 +527,8 @@ end = struct
       match p.pat_desc with
       | `Or (p1, p2, _) ->
           split_explode p1 aliases (split_explode p2 aliases rem)
-      | `Alias (p, id, _, _, _, _, _) -> split_explode p (id :: aliases) rem
+      | `Alias (p, id, _, _, _, _, _) ->
+          split_explode p ((id, None) :: aliases) rem
       | `Var (id, str, uid, sort, mode) ->
           explode
             { p with pat_desc =
@@ -510,14 +538,25 @@ end = struct
       | `Deref _ ->
           fatal_error
             "Matching.explode_or_pat: dereference pattern under or-pattern"
-      | `Slice_rest _ -> fatal_slice_rest ()
+      | `Slice_rest
+          (mutability, sort, prefix, Tslice_rest_var { id; _ }, suffix) ->
+          (* The rest is bound to its slice of the argument *)
+          let rest arg =
+            slice_rest p arg ~prefix:(List.length prefix)
+              ~suffix:(List.length suffix)
+          in
+          let elements = Tslice_open { prefix; rest_var = None; suffix } in
+          explode
+            { p with pat_desc = `Slice (mutability, sort, elements) }
+            ((id, Some (Punboxed_product slice_layouts, rest)) :: aliases) rem
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
                avoid reusing the same identifier in distinct exploded
                branches
-             - we bind the variables in [aliases] to the argument [arg]
-               (the other variables are bound by [view]); to avoid
+             - we bind the variables in [aliases] to the argument [arg], or
+               to their value computed from it (the other variables are
+               bound by [view]); to avoid
                code duplication if [arg] is itself not a variable, we
                generate a binding for it, but only if the binding is
                needed.
@@ -533,12 +572,23 @@ end = struct
                 let fresh_action = mk_action ~vars:(List.rev action_vars) in
                 (fresh_pat, fresh_action)
             | (pat_id, pat_duid) :: rem_vars ->
-              if not (List.mem pat_id aliases) then begin
+              match List.assoc_opt pat_id aliases with
+              | None ->
                 let fresh_id = Ident.rename pat_id in
                 let action_vars = fresh_id :: action_vars in
                 let renaming_env = ((pat_id, fresh_id) :: renaming_env) in
                 fresh_clause arg_id action_vars renaming_env rem_vars
-              end else begin match arg_id, arg with
+              | Some (Some (layout, value)) ->
+                let fresh_id = Ident.rename pat_id in
+                let action_vars = fresh_id :: action_vars in
+                let pat, action =
+                  fresh_clause arg_id action_vars renaming_env rem_vars
+                in
+                let arg = match arg_id with Some id -> Lvar id | None -> arg in
+                pat,
+                bind_with_layout Alias (fresh_id, pat_duid, layout)
+                  (value arg) action
+              | Some None -> begin match arg_id, arg with
                 | Some id, _
                 | None, Lvar id ->
                   let action_vars = id :: action_vars in
