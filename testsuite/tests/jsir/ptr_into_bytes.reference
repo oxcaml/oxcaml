@@ -23,3 +23,5 @@ Invalid_argument "index out of bounds"
 Invalid_argument "index out of bounds"
 record, idx: 1 -2
 record after idx writes: 3 s -4
+Invalid_argument "index out of bounds"
+Invalid_argument "index out of bounds"
