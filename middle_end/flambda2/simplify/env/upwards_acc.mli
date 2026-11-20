@@ -86,8 +86,8 @@ val mutable_unboxing_result : t -> Flow_types.Mutable_unboxing_result.t
 
 val set_resimplify : t -> t
 
-(** The FDO counters dropped so far, including those of the downwards traversal
-    (see [Downwards_acc.fdo_dropped_counters]). *)
+(** The FDO counters dropped so far, including those of the downwards traversal.
+*)
 val fdo_dropped_counters : t -> Fdo_dropped_counters.t
 
 val add_dropped_fdo_counters :
