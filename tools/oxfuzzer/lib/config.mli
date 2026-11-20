@@ -4,6 +4,10 @@ val fun_min_param_count : int
 
 val fun_max_param_count : int
 
+val wide_fun_min_param_count : int
+
+val wide_fun_max_param_count : int
+
 val max_block_depth : int
 
 val max_loop_stride : int
@@ -111,6 +115,12 @@ val curried_lambda_probability : int
 
 val opaque_recursive_call_probability : int
 
+val wide_function_probability : int
+
+val tail_call_probability : int
+
+val wide_argument_variable_probability : int
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -146,7 +156,8 @@ module Swarm : sig
       exceptions : bool;
       closures : bool;
       partial_applications : bool;
-      recursive_functions : bool
+      recursive_functions : bool;
+      wide_functions : bool
     }
 
   val create : Random.State.t -> t
