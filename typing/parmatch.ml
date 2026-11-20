@@ -525,7 +525,9 @@ let extract_fields lbls arg =
   in
   List.map (fun lbl -> get_field lbl.lbl_pos arg) lbls
 
-(* Build argument list when p2 >= p1, where p1 is a simple pattern *)
+(* Build the argument list of a pattern with head [head] and arguments [args]
+   for the discriminating head [discr], when [head] matches all the values of
+   [discr] *)
 let simple_match_args discr head args =
   let open Patterns.Head in
   match head.pat_desc with
@@ -605,6 +607,15 @@ let refine_record_head head pss =
     { head with pat_desc = Record_unboxed_product (fields, repr) }
   | Any | Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _
   | Unboxed_tuple _ | Variant _ | Array _ | Addr _ | Slice _ | Lazy -> head
+
+(* The discriminating heads that the head [head] stands for in the first
+   column of [pss]: [head] itself *)
+let split_discr head _pss =
+  let open Patterns.Head in
+  match head.pat_desc with
+  | Any | Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _
+  | Unboxed_tuple _ | Record _ | Record_unboxed_product _ | Variant _ | Array _
+  | Addr _ | Slice _ | Lazy -> [head]
 
 (*
    In case a matching value is found, set actual arguments
@@ -796,10 +807,14 @@ let build_specialized_submatrices ~extend_row rows =
   (* The discriminating heads of the column, in the order of their first row,
      which gives exhaustivity counter-examples in source order *)
   let discrs =
+    let add_discr discrs d =
+      if List.exists (fun d' -> simple_match d' d) discrs then discrs
+      else d :: discrs
+    in
     List.fold_left
       (fun discrs ((head, _), _) ->
-         if List.exists (fun d -> simple_match d head) discrs then discrs
-         else refine_record_head head rows :: discrs)
+         List.fold_left add_discr discrs
+           (split_discr (refine_record_head head rows) rows))
       [] constr_rows
     |> List.rev
   in
@@ -1383,11 +1398,13 @@ let rec satisfiable pss qs = match pss with
           let hq, qargs = Patterns.Head.deconstruct q in
           if not (all_coherent (hq :: first_column pss)) then
             false
-          else begin
-              let q0 = refine_record_head hq pss in
-              satisfiable (build_specialized_submatrix ~extend_row:(@) q0 pss)
-                (simple_match_args q0 hq qargs @ qs)
-            end
+          else
+            List.exists
+              (fun q0 ->
+                 satisfiable
+                   (build_specialized_submatrix ~extend_row:(@) q0 pss)
+                   (simple_match_args q0 hq qargs @ qs))
+              (split_discr (refine_record_head hq pss) pss)
 
 (* While [satisfiable] only checks whether the last row of [pss + qs] is
    satisfiable, this function returns the (possibly empty) list of vectors [es]
@@ -1457,13 +1474,14 @@ let rec list_satisfying_vectors pss qs =
           let pss = simplify_first_col pss in
           if not (all_coherent (hq :: first_column pss)) then
             []
-          else begin
-            let q0 = refine_record_head hq pss in
-            List.map (set_args (Patterns.Head.to_omega_pattern q0))
-              (list_satisfying_vectors
-                 (build_specialized_submatrix ~extend_row:(@) q0 pss)
-                 (simple_match_args q0 hq qargs @ qs))
-          end
+          else
+            List.concat_map
+              (fun q0 ->
+                 List.map (set_args (Patterns.Head.to_omega_pattern q0))
+                   (list_satisfying_vectors
+                      (build_specialized_submatrix ~extend_row:(@) q0 pss)
+                      (simple_match_args q0 hq qargs @ qs)))
+              (split_discr (refine_record_head hq pss) pss)
 
 (******************************************)
 (* Look for a row that matches some value *)
@@ -1496,9 +1514,12 @@ let rec do_match pss qs = match qs with
       let pss = simplify_first_col pss in
       (* [pss] will (or won't) match [q0 :: qs] regardless of the coherence of
          its first column. *)
-      do_match
-        (build_specialized_submatrix ~extend_row:(@) q0 pss)
-        (qargs @ qs)
+      List.exists
+        (fun d ->
+           do_match
+             (build_specialized_submatrix ~extend_row:(@) d pss)
+             (simple_match_args d q0 qargs @ qs))
+        (split_discr q0 pss)
 
 (*
 let print_pat pat =
@@ -1814,6 +1835,15 @@ let union_res r1 r2 = match r1, r2 with
 | _, Used   -> r1
 | Upartial u1, Upartial u2 -> Upartial (u1@u2)
 
+(* Intersection of the unused parts of two answers *)
+let inter_res r1 r2 = match r1, r2 with
+| Unused, r | r, Unused -> r
+| Used, _ | _, Used -> Used
+| Upartial u1, Upartial u2 ->
+    match List.filter (fun p -> List.memq p u2) u1 with
+    | [] -> Used
+    | u -> Upartial u
+
 (* propose or pats for expansion *)
 let extract_elements qs =
   let rec do_rec seen = function
@@ -1898,13 +1928,18 @@ let rec every_satisfiables pss qs = match qs.active with
            [satisfiable] *)
         if not (all_coherent (hq :: first_column pss)) then
           Unused
-        else begin
-          let q0 = refine_record_head hq pss in
-          every_satisfiables
-            (build_specialized_submatrix q0 pss
-              ~extend_row:(fun ps r -> { r with active = ps @ r.active }))
-            {qs with active=simple_match_args q0 hq args @ rem}
-        end
+        else
+          (* A sub-pattern is unused if it is unused for every discriminating
+             head. *)
+          let extend_row ps r = { r with active = ps @ r.active } in
+          List.fold_left
+            (fun r q0 ->
+               inter_res r
+                 (every_satisfiables
+                    (build_specialized_submatrix q0 pss ~extend_row)
+                    {qs with active=simple_match_args q0 hq args @ rem}))
+            Unused
+            (split_discr (refine_record_head hq pss) pss)
     end
 
 (*
