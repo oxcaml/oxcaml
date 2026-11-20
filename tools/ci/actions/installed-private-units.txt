@@ -1,0 +1,41 @@
+# Module names of the dependencies built privately (see joinConsumingProject in
+# default.nix): the private sub-libraries, and the build-only sedlex ppx and
+# utils. No installed top-level compilation unit (a .cmi without "__") outside
+# lib/ocaml may have one of these names: it would clash with a user's own copy.
+# A trailing * matches any suffix.
+# cmdliner
+Cmdliner
+Cmdliner_*
+# gen
+Gen
+GenClone
+GenLabels
+GenLabels_intf
+GenM
+GenMList
+GenM_intf
+GenShims_
+Gen_intf
+# menhirLib
+MenhirLib
+# sedlex, sedlex.utils, sedlex.ppx
+Cset
+Iso
+Ppx_sedlex
+Sedlex
+Sedlex_cset
+Sedlex_ppx
+Sedlex_utils
+Sedlexing
+Unicode
+Utf8
+Xml
+# yojson
+Basic
+Codec
+Common
+Lexer_utils
+Raw
+Safe
+T
+Yojson

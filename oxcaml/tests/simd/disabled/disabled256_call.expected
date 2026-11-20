@@ -1,0 +1,1 @@
+Fatal error: exception extension disabled: found 256-bit vector in a function argument or result, but AVX is not enabled.

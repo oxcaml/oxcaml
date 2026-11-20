@@ -391,6 +391,7 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> id_fold
   | Tpat_alias { pattern = p; _ }
   | Tpat_variant (_, Some p, _)
+  | Tpat_addr (_, _, p)
   | Tpat_lazy p
   | Tpat_exception p -> of_pattern p
   | Tpat_value p -> of_pattern (p :> value general_pattern)
@@ -782,7 +783,8 @@ let of_node node =
       let name = Ident.name id in
       let sort =
         match vd.Types.val_kind with
-        | Types.Val_reg sort | Types.Val_mut (_, sort) -> sort
+        | Types.Val_reg (Representable sort) | Types.Val_mut (_, sort) -> sort
+        | Types.Val_reg Unrepresentable
         | Types.Val_prim _
         | Types.Val_ivar _
         | Types.Val_self _

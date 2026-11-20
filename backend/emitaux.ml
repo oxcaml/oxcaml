@@ -590,11 +590,17 @@ let emit_frames ~debug_strings_section ~code_begin a =
            | Common -> false)
          descrs
   in
+  (* The unit's pieces go in a section of their own, whose name must be a C
+     identifier (see [Asm_section.start_symbol]). *)
+  let unit_symbol =
+    Structured_mangling.mangle_ident (Current_unit.get_cu_exn ()) []
+  in
+  let piece ~group link_symbol =
+    Asm_section.Frametable_piece { unit_symbol; link_symbol; group }
+  in
   (* The unit's own piece, linked to [code_begin] to be sure the linker doesn't
      drop it. *)
-  let unit_piece =
-    Asm_section.Frametable_piece { link_symbol = code_begin; group = None }
-  in
+  let unit_piece = piece ~group:None code_begin in
   (* Emit each descriptor preceded by retaddr delta. The first descriptor of the
      frametable, and any descriptor that does not fit the short format, escapes:
      a 0 delta byte followed by the existing normal/long descriptor (which
@@ -628,8 +634,7 @@ let emit_frames ~debug_strings_section ~code_begin a =
           (* Leave the piece of any preceding code in a COMDAT group. *)
           if use_pieces then D.switch_to_section unit_piece
         | Linked { link_symbol; group } ->
-          D.switch_to_section
-            (Asm_section.Frametable_piece { link_symbol; group }));
+          D.switch_to_section (piece ~group link_symbol));
         escape ()
   in
   if not use_pieces
@@ -639,39 +644,28 @@ let emit_frames ~debug_strings_section ~code_begin a =
   end
   else begin
     (* Under [-frametable-sections], or in a unit with code in COMDAT groups,
-       the frametable is in three parts:
+       the frametable is in two parts:
 
-       - a header: a -1 tag, then 32-bit self-relative offsets to the start and
-       end of the pieces section and of the counts section;
+       - a header: a -1 tag, the number of descriptors, then 32-bit
+       self-relative offsets to the start and end of the unit's pieces section;
 
        - in the pieces section, a piece for each text section, holding the
        descriptors for that section's code (without the flag, only for each text
-       section in a COMDAT group; the unit's own piece holds the rest);
+       section in a COMDAT group; the unit's own piece holds the rest).
 
-       - in the counts section, a word holding the number of descriptors.
-
-       The linker merges the pieces of all the units in an executable or shared
-       object into one section, and likewise the counts. *)
-    (* Linked to [code_begin], like the unit's own piece. *)
-    let count_section =
-      Asm_section.Frametable_count { link_symbol = code_begin }
-    in
-    (* The linker defines these at the bounds of each merged section. *)
+       The linker merges the unit's pieces into one section, without those for
+       any code that it drops. *)
+    (* The linker defines these at the bounds of the merged section. *)
     let bounds =
-      List.concat_map
-        (fun section ->
-          [Asm_section.start_symbol section; Asm_section.stop_symbol section])
-        [unit_piece; count_section]
+      [Asm_section.start_symbol unit_piece; Asm_section.stop_symbol unit_piece]
     in
     a.efa_word (-1);
+    a.efa_word (List.length descrs);
     List.iter D.between_this_and_symbol_32bit_expr bounds;
     (* Keep each executable or shared object's bounds private to it. *)
     List.iter D.hidden bounds;
     (* Must be true as a precondition of this function. *)
     assert (Asm_section.equal (D.current_section ()) Read_only_data);
-    D.switch_to_section count_section;
-    a.efa_align Arch.size_addr;
-    a.efa_word (List.length descrs);
     (* Emit the unit's own piece, so that the pieces section, and hence its
        bounds, exist even if no other piece does. *)
     D.switch_to_section unit_piece;
@@ -926,9 +920,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Const_mask _ | Load _
+        | Tls_get | Domain_index | Thread_self_id | Poll | Pause | Const_int _
+        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+        | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)

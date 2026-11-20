@@ -66,6 +66,3 @@ let transl_unique_barrier barrier =
 let transl_staticity_mode = function
   | Staticity.Static -> Static
   | Staticity.Dynamic -> Dynamic
-
-let transl_staticity_mode_r staticity =
-  Staticity.zap_to_ceil_exn staticity |> transl_staticity_mode

@@ -182,7 +182,7 @@ let loc_results_return res =
      remaining args on stack.
    macOS/iOS peculiarities: scalars passed on stack occupy only their size in
    bytes, while the AAPCS64 pads them to 8 bytes.
-   Return values in r0...r1 or d0. *)
+   Return values in r0...r1 or d0...d3. *)
 
 let external_calling_conventions
     int_registers float_registers make_stack ty_args =
@@ -200,18 +200,53 @@ let external_calling_conventions
       | XFloat -> Float, float_registers, 1, size_float
       | XFloat32 -> Float32, float_registers, 2, size_float
       | XVec128 -> Vec128, float_registers, 1, size_vec128
+      | XFat_pointer -> Val, int_registers, 1, size_int
       | XVec256 | XVec512 ->
         Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
+      | XDummy_int -> Int, int_registers, 1, size_int
+      | XDummy_float -> Float, float_registers, 1, size_float
     in
     match !registers with
     | reg :: regs ->
       registers := regs;
-      loc.(i) <- [| phys_reg ty reg |]
+      loc.(i) <- (if Cmm.is_dummy_exttype ty_arg then [||]
+                  else [| phys_reg ty reg |])
     | [] ->
+      if Cmm.is_dummy_exttype ty_arg then
+        Misc.fatal_error
+          "Proc.loc_external_arguments: no register left for a dummy";
+      (match ty_arg with
+       | XFat_pointer ->
+         Misc.fatal_error
+           "Fat-pointer external arguments passed on the stack are not \
+            supported (too many integer arguments)"
+       | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+       | XVec128 | XVec256 | XVec512 | XDummy_int | XDummy_float -> ());
       let size = if macosx then size / divisor else size in
       ofs := Misc.align !ofs size;
       loc.(i) <- [| stack_slot (make_stack !ofs) ty |];
       ofs := !ofs + size)
+    ty_args;
+  (* Second pass: offsets of fat-pointer arguments, from the integer argument
+     registers the real signature left unused. *)
+  List.iteri (fun i (ty_arg : Cmm.exttype) ->
+    match ty_arg with
+    | XFat_pointer ->
+      let offset_loc =
+        match !int_registers with
+        | reg :: regs ->
+          int_registers := regs;
+          phys_reg Int reg
+        | [] ->
+          (* offset on stack after the real stack arguments. *)
+          ofs := Misc.align !ofs size_int;
+          let slot = stack_slot (make_stack !ofs) Int in
+          ofs := !ofs + size_int;
+          slot
+      in
+      loc.(i) <- [| loc.(i).(0); offset_loc |]
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32 | XVec128
+    | XVec256 | XVec512 | XDummy_int | XDummy_float -> ())
     ty_args;
   (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
 
@@ -222,7 +257,9 @@ let loc_external_arguments ty_args =
      outgoing ty_args
 
 let loc_external_results res =
-  let (loc, _) = calling_conventions [X0; X1] [D0; D1] not_supported 0 res in
+  let (loc, _) =
+    calling_conventions [X0; X1] [D0; D1; D2; D3] not_supported 0 res
+  in
   loc
 
 let loc_exn_bucket = phys_reg Int X0
@@ -317,7 +354,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
       else
         destroy_neon_reg7
   | Op (Intop (Iadd  | Isub | Imul | Idiv _ | Imod _ |Iand|Ior|Ixor|Ilsl
-              |Ilsr|Iasr|Imulh _|Iclz|Ictz|Icomp _))
+              |Ilsr|Iasr|Imulh _|Inot|Iclz|Ictz|Icomp _))
   | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Specific _
         | Move | Spill | Reload | Floatop _
@@ -328,7 +365,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-        | Begin_region | End_region | Dls_get | Tls_get | Domain_index)
+        | Begin_region | End_region | Dls_get | Tls_get | Domain_index
+        | Thread_self_id)
   | Poptrap _ | Prologue | Epilogue
   | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
@@ -513,18 +551,19 @@ let operation_supported : Cmm.operation -> bool = function
   | Cclz | Cctz | Cbswap _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-  | Cand | Cor | Cxor | Clsl | Clsr | Casr
+  | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
   | Ccmpi _ | Caddv | Cadda
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64
   | Csubf Float64 | Cmulf Float64 | Cdivf Float64
   | Ccmpf _
   | Ccsel _
   | Craise _
-  | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpause
+  | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cpause
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Creinterpret_cast (Int_of_value | Value_of_int |
                        Int64_of_float | Float_of_int64 |

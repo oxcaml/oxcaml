@@ -307,7 +307,7 @@ module T = struct
                   | `Auction_indicative_price ->
                       Auction_indicative_price_event.of_yojson json'
                       |> Result.map ~f:(fun event ->
-                             `Auction_indicative_price event)
+                          `Auction_indicative_price event)
                   | `Auction_outcome ->
                       Auction_outcome_event.of_yojson json'
                       |> Result.map ~f:(fun event -> `Auction_outcome event))))
@@ -400,12 +400,12 @@ module T = struct
                         "socket_sequence" )
                 in
                 (match message_type with
-                | `Heartbeat ->
-                    heartbeat_of_yojson json'
-                    |> Result.map ~f:(fun event -> `Heartbeat event)
-                | `Update ->
-                    Update.of_yojson json'
-                    |> Result.map ~f:(fun event -> `Update event))
+                  | `Heartbeat ->
+                      heartbeat_of_yojson json'
+                      |> Result.map ~f:(fun event -> `Heartbeat event)
+                  | `Update ->
+                      Update.of_yojson json'
+                      |> Result.map ~f:(fun event -> `Update event))
                 |> Result.map ~f:(fun message -> { socket_sequence; message })))
     | #Yojson.Safe.t as json ->
         Result.failf

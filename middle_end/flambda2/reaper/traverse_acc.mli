@@ -21,27 +21,45 @@ module Graph = Global_flow_graph
 (** Information about a continuation, including its parameters, arity, and
     whether it is an exception handler. This is used to register dependencies on
     the continuation at call sites. *)
-type continuation_info =
-  { is_exn_handler : bool;
-    params : Variable.t list;
-    arity : Flambda_kind.With_subkind.t list
-  }
+module Continuation_info : sig
+  type t =
+    { is_exn_handler : bool;
+      params : Variable.t list;
+      arity : Flambda_kind.With_subkind.t list
+    }
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
 
 (** Information about a function's code that is needed for building the
     dependency graph. Created by [prepare_code] during traversal and looked up
     when processing function bodies and call sites at the end of the traversal.
 *)
-type code_dep =
-  { code_metadata : Code_metadata.t;
-    params : Variable.t list;
-    my_closure : Variable.t;
-    return : Variable.t list;
-    exn : Variable.t;
-    known_arity_call_witness : Code_id_or_name.t;
-    unknown_arity_call_witnesses : Code_id_or_name.t list
-  }
+module Code_dep : sig
+  type t =
+    { code_metadata : Code_metadata.t;
+      params : Variable.t list;
+      my_closure : Variable.t;
+      return : Variable.t list;
+      exn : Variable.t;
+      known_arity_call_witness : Code_id_or_name.t;
+      unknown_arity_call_witnesses : Code_id_or_name.t list
+    }
 
-type delayed_deps
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
+
+module Delayed_deps : sig
+  type t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
 
 (** The function applications seen during traversal: for each callee, the size
     of the largest (complex) arguments. *)
@@ -64,6 +82,10 @@ module Applications : sig
   val empty : t
 
   val union : t -> t -> t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
 end
 
 (** The type of traversal accumulators. *)
@@ -96,22 +118,22 @@ val continuation_info :
   unit
 
 (** Return the map of all recorded continuation metadata. *)
-val get_continuation_info : t -> continuation_info Continuation.Map.t
+val get_continuation_info : t -> Continuation_info.t Continuation.Map.t
 
 (** Register a [code_dep] for a code id, recording the function's parameters,
     returns, and call witnesses in the accumulator. *)
-val add_code_dep : t -> Code_id.t -> code_dep -> unit
+val add_code_dep : t -> Code_id.t -> Code_dep.t -> unit
 
 (** Look up the [code_dep] for a code id. Returns [None] if the code id has not
     been registered (e.g. it belongs to another compilation unit). *)
-val find_code_dep : t -> Code_id.t -> code_dep option
+val find_code_dep : t -> Code_id.t -> Code_dep.t option
 
 (** Return the map of all registered code deps. *)
-val code_deps : t -> code_dep Code_id.Map.t
+val code_deps : t -> Code_dep.t Code_id.Map.t
 
-val add_code : t -> Code_id.t -> Rev_expr.rev_code -> unit
+val add_code : t -> Code_id.t -> Rev_expr.Rev_code.t -> unit
 
-val get_all_code : t -> Rev_expr.rev_code Code_id.Map.t
+val get_all_code : t -> Rev_expr.Rev_code.t Code_id.Map.t
 
 (** Add a (directed) alias edge: [from] flows into [to_], meaning that every
     usage of [to_] is a usage of [from]; and every source of [from] is a source
@@ -253,15 +275,15 @@ val deps : t -> Graph.graph
 (** Return the dependencies recorded by [add_apply] and
     [add_set_of_closures_dep], and the symbols from other compilation units
     recorded by [simple_to_node]. *)
-val delayed_deps : t -> delayed_deps
+val delayed_deps : t -> Delayed_deps.t
 
 (** Resolve all deferred dependencies into the graph. Imported symbols from
     compilation units outside [analysis_scope] are marked [any_source]. *)
 val resolve_delayed_deps :
   Graph.graph ->
   analysis_scope:Analysis_scope.t ->
-  code_deps:code_dep Code_id.Map.t ->
-  delayed_deps ->
+  code_deps:Code_dep.t Code_id.Map.t ->
+  Delayed_deps.t ->
   unit
 
 val sort_code_ids : t -> Code_id.t array

@@ -54,7 +54,9 @@ type file_content =
   | Index of index
   | Unknown
 
-val write : file:string -> index -> unit
+val write :
+  file_kind:Granular_marshal.File_kind.t -> file:string -> index -> unit
+
 val read : file:string -> file_content
 
 val read_exn : file:string -> index

@@ -108,9 +108,9 @@ let for_name compilation_unit name =
     linkage_name;
     hash = Hashtbl.hash linkage_name; }
 
-let for_structured_mangling_path ~compilation_unit ~path ~suffix =
+let for_structured_mangling_path ~compilation_unit ~path =
   let name = Structured_mangling.mangle_ident compilation_unit path in
-  let linkage_name = name ^ suffix |> Linkage_name.of_string in
+  let linkage_name = Linkage_name.of_string name in
   { compilation_unit;
     linkage_name;
     hash = Hashtbl.hash linkage_name; }

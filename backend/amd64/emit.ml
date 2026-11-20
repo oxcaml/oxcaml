@@ -101,12 +101,7 @@ let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end
 module I = struct
   include I
 
-  exception Extension_disabled of string
-
-  let () =
-    Printexc.register_printer (function
-      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
-      | _ -> None)
+  exception Extension_disabled = Arch.Extension.Disabled
 
   let require_vec256 () =
     if not (Arch.Extension.enabled_vec256 ())
@@ -843,30 +838,38 @@ type jump_table =
     elems : Linear.label array
   }
 
-let jump_tables = ref ([] : jump_table list)
+type function_jump_tables =
+  { fjt_fun_name : string;
+    fjt_weak : bool;
+    fjt_tables : jump_table list
+  }
 
-(* The jump tables of each function emitted so far that has its own jump-table
-   section, latest function first, with whether the function is weak. Under
-   [-jump-table-sections] every function's tables get their own section, so that
-   the linker can discard them along with the function. A weak function's tables
-   always do, in the function's COMDAT group, since they refer into it. *)
-let function_jump_tables = ref ([] : (string * bool * jump_table list) list)
+let jump_tables_this_function = ref ([] : jump_table list)
 
-let jump_table_sections () =
+let jump_tables = ref ([] : function_jump_tables list)
+
+let collect_function_jump_tables fundecl =
+  if not (Misc.Stdlib.List.is_empty !jump_tables_this_function)
+  then begin
+    let fjt_weak =
+      match fundecl.fun_sym_global with Weak -> true | Global | Local -> false
+    in
+    let new_tables =
+      { fjt_fun_name = fundecl.fun_name;
+        fjt_weak;
+        fjt_tables = !jump_tables_this_function
+      }
+    in
+    jump_tables := new_tables :: !jump_tables;
+    jump_tables_this_function := []
+  end
+
+let jump_table_sections_enabled () =
+  (* Without [-function-sections], [-jump-table-sections] doesn't accomplish
+     much. Rather than raise an error, we accept but ignore a lone
+     [-jump-table-sections] so that one can use it unconditionally to change how
+     function sections work without forcing [-function-sections] everywhere. *)
   !Oxcaml_flags.jump_table_sections && !Clflags.function_sections
-
-let emit_jump_table_section ~weak func_name =
-  let sym = emit_symbol func_name in
-  let name = Printf.sprintf ".text.caml.%s.jump_tables" sym in
-  let flags, args =
-    if weak
-    then "axG", [Printf.sprintf "@progbits,%s,comdat" sym]
-    else "ax", ["@progbits"]
-  in
-  D.switch_to_section_raw ~names:[name] ~flags:(Some flags) ~args
-    ~is_delayed:false;
-  Emitaux.enter_code_section name;
-  D.unsafe_set_internal_section_ref Text
 
 let emit_jump_table t =
   D.define_label t.table_lbl;
@@ -875,11 +878,54 @@ let emit_jump_table t =
     D.between_labels_32_bit ~upper ~lower:t.table_lbl ()
   done
 
-let emit_jump_tables tables =
+let emit_jump_table_section (~for_function, ~tables) =
+  begin match for_function with
+  | None ->
+    (* The one big section for all functions' jump tables *)
+    emit_named_text_section (Cmm_helpers.make_symbol "jump_tables")
+  | Some (~fun_name, ~weak) ->
+    (* An individual function, under [-jump-table-sections] or because it is
+       weak *)
+    let sym = emit_symbol fun_name in
+    let name = Printf.sprintf ".text.caml.%s.jump_tables" sym in
+    let flags, args =
+      if weak
+      then "axG", [Printf.sprintf "@progbits,%s,comdat" sym]
+      else "ax", ["@progbits"]
+    in
+    D.switch_to_section_raw ~names:[name] ~flags:(Some flags) ~args
+      ~is_delayed:false;
+    Emitaux.enter_code_section name;
+    D.unsafe_set_internal_section_ref Text
+  end;
   I.ud2 ();
   (* data in text below *)
   D.align ~fill:Nop ~bytes:4;
   List.iter emit_jump_table tables
+
+let emit_jump_tables () =
+  let section_for_function { fjt_fun_name; fjt_weak; fjt_tables } =
+    ( ~for_function:(Some (~fun_name:fjt_fun_name, ~weak:fjt_weak)),
+      ~tables:fjt_tables )
+  in
+  let sections =
+    if jump_table_sections_enabled ()
+    then
+      (* Each function's tables get their own section *)
+      List.map section_for_function !jump_tables
+    else
+      (* A weak function's tables get their own section, in the function's
+         COMDAT group, since they refer into it. All other functions' tables get
+         put into one section *)
+      let weak, others =
+        List.partition (fun { fjt_weak; _ } -> fjt_weak) !jump_tables
+      in
+      let tables =
+        List.concat_map (fun { fjt_tables; _ } -> fjt_tables) others
+      in
+      List.map section_for_function weak @ [~for_function:None, ~tables]
+  in
+  List.iter emit_jump_table_section sections
 
 (* Names for instructions *)
 
@@ -915,7 +961,8 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
+  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Inot | Iclz | Ictz | Icomp _ ->
+    assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -1974,28 +2021,33 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   assert (res_used = Array.length instr.res);
   (* Gathers require that all args are distinct registers. *)
-  match[@warning "-4"] simd.id with
-  | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
-  | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
-  | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
+  if
+    String.starts_with ~prefix:"vpgather" simd.mnemonic
+    || String.starts_with ~prefix:"vgather" simd.mnemonic
+  then
     let module Set = Reg.UsingLocEquality.Set in
     let set = Array.fold_right Set.add instr.arg Set.empty in
     assert (Set.cardinal set = Array.length instr.arg)
-  | _ -> ()
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
+  | Some R128 -> arg_as_xmm (arg instr i)
+  | Some R256 -> arg_as_ymm (arg instr i)
+  | Some R512 -> arg_as_zmm (arg instr i)
+  | Some R64 | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> res instr i
+  | Some R128 -> arg_as_xmm (res instr i)
+  | Some R256 -> arg_as_ymm (res instr i)
+  | Some R512 -> arg_as_zmm (res instr i)
+  | Some R64 | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -2049,7 +2101,10 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
             let n = num_args_addressing mode in
             let typ = to_addr_width arg.loc in
             let address = addressing mode typ instr idx in
-            emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
+            (* We do not sanitize masked loads and stores, which only access the
+               unmasked elements. *)
+            if not (Simd.instr_expects_mask simd)
+            then emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
             idx + n, address :: args
           | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
       (0, []) simd.args
@@ -2123,11 +2178,11 @@ let emit_simd ?mode (op : Simd.operation) instr =
       emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestz | Vptestz_X | Vptestz_Y ->
+    | Ptestz | Vptestz_X | Vptestz_Y | Kflag Zf ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestc | Vptestc_X | Vptestc_Y ->
+    | Ptestc | Vptestc_X | Vptestc_Y | Kflag Cf ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
@@ -2147,7 +2202,10 @@ let prologue_stack_offset () =
 
 let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  (* A label that only delimits a DWARF range is not a branch target: aligning
+     it would make the generated code depend on debugging information. *)
+  if (not fallthrough) && !fastcode_flag && not is_dwarf_only_label
+  then D.align ~fill:Nop ~bytes:4;
   D.define_label lbl
 
 (* Emit an instruction *)
@@ -2299,7 +2357,23 @@ let emit_instr ~first ~last ~fallthrough i =
     else (
       add_used_symbol func.sym_name;
       emit_jump func)
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; ty_args; _ }) ->
+    (* Fuse each fat-pointer argument, adding its offset register into its base
+       register, as part of emitting the call itself, so no GC safepoint can
+       separate the addition from the call. *)
+    let (_ : int) =
+      List.fold_left
+        (fun k (ty_arg : Cmm.exttype) ->
+          match ty_arg with
+          | XFat_pointer ->
+            I.add (arg i (k + 1)) (arg i k);
+            k + 2
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 ->
+            k + 1
+          | XDummy_int | XDummy_float -> k)
+        0 ty_args
+    in
     add_used_symbol func;
     if stack_ofs > 0
     then (
@@ -2533,6 +2607,7 @@ let emit_instr ~first ~last ~fallthrough i =
     when Reg.equal_location i.arg.(1).loc i.res.(0).loc && Reg.is_reg i.res.(0)
     ->
     I.xor (res32 i 0) (res32 i 0)
+  | Lop (Intop Inot) -> I.not_ (res i 0)
   | Lop (Intop (Idiv { signed = true } | Imod { signed = true })) ->
     I.cqo ();
     I.idiv (arg i 1)
@@ -2782,6 +2857,8 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Dls_get -> I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
   | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
+  | Lop Thread_self_id ->
+    I.mov (domain_field Domainstate.Domain_thread_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
   | Llabel_for_jump_target label ->
@@ -2820,7 +2897,7 @@ let emit_instr ~first ~last ~fallthrough i =
     I.add (reg tmp2) (reg tmp1);
     I.jmp (reg tmp1);
     let table = { table_lbl = lbl; elems = jumptbl } in
-    jump_tables := table :: !jump_tables
+    jump_tables_this_function := table :: !jump_tables_this_function
   | Lentertrap ->
     if fp
     then
@@ -2903,7 +2980,17 @@ let rec emit_all ~first ~fallthrough i =
       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
         Printlinear.instr i;
       raise exn);
-    emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
+    let fallthrough =
+      match i.desc with
+      | Llabel_for_dwarf _ -> fallthrough
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _
+      | Llabel_for_jump_target _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
+        Linear.has_fallthrough i.desc
+    in
+    emit_all ~first:false ~fallthrough i.next
 
 let all_functions = ref []
 
@@ -3018,16 +3105,7 @@ let fundecl fundecl =
   D.comment ("LLVM-MCA-END " ^ !function_name);
   D.cfi_endproc ();
   emit_function_type_and_size fundecl_sym;
-  let weak =
-    match fundecl.fun_sym_global with Weak -> true | Global | Local -> false
-  in
-  if
-    (jump_table_sections () || weak)
-    && not (Misc.Stdlib.List.is_empty !jump_tables)
-  then (
-    function_jump_tables
-      := (fundecl.fun_name, weak, !jump_tables) :: !function_jump_tables;
-    jump_tables := [])
+  collect_function_jump_tables fundecl
 
 (* Emission of data *)
 
@@ -3061,8 +3139,9 @@ let begin_assembly unix =
   if !Oxcaml_flags.internal_assembler && !Emitaux.binary_backend_available
   then X86_proc.register_internal_assembler (Internal_assembler.assemble unix);
   (* We initialize the new assembly directives. *)
-  Asm_targets.Asm_label.initialize ~new_label:(fun () ->
-      Cmm.new_label () |> Label.to_int);
+  Asm_targets.Asm_label.initialize
+    ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
+    ~new_dwarf_label:(fun () -> Label.new_dwarf_label () |> Label.to_int);
   D.initialize ~big_endian:Arch.big_endian
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments
       (* As a first step, we emit by calling the corresponding x86 emit
@@ -3412,17 +3491,8 @@ let end_assembly () =
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
-  List.iter
-    (fun (fun_name, weak, tables) ->
-      emit_jump_table_section ~weak fun_name;
-      emit_jump_tables tables)
-    (List.rev !function_jump_tables);
-  if not (jump_table_sections ())
-  then (
-    emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");
-    emit_jump_tables !jump_tables);
+  emit_jump_tables ();
   jump_tables := [];
-  function_jump_tables := [];
   let code_end = Cmm_helpers.make_symbol "code_end" in
   (* The linker places sections in input order, so a [code_end] of its own
      follows the weak functions' sections, and the unit's code range (for DWARF

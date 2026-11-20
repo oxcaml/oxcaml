@@ -2,6 +2,7 @@
    flambda2;
    { bytecode; }
    { native; }
+   { jsir; }
 *)
 
 type r1 = { x1 : string; y1 : float#; }

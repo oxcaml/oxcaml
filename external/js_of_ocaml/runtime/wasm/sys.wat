@@ -545,7 +545,9 @@
 (@else
    (func (export "caml_sys_isatty")
       (param $ch (ref eq)) (result (ref eq))
-      (return_call $isatty (call $caml_channel_descriptor (local.get $ch))))
+      ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+      ;; tail call cross
+      (return (call $isatty (call $caml_channel_descriptor (local.get $ch)))))
 ))
 
    (func (export "caml_sys_const_runtime5")

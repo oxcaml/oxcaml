@@ -110,8 +110,17 @@ let new_label_ref =
   ref (fun _section ->
       Misc.fatal_error "[Asm_label.initialize] has not been called")
 
-let initialize ~new_label =
-  new_label_ref := fun section -> create_int section (new_label ())
+let initialize ~new_label ~new_dwarf_label =
+  new_label_ref
+    := fun (section : Asm_section.t) ->
+         match section with
+         | DWARF _ -> create_int section (new_dwarf_label ())
+         | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
+         | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables
+         | Text | Function_text _ | Stapsdt_base | Stapsdt_note | Probes
+         | Note_ocaml_eh | Note_gnu_stack | Debuginfo_strings
+         | Frametable_piece _ | Custom _ ->
+           create_int section (new_label ())
 
 let create (section : Asm_section.t) = !new_label_ref section
 

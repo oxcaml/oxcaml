@@ -153,6 +153,7 @@ let is_move_basic : Cfg.basic -> bool =
     | Dls_get -> false
     | Tls_get -> false
     | Domain_index -> false
+    | Thread_self_id -> false
     | Poll -> false
     | Pause -> false
     | Alloc _ -> false)

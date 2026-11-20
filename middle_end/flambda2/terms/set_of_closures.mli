@@ -24,16 +24,22 @@ val sexp_fields : t -> Misc.Sexp.field list
 
 val is_empty : t -> bool
 
-(** Create a set of closures given the code for its functions and the closure
-    variables. *)
+(** Create a set of closures given the code for its functions, the closure
+    variables and the debuginfo of the allocation point. *)
 val create :
-  value_slots:Simple.t Value_slot.Map.t -> Function_declarations.t -> t
+  value_slots:Simple.t Value_slot.Map.t ->
+  dbg:Debuginfo.t ->
+  Function_declarations.t ->
+  t
 
 (** The function declarations associated with the set of closures. *)
 val function_decls : t -> Function_declarations.t
 
 (** The values of each value slot (the environment, or captured variables). *)
 val value_slots : t -> Simple.t Value_slot.Map.t
+
+(** The debuginfo describing where the set of closures is allocated. *)
+val debuginfo : t -> Debuginfo.t
 
 (** Returns true iff the given set of closures has no value slots. *)
 val is_closed : t -> bool

@@ -54,22 +54,17 @@ value frametable_unregister_test(value unit)
   caml_get_stack_sp_pc(Caml_state->current_stack, &sp, &pc);
   CHECK(3, found(pc));
 
-  /* Each table leaves in turn. The pieces stay, since other tables still
-     refer to them, even when the one leaving is their owner. */
+  /* Each table leaves in turn, taking its own unit's pieces and no others:
+     the caller's descriptor leaves with exactly one of them. */
+  int tables_with_pc = 0;
   for (int i = 0; i < ntables; i++) {
     caml_unregister_frametable(tables[i]);
     remove_unregistered();
-    CHECK(4, found(pc));
+    if (!found(pc)) tables_with_pc++;
     caml_register_frametable(tables[i]);
-    CHECK(5, found(pc));
+    CHECK(4, found(pc));
   }
-
-  /* Once every table has left, so have the pieces */
-  caml_unregister_frametables(tables, ntables);
-  remove_unregistered();
-  CHECK(6, !found(pc));
-  caml_register_frametables(tables, ntables);
-  CHECK(7, found(pc));
+  CHECK(5, tables_with_pc == 1);
 
   free(tables);
   return Val_int(failed);

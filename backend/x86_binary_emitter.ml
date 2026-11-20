@@ -1348,6 +1348,20 @@ let emit_neg b dst =
       emit_mod_rm_reg b rexw [ 0xF7 ] rm 3
   | _ -> assert false
 
+let emit_not b dst =
+  match dst with
+  | (Reg8L _ | Reg8H _ | Mem { typ = BYTE; _ } | Mem64_RIP (BYTE, _, _)) as rm
+    ->
+      emit_mod_rm_reg b no_rex [ 0xF6 ] rm 2
+  | (Reg16 _ | Mem { typ = WORD; _ } | Mem64_RIP (WORD, _, _)) as rm ->
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b no_rex [ 0xF7 ] rm 2
+  | (Reg32 _ | Mem { typ = DWORD; _ } | Mem64_RIP (DWORD, _, _)) as rm ->
+      emit_mod_rm_reg b no_rex [ 0xF7 ] rm 2
+  | (Reg64 _ | Mem { typ = QWORD; _ } | Mem64_RIP (QWORD, _, _)) as rm ->
+      emit_mod_rm_reg b rexw [ 0xF7 ] rm 2
+  | _ -> assert false
+
 let emit_LEA b dst src =
   match (dst, src) with
   | Reg64 reg, ((Mem _ | Mem64_RIP _) as rm) ->
@@ -1552,6 +1566,7 @@ let assemble_instr b loc = function
   | MOVZX (src, dst) -> emit_MOVZX b dst src
   | MOVSXD (src, dst) -> emit_movsxd b dst src
   | NEG dst -> emit_neg b dst
+  | NOT dst -> emit_not b dst
   | NOP -> buf_int8 b 0x90
   | OR (src, dst) -> emit_OR b dst src
   | PAUSE -> emit_pause b

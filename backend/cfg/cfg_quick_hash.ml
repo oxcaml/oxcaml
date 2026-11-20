@@ -42,6 +42,7 @@ let operation : Operation.t -> int =
   | Name_for_debugger _ -> 31
   | Alloc _ -> 32
   | Const_mask _ -> 33
+  | Thread_self_id -> 34
 
 let basic : Cfg.basic -> int = function
   | Op op -> operation op

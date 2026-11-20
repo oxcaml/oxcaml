@@ -76,6 +76,8 @@ module type Code_metadata_accessors_result_type = sig
 
   val dbg : 'a t -> Debuginfo.t
 
+  val fdo_entry_annotation : 'a t -> Fdo_annotation.With_body_hash.t
+
   val is_tupled : 'a t -> bool
 
   val is_my_closure_used : 'a t -> bool
@@ -119,6 +121,7 @@ type 'a create_type =
   cost_metrics:Cost_metrics.t ->
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
+  fdo_entry_annotation:Fdo_annotation.With_body_hash.t ->
   is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
@@ -152,6 +155,8 @@ val with_is_tupled : bool -> t -> t
 val with_result_types : Result_types.t Or_unknown_or_bottom.t -> t -> t
 
 val with_inlining_decision : Function_decl_inlining_decision_type.t -> t -> t
+
+val with_fdo_entry_annotation : Fdo_annotation.With_body_hash.t -> t -> t
 
 val print : Format.formatter -> t -> unit
 

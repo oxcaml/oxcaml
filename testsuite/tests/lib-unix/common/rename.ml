@@ -5,6 +5,8 @@
    bytecode;
  }{
    native;
+ }{
+   jsir;
  }
 *)
 

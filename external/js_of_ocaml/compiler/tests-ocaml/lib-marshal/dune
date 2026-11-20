@@ -4,7 +4,7 @@
  (build_if
   (and
    (>= %{ocaml_version} 5.2)
-   (not %{oxcaml_supported})))
+   (not %{ocaml-config:ox})))
  (modes js wasm))
 
 (tests

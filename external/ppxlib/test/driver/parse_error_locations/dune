@@ -3,4 +3,5 @@
  (libraries ppxlib))
 
 (cram
+ (package ppxlib)
  (deps identity_standalone.exe))

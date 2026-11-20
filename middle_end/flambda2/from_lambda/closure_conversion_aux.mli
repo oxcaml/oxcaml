@@ -75,6 +75,7 @@ module IR : sig
       exn_continuation : exn_continuation;
       loc : Lambda.scoped_location;
       region_close : Lambda.region_close;
+      yielding : Lambda.yielding_kind;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
       mode : Lambda.return_mode;
@@ -380,6 +381,7 @@ module Function_decls : sig
       body:(Acc.t -> Env.t -> Acc.t * Flambda.Import.Expr.t) ->
       attr:Lambda.function_attribute ->
       loc:Lambda.scoped_location ->
+      fdo_entry_annotation:Fdo_annotation.With_body_hash.t ->
       free_idents_of_body:Ident.Set.t ->
       Recursive.t ->
       closure_alloc_mode:Lambda.locality_mode ->
@@ -440,6 +442,10 @@ module Function_decls : sig
     val cohort : t -> Cohort_id.t option
 
     val loc : t -> Lambda.scoped_location
+
+    (** The counters of the entry edge of the function's code and its body hash
+        (see [Fdo_from_lambda_env]), empty if it has no FDO identity. *)
+    val fdo_entry_annotation : t -> Fdo_annotation.With_body_hash.t
 
     val recursive : t -> Recursive.t
 

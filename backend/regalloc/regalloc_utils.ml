@@ -100,7 +100,7 @@ let validator_debug = bool_of_param "VALIDATOR_DEBUG"
 
 let block_temporaries = bool_of_param "BLOCK_TEMPORARIES"
 
-let affinity = bool_of_param "AFFINITY"
+let affinity = bool_of_param "AFFINITY" ~default:true
 
 let verbose : bool Param.t = bool_of_param "VERBOSE"
 

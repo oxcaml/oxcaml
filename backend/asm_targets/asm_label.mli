@@ -47,7 +47,8 @@
 type t
 
 (** Create a fresh integer-valued label (using the [new_label] function passed
-    to [initialize], below). *)
+    to [initialize], below; or [new_dwarf_label] for a label in a DWARF
+    section). *)
 val create : Asm_section.t -> t
 
 (** Create an integer-valued label. The int must be positive.
@@ -83,9 +84,14 @@ val encode : t -> string
 val to_local_symbol : t -> Asm_symbol.t
 
 (** To be called by the emitter at the very start of code generation.
-    [new_label] should always be [Cmm.new_label]. Needed to avoid a circular
-    dependency. *)
-val initialize : new_label:(unit -> int) -> unit
+    [new_label] should always be [Cmm.new_label] and [new_dwarf_label] should
+    always be [Label.new_dwarf_label]. Needed to avoid a circular dependency. *)
+val initialize :
+  new_label:(unit -> int) -> new_dwarf_label:(unit -> int) -> unit
+
+(* CR-someday mshinwell: the functions given to [initialize] should return
+   abstract types of labels instead of [int]. That requires [Label] (or its two
+   counters) to live in a library that this one can depend on. *)
 
 (** Which section a label is in. *)
 val section : t -> Asm_section.t

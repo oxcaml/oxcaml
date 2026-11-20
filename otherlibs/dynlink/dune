@@ -91,6 +91,8 @@
   debug
   language_extension_kernel
   language_extension
+  json
+  action_trace
   profile
   consistbl
   terminfo
@@ -174,7 +176,7 @@
   mtype
   debuginfo
   static_label
-  slambdaident
+  layout_ident
   cohort_id
   lambda
   mixed_product_bytes
@@ -257,6 +259,10 @@
 (copy_files ../../utils/debug.ml)
 
 (copy_files ../../utils/language_extension_kernel.ml)
+
+(copy_files ../../utils/json.ml)
+
+(copy_files ../../utils/action_trace.ml)
 
 (copy_files ../../utils/profile.ml)
 
@@ -413,7 +419,7 @@
 
 (copy_files ../../lambda/static_label.ml)
 
-(copy_files ../../lambda/slambdaident.ml)
+(copy_files ../../lambda/layout_ident.ml)
 
 (copy_files ../../lambda/cohort_id.ml)
 
@@ -468,6 +474,10 @@
 (copy_files ../../utils/debug.mli)
 
 (copy_files ../../utils/language_extension_kernel.mli)
+
+(copy_files ../../utils/json.mli)
+
+(copy_files ../../utils/action_trace.mli)
 
 (copy_files ../../utils/profile.mli)
 
@@ -621,7 +631,7 @@
 
 (copy_files ../../lambda/static_label.mli)
 
-(copy_files ../../lambda/slambdaident.mli)
+(copy_files ../../lambda/layout_ident.mli)
 
 (copy_files ../../lambda/cohort_id.mli)
 
@@ -751,6 +761,8 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Numbers.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Clflags.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Warnings.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Json.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Action_trace.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Profile.cmo
   ; .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Profile_counters_functions.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Debug.cmo
@@ -796,6 +808,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Current_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_recovery.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scalar.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Primitive.cmo
@@ -814,7 +827,6 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_recovery.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
@@ -834,7 +846,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Cmt_format.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_recovery_state.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Slambdaident.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Layout_ident.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mixed_product_bytes.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_properties.cmo
@@ -894,6 +906,8 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Numbers.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Clflags.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Warnings.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Json.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Action_trace.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Profile.cmx
   ; .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Profile_counters_functions.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Debug.cmx
@@ -939,6 +953,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Current_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_recovery.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scalar.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Primitive.cmx
@@ -957,7 +972,6 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_recovery.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
@@ -977,7 +991,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Cmt_format.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_recovery_state.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Slambdaident.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Layout_ident.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mixed_product_bytes.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_properties.cmx

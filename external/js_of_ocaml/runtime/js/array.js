@@ -448,3 +448,13 @@ function caml_makearray_dynamic_scannable_unboxed_product(
   for (var i = 0; i < size; i++) b[i + 1] = init[1 + (i % num_components)];
   return b;
 }
+
+//Provides: caml_check_idx_base
+//Requires: caml_failwith
+//Version: >= 5.2
+//If: oxcaml
+function caml_check_idx_base(base) {
+  if (base === null)
+    caml_failwith("External ptrs are unimplemented in JavaScript");
+  return base;
+}

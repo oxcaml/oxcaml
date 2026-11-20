@@ -58,10 +58,10 @@ type t =
   | Note_gnu_stack
   | Debuginfo_strings
   | Frametable_piece of
-      { link_symbol : string;
+      { unit_symbol : string;
+        link_symbol : string;
         group : string option
       }
-  | Frametable_count of { link_symbol : string }
   | Custom of
       { names : string list;
         flags : string option;
@@ -94,8 +94,7 @@ let is_delayed = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
   | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
-  | Note_gnu_stack | Debuginfo_strings | Frametable_piece _ | Frametable_count _
-    ->
+  | Note_gnu_stack | Debuginfo_strings | Frametable_piece _ ->
     false
   | Custom { is_delayed; _ } -> is_delayed
 
@@ -127,12 +126,11 @@ let print ppf t =
     | Note_ocaml_eh -> "Note_ocaml_eh"
     | Note_gnu_stack -> "Note_gnu_stack"
     | Debuginfo_strings -> "Debuginfo_strings"
-    | Frametable_piece { link_symbol; group = None } ->
-      Printf.sprintf "(Frametable_piece -> %s)" link_symbol
-    | Frametable_piece { link_symbol; group = Some group } ->
-      Printf.sprintf "(Frametable_piece -> %s in %s)" link_symbol group
-    | Frametable_count { link_symbol } ->
-      Printf.sprintf "(Frametable_count -> %s)" link_symbol
+    | Frametable_piece { unit_symbol; link_symbol; group = None } ->
+      Printf.sprintf "(Frametable_piece %s -> %s)" unit_symbol link_symbol
+    | Frametable_piece { unit_symbol; link_symbol; group = Some group } ->
+      Printf.sprintf "(Frametable_piece %s -> %s in %s)" unit_symbol link_symbol
+        group
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
@@ -157,7 +155,7 @@ let section_is_text = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
   | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack
-  | Debuginfo_strings | Frametable_piece _ | Frametable_count _ ->
+  | Debuginfo_strings | Frametable_piece _ ->
     false
   | Custom { flags; _ } -> (
     (* Check if the section is executable based on flags *)
@@ -290,16 +288,19 @@ let details t first_occurrence =
       (* "aMS" = SHF_ALLOC | SHF_MERGE | SHF_STRINGS; de-duped by linker *)
       [".rodata.str1.1"], Some "aMS", [progbits arch; "1"]
     (* 1 = characters *)
-    | ( (Frametable_piece _ | Frametable_count _),
+    | ( Frametable_piece _,
         _,
         (MacOS_like | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin) ) ->
       Misc.fatal_error "Frametable sections are only supported on ELF targets"
     (* "ao" = SHF_ALLOC | SHF_LINK_ORDER; the linker drops the section together
-       with the section defining [link_symbol]. The names are C identifiers, so
-       that these sections have start and stop symbols. *)
-    | Frametable_piece { link_symbol; group = None }, arch, _ ->
-      ["caml_frametable_pieces"], Some "ao", [progbits arch; link_symbol]
-    | Frametable_piece { link_symbol; group = Some group }, arch, _ ->
+       with the section defining [link_symbol]. The name is a C identifier, so
+       that the unit's pieces have start and stop symbols. *)
+    | Frametable_piece { unit_symbol; link_symbol; group = None }, arch, _ ->
+      ( ["caml_frametable_pieces" ^ unit_symbol],
+        Some "ao",
+        [progbits arch; link_symbol] )
+    | Frametable_piece { unit_symbol; link_symbol; group = Some group }, arch, _
+      ->
       (* "G" adds SHF_GROUP. *)
       let args =
         match Config.link_order_group_syntax with
@@ -309,9 +310,9 @@ let details t first_occurrence =
           Misc.fatal_error
             "The assembler does not support frametable pieces in groups"
       in
-      ["caml_frametable_pieces"], Some "aoG", progbits arch :: args
-    | Frametable_count { link_symbol }, arch, _ ->
-      ["caml_frametable_counts"], Some "ao", [progbits arch; link_symbol]
+      ( ["caml_frametable_pieces" ^ unit_symbol],
+        Some "aoG",
+        progbits arch :: args )
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in

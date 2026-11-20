@@ -2,6 +2,7 @@
    flambda2;
    flags += "-flambda2-reaper";
    { native; }
+   { jsir; }
  *)
 
 type 'a t = A : (int -> int) t | B : int ref t

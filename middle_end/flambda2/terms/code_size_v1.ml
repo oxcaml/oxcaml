@@ -393,6 +393,7 @@ let nullary_prim_size prim =
   | Dls_get -> 1
   | Tls_get -> 1
   | Domain_index -> 1
+  | Thread_self_id -> 1
   | Poll | Cpu_relax -> alloc_size
 
 let unary_prim_size ~machine_width prim =

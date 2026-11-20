@@ -15,24 +15,38 @@
 
 (* Backends of the OCaml compiler and their properties *)
 
-type t = Native | Bytecode
+type t = Native | Bytecode | Jsir_js | Jsir_wasm
 
 let is_bytecode t = t=Bytecode
 
 let is_native t = t=Native
 
+let is_jsir = function
+  | Jsir_js | Jsir_wasm -> true
+  | Native | Bytecode -> false
+
 let string_of_backend = function
   | Native -> "native"
   | Bytecode -> "bytecode"
+  | Jsir_js -> "jsir-js"
+  | Jsir_wasm -> "jsir-wasm"
 
-(* Creates a function that returns its first argument for Bytecode           *)
-(* and its second argument for Native code                                   *)
-let make_backend_function bytecode_value native_value = function
-  | Bytecode -> bytecode_value
-  | Native -> native_value
+let module_extension = function
+  | Bytecode -> "cmo"
+  | Native -> "cmx"
+  | Jsir_js -> "cmjx"
+  | Jsir_wasm -> "cmwx"
 
-let module_extension = make_backend_function "cmo" "cmx"
+let library_extension = function
+  | Bytecode -> "cma"
+  | Native -> "cmxa"
+  | Jsir_js -> "cmjxa"
+  | Jsir_wasm -> "cmwxa"
 
-let library_extension = make_backend_function "cma" "cmxa"
-
-let executable_extension = make_backend_function "byte" "opt"
+let executable_extension = function
+  | Bytecode -> "byte"
+  | Native -> "opt"
+  | Jsir_js -> "js"
+  (* wasm_of_ocaml programs are run through a JavaScript wrapper, which loads
+     the WebAssembly code from a directory next to it. *)
+  | Jsir_wasm -> "js"

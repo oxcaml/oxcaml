@@ -59,16 +59,16 @@ type t =
   | Note_gnu_stack
   | Debuginfo_strings  (** Mergeable string section for debuginfo strings *)
   | Frametable_piece of
-      { link_symbol : string;
+      { unit_symbol : string;
+        link_symbol : string;
         group : string option
       }
       (** Frame descriptors linked (SHF_LINK_ORDER) to the section defining the
           already-encoded [link_symbol], for [-frametable-sections] (ELF only).
-          With a [group], the piece is also a member of that COMDAT group, so it
-          is discarded along with a losing copy of the group's code. *)
-  | Frametable_count of { link_symbol : string }
-      (** A unit's count of its frame descriptors, linked like a
-          [Frametable_piece] *)
+          [unit_symbol] names the section after the compilation unit: it must be
+          a C identifier that no other unit has. With a [group], the piece is
+          also a member of that COMDAT group, so it is discarded along with a
+          losing copy of the group's code. *)
   | Custom of
       { names : string list;
         flags : string option;

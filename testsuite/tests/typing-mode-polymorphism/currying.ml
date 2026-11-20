@@ -61,8 +61,9 @@ Error: This value is "local" but is expected to be "global".
 let bar (x @ once) =
   fst x
 [%%expect{|
-val bar : 'a @ [< 'm & global > once] -> 'b @ 'n -> 'a @ [> 'm | once] =
-  <fun>
+val bar :
+  'a @ [< 'm & global > once] ->
+  ('b @ 'n -> 'a @ [> 'm | once]) @ [> close('m) | once dynamic] = <fun>
 |}]
 
 let bar (x @ unique) =
@@ -291,7 +292,7 @@ Error: The value "bar1" is "nonportable"
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
 val nest :
-  'a @ [< 'm & global] -> unit @ 'p -> unit @ 'o -> unit @ 'n -> 'a @ [> 'm] =
+  'a @ [< 'm & global] -> unit @ 'n -> unit @ 'o -> unit @ 'p -> 'a @ [> 'm] =
   <fun>
 |}]
 

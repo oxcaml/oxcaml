@@ -184,6 +184,8 @@ let tag_anonymous_function = "L" (* lambda *)
 
 let tag_partial_function = "P"
 
+let tag_stamp = "D"
+
 type 'cu path_item =
   | Compilation_unit of 'cu
   | Inline_marker
@@ -193,6 +195,7 @@ type 'cu path_item =
   | Function of string
   | Anonymous_function of int * int * string option
   | Partial_function of int * int * string option
+  | Stamp of int
 
 type 'cu path = 'cu path_item list
 
@@ -221,6 +224,11 @@ let mangle_path_item buf path_item =
     tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_anonymous_function
   | Partial_function (line, col, file_opt) ->
     tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_partial_function
+  | Stamp n ->
+    (* A decimal number cannot be length-prefixed like an identifier (the two
+       would run together), so it is terminated by [_] instead, which cannot
+       start an item. *)
+    Printf.bprintf buf "%s%d_" tag_stamp n
 
 let mangle_path buf path = List.iter (mangle_path_item buf) path
 
@@ -397,19 +405,19 @@ module Parse = struct
       Some (tag_constructor decoded, l)
     in
     let len = String.length sym in
+    (* Inverse of the [Stamp] case of [mangle_path_item]: a decimal number
+       followed by its [_] terminator. *)
+    let parse_stamp pos tag_constructor =
+      Option.bind (undecimal sym pos) @@ fun (n, l) ->
+      if pos + l < len && Char.equal sym.[pos + l] '_'
+      then Some (tag_constructor n, l + 1)
+      else None
+    in
     Option.bind (matched_prefix_len sym) @@ fun start_pos ->
     let rec loop path pos =
       let aux parse_fun tag_constructor =
         Option.bind (parse_fun (pos + 1) tag_constructor) @@ fun (it, l) ->
         loop (it :: path) (pos + 1 + l)
-      and build_result () =
-        if pos = start_pos
-        then None
-        else
-          let suffix =
-            if pos < len then String.sub sym pos (len - pos) else ""
-          in
-          Some (List.rev path, suffix)
       in
       if pos < len
       then
@@ -421,10 +429,12 @@ module Parse = struct
         | 'L' -> aux parse_loc (fun l c f -> Anonymous_function (l, c, f))
         | 'S' -> aux parse_loc (fun l c f -> Anonymous_module (l, c, f))
         | 'P' -> aux parse_loc (fun l c f -> Partial_function (l, c, f))
+        | 'D' -> aux parse_stamp (fun n -> Stamp n)
         | 'I' -> loop (Inline_marker :: path) (pos + 1)
-        | '_' -> build_result ()
         | _ -> None
-      else build_result ()
+      else if pos = start_pos
+      then None
+      else Some (List.rev path)
     in
     loop [] start_pos
 end

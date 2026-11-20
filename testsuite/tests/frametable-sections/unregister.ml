@@ -7,10 +7,10 @@
  native;
 *)
 
-(* Unregister and reregister the frametables of this unit and [Mixed_lib],
-   which share one pieces section. The stub checks that the pieces stay in the
-   runtime's table for as long as any table that refers to them is registered,
-   and leave with the last one. Afterwards a major GC scans a deep stack. *)
+(* Unregister and reregister, one at a time, the frametables of this unit and
+   [Mixed_lib]. The stub checks that each table takes its own unit's pieces out
+   of the runtime's table and leaves the other units'. Afterwards a major GC
+   scans a deep stack. *)
 
 external unregister_and_reregister : unit -> int = "frametable_unregister_test"
 
