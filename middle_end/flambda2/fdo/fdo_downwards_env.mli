@@ -31,16 +31,20 @@
 
 type t
 
-(** At the unit toplevel, or for terms whose counters are already in the current
-    copy context. *)
+(** At the unit toplevel. *)
 val none : t
 
 val enter_set_of_closures : t -> inlined_debuginfo:Inlined_debuginfo.t -> t
 
 (** For the body of an inlined function. The call site's counter already carries
-    the copy context of the function the call is in. *)
+    the copy context of the function the call is in, unless [called_code] is the
+    code of a set being simplified (see [add_copied_code]). *)
 val enter_inlined_apply :
-  called_code:Code.t -> callsite_counter:Fdo_counter.t option -> t
+  t -> called_code:Code.t -> callsite_counter:Fdo_counter.t option -> t
+
+(** For terms whose counters are already in the current copy context. Also
+    clears the stub callsite counter. *)
+val clear_copy_context : t -> t
 
 (** If we are in the body of an inlined stub, this returns the counter of the
     call it was inlined at. The calls of the stub with no counter of their own
@@ -50,9 +54,12 @@ val enter_inlined_apply :
     application wrapper, which has the counter of the partial application). *)
 val stub_callsite_counter : t -> Fdo_counter.t option
 
-(** The FDO counters of the code of a function of a set of closures met where
-    [t] is, renamed (see [Fdo_counter.specialize]) if the set is a copy so that
-    they are not conflated with the original's or other copies'. To be applied
-    once per copy, before its code is simplified. *)
-val specialize_counters_of_copied_code :
-  t -> inlined_debuginfo:Inlined_debuginfo.t -> Code.t -> Code.t
+(** Record that the code bound under [code_id] (the new code id of a function of
+    the set of closures being simplified) is a copy made where [t] is, with the
+    original's counters. *)
+val add_copied_code : t -> Code_id.t -> t
+
+(** A counter of the code being simplified, renamed if that code is a copy (see
+    [Fdo_counter.specialize]) so that it is not conflated with the original's or
+    other copies'. *)
+val specialize_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t

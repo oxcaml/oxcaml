@@ -687,7 +687,7 @@ let set_inlined_debuginfo t ~from =
 let clear_inlined_debuginfo t =
   { t with
     inlined_debuginfo = Inlined_debuginfo.none;
-    fdo = Fdo_downwards_env.none
+    fdo = Fdo_downwards_env.clear_copy_context t.fdo
   }
 
 let inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
@@ -719,15 +719,15 @@ let merge_inlined_debuginfo_and_forward_inlined_attribute t ~from_apply_expr
 let add_inlined_debuginfo t dbg =
   Inlined_debuginfo.rewrite t.inlined_debuginfo dbg
 
-let inline_fdo_counter t counter =
-  Inlined_debuginfo.inline_fdo_counter t.inlined_debuginfo counter
+let rewrite_fdo_counter t counter =
+  Inlined_debuginfo.inline_fdo_counter t.inlined_debuginfo
+    (Fdo_downwards_env.specialize_fdo_counter t.fdo counter)
 
-let inline_fdo_annotation t annotation =
-  Fdo_annotation.map (inline_fdo_counter t) annotation
+let rewrite_fdo_annotation t annotation =
+  Fdo_annotation.map (rewrite_fdo_counter t) annotation
 
-let specialize_fdo_counters_of_copied_code t code =
-  Fdo_downwards_env.specialize_counters_of_copied_code t.fdo
-    ~inlined_debuginfo:t.inlined_debuginfo code
+let add_fdo_copied_code t code_id =
+  { t with fdo = Fdo_downwards_env.add_copied_code t.fdo code_id }
 
 let fdo_stub_callsite_counter t = Fdo_downwards_env.stub_callsite_counter t.fdo
 
@@ -774,7 +774,7 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   { t with
     inlined_debuginfo;
     fdo =
-      Fdo_downwards_env.enter_inlined_apply ~called_code
+      Fdo_downwards_env.enter_inlined_apply t.fdo ~called_code
         ~callsite_counter:(Apply.callsite_counter apply);
     inlined_attribute_to_forward;
     inlining_state;

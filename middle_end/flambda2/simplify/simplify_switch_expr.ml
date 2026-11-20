@@ -875,7 +875,7 @@ let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
   let action = AC.with_debuginfo action ~dbg in
   let annotations =
     Branch_annotations.map_fdo_annotation annotations
-      ~f:(DE.inline_fdo_annotation (DA.denv dacc))
+      ~f:(DE.rewrite_fdo_annotation (DA.denv dacc))
   in
   let dacc =
     DA.map_flow_acc dacc
@@ -1064,7 +1064,7 @@ let simplify_switch dacc switch ~down_to_up =
     (* The arm's edge disappears with the switch. *)
     let dacc =
       DA.add_dropped_fdo_counters dacc ~reason:Switch_to_single_arm
-        (DE.inline_fdo_annotation denv_at_use
+        (DE.rewrite_fdo_annotation denv_at_use
            (Branch_annotations.fdo_annotation (Switch_arm.annotations arm)))
     in
     Simplify_apply_cont_expr.simplify_apply_cont dacc (Switch_arm.action arm)
