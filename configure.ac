@@ -3556,6 +3556,18 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_AVX512BF16]) has_avx512bf16=yes, [])
 
+AC_SUBST([has_vpclmulqdq])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("vpclmulqdq")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_VPCLMULQDQ]) has_vpclmulqdq=yes, [])
+
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
 

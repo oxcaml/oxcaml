@@ -625,6 +625,8 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-fvpclmulqdq";
+    "-fno-vpclmulqdq";
     "-faes";
     "-fno-aes";
     "-fcssc";

@@ -158,7 +158,7 @@ let select_operation_clmul ~dbg:_ op args =
     match op with
     | "caml_clmul_int64x2" ->
       let i, args = extract_constant args ~max:31 op in
-      sse_or_avx pclmulqdq vpclmulqdq ~i args
+      sse_or_avx pclmulqdq vpclmulqdq_X_X_Xm128 ~i args
     | _ -> None
 
 let select_operation_popcnt ~dbg:_ op args =

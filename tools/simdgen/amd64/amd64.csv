@@ -1524,6 +1524,10 @@ PAUSE,F3 90,,NA,NA,NA,NA
 "VPBLENDW ymm1, ymm2, ymm3/m256, imm8",VEX.NDS.256.66.0F3A.WIG 0E /r ib,AVX2,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),imm8
 "PCLMULQDQ xmm1, xmm2/m128, imm8",66 0F 3A 44 /r ib,PCLMULQDQ,"ModRM:reg (r, w)",ModRM:r/m (r),imm8,NA
 "VPCLMULQDQ xmm1, xmm2, xmm3/m128, imm8",VEX.NDS.128.66.0F3A.WIG 44 /r ib,PCLMULQDQ AVX,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),imm8
+"VPCLMULQDQ ymm1, ymm2, ymm3/m256, imm8",VEX.NDS.256.66.0F3A.WIG 44 /r ib,VPCLMULQDQ AVX,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),imm8
+"VPCLMULQDQ xmm1, xmm2, xmm3/m128, imm8",EVEX.NDS.128.66.0F3A.WIG 44 /r ib,AVX512VL VPCLMULQDQ,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),imm8
+"VPCLMULQDQ ymm1, ymm2, ymm3/m256, imm8",EVEX.NDS.256.66.0F3A.WIG 44 /r ib,AVX512VL VPCLMULQDQ,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),imm8
+"VPCLMULQDQ zmm1, zmm2, zmm3/m512, imm8",EVEX.NDS.512.66.0F3A.WIG 44 /r ib,AVX512F VPCLMULQDQ,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),imm8
 "PCMPEQB mm,mm/m64",NP 0F 74 /r,MMX,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA
 "PCMPEQB xmm1,xmm2/m128",66 0F 74 /r,SSE2,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA
 "PCMPEQW mm,mm/m64",NP 0F 75 /r,MMX,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA

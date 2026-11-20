@@ -95,7 +95,7 @@ let parse_intrinsics path =
 let baseline_exts = ["AVX512F"; "AVX512DQ"; "AVX512CD"; "AVX512BW"; "AVX512VL"]
 
 (* Tests of these check for host support at runtime, see [test_guard]. *)
-let optional_exts = ["AVX512_BF16"]
+let optional_exts = ["AVX512_BF16"; "VPCLMULQDQ"]
 
 let in_scope i =
   i.cpuid <> []
