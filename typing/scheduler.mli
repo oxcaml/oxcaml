@@ -35,6 +35,12 @@ module Monitor : sig
       [with_] must not raise, and must return exceptions it doesn't recognise
       unchanged. *)
   val try_ : (unit -> 'a) -> with_:(exn -> exn) -> 'a
+
+  (** [with_] returns [recoverable e] when [e] has already been reported, so
+      can be recovered from. A job recovers by being abandoned: [e] escapes no
+      further. [body] itself has no result to recover with, so [try_] raises
+      [e]. *)
+  val recoverable : exn -> exn
 end
 
 type t

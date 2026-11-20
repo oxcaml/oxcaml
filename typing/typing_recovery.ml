@@ -55,15 +55,6 @@ let log_in ctx exn =
   ctx.has_errors := true;
   match ctx.errors with Some (l, _) -> l := exn :: !l | None -> ()
 
-let monitor body ~with_ =
-  let ctx = current_context () in
-  Scheduler.Monitor.try_ body ~with_:(fun e ->
-      match with_ e with
-      | Some exn ->
-          log_in ctx exn;
-          exn
-      | None -> e)
-
 let catch_errors caught f =
   let e = !ref_errors in
   ref_errors := Some (caught, RawTypeHash.create 3);
@@ -80,6 +71,17 @@ let register_recoverable handler =
 
 let is_recoverable exn =
   List.exists (fun handler -> handler exn) !ref_recoverable_handlers
+
+let monitor body ~with_ =
+  let ctx = current_context () in
+  Scheduler.Monitor.try_ body ~with_:(fun e ->
+      match with_ e with
+      | Some exn ->
+          log_in ctx exn;
+          if Option.is_some ctx.errors && is_recoverable exn
+          then Scheduler.Monitor.recoverable exn
+          else exn
+      | None -> e)
 
 let erroneous_type_check te =
   let te = Types.Transient_expr.coerce te in
