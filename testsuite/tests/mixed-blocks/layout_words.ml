@@ -1,6 +1,11 @@
 (* TEST
  include ocamlcommon;
  include ocamloptcomp;
+ {
+   native;
+ }{
+   bytecode;
+ }
 *)
 
 (* Check the compiler's encoder for layout blocks,

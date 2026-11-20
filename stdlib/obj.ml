@@ -42,16 +42,25 @@ external tag : t @ contended -> int @@ portable = "caml_obj_tag" [@@noalloc]
    restriction is likely not respected by callees of this module. *)
 external size : t @ contended -> int @@ portable = "%obj_size"
 external opaque_identity_contended : 'a @ contended -> 'a @ contended @@ portable = "%opaque"
-external get_header : t @ contended -> nativeint @@ portable = "%get_header"
-external nativeint_lsr : nativeint -> int -> nativeint @@ portable
-  = "%nativeint_lsr"
-external nativeint_to_int : nativeint -> int @@ portable = "%nativeint_to_int"
+external box_int64 : int64_u -> int64 @@ portable = "%box_int64"
+external unbox_int64 : int64 -> int64_u @@ portable = "%unbox_int64"
+external unsafe_get_int64_field : t -> int64_u -> int64_u @@ portable
+  = "%get_idx"
+external unsafe_get_int64_field_contended :
+  t @ contended -> int64_u -> int64_u @@ portable = "%get_idx"
 (* The number of words before a block's first field. In native code, a block
-   starts with a layout word if the top bit of its header is set. *)
+   starts with a layout word if the top bit of its header is set. The header
+   is read as the word before the block: "%get_header" can't be used, as this
+   file is also compiled for backends which don't have it. *)
 let [@inline always] layout_word_size t =
   match Sys.backend_type with
   | Native ->
-    nativeint_to_int (nativeint_lsr (get_header t) (Sys.word_size - 1))
+    let header_offset = Int64.of_int (- (Sys.word_size / 8)) in
+    let header =
+      box_int64
+        (unsafe_get_int64_field_contended t (unbox_int64 header_offset))
+    in
+    Int64.to_int (Int64.shift_right_logical header (Sys.word_size - 1))
   | Bytecode | Other _ -> 0
 let [@inline always] size t =
   let t = opaque_identity_contended t in
@@ -77,10 +86,6 @@ let [@inline always] double_field x i =
   floatarray_get (obj x : floatarray) (i + layout_word_size x)
 let [@inline always] set_double_field x i v =
   floatarray_set (obj x : floatarray) (i + layout_word_size x) v
-external box_int64 : int64_u -> int64 @@ portable = "%box_int64"
-external unbox_int64 : int64 -> int64_u @@ portable = "%unbox_int64"
-external unsafe_get_int64_field : t -> int64_u -> int64_u @@ portable
-  = "%get_idx"
 external unsafe_set_int64_field : t -> int64_u -> int64_u -> unit @@ portable
   = "%set_idx"
 external raw_field_bytecode : t -> int -> raw_data @@ portable

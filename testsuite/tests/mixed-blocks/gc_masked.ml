@@ -1,6 +1,12 @@
 (* TEST
  modules = "gc_masked_stubs.c";
- native;
+ {
+   native;
+ }{
+   multicore;
+   arguments = "3000 domains";
+   native;
+ }
 *)
 
 (* Push blocks with scan masks through the garbage collector: minor
@@ -108,6 +114,8 @@ let () =
   check_all n;
   deep 100_000;
   check_all n;
-  alloc_during_compactions ();
+  (* Only where a second domain can be had: see the test header. *)
+  if Array.length Sys.argv > 2 && String.equal Sys.argv.(2) "domains"
+  then alloc_during_compactions ();
   check_all n;
   print_endline "OK"

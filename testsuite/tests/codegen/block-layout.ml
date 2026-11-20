@@ -18,8 +18,8 @@ let sum_loop (a : int array) =
 [%%expect_asm X86_64{|
 sum_loop:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   orq   $1, %rdi
   leaq  -2(%rdi), %rsi
   cmpq  $1, %rsi
@@ -59,8 +59,8 @@ let get_mid (a : int array) i =
 [%%expect_asm X86_64{|
 get_mid:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax

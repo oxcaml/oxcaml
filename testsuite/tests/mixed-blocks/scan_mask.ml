@@ -1,5 +1,10 @@
 (* TEST
  modules = "scan_mask_stubs.c";
+ {
+   native;
+ }{
+   bytecode;
+ }
 *)
 
 (* Check the runtime's block-scannability iterator (caml/scan_mask.h)
