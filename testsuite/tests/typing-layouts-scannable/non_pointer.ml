@@ -474,10 +474,6 @@ Line 2, characters 73-74:
 2 | module M (X : sig type t : any end) : sig type t : any non_pointer end = X
                                                                              ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : any non_pointer end
        Type declarations do not match:
          type t = X.t
        is not included in
@@ -508,10 +504,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value non_pointer) t = int
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a : value non_pointer) t = int end
-       is not included in
-         sig type 'a t end
        Type declarations do not match:
          type ('a : value non_pointer) t = int
        is not included in
@@ -535,10 +527,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = t_maybeptr_val
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = t_maybeptr_val end
-       is not included in
-         sig type ('a : value non_pointer) t : value non_pointer end
        Type declarations do not match:
          type 'a t = t_maybeptr_val
        is not included in
@@ -695,10 +683,6 @@ Lines 5-9, characters 6-3:
 8 |   and s
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type r = { r : #(t * s); } and t and s end
-       is not included in
-         sig type r = { r : #(t * s); } and t : value non_pointer and s end
        Type declarations do not match:
          type t
        is not included in

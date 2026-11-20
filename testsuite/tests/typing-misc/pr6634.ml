@@ -15,10 +15,6 @@ Lines 3-5, characters 0-3:
 4 |   type t = [`T of t]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = [ `T of t ] end
-       is not included in
-         sig type t = [ `T of t ] end
        Type declarations do not match:
          type t = [ `T of t/2 ]
        is not included in

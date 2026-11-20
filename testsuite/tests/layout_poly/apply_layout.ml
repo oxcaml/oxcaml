@@ -45,14 +45,7 @@ Lines 3-5, characters 6-3:
 4 |   let g = M.f
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val g : 'a -> 'b -> unit end
-       is not included in
-         sig val g : int end
-       Values do not match:
-         val g : 'a -> 'b -> unit
-       is not included in
-         val g : int
+       The value "g" does not match its expected declaration
        The type "'a -> 'b -> unit" is not compatible with the type "int"
 |}]
 
@@ -115,15 +108,8 @@ Lines 5-7, characters 6-3:
 6 |   let g = M.f 42
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val g : '_weak1 -> unit end
-       is not included in
-         sig val poly_ g : 'b -> unit end
-       Values do not match:
-         val g : '_weak1 -> unit
-       is not included in
-         val poly_ g : 'b -> unit
-       The type "'_weak1 -> unit" is not compatible with the type "'a -> unit"
+       The value "g" does not match its expected declaration
+       The type "'_weak1 -> ..." is not compatible with the type "'a -> ..."
        Type "'_weak1" is not compatible with type "'a"
 |}]
 

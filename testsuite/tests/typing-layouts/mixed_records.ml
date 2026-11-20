@@ -68,10 +68,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { a : float; b : float#; }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { a : float; b : float#; } end
-       is not included in
-         sig type t = { a : float; b : float#; } end
        Type declarations do not match:
          type t = { a : float; b : float#; }
        is not included in
@@ -91,10 +87,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { a : float; b : float#; } [@@flatten_floats]
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { a : float; b : float#; } end
-       is not included in
-         sig type t = { a : float; b : float#; } end
        Type declarations do not match:
          type t = { a : float; b : float#; }
        is not included in
@@ -363,10 +355,6 @@ Lines 5-9, characters 6-3:
 8 |   let t = { u = 3.0; f = #4.0 }
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type u = float type t = { u : float; f : float#; } val t : t end
-       is not included in
-         sig type u type t = { u : u; f : float#; } val t : t end
        Type declarations do not match:
          type t = { u : float; f : float#; }
        is not included in

@@ -170,15 +170,8 @@ Line 6, characters 8-9:
 6 |   end = M
             ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val g : layout_ l. ('a : l addressable). 'a -> 'a end
-       is not included in
-         sig val poly_ g : 'a -> 'a end
-       Values do not match:
-         val g : layout_ l. ('a : l addressable). 'a -> 'a
-       is not included in
-         val poly_ g : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "g" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is <genvar> addressable
          because of the definition of g at line 5, characters 4-41.
        But the kind of 'a must be a subkind of <genvar> addressable
@@ -198,18 +191,8 @@ Line 6, characters 8-9:
 6 |   end = M
             ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b end
-       is not included in
-         sig
-           val g :
-             ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
-         end
-       Values do not match:
-         val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b
-       is not included in
-         val g : ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
-       The type "'a -> 'b" is not compatible with the type "'a -> 'c"
+       The value "g" does not match its expected declaration
+       The type "... -> 'a" is not compatible with the type "... -> 'b"
        The layout of 'a is bits8 addressable
          because of the definition of g at line 5, characters 4-71.
        But the layout of 'a must be a sublayout of bits8

@@ -99,10 +99,6 @@ Lines 3-5, characters 6-3:
 4 |   type r = { f : float# }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type r = { f : float#; } end
-       is not included in
-         sig type r = { f : float#; } end
        Type declarations do not match:
          type r = { f : float#; }
        is not included in
@@ -122,10 +118,6 @@ Lines 3-5, characters 6-3:
 4 |   type r = { f : float# } [@@represent_as_float_array]
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type r = { f : float#; } end
-       is not included in
-         sig type r = { f : float#; } end
        Type declarations do not match:
          type r = { f : float#; }
        is not included in

@@ -55,15 +55,8 @@ Line 7, characters 6-7:
 7 | end = X
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val should_not_work : 'a -> unit end
-       is not included in
-         sig val should_not_work : 'a -> unit end
-       Values do not match:
-         val should_not_work : 'a -> unit
-       is not included in
-         val should_not_work : 'a -> unit
-       The type "'a -> unit" is not compatible with the type "'b -> unit"
+       The value "should_not_work" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of should_not_work at line 6, characters 2-57.
        But the layout of 'a must be a sublayout of value
@@ -79,10 +72,6 @@ Line 1, characters 73-74:
 1 | module M (X : sig type 'a t end) : sig type ('a : value_or_null) t end = X
                                                                              ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a X.t end
-       is not included in
-         sig type ('a : value_or_null) t end
        Type declarations do not match:
          type 'a t = 'a X.t
        is not included in
@@ -156,15 +145,8 @@ Lines 3-5, characters 6-3:
 4 |   let f (type a) (x : a) = x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-40.
        But the layout of 'a must be a sublayout of value
@@ -183,15 +165,8 @@ Lines 3-5, characters 6-3:
 4 |   let f : 'a. 'a -> 'a = fun x -> x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-40.
        But the layout of 'a must be a sublayout of value
@@ -211,15 +186,8 @@ Lines 3-5, characters 6-3:
 4 |   let f : type a. a -> a = fun x -> x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.
        But the layout of 'a must be a sublayout of value
@@ -239,15 +207,8 @@ Lines 3-5, characters 6-3:
 4 |   let f : type a. a -> a = fun x -> x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.
        But the layout of 'a must be a sublayout of value
@@ -268,15 +229,8 @@ Lines 3-5, characters 6-3:
 4 |   let f : type a. a -> a = fun x -> x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.
        But the layout of 'a must be a sublayout of value

@@ -1876,10 +1876,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t : value_or_null mod everything
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : value_or_null mod everything end
-       is not included in
-         sig type 'a t : (value_or_null mod everything) separable end
        Type declarations do not match:
          type 'a t : value_or_null mod everything
        is not included in

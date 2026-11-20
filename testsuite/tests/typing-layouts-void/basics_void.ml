@@ -179,10 +179,6 @@ Lines 1-3, characters 47-3:
 2 |   type t = A of { mutable x : unit# }
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of { mutable x : unit#; } end
-       is not included in
-         sig type t : immutable_data end
        Type declarations do not match:
          type t = A of { mutable x : unit#; }
        is not included in

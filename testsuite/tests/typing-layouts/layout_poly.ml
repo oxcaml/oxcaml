@@ -132,18 +132,8 @@ Lines 4-6, characters 6-3:
 5 |   external[@layout_poly] id : ('a : any). 'a s -> 'a s = "%identity"
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a s -> 'a s = "%identity"
-             [@@layout_poly]
-         end
-       is not included in
-         sig external id : ('a : any). 'a s -> 'a s = "%identity" end
-       Values do not match:
-         external id : ('a : any). 'a s -> 'a s = "%identity" [@@layout_poly]
-       is not included in
-         external id : ('a : any). 'a s -> 'a s = "%identity"
-       The type "'a s -> 'a s" is not compatible with the type "'b s -> 'b s"
+       The value "id" does not match its expected declaration
+       The type "'a s -> ..." is not compatible with the type "'b s -> ..."
        The layout of 'a is any
          because of the definition of id at line 3, characters 2-54.
        But the layout of 'a must be representable
@@ -171,24 +161,9 @@ Lines 6-9, characters 6-3:
 8 |     ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s = "%identity"
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s
-             = "%identity" [@@layout_poly]
-         end
-       is not included in
-         sig
-           external id : ('b : any). (t_any, 'b) s -> (t_any, 'b) s
-             = "%identity" [@@layout_poly]
-         end
-       Values do not match:
-         external id : ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s
-           = "%identity" [@@layout_poly]
-       is not included in
-         external id : ('b : any). (t_any, 'b) s -> (t_any, 'b) s
-           = "%identity" [@@layout_poly]
-       The type "('a, 'b) s -> ('a, 'b) s" is not compatible with the type
-         "(t_any, 'c) s -> (t_any, 'c) s"
+       The value "id" does not match its expected declaration
+       The type "('a, ...) s -> ..." is not compatible with the type
+         "(t_any, ...) s -> ..."
        The layout of t_any is any
          because of the definition of t_any at line 2, characters 0-16.
        But the layout of t_any must be representable
@@ -217,25 +192,10 @@ Lines 7-10, characters 6-3:
  9 |     ('b : any). (t_any, 'b) s -> (t_any, 'b) s = "%identity"
 10 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('b : any). (t_any, 'b) s -> (t_any, 'b) s
-             = "%identity" [@@layout_poly]
-         end
-       is not included in
-         sig
-           external id : ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s
-             = "%identity" [@@layout_poly]
-         end
-       Values do not match:
-         external id : ('b : any). (t_any, 'b) s -> (t_any, 'b) s
-           = "%identity" [@@layout_poly]
-       is not included in
-         external id : ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s
-           = "%identity" [@@layout_poly]
-       The type "(t_any, 'a) s -> (t_any, 'a) s"
-       is not compatible with the type "('b, 'c) s -> ('b, 'c) s"
-       Type "t_any" is not compatible with type "'b"
+       The value "id" does not match its expected declaration
+       The type "(t_any, ...) s -> ..." is not compatible with the type
+         "('a, ...) s -> ..."
+       Type "t_any" is not compatible with type "'a"
 |}]
 
 (* together with local_opt *)
@@ -337,17 +297,8 @@ Lines 3-5, characters 6-3:
 4 |   external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
-         end
-       is not included in
-         sig val id : ('a : any). 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
-       is not included in
-         val id : ('a : any). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is any
          because of the definition of id at line 2, characters 2-31.
        But the layout of 'a must be representable
@@ -370,12 +321,6 @@ Lines 3-5, characters 6-3:
 4 |   let id: ('a : any). 'a -> 'a = assert false
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val id : ('a : any). 'a -> 'a end
-       is not included in
-         sig
-           external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
-         end
        Values do not match:
          val id : ('a : any). 'a -> 'a
        is not included in

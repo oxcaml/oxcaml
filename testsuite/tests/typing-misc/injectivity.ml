@@ -84,10 +84,6 @@ Line 1, characters 33-59:
 1 | module M : sig type +!'a t end = struct type 'a t = int end (* KO *)
                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type +-'a t = int end
-       is not included in
-         sig type +!'a t end
        Type declarations do not match:
          type +-'a t = int
        is not included in
@@ -146,10 +142,6 @@ Line 2, characters 2-36:
 2 |   struct type 'a t = < m : int > end
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type +-'a t = < m : int > end
-       is not included in
-         sig type !'a t = private < m : int; .. > end
        Type declarations do not match:
          type +-'a t = < m : int >
        is not included in
@@ -206,10 +198,6 @@ Line 4, characters 34-60:
 4 | module M : sig type +-!'a t end = struct type 'a t = int end;;
                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type +-'a t = int end
-       is not included in
-         sig type +-!'a t end
        Type declarations do not match:
          type +-'a t = int
        is not included in

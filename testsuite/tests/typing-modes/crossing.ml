@@ -34,14 +34,7 @@ Lines 3-5, characters 6-3:
 4 |     let f () = (`A : _ @ nonportable)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : unit -> [> `A ] end
-       is not included in
-         sig val f : unit -> [ `A | `B of 'a -> 'a ] @ portable end
-       Values do not match:
-         val f : unit -> [> `A ]
-       is not included in
-         val f : unit -> [ `A | `B of 'a -> 'a ] @ portable
+       The value "f" does not match its expected declaration
        The type "unit -> [ `A | `B of 'a -> 'a ]"
        is not compatible with the type
          "unit -> [ `A | `B of 'a -> 'a ] @ portable"
@@ -73,14 +66,7 @@ Lines 3-5, characters 6-3:
 4 |     let f () = exclave_ 42
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : unit -> int @ local forkable unyielding end
-       is not included in
-         sig val f : unit -> int end
-       Values do not match:
-         val f : unit -> int @ local forkable unyielding
-       is not included in
-         val f : unit -> int
+       The value "f" does not match its expected declaration
        The type "unit -> int @ local forkable unyielding"
        is not compatible with the type "unit -> int"
        The return mode was expected to be "global" but is "local"

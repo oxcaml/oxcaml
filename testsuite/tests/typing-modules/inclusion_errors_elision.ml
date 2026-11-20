@@ -27,13 +27,6 @@ Lines 9-13, characters 15-3:
 12 |   end
 13 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module B :
-             sig type a and b and c and d and e and f and g and h end
-         end
-       is not included in
-         S
        In module "B":
        Modules do not match:
          sig
@@ -66,6 +59,46 @@ Lines 1-7, characters 15-3:
 5 |     and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
 6 |   end
 7 | end
+Error: Signature mismatch:
+       In module "B":
+       Modules do not match:
+         sig
+           type a = B.a
+           and b = B.b
+           and c = B.c
+           and d = B.d
+           and e = B.e
+           and f = B.f
+           and g = B.g
+           and h = B.h
+           and a_type_with_extremely_long_long_long_long_long_long_long_long_name =
+               B.a_type_with_extremely_long_long_long_long_long_long_long_long_name
+           and a_type_with_extremely_long_long_long_long_long_long_long_long_name0 =
+               B.a_type_with_extremely_long_long_long_long_long_long_long_long_name0
+         end
+       is not included in
+         (module A)
+|}]
+
+module type F = functor (X : sig end) -> S
+
+module E : F = functor (X : sig end) -> struct
+  module B = struct
+    type a and b and c and d and e and f and g and h
+    and a_type_with_extremely_long_long_long_long_long_long_long_long_name
+    and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
+  end
+end
+[%%expect {|
+module type F = functor (X : sig end) -> S
+Lines 3-9, characters 23-3:
+3 | .......................(X : sig end) -> struct
+4 |   module B = struct
+5 |     type a and b and c and d and e and f and g and h
+6 |     and a_type_with_extremely_long_long_long_long_long_long_long_long_name
+7 |     and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
+8 |   end
+9 | end
 Error: Signature mismatch:
        ...
        In module "B":
@@ -117,16 +150,6 @@ Lines 11-17, characters 15-3:
 16 |   end
 17 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module type B =
-             sig
-               module C :
-                 sig type a and b and c and d and e and f and g and h end
-             end
-         end
-       is not included in
-         S
        Module type declarations do not match:
          module type B =
            sig
@@ -135,14 +158,6 @@ Error: Signature mismatch:
            end
        does not match
          module type B = sig module C = A end
-       At position "module type B = <here>"
-       Module types do not match:
-         sig
-           module C :
-             sig type a and b and c and d and e and f and g and h end
-         end
-       is not equal to
-         sig module C = A end
        At position "module type B = sig module C : <here> end"
        Modules do not match:
          sig
@@ -180,8 +195,6 @@ Lines 1-9, characters 15-3:
 8 |   end
 9 | end
 Error: Signature mismatch:
-       ...
-       ...
        ...
        At position "module type B = sig module C : <here> end"
        Modules do not match:

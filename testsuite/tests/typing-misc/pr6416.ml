@@ -18,15 +18,8 @@ Lines 5-8, characters 8-5:
 7 |     let f B = ()
 8 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = B val f : t -> unit end
-       is not included in
-         sig val f : t -> unit end
-       Values do not match:
-         val f : t/1 -> unit
-       is not included in
-         val f : t/2 -> unit
-       The type "t/1 -> unit" is not compatible with the type "t/2 -> unit"
+       The value "f" does not match its expected declaration
+       The type "t/1 -> ..." is not compatible with the type "t/2 -> ..."
        Type "t/1" is not compatible with type "t/2"
        Line 6, characters 4-14:
          Definition of type "t/1"
@@ -44,10 +37,6 @@ Line 4, characters 2-39:
 4 |   struct type t = B type u = A of t end
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = B type u = A of t end
-       is not included in
-         sig type u = A of t end
        Type declarations do not match:
          type u = A of t/1
        is not included in
@@ -79,10 +68,6 @@ Lines 4-7, characters 4-7:
 6 |       module A(X:s) =struct end
 7 |     end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type s module A : functor (X : s) -> sig end end
-       is not included in
-         sig module A : functor (X : s) -> sig end end
        In module "A":
        Modules do not match:
          (X : s/1) -> ...
@@ -110,10 +95,6 @@ Lines 4-7, characters 4-7:
 6 |       type t = A of T.t
 7 |     end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module T : sig type t end type t = A of T.t end
-       is not included in
-         sig type t = A of T.t end
        Type declarations do not match:
          type t = A of T/1.t
        is not included in
@@ -141,21 +122,10 @@ Line 5, characters 2-62:
 5 |   struct module type s type t = B let f (module X:s) A = B end
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type s type t = B val f : (module s) -> t/2 -> t/1 end
-       is not included in
-         sig val f : (module s) -> t -> t end
-       Values do not match:
-         val f : (module s/1) -> t/2 -> t/1
-       is not included in
-         val f : (module s/2) -> t/2 -> t/2
-       The type "(module s/1) -> t/2 -> t/1" is not compatible with the type
-         "(module s/2) -> t/2 -> t/2"
+       The value "f" does not match its expected declaration
+       The type "(module s/1) -> ..." is not compatible with the type
+         "(module s/2) -> ..."
        Modules do not match: s/1 is not included in s/2
-       Line 5, characters 23-33:
-         Definition of type "t/1"
-       Line 3, characters 2-12:
-         Definition of type "t/2"
        Line 5, characters 9-22:
          Definition of module type "s/1"
        Line 2, characters 2-15:
@@ -174,16 +144,9 @@ Line 5, characters 5-41:
 5 |    = struct type a = B let f A _  = B end
          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type a = B val f : a/2 -> 'a -> a/1 end
-       is not included in
-         sig val f : a -> (module a) -> a end
-       Values do not match:
-         val f : a/2 -> 'a -> a/1
-       is not included in
-         val f : a/2 -> (module a) -> a/2
-       The type "a/2 -> (module a) -> a/1" is not compatible with the type
-         "a/2 -> (module a) -> a/2"
+       The value "f" does not match its expected declaration
+       The type "... -> ... -> a/1" is not compatible with the type
+         "... -> ... -> a/2"
        Type "a/1" is not compatible with type "a/2"
        Line 5, characters 12-22:
          Definition of type "a/1"
@@ -208,10 +171,6 @@ Lines 4-7, characters 2-5:
 6 |     class b = a
 7 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class a : object method c : unit end class b : a end
-       is not included in
-         sig class b : a end
        Class declarations do not match:
          class b : a
        does not match
@@ -240,10 +199,6 @@ Lines 4-7, characters 2-5:
 6 |     class type b = a
 7 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig class type a = object  end class type b = a end
-       is not included in
-         sig class type b = a end
        Class type declarations do not match:
          class type b = a/1
        does not match
@@ -291,23 +246,6 @@ Lines 8-15, characters 6-3:
 14 |   end
 15 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t
-           class type a = object method m : t end
-           module K : sig type t class type c = object method m : t/2 end end
-         end
-       is not included in
-         sig
-           type t
-           class type a = object method m : t end
-           module K : sig type t class type c = object method m : t end end
-         end
-       In module "K":
-       Modules do not match:
-         sig type t = K.t class type c = object method m : t/2 end end
-       is not included in
-         sig type t class type c = object method m : t end end
        In module "K":
        Class type declarations do not match:
          class type c = object method m : t/2 end
@@ -330,10 +268,6 @@ Line 2, characters 0-59:
 2 | struct type t module M = struct type t end type a = M.t end;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = M.t module M : sig type t = M.M.t end type a = M.t end
-       is not included in
-         sig type t type a = M.t end
        Type declarations do not match:
          type a = M/1.t
        is not included in
@@ -364,25 +298,13 @@ Lines 5-7, characters 44-3:
 6 |   let f A B C = D
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : t/2 -> t/3 -> t/4 -> t/1 end
-       is not included in
-         sig val f : t -> t -> t -> t end
-       Values do not match:
-         val f : t/2 -> t/3 -> t/4 -> t/1
-       is not included in
-         val f : t/1 -> t/1 -> t/1 -> t/1
-       The type "t/2 -> t/3 -> t/4 -> t/1" is not compatible with the type
-         "t/1 -> t/1 -> t/1 -> t/1"
+       The value "f" does not match its expected declaration
+       The type "t/2 -> ..." is not compatible with the type "t/1 -> ..."
        Type "t/2" is not compatible with type "t/1"
        Line 4, characters 0-10:
          Definition of type "t/1"
        Line 1, characters 0-10:
          Definition of type "t/2"
-       Line 2, characters 0-10:
-         Definition of type "t/3"
-       Line 3, characters 0-10:
-         Definition of type "t/4"
 |}]
 
 (** Check interaction with no-alias-deps *)

@@ -2,10 +2,6 @@ File "recmodule_manifest_chain_bad.ml", line 18, characters 2-51:
 18 |   struct type b1 = A.anchor type checked = A.a1 end
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type b1 = A.anchor type checked = A.a1 end
-       is not included in
-         sig type b1 = A.anchor type checked = A.anchor end
        Type declarations do not match:
          type checked = A.a1
        is not included in
