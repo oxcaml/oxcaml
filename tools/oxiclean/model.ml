@@ -11,7 +11,7 @@ type module_statics =
       }
 
 type module_type =
-  { absent : module_item_absent_at_runtime list
+  { absent : type_decl list
   ; present : module_item_present_at_runtime list
   }
 
@@ -19,10 +19,6 @@ and type_decl =
   { arity : int
   ; manifest : val_type option
   }
-
-and module_item_absent_at_runtime =
-  | Module_type of module_type option
-  | Val_type of type_decl
 
 and module_item_present_at_runtime =
   | Module of module_type (* ...and not just an alias like [module M = N] *)

@@ -181,25 +181,19 @@ and binary_scalar_operation
 let impl = impl_in_scope []
 
 module Signature_parts = struct
-  type module_item_absent_at_runtime =
-    | Module_type of Ident.t * Types.modtype_declaration
-    | Val_type of Ident.t * Types.type_declaration
-
   type module_item_present_at_runtime =
     | Module of Ident.t * Types.module_type
     | Val of Ident.t * Types.type_expr
 
   type t =
-    { absent : module_item_absent_at_runtime list
+    { absent : (Ident.t * Types.type_declaration) list
     ; present : module_item_present_at_runtime list
     }
 
   let push (item : Types.signature_item) (parts : t) : t =
     match item with
-    | Sig_modtype (id, decl, _) ->
-      { parts with absent = Module_type (id, decl) :: parts.absent }
     | Sig_type (id, decl, _, _) ->
-      { parts with absent = Val_type (id, decl) :: parts.absent }
+      { parts with absent = (id, decl) :: parts.absent }
     | Sig_value (id, { val_type; val_kind = Val_reg _; _ }, _) ->
       { parts with present = Val (id, val_type) :: parts.present }
     | Sig_module (id, Mp_present, { md_type; _ }, _, _) ->
@@ -235,11 +229,7 @@ module Signature_parts = struct
       parts.present
 
   let find_type (matches : Ident.t -> bool) (parts : t) : int option =
-    List.find_index
-      ( function
-        | Val_type (id, _) -> matches id
-        | Module_type _ -> false )
-      parts.absent
+    List.find_index (fun (id, _) -> matches id) parts.absent
 end
 
 module Resolve = struct
@@ -413,19 +403,11 @@ and signature
   let env = Env.add_signature items env in
   let parts = Signature_parts.of_items items in
   let module_vars = parts :: module_vars in
-  { absent = List.map (module_item_absent_at_runtime ~env ~module_vars) parts.absent
-  ; present = List.map (module_item_present_at_runtime ~env ~module_vars) parts.present
+  { absent =
+      List.map (fun (id, td) -> type_decl ~env ~module_vars id td) parts.absent
+  ; present =
+      List.map (module_item_present_at_runtime ~env ~module_vars) parts.present
   }
-
-and module_item_absent_at_runtime
-    ~(env : Env.t)
-    ~(module_vars : Signature_parts.t list)
-    : Signature_parts.module_item_absent_at_runtime ->
-      Model.module_item_absent_at_runtime = function
-  | Module_type (_, m) ->
-    Module_type (Option.map (module_type ~env ~module_vars) m.mtd_type)
-  | Val_type (id, t) ->
-    Val_type (type_decl ~env ~module_vars id t)
 
 and module_item_present_at_runtime
     ~(env : Env.t)

@@ -299,7 +299,7 @@ def Oxiclean.Model.PredefinedType.structuralRelation
   /- CR-soon wsturgeon: `PER.option` needs a layout as well. -/
   | .option => ⟨1, PER.option⟩
 
-inductive SemanticTypeConstructor.ArityMismatch : Type 0 where
+inductive StructuralRelationError : Type 0 where
   | arityMismatch
 
 @[simp]
@@ -307,53 +307,87 @@ def SemanticTypeConstructor.instantiatedWithArguments?
     : {arity : Nat} →
       SemanticTypeConstructor arity →
       List (PER Value) →
-      Except SemanticTypeConstructor.ArityMismatch (PER Value)
+      Except StructuralRelationError (PER Value)
   | .zero, (relation : PER Value), args =>
     match args with
-    | [] => .ok relation
-    | _ :: _ => .error .arityMismatch
+    | [] => pure relation
+    | _ :: _ => throw .arityMismatch
   | .succ _, (relation : PER Value → SemanticTypeConstructor _), args =>
     match args with
-    | [] => .error .arityMismatch
+    | [] => throw .arityMismatch
     | head :: tail => relation head |>.instantiatedWithArguments? tail
+
+structure SemanticModuleInContext : Type 0 where
+  absent : List ((arity : Nat) × SemanticTypeConstructor arity)
+  present : List (Option SemanticModuleInContext)
+
+mutual
+  @[simp]
+  def Oxiclean.Model.ModuleType.semanticModuleInContext?
+      (moduleType : ModuleType SemanticTypeConstructor)
+      : Except StructuralRelationError SemanticModuleInContext := do
+    let { absent, present } := moduleType
+    let absent ← absent.mapM (·.semanticModuleInContext?)
+    let present ← present.mapM (·.semanticModuleInContext?)
+    pure { absent, present }
+
+  @[simp]
+  def Oxiclean.Model.TypeDecl.semanticModuleInContext?
+      (typeDecl : TypeDecl SemanticTypeConstructor)
+      : Except
+          StructuralRelationError
+          ((arity : Nat) × SemanticTypeConstructor arity) :=
+    match typeDecl.manifest with
+    | .abstract constructor => pure ⟨typeDecl.arity, constructor⟩
+    | .manifest _ => sorry
+
+  @[simp]
+  def Oxiclean.Model.ModuleItemPresentAtRuntime.semanticModuleInContext?
+      : ModuleItemPresentAtRuntime SemanticTypeConstructor →
+        Except StructuralRelationError (Option SemanticModuleInContext)
+    | .mod m => .some <$> m.semanticModuleInContext?
+    | .val _ => pure .none
+end
 
 mutual
   @[simp]
   def Oxiclean.Model.ModuleType.structuralRelationInScope?
       {Step} [S : StepRelation Step]
-      (context : List (ModuleType SemanticTypeConstructor))
+      (context : List SemanticModuleInContext)
       (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
-      : Except SemanticTypeConstructor.ArityMismatch (PER Value) := do
+      : Except StructuralRelationError (PER Value) := do
     let { absent, present } := userSuppliedRefinedSignature
+    let semanticModuleInContext ←
+      userSuppliedRefinedSignature.semanticModuleInContext?
     let relationOnValuesInTheBlock ←
       present.foldrM
         (fun item tail => do
           let head ←
             @item.structuralRelationInScope? Step S
-              (userSuppliedRefinedSignature :: context)
-          .ok (PER.cons head tail))
+              (semanticModuleInContext :: context)
+          pure (PER.cons head tail))
         PER.emptyList
-    .ok (PER.moduleRuntimeBlock relationOnValuesInTheBlock)
+    pure (PER.moduleRuntimeBlock relationOnValuesInTheBlock)
 
   @[simp]
   def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope?
       {Step} [S : StepRelation Step]
-      (context : List (ModuleType SemanticTypeConstructor))
+      (context : List SemanticModuleInContext)
       : ModuleItemPresentAtRuntime SemanticTypeConstructor →
-        Except SemanticTypeConstructor.ArityMismatch (PER Value)
+        Except StructuralRelationError (PER Value)
     | .mod m => @m.structuralRelationInScope? Step S context
     | .val v => @v.structuralRelationInScope? Step S context
 
   @[simp]
   def Oxiclean.Model.ValType.structuralRelationInScope?
       {Step} [S : StepRelation Step]
-      (context : List (ModuleType SemanticTypeConstructor))
+      (context : List SemanticModuleInContext)
       : ValType SemanticTypeConstructor →
-        Except SemanticTypeConstructor.ArityMismatch (PER Value)
+        Except StructuralRelationError (PER Value)
     | .arrow domain codomain => do
       let domain ← @domain.structuralRelationInScope? Step S context
       let codomain ← @codomain.structuralRelationInScope? Step S context
-      .ok (@PER.closure Step S domain codomain)
+      pure (@PER.closure Step S domain codomain)
     | .constr c args =>
       match c with
       | .field within index => sorry
@@ -370,5 +404,5 @@ end
 def Oxiclean.Model.ModuleType.structuralRelation?
       {Step} [S : StepRelation Step]
     : ModuleType SemanticTypeConstructor →
-      Except SemanticTypeConstructor.ArityMismatch (PER Value) :=
+      Except StructuralRelationError (PER Value) :=
   (@·.structuralRelationInScope? Step S [])

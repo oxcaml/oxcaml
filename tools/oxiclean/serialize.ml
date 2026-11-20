@@ -156,7 +156,7 @@ let type_constr : Model.type_constr -> Json.t = function
 
 let rec module_type ({ absent; present } : Model.module_type) : Json.t =
   Json.Object
-    [ "absent", array module_item_absent_at_runtime absent
+    [ "absent", array type_decl absent
     ; "present", array module_item_present_at_runtime present
     ]
 
@@ -165,14 +165,6 @@ and type_decl ({ manifest; arity } : Model.type_decl) : Json.t =
     [ "manifest", option val_type manifest
     ; "arity", Json.int arity
     ]
-
-and module_item_absent_at_runtime
-    : Model.module_item_absent_at_runtime -> Json.t = function
-  | Module_type m ->
-    option module_type m
-    |> tag "moduleTypeDecl"
-    |> tag "moduleType"
-  | Val_type t -> type_decl t |> tag "typeDecl" |> tag "valType"
 
 and module_item_present_at_runtime
     : Model.module_item_present_at_runtime -> Json.t = function

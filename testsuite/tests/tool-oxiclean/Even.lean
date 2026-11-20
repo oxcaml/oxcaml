@@ -11,7 +11,7 @@ abbrev expectedInterface : ModuleType Parametric :=
   let create : ValType Parametric := .arrow int t_option
   let get : ValType Parametric := .arrow t int
 
-  { absent := [.valType { manifest := .abstract .parametric, arity := 0 }]
+  { absent := [{ manifest := .abstract .parametric, arity := 0 }]
   , present := [.val create, .val get]
   }
 
@@ -50,7 +50,7 @@ abbrev refinedInterface : ModuleType SemanticTypeConstructor :=
   let create : ValType _ := .arrow int t_option
   let get : ValType _ := .arrow t int
 
-  { absent := [.valType { manifest := .abstract evenImmediates, arity := 0 }]
+  { absent := [{ manifest := .abstract evenImmediates, arity := 0 }]
   , present := [.val create, .val get]
   }
 
@@ -63,5 +63,5 @@ abbrev expectedRelation {Step} [StepRelation Step] : PER Value :=
 
 example {Step} [S : StepRelation Step]
     : @refinedInterface.structuralRelation? Step S =
-      .ok (@expectedRelation Step S) := by
+      pure (@expectedRelation Step S) := by
   simp

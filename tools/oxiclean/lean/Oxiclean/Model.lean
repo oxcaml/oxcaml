@@ -20,12 +20,8 @@ mutual
   variable (AbstractTypeConstructor : (arity : Nat) → Type u)
 
   structure ModuleType : Type u where
-    absent : List ModuleItemAbsentAtRuntime
+    absent : List TypeDecl
     present : List ModuleItemPresentAtRuntime
-
-  inductive ModuleItemAbsentAtRuntime : Type u where
-    | moduleType (moduleTypeDecl : Option ModuleType)
-    | valType (typeDecl : TypeDecl)
 
   inductive ModuleItemPresentAtRuntime : Type u where
     | mod (moduleType : ModuleType)
@@ -68,14 +64,6 @@ mutual
       { absent := absent.map (·.parameterize)
       , present := present.map (·.parameterize)
       }
-
-  @[simp]
-  def ModuleItemAbsentAtRuntime.parameterize
-      : ModuleItemAbsentAtRuntime AbstractTypeConstructor ->
-        ModuleItemAbsentAtRuntime Parametric
-    | .moduleType .none => .moduleType .none
-    | .moduleType (.some m) => .moduleType (.some m.parameterize)
-    | .valType typeDecl => .valType typeDecl.parameterize
 
   @[simp]
   def ModuleItemPresentAtRuntime.parameterize

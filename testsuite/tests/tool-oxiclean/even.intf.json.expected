@@ -1,5 +1,5 @@
 {
-  "absent": [{"valType": {"typeDecl": {"manifest": null, "arity": 0}}}],
+  "absent": [{"manifest": null, "arity": 0}],
   "present": [
     {
       "val": {

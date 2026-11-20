@@ -78,9 +78,9 @@ namespace WorkaroundForPr14959
 
   section ModuleType
     variable
-      (ModuleItemAbsentAtRuntime ModuleItemPresentAtRuntime TypeDecl : Type)
+      (TypeDecl ModuleItemPresentAtRuntime : Type)
     structure ModuleType : Type where
-      absent : List ModuleItemAbsentAtRuntime
+      absent : List TypeDecl
       present : List ModuleItemPresentAtRuntime
     deriving FromJson
   end ModuleType
@@ -89,30 +89,11 @@ namespace WorkaroundForPr14959
       : ModuleType Lean.Expr Lean.Expr → Except String Lean.Expr
     | { absent, present } =>
       mkApp2 (parametric ``Model.ModuleType.mk)
-        (Lean.Expr.mkList
-          (parametric ``Model.ModuleItemAbsentAtRuntime)
-          absent)
+        (Lean.Expr.mkList (parametric ``Model.TypeDecl) absent)
         (Lean.Expr.mkList
           (parametric ``Model.ModuleItemPresentAtRuntime)
           present)
       |> pure
-
-  section ModuleItemAbsentAtRuntime
-    variable (ModuleType TypeDecl : Type)
-    inductive ModuleItemAbsentAtRuntime : Type where
-      | moduleType (moduleType : Option ModuleType)
-      | valType (typeDecl : TypeDecl)
-    deriving FromJson
-  end ModuleItemAbsentAtRuntime
-
-  def ModuleItemAbsentAtRuntime.toTerm
-      : ModuleItemAbsentAtRuntime Lean.Expr Lean.Expr → Lean.Expr
-    | .moduleType moduleTypeDecl =>
-      mkApp
-        (parametric ``Model.ModuleItemAbsentAtRuntime.moduleType)
-        (Lean.Expr.mkOption (parametric ``Model.ModuleType) moduleTypeDecl)
-    | .valType typeDecl =>
-      mkApp (parametric ``Model.ModuleItemAbsentAtRuntime.valType) typeDecl
 
   section ModuleItemPresentAtRuntime
     variable (ModuleType ValType : Type)
@@ -189,22 +170,10 @@ namespace WorkaroundForPr14959
       @instFromJsonModuleType
         Lean.Expr
         Lean.Expr
-        ⟨ModuleItemAbsentAtRuntime.fromJson? dependencyNames⟩
+        ⟨TypeDecl.fromJson? dependencyNames⟩
         ⟨ModuleItemPresentAtRuntime.fromJson? dependencyNames⟩
       |>.fromJson? json
       >>= (·.toTerm?)
-
-    partial def ModuleItemAbsentAtRuntime.fromJson?
-        (dependencyNames : List String)
-        (json : Json)
-        : Except String Lean.Expr := do
-      @instFromJsonModuleItemAbsentAtRuntime
-        Lean.Expr
-        Lean.Expr
-        ⟨ModuleType.fromJson? dependencyNames⟩
-        ⟨TypeDecl.fromJson? dependencyNames⟩
-      |>.fromJson? json
-      |>.map (·.toTerm)
 
     partial def ModuleItemPresentAtRuntime.fromJson?
         (dependencyNames : List String)
