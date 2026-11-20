@@ -65,7 +65,9 @@ let print_counters title counters =
    [i]. *)
 let test name ~index cases =
   let scrutinee = Cmm.Cvar (Backend_var.create_local "x") in
-  let cases = Array.mapi (fun arm case -> case, annots arm) cases in
+  let cases =
+    Array.mapi (fun arm case -> case, Debuginfo.none, annots arm) cases
+  in
   Fdo_dropped_counters.reset ();
   let expr = Cmm_helpers.transl_switch_clambda dbg scrutinee index cases in
   let on_edges = edge_counters expr in
