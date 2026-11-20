@@ -28,49 +28,21 @@ module Signature_names : sig
   val simplify: Env.t -> t -> signature -> signature
 end
 
-(* In the following, the optional [expected_mode] is for better error messages
-and not strictly enforced. The caller is reponsible to enforce mode constraint
-by inspecting the returned mode. *)
-(* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
-
 val type_module:
-  Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
+        Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
 val type_structure:
   Env.t -> Parsetree.structure ->
-  Typedtree.structure
-  * Types.signature
-  * Mode.With_regionality.lr
-  * Signature_names.t
-  * Shape.t
-  * Env.t
+  Typedtree.structure * Types.signature * Signature_names.t * Shape.t *
+  Env.t
 val type_toplevel_phrase:
-  Env.t -> Types.signature -> Parsetree.structure ->
+  Env.t -> Parsetree.structure ->
   Typedtree.structure * Types.signature * (* Signature_names.t * *) Shape.t *
   Env.t
 val type_implementation:
-  Unit_info.t -> Compilation_unit.t -> Env.t ->
-  Parsetree.structure -> Typedtree.implementation
+  Unit_info.t -> Env.t -> Parsetree.structure ->
+  Typedtree.implementation
 val type_interface:
-  Unit_info.t -> Compilation_unit.t -> Env.t ->
-  Parsetree.signature -> Typedtree.signature
-val transl_signature:
-  ?interface_toplevel:bool -> md_mode:Mode.With_regionality.Const.t ->
-  Env.t -> Parsetree.signature -> Typedtree.signature
-
-(* If the [.mli] file has any file-level staticity modality (whether
-   [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
-   The presence of either annotation is treated as opt-in to staticity.
-
-   CR-soon zqian: all persistent modules should always be [Static]. *)
-val staticity_of_modalities:
-  Typedtree.modalities -> Mode.Staticity.Const.t
-
-(* [arg_signature sg ~param] describes a unit with signature [sg] compiled
-   with [-as-argument-for param]. *)
-val arg_signature:
-  Types.signature -> param:Global_module.Parameter_name.t ->
-  Types.arg_signature
-
+        Env.t -> Parsetree.signature -> Typedtree.signature
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
         (*
@@ -85,38 +57,17 @@ val modtype_of_package:
 val path_of_module : Typedtree.module_expr -> Path.t option
 
 val save_signature:
-  Unit_info.t -> Compilation_unit.t -> Typedtree.signature ->
-  Env.t -> Cmi_format.cmi_infos_lazy -> unit
+  Unit_info.t -> Typedtree.signature -> Env.t ->
+  Cmi_format.cmi_infos -> unit
 
 val package_units:
-  Env.t -> string list -> Unit_info.Artifact.t -> Compilation_unit.t
-  -> Typedtree.module_coercion
-
-(** Type-check a [-functorize] bundle interface ([.cmi] target): build the
-    bundle's signature and save the cmi/cmti/cmsi artifacts.  [params] and
-    [module_sigs] come from the driver's analysis of the bundled units. *)
-val functorize_interface:
-  Env.t ->
-  params:(Global_module.Parameter_name.t * Ident.t) list ->
-  module_sigs:(Ident.t * Types.signature) list ->
-  Unit_info.t -> Compilation_unit.t -> unit
-
-(** Type-check a [-functorize] bundle implementation: build the bundle's
-    signature, check it against the [-cmi-file] interface if one is given, and
-    save the cmi/cmt/cms artifacts.  Returns the coercion into the declared
-    interface ([Tcoerce_none] if there is none). *)
-val functorize_implementation:
-  Env.t ->
-  params:(Global_module.Parameter_name.t * Ident.t) list ->
-  modules:Global_module.t list ->
-  module_sigs:(Ident.t * Types.signature) list ->
-  Unit_info.t -> Compilation_unit.t -> Typedtree.module_coercion
+  Env.t -> string list -> Unit_info.Artifact.t -> Typedtree.module_coercion
 
 (* Should be in Envaux, but it breaks the build of the debugger *)
 val initial_env:
   loc:Location.t ->
   initially_opened_module:string option ->
-  open_implicit_args:Clflags.open_arg list -> Env.t
+  open_implicit_modules:string list -> Env.t
 
 module Sig_component_kind : sig
   type t =
@@ -124,13 +75,11 @@ module Sig_component_kind : sig
     | Type
     | Constructor
     | Label
-    | Unboxed_label
     | Module
     | Module_type
     | Extension_constructor
     | Class
     | Class_type
-    | Jkind
 
   val to_string : t -> string
 end
@@ -153,21 +102,12 @@ type hiding_error =
       user_loc: Location.t;
     }
 
-type functor_dependency_error =
-    Functor_applied
-  | Functor_included
-
 type error =
     Cannot_apply of module_type
   | Not_included of Includemod.explanation
-  | Not_included_functor of Includemod.explanation
-  | Cannot_eliminate_dependency of functor_dependency_error * module_type
+  | Cannot_eliminate_dependency of module_type
   | Signature_expected
   | Structure_expected of module_type
-  | Functor_expected of module_type
-  | Signature_parameter_expected of module_type
-  | Signature_result_expected of module_type
-  | Recursive_include_functor
   | With_no_component of Longident.t
   | With_mismatch of Longident.t * Includemod.explanation
   | With_makes_applicative_functor_ill_typed of
@@ -181,8 +121,7 @@ type error =
       { vars : type_expr list; item : value_description; mty : module_type }
   | Implementation_is_required of string
   | Interface_not_compiled of string
-  | Not_allowed_in_functor_body of Mtype.Contains_type_or_jkind.t
-  | Not_includable_in_functor_body of Mtype.Contains_type_or_jkind.t
+  | Not_allowed_in_functor_body
   | Not_a_packed_module of type_expr
   | Incomplete_packed_module of type_expr
   | Scoping_pack of Longident.t * type_expr
@@ -196,41 +135,19 @@ type error =
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
   | Cannot_alias of Path.t
-  | Strengthening_mismatch of Longident.t * Includemod.explanation
-  | Cannot_pack_parameter
-  | Compiling_as_parameterised_parameter
-  | Cannot_compile_implementation_as_parameter
-  | Cannot_implement_parameter of Compilation_unit.Name.t * Misc.filepath
-  | Argument_for_non_parameter of Global_module.Name.t * Misc.filepath
-  | Cannot_find_argument_type of Global_module.Parameter_name.t
-  | Inconsistent_argument_types of {
-      new_arg_type: Global_module.Parameter_name.t option;
-      old_arg_type: Global_module.Parameter_name.t option;
-      old_source_file: Misc.filepath;
-    }
-  | Duplicate_parameter_name of Global_module.Parameter_name.t
 
+exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
-exception Errors of Location.t * Typing_recovery.Error_set.t
 
 val report_error: Env.t -> loc:Location.t -> error -> Location.error
 
-(** Clear several bits of global state that may retain large amounts of memory
-    after typechecking is finished. *)
-val reset : preserve_persistent_env:bool -> unit
-
 (* merlin *)
-
-module Error : sig
-    type exn += private In_context of Location.t * Env.t * error
-end
 
 val normalize_signature : Types.signature -> unit
 
 val merlin_type_structure:
-  Env.t -> Types.signature -> Parsetree.structure ->
+  Env.t -> Parsetree.structure ->
   Typedtree.structure * Types.signature * (* Signature_names.t * *) Env.t
 
 val merlin_transl_signature:
-  ?interface_toplevel:bool -> md_mode:Mode.With_regionality.Const.t ->
-  Env.t -> Types.signature -> Parsetree.signature -> Typedtree.signature
+  Env.t -> Parsetree.signature -> Typedtree.signature

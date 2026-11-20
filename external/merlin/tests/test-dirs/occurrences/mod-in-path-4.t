@@ -81,6 +81,17 @@ I:
     },
     {
       "start": {
+        "line": 10,
+        "col": 6
+      },
+      "end": {
+        "line": 10,
+        "col": 7
+      },
+      "stale": false
+    },
+    {
+      "start": {
         "line": 8,
         "col": 27
       },
@@ -93,22 +104,11 @@ I:
     {
       "start": {
         "line": 9,
-        "col": 19
+        "col": 24
       },
       "end": {
         "line": 9,
         "col": 25
-      },
-      "stale": false
-    },
-    {
-      "start": {
-        "line": 10,
-        "col": 4
-      },
-      "end": {
-        "line": 10,
-        "col": 7
       },
       "stale": false
     }
@@ -132,7 +132,7 @@ t:
     {
       "start": {
         "line": 9,
-        "col": 19
+        "col": 26
       },
       "end": {
         "line": 9,
@@ -160,7 +160,7 @@ lbl:
     {
       "start": {
         "line": 8,
-        "col": 27
+        "col": 29
       },
       "end": {
         "line": 8,

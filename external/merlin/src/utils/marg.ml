@@ -50,8 +50,8 @@ let parse_one ~warning global_spec local_spec args global local =
   | [] -> None
   | arg :: args -> (
     match Hashtbl.find global_spec arg with
-    | action ->
-      begin match action args global with
+    | action -> begin
+      match action args global with
       | args, global -> Some (args, global, local)
       | exception Failure msg ->
         warning ("flag " ^ arg ^ " " ^ msg);
@@ -59,11 +59,11 @@ let parse_one ~warning global_spec local_spec args global local =
       | exception exn ->
         warning ("flag " ^ arg ^ ": error, " ^ Printexc.to_string exn);
         Some (args, global, local)
-      end
+    end
     | exception Not_found -> (
       match assoc3 arg local_spec with
-      | action ->
-        begin match action args local with
+      | action -> begin
+        match action args local with
         | args, local -> Some (args, global, local)
         | exception Failure msg ->
           warning ("flag " ^ arg ^ " " ^ msg);
@@ -71,7 +71,7 @@ let parse_one ~warning global_spec local_spec args global local =
         | exception exn ->
           warning ("flag " ^ arg ^ ": error, " ^ Printexc.to_string exn);
           Some (args, global, local)
-        end
+      end
       | exception Not_found -> None))
 
 let parse_all ~warning global_spec local_spec =
@@ -80,16 +80,16 @@ let parse_all ~warning global_spec local_spec =
     | Some (args, global, local) -> normal_parsing args global local
     | None -> (
       match args with
-      | arg :: args -> (
+      | arg :: args -> begin
         (* We split on the first '=' to check if the argument was
            of the form name=value *)
-        match Stdlib.String.split_on_char '=' arg with
-        | [] | [ _ ] ->
+        try
+          let name, value = Misc.cut_at arg '=' in
+          normal_parsing (name :: value :: args) global local
+        with Not_found ->
           warning ("unknown flag " ^ arg);
           resume_parsing args global local
-        | name :: rest ->
-          let value = String.concat ~sep:"=" rest in
-          normal_parsing (name :: value :: args) global local)
+      end
       | [] -> (global, local))
   and resume_parsing args global local =
     let args =

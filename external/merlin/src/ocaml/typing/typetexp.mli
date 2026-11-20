@@ -16,11 +16,6 @@
 (* Typechecking of type expressions for the core language *)
 
 open Types
-open Mode
-
-type jkind_initialization_choice = Sort | Any
-
-type valdecl_lpoly_flag = Lpoly | Lmono
 
 module TyVarEnv : sig
   (* this is just the subset of [TyVarEnv] that is needed outside
@@ -33,16 +28,7 @@ module TyVarEnv : sig
   (** Evaluate in a narrowed type-variable scope *)
 
   type poly_univars
-  val make_poly_univars :
-    Env.t -> (string Location.loc * Env.stage) list -> poly_univars
-    (** A variant of [make_poly_univars_jkinds] that gets variables
-        without jkind annotations *)
-
-  val make_poly_univars_jkinds :
-    Env.t ->
-    context:(string -> Jkind.History.annotation_context_lr) ->
-    (string Location.loc * Parsetree.jkind_annotation option * Env.stage) list
-    -> poly_univars
+  val make_poly_univars : string list -> poly_univars
     (** remember that a list of strings connotes univars; this must
         always be paired with a [check_poly_univars]. *)
 
@@ -56,6 +42,7 @@ module TyVarEnv : sig
      Env.t -> Location.t -> poly_univars -> type_expr list
     (** Same as [check_poly_univars], but instantiates the resulting
        type scheme (i.e. variables become Tvar rather than Tunivar) *)
+
 end
 
 (* Forward declaration, to be filled in by Typemod.type_open *)
@@ -66,107 +53,28 @@ val type_open:
 
 val valid_tyvar_name : string -> bool
 
-(** [transl_label lbl ty] produces a Typedtree argument label for an argument
-    with label [lbl] and type [ty].
-
-    Position arguments ([lbl:[%call_pos] -> ...]) are parsed as
-    {{!Parsetree.arg_label.Labelled}[Labelled l]}. This function converts them
-    to {{!Types.arg_label.Position}[Position l]} when the type is of the form
-    [[%call_pos]]. *)
-val transl_label :
-        Parsetree.arg_label -> Parsetree.core_type option -> Types.arg_label
-
-(** Produces a Typedtree argument label, as well as the pattern corresponding
-    to the argument. [transl_label lbl pat] is equal to:
-
-    - [Position l, P] when [lbl] is {{!Parsetree.arg_label.Labelled}[Labelled l]}
-      and [pat] represents [(P : [%call_pos])]
-    - [transl_label lbl None, pat] otherwise.
-  *)
-val transl_label_from_pat :
-        Parsetree.arg_label -> Parsetree.pattern
-        -> Types.arg_label * Parsetree.pattern
-
-(** Like [transl_label_from_pat], but with special handling for expressions
-    [(E : [%call_pos])] instead of for patterns.
-*)
-val transl_label_from_expr :
-  Parsetree.arg_label -> Parsetree.expression
-  -> Types.arg_label * Parsetree.expression
-
-(* Note about [new_var_jkind]
-
-   This is exposed as an option because the same initialization doesn't work in all
-   typing contexts.
-
-   If it's always [Sort], then it becomes difficult to get a type variable with jkind
-   any in type annotations on expressions and patterns due to the lack of explicit
-   binding sites.
-
-   If it's always [Any], then we risk breaking backwards compatibility with examples
-   such as:
-
-   [external to_bytes : 'a -> extern_flags list -> bytes = "caml_output_value_to_bytes"]
-
-   The general rule for selecting between [Sort] and [Any] is to use [Sort] in places
-   that allows users to explictly binding type variables to certain jkinds and [Any]
-   otherwise.
-
-   There are some exceptions made around type manifests and type constraints to not
-   constrain the type parameters to representable jkinds unnecessarily while maintaining
-   the most amount of backwards compatibility. It is for this reason, the left hand side
-   of a constraint is typed using [Any] while the right hand side uses [Sort]. *)
 val transl_simple_type:
-        Env.t -> new_var_jkind:jkind_initialization_choice
-        -> ?univars:TyVarEnv.poly_univars
-        -> closed:bool -> With_locality.Const.t
+        Env.t -> ?univars:TyVarEnv.poly_univars -> closed:bool
         -> Parsetree.core_type -> Typedtree.core_type
 val transl_simple_type_univars:
         Env.t -> Parsetree.core_type -> Typedtree.core_type
 val transl_simple_type_delayed
-  :  Env.t -> With_locality.Const.t
+  :  Env.t
   -> Parsetree.core_type
   -> Typedtree.core_type * type_expr * (unit -> unit)
-        (* Translate a type using [Any] as the [jkind_initialization_choice],
-           but leave type variables unbound.
-           Returns the type, an instance of the corresponding type_expr, and a
+        (* Translate a type, but leave type variables unbound. Returns
+           the type, an instance of the corresponding type_expr, and a
            function that binds the type variable. *)
 val transl_type_scheme:
-        Env.t -> With_locality.Const.t -> Parsetree.core_type ->
-        valdecl_lpoly_flag ->
-        Jkind_types.Sort.var list * Typedtree.core_type
+        Env.t -> Parsetree.core_type -> Typedtree.core_type
 val transl_type_param:
-  Env.t -> Path.t -> jkind_lr -> Parsetree.core_type ->
-  Typedtree.core_type * jkind_lr option
-(* the Path.t above is of the type/class whose param we are processing;
-   the level defaults to the current level. The jkind_lr is the jkind to
-   use if no annotation is provided. Also returns the translation of the
-   parameter's jkind annotation, if there was one, so that callers can
-   compare against it without re-translating (which would re-trigger
-   alerts and other side effects of translation). *)
-
-val get_type_param_jkind: Env.t -> Path.t -> Parsetree.core_type -> jkind_lr
-(* [get_type_param_jkind] is only used in contexts where the jkind will be
-   translated again later, so it does not treat the kind it is passed as "used"
-   for the purpose of warnings. *)
-
-val get_type_param_name: Parsetree.core_type -> string option
+  Env.t -> Parsetree.core_type -> Typedtree.core_type
 
 exception Already_bound
 
-type value_loc =
-    Poly_variant | Object_field
-
-type sort_loc =
-    Fun_arg | Fun_ret
-
-type cannot_quantify_reason
-type jkind_info
-type unbound_variable_reason
 type error =
-  | Unbound_type_variable of
-    string * string list * unbound_variable_reason option
-  | No_type_wildcards of unbound_variable_reason option
+  | Unbound_type_variable of string * string list
+  | No_type_wildcards
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
   | Bound_type_variable of string
@@ -179,38 +87,14 @@ type error =
   | Not_a_variant of type_expr
   | Variant_tags of string * string
   | Invalid_variable_name of string
-  | Cannot_quantify of string * cannot_quantify_reason
-  | Bad_univar_jkind of
-      { name : string; jkind_info : jkind_info; inferred_jkind : jkind_lr }
+  | Cannot_quantify of string * type_expr
   | Multiple_constraints_on_type of Longident.t
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
   | Not_an_object of type_expr
   | Repeated_tuple_label of string
-  | Unsupported_extension : _ Language_extension.t -> error
-  | Polymorphic_optional_param
-  | Non_value of
-      {vloc : value_loc; typ : type_expr; err : Jkind.Violation.t}
-  | Non_sort of
-      {vloc : sort_loc; typ : type_expr; err : Jkind.Violation.t}
-  | Bad_jkind_annot of type_expr * Jkind.Violation.t
-  | Did_you_mean_unboxed of Longident.t
-  | Invalid_label_for_call_pos of Parsetree.arg_label
-  | Invalid_variable_stage of
-      {name : string;
-       intro_stage : Env.stage;
-       usage_stage : Env.stage}
-  | Mismatched_jkind_annotation of
-    { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
-  | Lpoly_unsupported
-  | Val_poly_and_layout
 
-module Error : sig
-    type exn += private In_context of Location.t * Env.t * error
-
-  val log_or_raise : Location.t -> Env.t -> error -> unit
-  val log_and_raise : Location.t -> Env.t -> error -> 'a
-end
+exception Error of Location.t * Env.t * error
 
 (* Support for first-class modules. *)
 val transl_modtype_longident:  (* from Typemod *)

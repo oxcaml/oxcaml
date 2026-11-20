@@ -3,7 +3,7 @@
   > let () = print_int x
   > EOF
 
-  $ $OCAMLC -bin-annot -bin-annot-occurrences -c main.ml
+  $ ocamlc -bin-annot -bin-annot-occurrences -c main.ml
 
   $ ocaml-index aggregate main.cmt
 

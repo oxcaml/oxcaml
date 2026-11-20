@@ -1,11 +1,5 @@
-(rule
- (copy# ../ocaml/driver/pparse.ml pparse.ml))
-
-(rule
- (copy# ../ocaml/driver/pparse.mli pparse.mli))
-
-(rule
- (copy# ../runtime/float32.c float32.c))
+(rule (copy# ../ocaml/driver/pparse.ml  pparse.ml ))
+(rule (copy# ../ocaml/driver/pparse.mli pparse.mli))
 
 (library
  (name merlin_kernel)
@@ -21,10 +15,9 @@
   -open Merlin_extend)
  (libraries merlin_config os_ipc ocaml_parsing ocaml_preprocess ocaml_typing
             ocaml_utils merlin_extend merlin_specific merlin_utils
-            merlin_dot_protocol merlin_index_format unix str)
- (foreign_stubs (language c) (names float32)))
+            merlin_dot_protocol merlin_index_format unix str))
 
 (rule
- (targets standard_library.ml)
- (action
-  (write-file %{targets} "let path = {|%{ocaml-config:standard_library}|}")))
+  (targets standard_library.ml)
+  (action
+    (write-file %{targets} "let path = {|%{ocaml-config:standard_library}|}")))

@@ -10,7 +10,7 @@
     "value": "[
     structure_item (test.ml[1,0+0]..test.ml[3,104+28])
       Tstr_module (Present)
-      ERROR_locate_from_inside_function_literal_used_as_non_function
+      ERROR_locate_from_inside_function_literal_used_as_non_function/277
         module_expr (test.ml[1,0+72]..test.ml[3,104+28])
           Tmod_structure
           [
@@ -19,9 +19,7 @@
               [
                 <def>
                   pattern (test.ml[2,79+6]..test.ml[2,79+13])
-                    Tpat_var \"problem\"
-                    sort value
-                    value_mode id(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,many,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                    Tpat_var \"problem/274\"
                   expression (test.ml[2,79+16]..test.ml[2,79+24])
                     Texp_variant \"Problem\"
                     None
@@ -31,36 +29,33 @@
               [
                 <def>
                   pattern (test.ml[3,104+6]..test.ml[3,104+8])
-                    extra (test.ml[3,104+6]..test.ml[3,104+8])
-                      Tpat_inspected_type
-                        Label_disambiguation
-                          Unambiguous
                     Tpat_construct \"()\"
                     []
                     None
                   expression (test.ml[3,104+11]..test.ml[3,104+28])
                     Texp_function
-                    alloc_mode id(modevar#d<0>[global .. local])
-                    yielding_mode unyielding
-                    return_mode proj_Locality(modevar#e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
-                    []
                     [
                       Nolabel
                       Param_pat
                         pattern (test.ml[3,104+15]..test.ml[3,104+17])
-                          extra (test.ml[3,104+15]..test.ml[3,104+17])
-                            Tpat_inspected_type
-                              Label_disambiguation
-                                Unambiguous
                           Tpat_construct \"()\"
                           []
                           None
-                        proj_Locality(modevar#10<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
-                        []
                     ]
                     Tfunction_body
                       expression (test.ml[3,104+21]..test.ml[3,104+28])
-                        Texp_ident \"problem\"
+                        attribute \"merlin.incorrect\"
+                          []
+                        attribute \"merlin.saved-parts\"
+                          [
+                            structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
+                              Pstr_eval
+                              expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                                Pexp_constant
+                                constant (_none_[0,0+-1]..[0,0+-1]) ghost
+                                  PConst_int (1,None)
+                          ]
+                        Texp_ident \"*type-error*/275\"
               ]
           ]
   ]
@@ -69,6 +64,7 @@
   ",
     "notifications": []
   }
+
   $ $MERLIN single dump -what typedtree -filename type.ml <<EOF
   > let f = fun (type t) (foo : t list) -> let (_ : t) = () in ()
   > EOF
@@ -80,38 +76,29 @@
       [
         <def>
           pattern (type.ml[1,0+4]..type.ml[1,0+5])
-            Tpat_var \"f\"
-            sort value
-            value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            Tpat_var \"f/274\"
           expression (type.ml[1,0+8]..type.ml[1,0+61])
             extra (type.ml[1,0+18]..type.ml[1,0+19])
-              Texp_newtype  t
+              Texp_newtype' \"t/276\"
             Texp_function
-            alloc_mode global
-            yielding_mode unyielding
-            return_mode proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
-            []
             [
               Nolabel
               Param_pat
                 pattern (type.ml[1,0+22]..type.ml[1,0+25])
                   extra (type.ml[1,0+21]..type.ml[1,0+35])
                     Tpat_extra_constraint
-                    Some
-                      core_type (type.ml[1,0+28]..type.ml[1,0+34])
-                        Ttyp_constr \"list!\"
-                        [
-                          core_type (type.ml[1,0+28]..type.ml[1,0+29])
-                            Ttyp_constr \"t\"
-                            []
-                        ]
-                    global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
-                    []
-                  Tpat_var \"foo\"
-                  sort value
-                  value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#8<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                proj_Locality(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
-                []
+                    core_type (type.ml[1,0+28]..type.ml[1,0+34])
+                      Ttyp_constr \"list/11!\"
+                      [
+                        core_type (type.ml[1,0+28]..type.ml[1,0+29])
+                          Ttyp_constr \"t/276\"
+                          []
+                      ]
+                  Tpat_alias \"foo/277\"
+                  pattern (type.ml[1,0+22]..type.ml[1,0+25]) ghost
+                    attribute \"merlin.hide\"
+                      []
+                    Tpat_any
             ]
             Tfunction_body
               expression (type.ml[1,0+39]..type.ml[1,0+61])
@@ -121,17 +108,14 @@
                     pattern (type.ml[1,0+44]..type.ml[1,0+45])
                       extra (type.ml[1,0+43]..type.ml[1,0+50])
                         Tpat_extra_constraint
-                        Some
-                          core_type (type.ml[1,0+48]..type.ml[1,0+49])
-                            Ttyp_constr \"t\"
-                            []
-                        global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
-                        []
+                        core_type (type.ml[1,0+48]..type.ml[1,0+49])
+                          Ttyp_constr \"t/276\"
+                          []
                       Tpat_any
                     expression (type.ml[1,0+53]..type.ml[1,0+55])
-                      attribute \"ocaml.incorrect\"
+                      attribute \"merlin.incorrect\"
                         []
-                      attribute \"ocaml.saved-parts\"
+                      attribute \"merlin.saved-parts\"
                         [
                           structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                             Pstr_eval
@@ -140,17 +124,12 @@
                               constant (_none_[0,0+-1]..[0,0+-1]) ghost
                                 PConst_int (1,None)
                         ]
-                      Texp_ident \"*type-error*\"
+                      Texp_ident \"*type-error*/278\"
                 ]
                 expression (type.ml[1,0+59]..type.ml[1,0+61])
                   attribute \"merlin.loc\"
                     []
-                  extra (type.ml[1,0+59]..type.ml[1,0+61])
-                    Texp_inspected_type
-                      Label_disambiguation
-                        Unambiguous
                   Texp_construct \"()\"
-                  Constructor_uniform_value
                   []
       ]
   ]
@@ -224,9 +203,7 @@
                     "ghost": false,
                     "attrs": [],
                     "kind": "pattern (test.ml[1,0+4]..test.ml[1,0+5])
-    Tpat_var \"f\"
-    sort value
-    value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+    Tpat_var \"f/274\"
   ",
                     "children": []
                   },
@@ -257,9 +234,7 @@
                         "ghost": false,
                         "attrs": [],
                         "kind": "pattern (test.ml[1,0+6]..test.ml[1,0+9])
-    Tpat_var \"x\"
-    sort '_representable_layout_1
-    value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+    Tpat_var \"x/276\"
   ",
                         "children": []
                       },
@@ -290,10 +265,6 @@
                             "ghost": false,
                             "attrs": [],
                             "kind": "pattern (test.ml[2,27+4]..test.ml[2,27+8])
-    extra (test.ml[2,27+4]..test.ml[2,27+8])
-      Tpat_inspected_type
-        Label_disambiguation
-          Unambiguous
     Tpat_construct \"None\"
     []
     None
@@ -356,10 +327,6 @@
                             "ghost": false,
                             "attrs": [],
                             "kind": "pattern (test.ml[3,41+4]..test.ml[3,41+10])
-    extra (test.ml[3,41+4]..test.ml[3,41+10])
-      Tpat_inspected_type
-        Label_disambiguation
-          Unambiguous
     Tpat_construct \"Some\"
     [
       pattern (test.ml[3,41+9]..test.ml[3,41+10])
@@ -443,16 +410,10 @@
                             "ghost": false,
                             "attrs": [],
                             "kind": "pattern (test.ml[4,57+4]..test.ml[4,57+12])
-    extra (test.ml[4,57+4]..test.ml[4,57+12])
-      Tpat_inspected_type
-        Label_disambiguation
-          Unambiguous
     Tpat_construct \"Some\"
     [
       pattern (test.ml[4,57+9]..test.ml[4,57+12])
-        Tpat_var \"_aa\"
-        sort value
-        value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
+        Tpat_var \"_aa/277\"
     ]
     None
   ",
@@ -470,9 +431,7 @@
                                 "ghost": false,
                                 "attrs": [],
                                 "kind": "pattern (test.ml[4,57+9]..test.ml[4,57+12])
-    Tpat_var \"_aa\"
-    sort value
-    value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
+    Tpat_var \"_aa/277\"
   ",
                                 "children": []
                               }

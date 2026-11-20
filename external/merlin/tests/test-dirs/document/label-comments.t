@@ -46,6 +46,8 @@ FIXME: expected "Poly_b comment"
   > -filename main.ml <main.ml | jq '.value'
   "Not a valid identifier"
 
+FIXME: expected "fld_b comment"
+
   $ cat >main.ml <<EOF
   > type t2 = {
   >   fld_a: unit; (** fld_a comment *)
@@ -61,4 +63,4 @@ FIXME: expected "Poly_b comment"
 
   $ $MERLIN single document -position 8:4 \
   > -filename main.ml <main.ml | tr '\r\n' ' ' | jq '.value'
-  "fld_b comment"
+  "fld_a comment fld_b comment"

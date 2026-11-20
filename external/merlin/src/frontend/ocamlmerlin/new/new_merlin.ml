@@ -84,7 +84,7 @@ let run =
       (* Parse commandline *)
       match
         begin
-          let start_cpu = Std.time_spent () in
+          let start_cpu = Misc.time_spent () in
           let start_clock = Unix.gettimeofday () *. 1000. in
           let config, command_args =
             let fails = ref [] in
@@ -133,7 +133,7 @@ let run =
                   Location.print_main Format.str_formatter err;
                   ("error", `String (Format.flush_str_formatter ())))
             in
-            let cpu_time = Std.time_spent () -. start_cpu in
+            let cpu_time = Misc.time_spent () -. start_cpu in
             let gc_stats = Gc.quick_stat () in
             let heap_mbytes =
               gc_stats.heap_words * (Sys.word_size / 8) / 1_000_000
@@ -163,9 +163,10 @@ let run =
               ]
           in
           log ~title:"run(result)" "%a" Logger.json (fun () -> json);
-          begin match Mconfig.(config.merlin.protocol) with
-          | `Sexp -> Sexp.tell_sexp print_string (Sexp.of_json json)
-          | `Json -> Yojson.Basic.to_channel stdout json
+          begin
+            match Mconfig.(config.merlin.protocol) with
+            | `Sexp -> Sexp.tell_sexp print_string (Sexp.of_json json)
+            | `Json -> Yojson.Basic.to_channel stdout json
           end;
           print_newline ()
         end
@@ -186,11 +187,12 @@ let with_wd ~wd ~old_wd f args =
     f args
 
 let run ~new_env wd args =
-  begin match new_env with
-  | Some env ->
-    Os_ipc.merlin_set_environ env;
-    Unix.putenv "__MERLIN_MASTER_PID" (string_of_int (Unix.getpid ()))
-  | None -> ()
+  begin
+    match new_env with
+    | Some env ->
+      Os_ipc.merlin_set_environ env;
+      Unix.putenv "__MERLIN_MASTER_PID" (string_of_int (Unix.getpid ()))
+    | None -> ()
   end;
   let old_wd = Sys.getcwd () in
   let run args () =

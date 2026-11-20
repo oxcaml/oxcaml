@@ -40,7 +40,6 @@ val run :
   Types.type_expr Query_protocol.type_search_result list
 
 val get_doc :
-  buffer_source:string ->
   config:Mconfig.t ->
   env:Env.t ->
   local_defs:Mtyper.typedtree ->

@@ -12,10 +12,11 @@ let with_include_dir ~visible_path ~hidden_path f =
   Clflags.include_dirs := visible_path;
   Clflags.hidden_include_dirs := hidden_path;
   let result =
-    begin try f ()
-    with e ->
-      restore ();
-      raise e
+    begin
+      try f ()
+      with e ->
+        restore ();
+        raise e
     end
   in
   restore ();
@@ -23,15 +24,9 @@ let with_include_dir ~visible_path ~hidden_path f =
 
 let rewrite parsetree cfg =
   let ppx = cfg.ocaml.ppx in
-  let visible_path =
-    List.map
-      (fun path : Clflags.visible_include ->
-        (* [cmx_guaranteed] isn't relevant to Merlin, so we can fill in a bogus value *)
-        { path; cmx_guaranteed = false })
-      (Mconfig.build_path cfg)
-  in
   (* add include path attribute to the parsetree *)
-  with_include_dir ~visible_path ~hidden_path:(Mconfig.hidden_build_path cfg)
+  with_include_dir ~visible_path:(Mconfig.build_path cfg)
+    ~hidden_path:(Mconfig.hidden_build_path cfg)
   @@ fun () ->
   match
     Pparse.apply_rewriters ~restore:false ~ppx ~tool_name:"merlin" parsetree
@@ -43,5 +38,5 @@ let rewrite parsetree cfg =
         | None | Some `Already_displayed ->
           Format.fprintf fmt "%s" (Printexc.to_string exn)
         | Some (`Ok err) -> Location.print_main fmt err);
-    Typing_recovery.log_or_raise exn;
+    Msupport.raise_error exn;
     parsetree

@@ -46,7 +46,7 @@ let flatten lid = flat [] lid
 
 let rec head = function
     Lident s -> s
-  | Ldot({ txt = lid; _ }, _) -> head lid
+  | Ldot(lid, _) -> head lid.txt
   | Lapply(_, _) -> assert false
 
 let last = function
@@ -77,25 +77,25 @@ let parse s =
 
 let keep_suffix =
   let rec aux = function
-    | Lident str ->
+    | { txt = Lident str; _ } as t ->
       if String.uncapitalize_ascii str <> str then
-        Some (Lident str, false)
+        Some (t, false)
       else
         None
-    | Ldot (t, ({ txt = str; _ } as str_loc)) ->
-      if String.uncapitalize_ascii str <> str then
-        match aux t.txt with
-        | None -> Some (Lident str, true)
-        | Some (t, is_label) -> Some (Ldot (Location.mknoloc t, str_loc), is_label)
+    | { txt = Ldot (t, str); loc } ->
+      if String.uncapitalize_ascii str.txt <> str.txt then
+        match aux t with
+        | None -> Some ({ txt = Lident str.txt; loc = str.loc }, true)
+        | Some (t, is_label) -> Some ({ txt = Ldot (t, str); loc }, is_label)
       else
         None
     | t -> Some (t, false) (* Can be improved... *)
   in
   function
   | Lident s -> Lident s, false
-  | Ldot (t, ({ txt = s; _ } as s_loc)) ->
-    begin match aux t.txt with
-    | None -> Lident s, true
-    | Some (t, is_label) -> Ldot (Location.mknoloc t, s_loc), is_label
+  | Ldot (t, s) ->
+    begin match aux t with
+    | None -> Lident s.txt, true
+    | Some (t, is_label) -> Ldot (t, s), is_label
     end
   | otherwise -> otherwise, false

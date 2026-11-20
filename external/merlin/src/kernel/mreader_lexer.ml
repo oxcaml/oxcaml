@@ -75,9 +75,7 @@ let initial_position config =
   }
 
 let make warnings keywords config source =
-  Msupport.catch_errors_with_warning warnings (ref []) @@ fun () ->
-  (* Forget any [#syntax] directive left over from a previous buffer. *)
-  Lexer_raw.reset_syntax_mode ();
+  Msupport.catch_errors warnings (ref []) @@ fun () ->
   let items =
     get_tokens keywords (initial_position config) (Msource.text source) []
   in
@@ -333,10 +331,11 @@ let for_completion t pos =
     | (Triple (token, _, loc_end) as item) :: _ as items
       when Lexing.compare_pos pos loc_end = 0 ->
       check_label item;
-      begin match token with
-      (* Already on identifier, no need to introduce *)
-      | UIDENT _ | LIDENT _ -> raise Exit
-      | _ -> (acc, items)
+      begin
+        match token with
+        (* Already on identifier, no need to introduce *)
+        | UIDENT _ | LIDENT _ -> raise Exit
+        | _ -> (acc, items)
       end
     | items -> (acc, items)
   in

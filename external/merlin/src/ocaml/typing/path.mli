@@ -55,19 +55,9 @@ and extra_ty =
       it has the path
         [Pextra_ty (Pident `Error`, Pext_ty)].
   *)
-  | Punboxed_ty
-  (** [Pextra_ty (p, Punboxed_ty)] is the type of the unboxed version of [p].
-
-      Example: [float#], or [t#] given [type t = { i : int ; s : string }].
-  *)
-
-val unboxed_version : t -> t
-val boxed_version : t -> t option
-val is_unboxed_version : t -> bool
 
 val same: t -> t -> bool
 val compare: t -> t -> int
-val hash: t -> int
 val compare_extra: extra_ty -> extra_ty -> int
 val find_free_opt: Ident.t list -> t -> Ident.t option
 val exists_free: Ident.t list -> t -> bool
@@ -91,4 +81,3 @@ val is_constructor_typath: t -> bool
 
 module Map : Map.S with type key = t
 module Set : Set.S with type elt = t
-module Tbl : Hashtbl.S with type key = t

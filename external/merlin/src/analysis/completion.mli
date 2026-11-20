@@ -32,8 +32,8 @@ open Query_protocol
 
 type raw_info =
   [ `Constructor of Data_types.constructor_description
-  | `Modtype of Subst.Lazy.module_type
-  | `Modtype_declaration of Ident.t * Subst.Lazy.modtype_declaration
+  | `Modtype of Types.module_type
+  | `Modtype_declaration of Ident.t * Types.modtype_declaration
   | `None
   | `String of string
   | `Type_declaration of Ident.t * Types.type_declaration
@@ -52,7 +52,7 @@ val branch_complete :
   Mconfig.t ->
   ?get_doc:
     ([> `Completion_entry of Env_lookup.Namespace.t * Path.t * Location.t ] ->
-    [> `Found of string ]) ->
+     [> `Found of string ]) ->
   ?target_type:Types.type_expr ->
   ?kinds:Compl.kind list ->
   keywords:string list ->

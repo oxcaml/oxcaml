@@ -109,17 +109,12 @@ module List = struct
       | None -> filter_map ~f xs
       | Some x -> x :: filter_map ~f xs)
 
-  let rec find_map_opt ~f = function
-    | [] -> None
+  let rec find_map ~f = function
+    | [] -> raise Not_found
     | x :: xs -> (
       match f x with
-      | None -> find_map_opt ~f xs
-      | Some x' -> Some x')
-
-  let find_map ~f l =
-    match find_map_opt ~f l with
-    | None -> raise Not_found
-    | Some x -> x
+      | None -> find_map ~f xs
+      | Some x' -> x')
 
   let rec map_end ~f l1 l2 =
     match l1 with
@@ -177,11 +172,11 @@ module List = struct
   let filter_dup lst = filter_dup' ~equiv:(fun x -> x) lst
 
   let rec merge_cons ~f = function
-    | a :: (b :: tl as tl') ->
-      begin match f a b with
+    | a :: (b :: tl as tl') -> begin
+      match f a b with
       | Some a' -> merge_cons ~f (a' :: tl)
       | None -> a :: merge_cons ~f tl'
-      end
+    end
     | tl -> tl
 
   let rec take_while ~f = function
@@ -409,12 +404,12 @@ module String = struct
       let l' = String.length s in
       l' >= l
       &&
-        try
-          for i = 0 to pred l do
-            if s.[i] <> by.[i] then raise Not_found
-          done;
-          true
-        with Not_found -> false
+      try
+        for i = 0 to pred l do
+          if s.[i] <> by.[i] then raise Not_found
+        done;
+        true
+      with Not_found -> false
 
   (* Drop characters from beginning of string *)
   let drop n s = sub s ~pos:n ~len:(length s - n)
@@ -677,11 +672,63 @@ module Lexing = struct
 end
 
 module Char = struct
+  (* FIXME: Remove once we drop support for 4.02 and replace the calls to
+     [uppercase] and [lowercase] by their [_ascii] version. *)
+  [@@@ocaml.warning "-3"]
+
   include Char
   let is_lowercase c = lowercase_ascii c = c
   let is_uppercase c = uppercase_ascii c = c
   let is_strictly_lowercase c = not (is_uppercase c)
   let is_strictly_uppercase c = not (is_lowercase c)
+end
+
+module Glob : sig
+  type pattern = Wildwild | Exact of string | Regexp of Str.regexp
+  val compile_pattern : string -> pattern
+  val match_pattern : pattern -> string -> bool
+end = struct
+  type pattern = Wildwild | Exact of string | Regexp of Str.regexp
+
+  let compile_pattern = function
+    | "**" -> Wildwild
+    | pattern ->
+      let regexp = Buffer.create 15 in
+      let chunk = Buffer.create 15 in
+      let flush () =
+        if Buffer.length chunk > 0 then (
+          Buffer.add_string regexp (Str.quote (Buffer.contents chunk));
+          Buffer.clear chunk)
+      in
+      let l = String.length pattern in
+      let i = ref 0 in
+      while !i < l do
+        begin
+          match pattern.[!i] with
+          | '\\' ->
+            incr i;
+            if !i < l then Buffer.add_char chunk pattern.[!i]
+          | '*' ->
+            flush ();
+            Buffer.add_string regexp ".*"
+          | '?' ->
+            flush ();
+            Buffer.add_char regexp '.'
+          | x -> Buffer.add_char chunk x
+        end;
+        incr i
+      done;
+      if Buffer.length regexp = 0 then Exact (Buffer.contents chunk)
+      else (
+        flush ();
+        Buffer.add_char regexp '$';
+        Regexp (Str.regexp (Buffer.contents regexp)))
+
+  let match_pattern re str =
+    match re with
+    | Wildwild -> true
+    | Regexp re -> Str.string_match re str 0
+    | Exact s -> s = str
 end
 
 let fprintf = Format.fprintf
@@ -810,21 +857,25 @@ end
  * - modules_in_path ~ext:".mli" ["."] returns ["A"] *)
 let modules_in_path ~ext path =
   let seen = Hashtbl.create 7 in
-  List.fold_left ~init:[] path ~f:begin fun results dir ->
-      try
-        Array.fold_left
-          begin fun results file ->
-            if Filename.check_suffix file ext then
-              let name = Filename.chop_extension file in
-              if Hashtbl.mem seen name then results
-              else (
-                Hashtbl.add seen name ();
-                String.capitalize name :: results)
-            else results
-          end
-          results (Sys.readdir dir)
-      with Sys_error _ -> results
-    end
+  List.fold_left ~init:[] path
+    ~f:
+      begin
+        fun results dir ->
+          try
+            Array.fold_left
+              begin
+                fun results file ->
+                  if Filename.check_suffix file ext then
+                    let name = Filename.chop_extension file in
+                    if Hashtbl.mem seen name then results
+                    else (
+                      Hashtbl.add seen name ();
+                      String.capitalize name :: results)
+                  else results
+              end
+              results (Sys.readdir dir)
+          with Sys_error _ -> results
+      end
 
 let file_contents filename =
   let ic = open_in filename in
@@ -853,15 +904,3 @@ type 'a with_workdir = { workdir : string; workval : 'a }
 
 let dump_with_workdir f x : json =
   `Assoc [ ("workdir", `String x.workdir); ("workval", f x.workval) ]
-
-let time_spent () =
-  let open Unix in
-  let t = times () in
-  (t.tms_utime +. t.tms_stime +. t.tms_cutime +. t.tms_cstime) *. 1000.0
-
-let unitname filename =
-  let unitname =
-    try String.sub filename ~pos:0 ~len:(String.index filename '.')
-    with Not_found -> filename
-  in
-  String.capitalize_ascii unitname

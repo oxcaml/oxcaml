@@ -7,7 +7,7 @@
   > let () = print_string Lib.foo
   > EOF
 
-  $ $OCAMLC -bin-annot -bin-annot-occurrences -c lib.ml main.ml
+  $ ocamlc -bin-annot -bin-annot-occurrences -c lib.ml main.ml
 
   $ ocaml-index aggregate main.cmt lib.cmt
   $ ocaml-index dump project.ocaml-index
@@ -17,7 +17,7 @@
      "foo": File "lib.ml", line 1, characters 4-7;
      "foo": File "lib.ml", line 2, characters 22-25;
      "Lib.foo": File "main.ml", line 1, characters 22-29
-   uid: Stdlib.313; locs:
+   uid: Stdlib.312; locs:
      "print_string": File "lib.ml", line 2, characters 9-21;
      "print_string": File "main.ml", line 1, characters 9-21
    }, 0 approx shapes: {}, and shapes for CUS .
@@ -33,7 +33,7 @@
         "file": "$TESTCASE_ROOT/main.ml",
         "start": {
           "line": 1,
-          "col": 22
+          "col": 26
         },
         "end": {
           "line": 1,

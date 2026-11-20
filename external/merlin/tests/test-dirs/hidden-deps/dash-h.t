@@ -102,7 +102,7 @@ the type)
           "line": 4,
           "col": 12
         },
-        "type": "sig type t = int val x : int @@ stateless type s = Baz end",
+        "type": "sig type t = int val x : int type s = Baz end",
         "tail": "no"
       },
       {
@@ -199,7 +199,7 @@ reference.  With no liba, we also can't see Libb.t is int.
               "line": 4,
               "col": 12
             },
-            "message": "Hint:    Did you mean Libb?"
+            "message": "Hint: Did you mean Libb?"
           }
         ],
         "valid": true,
@@ -248,7 +248,7 @@ reference.  With no liba, we also can't see Libb.t is int.
               "line": 4,
               "col": 12
             },
-            "message": "Hint:    Did you mean Libb?"
+            "message": "Hint: Did you mean Libb?"
           }
         ],
         "valid": true,

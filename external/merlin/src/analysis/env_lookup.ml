@@ -6,9 +6,6 @@ module Namespace = struct
 
   let to_string = Shape.Sig_component_kind.to_string
 
-  type packed_label_description =
-    | P : 'rep Data_types.gen_label_description -> packed_label_description
-
   type under_type = [ `Constr | `Labels ]
 
   type inferred_basic =
@@ -17,18 +14,16 @@ module Namespace = struct
 
   type inferred =
     [ inferred_basic
-    | `This_label of packed_label_description
+    | `This_label of Data_types.label_description
     | `This_cstr of Data_types.constructor_description ]
 
   let from_context : Context.t -> inferred list = function
     | Type -> [ `Type; `Mod; `Modtype; `Constr; `Labels; `Vals ]
     | Module_type -> [ `Modtype; `Mod; `Type; `Constr; `Labels; `Vals ]
     | Expr | Constant -> [ `Vals; `Mod; `Modtype; `Constr; `Labels; `Type ]
-    | Unknown_constructor -> [ `Constr; `Vals; `Mod; `Modtype; `Labels; `Type ]
-    | Unknown_label -> [ `Labels; `Vals; `Mod; `Modtype; `Constr; `Type ]
     | Patt -> [ `Mod; `Modtype; `Type; `Constr; `Labels; `Vals ]
     | Unknown -> [ `Vals; `Type; `Constr; `Mod; `Modtype; `Labels ]
-    | Label (lbl, _) -> [ `This_label (P lbl) ]
+    | Label lbl -> [ `This_label lbl ]
     | Module_path -> [ `Mod ]
     | Constructor (c, _) -> [ `This_cstr c ]
 end
@@ -46,7 +41,7 @@ let by_path path (namespace : Namespace.t) env =
       | Value ->
         let vd = Env.find_value path env in
         (vd.val_loc, vd.val_uid, Value)
-      | Type | Extension_constructor | Constructor | Label | Unboxed_label ->
+      | Type | Extension_constructor | Constructor | Label ->
         let td = Env.find_type path env in
         (td.type_loc, td.type_uid, Type)
       | Module ->
@@ -61,9 +56,6 @@ let by_path path (namespace : Namespace.t) env =
       | Class_type ->
         let clty = Env.find_cltype path env in
         (clty.clty_loc, clty.clty_uid, Class)
-      | Jkind ->
-        let jk = Env.find_jkind path env in
-        (jk.jkind_loc, jk.jkind_uid, Jkind)
     in
     Some { uid; loc; namespace }
   with Not_found -> None
@@ -71,18 +63,18 @@ let by_path path (namespace : Namespace.t) env =
 exception
   Found of (Path.t * Shape.Sig_component_kind.t * Shape.Uid.t * Location.t)
 
-let path_and_loc_of_cstr (desc : Data_types.constructor_description) _ =
+let path_and_loc_of_cstr desc _ =
   let open Types in
-  match desc.cstr_tag with
-  | Extension path -> (path, desc.cstr_loc)
+  match desc.Data_types.cstr_tag with
+  | Cstr_extension (path, _) -> (path, desc.cstr_loc)
   | _ -> (
-    match get_desc desc.cstr_res with
-    | Tconstr (path, _, _) -> (path, desc.cstr_loc)
-    | _ -> assert false)
+      match get_desc desc.cstr_res with
+      | Tconstr (path, _, _) -> (path, desc.cstr_loc)
+      | _ -> assert false)
 
-let path_and_loc_from_label (desc : _ Data_types.gen_label_description) env =
+let path_and_loc_from_label desc env =
   let open Types in
-  match get_desc desc.lbl_res with
+  match get_desc desc.Data_types.lbl_res with
   | Tconstr (path, _, _) ->
     let typ_decl = Env.find_type path env in
     (path, typ_decl.Types.type_loc)
@@ -94,7 +86,7 @@ let by_longident (nss : Namespace.inferred list) ident env =
     List.iter nss ~f:(fun namespace ->
         try
           match namespace with
-          | `This_cstr ({ Data_types.cstr_tag = Extension _; _ } as cd) ->
+          | `This_cstr ({ Data_types.cstr_tag = Cstr_extension _; _ } as cd) ->
             log ~title:"lookup" "got extension constructor";
             let path, loc = path_and_loc_of_cstr cd env in
             (* TODO: Use [`Constr] here instead of [`Type] *)
@@ -105,23 +97,23 @@ let by_longident (nss : Namespace.inferred list) ident env =
             let path, loc = path_and_loc_of_cstr cd env in
             log ~title:"lookup" "found path: %a" Logger.fmt (fun fmt ->
                 (Format_doc.compat Path.print) fmt path);
-            let path = Path.Pdot (path, cd.cstr_name) in
+            let path = Path.Pextra_ty (path, Pcstr_ty cd.cstr_name) in
             raise (Found (path, Constructor, cd.cstr_uid, loc))
           | `Constr ->
             log ~title:"lookup" "lookup in constructor namespace";
             let cd = Env.find_constructor_by_name ident env in
             let path, loc = path_and_loc_of_cstr cd env in
-            let path = Path.Pdot (path, cd.cstr_name) in
+            let path = Path.Pextra_ty (path, Pcstr_ty cd.cstr_name) in
             (* TODO: Use [`Constr] here instead of [`Type] *)
             raise (Found (path, Constructor, cd.cstr_uid, loc))
           | `Mod ->
             log ~title:"lookup" "lookup in module namespace";
-            let path, md = Env.find_module_by_name_lazy ident env in
-            raise (Found (path, Module, md.md_uid, md.md_loc))
+            let path, md = Env.find_module_by_name ident env in
+            raise (Found (path, Module, md.md_uid, md.Types.md_loc))
           | `Modtype ->
             log ~title:"lookup" "lookup in module type namespace";
-            let path, mtd = Env.find_modtype_by_name_lazy ident env in
-            raise (Found (path, Module_type, mtd.mtd_uid, mtd.mtd_loc))
+            let path, mtd = Env.find_modtype_by_name ident env in
+            raise (Found (path, Module_type, mtd.mtd_uid, mtd.Types.mtd_loc))
           | `Type ->
             log ~title:"lookup" "lookup in type namespace";
             let path, typ_decl = Env.find_type_by_name ident env in
@@ -132,24 +124,15 @@ let by_longident (nss : Namespace.inferred list) ident env =
             let path, val_desc = Env.find_value_by_name ident env in
             raise
               (Found (path, Value, val_desc.val_uid, val_desc.Types.val_loc))
-          | `This_label (Namespace.P lbl) ->
+          | `This_label lbl ->
             log ~title:"lookup"
               "got label, fetching path and loc in type namespace";
             let path, loc = path_and_loc_from_label lbl env in
-            let path = Path.Pdot (path, lbl.lbl_name) in
+            let path = Path.Pextra_ty (path, Pcstr_ty lbl.lbl_name) in
             raise (Found (path, Label, lbl.lbl_uid, loc))
           | `Labels ->
             log ~title:"lookup" "lookup in label namespace";
-            let (P (type rep) (lbl : rep Data_types.gen_label_description)) :
-                Namespace.packed_label_description =
-              (* Try looking up in boxed namespace, and then fallback to unboxed if that
-                 fails *)
-              try
-                (P (Env.find_label_by_name Legacy ident env)
-                  : Namespace.packed_label_description)
-              with Not_found ->
-                P (Env.find_label_by_name Unboxed_product ident env)
-            in
+            let lbl = Env.find_label_by_name ident env in
             let path, loc = path_and_loc_from_label lbl env in
             (* TODO: Use [`Labels] here instead of [`Type] *)
             raise (Found (path, Type, lbl.lbl_uid, loc))

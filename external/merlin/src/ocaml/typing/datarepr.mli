@@ -26,9 +26,6 @@ val extension_descr:
 val labels_of_type:
   Path.t -> type_declaration ->
   (Ident.t * label_description) list
-val unboxed_labels_of_type:
-  Path.t -> type_declaration ->
-  (Ident.t * unboxed_label_description) list
 val constructors_of_type:
   current_unit:(Unit_info.t option) -> Path.t -> type_declaration ->
   (Ident.t * constructor_description) list
@@ -36,18 +33,9 @@ val constructors_of_type:
 
 exception Constr_not_found
 
-type variant_with_null_payload =
-  {
-    payload_cstr: constructor_declaration;
-    payload_arg: constructor_argument;
-  }
-
-val find_variant_with_null_payload :
-  constructor_declaration list -> variant_with_null_payload option
-
 val find_constr_by_tag:
-  constant:bool -> int -> ((constructor_description * 'a) * 'b) list ->
-    constructor_description
+  constructor_tag -> constructor_declaration list ->
+    constructor_declaration
 
 val constructor_existentials :
     constructor_arguments -> type_expr option -> type_expr list * type_expr list

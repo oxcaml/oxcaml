@@ -30,18 +30,6 @@ in the presence of underscores.
         "line": 3,
         "col": 6
       },
-      "type": "float",
-      "tail": "no"
-    },
-    {
-      "start": {
-        "line": 3,
-        "col": 2
-      },
-      "end": {
-        "line": 3,
-        "col": 6
-      },
       "type": "int",
       "tail": "no"
     },
@@ -67,18 +55,6 @@ in the presence of underscores.
   >   _foo
   > EOF
   [
-    {
-      "start": {
-        "line": 3,
-        "col": 2
-      },
-      "end": {
-        "line": 3,
-        "col": 6
-      },
-      "type": "float",
-      "tail": "no"
-    },
     {
       "start": {
         "line": 3,
@@ -147,18 +123,6 @@ We try several places in the identifier to check the result stability
         "line": 3,
         "col": 9
       },
-      "type": "float",
-      "tail": "no"
-    },
-    {
-      "start": {
-        "line": 3,
-        "col": 2
-      },
-      "end": {
-        "line": 3,
-        "col": 9
-      },
       "type": "int",
       "tail": "no"
     },
@@ -184,18 +148,6 @@ We try several places in the identifier to check the result stability
   >   foo_bar
   > EOF
   [
-    {
-      "start": {
-        "line": 3,
-        "col": 2
-      },
-      "end": {
-        "line": 3,
-        "col": 9
-      },
-      "type": "float",
-      "tail": "no"
-    },
     {
       "start": {
         "line": 3,
@@ -263,18 +215,6 @@ We try several places in the identifier to check the result stability
         "line": 3,
         "col": 9
       },
-      "type": "float",
-      "tail": "no"
-    },
-    {
-      "start": {
-        "line": 3,
-        "col": 2
-      },
-      "end": {
-        "line": 3,
-        "col": 9
-      },
       "type": "int",
       "tail": "no"
     },
@@ -301,18 +241,6 @@ We try several places in the identifier to check the result stability
   {
     "class": "return",
     "value": [
-      {
-        "start": {
-          "line": 3,
-          "col": 2
-        },
-        "end": {
-          "line": 3,
-          "col": 9
-        },
-        "type": "float",
-        "tail": "no"
-      },
       {
         "start": {
           "line": 3,
@@ -401,115 +329,5 @@ We try several places in the identifier to check the result stability
         "tail": "no"
       }
     ],
-    "notifications": []
-  }
-
-  $ $MERLIN single dump -what typedtree -filename under.ml <<EOF
-  > let aa = 4.2
-  > let f (x) : int = function
-  >   | None -> 3
-  >   | Some 5 -> 4
-  >   | Some _aa -> 4
-  > EOF
-  {
-    "class": "return",
-    "value": "[
-    structure_item (under.ml[1,0+0]..under.ml[1,0+12])
-      Tstr_value Nonrec
-      [
-        <def>
-          pattern (under.ml[1,0+4]..under.ml[1,0+6])
-            Tpat_var \"aa\"
-            sort value
-            value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-          expression (under.ml[1,0+9]..under.ml[1,0+12])
-            Texp_constant Const_float 4.2
-      ]
-    structure_item (under.ml[2,13+0]..under.ml[5,70+17])
-      Tstr_value Nonrec
-      [
-        <def>
-          pattern (under.ml[2,13+4]..under.ml[2,13+5])
-            Tpat_var \"f\"
-            sort value
-            value_mode id(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-          expression (under.ml[2,13+6]..under.ml[5,70+17]) ghost
-            Texp_function
-            alloc_mode global
-            yielding_mode unyielding
-            return_mode proj_Locality(modevar#16<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
-            []
-            [
-              Nolabel
-              Param_pat
-                pattern (under.ml[2,13+6]..under.ml[2,13+9])
-                  Tpat_var \"x\"
-                  sort '_representable_layout_1
-                  value_mode local_to_regional_full(modevar#e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#12<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                proj_Locality(modevar#e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
-                []
-            ]
-            Tfunction_cases (under.ml[2,13+18]..under.ml[5,70+17])
-              locality_mode proj_Locality(modevar#18<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
-              value
-              extra (under.ml[2,13+18]..under.ml[5,70+17])
-                Texp_constraint
-                core_type (under.ml[2,13+12]..under.ml[2,13+15])
-                  Ttyp_constr \"int!\"
-                  []
-              [
-                <case>
-                  pattern (under.ml[3,40+4]..under.ml[3,40+8])
-                    extra (under.ml[3,40+4]..under.ml[3,40+8])
-                      Tpat_inspected_type
-                        Label_disambiguation
-                          Unambiguous
-                    Tpat_construct \"None\"
-                    []
-                    None
-                  expression (under.ml[3,40+12]..under.ml[3,40+13])
-                    attribute \"merlin.loc\"
-                      []
-                    Texp_constant Const_int 3
-                <case>
-                  pattern (under.ml[4,54+4]..under.ml[4,54+10])
-                    extra (under.ml[4,54+4]..under.ml[4,54+10])
-                      Tpat_inspected_type
-                        Label_disambiguation
-                          Unambiguous
-                    Tpat_construct \"Some\"
-                    [
-                      pattern (under.ml[4,54+9]..under.ml[4,54+10])
-                        Tpat_constant Const_int 5
-                    ]
-                    None
-                  expression (under.ml[4,54+14]..under.ml[4,54+15])
-                    attribute \"merlin.loc\"
-                      []
-                    Texp_constant Const_int 4
-                <case>
-                  pattern (under.ml[5,70+4]..under.ml[5,70+12])
-                    extra (under.ml[5,70+4]..under.ml[5,70+12])
-                      Tpat_inspected_type
-                        Label_disambiguation
-                          Unambiguous
-                    Tpat_construct \"Some\"
-                    [
-                      pattern (under.ml[5,70+9]..under.ml[5,70+12])
-                        Tpat_var \"_aa\"
-                        sort value
-                        value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
-                    ]
-                    None
-                  expression (under.ml[5,70+16]..under.ml[5,70+17])
-                    attribute \"merlin.loc\"
-                      []
-                    Texp_constant Const_int 4
-              ]
-      ]
-  ]
-  
-  
-  ",
     "notifications": []
   }

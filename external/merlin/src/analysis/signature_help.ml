@@ -3,7 +3,7 @@ open Std
 let { Logger.log } = Logger.for_section "signature-help"
 
 type parameter_info =
-  { label : Typedtree.arg_label;
+  { label : Asttypes.arg_label;
     param_start : int;
     param_end : int;
     argument : Typedtree.apply_arg
@@ -23,13 +23,11 @@ let extract_ident (exp_desc : Typedtree.expression_desc) =
   let rec longident ppf : Longident.t -> unit = function
     | Lident s -> Format.fprintf ppf "%s" (Misc_utils.parenthesize_name s)
     | Ldot (p, s) ->
-      Format.fprintf ppf "%a.%s" longident p.txt
-        (Misc_utils.parenthesize_name s.txt)
-    | Lapply (p1, p2) ->
-      Format.fprintf ppf "%a(%a)" longident p1.txt longident p2.txt
+      Format.fprintf ppf "%a.%s" longident p.txt (Misc_utils.parenthesize_name s.txt)
+    | Lapply (p1, p2) -> Format.fprintf ppf "%a(%a)" longident p1.txt longident p2.txt
   in
   match exp_desc with
-  | Texp_ident { lid = { txt = li; _ }; _ } ->
+  | Texp_ident (_, { txt = li; _ }, _) ->
     let ppf, to_string = Format.to_string () in
     longident ppf li;
     Some (to_string ())
@@ -42,7 +40,7 @@ let extract_ident (exp_desc : Typedtree.expression_desc) =
 let pp_type env ppf ty =
   let module Printtyp = Type_utils.Printtyp in
   Printtyp.wrap_printing_env env ~verbosity:(Lvl 0) (fun () ->
-      Printtyp.Compat.shared_type_scheme ppf ty)
+      Printtyp.shared_type_scheme ppf ty)
 
 let rec type_is_arrow ty =
   match Types.get_desc ty with
@@ -58,21 +56,19 @@ let pp_parameter_type env ppf ty =
 
 (* print parameter labels and types *)
 let pp_parameter env label ppf ty =
-  match (label : Typedtree.arg_label) with
+  match (label : Asttypes.arg_label) with
   | Nolabel -> pp_parameter_type env ppf ty
   | Labelled l -> Format.fprintf ppf "%s:%a" l (pp_parameter_type env) ty
   | Optional l ->
     (* unwrap option for optional labels the same way as
        [Raw_compat.labels_of_application] *)
-    let rec unwrap_option ty =
+    let unwrap_option ty =
       match Types.get_desc ty with
       | Types.Tconstr (path, [ ty ], _) when Path.same path Predef.path_option
         -> ty
-      | Types.Tpoly (ty, []) -> unwrap_option ty
       | _ -> ty
     in
     Format.fprintf ppf "?%s:%a" l (pp_parameter_type env) (unwrap_option ty)
-  | Position l -> Format.fprintf ppf "%s:[%%call_pos]" l
 
 (* record buffer offsets to be able to underline parameter types *)
 let print_parameter_offset ~arg:argument ppf buffer env label ty =
@@ -83,23 +79,6 @@ let print_parameter_offset ~arg:argument ppf buffer env label ty =
   Format.pp_print_flush ppf ();
   { label; param_start; param_end; argument }
 
-let omitted : Typedtree.omitted_parameter =
-  let mode_closure =
-    Typedtree.create_locality_mode_r
-      (Mode.Locality.disallow_left Mode.Locality.legacy)
-  in
-  let mode_arg =
-    Typedtree.create_locality_mode_l
-      (Mode.Locality.disallow_right Mode.Locality.legacy)
-  in
-  let mode_ret =
-    Typedtree.create_return_mode
-      (Mode.Locality.disallow_right Mode.Locality.legacy)
-  in
-  let sort_arg = Jkind.Sort.scannable in
-  let sort_ret = Jkind.Sort.scannable in
-  { mode_closure; mode_arg; mode_ret; sort_arg; sort_ret }
-
 (* This function preprocesses the signature and associate already assigned
    arguments to the corresponding parameter. (They should always be in the correct
    order in the typedtree, even if they are not in order in the source file.) *)
@@ -109,15 +88,14 @@ let separate_function_signature ~args (e : Typedtree.expression) =
   let ppf = Format.formatter_of_buffer buffer in
   let rec separate ?(parameters = []) args ty =
     match (args, Types.get_desc ty) with
-    | (_l, arg) :: args, Tarrow ((label, _, _), ty1, ty2, _) ->
+    | (_l, arg) :: args, Tarrow (label, ty1, ty2, _) ->
       let parameter =
         print_parameter_offset ~arg ppf buffer e.exp_env label ty1
       in
       separate args ty2 ~parameters:(parameter :: parameters)
-    | [], Tarrow ((label, _, _), ty1, ty2, _) ->
+    | [], Tarrow (label, ty1, ty2, _) ->
       let parameter =
-        print_parameter_offset ~arg:(Omitted omitted) ppf buffer e.exp_env label
-          ty1
+        print_parameter_offset ~arg:(Omitted ()) ppf buffer e.exp_env label ty1
       in
       separate args ty2 ~parameters:(parameter :: parameters)
     (* end of function type, print remaining type without recording offsets *)
@@ -134,31 +112,30 @@ let separate_function_signature ~args (e : Typedtree.expression) =
 
 let active_parameter_by_arg ~arg params =
   let find_by_arg = function
-    | { argument = Arg (a, _); _ } when a == arg -> true
+    | { argument = Arg a; _ } when a == arg -> true
     | _ -> false
   in
   try Some (List.index params ~f:find_by_arg) with Not_found -> None
 
 let first_unassigned_argument params =
   let positional = function
-    | { argument = Omitted _; label = Typedtree.Nolabel; _ } -> true
+    | { argument = Omitted (); label = Asttypes.Nolabel; _ } -> true
     | _ -> false
   in
   let labelled = function
-    | { argument = Omitted _; label = Typedtree.Labelled _ | Optional _; _ } ->
-      true
+    | { argument = Omitted (); label = Asttypes.Labelled _ | Optional _; _ } -> true
     | _ -> false
   in
   try Some (List.index params ~f:positional)
   with Not_found -> (
-    try Some (List.index params ~f:labelled) with Not_found -> None)
+      try Some (List.index params ~f:labelled) with Not_found -> None)
 
 let active_parameter_by_prefix ~prefix params =
   let common = function
-    | Typedtree.Nolabel -> Some 0
+    | Asttypes.Nolabel -> Some 0
     | l
       when String.is_prefixed ~by:"~" prefix
-           || String.is_prefixed ~by:"?" prefix ->
+        || String.is_prefixed ~by:"?" prefix ->
       Some (String.common_prefix_len (Btype.prefixed_label_name l) prefix)
     | _ -> None
   in
@@ -170,12 +147,12 @@ let active_parameter_by_prefix ~prefix params =
     | [] -> longest_i
     | p :: ps when is_omitted p.argument -> (
       (* The search is performed only on the arguments not already given in the parameters. *)
-      match (common p.label, longest_len) with
-      | Some common_len, Some longest_len when common_len > longest_len ->
-        find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
-      | Some common_len, None ->
-        find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
-      | _ -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i)
+        match (common p.label, longest_len) with
+        | Some common_len, Some longest_len when common_len > longest_len ->
+          find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
+        | Some common_len, None ->
+          find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
+        | _ -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i)
     | _ :: ps -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i
   in
   find_by_prefix params
@@ -188,10 +165,8 @@ let is_arrow t =
 let application_signature ~prefix ~cursor = function
   | (_, Browse_raw.Expression arg)
     :: ( _,
-         Expression
-           { exp_desc = Texp_apply (({ exp_type; _ } as e), args, _, _, _, _);
-             _
-           } )
+         Expression { exp_desc = Texp_apply (({ exp_type; _ } as e), args); _ }
+       )
     :: _
     when is_arrow exp_type ->
     log ~title:"application_signature" "Last arg:\n%a" Logger.fmt (fun fmt ->

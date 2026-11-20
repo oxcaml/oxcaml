@@ -51,23 +51,18 @@ module Directive : sig
     | `CMT of string
     | `INDEX of string ]
 
-  type unit_name_mapping = { basename : string; unit_name : string }
-
   type no_processing_required =
     [ `EXT of string list
     | `FLG of string list
     | `STDLIB of string
     | `SOURCE_ROOT of string
     | `UNIT_NAME of string
-    | `UNIT_NAME_FOR of unit_name_mapping
     | `WRAPPING_PREFIX of string
-    | `SOURCE_ROOT of string
     | `SUFFIX of string
     | `READER of string list
     | `EXCLUDE_QUERY_DIR
     | `USE_PPX_CACHE
-    | `UNKNOWN_TAG of string
-    | `UNIT_NAME_FOR_ERROR of string ]
+    | `UNKNOWN_TAG of string ]
 
   module Processed : sig
     type acceptable_in_input = [ include_path | no_processing_required ]

@@ -3,7 +3,7 @@ open Std
 (** {1 OCaml commandline parsing} *)
 
 type ocaml =
-  { include_dirs : Clflags.visible_include list;
+  { include_dirs : string list;
     hidden_dirs : string list;
     no_std_include : bool;
     unsafe : bool;
@@ -16,20 +16,10 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
-    syntax_quotations : bool;
-    open_args : Clflags.open_arg list;
+    open_modules : string list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
-    warnings : Warnings.state;
-    cmi_file : string option;
-    parameters : string list;
-    as_parameter : bool;
-    as_argument_for : string option;
-    zero_alloc_check : Zero_alloc_annotations.Check.t;
-    zero_alloc_assert : Zero_alloc_annotations.Assert.t;
-    infer_with_bounds : bool;
-    kind_verbosity : int;
-    ikinds : bool
+    warnings : Warnings.state
   }
 
 val dump_ocaml : ocaml -> json
@@ -49,7 +39,6 @@ type merlin =
     stdlib : string option;
     source_root : string option;
     unit_name : string option;
-    unit_name_for : string String.Map.t;
     wrapping_prefix : string option;
     reader : string list;
     protocol : [ `Json | `Sexp ];
@@ -127,8 +116,6 @@ val document_arguments : out_channel -> unit
 
 val source_path : t -> string list
 
-val hidden_source_path : t -> string list
-
 val build_path : t -> string list
 
 val hidden_build_path : t -> string list
@@ -142,3 +129,7 @@ val global_modules : ?include_current:bool -> t -> string list
 val filename : t -> string
 
 val unitname : t -> string
+
+val intf_or_impl : t -> Unit_info.intf_or_impl
+
+val unit_info : t -> Unit_info.t

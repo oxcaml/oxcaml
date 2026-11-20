@@ -31,7 +31,7 @@ The parenthesis are typed as an open statement
       {
         "start": {
           "line": 4,
-          "col": 8
+          "col": 10
         },
         "end": {
           "line": 4,
@@ -42,7 +42,7 @@ The parenthesis are typed as an open statement
       {
         "start": {
           "line": 5,
-          "col": 8
+          "col": 11
         },
         "end": {
           "line": 5,
@@ -74,8 +74,8 @@ The parenthesis are typed as an open statement
       },
       {
         "start": {
-          "line": 8,
-          "col": 8
+          "line": 9,
+          "col": 2
         },
         "end": {
           "line": 9,

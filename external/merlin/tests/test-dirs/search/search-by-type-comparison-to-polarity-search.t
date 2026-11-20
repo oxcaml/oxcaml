@@ -81,6 +81,10 @@ a list.
     "type": "'a array list -> 'a array"
   }
   {
+    "name": "Seq.concat",
+    "type": "'a Seq.t Seq.t -> 'a Seq.t"
+  }
+  {
     "name": "Iarray.concat",
     "type": "'a iarray list -> 'a iarray"
   }
@@ -89,12 +93,8 @@ a list.
     "type": "'a option option -> 'a option"
   }
   {
-    "name": "Result.join",
-    "type": "(('a, 'e) result, 'e) result -> ('a, 'e) result"
-  }
-  {
-    "name": "Seq.concat",
-    "type": "'a Seq.t Seq.t -> 'a Seq.t"
+    "name": "Seq.transpose",
+    "type": "'a Seq.t Seq.t -> 'a Seq.t Seq.t"
   }
 
 3.) Looking for a function that take a list and produce a new list
@@ -129,6 +129,10 @@ map).
     "type": "f:(int -> 'a -> 'b) -> 'a list -> 'b list"
   }
   {
+    "name": "Seq.map",
+    "type": "('a -> 'b) -> 'a Seq.t -> 'b Seq.t"
+  }
+  {
     "name": "List.concat_map",
     "type": "('a -> 'b list) -> 'a list -> 'b list"
   }
@@ -139,10 +143,6 @@ map).
   {
     "name": "ListLabels.concat_map",
     "type": "f:('a -> 'b list) -> 'a list -> 'b list"
-  }
-  {
-    "name": "ListLabels.filter_map",
-    "type": "f:('a -> 'b option) -> 'a list -> 'b list"
   }
 
 
@@ -178,6 +178,10 @@ a list.
     "type": "'a array list -> 'a array"
   }
   {
+    "name": "Seq.concat",
+    "type": "'a Seq.t Seq.t -> 'a Seq.t"
+  }
+  {
     "name": "Iarray.concat",
     "type": "'a iarray list -> 'a iarray"
   }
@@ -186,12 +190,8 @@ a list.
     "type": "'a option option -> 'a option"
   }
   {
-    "name": "Result.join",
-    "type": "(('a, 'e) result, 'e) result -> ('a, 'e) result"
-  }
-  {
-    "name": "Seq.concat",
-    "type": "'a Seq.t Seq.t -> 'a Seq.t"
+    "name": "Seq.transpose",
+    "type": "'a Seq.t Seq.t -> 'a Seq.t Seq.t"
   }
 
 5.) Using polarity query inside search by type (result are a bit

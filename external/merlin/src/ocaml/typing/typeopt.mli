@@ -20,30 +20,19 @@ val is_function_type :
 val is_base_type : Env.t -> Types.type_expr -> Path.t -> bool
 
 val maybe_pointer_type : Env.t -> Types.type_expr
-  -> Lambda.immediate_or_pointer * Lambda.nullable
-val maybe_pointer : Typedtree.expression
-  -> Lambda.immediate_or_pointer * Lambda.nullable
+  -> Lambda.immediate_or_pointer
+val maybe_pointer : Typedtree.expression -> Lambda.immediate_or_pointer
 
-(* CR layouts-scannable: These functions will call [Ctype.type_sort] and extract
-   the layout in order to compute the array_kind. If (representable) layout info
-   is stored (e.g. in the typedtree) instead of sorts, those layouts can be
-   threaded through these functions to avoid the possibly expensive calls. *)
-val array_type_kind :
-  elt_ty:(Types.type_expr option)
-  -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
-(*
-val array_type_mut : Env.t -> Types.type_expr -> Lambda.mutable_flag
-val array_kind_of_elt :
-  Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
-*)
+val array_type_kind : Env.t -> Types.type_expr -> Lambda.array_kind
+
 val array_kind : Typedtree.expression -> Lambda.array_kind
-val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
-
 (*
-val refine_mixed_block_element :
-  Env.t -> Location.t -> Types.type_expr -> 'a Lambda.mixed_block_element
-  -> 'a Lambda.mixed_block_element
+val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
+val bigarray_type_kind_and_layout :
+      Env.t -> Types.type_expr -> Lambda.bigarray_kind * Lambda.bigarray_layout
+val value_kind : Env.t -> Types.type_expr -> Lambda.value_kind
 *)
+
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function
                              | `Float_that_cannot_be_shortcut
@@ -51,9 +40,8 @@ val classify_lazy_argument : Typedtree.expression ->
                              | `Other]
 
 (*
-(* Raises an error if the mixed block's scannable prefix would be too long.
-   The shape must not contain any splice variables. *)
-val assert_mixed_product_support_for_lambda_shape :
-  Location.t -> Typedecl.Mixed_product_kind.t
-  -> 'a Lambda.mixed_block_element array -> unit
+val value_kind_union :
+      Lambda.value_kind -> Lambda.value_kind -> Lambda.value_kind
+  (** [value_kind_union k1 k2] is a value_kind at least as general as
+      [k1] and [k2] *)
 *)

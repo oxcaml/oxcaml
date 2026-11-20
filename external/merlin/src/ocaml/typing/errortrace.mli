@@ -89,41 +89,30 @@ type first_class_module =
     | Package_inclusion of Format_doc.doc
     | Package_coercion of Format_doc.doc
 
-type arrow_position = Argument | Return
-
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
   | Variant : 'variety variant -> ('a, 'variety) elt
   | Obj : 'variety obj -> ('a, 'variety) elt
   | Escape : 'a escape -> ('a, _) elt
-  | Function_label_mismatch of arg_label diff
+  | Function_label_mismatch of Asttypes.arg_label diff
   | Tuple_label_mismatch of string option diff
   | Incompatible_fields : { name:string; diff: type_expr diff } -> ('a, _) elt
   | First_class_module: first_class_module -> ('a,_) elt
   (* Unification & Moregen; included in Equality for simplicity *)
   | Rec_occur : type_expr * type_expr -> ('a, _) elt
-  | Bad_jkind : type_expr * Jkind.Violation.t -> ('a, _) elt
-  | Bad_jkind_sort : type_expr * Jkind.Violation.t -> ('a, _) elt
-  | Unequal_var_jkinds :
-      type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
-  | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
-  | Mode_mismatch :
-      arrow_position * Mode.With_locality.error -> ('a, comparison) elt
-  | Weaken_sort : { pat: type_expr; subj: type_expr } -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
 type 'variety trace = (type_expr,     'variety) t
 type 'variety error = (expanded_type, 'variety) t
 
-val map_elt : ('a -> 'b) -> ('a, 'variety) elt -> ('b, 'variety) elt
-
-val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
-
+(** merlin specific *)
 val map_types :
   (type_expr -> type_expr) ->
   (expanded_type, 'variety) t -> (expanded_type, 'variety) t
+
+val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
 
 val incompatible_fields :
   name:string -> got:type_expr -> expected:type_expr -> (type_expr, _) elt
@@ -190,5 +179,6 @@ module Subtype : sig
 
   val map : ('a -> 'b) -> 'a t -> 'b t
 
+  (** merlin specific *)
   val map_types : (type_expr -> type_expr) -> expanded_type t -> expanded_type t
 end

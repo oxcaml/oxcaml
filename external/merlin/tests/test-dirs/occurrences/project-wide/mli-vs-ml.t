@@ -9,7 +9,7 @@
   > let _ : t = ()
   > EOF
 
-  $ $OCAMLC -bin-annot -bin-annot-occurrences -c main.mli main.ml
+  $ ocamlc -bin-annot -bin-annot-occurrences -c main.mli main.ml
 
   $ ocaml-index aggregate main.cmti main.cmt
 

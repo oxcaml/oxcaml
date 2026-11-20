@@ -40,6 +40,8 @@ module Printtyp : sig
 
   val type_scheme : Env.t -> Format.formatter -> Types.type_expr -> unit
 
+  val tree_of_typ_scheme : Types.type_expr -> Outcometree.out_type
+
   val modtype : Env.t -> Format.formatter -> Types.module_type -> unit
 
   val wrap_printing_env :
@@ -50,7 +52,7 @@ end
     than a particular threshold. Return (Some n) if module has size n, or None
     otherwise (module is bigger than threshold).
     Used to skip printing big modules in completion. *)
-val mod_smallerthan : int -> Subst.Lazy.module_type -> int option
+val mod_smallerthan : int -> Types.module_type -> int option
 
 (** [type_in_env env ppf input] parses [input] and prints its type on [ppf].
     Returning true if it printed a type, false otherwise. *)
@@ -76,14 +78,12 @@ val print_type_with_decl :
 (** [lookup_module] is a fancier version of [Env.lookup_module] that also
     returns the module type. *)
 val lookup_module :
-  Longident.t -> Env.t -> Path.t * Subst.Lazy.module_type * Parsetree.attributes
+  Longident.t -> Env.t -> Path.t * Types.module_type * Parsetree.attributes
 
 (** [read_doc_attributes] looks for a docstring in an attribute list. *)
 val read_doc_attributes : Parsetree.attributes -> (string * Location.t) option
 
 val is_deprecated : Parsetree.attributes -> bool
-
-val is_ppx_template_generated : Parsetree.attributes -> bool
 
 val print_constr :
   verbosity:Mconfig.Verbosity.t ->

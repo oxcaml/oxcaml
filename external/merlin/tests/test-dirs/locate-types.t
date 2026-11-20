@@ -93,19 +93,8 @@ Tuples
     b (2:5)
     c (3:5)
 
-  $ run "x:a * b"
+  $ run "a * b"
   Tuple
-    a (1:5)
-    b (2:5)
-
-  $ run "#(a * b * c)"
-  Unboxed_tuple
-    a (1:5)
-    b (2:5)
-    c (3:5)
-
-  $ run "#(x:a * b)"
-  Unboxed_tuple
     a (1:5)
     b (2:5)
 
@@ -189,11 +178,11 @@ Compound types
       a (1:5)
     'a
 
-  $ run "a -> b -> #(x:a * b)"
+  $ run "a -> b -> (a * b)"
   Arrow
     a (1:5)
     b (2:5)
-    Unboxed_tuple
+    Tuple
       a (1:5)
       b (2:5)
 

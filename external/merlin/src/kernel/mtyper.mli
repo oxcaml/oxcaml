@@ -54,10 +54,4 @@ val get_cache_stat : result -> typer_cache_stats
  *      preferable to use env from enclosing module rather than an env from
  *      inside x definition.
  *)
-val node_at :
-  ?skip_recovered:bool ->
-  ?let_pun_behavior:Mbrowse.Let_pun_behavior.t ->
-  ?record_pattern_pun_behavior:Mbrowse.Record_pattern_pun_behavior.t ->
-  result ->
-  Lexing.position ->
-  Mbrowse.t
+val node_at : ?skip_recovered:bool -> result -> Lexing.position -> Mbrowse.t

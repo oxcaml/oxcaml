@@ -27,7 +27,7 @@
    )* }}} *)
 
 open Merlin_utils
-open Ocaml_utils.Misc
+open Misc
 open Std
 open Std.Result
 
@@ -41,9 +41,10 @@ let findlib_ok =
     in
     (* This is a quick and dirty workaround to get Merlin to work even when
        findlib directory has been removed. *)
-    begin match Sys.getenv "OCAMLFIND_CONF" with
-    | exception Not_found -> Unix.putenv "OCAMLFIND_CONF" "/dev/null"
-    | _ -> ()
+    begin
+      match Sys.getenv "OCAMLFIND_CONF" with
+      | exception Not_found -> Unix.putenv "OCAMLFIND_CONF" "/dev/null"
+      | _ -> ()
     end;
     Error ("Error during findlib initialization: " ^ message)
 
@@ -99,17 +100,6 @@ module Cache = File_cache.Make (struct
           tell (`SOURCE_ROOT (String.drop 12 line))
         else if String.is_prefixed ~by:"UNIT_NAME " line then
           tell (`UNIT_NAME (String.drop 10 line))
-        else if String.is_prefixed ~by:"UNIT_NAME_FOR " line then
-          match List.rev (rev_split_words (String.drop 14 line)) with
-          | [ basename; unit_name ] ->
-            let mapping : Merlin_dot_protocol.Directive.unit_name_mapping =
-              { basename; unit_name }
-            in
-            tell (`UNIT_NAME_FOR mapping)
-          | _ ->
-            tell
-              (`UNIT_NAME_FOR_ERROR
-                 "Expected two arguments to UNIT_NAME_FOR directive")
         else if String.is_prefixed ~by:"WRAPPING_PREFIX " line then
           tell (`WRAPPING_PREFIX (String.drop 16 line))
         else if String.is_prefixed ~by:"FINDLIB " line then
@@ -216,18 +206,20 @@ let ppx_of_package ?(predicates = []) setup pkg =
            (Findlib.package_property predicates pkg "ppxopt"))
     with Not_found -> []
   in
-  begin match ppx with
-  | None -> ()
-  | Some ppx -> log ~title:"ppx" "%s" ppx
+  begin
+    match ppx with
+    | None -> ()
+    | Some ppx -> log ~title:"ppx" "%s" ppx
   end;
-  begin match ppxopts with
-  | [] -> ()
-  | lst ->
-    log ~title:"ppx options" "%a" Logger.json @@ fun () ->
-    let f (ppx, opts) =
-      `List [ `String ppx; `List (List.map ~f:(fun s -> `String s) opts) ]
-    in
-    `List (List.map ~f lst)
+  begin
+    match ppxopts with
+    | [] -> ()
+    | lst ->
+      log ~title:"ppx options" "%a" Logger.json @@ fun () ->
+      let f (ppx, opts) =
+        `List [ `String ppx; `List (List.map ~f:(fun s -> `String s) opts) ]
+      in
+      `List (List.map ~f lst)
   end;
   let setup =
     match ppx with
@@ -348,18 +340,17 @@ let prepend_config ~cwd ~cfg =
         | `EXCLUDE_QUERY_DIR
         | `USE_PPX_CACHE
         | `UNIT_NAME _
-        | `UNIT_NAME_FOR _
         | `WRAPPING_PREFIX _
-        | `UNKNOWN_TAG _
-        | `UNIT_NAME_FOR_ERROR _ ) as directive ->
+        | `UNKNOWN_TAG _ ) as directive ->
         { cfg with pass_forward = directive :: cfg.pass_forward }
       | `PKG ps -> { cfg with packages_to_load = ps @ cfg.packages_to_load }
       | `STDLIB path ->
         let canon_path = canonicalize_filename ~cwd path in
-        begin match cfg.stdlib with
-        | None -> ()
-        | Some p ->
-          log ~title:"conflicting paths for stdlib" "%s\n%s" p canon_path
+        begin
+          match cfg.stdlib with
+          | None -> ()
+          | Some p ->
+            log ~title:"conflicting paths for stdlib" "%s\n%s" p canon_path
         end;
         { cfg with stdlib = Some canon_path }
       | `SOURCE_ROOT path ->
@@ -367,20 +358,22 @@ let prepend_config ~cwd ~cfg =
         { cfg with source_root = Some canon_path }
       | `FINDLIB path ->
         let canon_path = canonicalize_filename ~cwd path in
-        begin match cfg.stdlib with
-        | None -> ()
-        | Some p ->
-          log ~title:"conflicting paths for findlib" "%s\n%s" p canon_path
+        begin
+          match cfg.stdlib with
+          | None -> ()
+          | Some p ->
+            log ~title:"conflicting paths for findlib" "%s\n%s" p canon_path
         end;
         { cfg with findlib = Some canon_path }
       | `FINDLIB_PATH path ->
         let canon_path = canonicalize_filename ~cwd path in
         { cfg with findlib_path = canon_path :: cfg.findlib_path }
       | `FINDLIB_TOOLCHAIN path ->
-        begin match cfg.stdlib with
-        | None -> ()
-        | Some p ->
-          log ~title:"conflicting paths for findlib toolchain" "%s\n%s" p path
+        begin
+          match cfg.stdlib with
+          | None -> ()
+          | Some p ->
+            log ~title:"conflicting paths for findlib toolchain" "%s\n%s" p path
         end;
         { cfg with findlib_toolchain = Some path })
 

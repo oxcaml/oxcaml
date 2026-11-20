@@ -7,12 +7,6 @@
   > 
   > (** a function *)
   > let c () = ()
-  > 
-  > (** a function with newtypes *)
-  > let d () (type a) (a : a) = a
-  > 
-  > (** last function *)
-  > let e () = ()
   > EOF
 
   $ cat >doc.ml <<EOF
@@ -27,7 +21,6 @@
   > let list_rev = List.rev
   > 
   > let () = A.a ()
-  > let () = A.e ()
   > EOF
 
 documentation for the last defined value (in the same file) is shown
@@ -49,9 +42,7 @@ documentation for the non-last defined value (in the same file) is show
   > jq '.value'
   "List reversal."
 
-# Jane Street: we can't run dune in tests yet, so we use ocamlc instead.
-# $ dune build --root=. ./doc.exe 2> /dev/null
-  $ $OCAMLC -bin-annot -o doc.exe a.ml doc.ml
+  $ dune build --root=. ./doc.exe 2> /dev/null
   $ cat >.merlin <<EOF
   > B _build/default/.doc.eobjs/byte
   > S .
@@ -60,7 +51,3 @@ documentation for the non-last defined value (in the same file) is show
   $ $MERLIN single document -position 11:12 -filename doc.ml < doc.ml |
   > jq '.value'
   "A function"
-
-  $ $MERLIN single document -position 12:12 -filename doc.ml < doc.ml |
-  > jq '.value'
-  "last function"

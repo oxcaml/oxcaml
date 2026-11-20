@@ -46,7 +46,6 @@ type config =
     stdlib : string option;
     source_root : string option;
     unit_name : string option;
-    unit_name_for : string String.Map.t;
     wrapping_prefix : string option;
     reader : string list;
     exclude_query_dir : bool;
@@ -67,7 +66,6 @@ let empty_config =
     stdlib = None;
     source_root = None;
     unit_name = None;
-    unit_name_for = String.Map.empty;
     wrapping_prefix = None;
     reader = [];
     exclude_query_dir = false;
@@ -129,34 +127,6 @@ end = struct
     | Dot_merlin -> "dot-merlin-reader"
     | Dune -> "dune"
 
-  let find_exe = function
-    | Dot_merlin ->
-      (* 1. If DOT_MERLIN_READER_EXE is defined, then use its value for the
-            dot-merlin-reader exe
-         2. If not, look in the same directory as the merlin executable for a
-            dot-merlin-reader.
-         3. If not, fallback to using whatever one is on the PATH. *)
-      let get_from_env_var = lazy (Sys.getenv_opt "DOT_MERLIN_READER_EXE") in
-      let get_from_same_dir_as_merlin_exe =
-        lazy
-          (let merlin_exe = Unix.realpath Sys.executable_name in
-           let merlin_bin = Filename.dirname merlin_exe in
-           let dot_merlin_reader_exe =
-             Filename.concat merlin_bin "dot-merlin-reader"
-           in
-           match Sys.file_exists dot_merlin_reader_exe with
-           | true -> Some dot_merlin_reader_exe
-           | false -> None)
-      in
-      List.find_map_opt
-        [ get_from_env_var; get_from_same_dir_as_merlin_exe ]
-        ~f:Lazy.force
-      |> Option.value ~default:"dot-merlin-reader"
-    | Dune ->
-      (* Always use the dune on the PATH *)
-      (* CR-someday: consider doing something better here *)
-      "dune"
-
   exception Process_exited
 
   module Process = struct
@@ -176,10 +146,10 @@ end = struct
       let prog, args =
         match cfg with
         | Dot_merlin ->
-          let prog = find_exe Dot_merlin in
+          let prog = "dot-merlin-reader" in
           (prog, [| prog |])
         | Dune ->
-          let prog = find_exe Dune in
+          let prog = "dune" in
           (prog, [| prog; "ocaml-merlin"; "--no-print-directory" |])
       in
       let cwd = Sys.getcwd () in
@@ -258,13 +228,12 @@ end = struct
     | _ -> begin
       Hashtbl.remove running_processes (dir, configurator);
       raise Process_exited
-      end
+    end
 end
 
 let prepend_config ~dir:cwd configurator (directives : directive list) config =
   List.fold_left ~init:(config, [])
-    ~f:(fun (config, errors) directive ->
-      match (directive : directive) with
+    ~f:(fun (config, errors) -> function
       | `B path ->
         ({ config with build_path = path :: config.build_path }, errors)
       | `S path ->
@@ -290,11 +259,6 @@ let prepend_config ~dir:cwd configurator (directives : directive list) config =
       | `STDLIB path -> ({ config with stdlib = Some path }, errors)
       | `SOURCE_ROOT path -> ({ config with source_root = Some path }, errors)
       | `UNIT_NAME name -> ({ config with unit_name = Some name }, errors)
-      | `UNIT_NAME_FOR { basename; unit_name } ->
-        let unit_name_for =
-          String.Map.add ~key:basename ~data:unit_name config.unit_name_for
-        in
-        ({ config with unit_name_for }, errors)
       | `WRAPPING_PREFIX prefix ->
         ({ config with wrapping_prefix = Some prefix }, errors)
       | `READER reader -> ({ config with reader }, errors)
@@ -307,8 +271,7 @@ let prepend_config ~dir:cwd configurator (directives : directive list) config =
         (config, errors)
       | `UNKNOWN_TAG tag ->
         let error = Printf.sprintf "Unknown configuration tag \"%s\"" tag in
-        (config, error :: errors)
-      | `UNIT_NAME_FOR_ERROR error -> (config, error :: errors))
+        (config, error :: errors))
     directives
 
 let postprocess_config config =
@@ -326,7 +289,6 @@ let postprocess_config config =
     stdlib = config.stdlib;
     source_root = config.source_root;
     unit_name = config.unit_name;
-    unit_name_for = config.unit_name_for;
     wrapping_prefix = config.wrapping_prefix;
     reader = config.reader;
     exclude_query_dir = config.exclude_query_dir;
@@ -359,12 +321,12 @@ let get_config { workdir; process_dir; configurator } path_abs =
     let path_rel =
       String.chop_prefix ~prefix:p.initial_cwd path_abs
       |> Option.map ~f:(fun path ->
-          (* We need to remove the leading path separator after chopping.
+             (* We need to remove the leading path separator after chopping.
                 There is one case where no separator is left: when [initial_cwd]
                 was the root of the filesystem *)
-          if String.length path > 0 && path.[0] = Filename.dir_sep.[0] then
-            String.drop 1 path
-          else path)
+             if String.length path > 0 && path.[0] = Filename.dir_sep.[0] then
+               String.drop 1 path
+             else path)
     in
 
     let path =
@@ -421,11 +383,8 @@ let get_config { workdir; process_dir; configurator } path_abs =
   | Unix.Unix_error (ENOENT, "create_process", "dot-merlin-reader") ->
     let error =
       Printf.sprintf
-        "%s could not find `dot-merlin-reader`. Please make sure that \
-         `dot-merlin-reader` is installed. `dot-merlin-reader` is expected to \
-         be in the same directory as the merlin executable or on the PATH. You \
-         may also specify the path to `dot-merlin-reader` via the \
-         `DOT_MERLIN_READER_EXE` environment variable."
+        "%s could not find `dot-merlin-reader` in the PATH. Please make sure \
+         that `dot-merlin-reader` is installed and in the PATH."
         (Lib_config.program_name ())
     in
     (empty_config, [ error ])

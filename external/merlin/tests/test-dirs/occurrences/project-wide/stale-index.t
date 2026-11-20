@@ -24,7 +24,7 @@ Foo was defined on line 2 when the index was built, but is now defined on line 1
       "file": "$TESTCASE_ROOT/main.ml",
       "start": {
         "line": 1,
-        "col": 22
+        "col": 26
       },
       "end": {
         "line": 1,

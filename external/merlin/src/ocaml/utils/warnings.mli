@@ -39,24 +39,9 @@ type constructor_usage_warning =
   | Not_constructed
   | Only_exported_private
 
-type upstream_compat_warning =
-  | Non_value_sort of string
-  | Unboxed_attribute of string
-  | Immediate_void_variant
-  | Separability_check
-  | Unpacked_attribute
-
-type name_out_of_scope_warning =
-  | Name of string
-  | Fields of { record_form : string ; fields : string list }
-
 type type_declaration_usage_warning =
   | Declaration
   | Alias
-
-type redundant_modifier_reason =
-  | Default_bound
-  | Implied_by of string
 
 type t =
   | Comment_start                           (*  1 *)
@@ -67,7 +52,7 @@ type t =
   | Labels_omitted of string list           (*  6 *)
   | Method_override of string list          (*  7 *)
   | Partial_match of Format_doc.t           (*  8 *)
-  | Missing_record_field_pattern of { form : string ; unbound : string } (* 9 *)
+  | Missing_record_field_pattern of string  (*  9 *)
   | Non_unit_statement                      (* 10 *)
   | Redundant_case                          (* 11 *)
   | Redundant_subpat                        (* 12 *)
@@ -81,13 +66,11 @@ type t =
   | Ignored_extra_argument                  (* 20 *)
   | Nonreturning_statement                  (* 21 *)
   | Preprocessor of string                  (* 22 *)
-  | Useless_record_with of string           (* 23 *)
+  | Useless_record_with                     (* 23 *)
   | Bad_module_name of string               (* 24 *)
   | All_clauses_guarded                     (* 8, used to be 25 *)
-  | Unused_var of { name : string ; mutated : bool } (* 26
-    [mutated] is set if the variable was mutated ([x <- 5]), allowing for a
-    more helpful error message. *)
-  | Unused_var_strict of { name : string ; mutated : bool } (* 27 *)
+  | Unused_var of string                    (* 26 *)
+  | Unused_var_strict of string             (* 27 *)
   | Wildcard_arg_to_constant_constr         (* 28 *)
   | Eol_in_string                           (* 29
       Note: since OCaml 5.2, the lexer normalizes \r\n sequences in
@@ -103,8 +86,7 @@ type t =
   | Unused_constructor of string * constructor_usage_warning (* 37 *)
   | Unused_extension of string * bool * constructor_usage_warning (* 38 *)
   | Unused_rec_flag                         (* 39 *)
-  | Name_out_of_scope of string * name_out_of_scope_warning (* 40
-      Tuple of (the type name, the name/fields out of scope) *)
+  | Name_out_of_scope of string * string list * bool   (* 40 *)
   | Ambiguous_name of string list * string list * bool * string (* 41 *)
   | Disambiguated_name of string            (* 42 *)
   | Nonoptional_label of string             (* 43 *)
@@ -122,9 +104,7 @@ type t =
   | Inlining_impossible of string           (* 55 *)
   | Unreachable_case                        (* 56 *)
   | Ambiguous_var_in_pattern_guard of string list (* 57 *)
-  | No_cmx_file of
-      { missing_extension : string;
-        module_name : string }              (* 58 *)
+  | No_cmx_file of string                   (* 58 *)
   | Flambda_assignment_to_non_mutable_value (* 59 *)
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
@@ -135,62 +115,22 @@ type t =
   | Unused_open_bang of string              (* 66 *)
   | Unused_functor_parameter of string      (* 67 *)
   | Match_on_mutable_state_prevent_uncurry  (* 68 *)
-  | Unused_field of
-      { form : string; field : string; complaint : field_usage_warning }(* 69 *)
+  | Unused_field of string * field_usage_warning (* 69 *)
   | Missing_mli                             (* 70 *)
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
-(* Oxcaml specific warnings: numbers should go down from 199 *)
-  | Imprecise_kind_annotation of {
-      name : string;
-      annotated : string;
-      inferred : string;
-    }                                       (* 181 *)
-  | Untagged_external_small_int_return      (* 182 *)
-  | Redundant_kind_modifier of string       (* 183 *)
-  | Ignored_kind_modifier of
-      { modifier : string; abbrev : string }  (* 184 *)
-  | Unmutated_mutable of string             (* 186 *)
-  | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
-  | Unerasable_position_argument            (* 188 *)
-  (* 189 was [Unnecessarily_partial_tuple_pattern], now upstream as 75 *)
-  | Probe_name_too_long of string           (* 190 *)
-  | Unused_kind_declaration of string       (* 191 *)
-  | Zero_alloc_all_hidden_arrow of string   (* 198 *)
-  | Unchecked_zero_alloc_attribute          (* 199 *)
-  | Unboxing_impossible                     (* 210 *)
-  | Redundant_modifier of
-      { modifier : string;
-        reason : redundant_modifier_reason }  (* 211 *)
-  (* 213 was [Modal_axis_specified_twice], now subsumed by
-     [Redundant_modality] (220) *)
-  | Atomic_float_record_boxed               (* 214 *)
-  | Implied_attribute of { implying: string; implied : string} (* 215 *)
-  | Use_during_borrowing                    (* 216 *)
-  | Lpoly_in_letrec                         (* 218 *)
-  | Useless_valpoly                         (* 219 *)
-  | Redundant_modality                      (* 220 *)
-  | Unused_alert_disable of string          (* 221 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 
 val parse_options : bool -> string -> alert option
 
-val parse_alert_option: ?disable_loc:loc -> string -> unit
+val parse_alert_option: string -> unit
   (** Disable/enable alerts based on the parameter to the -alert
       command-line option.  Raises [Arg.Bad] if the string is not a
       valid specification.
-
-      If [disable_loc] is provided (as done when the specification comes
-      from an [[@alert ...]] attribute rather than the command line), each
-      plain disable is additionally recorded so that disables that never
-      suppress an occurrence of their alert can be reported at the end of
-      compilation with warning 221 [Unused_alert_disable]; see
-      [flush_unused_alert_disables].  A disable of ["all"] is fulfilled by
-      a suppressed occurrence of any alert.
   *)
 
 val without_warnings : (unit -> 'a) -> 'a
@@ -227,13 +167,6 @@ val mk_lazy: (unit -> 'a) -> 'a Lazy.t
     (** Like [Lazy.of_fun], but the function is applied with
         the warning/alert settings at the time [mk_lazy] is called. *)
 
-val flush_unused_alert_disables : unit -> (loc * string * state) list
-    (** Returns (and forgets) the alert-disabling attributes registered via
-        [parse_alert_option ~disable_loc] that never suppressed an occurrence
-        of their alert, together with the warning state at the point where
-        the attribute was processed.  Used to report warning 221
-        [Unused_alert_disable] at the end of compilation. *)
-
 type description =
   { number : int;
     names : string list;
@@ -241,8 +174,6 @@ type description =
     since : Sys.ocaml_release_info option; }
 
 val descriptions : description list
-
-val parsed_ocamlparam : string ref
 
 (* merlin *)
 val dump : ?verbose:bool -> unit -> Std.json

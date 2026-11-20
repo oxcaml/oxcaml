@@ -1,6 +1,7 @@
 OLD: everything below is outdated
 
-## Problematic cases when detecting cycle only on item at pos = 1
+Problematic cases when detecting cycle only on item at pos = 1 
+==============================================================
 
 Here, recovery should favor second reduction, first will obviously cycle:
 

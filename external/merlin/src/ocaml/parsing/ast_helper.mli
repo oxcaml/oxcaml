@@ -48,7 +48,6 @@ val with_default_loc: loc -> (unit -> 'a) -> 'a
 module Const : sig
   val mk : ?loc:loc -> constant_desc -> constant
   val char : ?loc:loc -> char -> constant
-  val untagged_char : ?loc:loc -> char -> constant
   val string :
     ?quotation_delimiter:string -> ?loc:Location.t -> string -> constant
   val integer : ?loc:loc -> ?suffix:char -> string -> constant
@@ -74,34 +73,23 @@ module Typ :
     val mk: ?loc:loc -> ?attrs:attrs -> core_type_desc -> core_type
     val attr: core_type -> attribute -> core_type
 
-    val any: ?loc:loc -> ?attrs:attrs -> jkind_annotation option -> core_type
-    val var: ?loc:loc -> ?attrs:attrs -> string -> jkind_annotation option
-      -> core_type
-    val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type ->
-      mode with_loc list -> mode with_loc list -> core_type
+    val any: ?loc:loc -> ?attrs:attrs -> unit -> core_type
+    val var: ?loc:loc -> ?attrs:attrs -> string -> core_type
+    val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type
+               -> core_type
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * core_type) list
                -> core_type
-    val unboxed_tuple: ?loc:loc -> ?attrs:attrs
-                       -> (string option * core_type) list -> core_type
     val constr: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> core_type
     val object_: ?loc:loc -> ?attrs:attrs -> object_field list
                    -> closed_flag -> core_type
     val class_: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> core_type
-    val alias: ?loc:loc -> ?attrs:attrs -> core_type -> string with_loc option
-               -> jkind_annotation option -> core_type
-    (* Invariant: One of the options must be [Some]. *)
+    val alias: ?loc:loc -> ?attrs:attrs -> core_type -> string with_loc
+               -> core_type
     val variant: ?loc:loc -> ?attrs:attrs -> row_field list -> closed_flag
                  -> label list option -> core_type
-    val poly: ?loc:loc -> ?attrs:attrs ->
-      (str * jkind_annotation option) list -> core_type -> core_type
+    val poly: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val package: ?loc:loc -> ?attrs:attrs -> package_type -> core_type
     val open_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type -> core_type
-    val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
-    val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
-    val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
-    val repr: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
-    val newlayout:
-      ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
 
     val force_poly: core_type -> core_type
@@ -111,8 +99,7 @@ module Typ :
         any of nullary type constructor [tc] is replaced by type variable of
         the same name, if [tc]'s name appears in [newtypes].
         Raise [Syntaxerr.Variable_in_scope] if any type variable inside [te]
-        appears in [newtypes]. Used to translate [type a. a -> a] to
-        ['a. 'a -> 'a] during parsing.
+        appears in [newtypes].
         @since 4.05
      *)
 
@@ -132,25 +119,16 @@ module Pat:
     val alias: ?loc:loc -> ?attrs:attrs -> pattern -> str -> pattern
     val constant: ?loc:loc -> ?attrs:attrs -> constant -> pattern
     val interval: ?loc:loc -> ?attrs:attrs -> constant -> constant -> pattern
-    val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> pattern
-    val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> pattern
-    val unboxed_tuple: ?loc:loc -> ?attrs:attrs
-                       -> (string option * pattern) list -> closed_flag
-                       -> pattern
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * pattern) list
                -> closed_flag -> pattern
     val construct: ?loc:loc -> ?attrs:attrs ->
-      lid -> ((str * jkind_annotation option) list * pattern) option -> pattern
+      lid -> (str list * pattern) option -> pattern
     val variant: ?loc:loc -> ?attrs:attrs -> label -> pattern option -> pattern
     val record: ?loc:loc -> ?attrs:attrs -> (lid * pattern) list -> closed_flag
                 -> pattern
-    val record_unboxed_product: ?loc:loc -> ?attrs:attrs -> (lid * pattern) list
-                -> closed_flag -> pattern
-    val array: ?loc:loc -> ?attrs:attrs -> mutable_flag -> pattern list ->
-      pattern
+    val array: ?loc:loc -> ?attrs:attrs -> pattern list -> pattern
     val or_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern -> pattern
-    val constraint_: ?loc:loc -> ?attrs:attrs -> pattern -> core_type option
-                     -> mode with_loc list -> pattern
+    val constraint_: ?loc:loc -> ?attrs:attrs -> pattern -> core_type -> pattern
     val type_: ?loc:loc -> ?attrs:attrs -> lid -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
     val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> pattern
@@ -168,20 +146,16 @@ module Exp:
 
     val ident: ?loc:loc -> ?attrs:attrs -> lid -> expression
     val constant: ?loc:loc -> ?attrs:attrs -> constant -> expression
-    val let_: ?loc:loc -> ?attrs:attrs -> mutable_flag -> rec_flag ->
-              value_binding list -> expression -> expression
+    val let_: ?loc:loc -> ?attrs:attrs -> rec_flag -> value_binding list
+              -> expression -> expression
     val function_ : ?loc:loc -> ?attrs:attrs -> function_param list
-                   -> function_constraint -> function_body
+                   -> type_constraint option -> function_body
                    -> expression
     val apply: ?loc:loc -> ?attrs:attrs -> expression
                -> (arg_label * expression) list -> expression
     val match_: ?loc:loc -> ?attrs:attrs -> expression -> case list
                 -> expression
     val try_: ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
-    val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> expression
-    val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> expression
-    val unboxed_tuple: ?loc:loc -> ?attrs:attrs
-                       -> (string option * expression) list -> expression
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * expression) list
                -> expression
     val construct: ?loc:loc -> ?attrs:attrs -> lid -> expression option
@@ -190,16 +164,10 @@ module Exp:
                  -> expression
     val record: ?loc:loc -> ?attrs:attrs -> (lid * expression) list
                 -> expression option -> expression
-    val record_unboxed_product: ?loc:loc -> ?attrs:attrs -> (lid * expression) list
-                -> expression option -> expression
     val field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
-    val unboxed_field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
     val setfield: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
                   -> expression
-    val array: ?loc:loc -> ?attrs:attrs -> mutable_flag -> expression list ->
-      expression
-    val idx : ?loc:loc -> ?attrs:attrs -> block_access -> unboxed_access list
-      -> expression
+    val array: ?loc:loc -> ?attrs:attrs -> expression list -> expression
     val ifthenelse: ?loc:loc -> ?attrs:attrs -> expression -> expression
                     -> expression option -> expression
     val sequence: ?loc:loc -> ?attrs:attrs -> expression -> expression
@@ -210,8 +178,8 @@ module Exp:
               -> direction_flag -> expression -> expression
     val coerce: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
                 -> core_type -> expression
-    val constraint_: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
-                     -> mode with_loc list -> expression
+    val constraint_: ?loc:loc -> ?attrs:attrs -> expression -> core_type
+                     -> expression
     val send: ?loc:loc -> ?attrs:attrs -> expression -> str -> expression
     val new_: ?loc:loc -> ?attrs:attrs -> lid -> expression
     val setinstvar: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
@@ -229,8 +197,7 @@ module Exp:
     val poly: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
               -> expression
     val object_: ?loc:loc -> ?attrs:attrs -> class_structure -> expression
-    val newtype: ?loc:loc -> ?attrs:attrs -> str -> jkind_annotation option ->
-      expression  -> expression
+    val newtype: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
     val pack: ?loc:loc -> ?attrs:attrs -> module_expr -> package_type option
                -> expression
     val open_: ?loc:loc -> ?attrs:attrs -> open_declaration -> expression
@@ -239,25 +206,17 @@ module Exp:
                -> binding_op list -> expression -> expression
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> expression
     val unreachable: ?loc:loc -> ?attrs:attrs -> unit -> expression
-    val stack : ?loc:loc -> ?attrs:attrs -> expression -> expression
-    val comprehension :
-      ?loc:loc -> ?attrs:attrs -> comprehension_expression -> expression
-    val quote : ?loc:loc -> ?attrs:attrs -> expression -> expression
-    val splice : ?loc:loc -> ?attrs:attrs -> expression -> expression
-    val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
-    val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
 
     val case: pattern -> ?guard:expression -> expression -> case
     val binding_op: str -> pattern -> expression -> loc -> binding_op
-    val borrow : ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val hole: ?loc:loc -> ?attrs:attrs -> unit -> expression
   end
 
 (** Value declarations *)
 module Val:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?prim:string list ->
-      ?poly:bool -> ?modalities:modality with_loc list -> str -> core_type ->
-      value_description
+    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs ->
+      ?prim:string list -> str -> core_type -> value_description
   end
 
 (** Type declarations *)
@@ -266,23 +225,15 @@ module Type:
     val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
       ?params:(core_type * (variance * injectivity)) list ->
       ?cstrs:(core_type * core_type * loc) list ->
-      ?kind:type_kind -> ?priv:private_flag -> ?manifest:core_type ->
-      ?jkind_annotation:jkind_annotation ->
-      str ->
+      ?kind:type_kind -> ?priv:private_flag -> ?manifest:core_type -> str ->
       type_declaration
 
     val constructor: ?loc:loc -> ?attrs:attrs -> ?info:info ->
-      ?vars:(str * jkind_annotation option) list ->
-      ?args:constructor_arguments -> ?res:core_type ->
+      ?vars:str list -> ?args:constructor_arguments -> ?res:core_type ->
       str ->
       constructor_declaration
-
-    val constructor_arg: ?loc:loc -> ?modalities:modality with_loc list -> core_type ->
-      constructor_argument
-
     val field: ?loc:loc -> ?attrs:attrs -> ?info:info ->
-      ?mut:mutable_flag -> ?modalities:modality with_loc list -> str -> core_type ->
-      label_declaration
+      ?mut:mutable_flag -> str -> core_type -> label_declaration
   end
 
 (** Type extensions *)
@@ -299,8 +250,7 @@ module Te:
       str -> extension_constructor_kind -> extension_constructor
 
     val decl: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->
-      ?vars:(str * jkind_annotation option) list ->
-      ?args:constructor_arguments -> ?res:core_type ->
+      ?vars:str list -> ?args:constructor_arguments -> ?res:core_type ->
       str ->
       extension_constructor
     val rebind: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->
@@ -318,14 +268,12 @@ module Mty:
     val ident: ?loc:loc -> ?attrs:attrs -> lid -> module_type
     val alias: ?loc:loc -> ?attrs:attrs -> lid -> module_type
     val signature: ?loc:loc -> ?attrs:attrs -> signature -> module_type
-    val functor_: ?loc:loc -> ?attrs:attrs -> ?ret_mode:modes ->
+    val functor_: ?loc:loc -> ?attrs:attrs ->
       functor_parameter -> module_type -> module_type
     val with_: ?loc:loc -> ?attrs:attrs -> module_type ->
       with_constraint list -> module_type
     val typeof_: ?loc:loc -> ?attrs:attrs -> module_expr -> module_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> module_type
-    val strengthen: ?loc:loc -> ?attrs:attrs -> module_type -> lid ->
-      module_type
   end
 
 (** Module expressions *)
@@ -341,12 +289,11 @@ module Mod:
     val apply: ?loc:loc -> ?attrs:attrs -> module_expr -> module_expr ->
       module_expr
     val apply_unit: ?loc:loc -> ?attrs:attrs -> module_expr -> module_expr
-    val constraint_: ?loc:loc -> ?attrs:attrs -> module_type option -> modes ->
-      module_expr -> module_expr
+    val constraint_: ?loc:loc -> ?attrs:attrs -> module_expr -> module_type ->
+      module_expr
     val unpack: ?loc:loc -> ?attrs:attrs -> expression -> module_expr
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> module_expr
     val hole: ?loc:loc -> ?attrs:attrs -> unit -> module_expr
-    val instance: ?loc:loc -> ?attrs:attrs -> module_instance -> module_expr
   end
 
 (** Signature items *)
@@ -365,20 +312,12 @@ module Sig:
     val modtype: ?loc:loc -> module_type_declaration -> signature_item
     val modtype_subst: ?loc:loc -> module_type_declaration -> signature_item
     val open_: ?loc:loc -> open_description -> signature_item
-    val include_: ?loc:loc -> ?modalities:modalities -> include_description ->
-      signature_item
+    val include_: ?loc:loc -> include_description -> signature_item
     val class_: ?loc:loc -> class_description list -> signature_item
     val class_type: ?loc:loc -> class_type_declaration list -> signature_item
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> signature_item
     val attribute: ?loc:loc -> attribute -> signature_item
-    val jkind: ?loc:loc -> jkind_declaration -> signature_item
     val text: text -> signature_item list
-  end
-
-module Sg:
-  sig
-    val mk : ?loc:loc -> ?modalities:modality with_loc list ->
-      signature_item list -> signature
   end
 
 (** Structure items *)
@@ -400,7 +339,6 @@ module Str:
     val class_type: ?loc:loc -> class_type_declaration list -> structure_item
     val include_: ?loc:loc -> include_declaration -> structure_item
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> structure_item
-    val jkind: ?loc:loc -> jkind_declaration -> structure_item
     val attribute: ?loc:loc -> attribute -> structure_item
     val text: text -> structure_item list
   end
@@ -408,7 +346,7 @@ module Str:
 (** Module declarations *)
 module Md:
   sig
-    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text -> ?modalities:modalities ->
+    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
       str_opt -> module_type -> module_declaration
   end
 
@@ -443,16 +381,15 @@ module Opn:
 (** Includes *)
 module Incl:
   sig
-    val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?kind:include_kind -> 'a
-      -> 'a include_infos
+    val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> 'a -> 'a include_infos
   end
 
 (** Value bindings *)
 module Vb:
   sig
     val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
-      ?value_constraint:value_constraint -> ?poly:bool ->
-      ?modes:mode with_loc list -> pattern -> expression -> value_binding
+      ?value_constraint:value_constraint -> pattern -> expression ->
+      value_binding
   end
 
 
@@ -600,3 +537,4 @@ type let_bindings =
 
 val no_label : arg_label
 val extract_str_payload : payload -> (string * Location.t) option
+val hole_txt : string

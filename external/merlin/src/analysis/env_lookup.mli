@@ -1,19 +1,16 @@
 (** Provides tools to lookup items in the typing environment.
 
-  Establishing the namespace of an item before looking it up in the environement
-  is necessary to prevent mixing items which have the same name but are not of
-  the same namespace. (For example the environment can contain both type named
-  `t` and a value named `t`.) *)
+    Establishing the namespace of an item before looking it up in the environement
+    is necessary to prevent mixing items which have the same name but are not of
+    the same namespace. (For example the environment can contain both type named
+    `t` and a value named `t`.) *)
 
 (** Namespaces describe in which section of the environment an item should be
-  looked for. *)
+    looked for. *)
 module Namespace : sig
   type t = Shape.Sig_component_kind.t
 
   val to_string : t -> string
-
-  type packed_label_description =
-    | P : 'rep Data_types.gen_label_description -> packed_label_description
 
   type under_type = [ `Constr | `Labels ]
   type inferred_basic = [ `Constr | `Labels | `Mod | `Modtype | `Type | `Vals ]
@@ -23,7 +20,7 @@ module Namespace : sig
     | `Mod
     | `Modtype
     | `This_cstr of Data_types.constructor_description
-    | `This_label of packed_label_description
+    | `This_label of Data_types.label_description
     | `Type
     | `Vals ]
 

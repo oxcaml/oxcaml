@@ -2,14 +2,14 @@
   > type t = Float.t
   > EOF
 
-  $ $OCAMLC -bin-annot -bin-annot-occurrences -c main.mli
+  $ ocamlc -bin-annot -bin-annot-occurrences -c main.mli
 
   $ ls
   main.cmi
   main.cmti
   main.mli
 
-  $ $OCAMLOBJINFO -quiet -index main.cmti
+  $ ocamlobjinfo -quiet -index main.cmti
   Indexed shapes:
   Unresolved: CU Stdlib . "Float"[module] :
     Float (File "main.mli", line 1, characters 9-14)

@@ -18,10 +18,10 @@
   > (copy_files# %{project_root}/dep/*.ml)
   > EOF
 
-  $ $DUNE exec ./exe/main.exe
+  $ dune exec ./exe/main.exe
   Hello!
 
-  $ $MERLIN single errors -filename exe/main.ml <exe/main.ml | revert-newlines | jq '.value'
+  $ $MERLIN single errors -filename exe/main.ml <exe/main.ml | jq '.value'
   []
 
 FIXME: Dune should also provide a configuration for the original sources

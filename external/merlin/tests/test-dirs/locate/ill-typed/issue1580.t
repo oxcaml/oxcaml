@@ -52,7 +52,7 @@ The typing recovery allows Merlin to perform the correct jump here:
   {
     "file": "lib/ocaml/stdlib.mli",
     "pos": {
-      "line": 165,
+      "line": 158,
       "col": 9
     }
   }

@@ -13,7 +13,6 @@ let extract_toplevel_identifier item =
     List.map ~f:(fun Typedtree.{ ci_id_class; _ } -> ci_id_class) cls
   | Typedtree.Tsig_class_type cls ->
     List.map ~f:(fun Typedtree.{ ci_id_class_type; _ } -> ci_id_class_type) cls
-  | Typedtree.Tsig_jkind { jkind_id; _ } -> [ jkind_id ]
   | Typedtree.Tsig_type _
   | Typedtree.Tsig_typesubst _
   | Typedtree.Tsig_typext _
@@ -26,19 +25,13 @@ let let_bound_vars bindings =
   List.filter_map
     ~f:(fun value_binding ->
       match value_binding.Typedtree.vb_pat.pat_desc with
-      | Tpat_var { id; name; _ } | Tpat_fun_layout { id; name; _ } ->
-        Some (id, name)
+      | Tpat_var (id, loc, _) -> Some (id, loc)
       | Typedtree.Tpat_any
-      | Typedtree.Tpat_alias _
-      | Typedtree.Tpat_constant _
-      | Typedtree.Tpat_tuple _
-      | Typedtree.Tpat_unboxed_tuple _
-      | Typedtree.Tpat_unboxed_bool _
-      | Typedtree.Tpat_unboxed_unit
-      | Typedtree.Tpat_construct (_, _, _, _, _)
+      | Typedtree.Tpat_alias (_, _, _, _, _)
+      | Typedtree.Tpat_constant _ | Typedtree.Tpat_tuple _
+      | Typedtree.Tpat_construct (_, _, _, _)
       | Typedtree.Tpat_variant (_, _, _)
-      | Typedtree.Tpat_record (_, _, _)
-      | Typedtree.Tpat_record_unboxed_product (_, _, _)
+      | Typedtree.Tpat_record (_, _)
       | Typedtree.Tpat_array _ | Typedtree.Tpat_lazy _
       | Typedtree.Tpat_or (_, _, _) -> None)
     bindings
@@ -52,7 +45,7 @@ let location_of_declaration ~uid =
   let of_value_binding vb =
     let bound_idents = Typedtree.let_bound_idents_full [ vb ] in
     ListLabels.find_map
-      ~f:(fun (_, loc, _, _, uid') -> if uid = uid' then Some loc else None)
+      ~f:(fun (_, loc, _, uid') -> if uid = uid' then Some loc else None)
       bound_idents
   in
   function
@@ -68,13 +61,39 @@ let location_of_declaration ~uid =
   | Module_substitution msd -> Some msd.ms_name
   | Class cd -> Some cd.ci_id_name
   | Class_type ctd -> Some ctd.ci_id_name
-  | Jkind jkind -> Some jkind.jkind_name
 
 let pat_var_id_and_loc = function
-  | Typedtree.{ pat_desc = Tpat_var { id; name = loc; _ }; _ } -> Some (id, loc)
+  | Typedtree.{ pat_desc = Tpat_var (id, loc, _); _ } -> Some (id, loc)
   | _ -> None
 
 let pat_alias_pat_id_and_loc = function
-  | Typedtree.{ pat_desc = Tpat_alias { pattern = pat; id; name; _ }; _ } ->
-    Some (pat, id, name)
+  | Typedtree.{ pat_desc = Tpat_alias (pat, id, loc, _, _); _ } ->
+    Some (pat, id, loc)
+  | _ -> None
+
+open Typedtree
+
+type texp_match =
+  { expr : expression;
+    computation_cases : computation case list;
+    value_cases : value case list;
+    partial : partial
+  }
+
+type texp_try =
+  { expr : expression;
+    value_cases : value case list;
+    effect_cases : value case list
+  }
+
+let texp_match_of_expr expr =
+  match expr.exp_desc with
+  | Texp_match (expr, computation_cases, value_cases, partial) ->
+    Some { expr; computation_cases; value_cases; partial }
+  | _ -> None
+
+let texp_try_of_expr expr =
+  match expr.exp_desc with
+  | Texp_try (expr, value_cases, effect_cases) ->
+    Some { expr; value_cases; effect_cases }
   | _ -> None

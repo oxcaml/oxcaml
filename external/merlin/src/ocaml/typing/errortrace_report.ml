@@ -106,8 +106,7 @@ let rec filter_trace = function
 let may_prepare_expansion compact (Errortrace.{ty; expanded} as ty_exp) =
   match Types.get_desc expanded with
     Tvariant _ | Tobject _ when compact ->
-      Variable_names.reserve ty;
-      Errortrace.{ty; expanded = ty}
+      Variable_names.reserve ty; Errortrace.{ty; expanded = ty}
   | _ -> prepare_expansion ty_exp
 
 let print_path p =
@@ -118,21 +117,10 @@ let print_tag ppf s = Style.inline_code ppf ("`" ^ s)
 let print_tags ppf tags  =
   Fmt.(pp_print_list ~pp_sep:comma) print_tag ppf tags
 
-let is_unit_arg env ty =
-  let ty, vars = Btype.tpoly_get_poly ty in
-  if vars <> [] then false
-  else begin
-    (* CR metaprogramming jbachurski: Remove [contains_initial_stage_splice] and
-       track the stage in errors so we don't need this. See ticket 6726. *)
-    let env =
-      if Ctype.contains_initial_stage_splice (Env.stage env :> int) ty
-      then Env.enter_future env
-      else env
-    in
-    match Types.get_desc (Ctype.expand_head env ty) with
-    | Tconstr (p, _, _) -> Path.same p Predef.path_unit
-    | _ -> false
-  end
+let is_unit env ty =
+  match Types.get_desc (Ctype.expand_head env ty) with
+  | Tconstr (p, _, _) -> Path.same p Predef.path_unit
+  | _ -> false
 
 let unifiable env ty1 ty2 =
   let snap = Btype.snapshot () in
@@ -146,13 +134,13 @@ let unifiable env ty1 ty2 =
 let explanation_diff env t3 t4 =
   match Types.get_desc t3, Types.get_desc t4 with
   | Tarrow (_, ty1, ty2, _), _
-    when is_unit_arg env ty1 && unifiable env ty2 t4 ->
+    when is_unit env ty1 && unifiable env ty2 t4 ->
       Some (doc_printf
           "@,@[@{<hint>Hint@}: Did you forget to provide %a as argument?@]"
           Style.inline_code "()"
         )
   | _, Tarrow (_, ty1, ty2, _)
-    when is_unit_arg env ty1 && unifiable env t3 ty2 ->
+    when is_unit env ty1 && unifiable env t3 ty2 ->
       Some (doc_printf
           "@,@[@{<hint>Hint@}: Did you forget to wrap the expression using \
            %a?@]"
@@ -187,7 +175,6 @@ let explain_fixed_row pos expl = match expl with
            print_path p ppf))
       p
   | Types.Rigid -> Format_doc.Doc.empty
-  | Types.Fixed_existential -> Format_doc.Doc.empty
 
 let explain_variant (type variety) : variety Errortrace.variant -> _ = function
   (* Common *)
@@ -211,7 +198,7 @@ let explain_variant (type variety) : variety Errortrace.variant -> _ = function
         doc_printf "@,@[%a,@ %a@]" pp_doc (explain_fixed_row pos e)
           pp_doc (explain_fixed_row_case k)
       )
-  | Errortrace.Fixed_row (_,_, (Rigid | Fixed_existential)) ->
+  | Errortrace.Fixed_row (_,_, Rigid) ->
       (* this case never happens *)
       None
   (* Equality & Moregen *)
@@ -285,30 +272,27 @@ let explain_incompatible_fields name (diff: Types.type_expr Errortrace.diff) =
 
 
 let explain_label_mismatch ~missing_label_msg  {Errortrace.got;expected} =
-  let quoted_label ppf l =
-    Style.inline_code ppf (Printtyp.string_of_label l)
-  in
+  let quoted_label ppf l = Style.inline_code ppf (Asttypes.string_of_label l) in
   match got, expected with
-  | Types.Nolabel, Types.(Labelled _ | Optional _ | Position _)  ->
+  | Asttypes.Nolabel, Asttypes.(Labelled _ | Optional _ )  ->
       doc_printf "@,@[A label@ %a@ was expected@]"
         quoted_label expected
-  | Types.(Labelled _ | Optional _ | Position _), Types.Nolabel  ->
+  | Asttypes.(Labelled _|Optional _), Asttypes.Nolabel  ->
       doc_printf missing_label_msg
         quoted_label got
-  | Types.Labelled g, Types.Optional e when g = e ->
+ | Asttypes.Labelled g, Asttypes.Optional e when g = e ->
       doc_printf
         "@,@[The label@ %a@ was expected to be optional@]"
         quoted_label got
-  | Types.Optional g, Types.Labelled e when g = e ->
+  | Asttypes.Optional g, Asttypes.Labelled e when g = e ->
       doc_printf
         "@,@[The label@ %a@ was expected to not be optional@]"
         quoted_label got
-  | Types.(Labelled _ | Optional _ | Position _),
-    Types.(Labelled _ | Optional _ | Position _) ->
+  | Asttypes.(Labelled _ | Optional _), Asttypes.(Labelled _ | Optional _) ->
       doc_printf "@,@[Labels %a@ and@ %a do not match@]"
         quoted_label got
         quoted_label expected
-  | Types.Nolabel, Types.Nolabel ->
+  | Asttypes.Nolabel, Asttypes.Nolabel ->
       (* Two empty labels cannot be mismatched*)
       assert false
 
@@ -349,11 +333,11 @@ let explanation (type variety) intro prev env
     in
     Some(explain_label_mismatch ~missing_label_msg diff)
   | Errortrace.Tuple_label_mismatch diff ->
-    let types_label = function
-      | None -> Types.Nolabel
-      | Some x -> Types.Labelled x
+    let ast_label = function
+      | None -> Asttypes.Nolabel
+      | Some x -> Asttypes.Labelled x
     in
-    let diff = Errortrace.map_diff types_label diff in
+    let diff = Errortrace.map_diff ast_label diff in
     let missing_label_msg =
       format_of_string
         "@,@[The first tuple element is labeled@ %a,@ \
@@ -385,66 +369,9 @@ let explanation (type variety) intro prev env
              {[ The type int occurs inside int list -> 'a |}
         *)
     end
-  | Errortrace.Bad_jkind (t,e) ->
-    Some (doc_printf "@ @[<hov>%a@]"
-            (Jkind.Violation.report_with_offender
-               ~offender:(fun ppf ->
-                   prepare_for_printing [t];
-                   prepared_type_expr ppf t)
-               env) e)
-  | Errortrace.Bad_jkind_sort (t,e) ->
-    Some (doc_printf "@ @[<hov>%a@]"
-            (Jkind.Violation.report_with_offender_sort
-               ~offender:(fun ppf ->
-                   prepare_for_printing [t];
-                   prepared_type_expr ppf t)
-               env) e)
-  | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
-    let fmt_history t k ppf =
-      Jkind.(format_history env ~intro:(
-        dprintf "The layout of %a is %a" prepared_type_expr t
-          (format env) k) ppf k)
-    in
-    Some (doc_printf "@ because the layouts of their variables are different.\
-                      @ @[<v>%t@;%t@]"
-            (fmt_history t1 k1) (fmt_history t2 k2))
-  | Errortrace.Unequal_tof_kind_jkinds (k1, k2) ->
-    let fmt_history which k ppf =
-      Jkind.(format_history env ~intro:(
-        dprintf "The kind of %s is %a" which (format env) k) ppf k)
-    in
-    Some (doc_printf "@ because their kinds are different.\
-                      @ @[<v>%t@;%t@]"
-            (fmt_history "the first" k1) (fmt_history "the second" k2))
-  | Errortrace.Mode_mismatch _ -> None
-  | Errortrace.Weaken_sort { pat; subj } ->
-    add_type_to_preparation pat;
-    add_type_to_preparation subj;
-    Some (doc_printf "@ The type %a is layout polymorphic, \
-                      @ but %a is not layout polymorphic."
-            (Style.as_inline_code prepared_type_expr) subj
-            (Style.as_inline_code prepared_type_expr) pat)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)
-
-let split_mode_mismatch : type variety.
-  (_, variety) Errortrace.t -> Format_doc.doc option * (_, variety) Errortrace.t
-  = fun tr ->
-  match List.rev tr with
-  | Errortrace.Mode_mismatch (pos, e) :: rev_tr ->
-    let {left; right} : Mode_intf.print_error =
-      Mode.With_locality.print_error (Location.none, Unknown) e
-    in
-    let left ppf = ignore (left ppf) in
-    let right ppf = ignore (right ppf) in
-    let pos = match pos with Argument -> "argument" | Return -> "return" in
-    let doc =
-      doc_printf "@,@[<hov>The %s mode was expected to be %t but is %t@]"
-        pos right left
-    in
-    Some doc, List.rev rev_tr
-  | _ -> None, tr
 
 let warn_on_missing_def env ppf t =
   match Types.get_desc t with
@@ -471,12 +398,10 @@ let prepare_expansion_head empty_tr = function
       Some (Errortrace.map_diff (may_prepare_expansion empty_tr) d)
   | _ -> None
 
-let head_error_printer ~var_jkinds mode txt_got txt_but = function
+let head_error_printer mode txt_got txt_but = function
   | None -> Format_doc.Doc.empty
   | Some d ->
-      let d =
-        Errortrace.map_diff (trees_of_type_expansion' ~var_jkinds mode) d
-      in
+      let d = Errortrace.map_diff (trees_of_type_expansion mode) d in
       doc_printf "%a@;<1 2>%a@ %a@;<1 2>%a"
         pp_doc txt_got pp_type_expansion d.Errortrace.got
         pp_doc txt_but pp_type_expansion d.Errortrace.expected
@@ -493,19 +418,11 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
   reset ();
   (* We want to substitute in the opposite order from [Eqtype] *)
   Variable_names.add_subst (List.map (fun (ty1,ty2) -> ty2,ty1) subst);
-  let mode_mismatch, tr = split_mode_mismatch tr in
   let tr =
     prepare_trace
       (fun ty_exp ->
          Errortrace.{ty_exp with expanded = hide_variant_name ty_exp.expanded})
       tr
-  in
-  let jkind_error = match Misc.last tr with
-    | Some (Bad_jkind _ | Bad_jkind_sort _ | Unequal_var_jkinds _
-           | Unequal_tof_kind_jkinds _) ->
-        true
-    | _ ->
-        false
   in
   match tr with
   | [] -> assert false
@@ -515,9 +432,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       let head = prepare_expansion_head (tr=[] && last=None) elt in
       let tr = List.map (Errortrace.map_diff prepare_expansion) tr in
       let last = Option.map (Errortrace.map_diff prepare_expansion) last in
-      let head_error =
-        head_error_printer ~var_jkinds:jkind_error mode txt1 txt2 head
-      in
+      let head_error = head_error_printer mode txt1 txt2 head in
       let tr = trees_of_trace mode tr in
       let last =
         Option.map (Errortrace.map_diff (trees_of_type_expansion mode)) last in
@@ -528,16 +443,13 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
        in
        fprintf ppf
         "@[<v>\
-          @[%a%a@]%a%a%a\
+          @[%a%a@]%a%a\
          @]"
         pp_doc head_error
         pp_doc ty_expect_explanation
         (trace false (incompatibility_phrase trace_format)) tr
-        (pp_print_option pp_doc) mis
-        (pp_print_option pp_doc) mode_mismatch;
-      if env <> Env.empty && not jkind_error
-       (* the jkinds mechanism has its own way of reporting missing cmis
-          CR jkinds: streamline these *)
+        (pp_print_option pp_doc) mis;
+      if env <> Env.empty
       then warn_on_missing_defs env ppf head;
        Internal_names.print_explanations env ppf;
        Ident_conflicts.err_print ppf

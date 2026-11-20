@@ -25,8 +25,8 @@ end = struct
     | Path.Pdot (path, name) when List.exists ~f:(Path.same path) opens ->
       Longident.Lident name
     | Path.Pdot (path, name) ->
-      Ldot
-        (Location.mknoloc (to_shortest_lid ~opens path), Location.mknoloc name)
+      let lid = Location.mknoloc (to_shortest_lid ~opens path) in
+      Ldot (lid, Location.mknoloc name)
     | Pident ident -> Lident (Ident.name ident)
     | _ -> assert false
 
@@ -75,15 +75,17 @@ let reconstruct_identifier pipeline pos = function
       then dot
       else "( " ^ dot ^ ")"
     in
-    begin match path with
-    | [] -> []
-    | base :: tail ->
-      let f { Location.txt = base; loc = bl } { Location.txt = dot; loc = dl } =
-        let loc = Location_aux.union bl dl in
-        let txt = base ^ "." ^ reify dot in
-        Location.mkloc txt loc
-      in
-      [ List.fold_left tail ~init:base ~f ]
+    begin
+      match path with
+      | [] -> []
+      | base :: tail ->
+        let f { Location.txt = base; loc = bl } { Location.txt = dot; loc = dl }
+          =
+          let loc = Location_aux.union bl dl in
+          let txt = base ^ "." ^ reify dot in
+          Location.mkloc txt loc
+        in
+        [ List.fold_left tail ~init:base ~f ]
     end
   | Some (expr, offset) ->
     let loc_start =
@@ -111,11 +113,3 @@ let reconstruct_identifier pipeline pos = function
       else aux acc (succ i)
     in
     aux [] offset
-
-let is_current_unit comp_unit =
-  match Env.get_current_unit () with
-  | Some current_unit ->
-    String.equal
-      (current_unit |> Unit_info.modname |> Compilation_unit.name_as_string)
-      comp_unit
-  | None -> false

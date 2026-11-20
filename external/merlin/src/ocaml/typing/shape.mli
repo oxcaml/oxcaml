@@ -49,9 +49,6 @@
     a talk about the reduction strategy
 *)
 
-module Layout = Jkind_types.Sort.Const
-type base_layout = Jkind_types.Sort.base
-
 (** A [Uid.t] is associated to every declaration in signatures and
     implementations. They uniquely identify bindings in the program. When
     associated with these bindings' locations they are useful to external tools
@@ -63,7 +60,6 @@ module Uid : sig
     | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
     | Internal
     | Predef of string
-    | Unboxed_version of t
 
   val reinit : unit -> unit
   val get_current_stamp : unit -> int
@@ -71,53 +67,13 @@ module Uid : sig
   val stamp_of_uid : t -> int option
 
   val mk : current_unit:(Unit_info.t option) -> t
-  val of_compilation_unit_id : Compilation_unit.t -> t
-  val of_compilation_unit_name : Compilation_unit.Name.t -> t
+  val of_compilation_unit_id : Ident.t -> t
   val of_predef_id : Ident.t -> t
   val internal_not_actually_unique : t
-  val unboxed_version : t -> t
 
   val for_actual_declaration : t -> bool
 
   include Identifiable.S with type t := t
-end
-
-module Rec_var_ident : sig
-  type t
-
-  val mk_fresh : unit -> t
-
-  (** Reset the internal identifier counter. *)
-  val reinit : unit -> unit
-
-  val equal : t -> t -> bool
-
-  val compare : t -> t -> int
-
-  val hash : t -> int
-
-  val print : Format.formatter -> t -> unit
-end
-
-(** Environment for mapping [Rec_var_ident.t] to values. Used to track
-    bindings when converting from named recursive variables to De Bruijn
-    indices. *)
-module Rec_var_env : sig
-  type 'a t
-
-  val empty : 'a t
-
-  val is_empty : 'a t -> bool
-
-  val add : Rec_var_ident.t -> 'a -> 'a t -> 'a t
-
-  val find_opt : Rec_var_ident.t -> 'a t -> 'a option
-
-  val map : ('a -> 'b) -> 'a t -> 'b t
-
-  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-
-  val hash : ('a -> int) -> 'a t -> int
 end
 
 module Sig_component_kind : sig
@@ -126,13 +82,11 @@ module Sig_component_kind : sig
     | Type
     | Constructor
     | Label
-    | Unboxed_label
     | Module
     | Module_type
     | Extension_constructor
     | Class
     | Class_type
-    | Jkind
 
   val to_string : t -> string
 
@@ -155,104 +109,19 @@ module Item : sig
   val type_ : Ident.t -> t
   val constr : Ident.t -> t
   val label : Ident.t -> t
-  val unboxed_label : Ident.t -> t
   val module_ : Ident.t -> t
   val module_type : Ident.t -> t
   val extension_constructor : Ident.t -> t
   val class_ : Ident.t -> t
   val class_type : Ident.t -> t
-  val jkind : Ident.t -> t
 
   val print : Format.formatter -> t -> unit
-
-  val compare : t -> t -> int
-
-  val is_constructor : t -> bool
-  val is_label : t -> bool
-  val is_unboxed_label : t -> bool
 
   module Map : Map.S with type key = t
 end
 
-(* For several builtin types, we provide predefined type shapes with custom
-    logic associated with them for emitting the DWARF debugging information. *)
-module Predef : sig
-  type simd_vec_split =
-    (* 128 bit *)
-    | Int8x16
-    | Int16x8
-    | Int32x4
-    | Int64x2
-    | Float16x8
-    | Float32x4
-    | Float64x2
-    (* 256 bit *)
-    | Int8x32
-    | Int16x16
-    | Int32x8
-    | Int64x4
-    | Float16x16
-    | Float32x8
-    | Float64x4
-    (* 512 bit *)
-    | Int8x64
-    | Int16x32
-    | Int32x16
-    | Int64x8
-    | Float16x32
-    | Float32x16
-    | Float64x8
-
-  type unboxed =
-    | Unboxed_float
-    | Unboxed_float32
-    | Unboxed_nativeint
-    | Unboxed_int64
-    | Unboxed_int32
-    | Unboxed_int16
-    | Unboxed_int8
-    | Unboxed_mask
-    | Unboxed_simd of simd_vec_split
-    | Unboxed_unit
-
-  type t =
-    | Array
-    | Bytes
-    | Char
-    | Extension_constructor
-    | Float
-    | Float32
-    | Floatarray
-    | Int
-    | Int8
-    | Int16
-    | Int32
-    | Int64
-    | Lazy_t
-    | Mask
-    | Nativeint
-    | String
-    | Simd of simd_vec_split
-    | Exception
-    | Unboxed of unboxed
-
-  val to_string : t -> string
-
-  val print : Format.formatter -> t -> unit
-
-  val equal : t -> t -> bool
-
-  val unboxed_type_to_base_layout : unboxed -> base_layout
-
-  val to_base_layout : t -> base_layout
-
-  val to_layout : t -> Layout.t
-
-  val simd_vec_split_to_byte_size : simd_vec_split -> int
-end
-
 type var = Ident.t
-type t = private { hash: int; uid: Uid.t option; desc: desc; approximated: bool }
+type t = { uid: Uid.t option; desc: desc; approximated: bool }
 and desc =
   | Var of var
   | Abs of var * t
@@ -264,116 +133,9 @@ and desc =
   | Comp_unit of string
   | Error of string
 
-  (* constructors for types *)
-  | Constr of Ident.t * t list
-  | Tuple of t list (* boxed tuple (value layout) *)
-  | Unboxed_tuple of t list (* unboxed tuple (product layout) *)
-  | Predef of Predef.t * t list (* predef type with arguments *)
-  | Arrow
-  | Poly_variant of t poly_variant_constructors
-  | Mu of Rec_var_ident.t * t
-  (** [Mu (rv, t)] represents a binder for a recursive type with body [t],
-      binding the recursive variable [rv]. *)
-  | Rec_var of Rec_var_ident.t
-
-  (* constructors for type declarations *)
-  | Variant of (t * Layout.t option) constructors
-      (* An [any] field will have a layout of [None]. Each particular value of
-         that variant may have a different layout for that field. *)
-      (* CR sspies: Rename this just to constructor now that simple constructors
-         are no longer a thing. *)
-  | Variant_unboxed of
-    { name : string;
-      variant_uid : Uid.t option;
-      arg_name : string option;
-      (** if this is [None], we are looking at a singleton tuple;
-          otherwise, it is a singleton record. *)
-      arg_uid : Uid.t option;
-      arg_shape : t;
-      arg_layout : Layout.t
-    }
-    (** An unboxed variant corresponds to the [@@unboxed] annotation.
-        It must have a single constructor with a single argument. *)
-  | Record of
-      { fields : (string * Uid.t option * t * Layout.t) list;
-        kind : record_kind
-      }
-  | Mutrec of t Ident.Map.t
-    (** [Mutrec m] represents a map of (potentially mutually-recursive)
-        declarations. Declarations with type variables are represented as
-        abstractions inside. To project out a declaration, [Proj_decl] can be
-        used. *)
-  | Proj_decl of t * Ident.t
-  | Unknown_type
-    (** [Unknown_type] represents an unknown type. *)
-  | At_layout of t * Layout.t
-    (** [At_layout (shape, layout)] represents a shape with a known layout. *)
-
-(** For DWARF type emission to work as expected, we store the layouts in the
-    declaration alongside the shapes in those cases where the layout "expands"
-    again such as variant constructors, which themselves are values but
-    point to blocks in memory.  Here, layouts are stored for the individual
-    fields. *)
-
-and 'a poly_variant_constructors = 'a poly_variant_constructor list
-
-and 'a poly_variant_constructor =
-  { pv_constr_name : string;
-    pv_constr_args : 'a list
-  }
-
-
-and record_kind =
-  | Record_unboxed
-      (** [Record_unboxed] is the case for single-field records declared with
-          [@@unboxed], whose runtime representation is simply its contents
-          without any indirection. *)
-  | Record_unboxed_product
-      (** [Record_unboxed_product] is the truly unboxed record that
-            corresponds to [#{ ... }]. *)
-  | Record_boxed
-  | Record_mixed of mixed_product_shape
-  | Record_floats
-      (** Basically the same as [Record_mixed], but we don't reorder the
-          fields. *)
-
-and 'a constructors = 'a constructor list
-
-and 'a constructor =
-  { name : string;
-    constr_uid: Uid.t option;
-    kind : constructor_representation;
-    is_constant : bool;
-    args : 'a constructor_argument list
-  }
-
-and 'a constructor_argument =
-  { field_name : string option;
-    field_uid: Uid.t option;
-    field_value : 'a
-  }
-
-(* Unlike in [types.ml], we use [Layout.t] entries here, because we can
-    represent flattened floats simply as float64 in the debugger. [None] means
-    the field is an [any] field and thus has no fixed layout. *)
-and constructor_representation = Layout.t option array
-
-and mixed_product_shape = Layout.t array
-
-
-
 val print : Format.formatter -> t -> unit
 
 val strip_head_aliases : t -> t
-
-val equal : t -> t -> bool
-
-val equal_record_kind : record_kind -> record_kind -> bool
-
-val equal_constructor :
-  ('a -> 'a -> bool) -> 'a constructor -> 'a constructor -> bool
-
-val hash : t -> int
 
 (* Smart constructors *)
 
@@ -381,60 +143,17 @@ val for_unnamed_functor_param : var
 val fresh_var : ?name:string -> Uid.t -> var * t
 
 val var : Uid.t -> Ident.t -> t
-val var': Uid.t option -> Ident.t -> t
 val abs : ?uid:Uid.t -> var -> t -> t
 val app : ?uid:Uid.t -> t -> arg:t -> t
 val str : ?uid:Uid.t -> t Item.Map.t -> t
 val alias : ?uid:Uid.t -> t -> t
-val error : ?uid:Uid.t -> string -> t
 val proj : ?uid:Uid.t -> t -> Item.t -> t
 val leaf : Uid.t -> t
-val leaf' : Uid.t option -> t
-val comp_unit : ?uid:Uid.t -> string -> t
-
-(* constructors for types  *)
-val constr : ?uid:Uid.t -> Ident.t -> t list -> t
-val tuple : ?uid:Uid.t -> t list -> t
-val unboxed_tuple : ?uid:Uid.t -> t list -> t
-val predef : ?uid:Uid.t -> Predef.t -> t list -> t
-val arrow : ?uid:Uid.t -> unit -> t
-val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
-val mu : ?uid:Uid.t -> Rec_var_ident.t -> t -> t
-val rec_var : ?uid:Uid.t -> Rec_var_ident.t -> t
-
-(* constructors for type declarations *)
-val variant :
-  ?uid:Uid.t -> (t * Layout.t option) constructors -> t
-val variant_unboxed :
-  ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
-  string -> string option -> t -> Layout.t -> t
-val record : ?uid:Uid.t -> record_kind ->
-  (string * Uid.t option * t * Layout.t) list -> t
-val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
-val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
-val unknown_type : ?uid:Uid.t -> unit -> t
-val at_layout : ?uid:Uid.t -> t -> Layout.t -> t
-
-
-val set_approximated : approximated:bool -> t -> t
-
-val app_list : t -> t list -> t
-val abs_list : t -> Ident.t list -> t
 
 val decompose_abs : t -> (var * t) option
 
-(* CR lmaurer: Should really take a [Compilation_unit.t] *)
 val for_persistent_unit : string -> t
 val leaf_for_unpack : t
-
-val poly_variant_constructors_map :
-  ('a -> 'b) -> 'a poly_variant_constructors -> 'b poly_variant_constructors
-
-val constructor_map :
-  ('a -> 'b) -> 'a constructor -> 'b constructor
-
-val constructors_map :
-  ('a -> 'b) -> 'a constructors -> 'b constructors
 
 module Map : sig
   type shape = t
@@ -456,9 +175,6 @@ module Map : sig
   val add_label : t -> Ident.t -> Uid.t -> t
   val add_label_proj : t -> Ident.t -> shape -> t
 
-  val add_unboxed_label : t -> Ident.t -> Uid.t -> t
-  val add_unboxed_label_proj : t -> Ident.t -> shape -> t
-
   val add_module : t -> Ident.t -> shape -> t
   val add_module_proj : t -> Ident.t -> shape -> t
 
@@ -473,27 +189,12 @@ module Map : sig
 
   val add_class_type : t -> Ident.t -> Uid.t -> t
   val add_class_type_proj : t -> Ident.t -> shape -> t
-
-  val add_jkind : t -> Ident.t -> Uid.t -> t
-  val add_jkind_proj : t -> Ident.t -> shape -> t
 end
 
 val dummy_mod : t
 
-(** This function returns the shape corresponding to a given path. It requires a
-    callback to find shapes in the environment. It is generally more useful to
-    rely directly on the [Env.shape_of_path] function to get the shape
-    associated with a given path. *)
 val of_path :
   find_shape:(Sig_component_kind.t -> Ident.t -> t) ->
   namespace:Sig_component_kind.t -> Path.t -> t
-
-(** [set_uid t uid] sets [uid] on the outermost node of [t], replacing any
-    uid already present. Declaration shapes must carry the declaration's own
-    uid at the top: manifests such as [type t = unit] otherwise retain the
-    uid of the expanded right-hand side (here the [unit] predef), which
-    breaks uid-based tooling (e.g. occurrence indexing, which filters
-    predef uids). *)
-val set_uid : t -> Uid.t -> t
 
 val set_uid_if_none : t -> Uid.t -> t

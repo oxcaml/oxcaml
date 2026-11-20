@@ -1,8 +1,8 @@
-  $ $DUNE exec ./main.exe
+  $ dune exec ./main.exe
   test
 
 There should be no error.
-  $ $MERLIN single errors -filename main.ml <main.ml | revert-newlines | jq '.value'
+  $ $MERLIN single errors -filename main.ml <main.ml | jq '.value'
   []
 
 Dune should communicate the -open Dune__exe flag after the others.
@@ -59,5 +59,5 @@ Using a .merlin with the FLG flags in the correct order works:
     }
   ]
 
-  $ $MERLIN single errors -filename main.ml <main.ml | revert-newlines | jq '.value'
+  $ $MERLIN single errors -filename main.ml <main.ml | jq '.value'
   []

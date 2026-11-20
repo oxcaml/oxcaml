@@ -1,6 +1,5 @@
 open Std
 module Lid_set = Index_format.Lid_set
-module Outdated_store = Granular_marshal.Outdated_store
 
 let { Logger.log } = Logger.for_section "occurrences"
 
@@ -22,13 +21,9 @@ module Occurrence_set : sig
 
   val empty : t
 
-  (** Filter an [Lid_set.t]. [Lid.t]s that are kept must be assigned a
-      staleness. [Lid.t]s that cannot be read because they live in an outdated
-      index are skipped, and these indexes are returned. *)
+  (** Filter an [Lid_set.t]. [Lid.t]s that are kept must be assigned a staleness *)
   val of_filtered_lid_set :
-    Lid_set.t ->
-    f:(Index_format.Lid.t -> Staleness.t option) ->
-    t * outdated_indices:Outdated_store.Set.t
+    Lid_set.t -> f:(Index_format.Lid.t -> Staleness.t option) -> t
 
   val to_list : t -> (Index_format.Lid.t * Staleness.t) list
   val union : t -> t -> t
@@ -43,28 +38,10 @@ end = struct
   let of_filtered_lid_set lid_set ~f:get_staleness =
     let maybe_add_lid acc lid =
       match get_staleness lid with
-      | exception Granular_marshal.Outdated_store outdated_store ->
-        (* [get_staleness] reads the fields of [lid], which may live in an
-           outdated index even if [lid] itself does not. *)
-        Error outdated_store
-      | Some staleness -> Ok (Lid_map.add lid staleness acc)
-      | None -> Ok acc
+      | Some staleness -> Lid_map.add lid staleness acc
+      | None -> acc
     in
-    let occurrences, ~outdated =
-      Lid_set.fold_skipping_outdated maybe_add_lid empty lid_set
-    in
-    Outdated_store.Set.iter
-      (fun { filename; reason } ->
-        let reason =
-          match reason with
-          | `Missing_file -> "index file missing"
-          | `Index_ids_do_not_match ->
-            "index file's id does not match expected id"
-        in
-        log ~title:"of_filtered_lid_set"
-          "Skipping occurrences stored in index %s (%s)" filename reason)
-      outdated;
-    (occurrences, ~outdated_indices:outdated)
+    Lid_set.fold maybe_add_lid empty lid_set
 
   let either_fresh a b =
     let open Staleness in
@@ -77,36 +54,12 @@ end
 
 let () = Mtyper.set_index_items Index_occurrences.items
 
-let string_of_status : Query_protocol.occurrences_status -> string = function
-  | Not_requested -> "not requested"
-  | Out_of_sync { source_files; indices } ->
-    Printf.sprintf "out-of-sync (source files: [%s], indices: [%s])"
-      (String.concat ~sep:", " source_files)
-      (String.concat ~sep:", " indices)
-  | No_def -> "no definition"
-  | Included -> "included"
-
 let set_fname ~file (loc : Location.t) =
   let pos_fname = file in
   { loc with
     loc_start = { loc.loc_start with pos_fname };
     loc_end = { loc.loc_end with pos_fname }
   }
-
-(* Merlin-jst: Upstream Merlin only includes the location of the last segment of an
-   identifier. (ex: If the user wrote "Foo.bar", only the location of "bar") is included.
-   We instead choose to include the entire "Foo.bar", for two reasons:
-   1. We think that this is a slightly better user experience
-   2. Upstream Merlin does not include occurrences within ppx generated code, but we do.
-      Because of this, it is not always true for us that the reported location in the
-      buffer is text corresponding to the identifier. (For example, the location may
-      correspond to a ppx extension node.) In such a case, attempting to modify the
-      location to only include the last segment of the identifier is nonsensical. Since we
-      don't have a way to detect such a case, it forces us to not try.
-
-   But in the case of renaming, we need to get the location of just the "bar".
-   Fortunately, the ppx case is irrelevant to renaming, as it's pointless to try to rename
-   a variable in ppx-generated code. *)
 
 (* A longident can have the form: A.B.x Right now we are only interested in
    values, but we will eventually want to index all occurrences of modules in
@@ -119,30 +72,19 @@ let set_fname ~file (loc : Location.t) =
    when the ident does not require parenthesis. In that case the loc sie differs
    from the name size in a way that depends on the concrete syntax which is
    lost. *)
-let last_loc_for_renaming (loc : Location.t) lid =
-  match loc.loc_ghost with
-  | true ->
-    (* The occurrence either corresponds to ppx-generated code or something punned (record
-       field, let binding, etc). In the ppx case we can just return None. *)
-    (* CR-someday: Punning is incorrectly handled. If the thing being renamed is used in a
-       pun, the names will no longer match and the pun needs to get expanded.
-       ex: If we rename the expr [foo] to [bar], we must translate [{ foo }] to
-           [{ foo = bar }]. *)
-    None
-  | false ->
-    Some
-      (match lid with
-      | Longident.Lident _ -> loc
-      | _ ->
-        let last_segment = Longident.last lid in
-        let needs_parens = Pprintast.needs_parens ~kind:Other last_segment in
-        if not needs_parens then
-          let last_size = last_segment |> String.length in
-          { loc with
-            loc_start =
-              { loc.loc_end with pos_cnum = loc.loc_end.pos_cnum - last_size }
-          }
-        else loc)
+let last_loc (loc : Location.t) lid =
+  match lid with
+  | Longident.Lident _ -> loc
+  | _ ->
+    let last_segment = Longident.last lid in
+    let needs_parens = Pprintast.needs_parens ~kind:Other last_segment in
+    if not needs_parens then
+      let last_size = last_segment |> String.length in
+      { loc with
+        loc_start =
+          { loc.loc_end with pos_cnum = loc.loc_end.pos_cnum - last_size }
+      }
+    else loc
 
 let uid_and_loc_of_node env node =
   let open Browse_raw in
@@ -152,7 +94,7 @@ let uid_and_loc_of_node env node =
     let md = Env.find_module (Pident ident) env in
     Some (md.md_uid, mb_name.loc)
   | Pattern
-      { pat_desc = Tpat_var { name; uid; _ } | Tpat_alias { name; uid; _ }; _ }
+      { pat_desc = Tpat_var (_, name, uid) | Tpat_alias (_, _, name, uid, _); _ }
     -> Some (uid, name.loc)
   | Type_declaration { typ_type; typ_name; _ } ->
     Some (typ_type.type_uid, typ_name.loc)
@@ -162,10 +104,9 @@ let uid_and_loc_of_node env node =
     Some (val_val.val_uid, val_name.loc)
   | _ -> None
 
-let rec comp_unit_of_uid = function
+let comp_unit_of_uid = function
   | Shape.Uid.Compilation_unit comp_unit | Item { comp_unit; _ } ->
     Some comp_unit
-  | Unboxed_version uid -> comp_unit_of_uid uid
   | Internal | Predef _ -> None
 
 module Stat_check : sig
@@ -190,20 +131,20 @@ end = struct
       log ~title:"stat_check" "No stats found for file %S." file;
       true
     | Some { size; _ } -> (
-      try
-        let stats = Unix.stat file in
-        let equal =
-          (* This is fast but approximative. A better option would be to check
-             [mtime] and then [source_digest] if the times differ. *)
-          Int.equal stats.st_size size
-        in
-        if not equal then
-          log ~title:"stat_check"
-            "File %s has been modified since the index was built." file;
-        equal
-      with Unix.Unix_error _ ->
-        log ~title:"stat_check" "Could not stat file %S" file;
-        false)
+        try
+          let stats = Unix.stat file in
+          let equal =
+            (* This is fast but approximative. A better option would be to check
+               [mtime] and then [source_digest] if the times differ. *)
+            Int.equal stats.st_size size
+          in
+          if not equal then
+            log ~title:"stat_check"
+              "File %s has been modified since the index was built." file;
+          equal
+        with Unix.Unix_error _ ->
+          log ~title:"stat_check" "Could not stat file %S" file;
+          false)
 
   let check t ~file =
     let cache_and_return b =
@@ -218,17 +159,14 @@ end
 let get_buffer_locs result uid =
   Shape.Uid.Map.fold
     (fun uid' lids acc ->
-      if Shape.Uid.equal uid uid' then
-        List.fold_left lids ~init:acc ~f:(fun acc lid ->
+       if Shape.Uid.equal uid uid' then
+          List.fold_left lids ~init:acc ~f:(fun acc lid ->
             Lid_set.add (Index_format.Lid.of_lid lid) acc)
-      else acc)
+       else acc)
     (Mtyper.get_index result) Lid_set.empty
 
 let get_external_locs ~(config : Mconfig.t) ~current_buffer_path uid :
-    (Occurrence_set.t
-    * out_of_sync_files:String.Set.t
-    * outdated_indices:Outdated_store.Set.t)
-    list =
+  (Occurrence_set.t * Std.String.Set.t) list =
   let title = "get_external_locs" in
   List.filter_map config.merlin.index_files ~f:(fun index_file ->
       log ~title "Lookin for occurrences of %a in index %s" Logger.fmt
@@ -237,100 +175,63 @@ let get_external_locs ~(config : Mconfig.t) ~current_buffer_path uid :
       let external_locs =
         try
           let external_index = Index_cache.read index_file in
-          Ok
-            (Index_format.Uid_map.find_opt uid external_index.defs
-            |> Option.map ~f:(fun uid_locs -> (external_index, uid_locs)))
-        with
-        | Index_format.Not_an_index _ | Sys_error _ ->
+          Index_format.Uid_map.find_opt uid external_index.defs
+          |> Option.map ~f:(fun uid_locs -> (external_index, uid_locs))
+        with Index_format.Not_an_index _ | Sys_error _ ->
           log ~title "Could not load index %s" index_file;
-          Ok None
-        | Granular_marshal.Outdated_store outdated_store ->
-          log ~title "Could not load index %s" index_file;
-          Error outdated_store
+          None
       in
-      match external_locs with
-      | Error outdated_store ->
-        Some
-          ( Occurrence_set.empty,
-            ~out_of_sync_files:String.Set.empty,
-            ~outdated_indices:(Outdated_store.Set.singleton outdated_store) )
-      | Ok None -> None
-      | Ok (Some (index, locs)) ->
-        let stats = Stat_check.create ~cache_size:128 index in
-        (* Note: [get_outdated_files] must be evaluated after the [Stat_check.check stats ~file...],
-           as the latter one populates the cache inside [stats] *)
-        let occurrences, ~outdated_indices =
-          Occurrence_set.of_filtered_lid_set locs ~f:(fun lid ->
-              let ({ Location.loc; _ } as lid) = Index_format.Lid.to_lid lid in
-              (* We filter external results that concern the current buffer *)
-              let file_rel_to_root = loc.Location.loc_start.Lexing.pos_fname in
-              let file_uncanon, buf_uncanon =
-                match config.merlin.source_root with
-                | Some root ->
-                  (Filename.concat root file_rel_to_root, current_buffer_path)
-                | None -> (file_rel_to_root, config.query.filename)
-              in
-              let file = Misc.canonicalize_filename file_uncanon in
-              let buf = Misc.canonicalize_filename buf_uncanon in
-              let is_current_buffer = String.equal file buf in
-              let should_be_ignored =
-                (* We ignore results that don't have a location *)
-                Index_occurrences.should_ignore_lid lid
-              in
-              if is_current_buffer || should_be_ignored then None
-              else begin
-                (* We ignore external results if their source was modified *)
-                let is_fresh = Stat_check.check stats ~file:file_rel_to_root in
-                if not is_fresh then
-                  log ~title:"locs_of" "File %s might be out-of-sync." file;
-                let staleness : Staleness.t =
-                  match is_fresh with
-                  | true -> Fresh
-                  | false -> Stale
+      Option.map external_locs ~f:(fun (index, locs) ->
+          let stats = Stat_check.create ~cache_size:128 index in
+          ( Occurrence_set.of_filtered_lid_set locs ~f:(fun lid ->
+                let { Location.loc; _ } = Index_format.Lid.to_lid lid in
+                (* We ignore external results that concern the current buffer *)
+                let file_rel_to_root =
+                  loc.Location.loc_start.Lexing.pos_fname
                 in
-                Some staleness
-              end)
-        in
-        Some
-          ( occurrences,
-            ~out_of_sync_files:(Stat_check.get_outdated_files stats),
-            ~outdated_indices ))
+                let file_uncanon, buf_uncanon =
+                  match config.merlin.source_root with
+                  | Some root ->
+                    (Filename.concat root file_rel_to_root, current_buffer_path)
+                  | None -> (file_rel_to_root, config.query.filename)
+                in
+                let file = Misc.canonicalize_filename file_uncanon in
+                let buf = Misc.canonicalize_filename buf_uncanon in
+                if String.equal file buf then None
+                else begin
+                  (* We ignore external results if their source was modified *)
+                  let is_fresh =
+                    Stat_check.check stats ~file:file_rel_to_root
+                  in
+                  if not is_fresh then
+                    log ~title:"locs_of" "File %s might be out-of-sync." file;
+                  let staleness : Staleness.t =
+                    match is_fresh with
+                    | true -> Fresh
+                    | false -> Stale
+                  in
+                  Some staleness
+                end),
+            Stat_check.get_outdated_files stats )))
 
 let lookup_related_uids_in_indexes ~(config : Mconfig.t) uid =
   let title = "lookup_related_uids_in_indexes" in
   let open Index_format in
-  let store, related_uids, ~outdated_indices =
-    List.fold_left
-      ~init:
-        ( Uid_map.empty (),
-          Uid_map.empty (),
-          ~outdated_indices:Outdated_store.Set.empty )
-      config.merlin.index_files
-      ~f:(fun (store, acc, ~outdated_indices) index_file ->
-        try
-          let index = Index_cache.read index_file in
-          let store, acc =
-            Union_find.merge_union store index.related_uids
-              index.related_uids_store acc
-          in
-          (store, acc, ~outdated_indices)
-        with
-        | Index_format.Not_an_index _ | Sys_error _ ->
-          log ~title "Could not load index %s" index_file;
-          (store, acc, ~outdated_indices)
-        | Granular_marshal.Outdated_store outdated_store ->
-          log ~title "Could not load index %s" index_file;
-          ( store,
-            acc,
-            ~outdated_indices:(Outdated_store.Set.add outdated_store
-                                 outdated_indices) ))
-  in
   let related_uids =
-    Uid_map.find_opt uid related_uids
-    |> Option.value_map ~default:[] ~f:(fun x ->
-        x |> Union_find.get store |> Uid_set.elements)
+    List.fold_left ~init:(Uid_map.empty ()) config.merlin.index_files
+      ~f:(fun acc index_file ->
+          try
+            let index = Index_cache.read index_file in
+            Uid_map.union
+              (fun _ a b -> Some (Union_find.union a b))
+              index.related_uids acc
+          with Index_format.Not_an_index _ | Sys_error _ ->
+            log ~title "Could not load index %s" index_file;
+            acc)
   in
-  (related_uids, ~outdated_indices)
+  Uid_map.find_opt uid related_uids
+  |> Option.value_map ~default:[] ~f:(fun x ->
+      x |> Union_find.get |> Uid_set.to_list)
 
 let find_linked_uids ~config ~scope ~name uid =
   let title = "find_linked_uids" in
@@ -340,29 +241,28 @@ let find_linked_uids ~config ~scope ~name uid =
       { Locate.mconfig = config; ml_or_mli = `ML; traverse_aliases = false }
     in
     let check_name uid =
-      Locate.lookup_uid_loc_of_decl ~config uid
+      Locate.lookup_uid_decl ~config uid
+      |> Option.bind ~f:(Typedtree_utils.location_of_declaration ~uid)
       |> Option.value_map
-           ~f:(fun { Location.txt; _ } ->
-             let result = String.equal name txt in
-             if not result then
-               log ~title "Found clashing idents %S <> %S. Ignoring UID %a."
-                 name txt Logger.fmt
-                 (Fun.flip Shape.Uid.print uid);
-             result)
-           ~default:false
+        ~f:(fun { Location.txt; _ } ->
+            let result = String.equal name txt in
+            if not result then
+              log ~title "Found clashing idents %S <> %S. Ignoring UID %a."
+                name txt Logger.fmt
+                (Fun.flip Shape.Uid.print uid);
+            result)
+        ~default:false
     in
-    let related_uids, ~outdated_indices =
+    let related_uids =
       match scope with
-      | `Buffer -> ([], ~outdated_indices:Outdated_store.Set.empty)
-      | `Project ->
-        ( Locate.get_linked_uids ~config:locate_config ~comp_unit uid,
-          ~outdated_indices:Outdated_store.Set.empty )
+      | `Buffer -> []
+      | `Project -> Locate.get_linked_uids ~config:locate_config ~comp_unit uid
       | `Renaming -> lookup_related_uids_in_indexes ~config uid
     in
     log ~title "Found related uids: [%a]" Logger.fmt (fun fmt ->
         List.iter ~f:(fprintf fmt "%a;" Shape.Uid.print) related_uids);
-    (List.filter ~f:check_name related_uids, ~outdated_indices)
-  | _ -> ([], ~outdated_indices:Outdated_store.Set.empty)
+    List.filter ~f:check_name related_uids
+  | _ -> []
 
 let locs_of ~config ~env ~typer_result ~pos ~scope path =
   log ~title:"occurrences" "Looking for occurences of %s (pos: %s)" path
@@ -411,47 +311,27 @@ let locs_of ~config ~env ~typer_result ~pos ~scope path =
       (fun fmt -> Location.print_loc fmt def_loc);
     log ~title:"locs_of" "Indexing current buffer";
     let buffer_locs = get_buffer_locs typer_result def_uid in
-    let buffer_occurrences, ~outdated_indices:_ =
-      (* [buffer_locs] are in memory, so none of them are outdated *)
+    let buffer_occurrences =
       Occurrence_set.of_filtered_lid_set buffer_locs ~f:(fun _ -> Some Fresh)
     in
-    let external_occurrences, ~outdated_indices:outdated_for_linked_uids =
-      if scope = `Buffer then ([], ~outdated_indices:Outdated_store.Set.empty)
+    let external_occurrences =
+      if scope = `Buffer then []
       else
         let name =
           String.split_on_char ~sep:'.' path |> List.last |> Option.get
         in
-        let additional_uids, ~outdated_indices =
-          find_linked_uids ~config ~scope ~name def_uid
-        in
-        ( List.concat_map
-            (def_uid :: additional_uids)
-            ~f:(get_external_locs ~config ~current_buffer_path),
-          ~outdated_indices )
+        let additional_uids = find_linked_uids ~config ~scope ~name def_uid in
+        List.concat_map
+          (def_uid :: additional_uids)
+          ~f:(get_external_locs ~config ~current_buffer_path)
     in
-    let external_occurrences, ~out_of_sync_files, ~outdated_indices =
+    let external_occurrences, out_of_sync_files =
       List.fold_left
-        ~init:
-          ( Occurrence_set.empty,
-            ~out_of_sync_files:String.Set.empty,
-            ~outdated_indices:outdated_for_linked_uids )
-        ~f:(fun
-            ( acc_locs,
-              ~out_of_sync_files:acc_files,
-              ~outdated_indices:acc_outdated )
-            (locs, ~out_of_sync_files:files, ~outdated_indices)
-          ->
-          ( Occurrence_set.union acc_locs locs,
-            ~out_of_sync_files:(String.Set.union acc_files files),
-            ~outdated_indices:(Outdated_store.Set.union acc_outdated
-                                 outdated_indices) ))
+        ~init:(Occurrence_set.empty, String.Set.empty)
+        ~f:(fun (acc_locs, acc_files) (locs, files) ->
+            (Occurrence_set.union acc_locs locs, String.Set.union acc_files files))
         external_occurrences
     in
-    if not (String.Set.is_empty out_of_sync_files) then
-      log ~title:"locs_of"
-        "Occurrences may be incomplete: some source files are out-of-sync with \
-         the index: %s"
-        (String.concat ~sep:", " (String.Set.to_list out_of_sync_files));
     let occurrences =
       Occurrence_set.union buffer_occurrences external_occurrences
     in
@@ -471,48 +351,37 @@ let locs_of ~config ~env ~typer_result ~pos ~scope path =
           let lid = try Longident.head txt with _ -> "not flat lid" in
           log ~title:"occurrences" "Found occ: %s %a" lid Logger.fmt
             (Fun.flip Location.print_loc loc);
+          let loc = last_loc loc txt in
+          let fname = loc.Location.loc_start.Lexing.pos_fname in
           let loc =
-            match scope with
-            | `Renaming -> last_loc_for_renaming loc txt
-            | `Buffer | `Project -> Some loc
+            if not (Filename.is_relative fname) then Some loc
+            else
+              match config.merlin.source_root with
+              | Some path ->
+                let file = Filename.concat path loc.loc_start.pos_fname in
+                Some (set_fname ~file loc)
+              | None -> begin
+                  match Locate.find_source ~config loc fname with
+                  | `Found (file, _) -> Some (set_fname ~file loc)
+                  | `File_not_found msg ->
+                    log ~title:"occurrences" "%s" msg;
+                    None
+                end
           in
-          Option.bind loc ~f:(fun loc ->
-              let fname = loc.Location.loc_start.Lexing.pos_fname in
-              let loc =
-                if not (Filename.is_relative fname) then Some loc
-                else
-                  match config.merlin.source_root with
-                  | Some path ->
-                    let file = Filename.concat path loc.loc_start.pos_fname in
-                    Some (set_fname ~file loc)
-                  | None ->
-                    begin match Locate.find_source ~config loc fname with
-                    | `Found (file, _) -> Some (set_fname ~file loc)
-                    | `File_not_found msg ->
-                      log ~title:"occurrences" "%s" msg;
-                      None
-                    end
-              in
-              Option.map loc ~f:(fun loc : Query_protocol.occurrence ->
-                  { loc; is_stale = Staleness.is_stale staleness })))
+          Option.map loc ~f:(fun loc : Query_protocol.occurrence ->
+              { loc; is_stale = Staleness.is_stale staleness }))
     in
     let def_uid_is_in_current_unit =
       let uid_comp_unit = comp_unit_of_uid def_uid in
       Option.value_map ~default:false uid_comp_unit
-        ~f:Misc_utils.is_current_unit
+        ~f:(String.equal @@ Env.get_current_unit_name ())
     in
-    let status : Query_protocol.occurrences_status =
-      let outdated_indices =
-        Outdated_store.Set.elements outdated_indices
-        |> List.map ~f:(fun { Outdated_store.filename; _ } -> filename)
-        |> String.Set.of_list |> String.Set.to_list
-      in
-      match (scope, String.Set.to_list out_of_sync_files, outdated_indices) with
-      | `Buffer, _, _ -> Not_requested
-      | _, [], [] -> Included
-      | _, source_files, indices -> Out_of_sync { source_files; indices }
+    let status =
+      match (scope, String.Set.to_list out_of_sync_files) with
+      | `Buffer, _ -> `Not_requested
+      | _, [] -> `Included
+      | _, l -> `Out_of_sync l
     in
-    log ~title:"locs_of" "Occurrences status: %s" (string_of_status status);
     if not def_uid_is_in_current_unit then { occurrences; status }
     else
       let definition_occurrence : Query_protocol.occurrence =
@@ -520,4 +389,4 @@ let locs_of ~config ~env ~typer_result ~pos ~scope path =
       in
       let occurrences = definition_occurrence :: occurrences in
       { occurrences; status }
-  | None -> { occurrences = []; status = No_def }
+  | None -> { occurrences = []; status = `No_def }

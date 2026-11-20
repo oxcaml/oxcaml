@@ -12,16 +12,16 @@
   > let x = 21
   > EOF
 
-  $ $OCAMLC -bin-annot -bin-annot-occurrences -c lib2/bar.ml
-  $ $OCAMLC -bin-annot -bin-annot-occurrences -c lib1/foo.ml -I lib2
+  $ ocamlc -bin-annot -bin-annot-occurrences -c lib2/bar.ml
+  $ ocamlc -bin-annot -bin-annot-occurrences -c lib1/foo.ml -I lib2
 
 # Here we have an implicit transitive dependency on lib2:
-  $ $OCAMLC -bin-annot -bin-annot-occurrences -c main.ml -I lib1
+  $ ocamlc -bin-annot -bin-annot-occurrences -c main.ml -I lib1
 
 # We pass explicitely the implicit transitive dependency over lib2:
   $ ocaml-index aggregate -o main.uideps main.cmt -I lib2
-  $ (cd lib1 ; ocaml-index aggregate -o foo.uideps foo.cmt)
-  $ (cd lib2 ; ocaml-index aggregate -o bar.uideps bar.cmt)
+  $ ocaml-index aggregate -o lib1/foo.uideps lib1/foo.cmt
+  $ ocaml-index aggregate -o lib2/bar.uideps lib2/bar.cmt
 
   $ ocaml-index aggregate -o test.uideps main.uideps lib1/foo.uideps lib2/bar.uideps
 

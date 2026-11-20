@@ -4,7 +4,6 @@ module Type_tree = struct
   type node_data =
     | Arrow
     | Tuple
-    | Unboxed_tuple
     | Object
     | Poly_variant
     | Type_ref of { path : Path.t; ty : Types.type_expr }
@@ -15,20 +14,13 @@ end
 
 let rec flatten_arrow ret_ty =
   match Types.get_desc ret_ty with
-  | Tarrow ((label, _, _), ty1, ty2, _) ->
+  | Tarrow (label, ty1, ty2, _) ->
     let ty1 =
       match label with
       | Optional _ ->
-        let rec strip_option ty =
-          match Types.get_desc ty with
-          | Tconstr (path, [ ty ], _) when Path.same path Predef.path_option ->
-            ty
-          | Tpoly (ty, vars) ->
-            Btype.newty3 ~level:(Types.get_level ty) ~scope:(Types.get_scope ty)
-              (Tpoly (strip_option ty, vars))
-          | _ -> ty
-        in
-        strip_option ty1
+        (match Types.get_desc ty1 with
+        | Tconstr (path, [ ty1 ], _) when Path.same path Predef.path_option -> ty1
+        | _ -> ty1)
       | _ -> ty1
     in
     ty1 :: flatten_arrow ty2
@@ -44,15 +36,13 @@ let rec create_type_tree ty : Type_tree.t =
     let tys = List.map ~f:snd tys in
     let children = List.map tys ~f:create_type_tree in
     { data = Tuple; children }
-  | Tunboxed_tuple tys ->
-    let tys = List.map ~f:snd tys in
-    let children = List.map tys ~f:create_type_tree in
-    { data = Unboxed_tuple; children }
   | Tconstr (path, arg_tys, abbrev_memo) ->
-    let ty_without_args = Btype.newgenty (Tconstr (path, [], abbrev_memo)) in
+    let ty_without_args =
+      Btype.newty2 ~level:Ident.highest_scope (Tconstr (path, [], abbrev_memo))
+    in
     let children = List.map arg_tys ~f:create_type_tree in
     { data = Type_ref { path; ty = ty_without_args }; children }
-  | Tlink ty | Tpoly (ty, _) | Trepr (ty, _) -> create_type_tree ty
+  | Tlink ty | Tpoly (ty, _) -> create_type_tree ty
   | Tobject (fields_type, _) ->
     let rec extract_field_types (ty : Types.type_expr) =
       match Types.get_desc ty with
@@ -77,34 +67,5 @@ let rec create_type_tree ty : Type_tree.t =
           | Rpresent None | Rabsent -> None)
     in
     { data = Poly_variant; children }
-  | Tquote_eval ty ->
-    (* CR-someday liam923: Use a different constructor than Type_ref to represent this
-       case. *)
-    let ty_without_args =
-      Btype.newgenty (Tconstr (Predef.path_eval, [], ref Types.Mnil))
-    in
-    let children = [ create_type_tree ty ] in
-    { data = Type_ref { path = Predef.path_eval; ty = ty_without_args };
-      children
-    }
-  | Tquote ty ->
-    (* CR-someday liam923: Wrap this in something to indicate that it's inside a
-       Tquote. *)
-    create_type_tree ty
-  | Tbox ty ->
-    let ty_without_args =
-      Btype.newgenty (Tconstr (Predef.path_box, [], ref Types.Mnil))
-    in
-    let children = [ create_type_tree ty ] in
-    { data = Type_ref { path = Predef.path_box; ty = ty_without_args };
-      children
-    }
-  | Tmod (ty, _) -> create_type_tree ty
-  | Tnil
-  | Tvar _
-  | Tsubst _
-  | Tunivar _
-  | Tpackage _
-  | Tfield _
-  | Tsplice _
-  | Tof_kind _ -> { data = Other ty; children = [] }
+  | Tnil | Tvar _ | Tsubst _ | Tunivar _ | Tpackage _ | Tfield _ ->
+    { data = Other ty; children = [] }

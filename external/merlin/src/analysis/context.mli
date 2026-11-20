@@ -28,15 +28,11 @@
 
 type t =
   | Constructor of Data_types.constructor_description * Location.t
-    (* We attach the constructor description here so in the case of
-       disambiguated constructors we actually directly look for the type
-       path (cf. #486, #794). *)
-  | Unknown_constructor
+  (* We attach the constructor description here so in the case of
+     disambiguated constructors we actually directly look for the type
+     path (cf. #486, #794). *)
   | Expr
-  | Label :
-      'rep Data_types.gen_label_description * 'rep Data_types.record_form
-      -> t (* Similar to constructors. *)
-  | Unknown_label
+  | Label of Data_types.label_description (* Similar to constructors. *)
   | Module_path
   | Module_type
   | Patt
@@ -46,24 +42,17 @@ type t =
 
 val to_string : t -> string
 
-val of_locate_context : Query_protocol.Locate_context.t -> t
-
 (**
-  [inspect_browse_tree lid ~cursor mbrowse] tries to provide contextual
-  information given the selected identifier, the position of the cursor and the
-  typed tree. It is used by Locate and Type_enclosing.
+   [inspect_browse_tree lid ~cursor mbrowse] tries to provide contextual
+   information given the selected identifier, the position of the cursor and the
+   typed tree. It is used by Locate and Type_enclosing.
 
-  The cursor position is used to distinguished whether a module path or an actual
-  constructor name is pointed at when the cursor is in the middle of a
-  longident, e.g. [Foo.B|ar.Constructor] (with | being the cursor).
+   The cursor position is used to distinguished whether a module path or an actual
+   constructor name is pointed at when the cursor is in the middle of a
+   longident, e.g. [Foo.B|ar.Constructor] (with | being the cursor).
 
-  FIXME: when cursor at (M.|A 3), the enclosing node returned is const 3, thus
-  breaking the context inference.
+   FIXME: when cursor at (M.|A 3), the enclosing node returned is const 3, thus
+   breaking the context inference.
 *)
 val inspect_browse_tree :
-  ?let_pun_behavior:Mbrowse.Let_pun_behavior.t ->
-  ?record_pattern_pun_behavior:Mbrowse.Record_pattern_pun_behavior.t ->
-  cursor:Std.Lexing.position ->
-  Longident.t ->
-  Mbrowse.t list ->
-  t option
+  cursor:Std.Lexing.position -> Longident.t -> Mbrowse.t list -> t option

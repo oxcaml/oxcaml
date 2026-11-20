@@ -525,7 +525,7 @@ argument (lookup appropriate binary, setup logging, pass global settings)"
         ;; FIXME use logfile
         ;; (logfile     (or (merlin-lookup 'logfile merlin-buffer-configuration)
         ;;                  merlin-logfile))
-        (extensions  (merlin--map-flatten (lambda (x) (cons "-merlin-extension" x))
+        (extensions  (merlin--map-flatten (lambda (x) (cons "-extension" x))
                                           merlin-buffer-extensions))
         (packages    (merlin--map-flatten (lambda (x) (cons "-I" x))
                                           merlin-buffer-packages-path))

@@ -24,7 +24,7 @@ provide better result.
           "line": 4,
           "col": 15
         },
-        "type": "type 'k t : any = 'k t",
+        "type": "'a t",
         "tail": "no"
       },
       {
@@ -48,7 +48,7 @@ provide better result.
           "line": 4,
           "col": 15
         },
-        "type": "type 'k baz : immutable_data = Foo | Bar of 'k t",
+        "type": "type 'k baz = Foo | Bar of 'k t",
         "tail": "no"
       }
     ],
@@ -89,7 +89,7 @@ provide better result.
           "line": 1,
           "col": 25
         },
-        "type": "type t1 : immutable_data with t1 = [ `A of [ `A of 'a | `B ] as 'a | `B ]",
+        "type": "type t1 = [ `A of [ `A of 'a | `B ] as 'a | `B ]",
         "tail": "no"
       }
     ],

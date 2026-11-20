@@ -1,32 +1,19 @@
-(executable
- (name revert_newlines))
-
-(rule
- (target revert-newlines)
- (deps   revert_newlines.exe)
- (action (copy %{deps} %{target})))
-
-(env (_
- (binaries merlin-wrapper ocamlc-wrapper dune-wrapper revert-newlines)
- (env-vars
-  (MERLIN merlin-wrapper)
-  (OCAMLC ocamlc-wrapper)
-  (DUNE dune-wrapper))))
+(env
+ (_
+  (binaries merlin-wrapper)
+  (env-vars
+   (MERLIN merlin-wrapper)
+   (OCAMLC ocamlc)
+   (DUNE dune))))
 
 (cram
  (package merlin)
  (applies_to :whole_subtree)
  (deps
-  (env_var MERLIN_TEST_OCAML_PATH)
   %{bin:merlin-wrapper}
-  %{bin:ocamlc-wrapper}
-  %{bin:dune-wrapper}
-  %{bin:ocaml-index}
   %{bin:ocamlmerlin-server}
   %{bin:ocamlmerlin}
-  %{bin:dot-merlin-reader}
-  %{bin:revert-newlines}
-  (env_var MERLIN_TEST_OCAML_VERSION)))
+  %{bin:dot-merlin-reader}))
 
 (cram
  (applies_to with-ppx)

@@ -38,12 +38,7 @@ type mapper =
     expr: mapper -> expression -> expression;
     extension_constructor: mapper -> extension_constructor ->
       extension_constructor;
-    jkind_annotation:
-      mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
-    jkind_declaration: mapper -> jkind_declaration -> jkind_declaration;
     location: mapper -> Location.t -> Location.t;
-    modalities: mapper -> modalities -> modalities;
-    modes: 'a. mapper -> 'a modes -> 'a modes;
     module_binding: mapper -> module_binding -> module_binding;
     module_coercion: mapper -> module_coercion -> module_coercion;
     module_declaration: mapper -> module_declaration -> module_declaration;

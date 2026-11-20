@@ -7,7 +7,6 @@ module type S = sig
   type t_ext = ..
   type t_ext += Str of string | A
   type v = [`A of t_ext]
-  type t_function = int -> foo:string -> ?bar:bool -> here:[%call_pos] -> char
 
   val i : int
   val f : t -> int
@@ -29,15 +28,11 @@ module type S = sig
     val f : int -> float
     module type STyp = sig end
     module D : Another
-    val trepr : (repr_ 'a). 'a -> 'a
   end
 
   module Submod : Sig
 
   module SubFunc (M : Sig) : sig val g : unit end
-
-  kind_ k_abstract
-  kind_ k_concrete = immutable_data
 end
 
 module type Small = sig type t = int end

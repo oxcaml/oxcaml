@@ -34,30 +34,9 @@ type constructor_usage_warning =
   | Not_constructed
   | Only_exported_private
 
-type upstream_compat_warning =
-  | Non_value_sort of string (* example: abstract type
-      [t : float64] is marked as unboxed. *)
-  | Unboxed_attribute of string (* example: unboxed attribute
-      on an external declaration with float# is missing. *)
-  | Immediate_void_variant
-      (* example: [type t = A of void] is immediate, but
-         not after erasure, which boxes void, so it can't be erased. *)
-  | Separability_check
-      (* example: [type packed = | Mk of 'a t [@@unboxed]]
-         where ['a t : value mod non_float]. *)
-  | Unpacked_attribute
-
-type name_out_of_scope_warning =
-  | Name of string
-  | Fields of { record_form : string ; fields : string list }
-
 type type_declaration_usage_warning =
   | Declaration
   | Alias
-
-type redundant_modifier_reason =
-  | Default_bound
-  | Implied_by of string
 
 type t =
   | Comment_start                           (*  1 *)
@@ -68,7 +47,7 @@ type t =
   | Labels_omitted of string list           (*  6 *)
   | Method_override of string list          (*  7 *)
   | Partial_match of Format_doc.t           (*  8 *)
-  | Missing_record_field_pattern of { form : string ; unbound : string } (* 9 *)
+  | Missing_record_field_pattern of string  (*  9 *)
   | Non_unit_statement                      (* 10 *)
   | Redundant_case                          (* 11 *)
   | Redundant_subpat                        (* 12 *)
@@ -82,11 +61,11 @@ type t =
   | Ignored_extra_argument                  (* 20 *)
   | Nonreturning_statement                  (* 21 *)
   | Preprocessor of string                  (* 22 *)
-  | Useless_record_with of string           (* 23 *)
+  | Useless_record_with                     (* 23 *)
   | Bad_module_name of string               (* 24 *)
   | All_clauses_guarded                     (* 8, used to be 25 *)
-  | Unused_var of { name : string ; mutated : bool } (* 26 *)
-  | Unused_var_strict of { name : string ; mutated : bool } (* 27 *)
+  | Unused_var of string                    (* 26 *)
+  | Unused_var_strict of string             (* 27 *)
   | Wildcard_arg_to_constant_constr         (* 28 *)
   | Eol_in_string                           (* 29 *)
   | Duplicate_definitions of string * string * string * string (*30 *)
@@ -100,7 +79,7 @@ type t =
   | Unused_constructor of string * constructor_usage_warning (* 37 *)
   | Unused_extension of string * bool * constructor_usage_warning (* 38 *)
   | Unused_rec_flag                         (* 39 *)
-  | Name_out_of_scope of string * name_out_of_scope_warning (* 40 *)
+  | Name_out_of_scope of string * string list * bool (* 40 *)
   | Ambiguous_name of string list * string list *  bool * string (* 41 *)
   | Disambiguated_name of string            (* 42 *)
   | Nonoptional_label of string             (* 43 *)
@@ -118,9 +97,7 @@ type t =
   | Inlining_impossible of string           (* 55 *)
   | Unreachable_case                        (* 56 *)
   | Ambiguous_var_in_pattern_guard of string list (* 57 *)
-  | No_cmx_file of
-      { missing_extension : string;
-        module_name : string }              (* 58 *)
+  | No_cmx_file of string                   (* 58 *)
   | Flambda_assignment_to_non_mutable_value (* 59 *)
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
@@ -131,46 +108,13 @@ type t =
   | Unused_open_bang of string              (* 66 *)
   | Unused_functor_parameter of string      (* 67 *)
   | Match_on_mutable_state_prevent_uncurry  (* 68 *)
-  | Unused_field of
-      { form : string; field : string; complaint : field_usage_warning }(* 69 *)
+  | Unused_field of string * field_usage_warning (* 69 *)
   | Missing_mli                             (* 70 *)
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
-  (* Oxcaml specific warnings: numbers should go down from 199 *)
-  | Imprecise_kind_annotation of {
-      name : string;
-      annotated : string;
-      inferred : string;
-    }                                       (* 181 *)
-  | Untagged_external_small_int_return      (* 182 *)
-  | Redundant_kind_modifier of string       (* 183 *)
-  | Ignored_kind_modifier of
-      { modifier : string; abbrev : string }  (* 184 *)
-  | Unmutated_mutable of string             (* 186 *)
-  | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
-  | Unerasable_position_argument            (* 188 *)
-  (* 189 was [Unnecessarily_partial_tuple_pattern], now upstream as 75 *)
-  | Probe_name_too_long of string           (* 190 *)
-  | Unused_kind_declaration of string       (* 191 *)
-  | Zero_alloc_all_hidden_arrow of string   (* 198 *)
-  | Unchecked_zero_alloc_attribute          (* 199 *)
-  | Unboxing_impossible                     (* 210 *)
-  | Redundant_modifier of
-      { modifier : string;
-        reason : redundant_modifier_reason }  (* 211 *)
-  (* 212 taken *)
-  (* 213 was [Modal_axis_specified_twice], now subsumed by
-     [Redundant_modality] (220) *)
-  | Atomic_float_record_boxed               (* 214 *)
-  | Implied_attribute of { implying: string; implied : string} (* 215 *)
-  | Use_during_borrowing                    (* 216 *)
-  | Lpoly_in_letrec                         (* 218 *)
-  | Useless_valpoly                         (* 219 *)
-  | Redundant_modality                      (* 220 *)
-  | Unused_alert_disable of string          (* 221 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -202,7 +146,7 @@ let number = function
   | Ignored_extra_argument -> 20
   | Nonreturning_statement -> 21
   | Preprocessor _ -> 22
-  | Useless_record_with _ -> 23
+  | Useless_record_with -> 23
   | Bad_module_name _ -> 24
   | All_clauses_guarded -> 8 (* used to be 25 *)
   | Unused_var _ -> 26
@@ -252,35 +196,14 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
-  | Imprecise_kind_annotation _ -> 181
-  | Untagged_external_small_int_return -> 182
-  | Redundant_kind_modifier _ -> 183
-  | Ignored_kind_modifier _ -> 184
-  | Unmutated_mutable _ -> 186
-  | Incompatible_with_upstream _ -> 187
   | Degraded_to_partial_match -> 74
   | Unnecessarily_partial_tuple_pattern -> 75
-  | Unerasable_position_argument -> 188 (* 189 is now upstream as 75 *)
-  | Probe_name_too_long _ -> 190
-  | Unused_kind_declaration _ -> 191
-  | Zero_alloc_all_hidden_arrow _ -> 198
-  | Unchecked_zero_alloc_attribute -> 199
-  | Unboxing_impossible -> 210
-  | Redundant_modifier _ -> 211
-  | Atomic_float_record_boxed -> 214
-  | Implied_attribute _ -> 215
-  | Use_during_borrowing -> 216
-  | Lpoly_in_letrec -> 218
-  | Useless_valpoly -> 219
-  | Redundant_modality -> 220
-  | Unused_alert_disable _ -> 221
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
    the  definition of the number function above ends *)
 
-let last_warning_number = 250
-;;
+let last_warning_number = 75
 
 type description =
   { number : int;
@@ -629,93 +552,6 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
-  { number = 181;
-    names = ["imprecise-kind-annotation"];
-    description = "A kind annotation is less precise than the inferred kind.";
-    since = since 5 2 };
-  { number = 182;
-    names = ["untagged-external-small-int-return"];
-    description = "An external declaration returns an (int8[@untagged]) or \
-                   an (int16[@untagged])";
-    since = since 5 2 };
-  { number = 183;
-    names = ["redundant-kind-modifier"];
-    (* CR layouts-scannable: As more axes are added, this description (and
-       the following description) should be updated in tandem. *)
-    description = "A nullability or separability axis annotation appears on \
-                   a kind that already implies the annotation.";
-    since = since 5 2 };
-  { number = 184;
-    names = ["ignored-kind-modifier"];
-    (* CR layouts-scannable: As more axes are added, this description (and
-       the following description) should be updated in tandem. *)
-    description = "A nullability or separability axis annotation appears on \
-                   a non-value, non-any layout.";
-    since = since 5 2 };
-  { number = 186;
-    names = ["unmutated-mutable"];
-    description =
-    "Mutable variable was never mutated: mutable variable that\n\
-    \    doesn't start with an underscore (\"_\") character was never mutated.";
-    since = since 5 2 };
-  { number = 187;
-    names = ["incompatible-with-upstream"];
-    description = "Extension usage is incompatible with upstream.";
-    since = since 5 1 };
-  { number = 188;
-    names = ["unerasable-position-argument"];
-    description = "Unerasable position argument.";
-    since = since 5 1 };
-  (* 189 was [unnecessarily-partial-tuple-pattern], now upstream as 75 *)
-  { number = 190;
-    names = ["probe-name-too-long"];
-    description = "Probe name must be at most 100 characters long.";
-    since = since 4 14 };
-  { number = 191;
-    names = ["unused-kind-declaration"];
-    description = "Unused kind declaration.";
-    since = since 5 2 };
-  { number = 198;
-    names = ["zero-alloc-all-hidden-arrow"];
-    description = "A declaration whose type is an alias of a function type \
-                   will be ignored by zero_alloc all or all_opt.";
-    since = since 4 14 };
-  { number = 199;
-    names = ["unchecked-zero-alloc-attribute"];
-    description = "A property of a function that was \
-                  optimized away cannot be checked.";
-    since = since 4 14 };
-  { number = 210;
-    names = ["unboxing-impossible"];
-    description = "The parameter or return value corresponding @unboxed attribute cannot be unboxed.";
-    since = since 4 14 };
-  { number = 211;
-    names = ["redundant-modifier"];
-    description = "Modifier is redundant with the default or implied by \
-                   another modifier.";
-    since = since 4 14 };
-  { number = 214;
-    names = ["atomic-float-record-boxed"];
-    description = "Record contains atomic float fields, preventing the flat\n\
-                   float record optimization.";
-    since = since 4 14 };
-  { number = 215;
-    names = ["implied-attribute"];
-    description = "An attribute is unused because it is implied by another.";
-    since = since 4 14 };
-  { number = 216;
-    names = ["use-during-borrowing"];
-    description = "Use of a value during an active borrow.";
-    since = since 5 3 };
-  { number = 220;
-    names = ["redundant-modality"];
-    description = "Modality is redundant with the default.";
-    since = since 5 2 };
-  { number = 221;
-    names = ["unused-alert-disable"];
-    description = "An attribute disabling an alert did not suppress any\n\
-    \    occurrence of that alert.";
-    since = since 5 4 };
 ]
 
 let name_to_number =
@@ -727,10 +563,7 @@ let name_to_number =
 
 (* Must be the max number returned by the [number] function. *)
 
-let parsed_ocamlparam = ref "<not-set>"
-
-(* CR-soon xclerc for xclerc: remove the `for_debug` parameter... *)
-let letter for_debug = function
+let letter = function
   | 'a' ->
      let rec loop i = if i = 0 then [] else i :: loop (i - 1) in
      loop last_warning_number
@@ -759,20 +592,14 @@ let letter for_debug = function
   | 'x' -> [14; 15; 16; 17; 18; 19; 20; 21; 22; 23; 24; 30]
   | 'y' -> [26]
   | 'z' -> [27]
-  | chr ->
-    let ocamlparam_from_env = match Sys.getenv_opt "OCAMLPARAM" with None -> "-" | Some  value -> value in
-    Misc.fatal_errorf "Warnings.letter %C (for_debug=%S, ocamlparam_from_env=%S ocamlparam_from_compenv=%S)" chr for_debug ocamlparam_from_env !parsed_ocamlparam
+  | _ -> assert false
 
 type state =
   {
     active: bool array;
     error: bool array;
-    alerts: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
-    alert_errors: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
-    alert_disable_watches: loc list Misc.Stdlib.String.Map.t;
-    (* Locations of attributes that disabled a given alert and are in force in
-       the current scope; used to detect alert-disabling attributes that never
-       suppress anything (warning 221 [Unused_alert_disable]). *)
+    alerts: (Std.String.Set.t * bool); (* false:set complement *)
+    alert_errors: (Std.String.Set.t * bool); (* false:set complement *)
   }
 
 let current =
@@ -780,9 +607,8 @@ let current =
     {
       active = Array.make (last_warning_number + 1) true;
       error = Array.make (last_warning_number + 1) false;
-      alerts = (Misc.Stdlib.String.Set.empty, false);
-      alert_errors = (Misc.Stdlib.String.Set.empty, true); (* all soft *)
-      alert_disable_watches = Misc.Stdlib.String.Map.empty;
+      alerts = (Std.String.Set.empty, false);
+      alert_errors = (Std.String.Set.empty, true); (* all soft *)
     }
 
 let disabled = ref false
@@ -810,12 +636,12 @@ let is_error x =
 let alert_is_active {kind; _} =
   not !disabled &&
   let (set, pos) = (!current).alerts in
-  Misc.Stdlib.String.Set.mem kind set = pos
+  Std.String.Set.mem kind set = pos
 
 let alert_is_error {kind; _} =
   not !disabled &&
   let (set, pos) = (!current).alert_errors in
-  Misc.Stdlib.String.Set.mem kind set = pos
+  Std.String.Set.mem kind set = pos
 
 let with_state state f =
   let prev = backup () in
@@ -832,86 +658,19 @@ let mk_lazy f =
   let state = backup () in
   lazy (with_state state f)
 
-(* Status of alert-disabling attributes, for warning 221
-   [Unused_alert_disable].  Table keys are the location of the disabling
-   attribute together with the name of the disabled alert.
-
-   An [Unfulfilled] entry carries a snapshot of the warning state at the
-   point where the attribute was processed; if the entry is still
-   unfulfilled at the end of compilation, the snapshot decides the
-   activity/error status of warning 221 when the entry is reported (like
-   [Unchecked_zero_alloc_attribute]).
-
-   An entry becomes [Fulfilled] when the disable suppresses an occurrence
-   of its alert; fulfilled entries are never reported.  They are kept in
-   the table because the same attribute may be processed several times
-   (e.g. the type-checker enters the warning scope of a value binding once
-   to type the expression and again to check pattern totality), and a
-   later processing must not register the attribute anew.
-
-   The table deliberately lives outside [state]: an entry's status must
-   survive scope exits, so that leftovers can be reported at the end of
-   compilation via [flush_unused_alert_disables]. *)
-type alert_disable_status =
-  | Unfulfilled of state
-  | Fulfilled
-
-let alert_disables : (loc * string, alert_disable_status) Hashtbl.t =
-  Hashtbl.create 16
-
-let register_alert_disable ~loc name =
-  let watches =
-    Misc.Stdlib.String.Map.update name
-      (function None -> Some [loc] | Some locs -> Some (loc :: locs))
-      (!current).alert_disable_watches
-  in
-  current := {(!current) with alert_disable_watches = watches};
-  if not (Hashtbl.mem alert_disables (loc, name)) then
-    Hashtbl.add alert_disables (loc, name) (Unfulfilled !current)
-
-let mark_alert_disables_used kind =
-  if not !disabled then begin
-    let mark name =
-      match
-        Misc.Stdlib.String.Map.find_opt name (!current).alert_disable_watches
-      with
-      | None -> ()
-      | Some locs ->
-          List.iter
-            (fun loc -> Hashtbl.replace alert_disables (loc, name) Fulfilled)
-            locs
-    in
-    mark kind;
-    (* Disables of "all" act as wildcards: any suppressed alert fulfills
-       them.  ("all" is reserved, so [kind] is never literally "all".) *)
-    mark "all"
-  end
-
-let flush_unused_alert_disables () =
-  let entries =
-    Hashtbl.fold
-      (fun (loc, name) status acc ->
-         match status with
-         | Fulfilled -> acc
-         | Unfulfilled state -> (loc, name, state) :: acc)
-      alert_disables []
-  in
-  Hashtbl.clear alert_disables;
-  entries
-
 let set_alert ~error ~enable s =
   let upd =
     match s with
     | "all" ->
-        (Misc.Stdlib.String.Set.empty, not enable)
+        (Std.String.Set.empty, not enable)
     | s ->
         let (set, pos) =
           if error then (!current).alert_errors else (!current).alerts
         in
         let f =
           if enable = pos
-          then Misc.Stdlib.String.Set.add
-          else Misc.Stdlib.String.Set.remove
+          then Std.String.Set.add
+          else Std.String.Set.remove
         in
         (f s set, pos)
   in
@@ -920,7 +679,7 @@ let set_alert ~error ~enable s =
   else
     current := {(!current) with alerts=upd}
 
-let parse_alert_option ?disable_loc s =
+let parse_alert_option s =
   let n = String.length s in
   let id_char = function
     | 'a'..'z' | 'A'..'Z' | '_' | '\'' | '0'..'9' -> true
@@ -929,12 +688,6 @@ let parse_alert_option ?disable_loc s =
   let rec parse_id i =
     if i < n && id_char s.[i] then parse_id (i + 1) else i
   in
-  let disable name =
-    set_alert ~error:false ~enable:false name;
-    (* Watch attribute-level disables so that we can warn about the ones
-       that never suppress anything (warning 221). *)
-    Option.iter (fun loc -> register_alert_disable ~loc name) disable_loc
-  in
   let rec scan i =
     if i = n then ()
     else if i + 1 = n then raise (Arg.Bad "Ill-formed list of alert settings")
@@ -942,7 +695,7 @@ let parse_alert_option ?disable_loc s =
       | '+', '+' -> id (set_alert ~error:true ~enable:true) (i + 2)
       | '+', _ -> id (set_alert ~error:false ~enable:true) (i + 1)
       | '-', '-' -> id (set_alert ~error:true ~enable:false) (i + 2)
-      | '-', _ -> id disable (i + 1)
+      | '-', _ -> id (set_alert ~error:false ~enable:false) (i + 1)
       | '@', _ ->
           id (fun s ->
               set_alert ~error:true ~enable:true s;
@@ -1105,7 +858,7 @@ let parse_opt error active errflag s =
           | None -> if c = lc then Clear else Set
           | Some m -> m
         in
-        List.iter (action modifier) (letter s lc)
+        List.iter (action modifier) (letter lc)
     | Num(n1,n2,modifier) ->
         for n = n1 to Int.min n2 last_warning_number do action modifier n done
   in
@@ -1135,7 +888,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-221"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1194,12 +947,11 @@ let message = function
       msg "this pattern-matching is not exhaustive.@ \
            @[Here is an example of a case that is not matched:@;<1 2>%a@]"
         Format_doc.pp_doc doc
-  | Missing_record_field_pattern { form ; unbound } ->
+  | Missing_record_field_pattern s ->
       msg "the following labels are not bound@ in@ this@ \
-           %s@ pattern:@;<1 2>%a.@ \
+           record@ pattern:@;<1 2>%a.@ \
            @[Either bind these labels explicitly or add %a to the pattern.@]"
-        form
-        Style.inline_code unbound
+        Style.inline_code s
         Style.inline_code "; _"
   | Non_unit_statement ->
       msg "this expression should have type unit."
@@ -1243,10 +995,9 @@ let message = function
   | Nonreturning_statement ->
       msg "this statement never returns (or has an unsound type.)"
   | Preprocessor s -> msg "%s" s
-  | Useless_record_with s ->
-      msg "all the fields are explicitly listed in this %s:@ \
+  | Useless_record_with ->
+      msg "all the fields are explicitly listed in this record:@ \
            the %a clause is useless."
-        s
         Style.inline_code "with"
   | Bad_module_name (modname) ->
       msg "bad source file name: %a is not a valid module name."
@@ -1254,13 +1005,8 @@ let message = function
   | All_clauses_guarded ->
       msg "this pattern-matching is not exhaustive.@ \
            All clauses in this pattern-matching are guarded."
-  | Unused_var { name = v; mutated = false }
-  | Unused_var_strict { name = v; mutated = false } ->
+  | Unused_var v | Unused_var_strict v ->
       msg "unused variable %a."
-        Style.inline_code v
-  | Unused_var { name = v; mutated = true }
-  | Unused_var_strict { name = v; mutated = true } ->
-      msg "variable %a was mutated but never used."
         Style.inline_code v
   | Wildcard_arg_to_constant_constr ->
       msg "wildcard pattern given as argument to a constant constructor"
@@ -1311,19 +1057,19 @@ let message = function
       end
   | Unused_rec_flag ->
       msg "unused rec flag."
-  | Name_out_of_scope (ty, Name nm) ->
+  | Name_out_of_scope (ty, [nm], false) ->
       msg "%a was selected from type %a.@ \
            @[It is not visible in the current scope,@ and@ will@ not@ \
            be@ selected@ if the type becomes unknown@]."
         Style.inline_code nm
         Style.inline_code ty
-  | Name_out_of_scope (ty, Fields { record_form ; fields }) ->
-      msg "this %s of type %a@ contains@ fields@ that@ are@ \
+  | Name_out_of_scope (_, _, false) -> assert false
+  | Name_out_of_scope (ty, slist, true) ->
+      msg "this record of type %a@ contains@ fields@ that@ are@ \
            not@ visible in the current scope:@;<1 2>%a.@ \
            @[They will not be selected@ if the type@ becomes@ unknown.@]"
-        record_form
         Style.inline_code ty
-        space_inline_list fields
+        space_inline_list slist
   | Ambiguous_name ([s], tl, false, expansion) ->
       msg "%a belongs to several types:@;<1 2>%a.@ \
            The first one was selected.@ \
@@ -1401,7 +1147,7 @@ let message = function
   | Inlining_impossible reason ->
       msg "Cannot inline:@ %s" reason
   | Ambiguous_var_in_pattern_guard vars ->
-      let ref_manual = [ 13; 5; 4 ] in
+      let[@manual.ref "ss:warn57"] ref_manual = [ 13; 5; 4 ] in
       let vars = List.sort String.compare vars in
       let vars_explanation =
         match vars with
@@ -1413,7 +1159,7 @@ let message = function
               Style.inline_code x
         | _::_ ->
             Fmt.dprintf
-              "variables %a appear in@ different@ places@ in@ \
+              "variables %a appears in@ different@ places@ in@ \
                different@ or-pattern@ alternatives."
               comma_inline_list vars
       in
@@ -1424,12 +1170,11 @@ let message = function
          the@ guard@ expression.@ %a@]"
         vars_explanation
         Misc.print_see_manual ref_manual
-  | No_cmx_file { missing_extension; module_name } ->
+  | No_cmx_file name ->
       msg
-        "no %s file was found@ in@ path@ for@ module@ %a,@ \
+        "no cmx file was found@ in@ path@ for@ module@ %a,@ \
          and@ its@ interface@ was@ not@ compiled@ with %a"
-        missing_extension
-        Style.inline_code module_name
+        Style.inline_code name
         Style.inline_code "-opaque"
   | Flambda_assignment_to_non_mutable_value ->
       msg
@@ -1482,15 +1227,15 @@ let message = function
         "This pattern depends on@ mutable@ state.@ It prevents@ the@ \
          remaining@ arguments@ from@ being@ uncurried,@ which will@ cause@ \
          additional@ closure@ allocations."
-  | Unused_field { form; field; complaint = Unused } ->
-      msg "unused %s field %a." form Style.inline_code field
-  | Unused_field { form; field; complaint = Not_read } ->
-      msg "%s field %a is never read.@ \
+  | Unused_field (s, Unused) ->
+      msg "unused record field %a." Style.inline_code s
+  | Unused_field (s, Not_read) ->
+      msg "record field %a is never read.@ \
            (However, this field is used to build or mutate values.)"
-        form Style.inline_code field
-  | Unused_field { form; field; complaint = Not_mutated } ->
-      msg "mutable %s field %a is never mutated."
-        form Style.inline_code field
+        Style.inline_code s
+  | Unused_field (s, Not_mutated) ->
+      msg "mutable record field %a is never mutated."
+        Style.inline_code s
   | Missing_mli ->
       msg "Cannot find interface file."
   | Unused_tmc_attribute ->
@@ -1512,15 +1257,6 @@ let message = function
            should be applied@ to@ %a;@ using@ %a@ is deprecated."
         Style.inline_code "()"
         Style.inline_code "(struct end)"
-  | Untagged_external_small_int_return ->
-      msg "Using %a or %a on C stub returns is not@ \
-           recommended since %a does not perform a sign-extension.@ Use@ \
-           %a or %a instead."
-        Style.inline_code "(int8[@untagged])"
-        Style.inline_code "(int16[@untagged])"
-        Style.inline_code "[@untagged]"
-        Style.inline_code "(int8[@unboxed])"
-        Style.inline_code "(int16[@unboxed])"
   | Degraded_to_partial_match ->
       let[@manual.ref "ss:warn74"] ref_manual = [ 13; 5; 5 ] in
       msg
@@ -1529,104 +1265,11 @@ let message = function
          typically@ occurs@ due@ to@ complex@ matches@ on@ mutable@ fields.@ %a"
         Style.inline_code "Match_failure"
         Misc.print_see_manual ref_manual
-  | Redundant_kind_modifier abbrev ->
-      msg "This kind modifier, or a stronger one,@ \
-           is already implied by the kind %a."
-        Style.inline_code abbrev
-  | Ignored_kind_modifier { modifier; abbrev } ->
-      msg "The kind modifier %a has no effect on the kind %a."
-        Style.inline_code modifier Style.inline_code abbrev
-  | Incompatible_with_upstream Unpacked_attribute ->
-      msg "[@@unpacked] is not supported by upstream OCaml."
   | Unnecessarily_partial_tuple_pattern ->
       msg
         "This tuple pattern@ unnecessarily@ ends in %a,@ as@ it@ explicitly@ \
          matches@ all@ components@ of@ its@ expected@ type."
         Style.inline_code ".."
-  | Unmutated_mutable v ->
-      msg "mutable variable %a was never mutated." Style.inline_code v
-  | Incompatible_with_upstream (Non_value_sort layout) ->
-      msg "External declaration here is not upstream compatible.@ \
-           @[The only types with non-value layouts allowed are@ \
-           float#, int32_u, int64_u, and nativeint_u.@ \
-           Unknown type with layout@ %s encountered.@]" layout
-  | Incompatible_with_upstream (Unboxed_attribute layout) ->
-      msg "%a attribute must be added@ to@ external@ declaration@ \
-           argument type with layout %s for upstream compatibility."
-        Style.inline_code "[@unboxed]" layout
-  | Incompatible_with_upstream Immediate_void_variant ->
-      msg "This variant is immediate@ \
-           because all its constructors have all-void arguments,@ \
-           @[but after erasure for upstream compatibility,@ \
-           void is no longer zero-width,@ so it won't be immediate.@]"
-  | Incompatible_with_upstream Separability_check ->
-      msg "This type relies on OxCaml's extended separability checking@ \
-           and would not be accepted by upstream OCaml."
-  | Unerasable_position_argument ->
-      msg "this position argument cannot be erased."
-  | Probe_name_too_long name ->
-      msg "This probe name is too long: %a.@ \
-           Probe names must be at most 100 characters long."
-        Style.inline_code name
-  | Unused_kind_declaration s ->
-      msg "unused kind %a." Style.inline_code s
-  | Imprecise_kind_annotation { name; annotated; inferred } ->
-      msg
-        "The type variable `%s'@ \
-         was annotated with kind `%s'@ \
-         but was inferred to have kind `%s'."
-        name annotated inferred
-  | Zero_alloc_all_hidden_arrow s ->
-      msg "The type of this item is an@ alias of a function type,@ \
-           but the %a attribute for@ this signature does not apply to it@ \
-           because its type is not syntactically a function type.@ \
-           @[If it should be checked, use an explicit zero_alloc attribute@ \
-           with an arity.@ If not, use an explicit zero_alloc ignore \
-           attribute.@]"
-        Style.inline_code (Printf.sprintf "[@@@zero_alloc %s]" s)
-  | Unchecked_zero_alloc_attribute ->
-      msg "the zero_alloc attribute cannot be checked.@ \
-           @[The function it is attached to was optimized away.@ \
-           You can try to mark this function as %a@ \
-           or move the attribute to the relevant callers of this function.@]"
-        Style.inline_code "[@inline never]"
-  | Unboxing_impossible ->
-      msg "This %a attribute cannot be used.@ \
-           The type of this value does not allow unboxing."
-        Style.inline_code "[@unboxed]"
-  | Redundant_modifier { modifier; reason } ->
-      (match reason with
-       | Implied_by implying ->
-           msg "This modifier is redundant@ because it is implied by %a."
-             Style.inline_code implying
-       | Default_bound ->
-           msg "This modifier is redundant@ because %a is the default bound@ \
-                on its axis, so it has no effect."
-             Style.inline_code modifier)
-  (* 213 was [Modal_axis_specified_twice] *)
-  | Atomic_float_record_boxed ->
-      msg "This record contains atomic float fields,@ \
-           which prevents the float record optimization.@ \
-           @[The fields of this record will be boxed instead of being@ \
-           represented as a flat float array.@]"
-  | Implied_attribute { implying; implied } ->
-      msg "attribute %a is unused because it is implied by %a"
-        Style.inline_code (Printf.sprintf "[@%s]" implied)
-        Style.inline_code (Printf.sprintf "[@%s]" implying)
-  | Use_during_borrowing ->
-      msg "This value is used while being borrowed."
-  | Lpoly_in_letrec ->
-      msg "poly_ has no effect in recursive bindings, which do not support \
-           layout polymorphism. Consider using a regular let rec instead."
-  | Useless_valpoly ->
-      msg "This value description has no layout-polymorphic type variables,@ \
-      so \"poly_\" has no effect. Consider using a regular \"val\" instead."
-  | Redundant_modality ->
-      msg "This modality is redundant."
-  | Unused_alert_disable name ->
-      msg "This attribute disables alert %a,@ \
-           but it did not suppress any occurrence of the alert."
-        Style.inline_code name
 ;;
 
 let nerrors = ref 0
@@ -1663,9 +1306,7 @@ let report w =
 
 let report_alert (alert : alert) =
   match alert_is_active alert with
-  | false ->
-      mark_alert_disables_used alert.kind;
-      `Inactive
+  | false -> `Inactive
   | true ->
       let is_error = alert_is_error alert in
       if is_error then incr nerrors;
@@ -1724,7 +1365,7 @@ let help_warnings () =
   print_endline "  A all warnings";
   for i = Char.code 'b' to Char.code 'z' do
     let c = Char.chr i in
-    match letter "<help-warnings>" c with
+    match letter c with
     | [] -> ()
     | [n] ->
         Printf.printf "  %c Alias for warning %i.\n" (Char.uppercase_ascii c) n
@@ -1761,7 +1402,7 @@ let dump ?(verbose=false) () =
   in
   let alerts (set, enabled) =
     `Assoc
-      [ "alerts", Json.list Json.string (Misc.Stdlib.String.Set.elements set);
+      [ "alerts", Json.list Json.string (String.Set.elements set);
         "complement", Json.bool (not enabled) ]
   in
   `Assoc [

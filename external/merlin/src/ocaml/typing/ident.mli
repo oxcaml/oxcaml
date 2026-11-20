@@ -24,7 +24,6 @@ include Identifiable.S with type t := t
    - [compare] compares identifiers by binding location
 *)
 
-val print : Format.formatter -> t -> unit
 val doc_print: t Format_doc.printer
 val print_with_scope : t Format_doc.printer
         (** Same as {!print} except that it will also add a "[n]" suffix
@@ -34,30 +33,17 @@ val print_with_scope : t Format_doc.printer
 val create_scoped: scope:int -> string -> t
 val create_local: string -> t
 val create_persistent: string -> t
-val create_predef: string -> t (* CR-someday layouts: should take a sort *)
-val create_instance: string -> Global_module.Name.argument list -> t
-val create_global: Global_module.Name.t -> t
-
-val create_local_binding_for_global: Global_module.Name.t -> t
-        (** Creates a local identifier intended to bind the value of a global
-            that is not a static constant (that is, it is a parameter or depends
-            on one). The global is used purely for the mnemonic name for
-            debugging purposes - no semantic connection to the global is kept. *)
+val create_predef: string -> t
 
 val rename: t -> t
         (** Creates an identifier with the same name as the input, a fresh
             stamp, and no scope.
             @raise [Fatal_error] if called on a persistent / predef ident. *)
 
-val rename_with_stamp: int -> t -> t
-        (** Like {!rename}, but with the given stamp rather than a fresh one. *)
-
 val name: t -> string
 val unique_name: t -> string
-val canonical_name: t -> string
-        (** [name] or [unique_name] following [-d(no)canonical-ids] flag *)
-
 val unique_toplevel_name: t -> string
+val persistent: t -> bool
 val same: t -> t -> bool
         (** Compare identifiers by binding location.
             Two identifiers are the same either if they are both
@@ -71,19 +57,14 @@ val compare_stamp: t -> t -> int
 val compare: t -> t -> int
         (** Compare identifiers structurally, including the name *)
 
-val is_global: t -> bool
-val is_global_or_predef: t -> bool
+val global: t -> bool
 val is_predef: t -> bool
-val is_instance: t -> bool
 
-val stamp: t -> int
 val scope: t -> int
+val stamp: t -> int
 
 val lowest_scope : int
 val highest_scope: int
-
-val to_global: t -> Global_module.Name.t option
-val to_global_exn: t -> Global_module.Name.t
 
 val reinit: unit -> unit
 
@@ -122,8 +103,6 @@ type 'a tbl
 val empty: 'a tbl
 val add: t -> 'a -> 'a tbl -> 'a tbl
 val find_same: t -> 'a tbl -> 'a
-(* Non-raising variant of [find_same]; unboxed under [@@or_null]. *)
-val find_same_or_null: t -> 'a tbl -> 'a Misc.Or_null.t
 val find_name: string -> 'a tbl -> t * 'a
 val find_all: string -> 'a tbl -> (t * 'a) list
 val find_all_seq: string -> 'a tbl -> (t * 'a) Seq.t

@@ -26,7 +26,6 @@ type invalid_package_type =
   | Private_types
   | Not_with_type
   | Neither_identifier_nor_with_type
-  | Misplaced_attribute
 
 type error =
     Unclosed of Location.t * string * Location.t * string
@@ -38,14 +37,6 @@ type error =
   | Ill_formed_ast of Location.t * string
   | Invalid_package_type of Location.t * invalid_package_type
   | Removed_string_set of Location.t
-  | Missing_unboxed_literal_suffix of Location.t
-  | Malformed_instance_identifier of Location.t
-  | Quotation_reserved of Location.t * string
-  | Unspliceable of Location.t
-  | Let_mutable_not_allowed_at_structure_level of Location.t
-  | Let_mutable_not_allowed_in_class_definition of Location.t
-  | Let_mutable_not_allowed_with_function_bindings of Location.t
-  | Block_access_bad_paren of Location.t
 
 exception Error of error
 exception Escape_error

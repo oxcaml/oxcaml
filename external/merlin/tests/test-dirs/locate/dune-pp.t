@@ -35,11 +35,10 @@ https://github.com/ocaml/merlin/issues/1934
   $ cat >dune <<EOF
   > (executable
   >  (name main)
-  >  (modes byte)
   >  (libraries lib lib2))
   > EOF
 
-  $ $DUNE exec ./main.bc
+  $ $DUNE exec ./main.exe
   world
 
   $ ls _build/default/lib/*.ml

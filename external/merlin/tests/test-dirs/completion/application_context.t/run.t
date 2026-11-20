@@ -4,19 +4,11 @@
   [
     "application",
     {
-      "argument_type": "'b",
+      "argument_type": "'a",
       "labels": [
         {
           "name": "~j",
           "type": "int"
-        },
-        {
-          "name": "?k",
-          "type": "'a option"
-        },
-        {
-          "name": "~l",
-          "type": "lexing_position"
         }
       ]
     }

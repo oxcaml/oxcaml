@@ -16,7 +16,7 @@
 
 
 val pretty_const
-  : Typedtree.constant -> string
+  : Asttypes.constant -> string
 
 val top_pretty: 'k Typedtree.general_pattern Format_doc.printer
 

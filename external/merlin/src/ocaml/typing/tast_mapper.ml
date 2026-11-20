@@ -39,15 +39,7 @@ type mapper =
     expr: mapper -> expression -> expression;
     extension_constructor: mapper -> extension_constructor ->
       extension_constructor;
-    jkind_annotation:
-      mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
-    jkind_declaration:
-      mapper -> jkind_declaration -> jkind_declaration;
     location: mapper -> Location.t -> Location.t;
-    modalities: mapper -> modalities -> modalities;
-    (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
-       we should add an gadt parameter that determines the type of 'a. *)
-    modes: 'a. mapper -> 'a modes -> 'a modes;
     module_binding: mapper -> module_binding -> module_binding;
     module_coercion: mapper -> module_coercion -> module_coercion;
     module_declaration: mapper -> module_declaration -> module_declaration;
@@ -144,8 +136,7 @@ let module_declaration sub x =
   let md_name = map_loc sub x.md_name in
   let md_type = sub.module_type sub x.md_type in
   let md_attributes = sub.attributes sub x.md_attributes in
-  let md_modalities = sub.modalities sub x.md_modalities in
-  {x with md_loc; md_name; md_type; md_attributes; md_modalities}
+  {x with md_loc; md_name; md_type; md_attributes}
 
 let module_substitution sub x =
   let ms_loc = sub.location sub x.ms_loc in
@@ -154,27 +145,10 @@ let module_substitution sub x =
   let ms_attributes = sub.attributes sub x.ms_attributes in
   {x with ms_loc; ms_name; ms_txt; ms_attributes}
 
-let include_kind sub = function
-  | Tincl_structure -> Tincl_structure
-  | Tincl_functor { input_coercion; input_repr; yielding } ->
-      let input_coercion =
-        List.map
-          (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
-      in
-      Tincl_functor { input_coercion; input_repr; yielding }
-  | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
-      let input_coercion =
-        List.map
-          (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
-      in
-      Tincl_gen_functor { input_coercion; input_repr; yielding }
-
-let str_include_infos sub x =
+let include_infos sub f x =
   let incl_loc = sub.location sub x.incl_loc in
   let incl_attributes = sub.attributes sub x.incl_attributes in
-  let incl_mod = sub.module_expr sub x.incl_mod in
-  let incl_kind = include_kind sub x.incl_kind in
-  { x with incl_loc; incl_attributes; incl_mod; incl_kind }
+  {x with incl_loc; incl_attributes; incl_mod = f x.incl_mod}
 
 let class_type_declaration sub x =
   class_infos sub (sub.class_type sub) x
@@ -187,8 +161,8 @@ let structure_item sub {str_loc; str_desc; str_env} =
   let str_env = sub.env sub str_env in
   let str_desc =
     match str_desc with
-    | Tstr_eval (exp, jkind, attrs) ->
-        Tstr_eval (sub.expr sub exp, jkind, sub.attributes sub attrs)
+    | Tstr_eval (exp, attrs) ->
+        Tstr_eval (sub.expr sub exp, sub.attributes sub attrs)
     | Tstr_value (rec_flag, list) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
         Tstr_value (rec_flag, list)
@@ -210,10 +184,9 @@ let structure_item sub {str_loc; str_desc; str_env} =
           (List.map (tuple3
             id (map_loc sub) (sub.class_type_declaration sub)) list)
     | Tstr_include incl ->
-        Tstr_include (str_include_infos sub incl)
+        Tstr_include (include_infos sub (sub.module_expr sub) incl)
     | Tstr_open od -> Tstr_open (sub.open_declaration sub od)
     | Tstr_attribute attr -> Tstr_attribute (sub.attribute sub attr)
-    | Tstr_jkind d -> Tstr_jkind (sub.jkind_declaration sub d)
   in
   {str_desc; str_env; str_loc}
 
@@ -222,45 +195,32 @@ let value_description sub x =
   let val_name = map_loc sub x.val_name in
   let val_desc = sub.typ sub x.val_desc in
   let val_attributes = sub.attributes sub x.val_attributes in
-  let val_modal_info =
-    match x.val_modal_info with
-    | Valmi_sig_value moda -> Valmi_sig_value (sub.modalities sub moda)
-    | Valmi_str_primitive modes -> Valmi_str_primitive (sub.modes sub modes)
-  in
-  {x with val_loc; val_name; val_desc; val_attributes; val_modal_info}
+  {x with val_loc; val_name; val_desc; val_attributes}
 
 let label_decl sub x =
   let ld_loc = sub.location sub x.ld_loc in
   let ld_name = map_loc sub x.ld_name in
   let ld_type = sub.typ sub x.ld_type in
   let ld_attributes = sub.attributes sub x.ld_attributes in
-  let ld_modalities = sub.modalities sub x.ld_modalities in
-  {x with ld_loc; ld_name; ld_type; ld_attributes; ld_modalities}
-
-let field_decl sub x =
-  let ca_type = sub.typ sub x.ca_type in
-  let ca_loc = sub.location sub x.ca_loc in
-  let ca_modalities = sub.modalities sub x.ca_modalities in
-  { ca_type; ca_loc; ca_modalities }
+  {x with ld_loc; ld_name; ld_type; ld_attributes}
 
 let constructor_args sub = function
-  | Cstr_tuple l -> Cstr_tuple (List.map (field_decl sub) l)
+  | Cstr_tuple l -> Cstr_tuple (List.map (sub.typ sub) l)
   | Cstr_record l -> Cstr_record (List.map (label_decl sub) l)
 
 let constructor_decl sub cd =
   let cd_loc = sub.location sub cd.cd_loc in
   let cd_name = map_loc sub cd.cd_name in
+  let cd_vars = List.map (map_loc sub) cd.cd_vars in
   let cd_args = constructor_args sub cd.cd_args in
   let cd_res = Option.map (sub.typ sub) cd.cd_res in
   let cd_attributes = sub.attributes sub cd.cd_attributes in
-  {cd with cd_loc; cd_name; cd_args; cd_res; cd_attributes}
+  {cd with cd_loc; cd_name; cd_vars; cd_args; cd_res; cd_attributes}
 
 let type_kind sub = function
   | Ttype_abstract -> Ttype_abstract
   | Ttype_variant list -> Ttype_variant (List.map (constructor_decl sub) list)
   | Ttype_record list -> Ttype_record (List.map (label_decl sub) list)
-  | Ttype_record_unboxed_product list ->
-    Ttype_record_unboxed_product (List.map (label_decl sub) list)
   | Ttype_open -> Ttype_open
 
 let type_declaration sub x =
@@ -300,8 +260,6 @@ let type_exception sub x =
   let tyexn_attributes = sub.attributes sub x.tyexn_attributes in
   {tyexn_loc; tyexn_constructor; tyexn_attributes}
 
-let var_jkind sub (v, l) = v, Option.map (sub.jkind_annotation sub) l
-
 let extension_constructor sub x =
   let ext_loc = sub.location sub x.ext_loc in
   let ext_name = map_loc sub x.ext_name in
@@ -309,7 +267,7 @@ let extension_constructor sub x =
     match x.ext_kind with
       Text_decl(ids, ctl, cto) ->
         Text_decl(
-          List.map (var_jkind sub) ids,
+          List.map (map_loc sub) ids,
           constructor_args sub ctl,
           Option.map (sub.typ sub) cto
         )
@@ -319,28 +277,12 @@ let extension_constructor sub x =
   let ext_attributes = sub.attributes sub x.ext_attributes in
   {x with ext_loc; ext_name; ext_kind; ext_attributes}
 
-let[@warning "+9"] jkind_declaration sub
-     {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
-      jkind_loc} =
-  let jkind_name = map_loc sub jkind_name in
-  let jkind_annotation =
-    Option.map (sub.jkind_annotation sub) jkind_annotation
-  in
-  let jkind_attributes = sub.attributes sub jkind_attributes in
-  let jkind_loc = sub.location sub jkind_loc in
-  {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
-   jkind_loc}
-
 let pat_extra sub = function
   | Tpat_unpack as d -> d
   | Tpat_type (path,lid) -> Tpat_type (path, map_loc_lid sub lid)
   | Tpat_open (path,lid,env) ->
       Tpat_open (path, map_loc_lid sub lid, sub.env sub env)
-  | Tpat_constraint (ct, ma) ->
-    Tpat_constraint (Option.map (sub.typ sub) ct, sub.modes sub ma)
-  | Tpat_inspected_type (Label_disambiguation _) as d -> d
-  | Tpat_inspected_type (Polymorphic_parameter (Param _)) as d -> d
-  | Tpat_inspected_type (Module_pack _) as d -> d
+  | Tpat_constraint ct -> Tpat_constraint (sub.typ sub ct)
 
 let pat
   : type k . mapper -> k general_pattern -> k general_pattern
@@ -352,45 +294,22 @@ let pat
   let pat_desc : k pattern_desc =
     match x.pat_desc with
     | Tpat_any
-    | Tpat_constant _
-    | Tpat_unboxed_unit
-    | Tpat_unboxed_bool _ -> x.pat_desc
-    | Tpat_var { id; name; uid; sort; mode } ->
-      Tpat_var { id; name = map_loc sub name; uid; sort; mode }
+    | Tpat_constant _ -> x.pat_desc
+    | Tpat_var (id, s, uid) -> Tpat_var (id, map_loc sub s, uid)
     | Tpat_tuple l ->
-        Tpat_tuple
-          (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
-    | Tpat_unboxed_tuple l ->
-      Tpat_unboxed_tuple
-        (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
-    | Tpat_construct (lid, cd, rep, l, vto) ->
+        Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
+    | Tpat_construct (lid, cd, l, vto) ->
         let vto = Option.map (fun (vl,cty) ->
-          List.map
-            (fun (v, jk) ->
-               (map_loc sub v,
-                Option.map (sub.jkind_annotation sub) jk))
-            vl, sub.typ sub cty) vto in
-        Tpat_construct (map_loc_lid sub lid, cd, rep,
-                        List.map (fun (sort, pat) -> sort, sub.pat sub pat) l,
-                        vto)
+          List.map (map_loc sub) vl, sub.typ sub cty) vto in
+        Tpat_construct (map_loc_lid sub lid, cd, List.map (sub.pat sub) l, vto)
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
-    | Tpat_record (l, rep, closed) ->
-        Tpat_record (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l,
-                     rep, closed)
-    | Tpat_record_unboxed_product (l, rep, closed) ->
-        Tpat_record_unboxed_product
-          (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, rep,
-           closed)
-    | Tpat_array (am, arg_sort, l) ->
-        Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
-    | Tpat_alias { pattern; id; name; uid; sort; mode; type_expr } ->
-        Tpat_alias { pattern = sub.pat sub pattern; id;
-                     name = map_loc sub name; uid;
-                     sort; mode; type_expr }
-    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_locality_mode } ->
-        Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
-                          lpoly; env_locality_mode }
+    | Tpat_record (l, closed) ->
+        Tpat_record
+          (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, closed)
+    | Tpat_array (mut, l) -> Tpat_array (mut, List.map (sub.pat sub) l)
+    | Tpat_alias (p, id, s, uid, ty) ->
+        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, ty)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -402,44 +321,21 @@ let pat
   let pat_attributes = sub.attributes sub x.pat_attributes in
   {x with pat_loc; pat_extra; pat_desc; pat_env; pat_attributes}
 
-let function_param sub
-    { fp_kind;
-      fp_param;
-      fp_param_debug_uid;
-      fp_arg_label;
-      fp_partial;
-      fp_curry;
-      fp_newtypes;
-      fp_sort;
-      fp_mode;
-      fp_loc;
-    }
-  =
-  let fp_loc = sub.location sub fp_loc in
+let function_param sub fp =
   let fp_kind =
-    match fp_kind with
+    match fp.fp_kind with
     | Tparam_pat pat -> Tparam_pat (sub.pat sub pat)
-    | Tparam_optional_default (pat, expr, sort) ->
+    | Tparam_optional_default (pat, expr) ->
       let pat = sub.pat sub pat in
       let expr = sub.expr sub expr in
-      Tparam_optional_default (pat, expr, sort)
+      Tparam_optional_default (pat, expr)
   in
-  let fp_newtypes =
-    List.map
-      (fun (id, var, annot, uid) ->
-         id, map_loc sub var, Option.map (sub.jkind_annotation sub) annot, uid)
-      fp_newtypes
-  in
-  let fp_mode = sub.modes sub fp_mode in
+  let fp_loc = sub.location sub fp.fp_loc in
   { fp_kind;
-    fp_param;
-    fp_param_debug_uid;
-    fp_arg_label;
-    fp_partial;
-    fp_curry;
-    fp_newtypes;
-    fp_sort;
-    fp_mode;
+    fp_param = fp.fp_param;
+    fp_arg_label = fp.fp_arg_label;
+    fp_partial = fp.fp_partial;
+    fp_newtypes = fp.fp_newtypes;
     fp_loc;
   }
 
@@ -448,128 +344,45 @@ let extra sub = function
     Texp_constraint (sub.typ sub cty)
   | Texp_coerce (cty1, cty2) ->
     Texp_coerce (Option.map (sub.typ sub) cty1, sub.typ sub cty2)
-  | Texp_newtype _ as d -> d
+  | (Texp_newtype _ | Texp_newtype' _) as d -> d
   | Texp_poly cto -> Texp_poly (Option.map (sub.typ sub) cto)
-  | Texp_borrowed as d -> d
-  | Texp_ghost_region as d -> d
-  | Texp_stack as d -> d
-  | Texp_mode modes -> Texp_mode (sub.modes sub modes)
-  | Texp_inspected_type (Label_disambiguation _) as d -> d
-  | Texp_inspected_type (Polymorphic_parameter (Method _)) as d -> d
-  | Texp_inspected_type (Polymorphic_parameter (Arrow _)) as d -> d
-  | Texp_inspected_type (Module_pack _) as d -> d
 
 let function_body sub body =
   match body with
   | Tfunction_body body ->
       Tfunction_body (sub.expr sub body)
-  | Tfunction_cases
-      { fc_cases; fc_partial; fc_param; fc_param_debug_uid;
-        fc_loc; fc_exp_extra; fc_attributes;
-        fc_arg_mode; fc_arg_sort; fc_env; fc_ret_type; }
-    ->
-      let fc_loc = sub.location sub fc_loc in
-      let fc_attributes = sub.attributes sub fc_attributes in
-      let fc_cases = List.map (sub.case sub) fc_cases in
-      let fc_exp_extra = List.map (extra sub) fc_exp_extra in
-      let fc_env = sub.env sub fc_env in
-      Tfunction_cases
-        { fc_cases; fc_partial; fc_param; fc_param_debug_uid;
-          fc_loc; fc_exp_extra; fc_attributes;
-          fc_arg_mode; fc_arg_sort; fc_env; fc_ret_type; }
+  | Tfunction_cases { cases; partial; param; loc; exp_extra; attributes } ->
+      let loc = sub.location sub loc in
+      let cases = List.map (sub.case sub) cases in
+      let exp_extra = Option.map (extra sub) exp_extra in
+      let attributes = sub.attributes sub attributes in
+      Tfunction_cases { cases; partial; param; loc; exp_extra; attributes }
 
 let expr sub x =
   let extra x = extra sub x in
-  let exp_extra = List.map (tuple3 extra (sub.location sub) id) x.exp_extra in
   let exp_loc = sub.location sub x.exp_loc in
+  let exp_extra = List.map (tuple3 extra (sub.location sub) id) x.exp_extra in
   let exp_env = sub.env sub x.exp_env in
-  let map_comprehension {comp_body; comp_clauses} =
-    { comp_body =
-        sub.expr sub comp_body
-    ; comp_clauses =
-        List.map
-          (function
-            | Texp_comp_for bindings ->
-                Texp_comp_for
-                  (List.map
-                     (fun {comp_cb_iterator; comp_cb_attributes} ->
-                        let comp_cb_attributes =
-                          sub.attributes sub comp_cb_attributes
-                        in
-                        let comp_cb_iterator = match comp_cb_iterator with
-                          | Texp_comp_range
-                              { ident; ident_debug_uid; pattern; start; stop;
-                                direction }
-                            ->
-                              Texp_comp_range
-                                { ident
-                                ; ident_debug_uid
-                                ; pattern
-                                    (* Just mirroring [ident], ignored (see
-                                       [Texp_for] *)
-                                ; start = sub.expr sub start
-                                ; stop  = sub.expr sub stop
-                                ; direction }
-                          | Texp_comp_in { pattern; sequence } ->
-                              Texp_comp_in
-                                { pattern = sub.pat sub pattern
-                                ; sequence = sub.expr sub sequence }
-                        in
-                        {comp_cb_iterator; comp_cb_attributes})
-                     bindings)
-            | Texp_comp_when exp ->
-              Texp_comp_when (sub.expr sub exp))
-          comp_clauses
-    }
-  in
-  let map_fields fields =
-    Array.map (function
-      | label, sort, Kept (t, mut, uu) -> label, sort, Kept (t, mut, uu)
-      | label, sort, Overridden (lid, exp) ->
-          label, sort, Overridden (map_loc_lid sub lid, sub.expr sub exp))
-      fields
-  in
-  let map_block_access sub = function
-    | Baccess_field (lid, ld, r) ->
-      Baccess_field (map_loc_lid sub lid, ld, r)
-    | Baccess_block (mut, idx) ->
-      Baccess_block (mut, sub.expr sub idx)
-  in
-  let map_unboxed_access sub = function
-    | Uaccess_unboxed_field (lid, ld, r) ->
-      Uaccess_unboxed_field (map_loc_lid sub lid, ld, r)
-  in
   let exp_desc =
     match x.exp_desc with
-    | Texp_ident r ->
-        Texp_ident { r with lid = map_loc_lid sub r.lid }
-    | Texp_apply_layout (exp, args) ->
-        Texp_apply_layout (sub.expr sub exp, args)
+    | Texp_ident (path, lid, vd) ->
+        Texp_ident (path, map_loc_lid sub lid, vd)
     | Texp_constant _ as d -> d
     | Texp_let (rec_flag, list, exp) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
         Texp_let (rec_flag, list, sub.expr sub exp)
-    | Texp_letmutable (vb, exp) ->
-        Texp_letmutable (sub.value_binding sub vb, sub.expr sub exp)
-    | Texp_function { params; body; locality_mode; ret_mode; ret_sort;
-                      yielding; zero_alloc } ->
+    | Texp_function (params, body) ->
         let params = List.map (function_param sub) params in
         let body = function_body sub body in
-        let ret_mode = sub.modes sub ret_mode in
-        Texp_function { params; body; locality_mode; ret_mode; ret_sort;
-                        yielding; zero_alloc }
-    | Texp_apply (exp, list, pos, am, ym, za) ->
+        Texp_function (params, body)
+    | Texp_apply (exp, list) ->
         Texp_apply (
           sub.expr sub exp,
-          List.map
-            (tuple2 id (Typedtree.map_apply_arg (tuple2 (sub.expr sub) id)))
-            list,
-          pos, am, ym, za
+          List.map (tuple2 id (Typedtree.map_apply_arg (sub.expr sub))) list
         )
-    | Texp_match (exp, sort, cases, eff_cases, p) ->
+    | Texp_match (exp, cases, eff_cases, p) ->
         Texp_match (
           sub.expr sub exp,
-          sort,
           List.map (sub.case sub) cases,
           List.map (sub.case sub) eff_cases,
           p
@@ -580,110 +393,72 @@ let expr sub x =
           List.map (sub.case sub) exn_cases,
           List.map (sub.case sub) eff_cases
         )
-    | Texp_unboxed_unit -> Texp_unboxed_unit
-    | Texp_unboxed_bool b -> Texp_unboxed_bool b
-    | Texp_tuple (list, am) ->
-        Texp_tuple
-          (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list, am)
-    | Texp_unboxed_tuple list ->
-        Texp_unboxed_tuple
-          (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
-    | Texp_construct (lid, cd, rep, args, am) ->
-        Texp_construct (map_loc_lid sub lid, cd, rep,
-                        List.map (fun (sort, arg) -> sort, sub.expr sub arg)
-                          args,
-                        am)
+    | Texp_tuple list ->
+        Texp_tuple (List.map (fun (label, e) -> label, sub.expr sub e) list)
+    | Texp_construct (lid, cd, args) ->
+        Texp_construct (map_loc_lid sub lid, cd, List.map (sub.expr sub) args)
     | Texp_variant (l, expo) ->
-        Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
-    | Texp_record
-        { fields; representation; extended_expression; locality_mode } ->
+        Texp_variant (l, Option.map (sub.expr sub) expo)
+    | Texp_record { fields; representation; extended_expression } ->
+        let fields = Array.map (function
+            | label, Kept (t, mut) -> label, Kept (t, mut)
+            | label, Overridden (lid, exp) ->
+                label, Overridden (map_loc_lid sub lid, sub.expr sub exp))
+            fields
+        in
         Texp_record {
-          fields = map_fields fields; representation;
-          extended_expression =
-            Option.map
-              (fun (exp, sort, repres, ubr) ->
-                 (sub.expr sub exp, sort, repres, ubr))
-              extended_expression;
-          locality_mode
+          fields; representation;
+          extended_expression = Option.map (sub.expr sub) extended_expression;
         }
-    | Texp_record_unboxed_product
-          { fields; representation; extended_expression } ->
-        Texp_record_unboxed_product {
-          fields = map_fields fields; representation;
-          extended_expression =
-            Option.map
-              (fun (exp, sort) -> (sub.expr sub exp, sort)) extended_expression
-        }
-    | Texp_field { record; record_sort; record_repres; lid; label; boxing;
-                   unique_barrier; } ->
-        Texp_field { record = sub.expr sub record;
-                     lid = map_loc_lid sub lid;
-                     record_sort; record_repres; label; boxing; unique_barrier;
-                   }
-    | Texp_unboxed_field { record; record_sort; record_repres;
-                           lid; label; unique_use; } ->
-        Texp_unboxed_field { record = sub.expr sub record;
-                             lid = map_loc_lid sub lid; record_sort;
-                             record_repres; label; unique_use;
-                           }
-    | Texp_setfield { record; record_repres; modality; lid; label;
-                      newval } ->
-        Texp_setfield {
-          record = sub.expr sub record;
-          lid = map_loc_lid sub lid;
-          newval = sub.expr sub newval;
-          record_repres; modality; label;
-        }
-    | Texp_atomic_loc { record; record_sort; record_repres; lid; label;
-                        locality_mode; } ->
-        Texp_atomic_loc {
-          record = sub.expr sub record;
-          lid = map_loc_lid sub lid;
-          record_sort; record_repres; label; locality_mode;
-        }
-    | Texp_array (amut, sort, list, locality_mode) ->
-        Texp_array (amut, sort, List.map (sub.expr sub) list, locality_mode)
-    | Texp_idx (ba, uas) ->
-        Texp_idx
-          (map_block_access sub ba, List.map (map_unboxed_access sub) uas)
-    | Texp_list_comprehension comp ->
-        Texp_list_comprehension (map_comprehension comp)
-    | Texp_array_comprehension (amut, sort, comp) ->
-        Texp_array_comprehension (amut, sort, map_comprehension comp)
+    | Texp_field (exp, lid, ld) ->
+        Texp_field (sub.expr sub exp, map_loc_lid sub lid, ld)
+    | Texp_setfield (exp1, lid, ld, exp2) ->
+        Texp_setfield (
+          sub.expr sub exp1,
+          map_loc_lid sub lid,
+          ld,
+          sub.expr sub exp2
+        )
+    | Texp_atomic_loc (exp, lid, ld) ->
+        Texp_atomic_loc (sub.expr sub exp, map_loc sub lid, ld)
+    | Texp_array (mut, list) ->
+        Texp_array (mut, List.map (sub.expr sub) list)
     | Texp_ifthenelse (exp1, exp2, expo) ->
         Texp_ifthenelse (
           sub.expr sub exp1,
           sub.expr sub exp2,
           Option.map (sub.expr sub) expo
         )
-    | Texp_sequence (exp1, jkind, exp2) ->
+    | Texp_sequence (exp1, exp2) ->
         Texp_sequence (
           sub.expr sub exp1,
-          jkind,
           sub.expr sub exp2
         )
-    | Texp_while wh ->
-        Texp_while { wh_cond = sub.expr sub wh.wh_cond;
-                     wh_body = sub.expr sub wh.wh_body;
-                     wh_body_sort = wh.wh_body_sort
-                   }
-    | Texp_for tf ->
-        Texp_for {tf with for_from = sub.expr sub tf.for_from;
-                          for_to = sub.expr sub tf.for_to;
-                          for_body = sub.expr sub tf.for_body}
-    | Texp_send (exp, meth, ap) ->
+    | Texp_while (exp1, exp2) ->
+        Texp_while (
+          sub.expr sub exp1,
+          sub.expr sub exp2
+        )
+    | Texp_for (id, p, exp1, exp2, dir, exp3) ->
+        Texp_for (
+          id,
+          p,
+          sub.expr sub exp1,
+          sub.expr sub exp2,
+          dir,
+          sub.expr sub exp3
+        )
+    | Texp_send (exp, meth) ->
         Texp_send
           (
             sub.expr sub exp,
-            meth,
-            ap
+            meth
           )
-    | Texp_new (path, lid, cd, apos) ->
+    | Texp_new (path, lid, cd) ->
         Texp_new (
           path,
           map_loc_lid sub lid,
-          cd,
-          apos
+          cd
         )
     | Texp_instvar (path1, path2, id) ->
         Texp_instvar (
@@ -691,7 +466,6 @@ let expr sub x =
           path2,
           map_loc sub id
         )
-    | Texp_mutvar id -> Texp_mutvar (map_loc sub id)
     | Texp_setinstvar (path1, path2, id, exp) ->
         Texp_setinstvar (
           path1,
@@ -699,8 +473,6 @@ let expr sub x =
           map_loc sub id,
           sub.expr sub exp
         )
-    | Texp_setmutvar (id, sort, exp) ->
-        Texp_setmutvar (map_loc sub id, sort, sub.expr sub exp)
     | Texp_override (path, list) ->
         Texp_override (
           path,
@@ -727,16 +499,12 @@ let expr sub x =
         Texp_object (sub.class_structure sub cl, sl)
     | Texp_pack mexpr ->
         Texp_pack (sub.module_expr sub mexpr)
-    | Texp_letop {let_; ands; param; param_debug_uid; param_sort;
-                  body; body_sort; partial} ->
+    | Texp_letop {let_; ands; param; body; partial} ->
         Texp_letop{
           let_ = sub.binding_op sub let_;
           ands = List.map (sub.binding_op sub) ands;
           param;
-          param_debug_uid;
-          param_sort;
           body = sub.case sub body;
-          body_sort;
           partial;
         }
     | Texp_unreachable ->
@@ -745,20 +513,8 @@ let expr sub x =
         Texp_extension_constructor (map_loc_lid sub lid, path)
     | Texp_open (od, e) ->
         Texp_open (sub.open_declaration sub od, sub.expr sub e)
-    | Texp_probe {name; handler; enabled_at_init;} ->
-      Texp_probe {name; handler = sub.expr sub handler; enabled_at_init}
-    | Texp_probe_is_enabled _ as e -> e
-    | Texp_exclave exp ->
-        Texp_exclave (sub.expr sub exp)
-    | Texp_src_pos -> Texp_src_pos
-    | Texp_typed_hole -> Texp_typed_hole
-    | Texp_overwrite (exp1, exp2) ->
-        Texp_overwrite (sub.expr sub exp1, sub.expr sub exp2)
-    | Texp_hole use -> Texp_hole use
-    | Texp_quote exp ->
-        Texp_quote (sub.expr sub exp)
-    | Texp_splice exp ->
-        Texp_splice (sub.expr sub exp)
+    | Texp_typed_hole ->
+        Texp_typed_hole
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}
@@ -778,15 +534,7 @@ let binding_op sub x =
 let signature sub x =
   let sig_final_env = sub.env sub x.sig_final_env in
   let sig_items = List.map (sub.signature_item sub) x.sig_items in
-  let sig_modalities = sub.modalities sub x.sig_modalities in
-  {x with sig_items; sig_final_env; sig_modalities}
-
-let sig_include_infos sub x =
-  let incl_loc = sub.location sub x.incl_loc in
-  let incl_attributes = sub.attributes sub x.incl_attributes in
-  let incl_mod = sub.module_type sub x.incl_mod in
-  let incl_kind = include_kind sub x.incl_kind in
-  { x with incl_loc; incl_attributes; incl_mod; incl_kind }
+  {x with sig_items; sig_final_env}
 
 let signature_item sub x =
   let sig_loc = sub.location sub x.sig_loc in
@@ -813,10 +561,10 @@ let signature_item sub x =
         Tsig_recmodule (List.map (sub.module_declaration sub) list)
     | Tsig_modtype x ->
         Tsig_modtype (sub.module_type_declaration sub x)
-    | Tsig_modtypesubst x ->
+   | Tsig_modtypesubst x ->
         Tsig_modtypesubst (sub.module_type_declaration sub x)
-    | Tsig_include (incl, moda) ->
-        Tsig_include (sig_include_infos sub incl, sub.modalities sub moda)
+   | Tsig_include incl ->
+        Tsig_include (include_infos sub (sub.module_type sub) incl)
     | Tsig_class list ->
         Tsig_class (List.map (sub.class_description sub) list)
     | Tsig_class_type list ->
@@ -824,7 +572,6 @@ let signature_item sub x =
           (List.map (sub.class_type_declaration sub) list)
     | Tsig_open od -> Tsig_open (sub.open_description sub od)
     | Tsig_attribute attr -> Tsig_attribute (sub.attribute sub attr)
-    | Tsig_jkind jd -> Tsig_jkind (sub.jkind_declaration sub jd)
   in
   {sig_loc; sig_desc; sig_env}
 
@@ -833,8 +580,7 @@ let class_description sub x =
 
 let functor_parameter sub = function
   | Unit -> Unit
-  | Named (id, s, mtype, mmode) ->
-      Named (id, map_loc sub s, sub.module_type sub mtype, sub.modes sub mmode)
+  | Named (id, s, mtype) -> Named (id, map_loc sub s, sub.module_type sub mtype)
 
 let module_type sub x =
   let mty_loc = sub.location sub x.mty_loc in
@@ -844,9 +590,8 @@ let module_type sub x =
     | Tmty_ident (path, lid) -> Tmty_ident (path, map_loc_lid sub lid)
     | Tmty_alias (path, lid) -> Tmty_alias (path, map_loc_lid sub lid)
     | Tmty_signature sg -> Tmty_signature (sub.signature sub sg)
-    | Tmty_functor (arg, mtype2, mmode2) ->
-        Tmty_functor (functor_parameter sub arg, sub.module_type sub mtype2,
-          sub.modes sub mmode2)
+    | Tmty_functor (arg, mtype2) ->
+        Tmty_functor (functor_parameter sub arg, sub.module_type sub mtype2)
     | Tmty_with (mtype, list) ->
         Tmty_with (
           sub.module_type sub mtype,
@@ -854,8 +599,6 @@ let module_type sub x =
         )
     | Tmty_typeof mexpr ->
         Tmty_typeof (sub.module_expr sub mexpr)
-    | Tmty_strengthen (mtype, p, lid) ->
-        Tmty_strengthen (sub.module_type sub mtype, p, map_loc_lid sub lid)
   in
   let mty_attributes = sub.attributes sub x.mty_attributes in
   {x with mty_loc; mty_desc; mty_env; mty_attributes}
@@ -867,8 +610,6 @@ let with_constraint sub = function
   | Twith_modtypesubst mty -> Twith_modtypesubst (sub.module_type sub mty)
   | Twith_module (path, lid) -> Twith_module (path, map_loc_lid sub lid)
   | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc_lid sub lid)
-  | Twith_jkind      jd -> Twith_jkind (sub.jkind_declaration sub jd)
-  | Twith_jkindsubst jd -> Twith_jkindsubst (sub.jkind_declaration sub jd)
 
 let open_description sub od =
   {od with open_loc = sub.location sub od.open_loc;
@@ -884,63 +625,46 @@ let open_declaration sub od =
 
 let module_coercion sub = function
   | Tcoerce_none -> Tcoerce_none
-  | Tcoerce_functor (c1,c2,yielding) ->
-      Tcoerce_functor
-        (sub.module_coercion sub c1, sub.module_coercion sub c2, yielding)
+  | Tcoerce_functor (c1,c2) ->
+      Tcoerce_functor (sub.module_coercion sub c1, sub.module_coercion sub c2)
   | Tcoerce_alias (env, p, c1) ->
       Tcoerce_alias (sub.env sub env, p, sub.module_coercion sub c1)
-  | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
-      let pos_cc_list =
-        List.map
-          (fun (i,c) -> i, sub.module_coercion sub c) pos_cc_list
+  | Tcoerce_structure (l1, l2) ->
+      let l1' = List.map (fun (i,c) -> i, sub.module_coercion sub c) l1 in
+      let l2' =
+        List.map (fun (id,i,c) -> id, i, sub.module_coercion sub c) l2
       in
-      let id_pos_list =
-        List.map (fun (id,i,c) -> id, i, sub.module_coercion sub c) id_pos_list
-      in
-      Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
+      Tcoerce_structure (l1', l2')
   | Tcoerce_primitive pc ->
       Tcoerce_primitive {pc with pc_loc = sub.location sub pc.pc_loc;
                                  pc_env = sub.env sub pc.pc_env}
-  | Tcoerce_kindtemplate ks ->
-      Tcoerce_kindtemplate ks
-  | Tcoerce_invalid -> Tcoerce_invalid
 
 let module_expr sub x =
   let mod_loc = sub.location sub x.mod_loc in
   let mod_env = sub.env sub x.mod_env in
-  let mod_mode =
-    match x.mod_mode with
-    | _, None -> x.mod_mode
-    | mode, Some (locks, txt, loc) ->
-      let { txt; loc } = map_loc_lid sub { txt; loc } in
-      mode, Some (locks, txt, loc)
-  in
   let mod_desc =
     match x.mod_desc with
     | Tmod_typed_hole -> Tmod_typed_hole
     | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc_lid sub lid)
     | Tmod_structure st -> Tmod_structure (sub.structure sub st)
-    | Tmod_functor (arg, mexpr, staticity) ->
-        Tmod_functor
-          (functor_parameter sub arg, sub.module_expr sub mexpr, staticity)
-    | Tmod_apply (mexp1, mexp2, c, yielding, staticity) ->
+    | Tmod_functor (arg, mexpr) ->
+        Tmod_functor (functor_parameter sub arg, sub.module_expr sub mexpr)
+    | Tmod_apply (mexp1, mexp2, c) ->
         Tmod_apply (
           sub.module_expr sub mexp1,
           sub.module_expr sub mexp2,
-          sub.module_coercion sub c,
-          yielding,
-          staticity
+          sub.module_coercion sub c
         )
-    | Tmod_apply_unit (mexp1, yielding) ->
-        Tmod_apply_unit (sub.module_expr sub mexp1, yielding)
+    | Tmod_apply_unit mexp1 ->
+        Tmod_apply_unit (sub.module_expr sub mexp1)
     | Tmod_constraint (mexpr, mt, Tmodtype_implicit, c) ->
         Tmod_constraint (sub.module_expr sub mexpr, mt, Tmodtype_implicit,
                          sub.module_coercion sub c)
-    | Tmod_constraint (mexpr, mt, Tmodtype_explicit (mtype, ma), c) ->
+    | Tmod_constraint (mexpr, mt, Tmodtype_explicit mtype, c) ->
         Tmod_constraint (
           sub.module_expr sub mexpr,
           mt,
-          Tmodtype_explicit (sub.module_type sub mtype, sub.modes sub ma),
+          Tmodtype_explicit (sub.module_type sub mtype),
           sub.module_coercion sub c
         )
     | Tmod_unpack (exp, mty) ->
@@ -951,7 +675,7 @@ let module_expr sub x =
           )
   in
   let mod_attributes = sub.attributes sub x.mod_attributes in
-  {x with mod_loc; mod_desc; mod_mode; mod_env; mod_attributes}
+  {x with mod_loc; mod_desc; mod_env; mod_attributes}
 
 let module_binding sub x =
   let mb_loc = sub.location sub x.mb_loc in
@@ -986,9 +710,7 @@ let class_expr sub x =
     | Tcl_apply (cl, args) ->
         Tcl_apply (
           sub.class_expr sub cl,
-          List.map
-            (tuple2 id (Typedtree.map_apply_arg (tuple2 (sub.expr sub) id)))
-            args
+          List.map (tuple2 id (Typedtree.map_apply_arg (sub.expr sub))) args
         )
     | Tcl_let (rec_flag, value_bindings, ivars, cl) ->
         let (rec_flag, value_bindings) =
@@ -1060,17 +782,12 @@ let typ sub x =
   let ctyp_env = sub.env sub x.ctyp_env in
   let ctyp_desc =
     match x.ctyp_desc with
-    | (Ttyp_var (_,None) | Ttyp_call_pos) as d -> d
-    | Ttyp_var (s, Some jkind) ->
-        Ttyp_var (s, Some (sub.jkind_annotation sub jkind))
-    | Ttyp_arrow (label, ct1, ma1, ct2, ma2) ->
-        Ttyp_arrow (label, sub.typ sub ct1, sub.modes sub ma1,
-                    sub.typ sub ct2, sub.modes sub ma2)
+    | Ttyp_any
+    | Ttyp_var _ as d -> d
+    | Ttyp_arrow (label, ct1, ct2) ->
+        Ttyp_arrow (label, sub.typ sub ct1, sub.typ sub ct2)
     | Ttyp_tuple list ->
         Ttyp_tuple (List.map (fun (label, t) -> label, sub.typ sub t) list)
-    | Ttyp_unboxed_tuple list ->
-        Ttyp_unboxed_tuple
-          (List.map (fun (label, t) -> label, sub.typ sub t) list)
     | Ttyp_constr (path, lid, list) ->
         Ttyp_constr (path, map_loc_lid sub lid, List.map (sub.typ sub) list)
     | Ttyp_object (list, closed) ->
@@ -1081,23 +798,16 @@ let typ sub x =
            map_loc_lid sub lid,
            List.map (sub.typ sub) list
           )
-    | Ttyp_alias (ct, s, jkind) ->
-        Ttyp_alias (sub.typ sub ct, s,
-                    Option.map (sub.jkind_annotation sub) jkind)
+    | Ttyp_alias (ct, s) ->
+        Ttyp_alias (sub.typ sub ct, s)
     | Ttyp_variant (list, closed, labels) ->
         Ttyp_variant (List.map (sub.row_field sub) list, closed, labels)
-    | Ttyp_poly (vars, ct) ->
-        Ttyp_poly (List.map (var_jkind sub) vars, sub.typ sub ct)
+    | Ttyp_poly (sl, ct) ->
+        Ttyp_poly (sl, sub.typ sub ct)
     | Ttyp_package pack ->
         Ttyp_package (sub.package_type sub pack)
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc_lid sub mod_ident, sub.typ sub t)
-    | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
-    | Ttyp_newlayout (vars, ct) -> Ttyp_newlayout (vars, sub.typ sub ct)
-    | Ttyp_of_kind jkind ->
-        Ttyp_of_kind (sub.jkind_annotation sub jkind)
-    | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
-    | Ttyp_splice t -> Ttyp_splice (sub.typ sub t)
   in
   let ctyp_attributes = sub.attributes sub x.ctyp_attributes in
   {x with ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes}
@@ -1173,26 +883,9 @@ let value_binding sub x =
   let vb_expr = sub.expr sub x.vb_expr in
   let vb_attributes = sub.attributes sub x.vb_attributes in
   let vb_rec_kind = x.vb_rec_kind in
-  {vb_loc; vb_pat; vb_expr; vb_attributes; vb_sort = x.vb_sort; vb_rec_kind}
+  {vb_loc; vb_pat; vb_expr; vb_attributes; vb_rec_kind}
 
 let env _sub x = x
-
-let jkind_annotation sub annot =
-  (* map over locations contained within parsetree jkind annotation *)
-  let ast_mapper =
-    { Ast_mapper.default_mapper
-      with location = (fun _this loc -> sub.location sub loc)
-    }
-  in
-  ast_mapper.jkind_annotation ast_mapper annot
-
-let modalities sub x =
-  let moda_desc = List.map (map_loc sub) x.moda_desc in
-  {x with moda_desc}
-
-let modes sub x =
-  let mode_desc = List.map (map_loc sub) x.mode_desc in
-  { x with mode_desc }
 
 let default =
   {
@@ -1212,11 +905,7 @@ let default =
     env;
     expr;
     extension_constructor;
-    jkind_annotation;
-    jkind_declaration;
     location;
-    modalities;
-    modes;
     module_binding;
     module_coercion;
     module_declaration;

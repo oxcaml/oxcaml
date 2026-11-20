@@ -21,18 +21,6 @@ type t =
 and extra_ty =
   | Pcstr_ty of string
   | Pext_ty
-  | Punboxed_ty
-
-let unboxed_version t = Pextra_ty (t, Punboxed_ty)
-
-let boxed_version t =
-  match t with
-  | Pextra_ty (inner, Punboxed_ty) -> Some inner
-  | Pident _ | Pdot _ | Papply _
-  | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) ->
-    None
-
-let is_unboxed_version t = Option.is_some (boxed_version t)
 
 let rec same p1 p2 =
   p1 == p2
@@ -46,8 +34,7 @@ let rec same p1 p2 =
       let same_extra = match t1, t2 with
         | (Pcstr_ty s1, Pcstr_ty s2) -> s1 = s2
         | (Pext_ty, Pext_ty) -> true
-        | (Punboxed_ty, Punboxed_ty) -> true
-        | ((Pcstr_ty _ | Pext_ty | Punboxed_ty), _) -> false
+        | ((Pcstr_ty _ | Pext_ty), _) -> false
       in same_extra && same p1 p2
   | (_, _) -> false
 
@@ -77,14 +64,9 @@ and compare_extra t1 t2 =
     Pcstr_ty s1, Pcstr_ty s2 -> String.compare s1 s2
   | (Pext_ty, Pext_ty)
     -> 0
-  | (Punboxed_ty, Punboxed_ty) -> 0
-  | (Pcstr_ty _, (Pext_ty | Punboxed_ty))
+  | (Pcstr_ty _, Pext_ty)
     -> -1
-  | ((Pext_ty | Punboxed_ty), Pcstr_ty _)
-    -> 1
-  | (Pext_ty, Punboxed_ty)
-    -> -1
-  | (Punboxed_ty, Pext_ty)
+  | (Pext_ty, Pcstr_ty _)
     -> 1
 
 let rec find_free_opt ids = function
@@ -118,12 +100,6 @@ let rec name ?(paren=kfalse) = function
       name ~paren p ^ if paren s then ".( " ^ s ^ " )" else "." ^ s
   | Papply(p1, p2) -> name ~paren p1 ^ "(" ^ name ~paren p2 ^ ")"
   | Pextra_ty (p, Pext_ty) -> name ~paren p
-  | Pextra_ty (p, Punboxed_ty) ->
-    match p with
-    | Pident id -> Ident.name id ^ "#"
-    | Pdot (p, s) -> name ~paren (Pdot (p, s ^ "#"))
-    | Papply _ | Pextra_ty _ ->
-      Misc.fatal_error "Path.name"
 
 let rec print ppf = function
   | Pident id -> Ident.print_with_scope ppf id
@@ -131,12 +107,6 @@ let rec print ppf = function
       Format_doc.fprintf ppf "%a.%s" print p s
   | Papply(p1, p2) -> Format_doc.fprintf ppf "%a(%a)" print p1 print p2
   | Pextra_ty (p, Pext_ty) -> print ppf p
-  | Pextra_ty (p, Punboxed_ty) ->
-    match p with
-    | Pident id -> Format_doc.fprintf ppf "%a#" Ident.print_with_scope id
-    | Pdot (p, s) -> print ppf (Pdot (p, s ^ "#"))
-    | Papply _ | Pextra_ty _ ->
-      Misc.fatal_error "Path.print"
 
 let rec head = function
     Pident id -> id
@@ -148,7 +118,7 @@ let flatten =
     | Pident id -> `Ok (id, acc)
     | Pdot (p, s) | Pextra_ty (p, Pcstr_ty s) -> flatten (s :: acc) p
     | Papply _ -> `Contains_apply
-    | Pextra_ty (p, (Pext_ty | Punboxed_ty)) -> flatten acc p
+    | Pextra_ty (p, Pext_ty) -> flatten acc p
   in
   fun t -> flatten [] t
 
@@ -168,13 +138,11 @@ let rec last = function
   | Pident id -> Ident.name id
   | Pdot(_, s) | Pextra_ty (_, Pcstr_ty s) -> s
   | Papply(_, p) | Pextra_ty (p, Pext_ty) -> last p
-  | Pextra_ty (p, Punboxed_ty) ->
-    last p ^ "#"
 
 let is_constructor_typath p =
   match p with
-  | Pident _ | Pdot _ | Papply _ | Pextra_ty (_, Punboxed_ty) -> false
-  | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) -> true
+  | Pident _ | Pdot _ | Papply _ -> false
+  | Pextra_ty _ -> true
 
 module T = struct
   type nonrec t = t
@@ -182,32 +150,3 @@ module T = struct
 end
 module Set = Set.Make(T)
 module Map = Map.Make(T)
-
-let rec hash_aux acc p =
-  let combine acc x = Hashtbl.seeded_hash acc x in
-  match p with
-  | Pident id -> combine acc (Ident.hash id)
-  | Pdot (p', name) ->
-      let acc = combine acc 1 in
-      let acc = hash_aux acc p' in
-      combine acc name
-  | Papply (p1, p2) ->
-      let acc = combine acc 2 in
-      let acc = hash_aux acc p1 in
-      hash_aux acc p2
-  | Pextra_ty (p', extra) ->
-      let acc = combine acc 3 in
-      let acc = hash_aux acc p' in
-      begin match extra with
-      | Pcstr_ty s -> combine (combine acc 0) s
-      | Pext_ty -> combine acc 1
-      | Punboxed_ty -> combine acc 2
-      end
-
-let hash p = hash_aux 0 p
-
-module Tbl = Hashtbl.Make(struct
-  type nonrec t = t
-  let equal = same
-  let hash = hash
-end)

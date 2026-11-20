@@ -33,7 +33,7 @@ Build indices
      "Foo.bar": File "./main/main.ml", line 1, characters 8-15;
      "Foo.bar": File "./main/main.ml", line 2, characters 22-29
    uid: Main.0; locs: "x": File "./main/main.ml", line 1, characters 4-5
-   uid: Stdlib.313; locs:
+   uid: Stdlib.312; locs:
      "print_string": File "./lib/foo.ml", line 2, characters 9-21;
      "print_string": File "./main/main.ml", line 2, characters 9-21
    }, 0 approx shapes: {}, and shapes for CUS .
@@ -80,7 +80,7 @@ Perform the occurrences query
       "file": "$TESTCASE_ROOT/main/main.ml",
       "start": {
         "line": 1,
-        "col": 8
+        "col": 12
       },
       "end": {
         "line": 1,
@@ -92,7 +92,7 @@ Perform the occurrences query
       "file": "$TESTCASE_ROOT/main/main.ml",
       "start": {
         "line": 2,
-        "col": 22
+        "col": 26
       },
       "end": {
         "line": 2,

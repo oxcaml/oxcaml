@@ -58,8 +58,6 @@ open Parsetree
 type mapper = {
   attribute: mapper -> attribute -> attribute;
   attributes: mapper -> attribute list -> attribute list;
-  modes : mapper -> modes -> modes;
-  modalities : mapper -> modalities -> modalities;
   binding_op: mapper -> binding_op -> binding_op;
   case: mapper -> case -> case;
   cases: mapper -> case list -> case list;
@@ -81,19 +79,8 @@ type mapper = {
   extension: mapper -> extension -> extension;
   extension_constructor: mapper -> extension_constructor
                          -> extension_constructor;
-
   include_declaration: mapper -> include_declaration -> include_declaration;
-  (** In Jane Street's OCaml, this may be called for [include functor]s, and
-      thus the thing being included might be a functor and not a plain module
-      type *)
-
   include_description: mapper -> include_description -> include_description;
-  (** In Jane Street's OCaml, this may be called for [include functor]s, and
-      thus the thing being included might be a functor and not a plain module
-      type *)
-
-  jkind_annotation: mapper -> jkind_annotation -> jkind_annotation;
-  jkind_declaration: mapper -> jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> label_declaration -> label_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> module_binding -> module_binding;
@@ -139,7 +126,7 @@ val tool_name: unit -> string
     ["ocaml"], ...  Some global variables that reflect command-line
     options are automatically synchronized between the calling tool
     and the ppx preprocessor: {!Clflags.include_dirs},
-    {!Clflags.hidden_include_dirs}, {!Load_path}, {!Clflags.open_args},
+    {!Clflags.hidden_include_dirs}, {!Load_path}, {!Clflags.open_modules},
     {!Clflags.for_package}, {!Clflags.debug}. *)
 
 
@@ -205,9 +192,6 @@ val add_ppx_context_sig:
     tool_name:string -> Parsetree.signature -> Parsetree.signature
 (** Same as [add_ppx_context_str], but for signatures. *)
 
-val add_ppx_context_sig_items:
-    tool_name:string -> Parsetree.signature_item list -> Parsetree.signature_item list
-
 val drop_ppx_context_str:
     restore:bool -> Parsetree.structure -> Parsetree.structure
 (** Drop the ocaml.ppx.context attribute from a structure.  If
@@ -217,9 +201,6 @@ val drop_ppx_context_str:
 val drop_ppx_context_sig:
     restore:bool -> Parsetree.signature -> Parsetree.signature
 (** Same as [drop_ppx_context_str], but for signatures. *)
-
-val drop_ppx_context_sig_items:
-    restore:bool -> Parsetree.signature_item list -> Parsetree.signature_item list
 
 (** {1 Cookies} *)
 

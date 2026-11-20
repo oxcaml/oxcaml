@@ -33,25 +33,12 @@ open Browse_raw
 type node = Browse_raw.node
 type t = (Env.t * node) list
 
-module Let_pun_behavior = struct
-  type t = Prefer_expression | Prefer_pattern
-
-  let default = Prefer_pattern
-end
-
-module Record_pattern_pun_behavior = struct
-  type t = Prefer_label | Prefer_pattern
-
-  let default = Prefer_pattern
-end
-
 let node_of_binary_part = Browse_raw.node_of_binary_part
 
 let fold_node f env t acc =
   let acc =
     match
-      Typing_recovery_state.get_saved_types_from_attributes
-        (Browse_raw.node_attributes t)
+      Msupport.get_saved_types_from_attributes (Browse_raw.node_attributes t)
     with
     | [] -> acc
     | parts ->
@@ -82,6 +69,7 @@ let node_loc node = approximate_loc Browse_raw.node_real_loc node
 let node_merlin_loc node = approximate_loc Browse_raw.node_merlin_loc node
 
 let leaf_node = List.hd
+let leaf_loc t = node_loc (snd (leaf_node t))
 
 let drop_leaf t =
   match t with
@@ -114,140 +102,41 @@ let select_leafs pos root =
   (try traverse root with Exit -> ());
   !branches
 
-module Favorability = struct
-  type t = Unfavored | Neutral | Favored
-
-  let based_on_ghostliness (loc : Location.t) =
-    match loc.loc_ghost with
-    | true -> Unfavored
-    | false -> Neutral
-
-  let based_on_let_punning ~(let_pun_behavior : Let_pun_behavior.t) node =
-    let is_punned =
-      Browse_raw.has_attr ~name:Builtin_attributes.merlin_punned_let node
-    in
-    match (is_punned, node, let_pun_behavior) with
-    | true, Expression _, Prefer_expression -> Favored
-    | true, Expression _, Prefer_pattern -> Unfavored
-    | true, Pattern _, Prefer_expression -> Unfavored
-    | true, Pattern _, Prefer_pattern -> Favored
-    | _ -> Neutral
-
-  let based_on_record_pattern_punning
-      ~(record_pattern_pun_behavior : Record_pattern_pun_behavior.t) node =
-    let is_punned =
-      Browse_raw.has_attr ~name:Builtin_attributes.merlin_punned_record_pattern
-        node
-    in
-    match (is_punned, node, record_pattern_pun_behavior) with
-    | true, Pattern _, Prefer_label -> Unfavored
-    | true, Pattern _, Prefer_pattern -> Favored
-    | _ -> Neutral
-end
-
-module Node_comparison_result = struct
-  type t = Left | Neutral | Right
-
-  let left_or_neutral = function
-    | Left | Neutral -> true
-    | Right -> false
-
-  let invert = function
-    | Left -> Right
-    | Right -> Left
-    | Neutral -> Neutral
-
-  let from_favorabilities (left : Favorability.t) (right : Favorability.t) =
-    match (left, right) with
-    | Unfavored, (Neutral | Favored) | Neutral, Favored -> Right
-    | (Neutral | Favored), Unfavored | Favored, Neutral -> Left
-    | Unfavored, Unfavored | Neutral, Neutral | Favored, Favored -> Neutral
-
-  let rec combine_lazy_list = function
-    | [] -> Neutral
-    | (lazy Left) :: _ -> Left
-    | (lazy Right) :: _ -> Right
-    | (lazy Neutral) :: rest -> combine_lazy_list rest
-end
-
-let closer_to_end_of_file (l1 : Location.t) (l2 : Location.t) :
-    Node_comparison_result.t =
-  match Lexing.compare_pos l1.loc_end l2.loc_end with
-  | r when r < 0 -> Left
-  | r when r > 0 -> Right
-  | _ -> Neutral
-
-let compare_locations pos l1 l2 : Node_comparison_result.t =
+let compare_locations pos l1 l2 =
+  let t2_first = 1 in
+  let t1_first = -1 in
   match (Location_aux.compare_pos pos l1, Location_aux.compare_pos pos l2) with
-  (* Cursor inside both locations *)
-  | 0, 0 -> Neutral
+  (* Cursor inside both locations: favor non-ghost closer to the end *)
+  | 0, 0 -> begin
+    match (l1.Location.loc_ghost, l2.Location.loc_ghost) with
+    | true, false -> 1
+    | false, true -> -1
+    | _ -> Lexing.compare_pos l1.Location.loc_end l2.Location.loc_end
+  end
   (* Cursor inside one location: it has priority *)
-  | 0, _ -> Left
-  | _, 0 -> Right
-  (* Cursor between the two locations: favor the one before the cursor *)
-  | n, m when n > 0 && m < 0 -> Left
-  | n, m when m > 0 && n < 0 -> Right
-  (* Cursor is after both, select the one whose end is earlier in the file *)
-  | _, _ -> closer_to_end_of_file l1 l2 |> Node_comparison_result.invert
+  | 0, _ -> t1_first
+  | _, 0 -> t2_first
+  (* Cursor outside locations: favor before *)
+  | n, m when n > 0 && m < 0 -> t1_first
+  | n, m when m > 0 && n < 0 -> t2_first
+  (* Cursor is after both, select the closest one *)
+  | _, _ -> Lexing.compare_pos l2.Location.loc_end l1.Location.loc_end
 
-let compare_nodes ~let_pun_behavior ~record_pattern_pun_behavior pos
-    (node1, loc1) (node2, loc2) =
-  (* Prioritization order:
-     1. Choose the node whose location encompasses [pos]
-     2. If node is part of a let-punned pattern, choose the one on the preferred side
-        (based on [let_pun_behavior])
-     3. Choose the one that isn't marked as ghost
-     4. Choose the node that is closer to the end of the file *)
-  [ lazy (compare_locations pos loc1 loc2);
-    lazy
-      (Node_comparison_result.from_favorabilities
-         (Favorability.based_on_let_punning ~let_pun_behavior node1)
-         (Favorability.based_on_let_punning ~let_pun_behavior node2));
-    lazy
-      (Node_comparison_result.from_favorabilities
-         (Favorability.based_on_record_pattern_punning
-            ~record_pattern_pun_behavior node1)
-         (Favorability.based_on_record_pattern_punning
-            ~record_pattern_pun_behavior node2));
-    lazy
-      (Node_comparison_result.from_favorabilities
-         (Favorability.based_on_ghostliness loc1)
-         (Favorability.based_on_ghostliness loc2));
-    lazy (closer_to_end_of_file loc1 loc2)
-  ]
-  |> Node_comparison_result.combine_lazy_list
-
-let best_node ~let_pun_behavior ~record_pattern_pun_behavior pos = function
+let best_node pos = function
   | [] -> []
   | init :: xs ->
     let f acc x =
-      let leaf_with_loc leaf =
-        let _, node = leaf_node leaf in
-        let loc = node_loc node in
-        (node, loc)
-      in
-      match
-        compare_nodes ~let_pun_behavior ~record_pattern_pun_behavior pos
-          (leaf_with_loc acc) (leaf_with_loc x)
-      with
-      | Left | Neutral -> acc
-      | Right -> x
+      if compare_locations pos (leaf_loc acc) (leaf_loc x) <= 0 then acc else x
     in
     List.fold_left ~f ~init xs
 
-let enclosing ?(let_pun_behavior = Let_pun_behavior.default)
-    ?(record_pattern_pun_behavior = Record_pattern_pun_behavior.default) pos
-    roots =
-  match best_node ~let_pun_behavior ~record_pattern_pun_behavior pos roots with
+let enclosing pos roots =
+  match best_node pos roots with
   | [] -> []
-  | root ->
-    best_node ~let_pun_behavior ~record_pattern_pun_behavior pos
-      (select_leafs pos root)
+  | root -> best_node pos (select_leafs pos root)
 
-let deepest_before ?(let_pun_behavior = Let_pun_behavior.default)
-    ?(record_pattern_pun_behavior = Record_pattern_pun_behavior.default) pos
-    roots =
-  match enclosing ~let_pun_behavior ~record_pattern_pun_behavior pos roots with
+let deepest_before pos roots =
+  match enclosing pos roots with
   | [] -> []
   | root ->
     let rec aux path =
@@ -261,10 +150,7 @@ let deepest_before ?(let_pun_behavior = Let_pun_behavior.default)
           || Lexing.compare_pos loc.Location.loc_end loc0.Location.loc_end = 0
         then
           match acc with
-          | Some (_, loc', node')
-            when compare_nodes ~let_pun_behavior ~record_pattern_pun_behavior
-                   pos (node', loc') (node, loc)
-                 |> Node_comparison_result.left_or_neutral -> acc
+          | Some (_, loc', _) when compare_locations pos loc' loc <= 0 -> acc
           | Some _ | None -> Some (env, loc, node)
         else acc
       in
@@ -333,7 +219,7 @@ let of_typedtree = function
   | `Interface sg -> of_signature sg
 
 let optional_label_sugar = function
-  | Typedtree.Texp_construct (id, _, _, [ (_, e) ], _)
+  | Typedtree.Texp_construct (id, _, [ e ])
     when id.Location.loc.Location.loc_ghost
          && id.Location.txt = Longident.Lident "Some" -> Some e
   | _ -> None
@@ -341,10 +227,10 @@ let optional_label_sugar = function
 let rec is_recovered_expression e =
   match e.Typedtree.exp_desc with
   (* Recovery on arbitrary expressions *)
-  | Texp_tuple ([ _ ], _) -> true
+  | Texp_tuple [ _ ] -> true
   (* Recovery on unbound identifier *)
-  | Texp_ident { path = Path.Pident id; _ } when Ident.name id = "*type-error*"
-    -> true
+  | Texp_ident (Path.Pident id, _, _) when Ident.name id = "*type-error*" ->
+    true
   (* Recovery on desugared optional label application *)
   | Texp_construct _ as cstr when is_recovered_Texp_construct cstr -> true
   | _ -> false

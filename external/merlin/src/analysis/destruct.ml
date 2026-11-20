@@ -39,30 +39,31 @@ let { Logger.log } = Logger.for_section "destruct"
 
 let () =
   Location.register_error_of_exn (function
-    | Not_allowed s -> Some (Location.error ("Destruct not allowed on " ^ s))
-    | Useless_refine -> Some (Location.error "Cannot refine an useless branch")
-    | Nothing_to_do -> Some (Location.error "Nothing to do")
-    | Ill_typed ->
-      Some (Location.error "The node on which destruct was called is ill-typed")
-    | _ -> None)
+      | Not_allowed s -> Some (Location.error ("Destruct not allowed on " ^ s))
+      | Useless_refine -> Some (Location.error "Cannot refine an useless branch")
+      | Nothing_to_do -> Some (Location.error "Nothing to do")
+      | Ill_typed ->
+        Some (Location.error "The node on which destruct was called is ill-typed")
+      | _ -> None)
 
 let mk_id s = Location.mknoloc (Longident.Lident s)
 let mk_var s = Location.mknoloc s
 
 module Predef_types = struct
   let char_ env ty =
-    let a = Tast_helper.Pat.constant env ty (Const_char 'a') in
+    let a = Tast_helper.Pat.constant env ty (Asttypes.Const_char 'a') in
     let z = Patterns.omega in
     [ a; z ]
 
   let int_ env ty =
-    let zero = Tast_helper.Pat.constant env ty (Const_int 0) in
+    let zero = Tast_helper.Pat.constant env ty (Asttypes.Const_int 0) in
     let n = Patterns.omega in
     [ zero; n ]
 
   let string_ env ty =
     let empty =
-      Tast_helper.Pat.constant env ty (Const_string ("", Location.none, None))
+      Tast_helper.Pat.constant env ty
+        (Asttypes.Const_string ("", Location.none, None))
     in
     let s = Patterns.omega in
     [ empty; s ]
@@ -80,19 +81,11 @@ end
 
 let placeholder = Ast_helper.Exp.hole ()
 
-let omega_with_sort env (label, ty) =
-  let sort : Jkind.Sort.t =
-    match Ctype.type_sort ~why:Tuple_element ~allow_mutation:false env ty with
-    | Ok sort -> sort
-    | Error _ -> Var (Jkind.Sort.new_genvar ())
-  in
-  (label, Patterns.omega, sort)
-
 let rec gen_patterns ?(recurse = true) env type_expr =
   let open Types in
   log ~title:"gen_patterns" "%a" Logger.fmt (fun fmt ->
-      Format.fprintf fmt "Generating patterns for type %a"
-        Printtyp.Compat.type_expr type_expr);
+      Format.fprintf fmt "Generating patterns for type %a" Printtyp.type_expr
+        type_expr);
   match get_desc type_expr with
   | Tlink _ -> assert false (* impossible after [Btype.repr] *)
   | Tvar _ -> raise (Not_allowed "non-immediate type")
@@ -100,77 +93,68 @@ let rec gen_patterns ?(recurse = true) env type_expr =
   | Tobject _ -> raise (Not_allowed "object type")
   | Tpackage _ -> raise (Not_allowed "modules")
   | Ttuple lst ->
-    let patterns = List.map lst ~f:(omega_with_sort env) in
+    let patterns = Patterns.omega_list lst in
+    let patterns = List.map ~f:(fun p -> None, p) patterns in
     [ Tast_helper.Pat.tuple env type_expr patterns ]
-  | Tunboxed_tuple lst ->
-    let patterns = List.map lst ~f:(omega_with_sort env) in
-    [ Tast_helper.Pat.unboxed_tuple env type_expr patterns ]
-  | Tconstr (path, _params, _) ->
-    begin match Env.find_type_descrs path env with
-    | Type_record (labels, _, _) ->
-      let lst =
-        List.map labels ~f:(fun lbl_descr ->
-            let lidloc = mk_id lbl_descr.Data_types.lbl_name in
-            ( lidloc,
-              lbl_descr,
-              Tast_helper.Pat.var Uid.internal_not_actually_unique env type_expr
-                (mk_var lbl_descr.Data_types.lbl_name) ))
-      in
-      [ Tast_helper.Pat.record env type_expr lst Asttypes.Closed ]
-    | Type_variant (constructors, _, _) ->
-      let prefix =
-        let path = Out_type.shorten_type_path env path in
-        fun name ->
-          let env_check = Env.find_constructor_by_name in
-          Misc_utils.Path.to_shortest_lid ~env ~name ~env_check path
-      in
-      let are_types_unifiable typ =
-        let snap = Btype.snapshot () in
-        let res =
-          try
-            ignore
-              (let pattern_env =
-                 Ctype.Pattern_env.make env ~equations_scope:0
-                   ~in_counterexample:false
-               in
-               (* This function is run within a [Printtyp.wrap_printing_env] (this happens
-                  in query_commands.ml), which calls [Env.without_cmis] to avoid loading
-                  cmis for printing. But we may need to load cmis during this unification,
-                  so we wrap in a [Env.with_cmis]. *)
-               Env.with_cmis (fun () ->
-                   Ctype.unify_gadt pattern_env ~pat:type_expr ~expected:typ));
-            true
-          with Ctype.Unify _trace -> false
+  | Tconstr (path, _params, _) -> begin
+      match Env.find_type_descrs path env with
+      | Type_record (labels, _) ->
+        let lst =
+          List.map labels ~f:(fun lbl_descr ->
+              let lidloc = mk_id lbl_descr.Data_types.lbl_name in
+              ( lidloc,
+                lbl_descr,
+                Tast_helper.Pat.var Uid.internal_not_actually_unique env type_expr
+                  (mk_var lbl_descr.lbl_name) ))
         in
-        Btype.backtrack snap;
-        res
-      in
-      List.filter_map constructors ~f:(fun cstr_descr ->
-          if
-            cstr_descr.Data_types.cstr_generalized
-            && not (are_types_unifiable cstr_descr.Data_types.cstr_res)
-          then (
-            log ~title:"gen_patterns" "%a" Logger.fmt (fun fmt ->
-                Format.fprintf fmt
-                  "Eliminating '%s' branch, its return type is not compatible \
-                   with the expected type (%a)"
-                  cstr_descr.cstr_name Printtyp.Compat.type_expr type_expr);
-            None)
-          else
-            let args =
-              if cstr_descr.cstr_arity <= 0 then []
-              else
-                Patterns.omegas cstr_descr.cstr_arity
-                |> List.map ~f:(fun p -> (Jkind.Sort.scannable, p))
-            in
-            let lidl = Location.mknoloc (prefix cstr_descr.cstr_name) in
-            Some
-              (Tast_helper.Pat.construct env type_expr lidl cstr_descr args None))
-    | _ ->
-      if recurse then from_type_decl env path type_expr
-      else
-        raise
-          (Not_allowed (sprintf "non-destructible type: %s" (Path.last path)))
+        [ Tast_helper.Pat.record env type_expr lst Asttypes.Closed ]
+      | Type_variant (constructors, _) ->
+        let prefix =
+          let path = Out_type.shorten_type_path env path in
+          fun name ->
+            let env_check = Env.find_constructor_by_name in
+            Misc_utils.Path.to_shortest_lid ~env ~name ~env_check path
+        in
+        let are_types_unifiable typ =
+          let snap = Btype.snapshot () in
+          let res =
+            try
+              ignore
+                (let pattern_env =
+                   Ctype.Pattern_env.make env ~equations_scope:0
+                     ~in_counterexample:true
+                 in
+                 Ctype.unify_gadt pattern_env ~pat:type_expr ~expected:typ);
+              true
+            with Ctype.Unify _trace -> false
+          in
+          Btype.backtrack snap;
+          res
+        in
+        List.filter_map constructors ~f:(fun cstr_descr ->
+            if
+              cstr_descr.Data_types.cstr_generalized
+              && not (are_types_unifiable cstr_descr.cstr_res)
+            then (
+              log ~title:"gen_patterns" "%a" Logger.fmt (fun fmt ->
+                  Format.fprintf fmt
+                    "Eliminating '%s' branch, its return type is not compatible \
+                     with the expected type (%a)"
+                    cstr_descr.cstr_name Printtyp.type_expr type_expr);
+              None)
+            else
+              let args =
+                if cstr_descr.cstr_arity <= 0 then []
+                else Patterns.omegas cstr_descr.cstr_arity
+              in
+              let lidl = Location.mknoloc (prefix cstr_descr.cstr_name) in
+              Some
+                (Tast_helper.Pat.construct env type_expr lidl cstr_descr args None))
+      | _ ->
+        if recurse then from_type_decl env path type_expr
+        else
+          raise
+            (Not_allowed (sprintf "non-destructible type: %s" (Path.last path)))
     end
   | Tvariant row_desc ->
     List.filter_map (row_fields row_desc) ~f:(fun (lbl, row_field) ->
@@ -190,7 +174,7 @@ let rec gen_patterns ?(recurse = true) env type_expr =
           None)
   | _ ->
     let fmt, to_string = Format.to_string () in
-    Printtyp.Compat.type_expr fmt type_expr;
+    Printtyp.type_expr fmt type_expr;
     raise (Not_allowed (to_string ()))
 
 and from_type_decl env path texpr =
@@ -198,112 +182,105 @@ and from_type_decl env path texpr =
   match tdecl.Types.type_manifest with
   | Some te -> gen_patterns ~recurse:false env te
   | None -> (
-    try Hashtbl.find Predef_types.tbl path env texpr
-    with Not_found ->
-      raise (Not_allowed (sprintf "non-destructible type: %s" (Path.last path)))
+      try Hashtbl.find Predef_types.tbl path env texpr
+      with Not_found ->
+        raise (Not_allowed (sprintf "non-destructible type: %s" (Path.last path)))
     )
 
 let rec needs_parentheses = function
   | [] -> false
   | t :: ts -> (
-    match t with
-    | Structure _ | Structure_item _ | Value_binding _ -> false
-    | Expression e ->
-      begin match e.Typedtree.exp_desc with
-      | Texp_for _ | Texp_while _ -> false
-      | Texp_let _
-      (* We are after the "in" keyword, we need to look at the parent of the
-         binding. *)
-      | Texp_function { body = Tfunction_body _; _ }
-      (* The assumption here is that we're not in a [function ... | ...]
-          situation but either in [fun param] or [let name param]. *)
-        -> needs_parentheses ts
-      | _ -> true
-      end
-    | _ -> needs_parentheses ts)
+      match t with
+      | Structure _ | Structure_item _ | Value_binding _ -> false
+      | Expression e -> begin
+          match e.Typedtree.exp_desc with
+          | Texp_for _ | Texp_while _ -> false
+          | Texp_let _
+          (* We are after the "in" keyword, we need to look at the parent of the
+             binding. *)
+          | Texp_function (_, Tfunction_body _)
+            (* The assumption here is that we're not in a [function ... | ...]
+                situation but either in [fun param] or [let name param]. *)
+            -> needs_parentheses ts
+          | _ -> true
+        end
+      | _ -> needs_parentheses ts)
 
 let rec get_match = function
   | [] -> assert false
   | parent :: parents -> (
-    match parent with
-    | Case _ | Pattern _ ->
-      (* We are still in the same branch, going up. *)
-      get_match parents
-    | Expression m -> (
-      match m.Typedtree.exp_desc with
-      | Typedtree.Texp_match (e, _, _, _, _) -> (m, e.exp_type)
-      | Typedtree.Texp_function _ ->
-        let typ = m.exp_type in
-        (* Function must have arrow type. This arrow type
-           might be hidden behind type constructors *)
-        let param_typ =
-          match Types.get_desc typ with
-          | Tarrow (_, te, _, _) -> te
-          | Tconstr _ -> (
-            match
-              Ctype.full_expand ~may_forget_scope:true m.exp_env typ
-              |> Types.get_desc
-            with
-            | Tarrow (_, te, _, _) -> te
-            | _ -> assert false)
-          | _ -> assert false
-        in
-        let param_typ =
-          match Types.get_desc param_typ with
-          | Tpoly (param_typ, []) -> param_typ
-          | _ -> param_typ
-        in
-        (m, param_typ)
+      match parent with
+      | Case _ | Pattern _ ->
+        (* We are still in the same branch, going up. *)
+        get_match parents
+      | Expression m -> (
+          match m.Typedtree.exp_desc with
+          | Typedtree.Texp_match (e, _, _, _) -> (m, e.exp_type)
+          | Typedtree.Texp_function _ -> (
+              let typ = m.exp_type in
+              (* Function must have arrow type. This arrow type
+                 might be hidden behind type constructors *)
+              ( m,
+                match Types.get_desc typ with
+                | Tarrow (_, te, _, _) -> te
+                | Tconstr _ -> (
+                    match
+                      Ctype.full_expand ~may_forget_scope:true m.exp_env typ
+                      |> Types.get_desc
+                    with
+                    | Tarrow (_, te, _, _) -> te
+                    | _ -> assert false)
+                | _ -> assert false ))
+          | _ ->
+            (* We were not in a match *)
+            let s = Mbrowse.print_node () parent in
+            raise (Not_allowed s))
       | _ ->
         (* We were not in a match *)
         let s = Mbrowse.print_node () parent in
         raise (Not_allowed s))
-    | _ ->
-      (* We were not in a match *)
-      let s = Mbrowse.print_node () parent in
-      raise (Not_allowed s))
 
 let collect_every_pattern_for_expression parent =
   let patterns =
     Mbrowse.fold_node
       (fun env node acc ->
-        match node with
-        | Pattern _ -> (* Not expected here *) raise Nothing_to_do
-        | Case _ ->
-          Mbrowse.fold_node
-            (fun _env node acc ->
-              match node with
-              | Pattern p ->
-                let ill_typed_pred =
-                  Typedtree.
-                    { f =
-                        (fun p ->
-                          List.memq Typing_recovery_state.incorrect_attribute
-                            ~set:p.pat_attributes)
-                    }
-                in
-                if Typedtree.exists_general_pattern ill_typed_pred p then
-                  raise Ill_typed
-                else
-                  begin match Typedtree.classify_pattern p with
-                  | Value -> (p : Typedtree.pattern) :: acc
-                  | Computation ->
-                    begin match Typedtree.split_pattern p with
-                    | Some p, _ -> (p : Typedtree.pattern) :: acc
-                    | None, _ -> acc
-                    end
+         match node with
+         | Pattern _ -> (* Not expected here *) raise Nothing_to_do
+         | Case _ ->
+           Mbrowse.fold_node
+             (fun _env node acc ->
+                match node with
+                | Pattern p ->
+                  let ill_typed_pred =
+                    Typedtree.
+                      { f =
+                          (fun p ->
+                             List.memq Msupport.incorrect_attribute
+                               ~set:p.pat_attributes)
+                      }
+                  in
+                  if Typedtree.exists_general_pattern ill_typed_pred p then
+                    raise Ill_typed
+                  else begin
+                    match Typedtree.classify_pattern p with
+                    | Value -> (p : Typedtree.pattern) :: acc
+                    | Computation -> begin
+                        match Typedtree.split_pattern p with
+                        | Some p, _ -> (p : Typedtree.pattern) :: acc
+                        | None, _ -> acc
+                      end
                   end
-              | _ -> acc)
-            env node acc
-        | _ -> acc)
+                | _ -> acc)
+             env node acc
+         | _ -> acc)
       Env.empty parent []
   in
   let loc =
     Mbrowse.fold_node
       (fun _ node acc ->
-        let open Location in
-        let loc = Mbrowse.node_loc node in
-        if Lexing.compare_pos loc.loc_end acc.loc_end > 0 then loc else acc)
+         let open Location in
+         let loc = Mbrowse.node_loc node in
+         if Lexing.compare_pos loc.loc_end acc.loc_end > 0 then loc else acc)
       Env.empty parent Location.none
   in
   (loc, patterns)
@@ -316,42 +293,42 @@ let collect_function_pattern loc param_pattern =
 let rec get_every_pattern loc = function
   | [] -> assert false
   | parent :: parents -> (
-    match parent with
-    | Case _ | Pattern _ ->
-      (* We are still in the same branch, going up. *)
-      get_every_pattern loc parents
-    | Expression
-        { exp_desc = Typedtree.Texp_ident { path = Path.Pident id; _ }; _ }
-      when Ident.name id = "*type-error*" -> raise Ill_typed
-    | Expression { exp_desc = Typedtree.Texp_function { params; _ }; _ } ->
-      (* So we need to deal with the case where we're either in the body of a
-         function, or in a function parameter. *)
-      begin match
-        List.find_some
-          ~f:(fun param ->
-            Location_aux.included ~into:param.Typedtree.fp_loc loc)
-          params
-      with
-      | Some pattern ->
-        (* In parameter case *)
-        collect_function_pattern loc pattern
-      | None ->
-        (* In function body *)
+      match parent with
+      | Case _ | Pattern _ ->
+        (* We are still in the same branch, going up. *)
+        get_every_pattern loc parents
+      | Expression { exp_desc = Typedtree.Texp_ident (Path.Pident id, _, _); _ }
+        when Ident.name id = "*type-error*" -> raise Ill_typed
+      | Expression { exp_desc = Typedtree.Texp_function (params, _body); _ } ->
+        begin
+          (* So we need to deal with the case where we're either in the body of a
+             function, or in a function parameter. *)
+          match
+            List.find_some
+              ~f:(fun param ->
+                  Location_aux.included ~into:param.Typedtree.fp_loc loc)
+              params
+          with
+          | Some pattern ->
+            (* In parameter case *)
+            collect_function_pattern loc pattern
+          | None ->
+            (* In function body *)
+            collect_every_pattern_for_expression parent
+        end
+      | Expression _ ->
+        (* We are on the right node *)
         collect_every_pattern_for_expression parent
-      end
-    | Expression _ ->
-      (* We are on the right node *)
-      collect_every_pattern_for_expression parent
-    | _ ->
-      (* We were not in a match *)
-      let s = Mbrowse.print_node () parent in
-      raise (Not_allowed s))
+      | _ ->
+        (* We were not in a match *)
+        let s = Mbrowse.print_node () parent in
+        raise (Not_allowed s))
 
 let rec destructible patt =
   let open Typedtree in
   match patt.pat_desc with
   | Tpat_any | Tpat_var _ -> true
-  | Tpat_alias { pattern = p; _ } -> destructible p
+  | Tpat_alias (p, _, _, _, _) -> destructible p
   | _ -> false
 
 let is_package ty =
@@ -375,99 +352,51 @@ let filter_expr_attr expr = filter_attr.Ast_mapper.expr filter_attr expr
 let filter_pat_attr pat = filter_attr.Ast_mapper.pat filter_attr pat
 
 let rec subst_patt initial ~by patt =
-  let f = subst_patt initial ~by in
+  let f pat = subst_patt initial ~by pat in
+  let f_label (label, pat) = label, subst_patt initial ~by pat in
   if patt == initial then by
   else
     let open Typedtree in
     match patt.pat_desc with
-    | Tpat_any
-    | Tpat_var _
-    | Tpat_constant _
-    | Tpat_unboxed_bool _
-    | Tpat_unboxed_unit
-    | Tpat_fun_layout _ -> patt
-    | Tpat_alias ({ pattern = p; _ } as alias) ->
-      { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
-    | Tpat_tuple lst ->
-      { patt with
-        pat_desc =
-          Tpat_tuple (List.map lst ~f:(fun (lbl, p, sort) -> (lbl, f p, sort)))
-      }
-    | Tpat_unboxed_tuple lst ->
-      { patt with
-        pat_desc =
-          Tpat_unboxed_tuple
-            (List.map lst ~f:(fun (lbl, p, sort) -> (lbl, f p, sort)))
-      }
-    | Tpat_construct (lid, cd, repr, lst, lco) ->
-      { patt with
-        pat_desc =
-          Tpat_construct
-            (lid, cd, repr, List.map lst ~f:(fun (sort, p) -> (sort, f p)), lco)
-      }
+    | Tpat_any | Tpat_var _ | Tpat_constant _ -> patt
+    | Tpat_alias (p, x, y, uid, t) ->
+      { patt with pat_desc = Tpat_alias (f p, x, y, uid, t) }
+    | Tpat_tuple lst -> { patt with pat_desc = Tpat_tuple (List.map lst ~f:f_label) }
+    | Tpat_construct (lid, cd, lst, lco) ->
+      { patt with pat_desc = Tpat_construct (lid, cd, List.map lst ~f, lco) }
     | Tpat_variant (lbl, pat_opt, row_desc) ->
       { patt with
         pat_desc = Tpat_variant (lbl, Option.map pat_opt ~f, row_desc)
       }
-    | Tpat_record (sub, repr, flg) ->
+    | Tpat_record (sub, flg) ->
       let sub' =
         List.map sub ~f:(fun (lid, lbl_descr, patt) -> (lid, lbl_descr, f patt))
       in
-      { patt with pat_desc = Tpat_record (sub', repr, flg) }
-    | Tpat_record_unboxed_product (sub, repr, flg) ->
-      let sub' =
-        List.map sub ~f:(fun (lid, lbl_descr, patt) -> (lid, lbl_descr, f patt))
-      in
-      { patt with pat_desc = Tpat_record_unboxed_product (sub', repr, flg) }
-    | Tpat_array (m, sort, lst) ->
-      { patt with pat_desc = Tpat_array (m, sort, List.map lst ~f) }
+      { patt with pat_desc = Tpat_record (sub', flg) }
+    | Tpat_array (r, lst) -> { patt with pat_desc = Tpat_array (r, List.map lst ~f) }
     | Tpat_or (p1, p2, row) ->
       { patt with pat_desc = Tpat_or (f p1, f p2, row) }
     | Tpat_lazy p -> { patt with pat_desc = Tpat_lazy (f p) }
 
 let rec rm_sub patt sub =
   let f p = rm_sub p sub in
+  let f_label (label, p) = label, rm_sub p sub in
   let open Typedtree in
   match patt.pat_desc with
-  | Tpat_any
-  | Tpat_var _
-  | Tpat_constant _
-  | Tpat_unboxed_bool _
-  | Tpat_unboxed_unit
-  | Tpat_fun_layout _ -> patt
-  | Tpat_alias ({ pattern = p; _ } as alias) ->
-    { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
-  | Tpat_tuple lst ->
-    { patt with
-      pat_desc =
-        Tpat_tuple (List.map lst ~f:(fun (lbl, p, sort) -> (lbl, f p, sort)))
-    }
-  | Tpat_unboxed_tuple lst ->
-    { patt with
-      pat_desc =
-        Tpat_unboxed_tuple
-          (List.map lst ~f:(fun (lbl, p, sort) -> (lbl, f p, sort)))
-    }
-  | Tpat_construct (lid, cd, repr, lst, lco) ->
-    { patt with
-      pat_desc =
-        Tpat_construct
-          (lid, cd, repr, List.map lst ~f:(fun (sort, p) -> (sort, f p)), lco)
-    }
+  | Tpat_any | Tpat_var _ | Tpat_constant _ -> patt
+  | Tpat_alias (p, x, y, uid, ty) ->
+    { patt with pat_desc = Tpat_alias (f p, x, y, uid, ty) }
+  | Tpat_tuple lst -> { patt with pat_desc = Tpat_tuple (List.map lst ~f:f_label) }
+  | Tpat_construct (lid, cd, lst, lco) ->
+    { patt with pat_desc = Tpat_construct (lid, cd, List.map lst ~f, lco) }
   | Tpat_variant (lbl, pat_opt, row_desc) ->
     { patt with pat_desc = Tpat_variant (lbl, Option.map pat_opt ~f, row_desc) }
-  | Tpat_record (sub, repr, flg) ->
+  | Tpat_record (sub, flg) ->
     let sub' =
       List.map sub ~f:(fun (lid, lbl_descr, patt) -> (lid, lbl_descr, f patt))
     in
-    { patt with pat_desc = Tpat_record (sub', repr, flg) }
-  | Tpat_record_unboxed_product (sub, repr, flg) ->
-    let sub' =
-      List.map sub ~f:(fun (lid, lbl_descr, patt) -> (lid, lbl_descr, f patt))
-    in
-    { patt with pat_desc = Tpat_record_unboxed_product (sub', repr, flg) }
-  | Tpat_array (m, sort, lst) ->
-    { patt with pat_desc = Tpat_array (m, sort, List.map lst ~f) }
+    { patt with pat_desc = Tpat_record (sub', flg) }
+  | Tpat_array (r, lst) -> { patt with pat_desc = Tpat_array (r, List.map lst ~f) }
   | Tpat_or (p1, p2, row) ->
     if p1 == sub then p2
     else if p2 == sub then p1
@@ -477,82 +406,61 @@ let rec rm_sub patt sub =
 let rec qualify_constructors ~unmangling_tables f pat =
   let open Typedtree in
   let qualify_constructors = qualify_constructors ~unmangling_tables in
-  let qualify_in_record (type rep)
-      (labels : (_ * rep Data_types.gen_label_description * _) list) lable_table
-      closed (record_form : rep Data_types.record_form) ~(repr : rep) =
-    let labels =
-      let open Longident in
-      List.map labels ~f:(fun ((Location.{ txt; _ } as lid), lbl_des, pat) ->
-          let lid_name = flatten txt |> String.concat ~sep:"." in
-          let pat = qualify_constructors f pat in
-          (* Un-mangle *)
-          match Hashtbl.find_opt lable_table lid_name with
-          | Some lbl_des ->
-            ({ lid with txt = Lident lbl_des.Data_types.lbl_name }, lbl_des, pat)
-          | None -> (lid, lbl_des, pat))
-    in
-    let closed =
-      if List.length labels > 0 then
-        let _, lbl_des, _ = List.hd labels in
-        if List.length labels = Array.length lbl_des.Data_types.lbl_all then
-          Asttypes.Closed
-        else Asttypes.Open
-      else closed
-    in
-    match record_form with
-    | Legacy -> Tpat_record (labels, repr, closed)
-    | Unboxed_product -> Tpat_record_unboxed_product (labels, repr, closed)
-  in
   let pat_desc =
     match pat.pat_desc with
-    | Tpat_alias ({ pattern = p; _ } as alias) ->
-      Tpat_alias { alias with pattern = qualify_constructors f p }
-    | Tpat_tuple ps ->
-      Tpat_tuple
-        (List.map ps ~f:(fun (lbl, p, sort) ->
-             (lbl, qualify_constructors f p, sort)))
-    | Tpat_unboxed_tuple ps ->
-      Tpat_unboxed_tuple
-        (List.map ps ~f:(fun (lbl, p, sort) ->
-             (lbl, qualify_constructors f p, sort)))
-    | Tpat_record (labels, repr, closed) ->
-      let _, label_table, _ = unmangling_tables in
-      qualify_in_record labels label_table closed Legacy ~repr
-    | Tpat_record_unboxed_product (labels, repr, closed) ->
-      let _, _, label_table = unmangling_tables in
-      qualify_in_record labels label_table closed Unboxed_product ~repr
-    | Tpat_construct (lid, cstr_desc, repr, ps, lco) ->
+    | Tpat_alias (p, id, loc, uid, ty) ->
+      Tpat_alias (qualify_constructors f p, id, loc, uid, ty)
+    | Tpat_tuple ps -> Tpat_tuple (List.map ps ~f:(fun (label, ty) -> label, qualify_constructors f ty))
+    | Tpat_record (labels, closed) ->
+      let labels =
+        let open Longident in
+        List.map labels ~f:(fun ((Location.{ txt; _ } as lid), lbl_des, pat) ->
+            let lid_name = flatten txt |> String.concat ~sep:"." in
+            let pat = qualify_constructors f pat in
+            (* Un-mangle *)
+            let _, labels = unmangling_tables in
+            match Hashtbl.find_opt labels lid_name with
+            | Some lbl_des ->
+              ({ lid with txt = Lident lbl_des.Data_types.lbl_name }, lbl_des, pat)
+            | None -> (lid, lbl_des, pat))
+      in
+      let closed =
+        if List.length labels > 0 then
+          let _, lbl_des, _ = List.hd labels in
+          if List.length labels = Array.length lbl_des.Data_types.lbl_all then
+            Asttypes.Closed
+          else Asttypes.Open
+        else closed
+      in
+      Tpat_record (labels, closed)
+    | Tpat_construct (lid, cstr_desc, ps, lco) ->
       let lid =
         match lid.Asttypes.txt with
         | Longident.Lident name ->
           (* Un-mangle *)
           let name =
-            let constrs, _, _ = unmangling_tables in
+            let constrs, _ = unmangling_tables in
             match Hashtbl.find_opt constrs name with
             | Some cstr_des -> cstr_des.Data_types.cstr_name
             | None -> name
           in
-          begin match Types.get_desc pat.pat_type with
-          | Types.Tconstr (path, _, _) ->
-            let path = f pat.pat_env path in
-            let env_check = Env.find_constructor_by_name in
-            let txt =
-              Misc_utils.Path.to_shortest_lid ~env:pat.pat_env ~name ~env_check
-                path
-            in
-            { lid with Asttypes.txt }
-          | _ -> lid
+          begin
+            match Types.get_desc pat.pat_type with
+            | Types.Tconstr (path, _, _) ->
+              let path = f pat.pat_env path in
+              let env_check = Env.find_constructor_by_name in
+              let txt =
+                Misc_utils.Path.to_shortest_lid ~env:pat.pat_env ~name
+                  ~env_check path
+              in
+              { lid with Asttypes.txt }
+            | _ -> lid
           end
         | _ -> lid (* already qualified *)
       in
       Tpat_construct
-        ( lid,
-          cstr_desc,
-          repr,
-          List.map ps ~f:(fun (sort, p) -> (sort, qualify_constructors f p)),
-          lco )
-    | Tpat_array (m, sort, ps) ->
-      Tpat_array (m, sort, List.map ps ~f:(qualify_constructors f))
+        (lid, cstr_desc, List.map ps ~f:(qualify_constructors f), lco)
+    | Tpat_array (r, ps) -> Tpat_array (r, List.map ps ~f:(qualify_constructors f))
     | Tpat_or (p1, p2, row_desc) ->
       Tpat_or (qualify_constructors f p1, qualify_constructors f p2, row_desc)
     | Tpat_lazy p -> Tpat_lazy (qualify_constructors f p)
@@ -566,22 +474,15 @@ let find_branch patterns sub =
     else
       let open Typedtree in
       match patt.pat_desc with
-      | Tpat_any | Tpat_var _ | Tpat_constant _
-      | Tpat_variant (_, None, _)
-      | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> false
-      | Tpat_alias { pattern = p; _ }
-      | Tpat_variant (_, Some p, _)
-      | Tpat_lazy p -> is_sub_patt p ~sub
+      | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_variant (_, None, _) ->
+        false
+      | Tpat_alias (p, _, _, _, _) | Tpat_variant (_, Some p, _) | Tpat_lazy p ->
+        is_sub_patt p ~sub
       | Tpat_tuple lst ->
-        List.exists lst ~f:(fun (_lbl, p, _sort) -> is_sub_patt ~sub p)
-      | Tpat_unboxed_tuple lst ->
-        List.exists lst ~f:(fun (_lbl, p, _sort) -> is_sub_patt ~sub p)
-      | Tpat_construct (_, _, _, lst, _) ->
-        List.exists lst ~f:(fun (_, p) -> is_sub_patt ~sub p)
-      | Tpat_array (_, _, lst) -> List.exists lst ~f:(is_sub_patt ~sub)
-      | Tpat_record (subs, _, _) ->
-        List.exists subs ~f:(fun (_, _, p) -> is_sub_patt p ~sub)
-      | Tpat_record_unboxed_product (subs, _, _) ->
+        List.exists lst ~f:(fun (_, pat) -> is_sub_patt ~sub pat)
+      | Tpat_construct (_, _, lst, _) | Tpat_array (_, lst) ->
+        List.exists lst ~f:(is_sub_patt ~sub)
+      | Tpat_record (subs, _) ->
         List.exists subs ~f:(fun (_, _, p) -> is_sub_patt p ~sub)
       | Tpat_or (p1, p2, _) -> is_sub_patt p1 ~sub || is_sub_patt p2 ~sub
   in
@@ -596,12 +497,12 @@ let find_branch patterns sub =
    reconstructed with the label. ie: [{a; b}] with destruction on [a]
    becomes [{a = destruct_result; b}]. *)
 let find_field_name_for_punned_field patt = function
-  | Pattern { pat_desc = Tpat_record (fields, _, _); _ } :: _ ->
+  | Pattern { pat_desc = Tpat_record (fields, _); _ } :: _ ->
     List.find_opt
       ~f:(fun (_, _, opat) ->
-        let ppat_loc = patt.Typedtree.pat_loc
-        and opat_loc = opat.Typedtree.pat_loc in
-        Int.equal (Location_aux.compare ppat_loc opat_loc) 0)
+          let ppat_loc = patt.Typedtree.pat_loc
+          and opat_loc = opat.Typedtree.pat_loc in
+          Int.equal (Location_aux.compare ppat_loc opat_loc) 0)
       fields
     |> Option.map ~f:(fun (_, label, _) -> label)
   | _ -> None
@@ -615,7 +516,6 @@ let print_pretty ?punned_field config source subject =
 (* conversion from Typedtree.pattern to Parsetree.pattern list *)
 module Conv = struct
   open Asttypes
-  open Types
   open Typedtree
   open Parsetree
   let mkpat desc = Ast_helper.Pat.mk desc
@@ -629,72 +529,45 @@ module Conv = struct
   let conv typed =
     let constrs = Hashtbl.create 7 in
     let labels = Hashtbl.create 7 in
-    let unboxed_labels = Hashtbl.create 7 in
     let rec loop pat =
-      let conv_record (type rep)
-          (label_table : (_, rep Data_types.gen_label_description) Hashtbl.t)
-          (subpatterns : (_ * rep Data_types.gen_label_description * _) list)
-          (record_form : rep Data_types.record_form) =
-        let fields =
-          List.map
-            ~f:(fun (_, lbl, p) ->
-              let id = fresh lbl.Data_types.lbl_name in
-              Hashtbl.add label_table id lbl;
-              (mknoloc (Longident.Lident id), loop p))
-            subpatterns
-        in
-        match record_form with
-        | Legacy -> mkpat (Ppat_record (fields, Open))
-        | Unboxed_product -> mkpat (Ppat_record_unboxed_product (fields, Open))
-      in
       match pat.pat_desc with
       | Tpat_or (pa, pb, _) -> mkpat (Ppat_or (loop pa, loop pb))
-      | Tpat_var { name = { txt = "*extension*"; _ } as nm; _ } ->
+      | Tpat_var (_, ({ txt = "*extension*"; _ } as nm), _) ->
         (* PR#7330 *)
         mkpat (Ppat_var nm)
-      | Tpat_any | Tpat_var _ | Tpat_fun_layout _ -> mkpat Ppat_any
+      | Tpat_any | Tpat_var _ -> mkpat Ppat_any
       | Tpat_constant c -> mkpat (Ppat_constant (Untypeast.constant c))
-      | Tpat_alias { pattern = p; _ } -> loop p
-      | Tpat_tuple lst ->
-        let lst = List.map ~f:(fun (lbl, p, _sort) -> (lbl, loop p)) lst in
-        mkpat (Ppat_tuple (lst, Closed))
-      | Tpat_unboxed_tuple lst ->
-        let lst = List.map ~f:(fun (lbl, p, _sort) -> (lbl, loop p)) lst in
-        mkpat (Ppat_unboxed_tuple (lst, Closed))
-      | Tpat_construct (cstr_lid, cstr, _, lst, _) ->
+      | Tpat_alias (p, _, _, _, _) -> loop p
+      | Tpat_tuple lst -> mkpat (Ppat_tuple (List.map ~f:(fun (label, ty) -> label, loop ty) lst, Closed))
+      | Tpat_construct (cstr_lid, cstr, lst, _) ->
         let id = fresh cstr.cstr_name in
         let lid = { cstr_lid with txt = Longident.Lident id } in
         Hashtbl.add constrs id cstr;
         let arg =
-          match List.map ~f:(fun (_, p) -> loop p) lst with
+          match List.map ~f:loop lst with
           | [] -> None
           | [ p ] -> Some ([], p)
-          | lst ->
-            let lst = List.map lst ~f:(fun pat -> (None, pat)) in
-            Some ([], mkpat (Ppat_tuple (lst, Closed)))
+          | lst -> Some ([], mkpat (Ppat_tuple ((List.map ~f:(fun t -> None, t) lst), Closed)))
         in
         mkpat (Ppat_construct (lid, arg))
       | Tpat_variant (label, p_opt, _row_desc) ->
         let arg = Option.map ~f:loop p_opt in
         mkpat (Ppat_variant (label, arg))
-      | Tpat_record (subpatterns, _, _closed_flag) ->
-        conv_record labels subpatterns Legacy
-      | Tpat_record_unboxed_product (subpatterns, _, _closed_flag) ->
-        conv_record unboxed_labels subpatterns Unboxed_product
-      | Tpat_array (mut, _, lst) ->
-        let lst = List.map ~f:loop lst in
-        let mut : Asttypes.mutable_flag =
-          match mut with
-          | Mutable _mode -> Mutable
-          | Immutable -> Immutable
+      | Tpat_record (subpatterns, _closed_flag) ->
+        let fields =
+          List.map
+            ~f:(fun (_, lbl, p) ->
+                let id = fresh lbl.Data_types.lbl_name in
+                Hashtbl.add labels id lbl;
+                (mknoloc (Longident.Lident id), loop p))
+            subpatterns
         in
-        mkpat (Ppat_array (mut, lst))
+        mkpat (Ppat_record (fields, Open))
+      | Tpat_array (_, lst) -> mkpat (Ppat_array (List.map ~f:loop lst))
       | Tpat_lazy p -> mkpat (Ppat_lazy (loop p))
-      | Tpat_unboxed_bool b -> mkpat (Ppat_unboxed_bool b)
-      | Tpat_unboxed_unit -> mkpat Ppat_unboxed_unit
     in
     let ps = loop typed in
-    (ps, constrs, labels, unboxed_labels)
+    (ps, constrs, labels)
 end
 
 let need_recover_labeled_args = function
@@ -712,15 +585,15 @@ let remove_non_applied_optional_args (Parsetree.{ pexp_desc; _ } as base_expr) =
     let args =
       List.concat_map
         ~f:(fun (label, (expr : Parsetree.expression)) ->
-          match (label, expr.pexp_loc.loc_ghost, expr.pexp_desc) with
-          | ( Asttypes.Optional _,
-              true,
-              Pexp_construct ({ txt = Longident.Lident "None"; _ }, _) ) -> []
-          | Asttypes.Optional str, false, exp_desc -> (
-            match need_recover_labeled_args exp_desc with
-            | Some e -> [ (Asttypes.Labelled str, e) ]
-            | None -> [ (label, expr) ])
-          | _ -> [ (label, expr) ])
+            match (label, expr.pexp_loc.loc_ghost, expr.pexp_desc) with
+            | ( Asttypes.Optional _,
+                true,
+                Pexp_construct ({ txt = Longident.Lident "None"; _ }, _) ) -> []
+            | Asttypes.Optional str, false, exp_desc -> (
+                match need_recover_labeled_args exp_desc with
+                | Some e -> [ (Asttypes.Labelled str, e) ]
+                | None -> [ (label, expr) ])
+            | _ -> [ (label, expr) ])
         args
     in
     let pexp_desc = Parsetree.Pexp_apply (expr, args) in
@@ -757,8 +630,8 @@ let destruct_expression loc config source parents expr =
 let refine_partial_match last_case_loc config source patterns =
   let cases =
     List.map patterns ~f:(fun pat ->
-        let _pat, constrs, labels, unboxed_labels = Conv.conv pat in
-        let unmangling_tables = (constrs, labels, unboxed_labels) in
+        let _pat, constrs, labels = Conv.conv pat in
+        let unmangling_tables = (constrs, labels) in
         (* Unmangling and prefixing *)
         let pat =
           qualify_constructors ~unmangling_tables Out_type.shorten_type_path pat
@@ -809,9 +682,7 @@ let refine_and_generate_branches patt config source patterns sub_patterns =
     (top_patt.Typedtree.pat_loc, str)
 
 let refine_complete_match (type a) parents (patt : a Typedtree.general_pattern)
-    config source
-    (patterns :
-      Typedtree.value Typedtree.pattern_desc Typedtree.pattern_data list) =
+    config source patterns =
   match Typedtree.classify_pattern patt with
   | Computation -> raise (Not_allowed "computation pattern")
   | Value ->
@@ -819,16 +690,17 @@ let refine_complete_match (type a) parents (patt : a Typedtree.general_pattern)
     if not (destructible patt) then raise Nothing_to_do
     else
       let ty = patt.Typedtree.pat_type in
-      begin match gen_patterns patt.Typedtree.pat_env ty with
-      | [] -> assert false
-      | [ more_precise_pattern ] ->
-        (* If only one pattern is generated, then we're only refining the
+      begin
+        match gen_patterns patt.Typedtree.pat_env ty with
+        | [] -> assert false
+        | [ more_precise_pattern ] ->
+          (* If only one pattern is generated, then we're only refining the
              current pattern, not generating new branches. *)
-        refine_current_pattern parents patt config source more_precise_pattern
-      | sub_patterns ->
-        (* If more than one pattern is generated, then we're generating new
+          refine_current_pattern parents patt config source more_precise_pattern
+        | sub_patterns ->
+          (* If more than one pattern is generated, then we're generating new
              branches. *)
-        refine_and_generate_branches patt config source patterns sub_patterns
+          refine_and_generate_branches patt config source patterns sub_patterns
       end
 
 let destruct_pattern (type a) (patt : a Typedtree.general_pattern) config source
@@ -853,15 +725,15 @@ let destruct_pattern (type a) (patt : a Typedtree.general_pattern) config source
   | patterns -> refine_partial_match last_case_loc config source patterns
 
 let rec destruct_record config source selected_node = function
-  | (Expression { exp_desc = Texp_field _ | Texp_unboxed_field _; _ } as parent)
-    :: rest -> node config source parent rest
+  | (Expression { exp_desc = Texp_field _; _ } as parent) :: rest ->
+    node config source parent rest
   | Expression e :: rest -> node config source (Expression e) rest
   | _ -> raise (Not_allowed (string_of_node selected_node))
 
 and node config source selected_node parents =
   let loc = Mbrowse.node_loc selected_node in
   match selected_node with
-  | Record_field (`Expression _, _, _, _) ->
+  | Record_field (`Expression _, _, _) ->
     destruct_record config source selected_node parents
   | Expression expr -> destruct_expression loc config source parents expr
   | Pattern patt -> destruct_pattern patt config source loc parents

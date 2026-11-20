@@ -30,8 +30,6 @@ open Parsetree
 type iterator = {
   attribute: iterator -> attribute -> unit;
   attributes: iterator -> attribute list -> unit;
-  modes : iterator -> modes -> unit;
-  modalities : iterator -> modalities -> unit;
   binding_op: iterator -> binding_op -> unit;
   case: iterator -> case -> unit;
   cases: iterator -> case list -> unit;
@@ -51,8 +49,6 @@ type iterator = {
   extension_constructor: iterator -> extension_constructor -> unit;
   include_declaration: iterator -> include_declaration -> unit;
   include_description: iterator -> include_description -> unit;
-  jkind_annotation: iterator -> jkind_annotation -> unit;
-  jkind_declaration: iterator -> jkind_declaration -> unit;
   label_declaration: iterator -> label_declaration -> unit;
   location: iterator -> Location.t -> unit;
   module_binding: iterator -> module_binding -> unit;

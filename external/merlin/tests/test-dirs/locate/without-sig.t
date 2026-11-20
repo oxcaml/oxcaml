@@ -16,9 +16,7 @@
   >  (name main))
   > EOF
 
-# Jane Street: we can't run dune in tests yet, so we use ocamlc instead.
-# $ dune build ./main.exe 2> /dev/null
-  $ $OCAMLC -bin-annot -o main.exe nosig.ml main.ml
+  $ dune build ./main.exe 2> /dev/null
 
   $ $MERLIN single locate -look-for ml -position 1:15 \
   > -filename main.ml <main.ml

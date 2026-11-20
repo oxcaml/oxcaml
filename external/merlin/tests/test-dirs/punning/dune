@@ -1,7 +1,0 @@
-(env
- (_
-  (binaries helpers)))
-
-(cram
- (applies_to :whole_subtree)
- (deps %{bin:helpers}))

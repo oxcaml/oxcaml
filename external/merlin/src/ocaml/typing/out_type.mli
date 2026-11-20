@@ -51,7 +51,7 @@ val with_labels: bool -> (unit -> 'a) -> 'a
 (** {1 Printing idents and paths } *)
 
 val ident_name: Shape.Sig_component_kind.t option -> Ident.t -> out_name
-val tree_of_path: Path.t -> out_ident
+val tree_of_path: ?disambiguation:bool -> Path.t -> out_ident
 val namespaced_tree_of_path: Shape.Sig_component_kind.t -> Path.t -> out_ident
 val tree_of_type_path: Path.t -> out_ident
 (** Specialized functions for printing types with [short-paths] *)
@@ -63,12 +63,6 @@ val same_path: type_expr -> type_expr -> bool
 (** Simple heuristic to rewrite Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
 val rewrite_double_underscore_paths: Env.t -> Path.t -> Path.t
-val best_type_path_simple: Path.t -> Path.t
-val best_class_type_path_simple: Path.t -> Path.t
-val shorten_type_path: Env.t -> Path.t -> Path.t
-val shorten_module_type_path: Env.t -> Path.t -> Path.t
-val shorten_module_path: Env.t -> Path.t -> Path.t
-val shorten_class_type_path: Env.t -> Path.t -> Path.t
 
 (** {1 Printing type expressions} *)
 
@@ -99,24 +93,9 @@ val add_type_to_preparation: type_expr -> unit
 (** In [Type_scheme] mode, non-generic types variables are printed as weakly
     polymorphic type variables. *)
 type type_or_scheme = Type | Type_scheme
-val tree_of_typexp:
-  base:Mode.With_locality.Const.t -> type_or_scheme -> type_expr -> out_type
+val tree_of_typexp: type_or_scheme -> type_expr -> out_type
 (** [tree_of_typexp] generate the [outcometree] for a prepared type
     expression.*)
-
-val tree_of_type_scheme: type_expr -> out_type
-
-val tree_of_modalities:
-  Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
-
-val tree_of_modes_const:
-  Mode.With_locality.Const.t -> Outcometree.out_mode list
-
-(** [out_jkind_of_jkind env jkind] converts a jkind to an [out_jkind]
-    for printing. This uses the same naming scheme as error messages (e.g.,
-    ['_representable_layout_N] for sort variables). *)
-val out_jkind_of_jkind: Env.t -> 'd Types.jkind -> out_jkind
-
 
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer
@@ -138,8 +117,6 @@ val type_expr_with_reserved_names: type_expr printer
 type 'a diff = Same of 'a | Diff of 'a * 'a
 val trees_of_type_expansion:
   type_or_scheme -> Errortrace.expanded_type -> out_type diff
-val trees_of_type_expansion':
-  var_jkinds:bool -> type_or_scheme -> Errortrace.expanded_type -> out_type diff
 val prepare_expansion: Errortrace.expanded_type -> Errortrace.expanded_type
 val pp_type_expansion: out_type diff printer
 val hide_variant_name: Types.type_expr -> Types.type_expr
@@ -147,8 +124,7 @@ val hide_variant_name: Types.type_expr -> Types.type_expr
 
 (** {1: Label and constructors }*)
 val prepare_type_constructor_arguments: constructor_arguments -> unit
-val tree_of_constructor_arguments:
-  constructor_arguments -> (out_type * out_modality list) list
+val tree_of_constructor_arguments: constructor_arguments -> out_type list
 
 val tree_of_label: label_declaration -> out_label
 
@@ -158,15 +134,12 @@ val prepared_constructor : constructor_declaration printer
 val tree_of_extension_constructor:
     Ident.t -> extension_constructor -> ext_status -> out_sig_item
 val extension_constructor_args_and_ret_type_subtree:
-  constructor_arguments -> type_expr option ->
-  (out_type * out_modality list) list * (out_vars_jkinds * out_type) option
+  constructor_arguments -> type_expr option -> out_type list * out_type option
 val add_extension_constructor_to_preparation :
     extension_constructor -> unit
 val prepared_extension_constructor:
     Ident.t -> extension_constructor printer
 
-
-val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
 
 (** {1 Declarations }*)
 
@@ -175,59 +148,24 @@ val tree_of_type_declaration:
 val add_type_declaration_to_preparation :
   Ident.t -> type_declaration -> unit
 val prepared_type_declaration: Ident.t -> type_declaration printer
-val type_declaration_for_merlin:
-  print_non_value_inferred_jkind:bool ->
-  Ident.t -> type_declaration printer
-val type_scheme_for_merlin:
-  print_non_value_jkind_on_type_variables:bool -> type_expr printer
 
 val tree_of_value_description: Ident.t -> value_description -> out_sig_item
 val tree_of_modtype_declaration:
-    ?abbrev:bool -> Ident.t -> modtype_declaration -> out_sig_item
+    Ident.t -> modtype_declaration -> out_sig_item
 val tree_of_class_declaration:
     Ident.t -> class_declaration -> rec_status -> out_sig_item
 val tree_of_cltype_declaration:
     Ident.t -> class_type_declaration -> rec_status -> out_sig_item
 
-val tree_of_jkind_declaration:
-    Ident.t -> jkind_declaration -> out_sig_item
-
 (** {1 Module types }*)
 
 val tree_of_module:
-    Ident.t -> ?ellipsis:bool -> module_declaration -> rec_status ->
-    out_sig_item
-val tree_of_modtype: ?abbrev:bool -> module_type -> out_module_type
+    Ident.t -> ?ellipsis:bool -> module_type -> rec_status -> out_sig_item
+val tree_of_modtype: module_type -> out_module_type
 val tree_of_signature: Types.signature -> out_sig_item list
 
 val tree_of_class_type: type_or_scheme -> class_type -> out_class_type
 val prepare_class_type: class_type -> unit
-
-val expand_module_type: (Env.t -> module_type -> module_type) ref
-(* Forward declaration to be filled in Mtype. We want to be able to print types
-   in Mtype for debugging purposes and hence don't want to depend on Mtype
-   here. *)
-
-(** {1 For [Translquote] *)
-type typobject_repr = { fields : (string * type_expr) list; open_row : bool }
-type typvariant_repr = {
-  fields : (string * bool * type_expr list) list;
-  name : (Path.t * type_expr list) option;
-  closed : bool;
-  present : (string * row_field) list;
-  all_present : bool;
-  tags : string list option
-}
-val tree_of_typobject_repr : type_expr -> typobject_repr
-val tree_of_typvariant_repr : row_desc -> typvariant_repr
-
-module Compat: sig
-  type 'a printer := Format.formatter -> 'a -> unit
-  val type_declaration_for_merlin:
-    print_non_value_inferred_jkind:bool -> Ident.t -> type_declaration printer
-  val type_scheme_for_merlin:
-    print_non_value_jkind_on_type_variables:bool -> type_expr printer
-end
 
 (** {1 Toplevel printing}  *)
 val print_items: (Env.t -> signature_item -> 'a option) ->
@@ -259,8 +197,6 @@ module Ident_names: sig
   (** [with_fuzzy id f] locally disable ident disambiguation for [id] within
       [f] *)
   val with_fuzzy: Ident.t -> (unit -> 'a) -> 'a
-
-  val reset: unit -> unit
 end
 
 (** The [Ident_conflicts] module keeps track of conflicts arising when
@@ -304,9 +240,7 @@ module Variable_names: sig
   (** Add external type equalities*)
   val add_subst: (type_expr * type_expr) list -> unit
 
-  (** [reserve ty] registers the variable names appearing in [ty]. It also
-      registers the mode variable names appearing in [ty], and finds all
-      the constraints between them. *)
+  (** [reserve ty] registers the variable names appearing in [ty] *)
   val reserve: type_expr -> unit
 end
 
@@ -323,3 +257,13 @@ val reset: unit -> unit
 
 (** Reset all contexts except for conflicts *)
 val reset_except_conflicts: unit -> unit
+
+(** {1 Merlin Short Path }*)
+
+val best_type_path_simple: Path.t -> Path.t
+val best_class_type_path_simple: Path.t -> Path.t
+
+val shorten_type_path: Env.t -> Path.t -> Path.t
+val shorten_module_type_path: Env.t -> Path.t -> Path.t
+val shorten_module_path: Env.t -> Path.t -> Path.t
+val shorten_class_type_path: Env.t -> Path.t -> Path.t

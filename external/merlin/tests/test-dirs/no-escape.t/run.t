@@ -240,10 +240,10 @@ Syntax errors also shouldn't escape:
           "line": 1,
           "col": 41
         },
-        "type": "typer",
+        "type": "parser",
         "sub": [],
         "valid": true,
-        "message": "invalid package type: parametrized types are not supported"
+        "message": "Syntax error: invalid package type: parametrized types are not supported"
       }
     ],
     "notifications": []

@@ -1,5 +1,5 @@
 
-module String_map = Misc.Stdlib.String.Map
+module String_map = Misc.String.Map
 
 module Ident = struct
 
@@ -12,8 +12,9 @@ module Ident = struct
   let name = Ident.name
 
   let global name =
-    Ident.create_global name
+    Ident.create_persistent name
 
+  let print_with_scope t = Ident.print_with_scope t
 end
 
 module Ident_map = Map.Make(Ident)
@@ -43,14 +44,6 @@ module Desc = struct
   type deprecated =
     | Deprecated
     | Not_deprecated
-
-  type visibility =
-    | Visible
-    | Hidden
-
-  let visibility_of_deprecated = function
-    | Deprecated -> Hidden
-    | Not_deprecated -> Visible
 
   module Type = struct
 
@@ -228,24 +221,24 @@ let hidden_ident id =
     Since 5.0.0 unsafe_string is always false *)
  hidden_name (Ident.name id)
 
-let hidden_definition visibility name =
-  match visibility with
-  | Desc.Hidden -> true
-  | Desc.Visible -> hidden_name name
+let hidden_definition deprecated name =
+  match deprecated with
+  | Desc.Deprecated -> true
+  | Desc.Not_deprecated -> hidden_name name
 
-let hidden_base_definition visibility id =
-  match visibility with
-  | Desc.Hidden -> true
-  | Desc.Visible -> hidden_ident id
+let hidden_base_definition deprecated id =
+  match deprecated with
+  | Desc.Deprecated -> true
+  | Desc.Not_deprecated -> hidden_ident id
 
 module rec Type : sig
 
   type t
 
-  val base : Origin.t -> Ident.t -> Desc.Type.t option -> Desc.visibility -> t
+  val base : Origin.t -> Ident.t -> Desc.Type.t option -> Desc.deprecated -> t
 
   val child :
-    Module.normalized -> string -> Desc.Type.t option -> Desc.visibility -> t
+    Module.normalized -> string -> Desc.Type.t option -> Desc.deprecated -> t
 
   val declare : Origin.t -> Ident.t -> t
 
@@ -264,8 +257,6 @@ module rec Type : sig
     | Path of int list option * t
 
   val resolve : Graph.t -> t -> resolved
-
-  val is_defined : t -> bool
 
 end = struct
 
@@ -298,18 +289,18 @@ end = struct
     | Some (Subst(p, ns)) -> Subst(p, ns)
     | Some (Alias alias) -> Alias alias
 
-  let base origin id desc visibility =
+  let base origin id desc deprecated =
     let path = Path.Pident id in
-    let hidden = hidden_base_definition visibility id in
+    let hidden = hidden_base_definition deprecated id in
     let sort = Sort.Defined in
     let definition = definition_of_desc desc in
     Definition { origin; path; hidden; sort; definition }
 
-  let child md name desc visibility =
+  let child md name desc deprecated =
     let origin = Module.raw_origin md in
     let sort = Module.raw_sort md in
     let path = Path.Pdot(Module.raw_path md, name) in
-    let hidden = hidden_definition visibility name in
+    let hidden = hidden_definition deprecated name in
     let definition = definition_of_desc desc in
     Definition { origin; path; hidden; sort; definition }
 
@@ -353,23 +344,12 @@ end = struct
       end
 
   let normalize root t =
-    (* If [t] is a declaration but it's defined in [root], then we need to look it up in
-       [root] before continuing normalization. *)
-    let need_to_check_root =
-      match t with
-      | Definition { sort = Sort.Defined } -> false
-      | Definition { sort = Sort.Declared ids } ->
-        Ident_set.exists (Graph.is_type_defined root) ids
-      | Declaration { id; _} -> Graph.is_type_defined root id
-    in
-    let t =
-      if need_to_check_root
-      then
-        try Graph.find_type root (raw_path t)
-        with Not_found -> t
-      else t
-    in
-    normalize_loop root t
+    match t with
+    | Definition { sort = Sort.Defined } -> normalize_loop root t
+    | Definition { sort = Sort.Declared _ } | Declaration _ ->
+        match Graph.find_type root (raw_path t) with
+        | exception Not_found -> normalize_loop root t
+        | t -> normalize_loop root t
 
   let origin root t =
     raw_origin (normalize root t)
@@ -401,11 +381,6 @@ end = struct
       end
     | Definition { definition = Alias _ } -> assert false
 
-  let is_defined t =
-    match t with
-    | Declaration _ -> false
-    | Definition _ -> true
-
 end
 
 and Class_type : sig
@@ -413,11 +388,11 @@ and Class_type : sig
   type t
 
   val base :
-    Origin.t -> Ident.t -> Desc.Class_type.t option -> Desc.visibility -> t
+    Origin.t -> Ident.t -> Desc.Class_type.t option -> Desc.deprecated -> t
 
   val child :
     Module.normalized -> string ->
-    Desc.Class_type.t option -> Desc.visibility -> t
+    Desc.Class_type.t option -> Desc.deprecated -> t
 
   val declare : Origin.t -> Ident.t -> t
 
@@ -434,8 +409,6 @@ and Class_type : sig
   type resolved = int list option * t
 
   val resolve : Graph.t -> t -> resolved
-
-  val is_defined : t -> bool
 
 end = struct
 
@@ -466,18 +439,18 @@ end = struct
     | Some (Subst(p, ns)) -> Subst(p, ns)
     | Some (Alias alias) -> Alias alias
 
-  let base origin id desc visibility =
+  let base origin id desc deprecated =
     let path = Path.Pident id in
-    let hidden = hidden_base_definition visibility id in
+    let hidden = hidden_base_definition deprecated id in
     let sort = Sort.Defined in
     let definition = definition_of_desc desc in
     Definition { origin; path; hidden; sort; definition }
 
-  let child md name desc visibility =
+  let child md name desc deprecated =
     let origin = Module.raw_origin md in
     let sort = Module.raw_sort md in
     let path = Path.Pdot(Module.raw_path md, name) in
-    let hidden = hidden_definition visibility name in
+    let hidden = hidden_definition deprecated name in
     let definition = definition_of_desc desc in
     Definition { origin; path; hidden; sort; definition }
 
@@ -521,23 +494,12 @@ end = struct
       end
 
   let normalize root t =
-    (* If [t] is a declaration but it's defined in [root], then we need to look it up in
-       [root] before continuing normalization. *)
-    let need_to_check_root =
-      match t with
-      | Definition { sort = Sort.Defined } -> false
-      | Definition { sort = Sort.Declared ids } ->
-        Ident_set.exists (Graph.is_class_type_defined root) ids
-      | Declaration { id; _} -> Graph.is_class_type_defined root id
-    in
-    let t =
-      if need_to_check_root
-      then
-        try Graph.find_class_type root (raw_path t)
-        with Not_found -> t
-      else t
-    in
-    normalize_loop root t
+    match t with
+    | Definition { sort = Sort.Defined } -> normalize_loop root t
+    | Definition { sort = Sort.Declared _ } | Declaration _ ->
+        match Graph.find_class_type root (raw_path t) with
+        | exception Not_found -> normalize_loop root t
+        | t -> normalize_loop root t
 
   let origin root t =
     raw_origin (normalize root t)
@@ -565,11 +527,6 @@ end = struct
       end
     | Definition { definition = Alias _ } -> assert false
 
-  let is_defined t =
-    match t with
-    | Declaration _ -> false
-    | Definition _ -> true
-
 end
 
 and Module_type : sig
@@ -577,11 +534,11 @@ and Module_type : sig
   type t
 
   val base :
-    Origin.t -> Ident.t -> Desc.Module_type.t option -> Desc.visibility -> t
+    Origin.t -> Ident.t -> Desc.Module_type.t option -> Desc.deprecated -> t
 
   val child :
     Module.normalized -> string ->
-    Desc.Module_type.t option -> Desc.visibility -> t
+    Desc.Module_type.t option -> Desc.deprecated -> t
 
   val declare : Origin.t -> Ident.t -> t
 
@@ -594,8 +551,6 @@ and Module_type : sig
   val hidden : t -> bool
 
   val sort : Graph.t -> t -> Sort.t
-
-  val is_defined : t -> bool
 
 end = struct
 
@@ -618,9 +573,9 @@ end = struct
           sort : Sort.t;
           definition : definition; }
 
-  let base origin id desc visibility =
+  let base origin id desc deprecated =
     let path = Path.Pident id in
-    let hidden = hidden_base_definition visibility id in
+    let hidden = hidden_base_definition deprecated id in
     let sort = Sort.Defined in
     let definition =
       match desc with
@@ -630,11 +585,11 @@ end = struct
     in
     Definition { origin; path; hidden; sort; definition }
 
-  let child md name desc visibility =
+  let child md name desc deprecated =
     let origin = Module.raw_origin md in
     let sort = Module.raw_sort md in
     let path = Path.Pdot (Module.raw_path md, name) in
-    let hidden = hidden_definition visibility name in
+    let hidden = hidden_definition deprecated name in
     let definition =
       match desc with
       | None -> Unknown
@@ -683,23 +638,12 @@ end = struct
       end
 
   let normalize root t =
-    (* If [t] is a declaration but it's defined in [root], then we need to look it up in
-       [root] before continuing normalization. *)
-    let need_to_check_root =
-      match t with
-      | Definition { sort = Sort.Defined } -> false
-      | Definition { sort = Sort.Declared ids } ->
-        Ident_set.exists (Graph.is_module_type_defined root) ids
-      | Declaration { id; _} -> Graph.is_module_type_defined root id
-    in
-    let t =
-      if need_to_check_root
-      then
-        try Graph.find_module_type root (raw_path t)
-        with Not_found -> t
-      else t
-    in
-    normalize_loop root t
+    match t with
+    | Definition { sort = Sort.Defined } -> normalize_loop root t
+    | Definition { sort = Sort.Declared _ } | Declaration _ ->
+        match Graph.find_module_type root (raw_path t) with
+        | exception Not_found -> normalize_loop root t
+        | t -> normalize_loop root t
 
   let origin root t =
     raw_origin (normalize root t)
@@ -710,11 +654,6 @@ end = struct
   let sort root t =
     raw_sort (normalize root t)
 
-  let is_defined t =
-    match t with
-    | Declaration _ -> false
-    | Definition _ -> true
-
 end
 
 and Module : sig
@@ -724,10 +663,10 @@ and Module : sig
   type normalized
 
   val base :
-    Origin.t -> Ident.t -> Desc.Module.t option -> Desc.visibility -> t
+    Origin.t -> Ident.t -> Desc.Module.t option -> Desc.deprecated -> t
 
   val child :
-    normalized -> string -> Desc.Module.t option -> Desc.visibility -> t
+    normalized -> string -> Desc.Module.t option -> Desc.deprecated -> t
 
   val application : normalized -> t -> Desc.Module.t option -> t
 
@@ -771,8 +710,6 @@ and Module : sig
 
   val raw_sort : normalized -> Sort.t
 
-  val is_defined : t -> bool
-
 end = struct
 
   open Desc.Module
@@ -806,9 +743,9 @@ end = struct
           sort : Sort.t;
           definition : definition; }
 
-  let base origin id desc visibility =
+  let base origin id desc deprecated =
     let path = Path.Pident id in
-    let hidden = hidden_base_definition visibility id in
+    let hidden = hidden_base_definition deprecated id in
     let sort = Sort.Defined in
     let definition =
       match desc with
@@ -824,11 +761,11 @@ end = struct
     in
     Definition { origin; path; hidden; sort; definition }
 
-  let child md name desc visibility =
+  let child md name desc deprecated =
     let origin = Module.raw_origin md in
     let sort = Module.raw_sort md in
     let path = Path.Pdot(Module.raw_path md, name) in
-    let hidden = hidden_definition visibility name in
+    let hidden = hidden_definition deprecated name in
     let definition =
       match desc with
       | None -> Unknown
@@ -910,23 +847,12 @@ end = struct
       end
 
   let normalize root t =
-    (* If [t] is a declaration but it's defined in [root], then we need to look it up in
-       [root] before continuing normalization. *)
-    let need_to_check_root =
-      match t with
-      | Definition { sort = Sort.Defined } -> false
-      | Definition { sort = Sort.Declared ids } ->
-        Ident_set.exists (Graph.is_module_defined root) ids
-      | Declaration { id; _} -> Graph.is_module_defined root id
-    in
-    let t =
-      if need_to_check_root
-      then
-        try Graph.find_module root (raw_path t)
-        with Not_found -> t
-      else t
-    in
-    normalize_loop root t
+    match t with
+    | Definition { sort = Sort.Defined } -> normalize_loop root t
+    | Definition { sort = Sort.Declared _ } | Declaration _ ->
+        match Graph.find_module root (raw_path t) with
+        | exception Not_found -> normalize_loop root t
+        | t -> normalize_loop root t
 
   let unnormalize t = t
 
@@ -955,23 +881,19 @@ end = struct
         let rec loop types class_types module_types modules = function
           | [] -> Forced { types; class_types; module_types; modules }
           | Type(name, desc, dpr) :: rest ->
-              let visibility = Desc.visibility_of_deprecated dpr in
-              let typ = Type.child t name (Some desc) visibility in
+              let typ = Type.child t name (Some desc) dpr in
               let types = String_map.add name typ types in
               loop types class_types module_types modules rest
           | Class_type(name, desc, dpr) :: rest ->
-              let visibility = Desc.visibility_of_deprecated dpr in
-              let clty = Class_type.child t name (Some desc) visibility in
+              let clty = Class_type.child t name (Some desc) dpr in
               let class_types = String_map.add name clty class_types in
               loop types class_types module_types modules rest
           | Module_type(name, desc, dpr) :: rest ->
-              let visibility = Desc.visibility_of_deprecated dpr in
-              let mty = Module_type.child t name (Some desc) visibility in
+              let mty = Module_type.child t name (Some desc) dpr in
               let module_types = String_map.add name mty module_types in
               loop types class_types module_types modules rest
           | Module(name, desc, dpr) :: rest ->
-              let visibility = Desc.visibility_of_deprecated dpr in
-              let md = Module.child t name (Some desc) visibility in
+              let md = Module.child t name (Some desc) dpr in
               let modules = String_map.add name md modules in
               loop types class_types module_types modules rest
         in
@@ -1028,7 +950,7 @@ end = struct
     | Signature { components = Unforced _ } ->
         assert false
     | Unknown ->
-        Type.child t name None Visible
+        Type.child t name None Not_deprecated
     | Functor _ ->
         raise Not_found
     | Signature { components = Forced { types; _ }; _ } ->
@@ -1041,7 +963,7 @@ end = struct
     | Signature { components = Unforced _ } ->
         assert false
     | Unknown ->
-        Class_type.child t name None Visible
+        Class_type.child t name None Not_deprecated
     | Functor _ ->
         raise Not_found
     | Signature { components = Forced { class_types; _ }; _ } ->
@@ -1054,7 +976,7 @@ end = struct
     | Signature { components = Unforced _ } ->
         assert false
     | Unknown ->
-        Module_type.child t name None Visible
+        Module_type.child t name None Not_deprecated
     | Functor _ ->
         raise Not_found
     | Signature { components = Forced { module_types; _ }; _ } ->
@@ -1067,7 +989,7 @@ end = struct
     | Signature { components = Unforced _ } ->
         assert false
     | Unknown ->
-        Module.child t name None Visible
+        Module.child t name None Not_deprecated
     | Functor _ ->
         raise Not_found
     | Signature { components = Forced { modules; _ }; _ } ->
@@ -1090,11 +1012,6 @@ end = struct
             let md = Module.application t arg (Some (apply arg_path)) in
             r.applications <- Path_map.add arg_path md applications;
             md
-
-  let is_defined t =
-    match t with
-    | Declaration _ -> false
-    | Definition _ -> true
 
 end
 
@@ -1161,13 +1078,13 @@ and Component : sig
 
   type t =
     | Type of
-        Origin.t * Ident.t * Desc.Type.t * source * Desc.visibility
+        Origin.t * Ident.t * Desc.Type.t * source * Desc.deprecated
     | Class_type of
-        Origin.t * Ident.t * Desc.Class_type.t * source * Desc.visibility
+        Origin.t * Ident.t * Desc.Class_type.t * source * Desc.deprecated
     | Module_type of
-        Origin.t * Ident.t * Desc.Module_type.t * source * Desc.visibility
+        Origin.t * Ident.t * Desc.Module_type.t * source * Desc.deprecated
     | Module of
-        Origin.t * Ident.t * Desc.Module.t * source * Desc.visibility
+        Origin.t * Ident.t * Desc.Module.t * source * Desc.deprecated
     | Declare_type of Origin.t * Ident.t
     | Declare_class_type of Origin.t * Ident.t
     | Declare_module_type of Origin.t * Ident.t
@@ -1209,11 +1126,6 @@ and Graph : sig
 
   val is_module_ident_visible : t -> Ident.t -> bool
 
-  val is_type_defined : t -> Ident.t -> bool
-  val is_class_type_defined : t -> Ident.t -> bool
-  val is_module_type_defined : t -> Ident.t -> bool
-  val is_module_defined : t -> Ident.t -> bool
-
 end = struct
 
   type defs =
@@ -1242,38 +1154,23 @@ end = struct
       module_type_names = String_map.empty;
       module_names = String_map.empty; }
 
-  type prev_result =
-    | Already_defined
-    | Not_already_defined of Origin.t option
+  let failwith_id msg id =
+    failwith (Format_doc.asprintf "%s: %a" msg Ident.print_with_scope id)
 
-  let previous_type t id =
+  let previous_type _desc t id =
     match Ident_map.find id t.types with
-    | exception Not_found -> Not_already_defined None
+    | exception Not_found -> None
     | prev ->
       match Type.declaration prev with
-      | None ->
-        (* CR-soon: This is a good assertion to have because it verifies that the
-           environment is well-formed (that is, is doesn't have duplicate identifiers).
-           But as of OxCaml version 5.2.0minus-16, there is a compiler bug causing this
-           case to be hit. This is a re-appearance of the upstream issue
-           https://github.com/ocaml/merlin/issues/1322, which was initially resolved in
-           the compiler pr https://github.com/ocaml/ocaml/pull/10382. Commenting this
-           assertion back in causes test tests/test-dirs/issue1322.t/run.t to fail. This
-           bug should get fixed in the compiler, and then this assertion should get added
-           back.
-
-           Once that gets changed back, this function should just return a
-           [Origin.t option] again. *)
-        (* failwith "Graph.add: type already defined" *)
-        Already_defined
-      | Some _ as o -> Not_already_defined o
+      | None -> failwith_id "Graph.add: type already defined" id
+      | Some _ as o -> o
 
   let previous_class_type t id =
     match Ident_map.find id t.class_types with
     | exception Not_found -> None
     | prev ->
       match Class_type.declaration prev with
-      | None -> failwith "Graph.add: class type already defined"
+      | None -> failwith_id "Graph.add: class type already defined" id
       | Some _ as o -> o
 
   let previous_module_type t id =
@@ -1281,7 +1178,7 @@ end = struct
     | exception Not_found -> None
     | prev ->
       match Module_type.declaration prev with
-      | None -> failwith "Graph.add: module type already defined"
+      | None -> failwith_id "Graph.add: module type already defined" id
       | Some _ as o -> o
 
   let previous_module t id =
@@ -1289,7 +1186,7 @@ end = struct
     | exception Not_found -> None
     | prev ->
       match Module.declaration prev with
-      | None -> failwith "Graph.add: module already defined"
+      | None -> failwith_id "Graph.add: module already defined" id
       | Some _ as o -> o
 
   let add_name source id names =
@@ -1320,16 +1217,14 @@ end = struct
     let rec loop acc diff declarations = function
       | [] -> loop_declarations acc diff declarations
       | Component.Type(origin, id, desc, source, dpr) :: rest ->
-          (match previous_type acc id with
-          | Already_defined -> loop acc diff declarations rest
-          | Not_already_defined prev ->
-            let typ = Type.base origin id (Some desc) dpr in
-            let types = Ident_map.add id typ acc.types in
-            let type_names = add_name source id acc.type_names in
-            let item = Diff.Item.Type(id, typ, prev) in
-            let diff = item :: diff in
-            let acc = { acc with types; type_names } in
-            loop acc diff declarations rest)
+          let prev = previous_type desc acc id in
+          let typ = Type.base origin id (Some desc) dpr in
+          let types = Ident_map.add id typ acc.types in
+          let type_names = add_name source id acc.type_names in
+          let item = Diff.Item.Type(id, typ, prev) in
+          let diff = item :: diff in
+          let acc = { acc with types; type_names } in
+          loop acc diff declarations rest
       | Component.Class_type(origin,id, desc, source, dpr) :: rest ->
           let prev = previous_class_type acc id in
           let clty = Class_type.base origin id (Some desc) dpr in
@@ -1348,9 +1243,9 @@ end = struct
           let diff = item :: diff in
           let acc = { acc with module_types; module_type_names } in
           loop acc diff declarations rest
-      | Component.Module(origin,id, desc, source, visibility) :: rest ->
+      | Component.Module(origin,id, desc, source, dpr) :: rest ->
           let prev = previous_module acc id in
-          let md = Module.base origin id (Some desc) visibility in
+          let md = Module.base origin id (Some desc) dpr in
           let modules = Ident_map.add id md acc.modules in
           let module_names = add_name source id acc.module_names in
           let item = Diff.Item.Module(id, md, prev) in
@@ -1614,26 +1509,6 @@ end = struct
         failwith
           "Short_paths_graph.Graph.is_module_type_path_visible: \
            invalid module type path"
-
-  let is_type_defined t id =
-    match Ident_map.find id t.types with
-    | exception Not_found -> false
-    | ty -> Type.is_defined ty
-
-  let is_class_type_defined t id =
-    match Ident_map.find id t.class_types with
-    | exception Not_found -> false
-    | cls -> Class_type.is_defined cls
-
-  let is_module_type_defined t id =
-    match Ident_map.find id t.module_types with
-    | exception Not_found -> false
-    | mdty -> Module_type.is_defined mdty
-
-  let is_module_defined t id =
-    match Ident_map.find id t.modules with
-    | exception Not_found -> false
-    | md -> Module.is_defined md
 
 end
 

@@ -49,12 +49,8 @@ val class_type: Format.formatter -> Parsetree.class_type -> unit
 val module_type: Format.formatter -> Parsetree.module_type -> unit
 val structure_item: Format.formatter -> Parsetree.structure_item -> unit
 val signature_item: Format.formatter -> Parsetree.signature_item -> unit
-val signature_items: Format.formatter -> Parsetree.signature_item list -> unit
 val binding: Format.formatter -> Parsetree.value_binding -> unit
 val payload: Format.formatter -> Parsetree.payload -> unit
-
-val class_signature: Format.formatter -> Parsetree.class_signature -> unit
-val type_declaration: Format.formatter -> Parsetree.type_declaration -> unit
 
 val tyvar_of_name : string -> string
   (** Turn a type variable name into a valid identifier, taking care of the
@@ -66,27 +62,25 @@ val tyvar: Format.formatter -> string -> unit
       special treatment required for the single quote character in second
       position, or for keywords by escaping them with \#. No-op on "_". *)
 
-val jkind_annotation : Format.formatter -> Parsetree.jkind_annotation -> unit
-val mode : Format.formatter -> Parsetree.mode Location.loc -> unit
-
+(* merlin *)
 type longindent_kind =
-  | Constr
-  | Type
-  | Other
+| Constr (** variant constructors *)
+| Type (** core types, module types, class types, and classes *)
+| Other (** values and modules *)
+
+val case_list : Format.formatter -> Parsetree.case list -> unit
+val ident_of_name : Format.formatter -> string -> unit
+val needs_parens : kind:longindent_kind -> string -> bool
+
 
 (** {!Format_doc} functions for error messages *)
 module Doc:sig
   val longident: Longident.t Format_doc.printer
   val constr: Longident.t Format_doc.printer
   val tyvar: string Format_doc.printer
-  val jkind_annotation: Parsetree.jkind_annotation Format_doc.printer
 
   (** Returns a format document if the expression reads nicely as the subject
       of a sentence in a error message. *)
   val nominal_exp : Parsetree.expression -> Format_doc.t option
 end
 
-(* merlin *)
-val case_list : Format.formatter -> Parsetree.case list -> unit
-val ident_of_name : Format.formatter -> string -> unit
-val needs_parens : kind:longindent_kind -> string -> bool

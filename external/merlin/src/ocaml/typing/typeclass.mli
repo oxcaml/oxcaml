@@ -119,23 +119,13 @@ type error =
   | Non_collapsable_conjunction of
       Ident.t * Types.class_declaration * Errortrace.unification_error
   | Self_clash of Errortrace.unification_error
-  | Mutability_mismatch of string * Asttypes.mutable_flag
+  | Mutability_mismatch of string * mutable_flag
   | No_overriding of string * string
   | Duplicate of string * string
   | Closing_self_type of class_signature
-  | Polymorphic_class_parameter
-  | Non_value_binding of string * Jkind.Violation.t
-  | Non_value_let_binding of string * Jkind.sort
-  | Nonoptional_call_pos_label of string
 
+exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
-
-module Error : sig
-  type exn += private In_context of Location.t * Env.t * error
-
-  val log_or_raise : Location.t -> Env.t -> error -> unit
-  val log_and_raise : Location.t -> Env.t -> error -> 'a
-end
 
 val report_error : Env.t -> Format.formatter -> error -> unit
 val report_error_doc : Env.t -> error Format_doc.printer

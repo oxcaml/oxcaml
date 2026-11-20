@@ -61,8 +61,8 @@ let record_phrase loc =
    same upper bound -> sorted by decreasing lower bound
 *)
 let cmp_loc_inner_first loc1 loc2 =
-  match Int.compare loc1.loc_end.pos_cnum loc2.loc_end.pos_cnum with
-  | 0 -> Int.compare loc2.loc_start.pos_cnum loc1.loc_start.pos_cnum
+  match compare loc1.loc_end.pos_cnum loc2.loc_end.pos_cnum with
+  | 0 -> compare loc2.loc_start.pos_cnum loc1.loc_start.pos_cnum
   | x -> x
 
 let cmp_ti_inner_first ti1 ti2 =
@@ -108,7 +108,7 @@ let rec printtyp_reset_maybe loc =
      printtyp_reset_maybe loc;
   | _ -> ()
 
-let call_kind_string (k : call) =
+let call_kind_string k =
   match k with
   | Tail -> "tail"
   | Stack -> "stack"
@@ -149,8 +149,9 @@ let print_info pp prev_loc ti =
       Format.pp_print_string Format.str_formatter "  ";
       Printtyp.wrap_printing_env ~error:false env
         (fun () ->
-           Printtyp.shared_type_scheme Format.str_formatter typ
-        );
+           Printtyp.shared_type_scheme
+             Format.str_formatter typ);
+      (* (fun () -> Printtyp.shared_type_scheme Format.str_formatter typ); *)
       Format.pp_print_newline Format.str_formatter ();
       let s = Format.flush_str_formatter () in
       output_string pp s;

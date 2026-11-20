@@ -119,7 +119,7 @@ let rec skip_non_moving pos = function
 
 let get_cases_from_match node =
   match node with
-  | Expression { exp_desc = Texp_match (_, _, cases, _, _); _ } -> cases
+  | Expression { exp_desc = Texp_match (_, cases, _, _); _ } -> cases
   | _ -> []
 
 let find_case_pos cases pos direction =
@@ -219,30 +219,28 @@ let phrase typed_tree pos target =
   in
   let rec seek_item = function
     | [] -> None
-    | Browse_raw.Signature xs :: tail ->
-      begin match
-        find_pos (fun x -> x.Typedtree.sig_loc) xs.Typedtree.sig_items
-      with
+    | Browse_raw.Signature xs :: tail -> begin
+      match find_pos (fun x -> x.Typedtree.sig_loc) xs.Typedtree.sig_items with
       | [] -> seek_item tail
       | y :: _ -> Some y.Typedtree.sig_loc
-      end
-    | Browse_raw.Structure xs :: tail ->
-      begin match
-        find_pos (fun x -> x.Typedtree.str_loc) xs.Typedtree.str_items
-      with
+    end
+    | Browse_raw.Structure xs :: tail -> begin
+      match find_pos (fun x -> x.Typedtree.str_loc) xs.Typedtree.str_items with
       | [] -> seek_item tail
       | y :: _ -> Some y.Typedtree.str_loc
-      end
+    end
     | Browse_raw.Signature_item (x, _) :: Browse_raw.Signature xs :: tail ->
-      begin match find_item x xs.Typedtree.sig_items with
+    begin
+      match find_item x xs.Typedtree.sig_items with
       | [] -> seek_item tail
       | y :: _ -> Some y.Typedtree.sig_loc
-      end
+    end
     | Browse_raw.Structure_item (x, _) :: Browse_raw.Structure xs :: tail ->
-      begin match find_item x xs.Typedtree.str_items with
+    begin
+      match find_item x xs.Typedtree.str_items with
       | [] -> seek_item tail
       | y :: _ -> Some y.Typedtree.str_loc
-      end
+    end
     | _ :: xs -> seek_item xs
   in
   match (seek_item enclosing, target) with

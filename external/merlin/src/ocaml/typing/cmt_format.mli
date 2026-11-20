@@ -15,6 +15,8 @@
 
 (** cmt and cmti files format. *)
 
+open Misc
+
 (** The layout of a cmt file is as follows:
       <cmt> := \{<cmi>\} <cmt magic> \{cmt infos\} \{<source info>\}
     where <cmi> is the cmi file format:
@@ -37,9 +39,6 @@ type binary_annots =
   | Interface of signature
   | Partial_implementation of binary_part array
   | Partial_interface of binary_part array
-  | Functorize
-      (* CR-someday zqian: add data (e.g. the bundle signature and list of
-         input modules) to [Functorize] once tooling needs it. *)
 
 and binary_part =
   | Partial_structure of structure
@@ -53,7 +52,7 @@ and binary_part =
 
 type dependency_kind = Definition_to_declaration | Declaration_to_declaration
 type cmt_infos = {
-  cmt_modname : Compilation_unit.t;
+  cmt_modname : modname;
   cmt_annots : binary_annots;
   cmt_declaration_dependencies : (dependency_kind * Uid.t * Uid.t) list;
   cmt_comments : (string * Location.t) list;
@@ -65,13 +64,13 @@ type cmt_infos = {
   cmt_loadpath : Load_path.paths;
   cmt_source_digest : string option;
   cmt_initial_env : Env.t;
-  cmt_imports : Import_info.t array;
+  cmt_imports : crcs;
   cmt_interface_digest : Digest.t option;
   cmt_use_summaries : bool;
   cmt_uid_to_decl : item_declaration Shape.Uid.Tbl.t;
   cmt_impl_shape : Shape.t option; (* None for mli *)
   cmt_ident_occurrences :
-    (Longident.t Location.loc * Shape_reduce.result) array
+    (Longident.t Location.loc * Shape_reduce.result) list
 }
 
 type error =
@@ -87,19 +86,18 @@ exception Error of error
     only contain a cmi_infos at the beginning if there is no associated
     .cmti file.
 *)
-val read : string -> Cmi_format.cmi_infos_lazy option * cmt_infos option
+val read : string -> Cmi_format.cmi_infos option * cmt_infos option
 
 val read_cmt : string -> cmt_infos
-val read_cmi : string -> Cmi_format.cmi_infos_lazy
+val read_cmi : string -> Cmi_format.cmi_infos
 
 (** [save_cmt filename modname binary_annots sourcefile initial_env cmi]
     writes a cmt(i) file.  *)
 val save_cmt :
   Unit_info.Artifact.t ->
-  Compilation_unit.t ->  (* module name *)
   binary_annots ->
   Env.t -> (* initial env *)
-  Cmi_format.cmi_infos_lazy option -> (* if a .cmi was generated *)
+  Cmi_format.cmi_infos option -> (* if a .cmi was generated *)
   Shape.t option ->
   unit
 
@@ -115,18 +113,6 @@ val set_saved_types : binary_part list -> unit
 
 val get_declaration_dependencies : unit -> (dependency_kind * Uid.t * Uid.t) list
 val record_declaration_dependency: dependency_kind * Uid.t * Uid.t -> unit
-
-val index_occurrences :
-  binary_annots -> (Longident.t Location.loc * Shape_reduce.result) array
-
-val iter_declarations
-  : binary_annots
-  -> f:(Shape.Uid.t -> Typedtree.item_declaration -> unit)
-  -> unit
-
-(** Whether only the summary of the environment should be stored. This is based on
-    whether the environment variable OCAML_BINANNOT_WITHENV is set *)
-val need_to_clear_env : bool
 
 (*
 

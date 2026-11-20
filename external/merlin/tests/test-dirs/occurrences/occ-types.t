@@ -68,9 +68,3 @@
       "stale": false
     }
   ]
-
-  $ $MERLIN single occurrences -identifier-at 1:29 -filename type.ml <<EOF | \
-  > jq '.value'
-  > let f = fun (x : int) (type t) (foo : t list) -> let (_ : t) = () in ()
-  > EOF
-  []

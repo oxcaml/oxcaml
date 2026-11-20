@@ -26,14 +26,6 @@
 
    )* }}} *)
 
-module Artifact : sig
-  type t
-
-  val read : string -> t
-
-  val impl_shape : t -> Shape.t option
-end
-
 val log : 'a Logger.printf
 
 type config =
@@ -53,29 +45,12 @@ type result =
     approximated : bool
   }
 
-module Namespace_resolution : sig
-  type t =
-    | From_context of Query_protocol.Locate_context.t
-        (** Choose the namespaces based on a [Query_protocol.Locate_context.t] *)
-    | Explicit of Env_lookup.Namespace.inferred_basic list
-        (** Explicitly choose which namespaces to search in. The namespaces are prioritized
-        based on the list order (with the first element being highest priority) *)
-    | Inferred  (** Infer which namespaces to search in *)
-end
-
-(** Given the path that looks like a ppx-expanded sourcefile, returns the path of the true
-    sourcefile. If the path does not appear to be for a ppx-expanded file or the
-    sourcefile doesn't exist, returns [None].
-
-    ex: [sourcefile_for_ppx_sourcefile "foo.pp.ml"] -> [Some "foo.ml"] *)
-val sourcefile_for_ppx_sourcefile : string -> string option
-
 val uid_of_result :
   traverse_aliases:bool -> Shape_reduce.result -> Shape.Uid.t option * bool
 
-(** Lookup the declaration of the given Uid in the appropriate cmt file *)
-val lookup_uid_loc_of_decl :
-  config:Mconfig.t -> Shape.Uid.t -> string Location.loc option
+(** Lookup the delcaration of the given Uid in the appropriate cmt file *)
+val lookup_uid_decl :
+  config:Mconfig.t -> Shape.Uid.t -> Typedtree.item_declaration option
 
 (** [get_linked_uids] queries the [cmt_declaration_dependencies] table and
   returns udis related to the one passed as argument. TODO right now this
@@ -106,9 +81,7 @@ val from_string :
   env:Env.t ->
   local_defs:Mtyper.typedtree ->
   pos:Lexing.position ->
-  ?let_pun_behavior:Mbrowse.Let_pun_behavior.t ->
-  ?record_pattern_pun_behavior:Mbrowse.Record_pattern_pun_behavior.t ->
-  ?namespaces:Namespace_resolution.t ->
+  ?namespaces:Env_lookup.Namespace.inferred_basic list ->
   string ->
   [> `File_not_found of result
   | `Found of result
@@ -119,7 +92,6 @@ val from_string :
   | `At_origin ]
 
 val get_doc :
-  buffer_source:string ->
   config:Mconfig.t ->
   env:Env.t ->
   local_defs:Mtyper.typedtree ->

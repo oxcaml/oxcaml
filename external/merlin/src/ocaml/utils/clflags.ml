@@ -1,16 +1,8 @@
-type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
-type shape_format = Old_merlin | Debugging_shapes
-type visible_include =
-  { path : string;
-    cmx_guaranteed : bool;
-  }
-
 (** {0 OCaml compiler compatible command-line parameters} *)
 let cmi_file = ref None
 let include_dirs        = ref []
 let hidden_include_dirs = ref []
-let include_paths_files = ref ([] : string list) (* -I-paths *)
-let hidden_include_paths_files = ref ([] : string list) (* -H-paths *)
+let print_variance      = ref false          (* -i-variance *)
 let fast                = ref false
 let classic             = ref false
 let all_ppx             = ref []
@@ -19,33 +11,19 @@ let real_paths          = ref true
 let recursive_types     = ref false
 let strict_sequence     = ref false
 let applicative_functors = ref true
-let typing_recovery     = ref true
 
 let nopervasives        = ref false
 let strict_formats      = ref true
-let syntax_quotations   = ref Config.syntax_quotations
-
-type open_arg =
-  | Open of string
-  | Open_cmi of string
-
-let open_args           = ref ([] : open_arg list)
-let parameters          = ref ([] : string list)
-let as_parameter        = ref false
-let as_argument_for     = ref None
-let zero_alloc_check    = ref Zero_alloc_annotations.Check.Check_default
-let zero_alloc_assert   = ref Zero_alloc_annotations.Assert.Assert_default
-let infer_with_bounds   = ref false
-let kind_verbosity = ref 0
-let ikinds = ref true
+let no_alias_deps       = ref false           (* -no-alias-deps *)
+let unique_ids          = ref true               (* -d(no-)unique-ids *)
+let canonical_ids       = ref false           (* -d(no-)canonical-ids *)
+let open_modules        = ref []
 
 let annotations         = ref false
 let binary_annotations  = ref true
-let binary_annotations_cms  = ref false
-let shape_format        = ref Old_merlin
 let store_occurrences   = ref true
 let print_types         = ref false
-let[@inline] target_is_native () = false
+let native_code         = ref false
 let error_size          = ref 500
 let dont_write_files    = ref true
 let keep_locs           = ref true
@@ -55,22 +33,143 @@ let for_package         = ref None
 let debug               = ref false
 let unsafe              = ref false
 let opaque              = ref false
+
+let error_style = ref (Some Misc.Error_style.Merlin) (* -error-style *)
+
 let unboxed_types       = ref false
-let profile_columns     = ref []
-let dwarf_pedantic      = ref false
-let gdwarf_config_shape_eval_depth = ref None
-let type_to_shape_max_depth = ref None
-(* Merlin never emits DWARF debug info; keep the upstream-only
-   restriction on. *)
-let restrict_to_upstream_dwarf = ref true
-let gdwarf_config_max_evaluation_steps_per_variable = ref None
-let locs = ref true
+
 let locations = ref true
-let ikinds_debug = ref false
-let no_alias_deps = ref false
-let unique_ids = ref false
-let dump_dir = ref None
-let verbose_types = ref false
-let canonical_ids = ref false
-let print_variance = ref false
-let error_style = ref (Some Misc.Error_style.Merlin)
+
+let keyword_edition: string option ref = ref None
+
+
+(* This is used by the -save-ir-after option. *)
+module Compiler_ir = struct
+  type t = Linear
+
+  let all = [
+    Linear;
+  ]
+
+  let extension t =
+    let ext =
+    match t with
+      | Linear -> "linear"
+    in
+    ".cmir-" ^ ext
+
+  (** [extract_extension_with_pass filename] returns the IR whose extension
+      is a prefix of the extension of [filename], and the suffix,
+      which can be used to distinguish different passes on the same IR.
+      For example, [extract_extension_with_pass "foo.cmir-linear123"]
+      returns [Some (Linear, "123")]. *)
+  let extract_extension_with_pass filename =
+    let ext = Filename.extension filename in
+    let ext_len = String.length ext in
+    if ext_len <= 0 then None
+    else begin
+      let is_prefix ir =
+        let s = extension ir in
+        let s_len = String.length s in
+        s_len <= ext_len && s = String.sub ext 0 s_len
+      in
+      let drop_prefix ir =
+        let s = extension ir in
+        let s_len = String.length s in
+        String.sub ext s_len (ext_len - s_len)
+      in
+      let ir = List.find_opt is_prefix all in
+      match ir with
+      | None -> None
+      | Some ir -> Some (ir, drop_prefix ir)
+    end
+end
+
+
+(* This is used by the -stop-after option. *)
+module Compiler_pass = struct
+  (* If you add a new pass, the following must be updated:
+     - the variable `passes` below
+     - the manpages in man/ocaml{c,opt}.m
+     - the manual manual/src/cmds/unified-options.etex
+  *)
+  type t = Parsing | Typing | Lambda | Scheduling | Emit
+
+  let to_string = function
+    | Parsing -> "parsing"
+    | Typing -> "typing"
+    | Lambda -> "lambda"
+    | Scheduling -> "scheduling"
+    | Emit -> "emit"
+
+  let of_string = function
+    | "parsing" -> Some Parsing
+    | "typing" -> Some Typing
+    | "lambda" -> Some Lambda
+    | "scheduling" -> Some Scheduling
+    | "emit" -> Some Emit
+    | _ -> None
+
+  let rank = function
+    | Parsing -> 0
+    | Typing -> 1
+    | Lambda -> 2
+    | Scheduling -> 50
+    | Emit -> 60
+
+  let passes = [
+    Parsing;
+    Typing;
+    Lambda;
+    Scheduling;
+    Emit;
+  ]
+  let is_compilation_pass _ = true
+  let is_native_only = function
+    | Scheduling -> true
+    | Emit -> true
+    | _ -> false
+
+  let enabled is_native t = not (is_native_only t) || is_native
+  let can_save_ir_after = function
+    | Scheduling -> true
+    | _ -> false
+
+  let available_pass_names ~filter ~native =
+    passes
+    |> List.filter (enabled native)
+    |> List.filter filter
+    |> List.map to_string
+
+  let compare a b =
+    compare (rank a) (rank b)
+
+  let to_output_filename t ~prefix =
+    match t with
+    | Scheduling -> prefix ^ Compiler_ir.(extension Linear)
+    | _ -> Misc.fatal_error "Not supported"
+
+  let of_input_filename name =
+    match Compiler_ir.extract_extension_with_pass name with
+    | Some (Linear, _) -> Some Emit
+    | None -> None
+end
+
+let parse_keyword_edition s =
+  let parse_version s =
+  let bad_version () =
+    raise (Arg.Bad "Ill-formed version in keywords flag,\n\
+                    the supported format is <major>.<minor>, for example 5.2 .")
+  in
+  if s = "" then None else match String.split_on_char '.' s with
+  | [] | [_] | _ :: _ :: _ :: _ -> bad_version ()
+  | [major;minor] -> match int_of_string_opt major, int_of_string_opt minor with
+    | Some major, Some minor -> Some (major,minor)
+    | _ -> bad_version ()
+  in
+  match String.split_on_char '+' s with
+  | [] -> None, []
+  | [s] -> parse_version s, []
+  | v :: rest -> parse_version v, rest
+
+let stop_after = ref None

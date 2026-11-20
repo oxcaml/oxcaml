@@ -1098,13 +1098,13 @@ module Shortest = struct
         (fun desc ->
            match desc with
            | Desc.Type(id, desc, conc, dpr) ->
-               Component.Type(origin, id, desc, local_or_open conc, Desc.visibility_of_deprecated dpr)
+               Component.Type(origin, id, desc, local_or_open conc, dpr)
            | Desc.Class_type(id, desc, conc, dpr) ->
-               Component.Class_type(origin, id, desc, local_or_open conc, Desc.visibility_of_deprecated dpr)
+               Component.Class_type(origin, id, desc, local_or_open conc, dpr)
            | Desc.Module_type(id, desc, conc, dpr) ->
-               Component.Module_type(origin, id, desc, local_or_open conc, Desc.visibility_of_deprecated dpr)
+               Component.Module_type(origin, id, desc, local_or_open conc, dpr)
            | Desc.Module(id, desc, conc, dpr) ->
-               Component.Module(origin, id, desc, local_or_open conc, Desc.visibility_of_deprecated dpr)
+               Component.Module(origin, id, desc, local_or_open conc, dpr)
            | Desc.Declare_type id ->
                Component.Declare_type(origin, id)
            | Desc.Declare_class_type id ->
@@ -1739,11 +1739,10 @@ module String_set = Set.Make(String)
 module Basis = struct
 
   type load =
-    { name : Global_module.Name.t;
+    { name : string;
       depends : string list;
       alias_depends : string list;
       desc : Desc.Module.t;
-      visibility : Load_path.visibility;
       deprecated : Desc.deprecated; }
 
   type t =
@@ -1775,7 +1774,7 @@ module Basis = struct
     Rev_deps.extend_up_to t.rev_deps t.next_dep;
     List.iter
       (fun { name; depends; alias_depends; _ } ->
-         let index = String_map.find name.Global_module.Name.head t.assignment in
+         let index = String_map.find name t.assignment in
          List.iter
            (fun dep_name ->
               let dep_index = String_map.find dep_name t.assignment in
@@ -1791,16 +1790,11 @@ module Basis = struct
   let update_shortest t additions loads =
     let components =
       List.map
-        (fun { name; desc; visibility=load_visibility; deprecated; _ } ->
-           let index = String_map.find name.Global_module.Name.head t.assignment in
+        (fun { name; desc; deprecated; _ } ->
+           let index = String_map.find name t.assignment in
            let origin = Origin.Dependency index in
            let id = Ident.global name in
-           let component_visibility : Desc.visibility =
-             match load_visibility, deprecated with
-             | Hidden, _ | _, Deprecated -> Hidden
-             | Visible _, Not_deprecated -> Visible
-             in
-           Component.Module(origin, id, desc, Component.Global, component_visibility))
+           Component.Module(origin, id, desc, Component.Global, deprecated))
         loads
     in
     let components =
@@ -1808,7 +1802,6 @@ module Basis = struct
         (fun name acc ->
            let index = String_map.find name t.assignment in
            let origin = Origin.Dependency index in
-           let name = Global_module.Name.create_no_args name in
            let id = Ident.global name in
            Component.Declare_module(origin, id) :: acc)
         additions
@@ -1845,8 +1838,8 @@ module Basis = struct
   let add t name =
     t.pending_additions <- String_set.add name t.pending_additions
 
-  let load t name ~depends ~alias_depends desc visibility deprecated =
-    let load = { name; depends; alias_depends; desc; visibility; deprecated } in
+  let load t name depends alias_depends desc deprecated =
+    let load = { name; depends; alias_depends; desc; deprecated } in
     t.pending_loads <- load :: t.pending_loads
 
 end

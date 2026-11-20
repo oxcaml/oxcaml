@@ -20,8 +20,6 @@
 
 *)
 
-(* Do not add to this type; it is no longer used in the compiler but is
-   required by ppxlib. *)
 type constant =
     Const_int of int
   | Const_char of char
@@ -42,8 +40,6 @@ type mutable_flag = Immutable | Mutable
 
 type atomic_flag = Nonatomic | Atomic
 
-type access_flag = Immutable_access | Mutable_access | Atomic_access
-
 type virtual_flag = Virtual | Concrete
 
 type override_flag = Override | Fresh
@@ -52,7 +48,6 @@ type closed_flag = Closed | Open
 
 type label = string
 
-(** This is used only in the Parsetree. *)
 type arg_label =
     Nolabel
   | Labelled of string (** [label:T -> ...] *)

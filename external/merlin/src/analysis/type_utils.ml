@@ -28,6 +28,9 @@
 
 open Std
 
+let log_section = "type-utils"
+let { Logger.log } = Logger.for_section log_section
+
 module Verbosity = Mconfig.Verbosity
 
 let protect expr =
@@ -59,8 +62,8 @@ let parse_longident lid =
   with Parser_raw.Error -> None
 
 let lookup_module name env =
-  let path, md = Env.find_module_by_name_lazy name env in
-  (path, md.md_type, md.md_attributes)
+  let path, md = Env.find_module_by_name name env in
+  (path, md.Types.md_type, md.Types.md_attributes)
 
 let verbosity = ref Verbosity.default
 
@@ -86,8 +89,7 @@ module Printtyp = struct
         if mark ty0 then
           let open Types in
           let ty' = Ctype.full_expand ~may_forget_scope:true env ty0 in
-          if get_desc ty' == get_desc ty0 then
-            Btype.iter_type_expr (iter d) (Fun.const ()) ty0
+          if get_desc ty' == get_desc ty0 then Btype.iter_type_expr (iter d) ty0
           else begin
             let desc =
               match get_desc ty' with
@@ -96,8 +98,7 @@ module Printtyp = struct
               | desc -> desc
             in
             Types.Transient_expr.(set_desc (repr ty0) desc);
-            if d > 0 then
-              Btype.iter_type_expr (iter (pred d)) (Fun.const ()) ty0
+            if d > 0 then Btype.iter_type_expr (iter (pred d)) ty0
           end
       in
       iter
@@ -112,19 +113,16 @@ module Printtyp = struct
     | Some m -> { ty with Types.type_manifest = Some (expand_type env m) }
     | None -> ty
 
-  let expand_sig env mty = Env.with_cmis @@ fun () -> Mtype.scrape_alias env mty
+  let expand_sig env mty = Env.with_cmis @@ fun () -> Env.scrape_alias env mty
 
   let verbose_type_scheme env ppf t =
-    Out_type.Compat.type_scheme_for_merlin ppf (expand_type env t)
-      ~print_non_value_jkind_on_type_variables:true
+    let t = expand_type env t in
+    Printtyp.type_scheme ppf t
 
-  let verbose_type_declaration ~print_non_value_inferred_jkind env id ppf t =
-    Out_type.Compat.type_declaration_for_merlin id ppf (expand_type_decl env t)
-      ~print_non_value_inferred_jkind
+  let verbose_type_declaration env id ppf t =
+    Printtyp.type_declaration id ppf (expand_type_decl env t)
 
-  let modtype = Compat.modtype
-
-  let verbose_modtype env ppf t = modtype ppf (expand_sig env t)
+  let verbose_modtype env ppf t = Printtyp.modtype ppf (expand_sig env t)
 
   let select_by_verbosity ~default ?(smart = default) ~verbose =
     match !verbosity with
@@ -133,20 +131,16 @@ module Printtyp = struct
     | Lvl _ -> verbose
 
   let type_scheme env ppf ty =
-    (select_by_verbosity
-       ~default:
-         (Out_type.Compat.type_scheme_for_merlin
-            ~print_non_value_jkind_on_type_variables:false)
-       ~verbose:(verbose_type_scheme env))
+    (select_by_verbosity ~default:type_scheme ~verbose:(verbose_type_scheme env))
       ppf ty
 
+  let tree_of_typ_scheme te =
+    Out_type.prepare_for_printing [ te ];
+    Out_type.tree_of_typexp Type_scheme te
+
   let type_declaration env id ppf =
-    (select_by_verbosity
-       ~default:
-         (Out_type.Compat.type_declaration_for_merlin
-            ~print_non_value_inferred_jkind:false)
-       ~verbose:
-         (verbose_type_declaration ~print_non_value_inferred_jkind:true env))
+    (select_by_verbosity ~default:type_declaration
+       ~verbose:(verbose_type_declaration env))
       id ppf
 
   let modtype env ppf mty =
@@ -158,49 +152,54 @@ module Printtyp = struct
       ppf mty
 
   let wrap_printing_env env ~verbosity:v f =
-    let_ref verbosity v (fun () -> wrap_printing_env env f)
+    let_ref verbosity v (fun () -> wrap_printing_env ~error:true env f)
 end
 
-let si_modtype_opt : Subst.Lazy.signature_item -> _ = function
-  | Sig_modtype (_, m, _) -> m.mtd_type
-  | Sig_module (_, _, m, _, _) -> Some m.md_type
+let si_modtype_opt = function
+  | Types.Sig_modtype (_, m, _) -> m.mtd_type
+  | Types.Sig_module (_, _, m, _, _) -> Some m.md_type
   | _ -> None
 
 (* Check if module is smaller (= has less definition, counting nested ones)
  * than a particular threshold. Return (Some n) if module has size n, or None
  * otherwise (module is bigger than threshold).
  * Used to skip printing big modules in completion. *)
-let rec mod_smallerthan n (m : Subst.Lazy.module_type) =
+let rec mod_smallerthan n m =
   if n < 0 then None
   else
+    let open Types in
     match m with
     | Mty_ident _ -> Some 1
     | Mty_signature s -> begin
-      let s = Subst.Lazy.force_signature_once s in
       match List.length_lessthan n s with
       | None -> None
       | Some _ ->
-        List.fold_left s ~init:(Some 0) ~f:begin fun acc item ->
-            let sub n1 m =
-              match mod_smallerthan (n - n1) m with
-              | Some n2 -> Some (n1 + n2)
-              | None -> None
-            in
-            match (acc, si_modtype_opt item) with
-            | None, _ -> None
-            | Some n', _ when n' > n -> None
-            | Some n1, Some mty -> sub n1 mty
-            | Some n', _ -> Some (succ n')
-          end
-      end
-    | Mty_functor (m1, m2, _) ->
-      begin match (mod_smallerthan n m2, m1) with
-      | None, _ -> None
-      | result, Unit -> result
-      | Some n1, Named (_, mt, _) -> (
-        match mod_smallerthan (n - n1) mt with
-        | None -> None
-        | Some n2 -> Some (n1 + n2))
+        List.fold_left s ~init:(Some 0)
+          ~f:
+            begin
+              fun acc item ->
+                let sub n1 m =
+                  match mod_smallerthan (n - n1) m with
+                  | Some n2 -> Some (n1 + n2)
+                  | None -> None
+                in
+                match (acc, si_modtype_opt item) with
+                | None, _ -> None
+                | Some n', _ when n' > n -> None
+                | Some n1, Some mty -> sub n1 mty
+                | Some n', _ -> Some (succ n')
+            end
+    end
+    | Mty_functor _ ->
+      let m1, m2 = unpack_functor m in
+      begin
+        match (mod_smallerthan n m2, m1) with
+        | None, _ -> None
+        | result, Unit -> result
+        | Some n1, Named (_, mt) -> (
+          match mod_smallerthan (n - n1) mt with
+          | None -> None
+          | Some n2 -> Some (n1 + n2))
       end
     | _ -> Some 1
 
@@ -210,18 +209,20 @@ let print_short_modtype verbosity env ppf md =
   match mod_smallerthan 1000 md with
   | None when verbosity = 0 ->
     Format.pp_print_string ppf "(* large signature, repeat to confirm *)"
-  | _ ->
-    let md = Subst.Lazy.force_modtype md in
-    Printtyp.modtype env ppf md
+  | _ -> Printtyp.modtype env ppf md
 
 let print_type_with_decl ~verbosity env ppf typ =
   match verbosity with
   | Verbosity.Smart | Lvl 0 -> Printtyp.type_scheme env ppf typ
-  | Lvl _ ->
-    begin match Types.get_desc typ with
+  | Lvl _ -> begin
+    match Types.get_desc typ with
     | Types.Tconstr (path, params, _) ->
       let decl = Env.with_cmis @@ fun () -> Env.find_type path env in
-      let is_abstract = Btype.type_kind_is_abstract decl in
+      let is_abstract =
+        match decl.Types.type_kind with
+        | Types.Type_abstract _ -> true
+        | _ -> false
+      in
       (* Print expression only if it is parameterized or abstract *)
       let print_expr = is_abstract || params <> [] in
       if print_expr then Printtyp.type_scheme env ppf typ;
@@ -239,11 +240,10 @@ let print_type_with_decl ~verbosity env ppf typ =
           | Path.Pdot _ | Path.Pextra_ty _ ->
             Ident.create_persistent (Path.last path)
         in
-        Printtyp.verbose_type_declaration env ident ppf decl
-          ~print_non_value_inferred_jkind:false
+        Printtyp.type_declaration env ident ppf decl
       end
     | _ -> Printtyp.type_scheme env ppf typ
-    end
+  end
 
 let print_exn ppf exn =
   match Location.error_of_exn exn with
@@ -251,63 +251,50 @@ let print_exn ppf exn =
     Format.pp_print_string ppf (Printexc.to_string exn)
   | Some (`Ok report) -> Location.print_main ppf report
 
-let print_type ppf verbosity env lid =
+let print_type ppf env lid =
   let p, t = Env.find_type_by_name lid.Asttypes.txt env in
-  Printtyp.wrap_printing_env env ~verbosity begin fun () ->
-      Printtyp.type_declaration env
-        (Ident.create_persistent (* Incorrect, but doesn't matter. *)
-           (Path.last p))
-        ppf t
-    end
+  match t.type_manifest with
+  | None ->
+    Printtyp.type_declaration env
+      (Ident.create_persistent
+         (* Incorrect, but doesn't matter. *) (Path.last p))
+      ppf t
+  | Some type_expr -> Printtyp.type_expr ppf type_expr
 
 let print_modtype ppf verbosity env lid =
-  let _p, mtd = Env.find_modtype_by_name_lazy lid.Asttypes.txt env in
+  let _p, mtd = Env.find_modtype_by_name lid.Asttypes.txt env in
   match mtd.mtd_type with
   | Some mt -> print_short_modtype verbosity env ppf mt
   | None -> Format.pp_print_string ppf "(* abstract module *)"
 
 let print_modpath ppf verbosity env lid =
-  let _path, md = Env.find_module_by_name_lazy lid.Asttypes.txt env in
+  let _path, md = Env.find_module_by_name lid.Asttypes.txt env in
   print_short_modtype verbosity env ppf md.md_type
 
 let print_cstr_desc ppf cstr_desc =
-  Format_doc.compat !Oprint.out_type ppf
-    (Browse_misc.print_constructor cstr_desc)
+  !Oprint.out_type ppf (Browse_misc.print_constructor cstr_desc)
 
 let print_constr ppf env lid =
   let cstr_desc = Env.find_constructor_by_name lid.Asttypes.txt env in
   (* FIXME: support Reader printer *)
-  print_cstr_desc ppf cstr_desc
+  (Format_doc.compat print_cstr_desc) ppf cstr_desc
 
 exception Fallback
 let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
     =
   let print_expr expression =
-    let recovery_errors = ref [] in
     let str, _sg, _shape, _ =
-      Typing_recovery.catch_errors recovery_errors @@ fun () ->
       Env.with_cmis @@ fun () ->
-      Typemod.type_toplevel_phrase env []
-        (* This parameter is the list of toplevel definitions that are
-           available to [include functor].  It seems that this is handled
-           safely by Merlin as it stands, so we don't need to add anything
-           here. *)
-        [ Ast_helper.Str.eval expression ]
+      Typemod.type_toplevel_phrase env [ Ast_helper.Str.eval expression ]
     in
     let open Typedtree in
-    let first_error =
-      List.find_opt (List.rev !recovery_errors) ~f:(function
-        | Typing_recovery.Warning _ -> false
-        | _ -> true)
-    in
-    match (str.str_items, first_error) with
-    | [ { str_desc = Tstr_eval (exp, _, _); _ } ], None ->
+    match str.str_items with
+    | [ { str_desc = Tstr_eval (exp, _); _ } ] ->
       print_type_with_decl ~verbosity env ppf exp.exp_type
-    | _, Some exn -> raise exn
-    | _, None -> failwith "unhandled expression"
+    | _ -> failwith "unhandled expression"
   in
   Printtyp.wrap_printing_env env ~verbosity @@ fun () ->
-  Typing_recovery.uncatch_errors @@ fun () ->
+  Msupport.uncatch_errors @@ fun () ->
   match parse_expr ?keywords @@ protect expr with
   | exception exn ->
     print_exn ppf exn;
@@ -321,23 +308,26 @@ let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
     in
     let open Context in
     match extract_specific_parsing_info e with
-    | `Ident longident | `Constr longident ->
-      begin try
-        begin match context with
-        | Label (lbl_des, _) ->
-          (* We use information from the context because `Env.find_label_by_name`
+    | `Ident longident | `Constr longident -> begin
+      try
+        begin
+          match context with
+          | Label lbl_des ->
+            (* We use information from the context because `Env.find_label_by_name`
                can fail *)
-          Printtyp.Compat.type_expr ppf lbl_des.lbl_arg
-        | Type -> print_type ppf verbosity env longident
-        (* TODO: special processing for module aliases ? *)
-        | Module_type -> print_modtype ppf verbosity env longident
-        | Module_path -> print_modpath ppf verbosity env longident
-        | Constructor _ -> print_constr ppf env longident
-        | _ -> raise Fallback
+            Printtyp.type_expr ppf lbl_des.lbl_arg
+          | Type ->
+            log ~title:"type_in_env" "Type type";
+            print_type ppf env longident
+          (* TODO: special processing for module aliases ? *)
+          | Module_type -> print_modtype ppf verbosity env longident
+          | Module_path -> print_modpath ppf verbosity env longident
+          | Constructor _ -> print_constr ppf env longident
+          | _ -> raise Fallback
         end;
         true
       with _ -> (
-        (* Fallback to contextless typing attemps *)
+        (* Fallback to contextless typing attempts *)
         try
           print_expr e;
           true
@@ -358,7 +348,7 @@ let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
               with _ ->
                 print_exn ppf exn;
                 false))))
-      end
+    end
     | `Other -> (
       try
         print_expr e;
@@ -368,7 +358,8 @@ let type_in_env ?(verbosity = Verbosity.default) ?keywords ~context env ppf expr
         false))
 
 let print_constr ~verbosity env ppf cd =
-  Printtyp.wrap_printing_env env ~verbosity @@ fun () -> print_cstr_desc ppf cd
+  Printtyp.wrap_printing_env env ~verbosity @@ fun () ->
+  (Format_doc.compat print_cstr_desc) ppf cd
 
 (* From doc-ock
    https://github.com/lpw25/doc-ock/blob/master/src/docOckAttrs.ml *)
@@ -385,10 +376,4 @@ let is_deprecated =
   List.exists ~f:(fun (attr : Parsetree.attribute) ->
       match Ast_helper.Attr.as_tuple attr with
       | { Location.txt = "deprecated" | "ocaml.deprecated"; loc = _ }, _ -> true
-      | _ -> false)
-
-let is_ppx_template_generated =
-  List.exists ~f:(fun (attr : Parsetree.attribute) ->
-      match Ast_helper.Attr.as_tuple attr with
-      | { Location.txt = "merlin.ppx_template_generated"; loc = _ }, _ -> true
       | _ -> false)

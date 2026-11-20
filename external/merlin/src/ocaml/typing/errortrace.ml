@@ -103,29 +103,19 @@ type first_class_module =
     | Package_inclusion of Format_doc.doc
     | Package_coercion of Format_doc.doc
 
-type arrow_position = Argument | Return
-
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
   | Variant : 'variety variant -> ('a, 'variety) elt
   | Obj : 'variety obj -> ('a, 'variety) elt
   | Escape : 'a escape -> ('a, _) elt
-  | Function_label_mismatch of arg_label diff
+  | Function_label_mismatch of Asttypes.arg_label diff
   | Tuple_label_mismatch of string option diff
   | Incompatible_fields : { name:string; diff: type_expr diff } -> ('a, _) elt
       (* Could move [Incompatible_fields] into [obj] *)
   | First_class_module: first_class_module -> ('a,_) elt
   (* Unification & Moregen; included in Equality for simplicity *)
   | Rec_occur : type_expr * type_expr -> ('a, _) elt
-  | Bad_jkind : type_expr * Jkind.Violation.t -> ('a, _) elt
-  | Bad_jkind_sort : type_expr * Jkind.Violation.t -> ('a, _) elt
-  | Unequal_var_jkinds :
-      type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
-  | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
-  | Mode_mismatch :
-      arrow_position * Mode.With_locality.error -> ('a, comparison) elt
-  | Weaken_sort : { pat: type_expr; subj: type_expr } -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
@@ -146,12 +136,6 @@ let map_elt (type variety) f : ('a, variety) elt -> ('b, variety) elt = function
   | Variant _ | Obj _ | Function_label_mismatch _ | Tuple_label_mismatch _
   | Incompatible_fields _
   | Rec_occur (_, _) | First_class_module _  as x -> x
-  | Bad_jkind _ as x -> x
-  | Bad_jkind_sort _ as x -> x
-  | Unequal_var_jkinds _ as x -> x
-  | Unequal_tof_kind_jkinds _ as x -> x
-  | Mode_mismatch _ as x -> x
-  | Weaken_sort _ as x -> x
 
 let map f t = List.map (map_elt f) t
 

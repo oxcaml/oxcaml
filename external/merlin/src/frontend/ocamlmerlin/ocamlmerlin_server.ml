@@ -7,22 +7,16 @@ module Server = struct
     | "stop-server" :: _ -> raise Exit
     | args -> New_merlin.run ~new_env:(Some environ) (Some wd) args
 
-  let process_client ~server client =
+  let process_client client =
     let context = client.Os_ipc.context in
     Os_ipc.context_setup context;
     let close_with return_code =
       flush_all ();
-      Os_ipc.context_close context ~return_code;
-      (* The first flush may have failed due to IO errors, so flush again now that we've
-         reset our file descriptors.  This may cause us to send random output to the
-         server's stdout and stderr, but it's better than sending random output to the
-         next client to connect. *)
-      flush_all ()
+      Os_ipc.context_close context ~return_code
     in
     match process_request client with
     | code -> close_with code
     | exception Exit ->
-      Os_ipc.server_close server;
       close_with (-1);
       raise Exit
     | exception exn ->
@@ -48,10 +42,10 @@ module Server = struct
     match server_accept merlinid server with
     | None ->
       (* Timeout *)
-      Os_ipc.server_close server
+      ()
     | Some client ->
       let continue =
-        match process_client ~server client with
+        match process_client client with
         | exception Exit -> false
         | () -> true
       in
@@ -63,7 +57,8 @@ module Server = struct
     | Some server ->
       (* If the client closes its connection, don't let it kill us with a SIGPIPE. *)
       if Sys.unix then Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
-      loop (File_id.get Sys.executable_name) server
+      loop (File_id.get Sys.executable_name) server;
+      Os_ipc.server_close server
 end
 
 let main () =

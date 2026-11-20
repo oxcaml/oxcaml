@@ -30,21 +30,19 @@
 
 open Std
 
-let sherlodoc_type_of _env typ =
+let sherlodoc_type_of env typ =
   let open Merlin_sherlodoc in
   let rec aux typ =
     match Types.get_desc typ with
-    | Types.Tvar { name = None; jkind = _ } -> Type_parsed.Wildcard
-    | Types.Tvar { name = Some ty; jkind = _ } -> Type_parsed.Tyvar ty
+    | Types.Tvar None -> Type_parsed.Wildcard
+    | Types.Tvar (Some ty) -> Type_parsed.Tyvar ty
     | Types.Ttuple elts ->
-      let aux_tuple_element (_, typ) = aux typ in
-      Type_parsed.tuple @@ List.map ~f:aux_tuple_element elts
+      Type_parsed.tuple @@ List.map ~f:(fun (_, t) -> aux t) elts
     | Types.Tarrow (_, a, b, _) -> Type_parsed.Arrow (aux a, aux b)
     | Types.Tconstr (p, args, _) ->
-      let p = p in
+      let p = Out_type.rewrite_double_underscore_paths env p in
       let name = Format.asprintf "%a" Printtyp.path p in
       Type_parsed.Tycon (name, List.map ~f:aux args)
-    | Types.Tpoly (typ, []) -> aux typ
     | _ -> Type_parsed.Unhandled
   in
   typ |> aux |> Type_expr.normalize_type_parameters
@@ -52,15 +50,15 @@ let sherlodoc_type_of _env typ =
 let make_constructible path desc =
   let holes =
     match Types.get_desc desc with
-    | Types.Tarrow ((l, _, _), _, b, _) ->
+    | Types.Tarrow (l, _, b, _) ->
       let rec aux acc t =
         match Types.get_desc t with
-        | Types.Tarrow ((l, _, _), _, b, _) -> aux (acc ^ with_label l) b
+        | Types.Tarrow (l, _, b, _) -> aux (acc ^ with_label l) b
         | _ -> acc
       and with_label l =
         match l with
-        | Nolabel -> " _"
-        | Labelled s | Position s -> " ~" ^ s ^ ":_"
+        | Ocaml_parsing.Asttypes.Nolabel -> " _"
+        | Labelled s -> " ~" ^ s ^ ":_"
         | Optional _ -> ""
       in
       aux (with_label l) b
@@ -72,9 +70,8 @@ let doc_to_option = function
   | `Builtin doc | `Found doc -> Some doc
   | _ -> None
 
-let get_doc ~buffer_source ~config ~env ~local_defs ~comments ~pos name =
-  Locate.get_doc ~buffer_source ~config ~env ~local_defs ~comments ~pos
-    (`User_input name)
+let get_doc ~config ~env ~local_defs ~comments ~pos name =
+  Locate.get_doc ~config ~env ~local_defs ~comments ~pos (`User_input name)
   |> doc_to_option
 
 let compare_result Query_protocol.{ cost = cost_a; name = a; doc = doc_a; _ }
@@ -93,9 +90,8 @@ let compare_result Query_protocol.{ cost = cost_a; name = a; doc = doc_a; _ }
     | _ -> c
   else c
 
-let compute_value query env _ path desc _ acc =
+let compute_value query env _ path desc acc =
   let open Merlin_sherlodoc in
-  let desc = Subst.Lazy.force_value_description desc in
   let d = desc.Types.val_type in
   let typ = sherlodoc_type_of env d in
   let name =
@@ -117,19 +113,19 @@ let compute_values query env lident acc =
 
 let values_from_module query env lident acc =
   let rec aux acc lident =
-    match Env.find_module_by_name_lazy lident env with
+    match Env.find_module_by_name lident env with
     | exception _ -> acc
     | _ ->
       let acc = compute_values query env (Some lident) acc in
       Env.fold_modules
-        (fun name _ (mdl : Subst.Lazy.module_declaration) acc ->
-          match mdl.md_type with
-          | Mty_alias _ -> acc
-          | _ ->
-            let lident =
-              Longident.Ldot (Location.mknoloc lident, Location.mknoloc name)
-            in
-            aux acc lident)
+        (fun name _ mdl acc ->
+           match mdl.Types.md_type with
+           | Types.Mty_alias _ -> acc
+           | _ ->
+             let lident =
+               Longident.Ldot (Location.mknoloc lident, Location.mknoloc name)
+             in
+             aux acc lident)
         (Some lident) env acc
   in
   aux acc lident

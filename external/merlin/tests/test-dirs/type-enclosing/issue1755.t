@@ -21,7 +21,7 @@ provide better result.
           "line": 1,
           "col": 25
         },
-        "type": "type b : any = b",
+        "type": "b",
         "tail": "no"
       },
       {
@@ -45,7 +45,7 @@ provide better result.
           "line": 1,
           "col": 25
         },
-        "type": "type a : immutable_data = A | B of int * b",
+        "type": "type a = A | B of int * b",
         "tail": "no"
       }
     ],

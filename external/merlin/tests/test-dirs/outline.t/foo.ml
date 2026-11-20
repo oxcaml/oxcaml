@@ -22,31 +22,7 @@ exception Ex of char
 
 type ('a, 'b) eithery = Lefty of 'a | Righty of 'b
 
-type 'a point =
-  { x : 'a
-  ; y : 'a
-  ; z : 'a
-  }
-
-include struct
-  type t
-  let x = 1
-  include struct
-    type u
-    let y = "y"
-  end
-end
-
-module type S = sig
-  include sig
-    type t
-    val x : int
-    include sig
-      type u
-      val y : string
-    end
-  end
-end
+type 'a point = { x : 'a; y : 'a; z : 'a }
 
 class a = object end
 

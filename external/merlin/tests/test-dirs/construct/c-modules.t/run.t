@@ -1,16 +1,16 @@
 Simple module construction
-  $ $MERLIN single construct -position 45:16 \
+  $ $MERLIN single construct -position 40:16 \
   > -filename module.ml <module.ml
   {
     "class": "return",
     "value": [
       {
         "start": {
-          "line": 45,
+          "line": 40,
           "col": 15
         },
         "end": {
-          "line": 45,
+          "line": 40,
           "col": 16
         }
       },
@@ -21,7 +21,7 @@ Simple module construction
       | A 
       | B of t 
     type (-!'a, +!'b) t' =
-      | T of (('a) -> 'b) 
+      | T of ('a -> 'b) 
     type t2 =
       | A 
       | B of string 
@@ -37,8 +37,6 @@ Simple module construction
     type t_ext +=  
       | A 
     type v = [ `A of t_ext ]
-    type t_function =
-      (int) -> foo:(string) -> ?bar:(bool option) -> here:[%call_pos ] -> char
     let i = _
     let f = _
     module Sub = struct let y = _ end
@@ -51,10 +49,9 @@ Simple module construction
       sig
         type t
         and b
-        val f : (int) -> float
+        val f : int -> float
         module type STyp  = sig  end
         module D : Another
-        val trepr : 'a . ('a) -> 'a
       end
     module Submod =
       struct
@@ -63,11 +60,8 @@ Simple module construction
         let f = _
         module type STyp  = sig  end
         module D = struct let i = _ end
-        let trepr = _
       end
     module SubFunc(M:Sig) = struct let g = _ end
-    kind_ k_abstract
-    kind_ k_concrete = any
   end"
       ]
     ],
@@ -76,18 +70,18 @@ Simple module construction
 
 First class modules
 
-  $ $MERLIN single construct -position 47:26 \
+  $ $MERLIN single construct -position 42:26 \
   > -filename module.ml <module.ml
   {
     "class": "return",
     "value": [
       {
         "start": {
-          "line": 47,
+          "line": 42,
           "col": 25
         },
         "end": {
-          "line": 47,
+          "line": 42,
           "col": 26
         }
       },
@@ -98,18 +92,18 @@ First class modules
     "notifications": []
   }
 
-  $ $MERLIN single construct -position 49:17 \
+  $ $MERLIN single construct -position 44:17 \
   > -filename module.ml <module.ml
   {
     "class": "return",
     "value": [
       {
         "start": {
-          "line": 49,
+          "line": 44,
           "col": 16
         },
         "end": {
-          "line": 49,
+          "line": 44,
           "col": 17
         }
       },

@@ -11,19 +11,17 @@
   $ mkdir source
 
   $ cat >source/main.ml <<'EOF'
-  > let () = print_endline Pparse.x
+  > let () = print_endline Pparse.x 
   > EOF
 
   $ cat >source/dune <<'EOF'
   > (rule (copy# ../real_source/pparse.ml pparse.ml))
-  > (executable
-  >  (name main)
-  >  (modes byte))
+  > (executable (name main))
   > EOF
 
 
-  $ $DUNE build @check
-  $ $DUNE exec ./source/main.bc
+  $ dune build @check
+  $ dune exec ./source/main.exe
   Hello
 
   $ $MERLIN single locate -look-for ml -position 1:30 \

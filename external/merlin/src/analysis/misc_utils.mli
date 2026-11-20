@@ -1,3 +1,5 @@
+open Misc
+
 module Path : sig
   (** [to_shortest_lid ~env ~env_check path] will make a [Longident.t] from the
   provided [Path.t] and attempt to use the shortest prefix possible given the
@@ -22,12 +24,13 @@ module Path : sig
   val is_opened : Env.t -> Path.t -> bool
 end
 
+(* Add parenthesis to qualified operators *)
+val parenthesize_name : string -> string
+
 (** [parse_identifier] attempts to re-parse a longident so that we get
     the location of each of its components. *)
 val parse_identifier :
-  Mconfig.t * Msource.t ->
-  Lexing.position ->
-  Unit_info.modname Location.loc list
+  Mconfig.t * Msource.t -> Lexing.position -> modname Location.loc list
 
 (** [reconstruct_identifier pipeline pos] returns growing ranges around [pos] and the
   associated identifier. *)
@@ -36,9 +39,3 @@ val reconstruct_identifier :
   Lexing.position ->
   (string * int) option ->
   string Location.loc list
-
-(* Add parenthesis to qualified operators *)
-val parenthesize_name : string -> string
-
-(* [is_current_unit cu] returns true if [cu] is the current compilation unit *)
-val is_current_unit : string -> bool

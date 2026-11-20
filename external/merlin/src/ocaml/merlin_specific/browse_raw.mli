@@ -90,29 +90,14 @@ type node =
   | Open_description of open_description
   | Open_declaration of open_declaration
   | Method_call of expression * meth * Location.t
-  | Record_field :
+  | Record_field of
       [ `Expression of expression | `Pattern of pattern ]
-      * 'rep Data_types.gen_label_description
-      * 'rep Data_types.record_form
+      * Data_types.label_description
       * Longident.t Location.loc
-      -> node
   | Module_binding_name of module_binding
   | Module_declaration_name of module_declaration
   | Module_type_declaration_name of module_type_declaration
-  | Mode of Mode.With_locality.atom Location.loc
-  | Modality of Mode.Modality.atom Location.loc
-  | Jkind_annotation of Parsetree.jkind_annotation
-  | Jkind_declaration of jkind_declaration
-  | Mod_bound of Parsetree.mode Location.loc
-  | Scannable_axis_annotation of string Location.loc
-  | Attribute of attribute
-      (** The location of an [Attribute] is considered to be the location of the
-          [attr_name], not the overall attribute. This is because in an [Mbrowse.t], an
-          [Attribute] is not the parent node of its payload. Thus, to ensure that sibling
-          nodes do not have overlapping locations (otherwise [Mtyper.node_at] would
-          break), we cannot use the location of the entire attribute. *)
 
-(** Fold over the children of a node. Note that this is not deep. *)
 val fold_node : (Env.t -> node -> 'a -> 'a) -> Env.t -> node -> 'a -> 'a
 
 (** Accessors for information specific to a node *)

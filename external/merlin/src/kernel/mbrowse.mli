@@ -31,14 +31,6 @@ open Std
 type node = Browse_raw.node
 type t = (Env.t * node) list
 
-module Let_pun_behavior : sig
-  type t = Prefer_expression | Prefer_pattern
-end
-
-module Record_pattern_pun_behavior : sig
-  type t = Prefer_label | Prefer_pattern
-end
-
 val fold_node :
   (Env.t -> Browse_raw.node -> 'a -> 'a) -> Env.t -> Browse_raw.node -> 'a -> 'a
 val node_loc : Browse_raw.node -> Location.t
@@ -51,27 +43,12 @@ val drop_leaf : t -> t option
  * through:
  *    foo bar (baz :: tail) <cursor>
  * asking for node from cursor position will return context of "tail".
- * Returns the matching node and all its ancestors or the empty list.
-
- [let_pun_behavior] dictates whether to prefer the expression or pattern node in a
-    punned let expression. The default is [Prefer_pattern] *)
-val deepest_before :
-  ?let_pun_behavior:Let_pun_behavior.t ->
-  ?record_pattern_pun_behavior:Record_pattern_pun_behavior.t ->
-  Lexing.position ->
-  t list ->
-  t
+ * Returns the matching node and all its ancestors or the empty list. *)
+val deepest_before : Lexing.position -> t list -> t
 
 val select_open_node : t -> (Path.t * Longident.t * t) option
 
-(** [let_pun_behavior] dictates whether to prefer the expression or pattern node in a
-    punned let expression. The default is [Prefer_pattern] *)
-val enclosing :
-  ?let_pun_behavior:Let_pun_behavior.t ->
-  ?record_pattern_pun_behavior:Record_pattern_pun_behavior.t ->
-  Lexing.position ->
-  t list ->
-  t
+val enclosing : Lexing.position -> t list -> t
 
 val of_structure : Typedtree.structure -> t
 val of_signature : Typedtree.signature -> t

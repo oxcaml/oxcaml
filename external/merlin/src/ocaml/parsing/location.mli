@@ -22,23 +22,6 @@
 
 open Format
 
-(* loc_ghost: Ghost expressions and patterns:
-  expressions and patterns that do not appear explicitly in the
-  source file they have the loc_ghost flag set to true.
-  Then the profiler will not try to instrument them and the
-  -annot option will not try to display their type.
-
-  Every grammar rule that generates an element with a location must
-  make at most one non-ghost element, the topmost one.
-
-  How to tell whether your location must be ghost:
-  A location corresponds to a range of characters in the source file.
-  If the location contains a piece of code that is syntactically
-  valid (according to the documentation), and corresponds to the
-  AST node, then the location must be real; in all other cases,
-  it must be ghost.
-*)
-
 type t = Warnings.loc = {
   loc_start: Lexing.position;
   loc_end: Lexing.position;
@@ -76,14 +59,6 @@ type t = Warnings.loc = {
    Else all fields are correct.
 *)
 
-(** Strict comparison: Compares all fields of the two locations, irrespective of
-    whether or not they happen to refer to the same place.  For fully-defined
-    locations within the same file, is guaranteed to return them in source
-    order; otherwise, or if given two locations that differ only in ghostiness,
-    is just guaranteed to produce a consistent order, but which one is
-    unspecified. *)
-val compare : t -> t -> int
-
 val none : t
 (** An arbitrary value of type [t]; describes an empty ghost range. *)
 
@@ -100,9 +75,6 @@ val init : Lexing.lexbuf -> string -> unit
 val curr : Lexing.lexbuf -> t
 (** Get the location of the current token from the [lexbuf]. *)
 
-val ghostify : t -> t
-(** Return a version of the location with [loc_ghost = true] *)
-
 val symbol_rloc: unit -> t
 val symbol_gloc: unit -> t
 
@@ -115,13 +87,6 @@ val rhs_interval: int -> int -> t
 val get_pos_info: Lexing.position -> string * int * int
 (** file, line, char *)
 
-(** [merge locs] returns the location covering all locations from [locs]. It raises if
-    [locs] is empty, and the result only makes sense if all the locations are from the
-    same file. If [~ghost:false] is passed, the result location will only be ghost if one
-    of the input locations was ghost. The default is [~ghost:true], which causes the
-    result location to be ghost no matter what *)
-val merge: ?ghost:bool -> t list -> t
-
 type 'a loc = {
   txt : 'a;
   loc : t;
@@ -129,10 +94,7 @@ type 'a loc = {
 
 val mknoloc : 'a -> 'a loc
 val mkloc : 'a -> t -> 'a loc
-val get_txt : 'a loc -> 'a
-val get_loc : 'a loc -> t
-val map : ('a -> 'b) -> 'a loc -> 'b loc
-val compare_txt : ('a -> 'b -> 'c) -> 'a loc -> 'b loc -> 'c
+
 
 (** {1 Input info} *)
 
@@ -145,6 +107,7 @@ val input_lexbuf: Lexing.lexbuf option ref
    [!input_phrase_buffer] should be [Some buf] where [buf] contains the last
    toplevel phrase. *)
 val input_phrase_buffer: Buffer.t option ref
+
 
 (** {1 Toplevel-specific functions} *)
 
@@ -235,7 +198,6 @@ val show_filename: string -> string
 
 val print_filename: formatter -> string -> unit
 val print_loc: formatter -> t -> unit
-val print_loc_in_lowercase: formatter -> t -> unit
 val print_locs: formatter -> t list -> unit
 val separate_new_message: formatter -> unit
 
@@ -243,11 +205,12 @@ module Doc: sig
   val separate_new_message: unit Format_doc.printer
   val filename: string Format_doc.printer
   val quoted_filename: string Format_doc.printer
-  val loc: capitalize_first:bool -> t Format_doc.printer
+  val loc: t Format_doc.printer
   val locs: t list Format_doc.printer
 end
 
 (** {1 Toplevel-specific location highlighting} *)
+
 (*
 val highlight_terminfo:
   Lexing.lexbuf -> formatter -> t list -> unit
@@ -274,9 +237,10 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
-  source : error_source;
   footnote: Format_doc.t option;
+  source : error_source;
 }
+
 
 (* Exposed for Merlin *)
 val loc_of_report: report -> t
@@ -308,17 +272,10 @@ type report_printer = {
     existing ones.
 *)
 
-(*
-(* Support for flags that can also be set from an environment variable *)
-(* TODO This is not the natural home for these functions, but Clflags cannot
-        depend on Location *)
-val set_from_env : 'a option ref -> 'a Clflags.env_reader -> unit
-val read_clflags_from_env : unit -> unit
-*)
-
 (** {2 Report printers used in the compiler} *)
 
 val batch_mode_printer: report_printer
+
 (*
 val terminfo_toplevel_printer: Lexing.lexbuf -> report_printer
 
@@ -388,7 +345,7 @@ val default_alert_reporter: t -> Warnings.alert -> report option
 
 val print_alert: t -> formatter -> Warnings.alert -> unit
 (** Prints an alert. This is simply the composition of [report_alert] and
-   [print_report]. *)
+    [print_report]. *)
 
 val prerr_alert_ref: (t -> Warnings.alert -> unit) ref
 
@@ -417,31 +374,25 @@ type error = report
 
 type delayed_msg = unit -> Format_doc.t option
 
-val error:
-  ?loc:t -> ?sub:msg list -> ?source:error_source ->
-  ?footnote:delayed_msg -> string -> error
+val error: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ?source:error_source -> string -> error
 
-val errorf:
-  ?loc:t -> ?sub:msg list -> ?source:error_source ->
-  ?footnote:delayed_msg ->
-  ('a, Format_doc.formatter, unit, error) format4 -> 'a
+val errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ?source:error_source -> ('a, Format_doc.formatter, unit, error) format4 -> 'a
 
 val aligned_error_hint:
-  ?loc:t -> ?sub:msg list -> ?source:error_source ->
-  ?footnote:delayed_msg ->
+  ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg -> ?source:error_source ->
   ('a, Format_doc.formatter, unit, Format_doc.t option ->  error) format4 -> 'a
 (** [aligned_error_hint ?loc ?sub ?footnote fmt ... aligned_hint] produces an
     error report where the potential [aligned_hint] message has been aligned
     with the main error message before being added to the list of submessages.*)
 
-val error_of_printer:
-  ?loc:t -> ?sub:msg list -> ?source:error_source ->
-  ?footnote:delayed_msg ->
+val error_of_printer: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ?source:error_source -> (Format_doc.formatter -> 'a -> unit) -> 'a -> error
+
+val error_of_printer_file: ?source:error_source ->
   (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
-val error_of_printer_file: ?source:error_source -> (Format_doc.formatter -> 'a -> unit) -> 'a -> error
-
-val multiple_errors : ?loc:t -> error list -> error
 
 (** {1 Automatically reporting errors for raised exceptions} *)
 
@@ -463,13 +414,8 @@ exception Already_displayed_error
 (** Raising [Already_displayed_error] signals an error which has already been
    printed. The exception will be caught, but nothing will be printed *)
 
-val raise_errorf:
-  ?loc:t -> ?sub:msg list -> ?source:error_source ->
-  ?footnote:delayed_msg ->
-  ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
+val raise_errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ?source:error_source -> ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
 
 val report_exception: formatter -> exn -> unit
 (** Reraise the exception if it is unknown. *)
-
-(** CR uniqueness: remove this once overwriting is fully implemented *)
-val todo_overwrite_not_implemented : ?kind:string -> t -> 'a

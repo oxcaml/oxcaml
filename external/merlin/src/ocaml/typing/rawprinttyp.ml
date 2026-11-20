@@ -18,7 +18,6 @@
 
 open Format
 open Types
-open Mode
 let longident = Pprintast.longident
 
 let raw_list pr ppf = function
@@ -53,14 +52,6 @@ let print_name ppf = function
 
 let path = Format_doc.compat Path.print
 
-let string_of_label : Types.arg_label -> string = function
-    Nolabel -> ""
-  | Labelled s | Position s -> s
-  | Optional s -> "?"^s
-
-let out_modalities_of_mod_bounds mod_bounds =
-  Typemode.untransl_mod_bounds mod_bounds
-
 let visited = ref []
 let rec raw_type ppf ty =
   let ty = safe_repr [] ty in
@@ -84,59 +75,24 @@ and raw_lid_type_list tl =
              let lid = Longident.unflatten lid |> Option.get in
              fprintf ppf "(@,%a,@,%a)" longident lid raw_type typ)
     tl
-and raw_row_desc ppf row =
-  let Row {fields; more; name; fixed; closed} = row_repr row in
-  fprintf ppf
-    "@[<hov1>{@[%s@,%a;@]@ @[%s@,%a;@]@ %s%B;@ %s%a;@ @[<1>%s%t@]}@]"
-    "row_fields="
-    (raw_list (fun ppf (l, f) ->
-       fprintf ppf "@[%s,@ %a@]" l raw_field f))
-    fields
-    "row_more=" raw_type more
-    "row_closed=" closed
-    "row_fixed=" raw_row_fixed fixed
-    "row_name="
-    (fun ppf ->
-       match name with None -> fprintf ppf "None"
-                     | Some(p,tl) ->
-                       fprintf ppf "Some(@,%a,@,%a)" path p raw_type_list tl)
-and raw_type_desc ppf ty =
-  let env = Env.empty in
-  match ty with
-    Tvar { name; jkind } ->
-      fprintf ppf "@[<hov1>Tvar (@,%a,@,%a)]"
-        print_name name Jkind.Debug_printers.t jkind
-  | Tarrow((l,arg,ret),t1,t2,c) ->
-      fprintf ppf "@[<hov1>Tarrow((\"%s\",%a,%a),@,%a,@,%a,@,%s)@]"
-        (string_of_label l)
-        (Format_doc.compat (With_locality.print ~verbose:true ())) arg
-        (Format_doc.compat (With_locality.print ~verbose:true ())) ret
-        raw_type t1 raw_type t2
+and raw_type_desc ppf = function
+    Tvar name -> fprintf ppf "Tvar %a" print_name name
+  | Tarrow(l,t1,t2,c) ->
+      fprintf ppf "@[<hov1>Tarrow(\"%s\",@,%a,@,%a,@,%s)@]"
+        (Asttypes.string_of_label l) raw_type t1 raw_type t2
         (if is_commu_ok c then "Cok" else "Cunknown")
   | Ttuple tl ->
       fprintf ppf "@[<1>Ttuple@,%a@]" labeled_type_list tl
-  | Tunboxed_tuple tl ->
-      fprintf ppf "@[<1>Tunboxed_tuple@,%a@]" labeled_type_list tl
   | Tconstr (p, tl, abbrev) ->
       fprintf ppf "@[<hov1>Tconstr(@,%a,@,%a,@,%a)@]" path p
         raw_type_list tl
         (raw_list path) (list_of_memo !abbrev)
-  | Tmod (t, mod_bounds) ->
-      fprintf ppf "@[<hov1>Tmod(@,(%a @@ %s))@]"
-        raw_type t
-        (String.concat " " (out_modalities_of_mod_bounds mod_bounds))
   | Tobject (t, nm) ->
       fprintf ppf "@[<hov1>Tobject(@,%a,@,@[<1>ref%t@])@]" raw_type t
         (fun ppf ->
           match !nm with None -> fprintf ppf " None"
           | Some(p,tl) ->
               fprintf ppf "(Some(@,%a,@,%a))" path p raw_type_list tl)
-  | Tquote t ->
-      fprintf ppf "@[Tquote@ %a@]" raw_type t
-  | Tsplice t ->
-      fprintf ppf "@[Tsplice@ %a@]" raw_type t
-  | Tquote_eval t ->
-      fprintf ppf "@[Tquote_eval@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -146,39 +102,37 @@ and raw_type_desc ppf ty =
   | Tsubst (t, None) -> fprintf ppf "@[<1>Tsubst@,(%a,None)@]" raw_type t
   | Tsubst (t, Some t') ->
       fprintf ppf "@[<1>Tsubst@,(%a,@ Some%a)@]" raw_type t raw_type t'
-  | Tunivar { name; jkind } ->
-      fprintf ppf "@[<hov1>Tunivar (@,%a,@,%a)]"
-        print_name name Jkind.Debug_printers.t jkind
+  | Tunivar name -> fprintf ppf "Tunivar %a" print_name name
   | Tpoly (t, tl) ->
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
         raw_type_list tl
-  | Trepr (t, sort_vars) ->
-      let print_sort_univar ppf uv =
-        fprintf ppf "%s" (Option.value uv.Jkind_types.Sort.name ~default:"_")
-      in
-      fprintf ppf "@[<hov1>Trepr(@,%a,@,[@[%a@]])@]"
-        raw_type t
-        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
-          print_sort_univar) sort_vars
   | Tvariant row ->
-    raw_row_desc ppf row
+      let Row {fields; more; name; fixed; closed} = row_repr row in
+      fprintf ppf
+        "@[<hov1>{@[%s@,%a;@]@ @[%s@,%a;@]@ %s%B;@ %s%a;@ @[<1>%s%t@]}@]"
+        "row_fields="
+        (raw_list (fun ppf (l, f) ->
+          fprintf ppf "@[%s,@ %a@]" l raw_field f))
+        fields
+        "row_more=" raw_type more
+        "row_closed=" closed
+        "row_fixed=" raw_row_fixed fixed
+        "row_name="
+        (fun ppf ->
+          match name with None -> fprintf ppf "None"
+          | Some(p,tl) ->
+              fprintf ppf "Some(@,%a,@,%a)" path p raw_type_list tl)
   | Tpackage pack ->
     fprintf ppf "@[<hov1>Tpackage(@,%a,@,%a)@]"
       path pack.pack_path
       raw_lid_type_list pack.pack_cstrs
-  | Tof_kind jkind ->
-    fprintf ppf "Tof_kind@ %a" (Format_doc.compat (Jkind.format env)) jkind
-  | Tbox t ->
-    fprintf ppf "@[Tbox@ %a@]" raw_type t
-
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"
 | Some Types.Rigid -> fprintf ppf "Some Rigid"
 | Some Types.Univar t -> fprintf ppf "Some(Univar(%a))" raw_type t
 | Some Types.Reified p -> fprintf ppf "Some(Reified(%a))" path p
-| Some Types.Fixed_existential -> fprintf ppf "Some Fixed_existential"
 
 and raw_field ppf rf =
   match_row_field
@@ -195,12 +149,8 @@ and raw_field ppf rf =
           match e with None -> fprintf ppf " RFnone"
           | Some f -> fprintf ppf "@,@[<1>(%a)@]" raw_field f))
     rf
+
 let type_expr ppf t =
   visited := []; kind_vars := []; kind_count := 0;
   raw_type ppf t;
   visited := []; kind_vars := []
-let row_field = raw_field
-let row_desc = raw_row_desc
-
-let () = Btype.print_raw := type_expr
-let () = Jkind.set_raw_type_expr type_expr

@@ -1,2 +1,0 @@
-open! Foo
-open! Bar

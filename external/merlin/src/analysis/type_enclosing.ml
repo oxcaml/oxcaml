@@ -9,7 +9,6 @@ type type_info =
   | Type of Env.t * Types.type_expr
   | Type_decl of Env.t * Ident.t * Types.type_declaration
   | Type_constr of Env.t * Data_types.constructor_description
-  | Jkind of Env.t * Types.jkind_lr
   | String of string
 
 type typed_enclosings =
@@ -35,15 +34,6 @@ let print_type ~verbosity type_info =
     wrap_printing_env env (fun () ->
         Printtyp.modtype env ppf m;
         Format.flush_str_formatter ())
-  | Jkind (env, jkind) ->
-    wrap_printing_env env (fun () ->
-        let verbosity : Jkind.Format_verbosity.t =
-          match Mconfig.Verbosity.to_int ~for_smart:0 verbosity > 0 with
-          | false -> Expanded
-          | true -> Expanded_with_all_mod_bounds
-        in
-        (Format_doc.compat (Jkind.format_verbose ~verbosity env)) ppf jkind;
-        Format.flush_str_formatter ())
   | String s -> s
 
 let from_nodes ~path =
@@ -67,27 +57,12 @@ let from_nodes ~path =
     | Module_declaration_name { md_type = { mty_type = m } }
     | Module_type_declaration_name { mtd_type = Some { mty_type = m } } ->
       ret (Modtype (env, m))
-    | Jkind_annotation annot -> (
-      (* CR-someday: We need to parse the annotation because the compiler doesn't include
-         the parsed jkind in the relevant spots. We should track it so that this is less
-         hacky. It would also make it easier to deal with with-bounds. *)
-      (* [Jkind.of_annotation] will fail to parse jkinds with with-bounds. For now, this
-         isn't important. Usually, users will be hovering a jkind to know what an
-         abbreviation means. *)
-      try
-        (* The context isn't important. It's just used for printing error messages, which
-           we immediately discard anyways. *)
-        let jkind =
-          Jkind.of_annotation ~context:(Type_variable "fake_for_merlin") env
-            annot
-        in
-        ret (Jkind (env, jkind))
-      with Jkind.Error.User_error _ -> None)
     | Class_field
         { cf_desc = Tcf_method (_, _, Tcfk_concrete (_, { exp_type })) } ->
-      begin match Types.get_desc exp_type with
-      | Tarrow (_, _, t, _) -> ret (Type (env, t))
-      | _ -> None
+      begin
+        match Types.get_desc exp_type with
+        | Tarrow (_, _, t, _) -> ret (Type (env, t))
+        | _ -> None
       end
     | Class_field
         { cf_desc = Tcf_val (_, _, _, Tcfk_concrete (_, { exp_type = t }), _) }
@@ -139,32 +114,33 @@ let from_reconstructed ~nodes ~cursor ~verbosity exprs =
     | Some (Context.Constructor (cd, loc)) ->
       log ~title:"from_reconstructed" "ctx: constructor %s" cd.cstr_name;
       Some (loc, Type_constr (env, cd), `No)
-    | Some (Context.Label ({ lbl_name; lbl_arg; _ }, _)) ->
+    | Some (Context.Label { lbl_name; lbl_arg; _ }) ->
       log ~title:"from_reconstructed" "ctx: label %s" lbl_name;
       Some (loc, Type (env, lbl_arg), `No)
     | Some Context.Constant -> None
     | _ -> (
-      let context = Option.value ~default:Context.Expr context in
-      (* Else use the reconstructed identifier *)
-      match source with
-      | "" ->
-        log ~title:"from_reconstructed" "no reconstructed identifier";
-        None
-      | source when (not include_lident) && Char.is_lowercase source.[0] ->
-        log ~title:"from_reconstructed" "skipping lident";
-        None
-      | source when (not include_uident) && Char.is_uppercase source.[0] ->
-        log ~title:"from_reconstructed" "skipping uident";
-        None
-      | source -> (
-        try
-          let ppf, to_string = Format.to_string () in
-          if Type_utils.type_in_env ~verbosity ~context env ppf source then (
-            log ~title:"from_reconstructed" "typed %s" source;
-            Some (loc, String (to_string ()), `No))
-          else (
-            log ~title:"from_reconstructed" "FAILED to type %s" source;
-            None)
-        with _ -> None))
+        let context = Option.value ~default:Context.Expr context in
+        (* Else use the reconstructed identifier *)
+        match source with
+        | "" ->
+          log ~title:"from_reconstructed" "no reconstructed identifier";
+          None
+        | source when (not include_lident) && Char.is_lowercase source.[0] ->
+          log ~title:"from_reconstructed" "skipping lident";
+          None
+        | source when (not include_uident) && Char.is_uppercase source.[0] ->
+          log ~title:"from_reconstructed" "skipping uident";
+          None
+        | source -> (
+            try
+              let ppf, to_string = Format.to_string () in
+              if Type_utils.type_in_env ~verbosity ~context env ppf source then (
+                let result = to_string () in
+                log ~title:"from_reconstructed" "typed %s : %s" source result;
+                Some (loc, String result, `No))
+              else (
+                log ~title:"from_reconstructed" "FAILED to type %s" source;
+                None)
+            with _ -> None))
   in
   List.filter_map exprs ~f

@@ -64,7 +64,7 @@ We expect module appearing in paths to be highlighted
     {
       "start": {
         "line": 4,
-        "col": 8
+        "col": 12
       },
       "end": {
         "line": 4,
@@ -75,7 +75,7 @@ We expect module appearing in paths to be highlighted
     {
       "start": {
         "line": 7,
-        "col": 4
+        "col": 8
       },
       "end": {
         "line": 7,

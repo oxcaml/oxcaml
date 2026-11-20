@@ -19,9 +19,7 @@
   > EOF
 
 NOTE: we need to build the @check target to have the cmt and not only the cmti
-# Jane Street: we run these tests with ocamlc rather than dune.
-# $ dune build @check
-  $ $OCAMLC -bin-annot -c test2.mli test2.ml test.ml
+  $ dune build @check
 
 Jump to interface:
   $ $MERLIN single locate -look-for mli -position 1:16 \

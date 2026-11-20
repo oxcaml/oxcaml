@@ -20,7 +20,7 @@ module Ident : sig
 
   val name : t -> string
 
-  val global : Global_module.Name.t -> t
+  val global : string -> t
 
 end
 
@@ -53,12 +53,6 @@ module Desc : sig
   type deprecated =
     | Deprecated
     | Not_deprecated
-
-  type visibility =
-    | Visible
-    | Hidden
-
-  val visibility_of_deprecated : deprecated -> visibility
 
   module Type : sig
 
@@ -264,13 +258,13 @@ module Component : sig
 
   type t =
     | Type of
-        Origin.t * Ident.t * Desc.Type.t * source * Desc.visibility
+        Origin.t * Ident.t * Desc.Type.t * source * Desc.deprecated
     | Class_type of
-        Origin.t * Ident.t * Desc.Class_type.t * source * Desc.visibility
+        Origin.t * Ident.t * Desc.Class_type.t * source * Desc.deprecated
     | Module_type of
-        Origin.t * Ident.t * Desc.Module_type.t * source * Desc.visibility
+        Origin.t * Ident.t * Desc.Module_type.t * source * Desc.deprecated
     | Module of
-        Origin.t * Ident.t * Desc.Module.t * source * Desc.visibility
+        Origin.t * Ident.t * Desc.Module.t * source * Desc.deprecated
     | Declare_type of Origin.t * Ident.t
     | Declare_class_type of Origin.t * Ident.t
     | Declare_module_type of Origin.t * Ident.t
