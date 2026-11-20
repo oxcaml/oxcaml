@@ -1,0 +1,5 @@
+ramp-up suspends off-heap work: true
+ramp-down resumes off-heap work: true
+exception: suspended true, resumed true
+accumulated: suspended true, resumed true
+no ramp-up: true

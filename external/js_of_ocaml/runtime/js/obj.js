@@ -319,9 +319,21 @@ function caml_custom_identifier(o) {
 //Provides: caml_ml_gc_ramp_up
 //Requires: caml_callback
 //Version: >= 5.4
+//If: !oxcaml
 function caml_ml_gc_ramp_up(f) {
   var a = caml_callback(f, [0]);
   var suspended = 0;
+  return [0, a, suspended];
+}
+
+//Provides: caml_ml_gc_ramp_up
+//Requires: caml_callback
+//Version: >= 5.4
+//If: oxcaml
+function caml_ml_gc_ramp_up(f) {
+  var a = caml_callback(f, [0]);
+  // In OxCaml the suspended work is a pair: (words, dependent bytes).
+  var suspended = [0, 0, 0];
   return [0, a, suspended];
 }
 

@@ -50,11 +50,19 @@ void caml_init_gc_tweaks(void);
 uintnat* caml_lookup_gc_tweak(const char* name, uintnat len);
 void caml_print_gc_tweaks(void);
 
+/* Collection work suspended by a ramp-up phase: major-heap words and
+   bytes of dependent (off-heap) memory. */
+struct caml_gc_ramp_work {
+  uintnat words;
+  uintnat dependent_bytes;
+};
+
 /* See the documentation of [Gc.ramp_up] in the standard library. */
-caml_result caml_gc_ramp_up(value callback, uintnat *out_suspended_work);
+caml_result caml_gc_ramp_up(value callback,
+                            struct caml_gc_ramp_work *out_suspended_work);
 
 /* See the documentation of [Gc.ramp_down] in the standard library. */
-void caml_gc_ramp_down(uintnat suspended_ramp_up_words);
+void caml_gc_ramp_down(struct caml_gc_ramp_work suspended_work);
 
 #endif /* CAML_INTERNALS */
 

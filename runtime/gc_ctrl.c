@@ -631,17 +631,25 @@ CAMLprim value caml_runtime_parameters (value unit)
 }
 /* Ramp-up phase. */
 
-static uintnat get_ramp_up_suspended_words(void) {
-  return (Caml_state->current_ramp_up_allocated_words_diff
-          + Caml_state->allocated_words_suspended);
+static struct caml_gc_ramp_work get_ramp_up_suspended_work(void) {
+  return (struct caml_gc_ramp_work) {
+    .words = (Caml_state->current_ramp_up_allocated_words_diff
+              + Caml_state->allocated_words_suspended),
+    .dependent_bytes = (Caml_state->current_ramp_up_dependent_bytes_diff
+                        + Caml_state->allocated_dependent_bytes_suspended),
+  };
 }
 
-static void set_ramp_up_suspended_words(uintnat suspended_words) {
+static void set_ramp_up_suspended_work(struct caml_gc_ramp_work suspended) {
   Caml_state->current_ramp_up_allocated_words_diff =
-    suspended_words - Caml_state->allocated_words_suspended;
+    suspended.words - Caml_state->allocated_words_suspended;
+  Caml_state->current_ramp_up_dependent_bytes_diff =
+    suspended.dependent_bytes
+    - Caml_state->allocated_dependent_bytes_suspended;
 }
 
-caml_result caml_gc_ramp_up(value callback, uintnat *out_suspended_words) {
+caml_result caml_gc_ramp_up(value callback,
+                            struct caml_gc_ramp_work *out_suspended_work) {
     /* Calls to [caml_gc_ramp_up] could be nested, so we are careful
        to save the current setting beforehand and restore it afterwards.
 
@@ -657,24 +665,28 @@ caml_result caml_gc_ramp_up(value callback, uintnat *out_suspended_words) {
     if (!ramp_up_already)
       Caml_state->gc_policy = (Caml_state->gc_policy | CAML_GC_RAMP_UP);
 
-    /* Save the suspended words of a potential outer phase,
+    /* Save the suspended work of a potential outer phase,
        and start a new ramp_up phase. */
-    uintnat suspended_words_outer = get_ramp_up_suspended_words();
-    if (!ramp_up_already) CAMLassert(suspended_words_outer == 0);
-    set_ramp_up_suspended_words(0);
+    struct caml_gc_ramp_work suspended_outer = get_ramp_up_suspended_work();
+    if (!ramp_up_already) {
+      CAMLassert(suspended_outer.words == 0);
+      CAMLassert(suspended_outer.dependent_bytes == 0);
+    }
+    set_ramp_up_suspended_work((struct caml_gc_ramp_work) { 0, 0 });
 
     caml_result res = caml_callback_res(callback, Val_unit);
 
-    /* Write the suspended words of the inner phase,
-       restore the suspended words of the outer phase. */
-    uintnat suspended_words_inner = get_ramp_up_suspended_words();
-    *out_suspended_words = suspended_words_inner;
-    set_ramp_up_suspended_words(suspended_words_outer);
+    /* Write the suspended work of the inner phase,
+       restore the suspended work of the outer phase. */
+    struct caml_gc_ramp_work suspended_inner = get_ramp_up_suspended_work();
+    *out_suspended_work = suspended_inner;
+    set_ramp_up_suspended_work(suspended_outer);
 
     CAML_GC_MESSAGE(POLICY,
       "Leaving a GC ramp-up phase; "
-      "suspended words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
-      suspended_words_inner);
+      "suspended words: %"ARCH_INTNAT_PRINTF_FORMAT"u, "
+      "suspended dependent bytes: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
+      suspended_inner.words, suspended_inner.dependent_bytes);
 
     if (!ramp_up_already)
       Caml_state->gc_policy = (Caml_state->gc_policy & ~CAML_GC_RAMP_UP);
@@ -682,29 +694,41 @@ caml_result caml_gc_ramp_up(value callback, uintnat *out_suspended_words) {
     return res;
 }
 
-void caml_gc_ramp_down(uintnat ramp_up_words) {
-  Caml_state->allocated_words_resumed += ramp_up_words;
+void caml_gc_ramp_down(struct caml_gc_ramp_work suspended_work) {
+  Caml_state->allocated_words_resumed += suspended_work.words;
+  Caml_state->allocated_dependent_bytes_resumed +=
+    suspended_work.dependent_bytes;
 }
+
+/* Fields of [Gc.suspended_collection_work]. */
+#define RAMP_WORK_FIELD_WORDS 0
+#define RAMP_WORK_FIELD_DEPENDENT_BYTES 1
 
 CAMLprim value caml_ml_gc_ramp_up(value callback) {
   CAMLparam1(callback);
-  CAMLlocal1(v);
-  uintnat deferred_words;
-  caml_result res = caml_gc_ramp_up(callback, &deferred_words);
+  CAMLlocal2(v, work);
+  struct caml_gc_ramp_work deferred;
+  caml_result res = caml_gc_ramp_up(callback, &deferred);
   if (caml_result_is_exception(res)) {
     // We will re-raise the exception below; before that,
     // we ramp_down to avoid discarding the deferred work.
-    caml_gc_ramp_down(deferred_words);
+    caml_gc_ramp_down(deferred);
   }
   v = caml_get_value_or_raise(res);
-  CAMLreturn (caml_alloc_2(0, v, Val_long(deferred_words)));
+  work = caml_alloc_2(0, Val_long(deferred.words),
+                      Val_long(deferred.dependent_bytes));
+  CAMLreturn (caml_alloc_2(0, v, work));
 }
 
 CAMLprim value caml_ml_gc_ramp_down(value work) {
-  uintnat resumed_words = Long_val(work);
+  struct caml_gc_ramp_work resumed = {
+    .words = Long_val(Field(work, RAMP_WORK_FIELD_WORDS)),
+    .dependent_bytes = Long_val(Field(work, RAMP_WORK_FIELD_DEPENDENT_BYTES)),
+  };
   CAML_GC_MESSAGE(POLICY,
-    "GC ramp-down; resumed words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
-    resumed_words);
-  caml_gc_ramp_down(resumed_words);
+    "GC ramp-down; resumed words: %"ARCH_INTNAT_PRINTF_FORMAT"u, "
+    "resumed dependent bytes: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
+    resumed.words, resumed.dependent_bytes);
+  caml_gc_ramp_down(resumed);
   return Val_unit;
 }

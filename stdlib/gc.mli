@@ -694,52 +694,79 @@ module (Tweak @@ nonportable) : sig
 end
 
 
-type suspended_collection_work
+(** Ramp-up phases: telling the GC that the live memory of the program
+    is growing, so that it does not work harder to no benefit. *)
+module Ramp : sig
+  type work
+  (** An amount of collection work suspended by ramp-up phases. *)
+
+  val zero : work
+  (** No collection work: [down zero] does nothing. *)
+
+  val add : work -> work -> work
+  (** [add w1 w2] is the combined collection work of [w1] and [w2]:
+      passing it to {!down} is equivalent to passing both [w1] and
+      [w2]. This lets the work suspended by several ramp-up phases
+      (for instance, while building the parts of a large long-lived
+      data structure) be accumulated, and resumed together (when the
+      structure dies). *)
+
+  external up : (unit -> 'a) -> 'a * work = "caml_ml_gc_ramp_up"
+  (** In general, the OCaml GC assumes that the program runs in
+      a "steady state" where peak memory usage remains constant: for
+      each newly allocated work, it assumes that one work has become
+      unreachable and will try to collect it during the next GC slice.
+
+      This assumption is incorrect at the points during program
+      execution where the live memory increases instead of remaining
+      stable: the steady-state assumption will make the GC work harder
+      at no benefit as it will not find more memory to collect.
+
+      [up f] puts the current domain in a "ramp-up" phase for the
+      duration of the evaluation of [f ()], letting the GC know that the
+      steady-state assumption does not hold; it should be used when you
+      know that the live memory of the program will increase
+      significantly.
+
+      During a ramp-up phase, the GC will not try to work harder for new
+      allocations, either in the major heap or of off-heap memory owned
+      by heap blocks (such as the data of large bigarrays):
+      the corresponding collection work is "suspended". The
+      total amount of suspended collection work is returned by [up]
+      along with the result of the function.
+
+      If the user discards this suspended work (by doing nothing
+      with it), the GC will never accelerate to recover the
+      corresponding amount of memory. This is appropriate if the ramp-up
+      work allocates long-lived memory that remains live until the end
+      of the program execution.
+
+      If the user knows that at a certain point in the program the live
+      memory consumption has been reduced by the corresponding amount --
+      typically, because the memory allocated during [up] has become
+      unused -- then they should call {!down} below to have the GC
+      "resume" this collection work.
+
+      If [f ()] raises an exception, the ramp-up phase terminates, the
+      collection work that was suspended is resumed, and the exception
+      is re-raised.
+
+      If [f ()] performs an effect, the effect is not handled and an
+      [Effect.Unhandled] exception is thrown instead.
+  *)
+
+  external down : work -> unit = "caml_ml_gc_ramp_down"
+  (** Notify the GC about some amount of collection work that was
+      suspended during a ramp-up phase, to be resumed now. *)
+end
+
+type suspended_collection_work = Ramp.work
+(** Synonym of {!Ramp.work}. *)
 
 external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work
   = "caml_ml_gc_ramp_up"
-(** In general, the OCaml GC assumes that the program runs in
-    a "steady state" where peak memory usage remains constant: for
-    each newly allocated work, it assumes that one work has become
-    unreachable and will try to collect it during the next GC slice.
-
-    This assumption is incorrect at the points during program
-    execution where the live memory increases instead of remaining
-    stable: the steady-state assumption will make the GC work harder
-    at no benefit as it will not find more memory to collect.
-
-    [ramp_up f] puts the current domain in a "ramp-up" phase for the
-    duration of the evaluation of [f ()], letting the GC know that the
-    steady-state assumption does not hold; it should be used when you
-    know that the live memory of the program will increase
-    significantly.
-
-    During a ramp-up phase, the GC will not try to work harder for new
-    allocations: the corresponding collection work is "suspended". The
-    total amount of suspended collection work is returned by [ramp_up]
-    along with the result of the function.
-
-    If the user discards this suspended work (by doing nothing
-    with it), the GC will never accelerate to recover the
-    corresponding amount of memory. This is appropriate if the ramp-up
-    work allocates long-lived memory that remains live until the end
-    of the program execution.
-
-    If the user knows that at a certain point in the program the live
-    memory consumption has been reduced by the corresponding amount --
-    typically, because the memory allocated during [ramp_up] has become
-    unused -- then they should call {!ramp_down} below to have the GC
-    "resume" this collection work.
-
-    If [f ()] raises an exception, the ramp-up phase terminates, the
-    collection work that was suspended is resumed, and the exception
-    is re-raised.
-
-    If [f ()] performs an effect, the effect is not handled and an
-    [Effect.Unhandled] exception is thrown instead.
-*)
+(** Synonym of {!Ramp.up}. *)
 
 external ramp_down : suspended_collection_work -> unit
   = "caml_ml_gc_ramp_down"
-(** Notify the GC about some amount of collection work that was
-    suspended during a ramp-up phase, to be resumed now. *)
+(** Synonym of {!Ramp.down}. *)
