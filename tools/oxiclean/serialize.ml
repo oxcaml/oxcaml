@@ -34,12 +34,12 @@ let rec impl : Model.Expr.t -> Json.t = function
       ]
     |> tag "field"
   | Function { body } -> impl body |> tag "body" |> tag "function"
-  | LetBinding { bound; body } ->
+  | Let_binding { bound; body } ->
     Json.Object [ "bound", impl bound; "body", impl body ] |> tag "letBinding"
-  | PhysicalEquality { lhs; rhs } ->
+  | Physical_equality { lhs; rhs } ->
     Json.Object [ "lhs", impl lhs; "rhs", impl rhs ]
     |> tag "physicalEquality"
-  | ScalarOperation { operation } ->
+  | Scalar_operation { operation } ->
     scalar_operation operation |> tag "operation" |> tag "scalarOperation"
   | Switch { scrutinee; n_consts; n_blocks; consts; blocks; failaction } ->
     Json.Object
@@ -51,10 +51,10 @@ let rec impl : Model.Expr.t -> Json.t = function
       ; "failAction", option impl failaction
       ]
     |> tag "switch"
-  | UpstreamCompilationUnit { name } ->
+  | Compilation_unit { name } ->
     global_module_name name
+    |> tag "name"
     |> tag "compilationUnit"
-    |> tag "upstreamCompilationUnit"
   | Value { value = v } ->
     value v |> tag "value" |> tag "val"
   | Var { de_bruijn } ->
@@ -140,10 +140,10 @@ let module_statics_field (within : Json.t) (index : int) : Json.t =
   Json.Object [ "within", within; "index", Json.int index ] |> tag "field"
 
 let rec module_statics : Model.module_statics -> Json.t = function
-  | Upstream_compilation_unit { name } ->
+  | Compilation_unit { name } ->
     global_module_name name
+    |> tag "name"
     |> tag "compilationUnit"
-    |> tag "upstreamCompilationUnit"
   | Module_var { de_bruijn } ->
     Json.int de_bruijn |> tag "deBruijn" |> tag "var"
   | Module_field { within; index } ->

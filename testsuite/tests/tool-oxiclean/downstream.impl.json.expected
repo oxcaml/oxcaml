@@ -4,9 +4,7 @@
       "apply": {
         "func": {
           "field": {
-            "indexInto": {
-              "upstreamCompilationUnit": {"compilationUnit": "Even"}
-            },
+            "indexInto": {"compilationUnit": {"name": "Even"}},
             "index": 0
           }
         },

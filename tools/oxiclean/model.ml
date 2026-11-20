@@ -1,28 +1,28 @@
 type module_statics =
-  | Upstream_compilation_unit of
+  | Compilation_unit of
       { name : Global_module.Name.t
-      }
-  | Module_var of
-      { de_bruijn : int
       }
   | Module_field of
       { within : module_statics
       ; index : int
       }
+  | Module_var of
+      { de_bruijn : int
+      }
 
 type module_type =
-  | Signature of
-      { absent : module_item_absent_at_runtime list
-      ; present : module_item_present_at_runtime list
-      }
   | Module_type_field of
       { within : module_statics
       ; index : int
       }
+  | Signature of
+      { absent : module_item_absent_at_runtime list
+      ; present : module_item_present_at_runtime list
+      }
 
 and type_decl =
-  { manifest : val_type option
-  ; arity : int
+  { arity : int
+  ; manifest : val_type option
   }
 
 and module_item_absent_at_runtime =
@@ -93,6 +93,9 @@ module rec Expr : sig
         { tag : int
         ; fields : t list
         }
+    | Compilation_unit of
+        { name : Global_module.Name.t
+        }
     | Field of
         { within : t
         ; index : int
@@ -100,15 +103,15 @@ module rec Expr : sig
     | Function of
         { body : t
         }
-    | LetBinding of
+    | Let_binding of
         { bound : t
         ; body : t
         }
-    | PhysicalEquality of
+    | Physical_equality of
         { lhs : t
         ; rhs : t
         }
-    | ScalarOperation of
+    | Scalar_operation of
         { operation : Scalar_operation.t
         }
     | Switch of
@@ -118,9 +121,6 @@ module rec Expr : sig
         ; consts : switch_case list
         ; blocks : switch_case list
         ; failaction : t option
-        }
-    | UpstreamCompilationUnit of
-        { name : Global_module.Name.t
         }
     | Value of
         { value : Value.t

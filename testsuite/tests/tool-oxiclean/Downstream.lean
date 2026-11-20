@@ -3,14 +3,14 @@ open Oxiclean.Model
 
 abbrev interface : ModuleType :=
   let even : ModuleStatics :=
-    .upstreamCompilationUnit Oxiclean.Extracted.Even.interface
+    .compilationUnit Oxiclean.Extracted.Even.interface
   let t : ValType := .constr (.field even 0) []
   let t_option : ValType := .constr (.predef .option) [t]
 
   .signature [] [.val t_option]
 
 abbrev implementation : Expr :=
-  let even : Expr := .upstreamCompilationUnit Oxiclean.Extracted.Even.interface
+  let even : Expr := .compilationUnit Oxiclean.Extracted.Even.interface
   let create : Expr := .field even 0
   let three : Expr := .val (.immediate { bitsAboveLsb := 3#63 })
 

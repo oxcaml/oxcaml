@@ -24,7 +24,7 @@ let rec impl_in_scope (context : Ident.t list)
     in
     impl_in_scope context equivalent_switch_statement
   | Llet (_, _, id, _, bound, body) ->
-    LetBinding
+    Let_binding
       { bound = impl_in_scope context bound
       ; body = impl_in_scope (id :: context) body
       }
@@ -96,14 +96,14 @@ and primitive (context : Ident.t list) (args : Lambda.lambda list)
            "Field access given multiple arguments")
     end
   | Pgetglobal (compilation_unit, _) ->
-    UpstreamCompilationUnit
+    Compilation_unit
       { name = Compilation_unit.to_global_name_exn compilation_unit }
   | Pmakeblock (tag, Immutable, _, _) ->
     Block { tag; fields = List.map (impl_in_scope context) args }
   | Pphys_equal Eq ->
     begin match args with
     | [lhs; rhs] ->
-      PhysicalEquality
+      Physical_equality
         { lhs = impl_in_scope context lhs
         ; rhs = impl_in_scope context rhs
         }
@@ -136,7 +136,7 @@ and primitive (context : Ident.t list) (args : Lambda.lambda list)
                 Printlambda.primitive (Pscalar (Unary op) : Lambda.primitive)))
       end
     in
-    ScalarOperation { operation }
+    Scalar_operation { operation }
   | other ->
     raise
       (Error.Message
@@ -296,7 +296,7 @@ module Resolve = struct
       let { md_type; _ } : Types.module_declaration =
         Env.find_module (Pident id) Env.empty
       in
-      ( Upstream_compilation_unit { name = Ident.to_global_exn id }
+      ( Compilation_unit { name = Ident.to_global_exn id }
       , Signature_parts.of_module_type md_type )
     | path ->
       let within, (index, md_type) =

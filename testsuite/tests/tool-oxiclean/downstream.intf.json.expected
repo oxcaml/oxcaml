@@ -12,11 +12,7 @@
                   "constr": {
                     "constructor": {
                       "field": {
-                        "within": {
-                          "upstreamCompilationUnit": {
-                            "compilationUnit": "Even"
-                          }
-                        },
+                        "within": {"compilationUnit": {"name": "Even"}},
                         "index": 0
                       }
                     },

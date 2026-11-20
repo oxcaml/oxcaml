@@ -33,8 +33,8 @@ def Lean.Expr.mkOption (type : Lean.Expr) : Option Lean.Expr → Lean.Expr
 
 namespace Oxiclean.BuildSystem
 
-def upstreamInterface (compilationUnit : String) : Lean.Expr :=
-  mkConst (`Oxiclean.Extracted ++ .mkSimple compilationUnit ++ `interface)
+def compilationUnitByName (name : String) : Lean.Expr :=
+  mkConst (`Oxiclean.Extracted ++ .mkSimple name ++ `interface)
 
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
 
@@ -45,15 +45,15 @@ deriving instance Repr for
 -- TODO: remove when https://github.com/leanprover/lean4/pull/14959 is merged
 namespace WorkaroundForPr14959
   inductive ModuleStatics : Type where
-    | upstreamCompilationUnit (compilationUnit : String)
+    | compilationUnit (name : String)
     | var (deBruijn : Nat)
     | field (within : ModuleStatics) (index : Nat)
   deriving FromJson
 
   def ModuleStatics.toTerm : ModuleStatics → Lean.Expr
-    | .upstreamCompilationUnit compilationUnit =>
-      mkApp (mkConst ``Model.ModuleStatics.upstreamCompilationUnit)
-        (upstreamInterface compilationUnit)
+    | .compilationUnit name =>
+      mkApp (mkConst ``Model.ModuleStatics.compilationUnit)
+        (compilationUnitByName name)
     | .var deBruijn =>
       mkApp (mkConst ``Model.ModuleStatics.var) (toExpr deBruijn)
     | .field within index =>
@@ -240,7 +240,7 @@ namespace WorkaroundForPr14959
           (immediates : List ImmediateSwitchCase)
           (blocks : List BlockSwitchCase)
           (failAction : Option Expr)
-      | upstreamCompilationUnit (compilationUnit : String)
+      | compilationUnit (name : String)
       | val (value : Value)
       | var (deBruijn : Nat)
     deriving FromJson
@@ -274,9 +274,9 @@ namespace WorkaroundForPr14959
               | .none => .none
               | .some failAction => .some failAction.toTerm)
          ]
-    | .upstreamCompilationUnit compilationUnit =>
-      mkApp (mkConst ``Model.Expr.upstreamCompilationUnit)
-        (upstreamInterface compilationUnit)
+    | .compilationUnit name =>
+      mkApp (mkConst ``Model.Expr.compilationUnit)
+        (compilationUnitByName name)
     | .val value => mkApp (mkConst ``Model.Expr.val) value
     | .var deBruijn => mkApp (mkConst ``Model.Expr.var) (toExpr deBruijn)
 

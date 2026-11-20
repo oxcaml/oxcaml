@@ -10,7 +10,7 @@ inductive TypeKind : Type where
 
 mutual
   inductive ModuleStatics : Type where
-    | upstreamCompilationUnit (signature : ModuleType)
+    | compilationUnit (signature : ModuleType)
     | var (deBruijn : Nat)
     | field (within : ModuleStatics) (index : Nat)
 
@@ -81,7 +81,7 @@ mutual
         (immediates : List ImmediateSwitchCase)
         (blocks : List BlockSwitchCase)
         (failAction : Option Expr)
-    | upstreamCompilationUnit (signature : ModuleType)
+    | compilationUnit (signature : ModuleType)
     | val (value : Value)
     | var (deBruijn : Nat)
 
@@ -119,7 +119,7 @@ attribute [pp_nodot]
   -- Expr
   Expr.apply Expr.block Expr.field Expr.function Expr.letBinding
   Expr.physicalEquality Expr.scalarOperation Expr.switch
-  Expr.upstreamCompilationUnit Expr.val Expr.var
+  Expr.compilationUnit Expr.val Expr.var
   -- Please keep this up to date when adding new constructors!
 
 end Oxiclean.Model
