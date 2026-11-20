@@ -159,6 +159,7 @@ let builtin_attrs =
   ; "represent_as_float_array"
   ; "immediate_all_void_constructor"
   ; "rec"
+  ; "static"
   ]
 
 let builtin_attrs =
@@ -725,6 +726,12 @@ let parse_standard_implementation_attributes attr =
   zero_alloc_attribute ~in_signature:false attr;
   unsafe_allow_any_mode_crossing_attribute attr;
   llvm_backend_attribute attr
+
+let leading_static str =
+  match select_attribute ["static", Return] (attrs_of_str str) with
+  | None -> None
+  | Some attr ->
+    Option.map (fun () -> attr.attr_name.loc) (parse_empty_payload attr)
 
 let has_local_opt attrs =
   has_attribute "local_opt" attrs

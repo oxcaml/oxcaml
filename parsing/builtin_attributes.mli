@@ -216,6 +216,12 @@ val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 val parse_standard_interface_attributes : Parsetree.attribute -> unit
 val parse_standard_implementation_attributes : Parsetree.attribute -> unit
 
+(** The location of [[@@@static]], if it is among the attributes that start
+    the structure. [None] also when it has a payload, which is reported. Marks
+    each such attribute used for the purposes of misplaced attribute
+    warnings. *)
+val leading_static : Parsetree.structure -> Location.t option
+
 (** The attribute placed on the inner [Ptyp_arrow] node in [x -> (y -> z)]
     (meaning the [y -> z] node) to indicate parenthesization. This is relevant
     for locals, as [local_ x -> (y -> z)] is different than

@@ -5002,14 +5002,21 @@ let type_implementation target modulename initial_env ast =
           Location.prerr_warning
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
+          let staticity =
+            match Builtin_attributes.leading_static ast with
+            | None -> Staticity.Dynamic
+            | Some loc ->
+              Language_extension.assert_enabled ~loc Layout_poly
+                Language_extension.Alpha;
+              Staticity.Static
+          in
           let coercion, shape =
-            (* No [.mli], so the inferred signature has no file-level [@@]
-               and is at [Dynamic] on both sides. *)
+            (* For a static unit, this check is what makes the structure
+               static. The zapping below then puts [@@ dynamic] on its dynamic
+               items. *)
             let modes =
-              let mode =
-                Persistent_env.mode_pers_mod Dynamic
-              in
-              Includecore.Specific ((mode, None), mode)
+              Includecore.Specific
+                ((mode, None), Persistent_env.mode_pers_mod staticity)
             in
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit initial_env ~mark:true sourcefile ~modes
@@ -5032,7 +5039,7 @@ let type_implementation target modulename initial_env ast =
           in
           let argument_interface =
             check_argument_type_if_given initial_env sourcefile
-              ~actual_staticity:Staticity.Dynamic simple_sg arg_type
+              ~actual_staticity:staticity simple_sg arg_type
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
@@ -5055,7 +5062,7 @@ let type_implementation target modulename initial_env ast =
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
-                Env.save_signature ~alerts (simple_sg, Staticity.Dynamic)
+                Env.save_signature ~alerts (simple_sg, staticity)
                   name kind (Unit_info.cmi target))
             in
             Profile.record_call "save_cmt" (fun () ->
