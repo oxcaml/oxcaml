@@ -4,7 +4,7 @@
  asmgen;
 *)
 (* Regenerate with cpp -P immediates.cmmpp > immediates.cmm *)
-(function "testimm" ()
+(function "testimm" () : unit
   (let x (load int "X")
   (let r "R"
     (addraset r 1 (+ x 0))
