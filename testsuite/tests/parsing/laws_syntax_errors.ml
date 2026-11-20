@@ -17,6 +17,8 @@ law_? : true;;
 
 law_? Foo : true;;
 
+law_ : true;;
+
 (* The body cannot be omitted, nor the conclusion. *)
 
 law_? foo true;;

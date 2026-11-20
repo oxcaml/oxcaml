@@ -117,6 +117,11 @@ let fmt_closed_flag f x =
   | Closed -> fprintf f "Closed"
   | Open -> fprintf f "Open"
 
+let fmt_law_flag f x =
+  match x with
+  | Testable -> fprintf f "Testable"
+  | Provable -> fprintf f "Provable"
+
 let fmt_rec_flag f x =
   match x with
   | Nonrecursive -> fprintf f "Nonrec";
@@ -729,10 +734,10 @@ and jkind_declaration i ppf
   option (i+1) jkind_annotation ppf pjkind_manifest
 
 and law_declaration i ppf
-      { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+      { plaw_flag; plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
         plaw_attributes; plaw_loc } =
-  line i ppf "law_declaration %a %a\n" fmt_string_loc plaw_name
-       fmt_location plaw_loc;
+  line i ppf "law_declaration %a %a %a\n" fmt_law_flag plaw_flag
+       fmt_string_loc plaw_name fmt_location plaw_loc;
   attributes i ppf plaw_attributes;
   let i = i+1 in
   line i ppf "plaw_params =\n";
