@@ -28,6 +28,8 @@
   (:conf ../Makefile.config)
   (:c domainstate.ml.c)
   (:tbl
+   ../runtime/caml/minor_table.tbl
+   ../runtime/caml/minor_tables.tbl
    ../runtime/caml/domain_state.tbl)
   ../runtime/caml/config.h
   ../runtime/caml/m.h
@@ -46,6 +48,8 @@
   (:conf ../Makefile.config)
   (:c domainstate.mli.c)
   (:tbl
+   ../runtime/caml/minor_table.tbl
+   ../runtime/caml/minor_tables.tbl
    ../runtime/caml/domain_state.tbl)
   ../runtime/caml/config.h
   ../runtime/caml/m.h

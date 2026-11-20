@@ -30,17 +30,6 @@
 #define caml_minor_heap_wsz Caml_state->minor_heap_wsz
 #define caml_in_minor_collection Caml_state->in_minor_collection
 
-
-#define CAML_TABLE_STRUCT(t) { \
-  t *base;                     \
-  t *end;                      \
-  t *threshold;                \
-  t *ptr;                      \
-  t *limit;                    \
-  asize_t size;                \
-  asize_t reserve;             \
-}
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,31 +41,46 @@ CAMLextern atomic_uintnat caml_minor_collections_count;
    Always, [caml_major_slice_epoch <= caml_minor_collections_count] */
 CAMLextern atomic_uintnat caml_major_slice_epoch;
 
-struct caml_ref_table CAML_TABLE_STRUCT(value *);
+struct caml_ref_table {
+# define MINOR_TABLE_TYPE value *
+# include "minor_table.tbl"
+};
 
 struct caml_ephe_ref_elt {
   value ephe;      /* an ephemeron in major heap */
   mlsize_t offset; /* the offset that points in the minor heap  */
   value stash;     /* copy of the field if it requires minor-GC cleaning */
 };
-struct caml_ephe_ref_table CAML_TABLE_STRUCT(struct caml_ephe_ref_elt);
+
+struct caml_ephe_ref_table {
+# define MINOR_TABLE_TYPE struct caml_ephe_ref_elt
+# include "minor_table.tbl"
+};
 
 struct caml_custom_elt {
   value block;     /* The finalized block in the minor heap. */
 };
-struct caml_custom_table CAML_TABLE_STRUCT(struct caml_custom_elt);
+
+struct caml_custom_table {
+# define MINOR_TABLE_TYPE struct caml_custom_elt
+# include "minor_table.tbl"
+};
 
 struct caml_dependent_elt {
   value block;     /* The finalized block in the minor heap. */
   mlsize_t mem;    /* The size in bytes of the dependent memory. */
 };
-struct caml_dependent_table CAML_TABLE_STRUCT(struct caml_dependent_elt);
+
+struct caml_dependent_table {
+# define MINOR_TABLE_TYPE struct caml_dependent_elt
+# include "minor_table.tbl"
+};
 
 struct caml_minor_tables {
-  struct caml_ref_table major_ref;
-  struct caml_ephe_ref_table ephe_ref;
-  struct caml_custom_table custom;
-  struct caml_dependent_table dependent;
+# define MINOR_TABLE_BEGIN(name) struct {
+# define MINOR_TABLE_FIELD(type, prefix, name) CAMLalign(8) type name;
+# define MINOR_TABLE_END(name) } name;
+# include "minor_tables.tbl"
 };
 
 /* Setting this to a different value can be useful for debugging
@@ -114,8 +118,8 @@ extern void caml_realloc_ref_table (struct caml_ref_table *);
 extern void caml_realloc_ephe_ref_table (struct caml_ephe_ref_table *);
 extern void caml_realloc_custom_table (struct caml_custom_table *);
 extern void caml_realloc_dependent_table (struct caml_dependent_table *);
-struct caml_minor_tables* caml_alloc_minor_tables(void);
-void caml_free_minor_tables(struct caml_minor_tables*);
+void caml_setup_minor_tables(struct caml_minor_tables* tables);
+void caml_reset_minor_tables(struct caml_minor_tables* tables);
 void caml_empty_minor_heap_setup(caml_domain_state* domain, void*);
 
 /* We are about to write `count` fields on the major heap, with values
@@ -128,14 +132,34 @@ extern int caml_debug_is_minor(value val);
 extern int caml_debug_is_major(value val);
 #endif
 
-#define Ref_table_add(ref_table, x) do {                                \
-    struct caml_ref_table* ref = (ref_table);                           \
-    if (ref->ptr >= ref->limit) {                                       \
-      CAMLassert (ref->ptr == ref->limit);                              \
-      caml_realloc_ref_table (ref);                                     \
-    }                                                                   \
-    *ref->ptr++ = (value*)(x);                                          \
-  } while (0)
+Caml_inline void add_to_ref_table(struct caml_ref_table *tbl, value *x) {
+  if (tbl->ptr >= tbl->limit) {
+    CAMLassert (tbl->ptr == tbl->limit);
+    caml_realloc_ref_table (tbl);
+  }
+  value **ptr = tbl->ptr;
+  *ptr = x;
+  tbl->ptr = ptr + 1;
+}
+
+#define Caml_size_checked_cast(type, t) \
+  (sizeof(type) == sizeof(t)            \
+   ? (type *)(&t)                       \
+   : (CAMLassert(false), (type *)NULL))
+
+#define Caml_ref_table(t) \
+  Caml_size_checked_cast(struct caml_ref_table, t)
+#define Caml_ephe_ref_table(t) \
+  Caml_size_checked_cast(struct caml_ephe_ref_table, t)
+#define Caml_custom_table(t) \
+  Caml_size_checked_cast(struct caml_custom_table, t)
+#define Caml_dependent_table(t) \
+  Caml_size_checked_cast(struct caml_dependent_table, t)
+#define Caml_minor_tables(t) \
+  Caml_size_checked_cast(struct caml_minor_tables, t)
+
+#define Ref_table_add(table, x) \
+  add_to_ref_table(Caml_ref_table(table), (value*)(x))
 
 Caml_inline void add_to_ephe_ref_table (struct caml_ephe_ref_table *tbl,
                                         value ar, mlsize_t offset)

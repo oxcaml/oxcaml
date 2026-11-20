@@ -139,12 +139,12 @@ struct caml_thread_struct {
   value descr;              /* The heap-allocated descriptor (root) */
   struct caml_thread_struct * next; /* Doubly-linked list of running threads */
   struct caml_thread_struct * prev;
-  int domain_id;      /* The id of the domain to which this thread belongs */
   struct stack_info* current_stack;      /* saved Caml_state->current_stack */
   struct c_stack_link* c_stack;          /* saved Caml_state->c_stack */
   /* Note: we do not save Caml_state->stack_cache, because it can
      safely be shared between all threads on the same domain. */
   struct caml__roots_block *local_roots; /* saved value of local_roots */
+  int domain_id;      /* The id of the domain to which this thread belongs */
   int backtrace_pos;           /* saved value of Caml_state->backtrace_pos */
   backtrace_slot * backtrace_buffer;
     /* saved value of Caml_state->backtrace_buffer */
@@ -420,7 +420,7 @@ static void caml_thread_leave_blocking_section(void)
 /* Create and setup a new thread info block.
    This block has no associated thread descriptor and
    is not inserted in the list of threads. */
-static caml_thread_t caml_thread_new_info(caml_thread_t parent)
+static caml_thread_t caml_thread_new_info(void)
 {
   caml_thread_t th = NULL;
   caml_domain_state *domain_state = Caml_state;
@@ -527,7 +527,7 @@ static value caml_thread_new_descriptor(value id, value clos)
 /* Allocate a thread info block and add it to the list of threads */
 static caml_thread_t thread_alloc_and_add(void)
 {
-  caml_thread_t th = caml_thread_new_info(Active_thread);
+  caml_thread_t th = caml_thread_new_info();
 
   if (th == NULL) return NULL;
 

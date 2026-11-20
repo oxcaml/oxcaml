@@ -166,7 +166,8 @@ void caml_ephe_clean (value v) {
           } else {
             Field(v, i) = child = f;
             if (Is_block (f) && Is_young (f))
-              add_to_ephe_ref_table(&Caml_state->minor_tables->ephe_ref, v, i);
+              add_to_ephe_ref_table
+                (Caml_ephe_ref_table(Caml_state->minor_tables.ephe_ref), v, i);
             goto ephemeron_again;
           }
         }
@@ -209,8 +210,8 @@ Caml_inline void ephe_write_barrier (value e, mlsize_t offset, value v)
   if (Is_block (v) && Is_young (v)){
     value old = Field (e, offset);
     if (!(Is_block (old) && Is_young (old))){
-      add_to_ephe_ref_table (&Caml_state->minor_tables->ephe_ref,
-                             e, offset);
+      add_to_ephe_ref_table
+        (Caml_ephe_ref_table(Caml_state->minor_tables.ephe_ref), e, offset);
     }
   }
 }

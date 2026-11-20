@@ -75,8 +75,15 @@ DOMAIN_STATE(value*, gc_regs)
 /* Pointer to currently-used register bucket, or NULL.
    Documented in fiber.h. */
 
-DOMAIN_STATE(struct caml_minor_tables*, minor_tables)
+#ifdef MINOR_TABLE_BEGIN
+  struct {
+# include "minor_tables.tbl"
+  } minor_tables;
+#else
+# include "minor_tables.tbl"
+#endif
 
+// TODO: Could we avoid the indirection for tables esp remembered set?
 DOMAIN_STATE(struct mark_stack*, mark_stack)
 /* Mark stack */
 

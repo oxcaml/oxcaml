@@ -41,7 +41,10 @@
 #include "caml/sizeclasses.h"
 #include "caml/weak.h"
 
-struct generic_table CAML_TABLE_STRUCT(char);
+struct generic_table {
+# define MINOR_TABLE_TYPE char
+# include "caml/minor_table.tbl"
+};
 
 CAMLexport atomic_uintnat caml_minor_collections_count;
 CAMLexport atomic_uintnat caml_major_slice_epoch;
@@ -98,29 +101,16 @@ static void clear_table (struct generic_table *tbl,
   }
 }
 
-struct caml_minor_tables* caml_alloc_minor_tables(void)
-{
-  struct caml_minor_tables *r =
-      caml_stat_alloc_noexc(sizeof(struct caml_minor_tables));
-  if(r != NULL)
-    memset(r, 0, sizeof(*r));
-  return r;
+void caml_setup_minor_tables(struct caml_minor_tables *r) {
+  memset(r, 0, sizeof(*r));
 }
 
-static void reset_minor_tables(struct caml_minor_tables* r)
+void caml_reset_minor_tables(struct caml_minor_tables* r)
 {
   reset_table((struct generic_table *)&r->major_ref);
   reset_table((struct generic_table *)&r->ephe_ref);
   reset_table((struct generic_table *)&r->custom);
   reset_table((struct generic_table *)&r->dependent);
-}
-
-void caml_free_minor_tables(struct caml_minor_tables* r)
-{
-  CAMLassert(r->major_ref.ptr == r->major_ref.base);
-
-  reset_minor_tables(r);
-  caml_stat_free(r);
 }
 
 #ifdef DEBUG
@@ -136,7 +126,8 @@ extern int caml_debug_is_major(value val) {
 void caml_set_minor_heap_size (asize_t wsize)
 {
   caml_domain_state* domain_state = Caml_state;
-  struct caml_minor_tables *r = domain_state->minor_tables;
+  struct caml_minor_tables *r =
+    Caml_minor_tables(domain_state->minor_tables);
 
   if (domain_state->young_ptr != domain_state->young_end) {
     CAML_EV_COUNTER (EV_C_FORCE_MINOR_SET_MINOR_HEAP_SIZE, 1);
@@ -150,7 +141,7 @@ void caml_set_minor_heap_size (asize_t wsize)
     caml_fatal_error("Fatal error: No memory for minor heap");
   }
 
-  reset_minor_tables(r);
+  caml_reset_minor_tables(r);
 }
 
 /* We are about to write `count` ref table entries. We may wish to
@@ -162,7 +153,8 @@ void caml_set_minor_heap_size (asize_t wsize)
 
 bool caml_maybe_minor_gc_before_writes(mlsize_t count)
 {
-  struct caml_ref_table *table = &Caml_state->minor_tables->major_ref;
+  struct caml_ref_table *table =
+    Caml_ref_table(Caml_state->minor_tables.major_ref);
   size_t space = table->base ? (table->limit - table->ptr) : table->size;
   if (count > (space * WRITE_PERCENT_TO_TRIGGER_MINOR_GC) / 100) {
     CAML_EV_COUNTER(EV_C_FORCE_MINOR_MAKE_VECT, 1);
@@ -431,15 +423,13 @@ tail_call:
         if (scannable_sz == 0) {
           return;
         } else if (scannable_sz > 1) { /* add to todo_list */
-          Field(result, 0) = field0;
           Field(result, 1) = st->todo_list;
           st->todo_list = v;
-        } else {
-          CAMLassert (scannable_sz == 1);
-          p = Op_val(result);
-          v = field0;
-          goto tail_call;
         }
+
+        p = Op_val(result);
+        v = field0;
+        goto tail_call;
       }
     }
   }
@@ -480,12 +470,6 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
       */
       CAMLassert (scannable_wosize > 1);
 
-      value f = Field(new_v, 0);
-      CAMLassert (!Is_debug_tag(f));
-      if (Is_block (f) && Is_young(f)) {
-        oldify_one (st, f, Op_val (new_v));
-      }
-
       mlsize_t i = 1;
       if(Tag_val(new_v) == Closure_tag) {
         /* non-scannable prefix already copied in oldify_one */
@@ -494,7 +478,7 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
       }
 
       for (; i < scannable_wosize; i++){
-        f = Field(v, i);
+        value f = Field(v, i);
         CAMLassert (!Is_debug_tag(f));
         if (Is_block (f) && Is_young(f)) {
           oldify_one (st, f, Op_val (new_v) + i);
@@ -529,7 +513,7 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
     if (do_ephemerons) {
       /* Limits of *this* minor heap, not other domains' */
       struct caml_ephe_ref_table ephe_ref_table =
-        st->domain->minor_tables->ephe_ref;
+        *Caml_ephe_ref_table(st->domain->minor_tables.ephe_ref);
       value young_start = (value)st->domain->young_start;
       value young_end = (value)st->domain->young_end;
       for (struct caml_ephe_ref_elt *re = ephe_ref_table.base;
@@ -568,7 +552,8 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
 
 void caml_empty_minor_heap_domain_clear(caml_domain_state* domain)
 {
-  struct caml_minor_tables *minor_tables = domain->minor_tables;
+  struct caml_minor_tables *minor_tables =
+    Caml_minor_tables(domain->minor_tables);
 
   caml_final_empty_young(domain);
 
@@ -600,7 +585,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                               int participating_count,
                               caml_domain_state** participating)
 {
-  const struct caml_minor_tables *self_minor_tables = domain->minor_tables;
+  const struct caml_minor_tables *self_minor_tables =
+    Caml_minor_tables(domain->minor_tables);
   value* young_ptr = domain->young_ptr;
   value* young_end = domain->young_end;
   uintnat minor_allocated_bytes = (uintnat)young_end - (uintnat)young_ptr;
@@ -663,10 +649,10 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
       c = (c+1) % participating_count;
 
       struct caml_minor_tables* foreign_minor_tables =
-                                                 foreign_domain->minor_tables;
+        Caml_minor_tables(foreign_domain->minor_tables);
 
       struct caml_ref_table* foreign_major_ref =
-                                              &foreign_minor_tables->major_ref;
+        Caml_ref_table(foreign_minor_tables->major_ref);
 
       /* calculate the size of the remembered set */
       intnat major_ref_size = foreign_major_ref->ptr - foreign_major_ref->base;
@@ -698,7 +684,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                       refs_per_domain, participating_idx,
                       ref_start, ref_end);
 
-      for( r = ref_start ; r < foreign_major_ref->ptr && r < ref_end ; r++ )
+      for( r = ref_start ; r < ref_end ; r++ )
       {
         /* Because the work on the remembered set is shared, other threads may
            attempt to promote the same value; this is fine, but we need the
@@ -856,7 +842,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
 
 static void ephe_clean_minor (caml_domain_state* domain)
 {
-  struct caml_ephe_ref_table table = domain->minor_tables->ephe_ref;
+  struct caml_ephe_ref_table table =
+    *Caml_ephe_ref_table(domain->minor_tables.ephe_ref);
   for (struct caml_ephe_ref_elt* re = table.base; re < table.ptr; re++) {
     value v = re->stash;
     if (v == caml_ephe_none)
@@ -890,8 +877,8 @@ static void ephe_clean_minor (caml_domain_state* domain)
    code, but they cannot have any pointers into our minor heap. */
 static void custom_finalize_minor (caml_domain_state * domain)
 {
-  for (struct caml_custom_elt *elt = domain->minor_tables->custom.base;
-       elt < domain->minor_tables->custom.ptr;
+  for (struct caml_custom_elt *elt = domain->minor_tables.custom.base;
+       elt < domain->minor_tables.custom.ptr;
        elt++) {
     value *v = &elt->block;
     if (Is_block(*v) && Is_young(*v)) {
@@ -906,8 +893,8 @@ static void custom_finalize_minor (caml_domain_state * domain)
 static void dependent_accounting_minor (caml_domain_state *domain)
 {
   struct caml_dependent_elt *elt;
-  for (elt = domain->minor_tables->dependent.base;
-       elt < domain->minor_tables->dependent.ptr; elt++) {
+  for (elt = domain->minor_tables.dependent.base;
+       elt < domain->minor_tables.dependent.ptr; elt++) {
     value *v = &elt->block;
     CAMLassert (Is_block (*v));
     if (Is_young(*v)) {

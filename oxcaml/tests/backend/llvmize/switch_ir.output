@@ -46,7 +46,7 @@ L104:
   %29 = load i64, ptr %8
   store i64 %29, ptr %4
   %30 = load i64, ptr %ds
-  %31 = add i64 %30, 272
+  %31 = add i64 %30, 488
   %32 = inttoptr i64 %31 to ptr
   store i64 0, ptr %32
   %33 = load i64, ptr %4
@@ -99,7 +99,7 @@ L111:
   %51 = load i64, ptr %12
   store i64 %51, ptr %4
   %52 = load i64, ptr %ds
-  %53 = add i64 %52, 272
+  %53 = add i64 %52, 488
   %54 = inttoptr i64 %53 to ptr
   store i64 0, ptr %54
   %55 = load i64, ptr %4
@@ -128,7 +128,7 @@ L115:
   %69 = load i64, ptr %14
   store i64 %69, ptr %4
   %70 = load i64, ptr %ds
-  %71 = add i64 %70, 272
+  %71 = add i64 %70, 488
   %72 = inttoptr i64 %71 to ptr
   store i64 0, ptr %72
   %73 = load i64, ptr %4
@@ -157,7 +157,7 @@ L119:
   %87 = load i64, ptr %16
   store i64 %87, ptr %4
   %88 = load i64, ptr %ds
-  %89 = add i64 %88, 272
+  %89 = add i64 %88, 488
   %90 = inttoptr i64 %89 to ptr
   store i64 0, ptr %90
   %91 = load i64, ptr %4
@@ -186,7 +186,7 @@ L123:
   %105 = load i64, ptr %18
   store i64 %105, ptr %4
   %106 = load i64, ptr %ds
-  %107 = add i64 %106, 272
+  %107 = add i64 %106, 488
   %108 = inttoptr i64 %107 to ptr
   store i64 0, ptr %108
   %109 = load i64, ptr %4

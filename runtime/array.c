@@ -424,7 +424,7 @@ static value uniform_array_make(value len, value init, bool local)
       /* init is still on the minor heap (we didn't just collect),
        * so every entry needs a remembered set entry */
       for (mlsize_t i = 0; i < size; i++) {
-        Ref_table_add(&Caml_state->minor_tables->major_ref, &Field(res, i));
+        Ref_table_add(Caml_state->minor_tables.major_ref, &Field(res, i));
         Field(res, i) = init;
       }
     } else {
@@ -603,7 +603,7 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
     for (i = 0; i < size; i++) {
       value v = Field(v_init, i % num_initializers);
       if (Is_block(v) && Is_young(v)) {
-        Ref_table_add(&Caml_state->minor_tables->major_ref, &Field(res, i));
+        Ref_table_add(Caml_state->minor_tables.major_ref, &Field(res, i));
       }
       Field(res, i) = v;
     }
@@ -1686,7 +1686,7 @@ CAMLprim value caml_uniform_array_fill(
           caml_darken(Caml_state, old, NULL);
       }
       if (is_val_young_block)
-        Ref_table_add(&Caml_state->minor_tables->major_ref, fp);
+        Ref_table_add(Caml_state->minor_tables.major_ref, fp);
     }
     if (is_val_young_block) caml_check_urgent_gc (Val_unit);
   }
