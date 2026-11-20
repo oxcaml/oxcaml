@@ -1,5 +1,3 @@
-/* CR mshinwell: Reverted to 5.x version, need to check conflicts */
-
 /**************************************************************************/
 /*                                                                        */
 /*                                 OCaml                                  */
@@ -79,8 +77,9 @@ CAMLprim value caml_ephe_create (value len)
     caml_invalid_argument ("Weak.create");
   res = caml_alloc_shr (size, Abstract_tag);
 
-  Ephe_link(res) = domain_state->ephe_info->live;
-  domain_state->ephe_info->live = res;
+  /* Add the new ephemeron to the live list */
+  caml_ephe_list_cons_inplace(res, &domain_state->ephe_info->live);
+
   for (mlsize_t i = CAML_EPHE_DATA_OFFSET; i < size; i++)
     Field(res, i) = caml_ephe_none;
   /* run memprof callbacks */
@@ -138,7 +137,7 @@ static void do_check_key_clean(value e, mlsize_t offset)
     if (Tag_val(elt) == Infix_tag) elt -= Infix_offset_val(elt);
     if (is_unmarked(elt)) {
       Field(e, offset) = caml_ephe_none;
-      Field(e,CAML_EPHE_DATA_OFFSET) = caml_ephe_none;
+      atomic_store_relaxed(Ephe_data_addr(e), caml_ephe_none);
     }
   }
 }
@@ -182,7 +181,7 @@ void caml_ephe_clean (value v) {
   child = Ephe_data(v);
   if (child != caml_ephe_none) {
     if (release_data) {
-      Field(v, CAML_EPHE_DATA_OFFSET) = caml_ephe_none;
+      atomic_store_relaxed(Ephe_data_addr(v), caml_ephe_none);
     }
 #ifdef DEBUG
     else if (Is_block (child) && !Is_young (child)) {
@@ -552,4 +551,51 @@ CAMLprim value caml_weak_blit (value es, value ofs,
                       value ed, value ofd, value len)
 {
   return caml_ephe_blit_key (es, ofs, ed, ofd, len);
+}
+
+value caml_ephe_list_tail(value e)
+{
+  value last = 0;
+  while (e != 0) {
+    CAMLassert (Tag_val(e) == Abstract_tag);
+    last = e;
+    e = Ephe_link(e);
+  }
+  return last;
+}
+
+value caml_ephe_list_cons(value e, value li)
+{
+  Ephe_link(e) = li;
+  return e;
+}
+
+value caml_ephe_list_append_seg(value first, value last, value back)
+{
+  if (first == 0) return back;
+  Ephe_link(last) = back;
+  return first;
+}
+
+value caml_ephe_list_append(value front, value back)
+{
+  return caml_ephe_list_append_seg(front, caml_ephe_list_tail(front), back);
+}
+
+void caml_ephe_list_cons_inplace(value e, value *li)
+{
+  *li = caml_ephe_list_cons(e, *li);
+}
+
+void caml_ephe_list_append_inplace(value e, value *li)
+{
+  *li = caml_ephe_list_append(e, *li);
+}
+
+value caml_ephe_list_pop(value *li)
+{
+  CAMLassert(*li != (value)NULL);
+  value head = *li;
+  *li = Ephe_link(head);
+  return head;
 }
