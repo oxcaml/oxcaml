@@ -471,7 +471,9 @@ let gen_effects (st : State.t) =
   else
     List.init (random_int_in_range st ~min:1 ~max:Config.max_effect_count)
       (fun id ->
-        { Eff.id; ty = Ty.Number (random_number_ty ~value_only:true st) })
+        let payload = Ty.Number (random_number_ty ~value_only:true st) in
+        let result = Ty.Number (random_number_ty ~value_only:true st) in
+        { Eff.id; payload; result })
 
 let gen_constructor_type (st : State.t) constructor_index =
   let args =
@@ -1493,15 +1495,15 @@ and gen_let_rec_call (st : State.t) (env : Env.t) ty (first : Local_function.t)
 and gen_perform (st : State.t) (env : Env.t) ty =
   let effects =
     List.filter
-      (fun (eff : Eff.t) -> can_convert st eff.ty ty)
+      (fun (eff : Eff.t) -> can_convert st eff.result ty)
       env.handled_effects
   in
   Gen.when_
     (not (List.is_empty effects))
     (fun () ->
       let eff = random_element st effects in
-      convert_value st eff.ty ty
-        (Expr.Perform { eff; arg = gen_value st env eff.ty }))
+      convert_value st eff.result ty
+        (Expr.Perform { eff; arg = gen_value st env eff.payload }))
 
 and gen_handle (st : State.t) (env : Env.t) ty =
   Gen.when_
@@ -1519,7 +1521,8 @@ and gen_handle (st : State.t) (env : Env.t) ty =
                  env.handled_effects
         }
       in
-      Expr.Handle { eff; ty; body = gen_value st body_env ty })
+      let resume = gen_lambda st env [eff.payload] eff.result in
+      Expr.Handle { eff; ty; body = gen_value st body_env ty; resume })
 
 and gen_bool (st : State.t) env =
   let gen_binop op arg_ty gen_arg =

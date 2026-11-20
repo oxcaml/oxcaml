@@ -165,12 +165,13 @@ module Exn : sig
   val to_code : t -> Parsetree.structure_item option
 end
 
-(** Effects, each with a handler function that runs a computation and resumes it
-    with the payload of every [perform]. *)
+(** Effects, each with a handler function that runs a computation and resumes
+    every [perform] with a function of its payload. *)
 module Eff : sig
   type t =
     { id : int;
-      ty : Ty.t  (** The type of the payload and the result. A value type. *)
+      payload : Ty.t;  (** A value type. *)
+      result : Ty.t  (** The type of [perform]. A value type. *)
     }
 
   val equal : t -> t -> bool
@@ -351,8 +352,11 @@ module Expr : sig
     | Handle of
         { eff : Eff.t;
           ty : Ty.t;  (** A value type. *)
-          body : t
-        }  (** Evaluates [body] in a handler of [eff]. *)
+          body : t;
+          resume : t  (** A function from the payload of [eff] to its result. *)
+        }
+        (** Evaluates [body] in a handler of [eff], which resumes every
+            [perform] with [resume] applied to its payload. *)
 
   and raise =
     { exn : Exn.t;
