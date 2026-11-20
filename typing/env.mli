@@ -84,6 +84,10 @@ val diff: t -> t -> Ident.t list
 (* approximation to the preimage equivalence class of [find_type] *)
 val same_type_declarations: t -> t -> bool
 
+(** [same_types env1 env2] is a cheap approximation to the preimage equivalence
+    class of [find_type] and [find_jkind]. *)
+val same_types : t -> t -> bool
+
 type type_descr_kind =
   (label_description, unboxed_label_description, constructor_description) type_kind
 
@@ -96,7 +100,7 @@ val iter_types:
     (Path.t -> Path.t * type_declaration -> unit) ->
     t -> iter_cont
 val run_iter_cont: iter_cont list -> (Path.t * iter_cont) list
-val same_types: t -> t -> bool
+
 val used_persistent: unit -> Compilation_unit.Name.Set.t
 val find_shadowed_types: Path.t -> t -> Path.t list
 val without_cmis: ('a -> 'b) -> 'a -> 'b
