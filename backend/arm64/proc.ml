@@ -420,7 +420,8 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Prim {op = Probe _; _} ->
     [||]
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }
+  | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                              stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }; _} ->
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
@@ -442,8 +443,8 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Prim {op = Probe _; _} ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
-                     stack_ofs; _ }
+  | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                              stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                            stack_ofs; _ }; _ } ->
     if more_destruction_points then
