@@ -1,6 +1,7 @@
 (* TEST
  readonly_files = "mainimmed.c asan_report_wrappers.c";
  arguments = "-I ${test_source_directory} mainimmed.c asan_report_wrappers.c";
+ flags = "-dcmm-no-check-machtypes";
  asmgen;
 *)
 (* Regenerate with cpp -P immediates.cmmpp > immediates.cmm *)
