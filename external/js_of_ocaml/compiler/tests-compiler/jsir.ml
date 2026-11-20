@@ -71,7 +71,8 @@ let native_string s = Code.Pc (Code.NativeString (Code.Native_string.of_string s
 
 let extern name args = Code.Prim (Code.Extern (name, None), args)
 
-let jsir_file ?(target = Code.Js) ~name ~imports body : Code.jsir_file =
+let jsir_file ?(target = Code.Js) ?(whole_program = false) ~name ~imports body :
+    Code.jsir_file =
   let body = body ~fresh:Code.Var.fresh in
   let last_var = Code.Var.count () - 1 in
   let block = { Code.params = []; body; branch = Stop } in
@@ -80,9 +81,13 @@ let jsir_file ?(target = Code.Js) ~name ~imports body : Code.jsir_file =
       Code.Marshalable_program.of_program
         { start = 0; blocks = Code.Addr.Map.singleton 0 block; free_pc = 1 }
   ; last_var
+  ; var_names = []
   ; imported_compilation_units = imports
   ; exported_compilation_unit = name
   ; force_link = false
+  ; whole_program
+  ; symbol_imports = []
+  ; symbol_exports = []
   }
 
 let write_jsir_file file (body : Code.jsir_file) =
@@ -130,9 +135,9 @@ let unit_b =
 
 let%expect_test "Parse_bytecode.from_jsir_channel" =
   with_temp_dir ~f:(fun () ->
-      write_jsir_file "a.cmj" unit_a;
+      write_jsir_file "a.cm-jsir-js" unit_a;
       Code.Var.reset ();
-      let unit = read_jsir_file "a.cmj" in
+      let unit = read_jsir_file "a.cm-jsir-js" in
       print_unit unit;
       (* Fresh variables do not collide with the variables of the unit. *)
       Printf.printf "last_var: %d\n" unit_a.last_var;
@@ -153,10 +158,11 @@ let%expect_test "Parse_bytecode.from_jsir_channel" =
 let%expect_test
     "Parse_bytecode.from_jsir_channel keeps fresh variables disjoint across units" =
   with_temp_dir ~f:(fun () ->
-      write_jsir_file "a.cmj" unit_a;
-      write_jsir_file "b.cmj" unit_b;
+      write_jsir_file "a.cm-jsir-js" unit_a;
+      write_jsir_file "b.cm-jsir-js" unit_b;
       Code.Var.reset ();
-      List.iter [ "a.cmj"; "b.cmj" ] ~f:(fun file -> print_unit (read_jsir_file file));
+      List.iter [ "a.cm-jsir-js"; "b.cm-jsir-js" ] ~f:(fun file ->
+          print_unit (read_jsir_file file));
       (* Fresh variables do not collide with the variables of any unit. *)
       Printf.printf "last_var: %d, %d\n" unit_a.last_var unit_b.last_var;
       Printf.printf "fresh: %d\n" (Code.Var.idx (Code.Var.fresh ())));
@@ -202,16 +208,29 @@ function jsir_test_unused() {
 
 let setup () =
   Filetype.write_js ~name:"stubs.js" (Filetype.js_text_of_string stubs) |> ignore;
-  write_jsir_file "a.cmj" unit_a;
-  write_jsir_file "b.cmj" unit_b;
+  write_jsir_file "a.cm-jsir-js" unit_a;
+  write_jsir_file "b.cm-jsir-js" unit_b;
   js_of_ocaml [ "build-runtime"; "-o"; "runtime.js" ] |> print_string
 
 (* [filter] selects the lines of the program's output to print. *)
-let link_and_run ?(filter = fun _ -> true) files =
-  js_of_ocaml ([ "link"; "runtime.js" ] @ files @ [ "-o"; "bin.js" ]) |> print_string;
-  run_javascript (Filetype.js_file_of_path "bin.js")
+let run ?(filter = fun _ -> true) file =
+  run_javascript (Filetype.js_file_of_path file)
   |> String.split_on_char ~sep:'\n'
   |> List.iter ~f:(fun line -> if filter line then print_endline line)
+
+let link_and_run ?filter files =
+  js_of_ocaml ([ "link"; "runtime.js" ] @ files @ [ "-o"; "bin.js" ]) |> print_string;
+  run ?filter "bin.js"
+
+(* The number of times a generated file mentions [name]. *)
+let occurrences file name =
+  let regexp = Str.regexp_string name in
+  let rec count line pos =
+    match Str.search_forward regexp line pos with
+    | pos -> 1 + count line (pos + 1)
+    | exception Not_found -> 0
+  in
+  List.fold_left (file_lines_text file) ~init:0 ~f:(fun n line -> n + count line 0)
 
 (* The unit info headers of a generated file. *)
 let print_unit_infos file =
@@ -221,8 +240,8 @@ let print_unit_infos file =
 let%expect_test "JSIR file without --include-runtime" =
   with_temp_dir ~f:(fun () ->
       setup ();
-      js_of_ocaml [ "stubs.js"; "a.cmj"; "-o"; "a.js" ] |> print_string;
-      js_of_ocaml [ "b.cmj"; "-o"; "b.js" ] |> print_string;
+      js_of_ocaml [ "stubs.js"; "a.cm-jsir-js"; "-o"; "a.js" ] |> print_string;
+      js_of_ocaml [ "b.cm-jsir-js"; "-o"; "b.js" ] |> print_string;
       print_unit_infos "a.js";
       print_unit_infos "b.js";
       (* The stubs are not part of the output, so the program fails. Only the
@@ -240,9 +259,9 @@ let%expect_test "JSIR file without --include-runtime" =
 let%expect_test "JSIR file with --include-runtime" =
   with_temp_dir ~f:(fun () ->
       setup ();
-      js_of_ocaml [ "--include-runtime"; "stubs.js"; "a.cmj"; "-o"; "a.js" ]
+      js_of_ocaml [ "--include-runtime"; "stubs.js"; "a.cm-jsir-js"; "-o"; "a.js" ]
       |> print_string;
-      js_of_ocaml [ "b.cmj"; "-o"; "b.js" ] |> print_string;
+      js_of_ocaml [ "b.cm-jsir-js"; "-o"; "b.js" ] |> print_string;
       print_unit_infos "a.js";
       print_unit_infos "b.js";
       link_and_run [ "a.js"; "b.js" ]);
@@ -255,6 +274,44 @@ let%expect_test "JSIR file with --include-runtime" =
     //# unitInfo: Provides: B
     //# unitInfo: Requires: A
     hello A
+    |}]
+
+(* A whole program, as [ocamlopt -link-jsir] makes from the JSIR of the units
+   of an executable. *)
+let whole_program =
+  jsir_file ~whole_program:true ~name:"prog" ~imports:[] (fun ~fresh ->
+      let greeting = fresh () in
+      [ Let (greeting, extern "jsir_test_greet" [ string "whole program" ])
+      ; Let (fresh (), extern "jsir_test_print" [ Pv greeting ])
+      ; (* The runtime raises a predefined exception, which the program has to
+           register itself. *)
+        Let (fresh (), extern "caml_sys_getenv" [ string "JSIR_TEST_UNSET_VARIABLE" ])
+      ])
+
+let%expect_test "JSIR whole program" =
+  with_temp_dir ~f:(fun () ->
+      Filetype.write_js ~name:"stubs.js" (Filetype.js_text_of_string stubs) |> ignore;
+      write_jsir_file "prog.cm-jsir-js" whole_program;
+      js_of_ocaml [ "--pretty"; "stubs.js"; "prog.cm-jsir-js"; "-o"; "prog.js" ]
+      |> print_string;
+      (* The output is an executable, with the primitives that the program
+         uses. *)
+      print_unit_infos "prog.js";
+      List.iter
+        [ "jsir_test_greet"; "jsir_test_unused"; "caml_set_link_info" ]
+        ~f:(fun name -> Printf.printf "%s: %b\n" name (occurrences "prog.js" name > 0));
+      run
+        ~filter:(fun line ->
+          String.starts_with ~prefix:"hello" line
+          || String.starts_with ~prefix:"Fatal error" line)
+        "prog.js");
+  [%expect
+    {|
+    jsir_test_greet: true
+    jsir_test_unused: false
+    caml_set_link_info: false
+    Fatal error: exception Not_found
+    hello whole program
     |}]
 
 (* The error messages, without the path to the executable. *)
@@ -275,12 +332,12 @@ let print_errors output =
 let%expect_test "js_of_ocaml rejects units compiled for wasm_of_ocaml" =
   with_temp_dir ~f:(fun () ->
       let unit = jsir_file ~target:Code.Wasm ~name:"W" ~imports:[] (fun ~fresh:_ -> []) in
-      write_jsir_file "w.cmw" unit;
-      write_jsir_file "w.cmj" unit;
-      print_errors (js_of_ocaml ~fail:false [ "w.cmw"; "-o"; "w.js" ]);
-      print_errors (js_of_ocaml ~fail:false [ "w.cmj"; "-o"; "w.js" ]));
+      write_jsir_file "w.cm-jsir-wasm" unit;
+      write_jsir_file "w.cm-jsir-js" unit;
+      print_errors (js_of_ocaml ~fail:false [ "w.cm-jsir-wasm"; "-o"; "w.js" ]);
+      print_errors (js_of_ocaml ~fail:false [ "w.cm-jsir-js"; "-o"; "w.js" ]));
   [%expect
     {|
-    Error: w.cmw was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
-    Error: w.cmj was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
+    Error: w.cm-jsir-wasm was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
+    Error: w.cm-jsir-js was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
     |}]

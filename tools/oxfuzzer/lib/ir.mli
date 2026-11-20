@@ -71,12 +71,13 @@ end
 module Ty : sig
   type t =
     | Number of NumberTy.t
-    | Array of NumberTy.t * int list
+    | Array of t * int list
     | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
     | Or_null of t
     | Bool
+    | String
 
   and record =
     { id : int;
@@ -216,6 +217,15 @@ end
 module Expr : sig
   type t =
     | Const of Number.t
+    | Bool_const of bool
+    | String_const of string
+    | String_length of t
+    | Bounded_string_concat of
+        { lhs : t;
+          rhs : t;
+          result_name : Name.t;
+          max_length : int
+        }
     | Assert_false
         (** Non-returning expression, valid at any result type or layout. *)
     | Let of

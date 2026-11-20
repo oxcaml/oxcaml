@@ -283,6 +283,11 @@ let[@inline] target_is_native () =
   | Native -> true
   | Bytecode | Js_of_ocaml | Wasm_of_ocaml -> false
 
+let[@inline] target_is_bytecode () =
+  match !target with
+  | Bytecode -> true
+  | Native | Js_of_ocaml | Wasm_of_ocaml -> false
+
 let[@inline] target_is_jsir () =
   match !target with
   | Js_of_ocaml | Wasm_of_ocaml -> true
@@ -351,6 +356,9 @@ module Jsoo_effects = struct
     | Wasm -> Jspi
 end
 
+let link_jsir = ref false               (* -link-jsir *)
+let jsir_inlined_frames = ref false     (* -jsir-inlined-frames *)
+
 let jsoo_effects_flag = ref (None : Jsoo_effects.t option) (* -jsoo-effects *)
 
 let set_jsoo_effects effects = jsoo_effects_flag := Some effects
@@ -407,6 +415,9 @@ let inlining_report = ref false    (* -inlining-report *)
 
 let afl_instrument = ref Config.afl_instrument (* -afl-instrument *)
 let afl_inst_ratio = ref 100           (* -afl-inst-ratio *)
+let gated_trace_pc_guard = ref false   (* -gated-trace-pc-guard *)
+let gated_trace_pc_guard_define_gate = ref false
+                                    (* -gated-trace-pc-guard-define-gate *)
 
 let function_sections = ref false      (* -function-sections *)
 let probes = ref Config.probes         (* -probes *)
@@ -698,6 +709,8 @@ let set_dumped_pass s enabled =
 let dump_into_file = ref false (* -dump-into-file *)
 let dump_into_csv = ref false (* -dump-into-csv *)
 let dump_dir: string option ref = ref None (* -dump-dir *)
+let enable_action_trace = ref false (* -enable-action-trace *)
+let debug_action_trace = ref false (* -debug-action-trace *)
 
 type 'a env_reader = {
   parse : string -> 'a option;

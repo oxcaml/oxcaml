@@ -271,13 +271,20 @@ let gen_array_dimensions (st : State.t) =
   in
   sizes dimensions Config.max_array_elements
 
+let gen_scalar_type ?(value_only = false) (st : State.t) =
+  if with_probability st ~probability:Config.bool_probability
+  then Ty.Bool
+  else if with_probability st ~probability:Config.string_probability
+  then Ty.String
+  else Ty.Number (random_number_ty ~value_only st)
+
 (* With [value_only], only types of layout value are generated. Arrays are
    values whatever their element type. *)
 let gen_scalar_or_array_type ?(value_only = false) (st : State.t) =
   if
     st.swarm.arrays && with_probability st ~probability:Config.array_probability
-  then Ty.Array (random_number_ty st, gen_array_dimensions st)
-  else Ty.Number (random_number_ty ~value_only st)
+  then Ty.Array (gen_scalar_type st, gen_array_dimensions st)
+  else gen_scalar_type ~value_only st
 
 let gen_type_with_unboxed_tuples (st : State.t) ~leaf =
   let rec gen depth =
@@ -404,7 +411,7 @@ let gen_variant_types (st : State.t) =
 let gen_or_null_payload_type (st : State.t) =
   if
     st.swarm.arrays && with_probability st ~probability:Config.array_probability
-  then Ty.Array (random_number_ty st, gen_array_dimensions st)
+  then Ty.Array (gen_scalar_type st, gen_array_dimensions st)
   else
     let numbers =
       List.filter_map
@@ -421,7 +428,7 @@ let gen_or_null_payload_type (st : State.t) =
     let variants =
       List.map (fun variant -> Ty.Variant variant) st.variant_types
     in
-    random_element st (numbers @ records @ variants)
+    random_element st (Ty.Bool :: Ty.String :: (numbers @ records @ variants))
 
 let gen_sum_type (st : State.t) =
   Gen.run_exn
@@ -434,7 +441,6 @@ let gen_sum_type (st : State.t) =
            Gen.when_ st.swarm.or_null (fun () ->
                Sum.Or_null (gen_or_null_payload_type st)) ) ])
 
-(* CR-soon xclerc: Add boolean variable generation. *)
 let gen_type (st : State.t) =
   gen_type_with_unboxed_tuples st ~leaf:(fun () ->
       if
@@ -509,11 +515,11 @@ let places (st : State.t) (env : Env.t) ~for_write =
             collect field.ty ((not record.unboxed) && field.is_mutable)
               (fun () -> Place.Field (make (), record, field)))
           record.fields
-      | Ty.Array (nty, dimensions) ->
+      | Ty.Array (element_ty, dimensions) ->
         if for_write && not st.swarm.array_writes
         then []
         else
-          [ ( Ty.Number nty,
+          [ ( element_ty,
               fun () ->
                 Place.Element (make (), gen_array_indices st env dimensions) )
           ]
@@ -527,7 +533,7 @@ let places (st : State.t) (env : Env.t) ~for_write =
                   { tuple; arity = List.length components; index; name }))
           components
         |> List.concat
-      | Ty.Number _ | Ty.Bool | Ty.Variant _ | Ty.Or_null _ -> []
+      | Ty.Number _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _ -> []
     in
     here @ children
   in
@@ -549,9 +555,8 @@ let gen_existing st env ty =
       let from, make = random_element st choices in
       convert_value st from ty (Expr.Read (make ())))
 
-let gen_numeric_var (st : State.t) env nty =
-  Gen.map
-    (gen_existing st env (Ty.Number nty))
+let gen_var (st : State.t) env ty =
+  Gen.map (gen_existing st env ty)
     ~f:
       (maybe_opaque st ~enabled:st.swarm.opaque_leaves
          ~probability:Config.opaque_leaf_probability)
@@ -603,7 +608,7 @@ let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
     (Gen.weighted st.random_state
        [10, Gen.create random_bits; 5, small; 4, boundary; 1, special])
 
-let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
+let gen_scalar_const (st : State.t) (ty : Ty.t) =
   let gen_const_int base =
     Gen.create (fun () ->
         let small ~min ~max =
@@ -668,29 +673,53 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
       | (Int | Nativeint | Int64 | Int32 | Int16 | Int8) as base ->
         gen_const_int base
     in
-    let const =
-      if nty.unboxed
-      then
-        Gen.map boxed ~f:(fun expr ->
-            Expr.Convert { expr; from = NumberTy.boxed nty.base; to_ = nty })
-      else boxed
-    in
-    Gen.map const
-      ~f:
-        (maybe_opaque st ~enabled:st.swarm.opaque_leaves
-           ~probability:Config.opaque_leaf_probability)
+    if nty.unboxed
+    then
+      Gen.map boxed ~f:(fun expr ->
+          Expr.Convert { expr; from = NumberTy.boxed nty.base; to_ = nty })
+    else boxed
   in
-  gen_const nty
+  let const =
+    match ty with
+    | Number nty -> gen_const nty
+    | Bool ->
+      Gen.create (fun () -> Expr.Bool_const (Random.State.bool st.random_state))
+    | String ->
+      Gen.create (fun () ->
+          let length =
+            if Random.State.bool st.random_state
+            then
+              random_element st
+                [0; min 1 Config.max_string_length; Config.max_string_length]
+            else random_int_in_range st ~min:0 ~max:Config.max_string_length
+          in
+          let value =
+            if Random.State.bool st.random_state
+            then
+              String.make length
+                (random_element st ['\000'; '\255'; '"'; '\\'; '\n'; 'a'])
+            else
+              String.init length (fun _ ->
+                  Char.chr (Random.State.int st.random_state 256))
+          in
+          Expr.String_const value)
+    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
+      Misc.fatal_errorf "gen_scalar_const: expected a scalar type"
+  in
+  Gen.map const
+    ~f:
+      (maybe_opaque st ~enabled:st.swarm.opaque_leaves
+         ~probability:Config.opaque_leaf_probability)
 
 (* CR-someday xclerc: Let arrays have arbitrary types, including records. *)
-let gen_array st env nty dimensions =
+let gen_array st env element_ty dimensions =
   if with_probability st ~probability:Config.array_literal_probability
   then
     let count = List.fold_left ( * ) 1 dimensions in
     let pool =
       List.init
         (random_int_in_range st ~min:1 ~max:(max 1 (count / 2)))
-        (fun _ -> Gen.run_exn (gen_numeric_const st nty))
+        (fun _ -> Gen.run_exn (gen_scalar_const st element_ty))
     in
     let rec literal = function
       | [] -> random_element st pool
@@ -700,9 +729,9 @@ let gen_array st env nty dimensions =
     literal dimensions
   else
     let init =
-      match gen_numeric_var st env nty with
+      match gen_var st env element_ty with
       | Some generate -> generate ()
-      | None -> Gen.run_exn (gen_numeric_const st nty)
+      | None -> Gen.run_exn (gen_scalar_const st element_ty)
     in
     Expr.Array_make { dimensions; init_name = State.fresh st; init }
 
@@ -788,13 +817,20 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
   in
   let leaf =
     Gen.weighted st.random_state
-      [2, gen_numeric_var st env nty; 1, gen_numeric_const st nty]
+      [2, gen_var st env (Ty.Number nty); 1, gen_scalar_const st (Ty.Number nty)]
   in
   Gen.run_exn
     (Gen.weighted st.random_state
        [ 5, leaf;
          2, gen_unop nty;
          3, gen_binop nty;
+         ( 1,
+           Gen.create (fun () ->
+               Expr.Convert
+                 { expr = Expr.String_length (gen_value st env Ty.String);
+                   from = NumberTy.boxed Int;
+                   to_ = nty
+                 }) );
          1, gen_fun_call st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
@@ -940,6 +976,33 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
     in
     Gen.weighted st.random_state [2, existing_function; 1, new_function]
 
+and gen_string (st : State.t) env =
+  let leaf =
+    Gen.weighted st.random_state
+      [2, gen_var st env Ty.String; 1, gen_scalar_const st Ty.String]
+  in
+  let concat =
+    Gen.create (fun () ->
+        let lhs = gen_value st env Ty.String in
+        let rhs = gen_value st env Ty.String in
+        bind_operand st rhs ~f:(fun rhs ->
+            bind_operand st lhs ~f:(fun lhs ->
+                (* Bound repeated concatenation in loops as well as literals. *)
+                Expr.Bounded_string_concat
+                  { lhs;
+                    rhs;
+                    result_name = State.fresh st;
+                    max_length = Config.max_string_length
+                  })))
+  in
+  Gen.run_exn
+    (Gen.weighted st.random_state
+       [ 5, leaf;
+         2, concat;
+         1, gen_fun_call st env Ty.String;
+         1, gen_try_expr st env Ty.String;
+         1, gen_match st env Ty.String ])
+
 and gen_bool (st : State.t) env =
   let gen_binop op arg_ty gen_arg =
     Gen.create (fun () ->
@@ -952,13 +1015,22 @@ and gen_bool (st : State.t) env =
   let gen_bool_arg () = gen_value st env Ty.Bool in
   let gen_bool_binop op = gen_binop op Ty.Bool gen_bool_arg in
   let comparison = random_element st Bin_op.[Eq; Lt; Le; Gt; Ge] in
+  let leaf =
+    Gen.weighted st.random_state
+      [2, gen_var st env Ty.Bool; 1, gen_scalar_const st Ty.Bool]
+  in
   Gen.run_exn
     (Gen.weighted st.random_state
-       [ 5, gen_binop comparison (Ty.Number nty) gen_number_arg;
+       [ 5, leaf;
+         5, gen_binop comparison (Ty.Number nty) gen_number_arg;
+         ( 1,
+           gen_binop comparison Ty.String (fun () -> gen_value st env Ty.String)
+         );
          1, Gen.create (fun () -> gen_unary st env Ty.Bool);
          1, gen_bool_binop Bin_op.Eq;
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or;
+         1, gen_fun_call st env Ty.Bool;
          1, gen_try_expr st env Ty.Bool;
          1, gen_match st env Ty.Bool ])
 
@@ -975,7 +1047,7 @@ and gen_raise_expr (st : State.t) (env : Env.t) ty =
   let is_value =
     match ty with
     | Ty.Number { unboxed; _ } | Ty.Record { unboxed; _ } -> not unboxed
-    | Ty.Array _ | Ty.Bool | Ty.Variant _ | Ty.Or_null _ -> true
+    | Ty.Array _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _ -> true
     | Ty.Unboxed_tuple _ -> false
   in
   Gen.when_
@@ -1004,11 +1076,12 @@ and gen_value (st : State.t) env ty =
       match ty with
       | Ty.Number nty -> gen_number st env nty
       | Ty.Bool -> gen_bool st env
-      | Ty.Array (nty, dimensions) ->
+      | Ty.String -> gen_string st env
+      | Ty.Array (element_ty, dimensions) ->
         Gen.run_exn
           (Gen.weighted st.random_state
              [ 3, gen_existing st env ty;
-               2, Gen.create (fun () -> gen_array st env nty dimensions);
+               2, Gen.create (fun () -> gen_array st env element_ty dimensions);
                1, gen_fun_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ])

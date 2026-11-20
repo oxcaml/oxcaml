@@ -229,6 +229,7 @@ end
 
 val set_target : Target.t -> unit
 val target_is_native : unit -> bool
+val target_is_bytecode : unit -> bool
 
 (** Whether the target is one of the JSIR targets. *)
 val target_is_jsir : unit -> bool
@@ -238,11 +239,15 @@ val jsir_target_exn : unit -> Jsir_target.t
 (** The invocations of [js_of_ocaml] (or [wasm_of_ocaml] with
     [-target wasm_of_ocaml]) that options can be passed through to, with
     [-jsoo-opt-<phase>] (and [-jsoo-opt] for all of them):
-    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo]
-      ([.cmwo]);
-    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([.cmwa]) ([-a]);
-    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
-    - [Link]: [js_of_ocaml link], when linking an executable. *)
+    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmo-js]
+      ([.cmo-wasm]), or compiling the whole program when linking an executable
+      with [-link-jsir];
+    - [Archive]: [js_of_ocaml link -a], producing a [.cma-js] ([.cma-wasm])
+      ([-a]); not run with [-link-jsir];
+    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable (not
+      run with [-link-jsir]);
+    - [Link]: [js_of_ocaml link], when linking an executable (not run with
+      [-link-jsir]). *)
 module Jsoo_phase : sig
   type t = All | Compile | Archive | Runtime | Link
 
@@ -272,6 +277,13 @@ module Jsoo_effects : sig
   val default : Jsir_target.t -> t
 end
 
+(** Whether the units of an executable are linked as JSIR into one program
+    that [js_of_ocaml] (or [wasm_of_ocaml]) compiles as a whole, instead of
+    being compiled one by one and linked by [js_of_ocaml link]. Object files
+    then hold JSIR (see [Jscomp]). *)
+val link_jsir : bool ref
+
+val jsir_inlined_frames : bool ref
 val set_jsoo_effects : Jsoo_effects.t -> unit
 val jsoo_effects : unit -> Jsoo_effects.t option
 
@@ -336,6 +348,8 @@ val dump_jsir : bool ref
 val classic_inlining : bool ref
 val afl_instrument : bool ref
 val afl_inst_ratio : int ref
+val gated_trace_pc_guard : bool ref
+val gated_trace_pc_guard_define_gate : bool ref
 val function_sections : bool ref
 val probes : bool ref
 val kind_verbosity : int ref
@@ -355,6 +369,8 @@ val set_dumped_pass : string -> bool -> unit
 val dump_into_file : bool ref
 val dump_into_csv : bool ref
 val dump_dir : string option ref
+val enable_action_trace : bool ref
+val debug_action_trace : bool ref
 
 val keyword_edition: string option ref
 val parse_keyword_edition: string -> (int*int) option * string list

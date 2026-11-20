@@ -18,6 +18,8 @@ val max_array_axis_size : int
 
 val max_array_elements : int
 
+val max_string_length : int
+
 val max_record_types : int
 
 val max_record_fields : int
@@ -62,6 +64,10 @@ val mutable_binding_probability : int
 val mutable_field_probability : int
 
 val array_probability : int
+
+val bool_probability : int
+
+val string_probability : int
 
 val array_literal_probability : int
 

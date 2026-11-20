@@ -139,6 +139,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  action_trace
   json
   arrayset
   config
@@ -598,6 +599,8 @@
   dsl_helpers
   binary_emitter_helpers
   emit
+  emit_sancov
+  emit_sancov_common
   emitaux
   fdo_info
   generic_fns
@@ -676,6 +679,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_trace_pc_guard
   cfg_z3
   cfg_prologue
   cfg_merge_blocks
@@ -720,6 +724,7 @@
   ;; backend/ssa/
   ssa
   ssa_print
+  ssa_loops
   ssa_post_dominators
   ssa_reducer
   ssa_simplify

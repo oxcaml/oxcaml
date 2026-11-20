@@ -850,6 +850,14 @@ let mk_dump_into_file f =
 let mk_dump_into_csv f =
   "-dump-into-csv", Arg.Unit f, " Dump profile information to profile.csv"
 
+let mk_enable_action_trace f =
+  "-enable-action-trace", Arg.Unit f,
+  " Write action traces to the directory in DUNE_ACTION_TRACE_DIR"
+
+let mk_debug_action_trace f =
+  "-debug-action-trace", Arg.Unit f,
+  " Raise errors from writing action traces instead of ignoring them"
+
 let mk_no_ikinds f =
   "-no-ikinds", Arg.Unit f, " Disable ikinds-based kind checker"
 
@@ -1174,6 +1182,23 @@ let mk_afl_inst_ratio f =
   "Configure percentage of branches instrumented\n\
   \     (advanced, see afl-fuzz docs for AFL_INST_RATIO)"
 
+let mk_gated_trace_pc_guard f =
+  "-gated-trace-pc-guard", Arg.Unit f,
+  "Enable coverage instrumentation compatible with\n\
+  \     LLVM's -fsanitize-coverage=trace-pc-guard with\n\
+  \     gated callbacks: probes only call the callback when\n\
+  \     __sancov_should_track is non-zero (the\n\
+  \     __sanitizer_cov_trace_pc_guard callbacks must be\n\
+  \     provided at link time). Implies\n\
+  \     -gdwarf-inlined-frames unless\n\
+  \     -gno-dwarf-inlined-frames is given"
+
+let mk_gated_trace_pc_guard_define_gate f =
+  "-gated-trace-pc-guard-define-gate", Arg.Unit f,
+  "When linking, define __sancov_should_track (the
+  \     gate of -gated-trace-pc-guard) in the startup file,
+  \     as a zero-initialised symbol that is not weak"
+
 let mk__ f =
   "-", Arg.String f,
   "<file>  Treat <file> as a file name (even if it starts with `-')"
@@ -1340,6 +1365,8 @@ module type Compiler_options = sig
   val _dump_into_file : unit -> unit
   val _dump_into_csv : unit -> unit
   val _dump_dir : string -> unit
+  val _enable_action_trace : unit -> unit
+  val _debug_action_trace : unit -> unit
 
   val _args: string -> string array
   val _args0: string -> string array
@@ -1448,6 +1475,8 @@ module type Optcomp_options = sig
   val _shared : unit -> unit
   val _afl_instrument : unit -> unit
   val _afl_inst_ratio : int -> unit
+  val _gated_trace_pc_guard : unit -> unit
+  val _gated_trace_pc_guard_define_gate : unit -> unit
   val _function_sections : unit -> unit
   val _save_ir_after : string -> unit
   val _save_ir_before : string -> unit
@@ -1654,6 +1683,8 @@ struct
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
     mk_dump_into_csv F._dump_into_csv;
+    mk_enable_action_trace F._enable_action_trace;
+    mk_debug_action_trace F._debug_action_trace;
     mk_dump_dir F._dump_dir;
     mk_debug_ocaml F._debug_ocaml;
 
@@ -1776,6 +1807,8 @@ struct
     mk_no_locs F._no_locs;
     mk_afl_instrument F._afl_instrument;
     mk_afl_inst_ratio F._afl_inst_ratio;
+    mk_gated_trace_pc_guard F._gated_trace_pc_guard;
+    mk_gated_trace_pc_guard_define_gate F._gated_trace_pc_guard_define_gate;
     mk_annot F._annot;
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
@@ -1968,6 +2001,8 @@ struct
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
     mk_dump_into_csv F._dump_into_csv;
+    mk_enable_action_trace F._enable_action_trace;
+    mk_debug_action_trace F._debug_action_trace;
     mk_dump_dir F._dump_dir;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
@@ -2490,6 +2525,8 @@ module Default = struct
     let _dump_into_file = set dump_into_file
     let _dump_into_csv = set dump_into_csv
     let _dump_dir s = dump_dir := Some s
+    let _enable_action_trace = set enable_action_trace
+    let _debug_action_trace = set debug_action_trace
     let _for_pack s = for_package := (Some (String.capitalize_ascii s))
     let _g = set debug
     let _no_g = clear debug
@@ -2595,6 +2632,9 @@ module Default = struct
     include Compiler
     let _afl_inst_ratio n = afl_inst_ratio := n
     let _afl_instrument = set afl_instrument
+    let _gated_trace_pc_guard = set gated_trace_pc_guard
+    let _gated_trace_pc_guard_define_gate =
+      set gated_trace_pc_guard_define_gate
     let _function_sections () =
       assert Config.function_sections;
       Compenv.first_ccopts := ("-ffunction-sections" ::(!Compenv.first_ccopts));

@@ -947,7 +947,11 @@ let bytes_length =
   D.(unary "%bytes_length" ~params:param0 (fun _ () -> P.String_length String))
 
 let boolean_not =
-  D.(unary "%boolean_not" ~params:param0 (fun _ () -> P.Boolean_not))
+  D.(
+    unary "%boolean_not"
+      ~params:
+        (default ~def:P.Tagged_bool @@ constructor_flag ["imm", P.Naked_bool])
+      (fun _ repr -> P.Boolean_not repr))
 
 let duplicate_block =
   let open D in
@@ -1375,7 +1379,7 @@ module OfFlambda = struct
     | Block_load { kind; mut; field } -> block_load env (kind, mut, field)
     | Bigarray_length { dimension } -> bigarray_length env dimension
     | Box_number (bk, alloc) -> box_num env (bk, alloc)
-    | Boolean_not -> boolean_not env ()
+    | Boolean_not repr -> boolean_not env repr
     | End_region { ghost = false } -> end_region env ()
     | End_try_region { ghost = false } -> end_try_region env ()
     | End_region { ghost = true } -> end_ghost_region env ()

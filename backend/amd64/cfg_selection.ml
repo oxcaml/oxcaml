@@ -184,7 +184,12 @@ let pseudoregs_for_operation op arg res =
   | Intop (Idiv _) -> [| rax; rcx |], [| rax |]
   | Intop (Imod _) -> [| rax; rcx |], [| rdx |]
   | Int128op (Iadd128 | Isub128) ->
-    [| res.(0); res.(1); arg.(2); arg.(3) |], res
+    (* res.(0) will be written before arg.(3) is read, so they must not share a
+       register. *)
+    let high =
+      if Reg.same arg.(0) arg.(3) then Reg.create_with_typ arg.(3) else arg.(3)
+    in
+    [| res.(0); res.(1); arg.(2); high |], res
   | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
   | Floatop (Float64, Icompf cond) ->
     (* We need to temporarily store the result of the comparison in a float
@@ -239,8 +244,9 @@ let pseudoregs_for_operation op arg res =
   | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
   | Const_vec512 _ | Const_mask _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
-  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause | Begin_region
-  | End_region | Poll | Dls_get | Tls_get | Domain_index | Thread_self_id ->
+  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause
+  | Trace_pc_guard_gate | Trace_pc_guard _ | Begin_region | End_region | Poll
+  | Dls_get | Tls_get | Domain_index | Thread_self_id ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"

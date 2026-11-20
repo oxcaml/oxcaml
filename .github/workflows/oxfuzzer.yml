@@ -58,11 +58,11 @@ on:
       minutes:
         description: Stop starting cases after this many minutes
         type: number
-        default: 60
+        default: 120
       max_failures:
         description: Stop starting cases after this many failures
         type: number
-        default: 5
+        default: 100
       commit:
         description: >-
           Commit to fuzz, as a hash, branch or tag (default is the tip of
@@ -178,7 +178,7 @@ jobs:
       - id: timeout
         name: Compute the timeout
         env:
-          MINUTES: ${{ inputs.minutes || 60 }}
+          MINUTES: ${{ inputs.minutes || 120 }}
           BUILD: ${{ inputs.build || false }}
         run: |
           awk -v minutes="$MINUTES" -v build="$BUILD" 'BEGIN {
@@ -196,7 +196,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     # From the fuzzing time: see the select job. For an automatic run it is
-    # 90 minutes, which also limits how long a stuck run holds up the next
+    # 150 minutes, which also limits how long a stuck run holds up the next
     # commit.
     timeout-minutes: ${{ fromJSON(needs.select.outputs.timeout) }}
     permissions:
@@ -209,8 +209,8 @@ jobs:
       SYSTEM: ${{ matrix.system }}
       # Input defaults apply only to manual runs: automatic runs have no
       # inputs at all.
-      MINUTES: ${{ inputs.minutes || 60 }}
-      MAX_FAILURES: ${{ inputs.max_failures || 5 }}
+      MINUTES: ${{ inputs.minutes || 120 }}
+      MAX_FAILURES: ${{ inputs.max_failures || 100 }}
       BUILD: ${{ inputs.build || false }}
       SEED: ${{ inputs.seed }}
 
@@ -307,3 +307,4 @@ jobs:
             oxfuzzer-summary.md
             failures/
           if-no-files-found: ignore
+          retention-days: 30

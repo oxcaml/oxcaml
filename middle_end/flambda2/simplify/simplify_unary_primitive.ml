@@ -461,11 +461,19 @@ module Simplify_int_conv_naked_int64 = Make_simplify_int_conv (A.For_int64s)
 module Simplify_int_conv_naked_nativeint =
   Make_simplify_int_conv (A.For_nativeints)
 
-let simplify_boolean_not dacc ~original_term ~arg:_ ~arg_ty ~result_var =
+let simplify_boolean_not (repr : P.boolean_representation) dacc ~original_term
+    ~arg:_ ~arg_ty ~result_var =
   let denv = DA.denv dacc in
   let typing_env = DE.typing_env denv in
   let machine_width = DE.machine_width denv in
-  let proof = T.meet_equals_tagged_immediates typing_env arg_ty in
+  let proof, these_immediates =
+    match repr with
+    | Tagged_bool ->
+      ( T.meet_equals_tagged_immediates typing_env arg_ty,
+        T.these_tagged_immediates )
+    | Naked_bool ->
+      T.meet_naked_immediates typing_env arg_ty, T.these_naked_immediates
+  in
   match proof with
   | Known_result imms ->
     let imms =
@@ -482,16 +490,13 @@ let simplify_boolean_not dacc ~original_term ~arg:_ ~arg_ty ~result_var =
     if Target_ocaml_int.Set.is_empty imms
     then SPR.create_invalid dacc
     else
-      let ty = T.these_tagged_immediates imms in
+      let ty = these_immediates imms in
       let dacc = DA.add_variable dacc result_var ty in
       SPR.create original_term ~try_reify:true dacc
   | Need_meet ->
     (* CR-someday mshinwell: This could say something like (in the type) "when
        the input is 0, the value is 1" and vice-versa. *)
-    let machine_width = DE.machine_width denv in
-    let ty =
-      T.these_tagged_immediates (Target_ocaml_int.all_bools machine_width)
-    in
+    let ty = these_immediates (Target_ocaml_int.all_bools machine_width) in
     let dacc = DA.add_variable dacc result_var ty in
     SPR.create original_term ~try_reify:false dacc
   | Invalid -> SPR.create_invalid dacc
@@ -1054,7 +1059,7 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
       | Naked_int32 -> Simplify_int_conv_naked_int32.simplify ~dst
       | Naked_int64 -> Simplify_int_conv_naked_int64.simplify ~dst
       | Naked_nativeint -> Simplify_int_conv_naked_nativeint.simplify ~dst)
-    | Boolean_not -> simplify_boolean_not
+    | Boolean_not repr -> simplify_boolean_not repr
     | Reinterpret_64_bit_word reinterpret ->
       simplify_reinterpret_64_bit_word reinterpret
     | Reinterpret_boxed_vector -> simplify_reinterpret_boxed_vector

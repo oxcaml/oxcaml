@@ -61,7 +61,8 @@ let warn_jsir_ignore target what =
              ^ Jsir_target.program_name target)
 
 (* The files given on the command line that are recorded like C stubs and
-   passed to [js_of_ocaml build-runtime] or [wasm_of_ocaml build-runtime]. *)
+   passed to [js_of_ocaml build-runtime] or [wasm_of_ocaml build-runtime] (to
+   [compile] with [-link-jsir]). *)
 let is_jsir_stub name =
   match jsir_target () with
   | None -> false
@@ -326,6 +327,11 @@ let read_one_param ppf position name v =
   | "afl-instrument" -> set "afl-instrument" [ Clflags.afl_instrument ] v
   | "afl-inst-ratio" ->
       int_setter ppf "afl-inst-ratio" afl_inst_ratio v
+  | "gated-trace-pc-guard" ->
+      set "gated-trace-pc-guard" [ Clflags.gated_trace_pc_guard ] v
+  | "gated-trace-pc-guard-define-gate" ->
+      set "gated-trace-pc-guard-define-gate"
+        [ Clflags.gated_trace_pc_guard_define_gate ] v
   | "annot" -> set "annot" [ Clflags.annotations ] v
   | "absname" -> set "absname" [ Clflags.absname ] v
   | "compat-32" -> set "compat-32" [ bytecode_compatible_32 ] v
@@ -630,6 +636,10 @@ let read_one_param ppf position name v =
   | "dump-into-file" -> Clflags.dump_into_file := true
   | "dump-into-csv" -> Clflags.dump_into_csv := true
   | "dump-dir" -> Clflags.dump_dir := Some v
+  | "enable-action-trace" ->
+      set "enable-action-trace" [ Clflags.enable_action_trace ] v
+  | "debug-action-trace" ->
+      set "debug-action-trace" [ Clflags.debug_action_trace ] v
   | "profile-output" ->
     (check_relative_path ~on_error:(print_error ppf) "profile-output" v)
     |> Option.iter (fun path -> Clflags.profile_output_name := Some path)
@@ -784,6 +794,9 @@ let readenv ppf position =
         warn_jsir_ignore target "-ccopt";
         all_ccopts := []
       | Some _ | None -> ());
+     if not (Clflags.target_is_jsir ()) && !Clflags.link_jsir then
+       warn_once "ignoring -link-jsir, which is only used when \
+                  targeting js_of_ocaml or wasm_of_ocaml";
      if not (Clflags.target_is_jsir ()) then
        List.iter (fun phase ->
            if !(Clflags.jsoo_opts phase) <> [] then

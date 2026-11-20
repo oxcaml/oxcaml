@@ -106,6 +106,19 @@ let env_find_static_exception id env =
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
 
+let dbg_of_test (test : Cmm.expression) dbg =
+  if not (Debuginfo.is_none dbg)
+  then dbg
+  else
+    match test with
+    | Cop (_, _, dbg) -> dbg
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
+    | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _
+    | Cinvalid _ ->
+      Debuginfo.none
+
 let phantom_vars_from_env env =
   if !Clflags.restrict_to_upstream_dwarf then None else Some env.phantom_lets
 
@@ -620,10 +633,9 @@ let terminator_of_test :
   | Ieventest -> Parity_test { ifso = label_true; ifnot = label_false }
 
 module Stack_offset_and_exn = struct
-  (* This module relies on the field `can_raise` of basic blocks but does not
-     rely on this field of individual Cfg instructions. This may need to be
-     revisited when we remove dead trap handlers and the associated
-     pushtrap/poptrap operations. *)
+  (* This module derives exception edges from block-level [can_raise]. It runs
+     before CFG simplification; [Cfg.remove_blocks] adjusts stack offsets when
+     dead handlers are removed. *)
   type handler_stack = Label.t list
 
   let fun_name = ref ""
@@ -692,7 +704,8 @@ module Stack_offset_and_exn = struct
         | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
         | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
         | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Thread_self_id | Poll | Pause | Alloc _ )
+        | Domain_index | Thread_self_id | Poll | Pause | Trace_pc_guard_gate
+        | Trace_pc_guard _ | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->

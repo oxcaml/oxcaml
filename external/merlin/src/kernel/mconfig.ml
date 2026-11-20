@@ -659,6 +659,8 @@ let ocaml_ignored_flags =
     "-no-vectorize";
     "-dvectorize";
     "-dump-into-csv";
+    "-enable-action-trace";
+    "-debug-action-trace";
     "-no-mach-ir";
     "-flambda2-reaper";
     "-no-flambda2-reaper";
@@ -666,8 +668,6 @@ let ocaml_ignored_flags =
     "-dreaper";
     "-instantiate";
     "-dflambda-heavy-invariants";
-    "-cfg-eliminate-dead-trap-handlers";
-    "-no-cfg-eliminate-dead-trap-handlers";
     "-module-entry-functions-section";
     "-zero-alloc-checker-details-extra";
     "-no-zero-alloc-checker-details-extra";
@@ -722,6 +722,8 @@ let ocaml_ignored_flags =
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
     "-afl-instrument";
+    "-gated-trace-pc-guard";
+    "-gated-trace-pc-guard-define-gate";
     "-probes";
     "-no-probes";
     "-probes-optimized";
@@ -771,6 +773,8 @@ let ocaml_ignored_flags =
     "-no-manual-module-init";
     "-dfexpr-annot";
     "-dfexpr-annot-after";
+    "-fexpr-print-branch-annotations";
+    "-fexpr-print-fdo-counters";
     "-linscan";
     "-clambda-checks";
     "-dasm-comments";
@@ -825,7 +829,9 @@ let ocaml_ignored_flags =
     "-flambda2-simplify-stubs";
     "-stubs-forward-inlining";
     "-no-stubs-forward-inlining";
-    "-djsir"
+    "-djsir";
+    "-link-jsir";
+    "-jsir-inlined-frames"
   ]
 
 let ocaml_ignored_parametrized_flags =

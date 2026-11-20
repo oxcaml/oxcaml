@@ -168,16 +168,6 @@ let mk_cfg_stack_checks_threshold f =
     Arg.Int f,
     "<n>  Only CFGs with fewer than n blocks will be optimized" )
 
-let mk_cfg_eliminate_dead_trap_handlers f =
-  ( "-cfg-eliminate-dead-trap-handlers",
-    Arg.Unit f,
-    " Eliminate dead trap handlers" )
-
-let mk_no_cfg_eliminate_dead_trap_handlers f =
-  ( "-no-cfg-eliminate-dead-trap-handlers",
-    Arg.Unit f,
-    " Do not eliminate dead trap handlers" )
-
 let mk_cfg_eliminate_dead_code_validate f =
   ( "-cfg-eliminate-dead-code-validate",
     Arg.Unit f,
@@ -1230,6 +1220,18 @@ let mk_dfexpr_to f =
     Arg.String f,
     "<file> Like -dfexpr but dumps to given file (Flambda 2 only)" )
 
+let mk_fexpr_print_branch_annotations f =
+  ( "-fexpr-print-branch-annotations",
+    Arg.Unit f,
+    " Print the branch annotations of switch arms in fexpr\n\
+    \     (Flambda 2 only)" )
+
+let mk_fexpr_print_fdo_counters f =
+  ( "-fexpr-print-fdo-counters",
+    Arg.Unit f,
+    " Print the FDO annotations of function entries and call sites in fexpr\n\
+    \     (Flambda 2 only)" )
+
 let mk_dslot_offsets f =
   ("-dslot-offsets", Arg.Unit f, " Dump closure offsets (Flambda 2 only)")
 
@@ -1379,17 +1381,17 @@ let mk_jsoo_opt f =
         "<opt>  Pass option <opt> to every js_of_ocaml or wasm_of_ocaml \
          invocation"
     | Compile ->
-        "<opt>  Pass option <opt> when compiling a unit (js_of_ocaml or \
-         wasm_of_ocaml compile)"
+        "<opt>  Pass option <opt> when compiling a unit, or the whole program \
+         with -link-jsir (js_of_ocaml or wasm_of_ocaml compile)"
     | Archive ->
         "<opt>  Pass option <opt> when creating an archive with -a \
          (js_of_ocaml or wasm_of_ocaml link -a)"
     | Runtime ->
         "<opt>  Pass option <opt> when building the runtime of an executable \
-         (js_of_ocaml or wasm_of_ocaml build-runtime)"
+         (js_of_ocaml or wasm_of_ocaml build-runtime, not run with -link-jsir)"
     | Link ->
         "<opt>  Pass option <opt> when linking an executable (js_of_ocaml or \
-         wasm_of_ocaml link)"
+         wasm_of_ocaml link, not run with -link-jsir)"
   in
   List.map
     (fun phase ->
@@ -1421,6 +1423,19 @@ let mk_jsoo_effects f =
     Arg.Symbol (List.map fst assoc_list, fun s -> f (List.assoc s assoc_list)),
     Printf.sprintf " Effect handlers backend: %s; %s" (doc_for_target Js)
       (doc_for_target Wasm) )
+
+let mk_link_jsir f =
+  ( "-link-jsir",
+    Arg.Unit f,
+    " Link the units of an executable as JSIR, into one program that \
+     js_of_ocaml or wasm_of_ocaml compiles as a whole. " )
+
+let mk_jsir_inlined_frames f =
+  ( "-jsir-inlined-frames",
+    Arg.Unit f,
+    " With -g, record the call sites that code was inlined through in the \
+     source file names of its locations, as FILE<-FILE:LINE:COL<-... (with \
+     -target js_of_ocaml or wasm_of_ocaml)" )
 
 let mk_djsir f =
   ( "-djsir",
@@ -1484,8 +1499,6 @@ module type Oxcaml_options = sig
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
-  val cfg_eliminate_dead_trap_handlers : unit -> unit
-  val no_cfg_eliminate_dead_trap_handlers : unit -> unit
   val cfg_eliminate_dead_code_validate : unit -> unit
   val no_cfg_eliminate_dead_code_validate : unit -> unit
   val cfg_dominators_validate : unit -> unit
@@ -1648,6 +1661,8 @@ module type Oxcaml_options = sig
   val dfexpr_after : string -> unit
   val dfexpr_annot : unit -> unit
   val dfexpr_annot_after : string -> unit
+  val fexpr_print_branch_annotations : unit -> unit
+  val fexpr_print_fdo_counters : unit -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
@@ -1658,6 +1673,8 @@ module type Oxcaml_options = sig
   val target : Clflags.Target.t -> unit
   val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
   val jsoo_effects : Clflags.Jsoo_effects.t -> unit
+  val link_jsir : unit -> unit
+  val jsir_inlined_frames : unit -> unit
   val djsir : unit -> unit
   val x : string -> unit
 end
@@ -1703,9 +1720,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
-      mk_cfg_eliminate_dead_trap_handlers F.cfg_eliminate_dead_trap_handlers;
-      mk_no_cfg_eliminate_dead_trap_handlers
-        F.no_cfg_eliminate_dead_trap_handlers;
       mk_cfg_eliminate_dead_code_validate F.cfg_eliminate_dead_code_validate;
       mk_no_cfg_eliminate_dead_code_validate
         F.no_cfg_eliminate_dead_code_validate;
@@ -1901,6 +1915,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr_after F.dfexpr_after;
       mk_dfexpr_annot F.dfexpr_annot;
       mk_dfexpr_annot_after F.dfexpr_annot_after;
+      mk_fexpr_print_branch_annotations F.fexpr_print_branch_annotations;
+      mk_fexpr_print_fdo_counters F.fexpr_print_fdo_counters;
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
       mk_dflow F.dflow;
@@ -1910,6 +1926,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cached_generic_functions_path F.cached_generic_functions_path;
       mk_target F.target;
       mk_jsoo_effects F.jsoo_effects;
+      mk_link_jsir F.link_jsir;
+      mk_jsir_inlined_frames F.jsir_inlined_frames;
       mk_djsir F.djsir;
       mk_x F.x;
     ]
@@ -2083,12 +2101,6 @@ module Oxcaml_options_impl = struct
 
   let cfg_prologue_shrink_wrap_threshold n =
     Oxcaml_flags.cfg_prologue_shrink_wrap_threshold := n
-
-  let cfg_eliminate_dead_trap_handlers =
-    set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
-
-  let no_cfg_eliminate_dead_trap_handlers =
-    clear' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
 
   let cfg_eliminate_dead_code_validate =
     set' Oxcaml_flags.cfg_eliminate_dead_code_validate
@@ -2493,6 +2505,10 @@ module Oxcaml_options_impl = struct
   let dfexpr_annot_after pass =
     Flambda2.Dump.fexpr_annot_after := pass :: !Flambda2.Dump.fexpr_annot_after
 
+  let fexpr_print_branch_annotations =
+    set' Flambda2.Dump.fexpr_print_branch_annotations
+
+  let fexpr_print_fdo_counters = set' Flambda2.Dump.fexpr_print_fdo_counters
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
   let dfreshen = set' Flambda2.Dump.freshen
   let dflow = set' Flambda2.Dump.flow
@@ -2508,21 +2524,18 @@ module Oxcaml_options_impl = struct
   let target = Clflags.set_target
   let jsoo_opt = Compenv.add_first_jsoo_opt
   let jsoo_effects = Clflags.set_jsoo_effects
+  let link_jsir () = Clflags.link_jsir := true
+  let jsir_inlined_frames () = Clflags.jsir_inlined_frames := true
   let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
 
   (* Bundle of experimental codegen optimizations enabled by
      [-experimental-optimizations]. *)
   let experimental_optimizations () =
-    cfg_prologue_shrink_wrap ();
-    cfg_prologue_validate ();
     x86_peephole_optimize ();
-    regalloc_param "SPLIT_AROUND_LOOPS:on";
-    regalloc_param "AFFINITY:on";
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
-    cfg_eliminate_dead_trap_handlers ();
     cfg_value_propagation_flow ();
     use_ssa ()
 end
@@ -2567,8 +2580,13 @@ module Make_debugging_options (F : Debugging_options) = struct
 end
 
 module Debugging_options_impl = struct
-  let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
-  let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+  let dwarf_inlined_frames () =
+    Debugging.dwarf_inlined_frames := true;
+    Debugging.no_dwarf_inlined_frames := false
+
+  let no_dwarf_inlined_frames () =
+    Debugging.dwarf_inlined_frames := false;
+    Debugging.no_dwarf_inlined_frames := true
 
   let gdwarf_version version =
     match version with
@@ -2706,8 +2724,6 @@ module Extra_params = struct
     | "cfg-peephole-optimize" -> set' Oxcaml_flags.cfg_peephole_optimize
     | "x86-peephole-optimize" -> set' Oxcaml_flags.x86_peephole_optimize
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
-    | "cfg-eliminate-dead-trap-handlers" ->
-        set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-eliminate-dead-code-validate" ->
         set' Oxcaml_flags.cfg_eliminate_dead_code_validate
     | "cfg-dominators-validate" -> set' Oxcaml_flags.cfg_dominators_validate
@@ -2817,7 +2833,13 @@ module Extra_params = struct
     | "caml-apply-inline-fast-path" ->
         set' Oxcaml_flags.caml_apply_inline_fast_path
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
-    | "gdwarf-inlined-frames" -> set' Debugging.dwarf_inlined_frames
+    | "gdwarf-inlined-frames" ->
+        Compenv.setter ppf
+          (fun b -> not b)
+          name
+          [ Debugging.no_dwarf_inlined_frames ]
+          v;
+        set' Debugging.dwarf_inlined_frames
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gdwarf-may-alter-codegen-experimental" ->
         set' Debugging.gdwarf_may_alter_codegen_experimental
@@ -3000,6 +3022,19 @@ module Extra_params = struct
               "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml, \
                wasm_of_ocaml)"
               v)
+    | "link-jsir" ->
+        let link_jsir = Compenv.check_bool ppf name v in
+        (match position with
+        | Compenv.Before_args -> Clflags.link_jsir := link_jsir
+        | Compenv.Before_compile _ | Compenv.Before_link ->
+            (* The backend has been chosen by then, and with it the
+               extensions of the object files. *)
+            Compenv.fatal
+              "OCAMLPARAM: link-jsir must be given before the _ separator");
+        true
+    | "jsir-inlined-frames" ->
+        Clflags.jsir_inlined_frames := Compenv.check_bool ppf name v;
+        true
     | "jsoo-effects" -> (
         match Clflags.Jsoo_effects.of_string v with
         | Some effects ->

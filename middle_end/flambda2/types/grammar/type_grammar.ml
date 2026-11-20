@@ -3579,8 +3579,8 @@ let kind t =
 let non_null_value non_null =
   Value (TD.create { non_null = Ok non_null; is_null = Not_null })
 
-let create_variant ~is_unique ~(immediates : _ Or_unknown.t) ~blocks ~extensions
-    =
+let create_variant ~is_unique ~(immediates : _ Or_unknown.t) ~blocks ~is_int
+    ~get_tag ~extensions =
   (match immediates with
   | Unknown -> ()
   | Known immediates ->
@@ -3591,14 +3591,7 @@ let create_variant ~is_unique ~(immediates : _ Or_unknown.t) ~blocks ~extensions
          [Naked_immediate]:@ %a"
         print immediates);
   non_null_value
-    (Variant
-       { is_int = None;
-         get_tag = None;
-         immediates;
-         blocks;
-         extensions;
-         is_unique
-       })
+    (Variant { is_int; get_tag; immediates; blocks; extensions; is_unique })
 
 let mutable_block alloc_mode = non_null_value (Mutable_block { alloc_mode })
 
@@ -4604,16 +4597,10 @@ module Head_of_kind_value = struct
 
   let mk_non_null non_null = { non_null = Ok non_null; is_null = Not_null }
 
-  let create_variant ~is_unique ~blocks ~immediates ~extensions =
+  let create_variant ~is_unique ~blocks ~immediates ~is_int ~get_tag ~extensions
+      =
     mk_non_null
-      (Variant
-         { is_int = None;
-           get_tag = None;
-           is_unique;
-           blocks;
-           immediates;
-           extensions
-         })
+      (Variant { is_int; get_tag; is_unique; blocks; immediates; extensions })
 
   let create_mutable_block alloc_mode =
     mk_non_null (Mutable_block { alloc_mode })

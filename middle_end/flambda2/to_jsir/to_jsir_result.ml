@@ -51,6 +51,10 @@ type t =
     external_symbols : Jsir.Var.t Symbol.Map.t;
         (** The variables bound in [entry_prelude] to symbols from other
             compilation units. *)
+    symbol_exports : (Symbol.t * Jsir.Var.t) list;
+        (** The symbols of this unit that other compilation units may refer to,
+            with the variables holding their values (before the resolution of
+            [var_aliases]), most recent first. *)
     var_aliases : Jsir.Var.t Jsir.Var.Map.t;
         (** A mapping of variables created ahead of their definition to their
             materialised variables. *)
@@ -75,6 +79,7 @@ let create ~reachable_names =
     imported_compilation_units = Compilation_unit.Set.empty;
     entry_prelude = [];
     external_symbols = Symbol.Map.empty;
+    symbol_exports = [];
     var_aliases = Jsir.Var.Map.empty;
     call_events = None;
     reachable_names
@@ -102,6 +107,31 @@ let push_event parse_info (body : Jsir.instr list) : Jsir.instr list =
   | (Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _) :: _ | [] ->
     Event parse_info :: body
 
+let inlined_frames dbg ~file =
+  if not !Clflags.jsir_inlined_frames
+  then ""
+  else
+    match List.rev (Debuginfo.to_items dbg) with
+    | [] | [_] -> ""
+    | _ :: call_sites ->
+      String.concat ""
+        (List.map
+           (fun (call_site : Debuginfo.item) ->
+             Printf.sprintf "<-%s:%d:%d" (file call_site) call_site.dinfo_line
+               call_site.dinfo_char_start)
+           call_sites)
+
+(* The locations of a unit repeat a few file names, which are only stored once
+   in its JSIR file if they are physically equal. *)
+let shared_file_names : (string, string) Hashtbl.t = Hashtbl.create 16
+
+let share_file_name file =
+  match Hashtbl.find_opt shared_file_names file with
+  | Some file -> file
+  | None ->
+    Hashtbl.add shared_file_names file file;
+    file
+
 let parse_info_of_debuginfo dbg ~pos =
   if not (Flambda_features.debug ())
   then None
@@ -110,9 +140,23 @@ let parse_info_of_debuginfo dbg ~pos =
     if Location.is_none loc
     then None
     else
-      match pos with
-      | `Start -> Some (Parse_info.t_of_pos loc.loc_start)
-      | `End -> Some (Parse_info.t_of_pos loc.loc_end)
+      let (pos : Lexing.position) =
+        match pos with `Start -> loc.loc_start | `End -> loc.loc_end
+      in
+      let name =
+        share_file_name
+          (pos.pos_fname
+          ^ inlined_frames dbg ~file:(fun (item : Debuginfo.item) ->
+              item.dinfo_file))
+      in
+      let src =
+        Option.map
+          (fun file ->
+            share_file_name
+              (file ^ inlined_frames dbg ~file:Debuginfo.item_file_path))
+          (Debuginfo.to_file_path dbg)
+      in
+      Some { (Parse_info.t_of_pos { pos with pos_fname = name }) with src }
 
 let add_event_at_exn t parse_info =
   map_top_current_block_exn t ~f:(push_event parse_info)
@@ -287,8 +331,9 @@ let register_symbol t ?loc symbol var =
   then
     (* We don't need to add this symbol to our symbol table, because it is
        registered with [caml_register_global] and fetched with [caml_get_global]
-       instead (see [external_symbol_lookup]) *)
-    t
+       instead (see [external_symbol_lookup]). The linker still needs to know
+       which variable holds the module block. *)
+    { t with symbol_exports = (symbol, var) :: t.symbol_exports }
   else if not (Name_occurrences.mem_symbol t.reachable_names symbol)
   then
     (* No other compilation unit can refer to this symbol, as it is not
@@ -296,6 +341,7 @@ let register_symbol t ?loc symbol var =
     t
   else
     let compilation_unit_name, symbol_name = symbol_to_name_constants symbol in
+    let t = { t with symbol_exports = (symbol, var) :: t.symbol_exports } in
     let t = match loc with None -> t | Some loc -> add_event_at_exn t loc in
     add_instr_exn t
       (Let
@@ -363,7 +409,9 @@ let external_symbol_var t symbol =
 
 type program =
   { program : Jsir.program;
-    imported_compilation_units : Compilation_unit.Set.t
+    imported_compilation_units : Compilation_unit.Set.t;
+    symbol_imports : (Jsir.Var.t * Symbol.t) list;
+    symbol_exports : (Symbol.t * Jsir.Var.t) list
   }
 
 let to_program_exn
@@ -373,7 +421,8 @@ let to_program_exn
       reserved_addrs;
       imported_compilation_units;
       entry_prelude;
-      external_symbols = _;
+      external_symbols;
+      symbol_exports;
       var_aliases;
       call_events = _;
       reachable_names = _
@@ -401,9 +450,19 @@ let to_program_exn
   let program =
     { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
   in
-  let program =
-    Jsir_subst.Excluding_Binders.program
-      (Jsir_subst.from_map (resolve_var_aliases var_aliases))
-      program
+  let resolve = Jsir_subst.from_map (resolve_var_aliases var_aliases) in
+  let program = Jsir_subst.Excluding_Binders.program resolve program in
+  (* Predefined exceptions come from the runtime, not from a unit that could be
+     linked. *)
+  let symbol_imports =
+    Symbol.Map.fold
+      (fun symbol var imports ->
+        if Symbol.is_predefined_exception symbol
+        then imports
+        else (var, symbol) :: imports)
+      external_symbols []
   in
-  { program; imported_compilation_units }
+  let symbol_exports =
+    List.rev_map (fun (symbol, var) -> symbol, resolve var) symbol_exports
+  in
+  { program; imported_compilation_units; symbol_imports; symbol_exports }

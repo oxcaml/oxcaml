@@ -86,7 +86,7 @@ let () =
       exit Cmdliner.Cmd.Exit.internal_error
   | Magic_number.Bad_magic_number s ->
       Format.eprintf
-        "%s: Error: Not an ocaml bytecode file or Js_of_ocaml IR file (.cmw)@."
+        "%s: Error: Not an ocaml bytecode file or Js_of_ocaml IR file (.cm-jsir-wasm)@."
         Sys.argv.(0);
       Format.eprintf "%s: Error: Invalid magic number %S@." Sys.argv.(0) s;
       exit 1
@@ -98,7 +98,7 @@ let () =
       in
       let what =
         match k with
-        | `Jsir -> "Js_of_ocaml IR file (.cmw)"
+        | `Jsir -> "Js_of_ocaml IR file (.cm-jsir-wasm)"
         | `Cmo | `Cma | `Exe -> "ocaml bytecode"
       in
       (match k with

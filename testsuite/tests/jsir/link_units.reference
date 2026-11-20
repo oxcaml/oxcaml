@@ -1,0 +1,15 @@
+init a
+init b
+init main
+counter: 1 2 2
+add: 3 7
+constant: constant 42
+alias: true
+branchy: branchy 1
+even/odd: true false
+cycle: 1 2 true
+inner: 42
+apply_twice: 20
+exception: boom
+exception: twice
+module: 200

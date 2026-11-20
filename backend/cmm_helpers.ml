@@ -162,8 +162,8 @@ let bind_with_annotations name arg fn =
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ -> fn arg
   | _ ->
     let id = V.create_local name in
-    let body, annots = fn (Cvar id) in
-    Clet (VP.create id, arg, body), annots
+    let body, dbg, annots = fn (Cvar id) in
+    Clet (VP.create id, arg, body), dbg, annots
 
 let bind_list name args fn =
   let rec aux bound_args = function
@@ -1181,6 +1181,18 @@ let mk_not dbg cmm =
   | c ->
     (* 1 -> 3, 3 -> 1 *)
     Cop (Cxor, [Cconst_int (2, dbg); c], dbg)
+
+let mk_not_untagged dbg cmm =
+  match cmm with
+  | Cop (Ccmpi cmp, args, dbg') ->
+    Cop (Ccmpi (negate_integer_comparison cmp), args, dbg')
+  | Cop (Ccmpf (w, cmp), args, dbg') ->
+    Cop (Ccmpf (w, negate_float_comparison cmp), args, dbg')
+  | Cconst_int (0, _) -> Cconst_int (1, dbg)
+  | Cconst_int (1, _) -> Cconst_int (0, dbg)
+  | c ->
+    (* 0 -> 1, 1 -> 0 *)
+    Cop (Cxor, [c; Cconst_int (1, dbg)], dbg)
 
 (** Whether two expressions are known to denote the same machine word. Only
     variables and constants are recognised, so that evaluating one of the two
@@ -3564,11 +3576,14 @@ module SArgBlocks = struct
 
   type test = expression
 
-  type act = expression * Branch_annotations.t
+  (* CR-someday xclerc: make this a record (and likewise the type of
+     [StoreExpForSwitch] below). *)
+  type act = expression * Debuginfo.t * Branch_annotations.t
 
   (* The module [SArgBlocks] must conform to the signature `Switch.S`. Since we
-     do not need a layout, we pick unit as the layout. *)
-  type layout = unit
+     do not need a layout, we use that parameter to provide the debuginfo of the
+     switch to [make_if], which does not receive a [loc]. *)
+  type layout = Debuginfo.t
 
   type loc = Debuginfo.t
 
@@ -3588,29 +3603,21 @@ module SArgBlocks = struct
 
   let arg_as_test arg = arg
 
-  let make_if () cond (ifso, ifso_a) (ifnot, ifnot_a) =
-    ( Cifthenelse
-        ( cond,
-          Debuginfo.none,
-          ifso_a,
-          ifso,
-          Debuginfo.none,
-          ifnot_a,
-          ifnot,
-          Debuginfo.none ),
+  let make_if dbg cond (ifso, ifso_dbg, ifso_a) (ifnot, ifnot_dbg, ifnot_a) =
+    ( Cifthenelse (cond, ifso_dbg, ifso_a, ifso, ifnot_dbg, ifnot_a, ifnot, dbg),
+      dbg,
       Branch_annotations.fork_point [ifso_a; ifnot_a] )
 
-  let make_switch dbg () arg cases actions =
+  let make_switch dbg (_ : layout) arg cases actions =
     let annots =
       Branch_annotations.fork_point
-        (Array.map (fun (_, annots) -> annots) actions |> Array.to_list)
+        (Array.map (fun (_, _, annots) -> annots) actions |> Array.to_list)
     in
-    let actions = Array.map (fun (expr, annots) -> expr, dbg, annots) actions in
-    make_switch arg cases actions dbg, annots
+    make_switch arg cases actions dbg, dbg, annots
 
   let bind arg body = bind_with_annotations "switcher" arg body
 
-  let make_catch () (handler, annots) =
+  let make_catch (_ : layout) (handler, (_ : Debuginfo.t), annots) =
     match handler with
     | Cexit (Lbl i, [], []) -> i, annots, fun e -> e
     | _ ->
@@ -3621,13 +3628,14 @@ module SArgBlocks = struct
          (Format.flush_str_formatter ()) ; *)
       ( i,
         annots,
-        fun (body, annots) ->
+        fun (body, body_dbg, annots) ->
           ( (match body with
             | Cexit (j, _, _) -> if j = Lbl i then handler else body
             | _ -> ccatch (i, [], body, handler, dbg, false)),
+            body_dbg,
             annots ) )
 
-  let make_exit i annots = Cexit (Lbl i, [], []), annots
+  let make_exit i annots = Cexit (Lbl i, [], []), Debuginfo.none, annots
 end
 
 (* cmm store, as sharing as normally been detected in previous phases, we only
@@ -3637,15 +3645,15 @@ end
    the index in the action array as context allows to share them correctly
    without duplication. *)
 module StoreExpForSwitch = Switch.CtxStore (struct
-  type t = expression * Branch_annotations.t
+  type t = expression * Debuginfo.t * Branch_annotations.t
 
   type key = Static_label.t option * int
 
   type context = int
 
-  let with_annotations (expr, _) annots = expr, annots
+  let with_annotations (expr, dbg, _) annots = expr, dbg, annots
 
-  let make_key index (expr, annots) =
+  let make_key index (expr, _, annots) =
     let continuation =
       match expr with Cexit (Lbl i, [], []) -> Some i | _ -> None
     in
@@ -3680,12 +3688,12 @@ let transl_switch_clambda loc arg index cases =
   inters := (0, !this_high, !this_act) :: !inters;
   match !inters with
   | [_] ->
-    let case, _ = cases.(0) in
+    let case, _, _ = cases.(0) in
     case
   | inters ->
     bind "switcher" arg (fun a ->
-        let body, _ =
-          SwitcherBlocks.zyva loc ()
+        let body, _, _ =
+          SwitcherBlocks.zyva loc loc
             (0, n_index - 1)
             a (Array.of_list inters) store
         in

@@ -372,8 +372,8 @@ let register_allocator_irc cfg_with_infos =
   cfg_with_infos_profile ~accumulate:true "cfg_irc"
     (fun cfg_with_infos ->
       match Regalloc_irc.run cfg_with_infos with
-      | Some res -> res
-      | None -> Regalloc_ls.run cfg_with_infos)
+      | Ok result -> result
+      | Error prepared -> Regalloc_ls.run_after_prelude prepared)
     cfg_with_infos
 
 let register_allocator_ls cfg_with_infos =
@@ -456,6 +456,19 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
   ++ Cfg_with_infos.make
   ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
+  ++ (fun cfg_with_infos ->
+  match !Clflags.gated_trace_pc_guard with
+  | false -> cfg_with_infos
+  | true ->
+    cfg_with_infos
+    ++ cfg_with_infos_profile ~accumulate:true "cfg_trace_pc_guard"
+         Cfg_trace_pc_guard.run
+    ++ fun cfg_with_infos ->
+    let (_ : Cfg_with_layout.t) =
+      pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_trace_pc_guard"
+        (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+    in
+    cfg_with_infos)
   ++ save_cfg_before_regalloc
   (* CR-soon xclerc for xclerc: copy propagation should be "moved inside"
      register allocation, so that it would be covered by the validator; it
@@ -690,6 +703,9 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
        (empty) temporary file should be deleted. *)
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
+  if !Clflags.llvm_backend && !Clflags.gated_trace_pc_guard
+  then
+    Misc.fatal_error "-gated-trace-pc-guard is not supported with -llvm-backend";
   if !Clflags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
   let open_asm_file () =
     if create_asm

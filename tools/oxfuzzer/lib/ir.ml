@@ -155,12 +155,13 @@ end
 module Ty = struct
   type t =
     | Number of NumberTy.t
-    | Array of NumberTy.t * int list
+    | Array of t * int list
     | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
     | Or_null of t
     | Bool
+    | String
 
   and record =
     { id : int; (* Unique record ID. *)
@@ -187,15 +188,14 @@ module Ty = struct
   let rec equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
-    | Array (l, ls), Array (r, rs) ->
-      NumberTy.equal l r && List.equal Int.equal ls rs
+    | Array (l, ls), Array (r, rs) -> equal l r && List.equal Int.equal ls rs
     | Unboxed_tuple l, Unboxed_tuple r -> List.equal equal l r
     | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
     | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
     | Or_null l, Or_null r -> equal l r
-    | Bool, Bool -> true
+    | Bool, Bool | String, String -> true
     | ( ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _
-        | Or_null _ | Bool ),
+        | Or_null _ | Bool | String ),
         _ ) ->
       false
 
@@ -213,10 +213,10 @@ module Ty = struct
 
   let rec to_code = function
     | Number nty -> NumberTy.to_code nty
-    | Array (nty, dimensions) ->
+    | Array (element_ty, dimensions) ->
       List.fold_left
         (fun ty _ -> Ast_helper.Typ.constr (lid "array") [ty])
-        (NumberTy.to_code nty) dimensions
+        (to_code element_ty) dimensions
     | Unboxed_tuple components ->
       Ast_helper.Typ.unboxed_tuple
         (List.map (fun ty -> None, to_code ty) components)
@@ -224,6 +224,7 @@ module Ty = struct
     | Variant variant -> Ast_helper.Typ.constr (lid (variant_name variant)) []
     | Or_null ty -> Ast_helper.Typ.constr (lid "or_null") [to_code ty]
     | Bool -> Ast_helper.Typ.constr (lid "bool") []
+    | String -> Ast_helper.Typ.constr (lid "string") []
 end
 
 module Sum = struct
@@ -370,17 +371,17 @@ module Un_op = struct
       let numeric = [Neg; Abs; Succ; Pred] in
       if NumberTy.is_floating_point nty then numeric else numeric @ [Bit_not]
     | Bool -> [Not]
-    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
-      Misc.fatal_errorf "Un_op.ops_for_ty: unexpected aggregate"
+    | String | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
+      Misc.fatal_errorf "Un_op.ops_for_ty: expected a numeric or boolean type"
 
   let to_code ty unop ~arg =
     let module_name =
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
-      | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
+      | Ty.String | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
       | Ty.Or_null _ ->
-        Misc.fatal_errorf "Un_op.to_code: unexpected aggregate"
+        Misc.fatal_errorf "Un_op.to_code: expected a numeric or boolean type"
     in
     let name =
       match unop with
@@ -425,7 +426,8 @@ module Bin_op = struct
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
+    | Bool | String | Array _ | Unboxed_tuple _ | Record _ | Variant _
+    | Or_null _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop ~lhs ~rhs =
@@ -433,6 +435,7 @@ module Bin_op = struct
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
+      | Ty.String -> "String"
       | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
       | Ty.Or_null _ ->
         Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
@@ -466,6 +469,15 @@ module Expr = struct
      mitigate, we should make [t] private and add smart constructors. *)
   type t =
     | Const of Number.t
+    | Bool_const of bool
+    | String_const of string
+    | String_length of t
+    | Bounded_string_concat of
+        { lhs : t;
+          rhs : t;
+          result_name : Name.t;
+          max_length : int
+        }
     | Assert_false
     | Let of
         { name : Name.t;
@@ -593,6 +605,23 @@ module Expr = struct
 
   let rec to_code : t -> Parsetree.expression = function
     | Const n -> Number.to_code n
+    | Bool_const b -> Ast_helper.Exp.construct (lid (Bool.to_string b)) None
+    | String_const s -> Ast_helper.Exp.constant (Ast_helper.Const.string s)
+    | String_length expr ->
+      apply (qualified_ident "String" "length") [to_code expr]
+    | Bounded_string_concat { lhs; rhs; result_name; max_length } ->
+      bind result_name
+        (apply (qualified_ident "String" "cat") [to_code lhs; to_code rhs])
+        (fun result ->
+          Ast_helper.Exp.ifthenelse
+            (op "<="
+               [ apply (qualified_ident "String" "length") [result];
+                 int max_length ])
+            result
+            (Some
+               (apply
+                  (qualified_ident "String" "sub")
+                  [result; int 0; int max_length])))
     | Assert_false ->
       Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None)
     | Let { name; expr; body } ->

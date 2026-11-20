@@ -1232,9 +1232,10 @@ let build_other ext env =
       | Constant Const_untagged_char _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_char c) -> c
+            ~proj:(function Constant(Const_untagged_char c) ->
+                              Numbers.Int8.to_int c
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_char i)
+            ~make:(fun i -> Const_untagged_char (Numbers.Int8.of_int_exn i))
             [ Char.code 'a', Char.code 'z' ; Char.code 'A', Char.code 'Z' ;
               Char.code '0', Char.code '9' ; Char.code ' ', Char.code '~' ;
               0, 0x7f ; -0x80, -1 ] d env
@@ -1251,28 +1252,32 @@ let build_other ext env =
       | Constant Const_int8 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_int8 i) -> i | _ -> assert false)
-            ~make:(fun i -> Const_int8 i)
+            ~proj:(function Constant(Const_int8 i) -> Numbers.Int8.to_int i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_int8 (Numbers.Int8.of_int_exn i))
             [0, 0x7f; -0x80, -1] d env
       | Constant Const_untagged_int8 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_int8 i) -> i
+            ~proj:(function Constant(Const_untagged_int8 i) ->
+                            Numbers.Int8.to_int i
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_int8 i)
+            ~make:(fun i -> Const_untagged_int8 (Numbers.Int8.of_int_exn i))
             [0, 0x7f; -0x80, -1] d env
       | Constant Const_int16 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_int16 i) -> i | _ -> assert false)
-            ~make:(fun i -> Const_int16 i)
+            ~proj:(function Constant(Const_int16 i) -> Numbers.Int16.to_int i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_int16 (Numbers.Int16.of_int_exn i))
             [0, 0x7f_ff; -0x80_00, -1] d env
       | Constant Const_untagged_int16 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_int16 i) -> i
+            ~proj:(function Constant(Const_untagged_int16 i) ->
+                            Numbers.Int16.to_int i
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_int16 i)
+            ~make:(fun i -> Const_untagged_int16 (Numbers.Int16.of_int_exn i))
             [0, 0x7f_ff; -0x80_00, -1] d env
       | Constant Const_int32 _ ->
           build_other_constant
@@ -1288,7 +1293,7 @@ let build_other ext env =
           build_other_constant
             (function Constant(Const_nativeint i) -> i | _ -> assert false)
             (function i -> Tpat_constant(Const_nativeint i))
-            0n Nativeint.succ d env
+            Targetint.zero Targetint.succ d env
       | Constant Const_unboxed_int32 _ ->
           build_other_constant
             (function Constant(Const_unboxed_int32 i) -> i | _ -> assert false)
@@ -1303,7 +1308,7 @@ let build_other ext env =
           build_other_constant
             (function Constant(Const_unboxed_nativeint i) -> i | _ -> assert false)
             (function i -> Tpat_constant(Const_unboxed_nativeint i))
-            0n Nativeint.succ d env
+            Targetint.zero Targetint.succ d env
       | Constant Const_string _ ->
           build_other_constant
             (function Constant(Const_string (s, _, _)) -> String.length s
@@ -1992,6 +1997,8 @@ let rec le_pat p q =
   | Tpat_alias { pattern = p; _ }, _ -> le_pat p q
   | _, Tpat_alias { pattern = q; _ } -> le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
+  | Tpat_unboxed_unit, Tpat_unboxed_unit -> true
+  | Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 -> Bool.equal b1 b2
   | Tpat_construct(_,c1,_,ps,_), Tpat_construct(_,c2,_,qs,_) ->
       let ps = List.map snd ps in
       let qs = List.map snd qs in
@@ -2010,10 +2017,19 @@ let rec le_pat p q =
   | Tpat_record (l1,_,_), Tpat_record (l2,_,_) ->
       let ps,qs = records_args l1 l2 in
       le_pats ps qs
+  | Tpat_record_unboxed_product (l1,_,_),
+    Tpat_record_unboxed_product (l2,_,_) ->
+      let ps,qs = records_args l1 l2 in
+      le_pats ps qs
   | Tpat_array(am1, _, ps), Tpat_array(am2, _, qs) ->
       am1 = am2 && List.length ps = List.length qs && le_pats ps qs
 (* In all other cases, enumeration is performed *)
-  | _,_  -> not (satisfiable [[p]] [q])
+  | ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
+    | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
+    | Tpat_construct _ | Tpat_variant _ | Tpat_record _
+    | Tpat_record_unboxed_product _ | Tpat_array _ | Tpat_addr _
+    | Tpat_lazy _ | Tpat_or _ ), _ ->
+      not (satisfiable [[p]] [q])
 
 and le_pats ps qs =
   match ps,qs with
@@ -2053,6 +2069,8 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
 | Tpat_or (p1,p2,_),_     -> orlub p1 p2 q
 | _,Tpat_or (q1,q2,_)     -> orlub q1 q2 p (* Thanks god, lub is commutative *)
 | Tpat_constant c1, Tpat_constant c2 when const_compare c1 c2 = 0 -> p
+| Tpat_unboxed_unit, Tpat_unboxed_unit -> p
+| Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 when Bool.equal b1 b2 -> p
 | Tpat_tuple ps, Tpat_tuple qs ->
     let rs = tuple_lubs ps qs in
     make_pat (Tpat_tuple rs) p.pat_type p.pat_env
@@ -2083,12 +2101,21 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
     (* CR-someday lmaurer: Take lubs of reprs? *)
     make_pat (Tpat_record (rs, repr, closed))
       p.pat_type p.pat_env
+| Tpat_record_unboxed_product (l1,repr,closed),
+  Tpat_record_unboxed_product (l2,_,_) ->
+    let rs = record_lubs l1 l2 in
+    make_pat (Tpat_record_unboxed_product (rs, repr, closed))
+      p.pat_type p.pat_env
 | Tpat_array (am1, arg_sort, ps), Tpat_array (am2, _, qs)
       when am1 = am2 && List.length ps = List.length qs ->
         let rs = lubs ps qs in
         make_pat (Tpat_array (am1, arg_sort, rs))
           p.pat_type p.pat_env
-| _,_  ->
+| ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
+  | Tpat_construct _ | Tpat_variant _ | Tpat_record _
+  | Tpat_record_unboxed_product _ | Tpat_array _ | Tpat_addr _
+  | Tpat_lazy _ ), _ ->
     raise Empty
 
 and orlub p1 p2 q =
@@ -2101,7 +2128,11 @@ and orlub p1 p2 q =
 with
 | Empty -> lub p2 q
 
-and record_lubs l1 l2 =
+and record_lubs :
+  type rep. (_ * rep gen_label_description * _) list ->
+  (_ * rep gen_label_description * _) list ->
+  (_ * rep gen_label_description * _) list =
+  fun l1 l2 ->
   let rec lub_rec l1 l2 = match l1,l2 with
   | [],_ -> l2
   | _,[] -> l1

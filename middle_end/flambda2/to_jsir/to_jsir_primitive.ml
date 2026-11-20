@@ -550,7 +550,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Naked_nativeint, Naked_float -> caml_to "nativeint" "float"
     | Naked_nativeint, Naked_int32 -> caml_to "nativeint" "int32"
     | Naked_nativeint, Naked_int64 -> caml_of "int64" "nativeint")
-  | Boolean_not -> use_prim' Not
+  | Boolean_not (Tagged_bool | Naked_bool) -> use_prim' Not
   | Reinterpret_64_bit_word reinterpret -> (
     let int63 () =
       match Clflags.jsir_target_exn () with
