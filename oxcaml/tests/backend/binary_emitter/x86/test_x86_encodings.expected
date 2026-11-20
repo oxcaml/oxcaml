@@ -1,0 +1,37 @@
+movsbq sym(%rip), %rax                   48 0f be 05 00 00 00 00
+movsbl sym(%rip), %eax                   0f be 05 00 00 00 00
+movsbq sym(%rip), %r9                    4c 0f be 0d 00 00 00 00
+movsbl sym(%rip), %r9d                   44 0f be 0d 00 00 00 00
+movswq sym(%rip), %rax                   48 0f bf 05 00 00 00 00
+movswl sym(%rip), %eax                   0f bf 05 00 00 00 00
+movswq sym(%rip), %r9                    4c 0f bf 0d 00 00 00 00
+movswl sym(%rip), %r9d                   44 0f bf 0d 00 00 00 00
+movzbq sym(%rip), %rax                   48 0f b6 05 00 00 00 00
+movzbq sym(%rip), %r9                    4c 0f b6 0d 00 00 00 00
+movzwq sym(%rip), %rax                   48 0f b7 05 00 00 00 00
+movzwl sym(%rip), %eax                   0f b7 05 00 00 00 00
+movzwq sym(%rip), %r9                    4c 0f b7 0d 00 00 00 00
+movzwl sym(%rip), %r9d                   44 0f b7 0d 00 00 00 00
+addb $1, sym(%rip)                       80 05 00 00 00 00 01
+addb $-1, sym(%rip)                      80 05 00 00 00 00 ff
+cmpb $1, sym(%rip)                       80 3d 00 00 00 00 01
+xorb $-1, sym(%rip)                      80 35 00 00 00 00 ff
+addb $1, %ah                             80 c4 01
+addb $1, 8(%rsp)                         80 44 24 08 01
+addl $1, sym(%rip)                       83 05 00 00 00 00 01
+addl $1000, sym(%rip)                    81 05 00 00 00 00 e8 03 00 00
+cmpl $1, sym(%rip)                       83 3d 00 00 00 00 01
+subl $-1, sym(%rip)                      83 2d 00 00 00 00 ff
+andl $1000, sym(%rip)                    81 25 00 00 00 00 e8 03 00 00
+addq $1, sym(%rip)                       48 83 05 00 00 00 00 01
+addq $1000, sym(%rip)                    48 81 05 00 00 00 00 e8 03 00 00
+cmpq $1, sym(%rip)                       48 83 3d 00 00 00 00 01
+andq $-1, sym(%rip)                      48 83 25 00 00 00 00 ff
+testb $1, sym(%rip)                      f6 05 00 00 00 00 01
+testb $1, 8(%rsp)                        f6 44 24 08 01
+testl $1, sym(%rip)                      f7 05 00 00 00 00 01 00 00 00
+testl $1, 8(%rsp)                        f7 44 24 08 01 00 00 00
+testl $1, %r9d                           41 f7 c1 01 00 00 00
+testq $1, sym(%rip)                      48 f7 05 00 00 00 00 01 00 00 00
+testq $1, 8(%rsp)                        48 f7 44 24 08 01 00 00 00
+testq $1, %r9                            49 f7 c1 01 00 00 00

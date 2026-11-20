@@ -1,0 +1,6 @@
+int8#: -1
+int16#: -1
+unsafe_get: 255
+get_int8: -1
+get_uint16_le: 33023
+get_int16_le: -32513
