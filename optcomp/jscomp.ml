@@ -104,7 +104,7 @@ let with_distribution_sources cmdline =
   let env = Option.to_list (Sys.getenv_opt "BUILD_PATH_PREFIX_MAP") in
   let compiled =
     match !Clflags.directory with
-    | Some dir when String.starts_with ~prefix:root dir ->
+    | Some dir when String.starts_with ~prefix:root (Filename.concat dir "") ->
       [entry dir (Sys.getcwd ())]
     | Some _ | None -> []
   in
