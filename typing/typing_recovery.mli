@@ -32,6 +32,15 @@ val log_and_raise : exn -> 'a
     otherwise raises it. *)
 val log_or_raise : exn -> unit
 
+(** [monitor body ~with_] is [Scheduler.Monitor.try_ body], where [with_ e]
+    returns the user-facing error that [e] should become, if any. That error
+    is logged in the error context current when [monitor] is called, even
+    if it comes from a job that runs later. If logging is disabled there
+    (see {!uncatch_errors}), the error is never logged.
+
+    [with_] must follow the contract of [Scheduler.Monitor.try_]. *)
+val monitor : (unit -> 'a) -> with_:(exn -> exn option) -> 'a
+
 (** {1 Catching errors} *)
 
 (** [catch_error errors_log f] gathers all the errors logged by [f ()] into
@@ -68,4 +77,3 @@ val erroneous_type_check : Types.type_expr -> bool
     same location. *)
 
 module Error_set : Set.S with type elt = Location.error
-
