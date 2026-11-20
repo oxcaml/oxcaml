@@ -338,7 +338,8 @@ end
 module Eff = struct
   type t =
     { id : int;
-      ty : Ty.t
+      payload : Ty.t;
+      result : Ty.t
     }
 
   let equal left right = Int.equal left.id right.id
@@ -352,21 +353,24 @@ module Eff = struct
   (* [Effect.Deep.name] *)
   let deep name = loc (Longident.Ldot (ldot "Effect" "Deep", loc name))
 
-  (* [type _ Effect.t += Eff_i : ty -> ty Effect.t] *)
-  let declaration ({ ty; _ } as t) =
-    let ty = Ty.to_code ty in
+  (* [type _ Effect.t += Eff_i : payload -> result Effect.t] *)
+  let declaration ({ payload; result; _ } as t) =
     Ast_helper.Str.type_extension
       (Ast_helper.Te.mk
          ~params:[Ast_helper.Typ.any None, (NoVariance, NoInjectivity)]
          effect_lid
          [ Ast_helper.Te.decl
-             ~args:(Parsetree.Pcstr_tuple [Ast_helper.Type.constructor_arg ty])
-             ~res:(Ast_helper.Typ.constr effect_lid [ty])
+             ~args:
+               (Parsetree.Pcstr_tuple
+                  [Ast_helper.Type.constructor_arg (Ty.to_code payload)])
+             ~res:(Ast_helper.Typ.constr effect_lid [Ty.to_code result])
              (loc (constructor_name t)) ])
 
-  (* [let handle_i f = Effect.Deep.try_with f () { effc }], where [effc] resumes
-     the continuation of [Eff_i v] with [v]. *)
-  let handler t =
+  (* [let handle_i f (resume : payload -> result) = Effect.Deep.try_with f () {
+     effc }], where [effc] resumes the continuation of [Eff_i v] with [resume
+     v]. The annotation keeps [result] from escaping the scope of the locally
+     abstract type of [effc]. *)
+  let handler ({ payload; result; _ } as t) =
     let a = Ast_helper.Typ.constr (lid "a") [] in
     let continuation =
       Ast_helper.Typ.constr (deep "continuation") [a; Ast_helper.Typ.any None]
@@ -377,7 +381,9 @@ module Eff = struct
             (Ast_helper.Pat.constraint_
                (Ast_helper.Pat.var (loc "k"))
                (Some continuation) []) ]
-        (apply (Ast_helper.Exp.ident (deep "continue")) [ident "k"; ident "v"])
+        (apply
+           (Ast_helper.Exp.ident (deep "continue"))
+           [ident "k"; apply (ident "resume") [ident "v"]])
     in
     let effc =
       Ast_helper.Exp.function_
@@ -407,7 +413,12 @@ module Eff = struct
       [ Ast_helper.Vb.mk
           (Ast_helper.Pat.var (loc (handler_name t)))
           (function_
-             [value_param (Ast_helper.Pat.var (loc "f"))]
+             [ value_param (Ast_helper.Pat.var (loc "f"));
+               value_param
+                 (Ast_helper.Pat.constraint_
+                    (Ast_helper.Pat.var (loc "resume"))
+                    (Some (Ty.to_code (Ty.Arrow (payload, result))))
+                    []) ]
              (apply
                 (Ast_helper.Exp.ident (deep "try_with"))
                 [ ident "f";
@@ -732,7 +743,8 @@ module Expr = struct
     | Handle of
         { eff : Eff.t;
           ty : Ty.t;
-          body : t
+          body : t;
+          resume : t
         }
 
   and raise =
@@ -956,13 +968,14 @@ module Expr = struct
         [ Ast_helper.Exp.construct
             (lid (Eff.constructor_name eff))
             (Some (to_code arg)) ]
-    | Handle { eff; ty; body } ->
+    | Handle { eff; ty; body; resume } ->
       constrain ty
         (apply
            (ident (Eff.handler_name eff))
            [ function_
                [value_param (Ast_helper.Pat.construct (lid "()") None)]
-               (constrain ty (to_code body)) ])
+               (constrain ty (to_code body));
+             to_code resume ])
 
   and raise_to_code { exn; payload; notrace } =
     let payload =

@@ -66,9 +66,9 @@ let max_recursion_fuel = 3
    compiler bug (https://github.com/oxcaml/oxcaml/issues/8139) *)
 let unused_recursive_functions = false
 
-let max_effect_count = 2
+let max_effect_count = 6
 
-let max_handle_count = 4
+let max_handle_count = 8
 
 let max_probability = 10_000
 
