@@ -2,15 +2,18 @@ import extracted_oxcaml_even
 import Oxiclean.Leoization
 open Oxiclean.Leoization
 open Oxiclean.Model
+open Oxiclean.Reduction
 
-abbrev expectedInterface : ModuleType :=
-  let int : ValType := .constr (.predef .int) []
-  let t : ValType := .constr (.field (.var 0) 0) []
-  let t_option : ValType := .constr (.predef .option) [t]
-  let create : ValType := .arrow int t_option
-  let get : ValType := .arrow t int
+abbrev expectedInterface : ModuleType Parametric :=
+  let int : ValType Parametric := .constr (.predef .int) []
+  let t : ValType Parametric := .constr (.field (.var 0) 0) []
+  let t_option : ValType Parametric := .constr (.predef .option) [t]
+  let create : ValType Parametric := .arrow int t_option
+  let get : ValType Parametric := .arrow t int
 
-  .signature [.valType { manifest := none, arity := 0 }] [.val create, .val get]
+  .signature
+    [.valType { manifest := .abstract .parametric, arity := 0 }]
+    [.val create, .val get]
 
 abbrev expectedImplementation : Expr :=
   let get : Expr := .function (Expr.var 0)
@@ -31,27 +34,34 @@ abbrev expectedImplementation : Expr :=
 
   .letBinding get (.letBinding create (.block 0 [.var 0, .var 1]))
 
-abbrev dependencies : List ModuleType := []
+abbrev expectedDependencies : List (ModuleType Parametric) := []
 
-example : Oxiclean.Extracted.Even.dependencies = dependencies := by rfl
+example : Oxiclean.Extracted.Even.dependencies = expectedDependencies := by rfl
 example : Oxiclean.Extracted.Even.interface = expectedInterface := by rfl
 example : Oxiclean.Extracted.Even.implementation = expectedImplementation := by rfl
 
-abbrev refinedInterface : ModuleType :=
-  let int : ValType := .constr (.predef .int) []
-  let t : ValType := .constr (.field (.var 0) 0) []
-  let t_option : ValType := .constr (.predef .option) [t]
-  let create : ValType := .arrow int t_option
-  let get : ValType := .arrow t int
+def evenImmediates : PER Value :=
+  PER.refinedImmediate (fun bits : BitVec 63 => bits[0] = false)
 
-  .signature [.valType { manifest := TODO, arity := 0 }] [.val create, .val get]
+abbrev refinedInterface : ModuleType (PER Value) :=
+  let int : ValType (PER Value) := .constr (.predef .int) []
+  let t : ValType (PER Value) := .constr (.field (.var 0) 0) []
+  let t_option : ValType (PER Value) := .constr (.predef .option) [t]
+  let create : ValType (PER Value) := .arrow int t_option
+  let get : ValType (PER Value) := .arrow t int
+
+  .signature
+    [.valType { manifest := .abstract evenImmediates, arity := 0 }]
+    [.val create, .val get]
 
 example
     : refinedInterface.validWrtExtraction
-        Oxiclean.Extracted.Even.interface := by rfl
+        Oxiclean.Extracted.Even.interface := by simp
 
-abbrev expectedRelation {Step} [S : StepRelation S] : PER Value :=
+abbrev expectedRelation {Step} [StepRelation Step] : PER Value :=
   PER.always
 
-example {Step} [S : StepRelation S]
-    : refinedInterface.structuralRelation = expectedRelation := by rfl
+example {Step} [S : StepRelation Step]
+    : @refinedInterface.structuralRelation Step S =
+      @expectedRelation Step S := by
+  simp

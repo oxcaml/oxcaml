@@ -61,6 +61,7 @@ mutual
   universe u
   variable (AbstractType : Type u)
 
+  @[simp]
   def ModuleType.parameterize
       : ModuleType AbstractType -> ModuleType Parametric
     | .signature absent present =>
@@ -69,6 +70,7 @@ mutual
         (present.map (·.parameterize))
     | .field within index => .field within index
 
+  @[simp]
   def ModuleItemAbsentAtRuntime.parameterize
       : ModuleItemAbsentAtRuntime AbstractType ->
         ModuleItemAbsentAtRuntime Parametric
@@ -76,21 +78,25 @@ mutual
     | .moduleType (.some m) => .moduleType (.some m.parameterize)
     | .valType typeDecl => .valType typeDecl.parameterize
 
+  @[simp]
   def ModuleItemPresentAtRuntime.parameterize
       : ModuleItemPresentAtRuntime AbstractType ->
       ModuleItemPresentAtRuntime Parametric
     | .mod moduleType => .mod moduleType.parameterize
     | .val valType => .val valType.parameterize
 
+  @[simp]
   def TypeDecl.parameterize
       : TypeDecl AbstractType -> TypeDecl Parametric
     | { arity, manifest } => { arity, manifest := manifest.parameterize }
 
+  @[simp]
   def TypeManifest.parameterize
       : TypeManifest AbstractType -> TypeManifest Parametric
     | .abstract _ => .abstract .parametric
     | .manifest definition => .manifest definition.parameterize
 
+  @[simp]
   def ValType.parameterize
       : ValType AbstractType -> ValType Parametric
     | .arrow domain codomain => .arrow domain.parameterize codomain.parameterize
@@ -99,6 +105,7 @@ mutual
     | .poly body => .poly body.parameterize
     | .var deBruijn => .var deBruijn
 
+  @[simp]
   def TypeConstr.parameterize
       : TypeConstr AbstractType -> TypeConstr Parametric
     | .field within index => .field within index

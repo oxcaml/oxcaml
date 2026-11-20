@@ -235,6 +235,7 @@ end Oxiclean.Leoization
 
 open Oxiclean.Leoization
 
+@[simp]
 def Oxiclean.Model.ModuleType.validWrtExtraction
     (userSuppliedRefinedSignature : ModuleType (PER Value))
     (extractedParametricSignature : ModuleType Parametric)
@@ -242,6 +243,7 @@ def Oxiclean.Model.ModuleType.validWrtExtraction
   userSuppliedRefinedSignature.parameterize = extractedParametricSignature
 
 mutual
+  @[simp]
   def Oxiclean.Model.ModuleType.structuralRelationInScope
       {Step} [S : StepRelation Step]
       (context : List (ModuleType (PER Value)))
@@ -258,6 +260,7 @@ mutual
       |> PER.moduleRuntimeBlock
     | _ => sorry
 
+  @[simp]
   def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope
       {Step} [S : StepRelation Step]
       (context : List (ModuleType (PER Value)))
@@ -265,6 +268,7 @@ mutual
     | .mod m => @m.structuralRelationInScope Step S context
     | .val v => @v.structuralRelationInScope Step S context
 
+  @[simp]
   def Oxiclean.Model.ValType.structuralRelationInScope
       {Step} [S : StepRelation Step]
       (context : List (ModuleType (PER Value)))
@@ -276,6 +280,7 @@ mutual
     | _ => sorry
 end
 
+@[simp]
 def Oxiclean.Model.ModuleType.structuralRelation
       {Step} [S : StepRelation Step]
     : ModuleType (PER Value) → PER Value :=
