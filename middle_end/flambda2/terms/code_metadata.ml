@@ -322,8 +322,8 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(is_my_closure_used@ %b)@]@ \
       %a\
       @[<hov 1>(inlining_decision@ %a)@]@ \
-      @[<hov 1>(loopify@ %a)@]\
-      %a\
+      @[<hov 1>(loopify@ %a)@]@ \
+      @[<hov 1>%t(template_key@ %a)%t@]\
       )@]"
     (if Option.is_none newer_version_of then Flambda_colours.elide
     else Flambda_colours.none)
@@ -420,13 +420,10 @@ let [@ocamlformat "disable"] print ppf
     print_inlining_paths (relative_history, absolute_history)
     Function_decl_inlining_decision_type.print inlining_decision
     Loopify_attribute.print loopify
-    (fun ppf template_key ->
-      match template_key with
-      | None -> ()
-      | Some template_key ->
-        Format.fprintf ppf "@ @[<hov 1>(template_key@ %a)@]"
-          Symbol.print template_key)
-    template_key
+    (if Option.is_none template_key then Flambda_colours.elide
+    else Flambda_colours.none)
+    (Option.print_compact Symbol.print) template_key
+    Flambda_colours.pop
 
 let free_names
     { code_id = _;
@@ -523,13 +520,17 @@ let apply_renaming
         (Result_types.apply_renaming result_types renaming)
   in
   let template_key' =
-    Option.map (Renaming.apply_symbol renaming) template_key
+    match template_key with
+    | None -> template_key
+    | Some symbol ->
+      let symbol' = Renaming.apply_symbol renaming symbol in
+      if symbol == symbol' then template_key else Some symbol'
   in
   if
     code_id == code_id'
     && newer_version_of == newer_version_of'
     && result_types == result_types'
-    && Option.equal Symbol.equal template_key template_key'
+    && template_key == template_key'
   then t
   else
     { t with
