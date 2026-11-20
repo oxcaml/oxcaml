@@ -23,7 +23,6 @@ type t =
     closure_bound_names_inside_functions_all_sets :
       Bound_name.t Function_slot.Map.t list;
     old_to_new_code_ids_all_sets : Code_id.t Code_id.Map.t;
-    code_to_simplify : Code.t Code_id.Map.t;
     previously_free_depth_variables : Variable.Set.t;
     single_set_of_size_one : bool
   }
@@ -54,7 +53,6 @@ let create_for_static_stub dacc ~all_code ~simplify_function_body =
     dacc_inside_functions;
     closure_bound_names_inside_functions_all_sets = [];
     old_to_new_code_ids_all_sets = Code_id.Map.empty;
-    code_to_simplify = Code_id.Map.empty;
     previously_free_depth_variables = Variable.Set.empty;
     single_set_of_size_one = false
   }
@@ -66,8 +64,6 @@ let dacc_prior_to_sets t = t.dacc_prior_to_sets
 let dacc_inside_functions t = t.dacc_inside_functions
 
 let old_to_new_code_ids_all_sets t = t.old_to_new_code_ids_all_sets
-
-let code_to_simplify t code_id = Code_id.Map.find_opt code_id t.code_to_simplify
 
 let closure_bound_names_inside_functions_all_sets t =
   t.closure_bound_names_inside_functions_all_sets
@@ -247,31 +243,27 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
         old_to_new_code_ids_all_sets)
     Code_id.Map.empty all_sets_of_closures
 
-(* The code of the functions to be simplified, by old code id. A set of closures
-   met in an inlined body defines copies of its functions (e.g. an inlined
-   functor application), and their FDO counters should be renamed before
-   anything looks at the code. *)
-let compute_code_to_simplify denv ~old_to_new_code_ids_all_sets =
-  Code_id.Map.mapi
-    (fun old_code_id _new_code_id ->
-      DE.find_code_exn denv old_code_id
-      |> Code_or_metadata.get_code
-      |> DE.specialize_fdo_counters_of_copied_code denv)
-    old_to_new_code_ids_all_sets
-
-let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets
-    ~code_to_simplify =
+let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
   Code_id.Map.fold
-    (fun old_code_id code denv ->
-      let new_code_id =
-        Code_id.Map.find old_code_id old_to_new_code_ids_all_sets
-      in
-      let code =
-        Code.with_newer_version_of (Some old_code_id) code
-        |> Code.with_code_id new_code_id
-      in
-      DE.define_code denv ~code_id:new_code_id ~code)
-    code_to_simplify denv
+    (fun old_code_id new_code_id denv ->
+      match DE.find_code_exn denv old_code_id with
+      | exception Not_found -> denv
+      | code ->
+        if function_can_be_simplified denv code
+        then
+          let code =
+            Code_or_metadata.get_code code
+            |> Code.with_newer_version_of (Some old_code_id)
+            |> Code.with_code_id new_code_id
+          in
+          (* A set met in an inlined body defines copies of its functions (e.g.
+             an inlined functor application), whose FDO counters are renamed as
+             Simplify meets them (see [DE.rewrite_fdo_counter]). [code] still
+             has the original's: record this for when it is inlined. *)
+          let denv = DE.define_code denv ~code_id:new_code_id ~code in
+          DE.add_fdo_copied_code denv new_code_id
+        else denv)
+    old_to_new_code_ids_all_sets denv
 
 let compute_and_erase_depth_variables ~typing_env ~denv_inside_functions
     ~value_slot_types_all_sets =
@@ -362,13 +354,9 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
       ~value_slot_types_inside_functions_all_sets:value_slot_types_all_sets
       ~old_to_new_code_ids_all_sets
   in
-  let code_to_simplify =
-    compute_code_to_simplify denv ~old_to_new_code_ids_all_sets
-  in
   let dacc_inside_functions =
     denv_inside_functions
     |> bind_existing_code_to_new_code_ids ~old_to_new_code_ids_all_sets
-         ~code_to_simplify
     |> bind_closure_types_inside_functions
          ~closure_bound_names_inside_functions_all_sets
          ~closure_types_inside_functions_all_sets
@@ -386,7 +374,6 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     dacc_inside_functions;
     closure_bound_names_inside_functions_all_sets;
     old_to_new_code_ids_all_sets;
-    code_to_simplify;
     simplify_function_body;
     previously_free_depth_variables;
     single_set_of_size_one

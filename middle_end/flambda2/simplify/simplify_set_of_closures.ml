@@ -508,6 +508,14 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
       else DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code)
     in
     let cold = Code.cold code || body_is_cold in
+    let fdo_entry_annotation =
+      (* Renamed if this code is a copy (see [DE.rewrite_fdo_annotation]). *)
+      let entry_annotation = Code.fdo_entry_annotation code in
+      Fdo_annotation.With_body_hash.with_annotation entry_annotation
+        (DE.rewrite_fdo_annotation
+           (DA.denv dacc_at_function_entry)
+           (Fdo_annotation.With_body_hash.annotation entry_annotation))
+    in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
@@ -521,8 +529,7 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
-      ~inlining_arguments ~dbg
-      ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
+      ~inlining_arguments ~dbg ~fdo_entry_annotation
       ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
       ~absolute_history ~relative_history ~loopify
   in
@@ -588,10 +595,6 @@ let simplify_function context ~outer_dacc function_slot code_id
     | Code_present code
       when (not (Code.stub code))
            || C.stub_can_be_simplified (DA.denv outer_dacc) ->
-      (* The version of the code with its FDO counters renamed for this copy. *)
-      let code =
-        Option.value (C.code_to_simplify context code_id) ~default:code
-      in
       let rec run ~outer_dacc ~code count =
         let { code_id; code = new_code; outer_dacc; should_resimplify } =
           simplify_function0 context ~outer_dacc ~resimplifying:(count > 0)

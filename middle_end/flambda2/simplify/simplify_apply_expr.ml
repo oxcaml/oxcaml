@@ -1363,7 +1363,7 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~callsite_counter:
           (match Apply.callsite_counter apply, Apply.call_kind apply with
           | Some counter, _ ->
-            Some (DE.inline_fdo_counter (DA.denv dacc) counter)
+            Some (DE.rewrite_fdo_counter (DA.denv dacc) counter)
           | None, (Function _ | Method _) ->
             DE.fdo_stub_callsite_counter (DA.denv dacc)
           | None, (C_call _ | Effect _) -> None)

@@ -143,15 +143,21 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   | Maybe_alloc_stack _, Not_alloc_stack (* This is allowed by subtyping *)
   | Maybe_alloc_stack _, Maybe_alloc_stack
   | Not_alloc_stack _, Not_alloc_stack ->
-    (* No instruction is left to count the entries of the inlined function. *)
-    let dacc =
-      DA.add_dropped_fdo_counters dacc ~reason:Inlined_call
-        (Fdo_term_counters.of_inlined_call
-           ~callsite_counter:(Apply.callsite_counter apply)
-           code)
-    in
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
+    in
+    (* No instruction is left to count the entries of the inlined function, in
+       the context of the inlining (that of [denv]). Without a counter the call
+       gives the body no inlining context: the entry counters would be those of
+       the function itself. *)
+    let dacc =
+      match Apply.callsite_counter apply with
+      | None -> dacc
+      | Some _ ->
+        DA.add_dropped_fdo_counters dacc ~reason:Inlined_call
+          (DE.rewrite_fdo_annotation denv
+             (Fdo_annotation.With_body_hash.annotation
+                (Code.fdo_entry_annotation code)))
     in
     let params_and_body = Code.params_and_body code in
     Function_params_and_body.pattern_match params_and_body
