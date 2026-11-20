@@ -154,3 +154,10 @@ val add_specialization :
   old:Continuation.t ->
   specialized:Continuation.t ->
   t
+
+val compose_param_projection :
+  t ->
+  result_var:Bound_var.t ->
+  Simple.t ->
+  (Param_projection.t -> Param_projection.t) ->
+  t
