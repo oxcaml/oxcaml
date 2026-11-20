@@ -2312,7 +2312,8 @@ let rec free_sort_vars = function
            (kinst_result_layout :: kinst_args))
         (free_sort_vars fn)
   | Lcode ({code_fun}, body) ->
-      Layout_ident.Set.union (free_sort_vars_lfun code_fun) (free_sort_vars body)
+      Layout_ident.Set.union
+        (free_sort_vars_lfun code_fun) (free_sort_vars body)
 
 and free_sort_vars_list set exprs =
   List.fold_left
@@ -3495,7 +3496,7 @@ let primitive_can_raise prim =
   | Punboxed_int64_array_set_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_set_vec { unsafe = true; _ }
   | Pctconst _ | Pint_as_pointer _ | Popaque _
-  | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _ | Ptemplate_env _
+  | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
   | Pbox_vector (_, _) | Punbox_vector _
   | Pbox_mask _ | Punbox_mask
   | Pjoin_vec256 | Psplit_vec256
@@ -3527,7 +3528,7 @@ let primitive_can_raise prim =
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
-  | Ppeek _ | Ppoke _ | Pbox _ | Punbox _ ->
+  | Ppeek _ | Ppoke _ | Pbox _ | Punbox _ | Ptemplate_env _ ->
     false
 
 let constant_layout: constant -> layout = function
@@ -3852,7 +3853,6 @@ let primitive_result_layout (p : primitive) =
      | Naked (Floating (Float32 Any_locality_mode)) ->
        layout_unboxed_float Unboxed_float32)
   | Popaque layout | Pobj_magic layout -> layout
-  | Ptemplate_env _ -> layout_template_env
   | Pbytes_to_string | Pbytes_of_string -> layout_string
   | Pignore | Psetfield _ | Psetfield_computed _ | Psetfloatfield _ | Poffsetref _
   | Psetufloatfield _ | Psetmixedfield _
@@ -4078,6 +4078,7 @@ let primitive_result_layout (p : primitive) =
        like that of a tuple. *)
     layout_block
   | Punbox layout -> layout
+  | Ptemplate_env _ -> layout_template_env
 
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode

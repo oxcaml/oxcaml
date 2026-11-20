@@ -1417,11 +1417,19 @@ let rec lam ppf = function
         apply_probe ap.ap_probe
   | Lfunction lfun ->
       lfunction ppf lfun
-  | Lcode ({code_name; code_debug_uid; code_template; code_fun}, body) ->
-      fprintf ppf "@[<2>(code@ @[<2>%a%a[%a]@ %a@]@ %a)@]"
-        Ident.print code_name debug_uid code_debug_uid
-        (Format_doc.compat Template_id.print) code_template
-        lfunction code_fun lam body
+  | Lcode _ as expr ->
+      let rec codebody ~sp = function
+        | Lcode ({code_name; code_debug_uid; code_template; code_fun}, body) ->
+           if sp then fprintf ppf "@ ";
+           fprintf ppf "@[<2>%a%a[%a]@ %a@]"
+             Ident.print code_name debug_uid code_debug_uid
+             (Format_doc.compat Template_id.print) code_template
+             lfunction code_fun;
+           codebody ~sp:true body
+        | expr -> expr in
+      fprintf ppf "@[<2>(code@ @[<hv 1>(";
+      let expr = codebody ~sp:false expr in
+      fprintf ppf ")@]@ %a)@]" lam expr
   | Llet _ | Lmutlet _ as expr ->
       let let_kind = begin function
         | Llet(str,_,_,_,_,_) ->

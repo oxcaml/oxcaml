@@ -1752,7 +1752,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
         | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
         | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lwhile _
         | Lfor _ | Lassign _ | Lsend _ | Levent _ | Lifused _ | Lregion _
-        | Lexclave _ ->
+        | Lexclave _ | Lcode _ ->
           (* The continuations created here (and for failactions) are local. The
              bodies of the let_conts will not modify mutable variables. Hence,
              it is safe to exclude them from passing along the extra arguments
@@ -1763,8 +1763,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _
-        | Lcode _ ->
+        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
           Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in

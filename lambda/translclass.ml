@@ -1090,8 +1090,6 @@ let free_methods l =
         fv := Ident.Set.remove id !fv
     | Lletrec(decl, _body) ->
         List.iter (fun { id } -> fv := Ident.Set.remove id !fv) decl
-    | Lcode({ code_name }, _body) ->
-        fv := Ident.Set.remove code_name !fv
     | Lstaticcatch(_e1, (_,vars), _e2, _, _kind) ->
         List.iter (fun (id, _, _) -> fv := Ident.Set.remove id !fv) vars
     | Ltrywith(_e1, exn, _duid, _e2, _k) ->
@@ -1105,6 +1103,7 @@ let free_methods l =
     | Levent _ | Lifused _ | Lregion _ | Lexclave _
     | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
     | Linstantiate _ -> ()
+    | Lcode _ -> Lambda.fatal_error_invalid_constructor l
   in free l; !fv
 
 let transl_class ~scopes ids cl_id pub_meths cl vflag =

@@ -2877,7 +2877,7 @@ let lambda_primitive_needs_event_after = function
   | Parray_to_iarray | Parray_of_iarray
   | Pignore
   | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
-  | Pmakeufloatblock _ | Pmakelazyblock _ | Ptemplate_env _
+  | Pmakeufloatblock _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
@@ -2930,6 +2930,10 @@ let lambda_primitive_needs_event_after = function
   | Pmakearray_dynamic (Punspecializedarray, _, _) ->
     Misc.fatal_error
       "Translprim.lambda_primitive_needs_event_after: Punspecializedarray"
+  | Ptemplate_env _ ->
+    Misc.fatal_error
+      "Translprim.lambda_primitive_needs_event_after: [Ptemplate_env] only \
+       exists after slambda evaluation"
 
 (* Determine if a primitive should be surrounded by an "after" debug event *)
 let primitive_needs_event_after = function

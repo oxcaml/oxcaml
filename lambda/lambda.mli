@@ -500,7 +500,7 @@ type primitive =
   | Pset_ext_ptr of layout * modify_mode
   | Pbox of layout * locality_mode
   | Punbox of layout
-  (* The definition of [template]: allocates its environment like
+  (* The definition of a template: allocates its environment like
      [Pmakeblock (0, Immutable, Shape shape, mode)]. The template's
      instantiations ([Lcode]) are only ever passed environments created here. *)
   | Ptemplate_env of
@@ -1120,10 +1120,9 @@ and lfunction = private
   }
 
 (** [Lcode (code, body)] binds [code_name] in [body] to the code of an
-    instantiation of a template, created by slambda evaluation. The code has no
-    closure: the template's environment is its first parameter, and its only
-    free variables are the names of other instantiations' code. Those names may
-    only occur as the function of an [Lapply]. *)
+    instantiation of a template, created by slambda evaluation. Its only
+    free variables are the names of other instantiations' code. The names bound
+    bt this may only occur as the function of an [Lapply]. *)
 and lcode =
   { code_name : Ident.t;
     code_debug_uid : debug_uid;
