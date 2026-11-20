@@ -32,5 +32,5 @@
     body of [code]. Nested code is skipped. *)
 val calls_without_counter : Code.t -> int
 
-(** The union of the counters of the edges of the given switch arms. *)
+(** The union of the FDO annotations across all given switch arms. *)
 val of_switch_arms : Switch_arm.t Target_ocaml_int.Map.t -> Fdo_annotation.t

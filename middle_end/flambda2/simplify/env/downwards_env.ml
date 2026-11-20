@@ -726,8 +726,8 @@ let rewrite_fdo_counter t counter =
 let rewrite_fdo_annotation t annotation =
   Fdo_annotation.map (rewrite_fdo_counter t) annotation
 
-let add_fdo_copied_code t code_id =
-  { t with fdo = Fdo_downwards_env.add_copied_code t.fdo code_id }
+let add_fdo_unspecialized_copy t code_id =
+  { t with fdo = Fdo_downwards_env.add_unspecialized_copy t.fdo code_id }
 
 let fdo_stub_callsite_counter t = Fdo_downwards_env.stub_callsite_counter t.fdo
 

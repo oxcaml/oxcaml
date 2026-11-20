@@ -40,8 +40,7 @@ let dacc_inside_function context ~outer_dacc ~resimplifying ~params ~my_closure
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
   in
-  (* The previous run renamed the FDO counters of the sets of closures met in
-     the body. *)
+  (* The previous run already specialized the FDO counters in the body. *)
   let denv = if resimplifying then DE.clear_inlined_debuginfo denv else denv in
   let denv =
     if Code_metadata.stub code_metadata
@@ -509,7 +508,8 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
     in
     let cold = Code.cold code || body_is_cold in
     let fdo_entry_annotation =
-      (* Renamed if this code is a copy (see [DE.rewrite_fdo_annotation]). *)
+      (* Specialized if this code is a copy (see
+         [DE.rewrite_fdo_annotation]). *)
       let entry_annotation = Code.fdo_entry_annotation code in
       Fdo_annotation.With_body_hash.with_annotation entry_annotation
         (DE.rewrite_fdo_annotation

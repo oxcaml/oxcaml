@@ -26,31 +26,33 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** FDO counters that the compiler drops: those whose edge or instruction an
-    optimization removes while the code they count stays, such as the entry
-    counter of an inlined function. No instruction is left to measure a dropped
-    counter, so its count is unknown rather than zero.
+(** FDO counters dropped by optimizations.
 
-    Counters are dropped along with the reason, and registered for the
-    compilation unit so that the loss can be reported. *)
+    A counter is dropped when an optimization removes the branch or call it is
+    attached to while keeping the underlying code (for example, the entry
+    counter of an inlined function). Because no instruction remains to measure
+    it, the counter's execution count is unknown rather than zero.
+
+    Dropped counters are recorded with the reason they were dropped and
+    registered per compilation unit for reporting. *)
 
 module Reason : sig
   type t =
     | Inlined_call
-        (** The entry counters of a function, where a call to it is inlined. *)
+        (** Entry counters of a function whose call site was inlined. *)
     | Self_tail_call_to_jump
-        (** The counter of a self tail call that becomes a jump. *)
+        (** Counter of a self tail call converted to a jump. *)
     | Switch_to_single_arm
-        (** The counters of the only arm of a switch that can be taken. *)
+        (** Counters of a switch reduced to a single reachable arm. *)
     | Switch_with_identical_arms
-        (** The counters of the arms of a switch that all do the same. *)
+        (** Counters of a switch whose arms all jump to the same action. *)
     | Switch_to_lookup_table
-        (** The counters of the arms of a switch that becomes a table lookup. *)
+        (** Counters of a switch lowered to a lookup table. *)
 
   val to_string : t -> string
 end
 
-(** A set of dropped counters, each with the reason it was first dropped for. *)
+(** Dropped counters, mapped to the reason each was first dropped. *)
 type t
 
 val empty : t
