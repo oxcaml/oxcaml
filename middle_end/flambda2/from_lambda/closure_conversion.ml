@@ -2786,7 +2786,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
-      ~cost_metrics
+      ~cohort:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg
       ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
@@ -3181,10 +3181,13 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       then Default_loopify_and_tailrec
       else Default_loopify_and_not_tailrec
   in
-  let main_code_id =
+  let main_code_id, cohort =
     match calling_convention with
-    | Normal_calling_convention -> code_id
-    | Unboxed_calling_convention _ -> Code_id.rename code_id
+    | Normal_calling_convention -> code_id, Function_decl.cohort decl
+    | Unboxed_calling_convention _ ->
+      (* The wrapper and the main code would otherwise be two unrelated members
+         of the same cohort in this unit. *)
+      Code_id.rename code_id, None
   in
   let contains_no_escaping_local_allocs =
     match Function_decl.result_mode decl with
@@ -3212,7 +3215,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~is_a_functor:(Function_decl.is_a_functor decl)
       ~cold:(Function_decl.cold decl)
       ~is_opaque:(Function_decl.is_opaque decl)
-      ~recursive ~newer_version_of:None ~cost_metrics
+      ~recursive ~newer_version_of:None ~cohort ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~fdo_entry_annotation ~is_tupled:main_code_is_tupled
       ~is_my_closure_used:
@@ -3384,7 +3387,9 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)
             ~recursive:(Function_decl.recursive decl)
-            ~newer_version_of:None ~cost_metrics
+            ~newer_version_of:None
+            ~cohort:(Function_decl.cohort decl)
+            ~cost_metrics
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
             ~dbg ~fdo_entry_annotation ~is_tupled ~is_my_closure_used:true
             ~inlining_decision:Recursive
@@ -3773,7 +3778,8 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         poll = Default_poll;
         tmc_candidate = false;
         may_fuse_arity = true;
-        unbox_return = None
+        unbox_return = None;
+        cohort_id = None
       }
   in
   let free_idents_of_body =

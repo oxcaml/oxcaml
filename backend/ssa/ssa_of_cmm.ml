@@ -650,6 +650,7 @@ let convert ~ppf_dump (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph
   try
     let function_info : Ssa.Function_info.t =
       { sym_name = cmm.fun_name.sym_name;
+        sym_global = cmm.fun_name.sym_global;
         parameters = cmm.fun_args;
         codegen_options = cmm.fun_codegen_options;
         dbg = cmm.fun_dbg;

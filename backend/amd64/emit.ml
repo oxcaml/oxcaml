@@ -269,9 +269,13 @@ let pop r =
 
 (* Symbols *)
 
-(* Convert Cmm.is_global to Asm_symbol.visibility *)
+(* Convert Cmm.is_global to Asm_symbol.visibility. [Weak] is folded into
+   [Global] here: at reference sites [Weak] and [Global] are indistinguishable
+   to the linker, and [Asm_symbol.visibility] is used primarily as an
+   informational tag. The COMDAT / [.weak] emission for [Weak] definitions is
+   handled separately, not through this visibility. *)
 let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
-  | Cmm.Global -> S.Global
+  | Cmm.Global | Cmm.Weak -> S.Global
   | Cmm.Local -> S.Local
 
 let emit_symbol s = S.encode (S.create_global s)
@@ -322,7 +326,7 @@ let label_name lbl =
 let rel_plt (s : Cmm.symbol) =
   match (s.sym_global : Cmm.is_global) with
   | Local -> sym (label_name (emit_symbol s.sym_name))
-  | Global ->
+  | Global | Weak ->
     if windows && !Clflags.dlcode
     then mem__imp s.sym_name
     else
@@ -340,7 +344,7 @@ let emit_cmm_symbol (s : Cmm.symbol) =
     S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
   in
   match (s.sym_global : Cmm.is_global) with
-  | Global -> `Symbol sym
+  | Global | Weak -> `Symbol sym
   (* This label is special in that it is not of the form "Lnumber". Instead, we
      take the symbol, encode it, and turn the resulting string into a label. The
      label will still be prefixed by ".L"/"L" when emitting. *)
@@ -356,7 +360,7 @@ let emit_cmm_symbol_str (s : Cmm.symbol) =
 let load_symbol_addr (s : Cmm.symbol) arg =
   match (s.sym_global : Cmm.is_global) with
   | Local -> I.lea (mem64_rip NONE (label_name (emit_symbol s.sym_name))) arg
-  | Global ->
+  | Global | Weak ->
     if !Clflags.dlcode
     then
       if windows
@@ -367,6 +371,23 @@ let load_symbol_addr (s : Cmm.symbol) arg =
     else if !Clflags.pic_code
     then I.lea (mem64_rip NONE (emit_symbol s.sym_name)) arg
     else I.mov (sym (emit_symbol s.sym_name)) arg
+
+let emit_own_text_section ?link_symbol func_name =
+  let name = Printf.sprintf ".text.caml.%s" (emit_symbol func_name) in
+  D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["@progbits"]
+    ~is_delayed:false;
+  let link_symbol =
+    match link_symbol with
+    | Some link_symbol -> link_symbol
+    | None -> emit_symbol func_name
+  in
+  Emitaux.enter_code_section ~link_symbol name;
+  (* Warning: We set the internal section ref to Text here, because it currently
+     does not supported named text sections. In the rest of this file, we
+     pretend the section is called Text rather than the function specific text
+     section. *)
+  (* CR sspies: Add proper support for named text sections. *)
+  D.unsafe_set_internal_section_ref Text
 
 (* Output .text section directive, or named .text.caml.<name> if enabled and
    supported on the target system. *)
@@ -403,7 +424,7 @@ let emit_named_text_section ?link_symbol func_name =
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
   else if !Clflags.function_sections
-  then (
+  then
     match[@ocaml.warning "-4"] system with
     | S_macosx
     (* Names of section segments in macosx are restricted to 16 characters, but
@@ -413,22 +434,7 @@ let emit_named_text_section ?link_symbol func_name =
       (* Win systems provide named text sections, but configure on these systems
          does not support function sections. *) ->
       assert false
-    | _ ->
-      let name = Printf.sprintf ".text.caml.%s" (emit_symbol func_name) in
-      D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
-        ~args:["@progbits"] ~is_delayed:false;
-      let link_symbol =
-        match link_symbol with
-        | Some link_symbol -> link_symbol
-        | None -> emit_symbol func_name
-      in
-      Emitaux.enter_code_section ~link_symbol name;
-      (* Warning: We set the internal section ref to Text here, because it
-         currently does not supported named text sections. In the rest of this
-         file, we pretend the section is called Text rather than the function
-         specific text section. *)
-      (* CR sspies: Add proper support for named text sections. *)
-      D.unsafe_set_internal_section_ref Text)
+    | _ -> emit_own_text_section ?link_symbol func_name
   else (
     D.text ();
     (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
@@ -834,6 +840,7 @@ type jump_table =
 
 type function_jump_tables =
   { fjt_fun_name : string;
+    fjt_weak : bool;
     fjt_tables : jump_table list
   }
 
@@ -844,8 +851,12 @@ let jump_tables = ref ([] : function_jump_tables list)
 let collect_function_jump_tables fundecl =
   if not (Misc.Stdlib.List.is_empty !jump_tables_this_function)
   then begin
+    let fjt_weak =
+      match fundecl.fun_sym_global with Weak -> true | Global | Local -> false
+    in
     let new_tables =
       { fjt_fun_name = fundecl.fun_name;
+        fjt_weak;
         fjt_tables = !jump_tables_this_function
       }
     in
@@ -872,12 +883,17 @@ let emit_jump_table_section (~for_function, ~tables) =
   | None ->
     (* The one big section for all functions' jump tables *)
     emit_named_text_section (Cmm_helpers.make_symbol "jump_tables")
-  | Some fun_name ->
-    (* An individual function under [-jump-table-sections] *)
-    let name =
-      Printf.sprintf ".text.caml.%s.jump_tables" (emit_symbol fun_name)
+  | Some (~fun_name, ~weak) ->
+    (* An individual function, under [-jump-table-sections] or because it is
+       weak *)
+    let sym = emit_symbol fun_name in
+    let name = Printf.sprintf ".text.caml.%s.jump_tables" sym in
+    let flags, args =
+      if weak
+      then "axG", [Printf.sprintf "@progbits,%s,comdat" sym]
+      else "ax", ["@progbits"]
     in
-    D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["@progbits"]
+    D.switch_to_section_raw ~names:[name] ~flags:(Some flags) ~args
       ~is_delayed:false;
     Emitaux.enter_code_section name;
     D.unsafe_set_internal_section_ref Text
@@ -888,20 +904,26 @@ let emit_jump_table_section (~for_function, ~tables) =
   List.iter emit_jump_table tables
 
 let emit_jump_tables () =
+  let section_for_function { fjt_fun_name; fjt_weak; fjt_tables } =
+    ( ~for_function:(Some (~fun_name:fjt_fun_name, ~weak:fjt_weak)),
+      ~tables:fjt_tables )
+  in
   let sections =
     if jump_table_sections_enabled ()
     then
       (* Each function's tables get their own section *)
-      let section_for_function { fjt_fun_name; fjt_tables } =
-        ~for_function:(Some fjt_fun_name), ~tables:fjt_tables
-      in
       List.map section_for_function !jump_tables
     else
-      (* All functions' tables get put into one section *)
-      let tables =
-        List.concat_map (fun { fjt_tables; _ } -> fjt_tables) !jump_tables
+      (* A weak function's tables get their own section, in the function's
+         COMDAT group, since they refer into it. All other functions' tables get
+         put into one section *)
+      let weak, others =
+        List.partition (fun { fjt_weak; _ } -> fjt_weak) !jump_tables
       in
-      [~for_function:None, ~tables]
+      let tables =
+        List.concat_map (fun { fjt_tables; _ } -> fjt_tables) others
+      in
+      List.map section_for_function weak @ [~for_function:None, ~tables]
   in
   List.iter emit_jump_table_section sections
 
@@ -1175,6 +1197,33 @@ let global_maybe_protected (sym : S.t) =
          inlining. *)
       D.protected sym
 
+let has_weak_functions = ref false
+
+(* Switch to a COMDAT text section for a weak function. The section name embeds
+   the symbol so each weak function gets its own group. Both the section and the
+   symbol use the [comdat] key, so the linker keeps exactly one copy across all
+   object files that contain this group. *)
+let emit_weak_text_section_for_symbol sym_name =
+  if not (Oxcaml_flags.weak_functions_supported ())
+  then
+    (* CR-someday: macOS could use [.weak_definition]; PE-COFF has its own
+       selectany COMDAT syntax. *)
+    Misc.fatal_errorf
+      "COMDAT / weak function emission is not supported on this target \
+       (function %s)"
+      sym_name
+  else
+    let section_name = Printf.sprintf ".text.%s" (emit_symbol sym_name) in
+    D.switch_to_section_raw ~names:[section_name] ~flags:(Some "axG")
+      ~args:[Printf.sprintf "@progbits,%s,comdat" (emit_symbol sym_name)]
+      ~is_delayed:false;
+    has_weak_functions := true;
+    (* The function's frametable piece joins its group, so that the linker
+       discards it along with a losing copy. *)
+    Emitaux.enter_code_section ~link_symbol:(emit_symbol sym_name)
+      ~group:(emit_symbol sym_name) section_name;
+    D.unsafe_set_internal_section_ref Text
+
 (* CR sspies: The naming of these functions is confusing. *)
 let emit_global_label_for_symbol ~section lbl =
   add_def_symbol lbl;
@@ -1431,21 +1480,42 @@ type traps =
     mutable enter_traps : L.Set.t
   }
 
-let traps = { push_traps = []; pop_traps = []; enter_traps = L.Set.empty }
+let create_traps () =
+  { push_traps = []; pop_traps = []; enter_traps = L.Set.empty }
+
+let traps = create_traps ()
+
+(* The traps of code in COMDAT groups, by group, which go in notes in those
+   groups. *)
+let group_traps = ref []
 
 let reset_traps () =
   traps.push_traps <- [];
   traps.pop_traps <- [];
-  traps.enter_traps <- L.Set.empty
+  traps.enter_traps <- L.Set.empty;
+  group_traps := []
+
+let current_traps () =
+  match Emitaux.current_group () with
+  | None -> traps
+  | Some group -> (
+    match List.find_opt (fun (g, _) -> String.equal g group) !group_traps with
+    | Some (_, traps) -> traps
+    | None ->
+      let traps = create_traps () in
+      group_traps := (group, traps) :: !group_traps;
+      traps)
 
 let emit_pop_trap_label () =
   let lbl = L.create Text in
   D.define_label lbl;
+  let traps = current_traps () in
   traps.pop_traps <- lbl :: traps.pop_traps
 
 let emit_push_trap_label handler =
   let lbl = L.create Text in
   D.define_label lbl;
+  let traps = current_traps () in
   traps.push_traps <- lbl :: traps.push_traps;
   traps.enter_traps <- L.Set.add handler traps.enter_traps
 
@@ -2952,17 +3022,31 @@ let fundecl fundecl =
   prologue_required := fundecl.fun_prologue_required;
   frame_required := fundecl.fun_frame_required;
   all_functions := fundecl :: !all_functions;
-  emit_named_text_section fundecl.fun_name;
+  (match fundecl.fun_sym_global with
+  | Cmm.Weak ->
+    (* Place this function body in its own COMDAT group so the linker keeps
+       exactly one copy across all compilation units that define the same cohort
+       member (see [Cohort_id]). This overrides the normal [-function-sections]
+       / [module_entry_functions_section] handling. *)
+    emit_weak_text_section_for_symbol fundecl.fun_name
+  | Global | Local -> emit_named_text_section fundecl.fun_name);
   D.align ~fill:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
   let fundecl_sym = S.create_global fundecl.fun_name in
-  if
-    is_macosx system
-    && (not !Clflags.output_c_object)
-    && is_generic_function fundecl.fun_name
-  then (* PR#4690 *)
-    D.private_extern fundecl_sym
-  else global_maybe_protected fundecl_sym;
+  (match fundecl.fun_sym_global with
+  | Cmm.Weak -> D.weak fundecl_sym
+  | Global | Local ->
+    (* Preserve the pre-existing behavior: historically all functions were
+       emitted as global symbols regardless of [fun_name.sym_global], so we keep
+       calling [global_maybe_protected] (or [private_extern] for the macOS
+       generic-function case) when the new [Weak] case does not apply. *)
+    if
+      is_macosx system
+      && (not !Clflags.output_c_object)
+      && is_generic_function fundecl.fun_name
+    then (* PR#4690 *)
+      D.private_extern fundecl_sym
+    else global_maybe_protected fundecl_sym);
   (*= Even if the function name is Local, still emit an actual linker symbol for
       it. This provides symbols for perf, gdb, and similar tools.
 
@@ -3009,8 +3093,14 @@ let fundecl fundecl =
     let end_label = label_to_asm_label ~section:Text l in
     D.define_label end_label;
     let start_label = L.create_label_for_local_symbol Text fundecl_sym in
-    Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fundecl_sym
-      ~start_label ~end_label ~offset_past_end_label:None
+    let function_symbol =
+      (* The weak symbol may resolve to another unit's copy. *)
+      match fundecl.fun_sym_global with
+      | Weak -> L.to_local_symbol start_label
+      | Global | Local -> fundecl_sym
+    in
+    Emitaux.Dwarf_helpers.record_function_range ~function_symbol ~start_label
+      ~end_label ~offset_past_end_label:None
   | None -> ());
   D.comment ("LLVM-MCA-END " ^ !function_name);
   D.cfi_endproc ();
@@ -3041,7 +3131,8 @@ let reset_all () =
   Probe_emission.reset ();
   reset_traps ();
   float_constants := [];
-  all_functions := []
+  all_functions := [];
+  has_weak_functions := false
 
 let begin_assembly unix =
   reset_all ();
@@ -3340,19 +3431,38 @@ let emit_trap_notes () =
     List.iter (fun l -> D.label l) list;
     D.int64 0L
   in
-  let emit_desc () =
-    D.symbol S.Predef.stapsdt_base;
-    emit_labels (L.Set.elements traps.enter_traps);
-    emit_labels traps.push_traps;
-    emit_labels traps.pop_traps
+  let emit_note traps =
+    let emit_desc () =
+      D.symbol S.Predef.stapsdt_base;
+      emit_labels (L.Set.elements traps.enter_traps);
+      emit_labels traps.push_traps;
+      emit_labels traps.pop_traps
+    in
+    Emitaux.emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l
+      ~emit_desc
+  in
+  let has_traps traps = not (L.Set.is_empty traps.enter_traps) in
+  let group_traps =
+    List.filter (fun (_, traps) -> has_traps traps) (List.rev !group_traps)
   in
   if
     is_system_supported && !Arch.trap_notes
-    && not (L.Set.is_empty traps.enter_traps)
+    && (has_traps traps || not (Misc.Stdlib.List.is_empty group_traps))
   then (
-    D.switch_to_section Note_ocaml_eh;
-    Emitaux.emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l
-      ~emit_desc;
+    if has_traps traps
+    then (
+      D.switch_to_section Note_ocaml_eh;
+      emit_note traps);
+    (* A note in a COMDAT group is discarded along with the group, as a losing
+       copy of a weak function must be. *)
+    List.iter
+      (fun (group, traps) ->
+        D.switch_to_section_raw ~names:[".note.ocaml_eh"] ~flags:(Some "G")
+          ~args:["\"note\""; group; "comdat"]
+          ~is_delayed:false;
+        D.unsafe_set_internal_section_ref Note_ocaml_eh;
+        emit_note traps)
+      group_traps;
     (* Reuse stapsdt base section for calculating addresses after prelinking *)
     Emitaux.emit_stapsdt_base_section ();
     (* Switch back to Data section *)
@@ -3384,7 +3494,12 @@ let end_assembly () =
   emit_jump_tables ();
   jump_tables := [];
   let code_end = Cmm_helpers.make_symbol "code_end" in
-  emit_named_text_section code_end;
+  (* The linker places sections in input order, so a [code_end] of its own
+     follows the weak functions' sections, and the unit's code range (for DWARF
+     and code fragments) covers them. *)
+  if !has_weak_functions
+  then emit_own_text_section code_end
+  else emit_named_text_section code_end;
   if is_macosx system then I.nop ();
   (* suppress "ld warning: atom sorting error" *)
   emit_global_label_for_symbol ~section:Text code_end;

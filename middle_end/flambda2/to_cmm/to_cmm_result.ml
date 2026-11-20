@@ -21,6 +21,7 @@ type t =
     functions : Cmm.fundecl list;
     current_data : Cmm.data_item list;
     reachable_names : Name_occurrences.t;
+    cohort_code_names : string Code_id.Map.t;
     symbols : Cmm.symbol String.Map.t;
     (* This map is only used for symbols not directly translated from
        [Symbol.t], e.g. module entry point names. *)
@@ -29,12 +30,13 @@ type t =
     invalid_message_symbols : Symbol.t String.Map.t
   }
 
-let create ~module_symbol ~reachable_names =
+let create ~module_symbol ~reachable_names ~cohort_code_names =
   { gc_roots = [];
     data_list = [];
     functions = [];
     current_data = [];
     reachable_names;
+    cohort_code_names;
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
@@ -71,7 +73,6 @@ let symbol res sym =
   s
 
 let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
-  let sym_name = Linkage_name.to_string (Code_id.linkage_name code_id) in
   let () =
     (* In classic mode, ensure that all .cmx files have been loaded, so that the
        zero-alloc check can see the function summaries. We only need to do this
@@ -82,14 +83,18 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
     then Compilenv.require_global (Code_id.get_compilation_unit code_id)
     else ()
   in
-  let sym_global =
-    if
-      Current_unit.is_current (Code_id.get_compilation_unit code_id)
-      && not (Name_occurrences.mem_code_id res.reachable_names code_id)
-    then Cmm.Local
-    else Cmm.Global
-  in
-  { sym_name; sym_global }
+  match Code_id.Map.find_opt code_id res.cohort_code_names with
+  | Some sym_name -> { sym_name; sym_global = Weak }
+  | None ->
+    let sym_name = Linkage_name.to_string (Code_id.linkage_name code_id) in
+    let sym_global =
+      if
+        Current_unit.is_current (Code_id.get_compilation_unit code_id)
+        && not (Name_occurrences.mem_code_id res.reachable_names code_id)
+      then Cmm.Local
+      else Cmm.Global
+    in
+    { sym_name; sym_global }
 
 (* *)
 

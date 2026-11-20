@@ -14,12 +14,14 @@
 
 (** Selection of the symbol from which the offsets in location and range list
     entries are computed, together with any DWARF-4 base address selection entry
-    that must precede such entries. *)
+    that must precede such entries. [own_section] says whether the function is
+    in a section of its own whatever the code layout, as a weak function is. *)
 
 open Asm_targets
 
 val start_of_code_symbol_and_base_entries :
   Dwarf_state.t ->
   function_symbol:Asm_symbol.t ->
+  own_section:bool ->
   create_base_address_selection_entry:(base_address_symbol:Asm_symbol.t -> 'a) ->
   Asm_symbol.t * 'a list

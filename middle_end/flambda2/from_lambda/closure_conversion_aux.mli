@@ -439,6 +439,8 @@ module Function_decls : sig
 
     val stub : t -> bool
 
+    val cohort : t -> Cohort_id.t option
+
     val loc : t -> Lambda.scoped_location
 
     (** The counters of the entry edge of the function's code and its body hash

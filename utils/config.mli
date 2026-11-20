@@ -318,6 +318,17 @@ val frametable_sections : bool
     frame descriptors can be emitted in a section linked (SHF_LINK_ORDER) to
     the function's code *)
 
+type link_order_group_syntax =
+  | Link_symbol_first
+  | Group_first
+
+val link_order_group_syntax : link_order_group_syntax option
+(** The order in which the assembler takes the arguments of a section that is
+    both link-order and in a group, as the frame descriptors of a weak function
+    are: GNU as and LLVM from version 18 take the linked-to symbol first,
+    earlier versions of LLVM the group. [None] if it accepts neither, or if
+    [frametable_sections] is false. *)
+
 val probes : bool
 (** Whether the target supports tracing probes *)
 

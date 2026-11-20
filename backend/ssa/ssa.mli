@@ -85,6 +85,7 @@ type call_op =
 module Function_info : sig
   type t =
     { sym_name : string;
+      sym_global : Cmm.is_global;
       parameters : (Backend_var.With_provenance.t * Cmm.machtype) list;
       codegen_options : Cmm.codegen_option list;
       dbg : Debuginfo.t;

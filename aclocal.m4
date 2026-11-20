@@ -304,6 +304,54 @@ foo:
   OCAML_CC_RESTORE_VARIABLES
 ])
 
+dnl Probe the order in which the assembler takes the arguments of a section
+dnl that is both link-order ("o") and in a group ("G"), as used for the frame
+dnl descriptors of weak functions.  GNU as and LLVM from version 18 take the
+dnl linked-to symbol first; earlier versions of LLVM take the group first.
+dnl Uses $link_order_section_type from OCAML_AS_HAS_LINK_ORDER_SECTIONS.
+AC_DEFUN([OCAML_AS_LINK_ORDER_GROUP_SYNTAX], [
+  AC_MSG_CHECKING([the argument order of link-order sections in groups])
+  OCAML_CC_SAVE_VARIABLES
+  saved_ac_c_werror_flag="$ac_c_werror_flag"
+
+  # Modify C-compiler variables to use the assembler
+  CC="$AS"
+  CFLAGS="-o conftest.$ac_objext"
+  CPPFLAGS=""
+  ac_ext="S"
+  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+  # Treat any output on stderr as failure
+  ac_c_werror_flag=yes
+
+  AC_COMPILE_IFELSE(
+    [AC_LANG_SOURCE([
+        .section .text.foo,"axG",$link_order_section_type,foo,comdat
+        .weak   foo
+foo:
+        .long   0
+        .section caml_frametable,"aoG",$link_order_section_type,foo,foo,comdat
+        .long   0
+    ])],
+    [link_order_group_syntax='Some Link_symbol_first'
+    AC_MSG_RESULT([linked-to symbol first])],
+    [AC_COMPILE_IFELSE(
+      [AC_LANG_SOURCE([
+        .section .text.foo,"axG",$link_order_section_type,foo,comdat
+        .weak   foo
+foo:
+        .long   0
+        .section caml_frametable,"aoG",$link_order_section_type,foo,comdat,foo
+        .long   0
+      ])],
+      [link_order_group_syntax='Some Group_first'
+      AC_MSG_RESULT([group first])],
+      [link_order_group_syntax=None
+      AC_MSG_RESULT([unsupported])])])
+
+  ac_c_werror_flag="$saved_ac_c_werror_flag"
+  OCAML_CC_RESTORE_VARIABLES
+])
+
 AC_DEFUN([OCAML_MMAP_SUPPORTS_MAP_STACK], [
   AC_MSG_CHECKING([whether mmap supports MAP_STACK])
   AC_RUN_IFELSE(

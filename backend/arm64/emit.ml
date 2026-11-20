@@ -253,9 +253,11 @@ end
 (* CR mshinwell: maybe the following two functions should move to a new
    Cmm.Symbol module, which would include Cmm.symbol as the type "t"? *)
 
-(* Convert Cmm.is_global to Asm_symbol.visibility *)
+(* Convert Cmm.is_global to Asm_symbol.visibility. See the matching comment in
+   [backend/amd64/emit.ml]: [Weak] is folded into [Global] here; proper [.weak]
+   / COMDAT emission for weak definitions is handled separately. *)
 let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
-  | Cmm.Global -> S.Global
+  | Cmm.Global | Cmm.Weak -> S.Global
   | Cmm.Local -> S.Local
 
 (* Create symbol from Cmm.symbol, preserving visibility *)
@@ -1304,28 +1306,55 @@ let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
     Env.set_stack_realloc env
       { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
 
+let emit_own_text_section func_name =
+  (* CR sspies: Clean this up and add proper support for function sections in
+     the new asm directives. *)
+  let link_symbol = S.encode (S.create_global func_name) in
+  let name = ".text.caml." ^ link_symbol in
+  D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["%progbits"]
+    ~is_delayed:false;
+  Emitaux.enter_code_section ~link_symbol name;
+  (* Warning: We set the internal section ref to Text here, because it currently
+     does not supported named text sections. In the rest of this file, we
+     pretend the section is called Text rather than the function specific text
+     section. *)
+  D.unsafe_set_internal_section_ref Text
+
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
 let emit_named_text_section func_name =
   if !Clflags.function_sections
-  then (
-    (* CR sspies: Clean this up and add proper support for function sections in
-       the new asm directives. *)
-    let link_symbol = S.encode (S.create_global func_name) in
-    let name = ".text.caml." ^ link_symbol in
-    D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["%progbits"]
-      ~is_delayed:false;
-    Emitaux.enter_code_section ~link_symbol name;
-    (* Warning: We set the internal section ref to Text here, because it
-       currently does not supported named text sections. In the rest of this
-       file, we pretend the section is called Text rather than the function
-       specific text section. *)
-    D.unsafe_set_internal_section_ref Text)
+  then emit_own_text_section func_name
   else (
     D.text ();
     (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
        function boundaries need not break delta chains. *)
     Emitaux.enter_code_section ".text")
+
+let has_weak_functions = ref false
+
+(* Switch to a COMDAT text section for a weak function. Mirrors the amd64
+   emitter; arm64 GAS uses [%progbits] instead of [@progbits]. *)
+let emit_weak_text_section_for_symbol sym_name =
+  if not (Oxcaml_flags.weak_functions_supported ())
+  then
+    (* CR-someday: macOS could use [.weak_definition] plus the default
+       [.subsections_via_symbols] mode. *)
+    Misc.fatal_errorf
+      "COMDAT / weak function emission is not supported on this target \
+       (function %s)"
+      sym_name
+  else
+    let encoded = S.encode (S.create_global sym_name) in
+    let section_name = Printf.sprintf ".text.%s" encoded in
+    D.switch_to_section_raw ~names:[section_name] ~flags:(Some "axG")
+      ~args:[Printf.sprintf "%%progbits,%s,comdat" encoded]
+      ~is_delayed:false;
+    has_weak_functions := true;
+    (* The function's frametable piece joins its group, so that the linker
+       discards it along with a losing copy. *)
+    Emitaux.enter_code_section ~link_symbol:encoded ~group:encoded section_name;
+    D.unsafe_set_internal_section_ref Text
 
 (* Emit code to load an emitted literal *)
 
@@ -2271,10 +2300,18 @@ let fundecl fundecl =
            (label_to_asm_label ~section:Text)
            fundecl.fun_tailrec_entry_point_label)
   in
-  emit_named_text_section (Env.function_name env);
+  (match fundecl.fun_sym_global with
+  | Cmm.Weak -> emit_weak_text_section_for_symbol fundecl.fun_name
+  | Global | Local -> emit_named_text_section (Env.function_name env));
   let fun_sym = S.create_global fundecl.fun_name in
   D.align ~fill:Nop ~bytes:8;
-  global_maybe_protected fun_sym;
+  (match fundecl.fun_sym_global with
+  | Cmm.Weak -> D.weak fun_sym
+  | Global | Local ->
+    (* Historically all functions were emitted as global symbols regardless of
+       [fun_name.sym_global]; keep that behavior when the new [Weak] case does
+       not apply. *)
+    global_maybe_protected fun_sym);
   D.type_symbol ~ty:Function fun_sym;
   (* Define both a symbol and a label so the function can be referenced either
      way. Local references use the label form to avoid ELF visibility issues. *)
@@ -2302,7 +2339,13 @@ let fundecl fundecl =
   | Some fun_end_label ->
     let fun_end_label = label_to_asm_label ~section:Text fun_end_label in
     D.define_label fun_end_label;
-    Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fun_sym
+    let function_symbol =
+      (* The weak symbol may resolve to another unit's copy. *)
+      match fundecl.fun_sym_global with
+      | Cmm.Weak -> L.to_local_symbol fun_start_label
+      | Global | Local -> fun_sym
+    in
+    Emitaux.Dwarf_helpers.record_function_range ~function_symbol
       ~start_label:fun_start_label ~end_label:fun_end_label
       ~offset_past_end_label:None);
   D.cfi_endproc ();
@@ -2335,6 +2378,7 @@ let file_emitter ~file_num ~file_name =
 let begin_assembly _unix =
   reset_debug_info ();
   Probe_emission.reset ();
+  has_weak_functions := false;
   A.set_emit_string ~emit_string:Emitaux.emit_string;
   Asm_targets.Asm_label.initialize
     ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
@@ -2383,7 +2427,12 @@ let expect_asm_whole_function = ref false
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in
   let code_end_sym = S.create_global code_end in
-  emit_named_text_section code_end;
+  (* The linker places sections in input order, so a [code_end] of its own
+     follows the weak functions' sections, and the unit's code range (for DWARF
+     and code fragments) covers them. *)
+  if !has_weak_functions
+  then emit_own_text_section code_end
+  else emit_named_text_section code_end;
   global_maybe_protected code_end_sym;
   D.define_symbol_label ~section:Text code_end_sym;
   let data_end = Cmm_helpers.make_symbol "data_end" in

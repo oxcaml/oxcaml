@@ -802,6 +802,7 @@ let compare ~old_cfg ~new_cfg ppf =
        field added to [Cfg.t] must be explicitly considered here. *)
     let { Cfg.blocks = _ (* phases 1 and 2 *);
           fun_name = old_fun_name;
+          fun_sym_global = old_fun_sym_global;
           fun_args = _ (* feed the entry block's instructions, phase 2 *);
           fun_codegen_options = old_fun_codegen_options;
           fun_dbg = old_fun_dbg;
@@ -824,6 +825,7 @@ let compare ~old_cfg ~new_cfg ppf =
     in
     let { Cfg.blocks = new_blocks;
           fun_name = new_fun_name;
+          fun_sym_global = new_fun_sym_global;
           fun_codegen_options = new_fun_codegen_options;
           fun_dbg = new_fun_dbg;
           fun_contains_calls = new_fun_contains_calls;
@@ -856,6 +858,8 @@ let compare ~old_cfg ~new_cfg ppf =
     then
       Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_fun_name
         new_fun_name;
+    if Stdlib.( <> ) old_fun_sym_global new_fun_sym_global
+    then Format.fprintf ppf_m "fun_sym_global mismatch@.";
     if Stdlib.( <> ) old_fun_codegen_options new_fun_codegen_options
     then Format.fprintf ppf_m "fun_codegen_options mismatch@.";
     if Debuginfo.compare old_fun_dbg new_fun_dbg <> 0

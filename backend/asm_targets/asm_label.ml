@@ -99,6 +99,9 @@ let encode (t : t) =
   | String label -> label_prefix ^ label
   | Private_symbol label -> "l_caml" ^ string_of_int label
 
+let to_local_symbol t =
+  Asm_symbol.create_without_encoding ~visibility:Local (encode t)
+
 let section t = t.section
 
 let is_dwarf_only_label t = t.is_dwarf_only_label

@@ -26,8 +26,15 @@ type t
 (** Create a result structure.
 
     [reachable_names] specifies which names are reachable from outside the
-    compilation unit (same terminology as used in [Flambda_cmx]). *)
-val create : module_symbol:Symbol.t -> reachable_names:Name_occurrences.t -> t
+    compilation unit (same terminology as used in [Flambda_cmx]).
+
+    Each code id in [cohort_code_names] is defined and referred to under the
+    given symbol, with weak linkage (see [To_cmm_cohorts]). *)
+val create :
+  module_symbol:Symbol.t ->
+  reachable_names:Name_occurrences.t ->
+  cohort_code_names:string Code_id.Map.t ->
+  t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)
 val symbol : t -> Symbol.t -> Cmm.symbol

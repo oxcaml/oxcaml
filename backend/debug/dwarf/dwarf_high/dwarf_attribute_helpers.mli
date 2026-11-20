@@ -46,9 +46,7 @@ val create_low_pc_from_symbol :
   Asm_symbol.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_high_pc_from_symbol :
-  low_pc:Asm_symbol.t ->
-  Asm_symbol.t ->
-  Dwarf_attribute_values.Attribute_value.t
+  Asm_symbol.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_producer : string -> Dwarf_attribute_values.Attribute_value.t
 

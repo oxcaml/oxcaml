@@ -637,13 +637,18 @@ end = struct
        which don't contain any idents *)
     let closure = freshen_closure closure in
     let arg_names = List.map Mangling.symbol_arg_of_value args in
-    let name =
+    let name_string =
       Fmt.asprintf "%a_%a" Template_id.print id
         (Fmt.pp_print_list
            ~pp_sep:(fun ppf () -> Fmt.pp_print_string ppf "_")
            Fmt.pp_print_string)
         arg_names
-      |> Ident.create_persistent
+    in
+    let name = Ident.create_persistent name_string in
+    let cohort_id =
+      match id.owner, Current_unit.get_cu () with
+      | Some cu, _ | None, Some cu -> Some (Cohort_id.create cu name_string)
+      | None, None -> None
     in
     let slv_comptime =
       match Ident.Tbl.find_opt t.instantiated_templates name with
@@ -656,6 +661,12 @@ end = struct
            visited before calling it. *)
         Ident.Tbl.replace t.instantiated_templates name None;
         let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
+        let slv_runtime =
+          match slv_runtime, cohort_id with
+          | Lfunction lf, Some _ ->
+            Lfunction (lfunction_with_attr { lf.attr with cohort_id } lf)
+          | _, _ -> slv_runtime
+        in
         Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
         t.instantiations <- (name, slv_runtime) :: t.instantiations;
         slv_comptime

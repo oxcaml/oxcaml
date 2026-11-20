@@ -337,6 +337,7 @@
   allowance
   ;; lambda/
   branch_annotations
+  cohort_id
   debuginfo
   lambda
   static_label

@@ -502,6 +502,7 @@ let run cfg_with_layout =
       in
       next := { Linear_utils.label; insn });
   { Linear.fun_name = cfg.fun_name;
+    fun_sym_global = cfg.fun_sym_global;
     fun_args = Reg.set_of_array cfg.fun_args;
     fun_body = !next.insn;
     fun_tailrec_entry_point_label = !tailrec_label;

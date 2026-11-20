@@ -92,6 +92,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   in
   let r =
     R.create ~reachable_names
+      ~cohort_code_names:(To_cmm_cohorts.code_names all_code)
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
   in
   let body, body_free_vars, body_symbol_inits, res =

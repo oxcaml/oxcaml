@@ -14,7 +14,7 @@
 
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
-let start_of_code_symbol_and_base_entries state ~function_symbol
+let start_of_code_symbol_and_base_entries state ~function_symbol ~own_section
     ~create_base_address_selection_entry =
   match !Dwarf_flags.gdwarf_version with
   | Five ->
@@ -24,8 +24,9 @@ let start_of_code_symbol_and_base_entries state ~function_symbol
     function_symbol, []
   | Four -> (
     match Dwarf_state.code_layout state with
-    | Function_sections ->
+    | Continuous_code_section { code_begin; _ } when not own_section ->
+      code_begin, []
+    | Function_sections | Continuous_code_section _ ->
       ( function_symbol,
         [ create_base_address_selection_entry
-            ~base_address_symbol:function_symbol ] )
-    | Continuous_code_section { code_begin; _ } -> code_begin, [])
+            ~base_address_symbol:function_symbol ] ))

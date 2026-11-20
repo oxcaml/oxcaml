@@ -177,6 +177,7 @@
   debuginfo
   static_label
   layout_ident
+  cohort_id
   lambda
   mixed_product_bytes
   runtimedef
@@ -420,6 +421,8 @@
 
 (copy_files ../../lambda/layout_ident.ml)
 
+(copy_files ../../lambda/cohort_id.ml)
+
 (copy_files ../../lambda/mixed_product_bytes.ml)
 
 (copy_files ../../lambda/lambda.ml)
@@ -629,6 +632,8 @@
 (copy_files ../../lambda/static_label.mli)
 
 (copy_files ../../lambda/layout_ident.mli)
+
+(copy_files ../../lambda/cohort_id.mli)
 
 (copy_files ../../lambda/mixed_product_bytes.mli)
 

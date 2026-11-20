@@ -59,7 +59,8 @@ type t =
   | Debuginfo_strings
   | Frametable_piece of
       { unit_symbol : string;
-        link_symbol : string
+        link_symbol : string;
+        group : string option
       }
   | Custom of
       { names : string list;
@@ -125,8 +126,11 @@ let print ppf t =
     | Note_ocaml_eh -> "Note_ocaml_eh"
     | Note_gnu_stack -> "Note_gnu_stack"
     | Debuginfo_strings -> "Debuginfo_strings"
-    | Frametable_piece { unit_symbol; link_symbol } ->
+    | Frametable_piece { unit_symbol; link_symbol; group = None } ->
       Printf.sprintf "(Frametable_piece %s -> %s)" unit_symbol link_symbol
+    | Frametable_piece { unit_symbol; link_symbol; group = Some group } ->
+      Printf.sprintf "(Frametable_piece %s -> %s in %s)" unit_symbol link_symbol
+        group
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
@@ -291,10 +295,24 @@ let details t first_occurrence =
     (* "ao" = SHF_ALLOC | SHF_LINK_ORDER; the linker drops the section together
        with the section defining [link_symbol]. The name is a C identifier, so
        that the unit's pieces have start and stop symbols. *)
-    | Frametable_piece { unit_symbol; link_symbol }, arch, _ ->
+    | Frametable_piece { unit_symbol; link_symbol; group = None }, arch, _ ->
       ( ["caml_frametable_pieces" ^ unit_symbol],
         Some "ao",
         [progbits arch; link_symbol] )
+    | Frametable_piece { unit_symbol; link_symbol; group = Some group }, arch, _
+      ->
+      (* "G" adds SHF_GROUP. *)
+      let args =
+        match Config.link_order_group_syntax with
+        | Some Link_symbol_first -> [link_symbol; group; "comdat"]
+        | Some Group_first -> [group; "comdat"; link_symbol]
+        | None ->
+          Misc.fatal_error
+            "The assembler does not support frametable pieces in groups"
+      in
+      ( ["caml_frametable_pieces" ^ unit_symbol],
+        Some "aoG",
+        progbits arch :: args )
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in

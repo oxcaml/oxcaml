@@ -910,6 +910,13 @@ module Function_decls = struct
 
     let stub t = t.attr.stub
 
+    let cohort t =
+      (* Without weak functions, this unit's instances are ordinary code, and
+         other units refer to them as such. *)
+      if Oxcaml_flags.weak_functions_supported ()
+      then t.attr.cohort_id
+      else None
+
     let loc t = t.loc
 
     let fdo_entry_annotation t = t.fdo_entry_annotation

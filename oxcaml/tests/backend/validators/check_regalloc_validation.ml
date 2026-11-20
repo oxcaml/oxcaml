@@ -24,7 +24,7 @@ open Utils
        |> Cfg_desc.make_post_regalloc
      in
      let cfg =
-       Cfg.create ~fun_name:"foo"
+       Cfg.create ~fun_name:"foo" ~fun_sym_global:Cmm.Global
          ~fun_args:[| Proc.phys_reg 0 |]
          ~fun_dbg:Debuginfo.none ~fun_fast:false ~fun_contains_calls:false
          ~fun_num_stack_slots:(Array.make Proc.num_stack_slot_classes 0)

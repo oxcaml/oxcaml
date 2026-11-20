@@ -59,8 +59,14 @@ val record_frame_descr :
     descriptors at a section boundary escape to the full format. Re-entering the
     current section does not bump the epoch. [link_symbol] (already encoded)
     names the symbol whose section the frametable piece of descriptors in this
-    section is linked to under [-frametable-sections]. *)
-val enter_code_section : ?link_symbol:string -> string -> unit
+    section is linked to under [-frametable-sections]. [group] (already encoded)
+    is the section's COMDAT group, if any; the piece then joins it, even without
+    [-frametable-sections], which requires a [link_symbol]. *)
+val enter_code_section : ?link_symbol:string -> ?group:string -> string -> unit
+
+(** The [group] last passed to [enter_code_section]. Anything else that refers
+    to labels in the current section must join it too. *)
+val current_group : unit -> string option
 
 (* When set before [emit_frames], every frame descriptor escapes to the normal
    format instead of the short encoding. Backends set this when the short format
@@ -92,9 +98,10 @@ type emit_frame_actions =
    [Asm_section.Debuginfo_strings] so that the linker de-duplicates them, or
    [Read_only_data] to keep them inline in the frametable (the binary emitter
    needs this, having no relocations that can target the mergeable section).
-   Under [-frametable-sections], the descriptors go in [Frametable_piece]s
-   instead, with an empty piece linked to the (encoded) [code_begin] symbol. The
-   [efa_label_rel] action must then tag labels with the current section. *)
+   Under [-frametable-sections], or if any descriptor's code is in a COMDAT
+   group, the descriptors go in [Frametable_piece]s instead, with a piece linked
+   to the (encoded) [code_begin] symbol. The [efa_label_rel] action must then
+   tag labels with the current section. *)
 val emit_frames :
   debug_strings_section:Asm_targets.Asm_section.t ->
   code_begin:string ->

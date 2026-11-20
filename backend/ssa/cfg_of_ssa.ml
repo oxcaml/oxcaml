@@ -728,7 +728,8 @@ let convert ~future_funcnames (ssa_graph : finished Ssa.graph) :
   let fun_arg_regs = get_block_params_regs env entry in
   let fun_arg_locs = Proc.loc_parameters (Reg.typv fun_arg_regs) in
   let cfg =
-    Cfg.create ~fun_name:function_info.sym_name ~fun_args:fun_arg_locs
+    Cfg.create ~fun_name:function_info.sym_name
+      ~fun_sym_global:function_info.sym_global ~fun_args:fun_arg_locs
       ~fun_codegen_options:
         (Cfg.of_cmm_codegen_option function_info.codegen_options)
       ~fun_dbg:function_info.dbg ~fun_contains_calls:true
