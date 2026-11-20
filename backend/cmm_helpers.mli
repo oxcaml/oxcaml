@@ -719,9 +719,7 @@ val setfield_computed :
   Lambda.initialization_or_assignment ->
   ternary_primitive
 
-(** [transl_switch_clambda loc arg index cases]. The FDO counters of the cases
-    that no edge of the result has (e.g. because it is a table lookup) are
-    dropped (see [Fdo_dropped_counters]). *)
+(** [transl_switch_clambda loc kind arg index cases] *)
 val transl_switch_clambda :
   Debuginfo.t ->
   expression ->
