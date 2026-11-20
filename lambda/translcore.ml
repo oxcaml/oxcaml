@@ -441,7 +441,7 @@ let zero_alloc_of_application
 let add_loop_label ~transl_ctx ~loop_label =
   let static_exception_id = next_raise_count () in
   let enclosing_loops =
-    Ident.Map.add loop_label static_exception_id transl_ctx.enclosing_loops
+    Loop_label_map.add loop_label static_exception_id transl_ctx.enclosing_loops
   in
   static_exception_id, { transl_ctx with enclosing_loops }
 
@@ -1222,13 +1222,13 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
                 event_before ~scopes expr2
                   (transl_exp ~transl_ctx layout expr2))
   | Texp_while {wh_body; wh_body_sort; wh_cond; wh_label} ->
-      let static_exception_id, transl_ctx =
+      let static_exception_id, body_ctx =
         add_loop_label ~transl_ctx ~loop_label:wh_label
       in
       let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
       let cond = transl_exp ~transl_ctx Lambda.layout_bool wh_cond in
       let wh_body_layout = layout_exp wh_body_sort wh_body in
-      let body = transl_exp ~transl_ctx wh_body_layout wh_body in
+      let body = transl_exp ~transl_ctx:body_ctx wh_body_layout wh_body in
       let loop =
         Lwhile {
           wh_cond = maybe_region_layout layout_int cond;
@@ -1243,10 +1243,10 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
               for_body; for_body_sort; for_label} ->
       let for_body_sort = Jkind.Sort.default_for_transl_and_get for_body_sort in
       let for_body_layout = layout_exp for_body_sort for_body in
-      let static_exception_id, transl_ctx =
+      let static_exception_id, body_ctx =
         add_loop_label ~transl_ctx ~loop_label:for_label
       in
-      let body = transl_exp ~transl_ctx for_body_layout for_body in
+      let body = transl_exp ~transl_ctx:body_ctx for_body_layout for_body in
       let loop =
         Lfor {
           for_id;
@@ -1395,6 +1395,7 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
            Lambda.layout_unit)
       end
   | Texp_lazy e ->
+      let transl_ctx = clear_enclosing_loops ~transl_ctx in
       (* when e needs no computation (constants, identifiers, ...), we
          optimize the translation just as Lazy.lazy_from_val would
          do *)
@@ -1482,6 +1483,7 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
                !transl_module ~transl_ctx Tcoerce_none None od.open_expr, body)
       end
   | Texp_probe {name; handler=exp; enabled_at_init} ->
+    let transl_ctx = clear_enclosing_loops ~transl_ctx in
     if Clflags.target_is_native () && !Clflags.probes then begin
       let lam = transl_exp ~transl_ctx Lambda.layout_probe_arg exp in
       let map =
@@ -1655,6 +1657,7 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_quote exp ->
+      let transl_ctx = clear_enclosing_loops ~transl_ctx in
       Translquote.transl_quote
         ~scopes ~loc:e.exp_loc ~transl:(transl_exp ~transl_ctx layout) exp
   | Texp_splice _ ->
@@ -1664,7 +1667,7 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
         e.exp_loc
   | Texp_break loop_label ->
     let static_exception_id =
-      Ident.Map.find loop_label transl_ctx.enclosing_loops
+      Loop_label_map.find loop_label transl_ctx.enclosing_loops
     in
     Lstaticraise (static_exception_id, [])
 
@@ -1981,6 +1984,7 @@ and transl_apply ~transl_ctx
 and transl_function_without_attributes
     ~transl_ctx ~return_sort ~return_mode ~mode ~region ~fun_ty loc repr params
     body =
+  let transl_ctx = clear_enclosing_loops ~transl_ctx in
   let return_layout =
     match body with
     | Tfunction_body exp ->
@@ -3174,6 +3178,7 @@ and transl_match ~transl_ctx ~arg_sort ~return_layout e arg pat_expr_list
    Effect handlers require all types to have layout [value]. *)
 and transl_handler ~transl_ctx ~return_layout ~body_layout e body
                    val_caselist exn_caselist eff_caselist =
+  let transl_ctx = clear_enclosing_loops ~transl_ctx in
   let scopes = transl_ctx.scopes in
   (match (body_layout : Lambda.layout) with
    | Pvalue _ | Pbottom -> ()

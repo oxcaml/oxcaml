@@ -646,6 +646,7 @@ let rec compile_functor ~transl_ctx mexp coercion root_path loc =
     merge_functors ~transl_ctx mexp coercion root_path
   in
   assert (List.length functor_params_rev >= 1);  (* cf. [transl_module] *)
+  let transl_ctx = clear_enclosing_loops ~transl_ctx in
   let params, body =
     List.fold_left (fun (params, body) (param, loc, arg_coercion) ->
         let param_duid = Lambda.debug_uid_none in
@@ -1243,7 +1244,7 @@ let transl_implementation compilation_unit impl ~loc =
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
-  let transl_ctx = { scopes; enclosing_loops = Ident.Map.empty  } in
+  let transl_ctx = { scopes; enclosing_loops = Loop_label_map.empty  } in
   let body, repr =
     Translobj.transl_label_init (fun () ->
       transl_implementation_module ~loc ~transl_ctx compilation_unit impl)
@@ -1501,7 +1502,9 @@ let transl_toplevel_item_and_close ~transl_ctx itm =
           in expr, ()))
 
 let transl_toplevel_definition str =
-  let transl_ctx = { scopes = empty_scopes; enclosing_loops = Ident.Map.empty } in
+  let transl_ctx =
+    { scopes = empty_scopes; enclosing_loops = Loop_label_map.empty }
+  in
   reset_labels ();
   Translprim.clear_used_primitives ();
   make_sequence
