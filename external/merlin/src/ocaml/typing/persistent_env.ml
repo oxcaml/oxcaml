@@ -485,7 +485,6 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_cmi_name = found_name;
     }
   in
-<<<<<<< Merlin:pending-cmi-imports
   begin try
   if not (CU.Name.equal modname found_name) then
     error (Illegal_renaming(modname, found_name, filename));
@@ -507,18 +506,13 @@ let acknowledge_import penv ~check modname pers_sig =
         error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
   | _, _ -> ()
   end;
-  if check then check_consistency penv import
+  if check then check_consistency penv modname import
   with Error _ as exn ->
     (* Merlin needs to know that a module was found even if it is invalid to
        properly invalidate the cache. *)
     CUI.Tbl.replace imports modname (Invalid import);
     raise exn
   end;
-||||||| Compiler:last-imported
-  if check then check_consistency penv import;
-=======
-  if check then check_consistency penv modname import;
->>>>>>> Compiler:HEAD
   CUI.Tbl.add imports modname (Found import);
   import
 
