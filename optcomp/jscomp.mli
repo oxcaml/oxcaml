@@ -40,8 +40,9 @@
 
     - Whole program: the JSIR files are the object files. Linking an executable
       links the JSIR of its units into one program, which [js_of_ocaml] or
-      [wasm_of_ocaml] compiles at once. This makes compilation slower, but the
-      program is optimised across units.
+      [wasm_of_ocaml] compiles at once to the executable. This makes compilation
+      slower, but the program is optimised across units, and only has the parts
+      of the runtime that it uses.
 
     The correspondence with the native backend's files is (with the
     wasm_of_ocaml extensions in parentheses):
@@ -61,8 +62,8 @@
 
     - [.js] files given on the command line (and [.wat], [.wast] and [.wasm]
       files with wasm_of_ocaml): runtime stubs, analogous to C stubs. They are
-      recorded in library files and passed to [build-runtime] when linking an
-      executable.
+      recorded in library files and passed to [build-runtime] (to [compile] for
+      a whole program) when linking an executable.
 
     [-jsoo-opt] passes options to every invocation, and [-jsoo-opt-compile],
     [-jsoo-opt-archive], [-jsoo-opt-runtime] and [-jsoo-opt-link] to one of them
