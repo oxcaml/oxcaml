@@ -76,6 +76,13 @@ val lubs : pattern list -> pattern list -> pattern list
 
 val get_mins : ('a -> 'a -> bool) -> 'a list -> 'a list
 
+(** [slice_args d h ps]: the arguments of a slice pattern of shape [h] with
+    element patterns [ps] for a constructor [d] of a split that it covers (see
+    [Patterns.Slice.split]): its prefix, then wildcards for the elements
+    between its prefix and suffix, then its suffix. *)
+val slice_args :
+  Patterns.Slice.shape -> Patterns.Slice.shape -> pattern list -> pattern list
+
 (** This function recombines one pattern and its arguments:
     For instance:
       (_,_)::p1::p2::rem -> (p1, p2)::rem

@@ -49,15 +49,68 @@ end
 module Slice = struct
   type shape =
     | Closed of int
+    | Open of { prefix : int; suffix : int }
 
   let shape = function
     | Tslice_closed ps -> Closed (List.length ps)
-    | Tslice_open _ ->
-        Misc.fatal_error "Patterns.Slice.shape: slice pattern with a rest"
+    | Tslice_open { prefix; suffix; _ } ->
+        Open { prefix = List.length prefix; suffix = List.length suffix }
 
-  let arity (Closed n) = n
+  let arity = function
+    | Closed n -> n
+    | Open { prefix; suffix } -> prefix + suffix
 
-  let of_patterns (Closed _) ps = Tslice_closed ps
+  let of_patterns shape ps =
+    match shape with
+    | Closed _ -> Tslice_closed ps
+    | Open { prefix; _ } ->
+        Tslice_open
+          { prefix = List.filteri (fun i _ -> i < prefix) ps;
+            rest_var = None;
+            suffix = List.filteri (fun i _ -> i >= prefix) ps }
+
+  let split shapes =
+    let max_closed, max_prefix, max_suffix =
+      List.fold_left
+        (fun (c, p, s) shape ->
+           match shape with
+           | Closed n -> max c n, p, s
+           | Open { prefix; suffix } -> c, max p prefix, max s suffix)
+        (0, 0, 0) shapes
+    in
+    let max_prefix =
+      if max_closed + 1 >= max_prefix + max_suffix
+      then max_closed + 1 - max_suffix
+      else max_prefix
+    in
+    List.init (max_prefix + max_suffix) (fun n -> Closed n)
+    @ [Open { prefix = max_prefix; suffix = max_suffix }]
+
+  let covers d h =
+    match d, h with
+    | Closed n, Closed m -> n = m
+    | Open _, Closed _ -> false
+    | Closed n, Open { prefix; suffix } -> n >= prefix + suffix
+    | Open { prefix = p; suffix = s }, Open { prefix; suffix } ->
+        prefix <= p && suffix <= s
+
+  let missing shapes =
+    let first_missing_below l =
+      List.init l Fun.id
+      |> List.find_opt (fun n -> not (List.mem (Closed n) shapes))
+      |> Option.map (fun n -> Closed n)
+    in
+    match
+      List.find_opt (function Open _ -> true | Closed _ -> false) shapes
+    with
+    | Some open_shape -> first_missing_below (arity open_shape)
+    | None ->
+        let l =
+          1 + List.fold_left (fun m shape -> max m (arity shape)) 0 shapes
+        in
+        match first_missing_below l with
+        | Some _ as missing -> missing
+        | None -> Some (Open { prefix = l; suffix = 0 })
 end
 
 (* "views" on patterns are polymorphic variants
@@ -126,6 +179,8 @@ module General = struct
         * Jkind.Sort.t
         * Mode.With_regionality.l
         * Types.type_expr
+    | `Slice_rest of
+        mutability * Jkind.sort * pattern list * slice_rest_var * pattern list
   ]
   type pattern = view pattern_data
 
@@ -161,6 +216,11 @@ module General = struct
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
     | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
+    | Tpat_slice
+        { mutability; sort;
+          elements = Tslice_open { prefix; rest_var = Some rest_var; suffix } }
+      ->
+       `Slice_rest (mutability, sort, prefix, rest_var, suffix)
     | Tpat_slice { mutability; sort; elements } ->
        `Slice (mutability, sort, elements)
     | Tpat_deref { pattern = p; id; name = str; uid; sort; mode;
@@ -199,6 +259,11 @@ module General = struct
     | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
     | `Slice (mutability, sort, elements) ->
        Tpat_slice { mutability; sort; elements }
+    | `Slice_rest (mutability, sort, prefix, rest_var, suffix) ->
+       Tpat_slice
+         { mutability; sort;
+           elements =
+             Tslice_open { prefix; rest_var = Some rest_var; suffix } }
     | `Deref (p, id, str, uid, sort, mode, ty) ->
        Tpat_deref { pattern = p; id; name = str; uid; sort; mode;
                     type_expr = ty }
@@ -213,6 +278,9 @@ module General = struct
         strip_vars (view p)
     | `Var _ | `Fun_layout _ | `Deref (None, _, _, _, _, _, _) ->
         { p with pat_desc = `Any }
+    | `Slice_rest (mutability, sort, prefix, _, suffix) ->
+        let elements = Tslice_open { prefix; rest_var = None; suffix } in
+        { p with pat_desc = `Slice (mutability, sort, elements) }
     | #Half_simple.view as view -> { p with pat_desc = view }
 end
 

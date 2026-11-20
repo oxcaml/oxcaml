@@ -289,6 +289,11 @@ let slice_element_address ~loc ~array_kind slice index_kind n =
   in
   Lprim (Pmake_unboxed_product address_layouts, [ field 0; idx ], loc)
 
+(* CR slice-patterns: bind the variables bound by the rests of slice
+   patterns *)
+let fatal_slice_rest () =
+  fatal_error "Matching: rests of slice patterns are not bound yet"
+
 module General = struct
   include Patterns.General
 
@@ -401,6 +406,7 @@ end = struct
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
         | `Slice _ | `Lazy _ )
         as view -> stop p view
+      | `Slice_rest _ -> fatal_slice_rest ()
     in
     aux cl
 end
@@ -504,6 +510,7 @@ end = struct
       | `Deref _ ->
           fatal_error
             "Matching.explode_or_pat: dereference pattern under or-pattern"
+      | `Slice_rest _ -> fatal_slice_rest ()
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -580,6 +587,15 @@ let rec rev_split_at n ps =
 
 exception NoMatch
 
+(* Whether no slice is of both shapes *)
+let slice_shapes_disjoint (k1 : Patterns.Slice.shape)
+    (k2 : Patterns.Slice.shape) =
+  match k1, k2 with
+  | Closed n, Closed m -> n <> m
+  | Closed n, Open { prefix; suffix } | Open { prefix; suffix }, Closed n ->
+      n < prefix + suffix
+  | Open _, Open _ -> false
+
 let matcher discr (p : Simple.pattern) rem =
   let discr = expand_record_head discr in
   let p = expand_record_simple p in
@@ -628,7 +644,14 @@ let matcher discr (p : Simple.pattern) rem =
   | Lazy, Lazy -> yes ()
   | Slice { mutability = m1; shape = d; _ },
     Slice { mutability = m2; shape = h; _ } ->
-      yesif (m1 = m2 && d = h)
+      if m1 <> m2 || slice_shapes_disjoint d h then no ()
+      else if Patterns.Slice.covers d h then
+        Parmatch.slice_args d h args @ rem
+      else
+        (* [p] matches only some of the slices of [discr], so we
+           over-approximate, which is sound for contexts and default
+           environments *)
+        omegas @ rem
   | ( Constant _ | Construct _ | Variant _ | Addr _ | Slice _ | Lazy
     | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
     | Unboxed_bool _ | Tuple _ | Unboxed_tuple _), _ -> no ()
@@ -764,6 +787,8 @@ end = struct
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
           | `Alias (p, _, _, _, _, _, _) | `Deref (Some p, _, _, _, _, _, _) ->
               filter_rec ((left, p, right) :: rem)
+          | `Slice_rest _ ->
+              filter_rec ((left, General.(erase (strip_vars p)), right) :: rem)
           | `Var _ | `Deref (None, _, _, _, _, _, _) ->
               filter_rec ((left, Patterns.omega, right) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
@@ -909,6 +934,8 @@ end = struct
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) | `Deref (Some p, _, _, _, _, _, _) ->
               filter_rec ((p, ps) :: rem)
+          | `Slice_rest _ ->
+              filter_rec ((General.(erase (strip_vars p)), ps) :: rem)
           | `Var _ | `Deref (None, _, _, _, _, _, _) ->
               filter_rec ((Patterns.omega, ps) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
@@ -1622,6 +1649,10 @@ let can_group discr pat =
   | Slice { mutability = m1; shape = Closed _; _ },
     Slice { mutability = m2; shape = Closed _; _ } ->
       m1 = m2
+  | Slice { mutability = m1; shape = Open k1; _ },
+    Slice { mutability = m2; shape = Open k2; _ } ->
+      m1 = m2 && k1.prefix = k2.prefix && k1.suffix = k2.suffix
+  | Slice _, Slice _ -> false
   | ( _,
       ( Any
       | Constant
@@ -2691,8 +2722,8 @@ let divide_addr ~scopes head ctx pm =
 
 (* Matching against a slice pattern
 
-   The elements of a slice pattern are at fixed positions from the start of
-   the slice. *)
+   The elements of a slice pattern of a shape are at fixed positions from the
+   start or the end of the slice. *)
 
 let get_key_slice = function
   | { pat_desc = Tpat_slice { elements; _ } } ->
@@ -2741,7 +2772,21 @@ let get_expr_args_slice ~scopes head { arg; mut; _ } rem =
         }
       in
       let from_start i = element Ptagged_int_index (Lconst (const_int i)) in
-      let elements = match shape with Closed n -> List.init n from_start in
+      let from_end suffix j =
+        (* The position of the element [j] of a suffix of length [suffix] *)
+        element (Punboxed_or_untagged_integer_index Unboxed_nativeint)
+          (Lprim
+             ( Pscalar (Binary (Integral (slice_length_scalar, Sub))),
+               [ slice_field ~loc 1 arg;
+                 const_scalar slice_length_scalar (suffix - j) ],
+               loc ))
+      in
+      let elements =
+        match shape with
+        | Closed n -> List.init n from_start
+        | Open { prefix; suffix } ->
+            List.init prefix from_start @ List.init suffix (from_end suffix)
+      in
       elements @ rem
   | _ -> fatal_error "Matching.get_expr_args_slice"
 
@@ -3920,21 +3965,45 @@ let combine_unboxed_bool value_kind loc arg partial ctx def
   in
   (lambda1, Jumps.union local_jumps total)
 
+(* The rows of a group of slice patterns have closed shapes, or the same open
+   shape (see [can_group]) *)
 let combine_slice value_kind loc arg partial ctx def (cells, total, _pats) =
   let fail, local_jumps = mk_failaction_neg partial ctx def in
   let length = slice_field ~loc 1 arg in
-  let closed =
-    List.map
+  let closed, opens =
+    List.partition_map
       (fun ((shape : Patterns.Slice.shape), act) ->
          match shape with
-         | Closed n -> Const_unboxed_nativeint (Nativeint.of_int n), act)
+         | Closed n -> Left (Const_unboxed_nativeint (Nativeint.of_int n), act)
+         | Open { prefix; suffix } -> Right (prefix + suffix, act))
       cells
   in
-  let length_scalar =
-    Scalar.integral (Scalar.Integral.ignore_locality slice_length_scalar)
+  let at_least min =
+    Lprim
+      ( Pscalar
+          (Binary
+             (Icmp (Scalar.Integral.ignore_locality slice_length_scalar, Cge))),
+        [ length; const_scalar slice_length_scalar min ],
+        loc )
+  in
+  let otherwise =
+    List.fold_right
+      (fun (min, act) otherwise ->
+         match otherwise with
+         | None -> Some act
+         | Some otherwise ->
+             Some (Lifthenelse (at_least min, act, otherwise, value_kind)))
+      opens fail
   in
   let lambda =
-    make_test_sequence value_kind loc fail length_scalar length closed
+    match closed, otherwise with
+    | [], Some lambda -> lambda
+    | [], None -> fatal_error "Matching.combine_slice"
+    | _ :: _, _ ->
+        let length_scalar =
+          Scalar.integral (Scalar.Integral.ignore_locality slice_length_scalar)
+        in
+        make_test_sequence value_kind loc otherwise length_scalar length closed
   in
   (lambda, Jumps.union local_jumps total)
 

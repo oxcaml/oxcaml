@@ -37,12 +37,15 @@ module Non_empty_row : sig
   val map_first : ('a -> 'b) -> 'a t -> 'b t
 end
 
-(** Slice patterns match slices of an exact length ([[&| p1; ...; pn |]]).
-    Slice patterns with a rest are not supported yet. *)
+(** Slice patterns either match slices of an exact length
+    ([[&| p1; ...; pn |]]) or slices of a minimum length
+    ([[&| p1; ...; pk; ..; q1; ...; qm |]]). *)
 module Slice : sig
   (** The lengths a slice pattern matches *)
   type shape =
     | Closed of int  (** exactly this length *)
+    | Open of { prefix : int; suffix : int }
+        (** at least [prefix + suffix], with a rest between them *)
 
   val shape : slice_pattern -> shape
 
@@ -53,6 +56,29 @@ module Slice : sig
       patterns [ps], in order, without a variable bound by its rest. Inverse
       of [slice_element_patterns]. *)
   val of_patterns : shape -> pattern list -> slice_pattern
+
+  (** Variable-length patterns are not alone in their signature, so the
+      lengths of a column of slice patterns are split into finitely many
+      classes that behave like constructors, as rustc does.
+
+      Let [F] be the largest fixed length and [P] and [S] the largest prefix
+      and suffix of the variable-length patterns in the column. If
+      [F + 1 >= P + S], increase [P] to [F + 1 - S], and let [L = P + S]. Then
+      all slices of length at least [L] are matched by the same patterns in
+      the column: by none of the fixed-length patterns, and by all of the
+      variable-length patterns, without their prefixes and suffixes
+      overlapping. Hence [split shapes] is [Closed 0], ..., [Closed (L - 1)]
+      and [Open { prefix = P; suffix = S }]. *)
+  val split : shape list -> shape list
+
+  (** [covers d h]: whether a pattern of shape [h] matches all slices of the
+      constructor [d] of a split *)
+  val covers : shape -> shape -> bool
+
+  (** [missing shapes]: given the constructors of a split that a column
+      contains, a shape of slices that none of them matches, if there is
+      one *)
+  val missing : shape list -> shape option
 end
 
 module Simple : sig
@@ -76,6 +102,7 @@ module Simple : sig
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
     | `Slice of mutability * Jkind.sort * slice_pattern
+        (** Its rest binds no variable (see [`Slice_rest]) *)
     | `Lazy of pattern
   ]
   type pattern = view pattern_data
@@ -115,6 +142,10 @@ module General : sig
         * Jkind.Sort.t
         * Mode.With_regionality.l
         * Types.type_expr
+    | `Slice_rest of
+        mutability * Jkind.sort * pattern list * slice_rest_var * pattern list
+        (** A slice pattern whose rest binds a variable, with its prefix and
+            suffix *)
   ]
   type pattern = view pattern_data
 

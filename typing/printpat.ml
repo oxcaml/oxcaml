@@ -132,10 +132,15 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
   | Tpat_slice { mutability; elements; _ } ->
       let punct = if Types.is_mutable mutability then '|' else ':' in
+      let is_any p = match p.pat_desc with Tpat_any -> true | _ -> false in
       let patterns = List.map (fun v -> `Pattern v) in
       let items =
         match elements with
         | Tslice_closed vs -> patterns vs
+        | Tslice_open { prefix; rest_var = None; suffix }
+          when List.for_all is_any suffix ->
+            (* A suffix of wildcards can be printed as part of the prefix *)
+            patterns (prefix @ suffix) @ [`Rest None]
         | Tslice_open { prefix; rest_var; suffix } ->
             patterns prefix @ [`Rest rest_var] @ patterns suffix
       in
