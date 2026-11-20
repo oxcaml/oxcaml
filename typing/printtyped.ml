@@ -850,13 +850,13 @@ and expression i ppf x =
       expression i ppf e1;
       line i ppf "%a\n" fmt_sort s;
       expression i ppf e2;
-  | Texp_while {wh_cond; wh_body} ->
-      line i ppf "Texp_while\n";
+  | Texp_while {wh_cond; wh_body; wh_label} ->
+      line i ppf "Texp_while \"%a\"\n" fmt_ident wh_label;
       expression i ppf wh_cond;
       expression i ppf wh_body;
-  | Texp_for {for_id; for_from; for_to; for_dir; for_body} ->
-      line i ppf "Texp_for \"%a\" %a\n"
-        fmt_ident for_id fmt_direction_flag for_dir;
+  | Texp_for {for_id; for_from; for_to; for_dir; for_body; for_label} ->
+      line i ppf "Texp_for \"%a\" %a \"%a\"\n"
+        fmt_ident for_id fmt_direction_flag for_dir fmt_ident for_label;
       expression i ppf for_from;
       expression i ppf for_to;
       expression i ppf for_body
@@ -937,8 +937,8 @@ and expression i ppf x =
   | Texp_splice e ->
     line i ppf "Texp_splice";
     expression i ppf e
-  | Texp_break _ ->
-    line i ppf "Texp_break"
+  | Texp_break label ->
+    line i ppf "Texp_break \"%a\"\n" fmt_ident label
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location

@@ -197,12 +197,12 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_for _
     | Texp_setfield _
     | Texp_while _
-    | Texp_setinstvar _
-    | Texp_break _ ->
+    | Texp_setinstvar _ ->
         (* Unit-returning expressions *)
         Static
 
-    | Texp_unreachable ->
+    | Texp_unreachable
+    | Texp_break _ ->
         Static
 
     | Texp_record_unboxed_product { representation = Record_unboxed_product;
