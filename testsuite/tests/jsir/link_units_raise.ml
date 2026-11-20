@@ -2,6 +2,7 @@
  modules = "link_units_raise_a.ml";
  flambda2;
  exit_status = "2";
+ ocamlrunparam = "b=0";
  {
    native;
  }{

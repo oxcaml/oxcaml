@@ -72,13 +72,13 @@ CAMLextern void caml_record_backtraces(int);
  * [backtrace] (more expensive)
  *   OCaml values of algebraic data-type [Printexc.backtrace_slot]
  */
- /* [Caml_state->backtrace_active] is non zero iff backtraces are recorded.
+ /* [caml_backtrace_active] is non zero iff backtraces are recorded.
  * This variable must be changed with [caml_record_backtrace] in OCaml or
  * [caml_record_backtraces] in C.
  */
-#define caml_backtrace_active (Caml_state_field(backtrace_active))
+CAMLextern atomic_value caml_backtrace_active;
 /* The [Caml_state->backtrace_buffer] and [Caml_state->backtrace_last_exn]
- * variables are valid only if [Caml_state->backtrace_active != 0].
+ * variables are valid only if [caml_backtrace_active != 0].
  *
  * They are part of the state specific to each thread, and threading libraries
  * are responsible for copying them on context switch.
@@ -87,8 +87,6 @@ CAMLextern void caml_record_backtraces(int);
  *
  * [Caml_state->backtrace_buffer] is filled by runtime when unwinding stack. It
  * is an array ranging from [0] to [Caml_state->backtrace_pos - 1].
- * [Caml_state->backtrace_pos] is always zero if
- * [!Caml_state->backtrace_active].
  *
  * Its maximum size is determined by [BACKTRACE_BUFFER_SIZE] from
  * [backtrace_prim.h], but this shouldn't affect users.
@@ -97,7 +95,7 @@ CAMLextern void caml_record_backtraces(int);
 #define caml_backtrace_pos (Caml_state_field(backtrace_pos))
 
 /* [Caml_state->backtrace_last_exn] stores the last exception value that was
- * raised, iff [Caml_state->backtrace_active != 0]. It is tested for equality
+ * raised, iff [caml_backtrace_active != 0]. It is tested for equality
  * to determine whether a raise is a re-raise of the same exception.
  */
 #define caml_backtrace_last_exn (Caml_state_field(backtrace_last_exn))

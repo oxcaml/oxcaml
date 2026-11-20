@@ -329,7 +329,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
     accu = raise_exn_bucket;
 
     check_trap_barrier_for_exception (domain_state);
-    if (domain_state->backtrace_active) {
+    if (caml_backtrace_active) {
          /* pc has already been pushed on the stack when calling the C
          function that raised the exception. No need to push it again
          here. */
@@ -349,7 +349,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
     accu = raise_async_exn_bucket;
 
     check_trap_barrier_for_exception (domain_state);
-    if (domain_state->backtrace_active) {
+    if (caml_backtrace_active) {
          /* pc has already been pushed on the stack when calling the C
          function that raised the exception. No need to push it again
          here. */
@@ -1012,7 +1012,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
 
     Instruct(RERAISE):
       check_trap_barrier_for_exception (domain_state);
-      if (domain_state->backtrace_active) {
+      if (caml_backtrace_active) {
         *--sp = (value)(pc - 1);
         caml_stash_backtrace(accu, sp, 1);
       }
@@ -1021,7 +1021,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
     Instruct(RAISE):
     raise_exception:
       check_trap_barrier_for_exception (domain_state);
-      if (domain_state->backtrace_active) {
+      if (caml_backtrace_active) {
         *--sp = (value)(pc - 1);
         caml_stash_backtrace(accu, sp, 0);
       }
@@ -1374,14 +1374,14 @@ do_resume: {
       case Resume_raise:
         accu = resume_arg;
         check_trap_barrier_for_exception (domain_state);
-        if (domain_state->backtrace_active) {
+        if (caml_backtrace_active) {
           caml_stash_backtrace(accu, sp, /*reraise=*/ 0);
         }
         goto raise_notrace;
       case Resume_reraise:
         accu = resume_arg;
         check_trap_barrier_for_exception (domain_state);
-        if (domain_state->backtrace_active)
+        if (caml_backtrace_active)
           caml_stash_backtrace(accu, sp, /*reraise=*/ 1);
         goto raise_notrace;
       default:
