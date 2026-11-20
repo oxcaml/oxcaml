@@ -54,15 +54,15 @@ type t =
             [@inlined] call to a function of the same set that only becomes
             direct in the copy), its counters need the copy context of the set,
             not [none] as for other inlined bodies. *)
-        stub_callsite_counter : Fdo_counter.t option
+    stub_callsite_counter : Fdo_counter.t option
         (** When inlining a stub, the callsite counter of the call to the stub.
 
             A stub's forwarding call to the underlying function is
-            compiler-generated and has no counter of its own. Storing the
-            stub's callsite counter here lets that call inherit it, so the
-            user's callsite counter isn't lost when the stub is inlined away.
-            Calls inside the stub that already have a counter (e.g. default
-            arguments in an optional-argument wrapper) keep their own. *)
+            compiler-generated and has no counter of its own. Storing the stub's
+            callsite counter here lets that call inherit it, so the user's
+            callsite counter isn't lost when the stub is inlined away. Calls
+            inside the stub that already have a counter (e.g. default arguments
+            in an optional-argument wrapper) keep their own. *)
   }
 
 let none =
