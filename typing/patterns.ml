@@ -46,6 +46,20 @@ module Non_empty_row = struct
   let map_first f (p, patl) = (f p, patl)
 end
 
+module Slice = struct
+  type shape =
+    | Closed of int
+
+  let shape = function
+    | Tslice_closed ps -> Closed (List.length ps)
+    | Tslice_open _ ->
+        Misc.fatal_error "Patterns.Slice.shape: slice pattern with a rest"
+
+  let arity (Closed n) = n
+
+  let of_patterns (Closed _) ps = Tslice_closed ps
+end
+
 (* "views" on patterns are polymorphic variants
    that allow to restrict the set of pattern constructors
    statically allowed at a particular place *)
@@ -70,6 +84,7 @@ module Simple = struct
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
+    | `Slice of mutability * Jkind.sort * slice_pattern
     | `Lazy of pattern
   ]
 
@@ -146,6 +161,8 @@ module General = struct
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
     | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
+    | Tpat_slice { mutability; sort; elements } ->
+       `Slice (mutability, sort, elements)
     | Tpat_deref { pattern = p; id; name = str; uid; sort; mode;
                    type_expr = ty } ->
        `Deref (p, id, str, uid, sort, mode, ty)
@@ -180,6 +197,8 @@ module General = struct
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
     | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
+    | `Slice (mutability, sort, elements) ->
+       Tpat_slice { mutability; sort; elements }
     | `Deref (p, id, str, uid, sort, mode, ty) ->
        Tpat_deref { pattern = p; id; name = str; uid; sort; mode;
                     type_expr = ty }
@@ -220,6 +239,8 @@ module Head : sig
           type_row : unit -> row_desc; }
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort;
+                 shape : Slice.shape }
     | Lazy
 
   type t = desc pattern_data
@@ -256,6 +277,8 @@ end = struct
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort;
+                 shape : Slice.shape }
     | Lazy
 
   type t = desc pattern_data
@@ -300,6 +323,9 @@ end = struct
           Record_unboxed_product (lbls, repr), pats
       | `Addr (mut, arg_sort, p) ->
           Addr (mut, arg_sort), [p]
+      | `Slice (mutability, sort, elements) ->
+          Slice { mutability; sort; shape = Slice.shape elements },
+          slice_element_patterns elements
       | `Lazy p ->
           Lazy, [p]
     in
@@ -320,6 +346,7 @@ end = struct
       | Record_unboxed_product (l, _) -> List.length l
       | Variant { has_arg; _ } -> if has_arg then 1 else 0
       | Addr _ -> 1
+      | Slice { shape; _ } -> Slice.arity shape
       | Lazy -> 1
 
   let to_omega_pattern t =
@@ -328,6 +355,9 @@ end = struct
       match t.pat_desc with
       | Any -> Tpat_any
       | Addr (mut, arg_sort) -> Tpat_addr (mut, arg_sort, omega)
+      | Slice { mutability; sort; shape } ->
+          let elements = Slice.of_patterns shape (omegas (Slice.arity shape)) in
+          Tpat_slice { mutability; sort; elements }
       | Lazy -> Tpat_lazy omega
       | Constant c -> Tpat_constant c
       | Unboxed_unit -> Tpat_unboxed_unit

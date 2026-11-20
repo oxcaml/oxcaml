@@ -37,6 +37,24 @@ module Non_empty_row : sig
   val map_first : ('a -> 'b) -> 'a t -> 'b t
 end
 
+(** Slice patterns match slices of an exact length ([[&| p1; ...; pn |]]).
+    Slice patterns with a rest are not supported yet. *)
+module Slice : sig
+  (** The lengths a slice pattern matches *)
+  type shape =
+    | Closed of int  (** exactly this length *)
+
+  val shape : slice_pattern -> shape
+
+  (** The number of element patterns of this shape *)
+  val arity : shape -> int
+
+  (** [of_patterns shape ps]: the slice pattern of this shape with the element
+      patterns [ps], in order, without a variable bound by its rest. Inverse
+      of [slice_element_patterns]. *)
+  val of_patterns : shape -> pattern list -> slice_pattern
+end
+
 module Simple : sig
   type view = [
     | `Any
@@ -57,6 +75,7 @@ module Simple : sig
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
+    | `Slice of mutability * Jkind.sort * slice_pattern
     | `Lazy of pattern
   ]
   type pattern = view pattern_data
@@ -128,6 +147,8 @@ module Head : sig
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort;
+                 shape : Slice.shape }
     | Lazy
 
   type t = desc pattern_data
