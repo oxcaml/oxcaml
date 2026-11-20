@@ -34,6 +34,16 @@ type initialisation =
     aliases : To_jsir_result.var_binding list
   }
 
+(* With [-g], closures are named after their functions. The Lambda to Flambda
+   pass gives anonymous functions the name ["fn"], possibly followed by their
+   location in square brackets, which we omit. *)
+let name_closure slot fn_var =
+  if Flambda_features.debug () && Jsir.Var.generated_name fn_var
+  then
+    let name = Function_slot.name slot in
+    if not (String.equal name "fn" || String.starts_with ~prefix:"fn[" name)
+    then Jsir.Var.set_name fn_var name
+
 let prepare ~env ~res ~bindings ~add_to_env soc =
   let fun_decls = Set_of_closures.function_decls soc in
   let decls =
@@ -78,6 +88,7 @@ let prepare ~env ~res ~bindings ~add_to_env soc =
                 : To_jsir_env.code_id) =
             To_jsir_env.get_code_id_exn env code_id
           in
+          name_closure slot fn_var;
           let closures =
             if closure_bound_with_code
             then closures (* The code definition will later bind its closure. *)

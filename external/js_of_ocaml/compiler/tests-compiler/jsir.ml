@@ -80,6 +80,7 @@ let jsir_file ?(target = Code.Js) ~name ~imports body : Code.jsir_file =
       Code.Marshalable_program.of_program
         { start = 0; blocks = Code.Addr.Map.singleton 0 block; free_pc = 1 }
   ; last_var
+  ; var_names = []
   ; imported_compilation_units = imports
   ; exported_compilation_unit = name
   ; force_link = false

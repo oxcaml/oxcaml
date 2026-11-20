@@ -229,6 +229,7 @@ end
 
 val set_target : Target.t -> unit
 val target_is_native : unit -> bool
+val target_is_bytecode : unit -> bool
 
 (** Whether the target is one of the JSIR targets. *)
 val target_is_jsir : unit -> bool
@@ -280,6 +281,7 @@ end
     then hold JSIR (see [Jscomp]). *)
 val link_jsir : bool ref
 
+val jsir_inlined_frames : bool ref
 val set_jsoo_effects : Jsoo_effects.t -> unit
 val jsoo_effects : unit -> Jsoo_effects.t option
 

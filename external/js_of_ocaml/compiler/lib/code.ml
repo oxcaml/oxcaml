@@ -566,6 +566,20 @@ module Linkage_name = struct
   module Hashtbl = String.Hashtbl
 end
 
+module Variable_name = struct
+  type t =
+    { name : string
+    ; generated : bool
+    }
+
+  let of_var var =
+    match Var.get_name var with
+    | None -> None
+    | Some name -> Some { name; generated = Var.generated_name var }
+
+  let set var { name; generated } = Var.set_name var ~generated name
+end
+
 type jsir_file =
   { target : jsir_target
   ; program : Marshalable_program.t
@@ -573,6 +587,8 @@ type jsir_file =
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so the OxCaml JSIR backend must communicate it to
             [js_of_ocaml] to keep the two in sync. *)
+  ; var_names : (Var.t * Variable_name.t) list
+        (** The names of the variables of [program]. *)
   ; imported_compilation_units : string list
         (** Full paths of the compilation units that must be linked and
             initialised before [program]. *)
