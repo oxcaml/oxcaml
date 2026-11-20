@@ -44,7 +44,8 @@ type is_cheap_operation_result =
 
 module type S = sig
   (** The following methods can be overridden to handle processor-specific
-      operations. *)
+      operations. The generic pass also accounts for GC-sensitive argument and
+      result machtypes. *)
   val class_of_operation : Operation.t -> class_of_operation_result
 
   (** Operations that are so cheap that it isn't worth factoring them. *)
