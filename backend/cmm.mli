@@ -437,9 +437,10 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : symbol list option;
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
+        callsite_counter : Fdo_counter.t option
       }
   | Cextcall of
       { func : string;
@@ -633,6 +634,7 @@ type fundecl =
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
+    fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
     fun_ret_type : machtype
   }
 
