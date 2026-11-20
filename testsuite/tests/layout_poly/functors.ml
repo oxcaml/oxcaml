@@ -541,7 +541,8 @@ let k6 =
   let module R = K (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
+>> Fatal error: slambda eval: Expected value at line 3, characters 32-36
+to not be missing because it's a kind template being instantiated
 Uncaught exception: Misc.Fatal_error
 
 |}]

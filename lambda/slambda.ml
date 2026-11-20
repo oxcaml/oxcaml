@@ -30,6 +30,8 @@
 open Lambda
 module Fmt = Format_doc
 
+let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
+
 type error =
   | Block_index_gap_overflow_possible
   | No_static_data of Compilation_unit.t
@@ -360,9 +362,7 @@ end = struct
   let find_layout t var =
     match Layout_ident.Map.find_opt var t.sort_vars with
     | Some layout -> layout
-    | None ->
-      Misc.fatal_errorf "Slambda: no layout bound for sort variable %a"
-        Layout_ident.print var
+    | None -> errf "no layout bound for sort variable %a" Layout_ident.print var
 
   let restrict t ~idents ~sort_vars =
     let idents =
@@ -370,9 +370,7 @@ end = struct
         (fun id restricted ->
           match Ident.Map.find_opt id t.idents with
           | Some entry -> Ident.Map.add id entry restricted
-          | None ->
-            Misc.fatal_errorf "Slambda: no layout bound for variable %a"
-              Ident.print id)
+          | None -> errf "no layout bound for variable %a" Ident.print id)
         idents Ident.Map.empty
     in
     let sort_vars =
@@ -381,8 +379,7 @@ end = struct
           match Layout_ident.Map.find_opt var t.sort_vars with
           | Some layout -> Layout_ident.Map.add var layout restricted
           | None ->
-            Misc.fatal_errorf "Slambda: no layout bound for sort variable %a"
-              Layout_ident.print var)
+            errf "no layout bound for sort variable %a" Layout_ident.print var)
         sort_vars Layout_ident.Map.empty
     in
     { idents; sort_vars }
@@ -674,8 +671,6 @@ end
 
 include Types
 
-let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
-
 type _ value_type =
   | Tlayout : layout value_type
   | Trecord : record value_type
@@ -707,8 +702,13 @@ let expect (type a) (vty : a value_type) (v : value) : a =
     let (TP actual_vty) = typeof v in
     expect_err ~expected:vty ~actual:actual_vty
 
-let expect_not_missing (a : 'a Or_missing.t) : 'a =
-  match a with Present a -> a | Missing -> errf "unexpected missing value"
+let expect_not_missing ~loc ~reason (a : 'a Or_missing.t) : 'a =
+  let loc = Debuginfo.Scoped_location.to_location loc in
+  match a with
+  | Present a -> a
+  | Missing ->
+    errf "Expected value at %a@.to not be missing because %s"
+      Location.print_loc_in_lowercase loc reason
 
 let rec eval_structured_const env old_const =
   match old_const with
@@ -1228,15 +1228,21 @@ let rec eval_lam ?name ctx env old_lambda : halves =
           Or_missing.Present (Vlayout (eval_layout env old_layout_arg)))
         old_args
     in
-    let new_func = eval_lam ctx env old_func in
-    let instantiated =
-      instantiate ctx ~loc:kinst_loc new_func.slv_comptime new_args
+    let { slv_comptime = func_c; slv_runtime = new_func } =
+      eval_lam ctx env old_func
     in
+    let closure =
+      func_c
+      |> expect_not_missing ~loc:kinst_loc
+           ~reason:"it's a kind template being instantiated"
+      |> expect Tclosure
+    in
+    let instantiated = instantiate ctx ~loc:kinst_loc closure new_args in
     { slv_comptime = instantiated.slv_comptime;
       slv_runtime =
         Lapply
           { ap_func = instantiated.slv_runtime;
-            ap_args = [new_func.slv_runtime];
+            ap_args = [new_func];
             ap_result_layout = eval_layout env old_layout;
             ap_region_close = Rc_normal;
             ap_mode = kinst_mode;
@@ -1252,6 +1258,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
       ({ ap_func = old_func;
          ap_args = old_args;
          ap_result_layout = old_layout;
+         ap_loc;
          _
        } as old_apply) ->
     (* instantiate func arg1 ... argn ~>
@@ -1265,7 +1272,13 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     let { slv_comptime = func_c; slv_runtime = new_func } =
       eval_lam ctx env old_func
     in
-    let instantiated = instantiate ctx ~loc:old_apply.ap_loc func_c args_c in
+    let closure =
+      func_c
+      |> expect_not_missing ~loc:ap_loc
+           ~reason:"it's a template being instantiated"
+      |> expect Tclosure
+    in
+    let instantiated = instantiate ctx ~loc:old_apply.ap_loc closure args_c in
     { slv_comptime = instantiated.slv_comptime;
       slv_runtime =
         Lapply
@@ -1663,8 +1676,7 @@ and eval_template ?name ctx env template =
           func.loc )
   }
 
-and instantiate ctx ~loc func args =
-  let closure = func |> expect_not_missing |> expect Tclosure in
+and instantiate ctx ~loc closure args =
   Ctx.instantiate ctx ~loc closure args ~eval_apply:(eval_apply ctx)
 
 (** Evaluate the compile-time application of a closure to its arguments.
@@ -1748,7 +1760,12 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       try
         List.fold_left2
           (fun env var arg ->
-            let layout = arg |> expect_not_missing |> expect Tlayout in
+            let layout =
+              arg
+              |> expect_not_missing ~loc:old_func.loc
+                   ~reason:"it's the layout argument to a kind template"
+              |> expect Tlayout
+            in
             (try assert_layout_contains_no_splices layout
              with Found_a_splice ->
                Misc.fatal_errorf
