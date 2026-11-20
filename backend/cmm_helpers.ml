@@ -3615,8 +3615,6 @@ module SArgBlocks = struct
       dbg,
       Branch_annotations.fork_point [ifso_a; ifnot_a] )
 
-  (* The FDO counters of the actions of a collapsed switch have no edges of
-     their own, so they move to the edge into the switch. *)
   let make_switch dbg (_ : layout) arg cases actions =
     let annots =
       Array.map (fun (_, _, annots) -> annots) actions |> Array.to_list
@@ -3707,8 +3705,6 @@ let transl_switch_clambda loc arg index cases =
             (0, n_index - 1)
             a (Array.of_list inters) store)
   in
-  (* The counters that end up on the edge into the switch are those of the cases
-     that no edge of the result has. *)
   Fdo_dropped_counters.register ~reason:Cmm_switch_collapsed
     (Branch_annotations.fdo_annotation annots);
   case
