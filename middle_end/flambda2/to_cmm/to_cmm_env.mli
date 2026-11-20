@@ -105,6 +105,7 @@ val create :
   return_continuation:Continuation.t ->
   return_continuation_arity:Cmm.machtype list ->
   exn_continuation:Continuation.t ->
+  params:Bound_parameters.t ->
   t
 
 (** Given an existing environment providing the "global" information (such as
@@ -115,6 +116,7 @@ val enter_function_body :
   return_continuation:Continuation.t ->
   return_continuation_arity:Cmm.machtype list ->
   exn_continuation:Continuation.t ->
+  params:Bound_parameters.t ->
   t
 
 (** {2 Debuginfo} *)
@@ -396,3 +398,5 @@ val get_cmm_continuation : t -> Continuation.t -> Lambda.static_label
 (** print function *)
 val print_param_type :
   (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a param_type -> unit
+
+val argument_index_by_name : t -> Variable.t -> int option

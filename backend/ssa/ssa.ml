@@ -96,7 +96,7 @@ type op = Operation.t
 
 type call_op =
   | Direct of Cmm.symbol
-  | Indirect of Cmm.symbol list option
+  | Indirect of Cmm.callee list option
   | External of Cfg_intf.S.external_call_operation
   | Probe of
       { name : string;
