@@ -1,11 +1,10 @@
 (* TEST
  readonly_files = "main.c";
  arguments = "-DFLOAT_CATCH -DFUN=catch_float main.c";
- flags = "-dcmm-no-check-machtypes";
  asmgen;
 *)
 
-(function "catch_float" (b:int)
+(function "catch_float" (b:int) : float
   (+f 10.0
   (catch
     (exit lbl 100.0)
