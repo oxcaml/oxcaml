@@ -702,8 +702,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
              yield. *)
           (* CR yusumez: [dbg] and the counter of [apply] are already in the
              current inlining context. Inlining the wrapper at one of its
-             applications adds the context of that application on top, which duplicates the inlined frames in the backtrace and counters.
-             *)
+             applications adds the context of that application on top, which
+             duplicates the inlined frames in the backtrace and counters. *)
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity

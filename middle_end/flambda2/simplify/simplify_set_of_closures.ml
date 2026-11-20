@@ -176,7 +176,8 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     |> DA.with_shareable_constants ~shareable_constants
     |> DA.with_slot_offsets ~slot_offsets
     |> DA.with_code_age_relation ~code_age_relation
-    |> fun outer_dacc ->
+  in
+  let outer_dacc =
     DA.add_all_dropped_fdo_counters outer_dacc
       (UA.fdo_dropped_counters uacc_after_upwards_traversal)
   in
