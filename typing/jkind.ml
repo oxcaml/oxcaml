@@ -3413,33 +3413,39 @@ let constrain_above_addressable env jkind =
   constrain_addressable_with ~constrain:Layout.constrain_above_addressable env
     jkind
 
-let apply_addressable_r env jkind =
-  let jkind =
-    { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
-    |> disallow_left
-  in
-  match jkind.jkind.base with
-  | Layout l -> (
-    (* In this case, we want to return a [jkind'] such that for any [k],
-       [k addressable < jkind] can be reduced to [k < jkind'].
+let apply_operator_r env (operator : Jkind_types.Kind_operator.t) jkind =
+  (match operator with
+    | Id -> Ok jkind
+    | Addressable -> (
+      let jkind =
+        { jkind with
+          jkind = Base_and_axes.fully_expand_aliases env jkind.jkind
+        }
+      in
+      match jkind.jkind.base with
+      | Layout l -> (
+        (* In this case, we want to return a [jkind'] such that for any [k],
+           [k addressable < jkind] can be reduced to [k < jkind'].
 
-       Our strategy is to first constrain [jkind] "above addressable", which
-       can be thought of as asserting ['fresh addressable < jkind]. Then, we
-       return [jkind] stripping addressability, which can be thought of as
-       returning ['fresh].
+           Our strategy is to first constrain [jkind] "above addressable", which
+           can be thought of as asserting ['fresh addressable < jkind]. Then, we
+           return [jkind] stripping addressability, which can be thought of as
+           returning ['fresh].
 
-       This meets our original requirement, as [k < 'fresh] implies
-       [k addressable < 'fresh addressable < jkind].
+           This meets our original requirement, as [k < 'fresh] implies
+           [k addressable < 'fresh addressable < jkind].
 
-       However, stripping addressability is incomplete, in the same way that
-       [Sort.Const.equate] is for addressability. This should be fixed when
-       variables can carry proper addressability constraints. *)
-    match Layout.constrain_above_addressable ~allow_mutation:true l with
-    | Ok () -> Ok (set_layout jkind (Layout.strip_head_addressable l))
-    | Error _ -> Error ())
-  | Kconstr (p, sa, Addressable) ->
-    Ok { jkind with jkind = { jkind.jkind with base = Kconstr (p, sa, Id) } }
-  | Kconstr (_, _, Id) -> Error ()
+           However, stripping addressability is incomplete, in the same way that
+           [Sort.Const.equate] is for addressability. This should be fixed when
+           variables can carry proper addressability constraints. *)
+        match Layout.constrain_above_addressable ~allow_mutation:true l with
+        | Ok () -> Ok (set_layout jkind (Layout.strip_head_addressable l))
+        | Error _ -> Error ())
+      | Kconstr (p, sa, Addressable) ->
+        Ok
+          { jkind with jkind = { jkind.jkind with base = Kconstr (p, sa, Id) } }
+      | Kconstr (_, _, Id) -> Error ()))
+  |> Result.map disallow_left
 
 let is_surely_addressable env jkind =
   match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
@@ -4657,7 +4663,7 @@ module Unboxed_field_transformation = struct
      contention and the transformation says it doesn't, we fail.
 
      The right adjoint of [addressable] can only be applied incompletely (see
-     [apply_addressable_r]), so the operator is returned for the caller to
+     [apply_operator_r]), so the operator is returned for the caller to
      handle. *)
   let apply_r_except_op t jk =
     let satisfiable =

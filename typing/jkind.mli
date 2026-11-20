@@ -825,13 +825,16 @@ val constrain_below_addressable :
 val constrain_above_addressable :
   Env.t -> ('l * allowed) Types.jkind -> (unit, unit) result
 
-(** Try to apply the right adjoint of [addressable]. I.e.:
+(** Try to apply the right adjoint of [apply_operator_l]. I.e.:
 
     Given some kind [k], try to produce some kind [k'] such that constraints
-    like [l addressable < k] can be reduced to [l < k'] (where the latter
-    implies the former). *)
-val apply_addressable_r :
-  Env.t -> ('l * allowed) Types.jkind -> (Types.jkind_r, unit) result
+    like [apply_operator_l op l < k] can be reduced to [l < k'] (where the
+    latter implies the former). *)
+val apply_operator_r :
+  Env.t ->
+  Jkind_types.Kind_operator.t ->
+  ('l * allowed) Types.jkind ->
+  (Types.jkind_r, unit) result
 
 (** Whether the kind is known to be addressable. *)
 val is_surely_addressable : Env.t -> 'd Types.jkind -> bool

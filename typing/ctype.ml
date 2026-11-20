@@ -3624,23 +3624,19 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
         *)
         let open Misc.Stdlib.Monad.Result.Syntax in
         let operator : Jkind_types.Kind_operator.t =
-          (* Improve precision in this case, as [apply_addressable_r] is
+          (* Improve precision in this case, as [apply_operator_r] is
              incomplete *)
           match (operator : Jkind_types.Kind_operator.t) with
           | Addressable when Jkind.is_surely_addressable env var_jkind -> Id
           | _ -> operator
         in
         let* jkind =
-          match operator with
-          | Id -> Ok jkind
-          | Addressable ->
-            match Jkind.apply_addressable_r env jkind with
-            | Ok jkind -> Ok jkind
-            | Error () ->
-              Error (Jkind.Violation.of_ ~context env
-                       (Not_a_subjkind
-                          (Jkind.apply_operator_l operator var_jkind, jkind,
-                           [Layout_disagreement Incompatible])))
+          Jkind.apply_operator_r env operator jkind
+          |> Result.map_error (fun () ->
+            Jkind.Violation.of_ ~context env
+              (Not_a_subjkind
+                 (Jkind.apply_operator_l operator var_jkind, jkind,
+                  [Layout_disagreement Incompatible])))
         in
         let* ty's_new_jkind =
           Jkind.intersection_or_error ~type_equal ~context
