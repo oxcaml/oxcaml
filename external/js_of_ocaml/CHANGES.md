@@ -104,7 +104,7 @@
   targeting JavaScript (#2441)
 * Compiler: with `--effects=double-translation`, only generate a CPS version
   of the functions that may run below an effect handler (#2441)
-* Runtime: round doubles to float16 only once (#2634)
+* Runtime: faster conversion of float16 values to doubles (#2634)
 
 ## Bug fixes
 * Runtime: round doubles to float16 only once (#2634)
