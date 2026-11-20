@@ -34,7 +34,7 @@ end = struct
     | Const_base (Const_int32 i) -> Int32 i
     | Const_base (Const_int64 i) -> Int64 i
     | Const_base (Const_nativeint i) ->
-        NativeInt (Int32.of_nativeint_warning_on_overflow i)
+        NativeInt (Targetnativeint.of_nativeint_warning_on_overflow i)
     | Const_immstring s -> String s
     | Const_float_array sl ->
         let l = List.map ~f:(fun f -> Int64.bits_of_float (float_of_string f)) sl in
@@ -435,6 +435,7 @@ module Hint = struct
       Optimization_hint.ccall option =
     match h with
     | Hint_unsafe -> Some Hint_unsafe
+    | Hint_immediate_result -> Some Hint_immediate_result
     | Hint_int kind ->
         Some
           (Hint_int
@@ -537,6 +538,8 @@ module Hint = struct
     | Hint_physical_comparison ->
         (* No corresponding optimization in js_of_ocaml yet; ignore the hint. *)
         None
+    | Hint_immediate -> Some Hint_immediate
+    | Hint_variant -> Some Hint_variant
 end
 [@@if ocaml_version >= (5, 6, 0)]
 

@@ -152,7 +152,8 @@ let unit ~env ~res =
 let is_runtime_call (prim : Jsir.prim) =
   match prim with
   | Extern (name, _) -> not (String.starts_with ~prefix:"%" name)
-  | Vectlength _ | Array_get | Not | IsInt | Eq | Neq | Lt | Le | Ult -> false
+  | Vectlength _ | Array_get _ | Not | IsInt _ | Eq | Neq | Lt | Le | Ult ->
+    false
 
 let use_prim0 ~env ~res prim args =
   let expr : Jsir.expr = Prim (prim, args) in
@@ -394,7 +395,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Duplicate_block _ | Duplicate_array _ | Obj_dup _ ->
     use_prim' (Extern ("caml_obj_dup", None))
-  | Is_int _ -> use_prim' IsInt
+  | Is_int _ -> use_prim' (IsInt { variant_only = false })
   | Is_null ->
     let x, res = prim_arg ~env ~res x in
     use_prim ~env ~res Eq [x; Pc Null_]
@@ -665,7 +666,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
         | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks ) ) ->
-      use_prim' Array_get)
+      use_prim' (Array_get Non_float))
   | String_or_bigstring_load (value, width) -> (
     (* Flambda inserts the bounds checks itself, so these loads can always use
        the unchecked primitives. *)

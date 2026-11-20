@@ -179,9 +179,9 @@ let f
          with index-based accesses ([caml_register_global_by_index]) and skip
          emitting [caml_set_link_info] entirely. *)
     } =
-  Config.set_target `JavaScript;
   Jsoo_cmdline.Arg.eval common;
   Dune_manifests_reader.set manifests;
+  Config.set_target `JavaScript;
   Linker.reset ();
   let with_output f =
     match output_file with

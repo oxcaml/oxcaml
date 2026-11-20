@@ -146,7 +146,8 @@ let registers_symbol ~register_globals (instr : Jsir.instr) =
   | Let
       ( _,
         ( Prim
-            ( (Vectlength _ | Array_get | Not | IsInt | Eq | Neq | Lt | Le | Ult),
+            ( ( Vectlength _ | Array_get _ | Not | IsInt _ | Eq | Neq | Lt | Le
+              | Ult ),
               _ )
         | Apply _ | Block _ | Field _ | Closure _ | Constant _ | Special _ ) )
   | Assign _ | Set_field _ | Offset_ref _ | Array_set _ | Event _ ->

@@ -112,8 +112,11 @@ test 21 equal_nat (
 nat_of_string s,
 (let nat = make_nat 15 in
   set_digit_nat nat 0 3;
+  (* Use the actual length (14 with 32-bit digits, less with 64-bit
+     digits) rather than reading past the end of the nat *)
+  let n = nat_of_string (String.sub s 0 135) in
   set_mult_digit_nat nat 0 15
-                 (nat_of_string (String.sub s 0 135)) 0 14
+                 n 0 (length_nat n)
                  (nat_of_int 10) 0;
   nat))
 ;;
@@ -157,6 +160,18 @@ set_digit_nat nat2 0 1;
 set_digit_nat nat2 1 5;
 test 3 eq_int (compare_nat nat1 0 2 nat2 0 1, 1) &&
 test 4 eq_int (compare_nat nat2 0 1 nat1 0 2, -1);;
+
+testing_function "compare_digits_nat";;
+
+(* Digits are unsigned: with 32-bit digits, 2^31 and 2^32-1 are single
+   digits with the high bit set *)
+let n1 = nat_of_int 1 in
+let n2 = nat_of_string "2147483648" in
+let n3 = nat_of_string "4294967295" in
+test 1 eq_int (compare_digits_nat n2 0 n1 0, 1) &&
+test 2 eq_int (compare_digits_nat n1 0 n2 0, -1) &&
+test 3 eq_int (compare_digits_nat n3 0 n1 0, 1) &&
+test 4 eq_int (compare_digits_nat n3 0 n3 0, 0);;
 
 testing_function "sqrt_nat";;
 
