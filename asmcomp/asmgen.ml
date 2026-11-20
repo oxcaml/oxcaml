@@ -372,8 +372,8 @@ let register_allocator_irc cfg_with_infos =
   cfg_with_infos_profile ~accumulate:true "cfg_irc"
     (fun cfg_with_infos ->
       match Regalloc_irc.run cfg_with_infos with
-      | Some res -> res
-      | None -> Regalloc_ls.run cfg_with_infos)
+      | Ok result -> result
+      | Error prepared -> Regalloc_ls.run_after_prelude prepared)
     cfg_with_infos
 
 let register_allocator_ls cfg_with_infos =
