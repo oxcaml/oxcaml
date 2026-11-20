@@ -174,6 +174,55 @@ mutual
     body : Expr
 end
 
+def Expr.substitute (replacement : Value) (deBruijn : Nat := 0) : Expr → Expr
+  | .apply func arg =>
+    .apply
+      (func.substitute replacement deBruijn)
+      (arg.substitute replacement deBruijn)
+  | .block tag fields =>
+    .block tag (fields.map (·.substitute replacement deBruijn))
+  | .compilationUnit index => .compilationUnit index
+  | .field indexInto index =>
+    .field (indexInto.substitute replacement deBruijn) index
+  | .function body => .function (body.substitute replacement deBruijn.succ)
+  | .letBinding bound body =>
+    .letBinding
+      (bound.substitute replacement deBruijn)
+      (body.substitute replacement deBruijn.succ)
+  | .physicalEquality lhs rhs =>
+    .physicalEquality
+      (lhs.substitute replacement deBruijn)
+      (rhs.substitute replacement deBruijn)
+  | .scalarOperation (.binary operation lhs rhs) =>
+    .scalarOperation
+      (.binary operation
+        (lhs.substitute replacement deBruijn)
+        (rhs.substitute replacement deBruijn))
+  | .switch scrutinee nImmediates nBlocks immediates blocks failAction =>
+    .switch
+      (scrutinee.substitute replacement deBruijn)
+      nImmediates
+      nBlocks
+      (immediates.attach.map fun ⟨{ immediate, body }, _⟩ =>
+        { immediate, body := body.substitute replacement deBruijn })
+      (blocks.attach.map fun ⟨{ tag, body }, _⟩ =>
+        { tag, body := body.substitute replacement deBruijn })
+      (failAction.attach.map fun ⟨failAction, _⟩ =>
+        failAction.substitute replacement deBruijn)
+  | .val value => .val value
+  | .var index =>
+    if index < deBruijn then .var index else
+    if index = deBruijn then .val replacement else
+    .var (index - 1)
+termination_by expr => expr
+decreasing_by
+  all_goals first
+    | decreasing_tactic
+    | (rename_i member
+       have := List.sizeOf_lt_of_mem member
+       simp_all
+       omega)
+
 attribute [pp_nodot]
   -- ValType
   ValType.arrow ValType.constr ValType.firstClassModule ValType.poly ValType.var

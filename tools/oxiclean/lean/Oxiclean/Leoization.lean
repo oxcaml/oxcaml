@@ -78,10 +78,10 @@ namespace PER
       (codomain : PER Value)
       : Value → Value → Prop where
     | closure {f g : Expr}
-        (extensionality :
+        (extensional :
           (extensionality domain codomain).eq
-            (@Reduce Step S (f.substitute ·) ·)
-            (@Reduce Step S (g.substitute ·) ·))
+            (fun input output => @Reduce Step S (f.substitute input) output)
+            (fun input output => @Reduce Step S (g.substitute input) output))
         : Closure domain codomain
             (.indirection
               (.noMutableFields { tag := 247, contents := .closure f }))
@@ -93,8 +93,12 @@ namespace PER
       (codomain : PER Value)
       : PER Value where
     eq := @Closure Step S domain codomain
-    symmetric := sorry
-    transitive := sorry
+    symmetric
+      | .closure extensional =>
+        .closure ((extensionality domain codomain).symmetric extensional)
+    transitive
+      | .closure ab, .closure bc =>
+        .closure ((extensionality domain codomain).transitive ab bc)
 
   inductive EmptyList {α} : List α → List α → Prop where
     | emptyList : EmptyList [] []
@@ -239,6 +243,7 @@ def Oxiclean.Model.ModuleType.validWrtExtraction
 
 mutual
   def Oxiclean.Model.ModuleType.structuralRelationInScope
+      {Step} [S : StepRelation Step]
       (context : List (ModuleType (PER Value)))
       (userSuppliedRefinedSignature : ModuleType (PER Value))
       : PER Value :=
@@ -247,28 +252,31 @@ mutual
       present.foldr
         (fun item : ModuleItemPresentAtRuntime (PER Value) =>
           PER.cons
-            (item.structuralRelationInScope
+            (@item.structuralRelationInScope Step S
               (userSuppliedRefinedSignature :: context)))
         PER.emptyList
       |> PER.moduleRuntimeBlock
     | _ => sorry
 
   def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope
+      {Step} [S : StepRelation Step]
       (context : List (ModuleType (PER Value)))
       : ModuleItemPresentAtRuntime (PER Value) → PER Value
-    | .mod m => m.structuralRelationInScope context
-    | .val v => v.structuralRelationInScope context
+    | .mod m => @m.structuralRelationInScope Step S context
+    | .val v => @v.structuralRelationInScope Step S context
 
   def Oxiclean.Model.ValType.structuralRelationInScope
+      {Step} [S : StepRelation Step]
       (context : List (ModuleType (PER Value)))
       : ValType (PER Value) → PER Value
     | .arrow domain codomain =>
-      PER.closure
-        (domain.structuralRelationInScope context)
-        (codomain.structuralRelationInScope context)
+      @PER.closure Step S
+        (@domain.structuralRelationInScope Step S context)
+        (@codomain.structuralRelationInScope Step S context)
     | _ => sorry
 end
 
 def Oxiclean.Model.ModuleType.structuralRelation
+      {Step} [S : StepRelation Step]
     : ModuleType (PER Value) → PER Value :=
-  (·.structuralRelationInScope [])
+  (@·.structuralRelationInScope Step S [])
