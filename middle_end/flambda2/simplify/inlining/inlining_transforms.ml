@@ -146,10 +146,11 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
     in
-    (* No instruction is left to count the entries of the inlined function, in
-       the context of the inlining (that of [denv]). Without a counter the call
-       gives the body no inlining context: the entry counters would be those of
-       the function itself. *)
+    (* After inlining, no instruction remains to count entries to the callee in
+       this inlining context ([denv]), so record its entry counters as dropped.
+       Skip calls with no [callsite_counter]: without one, [denv] adds no
+       inlining frame, so we would wrongly mark the callee's own entry counter
+       as dropped. *)
     let dacc =
       match Apply.callsite_counter apply with
       | None -> dacc

@@ -177,12 +177,10 @@ val merge : t -> from_apply_expr:t -> t
     the same functions. *)
 val rewrite : t -> Debuginfo.t -> Debuginfo.t
 
-(** For an FDO counter from the body of a function inlined by [t]: the call
-    sites of the inlinings become its inlining context (see
-    [Fdo_counter.inline]). *)
+(** Appends the call sites in [t] to the inlining stack of an FDO counter from
+    an inlined function body (see [Fdo_counter.inline]). *)
 val inline_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t
 
-(** For an FDO counter from a function defined in the body of a function inlined
-    by [t], which is a copy of the original definition (see
-    [Fdo_counter.specialize]). *)
+(** Specializes an FDO counter from a function copied by the inlinings in [t]
+    (see [Fdo_counter.specialize]). *)
 val specialize_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t

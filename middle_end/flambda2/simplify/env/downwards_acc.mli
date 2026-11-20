@@ -44,9 +44,9 @@ val with_flow_acc : Flow.Acc.t -> t -> t
 (** Map the dataflow analysis accumulator of the given dacc. *)
 val map_flow_acc : t -> f:(Flow.Acc.t -> Flow.Acc.t) -> t
 
-(** The FDO counters dropped so far (see [Fdo_dropped_counters]). They are kept
-    here rather than registered directly, so that those of a traversal whose
-    result is discarded (e.g. speculative inlining) are discarded with it. *)
+(** FDO counters dropped so far (see [Fdo_dropped_counters]). Stored here rather
+    than registered globally so that counters from discarded traversals (e.g.
+    speculative inlining) are discarded too. *)
 val fdo_dropped_counters : t -> Fdo_dropped_counters.t
 
 (** The counters must already be in the current inlining context. *)

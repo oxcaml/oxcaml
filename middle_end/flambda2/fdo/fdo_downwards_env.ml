@@ -28,24 +28,46 @@
 
 type t =
   { copy_context : Inlined_debuginfo.t;
-        (** The inlinings that made a copy of the function being simplified (see
-            [Fdo_counter.specialize]). Separate from [Downward_env]'s own
-            [inlined_debuginfo] because a copy isn't inlined anywhere (so
-            shouldn't contain any inlining frames), while the counters are
-            renamed. None in an inlined body: the call site's counter carries
-            its copy context. *)
-    copied_code : Inlined_debuginfo.t Code_id.Map.t;
-        (** The copy context of the code bound under the new code ids of the
-            sets of closures being simplified, whose counters are still the
-            original's. *)
-    stub_callsite_counter : Fdo_counter.t option
-        (** In the body of an inlined stub, the counter of the call it was
-            inlined at. *)
+        (** The inlinings that led to the current code being specialized (copied
+            wholesale after the function it's defined in got inlined). Its
+            counters are specialized with the call sites of these inlinings as
+            Simplify meets them ([specialize_fdo_counter]), so that they are not
+            conflated with the original's or other copies'.
+
+            This is separate from [Downwards_env]'s [inlined_debuginfo] because
+            the copy is not itself inlined, so its debuginfo gets no inlining
+            frames.
+
+            [none] outside copies, and where the counters in the current body
+            are already specialized (if needed): e.g. an inlined body gets the
+            copy context of the call through the call site's counter instead
+            (see [Fdo_counter.inline]). See [unspecialized_copies] for an
+            exception. *)
+    unspecialized_copies : Inlined_debuginfo.t Code_id.Map.t;
+        (** The copy contexts of the functions of the sets of closures being
+            simplified, by their new code ids.
+
+            While a set of closures is simplified, its functions' new code ids
+            are bound to the original code
+            ([bind_existing_code_to_new_code_ids]), whose counters have not been
+            specialized yet. If that code is inlined in the meantime (e.g. an
+            [@inlined] call to a function of the same set that only becomes
+            direct in the copy), its counters need the copy context of the set,
+            not [none] as for other inlined bodies. *)
+        stub_callsite_counter : Fdo_counter.t option
+        (** When inlining a stub, the callsite counter of the call to the stub.
+
+            A stub's forwarding call to the underlying function is
+            compiler-generated and has no counter of its own. Storing the
+            stub's callsite counter here lets that call inherit it, so the
+            user's callsite counter isn't lost when the stub is inlined away.
+            Calls inside the stub that already have a counter (e.g. default
+            arguments in an optional-argument wrapper) keep their own. *)
   }
 
 let none =
   { copy_context = Inlined_debuginfo.none;
-    copied_code = Code_id.Map.empty;
+    unspecialized_copies = Code_id.Map.empty;
     stub_callsite_counter = None
   }
 
@@ -80,12 +102,12 @@ let enter_inlined_apply t ~called_code ~callsite_counter =
     && Flambda_features.check_invariants ()
   then check_stub_calls called_code;
   { t with
-    (* The call site's counter carries the copy context of the function the call
-       is in, except for the code of a set being simplified: its counters are
-       still the original's. *)
+    (* The counters of [called_code] are already specialized (if needed), and
+       the call site's counter carries the copy context of the function the call
+       is in, except for an unspecialized copy (see [unspecialized_copies]). *)
     copy_context =
       Option.value
-        (Code_id.Map.find_opt (Code.code_id called_code) t.copied_code)
+        (Code_id.Map.find_opt (Code.code_id called_code) t.unspecialized_copies)
         ~default:Inlined_debuginfo.none;
     stub_callsite_counter = (if stub then callsite_counter else None)
   }
@@ -95,13 +117,14 @@ let clear_copy_context t =
 
 let stub_callsite_counter t = t.stub_callsite_counter
 
-let add_copied_code t code_id =
+let add_unspecialized_copy t code_id =
   if
     Flambda_features.fdo_counters ()
     && not (Inlined_debuginfo.is_none t.copy_context)
   then
     { t with
-      copied_code = Code_id.Map.add code_id t.copy_context t.copied_code
+      unspecialized_copies =
+        Code_id.Map.add code_id t.copy_context t.unspecialized_copies
     }
   else t
 

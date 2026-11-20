@@ -36,9 +36,8 @@ val none : t
 
 val enter_set_of_closures : t -> inlined_debuginfo:Inlined_debuginfo.t -> t
 
-(** For the body of an inlined function. The call site's counter already carries
-    the copy context of the function the call is in, unless [called_code] is the
-    code of a set being simplified (see [add_copied_code]). *)
+(** For the body of [called_code], inlined at the call with [callsite_counter].
+*)
 val enter_inlined_apply :
   t -> called_code:Code.t -> callsite_counter:Fdo_counter.t option -> t
 
@@ -46,20 +45,16 @@ val enter_inlined_apply :
     clears the stub callsite counter. *)
 val clear_copy_context : t -> t
 
-(** If we are in the body of an inlined stub, this returns the counter of the
-    call it was inlined at. The calls of the stub with no counter of their own
-    stand for that call (e.g. the call of an unboxed function wrapper to the
-    main function). Other calls keep their own counters (e.g. in the default
-    arguments of an optional argument wrapper, or the call of a partial
-    application wrapper, which has the counter of the partial application). *)
+(** When inside an inlined stub, returns the callsite counter of the call to
+    the stub, to be inherited by a compiler-generated call in the stub that has
+    no counter of its own. *)
 val stub_callsite_counter : t -> Fdo_counter.t option
 
-(** Record that the code bound under [code_id] (the new code id of a function of
-    the set of closures being simplified) is a copy made where [t] is, with the
-    original's counters. *)
-val add_copied_code : t -> Code_id.t -> t
+(** Record that [code_id], the new code id of a function of a set of closures
+    being simplified, is bound to the original code, so that its counters get
+    the current copy context if it is inlined. *)
+val add_unspecialized_copy : t -> Code_id.t -> t
 
-(** A counter of the code being simplified, renamed if that code is a copy (see
-    [Fdo_counter.specialize]) so that it is not conflated with the original's or
-    other copies'. *)
+(** A counter of the code being simplified, specialized if that code is a copy
+    (see [Fdo_counter.specialize]). *)
 val specialize_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t
