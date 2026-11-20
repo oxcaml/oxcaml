@@ -137,3 +137,23 @@ let () =
   set_idx r (.y) (-#4s);
   Printf.printf "record after idx writes: %d %s %d\n" (Int8_u.to_int r.x) r.s
     (Int8_u.to_int r.y)
+
+(* An offset that does not fit in 32 bits is out of bounds: it does not wrap
+   around to a byte of the base. *)
+
+let[@inline never] get_byte_at base offset =
+  Int8_u.to_int (get #(base, idx offset))
+
+let[@inline never] get_byte_at_large_constant base =
+  Int8_u.to_int (get #(base, idx #0x1_0000_0008L))
+
+let () =
+  let s = "abc" in
+  let print_byte f =
+    match f () with
+    | byte -> Printf.printf "byte: %d\n" byte
+    | exception Invalid_argument msg ->
+      Printf.printf "Invalid_argument %S\n" msg
+  in
+  print_byte (fun () -> get_byte_at s #0x1_0000_0008L);
+  print_byte (fun () -> get_byte_at_large_constant s)
