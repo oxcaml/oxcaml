@@ -1760,7 +1760,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
         | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
         | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lwhile _
         | Lfor _ | Lassign _ | Lsend _ | Levent _ | Lifused _ | Lregion _
-        | Lexclave _ | Lcode _ ->
+        | Lexclave _ ->
           (* The continuations created here (and for failactions) are local. The
              bodies of the let_conts will not modify mutable variables. Hence,
              it is safe to exclude them from passing along the extra arguments
@@ -1771,7 +1771,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
+        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _
+        | Lcode _ ->
           Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
@@ -1902,8 +1903,6 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
       switch_expr acc ccenv)
     k_exn
 
-(* CR pchambart: define a record `target_config` to hold things like
-   `big_endian` *)
 (* Slambda binds the code of every instantiation of a template at the top of the
    unit. *)
 let rec split_lcodes (lam : L.lambda) =
@@ -1913,6 +1912,8 @@ let rec split_lcodes (lam : L.lambda) =
     lcode :: lcodes, body
   | _ -> [], lam
 
+(* CR pchambart: define a record `target_config` to hold things like
+   `big_endian` *)
 let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
