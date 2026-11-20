@@ -44,20 +44,17 @@ namespace PER
 
   inductive RefinedImmediate (condition : BitVec 63 → Prop)
       : Value → Value → Prop where
-    | refinedImm
-        {lhs rhs : BitVec 63}
-        (lhsRefined : condition lhs)
-        (rhsRefined : condition rhs)
+    | refinedImm {bitsAboveLsb : BitVec 63} (refined : condition lhs)
         : RefinedImmediate condition
-            (.immediate { bitsAboveLsb := lhs })
-            (.immediate { bitsAboveLsb := rhs })
+            (.immediate { bitsAboveLsb })
+            (.immediate { bitsAboveLsb })
 
   def refinedImmediate (condition : BitVec 63 → Prop) : PER Value where
     eq := RefinedImmediate condition
     symmetric
-      | .refinedImm lhs rhs => .refinedImm rhs lhs
+      | .refinedImm r => .refinedImm r
     transitive ab bc := match ab, bc with
-      | .refinedImm a _, .refinedImm _ c => .refinedImm a c
+      | .refinedImm r, .refinedImm _ => .refinedImm r
 
   inductive ModuleRuntimeBlock (valuesRelation : PER (List Value))
       : Value → Value → Prop where
@@ -116,70 +113,45 @@ namespace Statics
   structure DefinedElsewhere : Type 0 where
     -- empty
 
-  structure ModuleEnd : Type 0 where
+  structure Nil : Type 0 where
     -- empty
 
-  structure ModuleItem (Item Tail : Type 0) : Type 0 where
-    item : Item
+  structure Cons (Head Tail : Type 0) : Type 0 where
+    head : Head
     tail : Tail
 
-  structure ModuleType : Type 0 where
+  structure AbstractModuleType : Type 0 where
     -- empty
+
+  structure ModuleType (Absent Present : Type 0) : Type 0 where
+    absent : Absent
+    present : Present
+
+  structure ModuleTypeDecl (Decl : Type 0) : Type 0 where
+    moduleTypeDecl : Decl
+
+  structure ModuleDecl (Decl : Type 0) : Type 0 where
+    moduleDecl : Decl
+
+  structure ValDecl (Decl : Type 0) : Type 0 where
+    valDecl : Decl
 
   structure TypeDeclaration (Decl : Type 0) : Type 0 where
     typeDeclaration : Decl
+
+  structure Arrow (Domain Codomain : Type 0) : Type 0 where
+    domain : Domain
+    codomain : Codomain
+
+  structure TypeConstr (Constr Args : Type 0) : Type 0 where
+    constr : Constr
+    args : Args
+
+  structure FirstClassModule (Signature : Type 0) : Type 0 where
+    signature : Signature
+
+  structure Poly (Body : Type 0) : Type 0 where
+    body : Body
 end Statics
 
 end Oxiclean.Leoization
-
-open Oxiclean.Leoization
-
-mutual
-  @[simp]
-  def Oxiclean.Model.ModuleType.statics : ModuleType → Type 0
-    | .field _ _ => Statics.DefinedElsewhere
-    | .signature absent _present => absent.statics
-
-  @[simp]
-  def _root_.List.statics : List ModuleItemAbsentAtRuntime → Type 0 :=
-    List.foldr (Statics.ModuleItem ·.statics) Statics.ModuleEnd
-
-  @[simp]
-  def Oxiclean.Model.ModuleItemAbsentAtRuntime.statics
-      : ModuleItemAbsentAtRuntime → Type 0
-    | .moduleType _ => Statics.ModuleType
-    | .valType t => Statics.TypeDeclaration t.statics
-
-  @[simp]
-  def Oxiclean.Model.TypeDecl.statics (t : TypeDecl) : Type 0 :=
-    match t.manifest with
-    | .none => Statics.AbstractType
-    | .some _ => Statics.DefinedElsewhere
-end
-
-/-
-namespace Oxiclean.Leoization
-
-mutual
-  def Oxiclean.Model.ModuleType.structuralRelation
-      : ∀ moduleType : ModuleType, moduleType.statics → PER Value
-    | .field within index => fun { } =>
-      let within := sorry -- look up `within`
-      let indexed : ModuleType := moduleTypeWithinAnotherModule within index
-      indexed.knownStructuralRelation
-    | .signature absent present =>
-      PER.moduleRuntimeBlock ∘ absent.structuralRelation present
-
-  def _root_.List.structuralRelation
-      (absent : List ModuleItemAbsentAtRuntime)
-      (present : List ModuleItemPresentAtRuntime)
-      : absent.statics → PER (List Value) :=
-    sorry
-
-  def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelation
-      : ∀ item : ModuleItemPresentAtRuntime, sorry.statics → PER Value
-    | _ => sorry
-end
-
-end Oxiclean.Leoization
--/
