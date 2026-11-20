@@ -206,20 +206,27 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     match[@ocaml.warning "-fragile-match"] args with
     | [Cop (Cmulf Float64, args, _)] -> Rewritten (specific Inegmulf, args)
     | _ -> Use_default)
-  (* Recognize floating-point multiply and add/sub *)
+  (* Recognize floating-point multiply and add/sub. These fused operations round
+     only once, so may change the output. *)
   | Caddf Float64 -> (
-    match[@ocaml.warning "-fragile-match"] args with
-    | [arg; Cop (Cmulf Float64, args, _)] | [Cop (Cmulf Float64, args, _); arg]
-      ->
-      Rewritten (specific Imuladdf, arg :: args)
-    | _ -> Use_default)
+    if not !Oxcaml_flags.float_op_fusion
+    then Use_default
+    else
+      match[@ocaml.warning "-fragile-match"] args with
+      | [arg; Cop (Cmulf Float64, args, _)] | [Cop (Cmulf Float64, args, _); arg]
+        ->
+        Rewritten (specific Imuladdf, arg :: args)
+      | _ -> Use_default)
   | Csubf Float64 -> (
-    match[@ocaml.warning "-fragile-match"] args with
-    | [arg; Cop (Cmulf Float64, args, _)] ->
-      Rewritten (specific Imulsubf, arg :: args)
-    | [Cop (Cmulf Float64, args, _); arg] ->
-      Rewritten (specific Inegmulsubf, arg :: args)
-    | _ -> Use_default)
+    if not !Oxcaml_flags.float_op_fusion
+    then Use_default
+    else
+      match[@ocaml.warning "-fragile-match"] args with
+      | [arg; Cop (Cmulf Float64, args, _)] ->
+        Rewritten (specific Imulsubf, arg :: args)
+      | [Cop (Cmulf Float64, args, _); arg] ->
+        Rewritten (specific Inegmulsubf, arg :: args)
+      | _ -> Use_default)
   | Cpackf32 -> Rewritten (specific (Isimd Zip1_f32), args)
   (* Recognize floating-point square root *)
   | Cextcall { func = "sqrt" | "sqrtf" | "caml_neon_float64_sqrt"; _ } ->

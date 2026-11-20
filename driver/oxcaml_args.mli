@@ -95,6 +95,7 @@ module type Oxcaml_options = sig
   val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
   val function_layout : string -> unit
+  val float_op_fusion : string -> unit
   val name_mangling_scheme : string -> unit
   val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
