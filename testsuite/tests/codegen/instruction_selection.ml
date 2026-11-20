@@ -238,21 +238,14 @@ int_compare:
   ret
 |}]
 
-(* CR ttebbi: We materialize the boolean needlessly. *)
 let branch_and_return o =
   let cmp = o <> 0 in
   if cmp = true then o else 7
 ;;
 [%%expect_asm X86_64{|
 branch_and_return:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  cmpq  $1, %rbx
-  setne %al
-  leaq  1(%rax,%rax), %rax
-  cmpq  $3, %rax
-  jne   .L0
-  movq  %rbx, %rax
+  cmpq  $1, %rax
+  je    .L0
   ret
 .L0:
   movl  $15, %eax
