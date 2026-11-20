@@ -19,11 +19,9 @@ mutual
   universe u
   variable (AbstractTypeConstructor : (arity : Nat) → Type u)
 
-  inductive ModuleType : Type u where
-    | signature
-        (absent : List ModuleItemAbsentAtRuntime)
-        (present : List ModuleItemPresentAtRuntime)
-    | field (within : ModuleStatics) (index : Nat)
+  structure ModuleType : Type u where
+    absent : List ModuleItemAbsentAtRuntime
+    present : List ModuleItemPresentAtRuntime
 
   inductive ModuleItemAbsentAtRuntime : Type u where
     | moduleType (moduleTypeDecl : Option ModuleType)
@@ -66,11 +64,10 @@ mutual
   @[simp]
   def ModuleType.parameterize
       : ModuleType AbstractTypeConstructor -> ModuleType Parametric
-    | .signature absent present =>
-      .signature
-        (absent.map (·.parameterize))
-        (present.map (·.parameterize))
-    | .field within index => .field within index
+    | { absent, present } =>
+      { absent := absent.map (·.parameterize)
+      , present := present.map (·.parameterize)
+      }
 
   @[simp]
   def ModuleItemAbsentAtRuntime.parameterize

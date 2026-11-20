@@ -1,29 +1,27 @@
 {
-  "signature": {
-    "absent": [],
-    "present": [
-      {
-        "val": {
-          "valType": {
-            "constr": {
-              "constructor": {"predef": {"predef": "option"}},
-              "args": [
-                {
-                  "constr": {
-                    "constructor": {
-                      "field": {
-                        "within": {"compilationUnit": {"name": "Even"}},
-                        "index": 0
-                      }
-                    },
-                    "args": []
-                  }
+  "absent": [],
+  "present": [
+    {
+      "val": {
+        "valType": {
+          "constr": {
+            "constructor": {"predef": {"predef": "option"}},
+            "args": [
+              {
+                "constr": {
+                  "constructor": {
+                    "field": {
+                      "within": {"compilationUnit": {"name": "Even"}},
+                      "index": 0
+                    }
+                  },
+                  "args": []
                 }
-              ]
-            }
+              }
+            ]
           }
         }
       }
-    ]
-  }
+    }
+  ]
 }

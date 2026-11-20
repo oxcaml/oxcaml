@@ -154,15 +154,11 @@ let type_constr : Model.type_constr -> Json.t = function
     module_statics_field (module_statics within) index
   | Predef p -> predef p |> tag "predef" |> tag "predef"
 
-let rec module_type : Model.module_type -> Json.t = function
-  | Signature { absent; present } ->
-    Json.Object
-      [ "absent", array module_item_absent_at_runtime absent
-      ; "present", array module_item_present_at_runtime present
-      ]
-    |> tag "signature"
-  | Module_type_field { within; index } ->
-    module_statics_field (module_statics within) index
+let rec module_type ({ absent; present } : Model.module_type) : Json.t =
+  Json.Object
+    [ "absent", array module_item_absent_at_runtime absent
+    ; "present", array module_item_present_at_runtime present
+    ]
 
 and type_decl ({ manifest; arity } : Model.type_decl) : Json.t =
   Json.Object

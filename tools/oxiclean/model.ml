@@ -11,14 +11,9 @@ type module_statics =
       }
 
 type module_type =
-  | Module_type_field of
-      { within : module_statics
-      ; index : int
-      }
-  | Signature of
-      { absent : module_item_absent_at_runtime list
-      ; present : module_item_present_at_runtime list
-      }
+  { absent : module_item_absent_at_runtime list
+  ; present : module_item_present_at_runtime list
+  }
 
 and type_decl =
   { arity : int

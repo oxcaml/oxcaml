@@ -11,9 +11,9 @@ abbrev expectedInterface : ModuleType Parametric :=
   let create : ValType Parametric := .arrow int t_option
   let get : ValType Parametric := .arrow t int
 
-  .signature
-    [.valType { manifest := .abstract .parametric, arity := 0 }]
-    [.val create, .val get]
+  { absent := [.valType { manifest := .abstract .parametric, arity := 0 }]
+  , present := [.val create, .val get]
+  }
 
 abbrev expectedImplementation : Expr :=
   let get : Expr := .function (Expr.var 0)
@@ -50,9 +50,9 @@ abbrev refinedInterface : ModuleType SemanticTypeConstructor :=
   let create : ValType _ := .arrow int t_option
   let get : ValType _ := .arrow t int
 
-  .signature
-    [.valType { manifest := .abstract evenImmediates, arity := 0 }]
-    [.val create, .val get]
+  { absent := [.valType { manifest := .abstract evenImmediates, arity := 0 }]
+  , present := [.val create, .val get]
+  }
 
 example
     : refinedInterface.validWrtExtraction

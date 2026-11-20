@@ -79,18 +79,16 @@ namespace WorkaroundForPr14959
   section ModuleType
     variable
       (ModuleItemAbsentAtRuntime ModuleItemPresentAtRuntime TypeDecl : Type)
-    inductive ModuleType : Type where
-      | signature
-          (absent : List ModuleItemAbsentAtRuntime)
-          (present : List ModuleItemPresentAtRuntime)
-      | field (within : ModuleStatics) (index : Nat)
+    structure ModuleType : Type where
+      absent : List ModuleItemAbsentAtRuntime
+      present : List ModuleItemPresentAtRuntime
     deriving FromJson
   end ModuleType
 
-  def ModuleType.toTerm? (dependencyNames : List String)
+  def ModuleType.toTerm?
       : ModuleType Lean.Expr Lean.Expr → Except String Lean.Expr
-    | .signature absent present =>
-      mkApp2 (parametric ``Model.ModuleType.signature)
+    | { absent, present } =>
+      mkApp2 (parametric ``Model.ModuleType.mk)
         (Lean.Expr.mkList
           (parametric ``Model.ModuleItemAbsentAtRuntime)
           absent)
@@ -98,9 +96,6 @@ namespace WorkaroundForPr14959
           (parametric ``Model.ModuleItemPresentAtRuntime)
           present)
       |> pure
-    | .field within index => do
-      let within ← within.toTerm? dependencyNames
-      pure (mkApp2 (parametric ``Model.ModuleType.field) within (toExpr index))
 
   section ModuleItemAbsentAtRuntime
     variable (ModuleType TypeDecl : Type)
@@ -197,7 +192,7 @@ namespace WorkaroundForPr14959
         ⟨ModuleItemAbsentAtRuntime.fromJson? dependencyNames⟩
         ⟨ModuleItemPresentAtRuntime.fromJson? dependencyNames⟩
       |>.fromJson? json
-      >>= (·.toTerm? dependencyNames)
+      >>= (·.toTerm?)
 
     partial def ModuleItemAbsentAtRuntime.fromJson?
         (dependencyNames : List String)

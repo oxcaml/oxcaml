@@ -240,13 +240,6 @@ module Signature_parts = struct
         | Val_type (id, _) -> matches id
         | Module_type _ -> false )
       parts.absent
-
-  let find_module_type (matches : Ident.t -> bool) (parts : t) : int option =
-    List.find_index
-      ( function
-        | Module_type (id, _) -> matches id
-        | Val_type _ -> false )
-      parts.absent
 end
 
 module Resolve = struct
@@ -318,16 +311,10 @@ module Resolve = struct
         higher_order ~module_vars ~what:"Type" ~find:Signature_parts.find_type ~path
       in
       Type_constr_field { within; index }
-
-  let module_type_path ~(module_vars : Signature_parts.t list) (path : Path.t)
-      : Model.module_type =
-    let within, index =
-      higher_order ~module_vars ~what:"Module type" ~find:Signature_parts.find_module_type ~path
-    in
-    Module_type_field { within; index }
 end
 
 let rec val_type
+    ~(env : Env.t)
     ~(module_vars : Signature_parts.t list)
     ~(type_vars : Types.type_expr list)
     (t : Types.type_expr)
@@ -335,17 +322,18 @@ let rec val_type
   match Types.get_desc t with
   | Tarrow (_, domain, codomain, _) ->
     Arrow
-      { domain = val_type ~module_vars ~type_vars domain
-      ; codomain = val_type ~module_vars ~type_vars codomain
+      { domain = val_type ~env ~module_vars ~type_vars domain
+      ; codomain = val_type ~env ~module_vars ~type_vars codomain
       }
   | Tconstr (path, args, _) ->
     Constr
       { constr = Resolve.type_constr ~module_vars path
-      ; args = List.map (val_type ~module_vars ~type_vars) args
+      ; args = List.map (val_type ~env ~module_vars ~type_vars) args
       }
   | Tpackage { pack_path; pack_cstrs = [] } ->
-    First_class_module { signature = Resolve.module_type_path ~module_vars pack_path }
-  | Tpoly (body, vars) -> poly ~module_vars ~type_vars body vars
+    First_class_module
+      { signature = Types.Mty_ident pack_path |> module_type ~env ~module_vars }
+  | Tpoly (body, vars) -> poly ~env ~module_vars ~type_vars body vars
   | Tvar _ ->
     begin match List.find_index (Types.eq_type t) type_vars with
     | Some de_bruijn -> Type_var { de_bruijn }
@@ -364,15 +352,17 @@ let rec val_type
             Printtyp.type_expr t))
 
 and poly
+    ~(env : Env.t)
     ~(module_vars : Signature_parts.t list)
     ~(type_vars : Types.type_expr list)
     (body : Types.type_expr)
     : Types.type_expr list -> Model.val_type = function
-  | [] -> val_type ~module_vars ~type_vars body
+  | [] -> val_type ~env ~module_vars ~type_vars body
   | var :: vars ->
-    Poly { body = poly ~module_vars ~type_vars:(var :: type_vars) body vars }
+    Poly { body = poly ~env ~module_vars ~type_vars:(var :: type_vars) body vars }
 
-let type_decl
+and type_decl
+    ~(env : Env.t)
     ~(module_vars : Signature_parts.t list)
     (id : Ident.t)
     (decl : Types.type_declaration)
@@ -381,7 +371,7 @@ let type_decl
   | Type_abstract _, Public ->
     { manifest =
         Option.map
-          (val_type ~module_vars ~type_vars:decl.type_params)
+          (val_type ~env ~module_vars ~type_vars:decl.type_params)
           decl.type_manifest
     ; arity = decl.type_arity
     }
@@ -392,10 +382,22 @@ let type_decl
             "Type declaration not yet implemented: %a"
             (Printtyp.type_declaration id) decl))
 
-let rec module_type ~(module_vars : Signature_parts.t list)
+and module_type
+    ~(env : Env.t)
+    ~(module_vars : Signature_parts.t list)
     : Types.module_type -> Model.module_type = function
-  | Mty_signature items -> signature ~module_vars items
-  | Mty_ident path -> Resolve.module_type_path ~module_vars path
+  | Mty_signature items -> signature ~env ~module_vars items
+  | Mty_ident path ->
+    let m = Env.find_modtype path env in
+    begin match m.mtd_type with
+    | Some expansion -> module_type ~env ~module_vars expansion
+    | None ->
+      raise
+        (Error.Message
+           (Format.asprintf
+              "Abstract module types are not supported: %a"
+              Printtyp.path path))
+    end
   | other ->
     raise
       (Error.Message
@@ -403,27 +405,36 @@ let rec module_type ~(module_vars : Signature_parts.t list)
             "Module type not yet implemented: %a"
             Printtyp.modtype other))
 
-and signature ~(module_vars : Signature_parts.t list) (items : Types.signature)
+and signature
+    ~(env : Env.t)
+    ~(module_vars : Signature_parts.t list)
+    (items : Types.signature)
     : Model.module_type =
+  let env = Env.add_signature items env in
   let parts = Signature_parts.of_items items in
   let module_vars = parts :: module_vars in
-  Signature
-    { absent = List.map (module_item_absent_at_runtime ~module_vars) parts.absent
-    ; present = List.map (module_item_present_at_runtime ~module_vars) parts.present
-    }
+  { absent = List.map (module_item_absent_at_runtime ~env ~module_vars) parts.absent
+  ; present = List.map (module_item_present_at_runtime ~env ~module_vars) parts.present
+  }
 
-and module_item_absent_at_runtime ~(module_vars : Signature_parts.t list)
+and module_item_absent_at_runtime
+    ~(env : Env.t)
+    ~(module_vars : Signature_parts.t list)
     : Signature_parts.module_item_absent_at_runtime ->
       Model.module_item_absent_at_runtime = function
-  | Module_type (_, m) -> Module_type (Option.map (module_type ~module_vars) m.mtd_type)
+  | Module_type (_, m) ->
+    Module_type (Option.map (module_type ~env ~module_vars) m.mtd_type)
   | Val_type (id, t) ->
-    Val_type (type_decl ~module_vars id t)
+    Val_type (type_decl ~env ~module_vars id t)
 
-and module_item_present_at_runtime ~(module_vars : Signature_parts.t list)
-    : Signature_parts.module_item_present_at_runtime -> Model.module_item_present_at_runtime = function
-  | Module (_, md_type) -> Module (module_type ~module_vars md_type)
+and module_item_present_at_runtime
+    ~(env : Env.t)
+    ~(module_vars : Signature_parts.t list)
+    : Signature_parts.module_item_present_at_runtime ->
+      Model.module_item_present_at_runtime = function
+  | Module (_, md_type) -> Module (module_type ~env ~module_vars md_type)
   | Val (_, ty) ->
-    Val (poly ~module_vars ~type_vars:[] ty (Ctype.free_variables ty))
+    Val (poly ~env ~module_vars ~type_vars:[] ty (Ctype.free_variables ty))
 
 let intf ({ sig_type; _ } : Typedtree.signature) : Model.module_type =
-  signature ~module_vars:[] sig_type
+  signature ~env:Env.empty ~module_vars:[] sig_type

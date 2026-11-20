@@ -323,19 +323,17 @@ mutual
       {Step} [S : StepRelation Step]
       (context : List (ModuleType SemanticTypeConstructor))
       (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
-      : Except SemanticTypeConstructor.ArityMismatch (PER Value) :=
-    match userSuppliedRefinedSignature with
-    | .signature absent present => do
-      let relationOnValuesInTheBlock ←
-        present.foldrM
-          (fun item tail => do
-            let head ←
-              @item.structuralRelationInScope? Step S
-                (userSuppliedRefinedSignature :: context)
-            .ok (PER.cons head tail))
-          PER.emptyList
-      .ok (PER.moduleRuntimeBlock relationOnValuesInTheBlock)
-    | .field within index => sorry
+      : Except SemanticTypeConstructor.ArityMismatch (PER Value) := do
+    let { absent, present } := userSuppliedRefinedSignature
+    let relationOnValuesInTheBlock ←
+      present.foldrM
+        (fun item tail => do
+          let head ←
+            @item.structuralRelationInScope? Step S
+              (userSuppliedRefinedSignature :: context)
+          .ok (PER.cons head tail))
+        PER.emptyList
+    .ok (PER.moduleRuntimeBlock relationOnValuesInTheBlock)
 
   @[simp]
   def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope?
@@ -363,8 +361,7 @@ mutual
         let ⟨arity, ctor⟩ := p.structuralRelation
         let args ← args.mapM (@·.structuralRelationInScope? Step S context)
         ctor.instantiatedWithArguments? args
-    | .firstClassModule signature =>
-      @signature.structuralRelationInScope? Step S context
+    | .firstClassModule signature => sorry
     | .poly body => sorry
     | .var deBruijn => sorry
 end
