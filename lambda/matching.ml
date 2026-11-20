@@ -256,6 +256,39 @@ let bind_address (id, duid) deref_address action =
         (transl_deref_address deref_address) action
   | None -> fatal_error "Matching: dereference pattern without an address"
 
+(* Slices
+
+   A slice is an address and a length, and its elements are as far apart as in
+   an array of them. *)
+
+let slice_layouts =
+  [ Punboxed_product address_layouts;
+    Punboxed_or_untagged_integer Unboxed_nativeint ]
+
+(* The length of a slice is a [word] *)
+let slice_length_scalar : locality_mode Scalar.Integral.t =
+  Naked (Boxable (Nativeint Any_locality_mode))
+
+let slice_field ~loc i slice =
+  Lprim (Punboxed_product_field (i, slice_layouts), [ slice ], loc)
+
+(* The address of the element [n] positions after the start of the slice
+   [slice], where [n] is an integer of index kind [index_kind], and the
+   elements of the slice are as far apart as in an array of kind [array_kind]
+   (see [Typeopt.slice_type_kind]) *)
+let slice_element_address ~loc ~array_kind slice index_kind n =
+  let addr = slice_field ~loc 0 slice in
+  let field i =
+    Lprim (Punboxed_product_field (i, address_layouts), [ addr ], loc)
+  in
+  let idx =
+    match n with
+    | Lconst (Const_base (Const_int 0)) -> field 1
+    | _ ->
+        Lprim (Pidx_array_advance (array_kind, index_kind), [ field 1; n ], loc)
+  in
+  Lprim (Pmake_unboxed_product address_layouts, [ field 0; idx ], loc)
+
 module General = struct
   include Patterns.General
 
@@ -2656,6 +2689,70 @@ let divide_addr ~scopes head ctx pm =
     get_pat_args_addr
     head ctx pm
 
+(* Matching against a slice pattern
+
+   The elements of a slice pattern are at fixed positions from the start of
+   the slice. *)
+
+let get_key_slice = function
+  | { pat_desc = Tpat_slice { elements; _ } } ->
+      Patterns.Slice.shape elements
+  | p -> fatal_errorf "Matching.get_key_slice: %a" pretty_pat p
+
+let get_pat_args_slice p rem =
+  match p with
+  | { pat_desc = Tpat_slice { elements; _ } } ->
+      slice_element_patterns elements @ rem
+  | p -> fatal_errorf "Matching.get_pat_args_slice: %a" pretty_pat p
+
+let get_expr_args_slice ~scopes head { arg; mut; _ } rem =
+  match head.pat_desc with
+  | Patterns.Head.Slice { mutability; sort; shape } ->
+      let loc = head_loc ~scopes head in
+      let sort = Jkind.Sort.default_for_transl_and_get sort in
+      let layout = Typeopt.layout_of_sort head.pat_loc sort in
+      let array_kind =
+        Typeopt.slice_type_kind head.pat_env head.pat_loc head.pat_type
+      in
+      let mut_flag : Asttypes.mutable_flag =
+        if Types.is_mutable mutability then Mutable else Immutable
+      in
+      let ubr = Translmode.transl_unique_barrier head.pat_unique_barrier in
+      let load_flag : Asttypes.mutable_flag =
+        match ubr with
+        | Must_stay_here -> Mutable
+        | May_be_pushed_down -> mut_flag
+      in
+      (* The element [n] positions after the start of the slice, where [n]
+         is an integer of index kind [index_kind] *)
+      let element index_kind n =
+        let addr = slice_element_address ~loc ~array_kind arg index_kind n in
+        { arg = Lprim (Pget_ptr (layout, load_flag), [ addr ], loc);
+          binding_kind =
+            add_barrier_to_let_kind ubr
+              (if Types.is_mutable mutability then StrictOpt else Alias);
+          mut = compose_mut mut mut_flag;
+          sort;
+          layout;
+          deref_address =
+            Some
+              (In_address
+                 { addr; contents_layout = layout; rev_unboxed_path = []; loc })
+        }
+      in
+      let from_start i = element Ptagged_int_index (Lconst (const_int i)) in
+      let elements = match shape with Closed n -> List.init n from_start in
+      elements @ rem
+  | _ -> fatal_error "Matching.get_expr_args_slice"
+
+let divide_slice ~scopes ctx pm =
+  divide
+    (get_expr_args_slice ~scopes)
+    ( = )
+    get_key_slice
+    get_pat_args_slice
+    ctx pm
+
 (* Matching against a tuple pattern *)
 
 let get_pat_args_tuple arity p rem =
@@ -3823,6 +3920,24 @@ let combine_unboxed_bool value_kind loc arg partial ctx def
   in
   (lambda1, Jumps.union local_jumps total)
 
+let combine_slice value_kind loc arg partial ctx def (cells, total, _pats) =
+  let fail, local_jumps = mk_failaction_neg partial ctx def in
+  let length = slice_field ~loc 1 arg in
+  let closed =
+    List.map
+      (fun ((shape : Patterns.Slice.shape), act) ->
+         match shape with
+         | Closed n -> Const_unboxed_nativeint (Nativeint.of_int n), act)
+      cells
+  in
+  let length_scalar =
+    Scalar.integral (Scalar.Integral.ignore_locality slice_length_scalar)
+  in
+  let lambda =
+    make_test_sequence value_kind loc fail length_scalar length closed
+  in
+  (lambda, Jumps.union local_jumps total)
+
 let split_cases tag_lambda_list =
   let rec split_rec = function
     | [] -> ([], [], None)
@@ -4717,27 +4832,9 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             (divide_addr ~scopes ph)
             Context.combine
       | Slice _ ->
-          (* CR slice-patterns: compile slice patterns *)
-          let loc = ph.pat_loc in
-          let sloc = Scoped_location.of_location ~scopes loc in
-          let slot =
-            transl_extension_path sloc
-              (Lazy.force Env.initial) Predef.path_invalid_argument
-          in
-          let msg = "slice patterns are not compiled yet" in
-          let raise_invalid_argument =
-            Lprim
-              ( Praise Raise_regular,
-                [ Lprim
-                    ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-                      [ slot;
-                        Lconst (Const_base (Const_string (msg, loc, None)))
-                      ],
-                      sloc )
-                ],
-                sloc )
-          in
-          (raise_invalid_argument, Jumps.empty Total)
+          compile_test
+            (divide_slice ~scopes)
+            (combine_slice value_kind ploc arg arg_partial)
       | Lazy ->
           compile_no_test
             (divide_lazy ~scopes ph)

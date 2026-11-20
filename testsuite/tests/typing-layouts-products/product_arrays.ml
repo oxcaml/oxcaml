@@ -124,9 +124,9 @@ let f_bad (x : #(string * float#)) = make_vect 42 x
 Line 1, characters 37-51:
 1 | let f_bad (x : #(string * float#)) = make_vect 42 x
                                          ^^^^^^^^^^^^^^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -170,9 +170,9 @@ external make_bad : int -> #(string * float#) -> #(string * float#) array
 Line 3, characters 21-29:
 3 | let make_bad_app x = make_bad x
                          ^^^^^^^^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -226,9 +226,9 @@ let f_bad (x : #(string * float#) array) = len x
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = len x
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -259,9 +259,9 @@ external len_bad : #(string * float#) array -> int = "%array_length"
 Line 2, characters 28-29:
 2 | let len_bad_app x = len_bad x
                                 ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -317,9 +317,9 @@ let f_bad (x : #(string * float#) array) = get x 42
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x 42
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -361,9 +361,9 @@ external get_bad : #(string * float#) array -> int -> #(string * float#)
 Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
                                   ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -417,9 +417,9 @@ let f_bad (x : #(string * float#) array) = set x 42 #("1", #2.0)
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x 42 #("1", #2.0)
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -464,9 +464,9 @@ external set_bad :
 Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -524,9 +524,9 @@ let f_bad (x : #(string * float#) array) = get x 42
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x 42
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -568,9 +568,9 @@ external get_bad : #(string * float#) array -> int -> #(string * float#)
 Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
                                   ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -625,9 +625,9 @@ let f_bad (x : #(string * float#) array) = set x 42 #("1", #2.0)
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x 42 #("1", #2.0)
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -672,9 +672,9 @@ external set_bad :
 Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -732,9 +732,9 @@ let f_bad (x : #(string * float#) array) = get x #42L
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42L
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -777,9 +777,9 @@ external get_bad : #(string * float#) array -> int64_u -> #(string * float#)
 Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
                                   ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -837,9 +837,9 @@ let f_bad (x : #(string * float#) array) = set x #42L #("1", #2.0)
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42L #("1", #2.0)
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -885,9 +885,9 @@ external set_bad :
 Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -945,9 +945,9 @@ let f_bad (x : #(string * float#) array) = get x #42L
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42L
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -990,9 +990,9 @@ external get_bad : #(string * float#) array -> int64_u -> #(string * float#)
 Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
                                   ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1049,9 +1049,9 @@ let f_bad (x : #(string * float#) array) = set x #42L #("1", #2.0)
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42L #("1", #2.0)
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1097,9 +1097,9 @@ external set_bad :
 Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1157,9 +1157,9 @@ let f_bad (x : #(string * float#) array) = get x #42l
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42l
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1202,9 +1202,9 @@ external get_bad : #(string * float#) array -> int32_u -> #(string * float#)
 Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
                                   ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1262,9 +1262,9 @@ let f_bad (x : #(string * float#) array) = set x #42l #("1", #2.0)
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42l #("1", #2.0)
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1310,9 +1310,9 @@ external set_bad :
 Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1370,9 +1370,9 @@ let f_bad (x : #(string * float#) array) = get x #42l
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42l
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1415,9 +1415,9 @@ external get_bad : #(string * float#) array -> int32_u -> #(string * float#)
 Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
                                   ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1475,9 +1475,9 @@ let f_bad (x : #(string * float#) array) = set x #42l #("1", #2.0)
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42l #("1", #2.0)
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1523,9 +1523,9 @@ external set_bad :
 Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1584,9 +1584,9 @@ let f_bad (x : #(string * float#) array) = get x #42n
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42n
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1632,9 +1632,9 @@ external get_bad :
 Line 4, characters 30-31:
 4 | let get_bad_app a i = get_bad a i
                                   ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1692,9 +1692,9 @@ let f_bad (x : #(string * float#) array) = set x #42n #("1", #2.0)
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42n #("1", #2.0)
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1742,9 +1742,9 @@ external set_bad :
 Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1803,9 +1803,9 @@ let f_bad (x : #(string * float#) array) = get x #42n
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42n
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1851,9 +1851,9 @@ external get_bad :
 Line 4, characters 30-31:
 4 | let get_bad_app a i = get_bad a i
                                   ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1911,9 +1911,9 @@ let f_bad (x : #(string * float#) array) = set x #42n #("1", #2.0)
 Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42n #("1", #2.0)
                                                    ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -1961,9 +1961,9 @@ external set_bad :
 Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -2021,9 +2021,9 @@ let f_bad (x : #(string * float#) array) = blit x 0 x 2 3
 Line 1, characters 48-49:
 1 | let f_bad (x : #(string * float#) array) = blit x 0 x 2 3
                                                     ^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -2071,9 +2071,9 @@ external blit_bad :
 Line 5, characters 44-46:
 5 | let blit_bad_app a1 i1 a2 i2 len = blit_bad a1 i1 a2 i2 len
                                                 ^^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -2262,9 +2262,9 @@ let f_illegal_literal (type a : value mod external_)
 Line 2, characters 47-63:
 2 |       (x : float#) (y : a) (z : bool option) = [| #(x, y, z) |]
                                                    ^^^^^^^^^^^^^^^^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(float# * a * bool option), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -2278,9 +2278,9 @@ let f_illegal_empty_literal (type a : value mod external_)
 Lines 1-2, characters 28-45:
 1 | ............................(type a : value mod external_)
 2 |   : #(float# * a * bool option) array = [| |]
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(float# * 'a * bool option), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -2321,9 +2321,9 @@ let f_illegal_literal : #(float# * bool option * int) array -> int =
 Line 3, characters 4-18:
 3 |   | [| #(a,b,c) |] -> 1
         ^^^^^^^^^^^^^^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(float# * bool option * int), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
@@ -2339,9 +2339,9 @@ let f_illegal_empty_literal : #(float# * bool option * int) array -> int =
 Line 3, characters 4-9:
 3 |   | [| |] -> 0
         ^^^^^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(float# * bool option * int), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.

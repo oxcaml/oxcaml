@@ -32,6 +32,11 @@ val array_type_kind :
   elt_ty:(Types.type_expr option)
   -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
 val array_type_mut : Env.t -> Types.type_expr -> Lambda.mutable_flag
+
+(* The kind of an array of the elements of the slice type [ty], which are as
+   far apart as in such an array *)
+val slice_type_kind :
+  Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
 val array_kind_of_elt :
   Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
 val array_kind : Typedtree.expression -> Lambda.array_kind

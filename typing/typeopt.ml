@@ -447,6 +447,15 @@ let array_type_mut env ty =
   | Some (Tconstr(p, [_], _)) when Path.same p Predef.path_iarray -> Immutable
   | _ -> Mutable
 
+let slice_type_kind env loc ty =
+  match scrape_poly env ty with
+  | Some (Tconstr(p, [elt_ty], _))
+    when Path.same p Predef.path_slice || Path.same p Predef.path_slice_imm ->
+      array_kind_of_elt env loc elt_ty
+  | _ ->
+    Misc.fatal_errorf "Typeopt.slice_type_kind: %a is not a slice type"
+      Printtyp.type_expr ty
+
 let array_kind exp =
   array_type_kind ~elt_ty:None exp.exp_env exp.exp_loc exp.exp_type
 
@@ -1561,9 +1570,9 @@ let report_error ppf = function
         "Types whose layout contains [void] are not yet supported in arrays."
   | Mixed_product_array (const, elt_ty) ->
       fprintf ppf
-        "An unboxed product array element must be formed from all@ \
+        "An unboxed product array or slice element must be formed from all@ \
          external types (which are ignored by the gc) or all gc-scannable \
-         types.@ But this array operation is peformed for an array whose@ \
+         types.@ But this operation is performed for an array or slice whose@ \
          element type is %a, which is an unboxed product@ \
          that is not external and contains a type with the non-scannable@ \
          layout %s.@ \

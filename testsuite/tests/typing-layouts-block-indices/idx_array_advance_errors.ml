@@ -33,9 +33,9 @@ let f (i : (int ref, #(string * float#)) Idx_mut.t) =
 Line 2, characters 2-32:
 2 |   Idx_mut.unsafe_advance i ~by:1
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: An unboxed product array element must be formed from all
+Error: An unboxed product array or slice element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
-       But this array operation is peformed for an array whose
+       But this operation is performed for an array or slice whose
        element type is #(string * float#), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
