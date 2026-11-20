@@ -144,8 +144,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lconst constant -> assert_constant_contains_no_splices constant
   | Lapply { ap_result_layout; _ } ->
     assert_layout_contains_no_splices ap_result_layout
-  | Lfunction func | Lcode ({ code_fun = func; _ }, _) ->
-    assert_function_contains_no_splices func
+  | Lfunction func -> assert_function_contains_no_splices func
   | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lletrec _ -> ()
@@ -168,7 +167,8 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
   | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
-    Lambda.fatal_error_invalid_constructor lam);
+    Lambda.fatal_error_invalid_constructor lam
+  | Lcode _ -> ());
   Lambda.iter_head_constructor assert_no_splices lam
 
 module Or_missing = struct
@@ -531,9 +531,8 @@ module Ctx : sig
 
   (** Instantiate a template. This is memoized so if this template has already
       been instantiated with these arguments it just returns the previously
-      computed results, otherwise it uses [eval_apply] to evaluate the closure
-      to its compile-time value and the code of the instantiation. The returned
-      runtime half is a reference to the code. *)
+      computed results, otherwise it uses [eval_apply] to evaluate the closure.
+      The returned runtime half is a reference to the instantiated code. *)
   val instantiate :
     t ->
     loc:scoped_location ->
@@ -1420,7 +1419,7 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
     dyn (if new_repr == old_repr then old_prim else Pduprecord (new_repr, size))
   | Ptemplate_env _ ->
     (* Only evaluation creates [Ptemplate_env] (see [eval_template]). *)
-    Misc.fatal_errorf "Slambda: unexpected %a" Printlambda.primitive old_prim
+    errf "unexpected Ptemplate_env"
   | Pmixedfield (path, old_shape, sem) ->
     (* e.(pos1).(pos2) ~>
        let { c = e_c; r = e_r } = eval_lam env e in
@@ -1754,18 +1753,9 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       | Tupled, _ ->
         Misc.fatal_error "Tupled static functions are not currently supported"
     in
-    (* The middle end doesn't support unboxed parameters or results for code
-       that has no closure, so [@unboxable] is ignored. *)
-    let params =
-      List.map
-        (fun (param : lparam) ->
-          { param with attributes = default_param_attribute })
-        params
-    in
+    (* All instances are closed functions and can therefore be heap-allocated *)
     lfunction' ~kind:new_kind ~params:(closure_param :: params) ~return
-      ~body:closed_body
-      ~attr:{ attr with unbox_return = None }
-      ~loc ~mode:alloc_heap ~ret_mode
+      ~body:closed_body ~attr ~loc ~mode:alloc_heap ~ret_mode
     |> lfunction_with_yielding yielding
   in
   match clo_template with

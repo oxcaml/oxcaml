@@ -743,12 +743,6 @@ let rec choice ctx t =
         in
         let+ body = choice ctx ~tail ~region_depth body in
         Lletrec(bindings, body)
-    | Lcode (code, body) ->
-        let code =
-          { code with code_fun = traverse_lfunction ctx code.code_fun }
-        in
-        let+ body = choice ctx ~tail ~region_depth body in
-        Lcode (code, body)
     | Lswitch (l1, sw, loc, kind) ->
         (* decompose *)
         let consts_lhs, consts_rhs = List.split sw.sw_consts in
@@ -813,6 +807,10 @@ let rec choice ctx t =
     | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
     | Linstantiate _ ->
       fatal_error_invalid_constructor t
+    | Lcode _ ->
+      (* [choice] only sees the bodies of functions, and the code of
+         instantiations is only bound at the top of the unit. *)
+      Misc.fatal_error "Tmc.choice: [Lcode] inside a function"
 
   and choice_apply ctx ~tail ~region_depth apply =
     let exception No_tmc in

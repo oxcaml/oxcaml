@@ -402,17 +402,13 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   | Llet (_, _k, id, _duid, arg, body) | Lmutlet (_k, id, _duid, arg, body) ->
     (* We are intentionally dropping the [debug_uid] identifiers here. *)
     Let { id; arg = comp_expr arg; body = comp_expr body }
-  | Lcode ({ code_name; code_debug_uid; code_fun; _ }, body) ->
-    (* In bytecode, the code of an instantiation is an ordinary closure. *)
-    comp_expr
-      Lambda.(
-        Llet
-          ( Strict,
-            layout_function,
-            code_name,
-            code_debug_uid,
-            Lfunction code_fun,
-            body ))
+  | Lcode ({ code_name; code_debug_uid = _; code_template = _; code_fun }, body)
+    ->
+    Let
+      { id = code_name;
+        arg = Pseudo_event (Function (comp_fun code_fun), code_fun.loc);
+        body = comp_expr body
+      }
   | Lletrec (decl, body) ->
     Letrec
       { decls = List.map comp_rec_binding decl;

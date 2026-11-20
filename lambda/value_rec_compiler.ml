@@ -281,8 +281,8 @@ let compute_static_size lam =
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
     | Ltemplate _ | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
-    | Lcode (_, body) ->
-      compute_expression_size env body
+    | Lcode _ ->
+      Lambda.fatal_error_invalid_constructor lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -415,6 +415,10 @@ let compute_static_size lam =
          | Some arr -> Block (Mixed_block (compute_mixed_block_size arr)))
     | Pmakelazyblock _ ->
         Block Lazy_block
+    | Ptemplate_env _ ->
+        Misc.fatal_error
+          "size_of_primitive: [Ptemplate_env] only exists after slambda \
+           evaluation"
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
@@ -582,7 +586,6 @@ let compute_static_size lam =
     | Punboxed_nativeint_array_load_vec _
     | Pprobe_is_enabled _
     | Pobj_magic _
-    | Ptemplate_env _
     | Punbox_vector _
     | Pbox_vector (_, _)
     | Punbox_mask
@@ -896,12 +899,13 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lkindtemplate _
   | Lkindinstantiate _
   | Ltemplate _
-  | Linstantiate _
-  | Lcode _ ->
+  | Linstantiate _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
+  | Lcode _ ->
+    Lambda.fatal_error_invalid_constructor lam
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =
