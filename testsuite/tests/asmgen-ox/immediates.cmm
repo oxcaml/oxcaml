@@ -1,11 +1,10 @@
 (* TEST
  readonly_files = "mainimmed.c asan_report_wrappers.c";
  arguments = "-I ${test_source_directory} mainimmed.c asan_report_wrappers.c";
- flags = "-dcmm-no-check-machtypes";
  asmgen;
 *)
 (* Regenerate with cpp -P immediates.cmmpp > immediates.cmm *)
-(function "testimm" ()
+(function "testimm" () : unit
   (let x (load int "X")
   (let r "R"
     (addraset r 1 (+ x 0))
