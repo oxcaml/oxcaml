@@ -259,7 +259,7 @@ end = struct
     | Tailcall_func (Direct _) ->
       (* No result registers are produced by a tailcall. *)
       check ~expected_args:[] ~expected_res:[0]
-    | Call_no_return { ty_args; ty_res; _ } ->
+    | External_call_no_return { ty_args; ty_res; _ } ->
       (* External calls that do not return still follow the external calling
          convention for both arguments and (nonexistent) results. *)
       check_external ~ty_args ~ty_res
@@ -426,7 +426,7 @@ end = struct
             Label.print l Label.print destination)
     | Call _ | Prim _ | Tailcall_func _ | Never | Always _ | Parity_test _
     | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-    | Call_no_return _ | Invalid _ ->
+    | External_call_no_return _ | Invalid _ ->
       ()
 
   let check_can_raise t label (block : Cfg.basic_block) =
@@ -709,7 +709,7 @@ end = struct
         | Tailcall_self _ -> ()
         | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
         | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-        | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+        | External_call_no_return _ | Call _ | Prim _ | Invalid _ ->
           report t
             "Block %a is a predecessor of the entry block, but its terminator \
              is not a self tail call"

@@ -69,7 +69,7 @@ let terminator : Cfg.terminator -> int =
   | Raise _ -> 8
   | Tailcall_self _ -> 9
   | Tailcall_func _ -> 10
-  | Call_no_return _ -> 11
+  | External_call_no_return _ -> 11
   | Invalid _ -> 12
   | Call _ -> 13
   | Prim _ -> 14

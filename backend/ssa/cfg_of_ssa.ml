@@ -487,7 +487,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
           move_to_extcall_arg_locs body ty_args virt_args dbg
         in
         make_instr
-          (Cfg.Call_no_return { ext with stack_ofs; stack_align })
+          (Cfg.External_call_no_return { ext with stack_ofs; stack_align })
           loc_arg
           (Proc.loc_external_results ty_res)
           dbg

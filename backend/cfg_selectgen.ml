@@ -405,7 +405,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       if returns
       then Terminator (Prim { op = External external_call; label_after }), args
-      else Terminator (Call_no_return external_call), args
+      else Terminator (External_call_no_return external_call), args
     | Cload { memory_chunk; mutability; is_atomic } ->
       let arg = single_arg () in
       let addressing_mode, eloc = Target.select_addressing memory_chunk arg in
@@ -1154,13 +1154,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.set_traps_for_raise env;
         Sub_cfg.add_never_block sub_cfg ~label:label_after;
         Ok rd
-      | Terminator (Call_no_return ({ ty_args; _ } as r)) ->
+      | Terminator (External_call_no_return ({ ty_args; _ } as r)) ->
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
         let rd = Reg.createv ty in
         let r = { r with stack_ofs; stack_align } in
-        let term : Cfg.terminator = Call_no_return r in
+        let term : Cfg.terminator = External_call_no_return r in
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg term dbg loc_arg
             (Proc.loc_external_results (Reg.typv rd))
@@ -1548,7 +1548,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Terminator
           ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
           | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-          | Tailcall_func _ | Invalid _ | Call_no_return _ | Prim _ ) ->
+          | Tailcall_func _ | Invalid _ | External_call_no_return _ | Prim _ )
+        ->
         Misc.fatal_error "Cfg_selectgen.emit_tail")
 
   and emit_tail_ifthenelse env sub_cfg econd (ifso_dbg : Debuginfo.t) ifso_a eif
