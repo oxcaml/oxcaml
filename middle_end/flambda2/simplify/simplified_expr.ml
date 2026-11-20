@@ -183,8 +183,37 @@ and print_let_expr ~body ppf
 
 and print_lifted_constants ppf lcs =
   LCS.fold lcs ~init:() ~f:(fun () lc ->
-      let bound = Lifted_constant.bound_static lc in
-      Format.fprintf ppf "%a@ " Bound_static.print bound)
+      let defs = Lifted_constant.definitions lc in
+      List.iter
+        (fun def ->
+          let expr = Lifted_constant.Definition.defining_expr def in
+          match Lifted_constant.Definition.descr def with
+          | Code code_id ->
+            Format.fprintf ppf "@[<hov 2>%a = <code>@]@\n" Code_id.print code_id
+          | Set_of_closures
+              { typing_env = _;
+                closure_symbols_with_types;
+                symbol_projections = _
+              } ->
+            let symbols =
+              Function_slot.Lmap.data closure_symbols_with_types |> List.map fst
+            in
+            Format.fprintf ppf "@[<hov 2>%a =@ %a@]@\n"
+              print_set_of_closures_symbols symbols Rebuilt_static_const.print
+              expr
+          | Block_like
+              { symbol; typing_env = _; ty = _; symbol_projections = _ } ->
+            Format.fprintf ppf "@[<hov 2>%a = @ %a@]@\n" Symbol.print symbol
+              Rebuilt_static_const.print expr)
+        defs)
+
+and print_set_of_closures_symbols ppf = function
+  | [] -> assert false (* CR gbury: this should never happen I think *)
+  | [symbol] -> Symbol.print ppf symbol
+  | _ :: _ as symbols ->
+    Format.fprintf ppf "@[<hov 1>(%a)@]"
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space Symbol.print)
+      symbols
 
 and print_bindings_to_place ppf = function
   | [] ->
