@@ -1172,7 +1172,8 @@ and lambda_event_kind =
 type transl_ctx =
   {
     scopes: Debuginfo.Scoped_location.scopes;
-    label_map : static_label Ident.Map.t
+    enclosing_loops : static_label Ident.Map.t
+    (* Maps each loop label to the static exception that breaks out of it *)
   }
 
 (* A description of a parameter to be passed to the runtime representation of a

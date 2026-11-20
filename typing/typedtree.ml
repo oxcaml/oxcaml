@@ -406,7 +406,7 @@ and expression_desc =
       wh_cond : expression;
       wh_body : expression;
       wh_body_sort : Jkind.sort;
-      loop_label : Ident.t;
+      wh_label : Ident.t;
     }
   | Texp_for of {
       for_id  : Ident.t;
@@ -417,7 +417,7 @@ and expression_desc =
       for_dir  : direction_flag;
       for_body : expression;
       for_body_sort : Jkind.sort;
-      loop_label : Ident.t;
+      for_label : Ident.t;
     }
   | Texp_send of expression * meth * apply_position
   | Texp_new of

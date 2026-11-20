@@ -437,10 +437,10 @@ let zero_alloc_of_application
 
 let add_loop_label ~transl_ctx ~loop_label =
   let static_exception_id = next_raise_count () in
-  let label_map =
-    Ident.Map.add loop_label static_exception_id transl_ctx.label_map
+  let enclosing_loops =
+    Ident.Map.add loop_label static_exception_id transl_ctx.enclosing_loops
   in
-  static_exception_id, { transl_ctx with label_map }
+  static_exception_id, { transl_ctx with enclosing_loops }
 
 let rec transl_exp ~transl_ctx layout e =
   transl_exp1 ~transl_ctx ~in_new_scope:false layout e
@@ -1218,9 +1218,9 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
       Lsequence(transl_exp ~transl_ctx layout' expr1,
                 event_before ~scopes expr2
                   (transl_exp ~transl_ctx layout expr2))
-  | Texp_while {wh_body; wh_body_sort; wh_cond; loop_label} ->
+  | Texp_while {wh_body; wh_body_sort; wh_cond; wh_label} ->
       let static_exception_id, transl_ctx =
-        add_loop_label ~transl_ctx ~loop_label
+        add_loop_label ~transl_ctx ~loop_label:wh_label
       in
       let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
       let cond = transl_exp ~transl_ctx Lambda.layout_bool wh_cond in
@@ -1237,11 +1237,11 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
         (static_exception_id, []),
         Lconst const_unit, Same_region, layout_unit)
   | Texp_for {for_id; for_debug_uid; for_from; for_to; for_dir;
-              for_body; for_body_sort; loop_label} ->
+              for_body; for_body_sort; for_label} ->
       let for_body_sort = Jkind.Sort.default_for_transl_and_get for_body_sort in
       let for_body_layout = layout_exp for_body_sort for_body in
       let static_exception_id, transl_ctx =
-        add_loop_label ~transl_ctx ~loop_label
+        add_loop_label ~transl_ctx ~loop_label:for_label
       in
       let body = transl_exp ~transl_ctx for_body_layout for_body in
       let loop =
@@ -1660,7 +1660,9 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
         (Location.Doc.loc ~capitalize_first:false)
         e.exp_loc
   | Texp_break loop_label ->
-    let static_exception_id = Ident.Map.find loop_label transl_ctx.label_map in
+    let static_exception_id =
+      Ident.Map.find loop_label transl_ctx.enclosing_loops
+    in
     Lstaticraise (static_exception_id, [])
 
 and pure_module m =
