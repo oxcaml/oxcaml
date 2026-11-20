@@ -5002,8 +5002,18 @@ let type_implementation target modulename initial_env ast =
           Location.prerr_warning
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
-          let staticity = Staticity.Dynamic in
+          let staticity =
+            match Builtin_attributes.leading_static ast with
+            | None -> Staticity.Dynamic
+            | Some loc ->
+              Language_extension.assert_enabled ~loc Layout_poly
+                Language_extension.Alpha;
+              Staticity.Static
+          in
           let coercion, shape =
+            (* For a static unit, this check is what makes the structure
+               static. The zapping below then puts [@@ dynamic] on its dynamic
+               items. *)
             let modes =
               Includecore.Specific
                 ((mode, None), Persistent_env.mode_pers_mod staticity)

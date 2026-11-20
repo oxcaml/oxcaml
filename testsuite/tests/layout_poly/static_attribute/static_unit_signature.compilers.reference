@@ -5,7 +5,7 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val poly_ id : 'a -> 'a @@ stateless
-           val counter : int ref @@ stateless
+           val counter : int ref @@ stateless dynamic
            class cell :
              object
                val mutable contents : int

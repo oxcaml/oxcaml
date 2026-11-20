@@ -1,0 +1,4 @@
+File "static_attr_with_mli.ml", line 13, characters 4-10:
+13 | [@@@static]
+         ^^^^^^
+Warning 53 [misplaced-attribute]: the static attribute cannot appear in this context
