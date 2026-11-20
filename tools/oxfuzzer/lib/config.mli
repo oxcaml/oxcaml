@@ -121,6 +121,8 @@ val tail_call_probability : int
 
 val wide_argument_variable_probability : int
 
+val reraise_probability : int
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -157,7 +159,8 @@ module Swarm : sig
       closures : bool;
       partial_applications : bool;
       recursive_functions : bool;
-      wide_functions : bool
+      wide_functions : bool;
+      reraises : bool
     }
 
   val create : Random.State.t -> t
