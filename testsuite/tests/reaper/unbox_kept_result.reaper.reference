@@ -1,0 +1,73 @@
+let code make_0 deleted in
+let code loopify(never) size(3) stub
+      `fn[unbox_kept_result.ml:16,46--50]_1` (prim : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_succ = %int_barith.add (prim, 1) in
+  cont k (int_succ)
+in
+let code inline(never) loopify(never) size(8) newer_version_of(make_0)
+      make_0_1 (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  let Pmakeblock =
+    %block.[`0`].my_alloc_region (x, poison.val.reaper_unused_field_of_block)
+  in
+  cont k (Pmakeblock)
+in
+let $camlUnbox_kept_result__make_1 = closure make_0_1 @make &toplevel in
+(let w = %opaque (0) in
+ (let untagged = %untag_imm (w) in
+  let $`camlUnbox_kept_result__fn[unbox_kept_result.ml:16,46--50]_2` =
+    closure `fn[unbox_kept_result.ml:16,46--50]_1`
+      @`fn[unbox_kept_result.ml:16,46--50]` &toplevel
+  in
+  switch untagged
+    | 0 -> k2
+    | 1 ->
+      k1 ($`camlUnbox_kept_result__fn[unbox_kept_result.ml:16,46--50]_2`))
+   where k2 =
+     apply direct(make_0_1 &toplevel)
+       ($camlUnbox_kept_result__make_1 : _ -> [ 0 of val * val ])
+         (1)
+         -> k1 * error
+   where k1 (g : val) =
+     ((let untagged = %untag_imm (w) in
+       switch untagged
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          apply &toplevel g (3) -> k1 * error
+        where k2 =
+          (apply direct(make_0_1 &toplevel)
+             ($camlUnbox_kept_result__make_1 : _ -> [ 0 of val * val ])
+               (10)
+               -> k2 * error
+             where k2 (apply_result : [ 0 of imm tagged * imm tagged ]) =
+               let Pfield = %block_load.[`0`] (apply_result) in
+               cont k1 (Pfield))
+        where k1 (staticcatch_result : imm tagged) =
+          let stdout =
+            %project_value_slot.[print_int].[stdout]
+              ($Stdlib.camlStdlib__print_int_45_96)
+          in
+          (apply ccall inlining_state(depth(20))
+             ($`*extern*`.caml_format_int : val * val -> val)
+               ($Stdlib.camlStdlib__immstring_19, staticcatch_result)
+               -> k1 * error
+             where k1 (apply_result : val) =
+               let prim = %string_length (apply_result) in
+               let Pstringlength = %tag_imm (prim) in
+               (apply ccall inlining_state(depth(20))
+                  ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+                    (stdout, apply_result, 0, Pstringlength)
+                    -> k2 * error
+                  where k2 (function_return) =
+                    cont k1
+                  where k1 =
+                    cont k))))
+  where k =
+    let $camlUnbox_kept_result = Block 0 () in
+    cont done ($camlUnbox_kept_result)

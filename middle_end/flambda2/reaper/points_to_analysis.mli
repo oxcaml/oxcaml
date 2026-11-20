@@ -171,11 +171,22 @@ val has_source_query : Datalog.database -> Code_id_or_name.t -> bool
 val code_id_actually_directly_called :
   Datalog.database -> Name.t -> Code_id.Set.t Or_unknown.t
 
+(** The returns of a call which could have a source. *)
+type returns_with_source =
+  | All_returns_have_source
+  | Returns_with_source of unit Field.Map.t
+
 val arguments_used_by_known_arity_call :
-  Datalog.database -> Code_id_or_name.t -> int -> keep_or_delete list
+  Datalog.database ->
+  Code_id_or_name.t ->
+  int ->
+  keep_or_delete list * returns_with_source
 
 val arguments_used_by_unknown_arity_call :
-  Datalog.database -> Code_id_or_name.t -> int list -> keep_or_delete list list
+  Datalog.database ->
+  Code_id_or_name.t ->
+  int list ->
+  (keep_or_delete list * returns_with_source) list
 
 type single_field_source =
   | No_source
