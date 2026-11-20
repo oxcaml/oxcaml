@@ -1245,6 +1245,11 @@ let mk_dflow f =
     Arg.Unit f,
     " Dump debug info for the flow computation (Flambda 2 only)" )
 
+let mk_dsimplified f =
+  ( "-dsimplified",
+    Arg.Unit f,
+    " Print the intermediate simplified term (Flambda 2 only)" )
+
 let mk_dsimplify f =
   ( "-dsimplify",
     Arg.Unit f,
@@ -1666,6 +1671,7 @@ module type Oxcaml_options = sig
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
+  val dsimplified : unit -> unit
   val dsimplify : unit -> unit
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit
@@ -1920,6 +1926,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
       mk_dflow F.dflow;
+      mk_dsimplified F.dsimplified;
       mk_dsimplify F.dsimplify;
       mk_dreaper F.dreaper;
       mk_use_cached_generic_functions F.use_cached_generic_functions;
@@ -2512,6 +2519,7 @@ module Oxcaml_options_impl = struct
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
   let dfreshen = set' Flambda2.Dump.freshen
   let dflow = set' Flambda2.Dump.flow
+  let dsimplified = set' Flambda2.Dump.simplified
   let dsimplify = set' Flambda2.Dump.simplify
   let dreaper = set' Flambda2.Dump.reaper
 

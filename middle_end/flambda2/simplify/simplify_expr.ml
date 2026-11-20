@@ -83,6 +83,24 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
       (Flambda_arity.create [Singleton K.With_subkind.any_value])
   in
   let expr, dacc = simplify dacc ~down_to_up:(fun dacc expr -> expr, dacc) in
+  let header =
+    match DE.closure_info (DA.denv dacc) with
+    | Not_in_a_closure -> "During Simplify (toplevel)"
+    | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
+      "During Simplify (??)"
+    | Closure
+        { code_id;
+          return_continuation = _;
+          exn_continuation = _;
+          my_closure = _;
+          my_alloc_region = _
+        } ->
+      Format.asprintf "During Simplify of %a" Code_id.print code_id
+  in
+  Flambda_dump.if_enabled ~header
+    (DE.ppf_dump (DA.denv dacc))
+    (Flambda_features.dump_simplified ())
+    ~f:Simplified_expr.print expr;
   let expr, uacc =
     let dacc =
       DA.map_flow_acc dacc ~f:(Flow.Acc.exit_continuation dummy_toplevel_cont)

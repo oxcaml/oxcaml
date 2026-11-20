@@ -202,6 +202,8 @@ let dump_slot_offsets () = !Oxcaml_flags.Flambda2.Dump.slot_offsets
 
 let dump_flow () = !Oxcaml_flags.Flambda2.Dump.flow
 
+let dump_simplified () = !Oxcaml_flags.Flambda2.Dump.simplified
+
 let dump_simplify () = !Oxcaml_flags.Flambda2.Dump.simplify
 
 let dump_reaper () = !Oxcaml_flags.Flambda2.Dump.reaper
