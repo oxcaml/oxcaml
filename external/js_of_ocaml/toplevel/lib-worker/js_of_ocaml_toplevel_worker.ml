@@ -82,7 +82,9 @@ let wrap_fd, close_fd, clear_fds =
           Buffer.reset buf;
           post_message (Write (fd, s)))
       in
-      let ppf = Format.make_formatter (Buffer.add_substring buf) flush in
+      let ppf =
+        Format.make_formatter (fun s i n -> Buffer.add_substring buf s i n) flush
+      in
       fds := Fd.Map.add fd ppf !fds;
       ppf
   in

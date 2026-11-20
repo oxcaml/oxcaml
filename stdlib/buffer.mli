@@ -80,7 +80,7 @@ val sub : t -> int -> int -> string
     @raise Invalid_argument if [off] and [len] do not designate a valid
     range of [b]. *)
 
-val blit : t @ local -> int -> bytes @ local -> int -> int -> unit
+val blit : t -> int -> bytes @ local -> int -> int -> unit
 (** [Buffer.blit src srcoff dst dstoff len] copies [len] characters from
    the current contents of the buffer [src], starting at offset [srcoff]
    to [dst], starting at character [dstoff].
@@ -108,7 +108,7 @@ val reset : t -> unit
    For long-lived buffers that may have grown a lot, [reset] allows
    faster reclamation of the space used by the buffer. *)
 
-val output_buffer : out_channel -> t -> unit
+val output_buffer : out_channel @ local -> t -> unit
 (** [output_buffer oc b] writes the current contents of buffer [b]
    on the output channel [oc]. *)
 
@@ -147,21 +147,21 @@ val add_utf_16be_uchar : t -> Uchar.t -> unit
 
     @since 4.06 *)
 
-val add_string : t @ local -> string @ local -> unit
+val add_string : t -> string @ local -> unit
 (** [add_string b s] appends the string [s] at the end of buffer [b]. *)
 
-val add_bytes : t @ local -> bytes @ local -> unit
+val add_bytes : t -> bytes @ local read -> unit
 (** [add_bytes b s] appends the byte sequence [s] at the end of buffer [b].
     @since 4.02 *)
 
-val add_substring : t -> string -> int -> int -> unit
+val add_substring : t -> string @ local -> int -> int -> unit
 (** [add_substring b s ofs len] takes [len] characters from offset
    [ofs] in string [s] and appends them at the end of buffer [b].
 
     @raise Invalid_argument if [ofs] and [len] do not designate a valid
     range of [s]. *)
 
-val add_subbytes : t -> bytes -> int -> int -> unit
+val add_subbytes : t -> bytes @ local read -> int -> int -> unit
 (** [add_subbytes b s ofs len] takes [len] characters from offset
     [ofs] in byte sequence [s] and appends them at the end of buffer [b].
 
@@ -170,7 +170,7 @@ val add_subbytes : t -> bytes -> int -> int -> unit
 
     @since 4.02 *)
 
-val add_substitute : t -> (string -> string) -> string -> unit
+val add_substitute : t -> (string -> string) @ local -> string -> unit
 (** [add_substitute b f s] appends the string pattern [s] at the end
    of buffer [b] with substitution.
    The substitution process looks for variable references in
@@ -188,7 +188,7 @@ val add_buffer : t -> t -> unit
 (** [add_buffer b1 b2] appends the current contents of buffer [b2]
    at the end of buffer [b1].  [b2] is not modified. *)
 
-val add_channel : t -> in_channel -> int -> unit
+val add_channel : t -> in_channel @ local -> int -> unit
 (** [add_channel b ic n] reads at most [n] characters from the
    input channel [ic] and stores them at the end of buffer [b].
    @raise End_of_file if the channel contains fewer than [n]
@@ -306,19 +306,19 @@ val add_int32_le : t -> int32 -> unit
     @since 4.08
 *)
 
-val add_int64_ne  : t -> int64 -> unit
+val add_int64_ne  : t -> int64 @ local -> unit
 (** [add_int64_ne b i] appends a binary native-endian 64-bit integer
     [i] to [b].
     @since 4.08
 *)
 
-val add_int64_be : t -> int64 -> unit
+val add_int64_be : t -> int64 @ local -> unit
 (** [add_int64_be b i] appends a binary big-endian 64-bit integer
     [i] to [b].
     @since 4.08
 *)
 
-val add_int64_le : t -> int64 -> unit
+val add_int64_le : t -> int64 @ local -> unit
 (** [add_int64_ne b i] appends a binary little-endian 64-bit integer
     [i] to [b].
     @since 4.08

@@ -10,11 +10,11 @@ potential failures, so lifting the result in an int option).
   > tr '\n' ' ' | jq  '.value[] | {name,type}'
   {
     "name": "int_of_string_opt",
-    "type": "string -> int option"
+    "type": "string @ local -> int option"
   }
   {
     "name": "int_of_string_opt",
-    "type": "string -> int option"
+    "type": "string @ local -> int option"
   }
   {
     "name": "Int32.of_string_opt",
@@ -30,11 +30,11 @@ potential failures, so lifting the result in an int option).
   }
   {
     "name": "bool_of_string_opt",
-    "type": "string -> bool option"
+    "type": "string @ local -> bool option"
   }
   {
     "name": "bool_of_string_opt",
-    "type": "string -> bool option"
+    "type": "string @ local -> bool option"
   }
   {
     "name": "Float.of_string_opt",
@@ -42,11 +42,11 @@ potential failures, so lifting the result in an int option).
   }
   {
     "name": "float_of_string_opt",
-    "type": "string -> float option"
+    "type": "string @ local -> float option"
   }
   {
     "name": "float_of_string_opt",
-    "type": "string -> float option"
+    "type": "string @ local -> float option"
   }
 
 2.) Looking for a function that take a list of list of flatten-it into
