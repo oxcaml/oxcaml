@@ -17,8 +17,9 @@ abbrev expectedImplementation : Expr :=
   let intMod : BinaryScalarOperation := .integral .modulo
   let immZero : Immediate := { bitsAboveLsb := 0#63 }
   let immOne : Immediate := { bitsAboveLsb := 1#63 }
+  let immTwo : Immediate := { bitsAboveLsb := 2#63 }
   let zero : Expr := .val (.immediate immZero)
-  let two : Expr := .val (.immediate { bitsAboveLsb := 2#63 })
+  let two : Expr := .val (.immediate immTwo)
   let argModTwo : Expr := .scalarOperation (.binary intMod (.var 0) two)
   let argIsEven : Expr := .physicalEquality argModTwo zero
   let bodyIfFalse : ImmediateSwitchCase :=
@@ -36,32 +37,21 @@ example : Oxiclean.Extracted.Even.dependencies = dependencies := by rfl
 example : Oxiclean.Extracted.Even.interface = expectedInterface := by rfl
 example : Oxiclean.Extracted.Even.implementation = expectedImplementation := by rfl
 
-abbrev expectedStatics : Type :=
-  Statics.ModuleItem
-    (Statics.TypeDeclaration Statics.AbstractType)
-    Statics.ModuleEnd
+abbrev refinedInterface : ModuleType :=
+  let int : ValType := .constr (.predef .int) []
+  let t : ValType := .constr (.field (.var 0) 0) []
+  let t_option : ValType := .constr (.predef .option) [t]
+  let create : ValType := .arrow int t_option
+  let get : ValType := .arrow t int
 
-example : Oxiclean.Extracted.Even.interface.statics = expectedStatics := by rfl
+  .signature [.valType { manifest := TODO, arity := 0 }] [.val create, .val get]
 
-abbrev userDefinedStatics : expectedStatics :=
-  { item :=
-      { typeDeclaration :=
-          { abstractTypeRelation :=
-              PER.refinedImmediate (fun bitsAboveLsb => bitsAboveLsb[0] = false)
-          }
-      }
-  , tail := {}
-  }
+example
+    : refinedInterface.validWrtExtraction
+        Oxiclean.Extracted.Even.interface := by rfl
 
-def expectedRelation (_ _ : Value) : Prop := True
+abbrev expectedRelation {Step} [S : StepRelation S] : PER Value :=
+  PER.always
 
-/-
-example :
-    ∀ lhs rhs,
-    Oxiclean.Extracted.Even.interface.structuralRelation
-      userDefinedStatics
-      lhs
-      rhs ↔
-    expectedRelation lhs rhs := by
-  sorry
--/
+example {Step} [S : StepRelation S]
+    : refinedInterface.structuralRelation = expectedRelation := by rfl
