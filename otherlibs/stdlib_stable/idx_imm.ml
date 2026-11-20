@@ -51,3 +51,39 @@ external unsafe_create_into_iarray_indexed_by_nativeint
   : ('a : any mod non_float). nativeint_u -> ('a iarray, 'a) idx_imm
   = "%unsafe_array_idx_indexed_by_nativeint#"
 [@@layout_poly]
+
+external unsafe_advance
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_imm -> by:int -> ('a, 'b) idx_imm
+  = "%unsafe_idx_array_advance"
+[@@layout_poly]
+
+external unsafe_advance_indexed_by_int8
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_imm -> by:int8# -> ('a, 'b) idx_imm
+  = "%unsafe_idx_array_advance_indexed_by_int8#"
+[@@layout_poly]
+
+external unsafe_advance_indexed_by_int16
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_imm -> by:int16# -> ('a, 'b) idx_imm
+  = "%unsafe_idx_array_advance_indexed_by_int16#"
+[@@layout_poly]
+
+external unsafe_advance_indexed_by_int32
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_imm -> by:int32_u -> ('a, 'b) idx_imm
+  = "%unsafe_idx_array_advance_indexed_by_int32#"
+[@@layout_poly]
+
+external unsafe_advance_indexed_by_int64
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_imm -> by:int64_u -> ('a, 'b) idx_imm
+  = "%unsafe_idx_array_advance_indexed_by_int64#"
+[@@layout_poly]
+
+external unsafe_advance_indexed_by_nativeint
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_imm -> by:nativeint_u -> ('a, 'b) idx_imm
+  = "%unsafe_idx_array_advance_indexed_by_nativeint#"
+[@@layout_poly]

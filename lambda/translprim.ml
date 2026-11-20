@@ -38,6 +38,7 @@ type error =
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
   | Unable_to_specialize_array_idx_primitive of Types.type_expr
+  | Unable_to_specialize_idx_array_advance_primitive of Types.type_expr
   | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
@@ -1389,6 +1390,28 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
         (Punspecializedarray,
          Punboxed_or_untagged_integer_index Unboxed_nativeint,
          Value generic_value, []), 1)
+    | "%unsafe_idx_array_advance" ->
+      Primitive(Pidx_array_advance (Punspecializedarray, Ptagged_int_index), 2)
+    | "%unsafe_idx_array_advance_indexed_by_int8#" ->
+      Primitive(Pidx_array_advance
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Untagged_int8), 2)
+    | "%unsafe_idx_array_advance_indexed_by_int16#" ->
+      Primitive(Pidx_array_advance
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Untagged_int16), 2)
+    | "%unsafe_idx_array_advance_indexed_by_int32#" ->
+      Primitive(Pidx_array_advance
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Unboxed_int32), 2)
+    | "%unsafe_idx_array_advance_indexed_by_int64#" ->
+      Primitive(Pidx_array_advance
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Unboxed_int64), 2)
+    | "%unsafe_idx_array_advance_indexed_by_nativeint#" ->
+      Primitive(Pidx_array_advance
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Unboxed_nativeint), 2)
     | "%unsafe_get_ptr_imm" ->
       (* This primitive requires the pointed-to data to be truly immutable,
          which the compiler will rely upon when performing optimizations *)
@@ -2169,6 +2192,21 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     | _ ->
       (* Either something known to get reordered or an [any] that might be *)
       raise (Error (loc, Element_would_be_reordered_in_record));
+    end
+  | Primitive (Pidx_array_advance (_, ik), arity), p1 :: _ ->
+    let loc = to_location loc in
+    (* The types of the parameters of primitives are [Tpoly]s *)
+    let idx_ty =
+      match Types.get_desc p1 with Tpoly (ty, _) -> ty | _ -> p1
+    in
+    begin match Types.get_desc (Ctype.expand_head env idx_ty) with
+    | Tconstr (p, [_; elt_ty], _)
+      when Path.same p Predef.path_idx_mut
+        || Path.same p Predef.path_idx_imm ->
+      let ak = Typeopt.array_kind_of_elt env loc elt_ty in
+      Some (Primitive (Pidx_array_advance (ak, ik), arity))
+    | _ ->
+      raise (Error (loc, Unable_to_specialize_idx_array_advance_primitive p1))
     end
   | _ -> None
 
@@ -3024,6 +3062,13 @@ let report_error_doc ppf = function
          whose first parameter is equal to %a or %a.@]"
         Style.inline_code "(_, _) idx_mut" Style.inline_code "(_, _) idx_imm"
         Style.inline_code "_ array" Style.inline_code "_ iarray"
+  | Unable_to_specialize_idx_array_advance_primitive ty ->
+      fprintf ppf
+        "@[Unable to determine the array kind for array index primitive: \
+         the@ type of its first argument,@ %a,@ should be equal to a %a or \
+         %a.@]"
+        (Style.as_inline_code Printtyp.Doc.type_expr) ty
+        Style.inline_code "(_, _) idx_mut" Style.inline_code "(_, _) idx_imm"
   | Element_would_be_reordered_in_record ->
       fprintf ppf
         "Block indices into arrays of unboxed products containing a@ \
