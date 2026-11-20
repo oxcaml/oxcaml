@@ -73,6 +73,7 @@ let terminator : Cfg.terminator -> int =
   | Invalid _ -> 12
   | Call _ -> 13
   | Prim _ -> 14
+  | Call_no_return _ -> 15
 
 let rec basic_instruction_cell :
     Cfg.basic Cfg.instruction DLL.cell option -> fuel:int -> acc:int -> int =
