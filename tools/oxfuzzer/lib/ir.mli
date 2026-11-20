@@ -359,6 +359,15 @@ module Expr : sig
         }
         (** Evaluates [body] in a handler of [eff], which resumes every
             [perform] with [resume] applied to its payload. *)
+    | Let_stack_function of
+        { name : Name.t;
+          lambda : t;  (** A [Lambda], allocated on the stack. *)
+          body : t
+        }
+    | Apply_stack_function of
+        { name : Name.t;
+          args : t list
+        }  (** Not a tail call, as a local function cannot be one. *)
 
   and raise =
     { exn : Exn.t;
