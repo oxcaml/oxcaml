@@ -261,14 +261,14 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val id :
-             ('a : '_representable_layout_4 & '_representable_layout_5).
-               'a -> 'a
+             ('a : '_representable_layout_4
+                   & '_representable_layout_5 inherit). 'a -> 'a
          end
        is not included in
          Id
        Values do not match:
          val id :
-           ('a : '_representable_layout_4 & '_representable_layout_5).
+           ('a : '_representable_layout_4 & '_representable_layout_5 inherit).
              'a -> 'a
        is not included in
          val id : layout_ l l0. ('a : l & l0). 'a -> 'a @@ stateless
@@ -422,14 +422,14 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val id :
-             ('a : '_representable_layout_7 & '_representable_layout_8).
-               'a -> 'a
+             ('a : '_representable_layout_7
+                   & '_representable_layout_8 inherit). 'a -> 'a
          end
        is not included in
          Id
        Values do not match:
          val id :
-           ('a : '_representable_layout_7 & '_representable_layout_8).
+           ('a : '_representable_layout_7 & '_representable_layout_8 inherit).
              'a -> 'a
        is not included in
          val poly_ id : #('a * int) -> #('a * int)

@@ -243,7 +243,7 @@ module Layout = struct
         | Product ts ->
           String.concat ""
             [ (if nested then "(" else "");
-              String.concat " & " (List.map (to_string true) ts);
+              String.concat " & " (List.map component_to_string ts);
               (if nested then ")" else "") ]
         | Univar ({ name = n }, sa) ->
           let name = match n with Some n -> n | None -> "_" in
@@ -261,6 +261,10 @@ module Layout = struct
                 (Scannable_axes.residual (implied_box_axes t) sa)
           in
           String.concat " " ((to_string true t ^ " box") :: axes)
+      and component_to_string t =
+        if is_surely_addressable t
+        then to_string true (strip_head_addressable t)
+        else to_string true t ^ " inherit"
       in
       to_string false t
 
@@ -344,32 +348,6 @@ module Layout = struct
       if s' == s then t else Sort (s', sa)
     | (Any _ | Product _ | Box _) as t -> t
 
-  (* [constrain_below_addressable t] constrains [t < t addressable] *)
-  let rec constrain_below_addressable ~allow_mutation :
-      Sort.t t -> (unit, error) result = function
-    | Any _ -> Error Incompatible
-    | Addressable _ -> Ok ()
-    | Box _ -> Ok ()
-    | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
-    | Product ts ->
-      Misc.Stdlib.List.fold_left_result
-        (fun () t -> constrain_below_addressable ~allow_mutation t)
-        () ts
-
-  (* [constrain_above_addressable t] constrains [t addressable < t].
-     This differs from [constrain_below_addressable] only for kinds containing
-     [any]. *)
-  let rec constrain_above_addressable ~allow_mutation :
-      Sort.t t -> (unit, error) result = function
-    | Any _ -> Ok ()
-    | Addressable _ -> Ok ()
-    | Box _ -> Ok ()
-    | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
-    | Product ts ->
-      Misc.Stdlib.List.fold_left_result
-        (fun () -> constrain_above_addressable ~allow_mutation)
-        () ts
-
   let rec is_surely_addressable_flat : Sort.Flat.t t -> bool = function
     | Addressable _ -> true
     | Box _ -> true
@@ -378,6 +356,11 @@ module Layout = struct
     | Sort ((Sort.Flat.Var _ | Sort.Flat.Genvar _ | Sort.Flat.Univar _), _) ->
       false
     | Product ts -> List.for_all is_surely_addressable_flat ts
+
+  let rec strip_head_addressable_flat : Sort.Flat.t t -> Sort.Flat.t t =
+    function
+    | Addressable t -> strip_head_addressable_flat t
+    | (Sort _ | Product _ | Any _ | Box _) as t -> t
 
   (* Filling sort variables in [t] can only lower [implied_box_axes t].
 
@@ -660,12 +643,11 @@ module Layout = struct
           Fmt.fprintf ppf "%a" Sort.format s)
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
-      | Addressable t -> (
-        match constrain_below_addressable ~allow_mutation:false t with
-        | Ok () -> pp_element ~nested ppf t
-        | Error _ ->
-          Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t)
+        Fmt.pp_nested_list ~nested ~pp_element:pp_component ~pp_sep ppf ts
+      | Addressable t ->
+        if is_surely_addressable t
+        then pp_element ~nested ppf t
+        else Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t
       | Box (t, sa) ->
         let axes =
           Scannable_axes.to_string_list
@@ -673,6 +655,10 @@ module Layout = struct
         in
         Fmt.fprintf ppf "%a %a" (pp_element ~nested:true) t pp_string_list
           ("box" :: axes)
+    and pp_component ~nested ppf t =
+      if is_surely_addressable t
+      then pp_element ~nested ppf (strip_head_addressable t)
+      else Fmt.fprintf ppf "%a inherit" (pp_element ~nested:true) t
     in
     pp_element ~nested:false ppf layout
 
@@ -734,6 +720,7 @@ type error =
   | Unimplemented_syntax
   | With_on_right : (_ * allowed) History.annotation_context -> error
   | Abstract_kind_in_product
+  | Inherit_outside_product
   | Box_on_abstract_kind of Path.t
 
 module Error : sig
@@ -2597,34 +2584,6 @@ module Const = struct
       | (Layout _ | Kconstr _), _ -> false)
     && Mod_bounds.equal mod_bounds mod_bounds'
 
-  let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
-      =
-    let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
-        (kind : (l * r) t) =
-      let { base; mod_bounds; with_bounds } =
-        Base_and_axes.fully_expand_aliases_const env kind
-      in
-      let layout =
-        (* CR layouts: The [Kconstr] case here is pretty sad - see internal
-           ticket 5769 *)
-        match base with
-        | Kconstr (_, sa, _) ->
-          Error.log_or_raise ~loc Abstract_kind_in_product;
-          Layout.Const.any sa
-        | Layout l -> l
-      in
-      ( layout :: layouts_acc,
-        Mod_bounds.join mod_bounds mod_bounds_acc,
-        With_bounds.join with_bounds with_bounds_acc )
-    in
-    let layouts, mod_bounds, with_bounds =
-      List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
-    in
-    { base = Layout (Layout.Const.product (List.rev layouts));
-      mod_bounds;
-      with_bounds
-    }
-
   let transl_kind_operator ({ txt; loc } : string Location.loc) :
       (Kind_operator.t Location.loc, _) result =
     let scannable_axis axis = Kind_operator.Scannable_axis axis in
@@ -2725,13 +2684,59 @@ module Const = struct
       in
       jkind
     | Pjk_product ts ->
-      let jkinds =
-        List.map
-          (of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
-             env context)
+      let layouts, mod_bounds, with_bounds =
+        List.fold_left
+          (fun (layouts, mod_bounds_acc, with_bounds_acc)
+               (annot : Parsetree.jkind_annotation) ->
+            (* [&] makes the components that are not [inherit] addressable *)
+            let annot, (operator : Jkind_types.Kind_operator.t) =
+              match annot.pjka_desc with
+              | Pjk_inherit inner -> inner, Id
+              | _ -> annot, Addressable
+            in
+            (* If this component isn't under an [inherit], it may have a
+               technically-redundant [addressable], like in
+               [bits8 addressable & bits8].
+
+               However, we choose not to warn in this case, as it is less
+               "obviously wrong" than writing e.g. [bits8 addressable
+               addressable] or (more contentiously) [value addressable].
+
+               The broader principle is that users should be able to write kind
+               annotations that follow the structure of their types without too
+               much extra thought. For example, for some kind [k], it would be
+               nice if the following never warns:
+               {[
+                 type ('a : k) t : k & k = #{ x : 'a; y : 'a }
+               ]}
+
+               Yet if we warned for redundant [addressable]s under a product,
+               this would warn for e.g. [k := bits8 addressable].
+            *)
+            let { base; mod_bounds; with_bounds } =
+              of_user_written_annotation_unchecked_level ~use_abstract_jkinds
+                ~warn env context annot
+              |> Base_and_axes.fully_expand_aliases_const env
+            in
+            let layout =
+              (* CR layouts: The [Kconstr] case here is pretty sad - see
+                 internal ticket 5769 *)
+              match base with
+              | Kconstr (_, sa, _) ->
+                Error.log_or_raise ~loc Abstract_kind_in_product;
+                Layout.Const.any sa
+              | Layout l -> Layout.Const.apply_operator l operator
+            in
+            ( layout :: layouts,
+              Mod_bounds.join mod_bounds mod_bounds_acc,
+              With_bounds.join with_bounds with_bounds_acc ))
+          ([], Mod_bounds.min, No_with_bounds)
           ts
       in
-      jkind_of_product_annotations ~loc env jkinds
+      { base = Layout (Layout.Const.product (List.rev layouts));
+        mod_bounds;
+        with_bounds
+      }
     | Pjk_with (base, type_, modalities) -> (
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
@@ -2776,6 +2781,7 @@ module Const = struct
           mod_bounds = base.mod_bounds;
           with_bounds = With_bounds.add type_ { bounds_mask } base.with_bounds
         })
+    | Pjk_inherit _ -> Error.log_and_raise ~loc Inherit_outside_product
     | Pjk_default | Pjk_kind_of _ ->
       Error.log_and_raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
@@ -2858,8 +2864,10 @@ module Desc = struct
          layouts. *)
       | Layout (Product lays) ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
-          (List.map (fun layout -> { desc with base = Layout layout }) lays)
+        Fmt.pp_nested_list ~nested
+          ~pp_element:(fun ~nested ppf layout ->
+            format_ampersand_component ~nested ppf desc layout)
+          ~pp_sep ppf lays
       | Layout (Addressable lay) when Option.is_none (get_const desc) ->
         if Layout.is_surely_addressable_flat lay
         then format_desc ~nested ppf { desc with base = Layout lay }
@@ -2877,6 +2885,17 @@ module Desc = struct
         match get_const desc with
         | Some c -> Const.format ~verbosity env ppf c
         | None -> assert false (* handled above *))
+    and format_ampersand_component ~nested ppf (desc : _ t)
+        (layout : Sort.Flat.t Layout.t) =
+      let format_desc ~nested ppf layout =
+        format_desc ~nested ppf { desc with base = Layout layout }
+      in
+      if Layout.is_surely_addressable_flat layout
+      then format_desc ~nested ppf (Layout.strip_head_addressable_flat layout)
+      else
+        Fmt.fprintf ppf "%a inherit"
+          (fun ppf -> format_desc ~nested:true ppf)
+          layout
     in
     format_desc ppf ~nested:false t
 
@@ -3367,6 +3386,65 @@ let apply_or_null_l env jkind =
     | Some l -> Ok (set_layout jkind l)
     | None -> Error ())
 
+let apply_operator_l (operator : Jkind_types.Kind_operator.t) jkind =
+  match operator with
+  | Id -> jkind
+  | Addressable ->
+    let base =
+      match jkind.jkind.base with
+      | Layout l -> Layout (Layout.addressable l)
+      | Kconstr (p, sa, op) ->
+        Kconstr (p, sa, Jkind_types.Kind_operator.compose op Addressable)
+    in
+    { jkind with jkind = { jkind.jkind with base } }
+
+let constrain_addressable_with ~constrain env jkind =
+  match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
+  | Layout l -> constrain ~allow_mutation:true l |> Result.map_error ignore
+  | Kconstr (_, _, Addressable) -> Ok ()
+  | Kconstr (_, _, Id) -> Error ()
+
+let constrain_below_addressable env jkind =
+  constrain_addressable_with ~constrain:Layout.constrain_below_addressable env
+    jkind
+
+let constrain_above_addressable env jkind =
+  constrain_addressable_with ~constrain:Layout.constrain_above_addressable env
+    jkind
+
+let apply_addressable_r env jkind =
+  let jkind =
+    { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+  in
+  match jkind.jkind.base with
+  | Layout l -> (
+    (* In this case, we want to return a [jkind'] such that for any [k],
+       [k addressable < jkind] can be reduced to [k < jkind'].
+
+       Our strategy is to first constrain [jkind] "above addressable", which
+       can be thought of as asserting ['fresh addressable < jkind]. Then, we
+       return [jkind] stripping addressability, which can be thought of as
+       returning ['fresh].
+
+       This meets our original requirement, as [k < 'fresh] implies
+       [k addressable < 'fresh addressable < jkind].
+
+       However, stripping addressability is incomplete, in the same way that
+       [Sort.Const.equate] is for addressability. This should be fixed when
+       variables can carry proper addressability constraints. *)
+    match Layout.constrain_above_addressable ~allow_mutation:true l with
+    | Ok () -> Ok (set_layout jkind (Layout.strip_head_addressable l))
+    | Error _ -> Error ())
+  | Kconstr (p, sa, Addressable) ->
+    Ok { jkind with jkind = { jkind.jkind with base = Kconstr (p, sa, Id) } }
+  | Kconstr (_, _, Id) -> Error ()
+
+let is_surely_addressable env jkind =
+  match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
+  | Layout l -> Layout.is_surely_addressable l
+  | Kconstr (_, _, Addressable) -> true
+  | Kconstr (_, _, Id) -> false
+
 let apply_or_null_r env jkind =
   let payload_axes ({ nullability; separability } : Scannable_axes.t) :
       Scannable_axes.t option =
@@ -3430,35 +3508,31 @@ let for_or_null_variant env ~payload_type ~modality ~payload_jkind =
 
 let get_annotation jk = jk.annotation
 
+type 'd decomposed_product =
+  { components : 'd jkind list;
+    outer_addressable : bool
+  }
+
 let decompose_product env jk =
   let mk_jkind layout = set_layout jk layout in
-  let rec deal_with_sort : Sort.t -> _ = function
+  let rec deal_with_sort ~addressable : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
     | Product sorts ->
-      Some (List.map (fun sort -> Layout.Sort (sort, Scannable_axes.max)) sorts)
-    | Addressable s ->
-      (* Given a kind [jk] which should equal [k_0 & k_1 & ...] (e.g. for an
-         unboxed tuple/record being inspected in [Ctype.constrain_type_jkind]),
-         [decompose_product] tries to return the list of [k_i]s.
-
-         When [jk = _ addressable], the only way for [k_0 & k_1 & ...] to equal
-         [jk] is for each component to be addressable. *)
-      Option.map (List.map (fun l -> Layout.Addressable l)) (deal_with_sort s)
+      Some
+        ( List.map (fun sort -> Layout.Sort (sort, Scannable_axes.max)) sorts,
+          addressable )
+    | Addressable s -> deal_with_sort ~addressable:true s
     | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
   match extract_layout env jk with
   | Error _ -> None
   | Ok layout ->
-    let rec deal_with_layout : _ Layout.t -> _ = function
+    let rec deal_with_layout ~addressable : _ Layout.t -> _ = function
       | Any _ -> None
-      | Addressable l ->
-        (* see [deal_with_sort] *)
-        Option.map
-          (List.map (fun l -> Layout.Addressable l))
-          (deal_with_layout l)
-      | Product layouts -> Some layouts
-      | Sort (s, _) -> deal_with_sort (Sort.get s)
+      | Addressable l -> deal_with_layout ~addressable:true l
+      | Product layouts -> Some (layouts, addressable)
+      | Sort (s, _) -> deal_with_sort ~addressable (Sort.get s)
       | Box _ -> None
     in
     (* CR layouts v7.1: The histories here are wrong (we are giving each
@@ -3467,7 +3541,12 @@ let decompose_product env jk =
        part of improving errors around products. A couple options: re-work
        the relevant bits of [Ctype.type_jkind_sub] to just work on layouts,
        or introduce product histories. *)
-    Option.map (List.map mk_jkind) (deal_with_layout layout)
+    Option.map
+      (fun (layouts, addressable) ->
+        { components = List.map mk_jkind layouts;
+          outer_addressable = addressable
+        })
+      (deal_with_layout ~addressable:false layout)
 
 (*********************************)
 (* pretty printing *)
@@ -3846,6 +3925,8 @@ module Format_history = struct
       = function
     | Unboxed_tuple -> fprintf ppf "it is an unboxed tuple"
     | Unboxed_record -> fprintf ppf "it is an unboxed record"
+    | Unboxed_record_making_field_addressable ->
+      fprintf ppf "it is an unboxed record, which makes its fields addressable"
 
   let format_creation_reason ppf ~layout_or_kind :
       History.creation_reason -> unit = function
@@ -4478,15 +4559,17 @@ module Unboxed_field_transformation = struct
      and loosened by the modality. *)
   type t =
     { modality : Mode.Modality.Const.t;
-      mutability_transformation : Axis_lattice.t
+      mutability_transformation : Axis_lattice.t;
           (** Tracks how to weaken based on mutability, since outer modalities
               allow some mutability contributions to be ignored (see [nest]).
               Bottom on axes other than contention and visibility. *)
+      operator : Jkind_types.Kind_operator.t
     }
 
   let id =
     { modality = Mode.Modality.Const.id;
-      mutability_transformation = Axis_lattice.bot
+      mutability_transformation = Axis_lattice.bot;
+      operator = Id
     }
 
   (* A [mutable] label (without modalities) contributes only to the axes on
@@ -4498,7 +4581,7 @@ module Unboxed_field_transformation = struct
   let mutable_label_axes =
     Axis_lattice.co_sub Axis_lattice.mutable_data Axis_lattice.immutable_data
 
-  let of_field ~(mutability : Types.mutability) ~modality =
+  let of_field ~(mutability : Types.mutability) ~modality ~operator =
     let mutability_transformation =
       match mutability with
       | Immutable -> Axis_lattice.bot
@@ -4507,12 +4590,17 @@ module Unboxed_field_transformation = struct
         Misc.fatal_error
           "Jkind.Unboxed_field_transformation.of_field: atomic field"
     in
-    { modality; mutability_transformation }
+    { modality; mutability_transformation; operator }
 
-  let of_modality modality = of_field ~mutability:Immutable ~modality
+  let of_modality modality =
+    of_field ~mutability:Immutable ~modality ~operator:Id
 
-  let of_label ({ ld_modalities; ld_mutable; _ } : Types.label_declaration) =
+  let of_label
+      ({ ld_modalities; ld_mutable; _ } as ld : Types.label_declaration) =
     of_field ~mutability:ld_mutable ~modality:ld_modalities
+      ~operator:(Types.field_kind_operator ld)
+
+  let of_tuple_component = { id with operator = Addressable }
 
   (* The modality of [outer] masks the [mutability_transformation] of the
      [inner].
@@ -4530,7 +4618,8 @@ module Unboxed_field_transformation = struct
     in
     { modality = Mode.Modality.Const.concat outer.modality ~then_:inner.modality;
       mutability_transformation =
-        Axis_lattice.join outer.mutability_transformation masked_inner_weakening
+        Axis_lattice.join outer.mutability_transformation masked_inner_weakening;
+      operator = Jkind_types.Kind_operator.compose outer.operator inner.operator
     }
 
   let weaken weakening (jk : _ jkind) =
@@ -4553,7 +4642,9 @@ module Unboxed_field_transformation = struct
        type 'a t = #{ mutable a : 'a @@ contended }
    *)
   let apply_l t jk =
-    apply_modality_l t.modality jk |> weaken t.mutability_transformation
+    apply_modality_l t.modality jk
+    |> weaken t.mutability_transformation
+    |> apply_operator_l t.operator
 
   (* The modality loosens the container's upper bound [jk], turning it into a
      (potentially weaker) requirement on the contents.
@@ -4561,16 +4652,23 @@ module Unboxed_field_transformation = struct
      The [mutability_transformation] restricts crossing regardless of the
      record's contents; we fail if the [jk] bound requires more crossing than
      the transformation allows. For instance, if [jk] requires crossing
-     contention and the transformation says it doesn't, we fail. *)
-  let apply_r t jk =
+     contention and the transformation says it doesn't, we fail.
+
+     The right adjoint of [addressable] can only be applied incompletely (see
+     [apply_addressable_r]), so the operator is returned for the caller to
+     handle. *)
+  let apply_r_except_op t jk =
     let satisfiable =
       Axis_lattice.leq t.mutability_transformation
         (Mod_bounds.to_axis_lattice jk.jkind.mod_bounds)
     in
-    if satisfiable then Ok (apply_modality_r t.modality jk) else Error ()
+    if satisfiable
+    then Ok (t.operator, apply_modality_r t.modality jk)
+    else Error ()
 
-  (* The failure reasons carry over: [apply_r] only relaxes the requirement on
-     axes that [apply_l] strengthens, and [apply_r] succeeding means that the
+  (* The failure reasons carry over: [apply_r_except_op] only relaxes the
+     requirement on axes that [apply_l] strengthens, and [apply_r_except_op]
+     succeeding means that the
      weakening by [mutability_transformation] can't introduce new failures. *)
   let unapply_violation ~context env t ~history jk
       ({ violation; missing_cmi } : Violation.t) =
@@ -4584,10 +4682,29 @@ module Unboxed_field_transformation = struct
 end
 
 let product_of_fields ~why fields layouts =
+  let why : History.product_creation_reason =
+    match (why : History.product_creation_reason), fields, layouts with
+    | ( Unboxed_record,
+        [(_, ({ operator = Addressable; _ } : Unboxed_field_transformation.t))],
+        [layout] )
+      when not (Layout.is_surely_addressable layout) ->
+      Unboxed_record_making_field_addressable
+    | ( ( Unboxed_tuple | Unboxed_record
+        | Unboxed_record_making_field_addressable ),
+        _,
+        _ ) ->
+      why
+  in
+  let layouts =
+    List.map2
+      (fun (_, (wrapping : Unboxed_field_transformation.t)) layout ->
+        Layout.apply_operator layout wrapping.operator)
+      fields layouts
+  in
   let mod_bounds, with_bounds =
     List.fold_right
       (fun ( type_expr,
-             ({ modality; mutability_transformation } :
+             ({ modality; mutability_transformation; operator = _ } :
                Unboxed_field_transformation.t) ) (mod_bounds, with_bounds) ->
         ( Mod_bounds.join_axis_lattice mod_bounds mutability_transformation,
           With_bounds.add_modality ~type_expr ~modality with_bounds ))
@@ -5208,6 +5325,8 @@ module Debug_printers = struct
     function
     | Unboxed_tuple -> fprintf ppf "Unboxed_tuple"
     | Unboxed_record -> fprintf ppf "Unboxed_record"
+    | Unboxed_record_making_field_addressable ->
+      fprintf ppf "Unboxed_record_making_field_addressable"
 
   let creation_reason ppf : History.creation_reason -> unit = function
     | Annotated (ctx, loc) ->
@@ -5348,6 +5467,10 @@ let report_error ~loc : error -> _ = function
       Location.errorf ~loc "'with' syntax is not allowed on a right kind.")
   | Abstract_kind_in_product ->
     Location.errorf ~loc "Abstract kinds are not yet supported in products."
+  | Inherit_outside_product ->
+    Location.errorf ~loc
+      "%a must be on the outside of a component of a product kind."
+      Misc.Style.inline_code "inherit"
   | Box_on_abstract_kind p ->
     Location.errorf ~loc
       "The kind constructor box cannot yet be applied to the abstract kind %s."

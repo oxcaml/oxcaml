@@ -169,6 +169,11 @@ Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effe
 type t17b : value & value
 |}]
 
+type t17c : value & bits16 inherit
+[%%expect{|
+type t17c : value & bits16 inherit
+|}]
+
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
   ('a : value mod immutable global)
 [%%expect{|
@@ -1316,12 +1321,14 @@ type 'a with_idx : value & immediate =
 let idx #{ data = _ ; i } = i
 let #{ data = payload; _ } = #{ data = "payload" ; i = 0 }
 let inc r = #{ r with i = r.#i + 1 }
+type inherited : float64 = #{ inherit f : float# }
 [%%expect{|
 type 'a boxed_with_idx = { data : 'a; i : int; }
 type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
 val idx : 'a with_idx -> int = <fun>
 val payload : string = "payload"
 val inc : 'a with_idx -> 'a with_idx = <fun>
+type inherited = #{ inherit f : float#; }
 |}]
 
 (*****************)

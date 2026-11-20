@@ -184,6 +184,10 @@ module Sort = struct
 
     let product cs = Product cs
 
+    let strip_head_addressable = function
+      | Addressable c -> c
+      | (Base _ | Product _ | Univar _ | Genvar _) as c -> c
+
     let univar uv = Univar uv
 
     let genvar (v : var) =
@@ -201,18 +205,40 @@ module Sort = struct
         equal c1 c2
       | (Base _ | Product _ | Univar _ | Genvar _ | Addressable _), _ -> false
 
+    let rec equal_up_to_addressability c1 c2 =
+      match c1, c2 with
+      | Addressable c1, c2 | c1, Addressable c2 ->
+        equal_up_to_addressability c1 c2
+      | Product cs1, Product cs2 ->
+        List.equal equal_up_to_addressability cs1 cs2
+      | (Base _ | Product _ | Univar _ | Genvar _), _ -> equal c1 c2
+
+    let rec is_surely_addressable = function
+      | Base b -> base_is_addressable b
+      | Product cs -> List.for_all is_surely_addressable cs
+      | Univar _ | Genvar _ -> false
+      | Addressable _ -> true
+
+    (* Maintains invariant of no redundant [Addressable] constructors in
+       constants *)
+    let addressable c = if is_surely_addressable c then c else Addressable c
+
     let format ppf c =
       let module Fmt = Format_doc in
       let rec pp_element ~nested ppf = function
         | Base b -> Fmt.fprintf ppf "%s" (to_string_base b)
         | Product cs ->
           let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-          Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf cs
+          Fmt.pp_nested_list ~nested ~pp_element:pp_component ~pp_sep ppf cs
         | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
         | Univar { name = None } -> Fmt.fprintf ppf "_"
         | Genvar v -> Fmt.fprintf ppf "%s" (to_string_genvar v)
         | Addressable c ->
           Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) c
+      and pp_component ~nested ppf c =
+        if is_surely_addressable c
+        then pp_element ~nested ppf (strip_head_addressable c)
+        else Fmt.fprintf ppf "%a inherit" (pp_element ~nested:true) c
       in
       pp_element ~nested:false ppf c
 
@@ -229,16 +255,6 @@ module Sort = struct
         (* CR box: This may have to be updated once addressability affects boxed
            representations *)
         all_void t
-
-    let rec is_surely_addressable = function
-      | Base b -> base_is_addressable b
-      | Product cs -> List.for_all is_surely_addressable cs
-      | Univar _ | Genvar _ -> false
-      | Addressable _ -> true
-
-    (* Maintains invariant of no redundant [Addressable] constructors in
-       constants *)
-    let addressable c = if is_surely_addressable c then c else Addressable c
 
     let rec is_concrete = function
       | Base _ -> true
@@ -420,7 +436,7 @@ module Sort = struct
         List.assq v s
       | Base _ | Univar _ -> t
       | Product ts -> Product (List.map (subst s) ts)
-      | Addressable t -> Addressable (subst s t)
+      | Addressable t -> addressable (subst s t)
   end
 
   module Var = struct
@@ -857,7 +873,7 @@ module Sort = struct
     | Product ts -> Const.Product (List.map assert_const ts)
     | Univar uv -> Univar uv
     | Var v -> assert_const_var v
-    | Addressable s -> Addressable (assert_const s)
+    | Addressable s -> Const.addressable (assert_const s)
 
   and assert_const_var (v : var) : Const.t =
     match v.contents with
@@ -1004,12 +1020,16 @@ module Sort = struct
       | Var v -> Fmt.fprintf ppf "%s" (Var.name v)
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf " & " in
-        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+        Fmt.pp_nested_list ~nested ~pp_element:pp_component ~pp_sep ppf ts
       | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
       | Univar { name = None } -> Fmt.fprintf ppf "_"
       | Addressable s when is_surely_addressable s -> pp_element ~nested ppf s
       | Addressable s ->
         Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) s
+    and pp_component ~nested ppf t =
+      if is_surely_addressable t
+      then pp_element ~nested ppf (strip_head_addressable t)
+      else Fmt.fprintf ppf "%a inherit" (pp_element ~nested:true) t
     in
     pp_element ~nested:false ppf t
 
@@ -1107,6 +1127,10 @@ module Layout = struct
     let any sa = Any sa
 
     let product cs = Product cs
+
+    let strip_head_addressable = function
+      | Addressable c -> c
+      | (Any _ | Base _ | Product _ | Univar _ | Genvar _ | Box _) as c -> c
 
     let univar uv sa = Univar (uv, sa)
 
@@ -1231,7 +1255,7 @@ module Layout = struct
         ->
         Scannable_axes.max
       (* Impossible: consts have no redundant [Addressable] *)
-      | Addressable (Addressable _) | Addressable (Box _) ->
+      | Addressable (Addressable _ | Box _) ->
         Misc.fatal_error "implied_box_axes"
 
     let box c sa = Box (c, Scannable_axes.meet (implied_box_axes c) sa)
@@ -1457,9 +1481,40 @@ module Layout = struct
     | [lay] -> lay
     | lays -> Product lays
 
-  let apply_operator t : Kind_operator.t -> _ t = function
+  (* [constrain_below_addressable t] constrains [t < t addressable] *)
+  let rec constrain_below_addressable ~allow_mutation :
+      Sort.t t -> (unit, Sort.error) result = function
+    | Any _ -> Error Sort.Incompatible
+    | Addressable _ -> Ok ()
+    | Box _ -> Ok ()
+    | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
+    | Product ts ->
+      Misc.Stdlib.List.fold_left_result
+        (fun () t -> constrain_below_addressable ~allow_mutation t)
+        () ts
+
+  (* [constrain_above_addressable t] constrains [t addressable < t].
+     This differs from [constrain_below_addressable] only for kinds containing
+     [any]. *)
+  let rec constrain_above_addressable ~allow_mutation :
+      Sort.t t -> (unit, Sort.error) result = function
+    | Any _ -> Ok ()
+    | Addressable _ -> Ok ()
+    | Box _ -> Ok ()
+    | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
+    | Product ts ->
+      Misc.Stdlib.List.fold_left_result
+        (fun () -> constrain_above_addressable ~allow_mutation)
+        () ts
+
+  let is_surely_addressable t =
+    Result.is_ok (constrain_below_addressable ~allow_mutation:false t)
+
+  let addressable t = if is_surely_addressable t then t else Addressable t
+
+  let apply_operator t : Kind_operator.t -> _ = function
     | Id -> t
-    | Addressable -> Addressable t
+    | Addressable -> addressable t
 
   let rec get_const of_sort : _ t -> Const.t option = function
     | Any sa -> Some (Any sa)

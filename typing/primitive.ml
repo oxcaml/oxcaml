@@ -603,9 +603,15 @@ module Repr_check = struct
     | Success
 
   let is expected_repr repr : wrong_repr_error list =
-    if equal_native_repr expected_repr repr
-    then []
-    else [Repr_mismatch]
+    let equal =
+      match expected_repr, repr with
+      | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
+        (* Addressability is ignored for external checks as it only affects
+           boxed representations *)
+        Jkind_types.Sort.Const.equal_up_to_addressability s1 s2
+      | _, _ -> equal_native_repr expected_repr repr
+    in
+    if equal then [] else [Repr_mismatch]
 
   let any = fun _ -> []
 
