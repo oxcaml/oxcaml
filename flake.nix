@@ -31,7 +31,7 @@
       {
         packages = {
           inherit oxcaml;
-          inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
+          inherit (merlinPackages) merlin-lib merlin;
           oxcaml-fp = oxcaml.override { framePointers = true; };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           ppxlib = oxcaml.mkPpxlibLibs oxcaml;

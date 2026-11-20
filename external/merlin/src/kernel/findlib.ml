@@ -47,15 +47,13 @@ let environment ~(config : Config.t) =
   Array.of_list
     (List.map overrides ~f:(fun (name, value) -> name ^ "=" ^ value) @ inherited)
 
-(** [run ~config args] runs ocamlfind with the given args and returns the
-    stdout. Results are cached. *)
-let run =
-  let cache = Hashtbl.create 17 in
-  fun ~(config : Config.t) args ->
-    let key = (config, args) in
-    match Hashtbl.find_opt cache key with
-    | Some lines -> Ok lines
-    | None -> (
+let cache = Timed_cache.create ()
+
+(** [run ~dir ~config args] runs ocamlfind with the given args and returns the
+    stdout. Results are cached per [dir]. *)
+let run ~dir ~(config : Config.t) args =
+  let key = (dir, config, args) in
+  Timed_cache.read_or_compute cache ~key ~f:(fun () ->
       let args =
         match config.toolchain with
         | None -> args
@@ -80,17 +78,18 @@ let run =
             List.filter (String.split_on_char ~sep:'\n' output) ~f:(fun line ->
                 String.is_non_empty line)
           in
-          Hashtbl.add cache key lines;
           Ok lines
         | _ -> Error (String.trim errors)))
+
+let flush ?older_than () = Timed_cache.flush ?older_than cache
 
 let unexpected_output lines =
   Error
     (sprintf "Unexpected output from ocamlfind: %S"
        (String.concat ~sep:"\n" lines))
 
-let package_directory ~config package =
-  match run ~config [ "query"; "-format"; "%d"; package ] with
+let package_directory ~dir ~config package =
+  match run ~dir ~config [ "query"; "-format"; "%d"; package ] with
   | Ok [ directory ] -> Ok (Some directory)
   | Ok lines -> unexpected_output lines
   | Error message
@@ -98,8 +97,8 @@ let package_directory ~config package =
            (sprintf "ocamlfind: Package `%s' not found" package) -> Ok None
   | Error _ as error -> error
 
-let ocaml_stdlib ~config =
-  match run ~config [ "printconf"; "stdlib" ] with
+let ocaml_stdlib ~dir ~config =
+  match run ~dir ~config [ "printconf"; "stdlib" ] with
   | Ok [ stdlib ] -> Ok stdlib
   | Ok lines -> unexpected_output lines
   | Error _ as error -> error
@@ -120,7 +119,7 @@ let parse_ppxopt value =
    package names, directories or (word-oriented) META properties. *)
 let field_separator = '\t'
 
-let query ~config packages =
+let query ~dir ~config packages =
   let open Result.Infix in
   match packages with
   | [] -> Ok []
@@ -131,7 +130,8 @@ let query ~config packages =
         [ "%p"; "%d"; "%(ppx)"; "%(ppxopt)" ]
     in
     let* lines =
-      run ~config ("query" :: "-recursive" :: "-format" :: format :: packages)
+      run ~dir ~config
+        ("query" :: "-recursive" :: "-format" :: format :: packages)
     in
     Result.List.map lines ~f:(fun line ->
         match String.split_on_char ~sep:field_separator line with
@@ -144,11 +144,11 @@ let query ~config packages =
             }
         | _ -> unexpected_output [ line ])
 
-let resolve_path ~config ~base path =
+let resolve_path ~dir ~config ~base path =
   let open Result.Infix in
   if String.is_non_empty path then
     let package_directory package =
-      let* directory = package_directory ~config package in
+      let* directory = package_directory ~dir ~config package in
       match directory with
       | Some directory -> Ok directory
       | None ->
@@ -157,7 +157,7 @@ let resolve_path ~config ~base path =
     match path.[0] with
     | '^' | '+' ->
       let path = String.drop 1 path in
-      let* stdlib = ocaml_stdlib ~config in
+      let* stdlib = ocaml_stdlib ~dir ~config in
       Ok (Filename.concat stdlib path)
     | '@' ->
       let path = String.drop 1 path in

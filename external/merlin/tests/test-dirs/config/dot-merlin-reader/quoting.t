@@ -5,11 +5,6 @@
   > FLG -w @3
   > EOF
 
-  $ FILE=$(pwd)/test.ml; dot-merlin-reader <<EOF | sed 's#[0-9]*:#?:#g'
-  > (4:File${#FILE}:$FILE)
-  > EOF
-  ((?:EXCLUDE_QUERY_DIR)(?:FLG(?:-pp?:I/definitly/need/quoting.exe -nothing))(?:FLG(?:-ppx?:/path/to/ppx.exe --as-ppx --cookie 'library-name="model"'))(?:FLG(?:-w?:@3)))
-
   $ echo | $MERLIN single dump-configuration -filename test.ml 2> /dev/null | jq '.value.merlin'
   {
     "build_path": [],

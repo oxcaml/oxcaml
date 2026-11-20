@@ -166,9 +166,12 @@ let directives_of_files filenames =
   in
   process [] filenames
 
-let ppx_of_package ~findlib_config:config setup (package : Findlib.Package.t) =
+let ppx_of_package ~cwd ~findlib_config:config setup
+    (package : Findlib.Package.t) =
   let open Result.Infix in
-  let resolve_path = Findlib.resolve_path ~config ~base:package.directory in
+  let resolve_path =
+    Findlib.resolve_path ~dir:cwd ~config ~base:package.directory
+  in
   let* ppx = Result.Option.map package.ppx ~f:resolve_path in
   let* ppxopts =
     Result.List.map package.ppxopt ~f:(fun (ppx, opts) ->
@@ -197,19 +200,24 @@ let ppx_of_package ~findlib_config:config setup (package : Findlib.Package.t) =
     (List.fold_left ppxopts ~init:setup ~f:(fun setup (ppx, opts) ->
          Ppxsetup.add_ppxopts ppx opts setup))
 
+let standard_library_cache = Timed_cache.create ()
+
 let standard_library =
-  lazy
-    (match Sys.getenv_opt "OCAMLLIB" with
-    | Some stdlib -> stdlib
-    | None -> (
-      match Sys.getenv_opt "CAMLLIB" with
+ fun ~cwd ->
+  Timed_cache.read_or_compute standard_library_cache ~key:cwd ~f:(fun () ->
+      match Sys.getenv_opt "OCAMLLIB" with
       | Some stdlib -> stdlib
       | None -> (
-        match Findlib.ocaml_stdlib ~config:Findlib.Config.default with
-        | Ok stdlib -> stdlib
-        | Error message ->
-          log ~title:"standard_library" "%s" message;
-          Standard_library.path)))
+        match Sys.getenv_opt "CAMLLIB" with
+        | Some stdlib -> stdlib
+        | None -> (
+          match
+            Findlib.ocaml_stdlib ~dir:cwd ~config:Findlib.Config.default
+          with
+          | Ok stdlib -> stdlib
+          | Error message ->
+            log ~title:"standard_library" "%s" message;
+            Standard_library.path)))
 
 let is_package_optional name =
   let last = String.length name - 1 in
@@ -220,7 +228,7 @@ let remove_option name =
   if last >= 0 && name.[last] = '?' then String.sub name ~pos:0 ~len:last
   else name
 
-let path_of_packages ~findlib_config:config packages =
+let path_of_packages ~cwd ~findlib_config:config packages =
   let open Result.Infix in
   match packages with
   | [] ->
@@ -231,7 +239,7 @@ let path_of_packages ~findlib_config:config packages =
       let* installed_packages, invalid_packages =
         Result.List.partition packages ~f:(fun name ->
             let* directory =
-              Findlib.package_directory ~config (remove_option name)
+              Findlib.package_directory ~dir:cwd ~config (remove_option name)
             in
             Ok (Option.is_some directory))
       in
@@ -247,7 +255,7 @@ let path_of_packages ~findlib_config:config packages =
         | xs -> [ "Failed to load packages: " ^ String.concat ~sep:"," xs ]
       in
       let* packages =
-        Findlib.query ~config
+        Findlib.query ~dir:cwd ~config
           (List.map installed_packages ~f:(fun name -> remove_option name))
       in
       let path =
@@ -258,7 +266,7 @@ let path_of_packages ~findlib_config:config packages =
         List.fold_left packages ~init:(Ok Ppxsetup.empty)
           ~f:(fun setup package ->
             let* setup = setup in
-            ppx_of_package ~findlib_config:config setup package)
+            ppx_of_package ~cwd ~findlib_config:config setup package)
       in
       Ok (path, ppxs, failures)
     in
@@ -355,14 +363,14 @@ let expand =
     let path = canonicalize_filename ~cwd:dir path in
     expand_glob ~filter path []
 
-let postprocess cfg =
+let postprocess ~cwd cfg =
   let stdlib =
     match cfg.stdlib with
     | Some stdlib -> stdlib
-    | None -> Lazy.force standard_library
+    | None -> standard_library ~cwd
   in
   let pkg_paths, ppxsetup, failures =
-    path_of_packages ~findlib_config:cfg.findlib cfg.packages_to_load
+    path_of_packages ~cwd ~findlib_config:cfg.findlib cfg.packages_to_load
   in
   let ppx =
     match Ppxsetup.command_line ppxsetup with
@@ -405,19 +413,8 @@ let load dot_merlin_file =
     List.fold_left directives ~init:empty_config ~f:(fun cfg file ->
         process_one ~cfg file)
   in
-  postprocess cfg
+  postprocess ~cwd:(Filename.dirname dot_merlin_file) cfg
 
-let dot_merlin_file = Filename.concat (Sys.getcwd ()) ".merlin"
-
-let rec main () =
-  let open Merlin_dot_protocol.Blocking in
-  match Commands.read_input stdin with
-  | Halt -> exit 0
-  | File _path ->
-    let directives = load dot_merlin_file in
-    write stdout directives;
-    flush stdout;
-    main ()
-  | Unknown -> main ()
-
-let () = main ()
+let flush ?older_than () =
+  Cache.flush ?older_than ();
+  Timed_cache.flush ?older_than standard_library_cache

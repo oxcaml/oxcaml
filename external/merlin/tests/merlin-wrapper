@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 
-export PATH=$(dirname dot-merlin-reader):$PATH
-
 # If no dune-project of .merlin file are present in the test we write a default
-# `.merlin` file to force the use of dot-merlin-reader
+# `.merlin` file to force the use of .merlin configuration
 if [ ! -f dune-project ]; then
   touch .merlin
 fi
