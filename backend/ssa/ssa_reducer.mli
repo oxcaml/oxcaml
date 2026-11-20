@@ -117,6 +117,10 @@ module Context : sig
   val map_terminator : t -> finished Terminator.t -> out Terminator.t
 end
 
+(* CR-someday xclerc for xclerc: Consider whether we should restrict [Move_to]
+   to [visit_instruction] in the type system, instead of rejecting it at runtime
+   in the other hooks. *)
+
 (** A hook's decision for one instruction or terminator. [Unchanged]: defer to
     the next reducer (under [Combine]) or the framework's default translation.
     [Reduce f]: the reducer takes over; [f] is run with the output cursor (to

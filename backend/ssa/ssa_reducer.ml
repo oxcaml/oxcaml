@@ -276,20 +276,18 @@ module Combine (A : Reducer) (B : Reducer) : Reducer = struct
 end
 
 module Make_run (R : Reducer) = struct
-  let run ~ppf_dump ?(keep_unused_ops = false) (in_graph : finished Ssa.graph) :
-      finished Ssa.graph =
-    let out_graph =
-      Ssa.create_graph (Ssa.function_info in_graph) ~keep_unused_ops
-    in
-    let in_graph_size = Ssa.blocks in_graph |> List.length in
-    (* Map each input block to its output counterpart. *)
-    let block_map = Block.Tbl.create (2 * in_graph_size) in
-    let op_map = Instruction.Id.Tbl.create (20 * in_graph_size) in
-    let block_param_values = Block.Tbl.create (2 * in_graph_size) in
-    (* Step 1: create an output block for each input block. The entry's params
-       come from the function ABI and are kept verbatim; other blocks drop the
-       params [Ssa] scheduled for removal (unused, and droppable given their
-       predecessors). *)
+  type t =
+    { ctx : Context.t;
+      reducer : R.t;
+      (* The instructions moved by [Move_to], per target block, most recently
+         visited first. *)
+      moved_instructions : finished Instruction.t list Block.Tbl.t
+    }
+
+  (* Create an output block for each input block. The entry's params come from
+     the function ABI and are kept verbatim; other blocks drop the params [Ssa]
+     scheduled for removal (unused, and droppable given their predecessors). *)
+  let create_output_blocks (ctx : Context.t) =
     List.iter
       (fun (block : finished Block.t) ->
         let in_params = Block.params block in
@@ -302,14 +300,14 @@ module Make_run (R : Reducer) = struct
           |> Array.of_list
         in
         let out_block =
-          if Block.equal block (Ssa.entry in_graph)
-          then Ssa.entry out_graph
+          if Block.equal block (Ssa.entry ctx.in_graph)
+          then Ssa.entry ctx.out_graph
           else
-            Block.create_with_names out_graph ~params ~cold:(Block.cold block)
-              ~handler_dbg:(Block.handler_dbg block)
+            Block.create_with_names ctx.out_graph ~params
+              ~cold:(Block.cold block) ~handler_dbg:(Block.handler_dbg block)
               ~entry_dbg:(Block.entry_dbg block)
         in
-        Block.Tbl.replace block_map block out_block;
+        Block.Tbl.replace ctx.block_map block out_block;
         (* Index the output values by the original param index, with
            [Omitted_since_unused] in the dropped slots; the kept output params
            line up with the kept input params in order. *)
@@ -326,144 +324,173 @@ module Make_run (R : Reducer) = struct
                 Terminator.Arg v)
             in_params
         in
-        Block.Tbl.replace block_param_values block param_values)
-      (Ssa.blocks in_graph);
-    (* The op-emission step: the reducer's [emit_op] hook, and when it defers,
-       the default emission into the output graph. It is stored in [Context.t]
-       so the reducer's own [Cursor.emit_op] calls route back through it (see
-       [Context.Cursor.emit_op]). [ctx] and [reducer] are mutually recursive —
-       the reducer is built from [ctx], but [ctx]'s stored hook calls into the
-       reducer — so we tie the knot with a [lazy] reducer. *)
-    let rec emit_op c ~op ~dbg ~typ ~args =
-      match R.emit_op (Lazy.force reducer) ~op ~dbg ~typ ~args with
-      | Unchanged -> Ssa.Cursor.emit_op out_graph c op dbg typ args
-      | Reduce f -> f c
-      | Move_to _ -> Misc.fatal_error "Ssa_reducer: emit_op returned Move_to"
-    and ctx : Context.t =
-      { in_graph; out_graph; block_map; op_map; block_param_values; emit_op }
+        Block.Tbl.replace ctx.block_param_values block param_values)
+      (Ssa.blocks ctx.in_graph)
+
+  (* The op-emission step: the reducer's [emit_op] hook, and when it defers, the
+     default emission into the output graph. Framework calls use this helper
+     directly so it can be inlined. [Context.t] stores a callback so the
+     reducer's own [Cursor.emit_op] calls route back through it (see
+     [Context.Cursor.emit_op]). *)
+  let emit_op out_graph reducer c ~op ~dbg ~typ ~args =
+    match R.emit_op reducer ~op ~dbg ~typ ~args with
+    | Unchanged -> Ssa.Cursor.emit_op out_graph c op dbg typ args
+    | Reduce f -> f c
+    | Move_to _ -> Misc.fatal_error "Ssa_reducer: emit_op returned Move_to"
+
+  let create (in_graph : finished Ssa.graph) ~keep_unused_ops =
+    let out_graph =
+      Ssa.create_graph (Ssa.function_info in_graph) ~keep_unused_ops
+    in
+    let in_graph_size = Ssa.blocks in_graph |> List.length in
+    (* Map each input block to its output counterpart. *)
+    let block_map = Block.Tbl.create (2 * in_graph_size) in
+    let op_map = Instruction.Id.Tbl.create (20 * in_graph_size) in
+    let block_param_values = Block.Tbl.create (2 * in_graph_size) in
+    (* [ctx] and [reducer] are mutually recursive: the reducer is built from
+       [ctx], but [ctx]'s stored hook calls into the reducer, so we tie the knot
+       with a [lazy] reducer. Initialize the block maps before forcing it. *)
+    let rec ctx : Context.t =
+      { in_graph;
+        out_graph;
+        block_map;
+        op_map;
+        block_param_values;
+        emit_op =
+          (fun c ~op ~dbg ~typ ~args ->
+            emit_op out_graph (Lazy.force reducer) c ~op ~dbg ~typ ~args)
+      }
     and reducer : R.t Lazy.t = lazy (R.create ctx) in
+    create_output_blocks ctx;
     let reducer = Lazy.force reducer in
-    (* Finish a block: run its terminator through the reducer's [finish_block]
-       hook, and when the reducer returns a replacement, re-reduce that (it must
-       shrink each round to terminate) before finishing. Unlike [emit_op] this
-       is a pure framework step — the reducer never finishes a block itself — so
-       it is not reachable through [Context.t]. *)
-    let rec finish_block c ~dbg term =
-      match R.finish_block reducer ~dbg term with
-      | Unchanged -> Ssa.Cursor.finish_block out_graph c ~dbg term
-      | Reduce f ->
-        let dbg, term = f c in
-        finish_block c ~dbg term
-      | Move_to _ ->
-        Misc.fatal_error "Ssa_reducer: finish_block returned Move_to"
-    in
-    (* Default translation of one body instruction, returning the value(s) its
-       results map to ([||] for a trap instruction). *)
-    let default_translate_instruction (instr : finished Instruction.t)
-        (c : Cursor.t) : under_construction Value.t array =
-      match instr with
-      | Op { op; typ; args; dbg; name; _ } ->
-        let vs = emit_op c ~op ~dbg ~typ ~args:(Context.map_values ctx args) in
-        (match name with
-        | Some name when Array.length vs > 0 -> Value.set_name vs.(0) name
-        | Some _ | None -> ());
-        vs
-      | Push_trap { handler } ->
-        Cursor.emit_push_trap c ~handler:(Context.map_block ctx handler);
-        [||]
-      | Pop_trap { handler } ->
-        Cursor.emit_pop_trap c ~handler:(Context.map_block ctx handler);
-        [||]
-    in
-    (* Record the value(s) an input instruction's results map to. *)
-    let record_results (instr : finished Instruction.t) vs =
-      if Instruction.result_arity instr <> Array.length vs
-      then
-        Misc.fatal_errorf
-          "Ssa_reducer: replacement arity %d does not match input arity %d.@ \
-           Input: %a"
-          (Array.length vs)
-          (Instruction.result_arity instr)
-          Instruction.print instr;
-      match instr with
-      | Op { id; _ } -> Instruction.Id.Tbl.replace op_map id vs
-      | Push_trap _ | Pop_trap _ -> ()
-    in
-    (* The instructions moved by [Move_to], per target block, most recently
-       visited first. *)
-    let moved_instructions = Block.Tbl.create 16 in
-    let move_instruction (block : finished Block.t)
-        (instr : finished Instruction.t) ~(target : finished Block.t) =
-      (match instr with
-      | Op _ -> ()
-      | Push_trap _ | Pop_trap _ ->
-        Misc.fatal_errorf "Ssa_reducer: cannot move trap instruction %a"
-          Instruction.print instr);
-      if Block.equal block target || not (Block.dominates block target)
-      then
-        Misc.fatal_errorf
-          "Ssa_reducer: cannot move %a from block %a to block %a, which the \
-           former does not strictly dominate"
-          Instruction.print instr Block.print_id block Block.print_id target;
-      let moved =
-        Option.value (Block.Tbl.find_opt moved_instructions target) ~default:[]
+    { ctx; reducer; moved_instructions = Block.Tbl.create 16 }
+
+  (* Finish a block: run its terminator through the reducer's [finish_block]
+     hook, and when the reducer returns a replacement, re-reduce that (it must
+     shrink each round to terminate) before finishing. Unlike [emit_op] this is
+     a pure framework step — the reducer never finishes a block itself — so it
+     is not reachable through [Context.t]. *)
+  let rec finish_block t c term ~dbg =
+    match R.finish_block t.reducer ~dbg term with
+    | Unchanged -> Ssa.Cursor.finish_block t.ctx.out_graph c ~dbg term
+    | Reduce f ->
+      let dbg, term = f c in
+      finish_block t c term ~dbg
+    | Move_to _ -> Misc.fatal_error "Ssa_reducer: finish_block returned Move_to"
+
+  (* Default translation of one body instruction, returning the value(s) its
+     results map to ([||] for a trap instruction). *)
+  let default_translate_instruction t (instr : finished Instruction.t)
+      (c : Cursor.t) : under_construction Value.t array =
+    match instr with
+    | Op { op; typ; args; dbg; name; _ } ->
+      let vs =
+        emit_op t.ctx.out_graph t.reducer c ~op ~dbg ~typ
+          ~args:(Context.map_values t.ctx args)
       in
-      Block.Tbl.replace moved_instructions target (instr :: moved)
+      (match name with
+      | Some name when Array.length vs > 0 -> Value.set_name vs.(0) name
+      | Some _ | None -> ());
+      vs
+    | Push_trap { handler } ->
+      Cursor.emit_push_trap c ~handler:(Context.map_block t.ctx handler);
+      [||]
+    | Pop_trap { handler } ->
+      Cursor.emit_pop_trap c ~handler:(Context.map_block t.ctx handler);
+      [||]
+
+  (* Record the value(s) an input instruction's results map to. *)
+  let record_results t (instr : finished Instruction.t) vs =
+    if Instruction.result_arity instr <> Array.length vs
+    then
+      Misc.fatal_errorf
+        "Ssa_reducer: replacement arity %d does not match input arity %d.@ \
+         Input: %a"
+        (Array.length vs)
+        (Instruction.result_arity instr)
+        Instruction.print instr;
+    match instr with
+    | Op { id; _ } -> Instruction.Id.Tbl.replace t.ctx.op_map id vs
+    | Push_trap _ | Pop_trap _ -> ()
+
+  let move_instruction t (block : finished Block.t)
+      (instr : finished Instruction.t) ~(target : finished Block.t) =
+    (match instr with
+    | Op _ -> ()
+    | Push_trap _ | Pop_trap _ ->
+      Misc.fatal_errorf "Ssa_reducer: cannot move trap instruction %a"
+        Instruction.print instr);
+    if Block.equal block target || not (Block.dominates block target)
+    then
+      Misc.fatal_errorf
+        "Ssa_reducer: cannot move %a from block %a to block %a, which the \
+         former does not strictly dominate"
+        Instruction.print instr Block.print_id block Block.print_id target;
+    let moved =
+      Option.value (Block.Tbl.find_opt t.moved_instructions target) ~default:[]
     in
-    let emit_moved_instructions (block : finished Block.t) c =
-      match Block.Tbl.find_opt moved_instructions block with
-      | None -> ()
-      | Some moved ->
-        Block.Tbl.remove moved_instructions block;
-        List.iter
-          (fun instr ->
-            record_results instr (default_translate_instruction instr c))
-          (List.rev moved)
-    in
-    let visit_instruction (block : finished Block.t) ~instr_index c =
-      let instr = Array.get (Block.body block) instr_index in
-      match R.visit_instruction reducer block ~instr_index with
-      | Reduce f -> record_results instr (f c)
-      | Unchanged ->
-        record_results instr (default_translate_instruction instr c)
-      | Move_to target -> move_instruction block instr ~target
-    in
-    let visit_terminator (block : finished Block.t) c =
-      let dbg, terminator =
-        match R.visit_terminator reducer block with
-        | Reduce f -> f c
-        | Unchanged ->
-          ( Block.terminator_dbg block,
-            Context.map_terminator ctx (Block.terminator block) )
-        | Move_to _ ->
-          Misc.fatal_error "Ssa_reducer: visit_terminator returned Move_to"
-      in
-      finish_block c ~dbg terminator
-    in
-    (* Step 2: walk the input graph in [blocks] order, which already guarantees
-       each block's dominators come before it. *)
-    List.iter
-      (fun (block : finished Block.t) ->
-        let out_block = Block.Tbl.find block_map block in
-        let c = Cursor.start out_block in
-        try
-          emit_moved_instructions block c;
-          Array.iteri
-            (fun instr_index _ -> visit_instruction block ~instr_index c)
-            (Block.body block);
-          visit_terminator block c
-        with exn ->
-          let bt = Printexc.get_raw_backtrace () in
-          Format.fprintf ppf_dump
-            "*** Ssa_reducer.run error for %s while processing block %a: \
-             %s@.*** Input SSA:@.%a@."
-            (Ssa.function_info in_graph).sym_name Block.print_id block
-            (Printexc.to_string exn) Ssa_print.print in_graph;
-          Printexc.raise_with_backtrace exn bt)
-      (Ssa.blocks in_graph);
-    if Block.Tbl.length moved_instructions > 0
+    Block.Tbl.replace t.moved_instructions target (instr :: moved)
+
+  let emit_moved_instructions t (block : finished Block.t) c =
+    match Block.Tbl.find_opt t.moved_instructions block with
+    | None -> ()
+    | Some moved ->
+      Block.Tbl.remove t.moved_instructions block;
+      List.iter
+        (fun instr ->
+          record_results t instr (default_translate_instruction t instr c))
+        (List.rev moved)
+
+  let check_no_pending_moves t =
+    if Block.Tbl.length t.moved_instructions > 0
     then
       Misc.fatal_error
-        "Ssa_reducer: instructions were moved to a block outside the graph";
-    Ssa.finish_graph out_graph
+        "Ssa_reducer: instructions were moved to a block outside the graph"
+
+  let visit_instruction t (block : finished Block.t) c ~instr_index =
+    let instr = Array.get (Block.body block) instr_index in
+    match R.visit_instruction t.reducer block ~instr_index with
+    | Reduce f -> record_results t instr (f c)
+    | Unchanged ->
+      record_results t instr (default_translate_instruction t instr c)
+    | Move_to target -> move_instruction t block instr ~target
+
+  let visit_terminator t (block : finished Block.t) c =
+    let dbg, terminator =
+      match R.visit_terminator t.reducer block with
+      | Reduce f -> f c
+      | Unchanged ->
+        ( Block.terminator_dbg block,
+          Context.map_terminator t.ctx (Block.terminator block) )
+      | Move_to _ ->
+        Misc.fatal_error "Ssa_reducer: visit_terminator returned Move_to"
+    in
+    finish_block t c terminator ~dbg
+
+  let visit_block t (block : finished Block.t) ~ppf_dump =
+    let out_block = Context.map_block t.ctx block in
+    let c = Cursor.start out_block in
+    try
+      emit_moved_instructions t block c;
+      Array.iteri
+        (fun instr_index _ -> visit_instruction t block c ~instr_index)
+        (Block.body block);
+      visit_terminator t block c
+    with exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      Format.fprintf ppf_dump
+        "*** Ssa_reducer.run error for %s while processing block %a: %s@.*** \
+         Input SSA:@.%a@."
+        (Ssa.function_info t.ctx.in_graph).sym_name Block.print_id block
+        (Printexc.to_string exn) Ssa_print.print t.ctx.in_graph;
+      Printexc.raise_with_backtrace exn bt
+
+  let run ~ppf_dump ?(keep_unused_ops = false) (in_graph : finished Ssa.graph) :
+      finished Ssa.graph =
+    let t = create in_graph ~keep_unused_ops in
+    (* Walk the input graph in [blocks] order, which already guarantees each
+       block's dominators come before it. *)
+    List.iter (visit_block t ~ppf_dump) (Ssa.blocks in_graph);
+    check_no_pending_moves t;
+    Ssa.finish_graph t.ctx.out_graph
 end
