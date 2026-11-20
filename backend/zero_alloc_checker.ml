@@ -2663,7 +2663,8 @@ end = struct
           next
         | Reinterpret_cast (Int_of_value | Value_of_int)
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Intop_atomic _ | Store _ | Pause ->
+        | Begin_region | End_region | Intop_atomic _ | Store _ | Pause
+        | Trace_pc_guard_gate | Trace_pc_guard _ ->
           next
         | Poll ->
           (* Ignore poll points even though they may trigger an allocations,

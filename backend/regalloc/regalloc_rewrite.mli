@@ -41,6 +41,14 @@ val rewrite_gen :
   block_temporaries:bool ->
   Reg.t list * Reg.t list * bool
 
+(* The critical edges of a graph: the normal edges whose source has several
+   successors and whose destination has several predecessors. If [all] is
+   [false], only those that the register allocators need split are returned:
+   exceptional successors are not counted, and edges whose source has an
+   exception handler or a terminator that can raise, as well as edges from a
+   block to itself, are left out. *)
+val compute_critical_edges : all:bool -> Cfg.t -> Cfg_edge.Set.t
+
 (** The prepared CFG and its allocation metadata. IRC may pass this to linear
     scan when it gives up before changing the prepared CFG. *)
 type prelude_result =

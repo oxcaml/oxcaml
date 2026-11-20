@@ -274,7 +274,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
       | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Begin_region
       | End_region | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll
-      | Pause | Alloc _ )
+      | Pause | Trace_pc_guard_gate | Trace_pc_guard _ | Alloc _ )
   | Op
       (Reinterpret_cast
          (Int_of_value | Value_of_int | Mask_of_int64 | Int64_of_mask))

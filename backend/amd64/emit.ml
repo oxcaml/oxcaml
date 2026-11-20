@@ -1022,6 +1022,13 @@ let emit_test i ~(taken : X86_ast.condition -> unit) = function
     I.test (int 1) (arg8 i 0);
     taken E
 
+(* The guards of the coverage probes of the unit *)
+
+(* CR mshinwell: remove this global state. [begin_assembly] should return the
+   state of the emission of the unit, for [fundecl] and [end_assembly] to take
+   as an argument, which requires passing it through [Asmgen]. *)
+let sancov = ref (Emit_sancov.create ())
+
 (* Floating-point constants *)
 
 let float_constants = ref ([] : (int64 * L.t) list)
@@ -2633,6 +2640,9 @@ let emit_instr ~first ~last ~fallthrough i =
     assert (equal_reg64 (arg64 i 0) RCX);
     I.rdpmc ();
     emit_combine_edx_eax i.res.(0)
+  | Lop Trace_pc_guard_gate -> Emit_sancov.emit_gate ~res:(res i 0)
+  | Lop (Trace_pc_guard index) ->
+    Emit_sancov.emit_call !sancov ~live:i.live ~move ~emit_call ~index
   | Lop (Specific Ilfence) -> I.lfence ()
   | Lop (Specific Isfence) -> I.sfence ()
   | Lop (Specific Imfence) -> I.mfence ()
@@ -2863,6 +2873,7 @@ let emit_function_type_and_size fun_sym =
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
+  Emit_sancov.start_function !sancov;
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl
@@ -2970,6 +2981,7 @@ let reset_all () =
   Probe_emission.reset ();
   reset_traps ();
   float_constants := [];
+  sancov := Emit_sancov.create ();
   all_functions := []
 
 let begin_assembly unix =
@@ -3307,6 +3319,7 @@ let end_assembly () =
     D.switch_to_section Sixtyfour_byte_literals;
     D.align ~fill:Zero ~bytes:64;
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
+  Emit_sancov.emit_data !sancov ~add_def_symbol ~emit_call;
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
   emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");

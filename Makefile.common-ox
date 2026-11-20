@@ -73,7 +73,7 @@ endef
 
 
 .DEFAULT_GOAL := compiler
-.PHONY: boot-compiler boot-runtest compiler runtest runtest-llvmize runtest-dwarf
+.PHONY: boot-compiler boot-runtest compiler runtest runtest-llvmize runtest-dwarf runtest-sancov
 
 boot_targets = \
   $(boot_ocamlc) \
@@ -140,6 +140,9 @@ runtest-llvmize: compiler
 
 runtest-dwarf: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-dwarf $(ws_main)
+
+runtest-sancov: compiler
+	$(dune) build @runtest-sancov $(ws_main)
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
