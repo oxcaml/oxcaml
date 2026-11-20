@@ -440,6 +440,19 @@ module IdTbl =
           next: ('lock, 'a, 'b) t;
         }
 
+      | Expose of {
+          name: string;
+          (** The name made visible by [-expose]. *)
+
+          path: Path.t;
+          (** The path of the module it refers to. *)
+
+          entry: 'a;
+
+          next: ('lock, 'a, 'b) t;
+          (** The table before exposing the module. *)
+        }
+
       | Nothing
 
     let empty = { current = Ident.empty; layer = Nothing }
@@ -472,6 +485,9 @@ module IdTbl =
     let add_lock lock next =
       { current = Ident.empty; layer = Lock {lock; next} }
 
+    let add_expose name path entry next =
+      { current = Ident.empty; layer = Expose {name; path; entry; next} }
+
     let map f next =
       {
         current = Ident.empty;
@@ -483,7 +499,7 @@ module IdTbl =
       | This data -> data
       | Null ->
         begin match tbl.layer with
-        | Open {next; _} -> find_same_without_locks id next
+        | Open {next; _} | Expose {next; _} -> find_same_without_locks id next
         | Map {f; next} -> f (find_same_without_locks id next)
         | Lock {lock=_; next} -> find_same_without_locks id next
         | Nothing -> raise Not_found
@@ -498,7 +514,8 @@ module IdTbl =
         desc, macc
       with Not_found as exn ->
         begin match tbl.layer with
-        | Open {next; _} -> find_same_and_locks id next macc
+        | Open {next; _} | Expose {next; _} ->
+          find_same_and_locks id next macc
         | Map {f; next} ->
           let desc, locks = find_same_and_locks id next macc in
           f desc, locks
@@ -536,6 +553,9 @@ module IdTbl =
             |> Result.map (fun (p, macc, desc) -> p, macc, f desc)
         | Lock {lock; next} ->
             find_name_and_locks wrap ~mark name next (lock :: macc)
+        | Expose {name = exposed; path; entry; next} ->
+            if String.equal exposed name then Ok (path, macc, entry)
+            else find_name_and_locks wrap ~mark name next macc
         | Nothing ->
             Error macc
         end
@@ -548,7 +568,8 @@ module IdTbl =
     let rec get_all_locks tbl macc =
       match tbl.layer with
       | Open {next; _}
-      | Map {next; _} -> get_all_locks next macc
+      | Map {next; _}
+      | Expose {next; _} -> get_all_locks next macc
       | Lock {lock; next} -> get_all_locks next (lock :: macc)
       | Nothing -> macc
 
@@ -583,6 +604,10 @@ module IdTbl =
             (find_all wrap name next)
       | Lock {lock=_;next} ->
           find_all wrap name next
+      | Expose {name = exposed; path; entry; next} ->
+          if String.equal exposed name
+          then (path, entry) :: find_all wrap name next
+          else find_all wrap name next
 
     let rec find_all_idents name tbl () =
       let current =
@@ -600,6 +625,11 @@ module IdTbl =
         | Map {next; _ } -> find_all_idents name next ()
         | Lock {lock=_;next} ->
             find_all_idents name next ()
+        | Expose {name = exposed; next; _} ->
+            if String.equal exposed name then
+              Seq.Cons(None, find_all_idents name next)
+            else
+              find_all_idents name next ()
       in
       Seq.append current next ()
 
@@ -625,11 +655,14 @@ module IdTbl =
                next
       | Lock {lock=_; next} ->
           fold_name wrap f next acc
+      | Expose {name; path; entry; next} ->
+          fold_name wrap f next (f name (path, entry) acc)
 
     let rec local_keys tbl acc =
       let acc = Ident.fold_all (fun k _ accu -> k::accu) tbl.current acc in
       match tbl.layer with
-      | Open {next; _ } | Map {next; _} | Lock {next; _} -> local_keys next acc
+      | Open {next; _ } | Map {next; _} | Lock {next; _} | Expose {next; _} ->
+          local_keys next acc
       | Nothing -> acc
 
 
@@ -647,6 +680,9 @@ module IdTbl =
       | Map {f=g; next} ->
           iter wrap (fun id (path, desc) -> f id (path, g desc)) next
       | Lock {lock=_; next} ->
+          iter wrap f next
+      | Expose {name; path; entry; next} ->
+          f (Ident.create_scoped ~scope:(Path.scope path) name) (path, entry);
           iter wrap f next
       | Nothing -> ()
 
@@ -802,6 +838,9 @@ and module_alias_locks = locks
 and module_entry =
   | Mod_local of module_data * module_alias_locks
   | Mod_persistent
+  | Mod_exposed
+      (* The name was made visible by [-expose], and refers to the
+         compilation unit it is found with. *)
   | Mod_unbound of module_unbound_reason
 
 and modtype_data =
@@ -1406,7 +1445,7 @@ let check_functor_appl
 let find_ident_module id env =
   match find_same_module id env.modules with
   | Mod_local (data, _) -> data
-  | Mod_unbound _ -> raise Not_found
+  | Mod_unbound _ | Mod_exposed -> raise Not_found
   | Mod_persistent ->
       match Ident.to_global id with
       | Some global_name ->
@@ -1910,6 +1949,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       begin match IdTbl.find_same_without_locks id env.modules with
       | Mod_local ({ mda_shape; _ }, _) -> mda_shape
       | Mod_persistent -> Shape.for_persistent_unit (Ident.name id)
+      | Mod_exposed -> raise Not_found
       | Mod_unbound _ ->
           (* Only present temporarily while approximating the environment for
              recursive modules.
@@ -2269,6 +2309,16 @@ let iter_env wrap proj1 proj2 f env () =
        | Mod_unbound _ -> ()
        | Mod_local (data, _) ->
            iter_components (Pident id) path data.mda_components
+       | Mod_exposed -> begin
+           (* As for persistent modules below, only an exposed module that is
+              already loaded is visited. *)
+           match
+             Persistent_env.find_in_cache !persistent_env
+               (Ident.to_global_exn (Path.head path))
+           with
+           | Some data -> iter_components (Pident id) path data.mda_components
+           | None -> ()
+         end
        | Mod_persistent -> ())
     env.modules;
   Persistent_env.fold !persistent_env (fun name data () ->
@@ -2319,7 +2369,7 @@ let rec find_shadowed_comps path env =
         (fun (p, data) ->
            match data with
            | Mod_local (x, _) -> Some (p, x)
-           | Mod_unbound _ | Mod_persistent -> None)
+           | Mod_unbound _ | Mod_persistent | Mod_exposed -> None)
         (IdTbl.find_all wrap_module (Ident.name id) env.modules)
   | Pdot (p, s) ->
       let l = find_shadowed_comps p env in
@@ -3839,14 +3889,15 @@ type _ load =
   | Don't_load : unit load
 
 let lookup_global_name_module_no_locks
-      (type a) (load : a load) ~errors ~use ~loc name env =
+      (type a) (load : a load) ?(allow_hidden = false) ~errors ~use ~loc name
+      env =
   let path = Pident(Ident.create_global name) in
   match load with
   | Don't_load ->
-      check_pers_mod ~allow_hidden:false ~loc name;
+      check_pers_mod ~allow_hidden ~loc name;
       path, (() : a)
   | Load -> begin
-      match find_pers_mod ~allow_hidden:false name ~allow_excess_args:false with
+      match find_pers_mod ~allow_hidden name ~allow_excess_args:false with
       | mda ->
           use_module ~use ~loc path mda;
           path, (mda : a)
@@ -3869,37 +3920,45 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
     | exception Not_found ->
         may_lookup_error errors loc env (Unbound_module (Lident s))
   in
-  match data with
-  | Mod_local (mda, alias_locks) -> begin
-      use_module ~use ~loc path mda;
-      let _, mode = Normalize_mode.mda Assert_normalized mda in
-      let locks = alias_locks @ locks in
+  let local path (mda : module_data) alias_locks
+    : Path.t * mode_with_locks * a =
+    use_module ~use ~loc path mda;
+    let _, mode = Normalize_mode.mda Assert_normalized mda in
+    let locks = alias_locks @ locks in
+    match load with
+    (* CR-soon zqian: duplication of information. Should move modes out of
+       [value_data] and [module_data] *)
+    | Load -> path, (mode, locks), (mda : a)
+    | Don't_load -> path, (mode, locks), (() : a)
+  in
+  let persistent ~allow_hidden s : Path.t * mode_with_locks * a =
+    (* This is only used when processing [Longident.t]s, which never have
+       instance arguments *)
+    let name = Global_module.Name.create_no_args s in
+    let path, a =
+      lookup_global_name_module_no_locks load ~allow_hidden ~errors ~use ~loc
+        name env
+    in
+    let mode =
       match load with
-      (* CR-soon zqian: duplication of information. Should move modes out of
-         [value_data] and [module_data] *)
-      | Load -> path, (mode, locks), (mda : a)
-      | Don't_load -> path, (mode, locks), (() : a)
-    end
+      | Load -> (a : module_data).mda_mode
+      | Don't_load ->
+        (* The cmi is not loaded, so [cmi_staticity] is unknown.
+           Conservatively fall back to [Dynamic]. *)
+        Mode.With_regionality.disallow_right
+          (Persistent_env.mode_pers_mod Dynamic)
+    in
+    path, (mode, locks), a
+  in
+  match data with
+  | Mod_local (mda, alias_locks) -> local path mda alias_locks
   | Mod_unbound reason ->
       report_module_unbound ~errors ~loc env reason
-  | Mod_persistent -> begin
-      (* This is only used when processing [Longident.t]s, which never have
-         instance arguments *)
-      let name = Global_module.Name.create_no_args s in
-      let path, a =
-        lookup_global_name_module_no_locks load ~errors ~use ~loc name env
-      in
-      let mode =
-        match load with
-        | Load -> (a : module_data).mda_mode
-        | Don't_load ->
-          (* The cmi is not loaded, so [cmi_staticity] is unknown.
-             Conservatively fall back to [Dynamic]. *)
-          Mode.With_regionality.disallow_right
-            (Persistent_env.mode_pers_mod Dynamic)
-      in
-      path, (mode, locks), a
-    end
+  | Mod_persistent -> persistent ~allow_hidden:false s
+  | Mod_exposed ->
+      (* The name was made visible by [-expose], and refers to the
+         compilation unit [path], which may be hidden. *)
+      persistent ~allow_hidden:true (Ident.name (Path.head path))
 
 let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   let hint_comonadic : _ Mode.Hint.morph =
@@ -4586,6 +4645,16 @@ let open_pers_signature_cmi filename env =
   let env = add_components None path env comps locks in
   path, env
 
+let unit_path intf =
+  Pident (Ident.create_persistent (Compilation_unit.Name.to_string intf))
+
+let expose_module name intf env =
+  let path = unit_path intf in
+  { env with modules = IdTbl.add_expose name path Mod_exposed env.modules }
+
+let open_hidden_module intf env =
+  open_signature_by_path (unit_path intf) env
+
 let open_signature
     ~used_slot
     ~loc ~toplevel
@@ -5147,6 +5216,12 @@ let fold_modules f lid env acc =
            | Mod_unbound _ -> acc
            | Mod_local (mda, _) ->
                f name p mda.mda_declaration acc
+           | Mod_exposed -> begin
+               let modname = Ident.to_global_exn (Path.head p) in
+               match Persistent_env.find_in_cache !persistent_env modname with
+               | None -> acc
+               | Some mda -> f name p mda.mda_declaration acc
+             end
            | Mod_persistent ->
                (* CR lmaurer: Setting instance args to [] here isn't right. We
                   really should have [IdTbl.fold_name] provide the whole ident
@@ -5225,6 +5300,7 @@ let filter_non_loaded_persistent f env =
          match entry with
          | Mod_local _ -> acc
          | Mod_unbound _ -> acc
+         | Mod_exposed -> acc
          | Mod_persistent ->
              (* CR lmaurer: Again, setting args to [] here is weird but fine
                 for the moment *)

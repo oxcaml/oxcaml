@@ -1,0 +1,4 @@
+File "old_name.ml", line 1, characters 8-16:
+1 | let y = Lib__bar.x
+            ^^^^^^^^
+Error: Unbound module Lib__bar

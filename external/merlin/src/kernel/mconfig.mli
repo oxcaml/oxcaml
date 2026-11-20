@@ -17,7 +17,7 @@ type ocaml =
     nopervasives : bool;
     strict_formats : bool;
     syntax_quotations : bool;
-    open_args : Clflags.open_arg list;
+    scope_args : Clflags.scope_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
     warnings : Warnings.state;

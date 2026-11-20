@@ -1,0 +1,5 @@
+File "misspelt.ml", line 2, characters 8-12:
+2 | let b = Fooo.x
+            ^^^^
+Error: Unbound module Fooo
+Hint:    Did you mean Foo?
