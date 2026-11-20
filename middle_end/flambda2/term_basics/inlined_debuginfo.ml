@@ -51,12 +51,16 @@ module One_step = struct
     then Format.pp_print_string ppf "None"
     else Debuginfo.print_compact ppf dbg
 
-  let print ppf { dbg; callsite_counter = _; function_symbol; uid } =
+  let print_callsite_counter ppf = function
+    | None -> Format.pp_print_string ppf "None"
+    | Some counter -> Fdo_counter.print ppf counter
+
+  let print ppf { dbg; callsite_counter; function_symbol; uid } =
     Format.fprintf ppf
-      "@[<hov 1>(@[<hov 1>(dbg@ %a)@]@ @[<hov 1>(function_symbol@ %a)@]@ \
-       @[<hov 1>(uid@ %a)@])@]"
-      print_debuginfo dbg Linkage_name.print function_symbol
-      Format.pp_print_string uid
+      "@[<hov 1>(@[<hov 1>(dbg@ %a)@]@ @[<hov 1>(callsite_counter@ %a)@]@ \
+       @[<hov 1>(function_symbol@ %a)@]@ @[<hov 1>(uid@ %a)@])@]"
+      print_debuginfo dbg print_callsite_counter callsite_counter
+      Linkage_name.print function_symbol Format.pp_print_string uid
 
   let compare t1 t2 =
     let c = Debuginfo.compare t1.dbg t2.dbg in

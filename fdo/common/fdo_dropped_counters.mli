@@ -40,6 +40,8 @@ module Reason : sig
   type t =
     | Inlined_call
         (** Entry counters of a function whose call site was inlined. *)
+    | Inlined_call_without_counter
+        (** Entry counters of a function inlined at a call without a counter. *)
     | Self_tail_call_to_jump
         (** Counter of a self tail call converted to a jump. *)
     | Switch_to_single_arm
@@ -51,6 +53,21 @@ module Reason : sig
 
   val to_string : t -> string
 end
+
+(* Simplify also loses some counts by conflating counters rather than dropping
+   them, which this module does not record. *)
+
+(* CR-someday yusumez: When Simplify runs again on a function of a copy, it does
+   not specialize the counters of the sets of closures in the body, as the
+   previous run already did. But if the previous run kept a function of such a
+   set as the original's code (because simplifying it brought no improvements),
+   this run can produce new code for it that still has the original's counters,
+   so its counts are merged with the original's. *)
+
+(* CR-someday yusumez: The body of a function inlined at a call without a
+   counter (e.g. the second application of a split over-application) gets no
+   inlining context, so its counts are merged with those of the callee's
+   out-of-line code (see [Inlined_call_without_counter]). *)
 
 (** Dropped counters, mapped to the reason each was first dropped. *)
 type t

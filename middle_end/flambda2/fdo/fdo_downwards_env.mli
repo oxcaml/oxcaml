@@ -45,9 +45,9 @@ val enter_inlined_apply :
     clears the stub callsite counter. *)
 val clear_copy_context : t -> t
 
-(** When inside an inlined stub, returns the callsite counter of the call to
-    the stub, to be inherited by a compiler-generated call in the stub that has
-    no counter of its own. *)
+(** When inside an inlined stub, returns the callsite counter of the call to the
+    stub, to be inherited by a compiler-generated call in the stub that has no
+    counter of its own. *)
 val stub_callsite_counter : t -> Fdo_counter.t option
 
 (** Record that [code_id], the new code id of a function of a set of closures

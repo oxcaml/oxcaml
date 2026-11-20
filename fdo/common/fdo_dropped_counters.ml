@@ -29,6 +29,7 @@
 module Reason = struct
   type t =
     | Inlined_call
+    | Inlined_call_without_counter
     | Self_tail_call_to_jump
     | Switch_to_single_arm
     | Switch_with_identical_arms
@@ -36,6 +37,7 @@ module Reason = struct
 
   let to_string = function
     | Inlined_call -> "inlined_call"
+    | Inlined_call_without_counter -> "inlined_call_without_counter"
     | Self_tail_call_to_jump -> "self_tail_call_to_jump"
     | Switch_to_single_arm -> "switch_to_single_arm"
     | Switch_with_identical_arms -> "switch_with_identical_arms"

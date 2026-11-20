@@ -35,7 +35,7 @@ val map_denv : t -> f:(Downwards_env.t -> Downwards_env.t) -> t
 (** Replace the environment component of the given downwards accumulator. *)
 val with_denv : t -> Downwards_env.t -> t
 
-(** Extract the dataflow analysis accumulator *)
+(** Extract the dataflow analysis accumulator. *)
 val flow_acc : t -> Flow.Acc.t
 
 (** MSet the dataflow analysis accumulator of the given dacc. *)
