@@ -527,10 +527,7 @@ Error: Modules do not match:
        sig module Choice : T val r : '_weak1 list ref ref end
      is not included in
        S
-     Values do not match:
-       val r : '_weak1 list ref ref
-     is not included in
-       val r : Choice.t list ref ref
+     The value "r" does not match its expected declaration
      The type "'_weak1 list ref ref" is not compatible with the type
        "Choice.t list ref ref"
      The type constructor "Choice.t" would escape its scope
@@ -556,10 +553,7 @@ Error: Signature mismatch:
          sig module type s val f : (module s) -> unit end
        is not included in
          sig val f : (module s) -> unit end
-       Values do not match:
-         val f : (module s/1) -> unit
-       is not included in
-         val f : (module s/2) -> unit
+       The value "f" does not match its expected declaration
        The type "(module s/1) -> unit" is not compatible with the type
          "(module s/2) -> unit"
        Modules do not match: s/1 is not included in s/2
@@ -584,10 +578,7 @@ Error: Signature mismatch:
          sig val f : (< m : 'a. 'a * 'b > as 'b) -> unit end
        is not included in
          sig val f : < m : 'b. 'b * < m : 'c. 'c * 'a > as 'a > -> unit end
-       Values do not match:
-         val f : (< m : 'a. 'a * 'b > as 'b) -> unit
-       is not included in
-         val f : < m : 'b. 'b * < m : 'c. 'c * 'a > as 'a > -> unit
+       The value "f" does not match its expected declaration
        The type "(< m : 'a. 'a * 'd > as 'd) -> unit"
        is not compatible with the type
          "< m : 'b. 'b * < m : 'c. 'c * 'e > as 'e > -> unit"
@@ -614,10 +605,7 @@ Error: Signature mismatch:
          sig val f : < m : int > -> < m : int > end
        is not included in
          sig val f : s -> s end
-       Values do not match:
-         val f : < m : int > -> < m : int >
-       is not included in
-         val f : s -> s
+       The value "f" does not match its expected declaration
        The type "< m : int > -> < m : int >" is not compatible with the type
          "s -> s"
        Type "< m : int >" is not compatible with type "s" = "< m : int; .. >"
@@ -639,10 +627,7 @@ Error: Signature mismatch:
          sig val f : 'b -> int end
        is not included in
          sig val f : 'a -> float end
-       Values do not match:
-         val f : 'b -> int
-       is not included in
-         val f : 'a -> float
+       The value "f" does not match its expected declaration
        The type "'a -> int" is not compatible with the type "'a -> float"
        Type "int" is not compatible with type "float"
 |}]
@@ -662,10 +647,7 @@ Error: Signature mismatch:
          sig val x : '_weak2 list ref end
        is not included in
          sig val x : 'a list ref end
-       Values do not match:
-         val x : '_weak2 list ref
-       is not included in
-         val x : 'a list ref
+       The value "x" does not match its expected declaration
        The type "'_weak2 list ref" is not compatible with the type "'a list ref"
        Type "'_weak2" is not compatible with type "'a"
 |}];;
@@ -684,10 +666,7 @@ Error: Signature mismatch:
          sig val r : '_weak3 list ref end
        is not included in
          sig val r : t list ref end
-       Values do not match:
-         val r : '_weak3 list ref
-       is not included in
-         val r : t list ref
+       The value "r" does not match its expected declaration
        The type "'_weak3 list ref" is not compatible with the type "t list ref"
        The type constructor "t" would escape its scope
 |}];;
@@ -727,10 +706,7 @@ Error: Signature mismatch:
          sig val r : '_weak4 list ref end
        is not included in
          N.S
-       Values do not match:
-         val r : '_weak4 list ref
-       is not included in
-         val r : T.t list ref
+       The value "r" does not match its expected declaration
        The type "'_weak4 list ref" is not compatible with the type "T.t list ref"
        This instance of "T.t" is ambiguous:
        it would escape the scope of its equation
@@ -751,10 +727,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          sig val f : int -> float end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : int -> float
+       The value "f" does not match its expected declaration
        The type "int -> int" is not compatible with the type "int -> float"
        Type "int" is not compatible with type "float"
 |}];;
@@ -774,10 +747,7 @@ Error: Signature mismatch:
          sig val f : int * int -> int * int end
        is not included in
          sig val f : int * float * int -> int -> int end
-       Values do not match:
-         val f : int * int -> int * int
-       is not included in
-         val f : int * float * int -> int -> int
+       The value "f" does not match its expected declaration
        The type "int * int -> int * int" is not compatible with the type
          "int * float * int -> int -> int"
        Type "int * int" is not compatible with type "int * float * int"
@@ -798,10 +768,7 @@ Error: Signature mismatch:
          sig val f : < f : float; m : int > -> < f : float; m : int > end
        is not included in
          sig val f : < m : int; n : float > -> < m : int; n : float > end
-       Values do not match:
-         val f : < f : float; m : int > -> < f : float; m : int >
-       is not included in
-         val f : < m : int; n : float > -> < m : int; n : float >
+       The value "f" does not match its expected declaration
        The type "< f : float; m : int > -> < f : float; m : int >"
        is not compatible with the type
          "< m : int; n : float > -> < m : int; n : float >"
@@ -823,10 +790,7 @@ Error: Signature mismatch:
          sig val f : [ `Bar | `Foo ] -> unit end
        is not included in
          sig val f : [ `Foo ] -> unit end
-       Values do not match:
-         val f : [ `Bar | `Foo ] -> unit
-       is not included in
-         val f : [ `Foo ] -> unit
+       The value "f" does not match its expected declaration
        The type "[ `Bar | `Foo ] -> unit" is not compatible with the type
          "[ `Foo ] -> unit"
        The second variant type does not allow tag(s) "`Bar"
@@ -847,10 +811,7 @@ Error: Signature mismatch:
          sig val f : [< `Foo ] -> unit end
        is not included in
          sig val f : [> `Foo ] -> unit end
-       Values do not match:
-         val f : [< `Foo ] -> unit
-       is not included in
-         val f : [> `Foo ] -> unit
+       The value "f" does not match its expected declaration
        The type "[< `Foo ] -> unit" is not compatible with the type
          "[> `Foo ] -> unit"
        The second variant type is open and the first is not
@@ -871,10 +832,7 @@ Error: Signature mismatch:
          sig val f : [< `Foo ] -> unit end
        is not included in
          sig val f : [< `Bar | `Foo ] -> unit end
-       Values do not match:
-         val f : [< `Foo ] -> unit
-       is not included in
-         val f : [< `Bar | `Foo ] -> unit
+       The value "f" does not match its expected declaration
        The type "[< `Foo ] -> unit" is not compatible with the type
          "[< `Bar | `Foo ] -> unit"
        The first variant type does not allow tag(s) "`Bar"
@@ -895,10 +853,7 @@ Error: Signature mismatch:
          sig val f : < m : 'a. [< `Foo ] as 'a > -> unit end
        is not included in
          sig val f : < m : [< `Foo ] > -> unit end
-       Values do not match:
-         val f : < m : 'a. [< `Foo ] as 'a > -> unit
-       is not included in
-         val f : < m : [< `Foo ] > -> unit
+       The value "f" does not match its expected declaration
        The type "< m : 'a. [< `Foo ] as 'a > -> unit"
        is not compatible with the type "< m : [< `Foo ] > -> unit"
        The method "m" has type "'b. [< `Foo ] as 'b",
@@ -920,10 +875,7 @@ Error: Signature mismatch:
          sig val f : < m : [ `Foo ] > -> unit end
        is not included in
          sig val f : < m : 'a. [< `Foo ] as 'a > -> unit end
-       Values do not match:
-         val f : < m : [ `Foo ] > -> unit
-       is not included in
-         val f : < m : 'a. [< `Foo ] as 'a > -> unit
+       The value "f" does not match its expected declaration
        The type "< m : [ `Foo ] > -> unit" is not compatible with the type
          "< m : 'a. [< `Foo ] as 'a > -> unit"
        The method "m" has type "[ `Foo ]", but the expected method type was
@@ -945,10 +897,7 @@ Error: Signature mismatch:
          sig val f : [< `C of int & float ] -> unit end
        is not included in
          sig val f : [< `C ] -> unit end
-       Values do not match:
-         val f : [< `C of int & float ] -> unit
-       is not included in
-         val f : [< `C ] -> unit
+       The value "f" does not match its expected declaration
        The type "[< `C of & int & float ] -> unit"
        is not compatible with the type "[< `C ] -> unit"
        Types for tag "`C" are incompatible
@@ -969,10 +918,7 @@ Error: Signature mismatch:
          sig val f : [ `Foo of int ] -> unit end
        is not included in
          sig val f : [ `Foo ] -> unit end
-       Values do not match:
-         val f : [ `Foo of int ] -> unit
-       is not included in
-         val f : [ `Foo ] -> unit
+       The value "f" does not match its expected declaration
        The type "[ `Foo of int ] -> unit" is not compatible with the type
          "[ `Foo ] -> unit"
        Types for tag "`Foo" are incompatible
@@ -993,10 +939,7 @@ Error: Signature mismatch:
          sig val f : [ `Foo ] -> unit end
        is not included in
          sig val f : [ `Foo of int ] -> unit end
-       Values do not match:
-         val f : [ `Foo ] -> unit
-       is not included in
-         val f : [ `Foo of int ] -> unit
+       The value "f" does not match its expected declaration
        The type "[ `Foo ] -> unit" is not compatible with the type
          "[ `Foo of int ] -> unit"
        Types for tag "`Foo" are incompatible
@@ -1026,10 +969,7 @@ Error: Signature mismatch:
          sig val f : [> `Bar | `Foo ] -> unit end
        is not included in
          sig val f : [< `Bar | `Baz | `Foo ] -> unit end
-       Values do not match:
-         val f : [> `Bar | `Foo ] -> unit
-       is not included in
-         val f : [< `Bar | `Baz | `Foo ] -> unit
+       The value "f" does not match its expected declaration
        The type "[> `Bar | `Foo ] -> unit" is not compatible with the type
          "[< `Bar | `Baz | `Foo ] -> unit"
        The tag "`Foo" is guaranteed to be present in the first variant type,
@@ -1921,10 +1861,7 @@ Error: Signature mismatch:
          sig val f : x:'a -> unit end
        is not included in
          sig val f : int -> unit end
-       Values do not match:
-         val f : x:'a -> unit
-       is not included in
-         val f : int -> unit
+       The value "f" does not match its expected declaration
        The type "x:'a -> unit" is not compatible with the type "int -> unit"
        The first argument is labeled "x",
        but an unlabeled argument was expected
@@ -1950,10 +1887,7 @@ Error: Signature mismatch:
          sig val f : ('a : any). ?x:'a -> unit end
        is not included in
          sig val f : int -> unit end
-       Values do not match:
-         val f : ('a : any). ?x:'a -> unit
-       is not included in
-         val f : int -> unit
+       The value "f" does not match its expected declaration
        The type "?x:'a -> unit" is not compatible with the type "int -> unit"
        The first argument is labeled "?x",
        but an unlabeled argument was expected
@@ -1980,10 +1914,7 @@ Error: Signature mismatch:
          sig val f : ('a : any). ?x:'a -> unit end
        is not included in
          sig val f : x:int -> unit end
-       Values do not match:
-         val f : ('a : any). ?x:'a -> unit
-       is not included in
-         val f : x:int -> unit
+       The value "f" does not match its expected declaration
        The type "?x:'a -> unit" is not compatible with the type "x:int -> unit"
        The label "?x" was expected to not be optional
 |}]
@@ -2009,10 +1940,7 @@ Error: Signature mismatch:
          sig val f : ('a : any). ?y:'a -> unit end
        is not included in
          sig val f : ?x:int -> unit end
-       Values do not match:
-         val f : ('a : any). ?y:'a -> unit
-       is not included in
-         val f : ?x:int -> unit
+       The value "f" does not match its expected declaration
        The type "?y:'a -> unit" is not compatible with the type "?x:int -> unit"
        Labels "?y" and "?x" do not match
 |}]
@@ -2033,10 +1961,7 @@ Error: Signature mismatch:
          sig val f : 'a -> unit end
        is not included in
          sig val f : ?x:int -> unit end
-       Values do not match:
-         val f : 'a -> unit
-       is not included in
-         val f : ?x:int -> unit
+       The value "f" does not match its expected declaration
        The type "'a -> unit" is not compatible with the type "?x:int -> unit"
        A label "?x" was expected
 |}]

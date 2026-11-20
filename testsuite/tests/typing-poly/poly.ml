@@ -1183,10 +1183,7 @@ Error: Signature mismatch:
          sig
            val f : < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) > -> unit
          end
-       Values do not match:
-         val f : (< m : 'a. 'a * ('a * 'b) > as 'b) -> unit
-       is not included in
-         val f : < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) > -> unit
+       The value "f" does not match its expected declaration
        The type "(< m : 'a. 'a * ('a * 'd) > as 'd) -> unit"
        is not compatible with the type
          "< m : 'b. 'b * ('b * < m : 'c. 'c * 'e > as 'e) > -> unit"

@@ -386,10 +386,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b @ local unyielding -> unit end
        is not included in
          sig val f : 'a @ local -> 'b @ local -> unit end
-       Values do not match:
-         val f : 'a -> 'b @ local unyielding -> unit
-       is not included in
-         val f : 'a @ local -> 'b @ local -> unit
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ local unyielding -> unit"
        is not compatible with the type "'a @ local -> 'b @ local -> unit"
        Type "'b @ local unyielding -> unit" is not compatible with type

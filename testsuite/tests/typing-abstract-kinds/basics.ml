@@ -2355,10 +2355,7 @@ Error: Signature mismatch:
          sig val id : ('a : value mod portable). 'a -> 'a end
        is not included in
          Value_id
-       Values do not match:
-         val id : ('a : value mod portable). 'a -> 'a
-       is not included in
-         val id : 'a -> 'a
+       The value "id" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The kind of 'a is value
          because of the definition of id at line 8, characters 2-33.

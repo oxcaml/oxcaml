@@ -281,10 +281,7 @@ Error: Signature mismatch:
          sig val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local] end
        is not included in
          sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
-       Values do not match:
-         val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local]
-       is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
        is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
        The return mode was expected to be "global" but is "local"
@@ -303,10 +300,7 @@ Error: Signature mismatch:
          sig val f : 'a @ [< 'm & unique] -> 'a @ [> 'm] end
        is not included in
          sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
-       Values do not match:
-         val f : 'a @ [< 'm & unique] -> 'a @ [> 'm]
-       is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ [< 'm & unique] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "unique" but is "aliased"
@@ -325,10 +319,7 @@ Error: Signature mismatch:
          sig val f : 'a @ [< 'm & global] -> 'a @ [> 'm] end
        is not included in
          sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
-       Values do not match:
-         val f : 'a @ [< 'm & global] -> 'a @ [> 'm]
-       is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ [< 'm & global] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "global"
@@ -348,10 +339,7 @@ Error: Signature mismatch:
          sig val f : 'a @ [< 'm & portable] -> 'a @ [> 'm] end
        is not included in
          sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
-       Values do not match:
-         val f : 'a @ [< 'm & portable] -> 'a @ [> 'm]
-       is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ [< 'm & portable] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "portable" but is "nonportable"
@@ -395,10 +383,7 @@ Error: Signature mismatch:
          sig
            val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
          end
-       Values do not match:
-         val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
-       is not included in
-         val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
+       The value "f" does not match its expected declaration
        The type
          "'a @ [> past('m) | local] -> 'b @ [< 'n > past('o)] -> 'b @ [> 'n]"
        is not compatible with the type
@@ -421,10 +406,7 @@ Error: Signature mismatch:
          sig val f : 'a @ [< 'm] -> 'a @ [> 'm] end
        is not included in
          sig val f : 'a @ local -> 'a end
-       Values do not match:
-         val f : 'a @ [< 'm] -> 'a @ [> 'm]
-       is not included in
-         val f : 'a @ local -> 'a
+       The value "f" does not match its expected declaration
        The type
          "'a @ [< 'm > local aliased nonportable unforkable yielding stateful dynamic] ->
          'a @ [> 'm | local aliased nonportable unforkable yielding stateful dynamic]"
@@ -450,10 +432,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
-       is not included in
-         val f : 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]"
        is not compatible with the type "'a -> 'a"
        The argument mode was expected to be "portable" but is "nonportable"

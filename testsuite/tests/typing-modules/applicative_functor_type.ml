@@ -44,10 +44,7 @@ Line 1, characters 9-13:
 Error: Modules do not match:
        sig type t = M.t val equal : 'a -> 'a -> bool end
      is not included in sig type t = M.t val equal : unit end
-     Values do not match:
-       val equal : 'a -> 'a -> bool
-     is not included in
-       val equal : unit
+     The value "equal" does not match its expected declaration
      The type "'a -> 'a -> bool" is not compatible with the type "unit"
 |} ]
 

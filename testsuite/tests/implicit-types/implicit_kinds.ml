@@ -202,12 +202,7 @@ Error: Signature mismatch:
            val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
          end
        At position "module type T = <here>"
-       Values do not match:
-         val pack :
-           ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array @@
-           stateless
-       is not included in
-         val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+       The value "pack" does not match its expected declaration
        The type "'a -> 'a array" is not compatible with the type "'b -> 'b array"
        The layout of 'a is bits64
          because of the definition of pack at line 5, characters 4-43.
