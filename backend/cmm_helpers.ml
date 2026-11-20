@@ -1202,8 +1202,7 @@ let same_simple_value (e1 : expression) (e2 : expression) =
   | Cvar v1, Cvar v2 -> V.same v1 v2
   | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
   | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
-  | Cconst_symbol (s1, _), Cconst_symbol (s2, _) ->
-    String.equal s1.sym_name s2.sym_name
+  | Cconst_symbol (s1, _), Cconst_symbol (s2, _) -> equal_symbol s1 s2
   | _ -> false
 
 (** Whether [cond] is an equality test between the two arms of a [csel], so that
@@ -1507,7 +1506,7 @@ let is_power_of_2_or_zero n = Nativeint.logand n (Nativeint.pred n) = 0n
 let divide_by_zero_message = "Division by zero after check"
 
 let divide_by_zero_message_symbol =
-  { sym_name = "caml_divide_by_zero_uncaught"; sym_global = Global }
+  global_symbol ~ty:typ_int "caml_divide_by_zero_uncaught"
 
 let divide_by_zero dividend ~dbg:_ =
   bind "dividend" dividend (fun _ ->
@@ -1752,7 +1751,7 @@ let box_float32 dbg mode exp =
   Cop
     ( Calloc (mode, Alloc_block_kind_float32),
       [ alloc_boxedfloat32_header mode dbg;
-        Cconst_symbol (global_symbol caml_float32_ops, dbg);
+        Cconst_symbol (global_symbol ~ty:typ_int caml_float32_ops, dbg);
         exp ],
       dbg )
 
@@ -2666,7 +2665,8 @@ let send_function_name arity result (mode : Cmx_format.return_mode) =
   let suff =
     match mode with Not_alloc_stack -> "" | Maybe_alloc_stack -> "L"
   in
-  global_symbol ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
+  global_symbol ~ty:typ_int
+    ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
 
 let call_cached_method obj tag cache pos args args_type result (apos, mode)
     ~returns dbg =
@@ -2877,7 +2877,7 @@ let apply_function_sym arity result mode =
   let result = Extended_machtype.change_tagged_int_to_val result in
   assert (List.length arity > 0);
   Compilenv.need_apply_fun arity result mode;
-  global_symbol (apply_function_name arity result mode)
+  global_symbol ~ty:typ_int (apply_function_name arity result mode)
 
 let tuplify_function_name arity result =
   "caml_tuplify" ^ Int.to_string arity ^ result_layout_suffix result
@@ -2903,14 +2903,12 @@ let curry_function_sym_name function_kind arity result =
     tuplify_function_name (List.length arity) result
 
 let curry_function_sym function_kind arity result =
-  { sym_name = curry_function_sym_name function_kind arity result;
-    sym_global = Global
-  }
+  global_symbol ~ty:typ_int (curry_function_sym_name function_kind arity result)
 
 let fail_if_called_indirectly_name = "caml_fail_if_called_indirectly"
 
 let fail_if_called_indirectly_sym =
-  { sym_name = fail_if_called_indirectly_name; sym_global = Global }
+  global_symbol ~ty:typ_int fail_if_called_indirectly_name
 
 (* Big arrays *)
 
@@ -2957,7 +2955,7 @@ let operations_boxed_int (bi : Primitive.boxed_integer) =
     | Boxed_int32 -> caml_int32_ops
     | Boxed_int64 -> caml_int64_ops
   in
-  global_symbol sym_name
+  global_symbol ~ty:typ_int sym_name
 
 let alloc_header_boxed_int (bi : Primitive.boxed_integer) mode dbg =
   match bi with
@@ -3494,7 +3492,7 @@ let make_switch arg cases actions dbg =
       (Const_table
          ( Local,
            Array.to_list (Array.map (fun act -> const_actions.(act)) cases) ));
-    let table_sym = { sym_name = table; sym_global = Local } in
+    let table_sym = local_symbol ~ty:typ_int table in
     addr_array_ref (Cconst_symbol (table_sym, dbg)) (tag_int arg dbg) dbg
   in
   let make_affine_computation ~offset ~slope arg dbg =
@@ -4174,7 +4172,9 @@ let send_function (arity, result, mode) =
 let apply_function (arity, result, mode) =
   let args, clos, body = apply_function_body arity result mode in
   let all_args = List.combine args arity @ [clos, typ_val] in
-  let fun_name = global_symbol (apply_function_name arity result mode) in
+  let fun_name =
+    global_symbol ~ty:typ_int (apply_function_name arity result mode)
+  in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
   Cfunction
     { fun_name;
@@ -4209,7 +4209,9 @@ let tuplify_function arity return =
       get_field_gen Asttypes.Mutable (Cvar arg) i (dbg ())
       :: access_components (i + 1)
   in
-  let fun_name = global_symbol (tuplify_function_name arity return) in
+  let fun_name =
+    global_symbol ~ty:typ_int (tuplify_function_name arity return)
+  in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
   Cfunction
     { fun_name;
@@ -4404,7 +4406,7 @@ let final_curry_function nlocal arity result =
   let last_clos = V.create_local "clos" in
   let narity = List.length arity in
   let fun_name =
-    global_symbol
+    global_symbol ~ty:typ_int
       (curry_function_sym_name (Lambda.Curried { nlocal }) arity result
       ^ "_"
       ^ Int.to_string (narity - 1))
@@ -4448,7 +4450,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
       let has_nary = curry_clos_has_nary_application ~narity (num + 1) in
       let function_slot_size = if has_nary then 3 else 2 in
       Cfunction
-        { fun_name = global_symbol name2;
+        { fun_name = global_symbol ~ty:typ_int name2;
           fun_args =
             List.map (fun (arg, t) -> VP.create arg, [| t |]) args
             @ [VP.create clos, typ_val];
@@ -4459,7 +4461,8 @@ let intermediate_curry_functions ~nlocal ~arity result =
                     (function_slot_size + machtype_stored_size arg_type + 1)
                     (dbg ());
                   Cconst_symbol
-                    ( global_symbol (name1 ^ "_" ^ Int.to_string (num + 1)),
+                    ( global_symbol ~ty:typ_int
+                        (name1 ^ "_" ^ Int.to_string (num + 1)),
                       dbg () );
                   Cconst_natint
                     ( pack_closure_info
@@ -4472,7 +4475,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
                 @ (if has_nary
                    then
                      [ Cconst_symbol
-                         ( global_symbol
+                         ( global_symbol ~ty:typ_int
                              (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app"),
                            dbg () ) ]
                    else [])
@@ -4499,7 +4502,8 @@ let intermediate_curry_functions ~nlocal ~arity result =
              (direct_args @ [clos, typ_val])
          in
          let fun_name =
-           global_symbol (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app")
+           global_symbol ~ty:typ_int
+             (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app")
          in
          let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
          let cf =
@@ -4734,21 +4738,23 @@ let emit_boxed_int32_constant_fields n cont =
     (* This will sign extend. *)
     Nativeint.of_int32 n
   in
-  Csymbol_address (global_symbol caml_int32_ops) :: Cint n :: cont
+  Csymbol_address (global_symbol ~ty:typ_int caml_int32_ops) :: Cint n :: cont
 
 let emit_boxed_int64_constant_fields n cont =
   let lo = Int64.to_nativeint n in
-  Csymbol_address (global_symbol caml_int64_ops) :: Cint lo :: cont
+  Csymbol_address (global_symbol ~ty:typ_int caml_int64_ops) :: Cint lo :: cont
 
 let emit_boxed_nativeint_constant_fields n cont =
-  Csymbol_address (global_symbol caml_nativeint_ops) :: Cint n :: cont
+  Csymbol_address (global_symbol ~ty:typ_int caml_nativeint_ops)
+  :: Cint n :: cont
 
 let emit_float32_constant symb f cont =
   (* Here we are relying on the fact that the data section is zero initialized
      by just using [Csingle] and not worrying about the high 64 bits of the
      relevant field. *)
   emit_block symb boxedfloat32_header
-    (Csymbol_address (global_symbol caml_float32_ops) :: Csingle f :: cont)
+    (Csymbol_address (global_symbol ~ty:typ_int caml_float32_ops)
+    :: Csingle f :: cont)
 
 let emit_float_constant symb f cont =
   emit_block symb float_header (Cdouble f :: cont)
@@ -4815,7 +4821,7 @@ let entry_symbol_name ?compilation_unit () =
 let fail_if_called_indirectly_function () =
   let message = "This function should never be called indirectly" in
   let message_symbol =
-    { sym_name = "caml_fail_if_called_indirectly_message"; sym_global = Local }
+    local_symbol ~ty:typ_int "caml_fail_if_called_indirectly_message"
   in
   let string_data = emit_string_constant message_symbol message [] in
   let fun_body = Cinvalid { message; symbol = message_symbol } in
@@ -4861,18 +4867,19 @@ let entry_point namelist =
   let incr_global_inited () =
     Cop
       ( Cstore (Word_int, Assignment),
-        [ cconst_symbol (global_symbol "caml_globals_inited");
+        [ cconst_symbol (global_symbol ~ty:typ_int "caml_globals_inited");
           Cop
             ( Caddi,
               [ Cop
                   ( mk_load_mut Word_int,
-                    [cconst_symbol (global_symbol "caml_globals_inited")],
+                    [ cconst_symbol
+                        (global_symbol ~ty:typ_int "caml_globals_inited") ],
                     dbg () );
                 cconst_int 1 ],
               dbg () ) ],
         dbg () )
   in
-  let table_symbol = global_symbol "caml_globals_entry_functions" in
+  let table_symbol = global_symbol ~ty:typ_int "caml_globals_entry_functions" in
   let call i =
     let f =
       Cop
@@ -4897,7 +4904,8 @@ let entry_point namelist =
     List.map
       (fun name ->
         Csymbol_address
-          (global_symbol (entry_symbol_name ~compilation_unit:name ())))
+          (global_symbol ~ty:typ_int
+             (entry_symbol_name ~compilation_unit:name ())))
       namelist
   in
   let data = Cdefine_symbol table_symbol :: data in
@@ -4939,7 +4947,7 @@ let entry_point namelist =
         dbg,
         false )
   in
-  let fun_name = global_symbol "caml_program" in
+  let fun_name = global_symbol ~ty:typ_int "caml_program" in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
   [ Cdata data;
     Cfunction
@@ -4959,10 +4967,12 @@ let cint_zero = Cint 0n
 let global_table namelist =
   let mksym name =
     Csymbol_address
-      (global_symbol (make_symbol ~compilation_unit:name "gc_roots"))
+      (global_symbol ~ty:typ_int
+         (make_symbol ~compilation_unit:name "gc_roots"))
   in
   Cdata
-    ((Cdefine_symbol (global_symbol "caml_globals") :: List.map mksym namelist)
+    (Cdefine_symbol (global_symbol ~ty:typ_int "caml_globals")
+     :: List.map mksym namelist
     @ [cint_zero])
 
 (* Generate the unit dependency table for shared objects / complete objects.
@@ -5010,7 +5020,7 @@ let unit_deps_table units =
     List.fold_left
       (fun acc (cu, _) ->
         let sym_name = Compilenv.new_const_symbol () in
-        StringMap.add (unit_name cu) { sym_name; sym_global = Local } acc)
+        StringMap.add (unit_name cu) (local_symbol ~ty:typ_int sym_name) acc)
       StringMap.empty sorted_units
   in
   let string_data =
@@ -5027,7 +5037,7 @@ let unit_deps_table units =
         then data_acc, StringMap.add (unit_name cu) None sym_acc
         else
           let arr_sym_name = Compilenv.new_const_symbol () in
-          let arr_sym = { sym_name = arr_sym_name; sym_global = Local } in
+          let arr_sym = local_symbol ~ty:typ_int arr_sym_name in
           let arr_data =
             Cdefine_symbol arr_sym
             :: List.filter_map
@@ -5043,7 +5053,7 @@ let unit_deps_table units =
       ([], StringMap.empty) sorted_units
   in
   (* Emit main table *)
-  let table_sym = global_symbol "caml_unit_deps_table" in
+  let table_sym = global_symbol ~ty:typ_int "caml_unit_deps_table" in
   let num_units = List.length sorted_units in
   let table_header =
     [Cdefine_symbol table_sym; Cint (Nativeint.of_int num_units)]
@@ -5054,13 +5064,15 @@ let unit_deps_table units =
         let name = unit_name cu in
         let name_sym = StringMap.find name name_symbols in
         let entry_sym =
-          global_symbol (entry_symbol_name ~compilation_unit:cu ())
+          global_symbol ~ty:typ_int (entry_symbol_name ~compilation_unit:cu ())
         in
         let gc_roots_sym =
-          global_symbol (make_symbol ~compilation_unit:cu "gc_roots")
+          global_symbol ~ty:typ_int
+            (make_symbol ~compilation_unit:cu "gc_roots")
         in
         let frametable_sym =
-          global_symbol (make_symbol ~compilation_unit:cu "frametable")
+          global_symbol ~ty:typ_int
+            (make_symbol ~compilation_unit:cu "frametable")
         in
         let num_deps =
           List.length
@@ -5091,7 +5103,7 @@ let reference_symbols namelist =
   Cdata (List.map mksym namelist)
 
 let global_data sym_name v =
-  let symbol = { sym_name; sym_global = Global } in
+  let symbol = global_symbol ~ty:typ_int sym_name in
   Cdata (emit_string_constant symbol (Marshal.to_string v []) [])
 
 let globals_map v = global_data "caml_globals_map" v
@@ -5101,10 +5113,11 @@ let globals_map v = global_data "caml_globals_map" v
 let frame_table namelist =
   let mksym name =
     Csymbol_address
-      (global_symbol (make_symbol ~compilation_unit:name "frametable"))
+      (global_symbol ~ty:typ_int
+         (make_symbol ~compilation_unit:name "frametable"))
   in
   Cdata
-    (Cdefine_symbol (global_symbol "caml_frametable")
+    (Cdefine_symbol (global_symbol ~ty:typ_int "caml_frametable")
      :: List.map mksym namelist
     @ [cint_zero])
 
@@ -5112,13 +5125,15 @@ let frame_table namelist =
 
 let segment_table namelist symbol begname endname =
   let addsyms name lst =
-    Csymbol_address (global_symbol (make_symbol ~compilation_unit:name begname))
+    Csymbol_address
+      (global_symbol ~ty:typ_int (make_symbol ~compilation_unit:name begname))
     :: Csymbol_address
-         (global_symbol (make_symbol ~compilation_unit:name endname))
+         (global_symbol ~ty:typ_int
+            (make_symbol ~compilation_unit:name endname))
     :: lst
   in
   Cdata
-    (Cdefine_symbol (global_symbol symbol)
+    (Cdefine_symbol (global_symbol ~ty:typ_int symbol)
     :: List.fold_right addsyms namelist [cint_zero])
 
 let data_segment_table namelist =
@@ -5130,11 +5145,9 @@ let code_segment_table namelist =
 (* Initialize a predefined exception *)
 
 let predef_exception i name =
-  let name_sym =
-    { sym_name = Compilenv.new_const_symbol (); sym_global = Local }
-  in
+  let name_sym = local_symbol ~ty:typ_int (Compilenv.new_const_symbol ()) in
   let data_items = emit_string_constant name_sym name [] in
-  let exn_sym = global_symbol ("caml_exn_" ^ name) in
+  let exn_sym = global_symbol ~ty:typ_int ("caml_exn_" ^ name) in
   let tag = Obj.object_tag in
   let size = 2 in
   let fields = Csymbol_address name_sym :: cint_const (-i - 1) :: data_items in
@@ -5151,7 +5164,7 @@ let plugin_header units =
 (* Build the NULL terminated array of gc roots *)
 
 let emit_gc_roots_table ~symbols cont =
-  let table_symbol = global_symbol (make_symbol "gc_roots") in
+  let table_symbol = global_symbol ~ty:typ_int (make_symbol "gc_roots") in
   Cdata
     (Cdefine_symbol table_symbol
      :: List.map (fun s -> Csymbol_address s) symbols
@@ -5542,7 +5555,7 @@ let fundecl fun_name fun_args fun_body fun_codegen_options fun_dbg fun_poll
 let gc_root_table syms =
   let table_symbol = make_symbol ?compilation_unit:None "gc_roots" in
   cdata
-    (define_symbol { sym_name = table_symbol; sym_global = Global }
+    (define_symbol (global_symbol ~ty:typ_int table_symbol)
     @ List.map symbol_address syms
     @ [cint 0n])
 
@@ -5783,7 +5796,7 @@ let perform ~dbg ~returns eff =
   in
   (* Rc_normal means "allow tailcalls". Preventing them here by using Rc_nontail
      improves backtraces of paused fibers. *)
-  let sym = Cmm.global_symbol "caml_perform" in
+  let sym = Cmm.global_symbol ~ty:typ_int "caml_perform" in
   Cop
     ( Capply
         { result_type = typ_val;
@@ -5795,7 +5808,7 @@ let perform ~dbg ~returns eff =
       dbg )
 
 let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
-  let sym = Cmm.global_symbol "caml_runstack" in
+  let sym = Cmm.global_symbol ~ty:typ_int "caml_runstack" in
   Cop
     ( Capply
         { result_type = typ_val;
@@ -5803,7 +5816,7 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
           callees = Some [sym];
           returns
         },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+      [ Cconst_symbol (Cmm.global_symbol ~ty:typ_int "caml_runstack", dbg);
         Cop
           ( Cextcall
               { func = "caml_alloc_stack";
@@ -5823,7 +5836,7 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
 
 let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg
     ~returns =
-  let sym = Cmm.global_symbol "caml_runstack" in
+  let sym = Cmm.global_symbol ~ty:typ_int "caml_runstack" in
   Cop
     ( Capply
         { result_type = typ_val;
@@ -5831,7 +5844,7 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg
           callees = Some [sym];
           returns
         },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+      [ Cconst_symbol (Cmm.global_symbol ~ty:typ_int "caml_runstack", dbg);
         Cop
           ( Cextcall
               { func = "caml_alloc_stack_preemptible";
@@ -5855,7 +5868,7 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg
    the runtime resume function. *)
 
 let continue ~dbg ~cont ~value ~returns =
-  let sym = Cmm.global_symbol "caml_continue" in
+  let sym = Cmm.global_symbol ~ty:typ_int "caml_continue" in
   Cop
     ( Capply
         { result_type = typ_val;
@@ -5867,7 +5880,7 @@ let continue ~dbg ~cont ~value ~returns =
       dbg )
 
 let discontinue ~dbg ~cont ~exn ~returns =
-  let sym = Cmm.global_symbol "caml_discontinue" in
+  let sym = Cmm.global_symbol ~ty:typ_int "caml_discontinue" in
   Cop
     ( Capply
         { result_type = typ_val;
@@ -5879,7 +5892,7 @@ let discontinue ~dbg ~cont ~exn ~returns =
       dbg )
 
 let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
-  let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
+  let sym = Cmm.global_symbol ~ty:typ_int "caml_discontinue_with_backtrace" in
   Cop
     ( Capply
         { result_type = typ_val;
@@ -5893,7 +5906,7 @@ let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
 let reperform ~dbg ~eff ~cont ~last_fiber ~returns =
   (* Rc_normal is required here, this is used in tail position and should tail
      call. *)
-  let sym = Cmm.global_symbol "caml_reperform" in
+  let sym = Cmm.global_symbol ~ty:typ_int "caml_reperform" in
   Cop
     ( Capply
         { result_type = typ_val;

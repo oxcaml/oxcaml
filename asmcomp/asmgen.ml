@@ -808,7 +808,9 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
           (fun prim ->
             if not (Primitive.native_name_is_external prim)
             then None
-            else Some (Cmm.global_symbol (Primitive.native_name prim)))
+            else
+              Some
+                (Cmm.global_symbol ~ty:Cmm.typ_int (Primitive.native_name prim)))
           !Translmod.primitive_declarations));
   emit_end_assembly ~sourcefile ()
 

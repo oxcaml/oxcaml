@@ -877,14 +877,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let r = Reg.createv Cmm.typ_mask in
       Ok (insert_op_debug env sub_cfg (Operation.Const_mask bits) dbg [||] r)
     | Cconst_symbol (n, dbg) ->
-      (* Cconst_symbol _ evaluates to a statically-allocated address, so its
-         value fits in a typ_int register and is never changed by the GC.
-
-         Some Cconst_symbols point to statically-allocated blocks, some of which
-         may point to heap values. However, any such blocks will be registered
-         in the compilation unit's global roots structure, so adding this
-         register to the frame table would be redundant *)
-      let r = Reg.createv Cmm.typ_int in
+      let r = Reg.createv n.sym_type in
       Ok (insert_op_debug env sub_cfg (SU.make_const_symbol n) dbg [||] r)
     | Cvar v -> (
       try Ok (SU.env_find v env)

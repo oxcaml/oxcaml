@@ -292,7 +292,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
     | Cconst_mask (bits, dbg) ->
       Ok (emit_op env c (Operation.Const_mask bits) dbg Cmm.typ_mask [||])
     | Cconst_symbol (n, dbg) ->
-      Ok (emit_op env c (SU.make_const_symbol n) dbg Cmm.typ_int [||])
+      Ok (emit_op env c (SU.make_const_symbol n) dbg n.sym_type [||])
     | Cvar v -> Ok (env_find v env)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list ->

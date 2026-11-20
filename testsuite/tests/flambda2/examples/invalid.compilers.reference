@@ -44,14 +44,15 @@
    (!= (or (>>u (<< (load_mut int (+a t1/0 -8)) 8) 17) 1)
      (or (>>u (<< (load_mut int (+a t2/0 -8)) 8) 17) 1))
    (raise_notrace{invalid.ml:25,45-63;stdlib.ml:39,17-33}
-     L:"camlInvalid__Pmakeblock_5")
+     L:"camlInvalid__Pmakeblock_5":int)
    1) )
 
 (function{invalid.ml:27,17-68} camlInvalid__bar_1_4_code
      (t1/1: val t2/1: val) : int
  (let
    param/0
-     (app{invalid.ml:28,2-13} G:"camlInvalid__check_0_3_code" t1/1 t2/1 int)
+     (app{invalid.ml:28,2-13} G:"camlInvalid__check_0_3_code":int t1/1 t2/1
+       int)
    (+ (<< (==f (load_mut float64 t2/1) 0.) 1) 1)) )
 
 (function{invalid.ml:31,8-30} camlInvalid__foo_2_5_code (param/1: int) : int
@@ -59,13 +60,13 @@
    (Pmakearray/0 (alloc{invalid.ml:31,17-25} 1278 1.)
     param/2
       (app{invalid.ml:31,13-30;invalid.ml:28,2-13}
-        G:"camlInvalid__check_0_3_code" Pmakearray/0
-        L:"camlInvalid__empty_array_2" int))
+        G:"camlInvalid__check_0_3_code":int Pmakearray/0
+        L:"camlInvalid__empty_array_2":int int))
    (invalid
      "(Defining_expr_of_let (bound_pattern prim/109N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/105UV 0)\n   invalid.ml:29,2--23)))"
      L:"camlInvalid__invalid_9")) )
 
 (function no_cse reduce_code_size linscan camlInvalid__entry () : val
- (catch (exit 7 G:"camlInvalid") with(7 *ret*/0: val) 1) )
+ (catch (exit 7 G:"camlInvalid":int) with(7 *ret*/0: val) 1) )
 
 (data)

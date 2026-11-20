@@ -175,8 +175,7 @@ let linearize_terminator (func : string)
       [L.Lcall_op (Ltailcall_imm { func = func_symbol })], None
     | Tailcall_self { destination } ->
       ( [ L.Lcall_op
-            (Ltailcall_imm { func = { sym_name = func; sym_global = Local } })
-        ],
+            (Ltailcall_imm { func = Cmm.local_symbol ~ty:Cmm.typ_int func }) ],
         Some destination )
     | Call_no_return (Indirect _) -> single (L.Lcall_op Lcall_ind)
     | Call_no_return (Direct func) -> single (L.Lcall_op (Lcall_imm { func }))
