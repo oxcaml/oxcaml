@@ -57,26 +57,29 @@
    We use a simple linear congruential PRNG (see Knuth vol 2) instead
    of random(), because we need exactly 32 bits of pseudo-random data
    (i.e. 2 * (NUM_LEVELS - 1)).  Moreover, the congruential PRNG
-   is faster and guaranteed to be deterministic (to reproduce bugs). */
+   is faster and guaranteed to be deterministic when thread spawns
+   are controlled (to reproduce bugs). */
 
-static uint32_t _Atomic random_seed = 0;
+static uint32_t _Atomic random_seed_initial = 0x10001;
+static CAMLthread_local uint32_t random_seed = 0;
 
 static int random_level(void) {
   uint32_t r;
   int level = 0;
 
-  /* Linear congruence with modulus = 2^32, multiplier = 69069
-   (Knuth vol 2 p. 106, line 15 of table 1), additive = 25173. */
-
-  while( 1 ) {
-    uint32_t curr = atomic_load_relaxed(&random_seed);
-
-    r = curr * 69069 + 25173;
-
-    if( atomic_compare_exchange_strong(&random_seed, &curr, r) ) {
-        break;
-    }
+  r = random_seed;
+  if (r == 0) {
+    /* We use 0x10001, i.e. 65537 (a prime), to ensure that the high
+       bits also get populated immediately. */
+    r = atomic_fetch_add_explicit(&random_seed_initial, 0x10001,
+                                  memory_order_relaxed);
   }
+
+  /* Linear congruence with modulus = 2^32, multiplier = 69069
+    (Knuth vol 2 p. 106, line 15 of table 1), additive = 25173. */
+  r = r * 69069 + 25173;
+  random_seed = r;
+
   /* Knuth (vol 2 p. 13) shows that the least significant bits are
    "less random" than the most significant bits with a modulus of 2^m,
    so consume most significant bits first */
@@ -102,7 +105,6 @@ void caml_lf_skiplist_init(struct lf_skiplist *sk) {
     caml_fatal_error("caml_lf_skiplist_init: out of memory");
   sk->head->key = 0;
   sk->head->data = 0;
-  sk->head->garbage_next = NULL;
   sk->head->top_level = NUM_LEVELS - 1;
 
   sk->tail = caml_stat_alloc_noexc(SIZEOF_LF_SKIPCELL +
@@ -111,15 +113,9 @@ void caml_lf_skiplist_init(struct lf_skiplist *sk) {
     caml_fatal_error("caml_lf_skiplist_init: out of memory");
   sk->tail->key = CAML_UINTNAT_MAX;
   sk->tail->data = 0;
-  sk->tail->garbage_next = NULL;
   sk->tail->top_level = NUM_LEVELS - 1;
 
-  /* We do this so that later in find when we try to CAS a cell's
-     `garbage_next` in `skiplist_find` we can disambiguate between a cell with
-     an uninitialised `garbage_next` (that we may take ownership of) and one
-     that is already in the garbage list. If we instead used NULL then this
-     would not be possible.  */
-  sk->garbage_head = sk->head;
+  sk->garbage_head = NULL;
 
   /* each level in the skip list starts of being just head pointing to tail */
   for (int j = 0; j < NUM_LEVELS; j++) {
@@ -168,58 +164,21 @@ retry:
     compare-and-swap.
     */
     for (int level = NUM_LEVELS - 1; level >= 0; level--) {
-      curr = LF_SK_UNMARK(atomic_load_acquire(&pred->forward[level]));
+      curr = LF_SK_UNMARK(atomic_load(&pred->forward[level]));
       while (1) {
         int is_marked;
 
         LF_SK_EXTRACT(curr->forward[level], is_marked, succ);
         while (is_marked) {
-          struct lf_skipcell *null_cell = NULL;
-          int snip = atomic_compare_exchange_strong(&pred->forward[level],
-                                                    &curr, succ);
+          int snip =
+            atomic_compare_exchange_strong(&pred->forward[level], &curr, succ);
           if (!snip) {
             goto retry;
           }
 
-          /*
-          If we are at this point then we have successfully snipped out a
-          removed node. What we need to try to do now is add the node to the
-          skiplist's garbage list.
-
-          There's a bit of complexity here. While we use a compare-and-swap to
-          snip the node out of skiplist, it's possible that it can be removed by
-          two threads at the same time from different levels of the skiplist. To
-          avoid this we reuse the garbage_next field and make sure only one
-          thread can ever add the node to the garbage list. This is what the
-          compare-and-swap below ensures by swapping garbage_next to a value
-          of 1. We don't need to worry about anyone accidentally following this
-          bogus pointer, it is only dereferenced in the cleanup function and
-          this is called when no thread can be concurrently modifying the
-          skiplist.
-          */
-          if (atomic_compare_exchange_strong(&curr->garbage_next, &null_cell,
-                                             (struct lf_skipcell *)1)) {
-            /* Despite now having exclusivity of the current node's
-               garbage_next, having won the CAS, we might be racing another
-               thread to add a different node to the skiplist's garbage_head.
-               This is why we need to a retry loop and yet another CAS. */
-            while (1) {
-              struct lf_skipcell *_Atomic current_garbage_head =
-                  atomic_load_acquire(&sk->garbage_head);
-
-              atomic_store_release(&curr->garbage_next, current_garbage_head);
-
-              if (atomic_compare_exchange_strong(
-                      &sk->garbage_head,
-                      (struct lf_skipcell **)&current_garbage_head, curr)) {
-                break;
-              }
-            }
-          }
-
           /* Now try to load the current node again. We need to check it too
              hasn't been marked. If it has we repeat the process */
-          curr = LF_SK_UNMARK(atomic_load_acquire(&pred->forward[level]));
+          curr = LF_SK_UNMARK(atomic_load(&pred->forward[level]));
           LF_SK_EXTRACT(curr->forward[level], is_marked, succ);
         }
 
@@ -266,7 +225,7 @@ static struct lf_skipcell *lf_skiplist_lookup(struct lf_skiplist *sk,
      out marked nodes. If we did that for long enough we might leak memory. */
   for (int level = atomic_load_relaxed(&sk->search_level);
        level >= 0; level--) {
-    curr = LF_SK_UNMARK(atomic_load_acquire(&pred->forward[level]));
+    curr = LF_SK_UNMARK(atomic_load(&pred->forward[level]));
     while (1) {
       LF_SK_EXTRACT(curr->forward[level], marked, succ);
       while (marked) {
@@ -346,7 +305,15 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
     struct lf_skipcell *succ;
 
     if (found) {
-      /* Already present; update data */
+      /* Already present; update data
+
+         At the point when the below [atomic_store_relaxed] takes effect, the
+         node may actually have been removed from the skiplist and/or there can
+         be multiple concurrent inserts to the same `data` field.
+
+         This does not break linearizability -- if the node was removed, then
+         all concurrent inserts would linearize to the point just before the
+         removal. */
       atomic_store_relaxed((atomic_uintnat*)&succs[0]->data, data);
       return 1;
     } else {
@@ -364,7 +331,6 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
       new_cell->top_level = top_level;
       new_cell->key = key;
       new_cell->data = data;
-      atomic_store_relaxed(&new_cell->garbage_next,NULL);
 
       for (int level = 0; level <= top_level; level++) {
         atomic_store_release(&new_cell->forward[level], succs[level]);
@@ -392,24 +358,70 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
         continue;
       }
 
+      if (top_level == 0) {
+        /* We are entirely done now. */
+        return 0;
+      }
+
       for (int level = 1; level <= top_level; level++) {
         while (1) {
           pred = preds[level];
-          succ = succs[level];
+          succ = atomic_load(&new_cell->forward[level]);
 
-          /* If we were able to insert the node then we proceed to the next
-             level */
-          if (atomic_compare_exchange_strong(&pred->forward[level], &succ,
-                                             new_cell)) {
-            break;
+          /* We must not publish stale pointers, so we check `forward[level]`
+             agrees with `succs[level]`. */
+          if (succ != succs[level]) {
+            /* If `forward[level]` was marked it obviously means the `new_cell`
+               is already being removed or has been removed. */
+            if (LF_SK_IS_MARKED((uintnat)succ)) {
+              goto concurrently_removed;
+            }
+
+            /* Otherwise it means the skiplist was modified around us so we try
+               to update the `forward[level]` pointer. */
+            if (!atomic_compare_exchange_strong(
+                  &new_cell->forward[level], &succ, succs[level])) {
+              /* We have not yet linked `new_cell` at this `level` to the
+                 skiplist so the only reason it would be modified by someone
+                 else would be to mark it for removal. */
+              goto concurrently_removed;
+            }
+
+            succ = succs[level];
+          }
+
+          /* Before linking the node we check that the successor has not been
+             marked for deletion. */
+          if (!LF_SK_IS_MARKED((uintnat)atomic_load(&succ->forward[level])))
+          {
+            if (atomic_compare_exchange_strong(
+                  &pred->forward[level], &succ, new_cell)) {
+              /* If we were able to insert the node then we proceed to the next
+                 level.
+
+                 It is possible for `succ` to be marked for deletion before or
+                 after we linked our node to `pred->forward[level]`, but,
+                 because we succeeded, we know that it is no longer our
+                 responsibility to remove stale pointers to `succ`. */
+              break;
+            }
           }
 
           /* On the other hand if we failed it might be because the pointer was
              marked or because a new node was added between pred and succ nodes
              at level. In both cases we can fix things by calling
              [skiplist_find] and repopulating preds and succs */
-          skiplist_find(sk, key, preds, succs);
+          if (!skiplist_find(sk, key, preds, succs) || succs[0] != new_cell) {
+            return 0;
+          }
         }
+      }
+
+      /* After publishing the node at the top_level we check (once more) that
+         the node wasn't just removed concurrently. */
+      succ = atomic_load(&new_cell->forward[top_level]);
+      if (LF_SK_IS_MARKED((uintnat)succ)) {
+        goto concurrently_removed;
       }
 
       /* If we put the new node at a higher level than the current
@@ -419,9 +431,13 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
         atomic_store_relaxed(&sk->search_level, top_level);
       }
 
-      return 1;
+      return 0;
     }
   }
+
+  concurrently_removed:
+    skiplist_find(sk, key, preds, succs);
+    return 0;
 }
 
 /* Deletion in a skip list */
@@ -451,8 +467,8 @@ int caml_lf_skiplist_remove(struct lf_skiplist *sk, uintnat key) {
       LF_SK_EXTRACT(to_remove->forward[level], marked, succ);
 
       while (!marked) {
-        atomic_compare_exchange_strong(&to_remove->forward[level], &succ,
-                                       LF_SK_MARKED(succ));
+        atomic_compare_exchange_strong(
+          &to_remove->forward[level], &succ, LF_SK_MARKED(succ));
         LF_SK_EXTRACT(to_remove->forward[level], marked, succ);
       }
     }
@@ -464,11 +480,22 @@ int caml_lf_skiplist_remove(struct lf_skiplist *sk, uintnat key) {
     LF_SK_EXTRACT(to_remove->forward[0], marked, succ);
     while (1) {
       int mark_success = atomic_compare_exchange_strong(
-          &to_remove->forward[0], &succ, LF_SK_MARKED(succ));
+        &to_remove->forward[0], &succ, LF_SK_MARKED(succ));
 
       LF_SK_EXTRACT(to_remove->forward[0], marked, succ);
 
       if (mark_success) {
+        /* We are the thread that has now logically removed the node from the
+           skiplist and we can be considered to own the `garbage_next` pointer
+           of the node.  We can now add the node to the list of garbage nodes to
+           be freed at next STW.  As that list is only examined at the next STW,
+           when nothing is accessing the skiplist, we can simply use an atomic
+           exchange to updated the `garbage_head` and set the `garbage_next`
+           pointer of the removed node we own after that. */
+        struct lf_skipcell *garbage_next =
+          atomic_exchange(&sk->garbage_head, to_remove);
+        atomic_store_relaxed(&to_remove->garbage_next, garbage_next);
+
         skiplist_find(sk, key, preds, succs); /* This will fix up the mark */
         return 1;
       } else if (marked) {
@@ -482,20 +509,44 @@ int caml_lf_skiplist_remove(struct lf_skiplist *sk, uintnat key) {
   }
 }
 
+#ifdef DEBUG
+static bool has_marked_node(struct lf_skiplist *sk) {
+  for (int level = NUM_LEVELS - 1; level >= 0; level--) {
+    struct lf_skipcell *curr = sk->head;
+
+    while (curr != sk->tail) {
+      int is_marked;
+      struct lf_skipcell *succ;
+
+      LF_SK_EXTRACT(curr->forward[level], is_marked, succ);
+
+      if (is_marked)
+        return true;
+
+      curr = succ;
+    }
+  }
+  return false;
+}
+#endif
+
 /* Collects freed nodes from the skiplist. This must be called periodically from
    a single thread at a time when there can be no concurrent access to this
    skiplist */
 
 void caml_lf_skiplist_free_garbage(struct lf_skiplist *sk) {
+  /* At the point of freeing garbage there should be no marked forward pointers
+     in the skiplist. */
+  CAMLassert(!has_marked_node(sk));
+
   struct lf_skipcell *curr = atomic_load_acquire(&sk->garbage_head);
 
-  const struct lf_skipcell *head = sk->head;
-  while (curr != head) {
+  while (curr != NULL) {
     struct lf_skipcell *next = atomic_load_relaxed(&curr->garbage_next);
     // acquire not useful, if executed in STW
     caml_stat_free(curr);
     curr = next;
   }
 
-  atomic_store_release(&sk->garbage_head, sk->head);
+  atomic_store_release(&sk->garbage_head, NULL);
 }
