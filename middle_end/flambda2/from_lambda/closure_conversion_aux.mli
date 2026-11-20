@@ -65,7 +65,7 @@ module IR : sig
           loc : Lambda.scoped_location
         }
         (** The definition of [template], whose environment [block] has already
-            been allocated (see [Lambda.Ptemplate_env]) *)
+            been allocated (see [Lambda.Ptemplate_env]). *)
 
   type apply_kind =
     | Function
