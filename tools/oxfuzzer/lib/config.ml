@@ -120,7 +120,7 @@ let curried_lambda_probability = 2_500
 
 let opaque_recursive_call_probability = 2_500
 
-let wide_function_probability = 1_500
+let wide_function_probability = 500
 
 let tail_call_probability = 2_500
 
