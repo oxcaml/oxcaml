@@ -1266,13 +1266,17 @@ module Rewriter = struct
       let field = Field.block (Target_ocaml_int.to_int index) field_kind in
       follow_field context t field
     in
-    context, r
+    match r with
+    | At_least_one_source_no_usages -> Or_unknown.Unknown
+    | No_source | Single_source _ | Many_sources_any_usage
+    | Many_sources_usages _ ->
+      Or_unknown.Known (context, r)
 
   let array_slot (context, _t) _index _typing_env _flambda_type =
     (* Array primitives are opaque. Thus, anything put inside the array when it
        was created has been treated as escaping, thus giving a
        [Many_sources_any_usage] context. *)
-    context, Many_sources_any_usage
+    Or_unknown.Known (context, Many_sources_any_usage)
 
   let set_of_closures _t _function_slot _typing_env _closures_entry =
     Misc.fatal_error

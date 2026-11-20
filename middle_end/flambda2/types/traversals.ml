@@ -697,9 +697,9 @@ module Make (X : sig
      all types of accesses (i.e. array lenghts, boxed number contents, ...) to
      better reflect the actual traversal. *)
 
-  val block_slot : ?tag:Tag.t -> t -> TI.t -> TE.t -> TG.t -> t
+  val block_slot : ?tag:Tag.t -> t -> TI.t -> TE.t -> TG.t -> t Or_unknown.t
 
-  val array_slot : t -> TI.t -> TE.t -> TG.t -> t
+  val array_slot : t -> TI.t -> TE.t -> TG.t -> t Or_unknown.t
 
   type set_of_closures
 
@@ -707,11 +707,18 @@ module Make (X : sig
     t -> Function_slot.t -> TE.t -> TG.closures_entry -> set_of_closures
 
   val rec_info :
-    TE.t -> set_of_closures -> Function_slot.t -> Code_id.t -> TG.t -> t
+    TE.t ->
+    set_of_closures ->
+    Function_slot.t ->
+    Code_id.t ->
+    TG.t ->
+    t Or_unknown.t
 
-  val value_slot : set_of_closures -> Value_slot.t -> TE.t -> TG.t -> t
+  val value_slot :
+    set_of_closures -> Value_slot.t -> TE.t -> TG.t -> t Or_unknown.t
 
-  val function_slot : set_of_closures -> Function_slot.t -> TE.t -> TG.t -> t
+  val function_slot :
+    set_of_closures -> Function_slot.t -> TE.t -> TG.t -> t Or_unknown.t
 end) =
 struct
   open Or_unknown.Let_syntax
@@ -820,7 +827,7 @@ struct
     fold_destructuring pattern env ty (Var.Map.empty, acc)
       ~f:(fun (var, field_metadata) field_ty (sigma, acc) ->
         let field_ty', acc =
-          rewrite_arbitrary_type env acc field_metadata field_ty
+          rewrite_arbitrary_type0 env acc field_metadata field_ty
         in
         Var.Map.add var field_ty' sigma, acc)
 
@@ -912,7 +919,12 @@ struct
           TG.print ty;
         Printexc.raise_with_backtrace e bt)
 
-  and rewrite_arbitrary_type env acc abs ty =
+  and rewrite_arbitrary_type env acc (abs : _ Or_unknown.t) ty =
+    match abs with
+    | Or_unknown.Unknown -> More_type_creators.unknown_like ty, acc
+    | Or_unknown.Known abs -> rewrite_arbitrary_type0 env acc abs ty
+
+  and rewrite_arbitrary_type0 env acc abs ty =
     match TG.get_alias_opt ty with
     | Some alias ->
       let canonical =
@@ -1029,7 +1041,7 @@ struct
         | Unknown -> immediates, acc
         | Known immediates ->
           let immediates, acc =
-            rewrite_arbitrary_type env acc metadata immediates
+            rewrite_arbitrary_type0 env acc metadata immediates
           in
           Or_unknown.Known immediates, acc
       in
@@ -1041,31 +1053,31 @@ struct
         acc )
     | Mutable_block { alloc_mode = _ } -> head, acc
     | Boxed_float32 (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_float32 ty alloc_mode, acc
     | Boxed_float (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_float ty alloc_mode, acc
     | Boxed_int32 (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_int32 ty alloc_mode, acc
     | Boxed_int64 (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_int64 ty alloc_mode, acc
     | Boxed_nativeint (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_nativeint ty alloc_mode, acc
     | Boxed_vec128 (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_vec128 ty alloc_mode, acc
     | Boxed_vec256 (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_vec256 ty alloc_mode, acc
     | Boxed_vec512 (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_vec512 ty alloc_mode, acc
     | Boxed_mask (ty, alloc_mode) ->
-      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      let ty, acc = rewrite_arbitrary_type0 env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_mask ty alloc_mode, acc
     | Closures { by_function_slot; alloc_mode } ->
       let by_function_slot, acc =
@@ -1076,7 +1088,7 @@ struct
         acc )
     | String _ -> head, acc
     | Array { element_kind; length; contents; alloc_mode } ->
-      let length, acc = rewrite_arbitrary_type env acc metadata length in
+      let length, acc = rewrite_arbitrary_type0 env acc metadata length in
       let contents, acc =
         match contents with
         | Known (Immutable { fields }) ->
@@ -1361,7 +1373,7 @@ struct
             ~f:(fun (var, (name, abs)) ty (sbs, base_env, new_types, acc) ->
               (* CR bclement: use existing name if [ty] is an alias *)
               let var' = Variable.create name (TG.kind ty) in
-              let ty', acc = rewrite_arbitrary_type env acc abs ty in
+              let ty', acc = rewrite_arbitrary_type0 env acc abs ty in
               let bound_name =
                 Bound_name.create_var
                   (Bound_var.create var' Flambda_debug_uid.none Name_mode.normal)
