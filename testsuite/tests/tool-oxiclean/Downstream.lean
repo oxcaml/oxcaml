@@ -2,15 +2,14 @@ import extracted_oxcaml_downstream
 open Oxiclean.Model
 
 abbrev interface : ModuleType :=
-  let even : ModuleStatics :=
-    .compilationUnit Oxiclean.Extracted.Even.interface
+  let even : ModuleStatics := .compilationUnit 0
   let t : ValType := .constr (.field even 0) []
   let t_option : ValType := .constr (.predef .option) [t]
 
   .signature [] [.val t_option]
 
 abbrev implementation : Expr :=
-  let even : Expr := .compilationUnit Oxiclean.Extracted.Even.interface
+  let even : Expr := .compilationUnit 0
   let create : Expr := .field even 0
   let three : Expr := .val (.immediate { bitsAboveLsb := 3#63 })
 

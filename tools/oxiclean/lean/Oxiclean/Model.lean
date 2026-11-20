@@ -10,7 +10,12 @@ inductive TypeKind : Type where
 
 mutual
   inductive ModuleStatics : Type where
-    | compilationUnit (signature : ModuleType)
+    /--
+    An imported dependency.
+    Note that only its signature is accessible;
+    its implementation is invisible for modularity.
+    -/
+    | compilationUnit (indexAmongDependencies : Nat)
     | var (deBruijn : Nat)
     | field (within : ModuleStatics) (index : Nat)
 
@@ -69,6 +74,7 @@ mutual
   inductive Expr : Type where
     | apply (func : Expr) (arg : Expr)
     | block (tag : UInt8) (fields : List Expr)
+    | compilationUnit (indexAmongDependencies : Nat)
     | field (indexInto : Expr) (index : Nat)
     | function (body : Expr)
     | letBinding (bound : Expr) (body : Expr)
@@ -81,7 +87,6 @@ mutual
         (immediates : List ImmediateSwitchCase)
         (blocks : List BlockSwitchCase)
         (failAction : Option Expr)
-    | compilationUnit (signature : ModuleType)
     | val (value : Value)
     | var (deBruijn : Nat)
 
@@ -117,9 +122,9 @@ attribute [pp_nodot]
   -- ValType
   ValType.arrow ValType.constr ValType.firstClassModule ValType.poly ValType.var
   -- Expr
-  Expr.apply Expr.block Expr.field Expr.function Expr.letBinding
-  Expr.physicalEquality Expr.scalarOperation Expr.switch
-  Expr.compilationUnit Expr.val Expr.var
+  Expr.apply Expr.block Expr.compilationUnit Expr.field Expr.function
+  Expr.letBinding Expr.physicalEquality Expr.scalarOperation Expr.switch
+  Expr.val Expr.var
   -- Please keep this up to date when adding new constructors!
 
 end Oxiclean.Model

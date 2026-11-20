@@ -33,9 +33,6 @@ def Lean.Expr.mkOption (type : Lean.Expr) : Option Lean.Expr → Lean.Expr
 
 namespace Oxiclean.BuildSystem
 
-def compilationUnitByName (name : String) : Lean.Expr :=
-  mkConst (`Oxiclean.Extracted ++ .mkSimple name ++ `interface)
-
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
 
 deriving instance Repr for
@@ -50,25 +47,33 @@ namespace WorkaroundForPr14959
     | field (within : ModuleStatics) (index : Nat)
   deriving FromJson
 
-  def ModuleStatics.toTerm : ModuleStatics → Lean.Expr
-    | .compilationUnit name =>
-      mkApp (mkConst ``Model.ModuleStatics.compilationUnit)
-        (compilationUnitByName name)
+  def ModuleStatics.toTerm? (dependencyNames : List String)
+      : ModuleStatics → Except String Lean.Expr
+    | .compilationUnit name => do
+      let .some indexAmongDependencies := dependencyNames.idxOf? name
+        | throw s!"couldn't find a dependency called `{name}`"
+      mkApp
+        (mkConst ``Model.ModuleStatics.compilationUnit)
+        (toExpr indexAmongDependencies)
+      |> pure
     | .var deBruijn =>
-      mkApp (mkConst ``Model.ModuleStatics.var) (toExpr deBruijn)
-    | .field within index =>
-      mkApp2 (mkConst ``Model.ModuleStatics.field) within.toTerm (toExpr index)
+      pure (mkApp (mkConst ``Model.ModuleStatics.var) (toExpr deBruijn))
+    | .field within index => do
+      let within ← within.toTerm? dependencyNames
+      pure (mkApp2 (mkConst ``Model.ModuleStatics.field) within (toExpr index))
 
   inductive TypeConstr : Type where
     | field (within : ModuleStatics) (index : Nat)
     | predef (predef : PredefinedType)
   deriving FromJson
 
-  def TypeConstr.toTerm : TypeConstr → Lean.Expr
-    | .field within index =>
-      mkApp2 (mkConst ``Model.TypeConstr.field) within.toTerm (toExpr index)
+  def TypeConstr.toTerm? (dependencyNames : List String)
+      : TypeConstr → Except String Lean.Expr
+    | .field within index => do
+      let within ← within.toTerm? dependencyNames
+      pure (mkApp2 (mkConst ``Model.TypeConstr.field) within (toExpr index))
     | .predef predefined =>
-      mkApp (mkConst ``Model.TypeConstr.predef) (toExpr predefined)
+      pure (mkApp (mkConst ``Model.TypeConstr.predef) (toExpr predefined))
 
   section ModuleType
     variable
@@ -81,8 +86,8 @@ namespace WorkaroundForPr14959
     deriving FromJson
   end ModuleType
 
-  def ModuleType.toTerm
-      : ModuleType Lean.Expr Lean.Expr → Lean.Expr
+  def ModuleType.toTerm? (dependencyNames : List String)
+      : ModuleType Lean.Expr Lean.Expr → Except String Lean.Expr
     | .signature absent present =>
       mkApp2 (mkConst ``Model.ModuleType.signature)
         (Lean.Expr.mkList
@@ -91,8 +96,10 @@ namespace WorkaroundForPr14959
         (Lean.Expr.mkList
           (mkConst ``Model.ModuleItemPresentAtRuntime)
           present)
-    | .field within index =>
-      mkApp2 (mkConst ``Model.ModuleType.field) within.toTerm (toExpr index)
+      |> pure
+    | .field within index => do
+      let within ← within.toTerm? dependencyNames
+      pure (mkApp2 (mkConst ``Model.ModuleType.field) within (toExpr index))
 
   section ModuleItemAbsentAtRuntime
     variable (ModuleType TypeDecl : Type)
@@ -151,63 +158,82 @@ namespace WorkaroundForPr14959
     deriving FromJson
   end ValType
 
-  def ValType.toTerm : ValType Lean.Expr → Lean.Expr
-    | .arrow domain codomain =>
-      mkApp2 (mkConst ``Model.ValType.arrow) domain.toTerm codomain.toTerm
-    | .constr constructor args =>
-      mkApp2 (mkConst ``Model.ValType.constr) constructor.toTerm
-        (Lean.Expr.mkList (mkConst ``Model.ValType) (args.map ValType.toTerm))
+  def ValType.toTerm? (dependencyNames : List String)
+      : ValType Lean.Expr → Except String Lean.Expr
+    | .arrow domain codomain => do
+      let domain ← domain.toTerm? dependencyNames
+      let codomain ← codomain.toTerm? dependencyNames
+      pure (mkApp2 (mkConst ``Model.ValType.arrow) domain codomain)
+    | .constr constructor args => do
+      let constructor ← constructor.toTerm? dependencyNames
+      let args ← args.mapM (·.toTerm? dependencyNames)
+      mkApp2 (mkConst ``Model.ValType.constr) constructor
+        (Lean.Expr.mkList (mkConst ``Model.ValType) args)
+      |> pure
     | .firstClassModule signature =>
-      mkApp (mkConst ``Model.ValType.firstClassModule) signature
-    | .poly body => mkApp (mkConst ``Model.ValType.poly) body.toTerm
-    | .var deBruijn => mkApp (mkConst ``Model.ValType.var) (toExpr deBruijn)
+      pure (mkApp (mkConst ``Model.ValType.firstClassModule) signature)
+    | .poly body => do
+      let body ← body.toTerm? dependencyNames
+      pure (mkApp (mkConst ``Model.ValType.poly) body)
+    | .var deBruijn =>
+      pure (mkApp (mkConst ``Model.ValType.var) (toExpr deBruijn))
 
   mutual
-    partial def ModuleType.fromJson? (json : Json)
+    partial def ModuleType.fromJson?
+        (dependencyNames : List String)
+        (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonModuleType
         Lean.Expr
         Lean.Expr
-        ⟨ModuleItemAbsentAtRuntime.fromJson?⟩
-        ⟨ModuleItemPresentAtRuntime.fromJson?⟩
+        ⟨ModuleItemAbsentAtRuntime.fromJson? dependencyNames⟩
+        ⟨ModuleItemPresentAtRuntime.fromJson? dependencyNames⟩
       |>.fromJson? json
-      |>.map (·.toTerm)
+      >>= (·.toTerm? dependencyNames)
 
-    partial def ModuleItemAbsentAtRuntime.fromJson? (json : Json)
+    partial def ModuleItemAbsentAtRuntime.fromJson?
+        (dependencyNames : List String)
+        (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonModuleItemAbsentAtRuntime
         Lean.Expr
         Lean.Expr
-        ⟨ModuleType.fromJson?⟩
-        ⟨TypeDecl.fromJson?⟩
+        ⟨ModuleType.fromJson? dependencyNames⟩
+        ⟨TypeDecl.fromJson? dependencyNames⟩
       |>.fromJson? json
       |>.map (·.toTerm)
 
-    partial def ModuleItemPresentAtRuntime.fromJson? (json : Json)
+    partial def ModuleItemPresentAtRuntime.fromJson?
+        (dependencyNames : List String)
+        (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonModuleItemPresentAtRuntime
         Lean.Expr
         Lean.Expr
-        ⟨ModuleType.fromJson?⟩
-        ⟨ValType.fromJson?⟩
+        ⟨ModuleType.fromJson? dependencyNames⟩
+        ⟨ValType.fromJson? dependencyNames⟩
       |>.fromJson? json
       |>.map (·.toTerm)
 
-    partial def TypeDecl.fromJson? (json : Json)
+    partial def TypeDecl.fromJson?
+        (dependencyNames : List String)
+        (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonTypeDecl
         Lean.Expr
-        ⟨ValType.fromJson?⟩
+        ⟨ValType.fromJson? dependencyNames⟩
       |>.fromJson? json
       |>.map (·.toTerm)
 
-    partial def ValType.fromJson? (json : Json)
+    partial def ValType.fromJson?
+        (dependencyNames : List String)
+        (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonValType
         Lean.Expr
-        ⟨ModuleType.fromJson?⟩
+        ⟨ModuleType.fromJson? dependencyNames⟩
       |>.fromJson? json
-      |>.map (·.toTerm)
+      >>= (·.toTerm? dependencyNames)
   end
 end WorkaroundForPr14959
 
@@ -246,39 +272,56 @@ namespace WorkaroundForPr14959
     deriving FromJson
   end Expr
 
-  def Expr.toTerm
-      : Expr Lean.Expr Lean.Expr Lean.Expr Lean.Expr → Lean.Expr
-    | .apply func arg =>
-      mkApp2 (mkConst ``Model.Expr.apply) func.toTerm arg.toTerm
-    | .block tag fields =>
+  def Expr.toTerm? (dependencyNames : List String)
+      : Expr Lean.Expr Lean.Expr Lean.Expr Lean.Expr → Except String Lean.Expr
+    | .apply func arg => do
+      let func ← func.toTerm? dependencyNames
+      let arg ← arg.toTerm? dependencyNames
+      pure (mkApp2 (mkConst ``Model.Expr.apply) func arg)
+    | .block tag fields => do
+      let fields ← fields.mapM (·.toTerm? dependencyNames)
       mkApp2 (mkConst ``Model.Expr.block) (toExpr tag)
-        (Lean.Expr.mkList (mkConst ``Model.Expr) (fields.map Expr.toTerm))
-    | .field indexInto index =>
-      mkApp2 (mkConst ``Model.Expr.field) indexInto.toTerm (toExpr index)
-    | .function body => mkApp (mkConst ``Model.Expr.function) body.toTerm
-    | .letBinding bound body =>
-      mkApp2 (mkConst ``Model.Expr.letBinding) bound.toTerm body.toTerm
-    | .physicalEquality lhs rhs =>
-      mkApp2 (mkConst ``Model.Expr.physicalEquality) lhs.toTerm rhs.toTerm
+        (Lean.Expr.mkList (mkConst ``Model.Expr) fields)
+      |> pure
+    | .field within index => do
+      let within ← within.toTerm? dependencyNames
+      pure (mkApp2 (mkConst ``Model.Expr.field) within (toExpr index))
+    | .function body => do
+      let body ← body.toTerm? dependencyNames
+      pure (mkApp (mkConst ``Model.Expr.function) body)
+    | .letBinding bound body => do
+      let bound ← bound.toTerm? dependencyNames
+      let body ← body.toTerm? dependencyNames
+      pure (mkApp2 (mkConst ``Model.Expr.letBinding) bound body)
+    | .physicalEquality lhs rhs => do
+      let lhs ← lhs.toTerm? dependencyNames
+      let rhs ← rhs.toTerm? dependencyNames
+      pure (mkApp2 (mkConst ``Model.Expr.physicalEquality) lhs rhs)
     | .scalarOperation operation =>
-      mkApp (mkConst ``Model.Expr.scalarOperation) operation
-    | .switch scrutinee nImmediates nBlocks immediates blocks failAction =>
+      pure (mkApp (mkConst ``Model.Expr.scalarOperation) operation)
+    | .switch scrutinee nImmediates nBlocks immediates blocks failAction => do
+      let scrutinee ← scrutinee.toTerm? dependencyNames
+      let failAction ← match failAction with
+        | .none => pure .none
+        | .some failAction => .some <$> failAction.toTerm? dependencyNames
       mkAppN (mkConst ``Model.Expr.switch)
-        #[ scrutinee.toTerm
+        #[ scrutinee
          , toExpr nImmediates
          , toExpr nBlocks
          , Lean.Expr.mkList (mkConst ``Model.ImmediateSwitchCase) immediates
          , Lean.Expr.mkList (mkConst ``Model.BlockSwitchCase) blocks
-         , Lean.Expr.mkOption (mkConst ``Model.Expr)
-             (match failAction with
-              | .none => .none
-              | .some failAction => .some failAction.toTerm)
+         , Lean.Expr.mkOption (mkConst ``Model.Expr) failAction
          ]
-    | .compilationUnit name =>
-      mkApp (mkConst ``Model.Expr.compilationUnit)
-        (compilationUnitByName name)
-    | .val value => mkApp (mkConst ``Model.Expr.val) value
-    | .var deBruijn => mkApp (mkConst ``Model.Expr.var) (toExpr deBruijn)
+      |> pure
+    | .compilationUnit name => do
+      let .some indexAmongDependencies := dependencyNames.idxOf? name
+        | throw s!"couldn't find a dependency called `{name}`"
+      mkApp
+        (mkConst ``Model.Expr.compilationUnit)
+        (toExpr indexAmongDependencies)
+      |> pure
+    | .val value => pure (mkApp (mkConst ``Model.Expr.val) value)
+    | .var deBruijn => pure (mkApp (mkConst ``Model.Expr.var) (toExpr deBruijn))
 
   section Value
     variable (Indirection : Type)
@@ -375,67 +418,67 @@ namespace WorkaroundForPr14959
       mkApp2 (mkConst ``Model.BlockSwitchCase.mk) (toExpr tag) body
 
   mutual
-    partial def Expr.fromJson? (json : Json)
+    partial def Expr.fromJson? (dependencyNames : List String) (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonExpr
         Lean.Expr
         Lean.Expr
         Lean.Expr
         Lean.Expr
-        ⟨BlockSwitchCase.fromJson?⟩
-        ⟨ImmediateSwitchCase.fromJson?⟩
-        ⟨ScalarOperation.fromJson?⟩
-        ⟨Value.fromJson?⟩
+        ⟨BlockSwitchCase.fromJson? dependencyNames⟩
+        ⟨ImmediateSwitchCase.fromJson? dependencyNames⟩
+        ⟨ScalarOperation.fromJson? dependencyNames⟩
+        ⟨Value.fromJson? dependencyNames⟩
       |>.fromJson? json
-      |>.map (·.toTerm)
+      >>= (·.toTerm? dependencyNames)
 
-    partial def Value.fromJson? (json : Json)
+    partial def Value.fromJson? (dependencyNames : List String) (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonValue
         Lean.Expr
-        ⟨Indirection.fromJson?⟩
+        ⟨Indirection.fromJson? dependencyNames⟩
       |>.fromJson? json
       |>.map (·.toTerm)
 
-    partial def Indirection.fromJson? (json : Json)
+    partial def Indirection.fromJson? (dependencyNames : List String) (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonIndirection
         Lean.Expr
-        ⟨Block.fromJson?⟩
+        ⟨Block.fromJson? dependencyNames⟩
       |>.fromJson? json
       |>.map (·.toTerm)
 
-    partial def Block.fromJson? (json : Json)
+    partial def Block.fromJson? (dependencyNames : List String) (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonBlock
         Lean.Expr
         Lean.Expr
-        ⟨Expr.fromJson?⟩
-        ⟨Value.fromJson?⟩
+        ⟨Expr.fromJson? dependencyNames⟩
+        ⟨Value.fromJson? dependencyNames⟩
       |>.fromJson? json
       >>= Block.toTerm?
 
-    partial def ScalarOperation.fromJson? (json : Json)
+    partial def ScalarOperation.fromJson? (dependencyNames : List String) (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonScalarOperation
         Lean.Expr
-        ⟨Expr.fromJson?⟩
+        ⟨Expr.fromJson? dependencyNames⟩
       |>.fromJson? json
       |>.map (·.toTerm)
 
-    partial def ImmediateSwitchCase.fromJson? (json : Json)
+    partial def ImmediateSwitchCase.fromJson? (dependencyNames : List String) (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonImmediateSwitchCase
         Lean.Expr
-        ⟨Expr.fromJson?⟩
+        ⟨Expr.fromJson? dependencyNames⟩
       |>.fromJson? json
       |>.map (·.toTerm)
 
-    partial def BlockSwitchCase.fromJson? (json : Json)
+    partial def BlockSwitchCase.fromJson? (dependencyNames : List String) (json : Json)
         : Except String Lean.Expr := do
       @instFromJsonBlockSwitchCase
         Lean.Expr
-        ⟨Expr.fromJson?⟩
+        ⟨Expr.fromJson? dependencyNames⟩
       |>.fromJson? json
       |>.map (·.toTerm)
   end
@@ -458,19 +501,33 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
   let some unit := file.fileStem >>= (·.dropPrefix? "extracted_oxcaml_")
     | throwError "{file} is not named `extracted_oxcaml_<unit>.lean`"
   let unit : String := unit.toString
-  let ns : Name := `Oxiclean.Extracted ++ .mkSimple unit.capitalize
+  let prefixComponents : Name :=
+    `Oxiclean.Extracted ++ .mkSimple unit.capitalize
+  let env : Lean.Environment ← getEnv
+  let dependencyNames : List String :=
+    env.header.imports.toList.filterMap fun imported =>
+      imported.module.toString.dropPrefix? "extracted_oxcaml_"
+      |>.map (·.toString.capitalize)
   let interface : Json ← file.withFileName s!"{unit}.intf.json" |> readJson
   let implementation : Json ← file.withFileName s!"{unit}.impl.json" |> readJson
   let interface : Lean.Expr ←
-    Oxiclean.BuildSystem.WorkaroundForPr14959.ModuleType.fromJson? interface
+    Oxiclean.BuildSystem.WorkaroundForPr14959.ModuleType.fromJson?
+      dependencyNames
+      interface
     |> IO.ofExcept
   let implementation : Lean.Expr ←
-    Oxiclean.BuildSystem.WorkaroundForPr14959.Expr.fromJson? implementation
+    Oxiclean.BuildSystem.WorkaroundForPr14959.Expr.fromJson?
+      dependencyNames
+      implementation
     |> IO.ofExcept
   liftCoreM do
-    addTopLevelDefinition (ns ++ `interface)
+    addTopLevelDefinition (prefixComponents ++ `interface)
       (mkConst ``Oxiclean.Model.ModuleType) interface
-    addTopLevelDefinition (ns ++ `implementation)
+    addTopLevelDefinition (prefixComponents ++ `implementation)
       (mkConst ``Oxiclean.Model.Expr) implementation
-  elabCommand (← `(attribute [simp] $(mkIdent (ns ++ `interface))))
-  elabCommand (← `(attribute [simp] $(mkIdent (ns ++ `implementation))))
+  let simpIntf ←
+    `(attribute [simp] $(mkIdent (prefixComponents ++ `interface)))
+  let simpImpl ←
+    `(attribute [simp] $(mkIdent (prefixComponents ++ `implementation)))
+  elabCommand simpIntf
+  elabCommand simpImpl
