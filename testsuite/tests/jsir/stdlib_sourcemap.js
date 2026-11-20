@@ -19,7 +19,7 @@ for (const mode of ['whole', 'separate']) {
     ? ['-link-jsir', '-jsoo-opt-compile', '--source-map']
     : ['-jsoo-opt-link', '--source-map'];
   const sources = mode === 'whole' ? {}
-    : { BUILD_PATH_PREFIX_MAP: '/ocaml/stdlib/=/nonexistent/' };
+    : { BUILD_PATH_PREFIX_MAP: '/oxcaml/stdlib/=/nonexistent/' };
   execFileSync(path.join(root, 'ocamlopt.opt'), [
     '-target', tool, '-g', ...flags, '-I', '+stdlib_stable',
     'stdlib_stable.cmxa-' + target, '-o', mode + '.js',
@@ -36,7 +36,7 @@ for (const mode of ['whole', 'separate']) {
     const map = JSON.parse(fs.readFileSync(file, 'utf8'));
     for (const section of map.sections || [{ map }]) {
       for (const name of expected) {
-        const i = section.map.sources.indexOf('/ocaml/stdlib/' + name);
+        const i = section.map.sources.indexOf('/oxcaml/stdlib/' + name);
         if (i !== -1) {
           const text = fs.readFileSync(path.join(lib, name), 'utf8');
           assert.equal(section.map.sourcesContent[i], text, name);

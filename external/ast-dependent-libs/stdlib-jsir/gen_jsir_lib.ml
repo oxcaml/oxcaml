@@ -384,7 +384,7 @@ let () =
     List.iter
       (fun u -> Printf.fprintf ppf "(copy_files %s)\n" (source u))
       units;
-  let source_dir = "/ocaml/stdlib/" ^ !name ^ "/" in
+  let source_dir = "/oxcaml/stdlib/" ^ !name ^ "/" in
   let source_flags = if is_otherlib then ["-directory"; source_dir] else [] in
   let compile_rule target ~unit_name ~src_path ~jsir_cmx_deps ~flags =
     let cmi = cmi_of_unit ~cmi_dir:!cmi_dir unit_name in

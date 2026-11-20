@@ -228,10 +228,10 @@ let write_stdlib_jsir_dune_for_target ppf jsir_target =
     sprintf "(setenv %s %%{bin:%s} (run %%{ocamlopt} -target %s %s))"
       jsir_target.env_var jsir_target.program jsir_target.program args
   in
-  (* The libraries of the distribution record a source as [/ocaml/stdlib/]
+  (* The libraries of the distribution record a source as [/oxcaml/stdlib/]
      followed by its path below the installed standard library directory, where
      [ocamlopt] has js_of_ocaml find it (see optcomp/jscomp.ml). *)
-  let source_dir = "/ocaml/stdlib/" in
+  let source_dir = "/oxcaml/stdlib/" in
   let installed file = sprintf "%%{ocaml_where}/%s" file in
   let table = module_deps_table Sys.argv.(3) in
   iter_module_deps table (fun ~tgt_file ~base ~deps ->

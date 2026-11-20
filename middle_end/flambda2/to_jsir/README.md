@@ -60,8 +60,8 @@ This is a convention specific to JSIR, and as such normal debuggers will not be 
 The separate-compilation archives shipped with the compiler contain inline maps.
 A link that requests a map includes their mappings and available source text; a link without maps discards them.
 `--source-map-no-source` is a compile option: it does not strip text already embedded in an archive.
-The JSIR of these libraries records a source as `/ocaml/stdlib/` followed by its path below the standard library directory. `ocamlopt` runs `js_of_ocaml` with a `BUILD_PATH_PREFIX_MAP` entry from that prefix to the standard library directory, so `js_of_ocaml` reads the sources that are installed there, and names them by the recorded path in source maps. Sources that are not installed, such as those of `Sys`, `unix`, `str` and compiler-libs, have no text in the map of a `-link-jsir` link.
-Likewise, with an absolute `-directory`, `ocamlopt` adds an entry from that directory to the current one, where the sources it records there are.
+The JSIR of these libraries records a source as `/oxcaml/stdlib/` followed by its path below the standard library directory. `ocamlopt` runs `js_of_ocaml` with a `BUILD_PATH_PREFIX_MAP` entry from that prefix to the standard library directory, so `js_of_ocaml` reads the sources that are installed there, and names them by the recorded path in source maps. Sources that are not installed, such as those of `Sys`, `unix`, `str` and compiler-libs, have no text in the map of a `-link-jsir` link.
+When `-directory` is below that prefix, as when these libraries are compiled, `ocamlopt` also adds an entry from it to the current directory.
 
 For source maps, pass `-jsoo-opt --source-map-inline`.
 `--source-map` (a separate `.map` file) only works for the link of an executable, as `js_of_ocaml link` ignores source maps that are not inline in the files it is given. To get the source map of an executable in a separate file:
