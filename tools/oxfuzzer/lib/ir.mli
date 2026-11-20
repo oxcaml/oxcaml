@@ -5,6 +5,8 @@ module Name : sig
   val of_string : string -> t
 
   val to_string : t -> string
+
+  val equal : t -> t -> bool
 end
 
 module NumberTy : sig
@@ -78,6 +80,7 @@ module Ty : sig
     | Or_null of t
     | Bool
     | String
+    | Arrow of t * t
 
   and record =
     { id : int;
@@ -102,6 +105,13 @@ module Ty : sig
     }
 
   val equal : t -> t -> bool
+
+  (** [curry [a; b] c] is [a -> b -> c]. *)
+  val curry : t list -> t -> t
+
+  (** [uncurry (a -> b -> c)] is [([a; b], c)], and [uncurry ty] is [([], ty)]
+      if [ty] is not a function type. *)
+  val uncurry : t -> t list * t
 
   val variant_name : variant -> string
 
@@ -214,6 +224,13 @@ module Bin_op : sig
     Parsetree.expression
 end
 
+module Inline : sig
+  type t =
+    | Never
+    | Always
+    | Default
+end
+
 module Expr : sig
   type t =
     | Const of Number.t
@@ -291,6 +308,21 @@ module Expr : sig
           body : t;
           handlers : t Handler.t list
         }
+    | Lambda of
+        { params : Binding.t list;
+          inline : Inline.t;
+          body : t;
+          result_ty : Ty.t
+        }  (** An anonymous function, which may capture variables. *)
+    | Apply of
+        { func : t;
+          args : t list
+        }  (** Application of a function value. *)
+    | Let_rec of
+        { functions : (Name.t * t) list;
+              (** Each function must be a [Lambda]. *)
+          body : t
+        }  (** Local mutually recursive functions. *)
 
   and raise =
     { exn : Exn.t;
@@ -373,13 +405,6 @@ module Statement : sig
   val sequence : t -> t -> t
 
   val to_code : t -> Parsetree.expression
-end
-
-module Inline : sig
-  type t =
-    | Never
-    | Always
-    | Default
 end
 
 module Function : sig
