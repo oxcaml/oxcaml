@@ -419,6 +419,19 @@ end
 Exception: Match_failure ("", 2, 23).
 |}]
 
+module (M @ static) : sig
+    class point : object
+        val mutable x : int
+    end
+end = struct
+    class point = object
+        val mutable x = 0
+    end
+end
+[%%expect{|
+module M : sig class point : object val mutable x : int end end
+|}]
+
 (* Staticity interacts with functors as follows:
    - Functors with a parameter annotated as [static] are template functors,
      otherwise they are non-template functors.
