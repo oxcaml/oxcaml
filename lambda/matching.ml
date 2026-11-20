@@ -366,7 +366,7 @@ end = struct
               bind_address (id, uid) deref_address action )
       | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
-        | `Lazy _ )
+        | `Slice _ | `Lazy _ )
         as view -> stop p view
     in
     aux cl
@@ -423,6 +423,8 @@ end = struct
                                    closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
       | `Addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, alpha_pat env p)
+      | `Slice (mut, sort, elements) ->
+          `Slice (mut, sort, map_slice_pattern (alpha_pat env) elements)
       | `Lazy p -> `Lazy (alpha_pat env p)
     in
     { p with pat_desc }
@@ -561,7 +563,7 @@ let matcher discr (p : Simple.pattern) rem =
   let open Patterns.Head in
   match (discr.pat_desc, ph.pat_desc) with
   | Any, _ -> rem
-  | ( ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
+  | ( ( Constant _ | Construct _ | Variant _ | Addr _ | Slice _ | Lazy
       | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
       | Unboxed_bool _ | Tuple _ | Unboxed_tuple _ ), Any ) ->
       omegas @ rem
@@ -591,7 +593,10 @@ let matcher discr (p : Simple.pattern) rem =
       yesif (List.length l = List.length l')
   | Addr (mut1, _), Addr (mut2, _) -> yesif (mut1 = mut2)
   | Lazy, Lazy -> yes ()
-  | ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
+  | Slice { mutability = m1; shape = d; _ },
+    Slice { mutability = m2; shape = h; _ } ->
+      yesif (m1 = m2 && d = h)
+  | ( Constant _ | Construct _ | Variant _ | Addr _ | Slice _ | Lazy
     | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
     | Unboxed_bool _ | Tuple _ | Unboxed_tuple _), _ -> no ()
 
@@ -1581,6 +1586,9 @@ let can_group discr pat =
          to be executed even in the [_] branch. That's okay because addresses
          are always safe to read. *)
       true
+  | Slice { mutability = m1; shape = Closed _; _ },
+    Slice { mutability = m2; shape = Closed _; _ } ->
+      m1 = m2
   | ( _,
       ( Any
       | Constant
@@ -1594,7 +1602,7 @@ let can_group discr pat =
           | Const_untagged_int _ | Const_unboxed_nativeint _ )
       | Construct _ | Unboxed_unit | Unboxed_bool _ | Tuple _ | Unboxed_tuple _
       | Record _ | Record_unboxed_product _ | Array _ | Variant _ | Addr _
-      | Lazy ) ) ->
+      | Slice _ | Lazy ) ) ->
       false
 
 let is_or p =
@@ -4708,6 +4716,28 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_no_test
             (divide_addr ~scopes ph)
             Context.combine
+      | Slice _ ->
+          (* CR slice-patterns: compile slice patterns *)
+          let loc = ph.pat_loc in
+          let sloc = Scoped_location.of_location ~scopes loc in
+          let slot =
+            transl_extension_path sloc
+              (Lazy.force Env.initial) Predef.path_invalid_argument
+          in
+          let msg = "slice patterns are not compiled yet" in
+          let raise_invalid_argument =
+            Lprim
+              ( Praise Raise_regular,
+                [ Lprim
+                    ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+                      [ slot;
+                        Lconst (Const_base (Const_string (msg, loc, None)))
+                      ],
+                      sloc )
+                ],
+                sloc )
+          in
+          (raise_invalid_argument, Jumps.empty Total)
       | Lazy ->
           compile_no_test
             (divide_lazy ~scopes ph)
@@ -4847,7 +4877,9 @@ let rec tuple_has_direct_derefs (p : pattern) =
     | Tpat_any | Tpat_var _ | Tpat_fun_layout _ | Tpat_constant _
     | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
     | Tpat_construct _ | Tpat_variant _ | Tpat_record _ | Tpat_array _
-    | Tpat_addr _ | Tpat_lazy _ ->
+    | Tpat_addr _ | Tpat_lazy _
+    (* Positions of slice elements are not inside the tuple element *)
+    | Tpat_slice _ ->
         false
   in
   match p.pat_desc with
@@ -5157,6 +5189,7 @@ let flatten_simple_pattern size (p : Simple.pattern) =
   | `Record _
   | `Record_unboxed_product _
   | `Addr _
+  | `Slice _
   | `Lazy _
   | `Construct _
   | `Constant _
