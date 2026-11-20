@@ -302,13 +302,17 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
     Args
       [ Exactly Cmm.typ_addr;
         Exactly (Cmm.machtype_of_memory_chunk memory_chunk) ]
-  | Caddi | Csubi | Cand | Cor | Cxor | Ccmpi _ ->
-    Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_addr]
+  | Caddi -> Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_int]
+  | Cand | Ccmpi (Ceq | Cne) ->
+    Args [Exactly Cmm.typ_val; Exactly Cmm.typ_val]
+  | Csubi | Cor | Cxor
+  | Ccmpi (Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge) ->
+    Args [Exactly Cmm.typ_int; Exactly Cmm.typ_int]
   | Cnot -> Args [Exactly Cmm.typ_int]
   | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cmuli64 _ ->
     Args [Exactly Cmm.typ_int; Exactly Cmm.typ_int]
   | Clsl | Clsr | Casr ->
-    Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_int]
+    Args [Exactly Cmm.typ_int; Exactly Cmm.typ_int]
   | Cclz | Cctz | Cpopcnt | Cbswap _ -> Args [Exactly Cmm.typ_int]
   | Caddi128 | Csubi128 ->
     Args
