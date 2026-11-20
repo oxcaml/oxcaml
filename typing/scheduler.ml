@@ -1,4 +1,8 @@
 module Monitor = struct
+  exception Recoverable of exn
+
+  let recoverable e = Recoverable e
+
   type t =
     { goto : exn -> unit;
       frames : (exn -> exn) list  (** Exception decorators, innermost first *)
@@ -34,9 +38,10 @@ module Monitor = struct
       else
         let t = current () in
         with_current { t with frames = with_ :: t.frames } body
-    with e ->
+    with e -> (
       (* [with_] cannot match on the [Goto] exception *)
-      raise (with_ e)
+      match with_ e with
+      | Recoverable e | e -> raise e)
 
   let root body =
     if not (Language_extension.is_enabled Omnidirectionality)
@@ -62,9 +67,12 @@ module Monitor = struct
         match !escaping with
         | Some exn' when exn == exn' ->
           raise exn (* an inner job's escape; ignore it *)
-        | _ ->
-          t.goto
-            (List.fold_left (fun exn decorate -> decorate exn) exn t.frames))
+        | _ -> (
+          match
+            List.fold_left (fun exn decorate -> decorate exn) exn t.frames
+          with
+          | Recoverable _ -> ()
+          | exn -> t.goto exn))
 end
 
 module Job = struct
