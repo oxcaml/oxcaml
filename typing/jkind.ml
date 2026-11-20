@@ -3516,12 +3516,15 @@ let for_or_null_variant env ~payload_type ~modality ~payload_jkind =
 
 let get_annotation jk = jk.annotation
 
-type 'd decomposed_product =
-  { components : 'd jkind list;
-    outer_addressable : bool
-  }
+let has_layout_any env jkind =
+  let rec is_any : _ Layout.t -> bool = function
+    | Any _ -> true
+    | Addressable l -> is_any l
+    | Sort _ | Product _ | Box _ -> false
+  in
+  match extract_layout env jkind with Ok l -> is_any l | Error _ -> false
 
-let decompose_product env jk =
+let decompose_product_and_outer env jk =
   let mk_jkind layout = set_layout jk layout in
   let rec deal_with_sort ~addressable : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
@@ -3531,7 +3534,8 @@ let decompose_product env jk =
         ( List.map (fun sort -> Layout.Sort (sort, Scannable_axes.max)) sorts,
           addressable )
     | Addressable s -> deal_with_sort ~addressable:true s
-    | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
+    | Univar _ ->
+      Misc.fatal_error "Jkind.decompose_product_and_outer: Univar in product"
   in
   match extract_layout env jk with
   | Error _ -> None
@@ -3550,11 +3554,37 @@ let decompose_product env jk =
        the relevant bits of [Ctype.type_jkind_sub] to just work on layouts,
        or introduce product histories. *)
     Option.map
-      (fun (layouts, addressable) ->
-        { components = List.map mk_jkind layouts;
-          outer_addressable = addressable
-        })
+      (fun (layouts, addressable) -> List.map mk_jkind layouts, addressable)
       (deal_with_layout ~addressable:false layout)
+
+let decompose_products_for_sub env sub super =
+  match decompose_product_and_outer env sub with
+  | None -> None
+  | Some (subs, _) when has_layout_any env super ->
+    (* Even though [super] has layout any, it still might have mode-crossing
+       restrictions, so we just duplicate the jkind. *)
+    Some (subs, List.map (fun _ -> super) subs)
+  | Some (subs, sub_outer) -> (
+    match decompose_product_and_outer env super with
+    | Some (supers, super_outer) when List.compare_lengths subs supers = 0 -> (
+      (* As in [Layout.sub], to compare a product with [addressable] on the
+         outside against one without, first constrain the latter's components:
+         below [_ addressable] on the left, above it on the right. The returned
+         components can then be compared. *)
+      let reconciled =
+        match sub_outer, super_outer with
+        | true, false ->
+          Misc.Stdlib.List.iter_until_error
+            ~f:(constrain_above_addressable env)
+            supers
+        | false, true ->
+          Misc.Stdlib.List.iter_until_error
+            ~f:(constrain_below_addressable env)
+            subs
+        | true, true | false, false -> Ok ()
+      in
+      match reconciled with Ok () -> Some (subs, supers) | Error () -> None)
+    | Some _ | None -> None)
 
 (*********************************)
 (* pretty printing *)
@@ -5128,14 +5158,6 @@ let is_obviously_sub (type r l) (sub : (allowed * r) jkind)
 
 let fully_expand_aliases env ({ jkind; _ } as jk) =
   { jk with jkind = Base_and_axes.fully_expand_aliases env jkind }
-
-let has_layout_any env jkind =
-  let rec is_any : _ Layout.t -> bool = function
-    | Any _ -> true
-    | Addressable l -> is_any l
-    | Sort _ | Product _ | Box _ -> false
-  in
-  match extract_layout env jkind with Ok l -> is_any l | Error _ -> false
 
 let is_value_for_printing ~ignore_null env { jkind; _ } =
   let jkind = Base_and_axes.fully_expand_aliases env jkind in

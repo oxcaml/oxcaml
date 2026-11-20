@@ -850,23 +850,21 @@ val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
     Fails if no [or_null] type could have kind [k]. *)
 val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
-type 'd decomposed_product =
-  { components : 'd Types.jkind list;
-    outer_addressable : bool
-  }
-
-(** Given a jkind [k], produce its components [ks] and [outer_addressable] such
-    that [k] is equivalent to [Product ks], or to [Addressable (Product ks)]
-    when [outer_addressable] is set. In practice, [k] is the kind of, or
-    required kind of, a tuple/record being inspected in
-    [Ctype.constrain_type_jkind].
+(** Given jkinds [sub] and [super], produce lists of jkinds [subs] and [supers]
+    such that [subs] being pairwise below [supers] implies [sub] is below
+    [super]. In practice, [sub] is the kind of a tuple/record being inspected in
+    [Ctype.constrain_type_jkind], and [super] is its required kind.
 
     Because there are no product jkinds, the resulting jkinds are higher in the
     jkind lattice than they might need to be. (This decomposes the layout but
     just reuses the non-layout parts of the original jkind.)
 
-    Never does any mutation. *)
-val decompose_product : Env.t -> 'd Types.jkind -> 'd decomposed_product option
+    May fill sort variables. *)
+val decompose_products_for_sub :
+  Env.t ->
+  (allowed * 'r1) Types.jkind ->
+  ('l2 * allowed) Types.jkind ->
+  ((allowed * 'r1) Types.jkind list * ('l2 * allowed) Types.jkind list) option
 
 (** Get an annotation (that a user might write) for this [t]. *)
 val get_annotation : 'd Types.jkind -> Parsetree.jkind_annotation option

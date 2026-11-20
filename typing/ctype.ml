@@ -3793,7 +3793,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                            components of [ty's_jkind] because an unboxed record
                            with an [any] field has a product-of-[any]s kind on
                            the declaration, and we won't be able to
-                           [decompose_product] on one of those [any]s if it
+                           decompose one of those [any]s if it
                            itself is a product. So this estimation for each
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
@@ -3849,46 +3849,16 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                  in
                  report_best_jkind ty's_best_jkind
              in
-             begin match Jkind.decompose_product env ty's_jkind,
-                         Jkind.decompose_product env jkind with
-             | Some { components = ty's_jkinds;
-                      outer_addressable = ty's_outer_addressable },
-               Some { components = jkinds; outer_addressable }
-                  when List.length ty's_jkinds = num_components
-                       && List.length jkinds = num_components ->
-               (* As in [Layout.sub], to compare a product with [addressable]
-                  on the outside against one without, first constrain the
-                  latter's components: below [_ addressable] on the left, above
-                  it on the right. Then compare the components. *)
-               let open Misc.Stdlib.Monad.Result.Syntax in
-               let* () =
-                 (match ty's_outer_addressable, outer_addressable with
-                  | true, false ->
-                    Misc.Stdlib.List.fold_left_result
-                      (fun () -> Jkind.constrain_above_addressable env)
-                      () jkinds
-                  | false, true ->
-                    Misc.Stdlib.List.fold_left_result
-                      (fun () -> Jkind.constrain_below_addressable env)
-                      () ty's_jkinds
-                  | true, true | false, false -> Ok ())
-                 |> Result.map_error (fun () ->
-                      Jkind.Violation.of_ ~context env
-                        (Not_a_subjkind
-                           (ty's_jkind, jkind, sub_failure_reasons)))
-               in
+             begin match
+               Jkind.decompose_products_for_sub env ty's_jkind jkind
+             with
+             | Some (ty's_jkinds, jkinds)
+                  when List.length ty's_jkinds = num_components ->
                recur ty's_jkinds jkinds
-             | Some { components = ty's_jkinds; outer_addressable = _ }, None
-                  when Jkind.has_layout_any env jkind
-                    && List.length ty's_jkinds = num_components ->
-               (* Even though [jkind] has layout any, it still might have
-                  mode-crossing restrictions, so we recur, just duplicating
-                  the jkind. *)
-               recur ty's_jkinds (List.init num_components (fun _ -> jkind))
              | _ ->
-               (* Products don't line up. This is only possible if [ty] was
-                  given a jkind annotation of the wrong product arity.
-               *)
+               (* Products don't line up, either in arity (only possible if
+                  [ty] was given a jkind annotation of the wrong product
+                  arity) or in addressability. *)
                Error (Jkind.Violation.of_ ~context env
                   (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              end
