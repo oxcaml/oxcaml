@@ -142,10 +142,12 @@ val find_code_exn : t -> Code_id.t -> Code_or_metadata.t
 (** This function raises if the code ID is unbound. *)
 val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
 
+(** Also sets the copy context of FDO counters (see [rewrite_fdo_counter]). *)
 val set_inlined_debuginfo : t -> from:t -> t
 
-(** For simplifying terms whose debuginfo is already in the current inlining
-    context. *)
+(** For simplifying an expression built from already-simplified terms, whose
+    debuginfo and FDO counters are already in the current inlining and copy
+    contexts. *)
 val clear_inlined_debuginfo : t -> t
 
 val merge_inlined_debuginfo_and_forward_inlined_attribute :
@@ -155,6 +157,19 @@ val merge_inlined_debuginfo_and_forward_inlined_attribute :
   t
 
 val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
+
+(** Rewrites an FDO counter from the code being simplified: specializes it if
+    the code is a copy (see [Fdo_downwards_env.specialize_fdo_counter]) and adds
+    the current inlining context (see [Fdo_counter.inline]). *)
+val rewrite_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t
+
+val rewrite_fdo_annotation : t -> Fdo_annotation.t -> Fdo_annotation.t
+
+(** See [Fdo_downwards_env.add_unspecialized_copy]. *)
+val add_fdo_unspecialized_copy : t -> Code_id.t -> t
+
+(** See [Fdo_downwards_env.stub_callsite_counter]. *)
+val fdo_stub_callsite_counter : t -> Fdo_counter.t option
 
 val round : t -> int
 

@@ -35,7 +35,7 @@ val map_denv : t -> f:(Downwards_env.t -> Downwards_env.t) -> t
 (** Replace the environment component of the given downwards accumulator. *)
 val with_denv : t -> Downwards_env.t -> t
 
-(** Extract the dataflow analysis accumulator *)
+(** Extract the dataflow analysis accumulator. *)
 val flow_acc : t -> Flow.Acc.t
 
 (** MSet the dataflow analysis accumulator of the given dacc. *)
@@ -43,6 +43,17 @@ val with_flow_acc : Flow.Acc.t -> t -> t
 
 (** Map the dataflow analysis accumulator of the given dacc. *)
 val map_flow_acc : t -> f:(Flow.Acc.t -> Flow.Acc.t) -> t
+
+(** FDO counters dropped so far (see [Fdo_dropped_counters]). Stored here rather
+    than registered globally so that counters from discarded traversals (e.g.
+    speculative inlining) are discarded too. *)
+val fdo_dropped_counters : t -> Fdo_dropped_counters.t
+
+(** The counters must already be in the current inlining context. *)
+val add_dropped_fdo_counters :
+  t -> reason:Fdo_dropped_counters.Reason.t -> Fdo_annotation.t -> t
+
+val add_all_dropped_fdo_counters : t -> Fdo_dropped_counters.t -> t
 
 include Continuation_uses_env_intf.S with type t := t
 

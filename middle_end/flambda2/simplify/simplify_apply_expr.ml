@@ -107,6 +107,10 @@ let simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up =
   simplify_expr (dacc_for_terms_built_from_apply dacc) expr ~down_to_up
 
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
+  let dacc =
+    DA.add_dropped_fdo_counters dacc ~reason:Self_tail_call_to_jump
+      (Fdo_annotation.of_list (Option.to_list (Apply.callsite_counter apply)))
+  in
   Simplify_apply_cont_expr.simplify_apply_cont
     (dacc_for_terms_built_from_apply dacc)
     (Apply_cont_expr.create self_cont ~args:(Apply.args apply)
@@ -696,10 +700,10 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           (* The full application also receives the remaining parameters, which
              may be yielding even if the partial application itself cannot
              yield. *)
-          (* CR yusumez: [dbg] is already in the current inlining context.
-             Inlining the wrapper at one of its applications adds the context of
-             that application on top: the backtrace shows the frames of where
-             the closure was built, with the inlined frames they share twice. *)
+          (* CR yusumez: [dbg] and the counter of [apply] are already in the
+             current inlining context. Inlining the wrapper at one of its
+             applications adds the context of that application on top, which
+             duplicates the inlined frames in the backtrace and counters. *)
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
@@ -1356,7 +1360,13 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~call_kind:(Apply.call_kind apply)
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
-        ~callsite_counter:(Apply.callsite_counter apply)
+        ~callsite_counter:
+          (match Apply.callsite_counter apply, Apply.call_kind apply with
+          | Some counter, _ ->
+            Some (DE.rewrite_fdo_counter (DA.denv dacc) counter)
+          | None, (Function _ | Method _) ->
+            DE.fdo_stub_callsite_counter (DA.denv dacc)
+          | None, (C_call _ | Effect _) -> None)
         ~inlined ~inlining_state ~probe:(Apply.probe apply)
         ~position:(Apply.position apply) ~yielding:(Apply.yielding apply)
         ~relative_history:

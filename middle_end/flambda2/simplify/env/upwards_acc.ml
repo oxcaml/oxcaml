@@ -28,12 +28,14 @@ type t =
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t Or_unknown.t;
     flow_result : Flow_types.Flow_result.t;
+    fdo_dropped_counters : Fdo_dropped_counters.t;
     resimplify : bool
   }
 
 let [@ocamlformat "disable"] print ppf
       { uenv; creation_dacc = _; lifted_constants;
-        all_code = _; slot_offsets; flow_result; resimplify;
+        all_code = _; slot_offsets; flow_result;
+        fdo_dropped_counters = _; resimplify;
       } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(uenv@ %a)@]@ \
@@ -65,6 +67,7 @@ let create ~flow_result ~compute_slot_offsets uenv dacc =
        [Let_cont]). *)
     slot_offsets;
     flow_result;
+    fdo_dropped_counters = DA.fdo_dropped_counters dacc;
     resimplify = false
   }
 
@@ -126,6 +129,14 @@ let continuation_param_aliases t = t.flow_result.aliases_result
 let mutable_unboxing_result t = t.flow_result.mutable_unboxing_result
 
 let set_resimplify t = { t with resimplify = true }
+
+let fdo_dropped_counters t = t.fdo_dropped_counters
+
+let add_dropped_fdo_counters t ~reason counters =
+  { t with
+    fdo_dropped_counters =
+      Fdo_dropped_counters.add t.fdo_dropped_counters ~reason counters
+  }
 
 let resimplify t = t.resimplify
 

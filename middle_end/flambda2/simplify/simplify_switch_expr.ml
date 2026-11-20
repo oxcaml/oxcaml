@@ -812,6 +812,11 @@ let rebuild_switch
       in
       match switch_merged with
       | Some (dest, args) ->
+        (* The result is computed from the scrutinee without branching. *)
+        let uacc =
+          UA.add_dropped_fdo_counters uacc ~reason:Switch_to_lookup_table
+            (Fdo_term_counters.of_switch_arms arms)
+        in
         (* CR bclement: should use a single unboxed product lookup table *)
         let rec rebuild_merged_switch mergeable_args args_rev =
           match mergeable_args with
@@ -868,6 +873,10 @@ let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
   let dbg = AC.debuginfo action in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
   let action = AC.with_debuginfo action ~dbg in
+  let annotations =
+    Branch_annotations.map_fdo_annotation annotations
+      ~f:(DE.rewrite_fdo_annotation (DA.denv dacc))
+  in
   let dacc =
     DA.map_flow_acc dacc
       ~f:
@@ -1052,6 +1061,12 @@ let simplify_switch dacc switch ~down_to_up =
     (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let dacc = DA.with_denv dacc denv_at_use in
+    (* The arm's edge disappears with the switch. *)
+    let dacc =
+      DA.add_dropped_fdo_counters dacc ~reason:Switch_to_single_arm
+        (DE.rewrite_fdo_annotation denv_at_use
+           (Branch_annotations.fdo_annotation (Switch_arm.annotations arm)))
+    in
     Simplify_apply_cont_expr.simplify_apply_cont dacc (Switch_arm.action arm)
       ~down_to_up:(fun dacc simplified_expr ->
         down_to_up dacc

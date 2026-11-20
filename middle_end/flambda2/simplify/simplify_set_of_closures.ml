@@ -26,10 +26,11 @@ open! Simplify_import
 
 module C = Simplify_set_of_closures_context
 
-let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
-    ~my_depth function_slot_opt ~closure_bound_names_inside_function
-    ~inlining_arguments ~absolute_history code_id ~return_continuation
-    ~exn_continuation ~loopify_state code_metadata =
+let dacc_inside_function context ~outer_dacc ~resimplifying ~params ~my_closure
+    ~my_alloc_mode ~my_depth function_slot_opt
+    ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
+    code_id ~return_continuation ~exn_continuation ~loopify_state code_metadata
+    =
   let dacc = C.dacc_inside_functions context in
   let alloc_modes = Code_metadata.param_modes code_metadata in
   let denv =
@@ -39,6 +40,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
   in
+  (* The previous run already specialized the FDO counters in the body. *)
+  let denv = if resimplifying then DE.clear_inlined_debuginfo denv else denv in
   let denv =
     if Code_metadata.stub code_metadata
     then DE.enter_stub_function denv
@@ -173,6 +176,10 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     |> DA.with_slot_offsets ~slot_offsets
     |> DA.with_code_age_relation ~code_age_relation
   in
+  let outer_dacc =
+    DA.add_all_dropped_fdo_counters outer_dacc
+      (UA.fdo_dropped_counters uacc_after_upwards_traversal)
+  in
   outer_dacc, lifted_consts_this_function
 
 type simplify_function_body_result =
@@ -186,7 +193,7 @@ type simplify_function_body_result =
     uacc_after_upwards_traversal : UA.t
   }
 
-let simplify_function_body context ~outer_dacc function_slot_opt
+let simplify_function_body context ~outer_dacc ~resimplifying function_slot_opt
     ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
     code_id code ~return_continuation ~exn_continuation params ~body ~my_closure
     ~is_my_closure_used:_ ~my_alloc_mode ~my_depth ~free_names_of_body:_ =
@@ -196,10 +203,11 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     else Loopify_state.do_not_loopify
   in
   let dacc_at_function_entry =
-    dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
-      ~my_depth function_slot_opt ~closure_bound_names_inside_function
-      ~inlining_arguments ~absolute_history code_id ~return_continuation
-      ~exn_continuation ~loopify_state (Code.code_metadata code)
+    dacc_inside_function context ~outer_dacc ~resimplifying ~params ~my_closure
+      ~my_alloc_mode ~my_depth function_slot_opt
+      ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
+      code_id ~return_continuation ~exn_continuation ~loopify_state
+      (Code.code_metadata code)
   in
   let dacc = dacc_at_function_entry in
   if not (DA.no_lifted_constants dacc)
@@ -413,9 +421,9 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
     Function_params_and_body.pattern_match
       (Code.params_and_body code)
       ~f:
-        (simplify_function_body context ~outer_dacc function_slot_opt
-           ~closure_bound_names_inside_function ~inlining_arguments
-           ~absolute_history code_id code)
+        (simplify_function_body context ~outer_dacc ~resimplifying
+           function_slot_opt ~closure_bound_names_inside_function
+           ~inlining_arguments ~absolute_history code_id code)
   in
   let recursive = RE.Function_params_and_body.recursive params_and_body in
   let is_my_closure_used =
@@ -499,6 +507,15 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
       else DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code)
     in
     let cold = Code.cold code || body_is_cold in
+    let fdo_entry_annotation =
+      (* Specialized if this code is a copy (see
+         [DE.rewrite_fdo_annotation]). *)
+      let entry_annotation = Code.fdo_entry_annotation code in
+      Fdo_annotation.With_body_hash.with_annotation entry_annotation
+        (DE.rewrite_fdo_annotation
+           (DA.denv dacc_at_function_entry)
+           (Fdo_annotation.With_body_hash.annotation entry_annotation))
+    in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
@@ -512,8 +529,7 @@ let simplify_function0 context ~outer_dacc ~resimplifying function_slot_opt
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
-      ~inlining_arguments ~dbg
-      ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
+      ~inlining_arguments ~dbg ~fdo_entry_annotation
       ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
       ~absolute_history ~relative_history ~loopify
   in
