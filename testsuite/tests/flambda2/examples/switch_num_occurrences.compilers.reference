@@ -22,6 +22,7 @@
 
 (function no_cse reduce_code_size linscan camlSwitch_num_occurrences__entry
      () : val
- (catch (exit 6 G:"camlSwitch_num_occurrences":int) with(6 *ret*/0: val) 1) )
+ (catch (exit 6 G:"camlSwitch_num_occurrences":static_block) with(6
+   *ret*/0: val) 1) )
 
 (data)
