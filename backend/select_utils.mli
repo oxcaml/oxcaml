@@ -318,6 +318,16 @@ val insert_moves :
 val insert_move_args :
   environment -> Sub_cfg.t -> Reg.t array -> Reg.t array -> int -> unit
 
+(** For a call, return the args to actually pass on the stack/regs (which skips
+    the function-pointer arg for [Indirect]), the matching hard-reg locations,
+    and the stack offset. *)
+val call_arg_locations :
+  Cfg.func_call_operation -> Reg.t array -> Reg.t array * Reg.t array * int
+
+(** Prepends the function-pointer argument, if there is one. *)
+val call_arg_for_terminator :
+  Cfg.func_call_operation -> Reg.t array -> Reg.t array -> Reg.t array
+
 val insert_move_results :
   environment -> Sub_cfg.t -> Reg.t array -> Reg.t array -> int -> unit
 
