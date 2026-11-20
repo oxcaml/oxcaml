@@ -129,7 +129,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     aux args args_arity
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
-  let returns = true in
+  let returns = Apply.returns apply in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
