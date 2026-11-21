@@ -158,6 +158,11 @@ let of_function (context : Context.t) ~(binder : Ident.t option)
             }
         | Empty ->
           false
+        (* A function the compiler derives from the enclosing one (the body of a
+           function with optional arguments, a destination-passing variant, a
+           class initializer...) is named after it, as its scopes' string form
+           is that of the enclosing function. *)
+        | Cons { item = Sc_compiler_generated; _ } -> false
       in
       ( Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
           scopes,

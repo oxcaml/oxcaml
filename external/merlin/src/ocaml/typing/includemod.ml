@@ -1024,8 +1024,19 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
               let output_repr =
                 build_output_repr ~env:new_env input_repr cc
               in
+              let output_names =
+                List.filter_map
+                  (fun item ->
+                    if is_runtime_component item
+                    then
+                      let (id, _, _) = item_ident_name item in
+                      Some (Ident.name id)
+                    else None)
+                  sig2
+              in
               Ok (Tcoerce_structure
-                    { input_repr; output_repr; pos_cc_list = cc; id_pos_list },
+                    { input_repr; output_repr; pos_cc_list = cc; output_names;
+                      id_pos_list },
                   shape)
         end
     | missings, incompatibles, _runtime_coercions, _leftovers ->
