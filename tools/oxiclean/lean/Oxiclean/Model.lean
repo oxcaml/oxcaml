@@ -115,6 +115,7 @@ inductive BlockKind : Type where
   | closure
   | notYetSupported
 
+@[simp]
 def BlockKind.ofTag (tag : UInt8) : BlockKind :=
   if tag < 244 then .values else
   if tag > 250 then .bytes else
@@ -169,6 +170,7 @@ mutual
     body : Expr
 end
 
+@[simp]
 def Expr.substitute (replacement : Value) (deBruijn : Nat := 0) : Expr → Expr
   | .apply func arg =>
     .apply
