@@ -524,12 +524,18 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
 
 let run :
     Cfg_with_infos.t ->
-    (Cfg_with_infos.t, Regalloc_rewrite.prelude_result) result =
+    ( Cfg_with_infos.t * Regalloc_rematerializations.t,
+      Regalloc_rewrite.prelude_result )
+    result =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let ({ Regalloc_rewrite.cfg_infos; stack_slots; affinity; cfg_with_infos = _ }
-       as prepared) =
+  let ({ Regalloc_rewrite.cfg_infos;
+         stack_slots;
+         affinity;
+         rematerializations;
+         cfg_with_infos = _
+       } as prepared) =
     Regalloc_rewrite.prelude
       (module Utils)
       ~on_fatal_callback:(fun () -> save_cfg "irc" cfg_with_layout)
@@ -558,4 +564,4 @@ let run :
           (fun reg -> State.set_degree state reg 0)
           (all_precolored_regs ()))
       cfg_with_infos;
-    Ok cfg_with_infos
+    Ok (cfg_with_infos, rematerializations)
