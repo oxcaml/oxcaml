@@ -101,6 +101,19 @@ let exists_free ids p =
   | None -> false
   | _ -> true
 
+type unapplied =
+  | Uident of Ident.t
+  | Udot of unapplied * string
+
+let rec unapplied = function
+  | Pident id -> Some (Uident id)
+  | Pdot (p, s) -> Option.map (fun p -> Udot (p, s)) (unapplied p)
+  | Papply _ | Pextra_ty _ -> None
+
+let rec of_unapplied = function
+  | Uident id -> Pident id
+  | Udot (p, s) -> Pdot (of_unapplied p, s)
+
 let rec scope = function
     Pident id -> Ident.scope id
   | Pdot(p, _) | Pextra_ty (p, _) -> scope p
