@@ -48,6 +48,10 @@ val wrap_printing_env: error:bool -> Env.t -> (unit -> 'a) -> 'a
 (** [with_labels false] disable labels in function types *)
 val with_labels: bool -> (unit -> 'a) -> 'a
 
+val with_relevant_modes:
+  relevant:Mode.With_locality.lr list -> got:type_expr list ->
+  (unit -> 'a) -> 'a
+
 (** {1 Printing idents and paths } *)
 
 val ident_name: Shape.Sig_component_kind.t option -> Ident.t -> out_name

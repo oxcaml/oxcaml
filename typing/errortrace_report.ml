@@ -438,7 +438,7 @@ let split_mode_mismatch : type variety.
   (_, variety) Errortrace.t -> Format_doc.doc option * (_, variety) Errortrace.t
   = fun tr ->
   match List.rev tr with
-  | Errortrace.Mode_mismatch (pos, e) :: rev_tr ->
+  | Errortrace.Mode_mismatch { pos; error = e; _ } :: rev_tr ->
     let {left; right} : Mode_intf.print_error =
       Mode.With_locality.print_error (Location.none, Unknown) e
     in
