@@ -662,7 +662,7 @@ let context_free_attribute_modification ~loc =
    of one element; it only has [@@deriving].
 *)
 let handle_attr_group_inline attrs rf ~items ~expanded_items ~loc ~base_ctxt
-    ~embed_errors ~convert_exn =
+    ~embed_errors ~reset_inline_gensym ~convert_exn =
   List.fold_left attrs ~init:(return [])
     ~f:(fun acc (Rule.Attr_group_inline.T group) ->
       acc >>= fun acc ->
@@ -673,6 +673,7 @@ let handle_attr_group_inline attrs rf ~items ~expanded_items ~loc ~base_ctxt
       | None, Some _ | Some _, None ->
           context_free_attribute_modification ~loc |> of_result ~default:acc
       | Some values, Some _ -> (
+          if reset_inline_gensym then Common.Private.reset_gen_symbol ();
           let ctxt =
             Expansion_context.Deriver.make ~derived_item_loc:loc
               ~inline:group.expect ~base:base_ctxt ()
@@ -685,7 +686,7 @@ let handle_attr_group_inline attrs rf ~items ~expanded_items ~loc ~base_ctxt
             return (error_item :: acc)))
 
 let handle_attr_inline attrs ~convert_exn ~item ~expanded_item ~loc ~base_ctxt
-    ~embed_errors =
+    ~embed_errors ~reset_inline_gensym =
   List.fold_left attrs ~init:(return []) ~f:(fun acc (Rule.Attr_inline.T a) ->
       acc >>= fun acc ->
       Attribute.get_res a.attribute item |> of_result ~default:None
@@ -697,6 +698,7 @@ let handle_attr_inline attrs ~convert_exn ~item ~expanded_item ~loc ~base_ctxt
       | None, Some _ | Some _, None ->
           context_free_attribute_modification ~loc |> of_result ~default:acc
       | Some value, Some _ -> (
+          if reset_inline_gensym then Common.Private.reset_gen_symbol ();
           let ctxt =
             Expansion_context.Deriver.make ~derived_item_loc:loc
               ~inline:a.expect ~base:base_ctxt ()
@@ -709,7 +711,7 @@ let handle_attr_inline attrs ~convert_exn ~item ~expanded_item ~loc ~base_ctxt
             return (error_item :: acc)))
 
 let handle_attr_floating_inline attrs ~item ~loc ~base_ctxt ~embed_errors
-    ~convert_exn =
+    ~reset_inline_gensym ~convert_exn =
   List.fold_left attrs ~init:(return [])
     ~f:(fun acc (Rule.Attr_floating_inline.T a) ->
       acc >>= fun acc ->
@@ -718,6 +720,7 @@ let handle_attr_floating_inline attrs ~item ~loc ~base_ctxt ~embed_errors
       >>= function
       | None -> return acc
       | Some value -> (
+          if reset_inline_gensym then Common.Private.reset_gen_symbol ();
           let ctxt =
             Expansion_context.Deriver.make ~derived_item_loc:loc ~inline:true
               ~base:base_ctxt ()
@@ -749,8 +752,8 @@ let with_context base_ctxt e =
       >>| fun e -> (Expansion_context.Base.enter_value ~loc txt base_ctxt, e)
 
 class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
-  ?(generated_code_hook = Generated_code_hook.nop) ?(embed_errors = false) rules
-  =
+  ?(generated_code_hook = Generated_code_hook.nop) ?(embed_errors = false)
+  ?(reset_inline_gensym = false) rules =
   let hook = generated_code_hook in
 
   let special_functions =
@@ -867,9 +870,13 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
 
   let map_node = map_node ~hook ~embed_errors in
   let map_nodes = map_nodes ~hook ~embed_errors in
-  let handle_attr_group_inline = handle_attr_group_inline ~embed_errors in
-  let handle_attr_inline = handle_attr_inline ~embed_errors in
-  let handle_attr_floating_inline = handle_attr_floating_inline ~embed_errors in
+  let handle_attr_group_inline =
+    handle_attr_group_inline ~embed_errors ~reset_inline_gensym
+  in
+  let handle_attr_inline = handle_attr_inline ~embed_errors ~reset_inline_gensym in
+  let handle_attr_floating_inline =
+    handle_attr_floating_inline ~embed_errors ~reset_inline_gensym
+  in
 
   object (self)
     inherit Ast_traverse.map_with_expansion_context_and_errors as super

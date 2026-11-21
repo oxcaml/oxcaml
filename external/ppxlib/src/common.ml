@@ -30,12 +30,14 @@ let strip_gen_symbol_suffix =
     then String.prefix string !pos
     else string
 
-let gen_symbol =
-  let cnt = ref 0 in
-  fun ?(prefix = "_x") () ->
-    cnt := !cnt + 1;
-    let prefix = strip_gen_symbol_suffix prefix in
-    Printf.sprintf "%s__%03i_" prefix !cnt
+let gen_symbol_counter = ref 0
+
+let gen_symbol ?(prefix = "_x") () =
+  gen_symbol_counter := !gen_symbol_counter + 1;
+  let prefix = strip_gen_symbol_suffix prefix in
+  Printf.sprintf "%s__%03i_" prefix !gen_symbol_counter
+
+let reset_gen_symbol () = gen_symbol_counter := 0
 
 let name_type_params_in_td_res (td : type_declaration) :
     (type_declaration, _) result =
@@ -296,3 +298,7 @@ let valid_string_constant_delimiter string =
     else delimiter
   in
   attempt_string_constant_delimiter 0
+
+module Private = struct
+  let reset_gen_symbol = reset_gen_symbol
+end
