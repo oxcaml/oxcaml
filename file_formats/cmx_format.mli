@@ -68,6 +68,9 @@ type unit_infos =
     ui_generic_fns: generic_fns;  (* Generic functions needed *)
     ui_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
     ui_zero_alloc_info: Zero_alloc_info.t;
+    ui_opaque: bool;              (* The unit's interface was compiled with
+                                     -opaque, so units importing it must
+                                     behave as if this .cmx were absent *)
     ui_force_link: bool;          (* Always linked *)
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
@@ -94,6 +97,7 @@ type unit_infos_raw =
     uir_generic_fns: generic_fns;
     uir_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
     uir_zero_alloc_info: Zero_alloc_info.Raw.t;
+    uir_opaque: bool;
     uir_force_link: bool;
     uir_requires_metaprogramming: bool;
     uir_section_toc: int array;    (* Byte offsets of sections in .cmx
