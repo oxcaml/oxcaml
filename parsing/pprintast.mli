@@ -27,6 +27,7 @@ val longident : Format.formatter -> Longident.t -> unit
 val constr : Format.formatter -> Longident.t -> unit
 
 val expression : Format.formatter -> Parsetree.expression -> unit
+val is_infix_operator : string -> bool
 val string_of_expression : Parsetree.expression -> string
 
 val pattern: Format.formatter -> Parsetree.pattern -> unit

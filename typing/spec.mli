@@ -34,3 +34,18 @@ type expression =
           only if they form a prefix of the type's parameters, so no argument
           can be [Omitted] in the sense of the typedtree (e.g., [f ~x:1] is
           allowed, but [f ~y:2] is disallowed). *)
+
+(** {1 Traversals} *)
+
+val map_paths : value_path:(Path.t -> Path.t) -> expression -> expression
+
+(** Rename local variables, leaving global paths unchanged. [rename] must be
+    consistent across occurrences of the same identifier. *)
+val rename_vars : rename:(Ident.t -> Ident.t) -> expression -> expression
+
+(** The namespaces of the global paths of an expression: values. *)
+type namespace = Value
+
+(** The global paths of an expression with their namespaces, in traversal order.
+*)
+val paths : expression -> (namespace * Path.t) list

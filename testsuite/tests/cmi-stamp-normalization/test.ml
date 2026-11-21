@@ -67,6 +67,7 @@ let bound_ident_stamps cmi_file =
         | Sig_class (id, _, _, _) -> [id]
         | Sig_class_type (id, _, _, _) -> [id]
         | Sig_jkind (id, _, _) -> [id]
+        | Sig_law (id, _, _) -> [id]
       in
       List.map Ident.unique_name ids)
     sg
