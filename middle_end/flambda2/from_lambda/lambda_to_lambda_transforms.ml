@@ -397,10 +397,13 @@ let makearray_dynamic_singleton_uninitialized name (mode : L.locality_mode)
     (mode : L.locality_mode)
     ~length ~init:None loc
 
-let makearray_dynamic_unboxed_products_only_64_bit () =
+let makearray_dynamic_unboxed_products_only_64_bit ~machine_width =
   (* To keep things simple in the C stub as regards array length, we currently
      restrict to 64-bit targets. *)
-  if not (Target_system.is_64_bit ())
+  if
+    not
+      (Target_system.Machine_width.is_64_bit machine_width
+      || Clflags.target_is_jsir ())
   then
     Misc.fatal_error
       "Cannot compile Pmakearray_dynamic at unboxed product layouts for 32-bit \
@@ -422,7 +425,8 @@ let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
 let makearray_dynamic_non_scannable_unboxed_product env
     (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length ~init
     loc =
-  makearray_dynamic_unboxed_products_only_64_bit ();
+  makearray_dynamic_unboxed_products_only_64_bit
+    ~machine_width:(Env.machine_width env);
   let is_local =
     L.of_bool (match mode with Alloc_heap -> false | Alloc_local -> true)
   in
@@ -468,10 +472,10 @@ let makearray_dynamic_non_scannable_unboxed_product env
          all float32_u or int32_u. *)
       Sixty_four_or_more ~init term
 
-let makearray_dynamic_scannable_unboxed_product0
+let makearray_dynamic_scannable_unboxed_product0 ~machine_width
     (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length ~init
     loc =
-  makearray_dynamic_unboxed_products_only_64_bit ();
+  makearray_dynamic_unboxed_products_only_64_bit ~machine_width;
   (* Trick: use the local stack as a way of getting the variable argument list
      to the C function. *)
   if not Config.stack_allocation
@@ -541,8 +545,9 @@ let makearray_dynamic_scannable_unboxed_product env
   if must_be_scanned
   then
     ( env,
-      makearray_dynamic_scannable_unboxed_product0 lambda_array_kind mode
-        ~length ~init loc )
+      makearray_dynamic_scannable_unboxed_product0
+        ~machine_width:(Env.machine_width env) lambda_array_kind mode ~length
+        ~init loc )
   else
     makearray_dynamic_non_scannable_unboxed_product env lambda_array_kind mode
       ~length ~init:(Some init) loc

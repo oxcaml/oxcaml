@@ -1,0 +1,7 @@
+int lsl: -2147483648 0 0 0 0 0 0
+int asr: -1 0 0 0 0 0 0
+int lsr: 1 0 0 0 0 0 0
+nativeint shift_left: -2147483648 0 0 0 0 0 0
+nativeint shift_right: -1 0 0 0 0 0 0
+nativeint shift_right_logical: 1 0 0 0 0 0 0
+in range: true true true true true true

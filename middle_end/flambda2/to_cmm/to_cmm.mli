@@ -16,6 +16,7 @@
 
 (** Translate a compilation unit. *)
 val unit :
+  machine_width:Target_system.Machine_width.t ->
   offsets:Exported_offsets.t ->
   all_code:Exported_code.t ->
   reachable_names:Name_occurrences.t ->

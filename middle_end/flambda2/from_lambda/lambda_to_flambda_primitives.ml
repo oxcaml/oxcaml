@@ -21,8 +21,12 @@ module I_or_f = K.Standard_int_or_float
 module L = Lambda
 module P = Flambda_primitive
 
-let needs_64_bit_target prim dbg =
-  if not (Target_system.is_64_bit ())
+let supports_64_bit_primitives machine_width =
+  Target_system.Machine_width.is_64_bit machine_width
+  || Clflags.target_is_jsir ()
+
+let needs_64_bit_target ~machine_width prim dbg =
+  if not (supports_64_bit_primitives machine_width)
   then
     Misc.fatal_errorf
       "Primitive %a is not yet supported on 32-bit targets (this is not \
@@ -1763,7 +1767,7 @@ let extract_block_index_offset ~machine_width idx =
 (* Given an index that points to data of some layout, produce the list of
    offsets needed to access each element *)
 let block_index_access_offsets_and_kinds ~machine_width layout idx =
-  assert (Target_system.is_64_bit ());
+  assert (supports_64_bit_primitives machine_width);
   let mbe = L.mixed_block_element_of_layout layout in
   let cts = MPB.count mbe in
   let kinds =
@@ -1837,7 +1841,7 @@ let check_single_element offsets kinds =
   offset, full_kind
 
 let idx_atomic_offset_and_field_kind ~machine_width primitive dbg layout ~idx =
-  needs_64_bit_target primitive dbg;
+  needs_64_bit_target ~machine_width primitive dbg;
   let offsets, kinds =
     block_index_access_offsets_and_kinds ~machine_width layout idx
   in
@@ -1850,7 +1854,7 @@ let null_base : H.simple_or_prim =
 
 let convert_pget_indirect ~machine_width ~dbg primitive layout
     (mut : Asttypes.mutable_flag) ~ptr ~idx : H.expr_primitive list =
-  needs_64_bit_target primitive dbg;
+  needs_64_bit_target ~machine_width primitive dbg;
   let offsets, kinds =
     block_index_access_offsets_and_kinds ~machine_width layout idx
   in
@@ -1863,7 +1867,7 @@ let convert_pget_indirect ~machine_width ~dbg primitive layout
 
 let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
     mode ~ptr ~idx ~new_values : H.expr_primitive list =
-  needs_64_bit_target primitive dbg;
+  needs_64_bit_target ~machine_width primitive dbg;
   let mode = Alloc_mode.For_assignments.from_lambda mode in
   let offsets, kinds =
     block_index_access_offsets_and_kinds ~machine_width layout idx
@@ -2092,17 +2096,17 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Parray_element_size_in_bytes array_kind, [_witness] ->
     (* Also see comment in [L.array_element_size_in_bytes] about target word
        size *)
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target ~machine_width prim dbg;
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
     let num_bytes = L.array_element_size_in_bytes array_kind in
     [Simple (Simple.const_int (Target_ocaml_int.of_int machine_width num_bytes))]
   | Pmake_idx_field pos, [] ->
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target ~machine_width prim dbg;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
     [H.simple_i64_expr idx_raw_value]
   | Pmake_idx_mixed_field (shape, pos, path), [] ->
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target ~machine_width prim dbg;
     let module W = Mixed_product_bytes.Wrt_path in
     let { W.offset_bytes; gap_bytes } =
       match W.offset_and_gap (W.count_shape shape pos path) with
@@ -2120,7 +2124,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     in
     [H.simple_i64_expr idx_raw_value]
   | Pmake_idx_array (ak, ik, mbe, path), [[index]] ->
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target ~machine_width prim dbg;
     let module W = Mixed_product_bytes.Wrt_path in
     let index_in_bytes =
       H.Prim
@@ -2149,7 +2153,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           H.simple_i64 (Int64.of_int (BC.on_64_bit_arch offset_after_index)) )
     ]
   | Pidx_deepen (mbe, field_path), [[idx]] -> (
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target ~machine_width prim dbg;
     let module W = Mixed_product_bytes.Wrt_path in
     (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
     let cts = W.count mbe field_path in
@@ -3561,14 +3565,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pthread_self_id, _ -> [Nullary Thread_self_id]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
-    if not (Target_system.is_64_bit ())
+    if not (supports_64_bit_primitives machine_width)
     then
       Misc.fatal_error
         "Preinterpret_unboxed_int64_as_tagged_int63 can only be used on 64-bit \
          targets";
     [Unary (Reinterpret_64_bit_word Unboxed_int64_as_tagged_int63, i)]
   | Preinterpret_tagged_int63_as_unboxed_int64, [[i]] ->
-    if not (Target_system.is_64_bit ())
+    if not (supports_64_bit_primitives machine_width)
     then
       Misc.fatal_error
         "Preinterpret_tagged_int63_as_unboxed_int64 can only be used on 64-bit \

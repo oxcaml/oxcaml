@@ -438,7 +438,8 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
       lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
     in
     let cmm =
-      Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
+      Flambda2_to_cmm.To_cmm.unit flambda ~machine_width ~all_code ~offsets
+        ~reachable_names
     in
     if not keep_symbol_tables then reset_symbol_tables ();
     cmm
