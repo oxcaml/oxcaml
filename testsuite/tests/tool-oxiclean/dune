@@ -44,7 +44,7 @@
   repr.impl.json
   (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
  (action
-  (run lean -o %{targets} %{dep:extracted_oxcaml_repr.lean})))
+  (run lean -DautoImplicit=false -o %{targets} %{dep:extracted_oxcaml_repr.lean})))
 
 (rule
  (alias repr)
@@ -58,7 +58,7 @@
   (progn
    (diff repr.impl.json.expected repr.impl.json)
    (diff repr.intf.json.expected repr.intf.json)
-   (run lean %{dep:Repr.lean}))))
+   (run lean -DautoImplicit=false %{dep:Repr.lean}))))
 
 (rule
  (targets even.cmi even.cmti even.cmt)
@@ -94,7 +94,7 @@
   even.impl.json
   (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
  (action
-  (run lean -o %{targets} %{dep:extracted_oxcaml_even.lean})))
+  (run lean -DautoImplicit=false -o %{targets} %{dep:extracted_oxcaml_even.lean})))
 
 (rule
  (alias even)
@@ -108,7 +108,7 @@
   (progn
    (diff even.impl.json.expected even.impl.json)
    (diff even.intf.json.expected even.intf.json)
-   (run lean %{dep:Even.lean}))))
+   (run lean -DautoImplicit=false %{dep:Even.lean}))))
 
 (rule
  (targets downstream.cmi downstream.cmti downstream.cmt)
@@ -153,7 +153,7 @@
   extracted_oxcaml_even.olean
   (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
  (action
-  (run lean -o %{targets} %{dep:extracted_oxcaml_downstream.lean})))
+  (run lean -DautoImplicit=false -o %{targets} %{dep:extracted_oxcaml_downstream.lean})))
 
 (rule
  (alias downstream)
@@ -168,4 +168,4 @@
   (progn
    (diff downstream.impl.json.expected downstream.impl.json)
    (diff downstream.intf.json.expected downstream.intf.json)
-   (run lean %{dep:Downstream.lean}))))
+   (run lean -DautoImplicit=false %{dep:Downstream.lean}))))
