@@ -423,7 +423,8 @@ let insert_phi_moves :
             (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
           in
           match predecessor_block.terminator.desc with
-          | Return | Raise _ | Tailcall_func _ | Call_no_return _ | Never ->
+          | Return | Raise _ | Tailcall_func _ | Call_no_return_ext _
+          | Call_no_return_func _ | Never ->
             fatal
               "Regalloc_split.insert_phi_moves: phi block %a has predecessor \
                %a with unexpected terminator"

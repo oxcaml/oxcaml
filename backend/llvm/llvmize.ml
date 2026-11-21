@@ -801,7 +801,11 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
   | Tailcall_func op ->
     reject_addr_regs i.arg "tailcall func";
     call ~tail:true t i op
-  | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
+  | Call_no_return_func op ->
+    reject_addr_regs i.arg "non-returning call";
+    call t i op;
+    emit_ins_no_res t I.unreachable
+  | Call_no_return_ext { func_symbol; alloc; stack_ofs; stack_align; _ } ->
     extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
     emit_ins_no_res t I.unreachable
   | Prim { op; label_after } -> (

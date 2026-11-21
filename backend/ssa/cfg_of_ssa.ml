@@ -481,19 +481,33 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       Misc.fatal_error "Cfg_of_ssa: a call continuation cannot be Raise"
     | Call { op; args; continuation = Unreachable; _ } -> (
       let virt_args = Array.map (get_reg env) args in
+      let ocaml_call (call_op : Cfg.func_call_operation) =
+        let rarg, loc_arg, stack_ofs = call_arg_locations call_op virt_args in
+        if stack_ofs <> 0
+        then
+          DLL.add_end body
+            (make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
+               Debuginfo.none);
+        emit_moves body ~src:rarg ~dst:loc_arg;
+        make_instr (Cfg.Call_no_return_func call_op)
+          (call_arg_for_terminator call_op virt_args loc_arg)
+          [||] dbg
+      in
       match op with
+      | Direct sym -> ocaml_call (Direct sym)
+      | Indirect candidates -> ocaml_call (Indirect candidates)
       | External ({ ty_args; ty_res; _ } as ext) ->
         let loc_arg, stack_ofs, stack_align =
           move_to_extcall_arg_locs body ty_args virt_args dbg
         in
         make_instr
-          (Cfg.Call_no_return { ext with stack_ofs; stack_align })
+          (Cfg.Call_no_return_ext { ext with stack_ofs; stack_align })
           loc_arg
           (Proc.loc_external_results ty_res)
           dbg
-      | Direct _ | Indirect _ | Probe _ ->
+      | Probe _ ->
         Misc.fatal_error
-          "Cfg_of_ssa: only an external call can have continuation Unreachable")
+          "Cfg_of_ssa: a probe cannot have continuation Unreachable")
     | Call { op; args; continuation = Goto continuation; _ } -> (
       let virt_args = Array.map (get_reg env) args in
       let virt_res = get_block_params_regs env continuation in
