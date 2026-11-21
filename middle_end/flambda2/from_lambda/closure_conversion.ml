@@ -3681,21 +3681,23 @@ let close_lcodes acc env lcodes =
         close_lcode acc env ~lcode ~template ~template_env_approximation:None
           decl
       else
-        match Template_id.owner template, template_key template with
-        | Some owner, Some _
-          when Compilation_unit.equal owner (Current_unit.get_cu_exn ()) ->
+        match template_key template with
+        | Some template_key
+          when Current_unit.is_current (Symbol.compilation_unit template_key) ->
           Acc.await_template_definition acc template
             (fun acc ~template_env_approximation ->
               close_lcode acc env ~lcode ~template ~template_env_approximation
                 decl)
-        | _, template_key ->
-          let template_env_approximation =
-            Option.map
-              (fun template_key ->
-                Acc.find_symbol_approximation acc template_key)
-              template_key
-          in
-          close_lcode acc env ~lcode ~template ~template_env_approximation decl)
+        | Some template_key ->
+          (* The approximation of the environments of another unit's template
+             comes from its .cmx file. *)
+          close_lcode acc env ~lcode ~template
+            ~template_env_approximation:
+              (Some (Acc.find_symbol_approximation acc template_key))
+            decl
+        | None ->
+          close_lcode acc env ~lcode ~template ~template_env_approximation:None
+            decl)
     acc lcodes
 
 let close_lcodes_of_unreached_templates =
