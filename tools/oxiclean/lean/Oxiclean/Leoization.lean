@@ -127,7 +127,7 @@ namespace PER
 
   inductive RefinedImmediate (condition : BitVec 63 → Prop)
       : Value → Value → Prop where
-    | refinedImm {bitsAboveLsb : BitVec 63} (refined : condition lhs)
+    | refinedImm {bitsAboveLsb : BitVec 63} (refined : condition bitsAboveLsb)
         : RefinedImmediate condition
             (.immediate { bitsAboveLsb })
             (.immediate { bitsAboveLsb })
