@@ -438,14 +438,24 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
     | None -> (
       (* At that point, we've already applied the apply cont rewrite to the
          action of the arms. *)
+      (* [Apply_cont_expr.compare] includes debuginfo.  Normalise it on the key
+         unless debugging takes precedence, so that arms differing only by
+         source location still merge; the value keeps its original debuginfo. *)
+      let may_alter_codegen = !Dwarf_flags.gdwarf_may_alter_codegen in
       let actions =
         Target_ocaml_int.Map.fold
           (fun _ arm actions ->
-            Apply_cont_expr.Set.add (Switch_arm.action arm) actions)
-          arms Apply_cont_expr.Set.empty
+            let action = Switch_arm.action arm in
+            let key =
+              if may_alter_codegen
+              then action
+              else Apply_cont_expr.with_debuginfo action ~dbg:Debuginfo.none
+            in
+            Apply_cont_expr.Map.add key action actions)
+          arms Apply_cont_expr.Map.empty
       in
-      match Apply_cont_expr.Set.get_singleton actions with
-      | Some action ->
+      match Apply_cont_expr.Map.get_singleton actions with
+      | Some (_key, action) ->
         (* The resulting [Debuginfo] on the [Apply_cont] will be arbitrarily
            chosen from amongst the [Debuginfo] values on the arms, but this
            seems fine. *)

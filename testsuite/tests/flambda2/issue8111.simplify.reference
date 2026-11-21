@@ -1,0 +1,16 @@
+let code two_identical_raises_0 deleted in
+let code inline(never) loopify(never) size(12) newer_version_of(two_identical_raises_0)
+      two_identical_raises_0_1 (x : imm tagged, strict : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.lt (0, x) in
+  switch prim
+    | 0 -> k1 pop(reraise k1) ($`*predef*`.caml_exn_Not_found)
+    | 1 -> k (x)
+in
+let $camlIssue8111__two_identical_raises_1 =
+  closure two_identical_raises_0_1 @two_identical_raises &toplevel
+in
+let $camlIssue8111 = Block 0 ($camlIssue8111__two_identical_raises_1) in
+cont done ($camlIssue8111)
