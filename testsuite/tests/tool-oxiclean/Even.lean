@@ -58,10 +58,21 @@ example
     : refinedInterface.validWrtExtraction
         Oxiclean.Extracted.Even.interface := by simp
 
-abbrev expectedRelation {Step} [StepRelation Step] : PER Value :=
-  PER.always
+abbrev expectedRelation {Step} [S : StepRelation Step] : PER Value :=
+  PER.moduleRuntimeBlock
+    (PER.cons
+      (@PER.closure Step S PER.immediate (PER.option evenImmediates))
+      (PER.cons
+        (@PER.closure Step S evenImmediates PER.immediate)
+        PER.emptyList))
+
+abbrev actualRelation {Step} [S : StepRelation Step] :=
+  @refinedInterface.structuralRelation? Step S
 
 example {Step} [S : StepRelation Step]
-    : @refinedInterface.structuralRelation? Step S =
-      pure (@expectedRelation Step S) := by
+    : @actualRelation Step S = pure (@expectedRelation Step S) := by
+  simp
+
+example
+    : Oxiclean.Extracted.Even.implementation.wellTyped @expectedRelation := by
   simp

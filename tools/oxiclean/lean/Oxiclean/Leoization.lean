@@ -36,7 +36,7 @@ namespace PER
   Wherever the first function is defined (even if nondeterministic),
   the second function can produce the same result.
   -/
-  @[simp]
+  @[simp, pp_nodot]
   def atLeastAsDefinedAs {α : Type a} {β : Type b}
       (domain : PER α) (codomain : PER β)
       (reference maybeMoreDefined : α → β → Prop)
@@ -54,6 +54,7 @@ namespace PER
         (gAtLeastAsDefinedAsF : atLeastAsDefinedAs domain codomain g f)
         : Extensionality domain codomain f g
 
+  @[pp_nodot]
   def extensionality {α : Type a} {β : Type b}
       (domain : PER α)
       (codomain : PER β)
@@ -80,14 +81,15 @@ namespace PER
     | closure {f g : Expr}
         (extensional :
           (extensionality domain codomain).eq
-            (fun input output => @Reduce Step S (f.substitute input) output)
-            (fun input output => @Reduce Step S (g.substitute input) output))
+            (fun input output => Reduce Step (f.substitute input) output)
+            (fun input output => Reduce Step (g.substitute input) output))
         : Closure domain codomain
             (.indirection
               (.noMutableFields { tag := 247, contents := .closure f }))
             (.indirection
               (.noMutableFields { tag := 247, contents := .closure g }))
 
+  @[pp_nodot]
   def closure {Step} [S : StepRelation Step]
       (domain : PER Value)
       (codomain : PER Value)
@@ -103,6 +105,7 @@ namespace PER
   inductive EmptyList {α} : List α → List α → Prop where
     | emptyList : EmptyList [] []
 
+  @[pp_nodot]
   def emptyList : PER (List α) where
     eq := EmptyList
     symmetric
@@ -114,6 +117,7 @@ namespace PER
     | imm {bitsAboveLsb : BitVec 63}
         : Immediate (.immediate { bitsAboveLsb }) (.immediate { bitsAboveLsb })
 
+  @[pp_nodot]
   def immediate : PER Value where
     eq := Immediate
     symmetric
@@ -128,6 +132,7 @@ namespace PER
             (.immediate { bitsAboveLsb })
             (.immediate { bitsAboveLsb })
 
+  @[pp_nodot]
   def refinedImmediate (condition : BitVec 63 → Prop) : PER Value where
     eq := RefinedImmediate condition
     symmetric
@@ -145,6 +150,7 @@ namespace PER
             (.immediate { bitsAboveLsb := 1 })
             (.immediate { bitsAboveLsb := 1 })
 
+  @[pp_nodot]
   def boolean : PER Value where
     eq := Boolean
     symmetric
@@ -168,6 +174,7 @@ namespace PER
             (.indirection
               (.noMutableFields { tag := 0, contents := .values [rhs] }))
 
+  @[pp_nodot]
   def option (ifSome : PER Value) : PER Value where
     eq := OxCamlOption ifSome
     symmetric
@@ -188,6 +195,7 @@ namespace PER
             (.indirection (.noMutableFields
               { tag := 0, contents := .values rhs }))
 
+  @[pp_nodot]
   def moduleRuntimeBlock
       (relationOnValuesInTheBlock : PER (List Value))
       : PER Value where
@@ -213,6 +221,7 @@ namespace PER
             (lhsHead :: lhsTail)
             (rhsHead :: rhsTail)
 
+  @[pp_nodot]
   def cons {α} (headRelation : PER α) (tailRelation : PER (List α))
       : PER (List α) where
     eq := Cons headRelation tailRelation
@@ -299,8 +308,16 @@ def Oxiclean.Model.PredefinedType.structuralRelation
   /- CR-soon wsturgeon: `PER.option` needs a layout as well. -/
   | .option => ⟨1, PER.option⟩
 
+structure SemanticModuleInContext : Type 0 where
+  absent : List ((arity : Nat) × SemanticTypeConstructor arity)
+  present : List (Option SemanticModuleInContext)
+
 inductive StructuralRelationError : Type 0 where
   | arityMismatch
+  | moduleIndexOutOfBounds
+      (context : List SemanticModuleInContext)
+      (deBruijn : Nat)
+  | typeIndexOutOfBounds (within : ModuleStatics) (index : Nat)
 
 @[simp]
 def SemanticTypeConstructor.instantiatedWithArguments?
@@ -316,10 +333,6 @@ def SemanticTypeConstructor.instantiatedWithArguments?
     match args with
     | [] => throw .arityMismatch
     | head :: tail => relation head |>.instantiatedWithArguments? tail
-
-structure SemanticModuleInContext : Type 0 where
-  absent : List ((arity : Nat) × SemanticTypeConstructor arity)
-  present : List (Option SemanticModuleInContext)
 
 mutual
   @[simp]
@@ -348,6 +361,23 @@ mutual
     | .mod m => .some <$> m.semanticModuleInContext?
     | .val _ => pure .none
 end
+
+@[simp]
+def Oxiclean.Model.ModuleStatics.resolve?
+    (context : List SemanticModuleInContext)
+    (statics : ModuleStatics)
+    : Except StructuralRelationError SemanticModuleInContext := do
+  match statics with
+  | .var deBruijn =>
+    let .some semanticModule := context[deBruijn]?
+      | throw (.moduleIndexOutOfBounds context deBruijn)
+    pure semanticModule
+  | .field within index =>
+    let semanticModule ← within.resolve? context
+    let .some (.some submodule) := semanticModule.present[index]?
+      | throw (.typeIndexOutOfBounds statics index)
+    pure submodule
+  | .compilationUnit _ => sorry
 
 mutual
   @[simp]
@@ -388,13 +418,17 @@ mutual
       let domain ← @domain.structuralRelationInScope? Step S context
       let codomain ← @codomain.structuralRelationInScope? Step S context
       pure (@PER.closure Step S domain codomain)
-    | .constr c args =>
-      match c with
-      | .field within index => sorry
-      | .predef p => do
-        let ⟨arity, ctor⟩ := p.structuralRelation
-        let args ← args.mapM (@·.structuralRelationInScope? Step S context)
-        ctor.instantiatedWithArguments? args
+    | .constr c args => do
+      let ⟨arity, ctor⟩ ←
+        match c with
+        | .field within index =>
+          let semanticModule : SemanticModuleInContext ← within.resolve? context
+          let .some typeConstructor := semanticModule.absent[index]?
+            | throw (.typeIndexOutOfBounds within index)
+          pure typeConstructor
+        | .predef p => pure p.structuralRelation
+      args.mapM (@·.structuralRelationInScope? Step S context)
+      >>= ctor.instantiatedWithArguments?
     | .firstClassModule signature => sorry
     | .poly body => sorry
     | .var deBruijn => sorry
@@ -406,3 +440,20 @@ def Oxiclean.Model.ModuleType.structuralRelation?
     : ModuleType SemanticTypeConstructor →
       Except StructuralRelationError (PER Value) :=
   (@·.structuralRelationInScope? Step S [])
+
+@[simp]
+def Oxiclean.Model.Value.wellTyped
+    (relation : {Step : _} → [StepRelation Step] → PER Value)
+    (implementation : Value)
+    : Prop :=
+  ∀ {Step} [S : StepRelation Step],
+  (@relation Step S).eq implementation implementation
+
+@[simp]
+def Oxiclean.Model.Expr.wellTyped
+    (relation : {Step : _} → [StepRelation Step] → PER Value)
+    (implementation : Expr)
+    : Prop :=
+  ∀ {Step} [S : StepRelation Step],
+  ∀ v : Value, (reduction : Reduce Step implementation v) →
+  (@relation Step S).eq v v
