@@ -1,0 +1,11 @@
+float_u: 1
+float32_u: 2
+int32_u: 3
+int64_u: 4
+nativeint_u: 5
+int_u: 6
+int8_u: 7
+int16_u: 8
+meth_app: 9
+app_two_consts: 21
+app_mixed_consts: 25
