@@ -612,6 +612,13 @@ let set_o4 () =
 let opt_flag_handler : Clflags.Opt_flag_handler.t =
   { set_oclassic; set_o2; set_o3; set_o4 }
 
+let reset_opt_level () =
+  if Clflags.is_flambda2 () then begin
+    Flambda2.Inlining.use_inlining_arguments_set
+      Flambda2.Inlining.Default.default_arguments;
+    opt_level := Default
+  end
+
 let use_cached_generic_functions = ref false
 let cached_generic_functions_path =
   ref (Filename.concat Config.standard_library ("cached-generic-functions" ^ Config.ext_lib))
