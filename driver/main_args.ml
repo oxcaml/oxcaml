@@ -201,6 +201,12 @@ let mk_H f =
   "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
  \     (Like -I, but the program can not directly reference these dependencies)"
 
+let mk_Hx f =
+  "-Hx", Arg.String f,
+  "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
+ \     (Like -H, but indicates that cmx files for modules in <dir> are\n\
+ \     always available, like -Ix)"
+
 let mk_I_manifest f =
   "-I-manifest", Arg.String f, "<file>  Get paths that the compiler can\n\
   \    reference from a given manifest file. This option is an alternative\n\
@@ -523,6 +529,11 @@ let mk_open_cmi f =
   "-open-cmi", Arg.String f,
   "<file.cmi>  Same as -open, but reads the signature from <file.cmi>\n\
   \    rather than looking up a module on the include path"
+
+let mk_open_cmi_x f =
+  "-open-cmi-x", Arg.String f,
+  "<file.cmi>  Same as -open-cmi, but indicates that the cmx file for\n\
+  \    the module is always available (like -Ix)"
 
 let mk_output_obj f =
   "-output-obj", Arg.Unit f, " Output an object file instead of an executable"
@@ -1215,6 +1226,7 @@ module type Common_options = sig
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
+  val _Hx : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
   val _H_file : string -> unit
@@ -1237,6 +1249,7 @@ module type Common_options = sig
   val _nocwd : unit -> unit
   val _open : string -> unit
   val _open_cmi : string -> unit
+  val _open_cmi_x : string -> unit
   val _ppx : string -> unit
   val _keywords: string -> unit
   val _principal : unit -> unit
@@ -1564,6 +1577,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -1604,6 +1618,7 @@ struct
     mk_opaque F._opaque;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_output_complete_exe F._output_complete_exe;
@@ -1705,6 +1720,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -1735,6 +1751,7 @@ struct
     mk_nopervasives F._nopervasives;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_ppx F._ppx;
     mk_keywords F._keywords;
     mk_principal F._principal;
@@ -1852,6 +1869,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -1907,6 +1925,7 @@ struct
     mk_opaque F._opaque;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_p F._p;
@@ -2042,6 +2061,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -2093,6 +2113,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_o4 F._o4;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_ppx F._ppx;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
@@ -2179,6 +2200,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -2206,6 +2228,7 @@ struct
     mk_nocwd F._nocwd;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_pp F._pp;
     mk_ppx F._ppx;
     mk_principal F._principal;
@@ -2328,7 +2351,10 @@ module Default = struct
     let _no_auto_include_otherlibs = set no_auto_include_otherlibs
     let _nocwd = set no_cwd
     let _open s = open_args := Open s :: !open_args
-    let _open_cmi s = open_args := Open_cmi s :: !open_args
+    let _open_cmi path =
+      open_args := Open_cmi { path; cmx_guaranteed = false } :: !open_args
+    let _open_cmi_x path =
+      open_args := Open_cmi { path; cmx_guaranteed = true } :: !open_args
     let _principal = set principal
     let _rectypes = set recursive_types
     let _safer_matching = set safer_matching
@@ -2355,7 +2381,12 @@ module Default = struct
       include_dirs := { Clflags.path; cmx_guaranteed = false } :: !include_dirs
     let _Ix path =
       include_dirs := { Clflags.path; cmx_guaranteed = true } :: !include_dirs
-    let _H dir = hidden_include_dirs := dir :: (!hidden_include_dirs)
+    let _H path =
+      hidden_include_dirs :=
+        { Clflags.path; cmx_guaranteed = false } :: !hidden_include_dirs
+    let _Hx path =
+      hidden_include_dirs :=
+        { Clflags.path; cmx_guaranteed = true } :: !hidden_include_dirs
     let _I_manifest file = include_manifests := file :: !include_manifests
     let _H_manifest file =
       hidden_include_manifests := file :: !hidden_include_manifests
@@ -2696,6 +2727,8 @@ module Default = struct
          Odoc_global.hidden_include_dirs :=
            (s :: (!Odoc_global.hidden_include_dirs))
       *) ()
+    let _Hx(_:string) =
+      (* placeholder: same as _H for now *) ()
     let _I_manifest(_:string) = ()
     let _H_manifest(_:string) = ()
     let _H_file(_:string) = ()

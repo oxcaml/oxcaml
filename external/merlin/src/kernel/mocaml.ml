@@ -80,13 +80,13 @@ let init_params params =
 
 let setup_typer_config config =
   setup_reader_config config;
-  let visible =
-    Mconfig.build_path config
-    |> List.map ~f:(fun path : Clflags.visible_include ->
+  let to_include_dirs =
+    List.map ~f:(fun path : Clflags.include_dir ->
         (* [cmx_guaranteed] isn't relevant to Merlin, so we can fill in a bogus value *)
         { path; cmx_guaranteed = false })
   in
-  let hidden = Mconfig.hidden_build_path config in
+  let visible = to_include_dirs (Mconfig.build_path config) in
+  let hidden = to_include_dirs (Mconfig.hidden_build_path config) in
   Load_path.(init ~auto_include:no_auto_include ~visible ~hidden);
   init_params config.ocaml.parameters
 
