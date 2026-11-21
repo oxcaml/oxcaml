@@ -345,6 +345,8 @@ let eval_prim ~target x =
           Some (Int (Targetint.of_int_exn (Int64.compare i j)))
       | "caml_int64_to_int", [ Int64 i ] ->
           Some (Int (Targetint.of_int64_truncate i))
+      | "caml_int64_hi32", [ Int64 i ] ->
+          Some (Int (Targetint.of_int64_truncate (Int64.shift_right i 32)))
       | "caml_int64_of_int", [ Int i ] -> int64 (Targetint.to_int64 i)
       | "caml_int64_to_int32", [ Int64 i ] -> int32 (Int64.to_int32 i)
       | "caml_int64_of_int32", [ Int32 i ] -> int64 (Int64.of_int32 i)
