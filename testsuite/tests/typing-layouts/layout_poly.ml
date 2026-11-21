@@ -132,13 +132,6 @@ Lines 4-6, characters 6-3:
 5 |   external[@layout_poly] id : ('a : any). 'a s -> 'a s = "%identity"
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a s -> 'a s = "%identity"
-             [@@layout_poly]
-         end
-       is not included in
-         sig external id : ('a : any). 'a s -> 'a s = "%identity" end
        Values do not match:
          external id : ('a : any). 'a s -> 'a s = "%identity" [@@layout_poly]
        is not included in
@@ -171,16 +164,6 @@ Lines 6-9, characters 6-3:
 8 |     ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s = "%identity"
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s
-             = "%identity" [@@layout_poly]
-         end
-       is not included in
-         sig
-           external id : ('b : any). (t_any, 'b) s -> (t_any, 'b) s
-             = "%identity" [@@layout_poly]
-         end
        Values do not match:
          external id : ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s
            = "%identity" [@@layout_poly]
@@ -217,16 +200,6 @@ Lines 7-10, characters 6-3:
  9 |     ('b : any). (t_any, 'b) s -> (t_any, 'b) s = "%identity"
 10 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('b : any). (t_any, 'b) s -> (t_any, 'b) s
-             = "%identity" [@@layout_poly]
-         end
-       is not included in
-         sig
-           external id : ('a : any) ('b : any). ('a, 'b) s -> ('a, 'b) s
-             = "%identity" [@@layout_poly]
-         end
        Values do not match:
          external id : ('b : any). (t_any, 'b) s -> (t_any, 'b) s
            = "%identity" [@@layout_poly]
@@ -337,12 +310,6 @@ Lines 3-5, characters 6-3:
 4 |   external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
-         end
-       is not included in
-         sig val id : ('a : any). 'a -> 'a end
        Values do not match:
          external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
        is not included in
@@ -370,12 +337,6 @@ Lines 3-5, characters 6-3:
 4 |   let id: ('a : any). 'a -> 'a = assert false
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val id : ('a : any). 'a -> 'a end
-       is not included in
-         sig
-           external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
-         end
        Values do not match:
          val id : ('a : any). 'a -> 'a
        is not included in

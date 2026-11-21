@@ -19,10 +19,6 @@ Line _, characters _-_:
  | struct type t module M = struct type t end type a = M.t end;;
    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = M.t module M : sig type t = M.M.t end type a = M.t end
-       is not included in
-         sig type t type a = M.t end
        Type declarations do not match:
          type a = M/1.t
        is not included in

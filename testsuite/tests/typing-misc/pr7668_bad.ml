@@ -80,20 +80,6 @@ Lines 8-27, characters 6-3:
 26 |
 27 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t =
-               [ `A of int | `B of [ `BA | `BB of unit list ] | `C of unit ]
-           val a :
-             [> `A of int ] ->
-             [> `B of [> `BA | `BB of int list ] | `C of unit ]
-         end
-       is not included in
-         sig
-           type t =
-               [ `A of int | `B of [ `BA | `BB of unit list ] | `C of unit ]
-           val a : t -> t
-         end
        Values do not match:
          val a :
            [> `A of int ] ->

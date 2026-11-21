@@ -546,10 +546,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = { value : 'a }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = { value : 'a; } end
-       is not included in
-         sig type ('a [@rec]) t = { value : 'a; } end
        Type declarations do not match:
          type 'a t = { value : 'a; }
        is not included in
@@ -586,10 +582,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = { value : 'a }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = { value : 'a; } end
-       is not included in
-         sig type ('a [@rec]) t end
        Type declarations do not match:
          type 'a t = { value : 'a; }
        is not included in

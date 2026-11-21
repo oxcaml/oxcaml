@@ -2,10 +2,6 @@ File "pr10693_bad.ml", line 27, characters 26-27:
 27 | module Bad (A : S') : S = A
                                ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : 'a option module M : Dep -> S end
-       is not included in
-         S
        In module M:
        Modules do not match:
          Dep -> S
@@ -15,14 +11,6 @@ Error: Signature mismatch:
              val x : X.t option
              module M : functor (Y : Dep) -> sig val x : X.t option end
            end
-       In module M:
-       Modules do not match:
-         S
-       is not included in
-         sig
-           val x : X.t option
-           module M : functor (Y : Dep) -> sig val x : X.t option end
-         end
        In module M.M:
        Modules do not match:
          functor (X : Dep) ->
@@ -32,14 +20,6 @@ Error: Signature mismatch:
            end
        is not included in
          functor (Y : Dep) -> sig val x : X.t option end
-       In module M.M:
-       Modules do not match:
-         sig
-           val x : X/2.t option
-           module M : functor (Y : Dep) -> sig val x : X/2.t option end
-         end
-       is not included in
-         sig val x : X.t option end
        In module M.M:
        Values do not match:
          val x : X/1.t option

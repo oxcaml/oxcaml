@@ -449,10 +449,6 @@ Lines 3-5, characters 6-3:
 4 |    include X_int_int
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = x:int * int end
-       is not included in
-         sig type t = y:int * int end
        Type declarations do not match:
          type t = x:int * int
        is not included in
@@ -468,10 +464,6 @@ Line 3, characters 6-15:
 3 | end = X_int_int
           ^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = x:int * int end
-       is not included in
-         sig type t = int * int end
        Type declarations do not match:
          type t = x:int * int
        is not included in

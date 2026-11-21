@@ -221,10 +221,6 @@ Line 12, characters 25-26:
 12 |     let module O : N.S = M in
                               ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : '_weak1 list ref end
-       is not included in
-         N.S
        Values do not match:
          val r : '_weak1 list ref
        is not included in
@@ -255,10 +251,6 @@ Line 12, characters 25-26:
 12 |     let module O : N.S = M in
                               ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : '_weak2 list ref end
-       is not included in
-         N.S
        Values do not match:
          val r : '_weak2 list ref
        is not included in

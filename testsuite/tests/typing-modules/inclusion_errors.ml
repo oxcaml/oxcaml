@@ -15,10 +15,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) t = 'a * 'a
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a, 'b) t = 'a * 'a end
-       is not included in
-         sig type ('a, 'b) t = 'a * 'b end
        Type declarations do not match:
          type ('a, 'b) t = 'a * 'a
        is not included in
@@ -38,10 +34,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a, 'b) t = 'a * 'b
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a, 'b) t = 'a * 'b end
-       is not included in
-         sig type ('a, 'b) t = 'a * 'a end
        Type declarations do not match:
          type ('a, 'b) t = 'a * 'b
        is not included in
@@ -65,10 +57,6 @@ Lines 4-6, characters 6-3:
 5 |   type ('b,'c,'a) t = ('b * 'c * 'a * 'c * 'a) x
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type ('b, 'c, 'a) t = ('b * 'c * 'a * 'c * 'a) x end
-       is not included in
-         sig type ('a, 'b, 'c) t = ('a * 'b * 'c * 'b * 'a) x end
        Type declarations do not match:
          type ('b, 'c, 'a) t = ('b * 'c * 'a * 'c * 'a) x
        is not included in
@@ -89,10 +77,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = <m : 'a. 'a * ('a * 'foo)> as 'foo
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = < m : 'a. 'a * ('a * 'b) > as 'b end
-       is not included in
-         sig type t = < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) > end
        Type declarations do not match:
          type t = < m : 'a. 'a * ('a * 'b) > as 'b
        is not included in
@@ -120,10 +104,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = <m : int>
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = < m : int > end
-       is not included in
-         sig type t = s end
        Type declarations do not match:
          type t = < m : int >
        is not included in
@@ -143,10 +123,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = s
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = s end
-       is not included in
-         sig type t = < m : int > end
        Type declarations do not match:
          type t = s
        is not included in
@@ -169,10 +145,6 @@ Lines 4-7, characters 6-3:
 6 |     | Foo of (int*int)*float
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo of (int * int) * float end
-       is not included in
-         sig type t = Foo of int * float end
        Type declarations do not match:
          type t = Foo of (int * int) * float
        is not included in
@@ -195,10 +167,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = (int * float * int)
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = int * float * int end
-       is not included in
-         sig type t = int * float end
        Type declarations do not match:
          type t = int * float * int
        is not included in
@@ -217,10 +185,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = <n : int; f : float>
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = < f : float; n : int > end
-       is not included in
-         sig type t = < m : float; n : int > end
        Type declarations do not match:
          type t = < f : float; n : int >
        is not included in
@@ -241,10 +205,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = <n : int>
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = < n : int > end
-       is not included in
-         sig type t = < m : float; n : int > end
        Type declarations do not match:
          type t = < n : int >
        is not included in
@@ -264,10 +224,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = <n : int; m : int>
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = < m : int; n : int > end
-       is not included in
-         sig type t = < m : float * int; n : int > end
        Type declarations do not match:
          type t = < m : int; n : int >
        is not included in
@@ -292,10 +248,6 @@ Lines 4-7, characters 6-3:
 6 |     | Foo of [`Bar of string]
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo of [ `Bar of string ] end
-       is not included in
-         sig type t = Foo of [ `Bar of string | `Foo of string ] end
        Type declarations do not match:
          type t = Foo of [ `Bar of string ]
        is not included in
@@ -320,10 +272,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [`C]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [ `C ] end
-       is not included in
-         sig type t = private [ `C of int ] end
        Type declarations do not match:
          type t = private [ `C ]
        is not included in
@@ -343,10 +291,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [`C of int]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [ `C of int ] end
-       is not included in
-         sig type t = private [ `C ] end
        Type declarations do not match:
          type t = private [ `C of int ]
        is not included in
@@ -375,10 +319,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [`A of int]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [ `A of int ] end
-       is not included in
-         sig type t = private [> `A of int ] end
        Type declarations do not match:
          type t = private [ `A of int ]
        is not included in
@@ -398,10 +338,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [> `A of int]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [> `A of int ] end
-       is not included in
-         sig type t = private [ `A of int ] end
        Type declarations do not match:
          type t = private [> `A of int ]
        is not included in
@@ -421,10 +357,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t =  [> `A of int] as 'a
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a constraint 'a = [> `A of int ] end
-       is not included in
-         sig type 'a t = 'a constraint 'a = [> `A of int | `B of int ] end
        Type declarations do not match:
          type 'a t = 'a constraint 'a = [> `A of int ]
        is not included in
@@ -446,10 +378,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t =  [> `A of int | `C of float] as 'a
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a constraint 'a = [> `A of int | `C of float ] end
-       is not included in
-         sig type 'a t = 'a constraint 'a = [> `A of int ] end
        Type declarations do not match:
          type 'a t = 'a constraint 'a = [> `A of int | `C of float ]
        is not included in
@@ -480,10 +408,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [< `C of int&float]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [< `C of int & float ] end
-       is not included in
-         sig type t = private [< `C ] end
        Type declarations do not match:
          type t = private [< `C of int & float ]
        is not included in
@@ -523,10 +447,6 @@ Line 17, characters 16-29:
 Error: Modules do not match:
        functor () -> sig module Choice : T val r : '_weak1 list ref ref end
      is not included in functor () -> S
-     Modules do not match:
-       sig module Choice : T val r : '_weak1 list ref ref end
-     is not included in
-       S
      Values do not match:
        val r : '_weak1 list ref ref
      is not included in
@@ -552,10 +472,6 @@ Lines 5-8, characters 8-5:
 7 |     let f (module X:s) = ()
 8 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type s val f : (module s) -> unit end
-       is not included in
-         sig val f : (module s) -> unit end
        Values do not match:
          val f : (module s/1) -> unit
        is not included in
@@ -580,10 +496,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : <m : 'a. ('a * 'foo)> as 'foo) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (< m : 'a. 'a * 'b > as 'b) -> unit end
-       is not included in
-         sig val f : < m : 'b. 'b * < m : 'c. 'c * 'a > as 'a > -> unit end
        Values do not match:
          val f : (< m : 'a. 'a * 'b > as 'b) -> unit
        is not included in
@@ -610,10 +522,6 @@ Lines 5-7, characters 6-3:
 6 |   let f (x : <m : int>) = x
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : < m : int > -> < m : int > end
-       is not included in
-         sig val f : s -> s end
        Values do not match:
          val f : < m : int > -> < m : int >
        is not included in
@@ -635,10 +543,6 @@ Lines 3-5, characters 6-3:
 4 |   let f : 'b -> int = fun _ -> 0
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'b -> int end
-       is not included in
-         sig val f : 'a -> float end
        Values do not match:
          val f : 'b -> int
        is not included in
@@ -658,10 +562,6 @@ Lines 3-5, characters 6-3:
 4 |   let x = ref []
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : '_weak2 list ref end
-       is not included in
-         sig val x : 'a list ref end
        Values do not match:
          val x : '_weak2 list ref
        is not included in
@@ -680,10 +580,6 @@ Line 3, characters 40-41:
 3 | module N : sig val r : t list ref end = M;;
                                             ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : '_weak3 list ref end
-       is not included in
-         sig val r : t list ref end
        Values do not match:
          val r : '_weak3 list ref
        is not included in
@@ -723,10 +619,6 @@ Line 22, characters 25-26:
 22 |     let module O : N.S = M in
                               ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : '_weak4 list ref end
-       is not included in
-         N.S
        Values do not match:
          val r : '_weak4 list ref
        is not included in
@@ -747,10 +639,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : 'a) = x
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : int -> float end
        Values do not match:
          val f : 'a -> 'a
        is not included in
@@ -770,10 +658,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : (int * int)) = x
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int * int -> int * int end
-       is not included in
-         sig val f : int * float * int -> int -> int end
        Values do not match:
          val f : int * int -> int * int
        is not included in
@@ -794,10 +678,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : <m : int; f : float>) = x
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : < f : float; m : int > -> < f : float; m : int > end
-       is not included in
-         sig val f : < m : int; n : float > -> < m : int; n : float > end
        Values do not match:
          val f : < f : float; m : int > -> < f : float; m : int >
        is not included in
@@ -819,10 +699,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : [ `Foo | `Bar]) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : [ `Bar | `Foo ] -> unit end
-       is not included in
-         sig val f : [ `Foo ] -> unit end
        Values do not match:
          val f : [ `Bar | `Foo ] -> unit
        is not included in
@@ -843,10 +719,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : [< `Foo]) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : [< `Foo ] -> unit end
-       is not included in
-         sig val f : [> `Foo ] -> unit end
        Values do not match:
          val f : [< `Foo ] -> unit
        is not included in
@@ -867,10 +739,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : [< `Foo]) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : [< `Foo ] -> unit end
-       is not included in
-         sig val f : [< `Bar | `Foo ] -> unit end
        Values do not match:
          val f : [< `Foo ] -> unit
        is not included in
@@ -891,10 +759,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : < m : 'a. [< `Foo] as 'a >) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : < m : 'a. [< `Foo ] as 'a > -> unit end
-       is not included in
-         sig val f : < m : [< `Foo ] > -> unit end
        Values do not match:
          val f : < m : 'a. [< `Foo ] as 'a > -> unit
        is not included in
@@ -916,10 +780,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : < m : [`Foo] >) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : < m : [ `Foo ] > -> unit end
-       is not included in
-         sig val f : < m : 'a. [< `Foo ] as 'a > -> unit end
        Values do not match:
          val f : < m : [ `Foo ] > -> unit
        is not included in
@@ -941,10 +801,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : [< `C of int&float]) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : [< `C of int & float ] -> unit end
-       is not included in
-         sig val f : [< `C ] -> unit end
        Values do not match:
          val f : [< `C of int & float ] -> unit
        is not included in
@@ -965,10 +821,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : [`Foo of int]) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : [ `Foo of int ] -> unit end
-       is not included in
-         sig val f : [ `Foo ] -> unit end
        Values do not match:
          val f : [ `Foo of int ] -> unit
        is not included in
@@ -989,10 +841,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : [`Foo]) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : [ `Foo ] -> unit end
-       is not included in
-         sig val f : [ `Foo of int ] -> unit end
        Values do not match:
          val f : [ `Foo ] -> unit
        is not included in
@@ -1022,10 +870,6 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : [> `Foo | `Bar]) = ()
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : [> `Bar | `Foo ] -> unit end
-       is not included in
-         sig val f : [< `Bar | `Baz | `Foo ] -> unit end
        Values do not match:
          val f : [> `Bar | `Foo ] -> unit
        is not included in
@@ -1049,10 +893,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = [`C]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = [ `C ] end
-       is not included in
-         sig type t = private [< `A | `B ] end
        Type declarations do not match:
          type t = [ `C ]
        is not included in
@@ -1071,10 +911,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [> `A]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [> `A ] end
-       is not included in
-         sig type t = private [< `A | `B ] end
        Type declarations do not match:
          type t = private [> `A ]
        is not included in
@@ -1093,10 +929,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = [`B]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = [ `B ] end
-       is not included in
-         sig type t = private [< `A | `B > `A ] end
        Type declarations do not match:
          type t = [ `B ]
        is not included in
@@ -1115,10 +947,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = [`A]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = [ `A ] end
-       is not included in
-         sig type t = private [> `A of int ] end
        Type declarations do not match:
          type t = [ `A ]
        is not included in
@@ -1137,10 +965,6 @@ Lines 3-5, characters 6-3:
 4 |    type t = private [< `A of & int]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [< `A of & int ] end
-       is not included in
-         sig type t = private [< `A of int ] end
        Type declarations do not match:
          type t = private [< `A of & int ]
        is not included in
@@ -1160,10 +984,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [< `A]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [< `A ] end
-       is not included in
-         sig type t = private [< `A of int ] end
        Type declarations do not match:
          type t = private [< `A ]
        is not included in
@@ -1183,10 +1003,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [< `A]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [< `A ] end
-       is not included in
-         sig type t = private [< `A of int & float ] end
        Type declarations do not match:
          type t = private [< `A ]
        is not included in
@@ -1205,10 +1021,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = [`A of float]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = [ `A of float ] end
-       is not included in
-         sig type t = private [> `A of int ] end
        Type declarations do not match:
          type t = [ `A of float ]
        is not included in
@@ -1227,10 +1039,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [`A | `B]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [ `A | `B ] end
-       is not included in
-         sig type t = private [< `A | `B ] end
        Type declarations do not match:
          type t = private [ `A | `B ]
        is not included in
@@ -1251,10 +1059,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [`A | `B]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [ `A | `B ] end
-       is not included in
-         sig type t = [ `A | `B ] end
        Type declarations do not match:
          type t = private [ `A | `B ]
        is not included in
@@ -1273,10 +1077,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [< `A | `B]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [< `A | `B ] end
-       is not included in
-         sig type t = private [< `A | `B > `B ] end
        Type declarations do not match:
          type t = private [< `A | `B ]
        is not included in
@@ -1296,10 +1096,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = <b : int>
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = < b : int > end
-       is not included in
-         sig type t = private < a : int; .. > end
        Type declarations do not match:
          type t = < b : int >
        is not included in
@@ -1318,10 +1114,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = <a : int>
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = < a : int > end
-       is not included in
-         sig type t = private < a : float; .. > end
        Type declarations do not match:
          type t = < a : int >
        is not included in
@@ -1347,10 +1139,6 @@ Lines 6-8, characters 6-3:
 7 |   type t = private u
 8 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private u end
-       is not included in
-         sig type t = private int * (int * int) end
        Type declarations do not match:
          type t = private u
        is not included in
@@ -1376,10 +1164,6 @@ Lines 6-8, characters 6-3:
 7 |   type t = private u
 8 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private u end
-       is not included in
-         sig type t = private int * (int * int) end
        Type declarations do not match:
          type t = private u
        is not included in
@@ -1403,10 +1187,6 @@ Lines 5-7, characters 6-3:
 6 |   type t = private s
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private s end
-       is not included in
-         sig type t = private float end
        Type declarations do not match:
          type t = private s
        is not included in
@@ -1425,10 +1205,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private A
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private A end
-       is not included in
-         sig type t = A end
        Type declarations do not match:
          type t = private A
        is not included in
@@ -1447,10 +1223,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private A | B
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private A | B end
-       is not included in
-         sig type t = A | B end
        Type declarations do not match:
          type t = private A | B
        is not included in
@@ -1469,10 +1241,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private A of { x : int; y : bool }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private A of { x : int; y : bool; } end
-       is not included in
-         sig type t = A of { x : int; y : bool; } end
        Type declarations do not match:
          type t = private A of { x : int; y : bool; }
        is not included in
@@ -1491,10 +1259,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private { x : int; y : bool }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private { x : int; y : bool; } end
-       is not included in
-         sig type t = { x : int; y : bool; } end
        Type declarations do not match:
          type t = private { x : int; y : bool; }
        is not included in
@@ -1513,10 +1277,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private A | B
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private A | B end
-       is not included in
-         sig type t = A end
        Type declarations do not match:
          type t = private A | B
        is not included in
@@ -1535,10 +1295,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private A
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private A end
-       is not included in
-         sig type t = A | B end
        Type declarations do not match:
          type t = private A
        is not included in
@@ -1557,10 +1313,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private { x : int; y : bool }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private { x : int; y : bool; } end
-       is not included in
-         sig type t = { x : int; } end
        Type declarations do not match:
          type t = private { x : int; y : bool; }
        is not included in
@@ -1579,10 +1331,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private { x : int }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private { x : int; } end
-       is not included in
-         sig type t = { x : int; y : bool; } end
        Type declarations do not match:
          type t = private { x : int; }
        is not included in
@@ -1601,10 +1349,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private { x : int; y : bool }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private { x : int; y : bool; } end
-       is not included in
-         sig type t = A | B end
        Type declarations do not match:
          type t = private { x : int; y : bool; }
        is not included in
@@ -1623,10 +1367,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private A | B
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private A | B end
-       is not included in
-         sig type t = { x : int; y : bool; } end
        Type declarations do not match:
          type t = private A | B
        is not included in
@@ -1645,10 +1385,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [> `A | `B]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [> `A | `B ] end
-       is not included in
-         sig type t = [ `A ] end
        Type declarations do not match:
          type t = private [> `A | `B ]
        is not included in
@@ -1667,10 +1403,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [< `A | `B]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [< `A | `B ] end
-       is not included in
-         sig type t = [ `A ] end
        Type declarations do not match:
          type t = private [< `A | `B ]
        is not included in
@@ -1689,10 +1421,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private [< `A | `B > `A]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private [< `A | `B > `A ] end
-       is not included in
-         sig type t = [ `A ] end
        Type declarations do not match:
          type t = private [< `A | `B > `A ]
        is not included in
@@ -1711,10 +1439,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = private < m : int; .. >
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = private < m : int; .. > end
-       is not included in
-         sig type t = < m : int > end
        Type declarations do not match:
          type t = private < m : int; .. >
        is not included in
@@ -1735,12 +1459,6 @@ Lines 3-5, characters 6-3:
 4 |   type _ t = A : (<x:'a * 'a> as 'a) -> (<y:'b> as 'b) t
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type _ t = A : (< x : 'b * 'b > as 'b) -> (< y : 'a > as 'a) t
-         end
-       is not included in
-         sig type _ t = A : (< x : 'b > as 'b) -> (< y : 'a > as 'a) t end
        Type declarations do not match:
          type _ t = A : (< x : 'b * 'b > as 'b) -> (< y : 'a > as 'a) t
        is not included in
@@ -1765,10 +1483,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { a: (<x:'a * 'a> as 'a) }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { a : < x : 'a * 'a > as 'a; } end
-       is not included in
-         sig type t = { a : < x : 'a > as 'a; } end
        Type declarations do not match:
          type t = { a : < x : 'a * 'a > as 'a; }
        is not included in
@@ -1795,15 +1509,6 @@ Lines 4-6, characters 6-3:
 5 |   type _ ext  += A : (<x:'a * 'a> as 'a) -> (<y:'b> as 'b) ext
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type _ ext +=
-               A : (< x : 'b * 'b > as 'b) -> (< y : 'a > as 'a) ext
-         end
-       is not included in
-         sig
-           type _ ext += A : (< x : 'b > as 'b) -> (< y : 'a > as 'a) ext
-         end
        Extension declarations do not match:
          type _ ext += A : (< x : 'b * 'b > as 'b) -> (< y : 'a > as 'a) ext
        is not included in
@@ -1843,15 +1548,6 @@ Lines 7-10, characters 6-3:
  9 |   end
 10 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module N : sig end end
-       is not included in
-         sig module N : sig type t val x : t val y : t end end
-       In module "N":
-       Modules do not match:
-         sig end
-       is not included in
-         sig type t val x : t val y : t end
        In module "N":
        The type "t" is required but not provided
        The value "x" is required but not provided
@@ -1870,10 +1566,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = x:int -> int
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = x:int -> int end
-       is not included in
-         sig type t = int -> int end
        Type declarations do not match:
          type t = x:int -> int
        is not included in
@@ -1894,10 +1586,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = x:int -> int
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = x:int -> int end
-       is not included in
-         sig type t = y:int -> int end
        Type declarations do not match:
          type t = x:int -> int
        is not included in
@@ -1917,10 +1605,6 @@ Lines 3-5, characters 6-3:
 4 |   let f ~x = ()
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : x:'a -> unit end
-       is not included in
-         sig val f : int -> unit end
        Values do not match:
          val f : x:'a -> unit
        is not included in
@@ -1946,10 +1630,6 @@ Lines 3-5, characters 6-3:
 4 |   let f ?x = ()
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('a : any). ?x:'a -> unit end
-       is not included in
-         sig val f : int -> unit end
        Values do not match:
          val f : ('a : any). ?x:'a -> unit
        is not included in
@@ -1976,10 +1656,6 @@ Lines 3-5, characters 6-3:
 4 |   let f ?x = ()
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('a : any). ?x:'a -> unit end
-       is not included in
-         sig val f : x:int -> unit end
        Values do not match:
          val f : ('a : any). ?x:'a -> unit
        is not included in
@@ -2005,10 +1681,6 @@ Lines 3-5, characters 6-3:
 4 |   let f ?y = ()
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('a : any). ?y:'a -> unit end
-       is not included in
-         sig val f : ?x:int -> unit end
        Values do not match:
          val f : ('a : any). ?y:'a -> unit
        is not included in
@@ -2029,10 +1701,6 @@ Lines 3-5, characters 6-3:
 4 |   let f x = ()
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> unit end
-       is not included in
-         sig val f : ?x:int -> unit end
        Values do not match:
          val f : 'a -> unit
        is not included in

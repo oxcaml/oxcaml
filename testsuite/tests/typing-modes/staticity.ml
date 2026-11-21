@@ -780,14 +780,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module Make :
-             functor (Arg : Id @ static) ->
-               sig val poly_ id : 'a -> 'a end @ static
-         end
-       is not included in
-         sig module Make : Id -> Id end
        In module "Make":
        Modules do not match:
          functor (Arg : Id @ static) ->
@@ -809,13 +801,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module Make :
-             functor (Arg : Id) -> sig val poly_ id : 'a -> 'a end
-         end
-       is not included in
-         sig module Make : Id @ static -> Id @ static end
        In module "Make":
        Modules do not match:
          functor (Arg : Id) -> sig val poly_ id : 'a -> 'a end
@@ -851,13 +836,6 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module Make :
-             functor (Arg : Id) -> sig val poly_ id : 'a -> 'a end
-         end
-       is not included in
-         sig module Make : Id @ static -> Id end
        In module "Make":
        Modules do not match:
          functor (Arg : Id) -> sig val poly_ id : 'a -> 'a end

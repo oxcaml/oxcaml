@@ -249,8 +249,7 @@ end
 Line 3, characters 11-15:
 3 |   type v = G(M).u
                ^^^^
-Error: Modules do not match: sig val x : t_any val y : int end
-     is not included in U
+Error: Modules do not match: M is not included in U
      Signatures containing unrepresentable items cannot be
      coerced to other module types.
      "x" is not representable.

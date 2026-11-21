@@ -33,10 +33,6 @@ Line 1, characters 38-39:
 1 | module M3 : S with kind_ k = bits64 = M
                                           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k = value type t = int end
-       is not included in
-         sig kind_ k = bits64 type t : bits64 end
        Kind declarations do not match:
          kind_ k = value
        is not included in
@@ -107,10 +103,6 @@ Line 1, characters 39-40:
 1 | module M3 : S with kind_ k := bits64 = M
                                            ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k = value type t = int end
-       is not included in
-         sig type t : bits64 end
        Type declarations do not match:
          type t = int
        is not included in
@@ -131,10 +123,6 @@ Lines 1-3, characters 39-3:
 2 |   type t : bits64
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits64 end
-       is not included in
-         sig type t end
        Type declarations do not match:
          type t : bits64
        is not included in
@@ -569,7 +557,6 @@ Lines 2-5, characters 17-30:
 5 | end with kind_ M2.k := float64
 Error: This "with" constraint on "M2.k" makes the applicative functor
        type "Id(M2).k" ill-typed in the constrained signature:
-       Modules do not match: sig end is not included in sig kind_ k end
        The kind "k" is required but not provided
 |}]
 
@@ -613,10 +600,6 @@ Lines 1-4, characters 35-3:
 3 |   type t = float#
 4 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module K = K' type t = float# end
-       is not included in
-         sig module K : sig kind_ k = value end type t end
        Type declarations do not match:
          type t = float#
        is not included in
@@ -636,10 +619,6 @@ Lines 1-3, characters 36-3:
 2 |   type t = int64_u
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = int64_u end
-       is not included in
-         sig type t end
        Type declarations do not match:
          type t = int64_u
        is not included in
@@ -747,10 +726,6 @@ Line 1, characters 17-45:
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This "with" constraint on "M.k1" makes the applicative functor
        type "F(M).k1" ill-typed in the constrained signature:
-       Modules do not match:
-         sig kind_ k2 = M.k2 end
-       is not included in
-         sig kind_ k1 end
        The kind "k1" is required but not provided
 |}]
 

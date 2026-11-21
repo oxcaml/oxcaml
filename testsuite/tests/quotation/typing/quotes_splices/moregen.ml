@@ -95,14 +95,6 @@ Line 3, characters 6-8:
 3 | end = M3
           ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
-         end
-       is not included in
-         sig
-           val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
-         end
        Values do not match:
          val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
        is not included in
@@ -145,10 +137,6 @@ Line 3, characters 6-8:
 3 | end = M4
           ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : <[$('a) * $('a)]> expr end
-       is not included in
-         sig val x : <[int * string]> expr end
        Values do not match:
          val x : <[$('a) * $('a)]> expr
        is not included in
@@ -173,10 +161,6 @@ Lines 3-5, characters 6-3:
 4 |   let e = <[ fun x -> () ]>
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val e : <[$('a) -> unit]> expr end
-       is not included in
-         sig val e : ('a -> unit) expr end
        Values do not match:
          val e : <[$('a) -> unit]> expr
        is not included in
@@ -198,10 +182,6 @@ Lines 3-5, characters 6-3:
 4 |   let e : (_ -> _) expr = Obj.magic <[ fun x -> () ]>
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val e : ('a : any) ('b : any). ('a -> 'b) expr end
-       is not included in
-         sig val e : <[$('a) -> unit]> expr end
        Values do not match:
          val e : ('a : any) ('b : any). ('a -> 'b) expr
        is not included in

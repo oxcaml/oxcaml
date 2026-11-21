@@ -170,10 +170,6 @@ Line 6, characters 8-9:
 6 |   end = M
             ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val g : layout_ l. ('a : l addressable). 'a -> 'a end
-       is not included in
-         sig val poly_ g : 'a -> 'a end
        Values do not match:
          val g : layout_ l. ('a : l addressable). 'a -> 'a
        is not included in
@@ -198,13 +194,6 @@ Line 6, characters 8-9:
 6 |   end = M
             ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b end
-       is not included in
-         sig
-           val g :
-             ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
-         end
        Values do not match:
          val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b
        is not included in
