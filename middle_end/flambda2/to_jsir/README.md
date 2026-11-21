@@ -57,6 +57,8 @@ This is a convention specific to JSIR, and as such normal debuggers will not be 
 
 `-g` does not change the `js_of_ocaml` commands: what `js_of_ocaml` does with this information is chosen with `-jsoo-opt`, for example `--source-map`, `--pretty`, or `--debuginfo` (which puts the locations in comments in the generated JavaScript).
 
+The WebAssembly archive of the standard library is compiled with `--pretty`, so that its functions have names in stack traces.
+
 The separate-compilation archives shipped with the compiler contain inline maps.
 A link that requests a map includes their mappings and available source text; a link without maps discards them.
 `--source-map-no-source` is a compile option: it does not strip text already embedded in an archive.
@@ -85,7 +87,7 @@ The JSIR linker renumbers the variables and block addresses of each unit so that
 
 The JSIR of a unit refers to the symbols of other units through the runtime's symbol table: a unit binds `caml_get_symbol` (or `caml_get_global`, for a module block) to a fresh variable at the start of its entry block, and registers its own symbols with `caml_register_symbol` (`caml_register_global` for its module block) where they are defined.
 JSIR files record these variables (`symbol_imports` and `symbol_exports` in [`Code.jsir_file`](../../../external/js_of_ocaml/compiler/lib/code.mli)), and the linker substitutes the importing unit's variable with the exporting unit's, deleting the `caml_get_symbol` binding.
-The `caml_register_global` calls are deleted too unless `-linkall` is given (as `js_of_ocaml` does for bytecode executables), so that `js_of_ocaml` can remove the fields of module blocks that are not used.
+The `caml_register_global` calls are deleted too, so that `js_of_ocaml` can remove the fields of module blocks that are not used.
 
 A unit whose toplevel code never exits normally (it always raises) makes the units after it unreachable, and the linker leaves them out.
 
