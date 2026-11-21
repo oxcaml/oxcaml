@@ -220,7 +220,10 @@ let prepare_cmx ~roots create_typing_env ~free_names_of_name ~used_value_slots
   in
   reachable_names, Some cmx
 
-let template_roots ~module_symbol ~template_keys =
+(* The exported names are those reachable from the module block and from the
+   keys of the unit's templates, whose types are those of the templates'
+   environments. *)
+let reachability_roots ~module_symbol ~template_keys =
   Symbol.Set.fold
     (fun template_key roots ->
       Name_occurrences.add_symbol roots template_key Name_mode.normal)
@@ -242,7 +245,7 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~template_keys
       Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
     prepare_cmx
-      ~roots:(template_roots ~module_symbol ~template_keys)
+      ~roots:(reachability_roots ~module_symbol ~template_keys)
       create_typing_env ~free_names_of_name ~used_value_slots ~canonicalise
       ~exported_offsets ~sections all_code
 

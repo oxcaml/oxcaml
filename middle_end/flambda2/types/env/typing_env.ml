@@ -552,7 +552,7 @@ let mem ?min_name_mode t name =
 let symbol_has_known_definition t sym =
   let name = Name.symbol sym in
   let comp_unit = Symbol.compilation_unit sym in
-  if Compilation_unit.equal comp_unit (Current_unit.get_cu_exn ())
+  if Current_unit.is_current comp_unit
   then Symbol.Set.mem sym t.defined_symbols
   else
     Name.Map.mem name (names_to_types t)
