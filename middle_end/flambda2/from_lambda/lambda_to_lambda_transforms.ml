@@ -1148,23 +1148,24 @@ let transform_primitive0 env (prim : L.primitive) args loc =
           "Lambda_to_flambda.transform_primitive: Pbigarrayset with unknown \
            layout and elements should only have dimensions between 1 and 3 \
            (see translprim).")
-  | Pctconst const, _ when Clflags.target_is_jsir () ->
-    let name =
-      match const with
-      | Big_endian -> "big_endian"
-      | Word_size -> "word_size"
-      | Int_size -> "int_size"
-      | Max_wosize -> "max_wosize"
-      | Ostype_unix -> "ostype_unix"
-      | Ostype_win32 -> "ostype_win32"
-      | Ostype_cygwin -> "ostype_cygwin"
-      | Backend_type -> "backend_type"
-      | Arch_amd64 -> "arch_amd64"
-      | Arch_arm64 -> "arch_arm64"
+  | Pctconst const, _ when Clflags.target_is_jsir () -> (
+    let runtime name =
+      let name = Format.sprintf "caml_sys_const_%s" name in
+      let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
+      Primitive (L.Pccall desc, [L.lambda_unit], loc)
     in
-    let name = Format.sprintf "caml_sys_const_%s" name in
-    let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
-    Primitive (L.Pccall desc, [L.lambda_unit], loc)
+    match const with
+    | Big_endian -> runtime "big_endian"
+    | Word_size -> runtime "word_size"
+    | Int_size -> runtime "int_size"
+    | Max_wosize -> runtime "max_wosize"
+    | Ostype_unix -> runtime "ostype_unix"
+    | Ostype_win32 -> runtime "ostype_win32"
+    | Ostype_cygwin -> runtime "ostype_cygwin"
+    | Backend_type -> runtime "backend_type"
+    | Arch_amd64 -> runtime "arch_amd64"
+    | Arch_arm64 -> runtime "arch_arm64"
+    | Target_is_jsir -> Primitive (prim, args, loc))
   | ( Pstring_load_vec
         ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )

@@ -22,12 +22,27 @@
 (module
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
    (import "obj" "null" (global $null (ref eq)))
+   (import "string" "caml_bytes_geti8"
+      (func $caml_bytes_geti8 (param (ref eq)) (param i32) (result i32)))
+   (import "string" "caml_bytes_set8"
+      (func $caml_bytes_set8
+         (param (ref eq)) (param i32) (param i32) (result (ref eq))))
+   (import "bigarray" "caml_ba_uint8_geti8"
+      (func $caml_ba_uint8_geti8 (param (ref eq)) (param i32) (result i32)))
+   (import "bigarray" "caml_ba_uint8_set8"
+      (func $caml_ba_uint8_set8
+         (param (ref eq)) (param i32) (param i32) (result (ref eq))))
+   (@if $portable-int
+   (@then
+      (import "portableint" "portable_int_val_32"
+         (func $portable_int_val_32 (param (ref eq)) (result i32)))))
    (import "string" "caml_string_concat"
       (func $caml_string_concat
          (param (ref eq)) (param (ref eq)) (result (ref eq))))
 
    ;; [@string] expands to [array.new_fixed $bytes ...]
    (type $bytes (array (mut i8)))
+   (type $block (array (mut (ref eq))))
    (type $float (struct (field f64)))
 
    (@string $invalid_switch_arm
@@ -65,6 +80,61 @@
       (if (ref.eq (local.get $base) (global.get $null))
          (then (call $caml_failwith (global.get $unimplemented_ext_ptr))))
       (local.get $base))
+
+   (func $int_val (param $v (ref eq)) (result i32)
+      (@if $portable-int
+      (@then (call $portable_int_val_32 (local.get $v)))
+      (@else (i31.get_s (ref.cast (ref i31) (local.get $v))))))
+
+   ;; The base of a pointer to a byte is either a block, or a string, bytes
+   ;; or one-dimensional bigarray of bytes. For the latter, the field index is
+   ;; the position of the byte, and accesses are bounds checked and reads sign
+   ;; extended, as for the string-like indices of [caml_get_idx_bytecode].
+
+   ;; caml_idx_base_get_int8 : base -> field index -> int8
+   (func (export "caml_idx_base_get_int8")
+      (param $base (ref eq)) (param $vi (ref eq)) (result (ref eq))
+      (local $i i32)
+      (local.set $i (call $int_val (local.get $vi)))
+      (if (ref.test (ref $block) (local.get $base))
+         (then
+            (return
+               (array.get $block
+                  (ref.cast (ref $block) (local.get $base))
+                  (i32.add (local.get $i) (i32.const 1))))))
+      (if (ref.eq (local.get $base) (global.get $null))
+         (then (call $caml_failwith (global.get $unimplemented_ext_ptr))))
+      ;; Strings and bytes have the same representation.
+      (if (ref.test (ref $bytes) (local.get $base))
+         (then
+            (return
+               (ref.i31
+                  (call $caml_bytes_geti8 (local.get $base) (local.get $i))))))
+      (ref.i31 (call $caml_ba_uint8_geti8 (local.get $base) (local.get $i))))
+
+   ;; caml_idx_base_set_int8 : base -> field index -> int8 -> unit
+   (func (export "caml_idx_base_set_int8")
+      (param $base (ref eq)) (param $vi (ref eq)) (param $v (ref eq))
+      (result (ref eq))
+      (local $i i32)
+      (local.set $i (call $int_val (local.get $vi)))
+      (if (ref.test (ref $block) (local.get $base))
+         (then
+            (array.set $block
+               (ref.cast (ref $block) (local.get $base))
+               (i32.add (local.get $i) (i32.const 1))
+               (local.get $v))
+            (return (ref.i31 (i32.const 0)))))
+      (if (ref.eq (local.get $base) (global.get $null))
+         (then (call $caml_failwith (global.get $unimplemented_ext_ptr))))
+      (if (ref.test (ref $bytes) (local.get $base))
+         (then
+            (return
+               (call $caml_bytes_set8
+                  (local.get $base) (local.get $i)
+                  (call $int_val (local.get $v))))))
+      (call $caml_ba_uint8_set8
+         (local.get $base) (local.get $i) (call $int_val (local.get $v))))
 
    ;; caml_is_boxed_float : value -> bool
    (func (export "caml_is_boxed_float") (param $v (ref eq)) (result (ref eq))

@@ -1,0 +1,9 @@
+int64#: tags 0 0, equal true, same hash true
+int32#: tags 0 0, equal true, same hash true
+nativeint#: tags 0 0, equal true, same hash true
+float32#: tags 0 0, equal true, same hash true
+int8#: tags 0 0, equal true, same hash true
+int16#: tags 0 0, equal true, same hash true
+int#: tags 0 0, equal true, same hash true
+float#: tags 254 254, equal true, same hash true
+int64# (not constant): tags 0 0, equal true, same hash true
