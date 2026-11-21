@@ -460,7 +460,7 @@ let recognize_affine_argument ~machine_width affine_argument discr const =
 type mergeable_argument =
   | Invariant_argument of Simple.t
   | Tagged_scrutinee
-  | Not_scrutinee (* always tagged immediate *)
+  | Not_scrutinee of affine_immediate_kind
   | Affine_argument of
       { kind : affine_immediate_kind;
         offset : TI.t;
@@ -479,7 +479,7 @@ type mergeable_argument =
           every arm is a constant of the kind described by [array_load_kind]. *)
 
 let enough_arms ~num_arms = function
-  | Invariant_argument _ | Tagged_scrutinee | Not_scrutinee -> true
+  | Invariant_argument _ | Tagged_scrutinee | Not_scrutinee _ -> true
   | Affine_argument _ | Lookup_table_argument _ ->
     (* Only introduce affine computations and lookup tables if the switch is
        large enough *)
@@ -531,7 +531,19 @@ let rebuild_mergeable_argument ~machine_width ~scrutinee ~dbg mergeable_argument
   | Tagged_scrutinee ->
     let$ tagged_scrutinee = bound_tagged_scrutinee scrutinee dbg in
     k tagged_scrutinee
-  | Not_scrutinee ->
+  | Not_scrutinee Naked ->
+    let$ not_scrutinee =
+      bound_prim "not_scrutinee" K.naked_immediate
+        (P.Unary (Boolean_not Naked_bool, scrutinee))
+        dbg
+    in
+    k not_scrutinee
+  | Not_scrutinee Tagged ->
+    (* The scrutinee is tagged before being negated, rather than the other way
+       round. The tagged scrutinee is usually already available (it is found by
+       CSE when the scrutinee was obtained by untagging), in which case only the
+       negation needs to be computed; and the negation can then be shared with
+       any existing negation of that tagged value. *)
     let$ tagged_scrutinee = bound_tagged_scrutinee scrutinee dbg in
     let$ not_scrutinee =
       bound_prim "not_scrutinee" K.value
@@ -682,10 +694,10 @@ let recognize_mergeable_argument ~machine_width ~scrutinee required_names ~dbg
       match kind with
       | Naked -> Some (Invariant_argument scrutinee)
       | Tagged -> Some Tagged_scrutinee)
-    | Affine (kind, offset, slope), _ -> (
-      match kind with
-      | Tagged when affine_is_boolean_not ~offset ~slope -> Some Not_scrutinee
-      | Tagged | Naked -> Some (Affine_argument { kind; offset; slope }))
+    | Affine (kind, offset, slope), _ ->
+      if affine_is_boolean_not ~offset ~slope
+      then Some (Not_scrutinee kind)
+      else Some (Affine_argument { kind; offset; slope })
     | Not_affine, Some ([], _) -> None
     | Not_affine, Some (args_rev, _) -> (
       let args : Simple.t list = List.rev args_rev in
@@ -1032,6 +1044,10 @@ let decide_continuation_specialization ~dacc ~switch ~scrutinee =
       | `Specialized _ -> Profile.Counters.incr "specialized" counters)
 
 let simplify_switch dacc switch ~down_to_up =
+  (* CR mshinwell: A switch whose scrutinee is the negation of a naked boolean
+     ([Boolean_not Naked_bool]) should be turned here into a switch on that
+     boolean with the arms exchanged. At present this is only done by a peephole
+     in [To_cmm_expr.switch], which should then be removed. *)
   let scrutinee = Switch.scrutinee switch in
   let scrutinee_ty, scrutinee =
     S.simplify_simple dacc scrutinee ~min_name_mode:NM.normal

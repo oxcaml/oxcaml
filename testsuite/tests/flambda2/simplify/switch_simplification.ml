@@ -242,3 +242,33 @@ in
 let $camlTOP11 = Block 0 ($camlTOP11__poison_prevents_boolean_not_31) in
 cont done ($camlTOP11)
 |}]
+
+(* The negation of a boolean that is only needed untagged. *)
+let naked_boolean_not x b =
+  let #(c, _) =
+    match b with
+    | true -> #(false, x)
+    | false -> #(true, x)
+  in
+  if c then x else 7
+[%%expect_fexpr Simplify{|
+let code naked_boolean_not_7 deleted in
+let code loopify(never) size(13) newer_version_of(naked_boolean_not_7)
+      naked_boolean_not_7_1 (x : imm tagged, b : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (b) in
+   let not_scrutinee = %boolean_not.`imm` (untagged) in
+   cont k2 (not_scrutinee))
+    where k2 (naked_immediate : imm) =
+      switch naked_immediate
+        | 0 -> k (7)
+        | 1 -> k (x)
+in
+let $camlTOP12__naked_boolean_not_35 =
+  closure naked_boolean_not_7_1 @naked_boolean_not &toplevel
+in
+let $camlTOP12 = Block 0 ($camlTOP12__naked_boolean_not_35) in
+cont done ($camlTOP12)
+|}]

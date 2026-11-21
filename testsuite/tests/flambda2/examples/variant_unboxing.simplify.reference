@@ -105,7 +105,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
       cont k (region_return)
 in
 let $camlVariant_unboxing__f2_2 = closure f2_1_1 @f2 &toplevel in
-let code loopify(never) size(45) newer_version_of(f3_returning_a_2)
+let code loopify(never) size(37) newer_version_of(f3_returning_a_2)
       f3_returning_a_2_1
         (x : imm tagged, y : imm tagged, a : imm tagged, b : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -123,9 +123,8 @@ let code loopify(never) size(45) newer_version_of(f3_returning_a_2)
           poison.val.variant_unboxing_field))
     where k4 =
       let untagged = %untag_imm (y) in
-      switch untagged
-        | 0 -> k3 (1i, 0i, a, poison.val.variant_unboxing_field)
-        | 1 -> k3 (0i, 0i, poison.val.variant_unboxing_field, a)
+      let not_scrutinee = %boolean_not.`imm` (untagged) in
+      cont k3 (not_scrutinee, 0i, a, a)
     where k3 (tag : imm, is_int : imm, unboxed_field_1_1, unboxed_field_0_0) =
       (switch is_int
          | 0 -> k3

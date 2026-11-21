@@ -396,12 +396,11 @@ let branch_on_negated_is_int (o : int option) x =
 branch_on_negated_is_int:
   movq  %rax, %rdi
   movq  %rbx, %rax
-  andl  $1, %edi
-  xorq  $1, %rdi
+  testb $1, %dil
   je    .L0
+  movl  $15, %eax
   ret
 .L0:
-  movl  $15, %eax
   ret
 |}]
 
@@ -426,17 +425,12 @@ let branch_on_negating_switch x b =
   if c then x else 7
 [%%expect_asm X86_64{|
 branch_on_negating_switch:
-  cmpq  $1, %rbx
-  jne   .L0
-  movl  $1, %ebx
-  jmp   .L1
-.L0:
-  xorl  %ebx, %ebx
-  jmp   .L2
-.L1:
-  ret
-.L2:
+  sarq  $1, %rbx
+  testq %rbx, %rbx
+  je    .L0
   movl  $15, %eax
+  ret
+.L0:
   ret
 |}]
 

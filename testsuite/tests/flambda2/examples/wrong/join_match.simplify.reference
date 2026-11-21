@@ -24,15 +24,14 @@ let code inline(always) loopify(never) size(33) newer_version_of(g_0)
       cont k (int_add)
 in
 let $camlJoin_match__g_1 = closure g_0_1 @g &toplevel in
-let code loopify(never) size(40) newer_version_of(bar_1)
+let code loopify(never) size(32) newer_version_of(bar_1)
       bar_1_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let prim = %int_comp.lt (x, 0) in
-   switch prim
-     | 0 -> k2 (1i, x, poison.val.variant_unboxing_field)
-     | 1 -> k2 (0i, poison.val.variant_unboxing_field, x))
+   let not_scrutinee = %boolean_not.`imm` (prim) in
+   cont k2 (not_scrutinee, x, x))
     where k2 (tag : imm, unboxed_field_1_0, unboxed_field_0_0) =
       let unboxed_field_2_0 = poison.val.variant_unboxing_field in
       (switch tag
