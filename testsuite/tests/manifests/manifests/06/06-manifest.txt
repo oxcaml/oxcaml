@@ -1,0 +1,2 @@
+file foo.cmi 00/foo
+file foo.cmx 01/bad x
