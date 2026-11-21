@@ -4,6 +4,8 @@ open Oxiclean.Reduction
 
 namespace Oxiclean.Leoization
 
+universe u a b
+
 structure PER (α : Type u) where
   eq : α → α → Prop
   symmetric {a b} : eq a b → eq b a
@@ -106,7 +108,7 @@ namespace PER
     | emptyList : EmptyList [] []
 
   @[pp_nodot]
-  def emptyList : PER (List α) where
+  def emptyList {α : Type u} : PER (List α) where
     eq := EmptyList
     symmetric
       | .emptyList => .emptyList
