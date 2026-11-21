@@ -361,6 +361,85 @@ branch_on_and_return_call_result:
   ret
 |}]
 
+(* Comparing a boolean against a constant should neither materialise it nor
+   compute its negation. *)
+let branch_on_negated_comparison (x : int) y =
+  let cmp = x < y in
+  if cmp = false then x else 7
+[%%expect_asm X86_64{|
+branch_on_negated_comparison:
+  cmpq  %rbx, %rax
+  jl    .L0
+  ret
+.L0:
+  movl  $15, %eax
+  ret
+|}]
+
+let negated_comparison (x : int) y =
+  let cmp = x < y in
+  cmp = false
+[%%expect_asm X86_64{|
+negated_comparison:
+  cmpq  %rbx, %rax
+  setge %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+(* Likewise when the boolean is not the result of a comparison. *)
+let branch_on_negated_is_int (o : int option) x =
+  let is_none = match o with None -> true | Some _ -> false in
+  if is_none = false then x else 7
+[%%expect_asm X86_64{|
+branch_on_negated_is_int:
+  movq  %rax, %rdi
+  movq  %rbx, %rax
+  andl  $1, %edi
+  xorq  $1, %rdi
+  je    .L0
+  ret
+.L0:
+  movl  $15, %eax
+  ret
+|}]
+
+let negated_is_int (o : int option) =
+  let is_none = match o with None -> true | Some _ -> false in
+  is_none = false
+[%%expect_asm X86_64{|
+negated_is_int:
+  andl  $1, %eax
+  xorq  $1, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+(* A switch that only negates its scrutinee should not need a join point. *)
+let branch_on_negating_switch x b =
+  let #(c, _) =
+    match b with
+    | true -> #(false, x)
+    | false -> #(true, x)
+  in
+  if c then x else 7
+[%%expect_asm X86_64{|
+branch_on_negating_switch:
+  cmpq  $1, %rbx
+  jne   .L0
+  movl  $1, %ebx
+  jmp   .L1
+.L0:
+  xorl  %ebx, %ebx
+  jmp   .L2
+.L1:
+  ret
+.L2:
+  movl  $15, %eax
+  ret
+|}]
+
 
 (* CR ttebbi: `leaq  8(%r15), %rbx` could be merged with
    the subsequent addition. *)
