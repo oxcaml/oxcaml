@@ -82,6 +82,9 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     }
   in
   Acc.add_any_source acc (Code_id_or_name.code_id code_id);
+  (* Note: this significantly degrades the analysis on code being checked by the
+     zero alloc checker. However, it is highly unclear what should be done for
+     such code, so we simply mark the code as escaping. *)
   if never_delete
   then (
     List.iter
@@ -349,61 +352,35 @@ let must_have_callee apply =
 
 let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   match Apply.call_kind apply with
-  | Function { function_call = Direct code_id; _ } -> (
+  | Function { function_call = Direct code_id; _ } ->
     (* CR ncourant: think about cross-module propagation *)
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
         ~exn:exn_arg
     in
-    let callee = Apply.callee apply in
-    let is_external =
-      not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
+    let callee, call_widget =
+      match Apply.callee apply with
+      | None -> None, call_widget
+      | Some callee ->
+        let callee = Acc.simple_to_node acc ~denv callee in
+        Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
+          ~base:callee;
+        let callee_if_any_source =
+          Code_id_or_name.var (Variable.create "callee_if_any_source" K.value)
+        in
+        let widget_if_any_source =
+          Code_id_or_name.var
+            (Variable.create "widget_if_any_source" K.rec_info)
+        in
+        Acc.add_alias_if_any_source_dep acc ~if_any_source:callee ~from:callee
+          ~to_:callee_if_any_source;
+        Acc.add_alias_if_any_source_dep acc ~if_any_source:callee
+          ~from:widget_if_any_source ~to_:call_widget;
+        Some callee_if_any_source, widget_if_any_source
     in
-    let[@local] add_apply acc ~only_if_closure_any_source =
-      let callee, call_widget =
-        if only_if_closure_any_source
-        then (
-          let callee = Acc.simple_to_node acc ~denv (must_have_callee apply) in
-          let callee_if_any_source =
-            Variable.create "callee_if_any_source" K.value
-          in
-          let widget_if_any_source =
-            Code_id_or_name.var
-              (Variable.create "widget_if_any_source" K.rec_info)
-          in
-          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee ~from:callee
-            ~to_:(Code_id_or_name.var callee_if_any_source);
-          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee
-            ~from:widget_if_any_source ~to_:call_widget;
-          Some (Simple.var callee_if_any_source), widget_if_any_source)
-        else callee, call_widget
-      in
-      Acc.add_apply acc
-        ~function_containing_apply_expr:(Env.current_code_id denv)
-        ~apply_code_id:code_id
-        ~apply_closure:(Option.map (Acc.simple_to_node acc ~denv) callee)
-        ~apply_call_witness:call_widget
-    in
-    match callee with
-    | None -> add_apply acc ~only_if_closure_any_source:false
-    | Some callee -> (
-      let closure = Acc.simple_to_node acc ~denv callee in
-      Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
-        ~base:closure;
-      match Env.should_preserve_direct_calls denv with
-      | Yes -> add_apply acc ~only_if_closure_any_source:false
-      | Auto -> add_apply acc ~only_if_closure_any_source:true
-      | No ->
-        if is_external
-        then
-          (* External call. We always want to mark everything as escaping here,
-             as we will not be able to recover the code_id from the sources of
-             the closure, and the call is indeed very likely to be a call to
-             that code_id. *)
-          (* CR ncourant: LTO mode will be slightly less precise when no
-             always preserving direct calls; I don't think this really matters.
-           *)
-          add_apply acc ~only_if_closure_any_source:false))
+    Acc.add_apply acc ~function_containing_apply_expr:(Env.current_code_id denv)
+      ~apply_code_id:code_id ~apply_closure:callee
+      ~apply_call_witness:call_widget
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
@@ -713,19 +690,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     ~function_slots_to_keep ~value_slots_to_keep ~my_depth : Rev_code.t =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
-  (* Note: this significantly degrades the analysis on code being checked by the
-     zero alloc checker. However, it is highly unclear what should be done for
-     such code, so we simply mark the code as escaping. *)
   let is_opaque = Code_metadata.is_opaque code_metadata in
-  let check_zero_alloc =
-    match Code.zero_alloc_attribute code with
-    | Default_zero_alloc ->
-      (* The effect of [Clflags.zero_alloc_assert] has been compiled into
-         [Check] earlier. *)
-      false
-    | Assume _ -> false
-    | Check _ -> true
-  in
   let code_dep =
     match Acc.find_code_dep acc code_id with
     | Some code_dep -> code_dep
@@ -747,17 +712,9 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
-  let should_preserve_direct_calls : Env.should_preserve_direct_calls =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Never -> No
-    | Always -> Yes
-    | Zero_alloc -> if check_zero_alloc then Yes else No
-    | Auto -> Auto
-  in
   let denv =
-    Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-      ~current_code_id:(Some code_id) ~all_constants ~function_slots_to_keep
-      ~value_slots_to_keep
+    Env.create ~parent:Hole ~conts ~current_code_id:(Some code_id)
+      ~all_constants ~function_slots_to_keep ~value_slots_to_keep
   in
   if not is_opaque
   then (
@@ -968,12 +925,6 @@ let run0 unit acc ~free_names ~all_constants () =
     ~params:[dummy_toplevel_exn] ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
-  let should_preserve_direct_calls : Env.should_preserve_direct_calls =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Never | Zero_alloc -> No
-    | Always -> Yes
-    | Auto -> Auto
-  in
   let function_slots_to_keep =
     Name_occurrences.function_slots_in_normal_projections free_names
   in
@@ -982,8 +933,7 @@ let run0 unit acc ~free_names ~all_constants () =
   in
   ( Code_id_or_name.var dummy_toplevel_return,
     traverse
-      (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-         ~current_code_id:None
+      (Env.create ~parent:Hole ~conts ~current_code_id:None
          ~all_constants:(Name.symbol all_constants)
          ~function_slots_to_keep ~value_slots_to_keep)
       acc (Flambda_unit.body unit) )
