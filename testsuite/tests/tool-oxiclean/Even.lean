@@ -60,19 +60,23 @@ example
 
 @[simp]
 abbrev expectedRelation {Step} [S : StepRelation Step] : PER Value :=
-  PER.moduleRuntimeBlock
-    (PER.cons
-      (@PER.closure Step S PER.immediate (PER.option evenImmediates))
-      (PER.cons
-        (@PER.closure Step S evenImmediates PER.immediate)
-        PER.emptyList))
+  PER.forAllWhere
+    (List.forAllPairs
+      SemanticModuleInContext.refines
+      Oxiclean.Extracted.Even.dependencies)
+    fun _ =>
+      PER.moduleRuntimeBlock
+        (PER.cons
+          (@PER.closure Step S PER.immediate (PER.option evenImmediates))
+          (PER.cons
+            (@PER.closure Step S evenImmediates PER.immediate)
+            PER.emptyList))
 
-abbrev actualRelation {Step} [S : StepRelation Step] :=
-  @refinedInterface.structuralRelation? Step S
+abbrev actualRelation {Step} [S : StepRelation Step] : PER Value :=
+  @refinedInterface.structuralRelation! Step S Oxiclean.Extracted.Even.dependencies
 
 example {Step} [S : StepRelation Step]
-    : @actualRelation Step S = pure (@expectedRelation Step S) := by
-  simp
+    : @actualRelation Step S = @expectedRelation Step S := by simp; rfl
 
 @[simp]
 abbrev expectedValue : Value :=
@@ -110,7 +114,7 @@ abbrev expectedValue : Value :=
                   { tag := 247,
                     contents := BlockContents.closure (Expr.var 0) })] })
 
-theorem evenModuleReducesToValue {Step} [S : StepRelation Step]
+theorem implementationReducesToValue {Step} [S : StepRelation Step]
     : Reduce Step Oxiclean.Extracted.Even.implementation expectedValue := by
   simp
   apply Reduce.step; apply S.letBinding; apply S.function
@@ -152,7 +156,9 @@ theorem ifInputRelationIsEqualityThenDiagonalSufficesForExtensionality {Step}
 example
     : Oxiclean.Extracted.Even.implementation.wellTyped @expectedRelation := by
   intro Step S v reduction
-  obtain ⟨⟩ := @S.deterministic _ _ reduction _ evenModuleReducesToValue
+  obtain ⟨⟩ := @S.deterministic _ _ reduction _ implementationReducesToValue
+  intro dependencies allDependenciesAreValid
+  obtain ⟨⟩ := allDependenciesAreValid
   constructor
   constructor
   · constructor

@@ -4,7 +4,24 @@ open Oxiclean.Reduction
 
 namespace Oxiclean.Leoization
 
-universe u a b
+universe u a b l r
+
+inductive _root_.List.forAll {α : Type u} (condition : α → Prop)
+    : List α → Prop where
+  | nil : [].forAll condition
+  | cons {head : α}
+      (headHolds : condition head) {tail : List α}
+      (tailHolds : tail.forAll condition)
+      : (head :: tail).forAll condition
+
+inductive _root_.List.forAllPairs {L : Type l} {R : Type r}
+    (condition : L → R → Prop)
+    : List L → List R → Prop where
+  | nil : [].forAllPairs condition []
+  | cons {lhsHead rhsHead}
+      (headsHold : condition lhsHead rhsHead) {lhsTail : List L} {rhsTail}
+      (tailsHold : lhsTail.forAllPairs condition rhsTail)
+      : (lhsHead :: lhsTail).forAllPairs condition (rhsHead :: rhsTail)
 
 structure PER (α : Type u) where
   eq : α → α → Prop
@@ -22,6 +39,9 @@ namespace PER
     symmetric := nofun
     transitive := nofun
 
+  instance inhabited {α}: Inhabited (PER α) where
+    default := never
+
   def diagonal {α : Type u} : PER α where
     eq := Eq
     symmetric := Eq.symm
@@ -33,6 +53,20 @@ namespace PER
       | ⟨e, pl, pr⟩ => ⟨per.symmetric e, pr, pl⟩
     transitive ab bc := match ab, bc with
       | ⟨ab, pa, _⟩, ⟨bc, _, pc⟩ => ⟨per.transitive ab bc, pa, pc⟩
+
+  def forAll {α : Type a} {β : Type b} (parameterized : α → PER β) : PER β where
+    eq lhs rhs := ∀ a : α, parameterized a |>.eq lhs rhs
+    symmetric h a := parameterized a |>.symmetric (h a)
+    transitive xy yz a := parameterized a |>.transitive (xy a) (yz a)
+
+  def forAllWhere {α : Type a} {β : Type b}
+      (precondition : α → Prop)
+      (parameterized : α → PER β)
+      : PER β where
+    eq lhs rhs := ∀ a : α, precondition a → (parameterized a).eq lhs rhs
+    symmetric h a pre := parameterized a |>.symmetric (h a pre)
+    transitive xy yz a pre :=
+      parameterized a |>.transitive (xy a pre) (yz a pre)
 
   /--
   Wherever the first function is defined (even if nondeterministic),
@@ -295,15 +329,24 @@ def SemanticTypeConstructor : (arity : Nat) → Type 0
   | .zero => PER Value
   | .succ pred => PER Value → SemanticTypeConstructor pred
 
+instance {arity} : Inhabited (SemanticTypeConstructor arity) where
+  default := by
+    induction arity with
+    | zero => exact PER.inhabited.default
+    | succ pred ih => exact fun _ => ih
+
+instance : Inhabited ((arity : Nat) × SemanticTypeConstructor arity) where
+  default := ⟨0, PER.inhabited.default⟩
+
 @[simp]
-def Oxiclean.Model.ModuleType.validWrtExtraction
+def _root_.Oxiclean.Model.ModuleType.validWrtExtraction
     (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
     (extractedParametricSignature : ModuleType Parametric)
     : Prop :=
   userSuppliedRefinedSignature.parameterize = extractedParametricSignature
 
 @[simp]
-def Oxiclean.Model.PredefinedType.structuralRelation
+def _root_.Oxiclean.Model.PredefinedType.structuralRelation
     : PredefinedType → (arity : Nat) × SemanticTypeConstructor arity
   | .int => ⟨0, PER.immediate⟩
   | .bool => ⟨0, PER.boolean⟩
@@ -313,142 +356,161 @@ def Oxiclean.Model.PredefinedType.structuralRelation
 structure SemanticModuleInContext : Type 0 where
   absent : List ((arity : Nat) × SemanticTypeConstructor arity)
   present : List (Option SemanticModuleInContext)
+deriving Inhabited
 
-inductive StructuralRelationError : Type 0 where
-  | arityMismatch
-  | moduleIndexOutOfBounds
-      (context : List SemanticModuleInContext)
-      (deBruijn : Nat)
-  | typeIndexOutOfBounds (within : ModuleStatics) (index : Nat)
-  | manifestTypesNotYetSupported
-  | compilationUnitsNotYetSupported
-  | firstClassModulesNotYetSupported
-  | polymorphismNotYetSupported
+def SemanticModuleInContext.getTypeConstructor!
+    (index : Nat)
+    (semanticModule : SemanticModuleInContext)
+    : (arity : Nat) × SemanticTypeConstructor arity :=
+  match semanticModule.absent[index]? with
+  | .some typeConstructor => typeConstructor
+  | .none => panic! s!"type constructor index out of bounds: #{index} of {semanticModule.absent.length}"
 
 @[simp]
-def SemanticTypeConstructor.instantiatedWithArguments?
-    : {arity : Nat} →
-      SemanticTypeConstructor arity →
-      List (PER Value) →
-      Except StructuralRelationError (PER Value)
-  | .zero, (relation : PER Value), args =>
+def SemanticTypeConstructor.instantiatedWithArguments!
+    {arity : Nat}
+    (relation : SemanticTypeConstructor arity)
+    (args : List (PER Value))
+    : PER Value :=
+  match arity with
+  | .zero =>
     match args with
-    | [] => pure relation
-    | _ :: _ => throw .arityMismatch
-  | .succ _, (relation : PER Value → SemanticTypeConstructor _), args =>
+    | [] => relation
+    | _ :: _ => panic! s!"semantic type constructor arity mismatch: too many arguments ({arity} left over)"
+  | .succ _ =>
     match args with
-    | [] => throw .arityMismatch
-    | head :: tail => relation head |>.instantiatedWithArguments? tail
+    | [] => panic! s!"semantic type constructor arity mismatch: not enough arguments (expected {arity} more)"
+    | head :: tail => relation head |>.instantiatedWithArguments! tail
 
 mutual
   @[simp]
-  def Oxiclean.Model.ModuleType.semanticModuleInContext?
+  def _root_.Oxiclean.Model.ModuleType.semanticModuleInContext!
       (moduleType : ModuleType SemanticTypeConstructor)
-      : Except StructuralRelationError SemanticModuleInContext := do
+      : SemanticModuleInContext :=
     let { absent, present } := moduleType
-    let absent ← absent.mapM (·.semanticModuleInContext?)
-    let present ← present.mapM (·.semanticModuleInContext?)
-    pure { absent, present }
+    { absent := absent.map TypeDecl.semanticModuleInContext!,
+      present :=
+        present.map ModuleItemPresentAtRuntime.semanticModuleInContext! }
 
   @[simp]
-  def Oxiclean.Model.TypeDecl.semanticModuleInContext?
+  def _root_.Oxiclean.Model.TypeDecl.semanticModuleInContext!
       (typeDecl : TypeDecl SemanticTypeConstructor)
-      : Except
-          StructuralRelationError
-          ((arity : Nat) × SemanticTypeConstructor arity) :=
+      : (arity : Nat) × SemanticTypeConstructor arity :=
     match typeDecl.manifest with
-    | .abstract constructor => pure ⟨typeDecl.arity, constructor⟩
-    | .manifest _ => throw .manifestTypesNotYetSupported
+    | .abstract constructor => ⟨typeDecl.arity, constructor⟩
+    | .manifest _ => panic! "types with manifests not yet implemented"
 
   @[simp]
-  def Oxiclean.Model.ModuleItemPresentAtRuntime.semanticModuleInContext?
+  def _root_.Oxiclean.Model.ModuleItemPresentAtRuntime.semanticModuleInContext!
       : ModuleItemPresentAtRuntime SemanticTypeConstructor →
-        Except StructuralRelationError (Option SemanticModuleInContext)
-    | .mod m => .some <$> m.semanticModuleInContext?
-    | .val _ => pure .none
+        Option SemanticModuleInContext
+    | .mod m => .some m.semanticModuleInContext!
+    | .val _ => .none
 end
 
+def _root_.List.getDependencyCompilationUnit!
+    (indexAmongDependencies : Nat)
+    (dependencies : List SemanticModuleInContext)
+    : SemanticModuleInContext :=
+  match dependencies[indexAmongDependencies]? with
+  | .none => panic s!"dependency compilation unit out of bounds: #{indexAmongDependencies} of {dependencies.length}"
+  | .some dependency => dependency
+
 @[simp]
-def Oxiclean.Model.ModuleStatics.resolve?
+def _root_.Oxiclean.Model.ModuleStatics.resolve!
     (context : List SemanticModuleInContext)
+    (dependencies : List SemanticModuleInContext)
     (statics : ModuleStatics)
-    : Except StructuralRelationError SemanticModuleInContext := do
+    : SemanticModuleInContext :=
   match statics with
   | .var deBruijn =>
-    let .some semanticModule := context[deBruijn]?
-      | throw (.moduleIndexOutOfBounds context deBruijn)
-    pure semanticModule
+    match context[deBruijn]? with
+    | .none => panic s!"module de Bruijn index out of bounds: #{deBruijn} of {context.length}"
+    | .some semanticModule => semanticModule
   | .field within index =>
-    let semanticModule ← within.resolve? context
-    let .some (.some submodule) := semanticModule.present[index]?
-      | throw (.typeIndexOutOfBounds statics index)
-    pure submodule
-  | .compilationUnit _ => throw .compilationUnitsNotYetSupported
+    let semanticModule := within.resolve! context dependencies
+    match semanticModule.present[index]? with
+    | .none => panic s!"type index out of bounds: #{index} of {semanticModule.present.length}"
+    | .some .none => panic s!"type index not populated: #{index} of {semanticModule.present.length}"
+    | .some (.some submodule) => submodule
+  | .compilationUnit indexAmongDependencies =>
+    dependencies.getDependencyCompilationUnit! indexAmongDependencies
 
 mutual
   @[simp]
-  def Oxiclean.Model.ModuleType.structuralRelationInScope?
+  def _root_.Oxiclean.Model.ModuleType.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
+      (dependencies : List SemanticModuleInContext)
       (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
-      : Except StructuralRelationError (PER Value) := do
+      : PER Value :=
     let { present, .. } := userSuppliedRefinedSignature
-    let semanticModuleInContext ←
-      userSuppliedRefinedSignature.semanticModuleInContext?
-    let relationOnValuesInTheBlock ←
-      present.foldrM
-        (fun item tail => do
-          let head ←
-            @item.structuralRelationInScope? Step S
-              (semanticModuleInContext :: context)
-          pure (PER.cons head tail))
+    let semanticModuleInContext :=
+      userSuppliedRefinedSignature.semanticModuleInContext!
+    let relationOnValuesInTheBlock :=
+      present.foldr
+        (fun item tail =>
+          let head :=
+            @item.structuralRelationInScope! Step S
+              (semanticModuleInContext :: context) dependencies
+          PER.cons head tail)
         PER.emptyList
-    pure (PER.moduleRuntimeBlock relationOnValuesInTheBlock)
+    PER.moduleRuntimeBlock relationOnValuesInTheBlock
 
   @[simp]
-  def Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope?
+  def _root_.Oxiclean.Model.ModuleItemPresentAtRuntime.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
-      : ModuleItemPresentAtRuntime SemanticTypeConstructor →
-        Except StructuralRelationError (PER Value)
-    | .mod m => @m.structuralRelationInScope? Step S context
-    | .val v => @v.structuralRelationInScope? Step S context
+      (dependencies : List SemanticModuleInContext)
+      : ModuleItemPresentAtRuntime SemanticTypeConstructor → PER Value
+    | .mod m => @m.structuralRelationInScope! Step S context dependencies
+    | .val v => @v.structuralRelationInScope! Step S context dependencies
 
   @[simp]
-  def Oxiclean.Model.ValType.structuralRelationInScope?
+  def _root_.Oxiclean.Model.ValType.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
-      : ValType SemanticTypeConstructor →
-        Except StructuralRelationError (PER Value)
-    | .arrow domain codomain => do
-      let domain ← @domain.structuralRelationInScope? Step S context
-      let codomain ← @codomain.structuralRelationInScope? Step S context
-      pure (@PER.closure Step S domain codomain)
-    | .constr c args => do
-      let ⟨arity, ctor⟩ ←
+      (dependencies : List SemanticModuleInContext)
+      : ValType SemanticTypeConstructor → PER Value
+    | .arrow domain codomain =>
+      let domain :=
+        @domain.structuralRelationInScope! Step S context dependencies
+      let codomain :=
+        @codomain.structuralRelationInScope! Step S context dependencies
+      @PER.closure Step S domain codomain
+    | .constr c args =>
+      let ⟨arity, ctor⟩ :=
         match c with
         | .field within index =>
-          let semanticModule : SemanticModuleInContext ← within.resolve? context
-          let .some typeConstructor := semanticModule.absent[index]?
-            | throw (.typeIndexOutOfBounds within index)
-          pure typeConstructor
-        | .predef p => pure p.structuralRelation
-      args.mapM (@·.structuralRelationInScope? Step S context)
-      >>= ctor.instantiatedWithArguments?
-    | .firstClassModule _ => throw .firstClassModulesNotYetSupported
-    | .poly _ => throw .polymorphismNotYetSupported
-    | .var _ => throw .polymorphismNotYetSupported
+          within.resolve! context dependencies |>.getTypeConstructor! index
+        | .predef p => p.structuralRelation
+      args.map (@ValType.structuralRelationInScope! Step S context dependencies)
+      |> ctor.instantiatedWithArguments!
+    | .firstClassModule _ => panic! "first-class modules not yet implemented"
+    | .poly _ => panic! "polymorphic types not yet implemented"
+    | .var _ => panic! "type references not yet implemented"
 end
 
-@[simp]
-def Oxiclean.Model.ModuleType.structuralRelation?
-      {Step} [S : StepRelation Step]
-    : ModuleType SemanticTypeConstructor →
-      Except StructuralRelationError (PER Value) :=
-  (@·.structuralRelationInScope? Step S [])
+def SemanticModuleInContext.refines
+    (dependencySignature : ModuleType Parametric)
+    (semanticModuleInContext : SemanticModuleInContext)
+    : Prop :=
+  ∃ refinedSignature : ModuleType SemanticTypeConstructor,
+  refinedSignature.validWrtExtraction dependencySignature ∧
+  refinedSignature.semanticModuleInContext! = semanticModuleInContext
 
 @[simp]
-def Oxiclean.Model.Value.wellTyped
+def _root_.Oxiclean.Model.ModuleType.structuralRelation!
+    {Step} [S : StepRelation Step]
+    (dependencySignatures : List (ModuleType Parametric))
+    (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
+    : PER Value :=
+    PER.forAllWhere
+      (dependencySignatures.forAllPairs SemanticModuleInContext.refines)
+      (@userSuppliedRefinedSignature.structuralRelationInScope! Step S [])
+
+@[simp]
+def _root_.Oxiclean.Model.Value.wellTyped
     (relation : {Step : _} → [StepRelation Step] → PER Value)
     (implementation : Value)
     : Prop :=
@@ -456,7 +518,7 @@ def Oxiclean.Model.Value.wellTyped
   (@relation Step S).eq implementation implementation
 
 @[simp]
-def Oxiclean.Model.Expr.wellTyped
+def _root_.Oxiclean.Model.Expr.wellTyped
     (relation : {Step : _} → [StepRelation Step] → PER Value)
     (implementation : Expr)
     : Prop :=

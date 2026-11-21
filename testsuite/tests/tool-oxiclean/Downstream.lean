@@ -41,19 +41,29 @@ example
 
 @[simp]
 abbrev expectedRelation {Step} [S : StepRelation Step] : PER Value :=
-  PER.never
+  PER.forAllWhere
+    (List.forAllPairs
+      SemanticModuleInContext.refines
+      Oxiclean.Extracted.Downstream.dependencies)
+    fun dependencies =>
+      let even := dependencies.getDependencyCompilationUnit! 0
+      let ⟨_even_t_arity, even_t⟩ := even.getTypeConstructor! 0
+      PER.moduleRuntimeBlock
+        (PER.cons
+          (PER.option (even_t.instantiatedWithArguments! []))
+          PER.emptyList)
 
-abbrev actualRelation {Step} [S : StepRelation Step] :=
-  @refinedInterface.structuralRelation? Step S
+abbrev actualRelation {Step} [S : StepRelation Step] : PER Value :=
+  @refinedInterface.structuralRelation! Step S Oxiclean.Extracted.Downstream.dependencies
 
 example {Step} [S : StepRelation Step]
-    : @actualRelation Step S = pure (@expectedRelation Step S) := by simp
+    : @actualRelation Step S = @expectedRelation Step S := by simp
 
 @[simp]
 abbrev expectedValue : Value :=
   sorry
 
-theorem evenModuleReducesToValue {Step} [S : StepRelation Step]
+theorem implementationReducesToValue {Step} [S : StepRelation Step]
     : Reduce Step Oxiclean.Extracted.Downstream.implementation expectedValue := by
   simp
   sorry
@@ -61,5 +71,5 @@ theorem evenModuleReducesToValue {Step} [S : StepRelation Step]
 example
     : Oxiclean.Extracted.Downstream.implementation.wellTyped @expectedRelation := by
   intro Step S v reduction
-  obtain ⟨⟩ := @S.deterministic _ _ reduction _ evenModuleReducesToValue
+  obtain ⟨⟩ := @S.deterministic _ _ reduction _ implementationReducesToValue
   sorry
