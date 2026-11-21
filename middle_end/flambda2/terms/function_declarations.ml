@@ -102,7 +102,9 @@ let compare { funs = funs1; _ } { funs = funs2; _ } =
       | ( Deleted { function_slot_size = size1; dbg = dbg1 },
           Deleted { function_slot_size = size2; dbg = dbg2 } ) ->
         let c = Int.compare size1 size2 in
-        if c <> 0 then c else Debuginfo.compare dbg1 dbg2
+        if c <> 0 || not !Dwarf_flags.gdwarf_may_alter_codegen
+        then c
+        else Debuginfo.compare dbg1 dbg2
       | Deleted _, Code_id _ -> -1
       | Code_id _, Deleted _ -> 1
       | ( Code_id
