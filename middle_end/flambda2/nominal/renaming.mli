@@ -27,6 +27,12 @@ module Simple = Int_ids.Simple
 
 type t
 
+type import_map
+
+val imported_variables : import_map -> Variable.importer
+
+val imported_symbols : import_map -> Symbol.importer
+
 val empty : t
 
 val print : Format.formatter -> t -> unit
@@ -43,7 +49,9 @@ val create_import_map :
   fields:Field.importer ->
   used_value_slots:Value_slot.Set.t ->
   original_compilation_unit:Compilation_unit.t ->
-  t
+  import_map
+
+val from_import_map : import_map -> t
 
 val has_import_map : t -> bool
 
