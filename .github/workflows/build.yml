@@ -172,10 +172,12 @@ jobs:
             check_arch: true
             sysdeps: gdb
 
+          # gdwarf-may-alter-codegen stops cfg-merge-blocks from merging blocks
+          # that differ only in debug info, which would change backtraces.
           - name: experimental-optimizations (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
-            ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            build_ocamlparam: "_,w=-46,experimental-optimizations=1,gdwarf-may-alter-codegen=1"
+            ocamlparam: "_,w=-46,experimental-optimizations=1,gdwarf-may-alter-codegen=1"
             check_arch: true
             sysdeps: gdb
 
