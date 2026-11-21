@@ -1,9 +1,10 @@
 heap built: ok
+compaction runs: ok
+compaction rate: ok
 slices measured: ok
 work cross-check: ok
 sweep rate: ok
 mark rate: ok
 minor collections measured: ok
 promotion rate: ok
-compaction runs: ok
-compaction rate: ok
+compactions seen: ok
