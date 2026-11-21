@@ -197,6 +197,13 @@ open Lambda_utils.Primitive
     as a labeled argument, along with the necessary [scopes] labeled argument
     that it requires. *)
 
+(* CR layouts v4: Comprehensions can only produce arrays of values for now
+   ([typecore.ml] restricts the element jkind to [value_or_null]).
+   The dynamic-size path grows the array with [caml_array_append] and trims
+   it with [caml_array_sub], which are runtime primitives that only work on
+   arrays of values. Before the restriction in [typecore.ml] is lifted, the
+   dynamic-size path must grow and trim with kind-specific code instead. *)
+
 module Precompute_array_size : sig
   (** Generates the lambda expression that throws the exception once we've
       determined that precomputing the array size has overflowed. The check for
