@@ -133,6 +133,7 @@ module Allowlisted = struct
         "ocaml.represent_as_float_array";
         "ocaml.magic_staged_modes";
         "ocaml.immediate_all_void_constructor";
+        "ocaml.rec";
       ]
 
   (* Allow list the following extensions.
