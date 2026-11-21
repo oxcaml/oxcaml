@@ -251,7 +251,8 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
   else if doing_speculative_inlining
   then Doing_speculative_inlining
   else
-    Profile.record_call_with_counters ~accumulate:true "speculative_inlining"
+    Profile.record_call_with_counters ~accumulate:true ~level:2
+      "speculative_inlining"
       ~counter_f:(fun (decision : Call_site_inlining_decision_type.t) ->
         let counters = Profile.Counters.create () in
         match decision with
