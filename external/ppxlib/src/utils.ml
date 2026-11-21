@@ -65,7 +65,23 @@ let get_doc_comments_loc_bounds =
       | _ -> Some attr.attr_loc
   end
 
+(* TODO: This code is used to fix the bug described in
+   [test-doc-comments-fix.t]. We should instead consider:
 
+  1. Update the parser directly to include doc comment locations in str/sig items.
+     However, this could potentially break existing ppx code that expects the location to
+     have the current behavior. In addition, this also changes where error locations get
+     reported, which might confuse users when an error appears at the start of the doc
+     comment instead of where the code itself starts.
+
+  2. Update [Code_matcher] to replace the entire block if a mismatch is found, rather than
+     replacing one item at a time. This is behaviour changing however (e.g. regular
+     comments inside inline blocks would always get removed, which arguably users should
+     not be relying anyways). In addition, there are currently some bugs in the pretty
+     printer that produces programs that do not parse. If such a program is inlined, it
+     needs to be manually fixed, which would be annoying to do every time unrelated items
+     are changed or if new items are inlined.
+*)
 let update_locs_to_include_doc_comments =
   object
     inherit Ast_traverse.map as super
@@ -212,6 +228,7 @@ module Ast_io = struct
         | Impl -> Oxcaml_private_lrgrep.Frontend.implementation lexbuf
       in
       match lrgrep_error with
+      (* TODO: Consider finding a more principled approach *)
       (* The message is exactly "Syntax error" when lrgrep has no explanation
          (see lrgrep/frontend.ml): report the compiler's own error then. *)
       | Error { Oxcaml_private_lrgrep.Frontend.Syntax_error.msg; loc }

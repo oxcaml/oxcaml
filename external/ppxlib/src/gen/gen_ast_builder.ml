@@ -68,7 +68,9 @@ struct
       ~wrapper:(wpath, wprefix, has_attrs, has_loc_stack) path ~prefix
       return_type cd =
     match cd.pcd_args with
-    | Pcstr_record _ -> None
+    | Pcstr_record _ ->
+      (* TODO: Support inline records. *)
+      None
     | Pcstr_tuple cd_args ->
         let args = List.mapi cd_args ~f:(fun i _ -> sprintf "x%d" i) in
         let exp =

@@ -724,7 +724,9 @@ and function_constraint = Parsetree.function_constraint =
        This field only affects the interpretation of [ret_type_constraint], while the
        latter is translated in [typecore] to [Pexp_constraint] to contrain the mode of the
        function.
-
+       (* TODO: This field is not failthful representation of the
+       user syntax, and complicates [pprintast]. It should be removed and their
+       functionality should be moved to [pvb_modes]. *)
     *)
     ret_mode_annotations : modes;
     (** The mode annotation placed on a function's body, e.g.
@@ -749,7 +751,13 @@ and unboxed_access = Parsetree.unboxed_access =
       (** [.#foo] *)
 
 and comprehension_iterator = Parsetree.comprehension_iterator =
+  (* TODO: It's weird to use an inline record argument here. It's the only
+     parsetree node that has one, and it hits relatively sharp corners of ppx_traverse.
 
+     E.g. if one used [lift] to implement e.g. [sexp_of], they
+     would end up with (Pcomp_range ((start .) (stop .) (direction .))) rather
+     than (Pcomp_range (start .) (stop .) (direction .)).
+  *)
   | Pcomp_range of
       { start : expression;
         stop : expression;
