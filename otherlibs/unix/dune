@@ -85,7 +85,7 @@
    getpw
    getserv
    getsockname_unix
-   gettimeofday_unix
+   gettimeofday
    getuid
    gmtime
    initgroups
