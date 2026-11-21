@@ -1451,3 +1451,149 @@ let () = test_loop ~loop_loc_first:false 5
 let () = test_loop ~loop_loc_first:false 10
 
 let () = test_loop ~loop_loc_first:false 20
+
+let () =
+  (* Between the calls only [x] and [z] occur initially. Rematerializing them
+     introduces uses of [a] and [p], retaining [p]'s reload and allowing [a] to
+     be rematerialized before [x] in the same split pass. *)
+  let ids = InstructionId.make_sequence () in
+  let instruction ?(arg = [||]) ?(res = [||]) desc =
+    Cfg.make_instruction ~desc ~arg ~res ~stack_offset:0
+      ~id:(InstructionId.get_and_incr ids)
+      ()
+  in
+  let copy src dst = instruction (Op Move) ~arg:[| src |] ~res:[| dst |] in
+  let load src dst offset =
+    instruction
+      (Op
+         (Load
+            { memory_chunk = Word_val;
+              addressing_mode = Arch.Iindexed offset;
+              mutability = Immutable;
+              is_atomic = false
+            }))
+      ~arg:[| src |] ~res:[| dst |]
+  in
+  let block label body terminator =
+    let block =
+      { (Cfg.make_empty_block ~label terminator) with
+        can_raise = Cfg.can_raise_terminator terminator.desc;
+        stack_offset = 0
+      }
+    in
+    List.iter (DLL.add_end block.body) body;
+    block
+  in
+  let p = Reg.create Val in
+  let a = Reg.create Val in
+  let x = Reg.create Val in
+  let z = Reg.create Val in
+  let y = Reg.create Val in
+  let other = Reg.create Val in
+  let result = Reg.create Int in
+  let arg0 = Proc.phys_reg Val (P RAX) in
+  let arg1 = Proc.phys_reg Val (P RBX) in
+  let return_reg = Proc.phys_reg Int (P RAX) in
+  let middle_label = Label.new_label () in
+  let last_label = Label.new_label () in
+  let call label_after =
+    instruction
+      (Call
+         { op = Direct { sym_name = "consume"; sym_global = Global };
+           label_after
+         })
+      ~arg:[| arg0; arg1 |] ~res:[| arg0 |]
+  in
+  let a_load = load p a 0 in
+  let x_load = load a x 0 in
+  let z_load = load p z 8 in
+  let first =
+    block Label.entry_label
+      [copy arg0 p; a_load; x_load; z_load; copy x arg0; copy z arg1]
+      (call middle_label)
+  in
+  let middle =
+    block middle_label [copy x arg0; copy z arg1] (call last_label)
+  in
+  let last =
+    block last_label
+      [ load a y 8;
+        load p other 16;
+        instruction (Op (Intop Iadd)) ~arg:[| y; other |] ~res:[| result |];
+        copy result return_reg ]
+      (instruction Return ~arg:[| return_reg |])
+  in
+  let cfg =
+    Cfg.create ~fun_name:"cascading_rematerialization" ~fun_args:[| arg0 |]
+      ~fun_codegen_options:
+        [ Use_regalloc_param
+            [ "SPLIT_REMATERIALIZE:on";
+              "IRC_INTERF_THRESHOLD:0";
+              "STACK_SLOTS_THRESHOLD:1" ] ]
+      ~fun_dbg:Debuginfo.none ~fun_contains_calls:true
+      ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
+      ~fun_poll:Lambda.Default_poll ~next_instruction_id:ids
+      ~fun_ret_type:Cmm.typ_int ~fun_phantom_lets:Backend_var.Map.empty
+      ~allowed_to_be_irreducible:false
+  in
+  List.iter (Cfg.add_block_exn cfg) [first; middle; last];
+  Cfg.register_predecessors_for_all_blocks cfg;
+  let layout =
+    Cfg_with_layout.create cfg
+      ~layout:(DLL.of_list [first.start; middle.start; last.start])
+  in
+  let description =
+    Misc.protect_refs
+      [R (Oxcaml_flags.regalloc_validate, true)]
+      (fun () -> Regalloc_validate.Description.create layout)
+    |> Option.get
+  in
+  let prepared =
+    match Regalloc_irc.run (Cfg_with_infos.make layout) with
+    | Ok _ -> failwith "IRC did not fall back"
+    | Error prepared -> prepared
+  in
+  let copies =
+    DLL.to_list middle.body
+    |> List.mapi (fun index instr -> index, instr)
+    |> List.filter_map (fun (index, instr) ->
+        match
+          Regalloc_rematerializations.find prepared.rematerializations
+            instr.Cfg.id
+        with
+        | None -> None
+        | Some record -> Some (index, instr, record))
+  in
+  let find_copy (source : Cfg.basic Cfg.instruction) =
+    List.find
+      (fun (_, _, record) ->
+        InstructionId.equal record.Regalloc_rematerializations.source source.id)
+      copies
+  in
+  assert (List.length copies = 3);
+  let a_index, a_copy, _ = find_copy a_load in
+  let x_index, x_copy, _ = find_copy x_load in
+  let _ = find_copy z_load in
+  assert (a_index < x_index);
+  assert (Reg.same a_copy.res.(0) x_copy.arg.(0));
+  let live = Cfg_with_infos.liveness prepared.cfg_with_infos in
+  let stack_regs =
+    Reg.Set.filter Reg.is_stack
+      (InstructionId.Tbl.find live first.terminator.id).across
+  in
+  assert (not (Reg.Set.is_empty stack_regs));
+  let next_id = InstructionId.get ids in
+  let allocated, rematerializations = Regalloc_ls.run_after_prelude prepared in
+  (* This low-pressure CFG needs no allocation rewrites. In particular, fallback
+     must not reset the existing stack twins and split them again. *)
+  assert (InstructionId.equal next_id (InstructionId.get ids));
+  assert (Reg.Set.for_all Reg.is_stack stack_regs);
+  assert (Regalloc_stack_slots.total_number_of_slots prepared.stack_slots = 1);
+  assert (rematerializations == prepared.rematerializations);
+  (match
+     Regalloc_validate.test description ~rematerializations
+       (Cfg_with_infos.cfg_with_layout allocated)
+   with
+  | Ok _ -> ()
+  | Error error -> Misc.fatal_errorf "%a" Regalloc_validate.Error.print error);
+  Format.printf "Cascading rematerialization and IRC fallback: OK\n%!"
