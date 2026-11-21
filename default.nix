@@ -884,6 +884,7 @@ stdenv.mkDerivation {
   setOutputFlags = false;
 
   nativeBuildInputs = [
+    pkgs.lean4
     pkgs.autoconf
     menhir
     ocaml_5_4_0
