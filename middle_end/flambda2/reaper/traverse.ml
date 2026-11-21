@@ -288,6 +288,16 @@ let traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures =
 let traverse_block_like_static_const denv acc symbol
     (static_const : Static_const.t) =
   let name = Name.symbol symbol |> Code_id_or_name.name in
+  let all_constants = Code_id_or_name.name (Env.all_constants denv) in
+  let or_variable_to_node (or_variable : _ Or_variable.t) =
+    match or_variable with
+    | Const _ -> all_constants
+    | Var (var, _) -> Code_id_or_name.var var
+  in
+  let add_boxed_number_dep bn contents =
+    Acc.add_constructor_dep acc ~base:name (Field.boxed_number bn)
+      ~from:(or_variable_to_node contents)
+  in
   match static_const with
   | Block (_, _, _, fields) | Immutable_value_array fields ->
     List.iteri
@@ -298,25 +308,45 @@ let traverse_block_like_static_const denv acc symbol
         in
         Acc.add_constructor_dep acc ~base:name (Field.block i kind) ~from)
       fields;
-    Acc.add_constructor_dep acc ~base:name Field.is_int
-      ~from:(Code_id_or_name.name (Env.all_constants denv));
-    Acc.add_constructor_dep acc ~base:name Field.get_tag
-      ~from:(Code_id_or_name.name (Env.all_constants denv))
+    Acc.add_constructor_dep acc ~base:name Field.is_int ~from:all_constants;
+    Acc.add_constructor_dep acc ~base:name Field.get_tag ~from:all_constants
+  | Immutable_float_block fields ->
+    (* As for [Make_block] primitives with [Naked_floats] block kind. *)
+    List.iteri
+      (fun i field ->
+        Acc.add_constructor_dep acc ~base:name
+          (Field.block i K.naked_float)
+          ~from:(or_variable_to_node field))
+      fields;
+    Acc.add_constructor_dep acc ~base:name Field.is_int ~from:all_constants;
+    Acc.add_constructor_dep acc ~base:name Field.get_tag ~from:all_constants
+  | Boxed_float32 f -> add_boxed_number_dep Naked_float32 f
+  | Boxed_float f -> add_boxed_number_dep Naked_float f
+  | Boxed_int32 n -> add_boxed_number_dep Naked_int32 n
+  | Boxed_int64 n -> add_boxed_number_dep Naked_int64 n
+  | Boxed_nativeint n -> add_boxed_number_dep Naked_nativeint n
+  | Boxed_vec128 v -> add_boxed_number_dep Naked_vec128 v
+  | Boxed_vec256 v -> add_boxed_number_dep Naked_vec256 v
+  | Boxed_vec512 v -> add_boxed_number_dep Naked_vec512 v
+  | Boxed_mask m -> add_boxed_number_dep Naked_mask m
   | Set_of_closures _ ->
     Misc.fatal_errorf
       "Unexpected [Set_of_closures] in block_like static const traversal for \
        symbol %a"
       Symbol.print symbol
-  | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
-  | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-  | Boxed_mask _ | Immutable_float_block _ | Immutable_float_array _
-  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
-  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
-  | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
-  | Empty_array _ | Immutable_string _ ->
-    Acc.add_alias acc ~to_:name
-      ~from:(Code_id_or_name.name (Env.all_constants denv))
+  | Immutable_float_array _ | Immutable_float32_array _ | Immutable_int_array _
+  | Immutable_int8_array _ | Immutable_int16_array _ | Immutable_int32_array _
+  | Immutable_int64_array _ | Immutable_nativeint_array _
+  | Immutable_vec128_array _ | Immutable_vec256_array _
+  | Immutable_vec512_array _ | Immutable_mask_array _ | Empty_array _
+  | Immutable_string _ ->
+    (* The fields of these constants are not tracked, as for [Make_array]
+       primitives. However, they can be variables, which must be kept if the
+       constant is used. *)
+    Acc.add_alias acc ~to_:name ~from:all_constants;
+    Name_occurrences.fold_variables (Static_const.free_names static_const)
+      ~init:() ~f:(fun () var ->
+        Acc.add_use_dep acc ~to_:name ~from:(Code_id_or_name.var var))
 
 let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
