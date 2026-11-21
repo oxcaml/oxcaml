@@ -47,6 +47,11 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   in
   let name_occurrences = RE.free_names body in
   let body = Rebuilt_expr.to_expr body (UA.are_rebuilding_terms uacc) in
+  (* Sometimes, a variable is unbound at toplevel mainly because a symbol (using
+     said variable) was misplaced; therefore it's interesting to run this check
+     before the "variable free in whole compilation unit" check to get more
+     accurate bug reports. *)
+  if Flambda_features.Expert.symbol_check () then Symbol_check.check body;
   NO.fold_names name_occurrences ~init:() ~f:(fun () name ->
       Name.pattern_match name
         ~var:(fun var ->

@@ -345,6 +345,19 @@ let flambda_to_flambda0 : type m.
   in
   print_flambda last_pass_name (Flambda_features.dump_flambda ()) ppf flambda;
   print_fexpr last_pass_name (Flambda_features.dump_fexpr Last_pass) ppf flambda;
+  if Flambda_features.Expert.symbol_check ()
+  then
+    begin match mode with
+    | Classic ->
+      (* CR gbury: enable this check.
+
+         classic mode can currently produces terms that do not respect the
+         dominator scoping of symbols, and therefore make the test fail *)
+      if false then Symbol_check.check (Flambda_unit.body flambda)
+    | Normal ->
+      (* we already check symbol placement during Simplify *)
+      ()
+    end;
   let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
     build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
