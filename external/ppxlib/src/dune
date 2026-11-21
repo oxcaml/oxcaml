@@ -11,7 +11,8 @@
   ppxlib_jane
   ppxlib_ast.traverse_builtins
   ppxlib_ast.stdppx
-  sexp_type)
+  sexp_type
+  oxcaml_private_lrgrep)
  (flags
   (:standard -safe-string -open Oxcaml_private_compiler_libs -open Ocaml_shadow))
  (ppx.driver

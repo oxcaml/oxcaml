@@ -16,6 +16,10 @@ GenMList
 GenM_intf
 GenShims_
 Gen_intf
+# lrgrep
+Frontend
+Lrgrep_runtime
+Parse_errors
 # menhirLib
 MenhirLib
 # sedlex, sedlex.utils, sedlex.ppx
