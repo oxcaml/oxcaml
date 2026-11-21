@@ -122,6 +122,33 @@ theorem evenModuleReducesToValue {Step} [S : StepRelation Step]
   · constructor; constructor; constructor
   apply Reduce.alreadyReduced
 
+theorem lsbZeroIfModTwoZero {bits : BitVec 63} (remainderZero : bits.srem 2 = 0)
+    : bits[0] = false := by
+  have remainderZero := congrArg BitVec.toNat remainderZero
+  simp [BitVec.srem, BitVec.msb_eq_decide] at remainderZero
+  have := bits.isLt
+  split at remainderZero <;> simp_all [BitVec.toNat_umod, BitVec.toNat_neg,
+    BitVec.getElem_eq_testBit_toNat, Nat.testBit_zero] <;> omega
+
+theorem ifInputRelationIsEqualityThenDiagonalSufficesForExtensionality {Step}
+    {domain codomain : PER Value} {body : Expr}
+    (domainIsEquality : ∀ {lhs rhs}, domain.eq lhs rhs → lhs = rhs)
+    (resultsRelated :
+      ∀ {input output}, domain.eq input input →
+      Reduce Step (body.substitute input) output →
+      codomain.eq output output)
+    : (PER.extensionality domain codomain).eq
+        (fun input output => Reduce Step (body.substitute input) output)
+        (fun input output => Reduce Step (body.substitute input) output) := by
+  have atLeastAsDefined
+      : PER.atLeastAsDefinedAs domain codomain
+          (fun input output => Reduce Step (body.substitute input) output)
+          (fun input output => Reduce Step (body.substitute input) output) := by
+    intro lhs rhs inputsRelated output reduction
+    cases domainIsEquality inputsRelated
+    exact ⟨output, reduction, resultsRelated inputsRelated reduction⟩
+  exact .extensionality atLeastAsDefined atLeastAsDefined
+
 example
     : Oxiclean.Extracted.Even.implementation.wellTyped @expectedRelation := by
   intro Step S v reduction
@@ -129,8 +156,50 @@ example
   constructor
   constructor
   · constructor
-    sorry
+    apply ifInputRelationIsEqualityThenDiagonalSufficesForExtensionality
+    · rintro _ _ ⟨⟩; rfl
+    · rintro _ output ⟨⟩ reduction
+      rename_i bits
+      by_cases even : bits.srem 2#63 = 0#63
+      · obtain ⟨⟩ := S.deterministic reduction
+          (v' :=
+            .indirection
+              (.noMutableFields
+                { tag := 0,
+                  contents := .values [.immediate { bitsAboveLsb := bits }] }))
+          (by
+            simp
+            apply Reduce.step; apply S.switchScrutinee
+            apply S.physicalEqualityLhs; apply S.modulo; decide
+            apply Reduce.step; apply S.switchScrutinee
+            apply S.physicalEqualityImmediates
+            simp only [even, if_true]
+            apply Reduce.step; apply S.switchImmediate; rfl
+            apply Reduce.step; apply S.blockValues
+            · simp
+            · constructor; constructor
+            apply Reduce.alreadyReduced)
+        exact
+          PER.OxCamlOption.some
+            (PER.RefinedImmediate.refinedImm (lsbZeroIfModTwoZero even))
+      · obtain ⟨⟩ := S.deterministic reduction
+          (v' := .immediate { bitsAboveLsb := 0 })
+          (by
+            simp
+            apply Reduce.step; apply S.switchScrutinee
+            apply S.physicalEqualityLhs; apply S.modulo; decide
+            apply Reduce.step; apply S.switchScrutinee
+            apply S.physicalEqualityImmediates
+            simp only [even, if_false]
+            apply Reduce.step; apply S.switchImmediate; rfl
+            apply Reduce.alreadyReduced)
+        exact PER.OxCamlOption.none
   · constructor
     · constructor
-      sorry
+      apply ifInputRelationIsEqualityThenDiagonalSufficesForExtensionality
+      · rintro _ _ ⟨⟩; rfl
+      · rintro _ output ⟨⟩ reduction
+        simp at reduction
+        cases S.deterministic reduction .alreadyReduced
+        exact PER.Immediate.imm
     · constructor

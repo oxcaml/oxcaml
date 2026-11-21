@@ -320,6 +320,10 @@ inductive StructuralRelationError : Type 0 where
       (context : List SemanticModuleInContext)
       (deBruijn : Nat)
   | typeIndexOutOfBounds (within : ModuleStatics) (index : Nat)
+  | manifestTypesNotYetSupported
+  | compilationUnitsNotYetSupported
+  | firstClassModulesNotYetSupported
+  | polymorphismNotYetSupported
 
 @[simp]
 def SemanticTypeConstructor.instantiatedWithArguments?
@@ -354,7 +358,7 @@ mutual
           ((arity : Nat) × SemanticTypeConstructor arity) :=
     match typeDecl.manifest with
     | .abstract constructor => pure ⟨typeDecl.arity, constructor⟩
-    | .manifest _ => sorry
+    | .manifest _ => throw .manifestTypesNotYetSupported
 
   @[simp]
   def Oxiclean.Model.ModuleItemPresentAtRuntime.semanticModuleInContext?
@@ -379,7 +383,7 @@ def Oxiclean.Model.ModuleStatics.resolve?
     let .some (.some submodule) := semanticModule.present[index]?
       | throw (.typeIndexOutOfBounds statics index)
     pure submodule
-  | .compilationUnit _ => sorry
+  | .compilationUnit _ => throw .compilationUnitsNotYetSupported
 
 mutual
   @[simp]
@@ -388,7 +392,7 @@ mutual
       (context : List SemanticModuleInContext)
       (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
       : Except StructuralRelationError (PER Value) := do
-    let { absent, present } := userSuppliedRefinedSignature
+    let { present, .. } := userSuppliedRefinedSignature
     let semanticModuleInContext ←
       userSuppliedRefinedSignature.semanticModuleInContext?
     let relationOnValuesInTheBlock ←
@@ -431,9 +435,9 @@ mutual
         | .predef p => pure p.structuralRelation
       args.mapM (@·.structuralRelationInScope? Step S context)
       >>= ctor.instantiatedWithArguments?
-    | .firstClassModule signature => sorry
-    | .poly body => sorry
-    | .var deBruijn => sorry
+    | .firstClassModule _ => throw .firstClassModulesNotYetSupported
+    | .poly _ => throw .polymorphismNotYetSupported
+    | .var _ => throw .polymorphismNotYetSupported
 end
 
 @[simp]
