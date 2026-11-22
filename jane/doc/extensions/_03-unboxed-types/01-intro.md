@@ -364,8 +364,14 @@ As with records, some boxed variant declarations have no implicit unboxed
 version. For example, in `type t = Empty | Witness of unit#`, both constructors
 have payload layout `void`. The boxed representation uses an immediate for
 `Empty` and a block for `Witness`. The sum `void + void` does not record that
-distinction, so this declaration provides only `t`. Constructors with inline
-records or GADT result types also preclude an implicit unboxed variant.
+distinction, so this declaration provides only `t`.
+
+The compiler also omits the implicit unboxed variant when a constructor
+declares its own record fields, as in `Record of { count : int }`, or has a
+GADT result type. In the `answer` example, `Ready of reply#` takes an existing
+variant type as its argument, so `answer` can have an implicit unboxed
+variant (`answer#`). A record with a `reply#` field can likewise have
+an implicit unboxed record (`entry#`).
 
 *Limitations and future plans*:
 * Arrays of unboxed variants follow the same rule as arrays of unboxed
