@@ -1,0 +1,7 @@
+File "parallel_slice_capture.ml", line 16, characters 35-42:
+16 |     (fun _left -> Target_array.set targets 1 Broadcast)
+                                        ^^^^^^^
+Error: This value is contended
+         because it is used inside the function at file "parallel_slice_capture.ml", line 16, characters 4-55
+         which is expected to be portable.
+       However, the highlighted expression is expected to be uncontended.
