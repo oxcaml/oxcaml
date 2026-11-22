@@ -1427,12 +1427,12 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%box" ->
       (match lambda_prim.prim_native_repr_args with
        | [_, Same_as_ocaml_repr (Sum arms)] ->
-         Convert_sum (Box mode, Jkind_types.Sum_repr.leaf_sorts arms)
+         Convert_sum (Box mode, arms)
        | _ -> Primitive(Pbox (List.hd (get_arg_layouts ()), mode), 1))
     | "%unbox" ->
       (match snd lambda_prim.prim_native_repr_res with
        | Same_as_ocaml_repr (Sum arms) ->
-         Convert_sum (Unbox, Jkind_types.Sum_repr.leaf_sorts arms)
+         Convert_sum (Unbox, arms)
        | _ -> Primitive(Punbox layout, 1))
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s (Lazy.force indexing_primitives) with
@@ -2500,8 +2500,8 @@ let remove_exception_ident id =
 
 let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
   match prim, args with
-  | Convert_sum (direction, leaves), [arg] ->
-      Translrepr.Boxed_sum.translate loc direction leaves arg
+  | Convert_sum (direction, alternatives), [arg] ->
+      Translrepr.Boxed_sum.translate loc direction alternatives arg
   | Primitive (prim, arity), args when arity = List.length args ->
       Lprim(prim, args, loc)
   | Sys_argv, [] ->

@@ -700,7 +700,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
               | Some mode -> transl_typed_locality_mode_r mode
               | None -> alloc_heap in
             Translrepr.Boxed_sum.translate loc (Box mode)
-              (Jkind_types.Sum_repr.leaf_sorts_of_repr repr) inline
+              repr.alternatives inline
           else inline
       | Ordinary {runtime_tag},
         (Variant_boxed _ | Variant_extensible) when cstr.cstr_constant ->

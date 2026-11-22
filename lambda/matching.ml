@@ -3806,8 +3806,8 @@ let combine_regular_constructor value_kind loc arg cstr partial
     let (low, high), (intervals, actions) =
       as_interval fail_opt ~low:0 ~high:(nconstrs - 1) cases
     in
-    let first index = repr.arms.(index).first_leaf in
-    let last = Jkind_types.Sum_repr.last_leaf repr in
+    let first index = repr.arms.(index).first_tag in
+    let last = Jkind_types.Sum_repr.last_tag repr in
     let intervals = Array.map (fun (low, high, action) ->
       first low, last high, action) intervals
     in
@@ -4574,14 +4574,14 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           in
           (match cstr.cstr_sum with
            | Some sum when Data_types.is_boxed_sum_constructor cstr ->
-             let leaves = Jkind_types.Sum_repr.leaf_sorts_of_repr sum in
-             let sort = Jkind_types.Sum_repr.carrier leaves in
+             let alternatives = sum.alternatives in
+             let sort = Jkind_types.Sum_repr.carrier alternatives in
              let layout = Typeopt.layout_of_sort ph.pat_loc sort in
              let id = Ident.create_local "unboxed" in
              let first = { first with arg = Var id; sort; layout } in
              let body, jumps = compile { pm.args with first } (Lvar id) in
              let inline =
-               Translrepr.Boxed_sum.translate ploc Unbox leaves arg in
+               Translrepr.Boxed_sum.translate ploc Unbox alternatives arg in
              Llet (Strict, layout, id, Lambda.debug_uid_none, inline, body),
              jumps
            | _ -> compile pm.args arg)

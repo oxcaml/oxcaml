@@ -283,13 +283,13 @@ module Sum = struct
       <- (match repr.fields with
          | Bits32 :: _ ->
            Lconst
-             (Const_base (Const_unboxed_int32 (Int32.of_int arm.first_leaf)))
-         | _ -> tagged_immediate arm.first_leaf);
+             (Const_base (Const_unboxed_int32 (Int32.of_int arm.first_tag)))
+         | _ -> tagged_immediate arm.first_tag);
     let rec fill (projection : Repr.projection) layout arg =
       match projection, layout with
       | Void, _ -> ()
       | Nested_tag base, _ ->
-        fields.(0) <- shift_tag loc base bases.(0) arm.first_leaf arg
+        fields.(0) <- shift_tag loc base bases.(0) arm.first_tag arg
       | Field (i, base), _ -> fields.(i) <- convert loc base bases.(i) arg
       | Product projections, Punboxed_product layouts ->
         List.iteri
@@ -321,7 +321,7 @@ module Sum = struct
       match projection, layout with
       | Void, _ -> Lprim (Punbox_unit, [lambda_unit], loc)
       | Nested_tag base, _ ->
-        shift_tag loc (List.hd repr.fields) base (-arm.first_leaf)
+        shift_tag loc (List.hd repr.fields) base (-arm.first_tag)
           (tag_field loc repr arg)
       | Field (i, base), _ ->
         convert loc (List.nth repr.fields i) base
@@ -344,21 +344,21 @@ module Boxed_sum = struct
     | Box of locality_mode
     | Unbox
 
-  let translate loc direction leaves argument =
+  let translate loc direction alternatives argument =
     let field_sorts (sort : Jkind.Sort.Const.t) =
       if Jkind.Sort.Const.all_void sort
       then []
       else match sort with Product fields -> fields | _ -> [sort]
     in
-    let arms = List.map field_sorts leaves in
+    let arms = List.map field_sorts alternatives in
     let repr =
-      match Repr.make arms with
+      match Repr.make (List.map (fun fields -> Repr.Fields fields) arms) with
       | Some repr -> repr
       | None -> Misc.fatal_error "Boxed_sum: unrepresentable sum"
     in
     let location = Debuginfo.Scoped_location.to_location loc in
     let carrier_layout =
-      Typeopt.layout_of_sort location (Repr.carrier leaves)
+      Typeopt.layout_of_sort location (Repr.carrier alternatives)
     in
     let arg_layout, result_layout =
       match direction with

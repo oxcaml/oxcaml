@@ -358,6 +358,8 @@ constructor it holds.
 When the sole argument of an outer constructor is another unboxed variant,
 the two variants share a tag. For example, `type answer = Busy | Ready of reply#`
 uses one tag to distinguish `Busy`, `Ready Missing`, and `Ready (Found s)`.
+The layout `void + void + value` lists these three alternatives in order.
+Another variant can have the same layout and still be a different type.
 Two unboxed variant fields in a product keep independent tags.
 
 As with records, some boxed variant declarations have no implicit unboxed
@@ -380,14 +382,18 @@ The boxed pattern `Count fields` on a `counter` binds the original block:
 A direct `[@@unboxed]` variant uses the same product for its record fields.
 Matching its `box` also binds the product, so it does not allow assignment.
 
+A constructor with inline record fields keeps the tag of each field. The
+layout of `type t = Busy | Ready of { reply : reply# }` is `value` for `t`
+and `void + (void + value)` for `t#`. The outer tag selects `Busy` or `Ready`.
+In `Ready`, the inner tag selects `Missing` or `Found`. Adding a field, as in
+`Ready of { marker : unit#; reply : reply# }`, gives the payload a product
+layout: `void & (void + value)`. These layouts also tell an abstract client
+how to box and unbox the value without seeing its constructors.
+
 A GADT result type or an atomic field prevents an implicit unboxed variant.
-There is also a compatibility exception for tag sharing. If the declaration
-contains a record constructor, its boxed constructors keep their original
-tags. It gets no `t#` if tag sharing would change those tags, for example in
-`type t = Busy | Ready of { reply : reply# }`. A one-field product has the
-layout of its field, so it does not separate the two tags. Adding a second
-field, as in `Ready of { reply : reply#; count : int }`, keeps the nested
-tag inside the product and allows `t#`.
+If a declaration contains a record constructor, its ordinary boxed tags stay
+unchanged. A separate non-record constructor in that declaration cannot share
+its tag with a nested variant, so the declaration gets no `t#` in that case.
 
 *Limitations and future plans*:
 * Arrays of unboxed variants follow the same rule as arrays of unboxed

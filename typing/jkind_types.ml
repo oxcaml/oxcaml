@@ -439,6 +439,15 @@ module Sort = struct
   end
 
   module Sum_repr = struct
+    type 'a source_arm =
+      | Fields of 'a list
+      | Splice of 'a list
+
+    let alternatives ~payload =
+      List.concat_map (function
+        | Fields args -> [payload args]
+        | Splice arms -> arms)
+
     type projection =
       | Void
       | Field of int * base
@@ -446,15 +455,15 @@ module Sort = struct
       | Product of projection list
 
     type arm =
-      { first_leaf : int;
-        arguments : projection list;
-        payload : Const.t
+      { first_tag : int;
+        arguments : projection list
       }
 
     type t =
       { fields : base list;
         arms : arm array;
-        leaf_count : int
+        tag_count : int;
+        alternatives : Const.t list
       }
 
     let rec direct_sum : Const.t -> Const.t list option = function
@@ -462,21 +471,17 @@ module Sort = struct
       | Addressable sort -> direct_sum sort
       | Base _ | Product _ | Univar _ | Genvar _ -> None
 
-    let rec leaf_sorts arms =
-      List.concat_map
-        (fun arm ->
-          match direct_sum arm with
-          | None -> [arm]
-          | Some arms -> leaf_sorts arms)
-        arms
+    let payload = function
+      | [] -> Const.void
+      | [sort] -> sort
+      | sorts -> Const.product sorts
 
-    let leaf_sorts_of_repr repr =
-      leaf_sorts (Array.to_list (Array.map (fun arm -> arm.payload) repr.arms))
+    let separate arms = List.map (fun arm -> Fields [arm]) arms
 
-    let last_leaf repr index =
+    let last_tag repr index =
       if index + 1 = Array.length repr.arms
-      then repr.leaf_count - 1
-      else repr.arms.(index + 1).first_leaf - 1
+      then repr.tag_count - 1
+      else repr.arms.(index + 1).first_tag - 1
 
     let storage_sort repr =
       match repr.fields with
@@ -500,14 +505,14 @@ module Sort = struct
       let exception Unsupported in
       let scanned_count = ref 0 in
       let raw_fields = Dynarray.create () in
-      let next_leaf = ref 0 in
+      let next_tag = ref 0 in
       (* Keep raw positions separate from scanned positions until every arm's
          scanned prefix has been counted. The result indexes product fields,
          not byte offsets. The normal product layout handles padding. *)
-      let inspect args =
+      let inspect arm =
         let scanned = ref 0 and raw = ref 0 in
         let nested arms =
-          match make (List.map (fun arm -> [arm]) arms) with
+          match make (separate arms) with
           | None -> raise Unsupported
           | Some repr -> repr
         in
@@ -535,17 +540,11 @@ module Sort = struct
             incr raw;
             fun start -> Field (start + index, base)
         in
-        let first_leaf = !next_leaf in
-        let payload =
-          match args with
-          | [] -> Const.void
-          | [sort] -> sort
-          | sorts -> Const.product sorts
-        in
-        let leaf_count, arguments =
-          match direct_sum payload with
-          | None -> 1, List.map visit args
-          | Some arms ->
+        let first_tag = !next_tag in
+        let tag_count, arguments =
+          match arm with
+          | Fields args -> 1, List.map visit args
+          | Splice arms ->
             let inner = nested arms in
             let tag = Nested_tag (List.hd inner.fields) in
             let slots =
@@ -558,19 +557,18 @@ module Sort = struct
               | [] -> tag
               | _ -> Product (tag :: List.map (fun slot -> slot start) slots)
             in
-            inner.leaf_count, [argument]
+            inner.tag_count, [argument]
         in
-        next_leaf := first_leaf + leaf_count;
+        next_tag := first_tag + tag_count;
         scanned_count := max !scanned_count !scanned;
         fun start ->
-          { first_leaf;
-            payload;
+          { first_tag;
             arguments = List.map (fun project -> project start) arguments
           }
       in
       match List.map inspect arms with
       | exception Unsupported -> None
-      | arms ->
+      | projections ->
         (* A scanned-only sum uses a tagged ordinal. A sum containing raw
            fields uses an unboxed ordinal, so a raw-only array has no roots. *)
         let tag =
@@ -582,18 +580,24 @@ module Sort = struct
           (tag :: List.init !scanned_count (fun _ -> Scannable))
           @ Dynarray.to_list raw_fields
         in
-        let arms = List.map (fun arm -> arm (1 + !scanned_count)) arms in
-        Some { fields; arms = Array.of_list arms; leaf_count = !next_leaf }
+        let projections =
+          List.map (fun arm -> arm (1 + !scanned_count)) projections
+        in
+        Some
+          { fields;
+            arms = Array.of_list projections;
+            tag_count = !next_tag;
+            alternatives = alternatives ~payload arms
+          }
 
     let carrier arms =
-      match make (List.map (fun arm -> [arm]) arms) with
+      match make (separate arms) with
       | None -> Misc.fatal_error "No carrier for an unrepresentable sum"
       | Some repr -> storage_sort repr
 
     let rec physical_sort (s : Const.t) =
       match s with
-      | Sum arms ->
-        Option.map storage_sort (make (List.map (fun arm -> [arm]) arms))
+      | Sum arms -> Option.map storage_sort (make (separate arms))
       | Product fields ->
         Option.map Const.product
           (Misc.Stdlib.List.map_option physical_sort fields)

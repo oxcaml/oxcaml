@@ -67,8 +67,8 @@ let check_block value words =
 let () =
   check_block (Single { inner = Off } : ordinary_nested) 2;
   check_block (Single { inner = On "on" } : ordinary_nested) 2;
-  assert (Obj.repr (pack_nested (Single { inner = Off })) == Obj.repr 1);
-  check_block (pack_nested (Single { inner = On "on" })) 1
+  check_block (pack_nested (Single { inner = Off })) 2;
+  check_block (pack_nested (Single { inner = On "on" })) 2
 
 type nested_product = Absent | Present of { inner : inner#; count : int }
 external box_product : nested_product# -> nested_product = "%box"

@@ -119,6 +119,12 @@ module Sort : sig
   (** Physical storage for a closed sum. Every index refers to the same field
       for all constructors. Field zero holds the constructor's ordinal. *)
   module Sum_repr : sig
+    type 'a source_arm =
+      | Fields of 'a list
+      | Splice of 'a list
+
+    val alternatives : payload:('a list -> 'a) -> 'a source_arm list -> 'a list
+
     type projection =
       | Void
       | Field of int * base
@@ -126,31 +132,25 @@ module Sort : sig
       | Product of projection list
 
     type arm = private
-      { first_leaf : int;
-        arguments : projection list;
-        payload : Const.t
+      { first_tag : int;
+        arguments : projection list
       }
 
     type t = private
       { fields : base list;
         arms : arm array;
-        leaf_count : int
+        tag_count : int;
+        alternatives : Const.t list
       }
 
     (** Arguments within a constructor are in source order. Returns [None] for
         an unknown representation or an unsupported vector or mask. *)
-    val make : Const.t list list -> t option
+    val make : Const.t source_arm list -> t option
 
     val direct_sum : Const.t -> Const.t list option
 
-    (** Flatten direct sum alternatives in tag order. A sum underneath a product
-        has an independent tag and stays in its product. *)
-    val leaf_sorts : Const.t list -> Const.t list
-
-    val leaf_sorts_of_repr : t -> Const.t list
-
-    (** Inclusive upper bound of a source constructor's range of leaf tags. *)
-    val last_leaf : t -> int -> int
+    (** Inclusive upper bound of a source constructor's range of tags. *)
+    val last_tag : t -> int -> int
 
     val carrier : Const.t list -> Const.t
 

@@ -24,6 +24,17 @@ module Jkind = Btype.Jkind0
 let boxed_sum_constructor cstr =
   { cstr with cstr_res = new_box_ty cstr.cstr_res }
 
+let sum_arm cd_args ~direct_sum fields : _ Jkind_types.Sum_repr.source_arm =
+  match cd_args, fields with
+  | Cstr_tuple _, [field] ->
+    (match direct_sum field with
+     | Some arms -> Splice arms
+     | None -> Fields fields)
+  | _ -> Fields fields
+
+let sort_arm cd_args fields =
+  sum_arm cd_args ~direct_sum:Jkind_types.Sum_repr.direct_sum fields
+
 let uses_fused_boxed_tags decl =
   match decl.type_kind with
   | Type_variant (_, Variant_boxed layouts, _) ->
@@ -260,7 +271,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
            | Cstr_layout_undetermined -> None)
          (Array.to_list cstr_layouts) with
        | None -> None (* Temporary recursive environment. *)
-       | Some arms -> Jkind_types.Sum_repr.make arms)
+       | Some arms -> Jkind_types.Sum_repr.make
+           (List.map2 (fun cstr -> sort_arm cstr.cd_args) cstrs arms))
     | _ -> None
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
@@ -307,7 +319,10 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) cstr_tag cstr_shape rep
         ~variant_jkind:decl.type_jkind
         ~sum_arm:(match rep, cstrs with
-          | Variant_unboxed, _ :: _ :: _ -> Some src_index | _ -> None)
+          | Variant_unboxed, _ :: _ :: _ ->
+            Some (match sum with None -> src_index
+              | Some repr -> repr.arms.(src_index).first_tag)
+          | _ -> None)
     in
     let cstr =
       { cstr_name;

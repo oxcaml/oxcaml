@@ -77,7 +77,7 @@ module Sum : sig
     Lambda.layout list ->
     Lambda.lambda list
 
-  (** Read the leaf tag. A nested constructor occupies a range of leaf tags. *)
+  (** Read the outer tag. A fused constructor occupies a range of tags. *)
   val tag :
     Lambda.scoped_location ->
     Jkind_types.Sum_repr.t ->

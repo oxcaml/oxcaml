@@ -283,14 +283,42 @@ Error: The unboxed record field "count" is declared mutable,
 
 type inner_arm = Off | On of int
 type nested_record_arm = Stop | Entry of { inner : inner_arm# }
-type rejected = nested_record_arm#
+type retained : void + (void + value) = nested_record_arm#
 [%%expect{|
 type inner_arm = Off | On of int
 type nested_record_arm = Stop | Entry of { inner : inner_arm#; }
-Line 3, characters 16-34:
-3 | type rejected = nested_record_arm#
-                    ^^^^^^^^^^^^^^^^^^
-Error: The type "nested_record_arm" has no unboxed version.
+type retained = nested_record_arm#
+|}]
+
+type direct_arm = Stop | Entry of inner_arm#
+type fused : void + void + value = direct_arm#
+type wrong : void + (void + value) = direct_arm#
+[%%expect{|
+type direct_arm = Stop | Entry of inner_arm#
+type fused = direct_arm#
+Line 3, characters 0-48:
+3 | type wrong : void + (void + value) = direct_arm#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "direct_arm#" is void + void + value non_pointer
+         because it's an [@@unboxed] type.
+       But the layout of type "direct_arm#" must be a sublayout of
+           void + (void + value)
+         because of the definition of wrong at line 3, characters 0-48.
+       Note: The layout of immediate is value non_pointer.
+|}]
+
+type wrong : void + void + value = nested_record_arm#
+[%%expect{|
+Line 1, characters 0-53:
+1 | type wrong : void + void + value = nested_record_arm#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "nested_record_arm#" is
+           void + (void + value non_pointer)
+         because it's an [@@unboxed] type.
+       But the layout of type "nested_record_arm#" must be a sublayout of
+           void + void + value
+         because of the definition of wrong at line 1, characters 0-53.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type void_record_arm = Stop | Entry of { ignored : unit# }

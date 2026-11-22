@@ -25,12 +25,18 @@ List.iter print_layout
   [ "bits32 & bits32 + void + value"
   ; "(bits32 + value) & bits64"
   ; "bits32 + (void + value)"
+  ; "void + void + value"
+  ; "void + (void + value)"
+  ; "void + (void & (void + value))"
   ];;
 
 [%%expect{|
 type t : (bits32 & bits32) + void + value
 type t : (bits32 + value) & bits64
 type t : bits32 + (void + value)
+type t : void + void + value
+type t : void + (void + value)
+type t : void + (void & (void + value))
 - : unit = ()
 |}];;
 

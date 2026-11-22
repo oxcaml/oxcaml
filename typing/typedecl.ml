@@ -1479,12 +1479,11 @@ let compatible_boxed_arms cstrs layouts =
           Misc.Stdlib.List.map_option (fun label -> label.ld_sort) labels
       in
       Option.bind sorts (fun sorts ->
+        let arm = Datarepr.sort_arm cstr.cd_args sorts in
         if (not (cstr_layout_is_constant layout) &&
             List.for_all Jkind.Sort.Const.all_void sorts) ||
-           (has_record && match sorts with
-            | [sort] -> Option.is_some (Jkind_types.Sum_repr.direct_sum sort)
-            | _ -> false)
-        then None else Some sorts)
+           (has_record && match arm with Splice _ -> true | Fields _ -> false)
+        then None else Some arm)
   in
   let arms = Misc.Stdlib.List.map2_option arm cstrs (Array.to_list layouts) in
   Option.is_some (Option.bind arms Jkind_types.Sum_repr.make)
@@ -2746,16 +2745,24 @@ let rec update_decl_jkind env dpath decl =
           let args, fields = List.split (List.map tuple_field args) in
           Types.Cstr_tuple args, fields
         in
-        let layouts = List.map (fun (_, layout, _) -> layout) fields in
-        let arm = match layouts with
+        { cstr with cd_args }, fields
+      in
+      let cstrs, args = List.split (List.map args_and_layouts cstrs) in
+      let rec direct_sum : _ Jkind_types.Layout.t -> _ = function
+        | Sum arms -> Some arms
+        | Addressable layout -> direct_sum layout
+        | _ -> None in
+      let payload = function
           | [] -> Jkind_types.Layout.Sort
                     (Jkind.Sort.void, Jkind_types.Scannable_axes.max)
-          | _ -> Jkind_types.Layout.product layouts in
-        { cstr with cd_args }, (arm, fields)
-      in
-      let cstrs, arms = List.split (List.map args_and_layouts cstrs) in
-      let layouts, args = List.split arms in
-      let sorts = List.map (List.map (fun (sort, _, _) -> sort)) args in
+          | layouts -> Jkind_types.Layout.product layouts in
+      let layouts = List.map2 (fun cstr fields ->
+        Datarepr.sum_arm cstr.Types.cd_args ~direct_sum
+          (List.map (fun (_, layout, _) -> layout) fields)) cstrs args
+        |> Jkind_types.Sum_repr.alternatives ~payload in
+      let sorts = List.map2 (fun cstr fields ->
+        Datarepr.sort_arm cstr.Types.cd_args
+          (List.map (fun (sort, _, _) -> sort) fields)) cstrs args in
       if Option.is_none (Jkind_types.Sum_repr.make sorts)
       then invalid loc "a vector or mask arm is not supported";
       let fields = List.concat_map (List.map (fun (_, _, f) -> f)) args in
