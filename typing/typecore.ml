@@ -5131,6 +5131,29 @@ let reset_delayed_checks () = delayed_checks := []
 let add_delayed_check f =
   delayed_checks := (f, Warnings.backup ()) :: !delayed_checks
 
+let pending_field_writes = ref None
+
+let with_field_write_checks type_rhs =
+  let checks = ref [] in
+  let rhs =
+    Misc.protect_refs [R (pending_field_writes, Some checks)] type_rhs
+  in
+  List.iter (fun check -> check ()) (List.rev !checks);
+  rhs
+
+let check_field_write check =
+  match !pending_field_writes with
+  | None -> check ()
+  | Some checks -> checks := check :: !checks
+
+let specialize_primitive_value exp =
+  match exp.exp_desc with
+  | Texp_ident { desc = { val_kind = Val_prim prim; val_type; _ }; _ }
+    when prim.prim_is_layout_poly ->
+    Ctype.check_primitive_sum_access Specialized_value ~loc:exp.exp_loc
+      exp.exp_env prim val_type
+  | _ -> ()
+
 let force_delayed_checks () =
   (* checks may change type levels *)
   let snap = Btype.snapshot () in
@@ -7929,6 +7952,8 @@ and type_expect_
             type_expect
               new_env expected_mode sbody ty_expected_explained
           in
+          List.iter (fun vb -> specialize_primitive_value vb.vb_expr)
+            pat_exp_list;
           let pat_exp_list = match rec_flag with
             | Recursive -> annotate_recursive_bindings env pat_exp_list
             | Nonrecursive -> pat_exp_list
@@ -8526,9 +8551,11 @@ and type_expect_
       in
       unify_exp ~sexp env record ty_record;
       if Ctype.may_contain_inline_sum env newval.exp_type then
-        submode ~loc:record.exp_loc ~env rmode
-          (mode_mutate_mutable ~contention:Uncontended
-             (Record_field label.lbl_name));
+        check_field_write (fun () ->
+          if Ctype.may_contain_inline_sum env newval.exp_type then
+            submode ~loc:record.exp_loc ~env rmode
+              (mode_mutate_mutable ~contention:Uncontended
+                 (Record_field label.lbl_name)));
       let record_repres =
         update_labels env Legacy ~representative_label:label ~loc
           ~why:Field_assignment
@@ -11386,13 +11413,7 @@ and type_argument ?explanation ?recarg ~overwrite env mode sarg
   let delayed () =
     let exp = type_argument_ ?explanation ?recarg ~overwrite env mode
         sarg ty_expected' ty_expected in
-    begin match exp.exp_desc with
-    | Texp_ident { desc = { val_kind = Val_prim prim; val_type; _ }; _ }
-      when prim.prim_is_layout_poly ->
-      Ctype.check_primitive_sum_access Specialized_value ~loc:exp.exp_loc
-        env prim val_type
-    | _ -> ()
-    end;
+    specialize_primitive_value exp;
     exp
   in
   if !Clflags.typing_recovery then
@@ -12672,6 +12693,11 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           ~exp_env ~new_env ~spat_sexp_list ~attrs_list ~mode_pat_typ_list ~pvs
           (fun exp_env ({pvb_attributes; _} as vb) mode expected_ty ->
             let sexp = vb_exp_constraint vb in
+            let type_rhs ty =
+              Builtin_attributes.warning_scope pvb_attributes (fun () ->
+                with_field_write_checks (fun () ->
+                  type_expect exp_env mode sexp (mk_expected ty)))
+            in
             match get_desc expected_ty with
             | Tpoly (ty, tl) ->
                 let vars, ty' =
@@ -12680,16 +12706,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                       generalize_structure ty')
                     (fun () -> instance_poly_fixed ~keep_names:true tl ty)
                 in
-                let exp =
-                  Builtin_attributes.warning_scope pvb_attributes (fun () ->
-                    type_expect exp_env mode sexp (mk_expected ty'))
-                in
+                let exp = type_rhs ty' in
                 exp, Some vars
             | _ ->
-                let exp =
-                  Builtin_attributes.warning_scope pvb_attributes (fun () ->
-                    type_expect exp_env mode sexp (mk_expected expected_ty))
-                in
+                let exp = type_rhs expected_ty in
                 exp, None)
       in
       List.iter2

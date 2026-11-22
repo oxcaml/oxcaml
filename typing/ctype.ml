@@ -3571,6 +3571,8 @@ let instance_primitive_destination env prim ty =
         then ty
         else
           let fresh, _ = With_locality.newvar_below !current_level arg_mode in
+          Mode.Contention.update_level 0
+            (With_locality.proj_monadic Contention fresh);
           With_locality.submode_exn arg_mode
             (With_locality.join_const_with Contention
                Mode.Contention.Const.Contended fresh);

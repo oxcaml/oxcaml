@@ -43,3 +43,15 @@ let higher_order = accept_setter weak_set
 let update_ref (dst : target ref @ uncontended) v = dst := v
 let via_address (dst : target addr @ write uncontended) v = store dst v
 let via_index (dst : cell @ write uncontended) v = set_idx dst (.data) v
+
+let replace_through_alias (dst : target array @ write uncontended) value =
+  let setter = weak_set in setter dst 0 value
+
+let replace_integer_through_alias (dst : int array @ write corrupted) value =
+  let setter = weak_set in setter dst 0 value
+
+type ('a : any) generic_cell = { mutable payload : 'a; tag : int }
+
+let update_integer (dst : _ generic_cell @ write corrupted) value =
+  dst.payload <- value;
+  value + 1
