@@ -690,6 +690,47 @@ built with that variant. Bytecode and JSIR have no codegen variants:
 bytecode and JSIR compilations, the bytecode toplevel and bytecode expect
 tests ignore the selection and use the default library tree.
 
+A test that is about an axis, and not about one variant, says what it
+needs of the variant instead of naming one. The value of
+=codegen_variant= is then made of signed axes, =+AXIS= (the axis is on)
+and =-AXIS= (it is off), where =AXIS= is =asan=, =fp=, =poll= or =sc=:
+
+#+begin_src
+(* TEST
+  {
+    codegen_variant = "+fp -sc";
+    variant_available;
+    native;
+  }
+*)
+#+end_src
+
+The syntax follows the warning options of the compilers (=-w +a-4=): the
+blanks between the signed axes are optional, so =+fp-sc= and =+fp -sc=
+both ask for =fp= on and =sc= off. A value whose first character, blanks
+aside, is a sign is requirements. Any other value is the name of a
+variant: it has no blank and no =+=, and its hyphens separate the axes
+that are on, so =fp-sc= is the variant with both axes on.
+
+The block runs under the variant that the run uses anyway (the one given
+with =-codegen-variant=, else the default variant of the compiler under
+test) when that one meets the requirements, and otherwise under the
+variant of the compiler under test that meets them and differs from it on
+the fewest axes (of several such variants, the default one if it is among
+them, else the first by name). =variant_available= skips the block when
+there is none. A value of =codegen_variant= that is neither the name of a
+variant nor a list of requirements is a mistake, not a variant that the
+compiler lacks: it fails the block, in =variant_available= and in
+whatever else reads the selection (a compilation, a script, a predicate
+on the variant). A block that selects a variant which the compiler under
+test does not have fails as well where it would compile, link or run a
+command for that variant: guard it with =variant_available=.
+Such a test runs with every compiler that has a variant for it, whatever
+its default variant and the list of variants it was built with, and under
+each =-codegen-variant= that meets the requirements. Name a variant only
+when the test is about that variant, for example because its reference
+output shows every axis.
+
 The predicates =frame_pointers=, =no-frame_pointers=, =stack-checks=,
 =no-stack-checks=, =poll-insertion=, =no-poll-insertion=,
 =no-address-sanitizer= and =multicore= (which requires poll insertion) look

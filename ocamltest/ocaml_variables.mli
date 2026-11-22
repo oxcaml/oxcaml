@@ -48,6 +48,8 @@ val codegen_exit_status : Variables.t
 
 val codegen_variant : Variables.t
 
+val codegen_variant_stdlib : Variables.t
+
 val compare_programs : Variables.t
 
 val compiler_directory_suffix : Variables.t

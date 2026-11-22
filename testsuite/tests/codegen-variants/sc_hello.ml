@@ -1,11 +1,11 @@
 (* TEST
  {
-   codegen_variant = "sc";
+   codegen_variant = "+sc -fp";
    variant_available;
    compiler_directory_suffix = ".sc";
    native;
  }{
-   codegen_variant = "fp-sc";
+   codegen_variant = "+sc +fp";
    variant_available;
    compiler_directory_suffix = ".fp-sc";
    native;

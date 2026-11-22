@@ -51,6 +51,8 @@ let print_exn loc e bt =
       sprintf "This is not the name of a test or an action: \"%s\".\n" name
     | Ocaml_actions.Cannot_compile_file_type t ->
       sprintf "Cannot compile files of type %s.\n" t
+    | Ocaml_flags.Invalid_codegen_variant message ->
+      sprintf "%s.\n" message
     | _ ->
       sprintf "Unexpected exception: %s\n%s" (Printexc.to_string e) bt
   in

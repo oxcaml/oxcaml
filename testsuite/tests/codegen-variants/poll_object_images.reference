@@ -1,0 +1,4 @@
+unit info with polls, object file without, another image: refused, as an object file without polls
+unit info and object file with polls, another image: fully polled, the loop polls
+unit info with polls, object file without, in a plugin: refused, as an object file without polls
+unit info and object file with polls, in a plugin: links

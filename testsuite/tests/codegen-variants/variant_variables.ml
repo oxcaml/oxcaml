@@ -4,6 +4,14 @@
  cflags += " -DFROM_TEST";
  output = "variant_variables.output";
  {
+ (* A test that assigns stdlib keeps its value, also when that value is a
+    library tree of the compiler under test and a variant is selected. *)
+   codegen_variant = "fp";
+   variant_available;
+   stdlib = "${ocamlsrcdir}/stdlib";
+   script = "sh ${test_source_directory}/variant_variables.sh own-stdlib ${ocamlsrcdir}/stdlib";
+   script;
+ }{
    compiler_directory_suffix = ".sc";
    setup-ocamlopt.byte-build-env;
    codegen_variant = "sc";
@@ -64,7 +72,7 @@
  }{
    compiler_directory_suffix = ".no-asan";
    setup-ocamlopt.byte-build-env;
-   codegen_variant = "fp";
+   codegen_variant = "-asan";
    variant_available;
    all_modules = "variant_variables_.c variant_variables.ml";
    ocamlopt_flags = "-ccopt '${cflags}'";

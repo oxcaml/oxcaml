@@ -17,6 +17,12 @@ case "$1" in
     $mkexe -DSTANDALONE -I"$runtime" -o standalone.exe variant_variables_.c
     ./standalone.exe
     ;;
+  own-stdlib)
+    if [ "$stdlib" != "$2" ]; then
+      echo "stdlib is $stdlib, and the test assigned $2"
+      exit 1
+    fi
+    ;;
   bytecode)
     for flags in "$cflags" "$mkexe"; do
       case "$flags" in

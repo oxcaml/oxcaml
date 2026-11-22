@@ -127,7 +127,7 @@ let hasstr = make
    install's default) enables poll insertion.  One predicate guards both
    the byte and native legs of a test block, so it conservatively requires
    the native condition even though bytecode is always fully polled; set
-     codegen_variant = "poll";  (or another poll-enabled variant name)
+     codegen_variant = "+poll";  (or the name of a variant that polls)
    before this predicate to opt a test in when the variant of the run
    does not poll. *)
 let multicore_possible_and_allowed variant =

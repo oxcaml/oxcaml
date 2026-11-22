@@ -1,0 +1,3 @@
+unit info of the tree with polls, object file of the tree without: refused, as an object file without polls
+unit info and object file of the tree with polls: fully polled, the loop polls
+unit info of the tree with polls, object file that both trees have: fully polled, the loop polls

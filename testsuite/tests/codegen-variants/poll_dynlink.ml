@@ -1,5 +1,5 @@
 (* TEST
- codegen_variant = "poll";
+ codegen_variant = "+poll";
  variant_available;
  shared-libraries;
  native-dynlink;

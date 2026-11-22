@@ -1,5 +1,5 @@
 (* TEST
- codegen_variant = "fp-sc";
+ codegen_variant = "+fp +sc";
  variant_available;
  arch_amd64;
  readonly_files = "sc_stub_omit_fp_.c";

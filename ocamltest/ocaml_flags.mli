@@ -19,9 +19,24 @@
    utils/config.ml. *)
 val default_codegen_variant : string
 
-(* The test's own selection: the value of the [codegen_variant] TSL
-   variable ([None] when unset or empty). *)
+(* The test's own selection, from the [codegen_variant] TSL variable
+   ([None] when unset or empty).  The value is the name of a variant, or
+   what the test needs of one: signed axes, +<axis> (the axis is on) and
+   -<axis> (it is off), with or without blanks between them, as in "+fp",
+   "+fp-sc" or "+fp -sc".  A value whose first character, blanks aside,
+   is a sign is requirements; any other value is a name.  The selection is
+   then the variant that the run uses anyway (the suite variant, else the
+   install's default) when that one meets the requirements, and otherwise
+   the available variant that meets them and differs from it on the fewest
+   axes; when none is available, the variant that would have been
+   closest, which [codegen_variant_available] then refuses.  A value that
+   is neither a name nor requirements raises [Invalid_codegen_variant],
+   here and in everything below that reads the selection. *)
 val test_codegen_variant : Environments.t -> string option
+
+(* A value of [codegen_variant] that is neither a variant name nor
+   requirements.  The argument is the error to report for it. *)
+exception Invalid_codegen_variant of string
 
 (* The selection for the whole run: the operand of -codegen-variant, when
    it names a variant other than the install's default ([None] otherwise:
@@ -43,8 +58,7 @@ val effective_codegen_variant : Environments.t -> string
    variant. *)
 val non_default_codegen_variant : Environments.t -> string option
 
-(* Whether [effective_codegen_variant] enables the given axis ([false] for
-   unknown variant names, which the compile actions reject loudly). *)
+(* Whether [effective_codegen_variant] enables the given axis. *)
 val effective_codegen_variant_mem :
   Environments.t -> Codegen_variant_name.token -> bool
 
@@ -57,7 +71,9 @@ val has_variant_work : Actions.task -> bool
 
 (* [variant_work_for env task] marks [task], which runs a command that is
    given the effective variant (a program built for it, its C flags, its
-   OCAMLPARAM keys), when that variant is not the default one. *)
+   OCAMLPARAM keys), when that variant is not the default one.  When the
+   install does not have that variant, the result is a failure that says
+   so instead: such a block needs the [variant_available] guard. *)
 val variant_work_for : Environments.t -> Actions.task -> Actions.task
 
 (* [variant_work_for] for a task that runs a compiler for [backend] with
@@ -124,10 +140,12 @@ val variant_library_directories :
 val variant_include_flags :
   Environments.t -> backend:Ocaml_backends.t -> string -> string
 
-(* [env] with [stdlib] bound to the library tree of the effective variant,
-   unless the test gave the variable a value of its own (one that is not a
-   library tree of the install).  Applied before every test and action of
-   a test file, so the variable follows the selection. *)
+(* What [stdlib] is bound to at the start of a test: a reference to the
+   variable [codegen_variant_stdlib].  [with_variant_stdlib env] is [env]
+   with that variable bound to the library tree of the effective variant;
+   it is applied before every test and action of a test file, so [stdlib]
+   follows the selection for as long as the test does not assign it. *)
+val variant_stdlib_reference : string
 val with_variant_stdlib : Environments.t -> Environments.t
 
 (* Takes out of the environment of ocamltest, which its commands inherit,

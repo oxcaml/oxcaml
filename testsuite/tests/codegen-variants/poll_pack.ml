@@ -1,5 +1,5 @@
 (* TEST
- codegen_variant = "poll";
+ codegen_variant = "+poll";
  variant_available;
  readonly_files = "poll_pack_member_a.ml poll_pack_member_b.ml";
  {

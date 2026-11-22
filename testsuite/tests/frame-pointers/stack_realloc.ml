@@ -1,6 +1,6 @@
 (* TEST
  {
-   codegen_variant = "fp";
+   codegen_variant = "+fp -sc";
    variant_available;
    script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
    config_script;
@@ -25,7 +25,7 @@
     (runtime/fiber.c) across the C stub's frame: the backtrace below the
     growth cannot come out identical if the reallocation fails (the fiber
     is too small for the recursion) or rewrites the chain incorrectly. *)
-   codegen_variant = "fp-sc";
+   codegen_variant = "+fp +sc";
    variant_available;
    script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
    config_script;

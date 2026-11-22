@@ -1,0 +1,5 @@
+the unit runs
+same.cmxs: loaded
+raw_same.cmxs: loaded
+other.cmxs: refused by Dynlink, as compiled for another variant
+other_printf.cmxs: refused by Dynlink, as compiled for another variant

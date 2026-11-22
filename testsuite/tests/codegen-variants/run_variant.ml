@@ -1,6 +1,6 @@
 (* TEST
  readonly_files = "sc_unit.ml";
- codegen_variant = "sc";
+ codegen_variant = "+sc";
  variant_available;
  setup-ocamlopt.byte-build-env;
  program = "${ocamlrun}";

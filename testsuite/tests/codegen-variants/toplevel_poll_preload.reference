@@ -16,3 +16,4 @@ in a directory of the library root, original.cmxs by directive: File not found: 
 after #cd between directories outside the library root: the current directory
 after #cd out of the library root, by a script: the tree of the other setting
 after #cd into the library root: in the counterpart of the directory
+-nocwd in the directory of the standard library: still found

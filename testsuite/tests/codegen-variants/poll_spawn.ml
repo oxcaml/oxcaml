@@ -1,6 +1,6 @@
 (* TEST
  {
-   codegen_variant = "poll";
+   codegen_variant = "+poll";
    variant_available;
    multicore;
    compiler_directory_suffix = ".poll";

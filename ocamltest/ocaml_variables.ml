@@ -100,8 +100,13 @@ let codegen_exit_status = make ("codegen_exit_status",
   "Expected exit status of codegen")
 
 let codegen_variant = make ("codegen_variant",
-  "Codegen variant name (e.g. \"base\" or \"fp\") to compile and link \
-   native code for")
+  "Codegen variant to compile and link native code for: its name (e.g. \
+   \"base\" or \"fp\"), or the axes it must have on or off (e.g. \
+   \"+fp\" or \"+fp-sc\")")
+
+let codegen_variant_stdlib = make ("codegen_variant_stdlib",
+  "Library tree of the codegen variant in effect: what stdlib is, for as \
+   long as the test does not assign stdlib")
 
 let compare_programs = make ("compare_programs",
   "Set to \"false\" to disable program comparison")
@@ -317,6 +322,7 @@ let init () =
     caml_ld_library_path;
     codegen_exit_status;
     codegen_variant;
+    codegen_variant_stdlib;
     compare_programs;
     compiler_directory_suffix;
     compiler_reference;

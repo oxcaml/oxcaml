@@ -1,17 +1,17 @@
 (* TEST
  ocamlrunparam += ",l=200000";
  {
-   codegen_variant = "base";
+   codegen_variant = "-sc";
    variant_available;
    compiler_directory_suffix = ".base";
    native;
  }{
-   codegen_variant = "sc";
+   codegen_variant = "+sc -fp";
    variant_available;
    compiler_directory_suffix = ".sc";
    native;
  }{
-   codegen_variant = "fp-sc";
+   codegen_variant = "+sc +fp";
    variant_available;
    compiler_directory_suffix = ".fp-sc";
    native;

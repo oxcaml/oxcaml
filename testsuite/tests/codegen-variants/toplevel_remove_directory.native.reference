@@ -1,0 +1,5 @@
+val listed : string -> bool = <fun>
+val listed_after : (string -> 'a) -> bool = <fun>
+- : bool = true
+- : bool = false
+

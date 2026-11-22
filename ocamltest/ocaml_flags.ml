@@ -33,18 +33,51 @@ let default_codegen_variant =
            then []
            else [Codegen_variant_name.Stack_checks])))
 
+let codegen_variant_directory name =
+  if String.equal name default_codegen_variant
+  then Ocaml_directories.stdlib
+  else
+    Ocamltest_stdlib.Filename.make_path
+      [Ocaml_directories.stdlib; "variants"; name]
+
+(* Whether the tested install can compile and link native code for the named
+   codegen variant: either the variant is the configure-time default (served
+   by the standard-library root itself), or the install provides a library
+   tree for it under <stdlib>/variants/.  Checked against the actual tree
+   being tested rather than configure-time truth, so that predicates stay
+   correct if the variant trees are absent (e.g. --disable-codegen-variants
+   builds, or incomplete installs). *)
+let codegen_variant_available name =
+  String.equal name default_codegen_variant
+  || (let dir = codegen_variant_directory name in
+      Sys.file_exists dir && Sys.is_directory dir)
+
+let available_codegen_variants =
+  let available =
+    lazy
+      (let variants =
+         Ocamltest_stdlib.Filename.make_path
+           [Ocaml_directories.stdlib; "variants"]
+       in
+       let installed =
+         if Sys.file_exists variants && Sys.is_directory variants
+         then
+           List.filter codegen_variant_available
+             (List.sort String.compare (Array.to_list (Sys.readdir variants)))
+         else []
+       in
+       default_codegen_variant :: installed)
+  in
+  fun () -> Lazy.force available
+
 (* A codegen variant (absolute name, e.g. "base" or "fp"; see
    utils/codegen_variant_name.ml, copied into ocamltest) is selected either
    by a test, with the [codegen_variant] TSL variable, or for the whole run,
    with the -codegen-variant option (the "suite variant").  The test's
    selection wins; an empty [codegen_variant] selects nothing, so the suite
-   variant applies. *)
-let test_codegen_variant env =
-  match Environments.safe_lookup Ocaml_variables.codegen_variant env with
-  | "" -> None
-  | name -> Some name
+   variant applies.
 
-(* Asking for the install's default variant is the same as not asking:
+   Asking for the install's default variant is the same as not asking:
    [make test CODEGEN_VARIANT=base] on a base-default install is
    [make test]. *)
 let suite_codegen_variant =
@@ -52,6 +85,201 @@ let suite_codegen_variant =
   | "" -> None
   | name when String.equal name default_codegen_variant -> None
   | name -> Some name
+
+(* A value of [codegen_variant] that is neither a name nor requirements is
+   an error of the test, reported wherever the selection is read: a
+   misspelled selection must look neither like a variant that the install
+   lacks nor like no selection at all.  The exception carries the message,
+   which starts with the same words whatever the [reason]. *)
+exception Invalid_codegen_variant of string
+
+let invalid_codegen_variant ?reason selection =
+  let message =
+    Printf.sprintf
+      "codegen_variant \"%s\" is neither the name of a codegen variant (such \
+       as \"base\" or \"fp-sc\") nor requirements, which are signed axes \
+       (such as \"+fp-sc\" for fp on and sc off)"
+      selection
+  in
+  raise
+    (Invalid_codegen_variant
+       (match reason with
+        | None -> message
+        | Some reason -> message ^ ": " ^ reason))
+
+(* The variant that [name] names.  Every name that ocamltest computes with
+   is one: the install's default variant, the suite variant (checked at
+   startup) or a test's selection (checked by [test_codegen_variant]). *)
+let variant_of_name name =
+  match Codegen_variant_name.of_string name with
+  | Some variant -> variant
+  | None -> invalid_codegen_variant name
+
+(* A test selects a variant by its name ("fp-sc"), or by what it needs of
+   one: signed axes, +<axis> (the axis is on) and -<axis> (it is off), as
+   in "+fp" or "+fp-sc".  The syntax is that of the warning options of the
+   compilers (-w +a-4): a value whose first character other than a blank
+   is a sign is requirements, and is split at every sign and at blanks, so
+   that "+fp-sc" and "+fp -sc" are the same.  Each axis is given once. *)
+let is_blank c = Char.equal c ' ' || Char.equal c '\t'
+
+let is_sign c = Char.equal c '+' || Char.equal c '-'
+
+let is_requirements selection =
+  let length = String.length selection in
+  let rec first_character i =
+    i < length
+    && (is_sign selection.[i]
+        || (is_blank selection.[i] && first_character (i + 1)))
+  in
+  first_character 0
+
+let requirements_of_selection selection =
+  let invalid reason = invalid_codegen_variant ~reason selection in
+  let length = String.length selection in
+  let rec word_end i =
+    if i < length && not (is_sign selection.[i] || is_blank selection.[i])
+    then word_end (i + 1)
+    else i
+  in
+  let rec requirements_from i requirements =
+    if i >= length
+    then List.rev requirements
+    else if is_blank selection.[i]
+    then requirements_from (i + 1) requirements
+    else if is_sign selection.[i]
+    then begin
+      let j = word_end (i + 1) in
+      let name = String.sub selection (i + 1) (j - i - 1) in
+      match Codegen_variant_name.token_of_name name with
+      | Some token ->
+        if List.exists
+             (fun (other, _) -> Codegen_variant_name.equal_token token other)
+             requirements
+        then invalid (Printf.sprintf "the axis %s is given twice" name)
+        else
+          requirements_from j
+            ((token, Char.equal selection.[i] '+') :: requirements)
+      | None ->
+        invalid
+          (if String.equal name ""
+           then "a sign is followed by the name of an axis"
+           else if Option.is_some (Codegen_variant_name.of_string name)
+           then
+             Printf.sprintf "\"%s\" is the name of a variant, not an axis"
+               name
+           else
+             Printf.sprintf "\"%s\" is not an axis (the axes are %s)" name
+               (String.concat ", "
+                  (List.map Codegen_variant_name.token_name
+                     Codegen_variant_name.all_tokens)))
+    end
+    else
+      let j = word_end i in
+      invalid
+        (Printf.sprintf "\"%s\" has no sign" (String.sub selection i (j - i)))
+  in
+  requirements_from 0 []
+
+(* A value that does not start with a sign is the name of a variant.  One
+   that has a sign or a blank further on is likely a slip between the two
+   forms, so the error shows what each form would be. *)
+let variant_of_selection selection =
+  match Codegen_variant_name.of_string selection with
+  | Some variant -> variant
+  | None ->
+    if String.exists (fun c -> Char.equal c '+' || is_blank c) selection
+    then
+      let requirement = "+" ^ selection in
+      invalid_codegen_variant selection
+        ~reason:
+          (match requirements_of_selection requirement with
+           | requirements ->
+             Printf.sprintf
+               "requirements start with a sign, blanks aside (\"%s\" asks \
+                for %s); a name has no sign in front, no blank and no \"+\" \
+                (\"%s\" is the name of the variant with these axes on)"
+               requirement
+               (String.concat ", "
+                  (List.map
+                     (fun (token, enabled) ->
+                       Codegen_variant_name.token_name token
+                       ^ if enabled then " on" else " off")
+                     requirements))
+               (Codegen_variant_name.to_string
+                  (Codegen_variant_name.of_tokens (List.map fst requirements)))
+           | exception Invalid_codegen_variant _ ->
+             "requirements start with a sign, blanks aside; a name has no \
+              sign in front, no blank and no \"+\"")
+    else invalid_codegen_variant selection
+
+(* A test that is about an axis, and not about one variant, states its
+   requirements.  It then runs under the variant that the run uses anyway
+   (the suite variant, else the install's default) when that one meets
+   them, and otherwise under the available variant that meets them and
+   differs from it on the fewest axes (the first such one in
+   [available_codegen_variants]).  So it runs wherever some variant will
+   do, whatever the default and the list of variants of the install, and
+   under each suite variant that will do.  When no available variant meets
+   the requirements, the result is the one that would have been closest,
+   for [variant_available] to report. *)
+let variant_meeting requirements =
+  let run_variant =
+    variant_of_name
+      (Option.value suite_codegen_variant ~default:default_codegen_variant)
+  in
+  let required token =
+    List.find_map
+      (fun (required, enabled) ->
+        if Codegen_variant_name.equal_token required token
+        then Some enabled
+        else None)
+      requirements
+  in
+  let meets variant =
+    List.for_all
+      (fun (token, enabled) ->
+        Bool.equal (Codegen_variant_name.mem token variant) enabled)
+      requirements
+  in
+  let distance variant =
+    List.length
+      (List.filter
+         (fun token ->
+           not
+             (Bool.equal
+                (Codegen_variant_name.mem token variant)
+                (Codegen_variant_name.mem token run_variant)))
+         Codegen_variant_name.all_tokens)
+  in
+  let closest best name =
+    match Codegen_variant_name.of_string name with
+    | Some variant when meets variant ->
+      (match best with
+       | Some (_, best_distance) when best_distance <= distance variant ->
+         best
+       | Some _ | None -> Some (name, distance variant))
+    | Some _ | None -> best
+  in
+  match List.fold_left closest None (available_codegen_variants ()) with
+  | Some (name, _) -> name
+  | None ->
+    Codegen_variant_name.to_string
+      (Codegen_variant_name.of_tokens
+         (List.filter
+            (fun token ->
+              Option.value (required token)
+                ~default:(Codegen_variant_name.mem token run_variant))
+            Codegen_variant_name.all_tokens))
+
+let test_codegen_variant env =
+  match Environments.safe_lookup Ocaml_variables.codegen_variant env with
+  | "" -> None
+  | selection ->
+    if is_requirements selection
+    then Some (variant_meeting (requirements_of_selection selection))
+    else
+      Some (Codegen_variant_name.to_string (variant_of_selection selection))
 
 (* The selected variant is what everything that generates or loads native
    code targets: compilations and links, which get the variant's flags
@@ -120,13 +348,9 @@ let has_variant_work (task : Actions.task) =
 (* Per-axis read of the effective variant, for the axis predicates
    (frame_pointers, stack-checks, poll-insertion, address-sanitizer and
    their duals): each predicate's meaning is the axis's value in the
-   variant the block actually compiles for, not the raw configure default.
-   An unknown variant name has no axes ([false] for every token); the
-   compile actions reject such names loudly ([codegen_variant_flags]). *)
+   variant the block actually compiles for, not the raw configure default. *)
 let codegen_variant_name_mem name token =
-  match Codegen_variant_name.of_string name with
-  | Some variant -> Codegen_variant_name.mem token variant
-  | None -> false
+  Codegen_variant_name.mem token (variant_of_name name)
 
 let effective_codegen_variant_mem env token =
   codegen_variant_name_mem (effective_codegen_variant env) token
@@ -151,54 +375,30 @@ let codegen_variant_axis_predicate token ~enabled =
   codegen_variant_predicate (fun name ->
     Bool.equal (codegen_variant_name_mem name token) enabled)
 
-let codegen_variant_directory name =
-  if String.equal name default_codegen_variant
-  then Ocaml_directories.stdlib
-  else
-    Ocamltest_stdlib.Filename.make_path
-      [Ocaml_directories.stdlib; "variants"; name]
-
-(* Whether the tested install can compile and link native code for the named
-   codegen variant: either the variant is the configure-time default (served
-   by the standard-library root itself), or the install provides a library
-   tree for it under <stdlib>/variants/.  Checked against the actual tree
-   being tested rather than configure-time truth, so that predicates stay
-   correct if the variant trees are absent (e.g. --disable-codegen-variants
-   builds, or incomplete installs). *)
-let codegen_variant_available name =
-  String.equal name default_codegen_variant
-  || (let dir = codegen_variant_directory name in
-      Sys.file_exists dir && Sys.is_directory dir)
-
-let available_codegen_variants () =
-  let variants =
-    Ocamltest_stdlib.Filename.make_path [Ocaml_directories.stdlib; "variants"]
-  in
-  let installed =
-    if Sys.file_exists variants && Sys.is_directory variants
-    then
-      List.filter codegen_variant_available
-        (List.sort String.compare (Array.to_list (Sys.readdir variants)))
-    else []
-  in
-  default_codegen_variant :: installed
-
 let codegen_variant_flags env backend =
   match backend, codegen_variant env with
   | Ocaml_backends.(Bytecode | Jsir_js | Jsir_wasm), _ | _, None -> ""
   | Ocaml_backends.Native, Some name ->
-    (match Codegen_variant_name.of_string name with
-     | Some variant ->
-       String.concat " " (Codegen_variant_name.ocamlopt_flags variant)
-     | None ->
-       Printf.ksprintf failwith
-         "unknown codegen_variant %S (expected a variant name such as \
-          \"base\" or \"fp\")" name)
+    String.concat " "
+      (Codegen_variant_name.ocamlopt_flags (variant_of_name name))
 
-(* [task] runs a command that is given the selected variant. *)
+(* [task] runs a command that is given the selected variant.  A variant
+   that the install lacks can only be a test's own selection (the suite
+   variant is checked at startup), in a block that [variant_available]
+   does not guard: the command would run for another variant, or fail for
+   a reason that does not say so. *)
 let variant_work_for env task =
   match non_default_codegen_variant env with
-  | Some _ -> variant_work task
+  | Some name when codegen_variant_available name -> variant_work task
+  | Some name ->
+    Actions.Static
+      (Result.fail_with_reason
+         (Printf.sprintf
+            "the compiler under test has no codegen variant %s (selected \
+             by codegen_variant = \"%s\"): guard the block with \
+             variant_available"
+            name
+            (Environments.safe_lookup Ocaml_variables.codegen_variant env)))
   | None -> task
 
 (* [variant_work_for] for a compiler for [backend], which is given the
@@ -329,22 +529,22 @@ let stdlib env ~backend =
 (* [stdlib] is the library tree of the effective variant, in every block:
    the bytecode files are the same in every tree, and a block set up for a
    bytecode compiler may start native compilers too.  The variable follows
-   the selection: it is bound again before every test and action of a test
-   file ([Main.run_test_tree]).  A value that is not a library tree of the
-   install is one that the test assigned, and stays. *)
+   the selection through [codegen_variant_stdlib]: it starts out as a
+   reference to that variable ([variant_stdlib_reference]), which is bound
+   again before every test and action of a test file
+   ([Main.run_test_tree]).  A test that assigns [stdlib] replaces the
+   reference, so its value stays, whatever it is.  A selection that is
+   not valid is left for what reads it next to report. *)
+let variant_stdlib_reference =
+  Printf.sprintf "${%s}"
+    (Variables.name_of_variable Ocaml_variables.codegen_variant_stdlib)
+
 let with_variant_stdlib env =
-  let is_library_tree dir =
-    String.equal dir Ocaml_directories.stdlib
-    || String.equal (Filename.dirname dir)
-         (Ocamltest_stdlib.Filename.make_path
-            [Ocaml_directories.stdlib; "variants"])
-  in
-  match Environments.lookup Ocaml_variables.stdlib env with
-  | Some dir when not (is_library_tree dir) -> env
-  | Some _ | None ->
-    Environments.add Ocaml_variables.stdlib
-      (codegen_variant_directory (effective_codegen_variant env))
-      env
+  match effective_codegen_variant env with
+  | name ->
+    Environments.add Ocaml_variables.codegen_variant_stdlib
+      (codegen_variant_directory name) env
+  | exception Invalid_codegen_variant _ -> env
 
 (* The C code that a test builds itself, with the [cc] action or from a
    script, goes into the programs of its block.  Native programs are built
@@ -442,10 +642,8 @@ let inherited_axis_settings () =
 let variant_cc_flags env =
   match non_default_codegen_variant env with
   | Some name when builds_native_programs env ->
-    (match Codegen_variant_name.of_string name with
-     | Some variant ->
-       String.concat " " (Codegen_variant_name.variant_cc_flags variant)
-     | None -> "")
+    String.concat " "
+      (Codegen_variant_name.variant_cc_flags (variant_of_name name))
   | Some _ | None -> ""
 
 let cflags env =
@@ -489,33 +687,25 @@ let command_environment env =
   match non_default_codegen_variant env with
   | None -> env
   | Some name ->
-    (match Codegen_variant_name.of_string name with
-     | None -> env
-     | Some variant ->
-       let keys = Codegen_variant_name.ocamlparams variant in
-       let current =
-         if Environments.is_variable_defined Ocaml_variables.ocamlparam env
-         then Environments.safe_lookup Ocaml_variables.ocamlparam env
-         else Ocamltest_stdlib.Sys.safe_getenv "OCAMLPARAM"
-       in
-       let value =
-         if String.equal current ""
-         then String.concat "," (keys @ ["_"])
-         else
-           (* A value may start with the separator that it uses. *)
-           match current.[0] with
-           | (':' | '|' | ';' | ' ' | ',') as separator ->
-             let separator = String.make 1 separator in
-             separator ^ String.concat separator keys ^ current
-           | _ -> String.concat "," keys ^ "," ^ current
-       in
-       let env = Environments.add Ocaml_variables.ocamlparam value env in
-       (match variant_cc_flags env with
-        | "" -> env
-        | variant_flags ->
-          env
-          |> Environments.append Ocaml_variables.cflags (" " ^ variant_flags)
-          |> Environments.append Ocaml_variables.mkexe (" " ^ variant_flags)))
+    let keys = Codegen_variant_name.ocamlparams (variant_of_name name) in
+    let current =
+      if Environments.is_variable_defined Ocaml_variables.ocamlparam env
+      then Environments.safe_lookup Ocaml_variables.ocamlparam env
+      else Ocamltest_stdlib.Sys.safe_getenv "OCAMLPARAM"
+    in
+    let value =
+      if String.equal current ""
+      then String.concat "," (keys @ ["_"])
+      else
+        (* A value may start with the separator that it uses. *)
+        match current.[0] with
+        | (':' | '|' | ';' | ' ' | ',') as separator ->
+          let separator = String.make 1 separator in
+          separator ^ String.concat separator keys ^ current
+        | _ -> String.concat "," keys ^ "," ^ current
+    in
+    with_variant_c_flags
+      (Environments.add Ocaml_variables.ocamlparam value env)
 
 (* What a command of this kind does with the variant is not visible from
    here, so it counts as work that depends on it. *)

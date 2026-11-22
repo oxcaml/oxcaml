@@ -1,5 +1,5 @@
 (* TEST
- codegen_variant = "fp";
+ codegen_variant = "+fp";
  variant_available;
  flags = "-no-frame-pointers";
  set OCAMLPARAM = "_,frame-pointers=1";
@@ -8,10 +8,10 @@
 
 (* frame-pointers=1 in the post-underscore part of OCAMLPARAM overrides the
    command line (here an explicit -no-frame-pointers, which itself overrides
-   the -frame-pointers that codegen_variant = "fp" injects), so the fp mode
-   of this binary comes from OCAMLPARAM alone.  codegen_variant = "fp" is
-   still needed so that ocamltest compiles and links against the fp library
-   root. *)
+   the -frame-pointers that the selected variant injects), so the fp mode
+   of this binary comes from OCAMLPARAM alone.  A variant with frame
+   pointers is still selected so that ocamltest compiles and links against
+   a library root built with them. *)
 
 external frame_pointers : bool = "%frame_pointers"
 

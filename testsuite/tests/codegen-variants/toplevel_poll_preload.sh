@@ -107,3 +107,11 @@ echo "after #cd into the library root:" \
   "$(printf '#cd "%s";;\n#directory ".";;\n#load "counterpart.cmxs";;\n' \
        "$root/pkg" \
      | $toplevel $flag 2>&1)"
+
+# The toplevel of the other variant, started in the library root: its
+# current directory and its standard library are then one directory, and
+# -nocwd only takes away the entry for the first.
+host="$ocamlsrcdir/testsuite/tools/variants/$other/ocamlnat"
+echo "-nocwd in the directory of the standard library:" \
+  "$(cd "$root" && echo 'let () = print_endline "still found";;' \
+     | $host -noinit -no-version -noprompt -nocwd 2>&1)"

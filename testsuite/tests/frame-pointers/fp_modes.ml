@@ -1,12 +1,12 @@
 (* TEST
  {
-   codegen_variant = "fp";
+   codegen_variant = "+fp";
    variant_available;
    compiler_directory_suffix = ".fp";
    reference = "${test_source_directory}/fp_modes.fp.reference";
    native;
  }{
-   codegen_variant = "base";
+   codegen_variant = "-fp";
    variant_available;
    compiler_directory_suffix = ".base";
    reference = "${test_source_directory}/fp_modes.base.reference";

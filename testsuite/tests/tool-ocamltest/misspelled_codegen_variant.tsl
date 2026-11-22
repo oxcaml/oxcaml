@@ -1,0 +1,5 @@
+(* CHILDTEST
+ codegen_variant = "sc-fp";
+ variant_available;
+ native;
+*)

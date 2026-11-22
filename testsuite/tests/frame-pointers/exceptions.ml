@@ -1,5 +1,5 @@
 (* TEST
-   codegen_variant = "fp";
+   codegen_variant = "+fp";
    variant_available;
    script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
    config_script;

@@ -1,5 +1,5 @@
 (* TEST
- codegen_variant = "asan-fp";
+ codegen_variant = "+asan";
  variant_available;
  readonly_files = "asan_fno_asan_unit.ml";
  setup-ocamlopt.byte-build-env;

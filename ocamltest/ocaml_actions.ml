@@ -1366,6 +1366,7 @@ let config_variables _log env =
     Ocaml_variables.ocamlc_byte, Ocaml_files.ocamlc;
     Ocaml_variables.ocamlopt_byte, Ocaml_files.ocamlopt;
     Ocaml_variables.runtime, Ocaml_directories.runtime;
+    Ocaml_variables.stdlib, Ocaml_flags.variant_stdlib_reference;
     Ocaml_variables.bytecc_libs, Ocamltest_config.bytecc_libs;
     Ocaml_variables.nativecc_libs, Ocamltest_config.nativecc_libs;
     Ocaml_variables.mkdll, Ocamltest_config.mkdll;
@@ -1644,24 +1645,40 @@ let only_stack_checks_codegen =
        "stack-checks codegen"
        "non-stack-checks codegen")
 
-(* TSL actions take no arguments, so the variant to probe is the value of
-   the [codegen_variant] variable; set it before this action, e.g.
+(* TSL actions take no arguments, so the variant to probe is the one that
+   the [codegen_variant] variable selects; set it before this action, e.g.
      codegen_variant = "fp";
      variant_available;
-   An unset variable names the install's default variant (always
-   available). *)
+   or, for a test that needs an axis rather than one variant,
+     codegen_variant = "+fp";
+     variant_available;
+   (see [Ocaml_flags.test_codegen_variant]).  With the variable unset,
+   the variant is the run's (the one of -codegen-variant, else the
+   install's default), which is always available. *)
 let variant_available = Actions.make
   ~name:"variant_available"
   ~description:"Passes if the tested install can compile and link native \
-                code for the codegen variant named by the codegen_variant \
-                variable (the install's default variant when unset)"
+                code for the codegen variant that the codegen_variant \
+                variable selects (when unset: the one of -codegen-variant, \
+                else the install's default)"
   ~does_something:false
   (fun log env ->
-    let name = Ocaml_flags.effective_codegen_variant env in
-    Actions_helpers.predicate (Ocaml_flags.codegen_variant_available name)
-      (Printf.sprintf "%s codegen variant available" name)
-      (Printf.sprintf "%s codegen variant not available" name)
-      log env)
+    match Ocaml_flags.effective_codegen_variant env with
+    | name ->
+      let selection =
+        Environments.safe_lookup Ocaml_variables.codegen_variant env
+      in
+      let what =
+        if String.equal selection "" || String.equal selection name
+        then name ^ " codegen variant"
+        else "codegen variant meeting " ^ selection
+      in
+      Actions_helpers.predicate (Ocaml_flags.codegen_variant_available name)
+        (what ^ " available")
+        (what ^ " not available")
+        log env
+    | exception Ocaml_flags.Invalid_codegen_variant message ->
+      Actions.Static (Result.fail_with_reason message), env)
 
 let ocamldoc = Ocaml_tools.ocamldoc
 module Ocamldoc = (val ocamldoc)

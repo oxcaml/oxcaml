@@ -1,5 +1,5 @@
 (* TEST
- codegen_variant = "asan-fp";
+ codegen_variant = "+asan";
  variant_available;
  flags = "-I +unix";
  libraries = "unix";

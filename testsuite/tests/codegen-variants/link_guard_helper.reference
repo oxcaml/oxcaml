@@ -1,0 +1,14 @@
+GNU ld: refused: nothing defines the guard of the code
+lld: refused: nothing defines the guard of the code
+ld64: refused: nothing defines the guard of the code
+ld64.lld: refused: nothing defines the guard of the code
+the dynamic linker of musl: refused: nothing defines the guard of the code
+the dynamic linker of macOS: refused: nothing defines the guard of the code
+a longer symbol: failed for another reason:
+a symbol that ends with it: failed for another reason:
+two definitions of the guard: failed for another reason:
+two runtimes, GNU ld: refused: two runtimes
+two runtimes, lld: refused: two runtimes
+two runtimes, ld64: refused: two runtimes
+two definitions of something else: failed for another reason:
+two runtimes, a file named after a word of the linker: refused: two runtimes

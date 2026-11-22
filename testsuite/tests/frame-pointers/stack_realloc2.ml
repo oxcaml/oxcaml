@@ -1,6 +1,6 @@
 (* TEST
  {
-   codegen_variant = "fp";
+   codegen_variant = "+fp -sc";
    variant_available;
    script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
    config_script;
@@ -23,7 +23,7 @@
     guard-page variants never reallocate), exercising the frame-pointer
     chain rewrite in caml_try_realloc_stack (runtime/fiber.c); see
     stack_realloc.ml. *)
-   codegen_variant = "fp-sc";
+   codegen_variant = "+fp +sc";
    variant_available;
    script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
    config_script;
