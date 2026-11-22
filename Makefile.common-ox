@@ -6,6 +6,9 @@
 ROOTDIR ?= .
 
 ws_main   = --workspace=duneconf/main.ws
+# The main context together with every codegen-variant context: what
+# `make compiler` builds (see the compiler rule).
+ws_compiler = --workspace=duneconf/compiler.ws
 
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
@@ -43,9 +46,15 @@ else
 main_ocamlopt_optimization_flags := -O3
 endif
 
-define dune_main_context
+# $(call dune_workspace,<context stanzas>): the contents of a workspace
+# file of the compiler build.
+define dune_workspace
 (lang dune 3.23)
 (using oxcaml 0.1)
+$(1)
+endef
+
+define dune_main_context
 (context (default
   (name main)
   (profile $(main_build_profile))
@@ -94,15 +103,13 @@ endef
 # configure); names are absolute (e.g. "fp" or "base"), agreeing with
 # utils/codegen_variant_name.ml, stdlib/dune_rules/gen.ml and the runtime
 # archive suffixes. Otherlibs for each variant are built in a dedicated
-# dune context main-<name>, each in its own workspace file so that ordinary
-# $(ws_main) builds never build anything there. Each context's OCAMLLIB
-# points at the variant stdlib tree (stdlib/build_<name>, built in the boot
-# context by @stdlib_<name>). The per-name flag tables live in
-# Makefile.codegen-variants.
+# dune context main-<name>, kept out of duneconf/main.ws so that ordinary
+# $(ws_main) builds never build anything there: each has its own workspace
+# file, and duneconf/compiler.ws holds them all next to the main context.
+# Each context's OCAMLLIB points at the variant stdlib tree
+# (stdlib/build_<name>, built in the boot context by @stdlib_<name>). The
+# per-name flag tables live in Makefile.codegen-variants.
 include $(ROOTDIR)/Makefile.codegen-variants
-
-# The codegen-variant contexts of this configure.
-all_variant_context_names := $(codegen_variant_names)
 
 # Each variant context carries its per-axis settings BOTH as ocamlopt flags
 # (env + duneconf/ocamlopt_flags_main-<name>.sexp) and through OCAMLPARAM.
@@ -132,8 +139,6 @@ VARIANT_ENV_VARS = (env-vars ("OCAMLPARAM" "syntax-quotations=0,$(if $(BUILD_OCA
 
 # $(call dune_variant_context,<name>)
 define dune_variant_context
-(lang dune 3.23)
-(using oxcaml 0.1)
 (context (default
   (name main-$(1))
   (profile $(main_build_profile))
@@ -154,6 +159,18 @@ define dune_variant_context
     $(call VARIANT_ENV_VARS,$(1))))))
 endef
 
+# $(call dune_variant_workspace,<name>): the contents of duneconf/main-<name>.ws
+dune_variant_workspace = \
+  $(call dune_workspace,$(call dune_variant_context,$(1)))
+
+# The contexts of duneconf/compiler.ws: main and every variant context of
+# this configure. They are listed from the variant names, not collected
+# from the duneconf/main-*.ws files, some of which may be left over from an
+# earlier configure.
+define dune_compiler_contexts
+$(dune_main_context)$(foreach n,$(codegen_variant_names),
+$(call dune_variant_context,$(n)))
+endef
 
 .DEFAULT_GOAL := compiler
 .PHONY: boot-compiler boot-runtest compiler runtest runtest-llvmize runtest-dwarf runtest-sancov
@@ -183,28 +200,33 @@ boot-runtest: boot-compiler
 variant_boot_aliases = @runtime_variants \
   $(foreach n,$(codegen_variant_names),@stdlib_$(n))
 
+# The aliases that `make compiler` builds in every variant context.
+variant_context_aliases = otherlibs/codegen-variant-libs
+
+# One dune invocation builds the main context and every variant context. A
+# variant context depends on the boot context only (its compiler is the boot
+# compiler and its OCAMLLIB the variant stdlib tree that the first command
+# builds), so its build runs alongside the main context's instead of after
+# it. In $(ws_compiler) every target and alias names its context
+# (_build/<context>/...): dune would build a bare one in every context.
 compiler: boot-compiler
 	$(dune) build $(coverage_dune_flags) $(variant_boot_aliases)
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" $(compiler_jsoo_env) \
-          $(dune) build --always-show-command-line $(ws_main) \
-          --promote-install-files=false ocaml.install $(compiler_jsoo_targets) \
-          tools/regalloc/regalloc.exe \
-          oxcaml/testsuite/tools/expect.exe \
-          oxcaml/testsuite/tools/expectnat.exe \
-          oxcaml/testsuite/tools/codegen_main.exe \
-          oxcaml/testsuite/tools/asmgen_$(ARCH).o \
-          testsuite/lib/lib.cm{,x}a \
-          testsuite/lib/testing.cm{,x}a \
-          @middle_end/flambda2/tests/tools/all \
-          $(ocamldir)/tools/dumpobj.bc
-ifneq ($(strip $(all_variant_context_names)),)
-	for name in $(all_variant_context_names); do \
-	  $(dune) build --always-show-command-line \
-	    --workspace=duneconf/main-$$name.ws \
-	    @otherlibs/codegen-variant-libs || exit 1; \
-	done
-endif
+          $(dune) build --always-show-command-line $(ws_compiler) \
+          --promote-install-files=false \
+          _build/main/ocaml.install $(compiler_jsoo_targets) \
+          _build/main/tools/regalloc/regalloc.exe \
+          _build/main/oxcaml/testsuite/tools/expect.exe \
+          _build/main/oxcaml/testsuite/tools/expectnat.exe \
+          _build/main/oxcaml/testsuite/tools/codegen_main.exe \
+          _build/main/oxcaml/testsuite/tools/asmgen_$(ARCH).o \
+          _build/main/testsuite/lib/lib.cm{,x}a \
+          _build/main/testsuite/lib/testing.cm{,x}a \
+          @_build/main/middle_end/flambda2/tests/tools/all \
+          _build/main/$(ocamldir)/tools/dumpobj.bc \
+          $(foreach n,$(codegen_variant_names),\
+            $(addprefix @_build/main-$(n)/,$(variant_context_aliases)))
 
 .PHONY: minimize-failure
 minimize-failure: boot-minimizer boot-compiler
@@ -283,8 +305,11 @@ runtest-sancov: compiler
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
-duneconf/main.ws: export contents = $(dune_main_context)
-$(foreach n,$(all_variant_context_names),$(eval duneconf/main-$(n).ws: export contents = $$(call dune_variant_context,$(n))))
+duneconf/main.ws: export contents = \
+  $(call dune_workspace,$(dune_main_context))
+$(foreach n,$(codegen_variant_names),$(eval duneconf/main-$(n).ws: export contents = $$(call dune_variant_workspace,$(n))))
+duneconf/compiler.ws: export contents = \
+  $(call dune_workspace,$(dune_compiler_contexts))
 duneconf/%.ws: Makefile.common-ox $(ROOTDIR)/Makefile.codegen-variants
 	echo "$$contents" > $@
 
@@ -292,8 +317,8 @@ duneconf/%.ws: Makefile.common-ox $(ROOTDIR)/Makefile.codegen-variants
 # default variant and the variant list). The pattern rule above also makes
 # duneconf/ast-dependent-libs.ws, which is built in trees that were never
 # configured.
-compiler_workspaces = duneconf/main.ws \
-  $(foreach n,$(all_variant_context_names),duneconf/main-$(n).ws)
+compiler_workspaces = duneconf/main.ws duneconf/compiler.ws \
+  $(foreach n,$(codegen_variant_names),duneconf/main-$(n).ws)
 $(compiler_workspaces): $(ROOTDIR)/Makefile.config
 
 # We need to disable ocaml/otherlibs when compiling with coverage, because we
@@ -316,14 +341,11 @@ duneconf/ocaml: Makefile.common-ox
 
 # Targets that should be prerequisites to any target that runs Dune
 dune_config_targets = \
-  duneconf/main.ws \
+  $(compiler_workspaces) \
   duneconf/ocaml \
   $(ocamldir)/duneconf/dirs-to-ignore.inc \
   $(ocamldir)/duneconf/ox-extra.inc \
   dune-project
-
-dune_config_targets += \
-  $(foreach n,$(all_variant_context_names),duneconf/main-$(n).ws)
 
 _build/_bootinstall: Makefile.config Makefile.common-ox \
   $(ROOTDIR)/Makefile.codegen-variants $(dune_config_targets)

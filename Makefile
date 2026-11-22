@@ -15,6 +15,7 @@ toplevels_installed = top opttop
 
 CLEAN_DUNE_WORKSPACES = \
   duneconf/main.ws \
+  duneconf/compiler.ws \
   $(wildcard duneconf/main-*.ws)
 
 # These are getting rm -rf'd, so be careful with this.
@@ -412,7 +413,7 @@ SHIPPED_LIB_PACKAGES = $(JSOO_PACKAGES)
 SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 
 ifeq ($(WITH_JSOO),1)
-compiler_jsoo_targets = @$(ast_dependent_libs_root)/jsoo-libs
+compiler_jsoo_targets = @_build/main/$(ast_dependent_libs_root)/jsoo-libs
 compiler_jsoo_env = $(build_stdlib_jsir)
 compiler: $(PPXLIB_DEPS) $(JSOO_DEPS)
 endif
