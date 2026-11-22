@@ -122,16 +122,35 @@ module Sort : sig
     type projection =
       | Void
       | Field of int * base
+      | Nested_tag of base
       | Product of projection list
+
+    type arm = private
+      { first_leaf : int;
+        arguments : projection list;
+        payload : Const.t
+      }
 
     type t = private
       { fields : base list;
-        arms : projection list array
+        arms : arm array;
+        leaf_count : int
       }
 
     (** Arguments within a constructor are in source order. Returns [None] for
         an unknown representation or an unsupported vector or mask. *)
     val make : Const.t list list -> t option
+
+    val direct_sum : Const.t -> Const.t list option
+
+    (** Flatten direct sum alternatives in tag order. A sum underneath a product
+        has an independent tag and stays in its product. *)
+    val leaf_sorts : Const.t list -> Const.t list
+
+    val leaf_sorts_of_repr : t -> Const.t list
+
+    (** Inclusive upper bound of a source constructor's range of leaf tags. *)
+    val last_leaf : t -> int -> int
 
     val carrier : Const.t list -> Const.t
 

@@ -119,3 +119,80 @@ let () =
   assert (signal_number Stop = 0);
   assert (signal_number Wait = 1);
   assert (signal_number Go = 2)
+
+type nested = Before | Nested of Boundary.t | After of float# [@@unboxed]
+type flat = First | Raw of int32_u | Count of int | Last of float# [@@unboxed]
+type nested_cell = { nested : nested }
+type flat_cell = { flat : flat }
+
+let[@inline never] unwrap = function
+  | Nested inner -> Boundary.read (pass inner)
+  | Before -> -1
+  | After value -> int_of_float (box_float value)
+
+let[@inline never] read_flat_cell cell =
+  match cell.flat with
+  | First -> -1
+  | Raw value -> Int32.to_int (box_int32 value)
+  | Count number -> number
+  | Last value -> int_of_float (box_float value)
+
+let () =
+  assert (unwrap Before = -1);
+  assert (unwrap (Nested (Boundary.raw (-#123l))) = -123);
+  assert (unwrap (Nested (Boundary.count 42)) = 42);
+  assert (unwrap (After #7.0) = 7);
+  assert (Obj.size (Obj.repr {nested = Nested Boundary.sample})
+          = Obj.size (Obj.repr {flat = Count 19}));
+  let check_layout nested expected =
+    assert (read_flat_cell (Obj.magic {nested}) = expected)
+  in
+  check_layout Before (-1);
+  check_layout (Nested (Boundary.raw (-#7l))) (-7);
+  check_layout (Nested Boundary.sample) 19;
+  check_layout (After #23.0) 23
+
+type pair = Neither | Both of nested * nested [@@unboxed]
+
+let[@inline never] read_pair = function
+  | Neither -> None
+  | Both (left, right) -> Some (unwrap left, unwrap right)
+
+let () =
+  assert (read_pair Neither = None);
+  assert (read_pair (Both (Nested Boundary.sample, After #4.0))
+          = Some (19, 4));
+  assert (read_pair (Both (Before, Nested (Boundary.raw #31l)))
+          = Some (-1, 31))
+
+type signed = Number of int | Signal of signal [@@unboxed]
+type command = Begin of signed | Cancel | End of signed [@@unboxed]
+
+let[@inline never] classify_signed = function
+  | Number number -> number
+  | Signal signal -> signal_number signal
+
+let[@inline never] classify_command = function
+  | End (Signal Wait) -> 100
+  | Begin payload -> classify_signed payload
+  | End payload -> 10 + classify_signed payload
+  | Cancel -> -1
+
+let () =
+  assert (classify_command (Begin (Number 70)) = 70);
+  assert (classify_command (Begin (Signal Go)) = 2);
+  assert (classify_command Cancel = -1);
+  assert (classify_command (End (Signal Wait)) = 100);
+  assert (classify_command (End (Signal Stop)) = 10);
+  assert (classify_command (End (Number 4)) = 14)
+
+type message = Ready of Boundary.wrapped | Busy [@@unboxed]
+
+let[@inline never] receive = function
+  | Busy -> -2
+  | Ready inner -> Boundary.read_wrapped inner
+
+let () =
+  assert (receive Busy = -2);
+  assert (receive (Ready (Boundary.wrap (Boundary.raw (-#21l)))) = -21);
+  assert (receive (Ready (Boundary.wrap Boundary.sample)) = 19)

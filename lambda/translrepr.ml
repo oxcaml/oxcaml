@@ -250,17 +250,46 @@ module Sum = struct
           ~native_name:"caml_float32_of_bits"
       | _ -> bits
 
-  let inject loc (repr : Repr.t) tag args =
+  let tag_size : Jkind_types.Sort.base -> _ = function
+    | Bits32 -> Scalar.integral (Naked (Boxable (Int32 Any_locality_mode)))
+    | Scannable -> Scalar.integral (Value (Taggable Int))
+    | _ -> Misc.fatal_error "Translrepr.Sum: invalid tag field"
+
+  let cast_tag loc src dst arg =
+    if Jkind_types.Sort.equal_base src dst
+    then arg
+    else static_cast ~src:(tag_size src) ~dst:(tag_size dst) arg ~loc
+
+  let shift_tag loc src dst offset arg =
+    if offset = 0
+    then cast_tag loc src dst arg
+    else
+      let index = cast_tag loc src Scannable arg in
+      cast_tag loc Scannable dst (add int index (tagged_immediate offset) ~loc)
+
+  let tag_field loc (repr : Repr.t) arg =
+    match repr.fields with
+    | [_] -> arg
+    | _ -> Lprim (Punboxed_product_field (0, layouts loc repr), [arg], loc)
+
+  let tag loc (repr : Repr.t) arg =
+    cast_tag loc (List.hd repr.fields) Scannable (tag_field loc repr arg)
+
+  let inject loc (repr : Repr.t) index args =
+    let arm = repr.arms.(index) in
     let bases = Array.of_list repr.fields in
     let fields = Array.map zero bases in
     fields.(0)
       <- (match repr.fields with
          | Bits32 :: _ ->
-           Lconst (Const_base (Const_unboxed_int32 (Int32.of_int tag)))
-         | _ -> tagged_immediate tag);
+           Lconst
+             (Const_base (Const_unboxed_int32 (Int32.of_int arm.first_leaf)))
+         | _ -> tagged_immediate arm.first_leaf);
     let rec fill (projection : Repr.projection) layout arg =
       match projection, layout with
       | Void, _ -> ()
+      | Nested_tag base, _ ->
+        fields.(0) <- shift_tag loc base bases.(0) arm.first_leaf arg
       | Field (i, base), _ -> fields.(i) <- convert loc base bases.(i) arg
       | Product projections, Punboxed_product layouts ->
         List.iteri
@@ -283,13 +312,17 @@ module Sum = struct
         fill projection layout (Lvar id);
         Llet (Strict, layout, id, debug_uid_none, arg, build rest)
     in
-    build (List.rev (List.combine repr.arms.(tag) args))
+    build (List.rev (List.combine arm.arguments args))
 
-  let project loc (repr : Repr.t) tag arg layouts_of_args =
+  let project loc (repr : Repr.t) index arg layouts_of_args =
+    let arm = repr.arms.(index) in
     let fields = layouts loc repr in
     let rec read (projection : Repr.projection) layout =
       match projection, layout with
       | Void, _ -> Lprim (Punbox_unit, [lambda_unit], loc)
+      | Nested_tag base, _ ->
+        shift_tag loc (List.hd repr.fields) base (-arm.first_leaf)
+          (tag_field loc repr arg)
       | Field (i, base), _ ->
         convert loc (List.nth repr.fields i) base
           (Lprim (Punboxed_product_field (i, fields), [arg], loc))
@@ -301,19 +334,5 @@ module Sum = struct
       | Product _, _ ->
         Misc.fatal_error "Translrepr.Sum.project: expected product"
     in
-    List.map2 read repr.arms.(tag) layouts_of_args
-
-  let tag loc (repr : Repr.t) arg =
-    let field =
-      match repr.fields with
-      | [_] -> arg
-      | _ -> Lprim (Punboxed_product_field (0, layouts loc repr), [arg], loc)
-    in
-    match repr.fields with
-    | Bits32 :: _ ->
-      static_cast
-        ~src:(Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))
-        ~dst:(Scalar.integral (Value (Taggable Int)))
-        field ~loc
-    | _ -> field
+    List.map2 read arm.arguments layouts_of_args
 end

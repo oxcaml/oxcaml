@@ -61,6 +61,7 @@ val label_sort_for_representation :
   Jkind.Sort.Const.t
 
 module Sum : sig
+  (** [inject] and [project] take a source constructor index. *)
   val inject :
     Lambda.scoped_location ->
     Jkind_types.Sum_repr.t ->
@@ -76,6 +77,7 @@ module Sum : sig
     Lambda.layout list ->
     Lambda.lambda list
 
+  (** Read the leaf tag. A nested constructor occupies a range of leaf tags. *)
   val tag :
     Lambda.scoped_location ->
     Jkind_types.Sum_repr.t ->

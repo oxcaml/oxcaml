@@ -9,3 +9,10 @@ let[@inline never] count x = Count x
 let[@inline never] read = function
   | Raw x -> Int32.to_int (box_int32 x)
   | Count x -> x
+
+type wrapped = Missing | Wrapped of t [@@unboxed]
+
+let[@inline never] wrap inner = Wrapped inner
+let[@inline never] read_wrapped = function
+  | Missing -> -1
+  | Wrapped inner -> read inner

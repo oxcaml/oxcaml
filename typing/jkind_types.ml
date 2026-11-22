@@ -442,12 +442,41 @@ module Sort = struct
     type projection =
       | Void
       | Field of int * base
+      | Nested_tag of base
       | Product of projection list
+
+    type arm =
+      { first_leaf : int;
+        arguments : projection list;
+        payload : Const.t
+      }
 
     type t =
       { fields : base list;
-        arms : projection list array
+        arms : arm array;
+        leaf_count : int
       }
+
+    let rec direct_sum : Const.t -> Const.t list option = function
+      | Sum arms -> Some arms
+      | Addressable sort -> direct_sum sort
+      | Base _ | Product _ | Univar _ | Genvar _ -> None
+
+    let rec leaf_sorts arms =
+      List.concat_map
+        (fun arm ->
+          match direct_sum arm with
+          | None -> [arm]
+          | Some arms -> leaf_sorts arms)
+        arms
+
+    let leaf_sorts_of_repr repr =
+      leaf_sorts (Array.to_list (Array.map (fun arm -> arm.payload) repr.arms))
+
+    let last_leaf repr index =
+      if index + 1 = Array.length repr.arms
+      then repr.leaf_count - 1
+      else repr.arms.(index + 1).first_leaf - 1
 
     let storage_sort repr =
       match repr.fields with
@@ -471,17 +500,20 @@ module Sort = struct
       let exception Unsupported in
       let scanned_count = ref 0 in
       let raw_fields = Dynarray.create () in
+      let next_leaf = ref 0 in
       (* Keep raw positions separate from scanned positions until every arm's
          scanned prefix has been counted. The result indexes product fields,
          not byte offsets. The normal product layout handles padding. *)
       let inspect args =
         let scanned = ref 0 and raw = ref 0 in
+        let nested arms =
+          match make (List.map (fun arm -> [arm]) arms) with
+          | None -> raise Unsupported
+          | Some repr -> repr
+        in
         let rec visit (sort : Const.t) =
           match sort with
-          | Sum arms -> (
-            match make (List.map (fun arm -> [arm]) arms) with
-            | None -> raise Unsupported
-            | Some nested -> visit (storage_sort nested))
+          | Sum arms -> visit (storage_sort (nested arms))
           | Addressable sort -> visit sort
           | Product sorts ->
             let fields = List.map visit sorts in
@@ -503,9 +535,38 @@ module Sort = struct
             incr raw;
             fun start -> Field (start + index, base)
         in
-        let args = List.map visit args in
+        let first_leaf = !next_leaf in
+        let payload =
+          match args with
+          | [] -> Const.void
+          | [sort] -> sort
+          | sorts -> Const.product sorts
+        in
+        let leaf_count, arguments =
+          match direct_sum payload with
+          | None -> 1, List.map visit args
+          | Some arms ->
+            let inner = nested arms in
+            let tag = Nested_tag (List.hd inner.fields) in
+            let slots =
+              List.map
+                (fun base -> visit (Const.base base))
+                (List.tl inner.fields)
+            in
+            let argument start =
+              match slots with
+              | [] -> tag
+              | _ -> Product (tag :: List.map (fun slot -> slot start) slots)
+            in
+            inner.leaf_count, [argument]
+        in
+        next_leaf := first_leaf + leaf_count;
         scanned_count := max !scanned_count !scanned;
-        args
+        fun start ->
+          { first_leaf;
+            payload;
+            arguments = List.map (fun project -> project start) arguments
+          }
       in
       match List.map inspect arms with
       | exception Unsupported -> None
@@ -521,10 +582,8 @@ module Sort = struct
           (tag :: List.init !scanned_count (fun _ -> Scannable))
           @ Dynarray.to_list raw_fields
         in
-        let arms =
-          List.map (List.map (fun project -> project (1 + !scanned_count))) arms
-        in
-        Some { fields; arms = Array.of_list arms }
+        let arms = List.map (fun arm -> arm (1 + !scanned_count)) arms in
+        Some { fields; arms = Array.of_list arms; leaf_count = !next_leaf }
 
     let carrier arms =
       match make (List.map (fun arm -> [arm]) arms) with

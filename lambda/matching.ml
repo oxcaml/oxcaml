@@ -3803,8 +3803,16 @@ let combine_regular_constructor value_kind loc arg cstr partial
       | Extension _ | Null -> fatal_error "Matching: invalid sum tag")
       descr_lambda_list
     in
-    call_switcher value_kind loc fail_opt (Translrepr.Sum.tag loc repr arg)
-      ~low:0 ~high:(nconstrs - 1) (sort_int_lambda_list cases),
+    let (low, high), (intervals, actions) =
+      as_interval fail_opt ~low:0 ~high:(nconstrs - 1) cases
+    in
+    let first index = repr.arms.(index).first_leaf in
+    let last = Jkind_types.Sum_repr.last_leaf repr in
+    let intervals = Array.map (fun (low, high, action) ->
+      first low, last high, action) intervals
+    in
+    Switcher.zyva loc value_kind (first low, last high)
+      (Translrepr.Sum.tag loc repr arg) intervals actions,
     Jumps.union local_jumps total1
   | None ->
   let consts, nonconsts, null = split_cases descr_lambda_list in
