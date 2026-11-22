@@ -359,20 +359,18 @@ let array_kind_of_representable_elt env loc elt_ty elt_layout =
      fields from the shared carrier, even when the type is more precise. *)
   let storage_layout = Jkind.Layout.Const.storage_layout elt_layout in
   let lowered_sum = storage_layout != elt_layout in
-  let rec ignorable (layout : Jkind.Layout.Const.t) =
+  let rec has_scanned_sum_field ~in_sum (layout : Jkind.Layout.Const.t) =
     match layout with
-    | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) ->
-      let open Jkind_axis.Separability in
-      le separability (upper_bound_if_is_always_gc_ignorable ())
-    | Base _ -> true
-    | Addressable layout -> ignorable layout
-    | Product fields -> List.for_all ignorable fields
-    | Any _ | Sum _ | Univar _ | Genvar _ -> false
+    | Base (Scannable, _) | Box _ | Any _ | Univar _ | Genvar _ -> in_sum
+    | Base _ -> false
+    | Addressable layout -> has_scanned_sum_field ~in_sum layout
+    | Product fields -> List.exists (has_scanned_sum_field ~in_sum) fields
+    | Sum arms -> List.exists (has_scanned_sum_field ~in_sum:true) arms
   in
   let classify_product ty sorts =
     let all_ignorable =
-      if lowered_sum then List.for_all ignorable sorts
-      else Ctype.is_always_gc_ignorable env ty
+      Ctype.is_always_gc_ignorable env ty
+      && not (lowered_sum && has_scanned_sum_field ~in_sum:false elt_layout)
     in
     if all_ignorable then
       Pgcignorableproductarray (ignorable_product_array_kind loc sorts)

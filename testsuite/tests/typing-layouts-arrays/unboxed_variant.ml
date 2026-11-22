@@ -37,3 +37,25 @@ let () =
   assert (read_target targets 2 = Some (`Topic, 13l, 21l));
   Block_checks.check_mixed_block_scannable_size
     ~array_type:"target" (Obj.repr targets) 0
+
+module External : sig
+  type t : value mod external_
+  val sample : t
+end = struct
+  type t = int
+  let sample = 42
+end
+
+let () =
+  let pairs = [| #(External.sample, Entity (#13l, #21l)) |] in
+  Block_checks.check_mixed_block_scannable_size
+    ~array_type:"external value beside raw target" (Obj.repr pairs) 0
+
+type choice = Left of External.t | Right of External.t [@@unboxed]
+
+let () =
+  let choices = [| Left External.sample; Right External.sample |] in
+  if Sys.backend_type = Native then begin
+    let info = Obj.Uniform_or_mixed.of_block (Obj.repr choices) in
+    assert (Obj.Uniform_or_mixed.repr info = Uniform)
+  end
