@@ -78,12 +78,12 @@ bound_ident_stamps "ocamlc.byte/bar_orig.cmi"
 val label_ids : Types.label_declaration list -> Ident.t list = <fun>
 val decl_ids : Types.type_declaration -> Ident.t list = <fun>
 val bound_ident_stamps : string -> string list = <fun>
-- : string list = ["t_1"; "r_2"; "lbl_8"; "v_3"; "A_5"; "B_6"; "y_4"]
+- : string list = ["t_1"; "r_2"; "lbl_10"; "v_3"; "A_7"; "B_8"; "y_4"]
 |}]
 
 ;;
 bound_ident_stamps "ocamlc.byte/bar.cmi"
 ;;
 [%%expect {|
-- : string list = ["t_1"; "r_2"; "lbl_8"; "v_3"; "A_5"; "B_6"; "y_4"]
+- : string list = ["t_1"; "r_2"; "lbl_10"; "v_3"; "A_7"; "B_8"; "y_4"]
 |}]
