@@ -2422,7 +2422,7 @@ let rec transl_layout (layout : Jkind_types.Layout.Const.t)
   | Box (_, axes) ->
       Types.mixed_block_element_of_base Scannable axes
       |> transl_mixed_product_element
-  | Any _ | Univar _ ->
+  | Any _ | Univar _ | Sum _ ->
       fatal_error "Lambda.transl_layout: unrepresentable layout"
 
 let transl_module_representation repr =

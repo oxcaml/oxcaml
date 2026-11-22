@@ -2585,6 +2585,11 @@ let out_jkind_of_const_jkind env jkind =
 (* CR layouts v2.8: This is just like [Jkind.format], and likely needs to
    be overhauled with [with]-types. Internal ticket 5096. *)
 let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
+  let components layouts =
+    List.map
+      (fun layout -> out_jkind_of_desc env { desc with base = Layout layout })
+      layouts
+  in
   match desc.base with
   | Layout (Sort (Var n, sa)) ->
     Ojkind_var ("'_representable_layout_" ^
@@ -2593,12 +2598,8 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
   (* Analyze structure (products, addressability, and boxes) before calling
      [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
      better for atomic layouts. *)
-  | Layout (Product lays) ->
-    Ojkind_product
-      (List.map
-         (fun layout ->
-            out_jkind_of_desc env { desc with base = Layout layout })
-         lays)
+  | Layout (Product lays) -> Ojkind_product (components lays)
+  | Layout (Sum arms) -> Ojkind_sum (components arms)
   | Layout (Addressable lay) when Option.is_none (Jkind.Desc.get_const desc) ->
     if Jkind.Layout.is_surely_addressable_flat lay then
       out_jkind_of_desc env { desc with base = Layout lay }

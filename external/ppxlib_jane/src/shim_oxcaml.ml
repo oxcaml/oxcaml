@@ -416,6 +416,7 @@ type nonrec jkind_annotation_desc = jkind_annotation_desc =
   | Pjk_with of jkind_annotation * core_type * Modality.t loc list
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
+  | Pjk_sum of jkind_annotation list
 
 type nonrec jkind_annotation = jkind_annotation =
   { pjka_loc : Location.t

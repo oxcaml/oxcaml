@@ -1428,6 +1428,7 @@ module Parsetree = struct
     | Pjk_with of jkind_annotation * core_type * modalities
     | Pjk_kind_of of core_type
     | Pjk_product of jkind_annotation list
+    | Pjk_sum of jkind_annotation list
 
   and jkind_annotation (*IF_CURRENT = Parsetree.jkind_annotation *) =
     { pjka_loc : Location.t

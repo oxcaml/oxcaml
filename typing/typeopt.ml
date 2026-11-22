@@ -115,21 +115,14 @@ let maybe_pointer_type env ty =
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
-let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
-  | Any _ | Univar _ | Genvar _ -> false
-  | Base _ -> true
-  | Product sorts ->
-    List.for_all layout_is_representable sorts
-  | Addressable layout -> layout_is_representable layout
-  | Box _ -> true
-
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
    layouts in the typedtree (see [Sort] comment in [jkind_intf.ml]). *)
 let get_representable_layout_opt env ty =
   let jkind = Ctype.type_jkind env ty in
   match Jkind.get_layout_defaulting_to_scannable env jkind with
-  | Some layout when layout_is_representable layout -> Some layout
+  | Some layout when Jkind_types.Layout.Const.has_concrete_sort layout ->
+    Some layout
   | Some _ | None -> None
 
 (* This function also may mutate [ty] to constrain its jkind to be representable
@@ -189,7 +182,8 @@ type 'a classification =
 let rec classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
   | Addressable layout -> classify ~classify_product env ty layout
-  | Any _ -> Misc.fatal_error "classify called with non-representable layout"
+  | Any _ | Sum _ ->
+    Misc.fatal_error "classify called with non-representable layout"
   | Base (Scannable, _) | Box _ -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
      these calls. *)
@@ -296,7 +290,8 @@ let rec scannable_product_array_kind elt_ty_for_error loc layouts =
 and sort_to_scannable_product_element_kind elt_ty_for_error loc
       (layout : Jkind.Layout.Const.t) =
   match layout with
-  | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
+  | Any _ | Sum _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind called \
                                with non-representable layout"
   | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) ->
       let open Jkind_axis.Separability in
@@ -330,7 +325,8 @@ let rec ignorable_product_array_kind loc (sorts : Jkind.Layout.Const.t list) =
 
 and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   match layout with
-  | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
+  | Any _ | Sum _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind called \
                                with non-representable layout"
   (* Scannable axes are irrelevant, since we already know we can ignore *)
   | Base (Scannable, _) | Box _ -> Pint_ignorable
@@ -511,6 +507,7 @@ let value_kind_of_scannable_jkind env jkind =
       | Pointer, Pointer -> Pgenval)
     | Addressable layout -> of_layout layout
     | Any _
+    | Sum _
     | Product _
     | Univar _
     | Genvar _

@@ -113,6 +113,7 @@ and out_jkind =
   | Ojkind_box of out_jkind * string list
   (** The [string list] represents the non-redundant scannable axes applied
       atop the box *)
+  | Ojkind_sum of out_jkind list
 
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list

@@ -632,6 +632,9 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   | Pjk_product jkinds ->
       line i ppf "Pjk_product\n";
       list i jkind_annotation ppf jkinds
+  | Pjk_sum jkinds ->
+      line i ppf "Pjk_sum\n";
+      list i jkind_annotation ppf jkinds
 
 and function_param i ppf { pparam_desc = desc; pparam_loc = loc } =
   match desc with

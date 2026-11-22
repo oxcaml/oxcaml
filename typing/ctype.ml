@@ -2333,7 +2333,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
         Option.map
           (fun l -> Jkind.Layout.Addressable l)
           (instance_layout layout)
-      | Sort _ | Product _ | Box _ -> None
+      | Sort _ | Product _ | Sum _ | Box _ -> None
     in
     match Jkind.extract_layout env jkind with
     | Error _ -> None

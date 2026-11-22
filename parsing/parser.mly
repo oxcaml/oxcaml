@@ -4147,7 +4147,7 @@ type_parameters:
    responsible for ruling out with kinds in positions where they may not appear,
    but in practice they create problems for parsing around "with kind_"
    constraints, as both use the word "with". *)
-jkind_desc_gen(self):
+jkind_desc_gen(self, full):
     jkind_annotation_gen(self) MOD mkrhs(LIDENT)+ {
       (* LIDENTs here are for modes *)
       let modes =
@@ -4174,7 +4174,7 @@ jkind_desc_gen(self):
   | reverse_product_jkind_gen(self) %prec below_AMPERSAND {
       Pjk_product (List.rev $1)
     }
-  | LPAREN inner = self RPAREN axes = mkrhs(LIDENT)* {
+  | LPAREN inner = full RPAREN axes = mkrhs(LIDENT)* {
       match axes with
       | [] -> inner
       | _ :: _ ->
@@ -4203,20 +4203,31 @@ jkind_desc:
     WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
     }
-  | jkind_desc_gen(jkind_desc) { $1 }
+  | jkind_desc_gen(jkind_desc, sum_jkind_desc(jkind_desc)) { $1 }
+;
+
+(* A product describes the fields of one arm, so [&] binds tighter
+   than [+]. Parentheses preserve nested sums as separate arms. *)
+sum_jkind_desc(arm):
+  | arm { $1 }
+  | first = jkind_annotation_gen(arm) PLUS
+    rest = separated_nonempty_llist(PLUS, jkind_annotation_gen(arm))
+      { Pjk_sum (first :: rest) }
 ;
 
 jkind_annotation: (* : jkind_annotation *)
-  jkind_desc { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
+  sum_jkind_desc(jkind_desc) { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
 ;
 
 (* jkind grammar without WITH - used in [with_constraint] *)
 jkind_desc_no_with_kinds:
-  jkind_desc_gen(jkind_desc_no_with_kinds) { $1 }
+  jkind_desc_gen(jkind_desc_no_with_kinds,
+                 sum_jkind_desc(jkind_desc_no_with_kinds)) { $1 }
 ;
 
 jkind_annotation_no_with_kinds:
-  jkind_desc_no_with_kinds { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
+  sum_jkind_desc(jkind_desc_no_with_kinds)
+    { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
 ;
 
 jkind_constraint:

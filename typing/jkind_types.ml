@@ -1093,6 +1093,7 @@ module Layout = struct
     | Any of Scannable_axes.t
     | Addressable of 'sort t
     | Box of 'sort t * Scannable_axes.t
+    | Sum of 'sort t list
 
   module Const = struct
     type t =
@@ -1103,10 +1104,13 @@ module Layout = struct
       | Genvar of Sort.var * Scannable_axes.t
       | Addressable of t
       | Box of t * Scannable_axes.t
+      | Sum of t list
 
     let any sa = Any sa
 
     let product cs = Product cs
+
+    let sum arms = Sum arms
 
     let univar uv sa = Univar (uv, sa)
 
@@ -1122,7 +1126,7 @@ module Layout = struct
         Scannable_axes.equal sa1 sa2
       | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
       | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
-      | Product cs1, Product cs2 -> List.equal equal cs1 cs2
+      | Product cs1, Product cs2 | Sum cs1, Sum cs2 -> List.equal equal cs1 cs2
       | Univar (uv1, sa1), Univar (uv2, sa2) ->
         Sort.equal_univar_univar uv1 uv2 && Scannable_axes.equal sa1 sa2
       | Genvar (v1, sa1), Genvar (v2, sa2) ->
@@ -1135,13 +1139,13 @@ module Layout = struct
         (* Relies on the invariant that axes on const boxes incorporate the
            axes implied by the contents *)
         equal c1 c2 && Scannable_axes.equal sa1 sa2
-      | ( ( Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _
-          | Box _ ),
+      | ( ( Base _ | Any _ | Product _ | Sum _ | Univar _ | Genvar _
+          | Addressable _ | Box _ ),
           _ ) ->
         false
 
     let rec get_sort : t -> Sort.Const.t option = function
-      | Any _ -> None
+      | Any _ | Sum _ -> None
       | Base (b, _) -> Sort.Const.some (Base b)
       | Product ts ->
         Option.map
@@ -1155,7 +1159,7 @@ module Layout = struct
     let rec is_surely_addressable = function
       | Base (b, _) -> Sort.base_is_addressable b
       | Product cs -> List.for_all is_surely_addressable cs
-      | Any _ | Univar _ | Genvar _ -> false
+      | Any _ | Sum _ | Univar _ | Genvar _ -> false
       | Addressable _ -> true
       | Box _ -> true
 
@@ -1187,13 +1191,13 @@ module Layout = struct
         match Scannable_axes.less_or_equal sa1 sa2 with
         | Equal | Less -> Less
         | Not_le -> Not_le)
-      | (Base _ | Product _ | Univar _), Any _ -> Less
+      | (Base _ | Product _ | Sum _ | Univar _), Any _ -> Less
       | Any _, _ -> Not_le
       | Base (Scannable, sa1), Base (Scannable, sa2) ->
         Scannable_axes.less_or_equal sa1 sa2
       | Base (b1, _), Base (b2, _) ->
         if Sort.equal_base b1 b2 then Equal else Not_le
-      | Product cs1, Product cs2 ->
+      | Product cs1, Product cs2 | Sum cs1, Sum cs2 ->
         if List.compare_lengths cs1 cs2 = 0
         then Misc.Le_result.combine_list (List.map2 less_or_equal cs1 cs2)
         else Not_le
@@ -1201,13 +1205,13 @@ module Layout = struct
         if Sort.equal_univar_univar uv1 uv2 then Equal else Not_le
       | Genvar (v1, sa1), Genvar (v2, sa2) ->
         if v1.id = v2.id then Scannable_axes.less_or_equal sa1 sa2 else Not_le
-      | (Base _ | Product _ | Univar _ | Genvar _), _ -> Not_le
+      | (Base _ | Product _ | Sum _ | Univar _ | Genvar _), _ -> Not_le
 
-    let rec has_unknown_sort = function
-      | Any _ | Univar _ | Genvar _ -> true
-      | Base _ | Box _ -> false
-      | Product cs -> List.exists has_unknown_sort cs
-      | Addressable c -> has_unknown_sort c
+    let rec has_concrete_sort = function
+      | Any _ | Sum _ | Univar _ | Genvar _ -> false
+      | Base _ | Box _ -> true
+      | Product cs -> List.for_all has_concrete_sort cs
+      | Addressable c -> has_concrete_sort c
 
     let implied_box_axes : t -> Scannable_axes.t = function
       (* Non-addressable bases *)
@@ -1223,12 +1227,12 @@ module Layout = struct
         Scannable_axes.non_float_block_axes
       (* Products *)
       | (Product _ | Addressable (Product _)) as c ->
-        if has_unknown_sort c
-        then Scannable_axes.max
-        else Scannable_axes.non_float_block_axes
+        if has_concrete_sort c
+        then Scannable_axes.non_float_block_axes
+        else Scannable_axes.max
       (* Unknown *)
-      | Univar _ | Genvar _ | Any _ | Addressable (Univar _ | Genvar _ | Any _)
-        ->
+      | Sum _ | Univar _ | Genvar _ | Any _
+      | Addressable (Sum _ | Univar _ | Genvar _ | Any _) ->
         Scannable_axes.max
       (* Impossible: consts have no redundant [Addressable] *)
       | Addressable (Addressable _) | Addressable (Box _) ->
@@ -1240,7 +1244,7 @@ module Layout = struct
       | Any _ | Univar _ | Genvar _ -> Internal
       | Base (b, { separability; nullability = _ }) ->
         Sort.base_implied_externality ~separability b
-      | Product ts ->
+      | Product ts | Sum ts ->
         List.fold_left
           (fun acc t -> Externality.join acc (implied_externality t))
           Externality.min ts
@@ -1255,7 +1259,7 @@ module Layout = struct
       | Any sa -> Some sa
       | Base (Scannable, sa) -> Some sa
       | Base (_, _) -> None
-      | Product _ -> None
+      | Product _ | Sum _ -> None
       | Univar (_, sa) | Genvar (_, sa) -> Some sa
       | Addressable t -> get_root_scannable_axes t
       | Box (_, sa) -> Some sa
@@ -1265,7 +1269,7 @@ module Layout = struct
       | Any _ -> Any sa
       | Base (Scannable, _) -> Base (Scannable, sa)
       | Base (_, _) -> t
-      | Product _ -> t
+      | Product _ | Sum _ -> t
       | Univar (uv, _) -> Univar (uv, sa)
       | Genvar (v, _) -> Genvar (v, sa)
       | Addressable t' -> Addressable (set_root_scannable_axes t' sa)
@@ -1447,6 +1451,7 @@ module Layout = struct
     | Any sa -> Any sa
     | Base (b, sa) -> Sort (Sort.of_base b, sa)
     | Product cs -> Product (List.map of_const cs)
+    | Sum cs -> Sum (List.map of_const cs)
     | Univar (uv, sa) -> Sort (Sort.Univar uv, sa)
     | Genvar (v, sa) -> Sort (Sort.Var v, sa)
     | Addressable c -> Addressable (of_const c)
@@ -1468,6 +1473,9 @@ module Layout = struct
       Option.map
         (fun x -> Const.Product x)
         (Misc.Stdlib.List.map_option (get_const of_sort) layouts)
+    | Sum arms ->
+      Option.map Const.sum
+        (Misc.Stdlib.List.map_option (get_const of_sort) arms)
     | Addressable t -> Option.map Const.addressable (get_const of_sort t)
     | Box (t, sa) -> Option.map (fun c -> Const.box c sa) (get_const of_sort t)
 

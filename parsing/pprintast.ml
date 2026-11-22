@@ -531,7 +531,13 @@ and type_with_label ctxt f (label, c, mode) =
     pp f "?%a:%a" ident_of_name s
       (core_type1_with_optional_modes core_type1 ctxt) (c, mode)
 
-and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
+and jkind_annotation ?(nested = false) ctxt f k =
+  let components sep ts =
+    Misc.pp_parens_if nested (fun f ts ->
+      pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep) ts
+    ) f ts
+  in
+  match k.pjka_desc with
   | Pjk_default -> pp f "_"
   | Pjk_abbreviation s -> value_longident_loc f s
   | Pjk_operator (t, sa) ->
@@ -555,10 +561,8 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
         optional_space_atat_modalities modalities;
     ) f (t, ty, modalities)
   | Pjk_kind_of ty -> pp f "(kind_of_ %a)" (core_type ctxt) ty
-  | Pjk_product ts ->
-    Misc.pp_parens_if nested (fun f ts ->
-      pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
-    ) f ts
+  | Pjk_product ts -> components "@ & " ts
+  | Pjk_sum ts -> components "@ + " ts
 
 and tyvar_jkind tyvar f (str, jkind) =
   match jkind with

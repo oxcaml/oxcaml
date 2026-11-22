@@ -180,6 +180,9 @@ module Layout : sig
             [Const.implied_box_axes]), so the scannable axes of a box are the
             meet of those implied axes and the axes applied outside of the box
             constructor. *)
+    | Sum of 'sort t list
+        (** Ordered alternatives. There is no sum sort until lowering supports
+            the runtime representation. *)
 
   module Const : sig
     type t = private
@@ -197,10 +200,13 @@ module Layout : sig
           (** Invariant: axes on const boxes incorporate the axes implied by the
               contents. I.e., given [Box (t, sa)],
               [Scannable_axes.meet (implied_box_axes t) sa = sa]. *)
+      | Sum of t list
 
     val any : Scannable_axes.t -> t
 
     val product : t list -> t
+
+    val sum : t list -> t
 
     val univar : Sort.univar -> Scannable_axes.t -> t
 
@@ -221,6 +227,10 @@ module Layout : sig
     val max : t
 
     val get_sort : t -> Sort.Const.t option
+
+    (** Whether the compiler knows the runtime sort without instantiating
+        variables. An explicit box has a concrete sort for any contents. *)
+    val has_concrete_sort : t -> bool
 
     val implied_externality : t -> Jkind_axis.Externality.t
 

@@ -109,6 +109,7 @@ module Layout : sig
     | Any of Scannable_axes.t
     | Addressable of 'sort t  (** See Note [Addressable kinds] *)
     | Box of 'sort t * Scannable_axes.t  (** See [Jkind_types.Layout.t] *)
+    | Sum of 'sort t list
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t

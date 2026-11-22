@@ -1409,6 +1409,7 @@ and jkind_annotation_desc = Parsetree.jkind_annotation_desc =
   | Pjk_with of jkind_annotation * core_type * modalities
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
+  | Pjk_sum of jkind_annotation list
 
 and jkind_annotation = Parsetree.jkind_annotation =
   { pjka_loc : location
@@ -2708,6 +2709,8 @@ class virtual map =
         | Pjk_kind_of a -> let a = self#core_type a in Pjk_kind_of a
         | Pjk_product a ->
             let a = self#list self#jkind_annotation a in Pjk_product a
+        | Pjk_sum a ->
+            let a = self#list self#jkind_annotation a in Pjk_sum a
     method jkind_annotation : jkind_annotation -> jkind_annotation=
       fun { pjka_loc; pjka_desc } ->
         let pjka_loc = self#location pjka_loc in
@@ -3618,7 +3621,7 @@ class virtual iter =
         | Pjk_with (a, b, c) ->
             (self#jkind_annotation a; self#core_type b; self#modalities c)
         | Pjk_kind_of a -> self#core_type a
-        | Pjk_product a -> self#list self#jkind_annotation a
+        | Pjk_product a | Pjk_sum a -> self#list self#jkind_annotation a
     method jkind_annotation : jkind_annotation -> unit=
       fun { pjka_loc; pjka_desc } ->
         self#location pjka_loc; self#jkind_annotation_desc pjka_desc
@@ -4759,7 +4762,7 @@ class virtual ['acc] fold =
             let acc = self#core_type b acc in
             let acc = self#modalities c acc in acc
         | Pjk_kind_of a -> self#core_type a acc
-        | Pjk_product a -> self#list self#jkind_annotation a acc
+        | Pjk_product a | Pjk_sum a -> self#list self#jkind_annotation a acc
     method jkind_annotation : jkind_annotation -> 'acc -> 'acc=
       fun { pjka_loc; pjka_desc } acc ->
         let acc = self#location pjka_loc acc in
@@ -6367,6 +6370,9 @@ class virtual ['acc] fold_map =
         | Pjk_product a ->
             let (a, acc) = self#list self#jkind_annotation a acc in
             ((Pjk_product a), acc)
+        | Pjk_sum a ->
+            let (a, acc) = self#list self#jkind_annotation a acc in
+            ((Pjk_sum a), acc)
     method jkind_annotation :
       jkind_annotation -> 'acc -> (jkind_annotation * 'acc)=
       fun { pjka_loc; pjka_desc } acc ->
@@ -7756,6 +7762,8 @@ class virtual ['ctx] map_with_context =
         | Pjk_kind_of a -> let a = self#core_type ctx a in Pjk_kind_of a
         | Pjk_product a ->
             let a = self#list self#jkind_annotation ctx a in Pjk_product a
+        | Pjk_sum a ->
+            let a = self#list self#jkind_annotation ctx a in Pjk_sum a
     method jkind_annotation : 'ctx -> jkind_annotation -> jkind_annotation=
       fun ctx { pjka_loc; pjka_desc } ->
         let pjka_loc = self#location ctx pjka_loc in
@@ -9364,6 +9372,9 @@ class virtual ['res] lift =
         | Pjk_product a ->
             let a = self#list self#jkind_annotation a in
             self#constr "Pjk_product" [a]
+        | Pjk_sum a ->
+            let a = self#list self#jkind_annotation a in
+            self#constr "Pjk_sum" [a]
     method jkind_annotation : jkind_annotation -> 'res=
       fun { pjka_loc; pjka_desc } ->
         let pjka_loc = self#location pjka_loc in
@@ -11830,6 +11841,10 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#list self#jkind_annotation ctx a in
             ((Pjk_product (Stdlib.fst a)),
               (self#constr ctx "Pjk_product" [Stdlib.snd a]))
+        | Pjk_sum a ->
+            let a = self#list self#jkind_annotation ctx a in
+            ((Pjk_sum (Stdlib.fst a)),
+              (self#constr ctx "Pjk_sum" [Stdlib.snd a]))
     method jkind_annotation :
       'ctx -> jkind_annotation -> (jkind_annotation * 'res)=
       fun ctx { pjka_loc; pjka_desc } ->

@@ -2075,7 +2075,7 @@ module Element_repr = struct
         else Jkind.get_layout env jkind
       in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
-      | Any _ -> None
+      | Any _ | Sum _ -> None
       | Base (base, sa) -> Some (classify_base base sa)
       | Box (_, sa) -> Some (Value_element sa)
       | Product l ->
@@ -3323,7 +3323,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
        parameters.
        CR layouts v11: update this function for [layout_of] layouts. *)
     let rec is_representable : Jkind_types.Layout.Const.t -> bool = function
-      | Any _ -> false
+      | Any _ | Sum _ -> false
       | Base _ -> true
       | Product l -> List.for_all is_representable l
       | Addressable layout -> is_representable layout
@@ -4755,7 +4755,7 @@ let has_ty_var_containing_layout_any env ty =
   let rec needs_to_represent_any : _ Jkind.Layout.t -> bool = function
     | Any _ -> true
     | Addressable l -> needs_to_represent_any l
-    | Product ls -> List.exists needs_to_represent_any ls
+    | Product ls | Sum ls -> List.exists needs_to_represent_any ls
     | Sort _ | Box _ -> false
   in
   Ctype.exists_free_variable
