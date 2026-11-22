@@ -666,7 +666,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           (fun (sort, e) -> e, Jkind.Sort.default_for_transl_and_get sort)
           args
       in
-      if cstr.cstr_inlined <> None then begin match args_with_sorts with
+      if cstr.cstr_inlined <> None && cstr.cstr_sum = None then begin
+        match args_with_sorts with
         | [arg, _] -> transl_exp ~scopes layout arg
         | _ -> assert false
       end else begin

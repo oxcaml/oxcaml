@@ -269,3 +269,100 @@ Line 1, characters 18-31:
                       ^^^^^^^^^^^^^
 Error: Cannot create values of the private type "public#"
 |}]
+
+type mutable_arm = End | Item of { mutable count : int }
+let set = function #End -> () | #Item r -> r.count <- 1
+[%%expect{|
+type mutable_arm = End | Item of { mutable count : int; }
+Line 2, characters 43-55:
+2 | let set = function #End -> () | #Item r -> r.count <- 1
+                                               ^^^^^^^^^^^^
+Error: The unboxed record field "count" is declared mutable,
+       but fields of unboxed records can't be mutated.
+|}]
+
+type inner_arm = Off | On of int
+type nested_record_arm = Stop | Entry of { inner : inner_arm# }
+type rejected = nested_record_arm#
+[%%expect{|
+type inner_arm = Off | On of int
+type nested_record_arm = Stop | Entry of { inner : inner_arm#; }
+Line 3, characters 16-34:
+3 | type rejected = nested_record_arm#
+                    ^^^^^^^^^^^^^^^^^^
+Error: The type "nested_record_arm" has no unboxed version.
+|}]
+
+type void_record_arm = Stop | Entry of { ignored : unit# }
+type rejected = void_record_arm#
+[%%expect{|
+type void_record_arm = Stop | Entry of { ignored : unit#; }
+Line 2, characters 16-32:
+2 | type rejected = void_record_arm#
+                    ^^^^^^^^^^^^^^^^
+Error: The type "void_record_arm" has no unboxed version.
+|}]
+
+type atomic_record_arm = Stop | Entry of { mutable count : int [@atomic] }
+type rejected = atomic_record_arm#
+[%%expect{|
+type atomic_record_arm = Stop | Entry of { mutable count : int [@atomic]; }
+Line 2, characters 16-34:
+2 | type rejected = atomic_record_arm#
+                    ^^^^^^^^^^^^^^^^^^
+Error: The type "atomic_record_arm" has no unboxed version.
+|}]
+
+module Private_arm : sig
+  type t = private Stop | Entry of { count : int }
+end = struct
+  type t = Stop | Entry of { count : int }
+end
+let read_private = Private_arm.(function #Stop -> 0 | #Entry r -> r.#count)
+let rejected () = Private_arm.#Entry { count = 1 }
+[%%expect{|
+module Private_arm :
+  sig type t = private Stop | Entry of { count : int; } end
+val read_private : Private_arm.t# -> int = <fun>
+Line 7, characters 37-50:
+7 | let rejected () = Private_arm.#Entry { count = 1 }
+                                         ^^^^^^^^^^^^^
+Error: Cannot create values of the private type "Private_arm.t#.Entry"
+|}]
+
+type recursive_arm = Stop | More of { tail : recursive_arm } [@@unboxed]
+[%%expect{|
+Line 1, characters 0-72:
+1 | type recursive_arm = Stop | More of { tail : recursive_arm } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The definition of "recursive_arm" is recursive without boxing:
+         "recursive_arm" contains "recursive_arm"
+|}]
+
+type 'a local_arm = Stop | Entry of { left : 'a; right : 'a }
+let select (local_ left) (local_ right) =
+  match #Entry { left; right } with #Stop -> right | #Entry arm -> arm.#left
+[%%expect{|
+type 'a local_arm = Stop | Entry of { left : 'a; right : 'a; }
+val select : 'a @ local -> 'a @ local -> 'a @ local = <fun>
+|}]
+
+type atomic = End | Item of { mutable n : int [@atomic] } [@@unboxed]
+[%%expect{|
+Line 1, characters 30-55:
+1 | type atomic = End | Item of { mutable n : int [@atomic] } [@@unboxed]
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be atomic
+|}]
+
+type direct = Empty | Entry of { mutable count : int } [@@unboxed]
+let set (boxed : direct box) =
+  match boxed with Empty -> () | Entry r -> r.count <- 1
+[%%expect{|
+type direct = Empty | Entry of { mutable count : int; } [@@unboxed]
+Line 3, characters 44-56:
+3 |   match boxed with Empty -> () | Entry r -> r.count <- 1
+                                                ^^^^^^^^^^^^
+Error: The unboxed record field "count" is declared mutable,
+       but fields of unboxed records can't be mutated.
+|}]

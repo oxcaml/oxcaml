@@ -81,8 +81,14 @@ let unboxed_constructor_sort cd_args =
   | Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _) ->
     Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
 
+let inline_record_sort labels =
+  Option.map (function
+    | [sort] -> sort
+    | sorts -> Jkind_types.Sort.Const.product sorts)
+    (Misc.Stdlib.List.map_option (fun label -> label.ld_sort) labels)
+
 let constructor_args ~current_unit priv cd_args cd_res path tag shape vrep
-      ~variant_jkind =
+      ~variant_jkind ~sum_arm =
   let tyl, existentials = constructor_existentials cd_args cd_res in
   match cd_args with
   | Cstr_tuple l -> existentials, l, None
@@ -98,21 +104,29 @@ let constructor_args ~current_unit priv cd_args cd_res path tag shape vrep
          jkinds that are cheaper to deal with later. But doing so runs into some
          confusing mutual recursion that's non-trivial to debug. Reinvestigate
          later. Internal ticket 5102.  *)
-      let jkind, ca_sort =
-        match (vrep : variant_representation) with
-        | Variant_unboxed ->
+      let boxed_kind =
+        Type_record (lbls, Record_inlined (tag, shape, vrep), None) in
+      let type_kind, jkind, ca_sort =
+        match (vrep : variant_representation), sum_arm with
+        | Variant_unboxed, Some index ->
+          let layout = match variant_jkind.jkind.base with
+            | Layout (Sum arms) -> List.nth arms index
+            | _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max in
+          Type_record_unboxed_product (lbls, Record_unboxed_product, None),
+          Jkind.for_unboxed_record_layout lbls layout, inline_record_sort lbls
+        | Variant_unboxed, None ->
           (* An [@@unboxed] constructor has the same representation as the
              variant itself *)
-          variant_jkind, unboxed_constructor_sort cd_args
-        | Variant_boxed _ | Variant_extensible | Variant_with_null ->
-          Jkind.for_boxed_record lbls, Jkind_types.Sort.Const.(some scannable)
+          boxed_kind, variant_jkind, unboxed_constructor_sort cd_args
+        | (Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
+          boxed_kind, Jkind.for_boxed_record lbls,
+          Jkind_types.Sort.Const.(some scannable)
       in
       let tdecl =
         {
           type_params;
           type_arity = arity;
-          type_kind =
-            Type_record (lbls, Record_inlined (tag, shape, vrep), None);
+          type_kind;
           type_jkind = jkind;
           type_ikind = Types.ikinds_todo "datarepr boxed record";
           type_private = priv;
@@ -208,7 +222,11 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
              Cstr_layout_known
                { shape = Constructor_uniform_value;
                  sorts = Array.of_list sorts })
-        | Cstr_record _ -> Cstr_layout_undetermined) cstrs)
+        | Cstr_record labels ->
+          (match inline_record_sort labels with
+           | None -> Cstr_layout_undetermined
+           | Some sort -> Cstr_layout_known
+               { shape = Constructor_uniform_value; sorts = [|sort|] })) cstrs)
     | Variant_with_null, _ ->
       let layout cstr =
         match classify_variant_with_null_constructor cstr with
@@ -288,6 +306,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       constructor_args ~current_unit decl.type_private cd_args cd_res
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) cstr_tag cstr_shape rep
         ~variant_jkind:decl.type_jkind
+        ~sum_arm:(match rep, cstrs with
+          | Variant_unboxed, _ :: _ :: _ -> Some src_index | _ -> None)
     in
     let cstr =
       { cstr_name;
@@ -326,6 +346,7 @@ let extension_descr ~current_unit path_ext ext =
       Path.(Pextra_ty (path_ext, Pext_ty)) cstr_tag ext.ext_shape
       Variant_extensible
       ~variant_jkind:(Jkind.for_non_float ~why:Extensible_variant)
+      ~sum_arm:None
   in
     { cstr_name = Path.last path_ext;
       cstr_res = ty_res;

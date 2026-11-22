@@ -3148,23 +3148,17 @@ let contained_without_boxing env ty =
          does not depend on constructor order or sorts. *)
       List.concat_map
         (fun (cstr : constructor_declaration) ->
-           match cstr.cd_args with
-           | Cstr_tuple cargs ->
-             let payload_tys =
-               List.map (fun (carg : constructor_argument) -> carg.ca_type)
-                 cargs
-             in
-             let extra_substs =
-               Btype.Jkind0.gadt_payload_subst
-                 ~projected_params:args ~cstr_res:cstr.cd_res ~payload_tys
-                 ~get_free_vars:(free_variable_set_of_list env)
-             in
-             let extra_params, extra_args = List.split extra_substs in
-             List.map
-               (fun ty ->
-                  apply env (extra_params @ type_params) ty (extra_args @ args))
-               payload_tys
-           | Cstr_record _ -> [])
+           let payload_tys = Types.tys_of_constr_args cstr.cd_args in
+           let extra_substs =
+             Btype.Jkind0.gadt_payload_subst
+               ~projected_params:args ~cstr_res:cstr.cd_res ~payload_tys
+               ~get_free_vars:(free_variable_set_of_list env)
+           in
+           let extra_params, extra_args = List.split extra_substs in
+           List.map
+             (fun ty ->
+                apply env (extra_params @ type_params) ty (extra_args @ args))
+             payload_tys)
         cstrs
     | _ | exception Not_found ->
       begin match unbox_once env (mk_unwrapped_type_expr ty) with

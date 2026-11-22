@@ -1510,20 +1510,21 @@ let find_extension_full path env =
 
 let type_of_cstr path = function
   | {cstr_inlined = Some decl; _} ->
-      let labels =
-        List.map snd (Datarepr.labels_of_type path decl)
-      in
-      begin match decl.type_kind with
-      | Type_record (_, repr, umc) ->
+      let descriptions = match decl.type_kind with
+        | Type_record (_, repr, umc) ->
+          Type_record (List.map snd (Datarepr.labels_of_type path decl),
+                       repr, umc)
+        | Type_record_unboxed_product (_, repr, umc) ->
+          let labels = List.map snd (Datarepr.unboxed_labels_of_type path decl)
+          in Type_record_unboxed_product (labels, repr, umc)
+        | _ -> assert false in
         {
           tda_declaration = decl;
-          tda_descriptions = Type_record (labels, repr, umc);
+          tda_descriptions = descriptions;
           tda_shape = Shape.leaf decl.type_uid;
           tda_unboxed_version_descriptions = None;
           tda_hidden = false;
         }
-      | _ -> assert false
-      end
   | _ -> assert false
 
 type unboxed_version_step =

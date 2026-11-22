@@ -69,6 +69,13 @@ let () =
   assert (Eval.eval <[ $read ((fun x -> x) $value) ]> = 17)
 ;;
 
+let () =
+  let run = <[ fun count ->
+    match #Entry { count } with
+    | #Stop -> 0 | #Entry record -> record.#count ]> in
+  assert (Eval.eval <[ $run 17 ]> = 17)
+;;
+
 (* Unboxed records *)
 
 (* Construction *)

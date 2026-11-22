@@ -2253,6 +2253,32 @@ module Jkind0 = struct
       in
       add_labels_as_with_bounds lbls base
 
+    let unboxed_label_bounds = function
+      | Immutable -> Axis_lattice.bot
+      | Mutable { atomic = Nonatomic; _ } ->
+        Axis_lattice.(co_sub mutable_data immutable_data)
+      | Mutable { atomic = Atomic; _ } ->
+        Misc.fatal_error "atomic field in unboxed record"
+
+    let kind_of_inline_fields ~why ~field fields layout =
+      let add_field item (bounds, with_bounds) =
+        let type_expr, modality, weakening = field item in
+        Axis_lattice.join bounds weakening,
+        With_bounds.add_modality ~type_expr ~modality with_bounds in
+      let bounds, with_bounds =
+        List.fold_right add_field fields (Axis_lattice.bot, No_with_bounds) in
+      fresh_jkind_poly
+        { base = Layout layout; mod_bounds = Mod_bounds.of_axis_lattice bounds;
+          with_bounds }
+        ~annotation:None ~why
+      |> mark_best
+
+    let for_unboxed_record_layout labels layout =
+      kind_of_inline_fields ~why:(Product_creation Unboxed_record)
+        ~field:(fun label -> label.ld_type, label.ld_modalities,
+                             unboxed_label_bounds label.ld_mutable)
+        labels layout
+
     let for_non_float ~(why : Jkind_intf.History.value_creation_reason) =
       let mod_bounds =
         Mod_bounds.create Mode.Crossing.max

@@ -1509,6 +1509,14 @@ let extract_concrete_record (type rep) (record_form : rep record_form) env ty
 
 type variant_form = Declared_variant | Unboxed_variant | Boxed_sum
 
+let is_inline_record_product env ty =
+  match get_desc ty with
+  | Tconstr (path, _, _) when Path.is_constructor_typath path ->
+    (match (Env.find_type path env).type_kind with
+     | Type_record_unboxed_product _ -> true
+     | _ -> false)
+  | _ -> false
+
 type variant_extraction_result =
   | Variant_type of Path.t * Path.t * variant_form
   | Not_a_variant_type
@@ -3316,12 +3324,11 @@ end) = struct
     (* warn only on nominal labels *)
     let ambiguity =
       match check_disambiguated_name lbl candidates_in_scope with
-      | true ->
-        if in_env lbl then
-          warn_for_disambiguated_name warn lid lbl;
+      | true when in_env lbl ->
+        warn_for_disambiguated_name warn lid lbl;
         Ambiguous { path = get_type_path lbl; arity = get_type_arity lbl;
                     boxed = false }
-      | false -> Unambiguous
+      | true | false -> Unambiguous
     in
     lbl, ambiguity
 end
@@ -3358,9 +3365,7 @@ module Unboxed_label = NameChoice (struct
     Env.lookup_all_labels_from_type ~record_form:Unboxed_product ~loc usage path
       env
   let in_env (lbl : t) =
-    match lbl.lbl_repres with
-    | Record_unboxed_product | Record_unboxed_product_undetermined
-    | Record_unboxed_product_variable _ -> true
+    not (Path.is_constructor_typath (get_constr_type_path lbl.lbl_res))
 end)
 
 let label_get_type_path
@@ -4391,7 +4396,10 @@ and type_pat_aux
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_record(lid_sp_list, closed) ->
-      type_record_pat Legacy lid_sp_list closed sort
+      if is_inline_record_product !!penv expected_ty then
+        type_record_pat Unboxed_product lid_sp_list closed sort
+      else
+        type_record_pat Legacy lid_sp_list closed sort
   | Ppat_record_unboxed_product(lid_sp_list, closed) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_record_pat Unboxed_product lid_sp_list closed sort
@@ -8471,7 +8479,10 @@ and type_expect_
           exp_env = env }
       end
   | Pexp_record(lid_sexp_list, opt_sexp) ->
-      type_expect_record ~overwrite Legacy lid_sexp_list opt_sexp
+      if is_inline_record_product env ty_expected then
+        type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
+      else
+        type_expect_record ~overwrite Legacy lid_sexp_list opt_sexp
   | Pexp_record_unboxed_product(lid_sexp_list, opt_sexp) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
@@ -11934,6 +11945,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
       | [{pexp_desc =
             Pexp_ident _ |
             Pexp_record (_, (Some {pexp_desc = Pexp_ident _}| None)) |
+            Pexp_record_unboxed_product
+              (_, (Some {pexp_desc = Pexp_ident _}| None)) |
             Pexp_overwrite (_, {pexp_desc =
               Pexp_record (_, (Some {pexp_desc = Pexp_ident _}| None))})}] ->
         Required

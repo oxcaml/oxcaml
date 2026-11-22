@@ -4593,18 +4593,8 @@ module Unboxed_field_transformation = struct
 
      This is the best crossing we can give to unboxed versions so that boxing
      them (joining with [immutable_data]) gives the boxed version's crossing. *)
-  let mutable_label_axes =
-    Axis_lattice.co_sub Axis_lattice.mutable_data Axis_lattice.immutable_data
-
   let of_field ~(mutability : Types.mutability) ~modality =
-    let mutability_transformation =
-      match mutability with
-      | Immutable -> Axis_lattice.bot
-      | Mutable { atomic = Nonatomic; _ } -> mutable_label_axes
-      | Mutable { atomic = Atomic; _ } ->
-        Misc.fatal_error
-          "Jkind.Unboxed_field_transformation.of_field: atomic field"
-    in
+    let mutability_transformation = unboxed_label_bounds mutability in
     { modality; mutability_transformation }
 
   let of_modality modality = of_field ~mutability:Immutable ~modality
@@ -4682,23 +4672,13 @@ module Unboxed_field_transformation = struct
 end
 
 let kind_of_inline_fields ~why fields layout =
-  let mod_bounds, with_bounds =
-    List.fold_right
-      (fun ( type_expr,
-             ({ modality; mutability_transformation } :
-               Unboxed_field_transformation.t) ) (mod_bounds, with_bounds) ->
-        ( Mod_bounds.join_axis_lattice mod_bounds mutability_transformation,
-          With_bounds.add_modality ~type_expr ~modality with_bounds ))
-      fields
-      (Mod_bounds.min, No_with_bounds)
-  in
-  fresh_jkind_poly
-    { base = Layout layout; mod_bounds; with_bounds }
-    ~annotation:None ~why
-  (* [mark_best] is correct here because the with-bounds of a product jkind
-     include all the components of the product. Accordingly, looking through
-     the product, by one step, never loses any information. *)
-  |> mark_best
+  Jkind0.kind_of_inline_fields ~why
+    ~field:(fun
+        ( ty,
+          { Unboxed_field_transformation.modality; mutability_transformation }
+        )
+      -> ty, modality, mutability_transformation)
+    fields layout
 
 let product_of_fields ~why fields layouts =
   kind_of_inline_fields ~why:(Product_creation why) fields
@@ -4709,14 +4689,8 @@ let sum_of_arms fields arms =
     (Layout.Sum arms)
 
 let for_unboxed_record lbls =
-  let fields =
-    List.map
-      (fun ((lbl : Types.label_declaration), _layout) ->
-        lbl.ld_type, Unboxed_field_transformation.of_label lbl)
-      lbls
-  in
-  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
-  product_of_fields ~why:Unboxed_record fields layouts
+  let labels, layouts = List.split lbls in
+  for_unboxed_record_layout labels (Layout.product layouts)
 
 let for_abbreviation ~type_jkind_purely wrapping ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)

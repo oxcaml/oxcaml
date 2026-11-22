@@ -694,10 +694,12 @@ let transl_constructor_arguments ~new_var_jkind ~unboxed
       in
       Types.Cstr_tuple flds', Cstr_tuple flds
   | Pcstr_record l ->
-      let lbls, lbls' =
-        transl_labels ~record_form:Legacy ~new_var_jkind ~extension
+      let labels record_form =
+        transl_labels ~record_form ~new_var_jkind ~extension
           env univars closed l (Inlined_record { unboxed })
       in
+      let lbls, lbls' =
+        if unboxed then labels Unboxed_product else labels Legacy in
       Types.Cstr_record lbls',
       Cstr_record lbls
 
@@ -798,8 +800,7 @@ let verify_unboxed_attr unboxed_attr sdecl =
         | _ :: _ :: _ ->
           List.iter (fun c ->
             match c.pcd_args, c.pcd_res with
-            | Pcstr_tuple _, None -> ()
-            | Pcstr_record _, _ -> bad "inline record arms are not supported"
+            | (Pcstr_tuple _ | Pcstr_record _), None -> ()
             | _, Some _ -> bad "GADT arms are not supported") constructors
         | [c] -> begin match c.pcd_args with
             | Pcstr_tuple [] ->
@@ -1456,22 +1457,37 @@ let variant_has_companion_shape cstrs =
   | _ :: _ :: _ ->
     List.for_all (fun (cstr : Types.constructor_declaration) ->
       Option.is_none cstr.cd_res &&
-      match cstr.cd_args with Cstr_tuple _ -> true | Cstr_record _ -> false)
+      match cstr.cd_args with
+      | Cstr_tuple _ -> true
+      | Cstr_record labels -> not (record_has_atomic_field labels))
       cstrs
   | [] | [_] -> false
 
-let compatible_boxed_arms layouts =
-  Array.for_all (function
-    | Cstr_layout_undetermined -> false
-    | Cstr_layout_known { shape; sorts } as layout ->
-      (cstr_layout_is_constant layout ||
-       not (Array.for_all Jkind.Sort.Const.all_void sorts)) &&
-      (match shape with Constructor_mixed s -> not (shape_has_float_boxed s)
-                      | _ -> true)) layouts &&
-  let sorts = Array.to_list layouts |> List.map (function
-    | Cstr_layout_known { sorts; _ } -> Array.to_list sorts
-    | Cstr_layout_undetermined -> []) in
-  Option.is_some (Jkind_types.Sum_repr.make sorts)
+let compatible_boxed_arms cstrs layouts =
+  let has_record = List.exists (fun (cstr : Types.constructor_declaration) ->
+    match cstr.cd_args with Cstr_record _ -> true | Cstr_tuple _ -> false)
+    cstrs in
+  let arm (cstr : Types.constructor_declaration) layout =
+    match layout with
+    | Cstr_layout_undetermined -> None
+    | Cstr_layout_known { shape = Constructor_mixed s; _ }
+      when shape_has_float_boxed s -> None
+    | Cstr_layout_known { sorts; _ } ->
+      let sorts = match cstr.cd_args with
+        | Cstr_tuple _ -> Some (Array.to_list sorts)
+        | Cstr_record labels ->
+          Misc.Stdlib.List.map_option (fun label -> label.ld_sort) labels
+      in
+      Option.bind sorts (fun sorts ->
+        if (not (cstr_layout_is_constant layout) &&
+            List.for_all Jkind.Sort.Const.all_void sorts) ||
+           (has_record && match sorts with
+            | [sort] -> Option.is_some (Jkind_types.Sum_repr.direct_sum sort)
+            | _ -> false)
+        then None else Some sorts)
+  in
+  let arms = Misc.Stdlib.List.map2_option arm cstrs (Array.to_list layouts) in
+  Option.is_some (Option.bind arms Jkind_types.Sum_repr.make)
 
 let gets_unboxed_version decl =
   match decl.type_kind with
@@ -1483,14 +1499,7 @@ let gets_unboxed_version decl =
 
 let derive_unboxed_version has_unboxed_version decl =
   if not (gets_unboxed_version decl) then None else
-  let kind, jkind = match decl.type_kind with
-  | Type_variant (cstrs, Variant_boxed _, umc) ->
-    let cstrs = List.map (fun (cstr : Types.constructor_declaration) ->
-      { cstr with cd_id = Ident.rename cstr.cd_id;
-                  cd_uid = Uid.unboxed_version cstr.cd_uid }) cstrs in
-    Type_variant (cstrs, Variant_unboxed, umc),
-    Jkind.Builtin.any ~why:Old_style_unboxed_type
-  | Type_record (lbls, _rep, umc) ->
+  let unboxed_labels lbls =
     let keep_attribute a =
       (* If we keep [@deprecated_mutable], then a record that aliases
          a record with a [@deprecated_mutable] label will cause two alerts,
@@ -1498,24 +1507,24 @@ let derive_unboxed_version has_unboxed_version decl =
          alias). *)
       not (Builtin_attributes.attr_equals_builtin a "deprecated_mutable")
     in
-    let lbls_unboxed =
-      List.map
-        (fun (ld : Types.label_declaration) ->
-            { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
-            ld_mutable = ld.ld_mutable;
-            ld_modalities = ld.ld_modalities;
-              (* Inherit modalities from the boxed version. Note that these
-                 are affected by the mutability of the boxed label, even
-                 though the unboxed version cannot (currently) be mutated. *)
-            ld_sort = None;
-            ld_type = ld.ld_type;
-            ld_loc = ld.ld_loc;
-            ld_attributes = List.filter keep_attribute ld.ld_attributes;
-              (* Copy label attributes to the unboxed version *)
-            ld_uid = Uid.unboxed_version ld.ld_uid;
-          })
-        lbls
-    in
+    List.map (fun (ld : Types.label_declaration) ->
+      { ld with ld_id = Ident.rename ld.ld_id;
+                ld_sort = None;
+                ld_attributes = List.filter keep_attribute ld.ld_attributes;
+                ld_uid = Uid.unboxed_version ld.ld_uid }) lbls
+  in
+  let kind, jkind = match decl.type_kind with
+  | Type_variant (cstrs, Variant_boxed _, umc) ->
+    let cstrs = List.map (fun (cstr : Types.constructor_declaration) ->
+      let cd_args = match cstr.cd_args with
+        | Cstr_record labels -> Types.Cstr_record (unboxed_labels labels)
+        | Cstr_tuple _ as args -> args in
+      { cstr with cd_id = Ident.rename cstr.cd_id; cd_args;
+                  cd_uid = Uid.unboxed_version cstr.cd_uid }) cstrs in
+    Type_variant (cstrs, Variant_unboxed, umc),
+    Jkind.Builtin.any ~why:Old_style_unboxed_type
+  | Type_record (lbls, _rep, umc) ->
+    let lbls_unboxed = unboxed_labels lbls in
     let rep = Types.Record_unboxed_product in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
@@ -2709,40 +2718,47 @@ let rec update_decl_jkind env dpath decl =
       let invalid loc reason =
         Error.log_and_raise loc (Bad_unboxed_attribute reason) in
       let args_and_layouts (cstr : Types.constructor_declaration) =
-        let arg_layout (arg : Types.constructor_argument) =
-          let jkind = Ctype.type_jkind env arg.ca_type in
+        let field loc ty transform =
+          let jkind = Ctype.type_jkind env ty in
           match Jkind.get_layout_defaulting_to_scannable env jkind with
           | Some layout ->
             (match Jkind_types.Layout.Const.get_sort layout with
              | Some sort when Jkind.Sort.Const.is_concrete sort ->
-               { arg with ca_sort = Some sort },
-               Jkind_types.Layout.of_const layout
-             | Some _ | None -> invalid arg.ca_loc "an arm has unknown size")
-          | None -> invalid arg.ca_loc "an arm has unknown size"
+               Some sort,
+               (sort, Jkind_types.Layout.of_const layout, (ty, transform))
+             | Some _ | None -> invalid loc "an arm has unknown size")
+          | None -> invalid loc "an arm has unknown size"
         in
-        match cstr.cd_args with
-        | Cstr_record _ ->
-          invalid cstr.cd_loc "inline record arms are not supported"
+        let cd_args, fields = match cstr.cd_args with
+        | Cstr_record labels ->
+          let label_field (label : Types.label_declaration) =
+            let ld_sort, field = field label.ld_loc label.ld_type
+                (Jkind.Unboxed_field_transformation.of_label label) in
+            { label with ld_sort }, field in
+          let labels, fields = List.split (List.map label_field labels) in
+          Types.Cstr_record labels, fields
         | Cstr_tuple args ->
-          let args, layouts = List.split (List.map arg_layout args) in
-          let arm =
-            match layouts with
-            | [] -> Jkind_types.Layout.Sort
-                      (Jkind.Sort.void, Jkind_types.Scannable_axes.max)
-            | _ -> Jkind_types.Layout.product layouts
-          in
-          { cstr with cd_args = Cstr_tuple args }, (arm, args)
+          let tuple_field (arg : Types.constructor_argument) =
+            let ca_sort, field = field arg.ca_loc arg.ca_type
+                (Jkind.Unboxed_field_transformation.of_modality
+                   arg.ca_modalities) in
+            { arg with ca_sort }, field in
+          let args, fields = List.split (List.map tuple_field args) in
+          Types.Cstr_tuple args, fields
+        in
+        let layouts = List.map (fun (_, layout, _) -> layout) fields in
+        let arm = match layouts with
+          | [] -> Jkind_types.Layout.Sort
+                    (Jkind.Sort.void, Jkind_types.Scannable_axes.max)
+          | _ -> Jkind_types.Layout.product layouts in
+        { cstr with cd_args }, (arm, fields)
       in
       let cstrs, arms = List.split (List.map args_and_layouts cstrs) in
       let layouts, args = List.split arms in
-      let sorts = List.map (List.map (fun a -> Option.get a.ca_sort)) args in
+      let sorts = List.map (List.map (fun (sort, _, _) -> sort)) args in
       if Option.is_none (Jkind_types.Sum_repr.make sorts)
       then invalid loc "a vector or mask arm is not supported";
-      let field (arg : Types.constructor_argument) =
-        arg.ca_type, Jkind.Unboxed_field_transformation.of_modality
-                       arg.ca_modalities
-      in
-      let fields = List.concat_map (List.map field) args in
+      let fields = List.concat_map (List.map (fun (_, _, f) -> f)) args in
       cstrs, rep, Jkind.sum_of_arms fields layouts
     | [ cstr ], Variant_unboxed ->
       let jkind =
@@ -2900,9 +2916,9 @@ let rec update_decl_jkind env dpath decl =
 
   let type_unboxed_version =
     match new_decl.type_kind with
-    | Type_variant (_, Variant_boxed layouts, _)
+    | Type_variant (cstrs, Variant_boxed layouts, _)
       when Option.is_some decl.type_unboxed_version &&
-           not (compatible_boxed_arms layouts) -> None
+           not (compatible_boxed_arms cstrs layouts) -> None
     | _ -> Option.map (fun companion ->
         let path = Path.unboxed_version dpath in
         match companion.type_kind, companion.type_manifest with

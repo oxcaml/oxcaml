@@ -401,16 +401,16 @@ module Boxed_sum = struct
                       if uniform then All_value else Shape (shape ())
                     in
                     let args = Sum.project loc repr index arg layouts in
-                    Lprim (Pmakeblock (tag, Immutable, shape, mode), args, loc)
+                    Lprim (Pmakeblock (tag, Mutable, shape, mode), args, loc)
                 in
                 `Const (index, action)
               | Unbox ->
                 let field =
                   if uniform
-                  then fun pos -> Pfield (pos, Pointer, Reads_agree)
+                  then fun pos -> Pfield (pos, Pointer, Reads_vary)
                   else
                     let shape = shape () in
-                    fun pos -> Pmixedfield ([pos], shape, Reads_agree)
+                    fun pos -> Pmixedfield ([pos], shape, Reads_vary)
                 in
                 let args =
                   List.mapi

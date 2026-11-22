@@ -2386,7 +2386,8 @@ let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
   | None ->
     fatal_errorf "Translquote [at %a]: no global path for record field"
       Location.print_loc (to_location loc)
-  | Some (Path.Pident _) -> Field.of_string loc lbl_desc.lbl_name |> Field.wrap
+  | Some (Path.Pident _ | Path.Pextra_ty (_, (Pcstr_ty _ | Pext_ty))) ->
+    Field.of_string loc lbl_desc.lbl_name |> Field.wrap
   | Some (Path.Pdot (p, _)) ->
     Field.ident loc
       (Identifier.Field.dot loc (module_for_path loc env p) lbl_desc.lbl_name

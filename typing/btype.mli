@@ -763,6 +763,17 @@ module Jkind0 : sig
 
     val for_boxed_record : label_declaration list -> jkind_l
 
+    val unboxed_label_bounds : mutability -> Axis_lattice.t
+
+    val kind_of_inline_fields :
+      why:Jkind_intf.History.creation_reason ->
+      field:('a -> type_expr * Mode.Modality.Const.t * Axis_lattice.t) ->
+      'a list -> Jkind_types.Sort.t Jkind_types.Layout.t -> jkind_l
+
+    val for_unboxed_record_layout :
+      label_declaration list ->
+      Jkind_types.Sort.t Jkind_types.Layout.t -> jkind_l
+
     (* Shared type-level implementation of Steps B1-B4 from
        Note [With-bounds for GADTs].  Callers choose the projection target via
        [projected_params]: declaration parameters for boxed GADTs, or the

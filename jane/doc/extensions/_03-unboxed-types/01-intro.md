@@ -366,12 +366,28 @@ have payload layout `void`. The boxed representation uses an immediate for
 `Empty` and a block for `Witness`. The sum `void + void` does not record that
 distinction, so this declaration provides only `t`.
 
-The compiler also omits the implicit unboxed variant when a constructor
-declares its own record fields, as in `Record of { count : int }`, or has a
-GADT result type. In the `answer` example, `Ready of reply#` takes an existing
-variant type as its argument, so `answer` can have an implicit unboxed
-variant (`answer#`). A record with a `reply#` field can likewise have
-an implicit unboxed record (`entry#`).
+A constructor can declare record fields. The unboxed constructor stores the
+fields as a product in declaration order. A pattern can bind that product:
+
+```ocaml
+type counter = Stop | Count of { mutable number : int; name : string }
+let read = function #Stop -> 0 | #Count fields -> fields.#number
+let copy = function #Stop -> #Stop | #Count fields -> #Count fields
+```
+
+The boxed pattern `Count fields` on a `counter` binds the original block:
+`fields.number <- 1` changes that block. The unboxed fields cannot be assigned.
+A direct `[@@unboxed]` variant uses the same product for its record fields.
+Matching its `box` also binds the product, so it does not allow assignment.
+
+A GADT result type or an atomic field prevents an implicit unboxed variant.
+There is also a compatibility exception for tag sharing. If the declaration
+contains a record constructor, its boxed constructors keep their original
+tags. It gets no `t#` if tag sharing would change those tags, for example in
+`type t = Busy | Ready of { reply : reply# }`. A one-field product has the
+layout of its field, so it does not separate the two tags. Adding a second
+field, as in `Ready of { reply : reply#; count : int }`, keeps the nested
+tag inside the product and allows `t#`.
 
 *Limitations and future plans*:
 * Arrays of unboxed variants follow the same rule as arrays of unboxed
