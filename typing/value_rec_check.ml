@@ -174,6 +174,7 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_exclave e ->
         classify_expression env e
 
+    | Texp_construct (_, {cstr_sum = Some _}, _, _, _) -> Dynamic
     | Texp_construct (_, {cstr_repr = Variant_unboxed}, _, [_, e], _) ->
         classify_expression env e
     | Texp_construct _ ->

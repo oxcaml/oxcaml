@@ -75,6 +75,7 @@ module Sort : sig
     | Product of t list
     | Univar of univar
     | Addressable of t
+    | Sum of t list
 
   and var
 
@@ -115,6 +116,28 @@ module Sort : sig
   *)
   val decompose_into_product : t -> int -> (t list, error) result
 
+  (** Physical storage for a closed sum. Every index refers to the same field
+      for all constructors. Field zero holds the constructor's ordinal. *)
+  module Sum_repr : sig
+    type projection =
+      | Void
+      | Field of int * base
+      | Product of projection list
+
+    type t = private
+      { fields : base list;
+        arms : projection list array
+      }
+
+    (** Arguments within a constructor are in source order. Returns [None] for
+        an unknown representation or an unsupported vector or mask. *)
+    val make : Const.t list list -> t option
+
+    val carrier : Const.t list -> Const.t
+
+    val physical_sort : Const.t -> Const.t option
+  end
+
   module Flat : sig
     type t =
       | Var of Var.id
@@ -123,6 +146,8 @@ module Sort : sig
       | Base of base
   end
 end
+
+module Sum_repr = Sort.Sum_repr
 
 module Kind_operator : sig
   type t =
@@ -181,8 +206,8 @@ module Layout : sig
             meet of those implied axes and the axes applied outside of the box
             constructor. *)
     | Sum of 'sort t list
-        (** Ordered alternatives. There is no sum sort until lowering supports
-            the runtime representation. *)
+        (** Ordered alternative payload layouts; preserves refinements on each
+            scannable leaf across signature inclusion. *)
 
   module Const : sig
     type t = private
@@ -227,6 +252,11 @@ module Layout : sig
     val max : t
 
     val get_sort : t -> Sort.Const.t option
+
+    (** Machine representation, including a closed sum's shared storage. *)
+    val physical_sort : t -> Sort.Const.t option
+
+    val runtime_sum_sort : t -> Sort.Const.t option
 
     (** Whether the compiler knows the runtime sort without instantiating
         variables. An explicit box has a concrete sort for any contents. *)

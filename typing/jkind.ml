@@ -166,11 +166,26 @@ module Layout = struct
     let rec of_sort_const (s : Sort.Const.t) sa =
       match s with
       | Base b -> Static.of_base b sa
+      | Sum arms -> sum (List.map (fun s -> of_sort_const s sa) arms)
       | Product consts ->
         product (List.map (fun s -> of_sort_const s sa) consts)
       | Univar uv -> univar uv sa
       | Genvar v -> genvar v sa
       | Addressable s -> addressable (of_sort_const s sa)
+
+    let rec storage_layout (layout : t) =
+      match layout with
+      | Sum _ -> (
+        match physical_sort layout with
+        | Some sort -> of_sort_const sort Scannable_axes.max
+        | None -> Misc.fatal_error "Missing storage layout for sum")
+      | Product fields ->
+        let fields' = Misc.Stdlib.List.map_sharing storage_layout fields in
+        if fields == fields' then layout else product fields'
+      | Addressable contents ->
+        let contents' = storage_layout contents in
+        if contents == contents' then layout else addressable contents'
+      | Any _ | Base _ | Univar _ | Genvar _ | Box _ -> layout
 
     let rec equal_up_to_root_scannable_axes c1 c2 =
       match c1, c2 with
@@ -328,6 +343,8 @@ module Layout = struct
       | Base b ->
         Sort (Base b, sa)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
+      | Sum arms ->
+        Sum (List.map (fun s -> flatten_sort s Scannable_axes.max) arms)
       | Product sorts ->
         Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
       | Univar x -> Sort (Univar x, sa)
@@ -420,6 +437,15 @@ module Layout = struct
       Sort.implied_externality
         ~separability:(box_scannable_axes t sa).separability Sort.scannable
 
+  let sum_components layout sort n =
+    match Option.bind (get_const layout) Const.runtime_sum_sort with
+    | None -> Error Incompatible
+    | Some _ ->
+      let sorts = List.init n (fun _ -> Sort.Var (Sort.new_genvar ())) in
+      Result.map
+        (fun () -> List.map (fun s -> Sort (s, Scannable_axes.max)) sorts)
+        (Sort.equate ~allow_mutation:true sort (Sort.Sum sorts))
+
   let rec equate_or_equal ~allow_mutation t1 t2 =
     let ( let* ) = Result.bind in
     match t1, t2 with
@@ -436,6 +462,11 @@ module Layout = struct
             (conservatively) concludes that they are not equal. *)
       then if Scannable_axes.equal sa1 sa2 then Ok () else Error Incompatible
       else Ok ()
+    | (Sum ts as layout), Sort (sort, _) | Sort (sort, _), (Sum ts as layout) ->
+      let* sorts = sum_components layout sort (List.length ts) in
+      Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
+        (fun () -> equate_or_equal ~allow_mutation)
+        () ts sorts
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts ->
       (* CR-someday jbachurski: This might mutate [sort] even if
          [allow_mutation] is [false]. *)
@@ -574,8 +605,13 @@ module Layout = struct
       then Scannable_axes.less_or_equal sa1 sa2 |> Less_or_equal.of_le_result
       else Ok Less_or_equal.Equal
     | Product ts1, Product ts2 | Sum ts1, Sum ts2 -> sub_components ts1 ts2
-    | Sum _, (Sort _ | Product _) | (Sort _ | Product _), Sum _ ->
-      Error Incompatible
+    | (Sum ts as layout), Sort (sort, _) ->
+      let* sorts = sum_components layout sort (List.length ts) in
+      sub_components ts sorts
+    | Sort (sort, _), (Sum ts as layout) ->
+      let* sorts = sum_components layout sort (List.length ts) in
+      sub_components sorts ts
+    | Sum _, Product _ | Product _, Sum _ -> Error Incompatible
     | Product ts1, Sort (s2, _) ->
       let* ts2 = Sort.decompose_into_product s2 (List.length ts1) in
       sub_components ts1
@@ -636,8 +672,10 @@ module Layout = struct
     | Product ts1, Product ts2 ->
       Result.map (fun ts -> Product ts) (components ts1 ts2)
     | Sum ts1, Sum ts2 -> Result.map (fun ts -> Sum ts) (components ts1 ts2)
-    | Sum _, (Sort _ | Product _ | Box _) | (Sort _ | Product _ | Box _), Sum _
-      ->
+    | (Sum ts as layout), Sort (sort, _) | Sort (sort, _), (Sum ts as layout) ->
+      let* sorts = sum_components layout sort (List.length ts) in
+      Result.map (fun ts -> Sum ts) (components ts sorts)
+    | Sum _, (Product _ | Box _) | (Product _ | Box _), Sum _ ->
       Error Incompatible
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts ->
       let* sorts = Sort.decompose_into_product sort (List.length ts) in
@@ -673,8 +711,9 @@ module Layout = struct
           let sort_var_str = Fmt.asprintf "%a" Sort.format s in
           pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
         | Addressable s -> pp_element ~nested ppf (Addressable (Sort (s, sa)))
-        | Product _ when nested -> Fmt.fprintf ppf "(%a)" Sort.format s
-        | Base _ | Product _ | Univar _ ->
+        | (Product _ | Sum _) when nested ->
+          Fmt.fprintf ppf "(%a)" Sort.format s
+        | Base _ | Product _ | Sum _ | Univar _ ->
           (* Scannable axes aren't relevant in these cases *)
           Fmt.fprintf ppf "%a" Sort.format s)
       | (Product ts | Sum ts) as layout ->
@@ -3263,7 +3302,11 @@ let get t = Jkind_desc.get t.jkind
 let sort_option_of_jkind env (t : jkind_l) : sort option =
   let rec sort_of_layout (t : _ Layout.t) =
     match t with
-    | Any _ | Sum _ -> None
+    | Any _ -> None
+    | Sum _ ->
+      Option.bind (Jkind_types.Layout.get_const t) (fun layout ->
+          Option.map Sort.of_const
+            (Jkind_types.Layout.Const.runtime_sum_sort layout))
     | Sort (s, _) -> Some s
     | Product ls -> (
       match Misc.Stdlib.List.map_option sort_of_layout ls with
@@ -3467,7 +3510,7 @@ let decompose_product env jk =
   let mk_jkind layout = set_layout jk layout in
   let rec deal_with_sort : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
-    | Base _ -> None
+    | Base _ | Sum _ -> None
     | Product sorts ->
       Some (List.map (fun sort -> Layout.Sort (sort, Scannable_axes.max)) sorts)
     | Addressable s ->
@@ -4618,7 +4661,7 @@ module Unboxed_field_transformation = struct
     | No_intersection _ -> None
 end
 
-let product_of_fields ~why fields layouts =
+let kind_of_inline_fields ~why fields layout =
   let mod_bounds, with_bounds =
     List.fold_right
       (fun ( type_expr,
@@ -4630,12 +4673,20 @@ let product_of_fields ~why fields layouts =
       (Mod_bounds.min, No_with_bounds)
   in
   fresh_jkind_poly
-    { base = Layout (Layout.product layouts); mod_bounds; with_bounds }
-    ~annotation:None ~why:(Product_creation why)
+    { base = Layout layout; mod_bounds; with_bounds }
+    ~annotation:None ~why
   (* [mark_best] is correct here because the with-bounds of a product jkind
      include all the components of the product. Accordingly, looking through
      the product, by one step, never loses any information. *)
   |> mark_best
+
+let product_of_fields ~why fields layouts =
+  kind_of_inline_fields ~why:(Product_creation why) fields
+    (Layout.product layouts)
+
+let sum_of_arms fields arms =
+  kind_of_inline_fields ~why:(Any_creation Old_style_unboxed_type) fields
+    (Layout.Sum arms)
 
 let for_unboxed_record lbls =
   let fields =

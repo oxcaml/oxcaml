@@ -118,6 +118,10 @@ module Layout : sig
 
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
+    (** Replace each inline sum with its fixed storage layout, preserving
+        sharing when the layout already describes its own storage. *)
+    val storage_layout : t -> t
+
     val to_string : t -> string
 
     (** Whether the layout mentions a genvar anywhere (including inside a
@@ -554,6 +558,12 @@ end
     product are represented in the with-bounds. *)
 val product_of_fields :
   why:History.product_creation_reason ->
+  (Types.type_expr * Unboxed_field_transformation.t) list ->
+  Sort.t Layout.t list ->
+  Types.jkind_l
+
+(** Keep the layout of every arm and take the modal bounds of every field. *)
+val sum_of_arms :
   (Types.type_expr * Unboxed_field_transformation.t) list ->
   Sort.t Layout.t list ->
   Types.jkind_l

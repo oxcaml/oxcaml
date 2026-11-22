@@ -2214,6 +2214,14 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       }
   in
   let binding_kind = add_barrier_to_let_kind ubr Alias in
+  match cstr.cstr_sum, cstr.cstr_tag with
+  | Some repr, Ordinary {src_index} ->
+    let layouts = List.map (Typeopt.layout_of_sort head.pat_loc) arg_sorts in
+    let args = Translrepr.Sum.project loc repr src_index arg layouts in
+    List.map2 (fun arg (sort, layout) ->
+      { arg; binding_kind; mut = compose_mut mut Immutable; sort; layout })
+      args (List.combine arg_sorts layouts) @ rem
+  | _ ->
   if cstr.cstr_inlined <> None then
     { arg; binding_kind; mut; sort; layout } :: rem
   else
@@ -3787,6 +3795,18 @@ let combine_regular_constructor value_kind loc arg cstr partial
       mk_failaction_pos partial constrs ctx def
   in
   let descr_lambda_list = fails @ descr_lambda_list in
+  match cstr.cstr_sum with
+  | Some repr ->
+    let cases = List.map (fun (cstr, act) ->
+      match cstr.cstr_tag with
+      | Ordinary {src_index} -> src_index, act
+      | Extension _ | Null -> fatal_error "Matching: invalid sum tag")
+      descr_lambda_list
+    in
+    call_switcher value_kind loc fail_opt (Translrepr.Sum.tag loc repr arg)
+      ~low:0 ~high:(nconstrs - 1) (sort_int_lambda_list cases),
+    Jumps.union local_jumps total1
+  | None ->
   let consts, nonconsts, null = split_cases descr_lambda_list in
   (* Our duty below is to generate code, for matching on a list of
      constructor+action cases, that is good for both bytecode and

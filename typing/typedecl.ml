@@ -795,7 +795,12 @@ let verify_unboxed_attr unboxed_attr sdecl =
         bad "[@@unboxed] may not be used on unboxed records"
     | Ptype_variant constructors -> begin match constructors with
         | [] -> bad "it has no constructor"
-        | (_::_::_) -> bad "it has more than one constructor"
+        | _ :: _ :: _ ->
+          List.iter (fun c ->
+            match c.pcd_args, c.pcd_res with
+            | Pcstr_tuple _, None -> ()
+            | Pcstr_record _, _ -> bad "inline record arms are not supported"
+            | _, Some _ -> bad "GADT arms are not supported") constructors
         | [c] -> begin match c.pcd_args with
             | Pcstr_tuple [] ->
                 bad "its constructor has no argument"
@@ -1031,6 +1036,7 @@ let transl_declaration env sdecl (id, uid) =
       Option.is_none unboxed_attr
       && not represent_as_float_array
       && not flatten_floats
+    | Ptype_variant (_ :: _ :: _) -> unboxed_attr = Some true, false
     | Ptype_record_unboxed_product _ -> false, false
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
@@ -2075,7 +2081,11 @@ module Element_repr = struct
         else Jkind.get_layout env jkind
       in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
-      | Any _ | Sum _ -> None
+      | Sum _ as layout ->
+        if Jkind_types.Layout.Const.has_concrete_sort layout
+        then layout_to_t (Jkind.Layout.Const.storage_layout layout)
+        else None
+      | Any _ -> None
       | Base (base, sa) -> Some (classify_base base sa)
       | Box (_, sa) -> Some (Value_element sa)
       | Product l ->
@@ -2675,6 +2685,45 @@ let rec update_decl_jkind env dpath decl =
         end
       | None -> bad_or_null_payload_count loc
       end
+    | _ :: _ :: _, Variant_unboxed ->
+      let invalid loc reason =
+        Error.log_and_raise loc (Bad_unboxed_attribute reason) in
+      let args_and_layouts (cstr : Types.constructor_declaration) =
+        let arg_layout (arg : Types.constructor_argument) =
+          let jkind = Ctype.type_jkind env arg.ca_type in
+          match Jkind.get_layout_defaulting_to_scannable env jkind with
+          | Some layout ->
+            (match Jkind_types.Layout.Const.get_sort layout with
+             | Some sort when Jkind.Sort.Const.is_concrete sort ->
+               { arg with ca_sort = Some sort },
+               Jkind_types.Layout.of_const layout
+             | Some _ | None -> invalid arg.ca_loc "an arm has unknown size")
+          | None -> invalid arg.ca_loc "an arm has unknown size"
+        in
+        match cstr.cd_args with
+        | Cstr_record _ ->
+          invalid cstr.cd_loc "inline record arms are not supported"
+        | Cstr_tuple args ->
+          let args, layouts = List.split (List.map arg_layout args) in
+          let arm =
+            match layouts with
+            | [] -> Jkind_types.Layout.Sort
+                      (Jkind.Sort.void, Jkind_types.Scannable_axes.max)
+            | _ -> Jkind_types.Layout.product layouts
+          in
+          { cstr with cd_args = Cstr_tuple args }, (arm, args)
+      in
+      let cstrs, arms = List.split (List.map args_and_layouts cstrs) in
+      let layouts, args = List.split arms in
+      let sorts = List.map (List.map (fun a -> Option.get a.ca_sort)) args in
+      if Option.is_none (Jkind_types.Sum_repr.make sorts)
+      then invalid loc "a vector or mask arm is not supported";
+      let field (arg : Types.constructor_argument) =
+        arg.ca_type, Jkind.Unboxed_field_transformation.of_modality
+                       arg.ca_modalities
+      in
+      let fields = List.concat_map (List.map field) args in
+      cstrs, rep, Jkind.sum_of_arms fields layouts
     | [ cstr ], Variant_unboxed ->
       let jkind =
         Jkind.for_unboxed_variant
@@ -2747,7 +2796,7 @@ let rec update_decl_jkind env dpath decl =
           (List.rev cstrs)
       in
       cstrs, Variant_boxed cstr_layouts, jkind
-    | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
+    | ([], Variant_unboxed | _, Variant_extensible) ->
       assert false
   in
 
@@ -4488,7 +4537,7 @@ let type_sort_external ~is_layout_poly ~why env loc typ =
 let rec strip_addressable_sort (s : Jkind_types.Sort.Const.t) =
   match s with
   | Addressable s -> strip_addressable_sort s
-  | (Base _ | Product _ | Univar _ | Genvar _) as s -> s
+  | (Base _ | Product _ | Sum _ | Univar _ | Genvar _) as s -> s
 
 (* A fat pointer: an unboxed pair of a [value] base and a [bits64] byte
    offset. *)
@@ -4498,7 +4547,7 @@ let sort_is_fat_pointer (sort : Jkind_types.Sort.Const.t) =
     (match strip_addressable_sort a, strip_addressable_sort b with
      | Base Scannable, Base Bits64 -> true
      | _, _ -> false)
-  | Base _ | Product _ | Univar _ | Genvar _
+  | Base _ | Product _ | Sum _ | Univar _ | Genvar _
   (* [strip_addressable_sort] never returns [Addressable _] *)
   | Addressable _ -> false
 
@@ -4544,7 +4593,7 @@ let make_native_repr
         (Warnings.Incompatible_with_upstream
               (Warnings.Unboxed_attribute layout)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_absent, (Sort ((Product _ | Addressable _) as c)) ->
+  | Native_repr_attr_absent, Sort ((Product _ | Sum _ | Addressable _) as c) ->
     (if Language_extension.erasable_extensions_only ()
      then
        (* CR layouts v7.1: Using an unboxed product in a C external is not
@@ -4577,7 +4626,7 @@ let make_native_repr
   | Native_repr_attr_present Unboxed, Sort (Genvar _) ->
     Misc.fatal_error "typedecl: Genvar in concrete type"
   | Native_repr_attr_present Unboxed,
-    (Sort (Product _ | Base Void | Addressable _)) ->
+    (Sort (Product _ | Sum _ | Base Void | Addressable _)) ->
     Error.log_and_raise core_type.ptyp_loc
       (Bad_native_repr_attr Unboxed)
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
@@ -4617,8 +4666,8 @@ let make_native_repr
          (Warnings.Incompatible_with_upstream
             Warnings.Unpacked_attribute));
     Unpacked_product sort
-  | Native_repr_attr_present Unpacked, (Sort (Base _ | Addressable _) | Poly)
-    ->
+  | Native_repr_attr_present Unpacked,
+    (Sort (Base _ | Sum _ | Addressable _) | Poly) ->
     Error.log_and_raise core_type.ptyp_loc
       (Bad_native_repr_attr Unpacked)
   | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
@@ -4630,7 +4679,8 @@ let make_native_repr
     Sort (Base Bits16 | Addressable (Base Bits16)) ->
     Unextended_bits16
   | Native_repr_attr_present Unsafe_unextended,
-    (Poly | Sort (Product _ | Addressable _ | Base (Scannable | Void | Bits32 |
+    (Poly | Sort (Product _ | Sum _ | Addressable _
+      | Base (Scannable | Void | Bits32 |
       Bits64 | Word | Untagged_immediate | Float32 | Float64 | Vec128 | Vec256 |
       Vec512 | Mask))) ->
     Error.log_and_raise core_type.ptyp_loc

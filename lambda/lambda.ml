@@ -2415,6 +2415,7 @@ let rec transl_layout (layout : Jkind_types.Layout.Const.t)
   | Genvar (var, _axes) -> Splice_variable (Layout_ident.of_sort_var var)
   | Product layouts ->
       Product (Array.of_list (List.map transl_layout layouts))
+  | Sum _ -> transl_layout (Jkind.Layout.Const.storage_layout layout)
   | Addressable layout -> transl_layout layout
   | Base (base, axes) ->
       Types.mixed_block_element_of_base base axes
@@ -2422,7 +2423,7 @@ let rec transl_layout (layout : Jkind_types.Layout.Const.t)
   | Box (_, axes) ->
       Types.mixed_block_element_of_base Scannable axes
       |> transl_mixed_product_element
-  | Any _ | Univar _ | Sum _ ->
+  | Any _ | Univar _ ->
       fatal_error "Lambda.transl_layout: unrepresentable layout"
 
 let transl_module_representation repr =
@@ -3535,6 +3536,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Base Mask -> layout_unboxed_mask
   | Base Void -> layout_void
+  | Sum arms -> layout_of_const_sort (Jkind_types.Sum_repr.carrier arms)
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Addressable sort ->
@@ -3563,7 +3565,7 @@ let layout_of_extern_repr : extern_repr -> _ = function
 
 let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
-  | Same_as_ocaml_repr (Product _)
+  | Same_as_ocaml_repr (Product _ | Sum _)
   | Unpacked_product _ ->
     true
   | Same_as_ocaml_repr (Base _)

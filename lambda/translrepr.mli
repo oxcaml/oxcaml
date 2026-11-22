@@ -59,3 +59,26 @@ val label_sort_for_representation :
   record_sort:Jkind.Sort.Const.t ->
   variable_sorts:Jkind.Sort.Const.t array option ->
   Jkind.Sort.Const.t
+
+module Sum : sig
+  val inject :
+    Lambda.scoped_location ->
+    Jkind_types.Sum_repr.t ->
+    int ->
+    (Lambda.layout * Lambda.lambda) list ->
+    Lambda.lambda
+
+  val project :
+    Lambda.scoped_location ->
+    Jkind_types.Sum_repr.t ->
+    int ->
+    Lambda.lambda ->
+    Lambda.layout list ->
+    Lambda.lambda list
+
+  val tag :
+    Lambda.scoped_location ->
+    Jkind_types.Sum_repr.t ->
+    Lambda.lambda ->
+    Lambda.lambda
+end

@@ -162,3 +162,158 @@ let label_sort_for_representation (label : Data_types.label_description)
   | Record_inlined (_, Constructor_immediate_all_void, _) ->
     Misc.fatal_error
       "label_sort_for_representation: unexpected immediate representation"
+
+module Sum = struct
+  module Repr = Jkind_types.Sum_repr
+
+  let layouts loc (repr : Repr.t) =
+    List.map
+      (fun base ->
+        Typeopt.layout_of_sort
+          (Debuginfo.Scoped_location.to_location loc)
+          (Jkind.Sort.Const.base base))
+      repr.fields
+
+  let zero : Jkind_types.Sort.base -> lambda = function
+    | Scannable -> lambda_unit
+    | Float64 -> Lconst (Const_base (Const_unboxed_float "0."))
+    | Float32 -> Lconst (Const_base (Const_unboxed_float32 "0."))
+    | Word -> Lconst (Const_base (Const_unboxed_nativeint Targetint.zero))
+    | Bits32 -> Lconst (Const_base (Const_unboxed_int32 0l))
+    | Bits64 -> Lconst (Const_base (Const_unboxed_int64 0L))
+    | Bits8 -> Lconst (Const_base (Const_untagged_int8 Numbers.Int8.zero))
+    | Bits16 -> Lconst (Const_base (Const_untagged_int16 Numbers.Int16.zero))
+    | Untagged_immediate -> Lconst (Const_base (Const_untagged_int 0))
+    | Void | Vec128 | Vec256 | Vec512 | Mask ->
+      Misc.fatal_error "Translrepr.Sum.zero: invalid carrier field"
+
+  let convert loc (src : Jkind_types.Sort.base) (dst : Jkind_types.Sort.base)
+      arg =
+    let integral (base : Jkind_types.Sort.base) =
+      let open Scalar in
+      match base with
+      | Bits8 -> integral (Naked (Taggable Int8))
+      | Bits16 -> integral (Naked (Taggable Int16))
+      | Untagged_immediate -> integral (Naked (Taggable Int))
+      | Bits32 -> integral (Naked (Boxable (Int32 Any_locality_mode)))
+      | Bits64 -> integral (Naked (Boxable (Int64 Any_locality_mode)))
+      | Word -> integral (Naked (Boxable (Nativeint Any_locality_mode)))
+      | _ -> Misc.fatal_error "Translrepr.Sum.convert: expected integer"
+    in
+    let cast_bits src dst arg ~name ~native_name =
+      let repr base =
+        Primitive.Prim_global, Same_as_ocaml_repr (Jkind.Sort.Const.base base)
+      in
+      Lprim
+        ( Pccall
+            (Primitive.make ~name ~native_name ~alloc:false ~effects:No_effects
+               ~coeffects:No_coeffects ~c_builtin:true
+               ~native_repr_args:[repr src]
+               ~native_repr_res:(repr dst) ~is_layout_poly:false),
+          [arg],
+          loc )
+    in
+    let int_bits (base : Jkind_types.Sort.base) : Jkind_types.Sort.base =
+      match base with
+      | Float32 -> Jkind_types.Sort.Bits32
+      | Float64 -> Bits64
+      | _ -> base
+    in
+    if Jkind_types.Sort.equal_base src dst
+    then arg
+    else
+      let bits =
+        match src with
+        | Float64 ->
+          cast_bits src Bits64 arg ~name:"caml_int64_bits_of_float"
+            ~native_name:"caml_int64_bits_of_float_unboxed"
+        | Float32 ->
+          cast_bits src Bits32 arg ~name:"caml_float32_to_bits_bytecode"
+            ~native_name:"caml_float32_to_bits"
+        | _ -> arg
+      in
+      let bits =
+        if Jkind_types.Sort.equal_base (int_bits src) (int_bits dst)
+        then bits
+        else
+          static_cast
+            ~src:(integral (int_bits src))
+            ~dst:(integral (int_bits dst))
+            bits ~loc
+      in
+      match dst with
+      | Float64 ->
+        cast_bits Bits64 dst bits ~name:"caml_int64_float_of_bits"
+          ~native_name:"caml_int64_float_of_bits_unboxed"
+      | Float32 ->
+        cast_bits Bits32 dst bits ~name:"caml_float32_of_bits_bytecode"
+          ~native_name:"caml_float32_of_bits"
+      | _ -> bits
+
+  let inject loc (repr : Repr.t) tag args =
+    let bases = Array.of_list repr.fields in
+    let fields = Array.map zero bases in
+    fields.(0)
+      <- (match repr.fields with
+         | Bits32 :: _ ->
+           Lconst (Const_base (Const_unboxed_int32 (Int32.of_int tag)))
+         | _ -> tagged_immediate tag);
+    let rec fill (projection : Repr.projection) layout arg =
+      match projection, layout with
+      | Void, _ -> ()
+      | Field (i, base), _ -> fields.(i) <- convert loc base bases.(i) arg
+      | Product projections, Punboxed_product layouts ->
+        List.iteri
+          (fun i (projection, layout) ->
+            fill projection layout
+              (Lprim (Punboxed_product_field (i, layouts), [arg], loc)))
+          (List.combine projections layouts)
+      | Product _, _ ->
+        Misc.fatal_error "Translrepr.Sum.inject: expected product"
+    in
+    (* Evaluate each argument once in the same right-to-left order as a
+       regular constructor, including arguments that contribute no fields. *)
+    let rec build = function
+      | [] when Array.length fields = 1 -> fields.(0)
+      | [] ->
+        Lprim
+          (Pmake_unboxed_product (layouts loc repr), Array.to_list fields, loc)
+      | (projection, (layout, arg)) :: rest ->
+        let id = Ident.create_local "payload" in
+        fill projection layout (Lvar id);
+        Llet (Strict, layout, id, debug_uid_none, arg, build rest)
+    in
+    build (List.rev (List.combine repr.arms.(tag) args))
+
+  let project loc (repr : Repr.t) tag arg layouts_of_args =
+    let fields = layouts loc repr in
+    let rec read (projection : Repr.projection) layout =
+      match projection, layout with
+      | Void, _ -> Lprim (Punbox_unit, [lambda_unit], loc)
+      | Field (i, base), _ ->
+        convert loc (List.nth repr.fields i) base
+          (Lprim (Punboxed_product_field (i, fields), [arg], loc))
+      | Product projections, Punboxed_product layouts ->
+        Lprim
+          ( Pmake_unboxed_product layouts,
+            List.map2 read projections layouts,
+            loc )
+      | Product _, _ ->
+        Misc.fatal_error "Translrepr.Sum.project: expected product"
+    in
+    List.map2 read repr.arms.(tag) layouts_of_args
+
+  let tag loc (repr : Repr.t) arg =
+    let field =
+      match repr.fields with
+      | [_] -> arg
+      | _ -> Lprim (Punboxed_product_field (0, layouts loc repr), [arg], loc)
+    in
+    match repr.fields with
+    | Bits32 :: _ ->
+      static_cast
+        ~src:(Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))
+        ~dst:(Scalar.integral (Value (Taggable Int)))
+        field ~loc
+    | _ -> field
+end

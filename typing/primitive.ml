@@ -618,7 +618,8 @@ module Repr_check = struct
 
   let rec sort_contains_bits8_or_bits16 : Jkind_types.Sort.Const.t -> bool =
     function
-    | Product sorts -> List.exists sort_contains_bits8_or_bits16 sorts
+    | Product sorts | Sum sorts ->
+      List.exists sort_contains_bits8_or_bits16 sorts
     | Base (Bits8 | Bits16) -> true
     | Base _ -> false
     | Addressable sort -> sort_contains_bits8_or_bits16 sort
@@ -628,7 +629,7 @@ module Repr_check = struct
   let rec sort_is_bits8_or_bits16 : Jkind_types.Sort.Const.t -> bool =
     function
     | Base (Bits8 | Bits16) -> true
-    | Base _ | Product _ -> false
+    | Base _ | Product _ | Sum _ -> false
     | Addressable sort -> sort_is_bits8_or_bits16 sort
     | Univar _ -> Misc.fatal_error "sort_is_bits8_or_bits16: univar"
     | Genvar _ -> Misc.fatal_error "sort_is_bits8_or_bits16: genvar"
@@ -653,7 +654,7 @@ module Repr_check = struct
     | Unboxed_mask | Raw_pointer | Repr_poly -> []
 
   let rec c_stub_return_errors = function
-    | Same_as_ocaml_repr (Base _ | Product _)
+    | Same_as_ocaml_repr (Base _ | Product _ | Sum _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Repr_poly -> []
     | Same_as_ocaml_repr (Addressable s) ->

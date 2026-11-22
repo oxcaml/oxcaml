@@ -209,6 +209,7 @@ let force_runtime_shape_exn cs =
 let rec erase_addressable (ly : Layout.t) : Layout.t =
   match ly with
   | Base _ | Univar _ | Genvar _ -> ly
+  | Sum arms -> Layout.sum (List.map erase_addressable arms)
   | Product lys -> Layout.product (List.map erase_addressable lys)
   | Addressable ly -> erase_addressable ly
 
@@ -243,6 +244,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Void -> Void)
   | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_types_layout: Genvar"
+  | Sum arms -> layout_to_types_layout (Jkind_types.Sum_repr.carrier arms)
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
   | Addressable ly ->
     (* CR box: Addressability should be preserved here once it affects boxed
@@ -561,6 +563,7 @@ let lay_out_sequentially (cs : t) : RS.t list =
 
 let rec layout_to_unknown_shape (ly : Layout.t) : t =
   match ly with
+  | Sum arms -> layout_to_unknown_shape (Jkind_types.Sum_repr.carrier arms)
   | Product lys ->
     let layouts = List.map layout_to_unknown_shape lys in
     unboxed_tuple layouts
@@ -590,6 +593,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     else unknown_shape_exn ()
   in
   match type_shape.desc, type_layout with
+  | _, Some (Sum arms) ->
+    layout_to_unknown_shape (Jkind_types.Sum_repr.carrier arms)
   | _, Some (Addressable ly) ->
     (* CR box: Addressability should be preserved here once it affects boxed
        representations *)
@@ -657,7 +662,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
         match RS.Runtime_layout.of_base_layout base with
         | Void -> void
         | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
-      | Layout.(Product _ | Addressable _) as ly ->
+      | Layout.(Product _ | Sum _ | Addressable _) as ly ->
         (* We currently do not support unboxed recursive types; fall back to an
            unknown shape for the layout. *)
         layout_to_unknown_shape ly

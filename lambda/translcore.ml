@@ -696,6 +696,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
             ((tagged_immediate runtime_tag) : lambda)
             ll
+      | Ordinary {src_index}, Variant_unboxed
+        when Option.is_some cstr.cstr_sum ->
+          let args = List.map2 (fun (exp, sort) arg ->
+            layout_exp sort exp, arg) args_with_sorts ll in
+          Translrepr.Sum.inject (of_location ~scopes e.exp_loc)
+            (Option.get cstr.cstr_sum) src_index args
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->

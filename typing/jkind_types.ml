@@ -61,6 +61,7 @@ module Sort = struct
     | Product of t list
     | Univar of univar
     | Addressable of t
+    | Sum of t list
 
   and var =
     { mutable contents : t option;
@@ -179,10 +180,13 @@ module Sort = struct
       | Univar of univar
       | Genvar of var
       | Addressable of t
+      | Sum of t list
 
     let base b = Base b
 
     let product cs = Product cs
+
+    let sum cs = Sum cs
 
     let univar uv = Univar uv
 
@@ -193,18 +197,22 @@ module Sort = struct
     let rec equal c1 c2 =
       match c1, c2 with
       | Base b1, Base b2 -> equal_base b1 b2
-      | Product cs1, Product cs2 -> List.equal equal cs1 cs2
+      | Product cs1, Product cs2 | Sum cs1, Sum cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
       | Addressable c1, Addressable c2 ->
         (* Relies on constants not having redundant addressability wrappers. *)
         equal c1 c2
-      | (Base _ | Product _ | Univar _ | Genvar _ | Addressable _), _ -> false
+      | (Base _ | Product _ | Sum _ | Univar _ | Genvar _ | Addressable _), _ ->
+        false
 
     let format ppf c =
       let module Fmt = Format_doc in
       let rec pp_element ~nested ppf = function
         | Base b -> Fmt.fprintf ppf "%s" (to_string_base b)
+        | Sum cs ->
+          let pp_sep ppf () = Fmt.fprintf ppf "@ + " in
+          Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf cs
         | Product cs ->
           let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
           Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf cs
@@ -224,6 +232,7 @@ module Sort = struct
         false
       | Univar _ -> Misc.fatal_error "Sort.Const.all_void: Univar"
       | Genvar _ -> Misc.fatal_error "Sort.Const.all_void: Genvar"
+      | Sum _ -> false
       | Product ts -> List.for_all all_void ts
       | Addressable t ->
         (* CR box: This may have to be updated once addressability affects boxed
@@ -232,6 +241,7 @@ module Sort = struct
 
     let rec is_surely_addressable = function
       | Base b -> base_is_addressable b
+      | Sum _ -> false
       | Product cs -> List.for_all is_surely_addressable cs
       | Univar _ | Genvar _ -> false
       | Addressable _ -> true
@@ -242,7 +252,7 @@ module Sort = struct
 
     let rec is_concrete = function
       | Base _ -> true
-      | Product ts -> List.for_all is_concrete ts
+      | Product ts | Sum ts -> List.for_all is_concrete ts
       | Univar _ | Genvar _ -> false
       | Addressable t -> is_concrete t
 
@@ -252,7 +262,7 @@ module Sort = struct
           ( Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
           | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask ) ->
         false
-      | Product _ | Univar _ | Genvar _ -> false
+      | Product _ | Sum _ | Univar _ | Genvar _ -> false
       | Addressable t -> is_scannable t
 
     let scannable = Base Scannable
@@ -303,6 +313,10 @@ module Sort = struct
               | Vec256 -> "Vec256"
               | Vec512 -> "Vec512"
               | Mask -> "Mask")
+          | Sum cs ->
+            Format.fprintf ppf "Sum [%a]"
+              (Format.pp_print_list (pp_element ~nested:true))
+              cs
           | Product cs ->
             let pp_sep ppf () = Format.fprintf ppf "@ , " in
             Format.fprintf ppf "Product [%a]"
@@ -411,7 +425,7 @@ module Sort = struct
 
     let[@inline] some : t -> t option = function
       | Base b -> some_of_base b
-      | (Product _ | Univar _ | Genvar _ | Addressable _) as t -> Some t
+      | (Product _ | Sum _ | Univar _ | Genvar _ | Addressable _) as t -> Some t
 
     let rec subst s t =
       match t with
@@ -420,7 +434,112 @@ module Sort = struct
         List.assq v s
       | Base _ | Univar _ -> t
       | Product ts -> Product (List.map (subst s) ts)
+      | Sum ts -> Sum (List.map (subst s) ts)
       | Addressable t -> Addressable (subst s t)
+  end
+
+  module Sum_repr = struct
+    type projection =
+      | Void
+      | Field of int * base
+      | Product of projection list
+
+    type t =
+      { fields : base list;
+        arms : projection list array
+      }
+
+    let storage_sort repr =
+      match repr.fields with
+      | [tag] -> Const.base tag
+      | fields -> Const.product (List.map Const.base fields)
+
+    (* Identical raw fields retain their natural widths and register class.
+       Otherwise store their bits in an integer that fits either field. *)
+    let join_raw a b =
+      let fits_in_32 : base -> bool = function
+        | Bits8 | Bits16 | Bits32 | Float32 -> true
+        | _ -> false
+      in
+      if equal_base a b
+      then a
+      else if fits_in_32 a && fits_in_32 b
+      then Bits32
+      else Bits64
+
+    let rec make arms =
+      let exception Unsupported in
+      let scanned_count = ref 0 in
+      let raw_fields = Dynarray.create () in
+      (* Keep raw positions separate from scanned positions until every arm's
+         scanned prefix has been counted. The result indexes product fields,
+         not byte offsets. The normal product layout handles padding. *)
+      let inspect args =
+        let scanned = ref 0 and raw = ref 0 in
+        let rec visit (sort : Const.t) =
+          match sort with
+          | Sum arms -> (
+            match make (List.map (fun arm -> [arm]) arms) with
+            | None -> raise Unsupported
+            | Some nested -> visit (storage_sort nested))
+          | Addressable sort -> visit sort
+          | Product sorts ->
+            let fields = List.map visit sorts in
+            fun start -> Product (List.map (fun field -> field start) fields)
+          | Univar _ | Genvar _ -> raise Unsupported
+          | Base (Vec128 | Vec256 | Vec512 | Mask) -> raise Unsupported
+          | Base Void -> fun _ -> Void
+          | Base Scannable ->
+            incr scanned;
+            let index = !scanned in
+            fun _ -> Field (index, Scannable)
+          | Base base ->
+            let index = !raw in
+            if index = Dynarray.length raw_fields
+            then Dynarray.add_last raw_fields base
+            else
+              Dynarray.set raw_fields index
+                (join_raw (Dynarray.get raw_fields index) base);
+            incr raw;
+            fun start -> Field (start + index, base)
+        in
+        let args = List.map visit args in
+        scanned_count := max !scanned_count !scanned;
+        args
+      in
+      match List.map inspect arms with
+      | exception Unsupported -> None
+      | arms ->
+        (* A scanned-only sum uses a tagged ordinal. A sum containing raw
+           fields uses an unboxed ordinal, so a raw-only array has no roots. *)
+        let tag =
+          if !scanned_count > 0 && Dynarray.length raw_fields = 0
+          then Scannable
+          else Bits32
+        in
+        let fields =
+          (tag :: List.init !scanned_count (fun _ -> Scannable))
+          @ Dynarray.to_list raw_fields
+        in
+        let arms =
+          List.map (List.map (fun project -> project (1 + !scanned_count))) arms
+        in
+        Some { fields; arms = Array.of_list arms }
+
+    let carrier arms =
+      match make (List.map (fun arm -> [arm]) arms) with
+      | None -> Misc.fatal_error "No carrier for an unrepresentable sum"
+      | Some repr -> storage_sort repr
+
+    let rec physical_sort (s : Const.t) =
+      match s with
+      | Sum arms ->
+        Option.map storage_sort (make (List.map (fun arm -> [arm]) arms))
+      | Product fields ->
+        Option.map Const.product
+          (Misc.Stdlib.List.map_option physical_sort fields)
+      | Addressable s -> Option.map Const.addressable (physical_sort s)
+      | Base _ | Genvar _ | Univar _ -> Const.some s
   end
 
   module Var = struct
@@ -475,6 +594,7 @@ module Sort = struct
     let rec t ppf = function
       | Var v -> fprintf ppf "Var %a" var v
       | Base b -> base ppf b
+      | Sum ts -> fprintf ppf "Sum [%a]" (pp_print_list t) ts
       | Product ts ->
         fprintf ppf "Product [ %a ]"
           (pp_print_list ~pp_sep:(fun ppf () -> pp_print_text ppf "; ") t)
@@ -524,7 +644,7 @@ module Sort = struct
     | Var { contents = Some t } -> get_level t
     | Var { contents = None; level } -> level
     | Base _ | Univar _ -> generic_level
-    | Product ts ->
+    | Product ts | Sum ts ->
       List.fold_left (fun acc t -> min acc (get_level t)) generic_level ts
     | Addressable t -> get_level t
 
@@ -544,7 +664,7 @@ module Sort = struct
     | Var { contents = Some t } -> iter_var ~f t
     | Var ({ contents = None } as v) -> f v
     | Base _ | Univar _ -> ()
-    | Product ts -> List.iter (iter_var ~f) ts
+    | Product ts | Sum ts -> List.iter (iter_var ~f) ts
     | Addressable t -> iter_var ~f t
 
   let rec update_level level = function
@@ -556,7 +676,8 @@ module Sort = struct
       if generic then !add_to_pool ~level (Var v);
       result
     | Base _ | Univar _ -> Ok ()
-    | Product ts -> Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
+    | Product ts | Sum ts ->
+      Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
     | Addressable t -> update_level level t
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
@@ -627,6 +748,7 @@ module Sort = struct
       let rec of_const : Const.t -> t = function
         | Base b -> of_base b
         | Product cs -> Product (List.map of_const cs)
+        | Sum cs -> Sum (List.map of_const cs)
         | Univar uv -> Univar uv
         | Genvar v -> Var v
         | Addressable c -> Addressable (of_const c)
@@ -679,6 +801,8 @@ module Sort = struct
 
       let rec of_const : Const.t -> t option = function
         | Base b -> of_base b
+        | Sum cs ->
+          Option.map (fun x -> Sum x) (Misc.Stdlib.List.map_option of_const cs)
         | Product cs ->
           Option.map
             (fun x -> Product x)
@@ -797,10 +921,14 @@ module Sort = struct
     | Var v -> instance_var v
     | (Base _ | Univar _) as s -> s
     | Product ts -> Product (List.map instance ts)
+    | Sum ts -> Sum (List.map instance ts)
     | Addressable s -> Addressable (instance s)
 
   let rec get : t -> t = function
     | (Base _ | Univar _) as t -> t
+    | Sum ts as t ->
+      let ts' = List.map get ts in
+      if List.for_all2 ( == ) ts ts' then t else Sum ts'
     | Product ts as t ->
       let ts' = List.map get ts in
       if List.for_all2 ( == ) ts ts' then t else Product ts'
@@ -835,7 +963,7 @@ module Sort = struct
             v.level <- generic_level;
             generalized := v :: !generalized
           end
-        | Product sorts -> List.iter loop sorts
+        | Product sorts | Sum sorts -> List.iter loop sorts
         | Addressable sort -> loop sort
         | Base _ | Univar _ -> ()
       in
@@ -855,6 +983,7 @@ module Sort = struct
   let rec assert_const : t -> Const.t = function
     | Base b -> Static.Const.of_base b
     | Product ts -> Const.Product (List.map assert_const ts)
+    | Sum ts -> Const.Sum (List.map assert_const ts)
     | Univar uv -> Univar uv
     | Var v -> assert_const_var v
     | Addressable s -> Addressable (assert_const s)
@@ -871,7 +1000,7 @@ module Sort = struct
     let rec go = function
       | Base Scannable | Var _ -> true
       | Addressable s -> go s
-      | Base _ | Product _ | Univar _ -> false
+      | Base _ | Product _ | Sum _ | Univar _ -> false
     in
     go (get s)
 
@@ -879,7 +1008,7 @@ module Sort = struct
     let rec go ~separability = function
       | Base b -> base_implied_externality ~separability b
       | Var _ | Univar _ -> Jkind_axis.Externality.Internal
-      | Product ts ->
+      | Product ts | Sum ts ->
         List.fold_left
           (fun acc t ->
             Jkind_axis.Externality.join acc
@@ -896,6 +1025,7 @@ module Sort = struct
     function
     | Addressable _ -> Ok ()
     | Base b -> if base_is_addressable b then Ok () else Error Incompatible
+    | Sum _ -> Error Incompatible
     | Product ts ->
       Misc.Stdlib.List.fold_left_result
         (fun () t -> constrain_addressable ~allow_mutation t)
@@ -917,7 +1047,7 @@ module Sort = struct
     | Var { contents = Some s; _ } as t ->
       let s' = strip_head_addressable s in
       if s' == s then t else s'
-    | (Var _ | Base _ | Product _ | Univar _) as t -> t
+    | (Var _ | Base _ | Product _ | Sum _ | Univar _) as t -> t
 
   let rec equate ~allow_mutation s1 s2 =
     let open Misc.Stdlib.Monad.Result.Syntax in
@@ -944,13 +1074,13 @@ module Sort = struct
         (strip_head_addressable s1)
         (strip_head_addressable s2)
     | Base b1, Base b2 -> if equal_base b1 b2 then Ok () else Error Incompatible
-    | Product sorts1, Product sorts2 ->
+    | Product sorts1, Product sorts2 | Sum sorts1, Sum sorts2 ->
       Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
         (fun () s1 s2 -> equate ~allow_mutation s1 s2)
         () sorts1 sorts2
     | Univar uv1, Univar uv2 ->
       if equal_univar_univar uv1 uv2 then Ok () else Error Incompatible
-    | _, (Base _ | Product _ | Univar _) -> Error Incompatible
+    | _, (Base _ | Product _ | Sum _ | Univar _) -> Error Incompatible
 
   let decompose_into_product t n =
     let open Misc.Stdlib.Monad.Result.Syntax in
@@ -964,6 +1094,7 @@ module Sort = struct
     match s with
     | Base b -> Static.Const.of_base b
     | Product ts -> Product (List.map default_to_scannable_and_get ts)
+    | Sum ts -> Sum (List.map default_to_scannable_and_get ts)
     | Univar uv -> Univar uv
     | Var v -> default_to_scannable_and_get_var v
     | Addressable s -> Const.addressable (default_to_scannable_and_get s)
@@ -991,8 +1122,10 @@ module Sort = struct
     let const = default_to_scannable_and_get s in
     if Const.is_concrete const then Const.some const else None
 
-  (* CR layouts v12: Default to void instead. *)
-  let default_for_transl_and_get s = default_to_scannable_and_get s
+  let default_for_transl_and_get s =
+    match Sum_repr.physical_sort (default_to_scannable_and_get s) with
+    | Some sort -> sort
+    | None -> Misc.fatal_error "Unsupported sum at translation"
 
   (*** pretty printing ***)
 
@@ -1002,6 +1135,9 @@ module Sort = struct
       match get t with
       | Base b -> Fmt.fprintf ppf "%s" (to_string_base b)
       | Var v -> Fmt.fprintf ppf "%s" (Var.name v)
+      | Sum ts ->
+        let pp_sep ppf () = Fmt.fprintf ppf " + " in
+        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf " & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
@@ -1023,6 +1159,8 @@ module Sort = struct
       | Base of base
   end
 end
+
+module Sum_repr = Sort.Sum_repr
 
 module Kind_operator = struct
   type t =
@@ -1145,7 +1283,9 @@ module Layout = struct
         false
 
     let rec get_sort : t -> Sort.Const.t option = function
-      | Any _ | Sum _ -> None
+      | Any _ -> None
+      | Sum arms ->
+        Option.map Sort.Const.sum (Misc.Stdlib.List.map_option get_sort arms)
       | Base (b, _) -> Sort.Const.some (Base b)
       | Product ts ->
         Option.map
@@ -1155,6 +1295,11 @@ module Layout = struct
       | Genvar (v, _) -> Some (Sort.Const.Genvar v)
       | Addressable t -> Option.map Sort.Const.addressable (get_sort t)
       | Box _ -> Sort.Const.some (Base Scannable)
+
+    let physical_sort t = Option.bind (get_sort t) Sum_repr.physical_sort
+
+    (* Enable runtime use when destination access checks are in place. *)
+    let runtime_sum_sort _ = None
 
     let rec is_surely_addressable = function
       | Base (b, _) -> Sort.base_is_addressable b
@@ -1208,7 +1353,8 @@ module Layout = struct
       | (Base _ | Product _ | Sum _ | Univar _ | Genvar _), _ -> Not_le
 
     let rec has_concrete_sort = function
-      | Any _ | Sum _ | Univar _ | Genvar _ -> false
+      | Sum _ as layout -> Option.is_some (runtime_sum_sort layout)
+      | Any _ | Univar _ | Genvar _ -> false
       | Base _ | Box _ -> true
       | Product cs -> List.for_all has_concrete_sort cs
       | Addressable c -> has_concrete_sort c
@@ -1423,6 +1569,12 @@ module Layout = struct
         | Var v when Sort.is_genvar v -> Some (Genvar (v, sa))
         | Var _ -> None
         | Base b -> Some (Static.of_base b sa)
+        | Sum sorts ->
+          Option.map
+            (fun x -> Sum x)
+            (Misc.Stdlib.List.map_option
+               (fun s -> of_sort s Scannable_axes.max)
+               sorts)
         | Product sorts ->
           Option.map
             (fun x -> Product x)

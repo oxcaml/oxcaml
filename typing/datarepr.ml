@@ -185,8 +185,17 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
              { shape = Constructor_uniform_value; sorts = [| sort |] } |]
       | None -> [| Cstr_layout_undetermined |]
       end
-    | Variant_unboxed, ([] | _ :: _) ->
-      Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
+    | Variant_unboxed, _ ->
+      Array.of_list (List.map (fun cstr ->
+        match cstr.cd_args with
+        | Cstr_tuple args ->
+          (match Misc.Stdlib.List.map_option (fun a -> a.ca_sort) args with
+           | None -> Cstr_layout_undetermined
+           | Some sorts ->
+             Cstr_layout_known
+               { shape = Constructor_uniform_value;
+                 sorts = Array.of_list sorts })
+        | Cstr_record _ -> Cstr_layout_undetermined) cstrs)
     | Variant_with_null, _ ->
       let layout cstr =
         match classify_variant_with_null_constructor cstr with
@@ -209,6 +218,18 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
           Cstr_layout_undetermined
       in
       Array.of_list (List.map layout cstrs)
+  in
+  let sum =
+    match rep, cstrs with
+    | Variant_unboxed, _ :: _ :: _ ->
+      (match Misc.Stdlib.List.map_option
+         (function
+           | Cstr_layout_known { sorts; _ } -> Some (Array.to_list sorts)
+           | Cstr_layout_undetermined -> None)
+         (Array.to_list cstr_layouts) with
+       | None -> None (* Temporary recursive environment. *)
+       | Some arms -> Jkind_types.Sum_repr.make arms)
+    | _ -> None
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
@@ -262,6 +283,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         cstr_arity = List.length cstr_args;
         cstr_tag;
         cstr_repr = rep;
+        cstr_sum = sum;
         cstr_shape = cstr_shape;
         cstr_constant;
         cstr_consts = !num_consts;
@@ -298,6 +320,7 @@ let extension_descr ~current_unit path_ext ext =
       cstr_arity = List.length cstr_args;
       cstr_tag;
       cstr_repr = Variant_extensible;
+      cstr_sum = None;
       cstr_shape = ext.ext_shape;
       cstr_constant = ext.ext_constant;
       cstr_consts = -1;

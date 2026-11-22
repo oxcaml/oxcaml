@@ -634,6 +634,8 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
         } ])
   | Univar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Univar"
   | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
+  | Sum arms ->
+    unarize_const_sort_for_extern_repr (Jkind_types.Sum_repr.carrier arms)
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
   | Addressable sort ->
     (* Addressability does not affect the non-boxed representation *)
@@ -654,6 +656,8 @@ let unarize_extern_repr ~machine_width alloc_mode
       [{ kind; arg_transformer = None; return_transformer = None }]
     | Univar _ -> Misc.fatal_error "unarize_extern_repr: unexpected univar"
     | Genvar _ -> Misc.fatal_error "unarize_extern_repr: unexpected genvar"
+    | Sum arms ->
+      unarize_const_sort_for_extern_repr (Jkind_types.Sum_repr.carrier arms)
     | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
     | Addressable sort ->
       (* Addressability does not affect the non-boxed representation *)
@@ -753,6 +757,9 @@ let rec arity_component_of_const_sort_for_extern_repr
       Misc.fatal_error
         "Base sorts never unarize to more than one kind for [extern_repr] \
          purposes")
+  | Sum arms ->
+    arity_component_of_const_sort_for_extern_repr
+      (Jkind_types.Sum_repr.carrier arms)
   | Product sorts ->
     Flambda_arity.Component_for_creation.Unboxed_product
       (List.map arity_component_of_const_sort_for_extern_repr sorts)
@@ -773,7 +780,8 @@ let arity_components_of_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) :
     [`Complex] Flambda_arity.Component_for_creation.t list =
   match extern_repr with
-  | Same_as_ocaml_repr ((Product _ | Base Void | Addressable _) as sort) ->
+  | Same_as_ocaml_repr ((Product _ | Sum _ | Base Void | Addressable _) as sort)
+    ->
     [arity_component_of_const_sort_for_extern_repr sort]
   | Unpacked_product _ | Raw_pointer ->
     List.map
@@ -952,9 +960,9 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       if prim_apply_arity <> 1
       then Misc.fatal_errorf "Expected arity one for %s" prim_native_name
       else
-        match prim_native_repr_args, prim_native_repr_res with
-        | [(_, src)], (_, dst)
-          when Stdlib.( = ) src src_kind && Stdlib.( = ) dst dst_kind -> (
+        match unarized_params, unarized_results with
+        | [{ kind = src; _ }], [{ kind = dst; _ }]
+          when K.equal src src_kind && K.equal dst dst_kind -> (
           match args with
           | [arg] ->
             let prim = P.Unary (Reinterpret_64_bit_word op, arg) in
@@ -985,15 +993,11 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     in
     match prim_native_name with
     | "caml_int64_float_of_bits_unboxed" ->
-      unboxed_int64_to_and_from_unboxed_float
-        ~src_kind:(Unboxed_or_untagged_integer Unboxed_int64)
-        ~dst_kind:(Unboxed_float Boxed_float64)
-        ~op:Unboxed_int64_as_unboxed_float64
+      unboxed_int64_to_and_from_unboxed_float ~src_kind:K.naked_int64
+        ~dst_kind:K.naked_float ~op:Unboxed_int64_as_unboxed_float64
     | "caml_int64_bits_of_float_unboxed" ->
-      unboxed_int64_to_and_from_unboxed_float
-        ~src_kind:(Unboxed_float Boxed_float64)
-        ~dst_kind:(Unboxed_or_untagged_integer Unboxed_int64)
-        ~op:Unboxed_float64_as_unboxed_int64
+      unboxed_int64_to_and_from_unboxed_float ~src_kind:K.naked_float
+        ~dst_kind:K.naked_int64 ~op:Unboxed_float64_as_unboxed_int64
     | _ ->
       let callee = Simple.symbol call_symbol in
       let apply =

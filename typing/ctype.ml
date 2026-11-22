@@ -3135,6 +3135,8 @@ let contained_without_boxing env ty =
   match get_desc ty with
   | Tconstr (p, args, _) ->
     begin match Env.find_type p env with
+    | { type_kind = Type_variant ((_ :: _ :: _ as cstrs), Variant_unboxed, _);
+        type_params; _ }
     | { type_kind = Type_variant (cstrs, Variant_with_null, _);
         type_params; _ } ->
       (* Both constructors' arguments are contained without boxing. We

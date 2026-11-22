@@ -1121,6 +1121,8 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
      on [Sort] in [jkind_intf.ml] *)
   | Base base ->
     mixed_block_element_of_base base Jkind_types.Scannable_axes.max
+  | Sum arms ->
+    mixed_block_element_of_const_sort (Jkind_types.Sum_repr.carrier arms)
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Addressable sort -> Addressable (mixed_block_element_of_const_sort sort)
