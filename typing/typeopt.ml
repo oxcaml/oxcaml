@@ -1316,7 +1316,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.layout_void
-  | Sum arms ->
+  | Sum arms when Language_extension.(is_at_least Layouts Stable) ->
     layout_of_const_sort_generic ~value_kind ~error
       (Jkind_types.Sum_repr.carrier arms)
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
@@ -1332,7 +1332,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     layout_of_const_sort_generic ~value_kind ~error const
   | ((  Base (Void | Float32 | Float64 | Word | Bits8 |
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask)
-      | Product _) as const) ->
+      | Product _ | Sum _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
   | Genvar var -> Psplicevar (Layout_ident.of_sort_var var)
@@ -1355,6 +1355,13 @@ let layout env loc sort ty =
       | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
                Bits64) | Product _ | Sum _)
         as const ->
+        let const =
+          match get_representable_layout_opt env ty with
+          | Some layout
+            when Jkind.Layout.Const.storage_layout layout != layout ->
+            Option.value (Jkind.Layout.Const.get_sort layout) ~default:const
+          | Some _ | None -> const
+        in
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
                                                    Some ty)))
