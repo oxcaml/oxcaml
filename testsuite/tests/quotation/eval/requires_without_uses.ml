@@ -1,6 +1,6 @@
 (* TEST
  setup-ocamlopt.opt-build-env;
- set BUILD_PATH_PREFIX_MAP = "/test-root=${ocamlsrcdir}";
+ set BUILD_PATH_PREFIX_MAP = "/test-root=${stdlib}";
  directories += "${ocamlsrcdir}/otherlibs/eval";
  libraries += "eval";
  ld_library_path += "${ocamlsrcdir}/otherlibs/eval";

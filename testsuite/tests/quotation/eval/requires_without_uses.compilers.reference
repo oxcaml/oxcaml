@@ -1,4 +1,3 @@
 File "requires_without_uses.ml", line 1:
-Error: The library /test-root/stdlib/eval.cmxa
-       requires metaprogramming support
+Error: The library /test-root/eval.cmxa requires metaprogramming support
        but -uses-metaprogramming was not passed

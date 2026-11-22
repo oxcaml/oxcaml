@@ -1,0 +1,5 @@
+(* CHILDTEST
+ setup-ocamlc.byte-build-env;
+ commandline = "-version";
+ ocamlc.byte;
+*)

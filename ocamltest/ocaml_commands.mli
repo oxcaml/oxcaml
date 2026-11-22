@@ -23,7 +23,10 @@ val ocamlrun_ocaml : string
 
 val expect : string
 
-val expectnat : string
+(* The build of a native host for the test's effective codegen variant
+   (see [Ocaml_files.native_host] and
+   [Ocaml_flags.effective_codegen_variant]). *)
+val native_host : Environments.t -> Ocaml_files.native_host -> string
 
 val ocamlrun_ocamllex : string
 
@@ -34,7 +37,5 @@ val ocamlrun_ocamldebug : string
 val ocamlrun_ocamlobjinfo : string
 
 val ocamlrun_ocamlmklib : string
-
-val codegen : string
 
 val fexprc : string

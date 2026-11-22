@@ -126,8 +126,9 @@ let commandline_options =
   ("-run-ocamlrunparam", Arg.Set_string run_ocamlrunparam,
    "<params> Append <params> to OCAMLRUNPARAM when running test programs.");
   ("-codegen-variant", Arg.Set_string codegen_variant,
-   "<name> Compile and link native test programs for the codegen variant \
-    <name> unless a test selects one itself.");
+   "<name> Run the tests for the codegen variant <name>, as if it were \
+    the default of the compiler under test, unless a test selects one \
+    itself.");
   ("-codegen-variant-only", Arg.Set codegen_variant_only,
    " With -codegen-variant, skip the test files in which nothing depends \
     on the variant.");

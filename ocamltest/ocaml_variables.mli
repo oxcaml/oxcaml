@@ -23,6 +23,8 @@ val arch : Variables.t
 
 val binary_modules : Variables.t
 
+val build_env_backend : Variables.t
+
 val bytecc_libs : Variables.t
 (** Libraries to link with for bytecode *)
 
@@ -127,6 +129,8 @@ val ocamlopt_opt_exit_status : Variables.t
 val ocamlopt_jsir_js_exit_status : Variables.t
 
 val ocamlopt_jsir_wasm_exit_status : Variables.t
+
+val ocamlparam : Variables.t
 
 val ocamlrunparam : Variables.t
 

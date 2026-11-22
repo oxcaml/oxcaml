@@ -86,27 +86,51 @@ One build serves every codegen variant it was configured with (see `ocamlopt
     $ make test-one-no-rebuild TEST=effects/test1.ml CODEGEN_VARIANT=fp-sc
     $ make test-no-rebuild CODEGEN_VARIANT=poll
 
-Under `CODEGEN_VARIANT=<name>`, the native programs that the tests compile
-and link are built for that variant: with its flags, against its library tree
-and its runtime. This is how the tests that need poll insertion (everything
-guarded by `multicore;`) or stack checks run on a build whose default variant
-is `base`. A test that selects a variant itself, with the `codegen_variant`
-variable, keeps its selection.
+Under `CODEGEN_VARIANT=<name>` the testsuite runs what it would run with a
+compiler configured with that variant as its default. Everything that
+generates or loads native code does so for the variant:
 
-Nothing else has a codegen variant: bytecode steps, bytecode expect and
-toplevel tests and JSIR tests run as they do without the variable. Some tests
-are skipped, with the reason in the log: the native toplevel, native expect
-tests and asmgen tests (their host programs are built for the default variant
-only), and native tests that link the compiler's own libraries or `eval` (not
-built per variant).
+- The native programs that the tests compile and link are built for it: with
+  its flags, against its library tree (the compiler's own libraries and `eval`
+  included) and its runtime.
+- Native expect tests, native toplevel tests and asmgen tests run in the
+  builds of `expect.opt`, `ocamlnat` and the `codegen` tool for the variant,
+  which `make install_for_test` puts in
+  `_runtest/testsuite/tools/variants/<name>`.
+- C code that a test compiles for a native program gets the variant's flags
+  and macros (the `cc` action, `${cflags}`, `${mkexe}`).
+- Scripts, hooks and the other commands that a test writes itself (the
+  program of `run`, a compiler given its command line, `ocamlmklib`) run with
+  the variant as the default of the compilers that they start, and `${stdlib}`
+  is the variant's library tree.
+
+This is how the tests that need poll insertion (everything guarded by
+`multicore;`) or stack checks run on a build whose default variant is `base`.
+A test that selects a variant itself, with the `codegen_variant` variable,
+keeps its selection.
+
+Bytecode and JSIR have no codegen variant: bytecode steps, bytecode expect and
+toplevel tests and JSIR tests run as they do without the variable, against the
+default library tree. No test is skipped because of the variable: what a pass
+skips is what the tests' own guards (`no-stack-checks;`,
+`only-default-codegen;`, ...) exclude for that variant, as on a compiler
+configured with it.
+
+Three things remain that only a compiler configured with the variant covers:
+the bytecode runtime (`ocamlrun`, and what `-custom` links) is always the
+default variant's, so are the compiler executables themselves, and the dune
+tests (`make runtest`) run for the default variant. The one exception is the
+AddressSanitizer backend tests, which `make runtest` also runs in the build
+context of every other variant with AddressSanitizer that is built (`asan-fp`,
+or `asan-fp-poll` where poll insertion is the default).
 
 For a quick pass, add `VARIANT_ONLY=1`:
 
     $ make test CODEGEN_VARIANT=fp VARIANT_ONLY=1
 
 It skips the test files in which nothing depends on the variant (those that
-only run bytecode, say: about half of the suite). Such a pass supplements the
-pass without `CODEGEN_VARIANT`; it does not replace it.
+only run bytecode, say). Such a pass supplements the pass without
+`CODEGEN_VARIANT`; it does not replace it.
 
 `CODEGEN_VARIANT` composes with the other knobs of the testsuite:
 
@@ -131,7 +155,8 @@ Reference files are shared by all variants. If the output of a test really
 depends on the variant, the test needs a guard (`no-frame_pointers;`,
 `stack-checks;`, ...) or its own `codegen_variant` blocks, not a promotion.
 
-To run the testsuite for every variant of the build, one pass per variant:
+To run the whole testsuite for every variant of the build, one pass per
+variant:
 
     $ make test-variants
     $ make -j test-variants

@@ -56,9 +56,6 @@ let ocamlopt =
 let ocamlopt_dot_opt =
   srcdir_path [Filename.mkexe "ocamlopt.opt"]
 
-let ocamlnat =
-  srcdir_path [Filename.mkexe "ocamlnat"]
-
 let js_of_ocaml =
   Filename.make_path
     [Ocaml_directories.srcdir; Filename.mkexe "js_of_ocaml"]
@@ -84,10 +81,6 @@ let expect =
   srcdir_path ["testsuite"; "tools";
      Filename.mkexe "expect"]
 
-let expectnat =
-  srcdir_path ["testsuite"; "tools";
-     Filename.mkexe "expectnat"]
-
 let ocamllex =
   srcdir_path ["lex"; Filename.mkexe "ocamllex"]
 
@@ -109,8 +102,30 @@ let ocamlmklib =
 let ocamlfilt =
   srcdir_path ["tools"; Filename.mkexe "ocamlfilt"]
 
-let codegen =
-  srcdir_path ["testsuite"; "tools"; Filename.mkexe "codegen"]
+type native_host =
+  | Expectnat
+  | Ocamlnat
+  | Codegen
+
+let native_host_name = function
+  | Expectnat -> "expect.opt"
+  | Ocamlnat -> "ocamlnat"
+  | Codegen -> "codegen"
+
+let native_host ~variant host =
+  let file =
+    match host with
+    | Expectnat -> "expectnat"
+    | Ocamlnat -> "ocamlnat"
+    | Codegen -> "codegen"
+  in
+  match variant, host with
+  | None, Ocamlnat -> srcdir_path [Filename.mkexe file]
+  | None, (Expectnat | Codegen) ->
+    srcdir_path ["testsuite"; "tools"; Filename.mkexe file]
+  | Some variant, (Expectnat | Ocamlnat | Codegen) ->
+    srcdir_path
+      ["testsuite"; "tools"; "variants"; variant; Filename.mkexe file]
 
 let fexprc =
   srcdir_path ["testsuite"; "tools"; Filename.mkexe "fexprc"]

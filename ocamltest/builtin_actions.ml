@@ -440,13 +440,13 @@ let run = make
   ~name:"run"
   ~description:"Run the program"
   ~does_something:true
-  Actions_helpers.run_program
+  (Ocaml_flags.run_for_variant Actions_helpers.run_program)
 
 let script = make
   ~name:"script"
   ~description:"Run the script specified by the script variable"
   ~does_something:true
-  Actions_helpers.run_script
+  (Ocaml_flags.run_for_variant Actions_helpers.run_script)
 
 let config_script = make
   ~name:"config_script"
@@ -454,7 +454,7 @@ let config_script = make
                 checking test dependencies. The script may result in TEST_SKIP \
                 but does not have build artifacts available."
   ~does_something:false
-  Actions_helpers.run_config_script
+  (Ocaml_flags.run_for_variant Actions_helpers.run_config_script)
 
 let check_program_output = make
   ~name:"check-program-output"

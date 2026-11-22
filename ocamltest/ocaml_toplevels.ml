@@ -69,8 +69,10 @@ let ocaml = toplevel
   ~backend: Ocaml_backends.Bytecode
   ~compiler: Ocaml_compilers.ocamlc_byte
 
+(* [name] is the build for the install's default codegen variant; the
+   [ocamlnat] action runs the one for the test's effective variant. *)
 let ocamlnat = toplevel
-  ~name: Ocaml_files.ocamlnat
+  ~name: (Ocaml_files.native_host ~variant:None Ocamlnat)
   ~flags: "-S" (* Keep intermediate assembly files *)
   ~directory: "ocamlnat"
   ~exit_status_variable: Ocaml_variables.ocamlnat_exit_status

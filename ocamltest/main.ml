@@ -144,7 +144,10 @@ let run_test_tree log add_msg behavior env ast =
         | Skip_all -> (Actions.Static Result.skip, env)
         | Run ->
           begin try
-            let testenv = List.fold_left apply_modifiers env mods in
+            let testenv =
+              Ocaml_flags.with_variant_stdlib
+                (List.fold_left apply_modifiers env mods)
+            in
             Printf.fprintf log "Running test %s with %d actions\n%!"
               test.test_name
               (List.length test.test_actions);
@@ -275,7 +278,11 @@ let test_file test_filename =
        let install_hook name =
          let hook_name = Filename.make_filename hookname_prefix name in
          if Sys.file_exists hook_name then begin
-           let hook = Actions_helpers.run_hook hook_name in
+           let hook =
+             Ocaml_flags.run_for_variant
+               (fun ~command_env ->
+                 Actions_helpers.run_hook ~command_env hook_name)
+           in
            Actions.set_hook name hook
          end in
        String.Set.iter install_hook action_names;
@@ -446,27 +453,72 @@ let () =
   Strace.init ();
   init_tests_to_skip()
 
-(* A suite variant that this install cannot serve would turn the whole run
-   into skips and failures, so it is refused before anything runs. *)
+(* The native hosts that the test tree has for the install's default
+   variant and lacks for the suite variant. *)
+let missing_native_hosts () =
+  match Ocaml_flags.suite_codegen_variant with
+  | None -> []
+  | Some _ as variant ->
+    List.filter_map
+      (fun host ->
+        let program = Ocaml_files.native_host ~variant host in
+        if Sys.file_exists (Ocaml_files.native_host ~variant:None host)
+           && not (Sys.file_exists program)
+        then Some program
+        else None)
+      Ocaml_files.[Expectnat; Ocamlnat; Codegen]
+
+(* A suite variant that this install or this test tree cannot serve would
+   turn the whole run into failures, so it is refused before anything
+   runs. *)
 let check_suite_codegen_variant () =
   let name = Options.codegen_variant in
+  let available () =
+    Printf.sprintf "(available: %s)"
+      (String.concat " " (Ocaml_flags.available_codegen_variants ()))
+  in
   let problem =
     if String.equal name "" then None
     else if Option.is_none (Codegen_variant_name.of_string name)
-    then Some "is not the name of a codegen variant"
+    then Some ("is not the name of a codegen variant " ^ available ())
     else if not (Ocaml_flags.codegen_variant_available name)
-    then Some "is not built in the install under test"
-    else None
+    then Some ("is not built in the install under test " ^ available ())
+    else
+      match missing_native_hosts () with
+      | [] -> None
+      | program :: _ ->
+        Some
+          (Printf.sprintf
+             "has no native test hosts in this test tree (%s does not exist)"
+             program)
   in
   match problem with
   | None -> ()
   | Some problem ->
-    Printf.eprintf "ocamltest: -codegen-variant: '%s' %s (available: %s)\n%!"
-      name problem
-      (String.concat " " (Ocaml_flags.available_codegen_variants ()));
+    Printf.eprintf "ocamltest: -codegen-variant: '%s' %s\n%!" name problem;
+    exit 2
+
+(* An axis that the environment sets after the '_' of OCAMLPARAM is set
+   for every compiler that a test starts, whatever variant the test or the
+   run selects: the predicates, the library tree and the hosts would be
+   those of one variant and the code that of another. *)
+let check_inherited_axis_settings () =
+  match Ocaml_flags.inherited_axis_settings () with
+  | [] -> ()
+  | settings ->
+    Printf.eprintf
+      "ocamltest: OCAMLPARAM=%s in the environment sets %s after its '_', \
+       which would override the codegen variant of every test. To run \
+       the tests under a variant, give -codegen-variant <name> \
+       (CODEGEN_VARIANT=<name> to the make targets) instead.\n%!"
+      (Ocamltest_stdlib.Sys.safe_getenv "OCAMLPARAM")
+      (String.concat " and " settings);
     exit 2
 
 let () =
+  (* Before the defaults are taken out: the message quotes the value. *)
+  check_inherited_axis_settings ();
+  Ocaml_flags.clear_inherited_axis_defaults ();
   check_suite_codegen_variant ();
   let failed = ref false in
   let work_done = ref false in

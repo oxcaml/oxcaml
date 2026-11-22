@@ -51,6 +51,16 @@ let get_backend_value_from_env env ocamlc_var ocamlopt_var backend =
   | Bytecode -> Environments.safe_lookup ocamlc_var env
   | Native | Jsir_js | Jsir_wasm -> Environments.safe_lookup ocamlopt_var env
 
+(* The environment in which the flags that a test gives a compiler for
+   [backend] are read: for a native compiler, [cflags] and [mkexe] are
+   those of the block's codegen variant there (see
+   [Ocaml_flags.with_variant_c_flags]), as they are in a command line
+   given with [commandline]. *)
+let flags_environment env ~backend =
+  match (backend : Ocaml_backends.t) with
+  | Native -> Ocaml_flags.with_variant_c_flags env
+  | Bytecode | Jsir_js | Jsir_wasm -> env
+
 let modules env =
   Actions_helpers.words_of_variable env Ocaml_variables.modules
 
@@ -58,10 +68,9 @@ let plugins env =
   Actions_helpers.words_of_variable env Ocaml_variables.plugins
 
 let directories env ~backend =
-  (* Resolve library-modifier directories against the selected codegen
-     variant's library root (see [Ocaml_flags.variant_library_directory]). *)
-  List.map
-    (Ocaml_flags.variant_library_directory env ~backend)
+  (* In the library tree of the selected codegen variant (see
+     [Ocaml_flags.variant_library_directories]). *)
+  Ocaml_flags.variant_library_directories env ~backend
     (Actions_helpers.words_of_variable env Ocaml_variables.directories)
 
 let directory_flags env ~backend =
@@ -69,22 +78,19 @@ let directory_flags env ~backend =
   let l = List.map f (directories env ~backend) in
   String.concat " " l
 
-(* [directory_flags] for expect/toplevel invocations: resolves
-   library-modifier directories against the host binary's variant root
-   (see [Ocaml_flags.toplevel_library_directory]). *)
-let toplevel_directory_flags env ~backend =
-  let f dir =
-    "-I " ^ Ocaml_flags.toplevel_library_directory env ~backend dir
-  in
-  let l =
-    List.map f (Actions_helpers.words_of_variable env
-                  Ocaml_variables.directories)
-  in
-  String.concat " " l
-
 let flags env = Environments.safe_lookup Ocaml_variables.flags env
 
-let last_flags env = Environments.safe_lookup Ocaml_variables.last_flags env
+(* [flags] as a compiler, or a program that compiles in process, for
+   [backend] gets them: the directories given to -I are in the library
+   tree of the selected codegen variant (see
+   [Ocaml_flags.variant_include_flags]). *)
+let flags_for env ~backend =
+  Ocaml_flags.variant_include_flags env ~backend
+    (flags (flags_environment env ~backend))
+
+let last_flags env ~backend =
+  Environments.safe_lookup Ocaml_variables.last_flags
+    (flags_environment env ~backend)
 
 let ocamllex_flags env =
   Environments.safe_lookup Ocaml_variables.ocamllex_flags env
@@ -111,10 +117,13 @@ let backend_default_flags env =
     Ocaml_variables.ocamlc_default_flags
     Ocaml_variables.ocamlopt_default_flags
 
-let backend_flags env =
-  get_backend_value_from_env env
-    Ocaml_variables.ocamlc_flags
-    Ocaml_variables.ocamlopt_flags
+let backend_flags env backend =
+  Ocaml_flags.variant_include_flags env ~backend
+    (get_backend_value_from_env
+       (flags_environment env ~backend)
+       Ocaml_variables.ocamlc_flags
+       Ocaml_variables.ocamlopt_flags
+       backend)
 
 let default_ocaml_env = [|
   "TERM=dumb";
@@ -313,13 +322,13 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
         libraries;
         backend_default_flags env Compiler.target;
         Ocaml_flags.codegen_variant_flags env Compiler.target;
-        flags env;
+        flags_for env ~backend:Compiler.target;
         backend_flags env Compiler.target;
         compile_flags;
         output;
         (Environments.safe_lookup Ocaml_variables.ocaml_filetype_flag env);
         module_names;
-        last_flags env
+        last_flags env ~backend:Compiler.target
       ] in
       Actions.seq [
         module_tasks; 
@@ -359,7 +368,7 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
     libraries Compiler.target env;
     backend_default_flags env Compiler.target;
     Ocaml_flags.codegen_variant_flags env Compiler.target;
-    flags env;
+    flags_for env ~backend:Compiler.target;
     backend_flags env Compiler.target;
     compile_only_flag_opt;
     module_;
@@ -465,6 +474,7 @@ let setup_compiler_build_env (compiler : Ocaml_compilers.compiler) log env =
   let (t, env) =
     setup_tool_build_env (module Compiler : Ocaml_tools.Tool) log env
   in
+  let env = Ocaml_flags.set_build_env_backend Compiler.target env in
   begin
     let prog_var = Compiler.program_variable in
     let prog_output_var = Compiler.program_output_variable in
@@ -482,7 +492,10 @@ let setup_compiler_build_env (compiler : Ocaml_compilers.compiler) log env =
 
 let setup_toplevel_build_env (toplevel : Ocaml_toplevels.toplevel) log env =
   let (module Toplevel) = toplevel in
-  setup_tool_build_env (module Toplevel : Ocaml_tools.Tool) log env
+  let task, env =
+    setup_tool_build_env (module Toplevel : Ocaml_tools.Tool) log env
+  in
+  task, Ocaml_flags.set_build_env_backend Toplevel.backend env
 
 let mk_compiler_env_setup name (compiler : Ocaml_compilers.compiler) =
   Actions.make ~name ~description:(Printf.sprintf "Setup build env (%s)" name)
@@ -541,35 +554,27 @@ let setup_ocamlnat_build_env =
       "setup-ocamlnat-build-env"
       Ocaml_toplevels.ocamlnat)
 
-(* The variant trees leave out the compiler's own libraries, the debugger
-   and eval, so a native compilation that follows the suite variant and
-   names one of them is skipped: it could only mix variants (see
-   [Ocaml_flags.default_only_library]). *)
-let skip_default_only_library env backend =
-  Option.map
-    (fun library ->
-      Result.skip_with_reason
-        (Printf.sprintf
-           "%s is only built for the %s codegen variant, not for the suite \
-            variant"
-           library Ocaml_flags.default_codegen_variant))
-    (Ocaml_flags.default_only_library env backend)
-
 let compile (compiler : Ocaml_compilers.compiler) log env =
   let (module Compiler) = compiler in
-  match Environments.lookup_nonempty Builtin_variables.commandline env with
+  (* A command line that a test gives is the test's own command: a native
+     compiler takes the variant from its environment, as it does in a
+     script, and the command line is read in that environment, where
+     [cflags] and [mkexe] are the variant's. *)
+  let command_env =
+    match Compiler.target with
+    | Native -> Ocaml_flags.command_environment env
+    | Bytecode | Jsir_js | Jsir_wasm -> env
+  in
+  match
+    Environments.lookup_nonempty Builtin_variables.commandline command_env
+  with
   | None ->
-    begin
-      match skip_default_only_library env Compiler.target with
-      | Some skip -> (Actions.Static skip, env)
-      | None ->
-        let task, env =
-          match Environments.lookup_nonempty Ocaml_variables.module_ env with
-          | None -> compile_program compiler log env
-          | Some module_ -> compile_module compiler module_ log env, env
-        in
-        Ocaml_flags.native_variant_work env Compiler.target task, env
-    end
+    let task, env =
+      match Environments.lookup_nonempty Ocaml_variables.module_ env with
+      | None -> compile_program compiler log env
+      | Some module_ -> compile_module compiler module_ log env, env
+    in
+    Ocaml_flags.native_variant_work env Compiler.target task, env
   | Some cmdline ->
     let expected_exit_status =
       Ocaml_tools.expected_exit_status env
@@ -578,15 +583,16 @@ let compile (compiler : Ocaml_compilers.compiler) log env =
     Printf.fprintf log "%s\n%!" what;
     let commandline =
       [Compiler.name; Ocaml_flags.target_flags Compiler.target; cmdline] in
-    Actions_helpers.run_cmd
-      ~environment:(compiler_env Compiler.target)
-      ~stdin_variable: Ocaml_variables.compiler_stdin
-      ~stdout_variable:Compiler.output_variable
-      ~stderr_variable:Compiler.output_variable
-      ~append:true
-      ~exits:[expected_exit_status, Result.pass]
-      ~what
-      log env commandline,
+    Ocaml_flags.native_variant_work env Compiler.target
+      (Actions_helpers.run_cmd
+         ~environment:(compiler_env Compiler.target)
+         ~stdin_variable: Ocaml_variables.compiler_stdin
+         ~stdout_variable:Compiler.output_variable
+         ~stderr_variable:Compiler.output_variable
+         ~append:true
+         ~exits:[expected_exit_status, Result.pass]
+         ~what
+         log command_env commandline),
     env
 
 (* Compile actions *)
@@ -731,14 +737,18 @@ let mklib log env =
     "-o " ^ program
   ] @ modules env in
   let expected_exit_status = 0 in
-  Actions_helpers.run_cmd
-    ~environment:default_ocaml_env
-    ~stdout_variable:Ocaml_variables.compiler_output
-    ~stderr_variable:Ocaml_variables.compiler_output
-    ~append:true
-    ~exits:[expected_exit_status, Result.pass]
-    ~what
-    log env commandline,
+  (* ocamlmklib starts ocamlopt for the native half of what it is given:
+     that compiler takes the variant from its environment, as it does in a
+     script. *)
+  Ocaml_flags.variant_work_for env
+    (Actions_helpers.run_cmd
+       ~environment:default_ocaml_env
+       ~stdout_variable:Ocaml_variables.compiler_output
+       ~stderr_variable:Ocaml_variables.compiler_output
+       ~append:true
+       ~exits:[expected_exit_status, Result.pass]
+       ~what
+       log (Ocaml_flags.command_environment env) commandline),
   env
 
 let ocamlmklib =
@@ -862,84 +872,28 @@ let finalise_codegen_msvc test_basename log env =
   ] env in
   (task, env)
 
-(* Expect, toplevel and codegen (asmgen) tests go through a prebuilt
-   binary (expect/expect.opt, ocaml/ocamlnat, codegen) whose codegen
-   variant is fixed at build time, so a selection cannot take effect there.
-   A test that selects a variant other than [admitted], the variant the
-   binary actually compiles for, fails loudly rather than silently
-   producing [admitted]'s results: that is a mistake in the test.  Under a
-   suite variant other than [admitted] the answer is [under_suite_variant]:
-   a host that generates native code is skipped (running it would only
-   repeat the default run and report it as the variant's), and a bytecode
-   host, which has no codegen variant, runs as usual, because test blocks
-   use it to prepare what a native compilation then consumes. *)
-type under_suite_variant = Skip_under_suite_variant | Run_under_suite_variant
-
-let reject_codegen_variant ~tests ~admitted ~because ~under_suite_variant
-      env =
-  match
-    Ocaml_flags.test_codegen_variant env, Ocaml_flags.suite_codegen_variant
-  with
-  | Some name, _ when not (String.equal name admitted) ->
-    Some
-      (Result.fail_with_reason
-         (Printf.sprintf
-            "codegen_variant \"%s\" is not supported by %s tests: %s (%s)"
-            name tests because admitted))
-  | None, Some name when not (String.equal name admitted) ->
-    begin match under_suite_variant with
-    | Skip_under_suite_variant ->
-      Some
-        (Result.skip_with_reason
-           (Printf.sprintf
-              "%s tests only run for the %s codegen variant, not for the \
-               suite variant %s"
-              tests admitted name))
-    | Run_under_suite_variant -> None
-    end
-  | Some _, _ | None, (Some _ | None) -> None
-
-(* The codegen binary generates stand-alone assembly out of process, with
-   every axis at the configure default (it accepts no axis flags). *)
-let reject_asmgen_codegen_variant env =
-  reject_codegen_variant ~tests:"codegen (asmgen)"
-    ~admitted:Ocaml_flags.default_codegen_variant
-    ~because:"the codegen binary only generates code for the configure \
-              default variant"
-    ~under_suite_variant:Skip_under_suite_variant
-    env
-
-(* A native expect/toplevel host compiles phrases into its own image, so
-   the only selection it admits is the variant the host binary was built
-   for (see [Ocaml_flags.toplevel_host_codegen_variant]); an admitted
-   selection then behaves exactly like no selection.  Bytecode phrase
-   compilation has no codegen variant; bytecode hosts conservatively
-   admit only the configure default as a test's own selection, whose
-   library tree is the one their tests have always run against. *)
-let reject_in_process_codegen_variant ~tests ~(backend : Ocaml_backends.t)
-      env =
-  match backend with
-  | Native ->
-    reject_codegen_variant ~tests:("native " ^ tests)
-      ~admitted:Ocaml_flags.toplevel_host_codegen_variant
-      ~because:"they compile phrases in-process with a host binary whose \
-                variant is fixed at build time"
-      ~under_suite_variant:Skip_under_suite_variant
-      env
-  | Jsir_js | Jsir_wasm ->
-    invalid_arg "reject_in_process_codegen_variant: no JSIR toplevel"
-  | Bytecode ->
-    reject_codegen_variant ~tests:("bytecode " ^ tests)
-      ~admitted:Ocaml_flags.default_codegen_variant
-      ~because:"bytecode has no codegen variants, so they only accept the \
-                configure default variant"
-      ~under_suite_variant:Run_under_suite_variant
-      env
+(* The native expect and toplevel tests and the codegen (asmgen) tests go
+   through a program that generates native code itself, and that is built
+   once per codegen variant, for that variant.  A test runs the build for
+   its effective variant, so these tests follow the selection like every
+   other native step.  [native_host env host] is that program and a task
+   that checks for it: where the variant is available, a missing program
+   means that the test tree does not match the install under test, which
+   is a failure and must not look like a skip. *)
+let native_host env host =
+  let program = Ocaml_commands.native_host env host in
+  let reason =
+    Printf.sprintf
+      "no %s for codegen variant %s in this test tree: %s does not exist"
+      (Ocaml_files.native_host_name host)
+      (Ocaml_flags.effective_codegen_variant env)
+      program
+  in
+  let check = Actions.Task [Check_file_exists { filename = program; reason }] in
+  program, Ocaml_flags.variant_work_for env check
 
 let run_codegen log env =
-  match reject_asmgen_codegen_variant env with
-  | Some result -> (Actions.Static result, env)
-  | None ->
+  let codegen, check_codegen = native_host env Codegen in
   let testfile = Actions_helpers.testfile env in
   let testfile_basename = Filename.chop_extension testfile in
   let what = Printf.sprintf "Running codegen on %s" testfile in
@@ -960,7 +914,7 @@ let run_codegen log env =
   let env = Environments.add Builtin_variables.output output env in
   let commandline =
   [
-    Ocaml_commands.codegen;
+    codegen;
     flags env;
     "-S " ^ testfile
   ] in
@@ -969,14 +923,16 @@ let run_codegen log env =
       Ocaml_variables.codegen_exit_status
   in
   let compile =
-    Actions_helpers.run_cmd
-      ~environment:default_ocaml_env
-      ~stdout_variable:Ocaml_variables.compiler_output
-      ~stderr_variable:Ocaml_variables.compiler_output
-      ~append:true
-      ~exits:[expected_exit_status, Result.pass]
-      ~what
-      log env commandline in
+    Actions.seq [
+      check_codegen;
+      Actions_helpers.run_cmd
+        ~environment:default_ocaml_env
+        ~stdout_variable:Ocaml_variables.compiler_output
+        ~stderr_variable:Ocaml_variables.compiler_output
+        ~append:true
+        ~exits:[expected_exit_status, Result.pass]
+        ~what
+        log env commandline] in
   if expected_exit_status=0
   then begin
     let finalise =
@@ -1003,20 +959,21 @@ let run_cc log env =
   let commandline =
   [
     Ocamltest_config.cc;
-    Ocamltest_config.cflags;
+    Ocaml_flags.cflags env;
     "-I" ^ Ocaml_directories.runtime;
     output_exe ^ program;
     Environments.safe_lookup Builtin_variables.arguments env;
   ] @ modules env in
   let expected_exit_status = 0 in
-  Actions_helpers.run_cmd
-    ~environment:default_ocaml_env
-    ~stdout_variable:Ocaml_variables.compiler_output
-    ~stderr_variable:Ocaml_variables.compiler_output
-    ~append:true
-    ~exits:[expected_exit_status, Result.pass]
-    ~what
-    log env commandline,
+  Ocaml_flags.c_code_variant_work env
+    (Actions_helpers.run_cmd
+       ~environment:default_ocaml_env
+       ~stdout_variable:Ocaml_variables.compiler_output
+       ~stderr_variable:Ocaml_variables.compiler_output
+       ~append:true
+       ~exits:[expected_exit_status, Result.pass]
+       ~what
+       log env commandline),
   env
 
 let cc =
@@ -1027,10 +984,10 @@ let cc =
 let run_expect_once input_file principal log env ~backend =
   let expect_flags = Sys.safe_getenv "EXPECT_FLAGS" in
   let principal_flag = if principal then "-principal" else "" in
-  let command =
+  let command, check_command =
     match (backend : Ocaml_backends.t) with
-    | Bytecode -> Ocaml_commands.expect
-    | Native -> Ocaml_commands.expectnat
+    | Bytecode -> Ocaml_commands.expect, Actions.Static Result.pass
+    | Native -> native_host env Expectnat
     | Jsir_js | Jsir_wasm -> invalid_arg "run_expect_once: no JSIR toplevel"
   in
   let commandline =
@@ -1040,21 +997,23 @@ let run_expect_once input_file principal log env ~backend =
     Ocaml_flags.toplevel_default_flags;
     backend_default_flags env backend;
     backend_flags env backend;
-    Ocaml_flags.toplevel_stdlib env ~backend;
-    toplevel_directory_flags env ~backend;
+    Ocaml_flags.stdlib env ~backend;
+    directory_flags env ~backend;
     Ocaml_flags.include_toplevel_directory;
-    flags env;
+    flags_for env ~backend;
     principal_flag;
     libraries backend env;
     binary_modules backend env;
     input_file
   ]
   in
-  Actions_helpers.run_cmd
-    ~environment:default_ocaml_env
-    ~exits:[0, Result.pass; 3, Result.pass]
-    ~what:"expect"
-    log env commandline,
+  Actions.seq [
+    check_command;
+    Actions_helpers.run_cmd
+      ~environment:default_ocaml_env
+      ~exits:[0, Result.pass; 3, Result.pass]
+      ~what:"expect"
+      log env commandline],
   env,
   ~needs_principal:true
 
@@ -1084,11 +1043,8 @@ let run_expect_twice input_file log env ~backend =
   end
 
 let run_expect_with ~backend log env =
-  match reject_in_process_codegen_variant ~tests:"expect" ~backend env with
-  | Some result -> (Actions.Static result, env)
-  | None ->
-    let input_file = Actions_helpers.testfile env in
-    run_expect_twice input_file log env ~backend
+  let input_file = Actions_helpers.testfile env in
+  run_expect_twice input_file log env ~backend
 
 let run_expect =
   Actions.make ~name:"run-expect" ~description:"Run expect test"
@@ -1214,13 +1170,8 @@ let compare_binary_files =
       ~does_something:true
       (compare_programs Ocaml_backends.Native native_programs_comparison_tool))
 
-(* [for_toplevel_host] compiles the module for loading into an in-process
-   expect/toplevel host binary: the standard-library root and codegen
-   flags then follow the host's variant rather than the configure default
-   (see [Ocaml_flags.toplevel_stdlib] and
-   [Ocaml_flags.toplevel_codegen_variant_flags]). *)
-let compile_module ?(for_toplevel_host = false) compiler compilername
-  compileroutput log env (module_basename, module_filetype) =
+let compile_module compiler compilername compileroutput log env
+    (module_basename, module_filetype) =
   let (module Compiler : Ocaml_compilers.Compiler) = compiler in
   let backend = Compiler.target in
   let filename =
@@ -1237,13 +1188,9 @@ let compile_module ?(for_toplevel_host = false) compiler compilername
       | Some file -> "-o " ^ file in
     [
       compilername;
-      (if for_toplevel_host
-       then Ocaml_flags.toplevel_stdlib env ~backend
-       else Ocaml_flags.stdlib env ~backend);
-      (if for_toplevel_host
-       then Ocaml_flags.toplevel_codegen_variant_flags env backend
-       else Ocaml_flags.codegen_variant_flags env backend);
-      flags env;
+      Ocaml_flags.stdlib env ~backend;
+      Ocaml_flags.codegen_variant_flags env backend;
+      flags_for env ~backend;
       backend_flags env backend;
       optional_flags;
       compile;
@@ -1287,11 +1234,11 @@ let compile_module ?(for_toplevel_host = false) compiler compilername
         filename (Ocaml_filetypes.string_of_filetype module_filetype) in
       (Actions.Static (Result.fail_with_reason reason), env)
 
-let compile_modules ?for_toplevel_host compiler compilername compileroutput
+let compile_modules compiler compilername compileroutput
     modules_with_filetypes log initial_env
   =
   let compile_mod env mod_ =
-    compile_module ?for_toplevel_host compiler compilername compileroutput
+    compile_module compiler compilername compileroutput
     log env mod_ in
   let rec compile_mods env = function
     | [] -> ([], env)
@@ -1305,9 +1252,6 @@ let compile_modules ?for_toplevel_host compiler compilername compileroutput
 let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
   let (module Toplevel) = toplevel in
   let backend = Toplevel.backend in
-  match reject_in_process_codegen_variant ~tests:"toplevel" ~backend env with
-  | Some result -> (Actions.Static result, env)
-  | None ->
   let libraries = libraries backend env in
   (* This is a sub-optimal check - skip the test if any libraries requiring
      C stubs are loaded. It would be better at this point to build a custom
@@ -1330,7 +1274,7 @@ let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
       let compiler_name = Compiler.name in
       let modules_with_filetypes =
         List.map Ocaml_filetypes.filetype (modules env) in
-      let (tasks, env) = compile_modules ~for_toplevel_host:true
+      let (tasks, env) = compile_modules
         compiler compiler_name compiler_output_variable
         modules_with_filetypes log env in
       begin
@@ -1341,7 +1285,13 @@ let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
           (Ocaml_backends.string_of_backend backend)
           expected_exit_status in
         Printf.fprintf log "%s\n%!" what;
-        let toplevel_name = Toplevel.name in
+        let toplevel_name, check_toplevel =
+          match (backend : Ocaml_backends.t) with
+          | Bytecode -> Toplevel.name, Actions.Static Result.pass
+          | Native -> native_host env Ocamlnat
+          | Jsir_js | Jsir_wasm ->
+            invalid_arg "run_test_program_in_toplevel: no JSIR toplevel"
+        in
         let ocaml_script_as_argument =
           match
             Environments.lookup_as_bool
@@ -1355,10 +1305,10 @@ let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
           toplevel_name;
           Ocaml_flags.toplevel_default_flags;
           Toplevel.flags;
-          Ocaml_flags.toplevel_stdlib env ~backend;
-          toplevel_directory_flags env ~backend;
+          Ocaml_flags.stdlib env ~backend;
+          directory_flags env ~backend;
           Ocaml_flags.include_toplevel_directory;
-          flags env;
+          flags_for env ~backend;
           libraries;
           binary_modules backend env;
           if ocaml_script_as_argument then testfile else "";
@@ -1382,7 +1332,7 @@ let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
             ~what
             log env commandline
         in
-        Actions.seq (tasks @ [task]), env
+        Actions.seq (tasks @ [check_toplevel; task]), env
       end
 
 let ocaml = Actions.make
@@ -1407,27 +1357,6 @@ let check_ocamlnat_output =
     (make_check_toplevel_output
       "check-ocamlnat-output" Ocaml_toplevels.ocamlnat)
 
-(* Tests use [mkexe] for the links that ocamlopt leaves to them, such as
-   the final link of an -output-complete-obj object.  Objects compiled for
-   an AddressSanitizer variant need the sanitizer runtime at that link;
-   ocamlopt adds it to its own executable links only, and [mkexe] carries
-   it only when the configure default is instrumented. *)
-let mkexe =
-  let sanitized =
-    match Ocaml_flags.suite_codegen_variant with
-    | Some name ->
-      (match Codegen_variant_name.of_string name with
-       | Some variant ->
-         Codegen_variant_name.mem Codegen_variant_name.Address_sanitizer
-           variant
-       | None -> false)
-    | None -> false
-  in
-  if sanitized && not Config.with_address_sanitizer
-  then
-    Ocamltest_config.mkexe ^ " -fsanitize=address -fsanitize-recover=address"
-  else Ocamltest_config.mkexe
-
 let config_variables _log env =
   Environments.add_bindings
   [
@@ -1437,11 +1366,10 @@ let config_variables _log env =
     Ocaml_variables.ocamlc_byte, Ocaml_files.ocamlc;
     Ocaml_variables.ocamlopt_byte, Ocaml_files.ocamlopt;
     Ocaml_variables.runtime, Ocaml_directories.runtime;
-    Ocaml_variables.stdlib, Ocaml_directories.stdlib;
     Ocaml_variables.bytecc_libs, Ocamltest_config.bytecc_libs;
     Ocaml_variables.nativecc_libs, Ocamltest_config.nativecc_libs;
     Ocaml_variables.mkdll, Ocamltest_config.mkdll;
-    Ocaml_variables.mkexe, mkexe;
+    Ocaml_variables.mkexe, Ocamltest_config.mkexe;
     Ocaml_variables.cpp, Ocamltest_config.cpp;
     Ocaml_variables.cppflags, Ocamltest_config.cppflags;
     Ocaml_variables.cc, Ocamltest_config.cc;
@@ -1466,6 +1394,7 @@ let config_variables _log env =
     Ocaml_variables.os_type, Sys.os_type;
     Ocaml_variables.caml_ld_library_path, ""
   ] env
+  |> Ocaml_flags.with_variant_stdlib
 
 let flat_float_array = Actions.make
   ~name:"flat-float-array"

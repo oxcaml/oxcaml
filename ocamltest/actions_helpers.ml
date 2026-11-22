@@ -283,7 +283,7 @@ let run_cmd = run_cmd ~full_environment:false
 (* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
    here, for this action only, rather than in the initial environment:
    the compilers and other tools run without them. *)
-let run_program' interpreter log env =
+let run_program' ?(command_env = Fun.id) interpreter log env =
   let env =
     if Options.run_ocamlrunparam = "" then env
     else begin
@@ -295,34 +295,38 @@ let run_program' interpreter log env =
       Environments.add Ocaml_variables.ocamlrunparam value env
     end
   in
-  run
+  let (task, _env) = run
     ~full_environment:false
     ?interpreter
     "Running program"
     true
     Builtin_variables.program
     (Some Builtin_variables.arguments)
-    log env
+    log (command_env env) in
+  task, env
 
-let run_program = run_program' None
+let run_program ~command_env = run_program' ~command_env None
 
 let run_program_with ~interpreter = run_program' (Some interpreter)
 
-let run_script log env =
+(* [command_env] gives the environment that a program, a script or a hook
+   runs in from the environment of the test.  What it adds does not reach
+   the actions that follow. *)
+let run_script ~command_env log env =
   let response_file = "ocamltest-" ^ testfile env ^ ".response" in
   Printf.fprintf log "Script should write its response to %s\n%!"
     response_file;
   let scriptenv = Environments.add
     Builtin_variables.ocamltest_response response_file env in
-  let (task, newenv) = run
+  let (task, _env) = run
     ~full_environment:true
     "Running script"
     true
     Builtin_variables.script
     None
-    log scriptenv in
+    log (command_env scriptenv) in
   Actions.seq [task; Task [Check_file_absent { filename = response_file }]],
-  newenv
+  scriptenv
 (*
  * Support for reading modifiers from ocamltest_response is disabled in oxcaml
  *
@@ -338,18 +342,18 @@ let run_script log env =
   Sys.force_remove response_file;
   final_value *)
 
-let run_config_script log env =
+let run_config_script ~command_env log env =
   let response_file = Filename.temp_file "ocamltest" ".response" in
   let scriptenv = Environments.add
     Builtin_variables.ocamltest_response response_file env in
-  let (task, newenv) = run
+  let (task, _env) = run
     ~full_environment:true
     ~exits:[0, Result.pass; 125, Result.skip]
     "Running script"
     true
     Builtin_variables.script
     None
-    log scriptenv in
+    log (command_env scriptenv) in
   (* This command is run immediately, during setup. *)
   let r =
     match[@ocaml.warning "-fragile-match"] task with
@@ -364,9 +368,9 @@ let run_config_script log env =
       Actions.Static { r with reason = Some reason }
   in
   Sys.remove response_file;
-  task, newenv
+  task, scriptenv
 
-let run_hook hook_name log input_env =
+let run_hook ~command_env hook_name log input_env =
   Printf.fprintf log "Entering run_hook for hook %s\n%!" hook_name;
   let response_file = "ocamltest-" ^ testfile input_env ^ ".response" in
   Printf.fprintf log "Hook should write its response to %s\n%!"
@@ -374,7 +378,7 @@ let run_hook hook_name log input_env =
   let hookenv = Environments.add
     Builtin_variables.ocamltest_response response_file input_env in
   let systemenv =
-    Environments.to_system_env ~full:true hookenv in
+    Environments.to_system_env ~full:true (command_env hookenv) in
   let timeout =
     Option.value ~default:0
       (Environments.lookup_as_int Builtin_variables.timeout input_env) in

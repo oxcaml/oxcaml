@@ -35,6 +35,11 @@ let arch = make ("arch",
 let binary_modules = make ("binary_modules",
   "Additional binary modules to link")
 
+let build_env_backend = make ("build_env_backend",
+  "Backend of the compiler or toplevel that the build environment was last \
+   set up for (set by the setup-*-build-env actions): \"native\", \
+   \"bytecode\", \"jsir-js\" or \"jsir-wasm\"")
+
 let bytecc_libs = make ("bytecc_libs",
   "Libraries to link with for bytecode")
 
@@ -230,6 +235,9 @@ let ocamlopt_jsir_js_exit_status = make ("ocamlopt_jsir_js_exit_status",
 let ocamlopt_jsir_wasm_exit_status = make ("ocamlopt_jsir_wasm_exit_status",
   "Expected exit status of ocamlopt.opt -target wasm_of_ocaml")
 
+let ocamlparam = make ("OCAMLPARAM",
+  "The OCAMLPARAM of the compilers and scripts that the test starts")
+
 let ocamlrunparam =
   make_with_exporter
     ("OCAMLRUNPARAM", Fun.id)
@@ -298,6 +306,7 @@ let init () =
     all_modules;
     arch;
     binary_modules;
+    build_env_backend;
     bytecc_libs;
     cpp;
     cppflags;
@@ -324,6 +333,7 @@ let init () =
     last_flags;
     libraries;
     mkdll;
+    mkexe;
     module_;
     modules;
     nativecc_libs;
@@ -346,6 +356,7 @@ let init () =
     ocamlopt_opt_exit_status;
     ocamlopt_jsir_js_exit_status;
     ocamlopt_jsir_wasm_exit_status;
+    ocamlparam;
     ocamlrunparam;
     ocamllex_flags;
     ocamlyacc_flags;

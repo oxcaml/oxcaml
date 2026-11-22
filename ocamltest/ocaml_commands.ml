@@ -27,8 +27,9 @@ let ocamlrun_ocaml = ocamlrun Ocaml_files.ocaml
 let expect =
   Ocaml_files.expect
 
-let expectnat =
-  Ocaml_files.expectnat
+let native_host env host =
+  Ocaml_files.native_host host
+    ~variant:(Ocaml_flags.non_default_codegen_variant env)
 
 let ocamlrun_ocamllex = ocamlrun Ocaml_files.ocamllex
 
@@ -43,9 +44,6 @@ let ocamlrun_ocamlobjinfo =
 
 let ocamlrun_ocamlmklib =
   ocamlrun Ocaml_files.ocamlmklib
-
-let codegen =
-  Ocaml_files.codegen
 
 let fexprc =
   Ocaml_files.fexprc

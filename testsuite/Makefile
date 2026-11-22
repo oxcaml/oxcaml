@@ -173,9 +173,12 @@ endif
 # codegen variant of the compiler under test (see ocamlopt -config-var
 # codegen_variants), e.g.
 #   make one DIR=tests/effects CODEGEN_VARIANT=fp
-# The native programs that ocamltest compiles and links are then built for
-# that variant, unless a test selects a variant itself. Naming the
-# compiler's default variant is the same as not setting the variable.
+# The tests then run as if that variant were the compiler's default: the
+# native programs that ocamltest compiles and links are built for it, and
+# native expect, toplevel and asmgen tests run in the builds of their host
+# programs for it (see ocamltest/OCAMLTEST.org). A test that selects a
+# variant itself keeps its selection. Naming the compiler's default variant
+# is the same as not setting the variable.
 CODEGEN_VARIANT ?=
 ifeq "$(CODEGEN_VARIANT)" ""
   OCAMLTEST_CODEGEN_VARIANT_FLAG =
@@ -251,7 +254,7 @@ default:
 	@echo "the tests with the debug or the instrumented runtime."
 	@echo
 	@echo "Set CODEGEN_VARIANT to the name of a codegen variant of the compiler"
-	@echo "(e.g. fp) to build the native test programs for that variant. Add"
+	@echo "(e.g. fp) to run the tests as if that variant were its default. Add"
 	@echo "VARIANT_ONLY=1 to skip the tests in which nothing depends on it."
 	@echo
 	@echo "Set TEST_ID to a label to run several passes at once in one tree:"

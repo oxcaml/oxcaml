@@ -53,17 +53,24 @@ val run_cmd :
   what:string ->
   out_channel -> Environments.t -> string list -> Actions.task
 
-val run_program : Actions.code
+(* A program, a script or a hook runs in [command_env env], where [env] is
+   the environment of the test.  The actions that follow it do not see
+   what [command_env] adds. *)
+val run_program :
+  command_env:(Environments.t -> Environments.t) -> Actions.code
 
 (** Like [run_program], but runs the program through [interpreter]
-    (e.g. node for JavaScript programs) *)
+    (e.g. node for JavaScript programs), in the environment of the test *)
 val run_program_with : interpreter:string -> Actions.code
 
-val run_script : Actions.code
+val run_script :
+  command_env:(Environments.t -> Environments.t) -> Actions.code
 
-val run_config_script : Actions.code
+val run_config_script :
+  command_env:(Environments.t -> Environments.t) -> Actions.code
 
-val run_hook : string -> Actions.code
+val run_hook :
+  command_env:(Environments.t -> Environments.t) -> string -> Actions.code
 
 val compare_files : string -> string -> string -> Actions.code
 
