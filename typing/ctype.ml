@@ -3515,6 +3515,164 @@ let type_jkind_base env ty =
   let jkind = type_jkind ~ignore_mod_bounds:true env ty in
   jkind.jkind.base
 
+let inline_sum ~unknown env ty =
+  let rec sort_has_sum sort =
+    match Jkind_types.Sort.get sort with
+    | Sum _ -> true
+    | Product components -> List.exists sort_has_sum components
+    | Addressable sort -> sort_has_sum sort
+    | Univar _ | Var _ -> unknown
+    | Base _ -> false
+  in
+  let rec layout_has_sum : _ Jkind.Layout.t -> bool = function
+    | Sum _ -> true
+    | Product components -> List.exists layout_has_sum components
+    | Addressable layout -> layout_has_sum layout
+    | Sort (sort, _) -> sort_has_sum sort
+    | Box _ -> false
+    | Any _ -> unknown
+  in
+  let jkind = type_jkind ~ignore_mod_bounds:true env ty in
+  match Jkind.extract_layout env jkind with
+  | Ok layout -> layout_has_sum layout
+  | Error _ -> unknown
+
+let may_contain_inline_sum env ty = inline_sum ~unknown:true env ty
+
+let uncontended_destination = With_locality.of_const
+    { With_locality.Const.max with contention = Uncontended }
+
+let instance_primitive_destination env prim ty =
+  let rec freshen index ty =
+    match get_desc (expand_head env ty) with
+    | Tarrow ((lbl, arg_mode, ret_mode), arg, ret, comm) ->
+      if index = 0 then
+        if With_locality.Guts.sub_loose arg_mode uncontended_destination
+        then ty
+        else
+          let fresh, _ = With_locality.newvar_below !current_level arg_mode in
+          With_locality.submode_exn arg_mode
+            (With_locality.join_const_with Contention
+               Mode.Contention.Const.Contended fresh);
+          newty (Tarrow ((lbl, fresh, ret_mode), arg, ret, comm))
+      else
+        let ret' = freshen (index - 1) ret in
+        if ret == ret' then ty else
+          newty (Tarrow ((lbl, arg_mode, ret_mode), arg, ret', comm))
+    | _ -> ty
+  in
+  match Primitive.sum_access prim with
+  | Store_array | Store_index | Store_pointer | Store_singleton -> freshen 0 ty
+  | Blit -> freshen 2 ty
+  | No_replacement | Scalar_memory_access | Unclassified
+  | Uninitialized_array -> ty
+
+type primitive_access_site =
+  | Declaration
+  | Specialized_value
+  | Function_value
+  | Direct_application of (int -> Location.t)
+
+let check_primitive_sum_access site ~loc env
+      (prim : Primitive.description) ty =
+  let access = Primitive.sum_access prim in
+  match access, site with
+  | No_replacement, _
+  | (Uninitialized_array | Scalar_memory_access | Unclassified),
+    Direct_application _ -> ()
+  | _ ->
+    let rec head ty =
+      match get_desc (unwrap_until_or_null env ty) with
+      | Tpoly (inner, _) -> head inner
+      | desc -> desc
+    in
+    let rec arguments remaining ty acc =
+      match remaining, head ty with
+      | n, Tarrow ((_, mode, _), arg, rest, _) when n > 0 ->
+        arguments (n - 1) rest ((mode, arg) :: acc)
+      | _ -> List.rev acc, ty
+    in
+    let args, result = arguments prim.prim_type_arity ty [] in
+    let unknown = match site, access with
+      | _, Scalar_memory_access | Specialized_value, _ -> false
+      | Declaration, _ -> not prim.prim_is_layout_poly
+      | (Function_value | Direct_application _), _ -> true
+    in
+    let rec contains ty =
+      match get_desc ty with
+      | Tpoly (inner, _) -> contains inner
+      | _ -> inline_sum ~unknown env ty
+    in
+    let array_element ty =
+      match head ty with
+      | Tconstr (path, [elt], _) when Path.same path Predef.path_array
+                                   || Path.same path Predef.path_iarray ->
+        contains elt
+      | _ -> false
+    in
+    let index_element ty =
+      match head ty with
+      | Tconstr (path, [_; elt], _)
+        when Path.same path Predef.path_idx_mut
+          || Path.same path Predef.path_idx_atomic ->
+        contains elt
+      | _ -> false
+    in
+    let pointer_element ty =
+      match head ty with
+      | Tconstr (path, [elt], _) when Path.same path Predef.path_addr ->
+        contains elt
+      | Tunboxed_tuple [_; _, idx] -> index_element idx
+      | _ -> false
+    in
+    let singleton_element ty =
+      match head ty with
+      | Tconstr (path, params, _) ->
+        begin match Env.find_type path env with
+        | { type_kind = Type_record ([field], _, _); type_params; _ } ->
+          contains (apply env type_params field.ld_type params)
+        | _ | exception Not_found -> false
+        end
+      | _ -> false
+    in
+    let require index mode stored =
+      let reject () = raise (Primitive.Error (loc,
+        Sum_write_requires_uncontended prim.prim_name)) in
+      if stored then
+        match site with
+        | Direct_application arg_loc ->
+          With_locality.submode_err (arg_loc index, Expression)
+            mode uncontended_destination
+        | Specialized_value ->
+          if Result.is_error
+               (With_locality.submode mode uncontended_destination)
+          then reject ()
+        | Declaration | Function_value ->
+          if not (With_locality.Guts.sub_loose mode uncontended_destination)
+          then reject ()
+    in
+    begin match access, args with
+    | Store_array, [(mode, dst); _; _, value] ->
+      require 0 mode (contains value || array_element dst)
+    | Store_index, [(mode, _); _, index; _, value] ->
+      require 0 mode (contains value || index_element index)
+    | Store_pointer, [(mode, dst); _, value] ->
+      require 0 mode (contains value || pointer_element dst)
+    | Store_singleton, [(mode, dst); _, value] ->
+      require 0 mode (contains value || singleton_element dst)
+    | Blit, [_; _; (mode, dst); _; _] -> require 2 mode (array_element dst)
+    | Uninitialized_array, [_] ->
+      if array_element result then
+        raise (Primitive.Error (loc, Uninitialized_sum_array))
+    | (Scalar_memory_access | Unclassified), _ ->
+      let unsupported ty = contains ty || array_element ty ||
+        index_element ty || pointer_element ty in
+      if unsupported result || List.exists (fun (_, ty) -> unsupported ty) args
+      then raise (Primitive.Error
+          (loc, Unsupported_sum_primitive prim.prim_name))
+    | _ -> ()
+    end
+
 let type_jkind env ty =
   type_jkind ~ignore_mod_bounds:false env ty
 

@@ -1665,11 +1665,11 @@ let mode_project_mutable mut_name =
   mode_default mode
 
 (** The [expected_mode] of the record when mutating a mutable field. *)
-let mode_mutate_mutable mut_name =
+let mode_mutate_mutable ~contention mut_name =
   let mode =
     { With_regionality.Const.max with
       visibility = Write;
-      contention = Corrupted }
+      contention }
     |> With_regionality.of_const ~hint_monadic:(Mutable_write mut_name)
   in
   mode_default mode
@@ -8127,6 +8127,17 @@ and type_expect_
         type_application env loc expected_mode pm funct funct_mode sargs rt
           ty_expected
       in
+      begin match funct.exp_desc with
+      | Texp_ident { desc = { val_kind = Val_prim prim }; _ }
+        when prim.prim_is_layout_poly ->
+        let arg_loc index = match List.nth_opt args index with
+          | Some (_, Arg (exp, _), _) -> exp.exp_loc
+          | _ -> funct.exp_loc
+        in
+        Ctype.check_primitive_sum_access (Direct_application arg_loc)
+          ~loc:funct.exp_loc env prim funct.exp_type
+      | _ -> ()
+      end;
       let mode_ret = With_locality.disallow_right mode_ret in
       let ap_mode = create_allocation_mode_l mode_ret in
       let mode_ret =
@@ -8491,8 +8502,9 @@ and type_expect_
         match label.lbl_mut with
         | Mutable { mode = m0; atomic } ->
           ignore atomic;  (* CR aspsmith: TODO *)
-          submode ~loc:record.exp_loc ~env rmode (mode_mutate_mutable
-            (Record_field label.lbl_name));
+          submode ~loc:record.exp_loc ~env rmode
+            (mode_mutate_mutable ~contention:Corrupted
+               (Record_field label.lbl_name));
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
@@ -8513,6 +8525,10 @@ and type_expect_
                 rmode))
       in
       unify_exp ~sexp env record ty_record;
+      if Ctype.may_contain_inline_sum env newval.exp_type then
+        submode ~loc:record.exp_loc ~env rmode
+          (mode_mutate_mutable ~contention:Uncontended
+             (Record_field label.lbl_name));
       let record_repres =
         update_labels env Legacy ~representative_label:label ~loc
           ~why:Field_assignment
@@ -10070,6 +10086,12 @@ and type_ident env ?(recarg=Rejected) lid =
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
+       let ty = if prim.prim_is_layout_poly
+         then Ctype.instance_primitive_destination env prim ty else ty in
+       if prim.prim_is_layout_poly then
+         add_delayed_check (fun () ->
+           Ctype.check_primitive_sum_access Function_value ~loc:lid.loc
+             env prim ty);
        begin match prim.prim_native_repr_res, mode with
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
@@ -11362,8 +11384,16 @@ and type_argument_ ?explanation ?recarg ~overwrite env
 and type_argument ?explanation ?recarg ~overwrite env mode sarg
       ty_expected' ty_expected =
   let delayed () =
-    type_argument_ ?explanation ?recarg ~overwrite env mode
-      sarg ty_expected' ty_expected
+    let exp = type_argument_ ?explanation ?recarg ~overwrite env mode
+        sarg ty_expected' ty_expected in
+    begin match exp.exp_desc with
+    | Texp_ident { desc = { val_kind = Val_prim prim; val_type; _ }; _ }
+      when prim.prim_is_layout_poly ->
+      Ctype.check_primitive_sum_access Specialized_value ~loc:exp.exp_loc
+        env prim val_type
+    | _ -> ()
+    end;
+    exp
   in
   if !Clflags.typing_recovery then
     Typing_recovery_state.with_saved_types (fun () ->

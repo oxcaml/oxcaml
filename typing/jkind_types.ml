@@ -1298,8 +1298,9 @@ module Layout = struct
 
     let physical_sort t = Option.bind (get_sort t) Sum_repr.physical_sort
 
-    (* Enable runtime use when destination access checks are in place. *)
-    let runtime_sum_sort _ = None
+    let runtime_sum_sort t =
+      Option.bind (get_sort t) (fun sort ->
+          Option.map (fun _ -> sort) (Sum_repr.physical_sort sort))
 
     let rec is_surely_addressable = function
       | Base (b, _) -> Sort.base_is_addressable b

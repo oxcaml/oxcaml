@@ -4887,7 +4887,9 @@ let unexpected_layout_any_check env prim cty ty =
 *)
 let error_if_containing_unexpected_jkind env prim cty ty =
   Primitive.prim_has_valid_reprs ~loc:cty.ctyp_loc prim;
-  unexpected_layout_any_check env prim cty ty
+  unexpected_layout_any_check env prim cty ty;
+  Ctype.check_primitive_sum_access Declaration ~loc:cty.ctyp_loc
+    env prim ty
 
 (* [@@@zero_alloc assert all] in signatures uses the apparent arity of each
    declaration just by looking at the number of arrows in the type.  If the type

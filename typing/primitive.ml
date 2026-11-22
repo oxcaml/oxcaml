@@ -102,6 +102,9 @@ type error =
   | Inconsistent_noalloc_attributes_for_effects
   | Raw_pointer_requires_noalloc
   | Invalid_representation_polymorphic_attribute
+  | Sum_write_requires_uncontended of string
+  | Uninitialized_sum_array
+  | Unsupported_sum_primitive of string
   | Invalid_native_repr_for_primitive of
       { prim_name : string; errors : wrong_repr_error list }
 
@@ -1440,10 +1443,61 @@ let prim_can_contain_layout_any prim =
   | "%array_unsafe_set_indexed_by_nativeint#" -> false
   | _ -> true
 
+type sum_access =
+  | No_replacement
+  | Store_array | Store_index | Store_pointer | Store_singleton | Blit
+  | Uninitialized_array | Scalar_memory_access | Unclassified
+
+let sum_access prim =
+  match prim.prim_name with
+  | "%array_safe_set" | "%array_unsafe_set"
+  | "%array_safe_set_indexed_by_int8#" | "%array_unsafe_set_indexed_by_int8#"
+  | "%array_safe_set_indexed_by_int16#" | "%array_unsafe_set_indexed_by_int16#"
+  | "%array_safe_set_indexed_by_int32#" | "%array_unsafe_set_indexed_by_int32#"
+  | "%array_safe_set_indexed_by_int64#" | "%array_unsafe_set_indexed_by_int64#"
+  | "%array_safe_set_indexed_by_nativeint#"
+  | "%array_unsafe_set_indexed_by_nativeint#" -> Store_array
+  | "%set_idx" -> Store_index
+  | "%setfield0_singleton" -> Store_singleton
+  | "%unsafe_set_ptr" -> Store_pointer
+  | "%arrayblit" | "%arrayblit_src_immut" -> Blit
+  | "%makearray_dynamic_uninit" -> Uninitialized_array
+  | "%peek" | "%poke" -> Scalar_memory_access
+  | "%identity" | "%opaque" | "%ignore" | "%revapply" | "%apply"
+  | "%makeblock" | "%makemutable" | "%field0_singleton"
+  | "%field0_singleton_immut" | "%box" | "%unbox"
+  | "%get_idx" | "%get_idx_imm" | "%unsafe_get_ptr" | "%unsafe_get_ptr_imm"
+  | "%array_length" | "%array_element_size_in_bytes" | "%makearray_dynamic"
+  | "%array_to_iarray" | "%array_of_iarray"
+  | "%floatarray_length" | "%floatarray_safe_get" | "%floatarray_unsafe_get"
+  | "%array_safe_get" | "%array_unsafe_get"
+  | "%array_safe_get_indexed_by_int8#" | "%array_unsafe_get_indexed_by_int8#"
+  | "%array_safe_get_indexed_by_int16#" | "%array_unsafe_get_indexed_by_int16#"
+  | "%array_safe_get_indexed_by_int32#" | "%array_unsafe_get_indexed_by_int32#"
+  | "%array_safe_get_indexed_by_int64#" | "%array_unsafe_get_indexed_by_int64#"
+  | "%array_safe_get_indexed_by_nativeint#"
+  | "%array_unsafe_get_indexed_by_nativeint#"
+  | "%unsafe_array_idx" | "%unsafe_array_idx_indexed_by_int8#"
+  | "%unsafe_array_idx_indexed_by_int16#"
+  | "%unsafe_array_idx_indexed_by_int32#"
+  | "%unsafe_array_idx_indexed_by_int64#"
+  | "%unsafe_array_idx_indexed_by_nativeint#" -> No_replacement
+  | name -> if is_builtin_prim_name name then Unclassified else No_replacement
+
 module Style = Misc.Style
 
 let report_error ppf err =
   match err with
+  | Sum_write_requires_uncontended name ->
+    Format_doc.fprintf ppf
+      "The destination of %s must require uncontended access because its@ \
+       element may contain an inline sum." name
+  | Uninitialized_sum_array ->
+    Format_doc.fprintf ppf
+      "%%makearray_dynamic_uninit cannot create an array whose elements@ \
+       may contain an inline sum. Supply an initializer instead."
+  | Unsupported_sum_primitive name ->
+    Format_doc.fprintf ppf "The primitive %s does not support inline sums." name
   | Old_style_float_with_native_repr_attribute ->
     Format_doc.fprintf ppf "Cannot use %a in conjunction with %a/%a."
       Style.inline_code "float"
