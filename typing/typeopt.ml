@@ -763,7 +763,9 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
       let decl =
         try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in
-      if cannot_proceed () then
+      if Datarepr.uses_fused_boxed_tags decl then
+        num_nodes_visited, non_nullable Pgenval
+      else if cannot_proceed () then
         num_nodes_visited,
         add_nullability_from_ty env scty
           (value_kind_of_scannable_jkind env decl.type_jkind)

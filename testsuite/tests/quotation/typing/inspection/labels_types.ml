@@ -1,6 +1,8 @@
 type vrt  = Foo | Bar
 type vrt' = Foo | Bar
 
+type raw = Miss | Hit of int [@@unboxed]
+
 type _         rcd1 = { foo: int; mutable bar: string }
 type (_, _)    rcd2 = { foo: int; mutable bar: string }
 type (_, _, _) rcd3 = { foo: int; mutable bar: string }

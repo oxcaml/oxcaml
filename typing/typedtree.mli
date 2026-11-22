@@ -177,7 +177,7 @@ val aliased_many_use : unique_use
     type constructor's argument list, e.g.: [{ path = result; arity = 2 }]
     results in the annotation [(_, _) result]. *)
 type label_ambiguity =
-  | Ambiguous of { path: Path.t; arity : int }
+  | Ambiguous of { path: Path.t; arity : int; boxed : bool }
   | Unambiguous
 
 type _ type_inspection =

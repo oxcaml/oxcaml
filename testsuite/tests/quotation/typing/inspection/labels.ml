@@ -57,6 +57,18 @@ let () =
 ;;
 
 
+let () =
+  let f = <[ fun (x : vrt#) -> match x with #Foo -> 10 | #Bar -> 20 ]> in
+  assert (Eval.eval <[ $f (#Foo : vrt#) ]> = 10)
+;;
+
+let () =
+  let (read : <[raw box -> int]> expr) =
+    <[ function Miss -> 0 | Hit n -> n ]> in
+  let (value : <[raw box]> expr) = <[ Hit 17 ]> in
+  assert (Eval.eval <[ $read ((fun x -> x) $value) ]> = 17)
+;;
+
 (* Unboxed records *)
 
 (* Construction *)

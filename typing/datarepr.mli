@@ -19,6 +19,9 @@
 open Types
 open Data_types
 
+val boxed_sum_constructor : constructor_description -> constructor_description
+val uses_fused_boxed_tags : type_declaration -> bool
+
 val extension_descr:
   current_unit:(Unit_info.t option) -> Path.t -> extension_constructor ->
   constructor_description

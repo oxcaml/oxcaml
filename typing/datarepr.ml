@@ -21,6 +21,19 @@ open Data_types
 open Btype
 module Jkind = Btype.Jkind0
 
+let boxed_sum_constructor cstr =
+  { cstr with cstr_res = new_box_ty cstr.cstr_res }
+
+let uses_fused_boxed_tags decl =
+  match decl.type_kind with
+  | Type_variant (_, Variant_boxed layouts, _) ->
+    Option.is_some decl.type_unboxed_version &&
+    Array.exists (function
+      | Cstr_layout_known { sorts = [|sort|]; _ } ->
+        Option.is_some (Jkind_types.Sum_repr.direct_sum sort)
+      | _ -> false) layouts
+  | _ -> false
+
 (* Simplified version of Ctype.free_vars *)
 let free_vars ?(param=false) ty =
   let ret = ref TypeSet.empty in
@@ -221,7 +234,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
   in
   let sum =
     match rep, cstrs with
-    | Variant_unboxed, _ :: _ :: _ ->
+    | (Variant_unboxed | Variant_boxed _), _ :: _ :: _
+      when rep = Variant_unboxed || uses_fused_boxed_tags decl ->
       (match Misc.Stdlib.List.map_option
          (function
            | Cstr_layout_known { sorts; _ } -> Some (Array.to_list sorts)

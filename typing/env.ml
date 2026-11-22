@@ -2523,7 +2523,7 @@ let rec components_of_module_maker
                     (Datarepr.constructors_of_type path final_decl
                         ~current_unit:(get_current_unit ()))
                   in
-                  List.iter
+                  if not (Path.is_unboxed_version path) then List.iter
                     (fun descr ->
                       let cda_shape = Shape.leaf descr.cstr_uid in
                       let cda = {
@@ -2839,10 +2839,10 @@ and store_type ~check ~hidden id info shape env =
                             ~current_unit:(get_current_unit ())
         in
         Type_variant (List.map snd constructors, repr, umc),
-        List.fold_left
+        (if Path.is_unboxed_version path then env else List.fold_left
           (fun env (cstr_id, cstr) ->
             store_constructor ~check info id cstr_id cstr env)
-          env constructors
+          env constructors)
     | Type_record (_, repr, umc) ->
         let labels = Datarepr.labels_of_type path info in
         Type_record (List.map snd labels, repr, umc),
@@ -3611,9 +3611,9 @@ let mark_label_used usage uid =
 let mark_constructor_description_used usage env cstr =
   let ty_path = cstr_res_type_path cstr in
   mark_type_path_used env ty_path;
-  match Types.Uid.Tbl.find !used_constructors cstr.cstr_uid with
-  | mark -> mark usage
-  | exception Not_found -> ()
+  let uid = match cstr.cstr_uid with
+    | Unboxed_version uid -> uid | uid -> uid in
+  mark_constructor_used usage uid
 
 let mark_label_description_used usage env lbl =
   let ty_path =

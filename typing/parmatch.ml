@@ -467,6 +467,8 @@ let clean_copy ty =
 
 let get_constructor_type_path ty tenv =
   let ty = Ctype.expand_head tenv (clean_copy ty) in
+  let ty = match get_desc ty with
+    | Tbox inner -> Ctype.expand_head tenv inner | _ -> ty in
   match get_desc ty with
   | Tconstr (path,_,_) -> path
   | _ -> assert false
@@ -1080,10 +1082,13 @@ let pats_of_type env ty =
   | May_have_typedecl -> [omega]
 
 let get_variant_constructors env ty =
+  let ty, box = match get_desc ty with
+    | Tbox inner -> inner, List.map Datarepr.boxed_sum_constructor
+    | _ -> ty, Fun.id in
   match Ctype.extract_concrete_typedecl env ty with
   | Typedecl (_, path, {type_kind = Type_variant _}) ->
       begin match Env.find_type_descrs path env with
-      | Type_variant (cstrs,_,_) -> cstrs
+      | Type_variant (cstrs,_,_) -> box cstrs
       | _ -> fatal_error "Parmatch.get_variant_constructors"
       end
   | _ -> fatal_error "Parmatch.get_variant_constructors"

@@ -221,3 +221,51 @@ let printed = { choice = Bits #42L; label = "next field" }
 type printed = { choice : mixed; label : string; }
 val printed : printed = {choice = <unboxed sum>; label = "next field"}
 |}]
+
+type ('a : any) first = 'a option = None | Some of 'a
+type ('a : any) second = 'a option = None | Some of 'a
+type ('a : any) alias = 'a first
+[%%expect{|
+type ('a : any) first = 'a option = None | Some of 'a
+type ('a : any) second = 'a option = None | Some of 'a
+type ('a : any) alias = 'a first
+|}]
+
+type rejected = int first#
+[%%expect{|
+Line 1, characters 20-26:
+1 | type rejected = int first#
+                        ^^^^^^
+Error: The type "first" has no unboxed version.
+|}]
+
+type rejected = int second#
+[%%expect{|
+Line 1, characters 20-27:
+1 | type rejected = int second#
+                        ^^^^^^^
+Error: The type "second" has no unboxed version.
+|}]
+
+type rejected = int alias#
+[%%expect{|
+Line 1, characters 20-26:
+1 | type rejected = int alias#
+                        ^^^^^^
+Error: The type "alias" has no unboxed version.
+|}]
+
+type public = Stop | More of int
+module Private = struct type t = public = private Stop | More of int end
+[%%expect{|
+type public = Stop | More of int
+module Private : sig type t = public = private Stop | More of int end
+|}]
+
+let rejected () = Private.#Stop
+[%%expect{|
+Line 1, characters 18-31:
+1 | let rejected () = Private.#Stop
+                      ^^^^^^^^^^^^^
+Error: Cannot create values of the private type "public#"
+|}]

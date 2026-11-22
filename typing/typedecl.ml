@@ -1451,21 +1451,44 @@ let record_gets_unboxed_version lbls repr =
     fatal_error
       "record_gets_unboxed_version: unexpected variable representation"
 
+let variant_has_companion_shape cstrs =
+  match cstrs with
+  | _ :: _ :: _ ->
+    List.for_all (fun (cstr : Types.constructor_declaration) ->
+      Option.is_none cstr.cd_res &&
+      match cstr.cd_args with Cstr_tuple _ -> true | Cstr_record _ -> false)
+      cstrs
+  | [] | [_] -> false
+
+let compatible_boxed_arms layouts =
+  Array.for_all (function
+    | Cstr_layout_undetermined -> false
+    | Cstr_layout_known { shape; sorts } as layout ->
+      (cstr_layout_is_constant layout ||
+       not (Array.for_all Jkind.Sort.Const.all_void sorts)) &&
+      (match shape with Constructor_mixed s -> not (shape_has_float_boxed s)
+                      | _ -> true)) layouts &&
+  let sorts = Array.to_list layouts |> List.map (function
+    | Cstr_layout_known { sorts; _ } -> Array.to_list sorts
+    | Cstr_layout_undetermined -> []) in
+  Option.is_some (Jkind_types.Sum_repr.make sorts)
+
 let gets_unboxed_version decl =
-  (* This must be kept in sync with the match in [derive_unboxed_version] *)
   match decl.type_kind with
+  | Type_variant (cstrs, Variant_boxed _, _) -> variant_has_companion_shape cstrs
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ -> false
   | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
 
-let derive_unboxed_version env path_in_group_has_unboxed_version decl =
-  (* This must be kept in sync with the match in [gets_unboxed_version] *)
-  match decl.type_kind with
-  | Type_abstract _ | Type_open | Type_record_unboxed_product _
-  | Type_variant _ -> None
-  | Type_record (lbls, repr, _)
-    when not (record_gets_unboxed_version lbls repr) ->
-    None
+let derive_unboxed_version has_unboxed_version decl =
+  if not (gets_unboxed_version decl) then None else
+  let kind, jkind = match decl.type_kind with
+  | Type_variant (cstrs, Variant_boxed _, umc) ->
+    let cstrs = List.map (fun (cstr : Types.constructor_declaration) ->
+      { cstr with cd_id = Ident.rename cstr.cd_id;
+                  cd_uid = Uid.unboxed_version cstr.cd_uid }) cstrs in
+    Type_variant (cstrs, Variant_unboxed, umc),
+    Jkind.Builtin.any ~why:Old_style_unboxed_type
   | Type_record (lbls, _rep, umc) ->
     let keep_attribute a =
       (* If we keep [@deprecated_mutable], then a record that aliases
@@ -1500,38 +1523,27 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     let kind =
       Type_record_unboxed_product(lbls_unboxed, rep, umc)
     in
+    kind, jkind
+  | _ -> Misc.fatal_error "Typedecl.derive_unboxed_version"
+  in
     let type_manifest =
-      let has_unboxed_version path =
-        match Path.Map.find_opt path path_in_group_has_unboxed_version with
-        | Some b -> b
-        | None ->
-          try Option.is_some (Env.find_type path env).type_unboxed_version with
-          | Not_found -> Misc.fatal_error "Typedecl.derive_unboxed_versions"
-      in
       match decl.type_manifest with
       | None -> None
       | Some ty ->
         match get_desc ty with
         | Tconstr (path, args, _) when has_unboxed_version path ->
           Some (Ctype.newconstr (Path.unboxed_version path) args)
-        | _ ->
-          (* We're in one of two scenarios:
-
-             1. The manifest is a Tconstr to a type without an unboxed version.
-             2. The manifest is not a Tconstr, and [check_coherence] will reject
-                this declaration later.
-
-             In both cases, we could just not give this type an unboxed version,
-             but it's fine to do so, as we already give unboxed versions to
-             types that don't have one (float and [@@unboxed] records), and this
-             simplifies things. *)
-          None
+        | _ -> None
     in
-    Some
+    match kind, decl.type_manifest, type_manifest with
+    | Type_variant _, Some _, None -> None
+    | _ -> Some
       {
         type_params = decl.type_params;
         type_arity = decl.type_arity;
-        type_kind = kind;
+        type_kind = (match kind, type_manifest with
+          | Type_variant _, Some _ -> Type_abstract Definition
+          | _ -> kind);
         type_jkind = jkind;
         type_ikind = Types.ikinds_todo "derive_unboxed_versions";
         type_private = decl.type_private;
@@ -1550,15 +1562,28 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
       }
 
 let derive_unboxed_versions decls env =
-  let path_in_group_has_unboxed_version =
-    Path.Map.of_seq
-      (List.to_seq decls |>
-       Seq.map (fun (id, d) -> Path.Pident id, gets_unboxed_version d))
+  let group = Ident.Map.of_seq (List.to_seq decls) in
+  let rec has_unboxed_version seen path =
+    match path with
+    | Path.Pident id when Ident.Map.mem id group ->
+      let d = Ident.Map.find id group in
+      begin match d.type_kind, d.type_manifest with
+      | Type_variant _, Some ty when gets_unboxed_version d ->
+        begin match get_desc ty with
+        | Tconstr (target, _, _) when not (Ident.Set.mem id seen) ->
+          has_unboxed_version (Ident.Set.add id seen) target
+        | _ -> false
+        end
+      | _ -> gets_unboxed_version d
+      end
+    | _ ->
+      match Env.find_type (Path.unboxed_version path) env with
+      | _ -> true | exception Not_found -> false
   in
   List.map
     (fun (id, d) ->
        let type_unboxed_version =
-         derive_unboxed_version env path_in_group_has_unboxed_version d
+         derive_unboxed_version (has_unboxed_version Ident.Set.empty) d
        in
        id, { d with type_unboxed_version })
     decls
@@ -1571,12 +1596,13 @@ let derive_unboxed_versions decls env =
 let remove_unboxed_versions decls =
   List.fold_left_map
     (fun removed (id, d) ->
-      match Option.is_some d.type_unboxed_version, gets_unboxed_version d with
-      | false, false | true, true -> removed, (id, d)
-      | true, false ->
+      match d.type_unboxed_version, gets_unboxed_version d with
+      | None, true ->
+        Path.Set.add (Pident id) removed, (id, d)
+      | None, false | Some _, true -> removed, (id, d)
+      | Some _, false ->
         Path.Set.add (Pident id) removed,
-        (id, { d with type_unboxed_version = None })
-      | false, true -> Misc.fatal_error "Typedecl.remove_unboxed_versions")
+        (id, { d with type_unboxed_version = None }))
     Path.Set.empty decls
 
 (* Generalize a type declaration *)
@@ -2584,13 +2610,6 @@ let instance_record_representation
    best kinds during normalization and subsumption
 *)
 let rec update_decl_jkind env dpath decl =
-  let type_unboxed_version =
-    Option.map
-      (fun d ->
-        update_decl_jkind env (Path.unboxed_version dpath) d)
-      decl.type_unboxed_version
-  in
-  let decl = { decl with type_unboxed_version } in
 
   (* returns updated constructors, updated rep, and updated jkind *)
   let update_variant_kind loc (cstrs : Types.constructor_declaration list) rep =
@@ -2878,6 +2897,19 @@ let rec update_decl_jkind env dpath decl =
       }
   in
 
+  let type_unboxed_version =
+    match new_decl.type_kind with
+    | Type_variant (_, Variant_boxed layouts, _)
+      when Option.is_some decl.type_unboxed_version &&
+           not (compatible_boxed_arms layouts) -> None
+    | _ -> Option.map (fun companion ->
+        let path = Path.unboxed_version dpath in
+        match companion.type_kind, companion.type_manifest with
+        | Type_abstract _, Some _ ->
+          narrow_to_manifest_jkind env companion.type_loc path companion
+        | _ -> update_decl_jkind env path companion) decl.type_unboxed_version
+  in
+  let new_decl = { new_decl with type_unboxed_version } in
   (* Check the layout here, both to check it, but more importantly to fill in any sort
      variables in the original decl's jkind, which might be shared with the jkinds of
      other types in a (maybe mutually recursive) type declaration. See Note [Default

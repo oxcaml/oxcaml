@@ -1507,18 +1507,30 @@ let extract_concrete_record (type rep) (record_form : rep record_form) env ty
   | _, Has_no_typedecl | _, Typedecl(_, _, _) -> Not_a_record_type
   | _, May_have_typedecl -> Maybe_a_record_type
 
+type variant_form = Declared_variant | Unboxed_variant | Boxed_sum
+
 type variant_extraction_result =
-  | Variant_type of Path.t * Path.t * Types.constructor_declaration list
+  | Variant_type of Path.t * Path.t * variant_form
   | Not_a_variant_type
   | Maybe_a_variant_type
 
 let extract_concrete_variant env ty =
   match extract_concrete_typedecl_protected env ty with
-  | Typedecl(p0, p, {type_kind=Type_variant (cstrs, _, _)}) ->
-    Variant_type (p0, p, cstrs)
-  | Typedecl(p0, p, {type_kind=Type_open}) ->
-    Variant_type (p0, p, [])
-  | Has_no_typedecl | Typedecl(_, _, _) -> Not_a_variant_type
+  | Typedecl(p0, p, {type_kind=Type_variant (_, Variant_unboxed, _)}) ->
+    Variant_type (p0, p, Unboxed_variant)
+  | Typedecl(p0, p, {type_kind=(Type_variant _ | Type_open)}) ->
+    Variant_type (p0, p, Declared_variant)
+  | Typedecl(_, _, _) -> Not_a_variant_type
+  | Has_no_typedecl ->
+    begin match get_desc (expand_head env (protect_expansion env ty)) with
+    | Tbox inner ->
+      begin match extract_concrete_typedecl env inner with
+      | Typedecl (p0,p,{type_kind=Type_variant (_::_::_,Variant_unboxed,_)}) ->
+        Variant_type (p0, p, Boxed_sum)
+      | _ -> Not_a_variant_type
+      end
+    | _ -> Not_a_variant_type
+    end
   | May_have_typedecl -> Maybe_a_variant_type
 
 let extract_label_names record_form env ty =
@@ -3307,7 +3319,8 @@ end) = struct
       | true ->
         if in_env lbl then
           warn_for_disambiguated_name warn lid lbl;
-        Ambiguous { path = get_type_path lbl; arity = get_type_arity lbl }
+        Ambiguous { path = get_type_path lbl; arity = get_type_arity lbl;
+                    boxed = false }
       | false -> Unambiguous
     in
     lbl, ambiguity
@@ -3581,6 +3594,75 @@ module Constructor = NameChoice (struct
         | _ -> []
   let in_env _ = true
 end)
+
+let disambiguate_constructor ~loc env usage lid context expected message =
+  let spelling = Longident.last lid.txt in
+  let explicit = String.starts_with ~prefix:"#" spelling in
+  let name, lookup_lid =
+    if not explicit then spelling, lid else
+    let name = String.sub spelling 1 (String.length spelling - 1) in
+    let open Longident in
+    let txt = match lid.txt with
+      | Lident _ -> Longident.Lident name
+      | Ldot (prefix, suffix) -> Ldot (prefix, {suffix with txt = name})
+      | Lapply _ -> lid.txt in
+    name, {lid with txt}
+  in
+  let expected_type, form = match extract_concrete_variant env expected.ty with
+    | Variant_type (p0, p, form) ->
+      let path = if explicit && form <> Unboxed_variant then None
+        else Some (p0, p, is_principal expected.ty) in
+      path, form
+    | Maybe_a_variant_type -> None, Declared_variant
+    | Not_a_variant_type ->
+      let sort = wrong_kind_sort_of_constructor lid.txt in
+      Error.log_and_raise loc env
+        (Wrong_expected_kind (sort, context, expected.ty))
+  in
+  let candidates =
+    Env.lookup_all_constructors ~loc:lid.loc usage lookup_lid.txt env in
+  let candidates =
+    if explicit ||
+       (match expected_type with
+        | Some (_, p, _) -> Path.is_unboxed_version p | None -> false)
+    then Result.bind candidates (fun candidates ->
+      let unboxed ((cstr, locks), use) = match cstr.cstr_repr with
+        | Variant_unboxed -> Some ((cstr, locks), use)
+        | Variant_boxed _ ->
+          let path = Path.unboxed_version (cstr_res_type_path cstr) in
+          let descriptions = match Env.find_type path env with
+            | {type_kind=Type_abstract _; type_manifest=Some ty; _} ->
+              begin match extract_concrete_typedecl env ty with
+              | Typedecl (_, target, _) -> Env.find_type_descrs target env
+              | _ -> Type_abstract Definition
+              end
+            | _ -> Env.find_type_descrs path env
+            | exception Not_found -> Type_abstract Definition in
+          begin match descriptions with
+          | Type_variant (cstrs, Variant_unboxed, _) ->
+            List.find_opt (fun descr -> descr.cstr_name = name) cstrs
+            |> Option.map (fun descr ->
+              let descr = match cstr.cstr_private with
+                | Public -> descr
+                | Private -> {descr with cstr_private = Private} in
+              (descr, locks), use)
+          | _ -> None
+          end
+        | Variant_with_null | Variant_extensible -> None in
+      match List.filter_map unboxed candidates with
+      | [] -> Error (lid.loc, env, Env.Unbound_constructor lid.txt)
+      | candidates -> Ok candidates)
+    else candidates
+  in
+  let (cstr, locks), ambiguity =
+    wrap_disambiguate message expected
+      (Constructor.disambiguate usage lookup_lid env expected_type) candidates
+  in
+  if form = Boxed_sum && not explicit then
+    (Datarepr.boxed_sum_constructor cstr, locks),
+    Ambiguous { path = cstr_res_type_path cstr;
+                arity = get_constr_type_arity cstr.cstr_res; boxed = true }
+  else (cstr, locks), ambiguity
 
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
@@ -4134,23 +4216,9 @@ and type_pat_aux
   | Ppat_unboxed_tuple (spl, closed) ->
       type_tuple_pat ~is_unboxed:true spl closed
   | Ppat_construct(lid, sarg) ->
-      let expected_type =
-        match extract_concrete_variant !!penv expected_ty with
-        | Variant_type(p0, p, _) ->
-            Some (p0, p, is_principal expected_ty)
-        | Maybe_a_variant_type -> None
-        | Not_a_variant_type ->
-            let srt = wrong_kind_sort_of_constructor lid.txt in
-            let err = Wrong_expected_kind(srt, Pattern, expected_ty) in
-            Error.log_and_raise loc !!penv err
-      in
       let (constr, locks), ambiguity =
-        let candidates =
-          Env.lookup_all_constructors Env.Pattern ~loc:lid.loc lid.txt !!penv in
-        wrap_disambiguate "This variant pattern is expected to have"
-          (mk_expected expected_ty)
-          (Constructor.disambiguate Env.Pattern lid !!penv expected_type)
-          candidates
+        disambiguate_constructor ~loc !!penv Env.Pattern lid Pattern
+          (mk_expected expected_ty) "This variant pattern is expected to have"
       in
       begin match no_existentials, constr.cstr_existentials with
       | None, _ | _, [] -> ()
@@ -11784,24 +11852,10 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
 and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
       ty_expected_explained =
   let { ty = ty_expected; explanation } = ty_expected_explained in
-  let expected_type =
-    match extract_concrete_variant env ty_expected with
-    | Variant_type(p0, p,_) ->
-        Some(p0, p, is_principal ty_expected)
-    | Maybe_a_variant_type -> None
-    | Not_a_variant_type ->
-        let srt = wrong_kind_sort_of_constructor lid.txt in
-        let ctx = Expression explanation in
-        let err = Wrong_expected_kind(srt, ctx, ty_expected) in
-        Error.log_and_raise sexp.pexp_loc env err
-  in
-  let constrs =
-    Env.lookup_all_constructors ~loc:lid.loc Env.Positive lid.txt env
-  in
   let (constr, locks), ambiguity =
-    wrap_disambiguate "This variant expression is expected to have"
-      ty_expected_explained
-      (Constructor.disambiguate Env.Positive lid env expected_type) constrs
+    disambiguate_constructor ~loc:sexp.pexp_loc env Env.Positive lid
+      (Expression explanation) ty_expected_explained
+      "This variant expression is expected to have"
   in
   let sargs =
     match sarg with
@@ -11901,9 +11955,11 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
   in
   let (argument_mode, locality_mode) =
     match constr.cstr_repr with
-    | Variant_unboxed | Variant_with_null -> expected_mode, None
+    | Variant_unboxed when not (is_boxed_sum_constructor constr) ->
+      expected_mode, None
+    | Variant_with_null -> expected_mode, None
     | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
-    | Variant_boxed _ | Variant_extensible ->
+    | Variant_boxed _ | Variant_unboxed | Variant_extensible ->
        let locality_mode, argument_mode =
          register_allocation ~loc:sexp.pexp_loc expected_mode
        in

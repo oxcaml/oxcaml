@@ -2295,6 +2295,16 @@ let module_type_for_path_opt loc env = function
   | _ -> None
 
 let type_for_path_opt loc env = function
+  | Path.Pextra_ty (Path.Pdot (p, s), Punboxed_ty) ->
+    module_for_path_opt loc env p
+    |> Option.map (fun m ->
+        Identifier.Type.dot loc m (s ^ "#") |> Identifier.Type.wrap)
+  | Path.Pextra_ty (Path.Pident id, Punboxed_ty) when Ident.is_predef id ->
+    Some
+      (Identifier.Type.builtin loc (Ident.name id ^ "#") |> Identifier.Type.wrap)
+  | Path.Pextra_ty (path, Punboxed_ty) ->
+    Location.raise_errorf ~loc:(to_location loc)
+      "Cannot quote the unboxed type %a# without a module path." Path.print path
   | Path.Pident id ->
     (match Hashtbl.find_opt vars_env.env_tys id with
       | Some t -> Identifier.Type.var loc t (quote_loc loc) |> Option.some
@@ -2411,27 +2421,26 @@ let quote_constructor loc env (constr : Data_types.constructor_description) =
       fatal_errorf "Translquote [at %a]: Papply in extension constructor."
         Location.print_loc (to_location loc)
     | Ordinary _ | Null -> (
-      match type_path env constr.cstr_res with
-      | None ->
-        fatal_errorf "Translquote [at %a]: no global path for constructor"
-          Location.print_loc (to_location loc)
-      | Some (Path.Pident _) ->
-        let name = constr.cstr_name in
+      let path = Data_types.cstr_res_type_path constr in
+      let path, name =
+        match Path.boxed_version path with
+        | Some boxed -> boxed, "#" ^ constr.cstr_name
+        | None -> path, constr.cstr_name
+      in
+      match path with
+      | Path.Pident _ ->
         if
           List.exists
             (fun (name', _) -> String.equal name name')
             Predef.builtin_constrs
         then Identifier.Constructor.builtin loc name |> persistent
         else local name
-      | Some (Path.Pdot (p, _)) ->
-        Identifier.Constructor.dot loc
-          (module_for_path loc env p)
-          constr.cstr_name
+      | Path.Pdot (p, _) ->
+        Identifier.Constructor.dot loc (module_for_path loc env p) name
         |> persistent
       | _ ->
-        fatal_errorf
-          "Translquote [at %a]: unsupported constructor type detected."
-          Location.print_loc (to_location loc)))
+        Location.raise_errorf ~loc:(to_location loc)
+          "Cannot quote constructor %s from this type path." name))
   |> Constructor.wrap
 
 let rec quote_modtype_path_of_lid loc = function
@@ -2552,7 +2561,14 @@ let quote_modes loc modes =
 let type_constraint_of_ambiguity loc env ambiguity =
   match ambiguity with
   | Unambiguous -> None
-  | Ambiguous { path; arity } -> Some (type_constr_for_path loc env path arity)
+  | Ambiguous { path; arity; boxed } ->
+    let ty = type_constr_for_path loc env path arity in
+    Some
+      (if boxed
+       then
+         Type.constr loc (type_for_path loc env Predef.path_box) [ty]
+         |> Type.wrap
+       else ty)
 
 let constrain_exp_with_type loc typ exp_desc =
   Type_constraint.constraint_ loc typ (Modes.wrap Modes.legacy)

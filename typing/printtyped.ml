@@ -490,8 +490,9 @@ and package_with i ppf (s, t) =
   core_type i ppf t
 
 and label_ambiguity i ppf = function
-  | Ambiguous { path; arity } ->
-    line i ppf "Ambiguous %a %d\n" fmt_path path arity
+  | Ambiguous { path; arity; boxed } ->
+    line i ppf "Ambiguous %a %d%s\n" fmt_path path arity
+      (if boxed then " box" else "")
   | Unambiguous ->
     line i ppf "Unambiguous\n"
 
