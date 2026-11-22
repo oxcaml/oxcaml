@@ -2573,6 +2573,12 @@ module Const = struct
             | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
             | Not_verbose | Expanded -> Layout.Const.to_string
           in
+          let layout_to_string layout =
+            let name = layout_to_string layout in
+            match (layout : Layout.Const.t) with
+            | Sum _ -> "(" ^ name ^ ")"
+            | _ -> name
+          in
           let out_jkind_verbose =
             convert_with_base ~verbosity env
               ~base:
