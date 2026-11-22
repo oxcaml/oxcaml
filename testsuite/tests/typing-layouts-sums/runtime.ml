@@ -93,3 +93,29 @@ let () =
   assert (adjacent_field #(true, Offset 1, false) = 3);
   assert (adjacent_field #(true, Sample #(1, true), true) = 4);
   assert (adjacent_field #(true, Empty_packet, false) = 4)
+
+type void : void
+external void : unit -> void = "%unbox_unit"
+
+type with_void = Absent | Present of void * int * void [@@unboxed]
+
+let[@inline never] read_present = function
+  | Absent -> None
+  | Present (_, number, _) -> Some number
+
+let () =
+  let calls = ref [] in
+  let mark index = calls := index :: !calls in
+  let make_void index = mark index; void () in
+  let value = Present (make_void 1, (mark 2; 19), make_void 3) in
+  assert (List.rev !calls = [3; 2; 1]);
+  assert (read_present value = Some 19)
+
+type signal = Stop | Wait | Go [@@unboxed]
+
+let[@inline never] signal_number = function Stop -> 0 | Wait -> 1 | Go -> 2
+
+let () =
+  assert (signal_number Stop = 0);
+  assert (signal_number Wait = 1);
+  assert (signal_number Go = 2)
