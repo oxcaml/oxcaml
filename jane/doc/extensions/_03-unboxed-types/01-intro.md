@@ -360,31 +360,28 @@ the two variants share a tag. For example, `type answer = Busy | Ready of reply#
 uses one tag to distinguish `Busy`, `Ready Missing`, and `Ready (Found s)`.
 Two unboxed variant fields in a product keep independent tags.
 
-## Limitations and future plans
+As with records, some boxed variant declarations have no implicit unboxed
+version. For example, in `type t = Empty | Witness of unit#`, both constructors
+have payload layout `void`. The boxed representation uses an immediate for
+`Empty` and a block for `Witness`. The sum `void + void` does not record that
+distinction, so this declaration provides only `t`. Constructors with inline
+records or GADT result types also preclude an implicit unboxed variant.
 
-* **Implicit unboxed variants.** As with records, some boxed declarations have
-  no implicit unboxed version. For example, in `type t = Empty | Witness of unit#`,
-  both constructors have payload layout `void`. The boxed representation uses
-  an immediate for `Empty` and a block for `Witness`. The sum `void + void`
-  does not record that distinction, so this declaration provides only `t`.
-  Constructors with inline records or GADT result types also preclude an
-  implicit unboxed variant.
-* **Array storage.** The same rule applies to unboxed products and variants:
-  the garbage collector must be able to scan the entire element or skip it
-  entirely. A mixed unboxed variant needs both scannable and raw storage. A
-  mixed record can put all its scannable fields first. In an array, the two
-  regions would repeat for each element. The mixed-block format describes
-  one scannable prefix, so the compiler rejects arrays of mixed unboxed
-  variants.
-* **Replacing a value.** Writing a whole unboxed variant to an existing field
+*Limitations and future plans*:
+* Arrays of unboxed variants follow the same rule as arrays of unboxed
+  products. The garbage collector must be able to scan the entire element or
+  skip it entirely. A mixed unboxed variant needs both scannable and raw
+  storage. In an array, the two regions would repeat for each element. The
+  mixed-block format describes one scannable prefix, so the compiler rejects
+  arrays of mixed unboxed variants.
+* Writing a whole unboxed variant to an existing field
   or array element requires `uncontended` write access to the destination.
   The rule also applies to a product containing an inline variant. A concurrent
   write could otherwise leave one constructor's tag with another's payload.
-* **Array and slice libraries.** `Array.get` and `Array.set` accept elements
+* `Array.get` and `Array.set` accept elements
   of kind `value_or_null mod separable`. The parallel slice library also
   excludes sum layouts. Extending these interfaces to supported unboxed
   element layouts is future library work.
-
   * The `parallel_slices.ml` test binds array primitives for one raw unboxed
     variant. It splits a five-element array into ranges of two and three.
     Each of two domains writes a different constructor to its range. The
