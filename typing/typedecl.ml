@@ -1475,7 +1475,8 @@ let compatible_boxed_arms layouts =
 
 let gets_unboxed_version decl =
   match decl.type_kind with
-  | Type_variant (cstrs, Variant_boxed _, _) -> variant_has_companion_shape cstrs
+  | Type_variant (cstrs, Variant_boxed _, _) ->
+    variant_has_companion_shape cstrs
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ -> false
   | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
