@@ -69,6 +69,14 @@
  (libraries ocamlopttoplevel)
  (modules topstart))
 
+(alias
+ (name codegen-variant-test-hosts)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (deps topstart.exe))
+
 (install
  (files
   (topstart.exe as ocamlnat))

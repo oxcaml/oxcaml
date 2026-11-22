@@ -10,3 +10,11 @@
  (name testing)
  (flags (:standard -linkall))
  (modules testing))
+
+(alias
+ (name codegen-variant-test-hosts)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (deps lib.cmxa lib.a testing.cmxa testing.a))

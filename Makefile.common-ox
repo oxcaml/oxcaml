@@ -201,9 +201,10 @@ variant_boot_aliases = @runtime_variants \
   $(foreach n,$(codegen_variant_names),@stdlib_$(n))
 
 # The aliases that `make compiler` builds in every variant context: the
-# otherlibs, and the compiler's own libraries with eval and the JIT.
+# otherlibs, the compiler's own libraries with eval and the JIT, and what
+# ocamltest runs for the native tests that compile inside a tool.
 variant_context_aliases = otherlibs/codegen-variant-libs \
-  codegen-variant-compiler-libs
+  codegen-variant-compiler-libs codegen-variant-test-hosts
 
 # One dune invocation builds the main context and every variant context. A
 # variant context depends on the boot context only (its compiler is the boot
@@ -811,10 +812,10 @@ ifeq ($(with_jsir),true)
 	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-js \
 	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-wasm _runtest/utils
 endif
-# The libraries of testsuite/lib for each codegen variant, where ocamltest
-# looks for them when a test or the whole run selects that variant (see
-# library_directory_for_variant in ocamltest/ocaml_flags.ml).
-	$(foreach n,$(codegen_variant_names),$(call variant_testsuite_lib,$(n)))
+# The tools and the libraries of testsuite/lib for each codegen variant,
+# where ocamltest looks for them when a test or the whole run selects that
+# variant.
+	$(foreach n,$(codegen_variant_names),$(call variant_test_tree,$(n)))
 # The directories that test-no-rebuild runs: all of testsuite/tests but
 # those that oxcaml/testsuite/flambda2-test-list excludes.
 	if [ "$(middle_end)" = "flambda2" ]; then \
@@ -826,25 +827,29 @@ endif
 	  done > _runtest/flambda2-test-list; \
 	fi
 
-# $(call variant_testsuite_lib,<name>): build the native halves of the
-# libraries of testsuite/lib for variant <name> with the installed compiler,
-# in _runtest/testsuite/lib/variants/<name>. The interfaces and the bytecode
-# halves do not depend on the variant: they are copied from the default
-# build, so that a test block that mixes backends sees one interface.
-define variant_testsuite_lib
-	mkdir -p _runtest/testsuite/lib/variants/$(1)
-	cd _runtest/testsuite/lib && \
-	  cp lib.ml lib.mli lib.cmi lib.cmo lib.cma \
-	    testing.ml testing.mli testing.cmi testing.cmo testing.cma \
-	    variants/$(1)/
-	cd _runtest/testsuite/lib/variants/$(1) && \
-	  ocamlopt="../../../../ocamlopt.opt -nostdlib \
-	    -I ../../../../stdlib/variants/$(1) \
-	    $(call codegen_variant_ocamlopt_flags,$(1)) -g" && \
-	  $$ocamlopt -c lib.ml && \
-	  $$ocamlopt -a -o lib.cmxa lib.cmx && \
-	  $$ocamlopt -linkall -c testing.ml && \
-	  $$ocamlopt -linkall -a -o testing.cmxa testing.cmx
+# $(call variant_test_tree,<name>): what ocamltest runs and links for
+# variant <name>, built in the variant's context as the default ones are in
+# the main context: the tools of the native tests that compile inside a
+# tool (expect.opt, the native toplevel and the asmgen tests), in
+# _runtest/testsuite/tools/variants/<name>, and the native halves of the
+# libraries of testsuite/lib, in _runtest/testsuite/lib/variants/<name>.
+# The interfaces and the bytecode halves of those libraries do not depend
+# on the variant: they are links to the default build's, so that a test
+# block that mixes backends sees one interface.
+define variant_test_tree
+	mkdir -p _runtest/testsuite/{tools,lib}/variants/$(1)
+	$(cpl) _build/main-$(1)/oxcaml/testsuite/tools/expectnat.exe \
+	  _runtest/testsuite/tools/variants/$(1)/expectnat
+	$(cpl) _build/main-$(1)/oxcaml/testsuite/tools/codegen_main.exe \
+	  _runtest/testsuite/tools/variants/$(1)/codegen
+	$(cpl) _build/main-$(1)/toplevel/native/topstart.exe \
+	  _runtest/testsuite/tools/variants/$(1)/ocamlnat
+	$(cpl) _build/main-$(1)/testsuite/lib/{lib,testing}.{a,cmxa} \
+	  _build/main-$(1)/testsuite/lib/.{lib,testing}.objs/native/*.{cmx,o} \
+	  _runtest/testsuite/lib/variants/$(1)/
+	cd _runtest/testsuite/lib && ln -s `find . -maxdepth 1 ! -type d \
+	    ! \( $(variant_native_files) \) ! \( $(variant_absent_files) \) \
+	  | sed 's|^\.|../..|'` variants/$(1)/
 
 endef
 

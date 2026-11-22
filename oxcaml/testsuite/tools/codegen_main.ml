@@ -68,7 +68,21 @@ let compile_file filename =
 
 let usage = "Usage: codegen <options> <files>\noptions are:"
 
+external code_is_fully_polled : unit -> bool
+  = "caml_sys_exit" "caml_code_is_fully_polled"
+  [@@noalloc]
+
 let main() =
+  (* The code is linked with objects built for the codegen variant of this
+     executable.  Poll insertion is a property of each unit and has no
+     constant: it is the variant's when all the units of this executable
+     have it. *)
+  Codegen_variant.apply
+    { address_sanitizer = Codegen_host_variant.address_sanitizer;
+      frame_pointers = Codegen_host_variant.frame_pointers;
+      poll_insertion = code_is_fully_polled ();
+      stack_checks = Codegen_host_variant.stack_checks
+    };
   Arg.parse [
      "-S", Arg.Set write_asm_file,
        " Output file to filename.s (default is stdout)";
