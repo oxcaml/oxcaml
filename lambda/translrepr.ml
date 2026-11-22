@@ -336,3 +336,109 @@ module Sum = struct
     in
     List.map2 read arm.arguments layouts_of_args
 end
+
+module Boxed_sum = struct
+  module Repr = Jkind_types.Sum_repr
+
+  type direction =
+    | Box of locality_mode
+    | Unbox
+
+  let translate loc direction leaves argument =
+    let field_sorts (sort : Jkind.Sort.Const.t) =
+      if Jkind.Sort.Const.all_void sort
+      then []
+      else match sort with Product fields -> fields | _ -> [sort]
+    in
+    let arms = List.map field_sorts leaves in
+    let repr =
+      match Repr.make arms with
+      | Some repr -> repr
+      | None -> Misc.fatal_error "Boxed_sum: unrepresentable sum"
+    in
+    let location = Debuginfo.Scoped_location.to_location loc in
+    let carrier_layout =
+      Typeopt.layout_of_sort location (Repr.carrier leaves)
+    in
+    let arg_layout, result_layout =
+      match direction with
+      | Box _ -> carrier_layout, layout_any_value
+      | Unbox -> layout_any_value, carrier_layout
+    in
+    name_lambda Strict argument arg_layout (fun id ->
+        let arg = Lvar id in
+        let next_const = ref 0 and next_block = ref 0 in
+        let cases =
+          List.mapi
+            (fun index fields ->
+              let constant = List.is_empty fields in
+              let next = if constant then next_const else next_block in
+              let tag = !next in
+              incr next;
+              if (not constant) && tag > Config.max_tag
+              then
+                Location.raise_errorf ~loc:location
+                  "A boxed sum cannot have more than %d non-constant \
+                   alternatives."
+                  (Config.max_tag + 1);
+              let layouts = List.map (Typeopt.layout_of_sort location) fields in
+              let shape () =
+                let shape =
+                  Array.of_list (List.map mixed_block_element_of_layout layouts)
+                in
+                Typeopt.assert_mixed_product_support_for_lambda_shape location
+                  Cstr_tuple shape;
+                shape
+              in
+              let uniform = List.for_all Jkind.Sort.Const.is_scannable fields in
+              match direction with
+              | Box mode ->
+                let action =
+                  if constant
+                  then tagged_immediate tag
+                  else
+                    let shape =
+                      if uniform then All_value else Shape (shape ())
+                    in
+                    let args = Sum.project loc repr index arg layouts in
+                    Lprim (Pmakeblock (tag, Immutable, shape, mode), args, loc)
+                in
+                `Const (index, action)
+              | Unbox ->
+                let field =
+                  if uniform
+                  then fun pos -> Pfield (pos, Pointer, Reads_agree)
+                  else
+                    let shape = shape () in
+                    fun pos -> Pmixedfield ([pos], shape, Reads_agree)
+                in
+                let args =
+                  List.mapi
+                    (fun pos layout -> layout, Lprim (field pos, [arg], loc))
+                    layouts
+                in
+                let case = tag, Sum.inject loc repr index args in
+                if constant then `Const case else `Block case)
+            arms
+        in
+        let consts, blocks =
+          List.partition_map
+            (function
+              | `Const case -> Either.Left case
+              | `Block case -> Either.Right case)
+            cases
+        in
+        let scrutinee =
+          match direction with Box _ -> Sum.tag loc repr arg | Unbox -> arg
+        in
+        Lswitch
+          ( scrutinee,
+            { sw_numconsts = List.length consts;
+              sw_consts = consts;
+              sw_numblocks = List.length blocks;
+              sw_blocks = blocks;
+              sw_failaction = None
+            },
+            loc,
+            result_layout ))
+end

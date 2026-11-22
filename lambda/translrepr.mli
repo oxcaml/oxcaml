@@ -84,3 +84,16 @@ module Sum : sig
     Lambda.lambda ->
     Lambda.lambda
 end
+
+module Boxed_sum : sig
+  type direction =
+    | Box of Lambda.locality_mode
+    | Unbox
+
+  val translate :
+    Lambda.scoped_location ->
+    direction ->
+    Jkind.Sort.Const.t list ->
+    Lambda.lambda ->
+    Lambda.lambda
+end

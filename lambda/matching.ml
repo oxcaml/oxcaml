@@ -4524,10 +4524,10 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
       let compile_no_test divide combine =
         compile_no_test ~scopes value_kind divide combine repr partial ctx pm
       in
-      let compile_test divide combine =
+      let compile_test ?(args = pm.args) divide combine =
         compile_test
           (compile_match ~scopes value_kind repr partial)
-          arg_partial divide combine ctx pm
+          arg_partial divide combine ctx { pm with args }
       in
       let open Patterns.Head in
       match ph.pat_desc with
@@ -4567,10 +4567,24 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             divide_constant
             (combine_constant value_kind ploc arg cst arg_partial)
       | Construct (cstr, _, _) ->
-          compile_test
-            (divide_constructor ~scopes)
-            (combine_constructor value_kind ploc arg ph.pat_env
-               ph.pat_unique_barrier cstr arg_partial)
+          let compile args arg =
+            compile_test ~args (divide_constructor ~scopes)
+              (combine_constructor value_kind ploc arg ph.pat_env
+                 ph.pat_unique_barrier cstr arg_partial)
+          in
+          (match cstr.cstr_sum with
+           | Some sum when Data_types.is_boxed_sum_constructor cstr ->
+             let leaves = Jkind_types.Sum_repr.leaf_sorts_of_repr sum in
+             let sort = Jkind_types.Sum_repr.carrier leaves in
+             let layout = Typeopt.layout_of_sort ph.pat_loc sort in
+             let id = Ident.create_local "unboxed" in
+             let first = { first with arg = Var id; sort; layout } in
+             let body, jumps = compile { pm.args with first } (Lvar id) in
+             let inline =
+               Translrepr.Boxed_sum.translate ploc Unbox leaves arg in
+             Llet (Strict, layout, id, Lambda.debug_uid_none, inline, body),
+             jumps
+           | _ -> compile pm.args arg)
       | Array (_, _, _) ->
           let kind = Typeopt.array_pattern_kind pomega in
           compile_test

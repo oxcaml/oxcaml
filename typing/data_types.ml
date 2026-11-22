@@ -56,8 +56,16 @@ let may_equal_constr c1 c2 =
      | tag1, tag2 ->
          equal_tag tag1 tag2)
 
+let is_boxed_sum_constructor cstr =
+  match cstr.cstr_repr, get_desc cstr.cstr_res with
+  | Variant_boxed _, _ -> Option.is_some cstr.cstr_sum
+  | Variant_unboxed, Tbox _ -> true
+  | _ -> false
+
 let cstr_res_type_path cstr =
-  match get_desc cstr.cstr_res with
+  let ty = match get_desc cstr.cstr_res with
+    | Tbox inner -> inner | _ -> cstr.cstr_res in
+  match get_desc ty with
   | Tconstr (p, _, _) -> p
   | _ -> assert false
 

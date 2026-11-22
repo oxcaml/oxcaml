@@ -687,6 +687,20 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           ll
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
+      | Ordinary {src_index}, (Variant_unboxed | Variant_boxed _)
+        when Option.is_some cstr.cstr_sum ->
+          let repr = Option.get cstr.cstr_sum in
+          let loc = of_location ~scopes e.exp_loc in
+          let args = List.map2 (fun (exp, sort) arg ->
+            layout_exp sort exp, arg) args_with_sorts ll in
+          let inline = Translrepr.Sum.inject loc repr src_index args in
+          if Data_types.is_boxed_sum_constructor cstr then
+            let mode = match locality_mode with
+              | Some mode -> transl_typed_locality_mode_r mode
+              | None -> alloc_heap in
+            Translrepr.Boxed_sum.translate loc (Box mode)
+              (Jkind_types.Sum_repr.leaf_sorts_of_repr repr) inline
+          else inline
       | Ordinary {runtime_tag},
         (Variant_boxed _ | Variant_extensible) when cstr.cstr_constant ->
           assert (
@@ -696,12 +710,6 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
             ((tagged_immediate runtime_tag) : lambda)
             ll
-      | Ordinary {src_index}, Variant_unboxed
-        when Option.is_some cstr.cstr_sum ->
-          let args = List.map2 (fun (exp, sort) arg ->
-            layout_exp sort exp, arg) args_with_sorts ll in
-          Translrepr.Sum.inject (of_location ~scopes e.exp_loc)
-            (Option.get cstr.cstr_sum) src_index args
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->

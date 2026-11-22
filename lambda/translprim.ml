@@ -138,6 +138,7 @@ type atomic_op =
 
 type prim =
   | Primitive of Lambda.primitive * int
+  | Convert_sum of Translrepr.Boxed_sum.direction * Jkind.Sort.Const.t list
   | External of Lambda.external_call_description
   | Sys_argv
   | Comparison of comparison * comparison_kind
@@ -1424,10 +1425,15 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%peek" -> Peek None
     | "%poke" -> Poke None
     | "%box" ->
-      let layout = List.nth (get_arg_layouts ()) 0 in
-      Primitive(Pbox (layout, mode), 1)
+      (match lambda_prim.prim_native_repr_args with
+       | [_, Same_as_ocaml_repr (Sum arms)] ->
+         Convert_sum (Box mode, Jkind_types.Sum_repr.leaf_sorts arms)
+       | _ -> Primitive(Pbox (List.hd (get_arg_layouts ()), mode), 1))
     | "%unbox" ->
-      Primitive(Punbox layout, 1)
+      (match snd lambda_prim.prim_native_repr_res with
+       | Same_as_ocaml_repr (Sum arms) ->
+         Convert_sum (Unbox, Jkind_types.Sum_repr.leaf_sorts arms)
+       | _ -> Primitive(Punbox layout, 1))
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s (Lazy.force indexing_primitives) with
        | Some prim -> prim ~mode
@@ -2494,6 +2500,8 @@ let remove_exception_ident id =
 
 let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
   match prim, args with
+  | Convert_sum (direction, leaves), [arg] ->
+      Translrepr.Boxed_sum.translate loc direction leaves arg
   | Primitive (prim, arity), args when arity = List.length args ->
       Lprim(prim, args, loc)
   | Sys_argv, [] ->
@@ -2602,7 +2610,8 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
   | Atomic (op, kind), args ->
       lambda_of_atomic prim_name loc op kind args
   | (Raise _ | Raise_with_backtrace
-    | Lazy_force _ | Loc _ | Primitive _ | Sys_argv | Comparison _
+    | Lazy_force _ | Loc _ | Primitive _ | Convert_sum _ | Sys_argv
+    | Comparison _
     | Send _ | Send_self _ | Send_cache _ | Frame_pointers | Identity
     | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
       raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
@@ -2637,7 +2646,7 @@ let check_primitive_arity loc p =
     | Send _ | Send_self _ -> p.prim_apply_arity = 2
     | Send_cache _ -> p.prim_apply_arity = 4
     | Frame_pointers -> p.prim_apply_arity = 0
-    | Identity | Peek _ -> p.prim_apply_arity = 1
+    | Identity | Peek _ | Convert_sum _ -> p.prim_apply_arity = 1
     | Apply _ | Revapply _ | Poke _ -> p.prim_apply_arity = 2
     | Atomic (op, kind) -> p.prim_apply_arity = atomic_arity op kind
     | Unsupported _ -> true
@@ -2934,7 +2943,7 @@ let lambda_primitive_needs_event_after = function
 (* Determine if a primitive should be surrounded by an "after" debug event *)
 let primitive_needs_event_after = function
   | Primitive (prim,_) -> lambda_primitive_needs_event_after prim
-  | External _ | Sys_argv -> true
+  | External _ | Sys_argv | Convert_sum _ -> true
   | Comparison(comp, knd) ->
       lambda_primitive_needs_event_after (comparison_primitive comp knd)
   | Lazy_force _ | Send _ | Send_self _ | Send_cache _
@@ -2951,6 +2960,12 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
   in
   if stack then begin
     match prim with
+    | Convert_sum (Box Alloc_local, _) -> ()
+    | Convert_sum (Box Alloc_heap, _) ->
+      raise (Error (to_location loc,
+                    Invalid_stack_primitive Allocating_on_heap))
+    | Convert_sum (Unbox, _) ->
+      raise (Error (to_location loc, Invalid_stack_primitive Not_allocating))
     | Primitive (prim, _) ->
         begin match Lambda.primitive_may_allocate prim with
         (*

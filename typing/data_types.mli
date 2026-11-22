@@ -55,6 +55,7 @@ val may_equal_constr :
 
 (* Type constructor of the constructor's result type. *)
 val cstr_res_type_path : constructor_description -> Path.t
+val is_boxed_sum_constructor : constructor_description -> bool
 
 type 'a gen_label_description =
   { lbl_name: string;                   (* Short name *)
