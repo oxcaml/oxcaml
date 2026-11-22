@@ -2421,7 +2421,18 @@ let quote_constructor loc env (constr : Data_types.constructor_description) =
       fatal_errorf "Translquote [at %a]: Papply in extension constructor."
         Location.print_loc (to_location loc)
     | Ordinary _ | Null -> (
-      let path = Data_types.cstr_res_type_path constr in
+      let result =
+        match Types.get_desc constr.cstr_res with
+        | Tbox inner -> inner
+        | _ -> constr.cstr_res
+      in
+      let path =
+        match type_path env result with
+        | Some path -> path
+        | None ->
+          fatal_errorf "Translquote [at %a]: no global path for constructor"
+            Location.print_loc (to_location loc)
+      in
       let path, name =
         match Path.boxed_version path with
         | Some boxed -> boxed, "#" ^ constr.cstr_name
