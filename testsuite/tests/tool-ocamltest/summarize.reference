@@ -1,0 +1,42 @@
+
+
+List of unexpected errors:
+    tests/a/x.ml
+
+Summary:
+     1 tests passed
+     0 tests skipped
+     0 tests failed
+     0 tests not started (parent test skipped or failed)
+     1 unexpected errors
+     2 tests considered
+#### Something failed. Exiting with error status.
+
+exit status: 4
+
+
+List of failed tests:
+    tests/a/x.ml
+
+Summary:
+     0 tests passed
+     0 tests skipped
+     1 tests failed
+     0 tests not started (parent test skipped or failed)
+     0 unexpected errors
+     1 tests considered
+#### Something failed. Exiting with error status.
+
+exit status: 4
+
+
+Summary:
+     0 tests passed
+     0 tests skipped
+     0 tests failed
+     0 tests not started (parent test skipped or failed)
+     0 unexpected errors
+     0 tests considered
+#### No test ran. Exiting with error status.
+
+exit status: 5

@@ -1,8 +1,17 @@
 (* TEST
- ocamlrunparam += ",d=129";
  multicore;
- { native; }
+ {
+   setup-ocamlopt.opt-build-env;
+   ocamlopt.opt;
+   check-ocamlopt.opt-output;
+   ocamlrunparam += ",d=129";
+   run;
+   check-program-output;
+ }
 *)
+
+(* The domain limit is set for the test program only: the compiler would
+   warn about it when it is not itself compiled with poll insertion. *)
 
 let m = Mutex.create ()
 

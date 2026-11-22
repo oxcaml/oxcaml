@@ -1,6 +1,7 @@
 (* TEST
  readonly_files = "helper.ml lib_a.ml lib_b.ml link.sh";
  {
+   only-default-codegen;
    setup-ocamlopt.byte-build-env;
    module = "helper.ml";
    ocamlopt.byte;
@@ -48,6 +49,9 @@
    maps them to content-addressed paths that do not retain the extension. In
    that case the companion object files ('foo.o', 'lib.a') must be listed as
    separate manifest entries and are resolved through the load path too.
+
+   The native half only runs for the base codegen variant: link.sh links
+   against the default library root, with no codegen-variant flags.
 
    See link.sh for the details: it moves all compilation artifacts into a
    simulated content-addressed store (extensionless blob names), writes a

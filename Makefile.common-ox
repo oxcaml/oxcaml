@@ -629,6 +629,12 @@ main_prefix = _build/install/main
 main_build = _build/main
 boot_build = _build/default
 
+# The directories of the test tree that have tests, from the testsuite's
+# own makefile: in a make of its own, which takes neither the options nor
+# the variables of this one (DIR, say, or -n).
+test_dirs_of_test_tree = env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL \
+  $(MAKE) -s --no-print-directory -C _runtest/testsuite test-dirs DIR=tests
+
 # The following horror will be removed when work to allow the testsuite to
 # run on an installed tree (led by David Allsopp) is completed.
 .PHONY: runtest-upstream test install_for_test
@@ -720,7 +726,7 @@ endif
 		$(cpl) stdlib/stdlib_$${universe}/* otherlibs/stdlib_$${universe}; \
 	 done; \
 	 $(cpl) stdlib/runtime_events/{lib,}runtime_events* otherlibs/runtime_events; \
-	 ln -s ../_build/main/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
+	 $(cpl) -R ../_build/main/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
 	)
 
 	# Various directories are put on the -I paths by tools/Makefile;
@@ -787,14 +793,103 @@ ifeq ($(with_jsir),true)
 	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-js \
 	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-wasm _runtest/utils
 endif
-test: install_for_test
+# The libraries of testsuite/lib for each codegen variant, where ocamltest
+# looks for them when a test or the whole run selects that variant (see
+# library_directory_for_variant in ocamltest/ocaml_flags.ml).
+	$(foreach n,$(codegen_variant_names),$(call variant_testsuite_lib,$(n)))
+# The directories that test-no-rebuild runs: all of testsuite/tests but
+# those that oxcaml/testsuite/flambda2-test-list excludes.
 	if [ "$(middle_end)" = "flambda2" ]; then \
-	  for path in `cd testsuite; ls -1 -d tests/*`; do \
-	    if [[ -d "testsuite/$$path" ]] && ! grep -q "^  $$path " oxcaml/testsuite/flambda2-test-list; then \
+	  dirs=`$(test_dirs_of_test_tree)` || exit 1; \
+	  for path in $$dirs; do \
+	    if ! grep -q "^  $$path " oxcaml/testsuite/flambda2-test-list; then \
 	      echo "  $$path"; \
 	    fi; \
 	  done > _runtest/flambda2-test-list; \
 	fi
+
+# $(call variant_testsuite_lib,<name>): build the native halves of the
+# libraries of testsuite/lib for variant <name> with the installed compiler,
+# in _runtest/testsuite/lib/variants/<name>. The interfaces and the bytecode
+# halves do not depend on the variant: they are copied from the default
+# build, so that a test block that mixes backends sees one interface.
+define variant_testsuite_lib
+	mkdir -p _runtest/testsuite/lib/variants/$(1)
+	cd _runtest/testsuite/lib && \
+	  cp lib.ml lib.mli lib.cmi lib.cmo lib.cma \
+	    testing.ml testing.mli testing.cmi testing.cmo testing.cma \
+	    variants/$(1)/
+	cd _runtest/testsuite/lib/variants/$(1) && \
+	  ocamlopt="../../../../ocamlopt.opt -nostdlib \
+	    -I ../../../../stdlib/variants/$(1) \
+	    $(call codegen_variant_ocamlopt_flags,$(1)) -g" && \
+	  $$ocamlopt -c lib.ml && \
+	  $$ocamlopt -a -o lib.cmxa lib.cmx && \
+	  $$ocamlopt -linkall -c testing.ml && \
+	  $$ocamlopt -linkall -a -o testing.cmxa testing.cmx
+
+endef
+
+# The ocamltest suite can target any codegen variant this tree builds:
+#   make test CODEGEN_VARIANT=fp
+# compiles and links the native test programs for that variant (see
+# testsuite/Makefile). The variable is honored by test, test-no-rebuild,
+# test-one, test-one-no-rebuild, promote-one, promote-one-no-rebuild,
+# promote-failed and runtest-upstream. With VARIANT_ONLY=1 as well, the pass
+# leaves out the test files in which nothing depends on the variant.
+CODEGEN_VARIANT ?=
+
+# $(call check_codegen_variants,<names>): fail, before anything is built or
+# run, if one of <names> is not a codegen variant this tree builds.
+built_codegen_variants = $(CODEGEN_DEFAULT_VARIANT) $(codegen_variant_names)
+define check_codegen_variants
+	@unbuilt="$(filter-out $(built_codegen_variants),$(1))"; \
+	if [ -n "$$unbuilt" ]; then \
+	  echo "error: this tree does not build the codegen variant(s):" \
+	    "$$unbuilt" >&2; \
+	  echo "  it builds: $(CODEGEN_DEFAULT_VARIANT) (the default)" \
+	    "$(codegen_variant_names)" >&2; \
+	  echo "  name one of those, or configure with" \
+	    "--with-codegen-variants=<comma-separated list>" >&2; \
+	  exit 1; \
+	fi
+endef
+
+.PHONY: check-codegen-variant
+check-codegen-variant:
+	$(call check_codegen_variants,$(CODEGEN_VARIANT))
+
+# The targets below rebuild the test tree before they run tests. The
+# prerequisites of install_for_test each run dune, which refuses to run
+# twice at once, so that step is serial whatever the -j of this make: -j is
+# for the tests.
+install_for_test_serially = $(MAKE) -j1 install_for_test
+
+test: check-codegen-variant
+	$(install_for_test_serially)
+	$(MAKE) test-no-rebuild
+
+# The directories of testsuite/tests to run, one per line in the form
+# tests/<directory>: by default the list that install_for_test writes.
+# TEST_LIST=<file> names another list (for one shard of the suite, say).
+TEST_LIST ?=
+test_list = $(if $(TEST_LIST),$(abspath $(TEST_LIST)),$(default_test_list))
+default_test_list = $(strip $(if $(filter flambda2,$(middle_end)),\
+  $(CURDIR)/_runtest/flambda2-test-list))
+
+# The whole ocamltest suite against the compiler in _install, in the test
+# tree that install_for_test left in _runtest: nothing is built and nothing
+# is installed. Besides a checkout, this reads only _install, _runtest,
+# Makefile.config and Makefile.build_config, so it also runs on a machine
+# that received those from the machine that built them, if that machine is
+# like the builder and the checkout is at the same path: both trees contain
+# absolute paths (the configured prefix has to be this _install) and code
+# compiled against the builder's C library.
+.PHONY: test-no-rebuild
+test-no-rebuild: check-codegen-variant
+	@test -d _runtest/testsuite || { \
+	  echo "error: no test tree in _runtest; run make install_for_test" >&2; \
+	  exit 1; }
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
@@ -804,19 +899,107 @@ test: install_for_test
 	  && if $$(which parallel > /dev/null 2>&1); \
              then \
 	       echo "Running testsuite in parallel (nproc=$$(nproc))"; \
-               if [ "$(middle_end)" = "flambda2" ]; then \
-                 make --no-print-directory list-parallel FILE=$$(pwd)/../flambda2-test-list; \
+               if [ -n "$(test_list)" ]; then \
+                 make --no-print-directory list-parallel FILE=$(test_list); \
 	       else \
                  make --no-print-directory parallel; \
                fi \
              else \
 	       echo "Running testsuite sequentially"; \
-               if [ "$(middle_end)" = "flambda2" ]; then \
-                 make --no-print-directory list FILE=$$(pwd)/../flambda2-test-list; \
+               if [ -n "$(test_list)" ]; then \
+                 make --no-print-directory list FILE=$(test_list); \
 	       else \
                  make --no-print-directory all; \
                fi \
              fi)
+
+# One pass of the suite per codegen variant, from one build: the default
+# variant and every other variant this tree builds
+# (TEST_VARIANTS="<names>" for a subset). The passes share _runtest and
+# are kept apart by TEST_ID=<variant>; with make -j they run at once, each
+# with its share of the processors. Each pass writes its output to
+# _runtest/test-variants.<variant>.out, and the summaries are printed
+# together at the end.
+TEST_VARIANTS ?= $(built_codegen_variants)
+
+# With make -j, the processors divided among the passes.
+test_variants_jobs = $(if $(TEST_JOBS),,$(if $(filter -j%,$(MAKEFLAGS)),\
+  TEST_JOBS=$(shell n=$(words $(TEST_VARIANTS)); \
+    echo $$(( ($$(getconf _NPROCESSORS_ONLN) + n - 1) / n )))))
+
+# The end of a pass's output: its failures, if any, and its summary. A
+# pass that stopped before its summary has an error to show instead: the
+# last lines of its output. The command fails for such a pass, whatever
+# the pass itself returned: without a summary nothing says that tests ran.
+test_variants_summary = awk \
+  '/^(List of failed tests|List of unexpected errors|Summary):/ { show = 1 } \
+   /^Summary:/ { summary = 1 } \
+   show { print; next } \
+   { last[NR % 20] = $$0 } \
+   END { if (!show) for (i = NR - 19; i <= NR; i++) \
+           if (i > 0) print last[i % 20]; \
+         exit !summary }'
+
+# The targets of the passes. With no variant to test there is no pass, and
+# the make that runs the passes would build its default goal instead.
+test_variant_passes = $(addprefix test-variant-,$(TEST_VARIANTS))
+no_test_variants = $(error TEST_VARIANTS names no codegen variant to test)
+
+# Where the passes write their output, and the command of the pass for
+# variant $*: variables, for the test of this target
+# (testsuite/tests/tool-ocamltest/test_lists.ml), which runs it on passes
+# of its own.
+test_variants_out = _runtest
+test_variant_pass = $(MAKE) --no-print-directory test-no-rebuild \
+  CODEGEN_VARIANT=$* TEST_ID=$*
+
+# The report follows the passes whatever they return, also where the shell
+# of the recipe stops at a command that fails.
+.PHONY: test-variants
+test-variants:
+	$(if $(strip $(TEST_VARIANTS)),,$(no_test_variants))
+	$(call check_codegen_variants,$(TEST_VARIANTS))
+	$(install_for_test_serially)
+	@status=0; \
+	$(MAKE) --no-print-directory -k $(test_variants_jobs) \
+	  $(test_variant_passes) || status=$$?; \
+	$(MAKE) --no-print-directory test-variants-report \
+	  test_variants_status=$$status
+
+# What test-variants ends with: what $(test_variants_summary) shows of the
+# output of each pass. It is a failure if the passes returned one (their
+# exit status is $(test_variants_status)), if a pass did not run or if a
+# pass has no summary. It is a target of its own so that the test of the
+# testsuite's targets (testsuite/tests/tool-ocamltest/test_lists.ml) can
+# run it on passes of its own.
+test_variants_status = 0
+
+.PHONY: test-variants-report
+test-variants-report:
+	@status=$(test_variants_status); \
+	for variant in $(TEST_VARIANTS); do \
+	  out="$(test_variants_out)/test-variants.$$variant.out"; \
+	  echo; \
+	  echo "==== Codegen variant $$variant ($$out)"; \
+	  if [ -f "$$out" ]; then \
+	    $(test_variants_summary) "$$out" \
+	      || { echo "The pass has no summary."; status=1; }; \
+	  else \
+	    echo "The pass did not run."; \
+	    status=1; \
+	  fi; \
+	done; \
+	exit $$status
+
+# A pass is not a file: a file named like one in this directory must not
+# stand for a pass that ran.
+ifneq "$(strip $(TEST_VARIANTS))" ""
+.PHONY: $(test_variant_passes)
+$(test_variant_passes): test-variant-%:
+	@echo "Running the testsuite for codegen variant $*"
+	+@$(test_variant_pass) \
+	  > "$(test_variants_out)/test-variants.$*.out" 2>&1
+endif
 
 .PHONY: test-typing
 test-typing: install_for_test
@@ -835,7 +1018,7 @@ test-typing: install_for_test
               make --no-print-directory all-typing; \
          fi)
 
-promote-failed:
+promote-failed: check-codegen-variant
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
@@ -845,7 +1028,8 @@ promote-failed:
 
 runtest-upstream: test
 
-test-one: install_for_test
+test-one: check-codegen-variant
+	$(install_for_test_serially)
 	$(MAKE) test-one-no-rebuild
 
 # If the TEST argument is passed as `testsuite/tests/foo` (as is invited by
@@ -857,7 +1041,7 @@ locate_test = \
     echo "tests/$${test}"; \
   )
 
-test-one-no-rebuild:
+test-one-no-rebuild: check-codegen-variant
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
@@ -865,10 +1049,11 @@ test-one-no-rebuild:
 	 fi; \
 	 cd _runtest/testsuite && make one $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
 
-promote-one: install_for_test
+promote-one: check-codegen-variant
+	$(install_for_test_serially)
 	$(MAKE) promote-one-no-rebuild
 
-promote-one-no-rebuild:
+promote-one-no-rebuild: check-codegen-variant
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \

@@ -220,6 +220,25 @@ let extract_rootenv (Ast (stmts, subs)) =
   let (env, stmts) = split_env stmts in
   (env, Ast (stmts, subs))
 
+(* A run under a suite variant (-codegen-variant) runs every test.  With
+   -codegen-variant-only it is a quick supplement to the default run
+   instead: a test file in which nothing depends on the variant (see
+   [Ocaml_flags.variant_work]) would only repeat the default run, so its
+   task is replaced by a skip.  A file that is already decided statically
+   keeps its own, more specific, result. *)
+let skip_without_variant_work (task : Actions.task) =
+  match Ocaml_flags.suite_codegen_variant, task with
+  | Some name, Task _
+    when Options.codegen_variant_only
+         && not (Ocaml_flags.has_variant_work task) ->
+    Actions.Static
+      (Result.skip_with_reason
+         (Printf.sprintf
+            "nothing in this test depends on the codegen variant (suite \
+             variant %s)"
+            name))
+  | Some _, (Task _ | Static _) | None, (Task _ | Static _) -> task
+
 let test_file test_filename =
   let skip_test = List.mem test_filename !tests_to_skip in
   let tsl_ast = tsl_parse_file_safe test_filename in
@@ -307,7 +326,7 @@ let test_file test_filename =
   in
   Actions.clear_all_hooks();
   if not Options.log_to_stderr then close_out log;
-  rootenv, msgs, task
+  rootenv, msgs, skip_without_variant_work task
 
 let run_test ~rootenv ~msgs ~task =
   let start = if Options.show_timings then Unix.gettimeofday () else 0.0 in
@@ -427,7 +446,28 @@ let () =
   Strace.init ();
   init_tests_to_skip()
 
+(* A suite variant that this install cannot serve would turn the whole run
+   into skips and failures, so it is refused before anything runs. *)
+let check_suite_codegen_variant () =
+  let name = Options.codegen_variant in
+  let problem =
+    if String.equal name "" then None
+    else if Option.is_none (Codegen_variant_name.of_string name)
+    then Some "is not the name of a codegen variant"
+    else if not (Ocaml_flags.codegen_variant_available name)
+    then Some "is not built in the install under test"
+    else None
+  in
+  match problem with
+  | None -> ()
+  | Some problem ->
+    Printf.eprintf "ocamltest: -codegen-variant: '%s' %s (available: %s)\n%!"
+      name problem
+      (String.concat " " (Ocaml_flags.available_codegen_variants ()));
+    exit 2
+
 let () =
+  check_suite_codegen_variant ();
   let failed = ref false in
   let work_done = ref false in
   let list_all_tests dir =

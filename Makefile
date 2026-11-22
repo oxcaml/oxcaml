@@ -451,8 +451,12 @@ jsoo-test: install $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
 	  $(dune) build $(ws_main) --promote-install-files=false \
 	  @@$(ast_dependent_libs_root)/jsoo-test
 
+# install and jsoo-install-shipped each run dune, which refuses to run twice
+# at once in one build directory, and the second installs into what the
+# first assembles: one after the other, in this order, whatever the -j.
 ifeq ($(with_jsir),true)
 install_for_test: jsoo-install-shipped
+.NOTPARALLEL: install_for_test
 endif
 
 .PHONY: test-without-jsir

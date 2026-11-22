@@ -37,11 +37,45 @@ endif
 BASEDIR_HOST := $(shell $(CYGPATH) "$(BASEDIR)")
 ROOTDIR_HOST := $(BASEDIR_HOST)/$(ROOTDIR)
 
-OCAMLTESTDIR = $(BASEDIR_HOST)/$(DIR)/_ocamltest
+# TEST_ID should be set by the user (to a label made of letters, digits,
+# '-' and '_') to run several passes at once in one tree, e.g. with
+# different CODEGEN_VARIANT values: the build directories of the tests, the
+# log and the failure stamp of a pass are then named after its label
+# (_ocamltest.<label>, _log.<label>, failure.stamp.<label>), and
+# 'promote-failed' and 'report' with the same TEST_ID read that log.
+TEST_ID ?=
+test_id_suffix = $(if $(TEST_ID),.$(TEST_ID))
 
-failstamp := failure.stamp
+ocamltestdir_name = _ocamltest$(test_id_suffix)
 
-TESTLOG ?= _log
+OCAMLTESTDIR = $(BASEDIR_HOST)/$(DIR)/$(ocamltestdir_name)
+
+# ocamltest itself builds the tests in _ocamltest when it is not told where.
+OCAMLTESTENV ?= \
+  $(if $(TEST_ID),OCAMLTESTDIR=$(BASEDIR_HOST)/$(ocamltestdir_name))
+
+failstamp := failure.stamp$(test_id_suffix)
+
+# The shell reports the status of the last command of a pipeline only, so a
+# command that fails on the left of a '|' (ocamltest listing the tests,
+# say, or GNU parallel) would go unnoticed, and the run would report the
+# tests that it did run as the whole result.
+# $(call or_stamp,<what>,<command>) runs <command> and records its failure
+# in $(failstamp), as <what>, for check-failstamp to report.
+or_stamp = { $(2) || echo "$(1) failed" >> $(failstamp); }
+
+TESTLOG ?= _log$(test_id_suffix)
+
+# The log of the 'one' target, which leaves the log of the last whole run
+# alone. The 'list' target is a whole run: it logs to $(TESTLOG), where
+# 'promote-failed' and 'report' look.
+ONELOG ?= $(TESTLOG).one
+
+# 'list' gives ONELOG on the command line of the 'one' that it runs, which
+# would hand it on to the tests through their environment. A test may start
+# this makefile itself (tool-ocamltest/test_lists.ml does), and its 'one'
+# would then write into the log of the run that the test is part of.
+unexport ONELOG
 
 ocamltest_directory := ../ocamltest
 
@@ -69,10 +103,19 @@ else # Windows
   IFS_LINE = IFS="$$CR_CHAR"
 endif
 
+# The options and the command-line variables of this make are not for the
+# makes that tests start. Such a make would otherwise give its recipes the
+# value that a variable has on this command line (OCAMLPARAM, say) in place
+# of the one that ocamltest gave the test. Make also puts its command-line
+# variables in the environment, where a testsuite makefile that a test
+# starts would take the variant of this run for its own: CODEGEN_VARIANT
+# and VARIANT_ONLY are for the arguments of ocamltest, not for the tests.
 ifeq "$(ocamltest_program)" ""
   ocamltest = $(error ocamltest not found in $(ocamltest_directory))
 else
-  ocamltest := SORT=$(SORT) MAKE=$(MAKE) $(ocamltest_program)
+  ocamltest := env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL \
+    -u CODEGEN_VARIANT -u VARIANT_ONLY \
+    SORT=$(SORT) MAKE=$(MAKE) $(ocamltest_program)
 endif
 
 # PROMOTE is only meant to be used internally in recursive calls;
@@ -126,13 +169,41 @@ else
   OCAMLTEST_RUNPARAM_FLAG = -run-ocamlrunparam '$(RUNPARAM)'
 endif
 
+# CODEGEN_VARIANT should be set by the user to run the tests for another
+# codegen variant of the compiler under test (see ocamlopt -config-var
+# codegen_variants), e.g.
+#   make one DIR=tests/effects CODEGEN_VARIANT=fp
+# The native programs that ocamltest compiles and links are then built for
+# that variant, unless a test selects a variant itself. Naming the
+# compiler's default variant is the same as not setting the variable.
+CODEGEN_VARIANT ?=
+ifeq "$(CODEGEN_VARIANT)" ""
+  OCAMLTEST_CODEGEN_VARIANT_FLAG =
+else
+  OCAMLTEST_CODEGEN_VARIANT_FLAG = -codegen-variant '$(CODEGEN_VARIANT)'
+endif
+
+# VARIANT_ONLY should be set by the user (to a non-empty value), together
+# with CODEGEN_VARIANT, for a quick pass that leaves out the test files in
+# which nothing depends on the variant (those that only run bytecode, say):
+# such a pass supplements a pass without CODEGEN_VARIANT and does not
+# replace it.
+VARIANT_ONLY ?=
+ifeq "$(VARIANT_ONLY)" ""
+  OCAMLTEST_CODEGEN_VARIANT_ONLY_FLAG =
+else
+  OCAMLTEST_CODEGEN_VARIANT_ONLY_FLAG = -codegen-variant-only
+endif
+
 OCAMLTESTFLAGS = \
   -exit-0-on-failure \
   -timeout $(TIMEOUT) \
   $(OCAMLTEST_PROMOTE_FLAG) \
   $(OCAMLTEST_KEEP_TEST_DIR_ON_SUCCESS_FLAG) \
   $(OCAMLTEST_SHOW_TIMINGS_FLAG) \
-  $(OCAMLTEST_RUNPARAM_FLAG)
+  $(OCAMLTEST_RUNPARAM_FLAG) \
+  $(OCAMLTEST_CODEGEN_VARIANT_FLAG) \
+  $(OCAMLTEST_CODEGEN_VARIANT_ONLY_FLAG)
 
 # Make sure USE_RUNTIME is defined
 USE_RUNTIME ?=
@@ -178,6 +249,13 @@ default:
 	@echo
 	@echo "Set the environment variable USE_RUNTIME to \"d\" or \"i\" to run"
 	@echo "the tests with the debug or the instrumented runtime."
+	@echo
+	@echo "Set CODEGEN_VARIANT to the name of a codegen variant of the compiler"
+	@echo "(e.g. fp) to build the native test programs for that variant. Add"
+	@echo "VARIANT_ONLY=1 to skip the tests in which nothing depends on it."
+	@echo
+	@echo "Set TEST_ID to a label to run several passes at once in one tree:"
+	@echo "each pass then uses _ocamltest.<label> directories and _log.<label>."
 
 .PHONY: all
 all:
@@ -187,10 +265,12 @@ all:
 .PHONY: new-without-report
 new-without-report:
 	@rm -f $(failstamp)
-	@($(ocamltest) -find-test-dirs tests | while $(IFS_LINE) read -r dir; do \
+	@($(call or_stamp,listing the directories of tests,\
+	    $(ocamltest) -find-test-dirs tests) \
+	 | while $(IFS_LINE) read -r dir; do \
 	  echo Running tests from \'$$dir\' ... ; \
 	  $(MAKE) exec-ocamltest DIR="$$dir" \
-	    OCAMLTESTENV=""; \
+	    OCAMLTESTENV="$(strip $(OCAMLTESTENV))"; \
 	done || echo outer loop >> $(failstamp)) 2>&1 | tee $(TESTLOG)
 	@$(MAKE) check-failstamp
 
@@ -205,9 +285,11 @@ check-failstamp:
 
 .PHONY: all-%
 all-%:
+	@rm -f $(failstamp)
 	@for dir in tests/$**; do \
 	  $(MAKE) --no-print-directory exec-one DIR=$$dir; \
 	done 2>&1 | tee $(TESTLOG)
+	@$(MAKE) check-failstamp
 	@$(MAKE) report
 
 # The targets below use GNU parallel to parallelize tests
@@ -239,7 +321,12 @@ all-%:
 # does not support -j without an argument, hence the double-filter. Note that
 # GNU make normalises -j in $(MAKEFLAGS) so it will either be -j alone or -jn
 # (i.e. with no space).
-J_ARGUMENT = $(filter-out -j,$(filter -j%,$(MAKEFLAGS)))
+# TEST_JOBS, when set, takes precedence: it is the number of tests to run at
+# once, for callers whose own -j means something else (several passes at
+# once, each of them parallel).
+TEST_JOBS ?=
+J_ARGUMENT = $(if $(TEST_JOBS),-j$(TEST_JOBS),\
+  $(filter-out -j,$(filter -j%,$(MAKEFLAGS))))
 
 .PHONY: parallel-%
 parallel-%:
@@ -251,15 +338,129 @@ parallel-%:
 	 || (echo "Your 'parallel' tool seems incompatible with GNU parallel.";\
 	     echo "This target requires GNU parallel.";\
 	     exit 1)
-	@$(ocamltest) $(or $(addprefix -find-tests ,$(sort $(wildcard tests/$**))),\
-	    $(error No test directory matches 'tests/$**')) \
-	 | parallel --gnu --no-notice --keep-order $(J_ARGUMENT) \
-	     "$(MAKE) --no-print-directory exec-test-file TEST={} 2>&1" \
+	@rm -f $(failstamp)
+	@$(call or_stamp,listing the tests,$(ocamltest) \
+	    $(or $(addprefix -find-tests ,$(sort $(wildcard tests/$**))),\
+	      $(error No test directory matches 'tests/$**'))) \
+	 | $(call or_stamp,GNU parallel,\
+	     parallel --gnu --no-notice --keep-order $(J_ARGUMENT) \
+	     "$(MAKE) --no-print-directory exec-test-file TEST={} 2>&1") \
 	 | tee $(TESTLOG)
+	@$(MAKE) check-failstamp
 	@$(MAKE) report
 
 .PHONY: parallel
 parallel: parallel-*
+
+# A list of tests is a file that names directories of tests, relative to
+# this directory, in the form tests/<directory>, one per line.
+# $(call list_dirs,<file>) prints the lines without what does not count:
+# empty lines, the blanks around a name, a ./ before it, and the slashes
+# after it that the completion of a shell adds.
+list_dirs = sed -e 's/^[[:blank:]]*//' -e 's/[[:blank:]]*$$//' -e '/^$$/d' \
+  -e 's|^\(\./\)*\(.\)|\2|' -e 's|\(.\)/*$$|\1|' '$(1)'
+
+# $(call check_list,<file>) fails, before any test runs, unless the list
+# names at least one directory and every line is one name of that form
+# that is a directory, has tests in it or below it, and is neither
+# repeated nor inside another directory of the list. Otherwise ocamltest
+# would stop at a path that does not exist, without running the
+# directories after it in the list; it would find nothing to run where
+# there is no test, and the run would succeed; and it would run a test
+# that two names lead to twice, possibly at once in one build directory.
+# A line with blanks inside is not a name: the testsuite does not handle
+# them, and two names on a line would otherwise be taken apart and run.
+# An ocamltest that fails where it is asked for the tests of the list has
+# said why: that is not a list without tests.
+check_list_lines = awk -v list='$(1)' ' \
+  /[ \t]/ { \
+    printf("\047%s\047, in the list \047%s\047, is not of the form " \
+           "tests/<directory>.\n", $$0, list); \
+    status = 1; \
+  } \
+  END { exit status }'
+check_list_overlaps = awk -v list='$(1)' ' \
+  { count[$$0]++ } \
+  END { \
+    for (dir in count) { \
+      if (count[dir] > 1) { \
+        printf("%s is in the list %s %d times.\n", dir, list, count[dir]); \
+        status = 1; \
+      } \
+      parent = dir; \
+      while (sub(/\/[^\/]*$$/, "", parent)) \
+        if (parent in count) { \
+          printf("%s, in the list %s, is inside %s, which is in the " \
+                 "list too.\n", dir, list, parent); \
+          status = 1; \
+        } \
+    } \
+    exit status; \
+  }'
+check_list_tests = awk -v list='$(1)' -v dirs="$$*" ' \
+  BEGIN { count = split(dirs, dir, " ") } \
+  { \
+    for (i = 1; i <= count; i++) \
+      if ($$0 == dir[i] || index($$0, dir[i] "/") == 1) has_tests[i] = 1; \
+  } \
+  END { \
+    for (i = 1; i <= count; i++) \
+      if (!(i in has_tests)) { \
+        printf("%s, in the list %s, has no test.\n", dir[i], list); \
+        status = 1; \
+      } \
+    exit status; \
+  }'
+check_list = \
+  if [ ! -f '$(1)' ]; then \
+    echo "File '$(1)' does not exist." >&2; exit 1; \
+  fi; \
+  $(call list_dirs,$(1)) | $(call check_list_lines,$(1)) >&2 || exit 1; \
+  set -f; set -- `$(call list_dirs,$(1))`; set +f; \
+  if [ -z "$$*" ]; then \
+    echo "The list '$(1)' names no directory." >&2; exit 1; \
+  fi; \
+  status=0; \
+  for dir do \
+    case "$$dir" in \
+      */|*//*|*/./*|*/.|*/../*|*/..) well_formed=false;; \
+      tests/?*) well_formed=true;; \
+      *) well_formed=false;; \
+    esac; \
+    if ! $$well_formed; then \
+      echo "'$$dir', in the list '$(1)', is not of the form" \
+        "tests/<directory>." >&2; \
+      status=1; \
+    elif [ ! -d "$$dir" ]; then \
+      echo "'$$dir', in the list '$(1)', is not a directory" \
+        "of `pwd`." >&2; \
+      status=1; \
+    fi; \
+  done; \
+  [ $$status -eq 0 ] || exit 1; \
+  printf '%s\n' "$$@" | $(call check_list_overlaps,$(1)) >&2 || exit 1; \
+  found=`$(ocamltest) $$(printf ' -find-test-dirs %s' "$$@")` || exit 1; \
+  printf '%s\n' "$$found" | $(call check_list_tests,$(1)) >&2
+
+# The directories directly under $(DIR), tests by default, that have tests
+# in them or below, one per line: the names that a list of all these tests
+# is made of. A directory without tests is not among them, since a list
+# must not name it. $(DIR) is taken as the lists take a name: a ./ before
+# it and slashes after it do not count, so that DIR=tests/ gives names of
+# the form tests/<directory> too.
+test_dirs_parent = printf '%s\n' '$(or $(DIR),tests)' \
+  | sed -e 's|^\(\./\)*\(.\)|\2|' -e 's|\(.\)/*$$|\1|'
+
+.PHONY: test-dirs
+test-dirs:
+	@parent=`$(test_dirs_parent)`; \
+	 dirs=`$(ocamltest) -find-test-dirs "$$parent"` || exit 1; \
+	 echo "$$dirs" | awk -v parent="$$parent/" ' \
+	   index($$0, parent) == 1 { \
+	     name = substr($$0, length(parent) + 1); \
+	     sub(/\/.*/, "", name); \
+	     if (!(name in printed)) { printed[name] = 1; print parent name } \
+	   }'
 
 .PHONY: list
 list:
@@ -267,7 +468,7 @@ list:
     then echo "No value set for variable 'FILE'."; \
     exit 1; \
   fi
-	@$(MAKE) --no-print-directory one LIST="$(FILE)"
+	@$(MAKE) --no-print-directory one LIST="$(FILE)" ONELOG="$(TESTLOG)"
 
 .PHONY: list-parallel
 list-parallel: lib tools
@@ -283,10 +484,16 @@ list-parallel: lib tools
 	 || (echo "Your 'parallel' tool seems incompatible with GNU parallel.";\
 	     echo "This target requires GNU parallel.";\
 	     exit 1)
-	@$(ocamltest) $(addprefix -find-tests ,$(shell cat $(FILE))) \
-	 | parallel --gnu --no-notice --keep-order \
-	   "$(MAKE) $(NO_PRINT) exec-test-file TEST={} 2>&1" \
+	@$(call check_list,$(FILE))
+	@rm -f $(failstamp)
+	@$(call or_stamp,listing the tests,$(ocamltest) \
+	    $(addprefix -find-tests ,\
+      $(shell { $(call list_dirs,$(FILE)); } 2>/dev/null))) \
+	 | $(call or_stamp,GNU parallel,\
+	     parallel --gnu --no-notice --keep-order $(J_ARGUMENT) \
+	     "$(MAKE) $(NO_PRINT) exec-test-file TEST={} 2>&1") \
 	 | tee $(TESTLOG)
+	@$(MAKE) check-failstamp
 	@$(MAKE) report
 
 .PHONY: one
@@ -302,27 +509,29 @@ one:
 	@if [ -n '$(TEST)' ] && [ ! -e '$(TEST)' ]; then \
     echo "Test '$(TEST)' does not exist."; exit 1; \
   fi
-	@if [ -n '$(LIST)' ] && [ ! -e '$(LIST)' ]; then \
-    echo "File '$(LIST)' does not exist."; exit 1; \
-  fi
+	@if [ -n '$(LIST)' ]; then $(call check_list,$(LIST)); fi
+	@rm -f $(failstamp)
 	@if [ -n '$(DIR)' ] ; then \
     $(MAKE) --no-print-directory exec-one DIR=$(DIR) \
-      2>&1 | tee $(TESTLOG).one ; \
+      2>&1 | tee $(ONELOG) ; \
    fi
 	@if [ -n '$(TEST)' ] ; then \
-    TERM=dumb $(OCAMLTESTENV) $(ocamltest) $(OCAMLTESTFLAGS) $(TEST) \
-     2>&1 | tee $(TESTLOG).one; fi
+    { TERM=dumb $(OCAMLTESTENV) $(ocamltest) $(OCAMLTESTFLAGS) $(TEST) || \
+      echo " ... testing '$(notdir $(TEST))' => unexpected error"; } \
+     2>&1 | tee $(ONELOG); fi
 	@if [ -n '$(LIST)' ] ; then \
-     while IFS='' read -r LINE; do \
-       $(MAKE) --no-print-directory exec-one DIR="`echo $$LINE | sed 's/^ *//g'`" ; \
-     done < $$LIST 2>&1 | tee $(TESTLOG).one ; \
+     for dir in `$(call list_dirs,$(LIST))`; do \
+       $(MAKE) --no-print-directory exec-one DIR="$$dir" ; \
+     done 2>&1 | tee $(ONELOG) ; \
    fi
 	@$(MAKE) check-failstamp
-	@$(MAKE) TESTLOG=$(TESTLOG).one report
+	@$(MAKE) TESTLOG=$(ONELOG) report
 
 .PHONY: exec-one
 exec-one:
-	@$(ocamltest) -find-test-dirs $(DIR) | while $(IFS_LINE) read -r dir; do \
+	@$(call or_stamp,listing the directories of tests in $(DIR),\
+	    $(ocamltest) -find-test-dirs $(DIR)) \
+	 | while $(IFS_LINE) read -r dir; do \
 	  echo "Running tests from '$$dir' ..."; \
 	  $(MAKE) exec-ocamltest DIR="$$dir" \
 	    OCAMLTESTENV="OCAMLTESTDIR=$(OCAMLTESTDIR)"; \
@@ -332,7 +541,9 @@ exec-one:
 exec-ocamltest:
 	@if [ -z "$(DIR)" ]; then exit 1; fi
 	@if [ ! -d "$(DIR)" ]; then exit 1; fi
-	@($(ocamltest) -list-tests $(DIR) | while $(IFS_LINE) read -r testfile; do \
+	@($(call or_stamp,listing the tests of $(DIR),\
+	    $(ocamltest) -list-tests $(DIR)) \
+	 | while $(IFS_LINE) read -r testfile; do \
 	   TERM=dumb $(OCAMLTESTENV) \
 	     $(ocamltest) $(OCAMLTESTFLAGS) "$(DIR)/$$testfile" || \
 	   echo " ... testing '$$testfile' => unexpected error"; \
@@ -342,7 +553,7 @@ exec-ocamltest:
 exec-test-file: test_dir = $(patsubst %/,%,$(dir $(TEST)))
 exec-test-file:
 	@echo "Running tests from '$(test_dir)' ..."
-	@TERM=dumb OCAMLTESTDIR=$(BASEDIR_HOST)/$(test_dir)/_ocamltest \
+	@TERM=dumb OCAMLTESTDIR=$(BASEDIR_HOST)/$(test_dir)/$(ocamltestdir_name) \
 	   $(ocamltest) $(OCAMLTESTFLAGS) $(TEST) || \
 	 echo " ... testing '$(notdir $(TEST))' => unexpected error"
 
@@ -358,8 +569,18 @@ clean-one:
 	  cd $(DIR) && $(MAKE) TERM=dumb BASEDIR=$(BASEDIR) clean; \
 	fi
 
+# Reference files are shared by every codegen variant. Promoting under
+# CODEGEN_VARIANT is how tests that only run under a variant get their
+# references, so it is allowed, and announced.
+.PHONY: announce-promotion
+announce-promotion:
+ifneq "$(CODEGEN_VARIANT)" ""
+	@echo "Promoting with CODEGEN_VARIANT=$(CODEGEN_VARIANT):" \
+	  "reference files are shared by every codegen variant."
+endif
+
 .PHONY: promote
-promote:
+promote: announce-promotion
 	@$(MAKE) one PROMOTE=true
 
 .PHONY: clean
@@ -377,10 +598,10 @@ report:
 	@$(AWK) -f ./summarize.awk < $(TESTLOG)
 
 .PHONY: promote-failed
-promote-failed: lib tools
+promote-failed: lib tools announce-promotion
 	@if [ ! -f $(TESTLOG) ]; then echo "No $(TESTLOG) file."; exit 1; fi
 	@for test in \
 	     $$(awk -f ./summarize.awk -v only_report_failed_tests=1 < $(TESTLOG)); \
 	 do \
-	   $(MAKE) promote TEST="$$test"; \
+	   $(MAKE) one PROMOTE=true TEST="$$test"; \
 	 done

@@ -38,10 +38,16 @@ function clear() {
     in_test = 0;
 }
 
+# A test file has one result. If the log has several for one file, a
+# failure or an error stands, whatever the log reports for the file later.
+function did_not_fail() {
+    return !(key in RESULTS) || (RESULTS[key] != "f" && RESULTS[key] != "e");
+}
+
 function record_pass() {
     check();
     if (!(key in RESULTS)) ++nresults;
-    RESULTS[key] = "p";
+    if (did_not_fail()) RESULTS[key] = "p";
     delete SKIPPED[curdir];
     clear();
 }
@@ -49,7 +55,7 @@ function record_pass() {
 function record_skip() {
     check();
     if (!(key in RESULTS)) ++nresults;
-    RESULTS[key] = "s";
+    if (did_not_fail()) RESULTS[key] = "s";
     if (curdir in SKIPPED) SKIPPED[curdir] = 1;
     clear();
 }
@@ -57,7 +63,7 @@ function record_skip() {
 function record_na() {
     check();
     if (!(key in RESULTS)) ++nresults;
-    RESULTS[key] = "n";
+    if (did_not_fail()) RESULTS[key] = "n";
     if (curdir in SKIPPED) SKIPPED[curdir] = 1;
     clear();
 }
@@ -75,6 +81,16 @@ function record_unexp() {
         if (!(key in RESULTS)) ++nresults;
         RESULTS[key] = "e";
     }
+    delete SKIPPED[curdir];
+    clear();
+}
+
+# ocamltest itself failed on a test file. Whatever it reported for the
+# tests of that file before it failed, other than a failure, the file did
+# not pass.
+function record_error() {
+    if (!(key in RESULTS)) ++nresults;
+    if (RESULTS[key] != "f") RESULTS[key] = "e";
     delete SKIPPED[curdir];
     clear();
 }
@@ -134,6 +150,13 @@ function record_unexp() {
     record_pass();
 }
 
+# In a quick pass under a suite codegen variant (CODEGEN_VARIANT with
+# VARIANT_ONLY), most skips are tests in which nothing depends on the
+# variant. They are counted, not listed.
+/=> skipped \(nothing in this test depends on the codegen variant/ {
+    VARIANT_INDEPENDENT[key] = 1;
+}
+
 /=> skipped/ {
     record_skip();
 }
@@ -153,7 +176,7 @@ function record_unexp() {
 }
 
 /=> unexpected error/ {
-    record_unexp();
+    record_error();
 }
 
 /make[^:]*: \*\*\* \[[^]]*\] Error/ {
@@ -197,7 +220,9 @@ END {
             }else if (r == "s"){
                 ++ skipped;
                 curdir = DIRS[key];
-                if (curdir in SKIPPED){
+                if (key in VARIANT_INDEPENDENT){
+                    ++ variant_independent;
+                }else if (curdir in SKIPPED){
                     if (SKIPPED[curdir]){
                         SKIPPED[curdir] = 0;
                         skips[skipidx++] = curdir;
@@ -218,6 +243,10 @@ END {
         if (skipped != 0){
             printf("\n%sList of skipped tests:\n", start_group);
             for (i=0; i < skipidx; i++) printf("    %s\n", skips[i]);
+            if (variant_independent != 0){
+                printf("    (and %d tests in which nothing depends on the " \
+                       "codegen variant)\n", variant_independent);
+            }
             if (ENVIRON["GITHUB_ACTIONS"] == "true") print "::endgroup::";
         }
         if (slowcount != 0){
@@ -253,6 +282,10 @@ END {
         if (failed || unexped){
             printf("#### Something failed. Exiting with error status.\n\n");
             exit 4;
+        }
+        if (nresults == 0){
+            printf("#### No test ran. Exiting with error status.\n\n");
+            exit 5;
         }
     }
 }

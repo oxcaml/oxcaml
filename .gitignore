@@ -42,6 +42,7 @@
 *.dSYM/
 *.swp
 _ocamltest
+_ocamltest.*
 _ocamltestd
 *.odoc
 .merlin
@@ -331,6 +332,7 @@ ocaml/primitives.new
 /testsuite/**/program
 /testsuite/**/_log*
 /testsuite/failure.stamp
+/testsuite/failure.stamp.*
 
 /testsuite/_retries
 

@@ -23,6 +23,10 @@ val unix : Environments.modifiers
 
 val str : Environments.modifiers
 
+(* The directories of the source tree that the compiler-libs modifiers
+   ([include ocamlcommon] and friends) add to the include path. *)
+val compilerlibs_subdirs : string list
+
 val latex: Environments.modifiers
 val man: Environments.modifiers
 val html: Environments.modifiers
