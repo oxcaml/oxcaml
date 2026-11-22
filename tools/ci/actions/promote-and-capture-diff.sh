@@ -24,7 +24,18 @@ usage() { echo "Usage: $0 TARGET" >&2; exit 1; }
 [ $# -eq 1 ] || usage
 target=$1
 
-make "$target"
+# `make promote-failed` runs each failed test again to promote its output,
+# and so reports those tests as failed once more: its status says nothing
+# about whether it promoted.
+make "$target" || echo "make $target exited with status $?"
+# ocamltest promotes into _runtest/testsuite. `make install_for_test`
+# hard-links that tree to the sources, but a tree unpacked from another
+# machine's archive (test-build.sh) is a copy: bring its changes back.
+# Where the two are linked, this finds nothing to copy.
+if [ -d _runtest/testsuite/tests ]; then
+  rsync -rc --existing --exclude='_ocamltest*' \
+    _runtest/testsuite/tests/ testsuite/tests/
+fi
 if ! git diff --quiet; then
   git diff > "$GITHUB_WORKSPACE/test-diffs.patch"
   echo "Test output differences detected and saved to artifact"

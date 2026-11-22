@@ -68,7 +68,8 @@ that built them. That takes more than the four: both trees contain absolute
 paths and code compiled against the builder's C library, so the build must
 have been configured with `--prefix=$PWD/_install`, and the other machine
 needs a checkout of the same commit at the same path, and the same
-architecture, C compiler and C library.
+architecture, C compiler and C library. `tools/ci/actions/test-build.sh`
+packs the four, and unpacks them only on such a machine.
 
 `TEST_LIST=<file>` restricts `test` and `test-no-rebuild` to the directories
 listed in `<file>`, one per line, in the form `tests/<directory>`. A list

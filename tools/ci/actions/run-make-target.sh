@@ -14,7 +14,8 @@
 #*                                                                        *#
 #**************************************************************************#
 
-# Run `make TARGET` for a build.yml step, with core dumps enabled.
+# Run `make TARGET [ARGUMENT]...` for a build.yml step, with core dumps
+# enabled.
 #
 # Environment:
 #   COLLECT_METRICS   if "true", make the compiler write per-file profiling
@@ -26,9 +27,8 @@
 #                     passed through to make
 
 set -euo pipefail
-usage() { echo "Usage: $0 TARGET" >&2; exit 1; }
-[ $# -eq 1 ] || usage
-target=$1
+usage() { echo "Usage: $0 TARGET [ARGUMENT]..." >&2; exit 1; }
+[ $# -ge 1 ] || usage
 
 if [ "${COLLECT_METRICS:-}" = "true" ]; then
   profile_dir="$GITHUB_WORKSPACE/_profile_csv"
@@ -41,4 +41,4 @@ if [ "${COLLECT_METRICS:-}" = "true" ]; then
 fi
 
 ulimit -c unlimited
-make "$target"
+make "$@"
