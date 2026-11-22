@@ -236,11 +236,44 @@ We now have `type 'a or_null : value_or_null`, the type of unboxed options.
 It has constructors `Null` and `This v`. See the [`or_null` document](../or-null)
 for more details.
 
+## Unboxed variants
+
+A closed variant with several constructors can have both a boxed type `t` and
+an unboxed type `t#`. An ordinary constructor creates a `t` by default. An
+expected type of `t#` selects its unboxed constructor. The `#` prefix selects
+that constructor explicitly in an expression or a pattern.
+
+```ocaml
+type reply = Missing | Found of string
+type entry = { key : int; reply : reply# }
+
+let boxed message = Found message
+let inline message = #Found message
+let store key message = { key; reply = Found message }
+let read entry = match entry.reply with #Missing -> None | #Found s -> Some s
+```
+
+Here, `boxed` returns a `reply`, and `inline` returns a `reply#`. The `reply`
+field stores the tag and payload directly in the `entry` record. Its size is
+fixed, so both constructors leave `key` at the same offset. Boxing a `reply#`
+on its own uses the ordinary `reply` representation. `Missing` is an immediate,
+and `Found` is a block with one field.
+
+When the sole argument of an outer constructor is another unboxed variant, the
+compiler combines the two tags. For example,
+`type answer = Busy | Ready of reply#` can encode `Busy`,
+`Ready Missing`, and `Ready (Found s)`. Two variant fields in a tuple keep
+separate tags so that each field can select its own constructor.
+
+Some declarations have only a boxed type. For example, in
+`type t = Empty | Witness of unit#`, both constructors have zero payload words,
+but the ordinary boxed representation gives `Witness` a block header. The
+compiler accepts this declaration and its ordinary constructors. Using `t#`
+for this declaration is a type error.
+
 ## Unboxed unit and unboxed bool
 
-While we do not have support for unboxed variants in their full generality, we have
-limited support for specific built-in types, including `unit#`, the type of unboxed
-units, and `bool#`, the type of unboxed booleans.
+The built-in types `unit#` and `bool#` have their own constructor syntax.
 
 Values of type `unit#` can be constructed as `#()` in expressions, and destructed as `#()`
 in patterns.
