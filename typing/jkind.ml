@@ -437,9 +437,15 @@ module Layout = struct
       Sort.implied_externality
         ~separability:(box_scannable_axes t sa).separability Sort.scannable
 
-  let sum_components layout sort n =
+  let sum_components ~allow_mutation layout sort n =
     match Option.bind (get_const layout) Const.runtime_sum_sort with
     | None -> Error Incompatible
+    | Some _ when not allow_mutation -> (
+      match get_const (Sort (sort, Scannable_axes.max)) with
+      | Some (Const.Sum arms as sum)
+        when Option.is_some (Const.runtime_sum_sort sum) ->
+        Ok (List.map of_const arms)
+      | _ -> Error Incompatible)
     | Some _ ->
       let sorts = List.init n (fun _ -> Sort.Var (Sort.new_genvar ())) in
       Result.map
@@ -463,7 +469,9 @@ module Layout = struct
       then if Scannable_axes.equal sa1 sa2 then Ok () else Error Incompatible
       else Ok ()
     | (Sum ts as layout), Sort (sort, _) | Sort (sort, _), (Sum ts as layout) ->
-      let* sorts = sum_components layout sort (List.length ts) in
+      let* sorts =
+        sum_components ~allow_mutation layout sort (List.length ts)
+      in
       Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
         (fun () -> equate_or_equal ~allow_mutation)
         () ts sorts
@@ -606,10 +614,14 @@ module Layout = struct
       else Ok Less_or_equal.Equal
     | Product ts1, Product ts2 | Sum ts1, Sum ts2 -> sub_components ts1 ts2
     | (Sum ts as layout), Sort (sort, _) ->
-      let* sorts = sum_components layout sort (List.length ts) in
+      let* sorts =
+        sum_components ~allow_mutation:true layout sort (List.length ts)
+      in
       sub_components ts sorts
     | Sort (sort, _), (Sum ts as layout) ->
-      let* sorts = sum_components layout sort (List.length ts) in
+      let* sorts =
+        sum_components ~allow_mutation:true layout sort (List.length ts)
+      in
       sub_components sorts ts
     | Sum _, Product _ | Product _, Sum _ -> Error Incompatible
     | Product ts1, Sort (s2, _) ->
@@ -673,7 +685,9 @@ module Layout = struct
       Result.map (fun ts -> Product ts) (components ts1 ts2)
     | Sum ts1, Sum ts2 -> Result.map (fun ts -> Sum ts) (components ts1 ts2)
     | (Sum ts as layout), Sort (sort, _) | Sort (sort, _), (Sum ts as layout) ->
-      let* sorts = sum_components layout sort (List.length ts) in
+      let* sorts =
+        sum_components ~allow_mutation:true layout sort (List.length ts)
+      in
       Result.map (fun ts -> Sum ts) (components ts sorts)
     | Sum _, (Product _ | Box _) | (Product _ | Box _), Sum _ ->
       Error Incompatible
