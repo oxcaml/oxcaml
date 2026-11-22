@@ -57,6 +57,11 @@ val may_equal_constr :
 val cstr_res_type_path : constructor_description -> Path.t
 val is_boxed_sum_constructor : constructor_description -> bool
 
+(** A boxed constructor with a single runtime alternative keeps its ordinary
+    payload representation, even if a fused sibling shifts its runtime tag. *)
+val sum_for_constructor_payload :
+  constructor_description -> Jkind_types.Sum_repr.t option
+
 type 'a gen_label_description =
   { lbl_name: string;                   (* Short name *)
     lbl_res: type_expr;                 (* Type of the result *)

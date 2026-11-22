@@ -391,11 +391,19 @@ layout: `void & (void + value)`. These layouts also tell an abstract client
 how to box and unbox the value without seeing its constructors.
 
 A GADT result type or an atomic field prevents an implicit unboxed variant.
-If a boxed declaration contains a record constructor, all of its constructors
-keep their original tags. For example, the companion of
-`type t = Busy | Direct of reply# | Count of { n : int }` has layout
-`void + (void + value) + immediate`. The tag in `Direct` stays separate from
-the tag that selects `Busy`, `Direct`, or `Count`.
+A record constructor does not prevent a sibling from sharing its tag with a
+direct sum argument. For example:
+
+```ocaml
+type t = Busy | Direct of reply# | Saved of { mutable reply : reply# }
+```
+
+The layout of `t#` is `void + void + value + (void + value)`. In the boxed
+type `t`, `Busy` and `Direct Missing` are immediates 0 and 1. A
+`Direct (Found s)` block has tag 0 and stores only `s`. A `Saved` block has
+tag 1 and stores the inner tag and space for the string. Matching `Saved r`
+and constructing `Saved r` again returns the same block.
+The limit on boxed block tags counts the alternatives after tag sharing.
 
 *Limitations and future plans*:
 * Arrays of unboxed variants follow the same rule as arrays of unboxed

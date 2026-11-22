@@ -222,6 +222,38 @@ type printed = { choice : mixed; label : string; }
 val printed : printed = {choice = <unboxed sum>; label = "next field"}
 |}]
 
+type choice = No | Left of string | Right of string
+type shown = A | B | C of choice# | D of string | E of { n : int }
+[%%expect{|
+type choice = No | Left of string | Right of string
+type shown = A | B | C of choice# | D of string | E of { n : int; }
+|}]
+
+let displayed = [C No; C (Left "l"); C (Right "r"); D "tail"; E { n = 7 }]
+[%%expect{|
+val displayed : shown list =
+  [C <unboxed sum>; C <unboxed sum>; C <unboxed sum>; D "tail"; E {n = 7}]
+|}]
+
+module Overflow = struct
+  type s0 = A of int | B of int [@@unboxed]
+  type s1 = A of s0 | B of s0 [@@unboxed]
+  type s2 = A of s1 | B of s1 [@@unboxed]
+  type s3 = A of s2 | B of s2 [@@unboxed]
+  type s4 = A of s3 | B of s3 [@@unboxed]
+  type s5 = A of s4 | B of s4 [@@unboxed]
+  type s6 = A of s5 | B of s5 [@@unboxed]
+  type s7 = A of s6 | B of s6 [@@unboxed]
+  type t = Direct of s7 | Record of { mutable label : string }
+end
+[%%expect{|
+Line 10, characters 2-62:
+10 |   type t = Direct of s7 | Record of { mutable label : string }
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Too many non-constant constructors
+       -- maximum is 244 non-constant constructors
+|}]
+
 type ('a : any) first = 'a option = None | Some of 'a
 type ('a : any) second = 'a option = None | Some of 'a
 type ('a : any) alias = 'a first

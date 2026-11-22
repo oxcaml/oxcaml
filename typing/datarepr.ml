@@ -24,30 +24,26 @@ module Jkind = Btype.Jkind0
 let boxed_sum_constructor cstr =
   { cstr with cstr_res = new_box_ty cstr.cstr_res }
 
-let can_fuse ~ordinary_box cstrs =
-  not ordinary_box || List.for_all (fun cstr -> match cstr.cd_args with
-    | Cstr_tuple _ -> true | Cstr_record _ -> false) cstrs
-
-let sum_arm ~can_fuse cd_args ~direct_sum fields
+let sum_arm cd_args ~direct_sum fields
   : _ Jkind_types.Sum_repr.source_arm =
   match cd_args, fields with
-  | Cstr_tuple _, [field] when can_fuse ->
+  | Cstr_tuple _, [field] ->
     (match direct_sum field with
      | Some arms -> Splice arms
      | None -> Fields fields)
   | _ -> Fields fields
 
-let sort_arm ~can_fuse cd_args fields =
-  sum_arm ~can_fuse cd_args ~direct_sum:Jkind_types.Sum_repr.direct_sum fields
+let sort_arm cd_args fields =
+  sum_arm cd_args ~direct_sum:Jkind_types.Sum_repr.direct_sum fields
 
 let uses_fused_boxed_tags decl =
   match decl.type_kind with
-  | Type_variant (cstrs, Variant_boxed layouts, _) ->
+  | Type_variant (cstrs, Variant_boxed _, _) ->
     Option.is_some decl.type_unboxed_version &&
-    Array.exists (function
-      | Cstr_layout_known { sorts = [|sort|]; _ } ->
+    List.exists (fun cstr -> match cstr.cd_args with
+      | Cstr_tuple [{ ca_sort = Some sort; _ }] ->
         Option.is_some (Jkind_types.Sum_repr.direct_sum sort)
-      | _ -> false) layouts && can_fuse ~ordinary_box:true cstrs
+      | _ -> false) cstrs
   | _ -> false
 
 (* Simplified version of Ctype.free_vars *)
@@ -102,6 +98,13 @@ let inline_record_sort labels =
     | [sort] -> sort
     | sorts -> Jkind_types.Sort.Const.product sorts)
     (Misc.Stdlib.List.map_option (fun label -> label.ld_sort) labels)
+
+let sum_argument_sorts cd_args layout =
+  match cd_args, layout with
+  | _, Cstr_layout_undetermined -> None
+  | Cstr_record labels, _ -> Option.map (fun sort -> [sort])
+      (inline_record_sort labels)
+  | Cstr_tuple _, Cstr_layout_known { sorts; _ } -> Some (Array.to_list sorts)
 
 let constructor_args ~current_unit priv cd_args cd_res path tag shape vrep
       ~variant_jkind ~sum_arm =
@@ -270,17 +273,21 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     match rep, cstrs with
     | (Variant_unboxed | Variant_boxed _), _ :: _ :: _
       when rep = Variant_unboxed || uses_fused_boxed_tags decl ->
-      (match Misc.Stdlib.List.map_option
-         (function
-           | Cstr_layout_known { sorts; _ } -> Some (Array.to_list sorts)
-           | Cstr_layout_undetermined -> None)
-         (Array.to_list cstr_layouts) with
-       | None -> None (* Temporary recursive environment. *)
-       | Some arms ->
-         let can_fuse = can_fuse cstrs
-             ~ordinary_box:(Path.is_unboxed_version ty_path) in
-         Jkind_types.Sum_repr.make
-           (List.map2 (fun cstr -> sort_arm ~can_fuse cstr.cd_args) cstrs arms))
+      let arm cstr layout =
+        Option.map (sort_arm cstr.cd_args)
+          (sum_argument_sorts cstr.cd_args layout)
+      in
+      Option.bind
+        (Misc.Stdlib.List.map2_option arm cstrs (Array.to_list cstr_layouts))
+        Jkind_types.Sum_repr.make
+    | _ -> None
+  in
+  let boxed_tags = match rep, sum with
+    | Variant_boxed _, Some repr ->
+      let cases = Array.of_list
+          (Jkind_types.Sum_repr.boxed_cases repr.alternatives) in
+      Some (Array.map (fun (arm : Jkind_types.Sum_repr.arm) ->
+        fst cases.(arm.first_tag)) repr.arms)
     | _ -> None
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
@@ -312,6 +319,10 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       else nonconst_tag, const_tag, 1 + nonconst_tag
     in
     let cstr_tag =
+      let runtime_tag = match boxed_tags with
+        | Some tags -> tags.(src_index)
+        | None -> runtime_tag
+      in
       match rep with
       | Variant_with_null ->
         begin match classify_variant_with_null_constructor
@@ -438,21 +449,27 @@ let label_descrs record_form ty_res lbls repres priv =
 
 exception Constr_not_found
 
-let find_constr ~constant tag cstrs =
-  try
-    List.find
-      (function
-        | (({cstr_tag=Ordinary {runtime_tag=tag'}; cstr_constant},_),_) ->
-          tag' = tag && cstr_constant = constant
-        | (({cstr_tag=Null; cstr_constant}, _),_) ->
-          tag = -1 && cstr_constant = constant
-        | (({cstr_tag=Extension _},_),_) -> false)
-      cstrs
-  with
-  | Not_found -> raise Constr_not_found
-
-let find_constr_by_tag ~constant tag cstrlist =
-  fst (fst (find_constr ~constant tag cstrlist))
+let find_constr_by_tag ~constant tag cstrs =
+  let matches = match cstrs with
+    | (({ cstr_repr = Variant_boxed _; cstr_sum = Some sum; _ }, _), _) :: _ ->
+      let cases = Jkind_types.Sum_repr.boxed_cases sum.alternatives in
+      let ordinal = match List.find_index (fun (runtime_tag, fields) ->
+        tag = runtime_tag && constant = List.is_empty fields) cases with
+        | Some ordinal -> ordinal | None -> raise Constr_not_found
+      in
+      (fun cstr -> match cstr.cstr_tag with
+        | Ordinary {src_index} -> sum.arms.(src_index).first_tag <= ordinal &&
+            ordinal <= Jkind_types.Sum_repr.last_tag sum src_index
+        | Null | Extension _ -> false)
+    | _ -> fun cstr -> cstr.cstr_constant = constant &&
+      match cstr.cstr_tag with
+      | Ordinary {runtime_tag} -> tag = runtime_tag
+      | Null -> tag = -1
+      | Extension _ -> false
+  in
+  match List.find_opt (fun ((cstr, _), _) -> matches cstr) cstrs with
+  | Some ((cstr, _), _) -> cstr
+  | None -> raise Constr_not_found
 
 let constructors_of_type ~current_unit ty_path decl =
   match decl.type_kind with

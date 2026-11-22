@@ -666,7 +666,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           (fun (sort, e) -> e, Jkind.Sort.default_for_transl_and_get sort)
           args
       in
-      if cstr.cstr_inlined <> None && cstr.cstr_sum = None then begin
+      let sum = Data_types.sum_for_constructor_payload cstr in
+      if Option.is_some cstr.cstr_inlined && Option.is_none sum then begin
         match args_with_sorts with
         | [arg, _] -> transl_exp ~scopes layout arg
         | _ -> assert false
@@ -689,8 +690,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
       | Ordinary {src_index}, (Variant_unboxed | Variant_boxed _)
-        when Option.is_some cstr.cstr_sum ->
-          let repr = Option.get cstr.cstr_sum in
+        when Option.is_some sum ->
+          let repr = Option.get sum in
           let loc = of_location ~scopes e.exp_loc in
           let args = List.map2 (fun (exp, sort) arg ->
             layout_exp sort exp, arg) args_with_sorts ll in

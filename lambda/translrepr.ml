@@ -345,14 +345,11 @@ module Boxed_sum = struct
     | Unbox
 
   let translate loc direction alternatives argument =
-    let field_sorts (sort : Jkind.Sort.Const.t) =
-      if Jkind.Sort.Const.all_void sort
-      then []
-      else match sort with Product fields -> fields | _ -> [sort]
-    in
-    let arms = List.map field_sorts alternatives in
+    let arms = Repr.boxed_cases alternatives in
     let repr =
-      match Repr.make (List.map (fun fields -> Repr.Fields fields) arms) with
+      match
+        Repr.make (List.map (fun (_, fields) -> Repr.Fields fields) arms)
+      with
       | Some repr -> repr
       | None -> Misc.fatal_error "Boxed_sum: unrepresentable sum"
     in
@@ -367,14 +364,10 @@ module Boxed_sum = struct
     in
     name_lambda Strict argument arg_layout (fun id ->
         let arg = Lvar id in
-        let next_const = ref 0 and next_block = ref 0 in
         let cases =
           List.mapi
-            (fun index fields ->
+            (fun index (tag, fields) ->
               let constant = List.is_empty fields in
-              let next = if constant then next_const else next_block in
-              let tag = !next in
-              incr next;
               if (not constant) && tag > Config.max_tag
               then
                 Location.raise_errorf ~loc:location

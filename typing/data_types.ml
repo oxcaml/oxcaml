@@ -62,6 +62,13 @@ let is_boxed_sum_constructor cstr =
   | Variant_unboxed, Tbox _ -> true
   | _ -> false
 
+let sum_for_constructor_payload cstr =
+  match cstr.cstr_sum, cstr.cstr_repr, cstr.cstr_tag with
+  | Some sum, Variant_boxed _, Ordinary {src_index}
+    when sum.arms.(src_index).first_tag =
+         Jkind_types.Sum_repr.last_tag sum src_index -> None
+  | sum, _, _ -> sum
+
 let cstr_res_type_path cstr =
   let ty = match get_desc cstr.cstr_res with
     | Tbox inner -> inner | _ -> cstr.cstr_res in

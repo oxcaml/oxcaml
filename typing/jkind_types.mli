@@ -149,6 +149,10 @@ module Sort : sig
 
     val direct_sum : Const.t -> Const.t list option
 
+    (** Runtime tag and fields of each boxed alternative, in sum order.
+        Immediates have no fields and are numbered separately from blocks. *)
+    val boxed_cases : Const.t list -> (int * Const.t list) list
+
     (** Inclusive upper bound of a source constructor's range of tags. *)
     val last_tag : t -> int -> int
 

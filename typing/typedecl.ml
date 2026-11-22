@@ -1463,26 +1463,29 @@ let variant_has_companion_shape cstrs =
       cstrs
   | [] | [_] -> false
 
-let compatible_boxed_arms cstrs layouts =
-  let can_fuse = Datarepr.can_fuse ~ordinary_box:true cstrs in
+let compatible_boxed_arms ~loc cstrs layouts =
   let arm (cstr : Types.constructor_declaration) layout =
     match layout with
     | Cstr_layout_undetermined -> None
     | Cstr_layout_known { shape = Constructor_mixed s; _ }
       when shape_has_float_boxed s -> None
-    | Cstr_layout_known { sorts; _ } ->
-      let sorts = match cstr.cd_args with
-        | Cstr_tuple _ -> Some (Array.to_list sorts)
-        | Cstr_record labels ->
-          Misc.Stdlib.List.map_option (fun label -> label.ld_sort) labels
-      in
+    | Cstr_layout_known _ ->
+      let sorts = Datarepr.sum_argument_sorts cstr.cd_args layout in
       Option.bind sorts (fun sorts ->
         if not (cstr_layout_is_constant layout) &&
            List.for_all Jkind.Sort.Const.all_void sorts
-        then None else Some (Datarepr.sort_arm ~can_fuse cstr.cd_args sorts))
+        then None else Some (Datarepr.sort_arm cstr.cd_args sorts))
   in
   let arms = Misc.Stdlib.List.map2_option arm cstrs (Array.to_list layouts) in
-  Option.is_some (Option.bind arms Jkind_types.Sum_repr.make)
+  match Option.bind arms Jkind_types.Sum_repr.make with
+  | None -> false
+  | Some repr ->
+    if repr.tag_count > Config.max_tag + 1 &&
+       List.exists (fun (tag, fields) ->
+         tag > Config.max_tag && not (List.is_empty fields))
+         (Jkind_types.Sum_repr.boxed_cases repr.alternatives)
+    then Error.log_and_raise loc Too_many_constructors;
+    true
 
 let gets_unboxed_version decl =
   match decl.type_kind with
@@ -2744,8 +2747,6 @@ let rec update_decl_jkind env dpath decl =
         { cstr with cd_args }, fields
       in
       let cstrs, args = List.split (List.map args_and_layouts cstrs) in
-      let can_fuse = Datarepr.can_fuse cstrs
-          ~ordinary_box:(Path.is_unboxed_version dpath) in
       let rec direct_sum : _ Jkind_types.Layout.t -> _ = function
         | Sum arms -> Some arms
         | Addressable layout -> direct_sum layout
@@ -2755,11 +2756,11 @@ let rec update_decl_jkind env dpath decl =
                     (Jkind.Sort.void, Jkind_types.Scannable_axes.max)
           | layouts -> Jkind_types.Layout.product layouts in
       let layouts = List.map2 (fun cstr fields ->
-        Datarepr.sum_arm ~can_fuse cstr.Types.cd_args ~direct_sum
+        Datarepr.sum_arm cstr.Types.cd_args ~direct_sum
           (List.map (fun (_, layout, _) -> layout) fields)) cstrs args
         |> Jkind_types.Sum_repr.alternatives ~payload in
       let sorts = List.map2 (fun cstr fields ->
-        Datarepr.sort_arm ~can_fuse cstr.Types.cd_args
+        Datarepr.sort_arm cstr.Types.cd_args
           (List.map (fun (sort, _, _) -> sort) fields)) cstrs args in
       if Option.is_none (Jkind_types.Sum_repr.make sorts)
       then invalid loc "a vector or mask arm is not supported";
@@ -2923,7 +2924,7 @@ let rec update_decl_jkind env dpath decl =
     match new_decl.type_kind with
     | Type_variant (cstrs, Variant_boxed layouts, _)
       when Option.is_some decl.type_unboxed_version &&
-           not (compatible_boxed_arms cstrs layouts) -> None
+           not (compatible_boxed_arms ~loc:decl.type_loc cstrs layouts) -> None
     | _ -> Option.map (fun companion ->
         let path = Path.unboxed_version dpath in
         match companion.type_kind, companion.type_manifest with

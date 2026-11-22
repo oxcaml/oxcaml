@@ -478,6 +478,21 @@ module Sort = struct
 
     let separate arms = List.map (fun arm -> Fields [arm]) arms
 
+    let boxed_cases alternatives =
+      let next_const = ref 0 and next_block = ref 0 in
+      List.map
+        (fun sort ->
+          let fields =
+            if Const.all_void sort
+            then []
+            else match sort with Const.Product fields -> fields | _ -> [sort]
+          in
+          let next = if List.is_empty fields then next_const else next_block in
+          let tag = !next in
+          incr next;
+          tag, fields)
+        alternatives
+
     let last_tag repr index =
       if index + 1 = Array.length repr.arms
       then repr.tag_count - 1

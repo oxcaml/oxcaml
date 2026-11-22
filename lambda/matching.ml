@@ -2130,7 +2130,8 @@ let get_pat_args_constr p rem =
     args @ rem
   | _ -> assert false
 
-let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
+let get_expr_args_constr ~scopes ?unboxed head
+    { arg; mut; sort; layout; _ } rem =
   let cstr, cstr_shape, arg_sorts =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
@@ -2214,17 +2215,18 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       }
   in
   let binding_kind = add_barrier_to_let_kind ubr Alias in
-  match cstr.cstr_sum, cstr.cstr_tag with
+  match Data_types.sum_for_constructor_payload cstr, cstr.cstr_tag with
   | Some repr, Ordinary {src_index} ->
+    let arg = Option.value unboxed ~default:arg in
     let layouts = List.map (Typeopt.layout_of_sort head.pat_loc) arg_sorts in
     let args = Translrepr.Sum.project loc repr src_index arg layouts in
     List.map2 (fun arg (sort, layout) ->
       { arg; binding_kind; mut = compose_mut mut Immutable; sort; layout })
       args (List.combine arg_sorts layouts) @ rem
   | _ ->
-  if cstr.cstr_inlined <> None then
-    { arg; binding_kind; mut; sort; layout } :: rem
-  else
+    if Option.is_some cstr.cstr_inlined then
+      { arg; binding_kind; mut; sort; layout } :: rem
+    else
     match cstr.cstr_repr with
     | Variant_boxed _ ->
       List.mapi
@@ -2258,9 +2260,9 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
           cstr.cstr_args
         @ rem
 
-let divide_constructor ~scopes ctx pm =
+let divide_constructor ~scopes ?unboxed ctx pm =
   divide
-    (get_expr_args_constr ~scopes)
+    (get_expr_args_constr ~scopes ?unboxed)
     Data_types.equal_constr
     get_key_constr
     get_pat_args_constr
@@ -4524,10 +4526,10 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
       let compile_no_test divide combine =
         compile_no_test ~scopes value_kind divide combine repr partial ctx pm
       in
-      let compile_test ?(args = pm.args) divide combine =
+      let compile_test divide combine =
         compile_test
           (compile_match ~scopes value_kind repr partial)
-          arg_partial divide combine ctx { pm with args }
+          arg_partial divide combine ctx pm
       in
       let open Patterns.Head in
       match ph.pat_desc with
@@ -4567,9 +4569,10 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             divide_constant
             (combine_constant value_kind ploc arg cst arg_partial)
       | Construct (cstr, _, _) ->
-          let compile args arg =
-            compile_test ~args (divide_constructor ~scopes)
-              (combine_constructor value_kind ploc arg ph.pat_env
+          let compile unboxed =
+            let scrutinee = Option.value unboxed ~default:arg in
+            compile_test (divide_constructor ~scopes ?unboxed)
+              (combine_constructor value_kind ploc scrutinee ph.pat_env
                  ph.pat_unique_barrier cstr arg_partial)
           in
           (match cstr.cstr_sum with
@@ -4578,13 +4581,12 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
              let sort = Jkind_types.Sum_repr.carrier alternatives in
              let layout = Typeopt.layout_of_sort ph.pat_loc sort in
              let id = Ident.create_local "unboxed" in
-             let first = { first with arg = Var id; sort; layout } in
-             let body, jumps = compile { pm.args with first } (Lvar id) in
+             let body, jumps = compile (Some (Lvar id)) in
              let inline =
                Translrepr.Boxed_sum.translate ploc Unbox alternatives arg in
              Llet (Strict, layout, id, Lambda.debug_uid_none, inline, body),
              jumps
-           | _ -> compile pm.args arg)
+           | _ -> compile None)
       | Array (_, _, _) ->
           let kind = Typeopt.array_pattern_kind pomega in
           compile_test
