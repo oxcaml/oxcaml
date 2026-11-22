@@ -37,8 +37,9 @@ by a *type*. The type system knows about a collection of fixed *base* layouts:
 The type system also supports two *composite* layouts:
 * `l1 & l2 & ... & lk` is the layout of unboxed products where the first element
   of the product has layout `l1`, the second has layout `l2`, and so on.
-* `l1 + l2 + ... + lk` is the layout of an unboxed variant whose constructors
-  have payload layouts `l1` through `lk`, in declaration order.
+* `l1 + l2 + ... + lk` is a sum layout. Its tag selects one of the payload
+  layouts `l1` through `lk`. A constructor with an unboxed variant argument
+  can contribute several [alternatives](#unboxed-variants) to the sum.
 
 ## Value layouts
 
@@ -355,19 +356,6 @@ field for the string. The `reply#` field in `entry` stores the tag and space
 for the string inside the record. The record has the same size whichever
 constructor it holds.
 
-When the sole argument of an outer constructor is another unboxed variant,
-the two variants share a tag. For example, `type answer = Busy | Ready of reply#`
-uses one tag to distinguish `Busy`, `Ready Missing`, and `Ready (Found s)`.
-The layout `void + void + value` lists these three alternatives in order.
-Another variant can have the same layout and still be a different type.
-Two unboxed variant fields in a product keep independent tags.
-
-As with records, some boxed variant declarations have no implicit unboxed
-version. For example, in `type t = Empty | Witness of unit#`, both constructors
-have payload layout `void`. The boxed representation uses an immediate for
-`Empty` and a block for `Witness`. The sum `void + void` does not record that
-distinction, so this declaration provides only `t`.
-
 A constructor can declare record fields. The unboxed constructor stores the
 fields as a product in declaration order. A pattern can bind that product:
 
@@ -382,30 +370,48 @@ The boxed pattern `Count fields` on a `counter` binds the original block:
 A direct `[@@unboxed]` variant uses the same product for its record fields.
 Matching its `box` also binds the product, so it does not allow assignment.
 
-A constructor with inline record fields keeps the tag of each field. The
-layout of `type t = Busy | Ready of { reply : reply# }` is `value` for `t`
-and `void + (void + value)` for `t#`. The outer tag selects `Busy` or `Ready`.
-In `Ready`, the inner tag selects `Missing` or `Found`. Adding a field, as in
-`Ready of { marker : unit#; reply : reply# }`, gives the payload a product
-layout: `void & (void + value)`. These layouts also tell an abstract client
-how to box and unbox the value without seeing its constructors.
-
-A GADT result type or an atomic field prevents an implicit unboxed variant.
-A record constructor does not prevent a sibling from sharing its tag with a
-direct sum argument. For example:
+Tag sharing depends on how each constructor stores its argument. Consider a
+variant that uses `reply#` twice, once directly and once in a record field:
 
 ```ocaml
 type t = Busy | Direct of reply# | Saved of { mutable reply : reply# }
 ```
 
-The layout of `t#` is `void + void + value + (void + value)`. In the boxed
-type `t`, `Busy` and `Direct Missing` are immediates 0 and 1. A
-`Direct (Found s)` block has tag 0 and stores only `s`. A `Saved` block has
-tag 1 and stores the inner tag and space for the string. Matching `Saved r`
-and constructing `Saved r` again returns the same block.
-The limit on boxed block tags counts the alternatives after tag sharing.
+`Direct` and its argument share one tag. That tag distinguishes
+`Direct Missing` from `Direct (Found s)`. A `Saved` record keeps its own
+`reply#` tag so that assigning to `r.reply` can change `Missing` to `Found s`
+while `r` remains the same record. The layout of `t#` is therefore
+`void + void + value + (void + value)`. The parentheses mark the tag inside
+`Saved`. Source patterns still use the constructor names at both levels.
+Types with the same layout can have different constructors.
+
+Boxing a `t#` produces an ordinary `t`. A boxed value stores only the fields
+of the selected outer alternative:
+
+| Source pattern | Boxed representation |
+| --- | --- |
+| `Busy` | Immediate 0 |
+| `Direct Missing` | Immediate 1 |
+| `Direct (Found s)` | Block with tag 0 and one field for `s` |
+| `Saved r` | Block with tag 1, the `reply#` tag, and space for the string |
+
+A match on `t# box` accepts these same patterns. Matching `Saved r` and
+constructing `Saved r` again returns the original block. A separately
+compiled function can box or unbox a value using just its sum layout.
+
+A record with several fields has a product layout. For example,
+`Saved of { marker : unit#; reply : reply# }` contributes
+`void & (void + value)` to the outer sum. Two unboxed variant fields in the
+same record each keep their own tag.
 
 *Limitations and future plans*:
+* As with records, some boxed declarations have no implicit unboxed version.
+  In `type t = Empty | Witness of unit#`, both payloads have layout `void`.
+  The boxed type uses an immediate for `Empty` and a block for `Witness`.
+  The layout `void + void` cannot express that distinction. A GADT result
+  type or an atomic field also prevents an implicit unboxed variant.
+* The limit on boxed block tags counts the alternatives after tag sharing.
+  Immediate alternatives do not use block tags.
 * Arrays of unboxed variants follow the same rule as arrays of unboxed
   products. The garbage collector must be able to scan the entire element or
   skip it entirely. A mixed unboxed variant needs both scannable and raw
