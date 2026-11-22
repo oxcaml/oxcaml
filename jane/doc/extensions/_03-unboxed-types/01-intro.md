@@ -662,15 +662,10 @@ type t =
 
 ## The "mixed block" representation
 
-The runtime representation of mixed blocks is slightly different than normal
-OCaml blocks. These differences are present to accommodate the garbage collector,
-which must scan the fields with layout `value`, but not the fields containing
-unboxed types.
-
-To enable this, the header word of mixed blocks remembers how many elements of
-the block are values, with a maximum of 254. The compiler _reorders_ the fields
-of your block so that all the values are first, and the GC knows to stop
-scanning after it has seen that number of fields.
+In native code, a mixed block begins with the words that the garbage collector
+(GC) scans for pointers. Its header gives the length of this *scannable
+prefix* in words, up to 254. The compiler places raw data, such as unboxed
+integers and floats, after the prefix. The GC skips those words.
 
 For example, consider this record type:
 ```ocaml
@@ -711,6 +706,21 @@ type t =
 ```
 This is represented as a block with six fields, and the fields appear the order
 `x`, `z`, `c`, `a`, `w`, `y`.
+
+An [unboxed variant](#unboxed-variants) field can contribute words to both
+parts of the same block. For example:
+
+```ocaml
+type payload = Text of string | Bits of int64_u [@@unboxed]
+type envelope = { payload : payload }
+```
+
+In native code, an `envelope` has the same size and scannable prefix for both
+constructors. The prefix contains one word for the string pointer. The raw
+part holds the constructor tag and space for the 64-bit integer. For `Text s`,
+the GC follows the pointer to `s`. For `Bits n`, the compiler puts an
+immediate in that same prefix word, so the GC can scan it safely. The GC uses
+the prefix length in the record header whichever constructor is active.
 
 ## Generic operations aren't supported
 
