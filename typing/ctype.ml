@@ -3542,6 +3542,26 @@ let may_contain_inline_sum env ty = inline_sum ~unknown:true env ty
 let uncontended_destination = With_locality.of_const
     { With_locality.Const.max with contention = Uncontended }
 
+let rec primitive_type_head env ty =
+  match get_desc (unwrap_until_or_null env ty) with
+  | Tpoly (inner, _) -> primitive_type_head env inner
+  | desc -> desc
+
+(* Primitive operations use runtime argument positions. Keep the source index
+   of each retained arrow for mode specialization and diagnostic locations. *)
+let primitive_arguments env prim ty =
+  let rec collect index reprs ty acc =
+    match reprs, primitive_type_head env ty with
+    | (_, repr) :: rest, Tarrow ((_, mode, _), arg, result, _) ->
+      let acc = match repr with
+        | Primitive.Elided_void -> acc
+        | Primitive.Native_repr _ -> (index, mode, arg) :: acc
+      in
+      collect (index + 1) rest result acc
+    | _ -> List.rev acc, ty
+  in
+  collect 0 prim.Primitive.prim_native_repr_args ty []
+
 let instance_primitive_destination env prim ty =
   let rec freshen index ty =
     match get_desc (expand_head env ty) with
@@ -3561,9 +3581,16 @@ let instance_primitive_destination env prim ty =
           newty (Tarrow ((lbl, arg_mode, ret_mode), arg, ret', comm))
     | _ -> ty
   in
+  let freshen_runtime_arg index =
+    let args, _ = primitive_arguments env prim ty in
+    match List.nth_opt args index with
+    | Some (source_index, _, _) -> freshen source_index ty
+    | None -> ty
+  in
   match Primitive.sum_access prim with
-  | Store_array | Store_index | Store_pointer | Store_singleton -> freshen 0 ty
-  | Blit -> freshen 2 ty
+  | Store_array | Store_index | Store_pointer | Store_singleton ->
+    freshen_runtime_arg 0
+  | Blit -> freshen_runtime_arg 2
   | No_replacement | Scalar_memory_access | Unclassified
   | Uninitialized_array -> ty
 
@@ -3581,18 +3608,8 @@ let check_primitive_sum_access site ~loc env
   | (Uninitialized_array | Scalar_memory_access | Unclassified),
     Direct_application _ -> ()
   | _ ->
-    let rec head ty =
-      match get_desc (unwrap_until_or_null env ty) with
-      | Tpoly (inner, _) -> head inner
-      | desc -> desc
-    in
-    let rec arguments remaining ty acc =
-      match remaining, head ty with
-      | n, Tarrow ((_, mode, _), arg, rest, _) when n > 0 ->
-        arguments (n - 1) rest ((mode, arg) :: acc)
-      | _ -> List.rev acc, ty
-    in
-    let args, result = arguments prim.prim_type_arity ty [] in
+    let head = primitive_type_head env in
+    let args, result = primitive_arguments env prim ty in
     let unknown = match site, access with
       | _, Scalar_memory_access | Specialized_value, _ -> false
       | Declaration, _ -> not prim.prim_is_layout_poly
@@ -3652,25 +3669,28 @@ let check_primitive_sum_access site ~loc env
           then reject ()
     in
     begin match access, args with
-    | Store_array, [(mode, dst); _; _, value] ->
-      require 0 mode (contains value || array_element dst)
-    | Store_index, [(mode, _); _, index; _, value] ->
-      require 0 mode (contains value || index_element index)
-    | Store_pointer, [(mode, dst); _, value] ->
-      require 0 mode (contains value || pointer_element dst)
-    | Store_singleton, [(mode, dst); _, value] ->
-      require 0 mode (contains value || singleton_element dst)
-    | Blit, [_; _; (mode, dst); _; _] -> require 2 mode (array_element dst)
+    | Store_array, [(i, mode, dst); _; _, _, value] ->
+      require i mode (contains value || array_element dst)
+    | Store_index, [(i, mode, _); _, _, index; _, _, value] ->
+      require i mode (contains value || index_element index)
+    | Store_pointer, [(i, mode, dst); _, _, value] ->
+      require i mode (contains value || pointer_element dst)
+    | Store_singleton, [(i, mode, dst); _, _, value] ->
+      require i mode (contains value || singleton_element dst)
+    | Blit, [_; _; (i, mode, dst); _; _] -> require i mode (array_element dst)
     | Uninitialized_array, [_] ->
       if array_element result then
         raise (Primitive.Error (loc, Uninitialized_sum_array))
-    | (Scalar_memory_access | Unclassified), _ ->
+    | No_replacement, _ -> ()
+    | (Scalar_memory_access | Unclassified | Store_array | Store_index
+      | Store_pointer | Store_singleton | Blit | Uninitialized_array), _ ->
+      (* Preserve Translprim's arity diagnostic for ordinary primitives. *)
       let unsupported ty = contains ty || array_element ty ||
         index_element ty || pointer_element ty in
-      if unsupported result || List.exists (fun (_, ty) -> unsupported ty) args
+      if unsupported result ||
+         List.exists (fun (_, _, ty) -> unsupported ty) args
       then raise (Primitive.Error
           (loc, Unsupported_sum_primitive prim.prim_name))
-    | _ -> ()
     end
 
 let type_jkind env ty =
