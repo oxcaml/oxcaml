@@ -365,7 +365,10 @@ let write_unit_info info filename =
          with the polled bit set" filename;
     seek_out oc (out_channel_length oc)
   end;
-  Digest.output oc crc)
+  Digest.output oc crc);
+  (* A later unit of this invocation and the link read this file where it
+     is, also inside the library root. *)
+  Codegen_variant.record_product filename
 
 (* The LLVM backend discards [Poll] instructions when lowering CFG to LLVM
    IR (see [llvmize]), so a unit it compiles is not polled no matter what
@@ -449,6 +452,19 @@ let standard_library_is_built_for (variant : Codegen_variant.t) =
   | info, _crc ->
     Codegen_variant.equal_fingerprint info.ui_codegen_fingerprint
       (Codegen_variant.fingerprint variant)
+
+(* Whether that unit info says that the root serves other settings than
+   those of [variant]. This is not the negation of the above: an installation
+   need not have the file, and a root without it is not known to be wrong. *)
+let standard_library_is_built_for_another (variant : Codegen_variant.t) =
+  let std_exit = Filename.concat Config.standard_library "std_exit.cmx" in
+  match read_unit_info std_exit with
+  | exception (Error _ | Sys_error _ | End_of_file | Failure _) ->
+    false
+  | info, _crc ->
+    not
+      (Codegen_variant.equal_fingerprint info.ui_codegen_fingerprint
+         (Codegen_variant.fingerprint variant))
 
 (* [Codegen_variant.missing_root_hint], except where the library root is itself
    a tree that serves the selected variant: no tree is missing then, and the

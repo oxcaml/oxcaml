@@ -183,9 +183,11 @@ let equal_fingerprint f1 f2 =
 let string_of_fingerprint f =
   String.concat ", " (List.map (fun (n, v) -> n ^ "=" ^ v) f)
 
+let variants_directory = "variants"
+
 let variant_root t =
   Filename.concat
-    (Filename.concat Config.standard_library "variants")
+    (Filename.concat Config.standard_library variants_directory)
     (to_string t)
 
 let directory_exists dir = try Sys.is_directory dir with Sys_error _ -> false
@@ -243,10 +245,103 @@ exception Directory_not_provided_by_variant of directory_error
 
 let is_plus_directory s = String.length s > 0 && s.[0] = '+'
 
+(* Variant trees only exist on systems whose directory separator is '/'.
+   Empty components (repeated and trailing separators) and "." components
+   do not count. *)
+let path_components path =
+  List.filter
+    (fun component ->
+      not
+        (String.equal component ""
+        || String.equal component Filename.current_dir_name))
+    (String.split_on_char '/' path)
+
+let rec strip_prefix ~prefix components =
+  match prefix, components with
+  | [], rest -> Some rest
+  | p :: prefix, c :: components when String.equal p c ->
+    strip_prefix ~prefix components
+  | _ :: _, _ -> None
+
+(* Paths are compared as files: by the components of the absolute path, a
+   relative one being taken from the current directory, so that a file or
+   a directory is the same however its path is spelled.  Symbolic links are
+   not resolved, and ".." is a component like another: a path that goes
+   through one is not recognized as inside the directory that it comes
+   back to. *)
+let absolute_components path =
+  path_components
+    (if Filename.is_relative path
+     then Filename.concat (Sys.getcwd ()) path
+     else path)
+
+(* The same file under any spelling of its path.  ".." stays where it is:
+   it follows a directory that can be a symbolic link, so it is not known
+   which directory it leads to. *)
+let file_identity path =
+  String.concat Filename.dir_sep (absolute_components path)
+
+let same_file path other =
+  String.equal (file_identity path) (file_identity other)
+
+(* A file that this invocation wrote is the file to read back, wherever it
+   is: what the tree of the selected variant has under the same name is
+   another file. *)
+let written_files : (string, unit) Hashtbl.t = Hashtbl.create 16
+
+let record_product path = Hashtbl.replace written_files (file_identity path) ()
+
+let is_product path =
+  Hashtbl.length written_files > 0
+  && Hashtbl.mem written_files (file_identity path)
+
+let selected_root_mapping () =
+  let default_root = Config.standard_library in
+  let root = effective_standard_library () in
+  if String.equal root default_root
+  then Fun.id
+  else
+    let prefix = absolute_components default_root in
+    fun path ->
+      match strip_prefix ~prefix (absolute_components path) with
+      | None -> path
+      | Some rest ->
+        (* A path that already names a variant's tree was chosen as such,
+           and a ".." component could leave the root again. *)
+        let names_variant_tree =
+          match rest with
+          | first :: _ -> String.equal first variants_directory
+          | [] -> false
+        in
+        if names_variant_tree
+           || List.mem Filename.parent_dir_name rest
+           || is_product path
+        then path
+        else
+          let counterpart = List.fold_left Filename.concat root rest in
+          (* A directory is replaced by a directory only; "" is the current
+             one. *)
+          let is_directory path =
+            directory_exists
+              (if String.equal path "" then Filename.current_dir_name else path)
+          in
+          if Sys.file_exists counterpart
+             && not (is_directory path && not (is_directory counterpart))
+          then counterpart
+          else path
+
+let in_selected_root path = selected_root_mapping () path
+
+let is_product_in_replaced_directory path =
+  is_product path
+  &&
+  let directory = Filename.dirname path in
+  not (String.equal (in_selected_root directory) directory)
+
 let expand_directory_unchecked s =
   if is_plus_directory s
   then Misc.expand_directory (effective_standard_library ()) s
-  else s
+  else in_selected_root s
 
 let expand_directory s =
   if is_plus_directory s
@@ -276,7 +371,7 @@ let expand_directory s =
            })
     else expanded
   end
-  else s
+  else in_selected_root s
 
 (* [Clflags] computes the -I flag for the standard library but cannot depend
    on this module (this module reads the [Clflags.frame_pointers] flag). *)

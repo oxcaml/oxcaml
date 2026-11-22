@@ -56,10 +56,34 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Unit of string * unit_infos * Digest.t
     | Library of string * library_infos
 
+  (* Every lookup of a link input goes through this function, so that the same
+     file always resolves to the same path (see the eval support files in
+     [link], below). *)
+  let find_link_input filename = Compmisc.find_input filename
+
+  let same_file = Codegen_variant.same_file
+
+  (* The C objects and archives of the link, those of the command line and those
+     that the linked archives record, likewise taken from the selected variant's
+     tree when they are named by a path inside the default library root: they
+     carry no fingerprint, so nothing would refuse the default tree's copy.
+     Everything else stays as written: linker options, files elsewhere, and a
+     file without a counterpart in the variant's tree, such as the default
+     tree's runtime archive when the variant has a runtime of its own, under
+     another name. These names are paths, relative to the current directory if
+     they are relative, and are not searched for on the load path. *)
+  let c_objects_to_link linkenv =
+    List.map
+      (fun name ->
+        if String.starts_with ~prefix:"-" name
+        then name
+        else Codegen_variant.in_selected_root name)
+      (!Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv)
+
   (* CR mshinwell: This should not be raising errors from [Linkenv] *)
   let read_file requested_filename =
     let resolved_pathname =
-      try Load_path.find requested_filename
+      try find_link_input requested_filename
       with Not_found ->
         raise (Linkenv.Error (File_not_found requested_filename))
     in
@@ -357,7 +381,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             objfiles
             ([], [], [], Generic_fns.Partition.Set.empty)
         in
-        Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
+        Clflags.ccobjs := c_objects_to_link linkenv;
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
         Backend.link_shared
           (List.map (fun f -> f.Linkenv.path) ml_objfiles)
@@ -407,15 +431,18 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             (* Avoid double linking errors in the case where the user has
                already passed one of the support files on the command line. The
                equality used here is the full path as resolved by [Load_path]
-               (see also [scan_file], above). *)
+               (see also [scan_file], above), whether it is spelled as a
+               relative path or as an absolute one. *)
             List.filter_map
               (fun support_file ->
                 (* CR mshinwell: it's unclear that [Load_path] does anything
                    along the lines of [realpath], so this equality might not be
                    as good as we would like *)
-                match Load_path.find support_file with
+                match find_link_input support_file with
                 | full_path ->
-                  if List.mem full_path full_paths then Some full_path else None
+                  if List.exists (same_file full_path) full_paths
+                  then Some full_path
+                  else None
                 | exception Not_found ->
                   (* An error will be reported by [scan_file], called below, in
                      this case. (This is likely to be a compiler bug or a
@@ -462,10 +489,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               (* Remove user-provided occurrences of support libraries *)
               List.filter
                 (fun file ->
-                  match Load_path.find file with
+                  match find_link_input file with
                   | full_path ->
                     not
-                      (List.mem full_path
+                      (List.exists (same_file full_path)
                          full_paths_of_eval_support_files_already_provided_by_user)
                   | exception Not_found ->
                     (* Some kind of race has occurred, just ignore it. *)
@@ -507,7 +534,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
            match Linkenv.extract_missing_globals linkenv with
            | [] -> ()
            | mg -> raise (Linkenv.Error (Missing_implementations mg)));
-        Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
+        Clflags.ccobjs := c_objects_to_link linkenv;
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
         (* put user's opts first *)
         Backend.link linkenv ml_objfiles output_name ~ppf_dump ~genfns

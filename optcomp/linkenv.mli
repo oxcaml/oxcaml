@@ -141,6 +141,26 @@ type error =
       { filename : filepath;
         variant : string
       }
+    (* The two errors below are for -use-cached-generic-functions without an
+       explicit path as well, where the archive has no place: the one above is
+       only for a file that can be generated where it is missing, in a library
+       tree that serves the selected variant.
+
+       The installation has no library tree that serves the selected variant. *)
+  | Cached_generic_functions_tree_not_found of { variant : string }
+    (* The library root, which stands for the tree of the selected variant, is
+       built for another one: so is its archive, if it has one. *)
+  | Cached_generic_functions_root_mismatch of
+      { root : filepath;
+        variant : string
+      }
+    (* The file that -cached-generic-functions-path names does not exist, and
+       neither does [also_looked_up], its counterpart in the selected variant's
+       tree, when the path lies inside the default library root. *)
+  | Cached_generic_functions_file_not_found of
+      { filename : filepath;
+        also_looked_up : filepath option
+      }
 
 exception Error of error
 
@@ -148,3 +168,7 @@ exception Error of error
     given variant (OCAMLLIB naming a variant's tree, say), judged by the codegen
     fingerprint of the standard library there. *)
 val standard_library_is_built_for : Codegen_variant.t -> bool
+
+(** Whether that fingerprint is one of other settings than the variant's: false
+    when the root has no standard library to read it from. *)
+val standard_library_is_built_for_another : Codegen_variant.t -> bool

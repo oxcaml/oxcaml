@@ -888,6 +888,9 @@ let process_action
         in
         if Ccomp.compile_file ?output:!output_name name <> 0
         then raise (Exit_with_status 2);
+        (* The link reads this object back: it is not a file of the
+           installation, even inside the library root. *)
+        Codegen_variant.record_product obj_name;
         ccobjs := obj_name :: !ccobjs
       end
   | ProcessObjects names ->

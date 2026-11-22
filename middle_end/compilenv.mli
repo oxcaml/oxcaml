@@ -129,6 +129,12 @@ exception Error of error
     such as a variant's tree that OCAMLLIB names. *)
 val standard_library_is_built_for : Codegen_variant.t -> bool
 
+(** Whether the standard library of [Config.standard_library] says that the
+    root is built for other such settings than those of the variant. False,
+    like [standard_library_is_built_for], when the root has no unit info of
+    the standard library to read. *)
+val standard_library_is_built_for_another : Codegen_variant.t -> bool
+
 (** [Codegen_variant.missing_root_hint], except where the library root
     serves the selected variant ([standard_library_is_built_for]): the note
     for an error about a file compiled for another variant, when it is

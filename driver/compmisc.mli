@@ -16,6 +16,19 @@
 val init_path :
   ?auto_include:Load_path.auto_include_callback -> ?dir:string -> unit -> unit
 val init_parameters : unit -> unit
+
+(** [Load_path.find] for a file that a link, an archive or a pack is made
+    from, and for the files that the compiler adds to a link.  The name is
+    looked for exactly as [Load_path.find] does it; the file found, like
+    one named by its path, is then taken from the library tree of the
+    selected codegen variant if it is inside the default library root
+    ([Codegen_variant.in_selected_root]).  Only a file that this invocation
+    wrote in a directory of that root that the variant's tree stands for is
+    not searched for: it is that file
+    ([Codegen_variant.is_product_in_replaced_directory]).  Under the default
+    variant this is [Load_path.find].  Raises [Not_found]. *)
+val find_input : string -> string
+
 val initial_env : unit -> Env.t
 
 val with_ppf_file :

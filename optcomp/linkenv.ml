@@ -69,6 +69,15 @@ type error =
       { filename : filepath;
         variant : string
       }
+  | Cached_generic_functions_tree_not_found of { variant : string }
+  | Cached_generic_functions_root_mismatch of
+      { root : filepath;
+        variant : string
+      }
+  | Cached_generic_functions_file_not_found of
+      { filename : filepath;
+        also_looked_up : filepath option
+      }
 
 exception Error of error
 
@@ -344,6 +353,9 @@ let lib_ccopts t = t.lib_ccopts
 
 let standard_library_is_built_for = Compilenv.standard_library_is_built_for
 
+let standard_library_is_built_for_another =
+  Compilenv.standard_library_is_built_for_another
+
 let missing_root_hint = Compilenv.missing_root_hint
 
 open Format_doc
@@ -443,12 +455,37 @@ let report_error ppf = function
       | None -> ""
     in
     fprintf ppf
-      "@[<hov>Cannot find %a:@ codegen variant '%s' of this installation does \
-       not provide a cached-generic-functions archive;@ generate it with@ \
+      "@[<hov>Cannot find %a,@ the cached-generic-functions archive for \
+       codegen variant '%s';@ generate it with@ \
        @[<h>generate_cached_generic_functions.exe%s %s@]@ or drop \
        -use-cached-generic-functions@]"
       Location.Doc.quoted_filename filename variant generator_flag
       (Filename.quote filename)
+  | Cached_generic_functions_tree_not_found { variant } ->
+    fprintf ppf
+      "@[<hov>This installation has no library tree for codegen variant '%s',@ \
+       and so no cached-generic-functions archive for it%t;@ name one with \
+       -cached-generic-functions-path@ or drop -use-cached-generic-functions@]"
+      variant (fun ppf ->
+        Option.iter (fprintf ppf "@ (%s)") (missing_root_hint ()))
+  | Cached_generic_functions_root_mismatch { root; variant } ->
+    fprintf ppf
+      "@[<hov>The library root %a@ is not built for codegen variant '%s':@ its \
+       cached-generic-functions archive is not for that variant either;@ name \
+       one with -cached-generic-functions-path@ or drop \
+       -use-cached-generic-functions@]"
+      Location.Doc.quoted_filename root variant
+  | Cached_generic_functions_file_not_found { filename; also_looked_up } ->
+    fprintf ppf
+      "@[<hov>Cannot find %a,@ the cached-generic-functions archive that \
+       -cached-generic-functions-path names%t@]"
+      Location.Doc.quoted_filename filename (fun ppf ->
+        Option.iter
+          (fprintf ppf
+             ",@ nor %a,@ where a path inside the default library root is \
+              looked up first for the selected codegen variant"
+             Location.Doc.quoted_filename)
+          also_looked_up)
 
 let () =
   Location.register_error_of_exn (function

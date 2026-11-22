@@ -35,11 +35,11 @@ end) : S = struct
 
   let read_info name =
     let filename =
-      try Load_path.find name
+      try Compmisc.find_input name
       with Not_found -> raise (Error (File_not_found name))
     in
     ( Filename.chop_suffix filename Backend.ext_flambda_obj ^ Backend.ext_obj,
-      Compilenv.read_unit_info filename )
+      (filename, Compilenv.read_unit_info filename) )
 
   let create_archive file_list lib_name =
     let archive_name = Filename.remove_extension lib_name ^ Backend.ext_lib in
@@ -51,14 +51,16 @@ end) : S = struct
         Misc.remove_file archive_name)
       (fun () ->
         output_string outchan Config.cmxa_magic_number;
-        let objfile_list, descr_list =
+        let objfile_list, read_list =
           List.split (List.map read_info file_list)
         in
         let linkenv = Linkenv.create () in
-        List.iter2
-          (fun file_name (unit, crc) ->
+        (* A message about a unit names the file that it was read from. *)
+        List.iter
+          (fun (file_name, (unit, crc)) ->
             Backend.check_consistency linkenv file_name unit crc)
-          file_list descr_list;
+          read_list;
+        let descr_list = List.map snd read_list in
         let cmis = Linkenv.extract_crc_interfaces linkenv in
         let cmxs = Linkenv.extract_crc_implementations linkenv in
         (* CR mshinwell: see comment in compilenv.ml let cmxs =

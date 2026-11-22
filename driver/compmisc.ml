@@ -40,6 +40,27 @@ let () =
       Some (Location.error_of_printer_file report_variant_directory_error err)
     | _ -> None)
 
+(* A name is looked for as [Load_path.find] does it, with the name as
+   written, and the file that is found is then mapped: so no name is
+   searched for under a tree that the search goes through already, and a
+   name with a directory part that the search finds inside the default
+   root, from a directory above it, is the selected variant's, as when it
+   is named by its path.  The one exception is a file that the invocation
+   wrote in a directory of the default root that the selected variant's
+   tree stands for: the search would look for it in that tree, so it is
+   used as the file that it is.  Under the default variant, and for every
+   file in a directory that is not replaced, this is [Load_path.find]. *)
+let find_input name =
+  if Codegen_variant.is_product_in_replaced_directory name
+  then if Sys.file_exists name then name else raise Not_found
+  else if Filename.is_implicit name
+  then Codegen_variant.in_selected_root (Load_path.find name)
+  else
+    (* A counterpart exists, and is an implicit name when the root is one:
+       it is not to be searched for. *)
+    let file = Codegen_variant.in_selected_root name in
+    if String.equal file name then Load_path.find name else file
+
 (* Initialize the search path.
    [dir] (default: the current directory)
    is always searched first  unless -nocwd is specified,
@@ -83,7 +104,14 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
   in
   let visible =
     (if !Clflags.no_cwd then []
-     else [{ Clflags.path = dir; cmx_guaranteed = false }])
+     else
+       (* The current directory is a directory of the load path like the
+          others: inside the default library root, it stands for its
+          counterpart in the selected variant's tree, as [-I .] does.  So
+          every file that is looked up by name comes from one tree, whoever
+          looks it up: an interface, a .cmx file, an input of the link. *)
+       [{ Clflags.path = Codegen_variant.in_selected_root dir;
+          cmx_guaranteed = false }])
     @ List.rev_append visible
         (List.map
            (fun path -> { Clflags.path; cmx_guaranteed = true })
@@ -124,10 +152,23 @@ let initial_env () =
     else
       Some "Stdlib"
   in
+  (* An interface inside the default library root is the selected variant's,
+     like the directory of -H that it is in; this is done for each
+     compilation, since the selection can differ between files. *)
+  let open_implicit_args =
+    List.rev_map
+      (fun (arg : Clflags.open_arg) : Clflags.open_arg ->
+        match arg with
+        | Open _ -> arg
+        | Open_cmi { path; cmx_guaranteed } ->
+          Open_cmi
+            { path = Codegen_variant.in_selected_root path; cmx_guaranteed })
+      !Clflags.open_args
+  in
   Typemod.initial_env
     ~loc:(Location.in_file "command line")
     ~initially_opened_module
-    ~open_implicit_args:(List.rev !Clflags.open_args)
+    ~open_implicit_args
 
 let directory_exists dir =
   Sys.file_exists dir && Sys.is_directory dir

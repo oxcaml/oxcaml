@@ -87,8 +87,8 @@ module Dune_manifests_reader : sig
 
   val read_manifest
     :  t
-    -> f:(basename:string -> location:Path.Cwd_relative.t ->
-          cmx_guaranteed:bool -> unit)
+    -> file_location:(Path.Cwd_relative.t -> string)
+    -> f:(basename:string -> location:string -> cmx_guaranteed:bool -> unit)
     -> on_manifest:(Path.Load_root_relative.t -> unit)
     -> manifest_path:Path.Load_root_relative.t
     -> unit
@@ -177,7 +177,7 @@ end = struct
 
   let iter_lines ~f path =
     In_channel.with_open_text
-      (Path.Cwd_relative.to_string path)
+      path
       (fun ic ->
         let rec loop () =
           try
@@ -220,15 +220,17 @@ end = struct
     | _ -> raise (Parse_error ("Cannot parse manifest file line: " ^ line))
   ;;
 
-  let read_manifest t ~f ~on_manifest ~manifest_path =
+  (* [file_location] says where a file that is named here is: the manifest
+     itself, and the files that it names. *)
+  let read_manifest t ~file_location ~f ~on_manifest ~manifest_path =
     let buffer = Buffer.create 16 in
     visit t manifest_path ~f:(fun manifest_path ->
-      iter_lines manifest_path ~f:(fun line ->
+      iter_lines (file_location manifest_path) ~f:(fun line ->
         match parse_line ~buffer line with
         | None -> ()
         | Some (Entry.File { basename; location; cmx_guaranteed }) ->
           visit t location ~f:(fun location ->
-            f ~basename ~location ~cmx_guaranteed)
+            f ~basename ~location:(file_location location) ~cmx_guaranteed)
         | Some (Manifest manifest_path) -> on_manifest manifest_path))
   ;;
 end
@@ -443,6 +445,20 @@ let pending_hidden_manifests
 
 let manifests_reader = s_table Dune_manifests_reader.create ()
 
+(* Where a manifest, or the file that a manifest or a -H-file option names,
+   is: one inside the default library root is taken from the tree of the
+   selected codegen variant, like the files of a directory given to -I or
+   -H.  The selection is read when this is applied to [()]; the load path is
+   initialized again before a unit is compiled or linked for another one. *)
+(* Merlin has no codegen variants: the location is the one given.
+let file_location () =
+  let in_selected_root = Codegen_variant.selected_root_mapping () in
+  fun location ->
+    in_selected_root
+      (Dune_manifests_reader.Path.Cwd_relative.to_string location)
+*)
+let file_location () = Dune_manifests_reader.Path.Cwd_relative.to_string
+
 let reset () =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.reset ();
@@ -490,9 +506,11 @@ let init_manifests () =
       Dune_manifests_reader.Path.Load_root_relative.of_string manifest_path in
     f manifest_path
   in
+  let file_location = file_location () in
   let rec load_visible_manifest manifest_path =
     Dune_manifests_reader.read_manifest
       !manifests_reader
+      ~file_location
       ~manifest_path
       ~on_manifest:load_visible_manifest
       ~f:(fun ~basename ~location ~cmx_guaranteed ->
@@ -500,7 +518,7 @@ let init_manifests () =
           Path_cache.prepend_add_single
             { visibility = Visible; cmx_guaranteed }
             basename
-            (Dune_manifests_reader.Path.Cwd_relative.to_string location))
+            location)
   in
   let enqueue_hidden_manifest manifest_path =
     Queue.add manifest_path !pending_hidden_manifests
@@ -532,13 +550,12 @@ let load_one_pending_manifest ~uncap fn =
     let found = ref None in
     Dune_manifests_reader.read_manifest
       !manifests_reader
+      ~file_location:(file_location ())
       ~manifest_path
       ~on_manifest:(fun manifest_path ->
         Queue.add manifest_path !pending_hidden_manifests)
       ~f:(fun ~basename ~location ~cmx_guaranteed ->
         let include_flags = { visibility = Hidden; cmx_guaranteed } in
-        let location =
-          Dune_manifests_reader.Path.Cwd_relative.to_string location in
         if Option.is_none !found && basename_matches ~uncap fn basename
         then found := Some (location, include_flags);
         Path_cache.add_single include_flags basename location);

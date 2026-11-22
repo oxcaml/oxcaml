@@ -150,6 +150,73 @@ val effective_standard_library : unit -> string
     [effective_standard_library]. *)
 val variant_root : t -> string
 
+(** The counterpart of [path] in the library tree of the selected variant.
+
+    Build systems name the libraries of the installation by path inside the
+    default root, the one [-where] and [-config] report whatever the variant
+    (<root>/unix, <root>/unix/unix.cmxa).  When the tree that serves the
+    selected variant ([selected_tree]) is not the default root and [path]
+    lies inside [Config.standard_library], this is the same path inside
+    [effective_standard_library ()], provided it exists there; in every
+    other case it is [path] itself.  So nothing changes when the default
+    root serves the selected variant or when no tree does, and a path
+    with no counterpart in the selected tree still names the default
+    root's file, for the fingerprint and consistency checks to accept or
+    reject.
+
+    A path is compared with the root as a file is, by its absolute path,
+    so it does not matter how either is spelled: a relative path is taken
+    from the current directory, and repeated and trailing separators and
+    "." components are ignored.  Symbolic links are not resolved, so a root
+    reached under another name is not recognized, and neither is a path
+    that comes back to the root through a ".." component.  A path below
+    <root>/variants already names a variant's tree and is left alone, as is
+    one with a ".." component below the root, and a file that the
+    invocation wrote ([is_product]).
+
+    The result is the path of a file or of a directory, to be used as it
+    is: it is not a name to give to [Load_path.find], which would search
+    for it again when it is relative.  A name is looked for first, as it
+    is written, and what is found is mapped ([Compmisc.find_input]). *)
+val in_selected_root : string -> string
+
+(** [in_selected_root], with the selected variant read once, when the
+    function is applied to [()]: for mapping many paths while the selection
+    cannot change. *)
+val selected_root_mapping : unit -> string -> string
+
+(** Records that this invocation wrote the file [path]: the .cmx file of a
+    unit, the interface file that compiling a .mli file or a unit without
+    one writes, the object of a C file.  The units that the same invocation
+    compiles afterwards and the link read such a file where it is, and not
+    what the selected variant's tree has under the same name:
+    [in_selected_root] leaves it alone, however its path is spelled when it
+    is read back.  Only that file is recorded, not the others that could be
+    named after the same source. *)
+val record_product : string -> unit
+
+(** Whether [path] names a file that [record_product] recorded
+    ([same_file]). *)
+val is_product : string -> bool
+
+(** Whether [path] is a file that this invocation wrote ([is_product]) in a
+    directory that [in_selected_root] replaces by another: a directory of
+    the default library root that the tree of the selected variant also
+    has.  That is the one case in which a search does not find such a file
+    where it was written: the other directory is searched in its place, and
+    can have a file of that name.  A directory of the root without a
+    counterpart, and one inside a variant's tree, are searched as they
+    are. *)
+val is_product_in_replaced_directory : string -> bool
+
+(** Whether two paths name the same file, as far as their spelling tells:
+    a relative path is taken from the current directory, and repeated and
+    trailing separators and "." components are ignored.  Symbolic links
+    are not resolved and ".." components are not followed, since the
+    directory before one can be a link: two paths that differ in them are
+    taken for different files. *)
+val same_file : string -> string -> bool
+
 (** A '+'-directory that the selected non-default variant's library tree
     does not provide while the default root does: expanding it against the
     variant root would silently resolve to a nonexistent directory even
@@ -163,13 +230,14 @@ type directory_error =
 
 exception Directory_not_provided_by_variant of directory_error
 
-(** [Misc.expand_directory] against [effective_standard_library], resolving
-    the root only when [s] actually starts with '+'.  For directories the
-    caller asked to read from (-I, -H, [#directory], ...): raises
-    [Directory_not_provided_by_variant] when the selected variant's tree
-    exists but lacks the subdirectory while the default root provides it;
-    directories absent from both roots expand permissively as always (a
-    nonexistent include directory is not an error). *)
+(** [Misc.expand_directory] against [effective_standard_library] when [s]
+    starts with '+', and [in_selected_root s] otherwise.  For directories
+    the caller asked to read from (-I, -H, [#directory], ...): raises
+    [Directory_not_provided_by_variant] when [s] starts with '+' and the
+    selected variant's tree exists but lacks the subdirectory while the
+    default root provides it; directories absent from both roots expand
+    permissively as always (a nonexistent include directory is not an
+    error). *)
 val expand_directory : string -> string
 
 (** Like [expand_directory], but never raises: the plain expansion within

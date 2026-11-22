@@ -120,6 +120,13 @@ let typecheck_intf info ast =
   Warnings.check_fatal ();
   alerts, tsg
 
+(* The interface file of the unit has just been written: what the same
+   invocation compiles next reads it where it is, also inside the library
+   root (see [Codegen_variant.record_product]). *)
+let record_interface_file info =
+  Codegen_variant.record_product
+    (Unit_info.Artifact.filename (Unit_info.cmi info.target))
+
 let emit_signature info alerts tsg ~arg_signature =
   let sg =
     let kind : Cmi_format.kind =
@@ -136,6 +143,7 @@ let emit_signature info alerts tsg ~arg_signature =
       (Compilation_unit.name info.module_name) kind
       (Unit_info.cmi info.target)
   in
+  record_interface_file info;
   Typemod.save_signature info.target info.module_name tsg info.env sg
 
 let interface ~hook_parse_tree ~hook_typed_tree info =
@@ -194,7 +202,19 @@ let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
     let { ast = parsed; info } : _ Parse_result.t = parse_impl info in
     let parsed = hook_parse_tree parsed in
     if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
+      (* Typing writes the interface file of a unit that has no interface
+         of its own.  The writing is out of reach, in the type checker, so
+         this repeats its condition ([Typemod.type_implementation]), and
+         before typing, as there: the file that typing writes must not pass
+         for an interface that the unit had. *)
+      let writes_interface_file =
+        (not !Clflags.print_types)
+        && (not !Clflags.dont_write_files)
+        && Option.is_none !Clflags.cmi_file
+        && not (Sys.file_exists (Unit_info.mli_from_source info.target))
+      in
       let typed = typecheck_impl info parsed in
+      if writes_interface_file then record_interface_file info;
       hook_typed_tree typed;
       if Clflags.(should_stop_after Compiler_pass.Typing) then () else begin
         backend info typed;

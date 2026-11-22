@@ -264,7 +264,7 @@ end) : S = struct
     let files =
       List.map
         (fun f ->
-          try Load_path.find f
+          try Compmisc.find_input f
           with Not_found -> raise (Error (File_not_found f)))
         files
     in

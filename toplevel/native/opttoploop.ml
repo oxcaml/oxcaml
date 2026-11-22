@@ -914,9 +914,14 @@ let initial_implicit_entries =
 
 (* The implicit entry of a load path for the current directory, as
    [Compmisc.init_path] makes it for the interactive loop: none under
-   -nocwd. *)
+   -nocwd, and the counterpart of the directory in the library tree of the
+   selected variant where it has one. It is computed when the path is made:
+   after [#cd] it stands for what it stood for then, as the entry of the
+   interactive loop does. *)
 let current_directory_entry () : Clflags.include_dir list =
-  if !Clflags.no_cwd then [] else [ { path = ""; cmx_guaranteed = false } ]
+  if !Clflags.no_cwd then []
+  else
+    [ { path = Codegen_variant.in_selected_root ""; cmx_guaranteed = false } ]
 
 let find_ocamlinit () =
   let ocamlinit = ".ocamlinit" in
@@ -1095,7 +1100,7 @@ let linkenv = Linkenv.create ()
 
 let load_file ppf name0 =
   let name =
-    try Some (Load_path.find name0)
+    try Some (Compmisc.find_input name0)
     with Not_found -> None
   in
   match name with
@@ -1106,7 +1111,14 @@ let load_file ppf name0 =
          || Filename.check_suffix name Compiler.ext_flambda_lib
       then
         let cmxs = Filename.temp_file "caml" ".cmxs" in
-        Compiler.link_shared ~ppf_dump:ppf linkenv [name] cmxs;
+        (* The file has been found: the linker must not search for it
+           again, as it would for a name without a directory. *)
+        let file =
+          if Filename.is_implicit name
+          then Filename.concat Filename.current_dir_name name
+          else name
+        in
+        Compiler.link_shared ~ppf_dump:ppf linkenv [file] cmxs;
         cmxs,true
       else
         name,false

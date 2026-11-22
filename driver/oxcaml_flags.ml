@@ -614,33 +614,9 @@ let use_cached_generic_functions = ref false
 
 (* [None] until -cached-generic-functions-path is passed.  The default cannot
    be computed at module initialization: it depends on the selected codegen
-   variant's standard-library root, and the flags are not parsed yet. *)
+   variant's standard-library root, and the flags are not parsed yet (see
+   [Asmlink.cached_generic_functions_archive]). *)
 let cached_generic_functions_path = ref None
-
-let get_cached_generic_functions_path () =
-  match !cached_generic_functions_path with
-  | Some path -> path
-  | None ->
-    (* Variant-STRICT resolution, deliberately not
-       [Codegen_variant.effective_standard_library]: its fallback to the
-       default root when no tree of the installation serves the selected
-       variant would select the DEFAULT variant's archive — the one
-       compiler-generated native artifact with no fingerprint that the
-       compiler can read: the mismatch would only be caught by the system
-       linker, as an undefined link-time guard (see asmcomp/asmgen.mli).
-       Resolving into the (possibly absent) variant root instead makes the
-       link-time existence check fail with the established missing-archive
-       error, unless the default root verifiably is a tree that serves the
-       selected variant (see cached_generic_functions_path in
-       asmcomp/asmlink.ml).  The archive of the tree with the other
-       poll-insertion setting will do, like the rest of that tree: generic
-       functions never get polls (see emit_code_fully_polled there). *)
-    let root =
-      match Codegen_variant.selected_tree () with
-      | Some (_variant, root) -> root
-      | None -> Codegen_variant.variant_root (Codegen_variant.current ())
-    in
-    Filename.concat root ("cached-generic-functions" ^ Config.ext_lib)
 
 let dissector_assume_lld_without_64_bit_eh_frames = ref true
   (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)

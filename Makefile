@@ -160,8 +160,9 @@ ci-coverage: boot-runtest coverage
 
 # Check an existing install at $(prefix); these targets do not install.
 # Both check compiler location, META paths/dependencies, native archive ownership,
-# Dune availability and native toplevel/JIT/eval consumers. The bundled target
-# also checks inventories and native consumers for the complete Nix library set.
+# Dune availability, native toplevel/JIT/eval consumers and findlib and Dune
+# consumers under each codegen variant. The bundled target also checks
+# inventories and native consumers for the complete Nix library set.
 .PHONY: check-installed
 check-installed:
 	bash tools/ci/actions/check-installed.sh "$(prefix)"

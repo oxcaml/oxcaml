@@ -1,0 +1,6 @@
+File "resolver_mismatch.ml", line 1:
+Error: resolver_callee.cmx, which contains unit Resolver_callee,
+       was compiled with codegen configuration
+       [frame_pointers=false, stack_checks=false, address_sanitizer=false],
+       which is incompatible with this invocation's
+       [frame_pointers=true, stack_checks=false, address_sanitizer=false]

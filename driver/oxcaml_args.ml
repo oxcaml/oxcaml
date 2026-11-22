@@ -1404,8 +1404,9 @@ let mk_use_cached_generic_functions f =
 let mk_cached_generic_functions_path f =
   ( "-cached-generic-functions-path",
     Arg.String f,
-    "<file>  Set the path of the cached generic functions (default to \
-     cached-generic-functions.o)" )
+    "<file>  Set the path of the archive of cached generic functions (default: \
+     cached-generic-functions" ^ Config.ext_lib
+    ^ " in the library tree of the selected codegen variant)" )
 
 let mk_target f =
   ( "-target",

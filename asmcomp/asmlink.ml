@@ -42,57 +42,125 @@ type unit_link_info = Linkenv.unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
-let cached_generic_functions_path () =
+(* Where the archive of cached generic functions of a link is. *)
+type cached_generic_functions_place =
+  | Named  (** By -cached-generic-functions-path. *)
+  | In_tree of Codegen_variant.t
+      (** In a library tree that serves the selected variant: that of the given
+          variant. *)
+  | In_missing_tree
+      (** The installation has no library tree that serves the selected variant.
+      *)
+  | In_mismatched_root
+      (** The library root stands for the selected variant's tree, and is built
+          for another variant. *)
+
+(* The archive of cached generic functions that a link uses, whether or not the
+   file exists, and where that is.
+
+   The archive carries no fingerprint that the compiler can read: the linker
+   refuses one generated for other frame-pointer, stack-check or
+   AddressSanitizer settings, through the link-time guard (see
+   [Asmgen.emit_codegen_variant_guard_reference]), but less clearly than the
+   errors of [cached_generic_functions_path]. So the archive of a library tree
+   is only used when the compiler has reason to take the tree for one of the
+   selected variant. *)
+let cached_generic_functions_archive_and_place () =
   match !Oxcaml_flags.cached_generic_functions_path with
   | Some path ->
-    (* An explicit -cached-generic-functions-path is passed through
-       untouched. *)
-    path
-  | None ->
-    (* The default path points into the library tree that serves the selected
-       variant, and installations do not necessarily ship the archive (make
-       installs never do); fail clearly rather than with a linker error. *)
-    let path = Oxcaml_flags.get_cached_generic_functions_path () in
+    (* An explicit -cached-generic-functions-path that names the archive of the
+       default root selects the one of the selected variant's tree, like any
+       path inside that root. Any other path is used as it is: it is for the
+       linker to refuse an archive generated for another variant. *)
+    Codegen_variant.in_selected_root path, Named
+  | None -> (
+    (* The archive of the library tree that serves the selected variant. The one
+       of the tree with the other poll-insertion setting will do, like the rest
+       of that tree: generic functions never get polls (see
+       [emit_code_fully_polled]). *)
+    let archive = "cached-generic-functions" ^ Config.ext_lib in
     let variant = Codegen_variant.current () in
-    let tree = Codegen_variant.selected_tree () in
-    let root_archive =
-      Filename.concat Config.standard_library (Filename.basename path)
-    in
-    let trusted =
-      (* The archive carries no fingerprint of its own. The root is taken at its
-         word for the default variant, and so is a tree under variants/ for its
-         own. When the root serves the default variant with the other
-         poll-insertion setting it is checked like a root that has no tree for
-         the selected variant: OCAMLLIB can make it anything. *)
-      match tree with
-      | Some (tree_variant, _root) ->
-        Codegen_variant.equal tree_variant variant
-        || (not (Codegen_variant.is_default tree_variant))
-        || Linkenv.standard_library_is_built_for variant
-      | None -> false
-    in
-    if trusted && Sys.file_exists path
-    then path
-    else if
+    match Codegen_variant.selected_tree () with
+    | Some (tree_variant, root) ->
+      (* A tree under variants/ is taken at its word for its own variant. The
+         root, which serves the default variant with either poll-insertion
+         setting, is checked, since OCAMLLIB can make it anything. For the
+         default variant itself it is refused when its standard library says
+         that it is built for another variant, and not when it has none to say
+         so, as in an installation that only links with -output-obj. For the
+         other poll-insertion setting std_exit.cmx has to be readable and have
+         the variant's other settings: its poll bit is not compared. *)
+      ( Filename.concat root archive,
+        if
+          (not (Codegen_variant.is_default tree_variant))
+          ||
+          if Codegen_variant.equal tree_variant variant
+          then not (Linkenv.standard_library_is_built_for_another variant)
+          else Linkenv.standard_library_is_built_for variant
+        then In_tree tree_variant
+        else In_mismatched_root )
+    | None ->
       (* The root has no tree that serves the selected variant, but it may
-         itself be such a tree. The archive carries no fingerprint that the
-         compiler can read (the linker refuses one generated for other
-         frame-pointer, stack-check or AddressSanitizer settings, through the
-         link-time guard, but less clearly than the error below), so its root's
-         archive is only used when the root is verifiably built for the
-         fingerprint of the selected variant. *)
-      Option.is_none tree
-      && Sys.file_exists root_archive
-      && Linkenv.standard_library_is_built_for variant
-    then root_archive
+         itself be such a tree: its own archive is then the one to use, and the
+         one to generate when it is missing. Otherwise the archive would be that
+         of the variant's own tree, which does not exist: not the one of the
+         root, which is for another variant. *)
+      if Linkenv.standard_library_is_built_for variant
+      then Filename.concat Config.standard_library archive, In_tree variant
+      else
+        ( Filename.concat (Codegen_variant.variant_root variant) archive,
+          In_missing_tree ))
+
+let cached_generic_functions_archive () =
+  fst (cached_generic_functions_archive_and_place ())
+
+(* The archive, when the link can use it. Installations do not necessarily ship
+   it (make installs never do): a missing one is reported here rather than by
+   the linker. The error gives the command that generates it only for the
+   archive of a library tree, where that command writes the archive of the
+   selected variant to its own place: not for a file that is named, which the
+   generator may spell otherwise and which may be the place of another variant's
+   archive. *)
+let cached_generic_functions_path () =
+  let path, place = cached_generic_functions_archive_and_place () in
+  let selected = Codegen_variant.to_string (Codegen_variant.current ()) in
+  match place with
+  | Named ->
+    if Sys.file_exists path
+    then path
     else
-      let variant =
-        match tree with Some (variant, _root) -> variant | None -> variant
+      (* A path inside the default library root was looked up in the selected
+         variant's tree first: say where. *)
+      let directory = Filename.dirname path in
+      let in_tree = Codegen_variant.in_selected_root directory in
+      let also_looked_up =
+        if String.equal in_tree directory
+        then None
+        else Some (Filename.concat in_tree (Filename.basename path))
       in
       raise
         (Linkenv.Error
+           (Cached_generic_functions_file_not_found
+              { filename = path; also_looked_up }))
+  | In_tree tree_variant ->
+    if Sys.file_exists path
+    then path
+    else
+      raise
+        (Linkenv.Error
            (Cached_generic_functions_not_found
-              { filename = path; variant = Codegen_variant.to_string variant }))
+              { filename = path;
+                variant = Codegen_variant.to_string tree_variant
+              }))
+  | In_missing_tree ->
+    raise
+      (Linkenv.Error
+         (Cached_generic_functions_tree_not_found { variant = selected }))
+  | In_mismatched_root ->
+    raise
+      (Linkenv.Error
+         (Cached_generic_functions_root_mismatch
+            { root = Config.standard_library; variant = selected }))
 
 let runtime_lib () =
   let variant =
@@ -108,12 +176,12 @@ let runtime_lib () =
   try
     if !Clflags.nopervasives || not !Clflags.with_runtime
     then []
-    else [Load_path.find libname]
+    else [Compmisc.find_input libname]
   with Not_found ->
     let unsuffixed_exists =
       (not (String.equal codegen_suffix ""))
       &&
-      match Load_path.find ("libasmrun" ^ variant ^ ext_lib) with
+      match Compmisc.find_input ("libasmrun" ^ variant ^ ext_lib) with
       | (_ : string) -> true
       | exception Not_found -> false
     in

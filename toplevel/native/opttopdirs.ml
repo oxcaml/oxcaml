@@ -56,7 +56,7 @@ let dir_remove_directory s =
     | fn -> Filename.dirname fn <> d
   in
   toplevel_env := Env.filter_non_loaded_persistent keep !toplevel_env;
-  Load_path.remove_dir s
+  Load_path.remove_dir d
 
 let _ =
   Hashtbl.add directive_table "remove_directory"

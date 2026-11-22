@@ -13,10 +13,12 @@
 (**************************************************************************)
 
 (* Check compiler location, META paths/dependencies, native archive ownership,
-   Dune availability and native toplevel/JIT/eval consumers. --bundled adds Nix
-   library inventories/consumers and checks that private dependencies stay
-   wrapped. The wrapper supplies a disposable cwd, bootstrap tools and an
-   environment without inherited OCaml configuration. *)
+   Dune availability, native toplevel/JIT/eval consumers, findlib and Dune
+   consumers under each codegen variant and a Dune consumer that mixes the
+   poll-insertion settings. --bundled adds Nix library
+   inventories/consumers and checks that private dependencies stay wrapped.
+   The wrapper supplies a disposable cwd, bootstrap tools and an environment
+   without inherited OCaml configuration. *)
 
 open Fl_metascanner
 
@@ -150,15 +152,16 @@ let check_meta_files t =
       if Sys.file_exists meta then
         check_package meta parent package (read_meta meta)))
     [stdlib; installed t "lib"];
-  archives
+  archives, Hashtbl.to_seq_keys packages |> List.of_seq |> sorted
 
 let check_archive_ownership t archives =
   checking "native archive ownership";
   (* The compiler links stdlib.cmxa implicitly. *)
   let implicit_stdlib = installed t "lib/ocaml/stdlib.cmxa" in
   (* Codegen-variant library trees deliberately carry no META files
-     (findlib is out of scope for them), so their archives are not
-     META-referenced by design. *)
+     (findlib and dune find the packages in the default root, and the
+     compiler looks the paths they pass up in the selected variant's
+     tree), so their archives are not META-referenced by design. *)
   let variants = installed t "lib/ocaml/variants" in
   let rec check_dir dir =
     Sys.readdir dir |> Array.to_list |> sorted |> List.iter (fun file ->
@@ -238,19 +241,175 @@ let check_findlib_consumer t name = function
       run t.findlib (["ocamlopt"; "-package"; name; "-linkpkg"; "-linkall"] @
         findlib_flags name @ ["-o"; "direct/main.exe"; "direct/main.ml"])
 
-let create_dune_target name kind =
-  Unix.mkdir name 0o700;
-  write (Filename.concat name "main.ml") "let () = ()\n";
+(* A directory with an executable that consumes the package, main.exe, and
+   with what ocamlobjinfo prints for the executable's unit as Dune compiled
+   it, main.objinfo. *)
+let create_dune_target ?(dir = ".") ?(source = "let () = ()\n") name kind =
+  let dir = Filename.concat dir name in
+  Unix.mkdir dir 0o700;
+  write (Filename.concat dir "main.ml") source;
   let dependency = match kind with
     | Library -> Printf.sprintf "(libraries %s)" name
     | Ppx_deriver | Ppx_rewriter ->
         Printf.sprintf "(preprocess (pps %s))" name
   in
-  write (Filename.concat name "dune") (Printf.sprintf
+  write (Filename.concat dir "dune") (Printf.sprintf
     "(executable (name main) (modes exe)\n %s\n\
-     (link_flags (:standard -linkall %s)))\n"
+     (link_flags (:standard -linkall %s)))\n\
+     (rule (with-stdout-to main.objinfo (run ocamlobjinfo %%{cmx:main})))\n"
     dependency (String.concat " " (link_flags name)));
-  name ^ "/main.exe"
+  dir
+
+(* The tokens of a codegen variant's name, with their OCAMLPARAM keys and
+   with what ocamlopt -config prints when the default variant has them. *)
+let codegen_axes =
+  [ "asan", "asan", ("with_address_sanitizer", "true");
+    "fp", "frame-pointers", ("with_frame_pointers", "true");
+    "poll", "poll-insertion", ("poll_insertion", "true");
+    "sc", "stack-checks", ("no_stack_checks", "false") ]
+
+(* A consumer prints whether it is fully polled. Poll insertion is not in
+   the fingerprint that the linker enforces, so only the linked program
+   tells whether the libraries it was linked with have poll insertion, as
+   its own units do: unless they all do, the runtime keeps the program to
+   one domain and Domain.spawn fails. *)
+let consumer_source =
+  "[@@@alert \"-unsafe_multidomain-do_not_spawn_domains\"]\n\
+   let () =\n\
+  \  match Domain.spawn ignore with\n\
+  \  | domain -> Domain.join domain; print_string \"fully polled\"\n\
+  \  | exception Failure message -> print_string message\n"
+
+(* Build systems select a codegen variant with OCAMLPARAM alone and go on
+   naming the libraries by their paths in the default tree, the one that
+   ocamlc -where reports; the compiler resolves those paths in the variant's
+   tree. So under every variant that the installation serves, its default
+   one (with an empty OCAMLPARAM) and each of the others, every package
+   whose native archives that variant's tree provides has to link, through
+   findlib and through Dune, into a program of that variant, which has to
+   run. *)
+let check_variant_consumers t packages =
+  let stdlib = installed t "lib/ocaml" in
+  let config variable =
+    capture (installed t "bin/ocamlopt") ["-config-var"; variable]
+  in
+  let default =
+    List.filter_map (fun (token, _, (variable, value)) ->
+      if config variable = value then Some token else None) codegen_axes
+  in
+  let variants =
+    ((if default = [] then "base" else String.concat "-" default),
+     default, stdlib, "") ::
+    List.map (fun variant ->
+      let tokens = String.split_on_char '-' variant in
+      variant, tokens,
+      Filename.concat (Filename.concat stdlib "variants") variant,
+      String.concat "," ("_" :: List.map (fun (token, key, _) ->
+        Printf.sprintf "%s=%d" key (Bool.to_int (List.mem token tokens)))
+        codegen_axes))
+      (config "codegen_variants" |> words)
+  in
+  Unix.mkdir "variants" 0o700;
+  write "variants/main.ml" consumer_source;
+  List.iter (fun (variant, tokens, root, ocamlparam) ->
+    let enabled token = List.mem token tokens in
+    Unix.putenv "OCAMLPARAM" ocamlparam;
+    let provided package =
+      let archives = findlib_query t
+        ["-predicates"; "native"; "-format"; "%+A"] package |> words
+      in
+      archives <> [] && List.for_all (fun archive ->
+        String.starts_with ~prefix:(stdlib ^ "/") archive &&
+        let length = String.length stdlib + 1 in
+        Sys.file_exists (Filename.concat root
+          (String.sub archive length (String.length archive - length))))
+        archives
+    in
+    let packages = List.filter provided packages in
+    if packages = [] then fail "No package has native archives in %s" root;
+    (* That the compilation was for the variant, whoever ran the compiler.
+       The linker refuses a unit whose fingerprint is not that of the
+       libraries, so the fingerprint of the unit is that of the program. It
+       links units of either poll-insertion setting, so that of the unit
+       says nothing about the program, nor the program's about the unit. *)
+    let compiled_for_variant =
+      [ Printf.sprintf "Codegen fingerprint: frame_pointers=%b, \
+                        stack_checks=%b, address_sanitizer=%b"
+          (enabled "fp") (enabled "sc") (enabled "asan");
+        Printf.sprintf "Polled: %b" (enabled "poll") ]
+    in
+    let check_unit unit objinfo =
+      let printed = lines objinfo in
+      List.iter (fun line ->
+        if not (List.mem line printed) then
+          fail "%s is not compiled for codegen variant %s: ocamlobjinfo \
+                does not print %S" unit variant line) compiled_for_variant
+    in
+    let check_program program =
+      let output = capture program [] in
+      if (output = "fully polled") <> enabled "poll" then
+        fail "%s is not linked for codegen variant %s, whose programs are \
+              %sfully polled: it printed %S" program variant
+          (if enabled "poll" then "" else "not ") output
+    in
+    let dir = Filename.concat "variants" variant in
+    Unix.mkdir dir 0o700;
+    let targets = List.map (fun package ->
+      checking "findlib native consumer %s for codegen variant %s"
+        package variant;
+      run t.findlib (["ocamlopt"; "-package"; package; "-linkpkg"; "-linkall"] @
+        findlib_flags package @
+        ["-o"; "variants/main.exe"; "variants/main.ml"]);
+      check_unit "variants/main.cmx"
+        (capture (installed t "bin/ocamlobjinfo") ["variants/main.cmx"]);
+      check_program "variants/main.exe";
+      create_dune_target ~dir ~source:consumer_source package Library) packages
+    in
+    checking "Dune native consumers for codegen variant %s" variant;
+    run t.dune ("build" :: "--root" :: "." :: "--display=short" ::
+      List.concat_map (fun target ->
+        [target ^ "/main.exe"; target ^ "/main.objinfo"]) targets);
+    List.iter (fun target ->
+      let built = Filename.concat (Filename.concat "_build/default" target) in
+      check_unit ("The unit that Dune compiled in " ^ target)
+        (read (built "main.objinfo"));
+      check_program (built "main.exe")) targets) variants;
+  Unix.putenv "OCAMLPARAM" ""
+
+(* Poll insertion is a property of each unit and not of the program, so a
+   build may give its flags to some stanzas only: the units of both settings
+   and the libraries of the installation link into one program, with either
+   setting for the link, whatever library trees the installation has. *)
+let check_poll_insertion_per_unit t =
+  checking "Dune consumer with units of both poll-insertion settings";
+  Unix.mkdir "poll" 0o700;
+  let flags enabled =
+    if enabled then "-enable-poll-insertion" else "-disable-poll-insertion"
+  in
+  let name enabled = if enabled then "polled" else "unpolled" in
+  let stanzas enabled =
+    Printf.sprintf
+      "(library (name %s) (modules %s) (libraries unix)\n\
+      \ (ocamlopt_flags (:standard %s)))\n\
+       (executable (name linked_%s) (modules linked_%s) (modes exe)\n\
+      \ (libraries polled unpolled)\n\
+      \ (ocamlopt_flags (:standard %s)) (link_flags (%s)))\n"
+      (name enabled) (name enabled) (flags enabled) (name enabled)
+      (name enabled) (flags enabled) (flags enabled)
+  in
+  write "poll/dune" (stanzas true ^ stanzas false);
+  write "poll/polled.ml" "let time () = Unix.gettimeofday ()\n";
+  write "poll/unpolled.ml" "let pid () = Unix.getpid ()\n";
+  let targets =
+    List.map (fun enabled ->
+      write (Printf.sprintf "poll/linked_%s.ml" (name enabled))
+        "let () = assert (Polled.time () > 0. && Unpolled.pid () > 0)\n";
+      Printf.sprintf "poll/linked_%s.exe" (name enabled))
+      [true; false]
+  in
+  run t.dune ("build" :: "--root" :: "." :: "--display=short" :: targets);
+  List.iter (fun target -> run (Filename.concat "_build/default" target) [])
+    targets
 
 let contains_double_underscore s =
   let rec go i =
@@ -328,7 +487,7 @@ let check_bundled_libraries t =
     in
     if consume then begin
       check_findlib_consumer t name kind;
-      targets := create_dune_target name kind :: !targets
+      targets := (create_dune_target name kind ^ "/main.exe") :: !targets
     end) findlib_names;
   checking "Dune native consumers";
   run t.dune
@@ -344,7 +503,14 @@ let configure_environment t =
   Unix.putenv "PATH" (installed t "bin" ^ ":" ^ path);
   Unix.putenv "OCAMLFIND_CONF" (Filename.concat (Sys.getcwd ()) "findlib.conf");
   Unix.putenv "TMPDIR" (Sys.getcwd ());
-  Unix.putenv "DUNE_CACHE" "disabled"
+  Unix.putenv "DUNE_CACHE" "disabled";
+  (* The checks do not run under the caller's settings: OCAMLPARAM can
+     select another variant than the one that a check is about, and the d
+     parameter of OCAMLRUNPARAM lifts the limit that consumer_source
+     observes. Empty values, for want of Unix.unsetenv: the runtime only
+     reads CAMLRUNPARAM when OCAMLRUNPARAM is unset. *)
+  Unix.putenv "OCAMLPARAM" "";
+  Unix.putenv "OCAMLRUNPARAM" ""
 
 let main () =
   let lists_dir, findlib, dune, prefix, bundled =
@@ -366,7 +532,7 @@ let main () =
     fail "Installed ocamlc uses %s, expected %s"
       where (installed t "lib/ocaml");
   write "dune-project" "(lang dune 3.0)\n";
-  let archives = check_meta_files t in
+  let archives, packages = check_meta_files t in
   check_archive_ownership t archives;
   checking "Dune library availability";
   let unavailable =
@@ -374,6 +540,8 @@ let main () =
   in
   if unavailable <> "" then fail "Unavailable Dune libraries:\n%s" unavailable;
   check_native_smoke_programs t;
+  check_variant_consumers t packages;
+  check_poll_insertion_per_unit t;
   if bundled then begin
     check_bundled_libraries t;
     check_private_units t
