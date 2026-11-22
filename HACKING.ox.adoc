@@ -36,11 +36,116 @@ from all failed tests in that run, use `promote-failed`:
 
 To run just one test without running a full dune build, you can use
 `*-no-rebuild` versions of `test-one` and `promote-one`. Note that these
-targets won't pick up changes you've made to compiler code, though they will
-faithfully pick up changes you've made to test files.
+targets won't pick up changes you've made to compiler code. They run in the
+test tree `_runtest`, which hard-links the test files: they see a change to
+an existing test file when your editor rewrites the file in place, but not a
+new file, nor a file that your editor replaced. `make install_for_test`
+rebuilds the compiler and the test tree without running anything.
 
     $ make test-one-no-rebuild TEST=typing-local/local.ml
     $ make promote-one-no-rebuild DIR=typing-local
+
+Likewise, `test-no-rebuild` runs the whole testsuite again against the
+compiler in `_install` and the test tree in `_runtest`:
+
+    $ make test-no-rebuild
+
+It needs nothing else from the build: `make test` is `make install_for_test`
+followed by `make test-no-rebuild`.
+
+So the suite also runs on another machine, one that received `_install`,
+`_runtest`, `Makefile.config` and `Makefile.build_config` from the machine
+that built them. That takes more than the four: both trees contain absolute
+paths and code compiled against the builder's C library, so the build must
+have been configured with `--prefix=$PWD/_install`, and the other machine
+needs a checkout of the same commit at the same path, and the same
+architecture, C compiler and C library.
+
+`TEST_LIST=<file>` restricts `test` and `test-no-rebuild` to the directories
+listed in `<file>`, one per line, in the form `tests/<directory>`. A list
+with any other entry, or with none, is an error before any test runs, and so
+is a list with a directory that has no test, that is listed twice or that is
+inside another directory of the list.
+
+### Testing other codegen variants and runtimes
+
+One build serves every codegen variant it was configured with (see `ocamlopt
+-config-var codegen_variants`), and the testsuite can target any of them:
+
+    $ make test CODEGEN_VARIANT=fp
+    $ make test-one DIR=effects CODEGEN_VARIANT=sc
+    $ make test-one-no-rebuild TEST=effects/test1.ml CODEGEN_VARIANT=fp-sc
+    $ make test-no-rebuild CODEGEN_VARIANT=poll
+
+Under `CODEGEN_VARIANT=<name>`, the native programs that the tests compile
+and link are built for that variant: with its flags, against its library tree
+and its runtime. This is how the tests that need poll insertion (everything
+guarded by `multicore;`) or stack checks run on a build whose default variant
+is `base`. A test that selects a variant itself, with the `codegen_variant`
+variable, keeps its selection.
+
+Nothing else has a codegen variant: bytecode steps, bytecode expect and
+toplevel tests and JSIR tests run as they do without the variable. Some tests
+are skipped, with the reason in the log: the native toplevel, native expect
+tests and asmgen tests (their host programs are built for the default variant
+only), and native tests that link the compiler's own libraries or `eval` (not
+built per variant).
+
+For a quick pass, add `VARIANT_ONLY=1`:
+
+    $ make test CODEGEN_VARIANT=fp VARIANT_ONLY=1
+
+It skips the test files in which nothing depends on the variant (those that
+only run bytecode, say: about half of the suite). Such a pass supplements the
+pass without `CODEGEN_VARIANT`; it does not replace it.
+
+`CODEGEN_VARIANT` composes with the other knobs of the testsuite:
+
+    $ make test CODEGEN_VARIANT=sc USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1
+    $ make test-one DIR=parallel CODEGEN_VARIANT=poll RUNPARAM=v=0x400
+
+`USE_RUNTIME=d` links the test programs with the debug runtime of the selected
+variant. Do not select a variant through `OCAMLPARAM` (`frame-pointers=1` and
+the like): the testsuite passes the library tree explicitly, and its
+predicates would not know.
+
+Naming a variant that this tree does not build is an error before anything
+runs; naming the default variant is the same as not setting the variable.
+
+The `promote-*` targets accept `CODEGEN_VARIANT` too, because a test that
+only runs under a variant can only be promoted there:
+
+    $ make promote-one TEST=parallel/join.ml CODEGEN_VARIANT=poll
+    $ make test CODEGEN_VARIANT=sc; make promote-failed CODEGEN_VARIANT=sc
+
+Reference files are shared by all variants. If the output of a test really
+depends on the variant, the test needs a guard (`no-frame_pointers;`,
+`stack-checks;`, ...) or its own `codegen_variant` blocks, not a promotion.
+
+To run the testsuite for every variant of the build, one pass per variant:
+
+    $ make test-variants
+    $ make -j test-variants
+    $ make test-variants TEST_VARIANTS="base fp sc"
+
+With `-j` the passes run at the same time and share the processors. Each pass
+writes its output to `_runtest/test-variants.<variant>.out`, and the summaries
+are printed together at the end.
+
+Passes can also be run side by side by hand: `TEST_ID=<label>` gives a pass
+its own build directories (`_ocamltest.<label>`), log
+(`_runtest/testsuite/_log.<label>`) and failure stamp, so that it does not
+disturb another pass in the same tree. `promote-failed` with the same
+`TEST_ID` promotes the failures of that pass. `TEST_JOBS=<n>` sets how many
+tests a pass runs at once (by default one per processor, or the `-j` of
+`make`).
+
+    $ make install_for_test
+    $ make test-no-rebuild CODEGEN_VARIANT=fp TEST_ID=fp TEST_JOBS=16 &
+    $ make test-no-rebuild CODEGEN_VARIANT=sc TEST_ID=sc TEST_JOBS=16 &
+
+`test`, `test-one` and `promote-one` rebuild `_runtest` first: do not start
+them while another pass is running in the same tree.
 
 ## Debugging
 

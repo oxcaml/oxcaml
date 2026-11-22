@@ -611,6 +611,61 @@ For instance, given the following blocks:
 
 - The definition of =baz= is visible only in =subtest1=.
 
+*** Testing a codegen variant
+
+The native compiler can generate code for several /codegen variants/
+(frame pointers, stack checks, poll insertion, AddressSanitizer; see
+=ocamlopt -config-var codegen_variants=). Each variant is named after the
+axes it enables: =base= for none, =fp=, =sc=, =poll=, =fp-sc=, =asan-fp= and
+so on. A test block selects one by assigning the =codegen_variant= variable:
+
+#+begin_src
+(* TEST
+  {
+    codegen_variant = "fp";
+    variant_available;
+    native;
+  }
+*)
+#+end_src
+
+The native compilations of the block then receive the variant's flags and
+library tree, and the test program is linked with the variant's runtime.
+=variant_available= skips the block when the compiler under test was not
+built with that variant. Bytecode has no codegen variants: bytecode
+compilations ignore the selection.
+
+The predicates =frame_pointers=, =no-frame_pointers=, =stack-checks=,
+=no-stack-checks=, =poll-insertion=, =no-poll-insertion=,
+=no-address-sanitizer= and =multicore= (which requires poll insertion) look
+at the variant in effect: the one the block selected, else the one given
+with the =-codegen-variant= option, else the default variant of the compiler
+under test. =only-default-codegen= and =only-stack-checks-codegen= pass
+only for the variants =base= and =sc=, whatever the default.
+
+The option =-codegen-variant NAME= selects a variant for the whole run (the
+testsuite's =make= targets pass it when =CODEGEN_VARIANT= is set). Then:
+
+- A block that selects a variant itself keeps its selection.
+- Native compilations and links use =NAME=.
+- Tests that go through a program built for the default variant are
+  skipped: the native toplevel (=toplevel.opt=), native expect tests
+  (=expect.opt=) and =asmgen= tests. So are native compilations that name
+  the compiler's own libraries, the debugger or =eval=, which are not
+  built per variant.
+- Bytecode actions, the bytecode toplevel, bytecode expect tests and the
+  JSIR tests run as usual, against the default library tree.
+
+With =-codegen-variant-only= as well (=VARIANT_ONLY=1= for the =make=
+targets), a test file in which nothing depends on the variant (no native
+compilation for it, and no predicate that only it satisfies) is skipped as
+a whole, since it would only repeat the run without the options. This
+makes for a quick run that supplements a run without them.
+
+The name must be a variant that the compiler under test provides; anything
+else is an error at startup. Naming the default variant is the same as not
+giving the option.
+
 *** Repeating similar tests with =split=
 
 You can concisely define several tests with differing initial setups with the
