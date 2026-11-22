@@ -108,6 +108,7 @@ end
 
 type mixed = Unwrap of inner# | Record of { label : string; number : int }
   [@@unboxed]
+type mixed_layout : void + value + (value & value) = mixed
 
 let read_mixed = function
   | Unwrap Off -> "off"
@@ -118,3 +119,60 @@ let () =
   assert (read_mixed (Unwrap Off) = "off");
   assert (read_mixed (Unwrap (On "on")) = "on");
   assert (read_mixed (Record { label = "n="; number = 4 }) = "n=4")
+
+module Sibling = struct
+  open Tag_boxes.Mixed_sources
+  open Sibling
+  include Tag_boxes.Sibling (struct type nonrec t = t# end)
+  let read = function Empty -> "empty" | Direct Off -> "off"
+    | Direct (On s) -> s | Record r -> string_of_int r.number
+  let read_inline = function #Empty -> "empty" | #Direct Off -> "off"
+    | #Direct (On s) -> s | #Record r -> string_of_int r.#number
+  let check ordinary inline expected =
+    assert (read_inline (unpack ordinary) = expected);
+    List.iter (fun value ->
+      assert (read value = expected);
+      let obj = Obj.repr (Sys.opaque_identity value) in
+      match value with
+      | Empty -> assert (Obj.is_int obj)
+      | Direct _ -> assert (Obj.tag obj = 0 && Obj.size obj = 2)
+      | Record r ->
+        assert (Obj.tag obj = 1 && Obj.size obj = 1);
+        let alias = Sys.opaque_identity (Record r) in
+        (match alias with Record r -> r.number <- 13 | _ -> assert false);
+        assert (read_inline (unpack value) = "13")) [ordinary; pack inline]
+  let () = check Empty #Empty "empty"; check (Direct Off) (#Direct Off) "off";
+    check (Direct (On "on")) (#Direct (On "on")) "on";
+    check (Record { number = 9 }) (#Record { number = 9 }) "9"
+end
+
+module Both = struct
+  open Tag_boxes.Mixed_sources
+  open Both
+  include Tag_boxes.Both (struct type nonrec t = t# end)
+  let read = function Empty -> "empty" | Direct Off -> "D:off"
+    | Direct (On s) -> "D:" ^ s | Record { inner = Off } -> "R:off"
+    | Record { inner = On s } -> "R:" ^ s
+  let read_inline = function #Empty -> "empty" | #Direct Off -> "D:off"
+    | #Direct (On s) -> "D:" ^ s | #Record { inner = Off } -> "R:off"
+    | #Record { inner = On s } -> "R:" ^ s
+  let check ordinary inline expected =
+    assert (read_inline (unpack ordinary) = expected);
+    List.iter (fun value ->
+      assert (read value = expected);
+      let obj = Obj.repr (Sys.opaque_identity value) in
+      match value with
+      | Empty -> assert (Obj.is_int obj)
+      | Direct _ -> assert (Obj.tag obj = 0 && Obj.size obj = 2)
+      | Record r ->
+        assert (Obj.tag obj = 1 && Obj.size obj = 2);
+        let alias = Sys.opaque_identity (Record r) in
+        (match alias with
+         | Record r -> r.inner <- On "after" | _ -> assert false);
+        Gc.compact ();
+        assert (read_inline (unpack value) = "R:after")) [ordinary; pack inline]
+  let () = check Empty #Empty "empty"; check (Direct Off) (#Direct Off) "D:off";
+    check (Direct (On "on")) (#Direct (On "on")) "D:on";
+    check (Record { inner = Off }) (#Record { inner = Off }) "R:off";
+    check (Record { inner = On "on" }) (#Record { inner = On "on" }) "R:on"
+end

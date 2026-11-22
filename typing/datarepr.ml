@@ -24,25 +24,30 @@ module Jkind = Btype.Jkind0
 let boxed_sum_constructor cstr =
   { cstr with cstr_res = new_box_ty cstr.cstr_res }
 
-let sum_arm cd_args ~direct_sum fields : _ Jkind_types.Sum_repr.source_arm =
+let can_fuse ~ordinary_box cstrs =
+  not ordinary_box || List.for_all (fun cstr -> match cstr.cd_args with
+    | Cstr_tuple _ -> true | Cstr_record _ -> false) cstrs
+
+let sum_arm ~can_fuse cd_args ~direct_sum fields
+  : _ Jkind_types.Sum_repr.source_arm =
   match cd_args, fields with
-  | Cstr_tuple _, [field] ->
+  | Cstr_tuple _, [field] when can_fuse ->
     (match direct_sum field with
      | Some arms -> Splice arms
      | None -> Fields fields)
   | _ -> Fields fields
 
-let sort_arm cd_args fields =
-  sum_arm cd_args ~direct_sum:Jkind_types.Sum_repr.direct_sum fields
+let sort_arm ~can_fuse cd_args fields =
+  sum_arm ~can_fuse cd_args ~direct_sum:Jkind_types.Sum_repr.direct_sum fields
 
 let uses_fused_boxed_tags decl =
   match decl.type_kind with
-  | Type_variant (_, Variant_boxed layouts, _) ->
+  | Type_variant (cstrs, Variant_boxed layouts, _) ->
     Option.is_some decl.type_unboxed_version &&
     Array.exists (function
       | Cstr_layout_known { sorts = [|sort|]; _ } ->
         Option.is_some (Jkind_types.Sum_repr.direct_sum sort)
-      | _ -> false) layouts
+      | _ -> false) layouts && can_fuse ~ordinary_box:true cstrs
   | _ -> false
 
 (* Simplified version of Ctype.free_vars *)
@@ -271,8 +276,11 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
            | Cstr_layout_undetermined -> None)
          (Array.to_list cstr_layouts) with
        | None -> None (* Temporary recursive environment. *)
-       | Some arms -> Jkind_types.Sum_repr.make
-           (List.map2 (fun cstr -> sort_arm cstr.cd_args) cstrs arms))
+       | Some arms ->
+         let can_fuse = can_fuse cstrs
+             ~ordinary_box:(Path.is_unboxed_version ty_path) in
+         Jkind_types.Sum_repr.make
+           (List.map2 (fun cstr -> sort_arm ~can_fuse cstr.cd_args) cstrs arms))
     | _ -> None
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in

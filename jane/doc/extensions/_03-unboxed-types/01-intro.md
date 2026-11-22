@@ -391,9 +391,11 @@ layout: `void & (void + value)`. These layouts also tell an abstract client
 how to box and unbox the value without seeing its constructors.
 
 A GADT result type or an atomic field prevents an implicit unboxed variant.
-If a declaration contains a record constructor, its ordinary boxed tags stay
-unchanged. A separate non-record constructor in that declaration cannot share
-its tag with a nested variant, so the declaration gets no `t#` in that case.
+If a boxed declaration contains a record constructor, all of its constructors
+keep their original tags. For example, the companion of
+`type t = Busy | Direct of reply# | Count of { n : int }` has layout
+`void + (void + value) + immediate`. The tag in `Direct` stays separate from
+the tag that selects `Busy`, `Direct`, or `Count`.
 
 *Limitations and future plans*:
 * Arrays of unboxed variants follow the same rule as arrays of unboxed
