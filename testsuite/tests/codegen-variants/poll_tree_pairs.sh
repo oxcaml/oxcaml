@@ -6,12 +6,10 @@
 # $ocamlsrcdir/stdlib, the default library root) whose codegen variants
 # differ only in poll insertion, checks that the two are the same libraries
 # but for the polls in their code:
-# - a tree other than the library root has no .cmx or .cmxa file, archive
-#   or object file that the other tree lacks (the root also holds the
-#   compiler's own libraries, which the trees of the other variants do not
-#   have), but for the archive of cached generic functions, which is
-#   generated for one tree at a time and which an installation need not
-#   have;
+# - they have the same .cmx and .cmxa files, archives and object files (a
+#   file that only one tree has is a difference, not a file to leave out),
+#   but for the archive of cached generic functions, which is generated
+#   for one tree at a time and which an installation need not have;
 # - every unit has the same implementation CRC in both;
 # - every archive and object file defines the same symbols in both.
 # One difference is intended and checked for itself: every object file of a
@@ -140,10 +138,8 @@ for with in $default $(config codegen_variants); do
     -o -name '*.o' > "files.$without"
   comm -23 "files.$with" "files.$without" > "only.$with"
   comm -13 "files.$with" "files.$without" > "only.$without"
-  # The library root also holds the compiler's own libraries: a file that
-  # only the root has is not a difference.
   for name in $with $without; do
-    if [ "$name" != "$default" ] && [ -s "only.$name" ]; then
+    if [ -s "only.$name" ]; then
       differ "do not have the same files: only that of $name has"
       head -n 40 "only.$name"
     fi

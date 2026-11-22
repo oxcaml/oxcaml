@@ -77,30 +77,21 @@ external code_is_fully_polled : unit -> bool
 
 (* The native toplevel and eval compile phrases in-process with the
    current flags, so a phrase's polledness is [!Clflags.poll_insertion]
-   at compile time (there is no cmx record to consult).  Loading a
-   non-polled phrase into a process whose domain cap exceeds 1 would
-   falsify the fully-polled property the cap was derived from: this is
-   the in-process analogue of natdynlink's [Library_not_fully_polled]
-   rejection.  The cap above 1 implies the host itself is fully polled
-   (or ran with an explicit OCAMLRUNPARAM d= override), so under default
-   flags this only fires when the phrase flags diverge from the host's
-   build, which the toplevel's host-variant pin already makes rare.
+   at compile time (there is no cmx record to consult).  Poll insertion
+   is a property of each unit, and a phrase is one: a phrase with polls
+   can be loaded into any program, and one without polls into a program
+   that is not fully polled, as such a unit can be linked into it.
+   Loading a non-polled phrase into a fully polled program whose domain
+   cap exceeds 1 would falsify the property the cap was derived from:
+   that is refused, as natdynlink refuses such a library
+   ([Library_not_fully_polled]).
 
    No friendlier alternative (e.g. silently enabling poll insertion for
-   the phrase) is needed, because a legitimately multi-domain host can
-   never reach this failure under default phrase flags: an eval-using
-   program links the DEFAULT variant's compiler-libs (the linker's
-   [set_load_path_for_eval] rejects eval under any other codegen variant
-   and resolves the eval support libraries against the default library
-   root).  So when the install's default variant lacks poll insertion,
-   those compiler-libs units are unpolled and the host is never fully
-   polled -- its cap defaults to 1 and the check passes vacuously; and
-   when the default variant includes poll insertion, phrases compile
-   with poll insertion on by default and the check passes positively.
-   The failure therefore fires only on explicit user divergence (an
-   OCAMLRUNPARAM d= override of an unpolled host's cap, or disabling
-   poll insertion for phrases on a poll-default install), where failing
-   with this message is the right answer. *)
+   the phrase) is needed, because the failure cannot be reached under
+   default phrase flags: in a fully polled host they default to poll
+   insertion (see [host_variant]).  It fires only when poll insertion
+   was disabled for the phrases of such a host, which is what the
+   message has to say. *)
 let check_poll_insertion_for_in_process_load () =
   (* As in [Compilenv.build_unit_info], the LLVM backend discards [Poll]
      instructions, so code it compiles is nonpolled even when

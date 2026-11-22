@@ -2,6 +2,15 @@
 
 See HACKING.md.
 
+`make compiler` also builds what is installed in the library tree of each
+codegen variant that `configure` selected (it prints the list): the stdlib,
+the otherlibs and the compiler's own libraries. So a change to the compiler is
+compiled once more per variant, in the same dune invocation as the compiler
+itself. If you do not need the variants, or have few cores, configure with
+`--with-codegen-variants=NAME,NAME` to build only those, or with
+`--disable-codegen-variants` to build none; tests that need a variant that
+was not built are skipped.
+
 ## Testing
 
 You can
@@ -672,6 +681,11 @@ What to keep in mind:
   command and links the AddressSanitizer runtime into a program whose OCaml
   code and runtime library are built without it. Select the variant with
   `-asan` or `OCAMLPARAM`.
+* In the tree of a variant with `asan`, the stdlib, the otherlibs and the C
+  stubs that native programs link are instrumented. The OCaml code of the
+  compiler's own libraries (compiler-libs, the native toplevel, eval, the
+  JIT) is not, as in a compiler configured with `--enable-address-sanitizer`:
+  AddressSanitizer does not check it.
 * Only the libraries in the compiler's own library root have a build per
   variant. A library installed elsewhere was built for one variant. Under a
   variant with another setting for frame pointers, stack checks or

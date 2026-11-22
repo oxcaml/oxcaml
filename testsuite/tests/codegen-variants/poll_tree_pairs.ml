@@ -25,6 +25,4 @@
    something that a .cmx file records, or the name of a symbol, has come
    to depend on poll insertion, or the build of the two trees differs in
    something else than poll insertion (the script prints which files
-   differ). The library root also holds the compiler's own libraries,
-   which the trees of the other variants do not have: those are not
-   compared. This file is not compiled. *)
+   differ). This file is not compiled. *)

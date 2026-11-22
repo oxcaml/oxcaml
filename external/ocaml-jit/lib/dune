@@ -3,12 +3,24 @@
  (libraries ocamlcommon ocamloptcomp ocamlopttoplevel flambda2 unix)
  (foreign_stubs
   (language c)
-  (names jit_stubs)))
+  (names jit_stubs)
+  ; OC_CFLAGS_SEXP: see otherlibs/unix/dune. jit_stubs.c has to be compiled
+  ; with AddressSanitizer where the programs that link it are: it then
+  ; allocates the memory for code within reach of the runtime, which
+  ; instrumented code calls directly.
+  (flags
+   ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
+    (:include %{project_root}/sharedlib_cflags.sexp)
+    (:include %{project_root}/oc_cppflags.sexp)))))
 
 (install
  (files
   (META as ocaml-jit/META)
-  (.jit.objs/native/jit.cmx as ocaml-jit/jit.cmx)
+  ; Every unit of the library: jit.cmx refers to the others, and a
+  ; compilation that uses Jit warns about each one that it does not find
+  ; (warning 58; see toplevel/native/dune).
+  (glob_files
+   (.jit.objs/native/*.cmx with_prefix ocaml-jit))
   (jit.cmxa as ocaml-jit/jit.cmxa)
   (jit.a as ocaml-jit/jit.a)
   (libjit_stubs.a as ocaml-jit/libjit_stubs.a)

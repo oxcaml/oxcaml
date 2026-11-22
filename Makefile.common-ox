@@ -200,8 +200,10 @@ boot-runtest: boot-compiler
 variant_boot_aliases = @runtime_variants \
   $(foreach n,$(codegen_variant_names),@stdlib_$(n))
 
-# The aliases that `make compiler` builds in every variant context.
-variant_context_aliases = otherlibs/codegen-variant-libs
+# The aliases that `make compiler` builds in every variant context: the
+# otherlibs, and the compiler's own libraries with eval and the JIT.
+variant_context_aliases = otherlibs/codegen-variant-libs \
+  codegen-variant-compiler-libs
 
 # One dune invocation builds the main context and every variant context. A
 # variant context depends on the boot context only (its compiler is the boot
@@ -408,6 +410,28 @@ _build/_bootinstall: Makefile.config Makefile.common-ox \
 # (not available on e.g. OS X)
 cpl=$(if $(filter linux,$(SYSTEM)),cp -l,cp -L)
 
+# For find: the native files of a library root, of which each
+# codegen-variant tree has its own build. The archives of the bytecode
+# runtime and of the bytecode systhreads stubs are not among them.
+variant_native_files = \( -name '*.cmx' -o -name '*.cmxa' -o -name '*.cmxs' \
+  -o -name '*.a' -o -name '*.o' \) \
+  ! -name 'libcamlrun*' ! -name libthreads_stubs.a
+
+# For find: the files of the base library root that a codegen-variant tree
+# does not have.
+variant_absent_files = -name '*-js' -o -name '*-wasm' -o -name META
+
+# From lines "<file> <destination>", the arguments of commands that put
+# many files in a directory at once: "<files> <directory>" for the files
+# that keep their name, the line itself for the others.
+group_by_directory = awk '{ \
+    n = split($$1, file, "/"); m = split($$2, destination, "/"); \
+    directory = substr($$2, 1, length($$2) - length(destination[m])); \
+    if (file[n] == destination[m]) \
+      group[directory] = group[directory] " " $$1; \
+    else print } \
+  END { for (directory in group) print group[directory], directory }'
+
 # Assemble the contents of the install directory in _install
 # This is needed to run the upstream testsuite (see runtest-upstream below)
 # We use a local directory rather than the final install path, since
@@ -443,28 +467,38 @@ _install: compiler
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
 ifneq ($(codegen_variant_names),)
-# Assemble the codegen-variant library trees: one COMPLETE stdlib root at
+# Assemble the codegen-variant library trees: one COMPLETE library root at
 # lib/ocaml/variants/<name> per built variant, mirroring the base root's
 # shape, so a compile/link for a non-default codegen variant can use it
 # wholesale via -I / as a remapped stdlib root. Rebuilt per variant:
-# native stdlib and otherlibs artifacts (.cmx/.cmxa/.a/.cmxs/std_exit),
-# the variant runtime archives (suffixed by the name's projection onto the
-# runtime axes), and the native C stub archives (compiled in the variant
-# context so that a variant whose asan axis differs from the default gets
-# matching sanitizer flags via OC_CFLAGS_SEXP; identical bits otherwise,
-# all stubs being built with -fno-omit-frame-pointer, see configure.ac).
-# Copied from the base root because they are codegen-
-# variant-agnostic: .cmi/.cmt*/.cms*, byte artifacts (.cma/.cmo, byte
-# runtime archives), byte stub archives and stublibs
-# (bytecode is unaffected by codegen variants), ld.conf,
-# Makefile.config, runtime-launch-info, expunge and the toplevel support
-# files. The caml/ headers are copied too, except that each variant's
-# caml/m.h gets a prefix naming that variant, so that C code compiled
-# against the tree's headers without -DCAML_CODEGEN_VARIANT_EXPLICIT sees
-# the tree's axis macros instead of the configure default's.
-# Deliberately absent: findlib META files, and the compiler-libs/
-# eval/ocaml-jit universe (eval and metaprogramming are unsupported under
-# non-default codegen variants). A final check asserts that the assembled
+# every native artifact of the base root (.cmx/.cmxa/.a/.cmxs/std_exit) --
+# the stdlib, the otherlibs and the compiler's own libraries
+# (compiler-libs, ocaml-jit, eval), so that a program that links those can
+# be built for any variant --, the variant runtime archives (suffixed by
+# the name's projection onto the runtime axes), and the C stub archives
+# but libthreads_stubs.a (compiled in the variant context with the
+# variant's C flags, see VARIANT_ENV_VARS: its axis macros, and its
+# sanitizer flags).
+# Every other file of the base root is codegen-variant-agnostic and is a
+# relative symbolic link to the base root's file, so that it is stored
+# once however the installation is copied or packed: .cmi/.cmt*/.cms*,
+# sources, byte artifacts (.cma/.cmo, the archives of the bytecode runtime,
+# libthreads_stubs.a and the stublibs), ld.conf, Makefile.config,
+# runtime-launch-info, expunge, the toplevel support files and the caml/
+# headers. The exception is each variant's caml/m.h, which gets a prefix
+# naming that variant, so that C code compiled against the tree's headers
+# without -DCAML_CODEGEN_VARIANT_EXPLICIT sees the tree's axis macros
+# instead of the configure default's.
+# Bytecode -custom and -output-obj links use the lib<name>_stubs.a
+# archives too, and a variant tree's are that variant's builds. A bytecode
+# link takes them from the base root unless it names a variant tree itself,
+# with -I or OCAMLLIB, which it should not: the stub archives of an
+# AddressSanitizer tree are instrumented, and where AddressSanitizer is not
+# the configure default a bytecode link does not pass -fsanitize=address,
+# so it fails on them.
+# Deliberately absent: findlib META files (findlib and Dune find the
+# packages in the base root) and the JSIR artifacts (a JSIR compilation
+# always uses the base root). A final check asserts that the assembled
 # variants/ directory agrees with the configure-computed list (what
 # `ocamlopt -config-var codegen_variants` will report).
 	rm -rf _install/lib/ocaml/variants
@@ -478,7 +512,6 @@ ifneq ($(codegen_variant_names),)
 	   vroot=variants/$$name; \
 	   rm -f $$vroot/dynlink/dynlink.cmxa; \
 	   rm -f $$vroot/{stdlib,camlinternal}*.{o,cmo}; \
-	   cp -f caml/* $$vroot/caml/; \
 	   rm -f $$vroot/caml/m.h; \
 	   { echo "/* Added at install time: these headers describe codegen"; \
 	     echo "   variant $$name unless CAML_CODEGEN_VARIANT_EXPLICIT is"; \
@@ -492,78 +525,63 @@ ifneq ($(codegen_variant_names),)
 	     case "-$$name-" in *-asan-*) \
 	       echo '#define WITH_ADDRESS_SANITIZER 1';; esac; \
 	     echo '#endif'; \
-	     cat caml/m.h; } > $$vroot/caml/m.h; \
-	   cp -R stublibs $$vroot/; \
-	   cp lib*_stubs*.a expunge $$vroot/; \
-	   cp {top,opttop}dirs.{cmi,mli,cmt,cmti} $$vroot/; \
-	   for libdir in unix str threads runtime_events dynlink stdlib_stable \
-	     stdlib_beta stdlib_alpha stdlib_upstream_compatible ; do \
-	     cp -R $$libdir $$vroot/ ; \
-	   done); \
-	  vroot=_install/lib/ocaml/variants/$$name; \
-	  vb=_build/main-$$name/otherlibs; \
-	  cpv() { rm -f "$$1/$$3"; cp "$$2" "$$1/$$3"; }; \
-	  for f in unix.cmxa unix.a unix.cmxs libunix_stubs.a ; do \
-	    cpv $$vroot/unix $$vb/unix/$$f $$f; \
-	  done; \
-	  cpv $$vroot $$vb/unix/libunix_stubs.a libunix_stubs_native.a; \
-	  for m in unix unixLabels ; do \
-	    cpv $$vroot/unix $$vb/unix/.unix.objs/native/$$m.cmx $$m.cmx; \
-	  done; \
-	  for f in str.cmxa str.a str.cmxs libstr_stubs.a ; do \
-	    cpv $$vroot/str $$vb/str/$$f $$f; \
-	  done; \
-	  cpv $$vroot $$vb/str/libstr_stubs.a libstr_stubs_native.a; \
-	  cpv $$vroot/str $$vb/str/.str.objs/native/str.cmx str.cmx; \
-	  for f in runtime_events.cmxa runtime_events.a runtime_events.cmxs \
-	    libruntime_events_stubs.a ; do \
-	    cpv $$vroot/runtime_events $$vb/runtime_events/$$f $$f; \
-	  done; \
-	  cpv $$vroot $$vb/runtime_events/libruntime_events_stubs.a \
-	    libruntime_events_stubs_native.a; \
-	  cpv $$vroot/runtime_events \
-	    $$vb/runtime_events/.runtime_events.objs/native/runtime_events.cmx \
-	    runtime_events.cmx; \
-	  cpv $$vroot/threads $$vb/systhreads/native/threadsnat.cmxa threads.cmxa; \
-	  cpv $$vroot/threads $$vb/systhreads/native/threadsnat.a threads.a; \
-	  cpv $$vroot $$vb/systhreads/native/libthreadsnat_stubs.a \
-	    libthreadsnat_stubs.a; \
-	  cpv $$vroot $$vb/systhreads/native/libthreadsnat_stubs.a \
-	    libthreadsnat_stubs_native.a; \
-	  for m in event thread multicore ; do \
-	    cpv $$vroot/threads \
-	      $$vb/systhreads/native/.threadsnat.objs/native/$$m.cmx $$m.cmx; \
-	  done; \
-	  cpv $$vroot/dynlink $$vb/dynlink/dynlink.cmxa dynlink.cmxa; \
-	  cpv $$vroot/dynlink $$vb/dynlink/dynlink.a dynlink.a; \
-	  cpv $$vroot/dynlink \
-	    $$vb/dynlink/.dynlink_internal.objs/native/dynlink.cmx dynlink.cmx; \
-	  for m in dynlink_common dynlink_platform_intf dynlink_types ; do \
-	    cpv $$vroot/dynlink \
-	      $$vb/dynlink/.dynlink_internal_common.objs/native/$$m.cmx $$m.cmx; \
-	  done; \
-	  for m in dynlink_internal_byte dynlink_internal_native ; do \
-	    cpv $$vroot/dynlink \
-	      $$vb/dynlink/.$$m.objs/native/$$m.cmx $$m.cmx; \
-	  done; \
-	  cpv $$vroot/dynlink \
-	    $$vb/dynlink/.dynlink_internal_native.objs/native/dynlink_host_variant.cmx \
-	    dynlink_host_variant.cmx; \
-	  for m in Axis_lattice Ldd_intf Ldd Misc ; do \
-	    cpv $$vroot \
-	      $$vb/dynlink/.dynlink_compilerlibs.objs/native/dynlink_compilerlibs__$$m.cmx \
-	      dynlink_compilerlibs__$$m.cmx; \
-	  done; \
-	  for u in stdlib_stable stdlib_beta stdlib_alpha \
-	    stdlib_upstream_compatible ; do \
-	    cpv $$vroot/$$u $$vb/$$u/$$u.cmxa $$u.cmxa; \
-	    cpv $$vroot/$$u $$vb/$$u/$$u.a $$u.a; \
-	    cpv $$vroot/$$u $$vb/$$u/$$u.cmxs $$u.cmxs; \
-	    rm -f $$vroot/$$u/*.cmx; \
-	    cp $$vb/$$u/.$$u.objs/native/*.cmx $$vroot/$$u/; \
-	  done; \
-	  find $$vroot -name META -delete; \
-	  find $$vroot -type d -empty -delete; \
+	     cat caml/m.h; } > $$vroot/caml/m.h); \
+	done
+# Complete each variant tree from the context of its variant and from the
+# base root.
+# - Every native file that the main context installs comes from the same
+#   place in the variant's context: the entries of the main context's
+#   install directory are links into its build directory. The interfaces that
+#   the variant's context compiled come along, to be checked.
+# - Every other file of the tree, whether the steps above took it from the
+#   variant's builds or from the base root, must be the base root's file
+#   byte for byte. This holds for the interfaces in particular: the
+#   variant's .cmx files were compiled against them, and their users will
+#   read the base root's.
+# - Each of those files, and every other file of the base root, is then a
+#   link to the base root's.
+# - No native file of the base root may be left without a build of it for
+#   the variant, the runtime archives aside (a variant has its own names
+#   for them).
+	set -e; \
+	built=`cd _build/install/main/lib/ocaml && find . -type l \
+	    \( $(variant_native_files) -o -name '*.cmi' \) -exec ls -l {} + \
+	  | sed 's|^.* \./\(.*\) -> [./]*main/\(.*\)$$|\1 \2|'`; \
+	cd _install/lib/ocaml; \
+	for name in $(codegen_variant_names); do \
+	  v=variants/$$name; \
+	  context=../../../_build/main-$$name; \
+	  find . -path ./variants -prune -o -type d -print \
+	    | sed "s|^|$$v/|" | xargs mkdir -p; \
+	  echo "$$built" | while read -r file path; do \
+	      case $$file in *.cmi) [ -e $$context/$$path ] || continue;; esac; \
+	      echo $$context/$$path $$v/$$file; \
+	    done | $(group_by_directory) \
+	    | while read -r files; do $(cpl) -f $$files; done; \
+	  find $$v -type f \( $(variant_absent_files) \) -delete; \
+	  if LC_ALL=C diff -rq -x variants -x m.h -x 'libasmrun*' -x '*.cmx' \
+	      -x '*.cmxa' -x '*.cmxs' -x '*.a' -x '*.o' . $$v | grep '^Files '; \
+	  then \
+	    echo "error: codegen variant $$name: these files should be" \
+	      "the base library root's" >&2; \
+	    exit 1; \
+	  fi; \
+	  find . -path ./variants -prune -o ! -type d \
+	      ! \( $(variant_native_files) \) ! \( $(variant_absent_files) \) \
+	      ! -name 'libasmrun*' ! -path ./caml/m.h -print \
+	    | awk -v v=$$v '{ path = substr($$0, 3); up = path; \
+	        sub(/[^\/]*$$/, "", up); gsub(/[^\/]+/, "..", up); \
+	        print "../../" up path, v "/" path }' \
+	    | $(group_by_directory) \
+	    | while read -r files; do ln -sf $$files; done; \
+	  find . -path ./variants -prune -o ! -type d \
+	      \( $(variant_native_files) \) ! -name 'libasmrun*' -print \
+	    | while read -r file; do \
+	        [ -f $$v/$$file ] || { \
+	          echo "error: codegen variant $$name: no build of $$file" >&2; \
+	          exit 1; }; \
+	      done; \
+	  find $$v -type d -empty -delete; \
 	done
 	@installed=`ls _install/lib/ocaml/variants | sort | tr '\n' ' '`; \
 	configured=`for n in $(codegen_variant_names); do echo $$n; done \

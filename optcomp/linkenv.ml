@@ -64,7 +64,6 @@ type error =
       { filename : filepath;
         variant : string
       }
-  | Metaprogramming_not_supported_under_codegen_variant of { variant : string }
   | Cached_generic_functions_not_found of
       { filename : filepath;
         variant : string
@@ -442,12 +441,6 @@ let report_error ppf = function
       Location.Doc.quoted_filename filename variant (fun ppf ->
         Option.iter (fprintf ppf "@ (%s)")
           (Codegen_variant.missing_root_hint ()))
-  | Metaprogramming_not_supported_under_codegen_variant { variant } ->
-    fprintf ppf
-      "@[<hov>Programs using eval (metaprogramming) are not supported under \
-       codegen variant %s:@ installations only provide compiler-libs for the \
-       default codegen variant@]"
-      variant
   | Cached_generic_functions_not_found { filename; variant } ->
     let generator_flag =
       match Codegen_variant.of_string variant with

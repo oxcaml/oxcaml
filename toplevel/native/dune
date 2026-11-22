@@ -54,6 +54,14 @@
  (action
   (copy %{deps} %{targets})))
 
+(alias
+ (name codegen-variant-compiler-libs)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (deps ocamlopttoplevel.cmxa ocamlopttoplevel.a))
+
 (executable
  (name topstart)
  (modes native)
@@ -71,6 +79,23 @@
  (files
   (ocamlopttoplevel.a as compiler-libs/ocamlopttoplevel.a)
   (ocamlopttoplevel.cmxa as compiler-libs/ocamlopttoplevel.cmxa)
+  ; The .cmx files of the units whose interfaces are installed, and of the
+  ; units that those use: without them, a compilation that uses the library
+  ; warns that it found no .cmx file (warning 58), unless the interfaces
+  ; were compiled with -opaque, as they are in the dev profile. Not that of
+  ; Topmain: the topmain.cmi in compiler-libs is the bytecode toplevel's.
+  (.ocamlopttoplevel.objs/native/genprintval_native.cmx
+   as
+   compiler-libs/genprintval_native.cmx)
+  (.ocamlopttoplevel.objs/native/opttopdirs.cmx
+   as
+   compiler-libs/opttopdirs.cmx)
+  (.ocamlopttoplevel.objs/native/opttoploop.cmx
+   as
+   compiler-libs/opttoploop.cmx)
+  (.ocamlopttoplevel.objs/native/toplevel_host_variant.cmx
+   as
+   compiler-libs/toplevel_host_variant.cmx)
   (opttopdirs.mli as compiler-libs/opttopdirs.mli)
   (.ocamlopttoplevel.objs/byte/opttopdirs.cmi
    as

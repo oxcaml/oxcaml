@@ -315,19 +315,12 @@ let native unix
       List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
 
     let set_load_path_for_eval () =
-      (* Installations only provide compiler-libs (and the other eval support
-         libraries) for the default codegen variant. *)
-      let variant = Codegen_variant.current () in
-      if not (Codegen_variant.is_default variant)
-      then
-        raise
-          (Linkenv.Error
-             (Metaprogramming_not_supported_under_codegen_variant
-                { variant = Codegen_variant.to_string variant }));
+      (* The eval support libraries of the selected codegen variant: every
+         variant's library tree has its own build of them. *)
       List.iter
         (fun lib ->
           Load_path.add_dir
             { visibility = Visible; cmx_guaranteed = true }
-            (Misc.expand_directory Config.standard_library ("+" ^ lib)))
+            (Codegen_variant.expand_directory ("+" ^ lib)))
         extra_load_paths_for_eval
   end) : S)

@@ -973,6 +973,8 @@ stdenv.mkDerivation {
       rm -f $out/bin/ocamlopt.byte
       rm -f $out/bin/ocamlprof
       rm -f $out/lib/ocaml/expunge
+      # The links to it in the codegen-variant library trees.
+      rm -f $out/lib/ocaml/variants/*/expunge
     '';
 
   postFixup = ''

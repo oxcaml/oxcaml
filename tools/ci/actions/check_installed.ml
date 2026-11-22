@@ -175,12 +175,17 @@ let check_archive_ownership t archives =
   in
   check_dir (installed t "lib")
 
+(* Warning 58 as an error: a compilation that uses a unit whose .cmx file is
+   not installed gets that warning, unless the unit's interface was compiled
+   with -opaque, as all are when the compiler is built in the dev profile. *)
+let no_missing_cmx = ["-w"; "@58"]
+
 let check_native_smoke_programs t =
   let smoke package text =
     checking "native consumer of %s" package;
     write "main.ml" text;
     run t.findlib (["ocamlopt"; "-package"; package; "-linkpkg"] @
-      findlib_flags package @ ["main.ml"; "-o"; "smoke.exe"]);
+      no_missing_cmx @ findlib_flags package @ ["main.ml"; "-o"; "smoke.exe"]);
     run "./smoke.exe" []
   in
   smoke "compiler-libs.native-toplevel"
@@ -194,6 +199,231 @@ let check_native_smoke_programs t =
   if not (List.mem "ocaml-jit" dependencies) then
     fail "eval: missing ocaml-jit dependency";
   smoke "eval" "let () = ()\n"
+
+(* The installation serves each codegen variant besides its default one from
+   a library tree of its own, lib/ocaml/variants/<name>, which mirrors the
+   default tree: it has its own build of every native file, and every other
+   file is a relative link to the default tree's file, so that it is stored
+   once. JSIR artifacts and META files are in the default tree only, and each
+   tree has its own runtime archives and caml/m.h. A program built for a
+   variant that compiles code into itself gets that variant's build of the
+   native toplevel, the JIT and eval. *)
+let check_variant_trees t =
+  let stdlib = installed t "lib/ocaml" in
+  let variants = Filename.concat stdlib "variants" in
+  let default_only file =
+    file = "META" || String.ends_with ~suffix:"-js" file ||
+    String.ends_with ~suffix:"-wasm" file
+  in
+  let own path =
+    let file = Filename.basename path in
+    path = "caml/m.h" ||
+    List.exists (Filename.check_suffix file)
+      [".cmx"; ".cmxa"; ".cmxs"; ".a"; ".o"] &&
+    (* Only bytecode links read these. *)
+    not (String.starts_with ~prefix:"libcamlrun" file) &&
+    file <> "libthreads_stubs.a"
+  in
+  let rec check_dir root dir =
+    Sys.readdir (Filename.concat stdlib dir) |> Array.to_list |> sorted
+    |> List.iter (fun file ->
+      let path = Filename.concat dir file in
+      let default = Filename.concat stdlib path in
+      let copy = Filename.concat root path in
+      if Sys.is_directory default then
+        (if default <> variants then check_dir root path)
+      else if String.starts_with ~prefix:"libasmrun" file then ()
+      else if default_only file then
+        (if Sys.file_exists copy then
+           fail "%s: only the default library tree has this file" copy)
+      else match (Unix.lstat copy).st_kind with
+        | exception Unix.Unix_error (ENOENT, _, _) -> fail "Missing %s" copy
+        | S_REG when own path -> ()
+        | S_LNK when not (own path) ->
+            if not (Filename.is_relative (Unix.readlink copy)) ||
+               Unix.realpath copy <> default
+            then fail "%s is not a relative link to %s" copy default
+        | _ ->
+            fail "%s should be %s" copy
+              (if own path then "a file of this variant's build"
+               else "a link to " ^ default))
+  in
+  let axes =
+    [ "asan", "-asan", "-no-asan";
+      "fp", "-frame-pointers", "-no-frame-pointers";
+      "poll", "-enable-poll-insertion", "-disable-poll-insertion";
+      "sc", "-stack-checks", "-no-stack-checks" ]
+  in
+  let toplevel =
+    [ "-I"; "+compiler-libs"; "-I"; "+unix"; "-I"; "+dynlink"; "unix.cmxa";
+      "dynlink.cmxa"; "ocamlcommon.cmxa"; "ocamlfrontend.cmxa";
+      "ocamloptcomp.cmxa"; "ocamlopttoplevel.cmxa"; "-linkall" ]
+  in
+  capture (installed t "bin/ocamlopt") ["-config-var"; "codegen_variants"]
+  |> words
+  |> List.iter (fun variant ->
+    checking "library tree of codegen variant %s" variant;
+    check_dir (Filename.concat variants variant) "";
+    let tokens = String.split_on_char '-' variant in
+    (* The headers of the tree are links to the default tree's, and the
+       caml/m.h that they include has to be the tree's own. *)
+    checking "C headers of codegen variant %s" variant;
+    write "macros.c"
+      "#include <caml/mlvalues.h>\n\
+       #ifdef WITH_ADDRESS_SANITIZER\nasan\n#endif\n\
+       #ifdef WITH_FRAME_POINTERS\nfp\n#endif\n\
+       #ifdef STACK_CHECKS_ENABLED\nsc\n#endif\n";
+    let cc =
+      capture (installed t "bin/ocamlopt") ["-config-var"; "c_compiler"]
+      |> words
+    in
+    let macros = ["asan"; "fp"; "sc"] in
+    let defined =
+      capture (List.hd cc)
+        (List.tl cc @
+         ["-E"; "-P"; "-I"; Filename.concat variants variant; "macros.c"])
+      |> lines |> List.filter (fun line -> List.mem line macros)
+    in
+    if defined <> List.filter (fun token -> List.mem token macros) tokens then
+      fail "The headers of codegen variant %s define the macros of [%s]"
+        variant (String.concat " " defined);
+    let flags =
+      List.map (fun (token, enable, disable) ->
+        if List.mem token tokens then enable else disable) axes
+    in
+    let smoke library arguments text =
+      checking "native consumer of %s for codegen variant %s" library variant;
+      write "main.ml" text;
+      run (installed t "bin/ocamlopt")
+        (flags @ no_missing_cmx @ arguments @ ["main.ml"; "-o"; "smoke.exe"]);
+      capture "./smoke.exe" []
+    in
+    let host = smoke "the native toplevel" toplevel
+      "let () =\n\
+      \  Opttoploop.initialize_toplevel_env ();\n\
+      \  print_string (Codegen_variant.to_string Opttoploop.host_variant)\n"
+    in
+    if host <> variant then
+      fail "The native toplevel of codegen variant %s compiles for %s"
+        variant host;
+    let (_ : string) = smoke "ocaml-jit"
+      (toplevel @ ["-I"; "+ocaml-jit"; "jit.cmxa"])
+      "let () = Jit.init_top ()\n"
+    in
+    let (_ : string) = smoke "eval" (link_flags "eval" @ ["eval.cmxa"])
+      "let () = ()\n"
+    in
+    ())
+
+(* The compiler offers the codegen variants whose trees it finds in the
+   installation, so a tree that the installation lost is not missed by what
+   asks the compiler for its variants, as the checks here do. The list of
+   the variants that were built is in the installed Makefile.config: the
+   compiler must report exactly those. *)
+let check_variant_list t =
+  checking "list of codegen variants";
+  let makefile = installed t "lib/ocaml/Makefile.config" in
+  let prefix = "CODEGEN_VARIANTS=" in
+  let built =
+    match
+      List.filter (String.starts_with ~prefix) (lines (read makefile))
+    with
+    | [line] ->
+        let length = String.length prefix in
+        sorted (words (String.sub line length (String.length line - length)))
+    | _ -> fail "%s: expected one line %s" makefile prefix
+  in
+  let found =
+    capture (installed t "bin/ocamlopt") ["-config-var"; "codegen_variants"]
+    |> words |> sorted
+  in
+  if found <> built then
+    fail "The installation was built with the codegen variants [%s], but \
+          has library trees for [%s] in %s"
+      (String.concat " " built) (String.concat " " found)
+      (installed t "lib/ocaml/variants")
+
+(* The symbols starting with [prefix] that a runtime archive or shared
+   library defines, by their names in C. nm prints "address type name" for
+   a symbol that the file defines and "U name" for one that it only refers
+   to. Its listing of external symbols, -g, exists for every object format;
+   an ELF shared library may have kept its dynamic symbols only, which -D
+   lists, and a Mach-O one has no such table. Mach-O also puts an underscore
+   in front of the names of C. *)
+let defined_symbols ~macho ~prefix path =
+  let listing =
+    if Filename.check_suffix path ".so" && not macho then "-D" else "-g"
+  in
+  capture "nm" [listing; path] |> lines
+  |> List.filter_map (fun line ->
+    match words line with
+    | [_address; kind; symbol] when kind <> "U" ->
+        let symbol =
+          if macho && String.starts_with ~prefix:"_" symbol
+          then String.sub symbol 1 (String.length symbol - 1)
+          else symbol
+        in
+        if String.starts_with ~prefix symbol then Some symbol else None
+    | _ -> None)
+  |> List.sort_uniq String.compare
+
+(* Each library tree has the archives of the native runtime built for its
+   variant and no others: a link that takes -lasmrun from a variant's tree,
+   as a hand-written link of an -output-obj object may, must not find the
+   runtime of another variant there. The names of the archives end in the
+   variant's axes that the runtime depends on, unless those are the default
+   variant's. A name does not say what the file is: each runtime defines
+   the guard symbol of the variant it was built for and no other (see
+   runtime/codegen_variant_guard.c), which nm shows. *)
+let check_runtime_archives t =
+  let stdlib = installed t "lib/ocaml" in
+  let config variable =
+    capture (installed t "bin/ocamlopt") ["-config-var"; variable]
+  in
+  let default_axes =
+    List.filter_map (fun (axis, variable, enabled) ->
+      if config variable = enabled then Some axis else None)
+      [ "asan", "with_address_sanitizer", "true";
+        "fp", "with_frame_pointers", "true";
+        "sc", "no_stack_checks", "false" ]
+  in
+  let macho = config "system" = "macosx" in
+  let check tree axes =
+    checking "runtime archives of %s" tree;
+    let suffix =
+      if axes = default_axes then ""
+      else if axes = [] then "_base"
+      else "_" ^ String.concat "_" axes
+    in
+    let expected =
+      sorted
+        [ "libasmrun" ^ suffix ^ ".a"; "libasmrund" ^ suffix ^ ".a";
+          "libasmrun_pic" ^ suffix ^ ".a";
+          "libasmrun_shared" ^ suffix ^ ".so" ]
+    in
+    let found =
+      Sys.readdir tree |> Array.to_list
+      |> List.filter (String.starts_with ~prefix:"libasmrun") |> sorted
+    in
+    if found <> expected then
+      fail "%s has the native runtime archives [%s], expected [%s]"
+        tree (String.concat " " found) (String.concat " " expected);
+    let guards = "caml_runtime_codegen_variant_is_" in
+    let guard =
+      guards ^ (if axes = [] then "base" else String.concat "_" axes)
+    in
+    List.iter (fun file ->
+      let path = Filename.concat tree file in
+      let defined = defined_symbols ~macho ~prefix:guards path in
+      if defined <> [guard] then
+        fail "%s defines [%s]: the runtime of this tree's variant defines %s"
+          path (String.concat " " defined) guard) expected
+  in
+  check stdlib default_axes;
+  config "codegen_variants" |> words |> List.iter (fun variant ->
+    check (Filename.concat (Filename.concat stdlib "variants") variant)
+      (String.split_on_char '-' variant
+       |> List.filter (fun token -> List.mem token ["asan"; "fp"; "sc"])))
 
 let read_list file =
   read file |> lines |> List.filter_map (fun line ->
@@ -534,6 +764,11 @@ let main () =
   write "dune-project" "(lang dune 3.0)\n";
   let archives, packages = check_meta_files t in
   check_archive_ownership t archives;
+  check_variant_list t;
+  (* Before the links of check_variant_trees: a link with the runtime of
+     another variant fails without saying which file is wrong. *)
+  check_runtime_archives t;
+  check_variant_trees t;
   checking "Dune library availability";
   let unavailable =
     capture dune ["installed-libraries"; "--root"; "."; "--na"]
