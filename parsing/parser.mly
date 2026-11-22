@@ -1124,6 +1124,9 @@ let maybe_pmod_constraint mode expr =
 %token SEMI                   ";"
 %token SEMISEMI               ";;"
 %token HASH                   "#"
+%token HASH_CONSTR            "# (constructor prefix)"
+%token HASH_MODULE            "# (module path prefix)"
+%token DOTHASH_CONSTR         ".# (constructor prefix)"
 %token HASH_SUFFIX            "# "
 %token <string> HASHOP        "##" (* just an example *)
 %token SIG                    "sig"
@@ -1232,7 +1235,7 @@ The precedences must be listed from low to high.
           HASH_CHAR HASH_FLOAT HASH_INT
           LBRACKETCOLON LESSLBRACKET DOLLAR
           HASHLBRACE HASHLPAREN UNDERSCORE
-          HASHFALSE HASHTRUE
+          HASHFALSE HASHTRUE HASH_CONSTR HASH_MODULE
 
 /* Entry points */
 
@@ -1664,7 +1667,7 @@ parse_val_longident:
 ;
 
 parse_constr_longident:
-  constr_longident EOF
+  variant_constructor EOF
     { $1 }
 ;
 
@@ -2983,7 +2986,7 @@ fun_expr:
   | labeled_tuple %prec below_COMMA
       { mkexp ~loc:$sloc (Pexp_tuple $1) }
   | maybe_stack (
-    mkrhs(constr_longident) simple_expr %prec below_HASH
+    mkrhs(expr_constructor) simple_expr %prec below_HASH
       { mkexp ~loc:$sloc (Pexp_construct($1, Some $2)) }
     ) { $1 }
   | name_tag simple_expr %prec below_HASH
@@ -3185,7 +3188,7 @@ block_access:
 %inline simple_expr_:
   | mkrhs(val_longident)
       { Pexp_ident ($1) }
-  | mkrhs(constr_longident) %prec prec_constant_constructor
+  | mkrhs(expr_constructor) %prec prec_constant_constructor
       { Pexp_construct($1, None) }
   | HASHLPAREN RPAREN
       { Pexp_unboxed_unit }
@@ -3762,12 +3765,12 @@ pattern_gen:
     simple_pattern
       { $1 }
   | mkpat(
-      mkrhs(constr_longident) pattern %prec prec_constr_appl
+      mkrhs(variant_constructor) pattern %prec prec_constr_appl
         { Ppat_construct($1, Some ([], $2)) }
-    | constr=mkrhs(constr_longident) LPAREN TYPE newtypes=newtypes RPAREN
+    | constr=mkrhs(variant_constructor) LPAREN TYPE newtypes=newtypes RPAREN
         pat=simple_pattern
         { Ppat_construct(constr, Some (newtypes, pat)) }
-    | constr=mkrhs(constr_longident)
+    | constr=mkrhs(variant_constructor)
         LPAREN TYPE ty=mkrhs(LIDENT) COLON jkind=jkind_annotation RPAREN
         pat=simple_pattern
         { Ppat_construct(constr, Some ([(ty,Some jkind)], pat)) }
@@ -3808,7 +3811,7 @@ simple_pattern_not_ident:
       { Ppat_any }
   | signed_constant DOTDOT signed_constant
       { Ppat_interval ($1, $3) }
-  | mkrhs(constr_longident)
+  | mkrhs(variant_constructor)
       { Ppat_construct($1, None) }
   | HASHLPAREN RPAREN
       { Ppat_unboxed_unit }
@@ -3818,7 +3821,7 @@ simple_pattern_not_ident:
       { Ppat_unboxed_bool true }
   | name_tag
       { Ppat_variant($1, None) }
-  | hash mkrhs(type_longident)
+  | pattern_type_hash mkrhs(type_longident)
       { Ppat_type ($2) }
   | mkrhs(mod_longident) DOT simple_delimited_pattern
       { Ppat_open($1, $3) }
@@ -5122,7 +5125,7 @@ atomic_type:
       tid = mkrhs(type_unboxed_longident)
         { unboxed_type $loc(tid) tid.txt tys }
     | tys = actual_type_parameters
-      HASH
+      class_hash
       cid = mkrhs(clty_longident)
         { Ptyp_class (cid, tys) }
     | mod_ident = mkrhs(mod_ext_longident)
@@ -5383,6 +5386,27 @@ constr_longident:
   | constr_extra_ident                   { Lident $1 }
   | constr_extra_nonprefix_ident         { Lident $1 }
 ;
+variant_constructor:
+  | constr_longident { $1 }
+  | hash_constructor(mod_longident) { $1 }
+;
+%inline hash_constructor(prefix):
+  | HASH_CONSTR UIDENT { Lident ("#" ^ $2) }
+  | prefix DOTHASH_CONSTR UIDENT
+      { let hash = $endpos($2) in
+        let start = Lexing.{ hash with pos_cnum = hash.pos_cnum - 1 } in
+        ldot $1 $loc($1) ("#" ^ $3) (start, $endpos($3)) }
+;
+expr_constructor:
+  | variant_constructor { $1 }
+  | HASH_MODULE UIDENT { Lident ("#" ^ $2) }
+;
+%inline class_hash:
+  | HASH | HASH_MODULE { () }
+;
+%inline pattern_type_hash:
+  | class_hash | HASH_SUFFIX { () }
+;
 mk_longident(prefix,final):
    | final            { Lident $1 }
    | prefix DOT final { ldot $1 $loc($1) $3 $loc($3) }
@@ -5431,6 +5455,7 @@ class_longident:
    final identifiers which are value specific are accepted even when
    the path prefix is only valid for types: (e.g. F(X).(::)) */
 any_longident:
+  | hash_constructor(mod_ext_longident) { $1 }
   | mk_longident (mod_ext_longident,
      ident | constr_extra_ident | val_extra_ident { $1 }
     ) { $1 }

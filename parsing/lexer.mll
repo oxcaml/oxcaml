@@ -868,6 +868,15 @@ rule token = parse
       Location.prerr_warning loc Warnings.Comment_not_end;
       produce_and_backtrack lexbuf STAR 1
     }
+  | ("#" | ".#" as prefix) (uppercase | utf8 as initial)
+      { let token =
+          match prefix, Utf8_lexeme.is_capitalized initial with
+          | "#", true -> HASH_CONSTR
+          | ".#", true -> DOTHASH_CONSTR
+          | "#", false -> HASH
+          | _, _ -> DOTHASH
+        in
+        produce_and_backtrack lexbuf token (String.length initial) }
   | "#"
       { if not (at_beginning_of_line lexbuf.lex_start_p)
         then HASH
@@ -1218,6 +1227,76 @@ and skip_hash_bang = parse
     | None -> token lexbuf
     | Some (_init, preprocess) -> preprocess token lexbuf
 
+  let lookahead_tokens = Queue.create ()
+
+  let token_window lexbuf token =
+    { token; start_pos = lexbuf.lex_start_p; end_pos = lexbuf.lex_curr_p },
+    lexbuf.lex_abs_pos + lexbuf.lex_start_pos,
+    lexbuf.lex_abs_pos + lexbuf.lex_curr_pos
+
+  let restore_window lexbuf ({ token; start_pos; end_pos }, first, last) =
+    lexbuf.lex_start_p <- start_pos;
+    lexbuf.lex_curr_p <- end_pos;
+    lexbuf.lex_start_pos <- first - lexbuf.lex_abs_pos;
+    lexbuf.lex_curr_pos <- last - lexbuf.lex_abs_pos;
+    token
+
+  let token_with_comments lexbuf =
+    let next =
+      match Queue.take_opt lookahead_tokens with
+      | None -> token_with_comments lexbuf
+      | Some window -> restore_window lexbuf window
+    in
+    match next with
+    | HASH_CONSTR | DOTHASH_CONSTR ->
+        let ((_, first, _) as prefix) = token_window lexbuf next in
+        let refill_buff buffer =
+          let start = buffer.lex_abs_pos + buffer.lex_start_pos in
+          buffer.lex_start_pos <- first - buffer.lex_abs_pos;
+          lexbuf.refill_buff buffer;
+          buffer.lex_start_pos <- start - buffer.lex_abs_pos
+        in
+        let scan = { lexbuf with refill_buff } in
+        let finish window =
+          lexbuf.lex_buffer <- scan.lex_buffer;
+          lexbuf.lex_buffer_len <- scan.lex_buffer_len;
+          lexbuf.lex_eof_reached <- scan.lex_eof_reached;
+          lexbuf.lex_abs_pos <- scan.lex_abs_pos;
+          restore_window lexbuf window
+        in
+        let rec peek () =
+          let token = token_with_comments scan in
+          Queue.add (token_window scan token) lookahead_tokens;
+          match token with
+          | EOL | COMMENT _ | DOCSTRING _ -> peek ()
+          | _ -> token
+        in
+        let rec before_projection depth =
+          match peek () with
+          | DOT when depth = 0 ->
+              next = HASH_CONSTR ||
+              (match peek () with LIDENT _ | UIDENT _ -> true | _ -> false)
+          | LPAREN when next = HASH_CONSTR -> before_projection (depth + 1)
+          | UIDENT _ | DOT when depth > 0 -> before_projection depth
+          | RPAREN when depth > 0 -> before_projection (depth - 1)
+          | _ -> false
+        in
+        let starts_path () =
+          match peek () with
+          | UIDENT _ -> before_projection 0
+          | _ -> false
+        in
+        (match starts_path () with
+         | is_path ->
+             ignore (finish prefix);
+             if not is_path then next
+             else if next = HASH_CONSTR then HASH_MODULE else DOTHASH
+         | exception exn ->
+             Queue.clear lookahead_tokens;
+             ignore (finish (token_window scan next));
+             raise exn)
+    | token -> token
+
   type newline_state =
     | NoLine (* There have been no blank lines yet. *)
     | NewLine
@@ -1308,6 +1387,8 @@ and skip_hash_bang = parse
       loop NoLine Initial lexbuf
 
   let init ?(keyword_edition=Config.default_keyword_edition) () =
+    Queue.clear lookahead_tokens;
+    Queue.clear deferred_tokens;
     populate_keywords keyword_edition;
     is_in_string := false;
     comment_start_loc := [];
