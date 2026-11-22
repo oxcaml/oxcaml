@@ -365,7 +365,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           (* The sort is undetermined (e.g., a field/arg of kind [any]), so
              compute it from the type of this particular value *)
           match Ctype.type_sort env ty ~allow_mutation:false ~why with
-          | Ok sort -> print_sort (Jkind.Sort.default_for_transl_and_get sort)
+          | Ok sort -> print_sort (Jkind.Sort.default_to_scannable_and_get sort)
           | Error _ -> Print_as "<unknown>"
 
     let field_types_of_labels env lbl_list type_params ty_list () =
