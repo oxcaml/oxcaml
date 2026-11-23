@@ -1029,19 +1029,93 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
                  idx,
                  Lsequence (store_low, store_high) ) ) ))
 
-(* CR mshinwell: this predicate does not look inside unboxed (or [@unpacked])
-   products, so their vec256 components escape the splitting below and hit a
-   fatal error in the arm64 backend. The transform cannot split products, so
-   either implement that or raise a proper error here. *)
-let ccall_involves_vec256 (desc : L.external_call_description) =
-  let repr_vec256 = function[@warning "-4"]
-    | _, L.Unboxed_vector Boxed_vec256 | _, L.Same_as_ocaml_repr (Base Vec256)
-      ->
-      true
-    | _ -> false
+(* The sort whose layout is that of [sort] when [L.split_vectors] is set. *)
+let rec split_vectors_in_sort (sort : S.t) : S.t =
+  match sort with
+  | Base Vec256 -> S.product [S.vec128; S.vec128]
+  | Base
+      ( Void | Scannable | Untagged_immediate | Float64 | Float32 | Word | Bits8
+      | Bits16 | Bits32 | Bits64 | Vec128 | Vec512 | Mask )
+  | Univar _ | Genvar _ ->
+    sort
+  | Product sorts -> S.product (List.map split_vectors_in_sort sorts)
+  | Addressable sort -> S.addressable (split_vectors_in_sort sort)
+
+let rec sort_involves_split_vectors (sort : S.t) =
+  match sort with
+  | Base Vec256 -> true
+  | Base
+      ( Void | Scannable | Untagged_immediate | Float64 | Float32 | Word | Bits8
+      | Bits16 | Bits32 | Bits64 | Vec128 | Vec512 | Mask )
+  | Univar _ | Genvar _ ->
+    false
+  | Product sorts -> List.exists sort_involves_split_vectors sorts
+  | Addressable sort -> sort_involves_split_vectors sort
+
+let extern_repr_involves_split_vectors (repr : L.extern_repr) =
+  match repr with
+  | Same_as_ocaml_repr sort | Unpacked_product sort ->
+    sort_involves_split_vectors sort
+  | Unboxed_vector Boxed_vec256 -> true
+  | Unboxed_vector (Boxed_vec128 | Boxed_vec512)
+  | Unboxed_mask | Unboxed_float _ | Unboxed_or_untagged_integer _ | Raw_pointer
+    ->
+    false
+
+let ccall_involves_split_vectors (desc : L.external_call_description) =
+  List.exists
+    (fun (_, repr) -> extern_repr_involves_split_vectors repr)
+    (desc.prim_native_repr_res :: desc.prim_native_repr_args)
+
+(* A split vector is passed to and returned from C as the unboxed product of its
+   128-bit components, that is, like a struct of 128-bit vectors. *)
+let split_vectors_in_ccall ~loc (desc : L.external_call_description) args =
+  let split_arg (mode, (repr : L.extern_repr)) arg =
+    match repr with
+    | Same_as_ocaml_repr sort ->
+      (mode, L.Same_as_ocaml_repr (split_vectors_in_sort sort)), arg
+    | Unpacked_product sort ->
+      (mode, L.Unpacked_product (split_vectors_in_sort sort)), arg
+    | Unboxed_vector Boxed_vec256 ->
+      ( (mode, L.Same_as_ocaml_repr (split_vectors_in_sort S.vec256)),
+        L.Lprim (Punbox_vector Boxed_vec256, [arg], loc) )
+    | Unboxed_vector (Boxed_vec128 | Boxed_vec512)
+    | Unboxed_mask | Unboxed_float _ | Unboxed_or_untagged_integer _
+    | Raw_pointer ->
+      (mode, repr), arg
   in
-  repr_vec256 desc.prim_native_repr_res
-  || List.exists repr_vec256 desc.prim_native_repr_args
+  let native_repr_args, args =
+    List.map2 split_arg desc.prim_native_repr_args args |> List.split
+  in
+  let ccall native_repr_res =
+    let desc =
+      Primitive.make ~name:desc.prim_name ~alloc:desc.prim_alloc
+        ~c_builtin:desc.prim_c_builtin ~effects:desc.prim_effects
+        ~coeffects:desc.prim_coeffects ~native_name:desc.prim_native_name
+        ~native_repr_args ~native_repr_res
+        ~is_layout_poly:desc.prim_is_layout_poly
+    in
+    L.Lprim (Pccall desc, args, loc)
+  in
+  match desc.prim_native_repr_res with
+  | mode, Same_as_ocaml_repr sort ->
+    ccall (mode, L.Same_as_ocaml_repr (split_vectors_in_sort sort))
+  | mode, Unpacked_product sort ->
+    ccall (mode, L.Unpacked_product (split_vectors_in_sort sort))
+  | mode, Unboxed_vector Boxed_vec256 ->
+    let alloc_mode =
+      Lambda.locality_mode_of_primitive_description desc
+      |> Option.value ~default:L.alloc_heap
+    in
+    L.Lprim
+      ( Pbox_vector (Boxed_vec256, alloc_mode),
+        [ccall (mode, L.Same_as_ocaml_repr (split_vectors_in_sort S.vec256))],
+        loc )
+  | ( _,
+      ( Unboxed_vector (Boxed_vec128 | Boxed_vec512)
+      | Unboxed_mask | Unboxed_float _ | Unboxed_or_untagged_integer _
+      | Raw_pointer ) ) as native_repr_res ->
+    ccall native_repr_res
 
 let transform_primitive0 env (prim : L.primitive) args loc =
   match prim, args with
@@ -1432,87 +1506,8 @@ let transform_primitive0 env (prim : L.primitive) args loc =
            arg_duid,
            arg,
            prim ))
-  | Pccall desc, _ when L.split_vectors && ccall_involves_vec256 desc -> (
-    let bindings = ref [] in
-    let prim_native_repr_args, args =
-      let rebind_arg arg kind =
-        let arg_id =
-          Ident.create_local (Printf.sprintf "arg/%d" (List.length !bindings))
-        in
-        let arg_duid = Lambda.debug_uid_none in
-        bindings := (arg, arg_id, arg_duid, kind) :: !bindings;
-        arg_id
-      in
-      let expand (mode, repr) arg =
-        match (repr : L.extern_repr) with
-        (* vec256[@unboxed] => vec128#, vec128# *)
-        | Unboxed_vector Boxed_vec256 ->
-          let arg_id =
-            rebind_arg
-              (boxed_vec256_to_mixed ~loc arg)
-              (L.layout_tupled_vector Boxed_vec256)
-          in
-          (* Tell flambda2 not to unbox the components *)
-          let ext = mode, L.Same_as_ocaml_repr S.vec128 in
-          [ ext, boxed_vec256_field ~loc 0 (Lvar arg_id);
-            ext, boxed_vec256_field ~loc 1 (Lvar arg_id) ]
-        (* vec256# as #(vec128# * vec128#) => vec128#, vec128# *)
-        | Same_as_ocaml_repr (Base Vec256) ->
-          let arg_id =
-            rebind_arg arg (L.layout_unboxed_tupled_vector Unboxed_vec256)
-          in
-          let ext = mode, L.Same_as_ocaml_repr S.vec128 in
-          [ ext, unboxed_vec256_field ~loc 0 (Lvar arg_id);
-            ext, unboxed_vec256_field ~loc 1 (Lvar arg_id) ]
-        | _ -> [(mode, repr), arg]
-      in
-      List.map2 expand desc.prim_native_repr_args args
-      |> List.concat |> List.split
-    in
-    let make_ccall prim_native_repr_res =
-      let desc =
-        Primitive.make ~name:desc.prim_name ~alloc:desc.prim_alloc
-          ~c_builtin:desc.prim_c_builtin ~effects:desc.prim_effects
-          ~coeffects:desc.prim_coeffects ~native_name:desc.prim_native_name
-          ~native_repr_args:prim_native_repr_args
-          ~native_repr_res:prim_native_repr_res
-          ~is_layout_poly:desc.prim_is_layout_poly
-      in
-      let rec rebind = function
-        | [] -> L.Lprim (Pccall desc, args, loc)
-        | (arg, arg_id, arg_duid, layout) :: bindings ->
-          L.Llet (Strict, layout, arg_id, arg_duid, arg, rebind bindings)
-      in
-      rebind !bindings
-    in
-    match desc.prim_native_repr_res with
-    (* #(vec128# x vec128#) -> vec256[@unboxed] *)
-    | mode, Unboxed_vector Boxed_vec256 ->
-      let repr_res =
-        (* Tell flambda2 not to box the components *)
-        mode, L.Same_as_ocaml_repr S.(product [vec128; vec128])
-      in
-      let res = Ident.create_local "res" in
-      let res_duid = Lambda.debug_uid_none in
-      let alloc_mode =
-        Lambda.locality_mode_of_primitive_description desc
-        |> Option.value ~default:L.alloc_heap
-      in
-      Transformed
-        (Llet
-           ( Strict,
-             L.layout_unboxed_tupled_vector Unboxed_vec256,
-             res,
-             res_duid,
-             make_ccall repr_res,
-             make_boxed_vec256 ~loc ~mode:alloc_mode
-               [ unboxed_vec256_field ~loc 0 (Lvar res);
-                 unboxed_vec256_field ~loc 1 (Lvar res) ] ))
-    (* #(vec128# * vec128#) -> vec256# as #(vec128# * vec128#) *)
-    | mode, Same_as_ocaml_repr (Base Vec256) ->
-      let repr_res = mode, L.Same_as_ocaml_repr S.(product [vec128; vec128]) in
-      Transformed (make_ccall repr_res)
-    | repr_res -> Transformed (make_ccall repr_res))
+  | Pccall desc, _ when L.split_vectors && ccall_involves_split_vectors desc ->
+    Transformed (split_vectors_in_ccall ~loc desc args)
   | _, _ -> Primitive (prim, args, loc)
 [@@ocaml.warning "-fragile-match"]
 
