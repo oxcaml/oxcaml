@@ -29,6 +29,7 @@ val print : Format.formatter -> t -> unit
 (** Create a new environment, marked as being at the toplevel of a compilation
     unit. *)
 val create :
+  ppf_dump:Format.formatter ->
   round:int ->
   machine_width:Target_system.Machine_width.t ->
   resolver:resolver ->
@@ -38,6 +39,8 @@ val create :
   unit_toplevel_return_continuation:Continuation.t ->
   toplevel_my_alloc_region:Variable.t ->
   t
+
+val ppf_dump : t -> Format.formatter
 
 val all_code : t -> Code.t Code_id.Map.t
 

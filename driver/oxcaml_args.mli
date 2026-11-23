@@ -221,6 +221,7 @@ module type Oxcaml_options = sig
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
+  val dsimplified : unit -> unit
   val dsimplify : unit -> unit
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit

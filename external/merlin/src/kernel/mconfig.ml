@@ -665,6 +665,7 @@ let ocaml_ignored_flags =
     "-flambda2-reaper";
     "-no-flambda2-reaper";
     "-dsimplify";
+    "-dsimplified";
     "-dreaper";
     "-instantiate";
     "-dflambda-heavy-invariants";
