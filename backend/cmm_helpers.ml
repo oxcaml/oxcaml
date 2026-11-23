@@ -5544,7 +5544,16 @@ let pack_small_ints_into_word ~bits int_list dbg =
       in
       or_int a (loop (previously_packed + bits) rest) dbg
   in
-  loop 0 int_list
+  (* The elements are bound first, the last one outermost, so that they are
+     evaluated from right to left: helpers such as [or_int] can move a [Clet] or
+     [Csequence] at the head of an operand (e.g. an external call) before the
+     evaluation of the operands to its right. *)
+  let rec bind_right_to_left bound = function
+    | [] -> loop 0 bound
+    | last :: rest ->
+      bind "elt" last (fun last -> bind_right_to_left (last :: bound) rest)
+  in
+  bind_right_to_left [] (List.rev int_list)
 
 let make_untagged_int8_array_payload dbg untagged_int8_list =
   let rec aux acc = function
