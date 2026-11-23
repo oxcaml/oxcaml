@@ -1,0 +1,153 @@
+Labels: entry = 1, A = 100, B = 101, C = 102, D = 103
+
+truth test, followed by A:
+    if not pin:anon:I/0[%rax] goto L101 fdo_annotation("Test.f":0:00000001:0:branch(2)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped:
+  lost:
+
+truth test, followed by B:
+    if pin:anon:I/0[%rax] goto L100 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
+  dropped:
+  lost:
+
+truth test, followed by C:
+    if pin:anon:I/0[%rax] goto L100 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
+    goto L101
+  dropped:
+  lost:
+
+parity test, followed by A:
+    if pin:anon:I/0[%rax] & 1 == 1 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(2)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped:
+  lost:
+
+parity test, followed by B:
+    if pin:anon:I/0[%rax] & 1 == 0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
+  dropped:
+  lost:
+
+parity test, followed by C:
+    if pin:anon:I/0[%rax] & 1 == 0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
+    goto L101
+  dropped:
+  lost:
+
+truth test to a single target, followed by A:
+  dropped: "Test.f":0:00000001:0:branch(1) "Test.f":0:00000001:0:branch(2)
+  lost:
+
+truth test to a single target, followed by B:
+    goto L100
+  dropped: "Test.f":0:00000001:0:branch(1) "Test.f":0:00000001:0:branch(2)
+  lost:
+
+truth test to a single target, followed by C:
+    goto L100
+  dropped: "Test.f":0:00000001:0:branch(1) "Test.f":0:00000001:0:branch(2)
+  lost:
+
+int test with two targets, followed by A:
+    if pin:anon:I/0[%rax] == 0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2))
+  dropped:
+  lost:
+
+int test with two targets, followed by B:
+    if pin:anon:I/0[%rax] != 0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped:
+  lost:
+
+int test with two targets, followed by C:
+    if pin:anon:I/0[%rax] == 0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2))
+    goto L100
+  dropped:
+  lost:
+
+int test with three targets, followed by A:
+    if pin:anon:I/0[%rax] >s 0 goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+    if pin:anon:I/0[%rax] == 0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0))
+  dropped:
+  lost:
+
+int test with three targets, followed by B:
+    if pin:anon:I/0[%rax] >s 0 goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+    if pin:anon:I/0[%rax] <s 0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped:
+  lost:
+
+int test with three targets, followed by C:
+    if pin:anon:I/0[%rax] == 0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    if pin:anon:I/0[%rax] <s 0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
+  dropped:
+  lost:
+
+int test with three targets, against 1 unsigned, followed by A:
+    switch3 pin:anon:I/0[%rax] fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0))case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+case 2: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+endswitch
+  dropped:
+  lost:
+
+int test with three targets, against 1 unsigned, followed by B:
+    switch3 pin:anon:I/0[%rax] fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))
+case 2: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+endswitch
+  dropped:
+  lost:
+
+int test with three targets, against 1 unsigned, followed by C:
+    switch3 pin:anon:I/0[%rax] fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))
+case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+endswitch
+  dropped:
+  lost:
+
+float test with two targets, followed by A:
+    if pin:anon:I/0[%rax] == pin:anon:I/0[%rax] goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2)
+                                                                                                                                     "Test.f":0:00000001:0:branch(3))
+  dropped:
+  lost:
+
+float test with two targets, followed by B:
+    if pin:anon:I/0[%rax] != pin:anon:I/0[%rax] goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)) fallthrough_fdo_annotation
+("Test.f":0:00000001:0:branch(1))
+  dropped:
+  lost:
+
+float test with two targets, followed by C:
+    if pin:anon:I/0[%rax] == pin:anon:I/0[%rax] goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2)
+                                                                                                                                     "Test.f":0:00000001:0:branch(3))
+    goto L100
+  dropped:
+  lost:
+
+float test with three targets, followed by A:
+    if pin:anon:I/0[%rax] !<= pin:anon:I/0[%rax] goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3))
+    if pin:anon:I/0[%rax] == pin:anon:I/0[%rax] goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0))
+  dropped:
+  lost:
+
+float test with three targets, followed by B:
+    if pin:anon:I/0[%rax] !<= pin:anon:I/0[%rax] goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3))
+    if pin:anon:I/0[%rax] < pin:anon:I/0[%rax] goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped:
+  lost:
+
+float test with three targets, followed by C:
+    if pin:anon:I/0[%rax] == pin:anon:I/0[%rax] goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    if pin:anon:I/0[%rax] < pin:anon:I/0[%rax] goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3))
+  dropped:
+  lost:
+
+switch, followed by A:
+    switch pin:anon:I/0[%rax]case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))case 2: goto L100 fdo_annotation
+("Test.f":0:00000001:0:branch(2))case 3: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(3))
+endswitch
+  dropped:
+  lost:
+
+call, followed by A:
+    {}
+call "g" pin:anon:I/0[%rax] pin:anon:I/0[%rax] callsite_counter("Test.f":0:00000001:1:call)
+  dropped:
+  lost:
+

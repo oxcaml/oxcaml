@@ -118,6 +118,29 @@
  (action
   (diff ssa_counters.output ssa_counters.output.corrected)))
 
+; The counters on the machine edges of the terminators that [Cfg_to_linear] linearizes.
+
+(executable
+ (name cfg_to_linear_counters)
+ (modules cfg_to_linear_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   cfg_to_linear_counters.output.corrected
+   (run ./cfg_to_linear_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps cfg_to_linear_counters.output cfg_to_linear_counters.output.corrected)
+ (action
+  (diff cfg_to_linear_counters.output cfg_to_linear_counters.output.corrected)))
+
 ; The counters of the blocks that [Cfg_merge_blocks] merges.
 
 (executable
