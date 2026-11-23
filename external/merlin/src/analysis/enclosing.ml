@@ -126,17 +126,18 @@ let rec go_down_right acc ~current_loc (expr : Typedtree.expression) =
     | { exp_desc =
           Texp_apply
             ( _map_or_bind,
-              [ (Nolabel, Arg value_binded);
+              [ (Nolabel, Arg (value_binded, _));
                 ( Labelled "f",
                   Arg
-                    { exp_desc =
-                        Texp_function
-                          { param = [ { fp_kind = Tparam_pat pat; _ } ];
-                            body = Tfunction_body right_expr;
-                            _
-                          };
-                      _
-                    } )
+                    ( { exp_desc =
+                          Texp_function
+                            { params = [ { fp_kind = Tparam_pat pat; _ } ];
+                              body = Tfunction_body right_expr;
+                              _
+                            };
+                        _
+                      },
+                      _ ) )
               ],
               _,
               _,
