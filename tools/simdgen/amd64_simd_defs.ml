@@ -45,6 +45,7 @@ type ext =
   | AVX512_BITALG
   | AVX512_VPOPCNTDQ
   | AVX512_IFMA
+  | GFNI
 
 (* Fixed machine register location *)
 type reg =
@@ -238,12 +239,14 @@ let equal_ext ext0 ext1 =
   | VAES, VAES
   | AVX512_BITALG, AVX512_BITALG
   | AVX512_VPOPCNTDQ, AVX512_VPOPCNTDQ
-  | AVX512_IFMA, AVX512_IFMA ->
+  | AVX512_IFMA, AVX512_IFMA
+  | GFNI, GFNI ->
     true
   | ( ( SSE | SSE2 | SSE3 | SSSE3 | SSE4_1 | SSE4_2 | POPCNT | LZCNT | PCLMULQDQ
       | AES | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F | AVX512DQ
       | AVX512CD | AVX512BW | AVX512VL | AVX512_BF16 | VPCLMULQDQ | AVX512_VBMI
-      | AVX512_VBMI2 | VAES | AVX512_BITALG | AVX512_VPOPCNTDQ | AVX512_IFMA ),
+      | AVX512_VBMI2 | VAES | AVX512_BITALG | AVX512_VPOPCNTDQ | AVX512_IFMA
+      | GFNI ),
       _ ) ->
     false
 
@@ -501,6 +504,7 @@ let ext_to_string : ext -> string = function
   | AVX512_BITALG -> "AVX512_BITALG"
   | AVX512_VPOPCNTDQ -> "AVX512_VPOPCNTDQ"
   | AVX512_IFMA -> "AVX512_IFMA"
+  | GFNI -> "GFNI"
 
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "

@@ -75,6 +75,8 @@ let has_avx512vpopcntdq = cpuid7 ecx 14
 
 let has_avx512ifma52 = cpuid7 ebx 21
 
+let has_gfni = cpuid7 ecx 8
+
 (* Each test is its own function: a module initializer containing all of them
    is too large for the register allocators. *)
 let[@inline never] test name f = f name

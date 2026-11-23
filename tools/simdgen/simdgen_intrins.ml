@@ -103,7 +103,8 @@ let optional_exts =
     "VAES";
     "AVX512_BITALG";
     "AVX512VPOPCNTDQ";
-    "AVX512IFMA52" ]
+    "AVX512IFMA52";
+    "GFNI" ]
 
 let in_scope i =
   i.cpuid <> []

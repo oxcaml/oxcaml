@@ -437,24 +437,6 @@ val has_avx512bf16 : bool
 val has_vpclmulqdq : bool
 (* Whether the compiler was configured on a machine with VPCLMULQDQ *)
 
-val has_avx512vbmi : bool
-(* Whether the compiler was configured on a machine with AVX512_VBMI *)
-
-val has_avx512vbmi2 : bool
-(* Whether the compiler was configured on a machine with AVX512_VBMI2 *)
-
-val has_vaes : bool
-(* Whether the compiler was configured on a machine with VAES *)
-
-val has_avx512bitalg : bool
-(* Whether the compiler was configured on a machine with AVX512_BITALG *)
-
-val has_avx512vpopcntdq : bool
-(* Whether the compiler was configured on a machine with AVX512_VPOPCNTDQ *)
-
-val has_avx512ifma : bool
-(* Whether the compiler was configured on a machine with AVX512_IFMA *)
-
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)
 
