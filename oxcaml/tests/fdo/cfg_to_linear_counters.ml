@@ -33,7 +33,12 @@ let successor target arm =
 
 let instruction_ids = InstructionId.make_sequence ()
 
-let reg = (Proc.loc_parameters Cmm.typ_int).(0)
+(* A pseudo-register, so that the output names no register of the target.
+   Pseudo-registers are numbered after the target's physical registers, of which
+   each target has a different number, so the numbering restarts at 0. *)
+let reg =
+  Reg.For_testing.set_state ~stamp:0 ~relocatable_regs:[];
+  Reg.create Cmm.Int
 
 let block label (terminator : Cfg.terminator) =
   let block =
