@@ -1310,16 +1310,26 @@ let move (src : Reg.t) (dst : Reg.t) =
       "Illegal move between registers of differing types (%a to %a)\n"
       Printreg.reg src Printreg.reg dst
 
+(* A stack slot that takes one word, as an integer. *)
+let stack_slot_as_int (r : Reg.t) : X86_ast.arg =
+  match reg r with
+  | Mem addr -> Mem { addr with typ = QWORD }
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+  | Regmask _ | Mem64_RIP _ ->
+    Misc.fatal_errorf "Not a stack slot: %a" Printreg.reg r
+
 let stack_to_stack_move (src : Reg.t) (dst : Reg.t) =
   assert (Cmm.equal_machtype_component src.typ dst.typ);
   if not (Reg.equal_location src.loc dst.loc)
   then
     match src.typ with
-    | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Val ->
-      (* Not calling move because r15 is not in int_reg_name. *)
-      I.mov (reg src) r15;
-      I.mov r15 (reg dst)
-    | Float | Addr | Vec128 | Vec256 | Vec512 | Mask | Valx2 | Float32 ->
+    | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Val | Float
+    | Float32 | Mask ->
+      (* The slot takes one word, which is copied through r15 whatever its type.
+         Not calling move because r15 is not in int_reg_name. *)
+      I.mov (stack_slot_as_int src) r15;
+      I.mov r15 (stack_slot_as_int dst)
+    | Addr | Vec128 | Vec256 | Vec512 | Valx2 ->
       Misc.fatal_errorf
         "Unexpected register type for stack to stack move: from %a to %a\n"
         Printreg.reg src Printreg.reg dst
@@ -3100,8 +3110,8 @@ let make_stack_loc ~offset n (r : Reg.t) =
   (* Use "Outgoing" stack locations, instead of "Local", because [slot_offset]
      emits (Outgoing n) directly as offset [n] from the stack pointer, rather
      than a calculation relative to the stack frame, which is incorrect for
-     naked floats (arising from live variables, not probe arguments) in the
-     wrapper's frame. *)
+     naked floats (arising from live variables or unboxed probe arguments) in
+     the wrapper's frame. *)
   let loc = Stack (Outgoing (offset + n)) in
   (* Manufacture stack entry with this register's type *)
   Reg.create_at_location r.typ loc
@@ -3147,11 +3157,9 @@ let make_stack_loc ~offset n (r : Reg.t) =
    is 16-byte aligned, we align this explicitly. It is a little wasteful,
    but reuses the calculation made by [Proc.loc_arguments].
 
-   [2] Stack to stack moves are only used for probe arguments, which must be
-   valid OCaml values and not naked floats, because probes are treated like
-   calls.
-   Therefore, for now, we do not need a temporary register of type float.
-   This assumption might no longer hold in the presence of unboxed types.
+   [2] Stack to stack moves are only used for probe arguments. An unboxed
+   float or mask is copied through r15 as well, as one word, so no temporary
+   register of another class is needed. Vectors are not supported there.
 *)
 
 let size_of_regs regs =
