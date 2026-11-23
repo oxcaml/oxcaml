@@ -1,6 +1,6 @@
 import extracted_oxcaml_even
-import Oxiclean.Leoization
-open Oxiclean.Leoization
+import Oxiclean.SemanticTypes
+open Oxiclean.SemanticTypes
 open Oxiclean.Model
 open Oxiclean.Reduction
 

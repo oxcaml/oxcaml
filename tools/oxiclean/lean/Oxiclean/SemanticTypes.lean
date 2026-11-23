@@ -2,7 +2,7 @@ import Oxiclean.Reduction
 open Oxiclean.Model
 open Oxiclean.Reduction
 
-namespace Oxiclean.Leoization
+namespace Oxiclean.SemanticTypes
 
 universe u a b l r
 
@@ -321,9 +321,9 @@ namespace Statics
     body : Body
 end Statics
 
-end Oxiclean.Leoization
+end Oxiclean.SemanticTypes
 
-open Oxiclean.Leoization
+open Oxiclean.SemanticTypes
 
 def SemanticTypeConstructor : (arity : Nat) → Type 0
   | .zero => PER Value

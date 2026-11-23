@@ -1,4 +1,7 @@
-(env (_ (env-vars (LEAN_PATH ..))))
+(env
+ (_
+  (env-vars
+   (LEAN_PATH ..))))
 
 (rule
  (targets Model.olean)
@@ -6,14 +9,7 @@
   (sandbox preserve_file_kind)
   Model.lean)
  (action
-  (run
-   lean
-   -DautoImplicit=false
-   -R
-   ..
-   -o
-   %{targets}
-   %{dep:Model.lean})))
+  (run lean -DautoImplicit=false -R .. -o %{targets} %{dep:Model.lean})))
 
 (rule
  (targets BuildSystem.olean)
@@ -22,14 +18,7 @@
   BuildSystem.lean
   Model.olean)
  (action
-  (run
-   lean
-   -DautoImplicit=false
-   -R
-   ..
-   -o
-   %{targets}
-   %{dep:BuildSystem.lean})))
+  (run lean -DautoImplicit=false -R .. -o %{targets} %{dep:BuildSystem.lean})))
 
 (rule
  (targets Reduction.olean)
@@ -38,20 +27,13 @@
   Reduction.lean
   Model.olean)
  (action
-  (run
-   lean
-   -DautoImplicit=false
-   -R
-   ..
-   -o
-   %{targets}
-   %{dep:Reduction.lean})))
+  (run lean -DautoImplicit=false -R .. -o %{targets} %{dep:Reduction.lean})))
 
 (rule
- (targets Leoization.olean)
+ (targets SemanticTypes.olean)
  (deps
   (sandbox preserve_file_kind)
-  Leoization.lean
+  SemanticTypes.lean
   Model.olean
   Reduction.olean)
  (action
@@ -62,4 +44,4 @@
    ..
    -o
    %{targets}
-   %{dep:Leoization.lean})))
+   %{dep:SemanticTypes.lean})))
