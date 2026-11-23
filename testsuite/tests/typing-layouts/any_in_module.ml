@@ -927,3 +927,30 @@ end
 [%%expect{|
 module M : sig type t : any val x : t module O : sig end end
 |}]
+
+(* Test printing an exception declared in a module with unrepresentable values.
+
+   The toplevel can't identify the constructor for exceptions missing runtime
+   addresses, so it falls back to an untyped printer. (We observe the same
+   behavior when constructing exceptions through a functor application [F(A).E],
+   for example.) *)
+
+let saved = ref Exit
+
+module M : sig
+  type t : any
+  val x : t
+  exception E of bool
+end = struct
+  type t = int
+  let x = 0
+  exception E of bool
+  let () = saved := E false
+end
+
+let _ = !saved;;
+[%%expect{|
+val saved : exn ref = {contents = Stdlib.Exit}
+module M : sig type t : any val x : t exception E of bool end
+- : exn = M.E 0
+|}]
