@@ -109,3 +109,7 @@ val registered : unit -> t
 
 (** To be called before compiling a unit. *)
 val reset : unit -> unit
+
+(** [f ()], without registering the counters it drops: for code that is built
+    and not compiled, e.g. for a comparison. *)
+val without_registering : (unit -> 'a) -> 'a

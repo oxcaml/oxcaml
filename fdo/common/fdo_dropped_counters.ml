@@ -92,3 +92,7 @@ let register_all t = registered_in_unit := union !registered_in_unit t
 let registered () = !registered_in_unit
 
 let reset () = registered_in_unit := empty
+
+let without_registering f =
+  let saved = !registered_in_unit in
+  Fun.protect f ~finally:(fun () -> registered_in_unit := saved)
