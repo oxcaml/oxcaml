@@ -38,6 +38,12 @@ val for_let:
         scopes:scopes -> arg_sort:Jkind.Sort.Const.t -> return_layout:layout ->
         Location.t -> lambda -> Asttypes.mutable_flag -> pattern -> lambda ->
         lambda
+
+(* Whether this pattern matches a tuple that is referenced by a [deref_]
+   pattern. This is used to check whether the tuple needs to be allocated or can
+   be flattened. *)
+val tuple_has_direct_derefs: pattern -> bool
+
 val for_multiple_match:
         scopes:scopes -> return_layout:layout -> Location.t ->
         (lambda * Jkind.Sort.Const.t * layout) list -> locality_mode ->
