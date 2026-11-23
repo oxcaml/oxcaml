@@ -1,8 +1,8 @@
-import Lox.Reduction
-open Lox.Model
-open Lox.Reduction
+import Oxbow.Reduction
+open Oxbow.Model
+open Oxbow.Reduction
 
-namespace Lox.SemanticTypes
+namespace Oxbow.SemanticTypes
 
 universe u a b l r
 
@@ -321,9 +321,9 @@ namespace Statics
     body : Body
 end Statics
 
-end Lox.SemanticTypes
+end Oxbow.SemanticTypes
 
-open Lox.SemanticTypes
+open Oxbow.SemanticTypes
 
 def SemanticTypeConstructor : (arity : Nat) → Type 0
   | .zero => PER Value
@@ -339,14 +339,14 @@ instance : Inhabited ((arity : Nat) × SemanticTypeConstructor arity) where
   default := ⟨0, PER.inhabited.default⟩
 
 @[simp]
-def _root_.Lox.Model.ModuleType.validWrtExtraction
+def _root_.Oxbow.Model.ModuleType.validWrtExtraction
     (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
     (extractedParametricSignature : ModuleType Parametric)
     : Prop :=
   userSuppliedRefinedSignature.parameterize = extractedParametricSignature
 
 @[simp]
-def _root_.Lox.Model.PredefinedType.structuralRelation
+def _root_.Oxbow.Model.PredefinedType.structuralRelation
     : PredefinedType → (arity : Nat) × SemanticTypeConstructor arity
   | .int => ⟨0, PER.immediate⟩
   | .bool => ⟨0, PER.boolean⟩
@@ -384,7 +384,7 @@ def SemanticTypeConstructor.instantiatedWithArguments!
 
 mutual
   @[simp]
-  def _root_.Lox.Model.ModuleType.semanticModuleInContext!
+  def _root_.Oxbow.Model.ModuleType.semanticModuleInContext!
       (moduleType : ModuleType SemanticTypeConstructor)
       : SemanticModuleInContext :=
     let { absent, present } := moduleType
@@ -393,7 +393,7 @@ mutual
         present.map ModuleItemPresentAtRuntime.semanticModuleInContext! }
 
   @[simp]
-  def _root_.Lox.Model.TypeDecl.semanticModuleInContext!
+  def _root_.Oxbow.Model.TypeDecl.semanticModuleInContext!
       (typeDecl : TypeDecl SemanticTypeConstructor)
       : (arity : Nat) × SemanticTypeConstructor arity :=
     match typeDecl.manifest with
@@ -401,7 +401,7 @@ mutual
     | .manifest _ => panic! "types with manifests not yet implemented"
 
   @[simp]
-  def _root_.Lox.Model.ModuleItemPresentAtRuntime.semanticModuleInContext!
+  def _root_.Oxbow.Model.ModuleItemPresentAtRuntime.semanticModuleInContext!
       : ModuleItemPresentAtRuntime SemanticTypeConstructor →
         Option SemanticModuleInContext
     | .mod m => .some m.semanticModuleInContext!
@@ -417,7 +417,7 @@ def _root_.List.getDependencyCompilationUnit!
   | .some dependency => dependency
 
 @[simp]
-def _root_.Lox.Model.ModuleStatics.resolve!
+def _root_.Oxbow.Model.ModuleStatics.resolve!
     (context : List SemanticModuleInContext)
     (dependencies : List SemanticModuleInContext)
     (statics : ModuleStatics)
@@ -438,7 +438,7 @@ def _root_.Lox.Model.ModuleStatics.resolve!
 
 mutual
   @[simp]
-  def _root_.Lox.Model.ModuleType.structuralRelationInScope!
+  def _root_.Oxbow.Model.ModuleType.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
       (dependencies : List SemanticModuleInContext)
@@ -458,7 +458,7 @@ mutual
     PER.moduleRuntimeBlock relationOnValuesInTheBlock
 
   @[simp]
-  def _root_.Lox.Model.ModuleItemPresentAtRuntime.structuralRelationInScope!
+  def _root_.Oxbow.Model.ModuleItemPresentAtRuntime.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
       (dependencies : List SemanticModuleInContext)
@@ -467,7 +467,7 @@ mutual
     | .val v => @v.structuralRelationInScope! Step S context dependencies
 
   @[simp]
-  def _root_.Lox.Model.ValType.structuralRelationInScope!
+  def _root_.Oxbow.Model.ValType.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
       (dependencies : List SemanticModuleInContext)
@@ -500,7 +500,7 @@ def SemanticModuleInContext.refines
   refinedSignature.semanticModuleInContext! = semanticModuleInContext
 
 @[simp]
-def _root_.Lox.Model.ModuleType.structuralRelation!
+def _root_.Oxbow.Model.ModuleType.structuralRelation!
     {Step} [S : StepRelation Step]
     (dependencySignatures : List (ModuleType Parametric))
     (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
@@ -510,7 +510,7 @@ def _root_.Lox.Model.ModuleType.structuralRelation!
       (@userSuppliedRefinedSignature.structuralRelationInScope! Step S [])
 
 @[simp]
-def _root_.Lox.Model.Value.wellTyped
+def _root_.Oxbow.Model.Value.wellTyped
     (relation : {Step : _} → [StepRelation Step] → PER Value)
     (implementation : Value)
     : Prop :=
@@ -518,7 +518,7 @@ def _root_.Lox.Model.Value.wellTyped
   (@relation Step S).eq implementation implementation
 
 @[simp]
-def _root_.Lox.Model.Expr.wellTyped
+def _root_.Oxbow.Model.Expr.wellTyped
     (relation : {Step : _} → [StepRelation Step] → PER Value)
     (implementation : Expr)
     : Prop :=

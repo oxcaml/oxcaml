@@ -1,7 +1,7 @@
 import Lean
-import Lox.Model
+import Oxbow.Model
 
-open Lox.Model Lean Elab Command
+open Oxbow.Model Lean Elab Command
 
 def BitVec.ofInt? {width : Nat} (i : Int)
     : Except String (BitVec width.succ) := do
@@ -31,7 +31,7 @@ def Lean.Expr.mkOption (type : Lean.Expr) : Option Lean.Expr → Lean.Expr
   | .none => mkApp (mkConst ``Option.none [.zero]) type
   | .some x => mkApp2 (mkConst ``Option.some [.zero]) type x
 
-namespace Lox.BuildSystem
+namespace Oxbow.BuildSystem
 
 deriving instance Lean.FromJson, Lean.ToExpr, Repr for PredefinedType
 
@@ -472,7 +472,7 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
     | throwError "{file} is not named `extracted_oxcaml_<unit>.lean`"
   let unit : String := unit.toString
   let prefixComponents : Name :=
-    `Lox.Extracted ++ .mkSimple unit.capitalize
+    `Oxbow.Extracted ++ .mkSimple unit.capitalize
   let env : Lean.Environment ← getEnv
   let dependencyNames : List String :=
     env.header.imports.toList.filterMap fun imported =>
@@ -492,7 +492,7 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
     |> IO.ofExcept
   let dependencies : Lean.Expr :=
     (dependencyNames.map fun name =>
-      mkConst (`Lox.Extracted ++ .mkSimple name ++ `interface))
+      mkConst (`Oxbow.Extracted ++ .mkSimple name ++ `interface))
     |> Lean.Expr.mkList (parametric ``Model.ModuleType)
   liftCoreM do
     addTopLevelDefinition (prefixComponents ++ `dependencies)
@@ -514,4 +514,4 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
   elabCommand simpIntf
   elabCommand simpImpl
 
-end Lox.BuildSystem
+end Oxbow.BuildSystem

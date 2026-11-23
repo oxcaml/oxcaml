@@ -1,7 +1,7 @@
-import Lox.Model
-open Lox.Model
+import Oxbow.Model
+open Oxbow.Model
 
-namespace Lox.Reduction
+namespace Oxbow.Reduction
 
 inductive Reduce (Step : Expr → Expr → Prop) : Expr → Value → Prop where
   | alreadyReduced {v} : Reduce Step (.val v) v
@@ -246,4 +246,4 @@ instance referenceStepRelationIsValid : StepRelation Step' where
   switchScrutinee := .switchScrutinee
   switchImmediate := .switchImmediate
 
-end Lox.Reduction
+end Oxbow.Reduction

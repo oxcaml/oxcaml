@@ -1,4 +1,4 @@
-namespace Lox.Model
+namespace Oxbow.Model
 
 inductive PredefinedType : Type where
   | bool
@@ -229,4 +229,4 @@ attribute [pp_nodot]
   Expr.val Expr.var
   -- Please keep this up to date when adding new constructors!
 
-end Lox.Model
+end Oxbow.Model

@@ -1,4 +1,4 @@
 (executable
- (name lox)
+ (name oxbow)
  (modes byte native)
  (libraries ocamlfrontend))
