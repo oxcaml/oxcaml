@@ -181,6 +181,11 @@ val has_attribute : string -> Parsetree.attributes -> bool
     attribute is found. *)
 val attribute_location : string -> Parsetree.attributes -> Location.t option
 
+(** Check for [[@@@static]] among the attributes at the start of the
+    structure. Like [attribute_location], returns the location of the
+    attribute's name and marks it used. *)
+val static_attribute_of_str : Parsetree.structure -> Location.t option
+
 (** [select_attributes actions attrs] finds the elements of [attrs] that appear
     in [actions] and either returns them or just marks them used, according to
     the corresponding [attr_action].

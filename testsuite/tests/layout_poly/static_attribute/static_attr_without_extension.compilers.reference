@@ -1,0 +1,4 @@
+File "static_attr_without_extension.ml", line 10, characters 4-10:
+10 | [@@@static]
+         ^^^^^^
+Error: The extension "layout_poly" is disabled and cannot be used

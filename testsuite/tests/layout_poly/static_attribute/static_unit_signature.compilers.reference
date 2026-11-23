@@ -1,0 +1,20 @@
+File "static_unit_signature.ml", line 18, characters 2-13:
+18 |   Static_unit
+       ^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val poly_ id : 'a -> 'a @@ stateless
+           val counter : int ref @@ stateless dynamic
+           class cell :
+             object
+               val mutable contents : int
+               method get : int
+               method set : int -> unit
+             end
+         end
+       is not included in
+         sig val absent : unit end
+       The value absent is required but not provided
+       File "static_unit_signature.ml", line 16, characters 2-19:
+         Expected declaration
