@@ -2989,6 +2989,9 @@ let reset_all () =
   Probe_emission.reset ();
   reset_traps ();
   float_constants := [];
+  vec128_constants := [];
+  vec256_constants := [];
+  vec512_constants := [];
   sancov := Emit_sancov.create ();
   all_functions := []
 
