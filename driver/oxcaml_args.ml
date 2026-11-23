@@ -889,6 +889,20 @@ let mk_no_flambda2_expert_cmm_safe_subst f =
       " Allow more substitutions in cmm, even ones that may be unsafe%s"
       (format_not_default Flambda2.Expert.Default.cmm_safe_subst) )
 
+let mk_flambda2_expert_cmm_pin_reads f =
+  ( "-flambda2-expert-cmm-pin-reads",
+    Arg.Unit f,
+    Printf.sprintf
+      " Never substitute or move reads of memory in cmm; assumes\n\
+      \     -flambda2-expert-cmm-safe-subst%s"
+      (format_default Flambda2.Expert.Default.cmm_pin_reads) )
+
+let mk_no_flambda2_expert_cmm_pin_reads f =
+  ( "-no-flambda2-expert-cmm-pin-reads",
+    Arg.Unit f,
+    Printf.sprintf " Allow reads of memory to be substituted or moved in cmm%s"
+      (format_not_default Flambda2.Expert.Default.cmm_pin_reads) )
+
 let mk_flambda2_expert_phantom_lets f =
   ( "-flambda2-expert-phantom-lets",
     Arg.Unit f,
@@ -1619,6 +1633,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
   val flambda2_expert_cmm_safe_subst : unit -> unit
   val no_flambda2_expert_cmm_safe_subst : unit -> unit
+  val flambda2_expert_cmm_pin_reads : unit -> unit
+  val no_flambda2_expert_cmm_pin_reads : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
@@ -1855,6 +1871,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_flambda2_expert_inline_effects_in_cmm;
       mk_flambda2_expert_cmm_safe_subst F.flambda2_expert_cmm_safe_subst;
       mk_no_flambda2_expert_cmm_safe_subst F.no_flambda2_expert_cmm_safe_subst;
+      mk_flambda2_expert_cmm_pin_reads F.flambda2_expert_cmm_pin_reads;
+      mk_no_flambda2_expert_cmm_pin_reads F.no_flambda2_expert_cmm_pin_reads;
       mk_flambda2_expert_phantom_lets F.flambda2_expert_phantom_lets;
       mk_no_flambda2_expert_phantom_lets F.no_flambda2_expert_phantom_lets;
       mk_flambda2_expert_max_block_size_for_projections
@@ -2366,6 +2384,8 @@ module Oxcaml_options_impl = struct
 
   let flambda2_expert_cmm_safe_subst = set Flambda2.Expert.cmm_safe_subst
   let no_flambda2_expert_cmm_safe_subst = clear Flambda2.Expert.cmm_safe_subst
+  let flambda2_expert_cmm_pin_reads = set Flambda2.Expert.cmm_pin_reads
+  let no_flambda2_expert_cmm_pin_reads = clear Flambda2.Expert.cmm_pin_reads
   let flambda2_expert_phantom_lets = set Flambda2.Expert.phantom_lets
   let no_flambda2_expert_phantom_lets = clear Flambda2.Expert.phantom_lets
 
@@ -2903,6 +2923,7 @@ module Extra_params = struct
     | "flambda2-expert-inline-effects-in-cmm" ->
         set Flambda2.Expert.inline_effects_in_cmm
     | "flambda2-expert-cmm-safe-subst" -> set Flambda2.Expert.cmm_safe_subst
+    | "flambda2-expert-cmm-pin-reads" -> set Flambda2.Expert.cmm_pin_reads
     | "flambda2-expert-phantom-lets" -> set Flambda2.Expert.phantom_lets
     | "flambda2-expert-max-unboxing-depth" ->
         set_int Flambda2.Expert.max_unboxing_depth

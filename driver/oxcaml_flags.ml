@@ -336,6 +336,7 @@ module Flambda2 = struct
       let fallback_inlining_heuristic = false
       let inline_effects_in_cmm = false
       let cmm_safe_subst = false
+      let cmm_pin_reads = false
       let phantom_lets = false
       let max_block_size_for_projections = None
       let max_unboxing_depth = 3
@@ -350,6 +351,7 @@ module Flambda2 = struct
       fallback_inlining_heuristic : bool;
       inline_effects_in_cmm : bool;
       cmm_safe_subst : bool;
+      cmm_pin_reads : bool;
       phantom_lets : bool;
       max_block_size_for_projections : int option;
       max_unboxing_depth : int;
@@ -364,6 +366,7 @@ module Flambda2 = struct
       fallback_inlining_heuristic = Default.fallback_inlining_heuristic;
       inline_effects_in_cmm = Default.inline_effects_in_cmm;
       cmm_safe_subst = Default.cmm_safe_subst;
+      cmm_pin_reads = Default.cmm_pin_reads;
       phantom_lets = Default.phantom_lets;
       max_block_size_for_projections = Default.max_block_size_for_projections;
       max_unboxing_depth = Default.max_unboxing_depth;
@@ -406,6 +409,7 @@ module Flambda2 = struct
     let fallback_inlining_heuristic = ref Default
     let inline_effects_in_cmm = ref Default
     let cmm_safe_subst = ref Default
+    let cmm_pin_reads = ref Default
     let phantom_lets = ref Default
     let max_block_size_for_projections = ref Default
     let max_unboxing_depth = ref Default

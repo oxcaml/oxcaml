@@ -546,6 +546,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     Env.enter_function_body env ~return_continuation ~return_continuation_arity
       ~exn_continuation
   in
+  let env = Env.set_my_closure env my_closure in
   (* [my_region] can be referenced in [Begin_region] primitives so must be in
      the environment; however it should never end up in actual generated code,
      so we don't need any binder for it (this is why we can ignore

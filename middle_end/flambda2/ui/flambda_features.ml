@@ -338,6 +338,10 @@ module Expert = struct
     !Oxcaml_flags.Flambda2.Expert.cmm_safe_subst
     |> with_default ~f:(fun d -> d.cmm_safe_subst)
 
+  let cmm_pin_reads () =
+    !Oxcaml_flags.Flambda2.Expert.cmm_pin_reads
+    |> with_default ~f:(fun d -> d.cmm_pin_reads)
+
   (* CR mshinwell: Remove any uses of this flag, then remove the flag. *)
   let max_block_size_for_projections () =
     !Oxcaml_flags.Flambda2.Expert.max_block_size_for_projections

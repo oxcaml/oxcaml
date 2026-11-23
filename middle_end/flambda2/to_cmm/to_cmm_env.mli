@@ -117,6 +117,14 @@ val enter_function_body :
   exn_continuation:Continuation.t ->
   t
 
+(** Record the [my_closure] variable of the function being translated. *)
+val set_my_closure : t -> Variable.t -> t
+
+(** Whether the given simple is the [my_closure] variable of the function being
+    translated. The closure of the current function stays allocated for the
+    whole of the function's body. *)
+val is_my_closure : t -> Simple.t -> bool
+
 (** {2 Debuginfo} *)
 
 (** Add the inlined debuginfo from the env to the debuginfo provided, in order

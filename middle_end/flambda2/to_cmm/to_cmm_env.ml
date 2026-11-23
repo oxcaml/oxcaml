@@ -170,6 +170,8 @@ type t =
     exn_continuation : Continuation.t;
     (* The exception continuation of the current context (used to determine
        where to insert try-with blocks). *)
+    my_closure : Variable.t option;
+    (* The [my_closure] variable of the function being translated, if any. *)
     conts : cont Continuation.Map.t;
     (* Information about whether each continuation in scope should have its
        handler inlined, or else reached via a jump. *)
@@ -287,6 +289,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
       (Return { param_types = return_continuation_arity })
   in
   { exn_continuation;
+    my_closure = None;
     offsets;
     functions_info;
     trans_prim;
@@ -306,6 +309,13 @@ let enter_function_body env ~return_continuation ~return_continuation_arity
     ~exn_continuation =
   create env.offsets env.functions_info ~trans_prim:env.trans_prim
     ~return_continuation ~return_continuation_arity ~exn_continuation
+
+let set_my_closure env my_closure = { env with my_closure = Some my_closure }
+
+let is_my_closure env simple =
+  match env.my_closure, Simple.must_be_var simple with
+  | Some my_closure, Some (var, _coercion) -> Variable.equal my_closure var
+  | None, (Some _ | None) | Some _, None -> false
 
 (* Debuginfo *)
 

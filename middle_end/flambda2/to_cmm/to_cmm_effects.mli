@@ -42,6 +42,17 @@ type effects_and_coeffects_classification =
 val classify_by_effects_and_coeffects :
   Effects_and_coeffects.t -> effects_and_coeffects_classification
 
+(** Whether the given primitive application reads from memory in a way that is
+    not accounted for by its effects and coeffects: the result of such a read
+    depends on where the read is performed, for example because the block read
+    from may be stack-allocated in a region which ends later on, or because the
+    read is only valid after some earlier control flow point.
+
+    A [Project_value_slot] from a closure for which [is_my_closure] holds is not
+    counted, as that closure outlives the body of the current function. *)
+val reads_memory :
+  Flambda_primitive.t -> is_my_closure:(Simple.t -> bool) -> bool
+
 (** Classification of [Let]-expressions, identifying what may be done with the
     defining expression. *)
 type let_binding_classification = private
