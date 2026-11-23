@@ -442,3 +442,25 @@ let () =
   let v0 = int64x4_of_int64s 1L 2L 3L 4L in
   let v = vector_and_then_stack_floats v0 1. 2. 3. 4. 5. 6. 7. 8. in
   assert (v = 36.)
+
+(* Pass a vector that does not fit in the remaining vector registers. On arm64,
+   the first float and three vectors take seven of the eight vector argument
+   registers, so the last vector is passed entirely on the stack, as is the
+   float after it. *)
+external vector_reg_stack_cutoff :
+  float ->
+  int64x4 ->
+  int64x4 ->
+  int64x4 ->
+  int64x4 ->
+  float ->
+  int64x4 = "" "vector_reg_stack_cutoff256"
+  [@@noalloc] [@@unboxed]
+
+let () =
+  let v0 = int64x4_of_int64s 1L 2L 3L 4L in
+  let v1 = int64x4_of_int64s 5L 6L 7L 8L in
+  let v2 = int64x4_of_int64s 9L 10L 11L 12L in
+  let v3 = int64x4_of_int64s 13L 14L 15L 16L in
+  let v = vector_reg_stack_cutoff 17. v0 v1 v2 v3 18. in
+  check v 45L 50L 36L 40L

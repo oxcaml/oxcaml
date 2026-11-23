@@ -161,6 +161,17 @@ double vector_and_then_stack_floats(
     return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7;
 }
 
+__m256i vector_reg_stack_cutoff256(
+    double f0, __m256i v0, __m256i v1, __m256i v2, __m256i v3, double f1)
+{
+    __m256i x0 = _mm256_add_epi64(v0, v1);
+    __m256i x1 = _mm256_add_epi64(v2, v3);
+    __m256i z = _mm256_add_epi64(x0, x1);
+    return vec256_of_int64s(vec256_first_int64(z) + (int64_t)f0,
+                            vec256_second_int64(z) + (int64_t)f1,
+                            vec256_third_int64(z), vec256_fourth_int64(z));
+}
+
 #elif defined(__ARM_NEON)
 #include <arm_neon.h>
 
@@ -305,6 +316,20 @@ double vector_and_then_stack_floats(
     double f4, double f5, double f6, double f7)
 {
     return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7;
+}
+
+// f0, v0, v1 and v2 take seven of the eight vector argument registers. v3 does
+// not fit in the last one, so it is passed entirely on the stack, as is f1.
+caml_int64x4_t vector_reg_stack_cutoff256(
+    double f0, caml_int64x4_t v0, caml_int64x4_t v1, caml_int64x4_t v2,
+    caml_int64x4_t v3, double f1)
+{
+    caml_int64x4_t x0 = add_int64x4(v0, v1);
+    caml_int64x4_t x1 = add_int64x4(v2, v3);
+    caml_int64x4_t z = add_int64x4(x0, x1);
+    return vec256_of_int64s(vec256_first_int64(z) + (int64_t)f0,
+                            vec256_second_int64(z) + (int64_t)f1,
+                            vec256_third_int64(z), vec256_fourth_int64(z));
 }
 
 #endif
