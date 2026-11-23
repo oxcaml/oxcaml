@@ -114,9 +114,7 @@ external phys_eq : 'a -> 'a -> bool = "%eq"
 
 let empty = Empty
 
-(* Written this way rather than as a literal so that the bytecode stays
-   loadable on 32-bit platforms (literals above [0x3FFFFFFF] are rejected by
-   [-compat-32]). *)
+(* Large literals result in a warning with wasm_of_ocaml *)
 let mask_0x55555555 = (0x5555 lsl 16) lor 0x5555
 
 let popcount b =

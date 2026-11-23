@@ -46,12 +46,7 @@ let f { Cmd_arg.common; output_file; use_stdin; files } =
     let pretty = Config.Flag.pretty () in
     Pretty_print.set_compact pp (not pretty);
     let error_of_pi pi =
-      match pi with
-      | { Parse_info.name = Some src; line; col; _ }
-      | { Parse_info.src = Some src; line; col; _ } ->
-          error "error at file:%S l:%d col:%d" src line col
-      | { Parse_info.src = None; name = None; line; col; _ } ->
-          error "error at l:%d col:%d" line col
+      error "%s" (Parse_info.Diagnostic.with_excerpt pi "syntax error")
     in
     let p =
       List.flatten
