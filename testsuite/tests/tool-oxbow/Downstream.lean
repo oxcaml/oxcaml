@@ -66,8 +66,7 @@ abbrev expectedValue : Value :=
 theorem implementationReducesToValue {Step} [S : StepRelation Step]
     : Reduce Step Oxbow.Extracted.Downstream.implementation expectedValue := by
   simp
-  apply Reduce.step; apply S.letBinding
-  sorry
+  apply Reduce.step; apply S.letBinding; apply S.applyFunc; fail
 
 example
     : Oxbow.Extracted.Downstream.implementation.wellTyped @expectedRelation := by

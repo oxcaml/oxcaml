@@ -170,6 +170,9 @@ mutual
     body : Expr
 end
 
+instance : Inhabited Expr where
+  default := .compilationUnit 42
+
 @[simp]
 def Expr.substitute (replacement : Value) (deBruijn : Nat := 0) : Expr → Expr
   | .apply func arg =>
@@ -211,6 +214,56 @@ def Expr.substitute (replacement : Value) (deBruijn : Nat := 0) : Expr → Expr
     if index < deBruijn then .var index else
     if index = deBruijn then .val replacement else
     .var (index - 1)
+termination_by expr => expr
+decreasing_by
+  all_goals first
+    | decreasing_tactic
+    | (rename_i member
+       have := List.sizeOf_lt_of_mem member
+       simp_all
+       omega)
+
+@[simp]
+def Expr.substituteCompilationUnits! (dependencies : List Value) : Expr → Expr
+  | .apply func arg =>
+    .apply
+      (func.substituteCompilationUnits! dependencies)
+      (arg.substituteCompilationUnits! dependencies)
+  | .block tag fields =>
+    .block tag (fields.map (·.substituteCompilationUnits! dependencies))
+  | .compilationUnit index =>
+    match dependencies[index]? with
+    | .some dependency => .val dependency
+    | .none => panic! s!"no dependency compilation unit at index {index}"
+  | .field indexInto index =>
+    .field (indexInto.substituteCompilationUnits! dependencies) index
+  | .function body => .function (body.substituteCompilationUnits! dependencies)
+  | .letBinding bound body =>
+    .letBinding
+      (bound.substituteCompilationUnits! dependencies)
+      (body.substituteCompilationUnits! dependencies)
+  | .physicalEquality lhs rhs =>
+    .physicalEquality
+      (lhs.substituteCompilationUnits! dependencies)
+      (rhs.substituteCompilationUnits! dependencies)
+  | .scalarOperation (.binary operation lhs rhs) =>
+    .scalarOperation
+      (.binary operation
+        (lhs.substituteCompilationUnits! dependencies)
+        (rhs.substituteCompilationUnits! dependencies))
+  | .switch scrutinee nImmediates nBlocks immediates blocks failAction =>
+    .switch
+      (scrutinee.substituteCompilationUnits! dependencies)
+      nImmediates
+      nBlocks
+      (immediates.attach.map fun ⟨{ immediate, body }, _⟩ =>
+        { immediate, body := body.substituteCompilationUnits! dependencies })
+      (blocks.attach.map fun ⟨{ tag, body }, _⟩ =>
+        { tag, body := body.substituteCompilationUnits! dependencies })
+      (failAction.attach.map fun ⟨failAction, _⟩ =>
+        failAction.substituteCompilationUnits! dependencies)
+  | .val value => .val value
+  | .var index => .var index
 termination_by expr => expr
 decreasing_by
   all_goals first
