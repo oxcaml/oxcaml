@@ -328,7 +328,7 @@ and print_terminator ~ctx ppf terminator : unit =
   match terminator with
   | Simplified_apply apply_expr -> (print_apply_expr ~ctx) ppf apply_expr
   | Simplified_apply_cont apply_cont -> (print_apply_cont ~ctx) ppf apply_cont
-  | Simplified_switch switch -> print_switch ppf switch
+  | Simplified_switch switch -> print_switch ~ctx ppf switch
   | Simplified_invalid invalid -> print_invalid ppf invalid
 
 and print_apply_expr ~ctx:_ ppf
@@ -340,10 +340,12 @@ and print_apply_expr ~ctx:_ ppf
     use_id print_rewrite_id_exn exn_cont_use_id Apply.print apply
 
 and print_apply_cont ~ctx ppf { apply_cont; args; rewrite_id } =
+  print_apply_cont_aux ~ctx ppf (Apply_cont.update_args apply_cont ~args, rewrite_id)
+
+and print_apply_cont_aux ~ctx ppf (apply_cont, rewrite_id) =
   Format.fprintf ppf "@[<hv 2>%a%a%a@]"
     (print_elide Apply_cont_rewrite_id.print)
-    rewrite_id Apply_cont.print
-    (Apply_cont.update_args apply_cont ~args)
+    rewrite_id Apply_cont.print apply_cont
     (print_apply_cont_extra_params_and_args ~ctx)
     (apply_cont, rewrite_id)
 
@@ -388,7 +390,7 @@ and print_extra_param_and_arg ppf (param, extra_arg) =
   Format.fprintf ppf "@[<hov>%a ->@ %a@]" Bound_parameter.print param
     print_extra_arg extra_arg
 
-and print_switch ppf
+and print_switch ~ctx ppf
     { arms;
       scrutinee;
       scrutinee_ty = _;
@@ -401,16 +403,15 @@ and print_switch ppf
     Flambda_colours.expr_keyword Flambda_colours.pop Simple.print scrutinee
     (if Debuginfo.is_none condition_dbg then "" else " ")
     Flambda_colours.debuginfo Debuginfo.print_compact condition_dbg
-    Flambda_colours.pop print_switch_arms arms
+    Flambda_colours.pop (print_switch_arms ~ctx) arms
 
-and print_switch_arms ppf arms =
-  Target_ocaml_int.Map.iter (print_switch_arm ppf) arms
+and print_switch_arms ~ctx ppf arms =
+  Target_ocaml_int.Map.iter (print_switch_arm ~ctx ppf) arms
 
-and print_switch_arm ppf discr
+and print_switch_arm ~ctx ppf discr
     (apply_cont, ~annotations:_, rewrite_id, _arity, _typing_env) =
-  Format.fprintf ppf "| %a -> @[<hov>%a%a@]@," Target_ocaml_int.print discr
-    (print_elide Apply_cont_rewrite_id.print)
-    rewrite_id Apply_cont_expr.print apply_cont
+  Format.fprintf ppf "| %a -> @[<hov>%a@]@," Target_ocaml_int.print discr
+    (print_apply_cont_aux ~ctx) (apply_cont, rewrite_id)
 
 and print_invalid ppf invalid =
   Format.fprintf ppf "@[<hov 1>(%tinvalid%t@ %s@]"
