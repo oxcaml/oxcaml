@@ -59,9 +59,10 @@ module Reason : sig
             into a jump. *)
     | Cfg_branch_to_jump
         (** The counters of the edges of a branch that a jump replaces because
-            its outcome is known. When the jump is that of a predecessor, the
-            branch keeps its counters if other code still reaches it, but they
-            miss the executions of that predecessor. *)
+            its outcome is known, e.g. when all its edges go to the same block.
+            When the jump is that of a predecessor, the branch keeps its
+            counters if other code still reaches it, but they miss the
+            executions of that predecessor. *)
     | Cfg_blocks_merged
         (** The counters of a block that is merged into an identical one. *)
 
