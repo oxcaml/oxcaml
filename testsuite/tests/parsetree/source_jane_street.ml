@@ -254,6 +254,36 @@ let f () = fun () : float# -> #0.
 val f : unit -> unit -> float# = <fun>
 |}]
 
+(********************)
+(* Unboxed variants *)
+
+type raw = No_bits | Bits of int32_u [@@unboxed]
+type shape : void + bits32 & bits64 + (void + value)
+
+module Variant = struct
+  type t = Empty | Payload of string
+
+  let make = function None -> #Empty | Some s -> #Payload s
+  let read = function #Empty -> None | #Payload s -> Some s
+end
+
+let copy (v : Variant.t#) =
+  match v with
+  | Variant.#Empty -> Variant.#Empty
+  | Variant.#Payload s -> Variant.#Payload s
+
+[%%expect{|
+type raw = No_bits | Bits of int32_u [@@unboxed]
+type shape : void + (bits32 & bits64) + (void + value)
+module Variant :
+  sig
+    type t = Empty | Payload of string
+    val make : string option -> t#
+    val read : t# -> string option
+  end @@ stateless
+val copy : Variant.t# -> Variant.t# = <fun>
+|}]
+
 (******************)
 (* Comprehensions *)
 
