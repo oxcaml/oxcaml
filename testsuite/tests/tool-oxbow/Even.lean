@@ -34,7 +34,7 @@ abbrev expectedImplementation : Expr :=
 
   .letBinding get (.letBinding create (.block 0 [.var 0, .var 1]))
 
-abbrev expectedDependencies : List (ModuleType Parametric) := []
+abbrev expectedDependencies : List (String × ModuleType Parametric) := []
 
 example : Oxbow.Extracted.Even.dependencies = expectedDependencies := by rfl
 example : Oxbow.Extracted.Even.interface = expectedInterface := by rfl
@@ -60,20 +60,15 @@ example
 
 @[simp]
 abbrev expectedRelation {Step} [S : StepRelation Step] : PER Value :=
-  PER.forAllWhere
-    (List.forAllPairs
-      SemanticModuleInContext.refines
-      Oxbow.Extracted.Even.dependencies)
-    fun _ =>
-      PER.moduleRuntimeBlock
-        (PER.cons
-          (@PER.closure Step S PER.immediate (PER.option evenImmediates))
-          (PER.cons
-            (@PER.closure Step S evenImmediates PER.immediate)
-            PER.emptyList))
+  PER.moduleRuntimeBlock
+    (PER.cons
+      (@PER.closure Step S PER.immediate (PER.option evenImmediates))
+      (PER.cons
+        (@PER.closure Step S evenImmediates PER.immediate)
+        PER.emptyList))
 
 abbrev actualRelation {Step} [S : StepRelation Step] : PER Value :=
-  @refinedInterface.structuralRelation! Step S Oxbow.Extracted.Even.dependencies
+  @refinedInterface.structuralRelation! Step S []
 
 example {Step} [S : StepRelation Step]
     : @actualRelation Step S = @expectedRelation Step S := by simp; rfl
@@ -115,21 +110,13 @@ abbrev expectedValue : Value :=
                     contents := BlockContents.closure (Expr.var 0) })] })
 
 theorem implementationReducesToValue
-    {refinedSignatures : List (ModuleType SemanticTypeConstructor)}
-    (signaturesRefineDependencies
-      : refinedSignatures.forAllPairs
-          ModuleType.validWrtExtraction
-          Oxbow.Extracted.Even.dependencies)
-    {dependencies : List Value}
-    (dependenciesInhabitTheirSignatures
-      : refinedSignatures.map
-          (fun sig Step S => @ModuleType.structuralRelation! Step S sorry sig)
-        |>.forAllPairs Value.wellTyped dependencies)
-    {Step} [S : StepRelation Step]
-    : let implementation :=
-        Oxbow.Extracted.Even.implementation.substituteCompilationUnits!
-          dependencies
-      Reduce Step implementation expectedValue := by
+    : Oxbow.Extracted.Even.implementation.mustReduceTo
+        expectedValue
+        Oxbow.Extracted.Even.dependencies := by
+  intro
+    Step S refinedSignatures signaturesRefineDependencies context
+    dependencies dependenciesInhabitTheirSignatures implementation
+  subst context implementation
   obtain ⟨⟩ := signaturesRefineDependencies
   obtain ⟨⟩ := dependenciesInhabitTheirSignatures
   simp
@@ -170,11 +157,21 @@ theorem ifInputRelationIsEqualityThenDiagonalSufficesForExtensionality {Step}
   exact .extensionality atLeastAsDefined atLeastAsDefined
 
 example
-    : Oxbow.Extracted.Even.implementation.wellTyped @expectedRelation := by
-  intro Step S v reduction
-  obtain ⟨⟩ := @S.deterministic _ _ reduction _ implementationReducesToValue
-  intro dependencies allDependenciesAreValid
-  obtain ⟨⟩ := allDependenciesAreValid
+    : Oxbow.Extracted.Even.implementation.wellTyped
+        refinedInterface
+        Oxbow.Extracted.Even.dependencies := by
+  intro
+    Step S refinedSignatures signaturesRefineDependencies context dependencies₁
+    dependencies₂ dependenciesInhabitTheirSignatures implementation₁
+    implementation₂ v₁ reduction₁ v₂ reduction₂
+  subst context implementation₁ implementation₂
+  obtain ⟨⟩ := signaturesRefineDependencies
+  obtain ⟨⟩ := dependenciesInhabitTheirSignatures
+  obtain ⟨⟩ :=
+    S.deterministic reduction₁ (implementationReducesToValue .nil .nil)
+  obtain ⟨⟩ :=
+    S.deterministic reduction₂ (implementationReducesToValue .nil .nil)
+  simp
   constructor
   constructor
   · constructor

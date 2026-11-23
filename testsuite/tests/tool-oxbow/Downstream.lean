@@ -5,21 +5,21 @@ open Oxbow.Model
 open Oxbow.Reduction
 
 abbrev expectedInterface : ModuleType Parametric :=
-  let even : ModuleStatics := .compilationUnit 0
+  let even : ModuleStatics := .compilationUnit "Even"
   let t : ValType _ := .constr (.field even 0) []
   let t_option : ValType _ := .constr (.predef .option) [t]
 
   { absent := [], present := [.val t_option] }
 
 abbrev expectedImplementation : Expr :=
-  let even : Expr := .compilationUnit 0
+  let even : Expr := .compilationUnit "Even"
   let create : Expr := .field even 0
   let three : Expr := .val (.immediate { bitsAboveLsb := 3#63 })
 
   .letBinding (.apply create three) (.block 0 [.var 0])
 
-abbrev expectedDependencies : List (ModuleType Parametric) :=
-  [Oxbow.Extracted.Even.interface]
+abbrev expectedDependencies : List (String × ModuleType Parametric) :=
+  [("Even", Oxbow.Extracted.Even.interface)]
 
 example : Oxbow.Extracted.Downstream.dependencies = expectedDependencies := by rfl
 example : Oxbow.Extracted.Downstream.interface = expectedInterface := by rfl
@@ -31,7 +31,7 @@ abbrev refinedInterface : ModuleType SemanticTypeConstructor :=
       .val
         (.constr
           (.predef .option)
-          [.constr (.field (.compilationUnit 0) 0) []]),
+          [.constr (.field (.compilationUnit "Even") 0) []]),
     ],
   }
 
@@ -40,13 +40,11 @@ example
         Oxbow.Extracted.Downstream.interface := by simp
 
 @[simp]
-abbrev expectedRelation {Step} [S : StepRelation Step] : PER Value :=
-  PER.forAllWhere
-    (List.forAllPairs
-      SemanticModuleInContext.refines
-      Oxbow.Extracted.Downstream.dependencies)
-    fun dependencies =>
-      let even := dependencies.getDependencyCompilationUnit! 0
+abbrev expectedRelation : PER Value :=
+  Oxbow.Extracted.Downstream.dependencies.enforceModularityAndPartialEquivalence
+    fun refinedSignatures =>
+      let context := refinedSignatures.toContext!
+      let even := context.getDependencyCompilationUnit! "Even"
       let ⟨_even_t_arity, even_t⟩ := even.getTypeConstructor! 0
       PER.moduleRuntimeBlock
         (PER.cons
@@ -54,43 +52,36 @@ abbrev expectedRelation {Step} [S : StepRelation Step] : PER Value :=
           PER.emptyList)
 
 abbrev actualRelation {Step} [S : StepRelation Step] : PER Value :=
-  @refinedInterface.structuralRelation! Step S Oxbow.Extracted.Downstream.dependencies
+  Oxbow.Extracted.Downstream.dependencies.enforceModularityAndPartialEquivalence
+    (fun refinedSignatures =>
+      @refinedInterface.structuralRelation! Step S refinedSignatures.toContext!)
 
 example {Step} [S : StepRelation Step]
-    : @actualRelation Step S = @expectedRelation Step S := by simp
+    : @actualRelation Step S = @expectedRelation := by simp
 
-@[simp]
-abbrev expectedValue : Value :=
-  sorry
-
-theorem implementationReducesToValue
-    {refinedSignatures : List (ModuleType SemanticTypeConstructor)}
-    (signaturesRefineDependencies
-      : refinedSignatures.forAllPairs
-          ModuleType.validWrtExtraction
-          Oxbow.Extracted.Downstream.dependencies)
-    {dependencies : List Value}
-    (dependenciesInhabitTheirSignatures
-      : refinedSignatures.map
-          (fun sig Step S => @ModuleType.structuralRelation! Step S sorry sig)
-        |>.forAllPairs Value.wellTyped dependencies)
-    {Step} [S : StepRelation Step]
-    : let implementation :=
-        Oxbow.Extracted.Downstream.implementation.substituteCompilationUnits!
-          dependencies
-      Reduce Step implementation expectedValue := by
+example
+    : Oxbow.Extracted.Downstream.implementation.wellTyped
+        refinedInterface
+        Oxbow.Extracted.Downstream.dependencies := by
+  intro
+    Step S refinedSignatures signaturesRefineDependencies context dependencies₁
+    dependencies₂ dependenciesInhabitTheirSignatures implementation₁
+    implementation₂ v₁ reduction₁ v₂ reduction₂
+  subst context implementation₁ implementation₂
   cases signaturesRefineDependencies with | @cons evenSig _ evenValid tailSig tailParametric signaturesRefineDependencies =>
   obtain ⟨⟩ := signaturesRefineDependencies
-  cases dependenciesInhabitTheirSignatures with | @cons evenRelation even evenWellTyped tailRelations tailValues dependenciesInhabitTheirSignatures =>
+  cases dependenciesInhabitTheirSignatures with | @cons evenRelation even₁ even₂ evenWellTyped tailRelations tailValues₁ tailValues₂ dependenciesInhabitTheirSignatures =>
   obtain ⟨⟩ := dependenciesInhabitTheirSignatures
-  obtain ⟨evenAbsent, evenPresent⟩ := evenSig; simp at evenValid
+  obtain ⟨evenSigName, ⟨evenAbsent, evenPresent⟩⟩ := evenSig
+  obtain ⟨evenName₁, even₁⟩ := even₁; obtain ⟨evenName₂, even₂⟩ := even₂
+  simp at evenValid; obtain ⟨⟨⟩, evenValid⟩ := evenValid
   obtain ⟨evenAbsentValid, evenPresentValid⟩ := evenValid
-  cases evenAbsent with simp at evenAbsentValid | cons evenT evenAbsent =>
-  cases evenAbsent with simp at evenAbsentValid | nil =>
+  obtain ⟨evenT, evenTValid⟩ := evenAbsentValid
+  obtain ⟨⟨⟩, evenTValid⟩ := evenTValid
   obtain ⟨evenTArity, evenT⟩ := evenT
-  cases evenTArity with simp at evenAbsentValid | zero =>
-  cases evenT with simp at evenAbsentValid | abstract evenT =>
-  obtain ⟨⟩ := evenAbsentValid
+  cases evenTArity with simp at evenTValid | zero =>
+  cases evenT with simp at evenTValid | abstract evenT =>
+  obtain ⟨⟩ := evenTValid
   cases evenPresent with simp at evenPresentValid | cons evenCreate evenPresent =>
   cases evenPresent with simp at evenPresentValid | cons evenGet evenPresent =>
   cases evenPresent with simp at evenPresentValid | nil =>
@@ -110,11 +101,6 @@ theorem implementationReducesToValue
   cases evenCreateCodomainArgArgs with simp at evenCreateValid | nil =>
   cases evenCreateCodomainArg with simp at evenCreateValid | field within index =>
   obtain ⟨⟨⟩, ⟨⟩⟩ := evenCreateValid
+  simp at evenWellTyped; obtain ⟨⟨⟩, ⟨⟨⟩, evenWellTyped⟩⟩ := evenWellTyped
   simp
-  apply Reduce.step; apply S.letBinding; apply S.applyFunc; fail
-
-example
-    : Oxbow.Extracted.Downstream.implementation.wellTyped @expectedRelation := by
-  intro Step S v reduction
-  obtain ⟨⟩ := @S.deterministic _ _ reduction _ implementationReducesToValue
   sorry

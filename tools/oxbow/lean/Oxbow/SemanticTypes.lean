@@ -2,9 +2,9 @@ import Oxbow.Reduction
 open Oxbow.Model
 open Oxbow.Reduction
 
-namespace Oxbow.SemanticTypes
+universe u a b c l r
 
-universe u a b l r
+namespace Oxbow.SemanticTypes
 
 inductive _root_.List.forAll {α : Type u} (condition : α → Prop)
     : List α → Prop where
@@ -22,6 +22,18 @@ inductive _root_.List.forAllPairs {L : Type l} {R : Type r}
       (headsHold : condition lhsHead rhsHead) {lhsTail : List L} {rhsTail}
       (tailsHold : lhsTail.forAllPairs condition rhsTail)
       : (lhsHead :: lhsTail).forAllPairs condition (rhsHead :: rhsTail)
+
+inductive _root_.List.forAllTriples {A : Type a} {B : Type b} {C : Type c}
+    (condition : A → B → C → Prop)
+    : List A → List B → List C → Prop where
+  | nil : [].forAllTriples condition [] []
+  | cons {aHead bHead cHead}
+      (headsHold : condition aHead bHead cHead) {aTail : List A} {bTail} {cTail}
+      (tailsHold : aTail.forAllTriples condition bTail cTail)
+      : (aHead :: aTail).forAllTriples
+          condition
+          (bHead :: bTail)
+          (cHead :: cTail)
 
 structure PER (α : Type u) where
   eq : α → α → Prop
@@ -359,6 +371,7 @@ structure SemanticModuleInContext : Type 0 where
   present : List (Option SemanticModuleInContext)
 deriving Inhabited
 
+@[simp]
 def SemanticModuleInContext.getTypeConstructor!
     (index : Nat)
     (semanticModule : SemanticModuleInContext)
@@ -409,18 +422,26 @@ mutual
     | .val _ => .none
 end
 
+@[simp]
+def _root_.List.toContext!
+    : List (String × ModuleType SemanticTypeConstructor) →
+      List (String × SemanticModuleInContext) :=
+  List.map (fun ⟨name, modType⟩ => (name, modType.semanticModuleInContext!))
+attribute [simp] _root_.List.lookup List.getElem?_cons_zero
+
+@[simp]
 def _root_.List.getDependencyCompilationUnit!
-    (indexAmongDependencies : Nat)
-    (dependencies : List SemanticModuleInContext)
+    (fullyQualifiedName : String)
+    (dependencies : List (String × SemanticModuleInContext))
     : SemanticModuleInContext :=
-  match dependencies[indexAmongDependencies]? with
-  | .none => panic s!"dependency compilation unit out of bounds: #{indexAmongDependencies} of {dependencies.length}"
+  match dependencies.lookup fullyQualifiedName with
+  | .none => panic s!"dependency compilation not found: #{fullyQualifiedName}"
   | .some dependency => dependency
 
 @[simp]
 def _root_.Oxbow.Model.ModuleStatics.resolve!
     (context : List SemanticModuleInContext)
-    (dependencies : List SemanticModuleInContext)
+    (dependencies : List (String × SemanticModuleInContext))
     (statics : ModuleStatics)
     : SemanticModuleInContext :=
   match statics with
@@ -434,15 +455,15 @@ def _root_.Oxbow.Model.ModuleStatics.resolve!
     | .none => panic s!"type index out of bounds: #{index} of {semanticModule.present.length}"
     | .some .none => panic s!"type index not populated: #{index} of {semanticModule.present.length}"
     | .some (.some submodule) => submodule
-  | .compilationUnit indexAmongDependencies =>
-    dependencies.getDependencyCompilationUnit! indexAmongDependencies
+  | .compilationUnit fullyQualifiedName =>
+    dependencies.getDependencyCompilationUnit! fullyQualifiedName
 
 mutual
   @[simp]
   def _root_.Oxbow.Model.ModuleType.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
-      (dependencies : List SemanticModuleInContext)
+      (dependencies : List (String × SemanticModuleInContext))
       (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
       : PER Value :=
     let { present, .. } := userSuppliedRefinedSignature
@@ -462,7 +483,7 @@ mutual
   def _root_.Oxbow.Model.ModuleItemPresentAtRuntime.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
-      (dependencies : List SemanticModuleInContext)
+      (dependencies : List (String × SemanticModuleInContext))
       : ModuleItemPresentAtRuntime SemanticTypeConstructor → PER Value
     | .mod m => @m.structuralRelationInScope! Step S context dependencies
     | .val v => @v.structuralRelationInScope! Step S context dependencies
@@ -471,7 +492,7 @@ mutual
   def _root_.Oxbow.Model.ValType.structuralRelationInScope!
       {Step} [S : StepRelation Step]
       (context : List SemanticModuleInContext)
-      (dependencies : List SemanticModuleInContext)
+      (dependencies : List (String × SemanticModuleInContext))
       : ValType SemanticTypeConstructor → PER Value
     | .arrow domain codomain =>
       let domain :=
@@ -503,26 +524,115 @@ def SemanticModuleInContext.refines
 @[simp]
 def _root_.Oxbow.Model.ModuleType.structuralRelation!
     {Step} [S : StepRelation Step]
-    (dependencySignatures : List (ModuleType Parametric))
+    (context : List (String × SemanticModuleInContext))
     (userSuppliedRefinedSignature : ModuleType SemanticTypeConstructor)
     : PER Value :=
-    PER.forAllWhere
-      (dependencySignatures.forAllPairs SemanticModuleInContext.refines)
-      (@userSuppliedRefinedSignature.structuralRelationInScope! Step S [])
+  @userSuppliedRefinedSignature.structuralRelationInScope! Step S [] context
 
 @[simp]
-def _root_.Oxbow.Model.Value.wellTyped
-    (relation : {Step : _} → [StepRelation Step] → PER Value)
-    (implementation : Value)
+def _root_.List.enforceModularity
+    (dependencySignatures : List (String × ModuleType Parametric))
+    (withRefinedSignatures
+      : (refinedSignatures
+          : List (String × ModuleType SemanticTypeConstructor)) →
+        Prop)
     : Prop :=
-  ∀ {Step} [S : StepRelation Step],
-  (@relation Step S).eq implementation implementation
+  {refinedSignatures : List (String × ModuleType SemanticTypeConstructor)} →
+  (signaturesRefineDependencies
+      : refinedSignatures.forAllPairs
+          (fun ⟨name₁, semantic⟩ ⟨name₂, parametric⟩ =>
+            name₁ = name₂ ∧
+            ModuleType.validWrtExtraction semantic parametric)
+          dependencySignatures) →
+  withRefinedSignatures refinedSignatures
+
+@[simp]
+def _root_.List.enforceModularityAndPartialEquivalence {T : Type u}
+    (dependencySignatures : List (String × ModuleType Parametric))
+    (withRefinedSignatures
+      : (refinedSignatures
+          : List (String × ModuleType SemanticTypeConstructor)) →
+        PER T)
+    : PER T :=
+  PER.forAllWhere
+    (fun
+        {refinedSignatures
+          : List (String × ModuleType SemanticTypeConstructor)} =>
+      refinedSignatures.forAllPairs
+        (fun ⟨name₁, semantic⟩ ⟨name₂, parametric⟩ =>
+          name₁ = name₂ ∧
+          ModuleType.validWrtExtraction semantic parametric)
+        dependencySignatures)
+    withRefinedSignatures
+
+@[simp]
+def _root_.List.forAllDependencyValues
+    {Step : Expr → Expr → Prop} [S : StepRelation Step]
+    (dependencySignatures : List (String × ModuleType Parametric))
+    (withDependencies : (dependencies : List (String × Value)) → Prop)
+    : Prop :=
+  dependencySignatures.enforceModularity fun refinedSignatures =>
+  let context := refinedSignatures.toContext!
+  {dependencies : List (String × Value)} →
+  (dependenciesInhabitTheirSignatures
+      : refinedSignatures.forAllPairs
+          (fun ⟨name₁, sig⟩ ⟨name₂, v⟩ =>
+            name₁ = name₂ ∧
+            (@sig.structuralRelation! Step S context).eq v v)
+          dependencies) →
+  withDependencies dependencies
+
+@[simp]
+def _root_.List.enforceRepresentationInvariance
+    {Step : Expr → Expr → Prop} [S : StepRelation Step]
+    (dependencySignatures : List (String × ModuleType Parametric))
+    (withDependencies
+      : (context : List (String × SemanticModuleInContext)) →
+        (dependencies₁ dependencies₂ : List (String × Value)) →
+        Prop)
+    : Prop :=
+  dependencySignatures.enforceModularity fun refinedSignatures =>
+  let context := refinedSignatures.toContext!
+  {dependencies₁ dependencies₂ : List (String × Value)} →
+  (dependenciesInhabitTheirSignatures
+      : refinedSignatures.forAllTriples
+          (fun ⟨name₀, sig⟩ ⟨name₁, v₁⟩ ⟨name₂, v₂⟩ =>
+            name₀ = name₁ ∧
+            name₁ = name₂ ∧
+            (@sig.structuralRelation! Step S context).eq v₁ v₂)
+          dependencies₁
+          dependencies₂) →
+  withDependencies context dependencies₁ dependencies₂
 
 @[simp]
 def _root_.Oxbow.Model.Expr.wellTyped
-    (relation : {Step : _} → [StepRelation Step] → PER Value)
-    (implementation : Expr)
+    (refinedInterface : ModuleType SemanticTypeConstructor)
+    (dependencySignatures : List (String × ModuleType Parametric))
+    (implementationWithoutDependencies : Expr)
     : Prop :=
-  ∀ {Step} [S : StepRelation Step],
-  ∀ v : Value, (reduction : Reduce Step implementation v) →
-  (@relation Step S).eq v v
+  {Step : Expr → Expr → Prop} → [S : StepRelation Step] →
+  @dependencySignatures.enforceRepresentationInvariance Step S
+    (fun context dependencies₁ dependencies₂ =>
+      let implementation₁ :=
+        implementationWithoutDependencies.substituteCompilationUnits!
+          dependencies₁
+      let implementation₂ :=
+        implementationWithoutDependencies.substituteCompilationUnits!
+          dependencies₂
+      (v₁ : Value) → (reduction₁ : Reduce Step implementation₁ v₁) →
+      (v₂ : Value) → (reduction₂ : Reduce Step implementation₂ v₂) →
+      (@refinedInterface.structuralRelation! Step S context).eq v₁ v₂)
+
+@[simp]
+def _root_.Oxbow.Model.Expr.mustReduceTo
+    (expectedValue : Value)
+    (dependencySignatures : List (String × ModuleType Parametric))
+    (implementationWithoutDependencies : Expr)
+    : Prop :=
+  {Step : Expr → Expr → Prop} → [S : StepRelation Step] →
+  @dependencySignatures.forAllDependencyValues Step S
+    (fun dependencies =>
+      let implementation :=
+        implementationWithoutDependencies.substituteCompilationUnits!
+          dependencies
+      Reduce Step implementation expectedValue)

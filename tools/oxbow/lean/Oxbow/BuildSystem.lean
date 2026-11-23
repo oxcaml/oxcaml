@@ -51,12 +51,9 @@ namespace WorkaroundForPr14959
   def ModuleStatics.toTerm? (dependencyNames : List String)
       : ModuleStatics → Except String Lean.Expr
     | .compilationUnit name => do
-      let .some indexAmongDependencies := dependencyNames.idxOf? name
-        | throw s!"couldn't find a dependency called `{name}`"
-      mkApp
-        (mkConst ``Model.ModuleStatics.compilationUnit)
-        (toExpr indexAmongDependencies)
-      |> pure
+      unless dependencyNames.contains name do
+        throw s!"couldn't find a dependency called `{name}`"
+      pure (mkApp (mkConst ``Model.ModuleStatics.compilationUnit) (toExpr name))
     | .var deBruijn =>
       pure (mkApp (mkConst ``Model.ModuleStatics.var) (toExpr deBruijn))
     | .field within index => do
@@ -286,12 +283,9 @@ namespace WorkaroundForPr14959
          ]
       |> pure
     | .compilationUnit name => do
-      let .some indexAmongDependencies := dependencyNames.idxOf? name
-        | throw s!"couldn't find a dependency called `{name}`"
-      mkApp
-        (mkConst ``Model.Expr.compilationUnit)
-        (toExpr indexAmongDependencies)
-      |> pure
+      unless dependencyNames.contains name do
+        throw s!"couldn't find a dependency called `{name}`"
+      pure (mkApp (mkConst ``Model.Expr.compilationUnit) (toExpr name))
     | .val value => pure (mkApp (mkConst ``Model.Expr.val) value)
     | .var deBruijn => pure (mkApp (mkConst ``Model.Expr.var) (toExpr deBruijn))
 
@@ -490,15 +484,21 @@ elab "_do_not_use_this_outside_automatically_generated_files%" : command => do
       dependencyNames
       implementation
     |> IO.ofExcept
+  let dependency : Lean.Expr :=
+    mkApp2 (mkConst ``Prod [.zero, .zero])
+      (mkConst ``String)
+      (parametric ``Model.ModuleType)
   let dependencies : Lean.Expr :=
     (dependencyNames.map fun name =>
-      mkConst (`Oxbow.Extracted ++ .mkSimple name ++ `interface))
-    |> Lean.Expr.mkList (parametric ``Model.ModuleType)
+      mkApp4 (mkConst ``Prod.mk [.zero, .zero])
+        (mkConst ``String)
+        (parametric ``Model.ModuleType)
+        (toExpr name)
+        (mkConst (`Oxbow.Extracted ++ .mkSimple name ++ `interface)))
+    |> Lean.Expr.mkList dependency
   liftCoreM do
     addTopLevelDefinition (prefixComponents ++ `dependencies)
-      (mkApp
-        (mkConst ``List [Level.zero])
-        (parametric ``Model.ModuleType))
+      (mkApp (mkConst ``List [Level.zero]) dependency)
       dependencies
     addTopLevelDefinition (prefixComponents ++ `interface)
       (parametric ``Model.ModuleType) interface

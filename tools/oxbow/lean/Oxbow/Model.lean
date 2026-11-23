@@ -11,7 +11,7 @@ inductive ModuleStatics : Type where
   Note that only its signature is accessible;
   its implementation is invisible for modularity.
   -/
-  | compilationUnit (indexAmongDependencies : Nat)
+  | compilationUnit (fullyQualifiedName : String)
   | var (deBruijn : Nat)
   | field (within : ModuleStatics) (index : Nat)
 
@@ -126,7 +126,7 @@ mutual
   inductive Expr : Type where
     | apply (func : Expr) (arg : Expr)
     | block (tag : UInt8) (fields : List Expr)
-    | compilationUnit (indexAmongDependencies : Nat)
+    | compilationUnit (fullyQualifiedName : String)
     | field (indexInto : Expr) (index : Nat)
     | function (body : Expr)
     | letBinding (bound : Expr) (body : Expr)
@@ -171,7 +171,9 @@ mutual
 end
 
 instance : Inhabited Expr where
-  default := .compilationUnit 42
+  default :=
+    .compilationUnit
+      "This is the default `Expr` from its `Inhabited Expr` instance."
 
 @[simp]
 def Expr.substitute (replacement : Value) (deBruijn : Nat := 0) : Expr → Expr
@@ -181,7 +183,7 @@ def Expr.substitute (replacement : Value) (deBruijn : Nat := 0) : Expr → Expr
       (arg.substitute replacement deBruijn)
   | .block tag fields =>
     .block tag (fields.map (·.substitute replacement deBruijn))
-  | .compilationUnit index => .compilationUnit index
+  | .compilationUnit fullyQualifiedName => .compilationUnit fullyQualifiedName
   | .field indexInto index =>
     .field (indexInto.substitute replacement deBruijn) index
   | .function body => .function (body.substitute replacement deBruijn.succ)
@@ -224,20 +226,24 @@ decreasing_by
        omega)
 
 @[simp]
-def Expr.substituteCompilationUnits! (dependencies : List Value) : Expr → Expr
+def Expr.substituteCompilationUnits!
+    (dependencies : List (String × Value))
+    : Expr → Expr
   | .apply func arg =>
     .apply
       (func.substituteCompilationUnits! dependencies)
       (arg.substituteCompilationUnits! dependencies)
   | .block tag fields =>
-    .block tag (fields.map (·.substituteCompilationUnits! dependencies))
-  | .compilationUnit index =>
-    match dependencies[index]? with
+    .block tag (fields.map (Expr.substituteCompilationUnits! dependencies))
+  | .compilationUnit fullyQualifiedName =>
+    match List.lookup fullyQualifiedName dependencies with
     | .some dependency => .val dependency
-    | .none => panic! s!"no dependency compilation unit at index {index}"
+    | .none =>
+      panic! s!"no dependency compilation unit named \"{fullyQualifiedName}\""
   | .field indexInto index =>
     .field (indexInto.substituteCompilationUnits! dependencies) index
-  | .function body => .function (body.substituteCompilationUnits! dependencies)
+  | .function body =>
+    .function (body.substituteCompilationUnits! dependencies)
   | .letBinding bound body =>
     .letBinding
       (bound.substituteCompilationUnits! dependencies)
