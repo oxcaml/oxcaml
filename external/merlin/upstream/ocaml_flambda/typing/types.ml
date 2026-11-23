@@ -1259,7 +1259,7 @@ let log_change ch =
 let () =
   Mode.set_append_changes (fun changes -> log_change (Cmodes !changes));
   Jkind_types.Sort.set_log (fun change -> log_change (Csort change));
-  Zero_alloc.set_log (fun change -> log_change (Czero_alloc change))
+  Zero_alloc.set_log (fun change -> log_change (Czero_alloc change));
   Scheduler.set_log (fun change -> log_change (Cscheduler change));
   Ivar.set_log (fun change -> log_change (Civar change))
 
