@@ -1311,10 +1311,21 @@ let stack_to_stack_move (src : Reg.t) (dst : Reg.t) =
         "Unexpected register type for stack to stack move: from %a to %a\n"
         Printreg.reg src Printreg.reg dst
 
+(* A move between a register and a slot of a probe handler wrapper. These slots
+   are packed, which does not align those of 128-bit vectors. *)
+let move_wrapper_slot (src : Reg.t) (dst : Reg.t) =
+  match src.typ, dst.typ with
+  | (Vec128 | Valx2), (Vec128 | Valx2) ->
+    movpd ~unaligned:true (reg src) (reg dst)
+  | ( ( Vec128 | Valx2 | Int | Val | Addr | Float | Float32 | Vec256 | Vec512
+      | Mask ),
+      _ ) ->
+    move src dst
+
 let move_allowing_stack_to_stack src dst =
   match Reg.is_stack src, Reg.is_stack dst with
   | true, true -> stack_to_stack_move src dst
-  | _ -> move src dst
+  | _ -> move_wrapper_slot src dst
 
 (* Entry point for tail recursive calls *)
 let tailrec_entry_point = ref None
@@ -3224,7 +3235,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   (* Save all live hard registers *)
   let offset = aux_offset + tmp_offset + loc_offset in
   let saved_live = stack_locations ~offset live in
-  Array.iteri (fun i reg -> move reg saved_live.(i)) live;
+  Array.iteri (fun i reg -> move_wrapper_slot reg saved_live.(i)) live;
   (* Spill r15 to free it to be used as a temporary register for stack to stack
      copying. *)
   let offset = tmp_offset + loc_offset in
@@ -3266,7 +3277,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   D.define_label (label_to_asm_label ~section:Text label);
   (* After the probe handler has finished executing, restore all live registers
      and free stack space. *)
-  Array.iteri (fun i reg -> move saved_live.(i) reg) live;
+  Array.iteri (fun i reg -> move_wrapper_slot saved_live.(i) reg) live;
   emit_stack_offset (-n);
   if fp then pop rbp;
   I.ret ();
