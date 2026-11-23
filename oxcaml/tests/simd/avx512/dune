@@ -6,6 +6,10 @@
 ; with the internal assembler -- via the rules generated in dune.inc. The run
 ; rules only execute the tests if the host CPU supports AVX512 (see
 ; avx512_available below).
+;
+; The tests that only rely on the layouts of 512-bit vectors and masks also run
+; on arm64, where 512-bit vectors are represented as four 128-bit vectors and
+; masks as 64-bit integers.
 
 (foreign_library
  (archive_name stubs512)
@@ -36,6 +40,30 @@
  (action
   (with-stdout-to
    flags512.sexp
+   (echo "()"))))
+
+; The ocamlopt flags enabling the AVX512 extensions, on amd64.
+
+(rule
+ (targets ocamlopt_flags512.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   ocamlopt_flags512.sexp
+   (echo "(-favx512f -favx512vl -favx512dq -favx512bw)"))))
+
+(rule
+ (targets ocamlopt_flags512.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   ocamlopt_flags512.sexp
    (echo "()"))))
 
 ; Helper used by the run rules in dune.inc: exits 0 iff the host CPU and OS

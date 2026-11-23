@@ -445,3 +445,198 @@ let () =
   let v0 = int64x8_of_int64s 1L 2L 3L 4L 5L 6L 7L 8L in
   let v = vector_and_then_stack_floats v0 1. 2. 3. 4. 5. 6. 7. 8. in
   assert (v = 36.)
+
+(* Masks *)
+
+external box_mask : mask# -> mask = "%box_mask"
+external unbox_mask : mask -> mask# = "%unbox_mask"
+
+external mask_of_int64 : int64 -> mask = "" "mask_ret" [@@noalloc] [@@unboxed]
+external int64_of_mask : mask -> int64 = "" "mask_bits" [@@noalloc] [@@unboxed]
+external bytes_get_mask : bytes -> int -> mask = "%caml_bytes_getmask"
+external bytes_set_mask : bytes -> int -> mask -> unit = "%caml_bytes_setmask"
+
+(* Unbox/Box *)
+let () =
+  let[@inline never] opaque_identity m = m in
+  let m = unbox_mask (mask_of_int64 0xAAL) in
+  let m = opaque_identity m in
+  let m = box_mask m in
+  eq (int64_of_mask m) 0xAAL
+
+(* Load from and store to bytes *)
+let () =
+  let bytes = Bytes.make 16 '\x00' in
+  bytes_set_mask bytes 3 (mask_of_int64 0x0102030405060708L);
+  eq (Bytes.get_int64_le bytes 3) 0x0102030405060708L;
+  eq (int64_of_mask (bytes_get_mask bytes 3)) 0x0102030405060708L;
+  eq (int64_of_mask (bytes_get_mask bytes 8)) 0x0000000000010203L
+
+(* Unboxed *)
+
+type nonrec mask = mask#
+
+external mask_of_int64 : int64 -> mask = "" "mask_ret" [@@noalloc] [@@unboxed]
+external int64_of_mask : mask -> int64 = "" "mask_bits" [@@noalloc] [@@unboxed]
+external bytes_get_mask : bytes -> int -> mask = "%caml_bytes_getmask#"
+external bytes_set_mask : bytes -> int -> mask -> unit = "%caml_bytes_setmask#"
+
+let[@inline never] check_mask m bits = eq (int64_of_mask m) bits
+
+(* Box/Unbox *)
+let () =
+  let m = box_mask (mask_of_int64 0x1234L) in
+  let m = Sys.opaque_identity m in
+  let m = unbox_mask m in
+  check_mask m 0x1234L
+
+(* Identity *)
+let () =
+  let m = mask_of_int64 0xAAL in
+  let m = Sys.opaque_identity m in
+  check_mask m 0xAAL
+
+(* Identity fn *)
+let () =
+  let[@inline never] id (m : mask) = m in
+  let m = id (mask_of_int64 0xFEDCBA9876543210L) in
+  check_mask m 0xFEDCBA9876543210L
+
+(* Pass to function *)
+let[@inline never] pick c (m0 : mask) (m1 : mask) = if c then m0 else m1
+
+let () =
+  let m0 = mask_of_int64 0xF0L in
+  let m1 = mask_of_int64 0x0FL in
+  check_mask (pick (Sys.opaque_identity true) m0 m1) 0xF0L;
+  check_mask (pick (Sys.opaque_identity false) m0 m1) 0x0FL
+
+(* Capture in closure *)
+let () =
+  let m = mask_of_int64 0x55L in
+  let f () = int64_of_mask m in
+  let f = Sys.opaque_identity f in
+  eq (f ()) 0x55L
+
+(* Store in module *)
+module type Mask_m = sig
+  val prefix : string
+  val m : mask
+  val v : int64x8
+end
+
+module Mask_m : Mask_m = struct
+  let prefix = "prefix"
+  let m = mask_of_int64 0xABCDL
+  let v = int64x8_of_int64s 1L 2L 3L 4L 5L 6L 7L 8L
+end
+
+let () =
+  check_mask Mask_m.m 0xABCDL;
+  let (module M) = Sys.opaque_identity (module Mask_m : Mask_m) in
+  check_mask M.m 0xABCDL;
+  check M.v 1L 2L 3L 4L 5L 6L 7L 8L;
+  assert (M.prefix = "prefix")
+
+(* Store in record *)
+type mask_record =
+  { prefix : string;
+    mutable m : mask;
+    v : int64x8
+  }
+
+let () =
+  let record =
+    { prefix = "prefix";
+      m = mask_of_int64 0x0102L;
+      v = int64x8_of_int64s 1L 2L 3L 4L 5L 6L 7L 8L
+    }
+  in
+  check_mask record.m 0x0102L;
+  let record = Sys.opaque_identity record in
+  record.m <- mask_of_int64 0x0304L;
+  check_mask record.m 0x0304L;
+  check record.v 1L 2L 3L 4L 5L 6L 7L 8L;
+  assert (record.prefix = "prefix");
+  let record = copy_via_weak record in
+  check_mask record.m 0x0304L;
+  check record.v 1L 2L 3L 4L 5L 6L 7L 8L;
+  let record = copy_via_tag record in
+  check_mask record.m 0x0304L;
+  check record.v 1L 2L 3L 4L 5L 6L 7L 8L;
+  assert (record.prefix = "prefix")
+
+(* Store in variant *)
+type mask_variant =
+  | M of mask
+  | I of int64
+
+let () =
+  (match Sys.opaque_identity (M (mask_of_int64 0xABCDL)) with
+  | M m -> check_mask m 0xABCDL
+  | I _ -> print_endline "fail");
+  match Sys.opaque_identity (I 0x1234L) with
+  | I i -> eq i 0x1234L
+  | M _ -> print_endline "fail"
+
+(* Store in array *)
+external array_get : mask array -> int -> mask = "%array_safe_get"
+external array_set : mask array -> int -> mask -> unit = "%array_safe_set"
+
+let () =
+  let[@inline never] make bits =
+    [| mask_of_int64 bits; mask_of_int64 0x55L; mask_of_int64 0xF0L |]
+  in
+  let array = make 0xAAL in
+  check_mask (array_get array 0) 0xAAL;
+  check_mask (array_get array 1) 0x55L;
+  check_mask (array_get array 2) 0xF0L;
+  array_set array 1 (mask_of_int64 0x1234L);
+  check_mask (array_get array 0) 0xAAL;
+  check_mask (array_get array 1) 0x1234L;
+  check_mask (array_get array 2) 0xF0L
+
+(* Load from and store to bytes *)
+let () =
+  let bytes = Bytes.make 16 '\x00' in
+  bytes_set_mask bytes 3 (mask_of_int64 0x0102030405060708L);
+  eq (Bytes.get_int64_le bytes 3) 0x0102030405060708L;
+  check_mask (bytes_get_mask bytes 3) 0x0102030405060708L;
+  check_mask (bytes_get_mask bytes 8) 0x0000000000010203L
+
+(* Pass a mask on the stack to an external: the eight preceding arguments
+   exhaust the C integer argument registers. *)
+external mask_after_ints :
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  mask ->
+  int64 = "" "mask_after_ints"
+[@@noalloc] [@@unboxed]
+
+let () =
+  let m = Sys.opaque_identity (mask_of_int64 0x5AL) in
+  eq (mask_after_ints 1L 2L 3L 4L 5L 6L 7L 8L m) 0x7EL
+
+(* Pass and return unboxed products containing masks *)
+external box_int64 : int64_u -> int64 = "%box_int64"
+
+external ret_mask_i64 : int64_u -> int64_u -> #(mask * int64_u)
+  = "" "extcall512_ret_mask_i64"
+[@@noalloc]
+
+external sum_i64_mask : #(int64_u * mask) -> int64_u
+  = "" "extcall512_sum_i64_mask"
+[@@noalloc]
+
+let () =
+  let #(m, i) = ret_mask_i64 #0x5aL #77L in
+  check_mask m 0x5aL;
+  eq (box_int64 i) 77L;
+  (* 10 + 2 * 0x5a *)
+  eq (box_int64 (sum_i64_mask #(#10L, m))) 190L

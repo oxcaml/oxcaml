@@ -591,6 +591,8 @@ let compute_static_size lam =
     | Preinterpret_unboxed_int64_as_tagged_int63
     | Preinterpret_boxed_vector_as_tuple _
     | Preinterpret_tuple_as_boxed_vector _
+    | Preinterpret_boxed_mask_as_tuple
+    | Preinterpret_tuple_as_boxed_mask
     | Pbox _
     | Punbox _ ->
         dynamic_size lam

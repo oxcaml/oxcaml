@@ -8,7 +8,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -41,10 +41,13 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -66,8 +69,22 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (= %{architecture} "arm64")))
+ (action
+  (with-outputs-to
+   basic512_u.out
+   (run ./basic512_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (diff empty.expected basic512_u.out)))
 
@@ -80,7 +97,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -116,7 +133,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -149,10 +166,13 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -174,8 +194,22 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (= %{architecture} "arm64")))
+ (action
+  (with-outputs-to
+   arrays512.out
+   (run ./arrays512.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (diff empty.expected arrays512.out)))
 
@@ -185,10 +219,13 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -210,8 +247,22 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (= %{architecture} "arm64")))
+ (action
+  (with-outputs-to
+   arrays512_u.out
+   (run ./arrays512_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (diff empty.expected arrays512_u.out)))
 
@@ -224,7 +275,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -260,7 +311,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -296,7 +347,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw ))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -342,7 +393,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -374,8 +425,11 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (copy basic512_u.ml basic512_u_nodynlink.ml)))
 
@@ -385,10 +439,13 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -410,8 +467,22 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (= %{architecture} "arm64")))
+ (action
+  (with-outputs-to
+   basic512_u_nodynlink.out
+   (run ./basic512_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (diff empty.expected basic512_u_nodynlink.out)))
 
@@ -434,7 +505,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -480,7 +551,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -512,8 +583,11 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (copy arrays512.ml arrays512_nodynlink.ml)))
 
@@ -523,10 +597,13 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -548,8 +625,22 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (= %{architecture} "arm64")))
+ (action
+  (with-outputs-to
+   arrays512_nodynlink.out
+   (run ./arrays512_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (diff empty.expected arrays512_nodynlink.out)))
 
@@ -558,8 +649,11 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (copy arrays512_u.ml arrays512_u_nodynlink.ml)))
 
@@ -569,10 +663,13 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -594,8 +691,22 @@
  (enabled_if
    (and
     (= %{context_name} "main")
-    (= %{architecture} "amd64")
-    (<> %{system} macosx)))
+    (= %{architecture} "arm64")))
+ (action
+  (with-outputs-to
+   arrays512_u_nodynlink.out
+   (run ./arrays512_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (or
+     (and
+      (= %{architecture} "amd64")
+      (<> %{system} macosx))
+     (= %{architecture} "arm64"))))
  (action
   (diff empty.expected arrays512_u_nodynlink.out)))
 
@@ -618,7 +729,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -664,7 +775,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -710,7 +821,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -756,7 +867,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -802,7 +913,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -848,7 +959,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -894,7 +1005,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -940,7 +1051,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -986,7 +1097,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -1032,7 +1143,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -1078,7 +1189,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -1124,7 +1235,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 
@@ -1170,7 +1281,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw -flambda2-reaper -reaper-local-fields))
+  (:standard -extension simd_beta (:include ocamlopt_flags512.sexp) -flambda2-reaper -reaper-local-fields))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs512))
 

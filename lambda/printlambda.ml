@@ -979,6 +979,10 @@ let primitive ppf = function
       fprintf ppf "reinterpret_boxed_%s_as_tuple" (boxed_vector v)
   | Preinterpret_tuple_as_boxed_vector v ->
       fprintf ppf "reinterpret_tuple_as_boxed_%s" (boxed_vector v)
+  | Preinterpret_boxed_mask_as_tuple ->
+      fprintf ppf "reinterpret_boxed_mask_as_tuple"
+  | Preinterpret_tuple_as_boxed_mask ->
+      fprintf ppf "reinterpret_tuple_as_boxed_mask"
   | Ppeek layout ->
       fprintf ppf "(peek@ %a)"
         peek_or_poke layout
@@ -1217,6 +1221,10 @@ let name_of_primitive = function
       "Preinterpret_boxed_vector_as_tuple"
   | Preinterpret_tuple_as_boxed_vector _ ->
       "Preinterpret_tuple_as_boxed_vector"
+  | Preinterpret_boxed_mask_as_tuple ->
+      "Preinterpret_boxed_mask_as_tuple"
+  | Preinterpret_tuple_as_boxed_mask ->
+      "Preinterpret_tuple_as_boxed_mask"
   | Ppeek _ -> "Ppeek"
   | Ppoke _ -> "Ppoke"
   | Pget_idx _ -> "Pget_idx"

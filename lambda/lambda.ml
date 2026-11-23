@@ -480,6 +480,8 @@ type primitive =
   | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple of boxed_vector
   | Preinterpret_tuple_as_boxed_vector of boxed_vector
+  | Preinterpret_boxed_mask_as_tuple
+  | Preinterpret_tuple_as_boxed_mask
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64
   (* Jane Street extensions *)
@@ -1657,18 +1659,30 @@ let layout_unboxed_int8 = Punboxed_or_untagged_integer Untagged_int8
 let layout_string = non_null_value Pgenval
 let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
-let layout_unboxed_mask = Punboxed_mask
+let layout_unboxed_mask =
+  if split_vectors then layout_unboxed_int64 else Punboxed_mask
+
+let layout_unboxed_tupled_vector v =
+  let fields =
+    match v with
+    | Unboxed_vec128 -> [Punboxed_vector Unboxed_vec128]
+    | Unboxed_vec256 ->
+      [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
+    | Unboxed_vec512 ->
+      [ Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128 ]
+  in
+  Punboxed_product fields
 
 let layout_unboxed_vector v =
   match v with
   | Unboxed_vec128 -> Punboxed_vector Unboxed_vec128
-  | Unboxed_vec256 ->
+  | Unboxed_vec256 | Unboxed_vec512 ->
     if split_vectors
-    then
-      Punboxed_product
-        [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
-    else Punboxed_vector Unboxed_vec256
-  | Unboxed_vec512 -> Punboxed_vector Unboxed_vec512
+    then layout_unboxed_tupled_vector v
+    else Punboxed_vector v
 
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
 let layout_boxed_mask = non_null_value Pboxedmaskval
@@ -1687,19 +1701,14 @@ let layout_tupled_vector v =
       nullable = Non_nullable
     }
 
-let layout_unboxed_tupled_vector v =
-  let fields =
-    match v with
-    | Unboxed_vec128 -> [Punboxed_vector Unboxed_vec128]
-    | Unboxed_vec256 ->
-      [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
-    | Unboxed_vec512 ->
-      [ Punboxed_vector Unboxed_vec128;
-        Punboxed_vector Unboxed_vec128;
-        Punboxed_vector Unboxed_vec128;
-        Punboxed_vector Unboxed_vec128 ]
-  in
-  Punboxed_product fields
+let layout_tupled_mask =
+  Pvalue
+    { raw_kind =
+        Pvariant
+          { consts = [];
+            non_consts = [0, Constructor_shape_mixed [| Bits64 |]] };
+      nullable = Non_nullable
+    }
 
 let layout_predef_value = nullable_value Pgenval
 
@@ -2206,6 +2215,7 @@ let sort_vars_of_primitive = function
   | Punbox_unit | Punbox_vector _ | Pbox_vector _ | Punbox_mask | Pbox_mask _
   | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _
+  | Preinterpret_boxed_mask_as_tuple | Preinterpret_tuple_as_boxed_mask
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
@@ -2350,7 +2360,10 @@ let rec transl_mixed_product_element (element : Types.mixed_block_element)
   | Vec128 -> Vec128
   | Vec256 when split_vectors -> Product [| Vec128; Vec128 |]
   | Vec256 -> Vec256
+  | Vec512 when split_vectors ->
+    Product [| Vec128; Vec128; Vec128; Vec128 |]
   | Vec512 -> Vec512
+  | Mask when split_vectors -> Bits64
   | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
@@ -2390,8 +2403,11 @@ let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
     if split_vectors
     then Product [|Vec128; Vec128|]
     else Vec256
-  | Vec512 -> Vec512
-  | Mask -> Mask
+  | Vec512 ->
+    if split_vectors
+    then Product [|Vec128; Vec128; Vec128; Vec128|]
+    else Vec512
+  | Mask -> if split_vectors then Bits64 else Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
   | Void -> Void
@@ -3278,6 +3294,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _
+  | Preinterpret_boxed_mask_as_tuple | Preinterpret_tuple_as_boxed_mask
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
@@ -3483,6 +3500,7 @@ let primitive_can_raise prim =
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _
+  | Preinterpret_boxed_mask_as_tuple | Preinterpret_tuple_as_boxed_mask
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _
@@ -3711,8 +3729,12 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec256 ->
     assert (not split_vectors);
     Vec256
-  | Punboxed_vector Unboxed_vec512 -> Vec512
-  | Punboxed_mask -> Mask
+  | Punboxed_vector Unboxed_vec512 ->
+    assert (not split_vectors);
+    Vec512
+  | Punboxed_mask ->
+    assert (not split_vectors);
+    Mask
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
   | Pvoid -> Void
   | Psplicevar id -> Splice_variable id
@@ -4012,6 +4034,8 @@ let primitive_result_layout (p : primitive) =
   | Preinterpret_unboxed_int64_as_tagged_int63 -> layout_int
   | Preinterpret_boxed_vector_as_tuple v -> layout_tupled_vector v
   | Preinterpret_tuple_as_boxed_vector v -> layout_boxed_vector v
+  | Preinterpret_boxed_mask_as_tuple -> layout_tupled_mask
+  | Preinterpret_tuple_as_boxed_mask -> layout_boxed_mask
   | Ppeek layout -> (
       match layout with
       | Ppp_tagged_immediate -> layout_int
