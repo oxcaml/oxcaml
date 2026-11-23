@@ -241,7 +241,6 @@ let jit_load (type a r)
   let symbols =
     Symbols.aggregate ~current:!Globals.symbols ~new_symbols:local_symbols
   in
-  Globals.symbols := symbols;
   if !Globals.debug then (
     Printf.printf "\n=== JIT Sections ===\n";
     String.Map.iter addressed_sections
@@ -272,6 +271,10 @@ let jit_load (type a r)
   load_text (module E) relocated_text;
   load_sections (module E) addressed_sections;
   let entry_points = entry_points ~phrase_name symbols in
+  (* Later phrases can only use the symbols of a phrase that has been loaded.
+     They are recorded before the phrase runs: it may load code that needs
+     them. *)
+  Globals.symbols := symbols;
   let result = jit_run entry_points in
   outcome_ref := Some result
 
