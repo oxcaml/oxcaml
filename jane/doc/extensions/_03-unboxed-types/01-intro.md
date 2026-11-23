@@ -316,10 +316,7 @@ versions.
 
 # Unboxed variants
 
-An unboxed product stores all its fields together. An unboxed variant stores
-one constructor's fields and a tag that identifies that constructor. The
-payload layouts form a sum, written `+`, just as the field layouts of a
-product are joined with `&`.
+An unboxed product stores all its fields together. An unboxed variant stores a tag and the fields of the active constructor. Its layout reserves enough space for any constructor to be active, so a record can store the variant inline at a fixed size. The constructor payload layouts form a sum, written `+`, just as the field layouts of a product are joined with `&`.
 
 Define an unboxed variant directly by adding `[@@unboxed]` to a variant
 declaration with several constructors:
@@ -349,14 +346,29 @@ let read entry = match entry.reply with #Missing -> None | #Found s -> Some s
 
 `boxed` returns a `reply`. The `#` prefix in `inline` selects the `reply#`
 constructor explicitly. In `store`, the field type `reply#` selects the same
-constructor. Patterns follow the same rule.
+constructor. Patterns follow the same rule, so we could write `read` as:
 
-A boxed `Missing` is an immediate. A boxed `Found` allocates a block with one
-field for the string. The `reply#` field in `entry` stores the tag and space
-for the string inside the record. The record has the same size whichever
+```ocaml
+let read entry = match entry.reply with Missing -> None | Found s -> Some s
+```
+
+A boxed `Missing` is an immediate and a boxed `Found` allocates a block with one
+field for the string, whereas the `reply#` field in `entry` stores the tag and space
+for one value (either a pointer or an immediate) inside the record, so that `Missing` can store a benign immediate, and `Found` can store the string pointer directly. The record has the same size whichever
 constructor it holds.
 
-A constructor can declare record fields. The unboxed constructor stores the
+Boxing a `t#` produces an ordinary `t`. A boxed unboxed value stores only the fields
+of the selected outer alternative, just like an originally-boxed value would:
+
+| Unboxed value | Boxed representation | Boxed pattern |
+| --- | --- | --- |
+| `#Missing` | Immediate 0 | `Missing` |
+| `#Found s` | Block with tag 0 and a value field for the string | `Found s` |
+
+A match on `t# box` accepts the same patterns as a match on `t` (see the last column of the table above). A separately
+compiled function can box or unbox a value using just its sum layout.
+
+An unboxed variant's constructor can declare record fields, as usual. The unboxed constructor stores the
 fields as a product in declaration order. A pattern can bind that product:
 
 ```ocaml
@@ -365,44 +377,36 @@ let read = function #Stop -> 0 | #Count fields -> fields.#number
 let copy = function #Stop -> #Stop | #Count fields -> #Count fields
 ```
 
-The boxed pattern `Count fields` on a `counter` binds the original block:
-`fields.number <- 1` changes that block. The unboxed fields cannot be assigned.
-A direct `[@@unboxed]` variant uses the same product for its record fields.
-Matching its `box` also binds the product, so it does not allow assignment.
+The boxed pattern `Count fields` on a `counter` binds the original block, which has a header denoting the tag (that it is `Count`) and two values. `fields.number <- 1` changes that block.
 
-Tag sharing depends on how each constructor stores its argument. Consider a
-variant that uses `reply#` twice, once directly and once in a record field:
+The pattern `#Count fields`, meanwhile, only binds the current values of the fields: a later assignment to the boxed record leaves the bound unboxed record unchanged, and the fields of the unboxed record cannot be assigned.
+
+Unboxed inner variants stored in outer variants are sometimes fused: they share a tag, which differentiates between the constructors of the parent and the children. Whether such fusing happens depends on how each constructor stores its that inner unboxed variant. Consider a variant that uses `reply#` in three different ways:
 
 ```ocaml
-type t = Busy | Direct of reply# | Saved of { mutable reply : reply# }
+type defined_inner = #{ reply : reply# }
+type t = Busy
+       | Direct of reply#
+       | Saved of { mutable reply : reply# }
+       | Deleted of defined_inner
 ```
 
-`Direct` and its argument share one tag. That tag distinguishes
-`Direct Missing` from `Direct (Found s)`. A `Saved` record keeps its own
-`reply#` tag so that assigning to `r.reply` can change `Missing` to `Found s`
-while `r` remains the same record. The layout of `t#` is therefore
-`void + void + value + (void + value)`. The parentheses mark the tag inside
-`Saved`. Source patterns still use the constructor names at both levels.
-Types with the same layout can have different constructors.
+- `Direct` and its argument share one tag: `t` and `reply#` are fused. That tag distinguishes `Direct Missing` from `Direct (Found s)`.
+- A `Saved` record stores a full reply, un-fused, inline in the record: `reply#` keeps its tag so that assigning to `r.reply` can change `Missing` to `Found s` while `r` remains the same record, and so that the record can be extracted by a match without changing its memory layout. Matching `Saved r` and
+constructing `Saved r` again returns the original block.
+- `Deleted`, meanwhile, since it takes an *unboxed* record whose layout reduces to `reply#`, has the same payload layout as `Direct`, and fuses with `t`.
 
-Boxing a `t#` produces an ordinary `t`. A boxed value stores only the fields
-of the selected outer alternative:
+Layouts represent this by making the layout `+` operator non-associative: parenthesis around a pair of values in a series of summed values indicate that the sub-tree around which the parentheses have been placed has its own tag.
+Thus, the layout of `t#` is
+`void + void + value + (void + value) + void + value`: six alternatives at the top level, with the fourth having nested alternatives with their own tag.
 
-| Source pattern | Boxed representation |
-| --- | --- |
-| `Busy` | Immediate 0 |
-| `Direct Missing` | Immediate 1 |
-| `Direct (Found s)` | Block with tag 0 and one field for `s` |
-| `Saved r` | Block with tag 1, the `reply#` tag, and space for the string |
-
-A match on `t# box` accepts these same patterns. Matching `Saved r` and
-constructing `Saved r` again returns the original block. A separately
-compiled function can box or unbox a value using just its sum layout.
-
-A record with several fields has a product layout. For example,
+A record with several fields has a product layout, so unboxed inner variants inside them are *not* fused with the parent. For example,
 `Saved of { marker : unit#; reply : reply# }` contributes
-`void & (void + value)` to the outer sum. Two unboxed variant fields in the
+`void & (void + value)` to the outer sum. Similarly, two unboxed variant fields in the
 same record each keep their own tag.
+
+Even when variants are fused, source patterns still use the constructor names at both levels, because that is handled by typechecking, not layout.
+By the same token, types with the same layout can have different constructors.
 
 *Limitations and future plans*:
 * As with records, some boxed declarations have no implicit unboxed version.
