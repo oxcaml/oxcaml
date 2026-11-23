@@ -866,7 +866,7 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
   in
   if insert_stack_check
   then
-    let fun_body =
+    let check =
       (* CR mshinwell: These availability sets aren't taking into account any
          potential clobbers by the stack check. *)
       Linear.instr_cons
@@ -875,7 +875,9 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
         ~available_across:fundecl.fun_body.available_across fundecl.fun_body
         ~phantom_available_before:fundecl.fun_body.phantom_available_before
     in
-    { fundecl with fun_body }
+    (* The check is at function entry, where the argument registers are live:
+       the emitter must preserve them if the stack is reallocated. *)
+    { fundecl with fun_body = { check with live = fundecl.fun_args } }
   else fundecl
 
 let stapsdt_base_emitted = ref false
