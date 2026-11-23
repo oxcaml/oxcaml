@@ -786,13 +786,13 @@ module M = struct
   end
 end
 [%%expect{|
-Line 5, characters 56-57:
-5 |     module Y : sig class c : object end include functor F end
-                                                            ^
-Error: Signature mismatch in included functor's parameter:
-       Class declarations c do not match:
-       First is "dynamic"
-       but second is "static".
+module M :
+  sig
+    module type F =
+      sig class c : object  end end @ static -> sig val y : int end
+    module type T =
+      sig module Y : sig class c : object  end val y : int end end
+  end
 |}]
 
 (* likewise in a structure *)
@@ -806,7 +806,7 @@ module M :
     module F :
       functor (X : sig class c : object  end end @ static) ->
         sig val y : int end
-    module Y : sig class c : object  end val y : int @@ dynamic end
+    module Y : sig class c : object  end val y : int end
   end
 |}]
 
