@@ -158,10 +158,10 @@ module Solver = struct
     | Normal
     | Normal_except_vars of (Types.type_expr -> unit)
         (** Like [Normal], but calls the callback on each [Tvar] or [Tivar]
-            whose kind is computed. Entering this mode uses a fresh
-            [ty_to_kind] table, so that a kind cached in another mode cannot
-            skip the callback. Constructor coefficients are still computed in
-            [Normal] mode. *)
+            whose kind is computed. Entering this mode uses a fresh [ty_to_kind]
+            table, so that a kind cached in another mode cannot skip the
+            callback. Constructor coefficients are still computed in [Normal]
+            mode. *)
     | Round_up
 
   let constr_to_string (path : Path.t) : string =

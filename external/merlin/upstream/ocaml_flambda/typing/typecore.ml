@@ -384,7 +384,7 @@ end = struct
      duplication. *)
 
   let deep_copy_desc copy = function
-    | Tvar _ | Tnil | Tunivar _ | Tof_kind _ as desc -> desc
+    | Tvar _ | Tivar _ | Tnil | Tunivar _ | Tof_kind _ as desc -> desc
     | Tvariant _ as desc ->
         (* The row_desc does contain some type exprs, but:
            - the absence of specific handling hasn't been reported as
