@@ -32,6 +32,15 @@ class StepRelation (Step : Expr → Expr → Prop) where
     (reduction : Reduce Step e v) {v'}
     (reduction' : Reduce Step e v')
     : v = v'
+  /-
+  Then, each inference rule, phrased as an axiom about `Step`:
+  -/
+  applyFunc {func func' : Expr}
+    (step : Step func func') {arg}
+    : Step (.apply func arg) (.apply func' arg)
+  applyArg {arg arg' : Expr}
+    (step : Step arg arg') {func}
+    : Step (.apply func arg) (.apply func arg')
   blockValues {tag}
     (kind : BlockKind.ofTag tag = .values) {args : List Expr} {values}
     (allValues : args.allValues values)
@@ -87,7 +96,16 @@ class StepRelation (Step : Expr → Expr → Prop) where
           nImmediates nBlocks immediates blocks failAction)
         case.body
 
+/--
+A copy of `StepRelation` without assuming determinism, with an elimination rule.
+-/
 inductive Step' : Expr → Expr → Prop where
+  | applyFunc {func func' : Expr}
+      (step : Step' func func') {arg}
+      : Step' (.apply func arg) (.apply func' arg)
+  | applyArg {arg arg' : Expr}
+      (step : Step' arg arg') {func}
+      : Step' (.apply func arg) (.apply func arg')
   | blockValues {tag}
       (kind : BlockKind.ofTag tag = .values) {args : List Expr} {values}
       (allValues : args.allValues values)
@@ -161,6 +179,26 @@ theorem _root_.List.allValues.functional {args : List Expr} {values}
 theorem Step'.diamond {e e₁ e₂} (step₁ : Step' e e₁) (step₂ : Step' e e₂)
     : e₁ = e₂ ∨ ∃ e₃, Step' e₁ e₃ ∧ Step' e₂ e₃ := by
   induction step₁ generalizing e₂ with
+  | applyFunc step₁ ih =>
+    cases step₂ with
+    | applyFunc step₂ =>
+      specialize ih step₂
+      match ih with
+      | .inl ih => subst ih; left; rfl
+      | .inr ⟨joined, joined₁, joined₂⟩ =>
+        exact .inr ⟨_, .applyFunc joined₁, .applyFunc joined₂⟩
+    | applyArg step₂ =>
+      exact .inr ⟨_, .applyArg step₂, .applyFunc step₁⟩
+  | applyArg step₁ ih =>
+    cases step₂ with
+    | applyArg step₂ =>
+      specialize ih step₂
+      match ih with
+      | .inl ih => subst ih; left; rfl
+      | .inr ⟨joined, joined₁, joined₂⟩ =>
+        exact .inr ⟨_, .applyArg joined₁, .applyArg joined₂⟩
+    | applyFunc step₂ =>
+      exact .inr ⟨_, .applyFunc step₂, .applyArg step₁⟩
   | blockValues _ allValues =>
     cases step₂ with
     | blockValues _ allValues' =>
@@ -171,7 +209,7 @@ theorem Step'.diamond {e e₁ e₂} (step₁ : Step' e e₁) (step₂ : Step' e 
     | letBinding step₂ =>
       match ih step₂ with
       | .inl same => exact .inl (by rw [same])
-      | .inr ⟨_, joined₁, joined₂⟩ =>
+      | .inr ⟨joined, joined₁, joined₂⟩ =>
         exact .inr ⟨_, .letBinding joined₁, .letBinding joined₂⟩
     | letBindingValue => contradiction
   | letBindingValue =>
@@ -183,7 +221,7 @@ theorem Step'.diamond {e e₁ e₂} (step₁ : Step' e e₁) (step₂ : Step' e 
     | physicalEqualityLhs step₂ =>
       match ih step₂ with
       | .inl same => exact .inl (by rw [same])
-      | .inr ⟨_, joined₁, joined₂⟩ =>
+      | .inr ⟨joined, joined₁, joined₂⟩ =>
         exact .inr ⟨_, .physicalEqualityLhs joined₁, .physicalEqualityLhs joined₂⟩
     | physicalEqualityRhs step₂ =>
       exact .inr ⟨_, .physicalEqualityRhs step₂, .physicalEqualityLhs step₁⟩
@@ -235,6 +273,8 @@ instance referenceStepRelationIsValid : StepRelation Step' where
       | alreadyReduced => rfl
       | step step reduce => contradiction
     | step step _ ih => exact ih (r'.strip step)
+  applyFunc := .applyFunc
+  applyArg := .applyArg
   blockValues := .blockValues
   function := .function
   letBinding := .letBinding
