@@ -1414,7 +1414,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pbox_vector (_, _)
       | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
       | Preinterpret_boxed_vector_as_tuple _
-      | Preinterpret_tuple_as_boxed_vector _ | Pmake_unboxed_product _
+      | Preinterpret_tuple_as_boxed_vector _ | Preinterpret_boxed_mask_as_tuple
+      | Preinterpret_tuple_as_boxed_mask | Pmake_unboxed_product _
       | Punboxed_product_field _ | Parray_element_size_in_bytes _
       | Pget_header _ | Pwith_stack | Pwith_stack_preemptible | Pperform
       | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace | Preperform

@@ -1465,6 +1465,14 @@ and cps_function env ~fid ~fuid ~let_bound ~(recursive : Recursive.t)
         | Boxed_nativeint -> Naked_nativeint
       in
       Some (Unboxed_number bn)
+    | Pvalue
+        { nullable = Non_nullable;
+          raw_kind =
+            Pboxedvectorval (Boxed_vec256 | Boxed_vec512) | Pboxedmaskval
+        }
+      when L.split_vectors ->
+      (* There are no naked numbers of these kinds on this target. *)
+      None
     | Pvalue { nullable = Non_nullable; raw_kind = Pboxedvectorval bv } ->
       let bn : Flambda_kind.Boxable_number.t =
         match bv with

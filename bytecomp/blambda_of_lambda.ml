@@ -1154,7 +1154,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
     | Pbox_vector _ | Punbox_vector _ | Pbox_mask _ | Punbox_mask | Pjoin_vec256
     | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
-    | Preinterpret_tuple_as_boxed_vector _ ->
+    | Preinterpret_tuple_as_boxed_vector _ | Preinterpret_boxed_mask_as_tuple
+    | Preinterpret_tuple_as_boxed_mask ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
       if Target_system.is_64_bit ()

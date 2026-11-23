@@ -1071,6 +1071,7 @@ let rec choice ctx t =
     | Preinterpret_unboxed_int64_as_tagged_int63
     | Preinterpret_boxed_vector_as_tuple _
     | Preinterpret_tuple_as_boxed_vector _
+    | Preinterpret_boxed_mask_as_tuple | Preinterpret_tuple_as_boxed_mask
     | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)

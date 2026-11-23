@@ -137,6 +137,21 @@ __mmask64 mask_ret(int64_t x)
     return (__mmask64)x;
 }
 
+// Masks are passed as integers per the C ABI.
+int64_t mask_bits(__mmask64 m)
+{
+    return (int64_t)m;
+}
+
+// A mask argument beyond the integer argument registers of both x86-64 and
+// arm64, passed on the stack per the C ABI.
+int64_t mask_after_ints(int64_t i0, int64_t i1, int64_t i2, int64_t i3,
+                        int64_t i4, int64_t i5, int64_t i6, int64_t i7,
+                        __mmask64 m)
+{
+    return i0 + i1 + i2 + i3 + i4 + i5 + i6 + i7 + (int64_t)m;
+}
+
 // Overwrites every mask register, checking that the compiler treats them as
 // destroyed at C calls.
 int64_t clobber_masks(int64_t x)
@@ -258,4 +273,167 @@ int64_t extcall512_i64x4_mask_pair(int64_t a0, int64_t a1, int64_t a2,
         + 64 * p.b;
 }
 
-#endif /* ARCH_AVX512 */
+#elif defined(__ARM_NEON)
+#include <arm_neon.h>
+#include <string.h>
+
+// On arm64, a 512-bit vector is passed and returned like a struct of four
+// 128-bit vectors, and a mask like a 64-bit integer.
+
+typedef struct
+{
+    int64x2_t v0;
+    int64x2_t v1;
+    int64x2_t v2;
+    int64x2_t v3;
+} caml_int64x8_t;
+
+static int64_t extract(caml_int64x8_t v, int i)
+{
+    int64_t tmp[8];
+    memcpy(tmp, &v, sizeof(tmp));
+    return tmp[i];
+}
+
+static caml_int64x8_t add_int64x8(caml_int64x8_t l, caml_int64x8_t r)
+{
+    return (caml_int64x8_t){vaddq_s64(l.v0, r.v0), vaddq_s64(l.v1, r.v1),
+                            vaddq_s64(l.v2, r.v2), vaddq_s64(l.v3, r.v3)};
+}
+
+int64_t vec512_w0(caml_int64x8_t v) { return extract(v, 0); }
+int64_t vec512_w1(caml_int64x8_t v) { return extract(v, 1); }
+int64_t vec512_w2(caml_int64x8_t v) { return extract(v, 2); }
+int64_t vec512_w3(caml_int64x8_t v) { return extract(v, 3); }
+int64_t vec512_w4(caml_int64x8_t v) { return extract(v, 4); }
+int64_t vec512_w5(caml_int64x8_t v) { return extract(v, 5); }
+int64_t vec512_w6(caml_int64x8_t v) { return extract(v, 6); }
+int64_t vec512_w7(caml_int64x8_t v) { return extract(v, 7); }
+
+caml_int64x8_t vec512_of_int64s(int64_t w0, int64_t w1, int64_t w2, int64_t w3,
+                                int64_t w4, int64_t w5, int64_t w6, int64_t w7)
+{
+    int64_t tmp[8] = {w0, w1, w2, w3, w4, w5, w6, w7};
+    caml_int64x8_t v;
+    memcpy(&v, tmp, sizeof(v));
+    return v;
+}
+
+caml_int64x8_t lots_of_vectors512(
+    caml_int64x8_t v0, caml_int64x8_t v1, caml_int64x8_t v2, caml_int64x8_t v3,
+    caml_int64x8_t v4, caml_int64x8_t v5, caml_int64x8_t v6, caml_int64x8_t v7,
+    caml_int64x8_t v8, caml_int64x8_t v9, caml_int64x8_t v10, caml_int64x8_t v11,
+    caml_int64x8_t v12, caml_int64x8_t v13, caml_int64x8_t v14, caml_int64x8_t v15)
+{
+    caml_int64x8_t x0 = add_int64x8(v0, v1);
+    caml_int64x8_t x1 = add_int64x8(v2, v3);
+    caml_int64x8_t x2 = add_int64x8(v4, v5);
+    caml_int64x8_t x3 = add_int64x8(v6, v7);
+    caml_int64x8_t x4 = add_int64x8(v8, v9);
+    caml_int64x8_t x5 = add_int64x8(v10, v11);
+    caml_int64x8_t x6 = add_int64x8(v12, v13);
+    caml_int64x8_t x7 = add_int64x8(v14, v15);
+    caml_int64x8_t y0 = add_int64x8(x0, x1);
+    caml_int64x8_t y1 = add_int64x8(x2, x3);
+    caml_int64x8_t y2 = add_int64x8(x4, x5);
+    caml_int64x8_t y3 = add_int64x8(x6, x7);
+    caml_int64x8_t z0 = add_int64x8(y0, y1);
+    caml_int64x8_t z1 = add_int64x8(y2, y3);
+    return add_int64x8(z0, z1);
+}
+
+int64_t mask_ret(int64_t x)
+{
+    return x;
+}
+
+int64_t mask_bits(int64_t m)
+{
+    return m;
+}
+
+// A mask argument beyond the integer argument registers of both x86-64 and
+// arm64, passed on the stack per the C ABI.
+int64_t mask_after_ints(int64_t i0, int64_t i1, int64_t i2, int64_t i3,
+                        int64_t i4, int64_t i5, int64_t i6, int64_t i7,
+                        int64_t m)
+{
+    return i0 + i1 + i2 + i3 + i4 + i5 + i6 + i7 + m;
+}
+
+// Mixed vector/float arguments, exercising the C calling convention.
+caml_int64x8_t vectors_and_floats512(
+    caml_int64x8_t v0, double f0, caml_int64x8_t v1, double f1,
+    caml_int64x8_t v2, double f2, caml_int64x8_t v3, double f3,
+    double f4, caml_int64x8_t v4, caml_int64x8_t v5, double f5,
+    double f6, caml_int64x8_t v6, caml_int64x8_t v7, double f7,
+    double f8, double f9, caml_int64x8_t v8, caml_int64x8_t v9,
+    caml_int64x8_t v10, double f10, double f11, double f12)
+{
+    caml_int64x8_t x0 = add_int64x8(v0, v1);
+    caml_int64x8_t x1 = add_int64x8(v2, v3);
+    caml_int64x8_t x2 = add_int64x8(v4, v5);
+    caml_int64x8_t x3 = add_int64x8(v6, v7);
+    caml_int64x8_t x4 = add_int64x8(v8, v9);
+    caml_int64x8_t y0 = add_int64x8(x0, x1);
+    caml_int64x8_t y1 = add_int64x8(x2, x3);
+    caml_int64x8_t y2 = add_int64x8(v10, x4);
+    caml_int64x8_t z0 = add_int64x8(y0, y1);
+    caml_int64x8_t z = add_int64x8(z0, y2);
+    double f = f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12;
+    return vec512_of_int64s((int64_t)f, extract(z, 0) + extract(z, 1),
+                            extract(z, 2), extract(z, 3), extract(z, 4),
+                            extract(z, 5), extract(z, 6), extract(z, 7));
+}
+
+// Mixed vector/float/int arguments.
+caml_int64x8_t vectors_and_floats_and_ints512(
+    caml_int64x8_t v0, double f0, caml_int64x8_t v1, int64_t i0,
+    caml_int64x8_t v2, double f1, caml_int64x8_t v3, int64_t i1,
+    int64_t i2, caml_int64x8_t v4, caml_int64x8_t v5, double f2,
+    double f3, caml_int64x8_t v6, caml_int64x8_t v7, int64_t i3,
+    int64_t i4, double f4, caml_int64x8_t v8, caml_int64x8_t v9,
+    caml_int64x8_t v10, int64_t i5, int64_t i6, double f5)
+{
+    caml_int64x8_t x0 = add_int64x8(v0, v1);
+    caml_int64x8_t x1 = add_int64x8(v2, v3);
+    caml_int64x8_t x2 = add_int64x8(v4, v5);
+    caml_int64x8_t x3 = add_int64x8(v6, v7);
+    caml_int64x8_t x4 = add_int64x8(v8, v9);
+    caml_int64x8_t y0 = add_int64x8(x0, x1);
+    caml_int64x8_t y1 = add_int64x8(x2, x3);
+    caml_int64x8_t y2 = add_int64x8(v10, x4);
+    caml_int64x8_t z0 = add_int64x8(y0, y1);
+    caml_int64x8_t z = add_int64x8(z0, y2);
+    double f = f0 + f1 + f2 + f3 + f4 + f5;
+    int64_t i = i0 + i1 + i2 + i3 + i4 + i5 + i6;
+    return vec512_of_int64s((int64_t)f + i, extract(z, 0) + extract(z, 1),
+                            extract(z, 2), extract(z, 3), extract(z, 4),
+                            extract(z, 5), extract(z, 6), extract(z, 7));
+}
+
+// A vector register argument followed by stack-passed floats.
+double vector_and_then_stack_floats512(
+    __attribute__((unused)) caml_int64x8_t v0,
+    double f0, double f1, double f2, double f3,
+    double f4, double f5, double f6, double f7)
+{
+    return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7;
+}
+
+// Unboxed products containing masks
+typedef struct { int64_t m; int64_t i; } extcall512_mask_i64;
+typedef struct { int64_t i; int64_t m; } extcall512_i64_mask;
+
+extcall512_mask_i64 extcall512_ret_mask_i64(int64_t m, int64_t i)
+{
+    extcall512_mask_i64 res = { m, i };
+    return res;
+}
+
+int64_t extcall512_sum_i64_mask(extcall512_i64_mask p)
+{
+    return p.i + 2 * p.m;
+}
+
+#endif

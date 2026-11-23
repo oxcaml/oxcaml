@@ -456,6 +456,8 @@ type primitive =
   | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple of boxed_vector
   | Preinterpret_tuple_as_boxed_vector of boxed_vector
+  | Preinterpret_boxed_mask_as_tuple
+  | Preinterpret_tuple_as_boxed_mask
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64
     (** At present [Preinterpret_unboxed_int64_as_tagged_int63] and
@@ -1258,7 +1260,8 @@ val lambda_unit: lambda
 
 val of_bool : bool -> lambda
 
-(* Whether to translate the vec256 layout to #(vec128 * vec128). *)
+(* Whether to translate the vec256 and vec512 layouts to unboxed products of
+   vec128s, and the mask layout to bits64. *)
 val split_vectors : bool
 
 val layout_unit : layout
@@ -1285,6 +1288,7 @@ val layout_boxed_int : boxed_integer -> layout
 val layout_boxed_vector : boxed_vector -> layout
 val layout_boxed_mask : layout
 val layout_tupled_vector : boxed_vector -> layout
+val layout_tupled_mask : layout
 val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout

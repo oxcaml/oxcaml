@@ -225,8 +225,11 @@ let singleton_or_product_of_mixed_block_element
     if Lambda.split_vectors
     then Product Lambda.[| Vec128; Vec128 |]
     else Singleton Vec256
-  | Vec512 -> Singleton Vec512
-  | Mask -> Singleton Mask
+  | Vec512 ->
+    if Lambda.split_vectors
+    then Product Lambda.[| Vec128; Vec128; Vec128; Vec128 |]
+    else Singleton Vec512
+  | Mask -> if Lambda.split_vectors then Singleton Bits64 else Singleton Mask
   | Word -> Singleton Word
   | Untagged_immediate -> Singleton Untagged_immediate
   | Void -> Product [||]

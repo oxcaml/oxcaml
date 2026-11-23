@@ -2857,6 +2857,7 @@ let lambda_primitive_needs_event_after = function
   | Pjoin_vec256 | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _
+  | Preinterpret_boxed_mask_as_tuple | Preinterpret_tuple_as_boxed_mask
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _

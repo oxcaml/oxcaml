@@ -3573,7 +3573,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
          targets";
     [Unary (Reinterpret_64_bit_word Tagged_int63_as_unboxed_int64, i)]
   | Preinterpret_boxed_vector_as_tuple _, [[arg]]
-  | Preinterpret_tuple_as_boxed_vector _, [[arg]] ->
+  | Preinterpret_tuple_as_boxed_vector _, [[arg]]
+  | Preinterpret_boxed_mask_as_tuple, [[arg]]
+  | Preinterpret_tuple_as_boxed_mask, [[arg]] ->
     [Unary (Reinterpret_boxed_vector, arg)]
   | Ppeek layout, [[ptr]] ->
     let kind = standard_int_or_float_of_peek_or_poke layout in
@@ -3655,7 +3657,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pmixedfield _ | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_boxed_vector_as_tuple _
-      | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
+      | Preinterpret_tuple_as_boxed_vector _ | Preinterpret_boxed_mask_as_tuple
+      | Preinterpret_tuple_as_boxed_mask | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
       | Pget_ptr _ | Pget_ext_ptr _ | Pbox _ | Punbox _ ),

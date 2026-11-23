@@ -936,117 +936,181 @@ let widen_index ~loc ~(index_kind : L.array_index_kind) idx :
         ~src:(Scalar.ignore_locality (scalar index_kind))
         ~dst:(scalar wide) idx ~loc )
 
-let make_boxed_vec256 ~loc ~mode args =
+(* When [L.split_vectors] is set, 256-bit and 512-bit vectors are represented as
+   unboxed products of 128-bit vectors (and as mixed blocks of 128-bit vectors,
+   when boxed), and masks as 64-bit integers. *)
+
+let vec128s_per_vector (vec : L.boxed_vector) =
+  match vec with Boxed_vec128 -> 1 | Boxed_vec256 -> 2 | Boxed_vec512 -> 4
+
+let vector_is_split (vec : L.boxed_vector) =
+  L.split_vectors
+  &&
+  match vec with
+  | Boxed_vec128 -> false
+  | Boxed_vec256 | Boxed_vec512 -> true
+
+let split_vector_shape vec = Array.make (vec128s_per_vector vec) L.Vec128
+
+let split_vector_layouts vec =
+  List.init (vec128s_per_vector vec) (fun _ -> L.Punboxed_vector Unboxed_vec128)
+
+let split_vector_layout vec =
+  L.layout_unboxed_tupled_vector (Primitive.unboxed_vector vec)
+
+let split_vector_sort vec =
+  S.product (List.init (vec128s_per_vector vec) (fun _ -> S.vec128))
+
+let make_unboxed_vector ~loc vec args =
+  L.Lprim (Pmake_unboxed_product (split_vector_layouts vec), args, loc)
+
+let make_boxed_vector ~loc ~mode vec args =
   L.Lprim
-    ( Preinterpret_tuple_as_boxed_vector Boxed_vec256,
+    ( Preinterpret_tuple_as_boxed_vector vec,
       [ Lprim
-          ( Pmakeblock (0, Immutable, Shape [| Vec128; Vec128 |], mode),
+          ( Pmakeblock (0, Immutable, Shape (split_vector_shape vec), mode),
             args,
             loc ) ],
       loc )
 
-let boxed_vec256_to_mixed ~loc arg =
-  L.Lprim (Preinterpret_boxed_vector_as_tuple Boxed_vec256, [arg], loc)
+let boxed_vector_to_mixed ~loc vec arg =
+  L.Lprim (Preinterpret_boxed_vector_as_tuple vec, [arg], loc)
 
-let unboxed_vec256_field ~loc i arg =
+let unboxed_vector_fields ~loc vec arg =
+  List.init (vec128s_per_vector vec) (fun i ->
+      L.Lprim (Punboxed_product_field (i, split_vector_layouts vec), [arg], loc))
+
+let boxed_vector_fields ~loc vec arg =
+  List.init (vec128s_per_vector vec) (fun i ->
+      L.Lprim
+        (Pmixedfield ([i], split_vector_shape vec, Reads_agree), [arg], loc))
+
+let make_boxed_mask ~loc ~mode arg =
   L.Lprim
-    ( Punboxed_product_field
-        (i, [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]),
-      [arg],
+    ( Preinterpret_tuple_as_boxed_mask,
+      [Lprim (Pmakeblock (0, Immutable, Shape [| Bits64 |], mode), [arg], loc)],
       loc )
 
-let boxed_vec256_field ~loc i arg =
-  L.Lprim (Pmixedfield ([i], [| Vec128; Vec128 |], Reads_agree), [arg], loc)
+let unbox_mask ~loc arg =
+  L.Lprim
+    ( Pmixedfield ([0], [| Bits64 |], Reads_agree),
+      [Lprim (Preinterpret_boxed_mask_as_tuple, [arg], loc)],
+      loc )
 
-let split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride ~load =
+let split_mask_load ~loc ~mode ~boxed load_64 args =
+  let load = L.Lprim (load_64, args, loc) in
+  Transformed (if boxed then make_boxed_mask ~loc ~mode load else load)
+
+let split_mask_store ~loc ~boxed set_64 ~arr ~idx ~value =
+  let value = if boxed then unbox_mask ~loc value else value in
+  Primitive (set_64, [arr; idx; value], loc)
+
+(* The index of the 128-bit vector [part] of a split vector at [idx], where
+   indices are in units of [stride] bytes. *)
+let split_vector_index ~loc ~index_kind ~idx ~stride part =
+  if part = 0 then idx else offset ~loc ~index_kind ~idx (16 * part / stride)
+
+(* The first 128-bit access performs the checks for the whole vector. *)
+let split_bigstring_checks ~size ~part checks =
+  if part = 0
+  then checks
+  else
+    let parts = vec128s_per_vector size in
+    Option.map
+      (fun (~len, ~align) -> ~len:(len / parts), ~align:(align / parts))
+      checks
+
+let split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride
+    ~load =
   let arr_id = Ident.create_local "arr" in
-  let arr_duid = Lambda.debug_uid_none in
   let idx_id = Ident.create_local "idx" in
-  let idx_duid = Lambda.debug_uid_none in
-  let low_id = Ident.create_local "low" in
-  let low_duid = Lambda.debug_uid_none in
-  let index_kind, idx = widen_index ~loc ~index_kind idx in
-  let load_low =
-    L.Lprim (load ~index_kind true, [Lvar arr_id; Lvar idx_id], loc)
+  let duid = Lambda.debug_uid_none in
+  let part_ids =
+    List.init (vec128s_per_vector size) (fun part ->
+        part, Ident.create_local (Printf.sprintf "part%d" part))
   in
-  let load_high =
-    let idx = offset ~loc ~index_kind ~idx:(Lvar idx_id) (16 / stride) in
-    L.Lprim (load ~index_kind false, [Lvar arr_id; idx], loc)
-  in
-  (* Rebind low to do its load first *)
+  let parts = List.map (fun (_, part_id) -> L.Lvar part_id) part_ids in
   let result =
     if boxed
-    then make_boxed_vec256 ~loc ~mode [Lvar low_id; load_high]
-    else
-      L.Lprim
-        ( Pmake_unboxed_product
-            [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
-          [Lvar low_id; load_high],
-          loc )
+    then make_boxed_vector ~loc ~mode size parts
+    else make_unboxed_vector ~loc size parts
+  in
+  let index_kind, idx = widen_index ~loc ~index_kind idx in
+  (* Bind the parts to do their loads in order *)
+  let loads =
+    List.fold_right
+      (fun (part, part_id) body ->
+        let idx =
+          split_vector_index ~loc ~index_kind ~idx:(Lvar idx_id) ~stride part
+        in
+        L.Llet
+          ( Strict,
+            Punboxed_vector Unboxed_vec128,
+            part_id,
+            duid,
+            Lprim (load ~index_kind part, [Lvar arr_id; idx], loc),
+            body ))
+      part_ids result
   in
   Transformed
     (Llet
        ( Strict,
          Pvalue L.generic_value,
          arr_id,
-         arr_duid,
+         duid,
          arr,
          Llet
-           ( Strict,
-             L.array_index_to_layout index_kind,
-             idx_id,
-             idx_duid,
-             idx,
-             Llet
-               ( Strict,
-                 Punboxed_vector Unboxed_vec128,
-                 low_id,
-                 low_duid,
-                 load_low,
-                 result ) ) ))
+           (Strict, L.array_index_to_layout index_kind, idx_id, duid, idx, loads)
+       ))
 
-let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride
-    ~check_high ~store =
+let split_vector_store ~loc ~index_kind ~boxed ~size ~arr ~idx ~value ~stride
+    ~check_last ~store =
   let arr_id = Ident.create_local "arr" in
-  let arr_duid = Lambda.debug_uid_none in
   let idx_id = Ident.create_local "idx" in
-  let idx_duid = Lambda.debug_uid_none in
   let value_id = Ident.create_local "value" in
-  let value_duid = Lambda.debug_uid_none in
-  let value = if boxed then boxed_vec256_to_mixed ~loc value else value in
-  let value_low, value_high, value_layout =
+  let duid = Lambda.debug_uid_none in
+  let value, value_layout, fields =
     if boxed
     then
-      ( boxed_vec256_field ~loc 0 (Lvar value_id),
-        boxed_vec256_field ~loc 1 (Lvar value_id),
-        L.layout_tupled_vector Boxed_vec256 )
+      ( boxed_vector_to_mixed ~loc size value,
+        L.layout_tupled_vector size,
+        boxed_vector_fields ~loc size (Lvar value_id) )
     else
-      ( unboxed_vec256_field ~loc 0 (Lvar value_id),
-        unboxed_vec256_field ~loc 1 (Lvar value_id),
-        L.layout_unboxed_tupled_vector Unboxed_vec256 )
+      ( value,
+        split_vector_layout size,
+        unboxed_vector_fields ~loc size (Lvar value_id) )
   in
   let index_kind, idx = widen_index ~loc ~index_kind idx in
-  let idx_high = offset ~loc ~index_kind ~idx:(Lvar idx_id) (16 / stride) in
-  let store_low =
-    L.Lprim (store ~index_kind true, [Lvar arr_id; Lvar idx_id; value_low], loc)
+  let part_idx part =
+    split_vector_index ~loc ~index_kind ~idx:(Lvar idx_id) ~stride part
   in
-  let store_high =
-    L.Lprim (store ~index_kind false, [Lvar arr_id; idx_high; value_high], loc)
-  in
-  let stores = L.Lsequence (store_low, store_high) in
   let stores =
-    (* If this is a checked store, we do a checked load of the upper half before
-       writing the lower half. The result of the load is unused, so the load is
+    List.mapi
+      (fun part field ->
+        L.Lprim
+          (store ~index_kind part, [Lvar arr_id; part_idx part; field], loc))
+      fields
+  in
+  let stores =
+    match List.rev stores with
+    | [] -> L.lambda_unit
+    | last :: rest ->
+      List.fold_left (fun body store -> L.Lsequence (store, body)) last rest
+  in
+  let stores =
+    (* If this is a checked store, we do a checked load of the last part before
+       writing the first part. The result of the load is unused, so the load is
        eliminated, but the bounds check remains. *)
-    match check_high with
+    match check_last with
     | None -> stores
     | Some load ->
+      let last = vec128s_per_vector size - 1 in
       L.Llet
         ( Strict,
           Punboxed_vector Unboxed_vec128,
-          Ident.create_local "check_high",
-          Lambda.debug_uid_none,
-          Lprim (load ~index_kind, [Lvar arr_id; idx_high], loc),
+          Ident.create_local "check_last",
+          duid,
+          Lprim (load ~index_kind, [Lvar arr_id; part_idx last], loc),
           stores )
   in
   Transformed
@@ -1054,36 +1118,40 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride
        ( Strict,
          value_layout,
          value_id,
-         value_duid,
+         duid,
          value,
          Llet
            ( Strict,
              Pvalue L.generic_value,
              arr_id,
-             arr_duid,
+             duid,
              arr,
              Llet
                ( Strict,
                  L.array_index_to_layout index_kind,
                  idx_id,
-                 idx_duid,
+                 duid,
                  idx,
                  stores ) ) ))
 
-let split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride
-    ~unsafe ~checked_load ~store =
-  split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride
-    ~check_high:(if unsafe then None else Some checked_load)
-    ~store:(fun ~index_kind low ->
-      store ~index_kind ~unsafe:(unsafe || not low))
+(* The checked load of the last part and the checked store of the first part
+   cover all of the parts between them, whose stores are hence unchecked. *)
+let split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~idx ~value
+    ~stride ~unsafe ~checked_load ~store =
+  split_vector_store ~loc ~index_kind ~boxed ~size ~arr ~idx ~value ~stride
+    ~check_last:(if unsafe then None else Some checked_load)
+    ~store:(fun ~index_kind part ->
+      store ~index_kind ~unsafe:(unsafe || part > 0))
 
 (* The sort whose layout is that of [sort] when [L.split_vectors] is set. *)
 let rec split_vectors_in_sort (sort : S.t) : S.t =
   match sort with
-  | Base Vec256 -> S.product [S.vec128; S.vec128]
+  | Base Vec256 -> split_vector_sort Boxed_vec256
+  | Base Vec512 -> split_vector_sort Boxed_vec512
+  | Base Mask -> S.bits64
   | Base
       ( Void | Scannable | Untagged_immediate | Float64 | Float32 | Word | Bits8
-      | Bits16 | Bits32 | Bits64 | Vec128 | Vec512 | Mask )
+      | Bits16 | Bits32 | Bits64 | Vec128 )
   | Univar _ | Genvar _ ->
     sort
   | Product sorts -> S.product (List.map split_vectors_in_sort sorts)
@@ -1091,10 +1159,10 @@ let rec split_vectors_in_sort (sort : S.t) : S.t =
 
 let rec sort_involves_split_vectors (sort : S.t) =
   match sort with
-  | Base Vec256 -> true
+  | Base (Vec256 | Vec512 | Mask) -> true
   | Base
       ( Void | Scannable | Untagged_immediate | Float64 | Float32 | Word | Bits8
-      | Bits16 | Bits32 | Bits64 | Vec128 | Vec512 | Mask )
+      | Bits16 | Bits32 | Bits64 | Vec128 )
   | Univar _ | Genvar _ ->
     false
   | Product sorts -> List.exists sort_involves_split_vectors sorts
@@ -1104,10 +1172,9 @@ let extern_repr_involves_split_vectors (repr : L.extern_repr) =
   match repr with
   | Same_as_ocaml_repr sort | Unpacked_product sort ->
     sort_involves_split_vectors sort
-  | Unboxed_vector Boxed_vec256 -> true
-  | Unboxed_vector (Boxed_vec128 | Boxed_vec512)
-  | Unboxed_mask | Unboxed_float _ | Unboxed_or_untagged_integer _ | Raw_pointer
-    ->
+  | Unboxed_vector (Boxed_vec256 | Boxed_vec512) | Unboxed_mask -> true
+  | Unboxed_vector Boxed_vec128
+  | Unboxed_float _ | Unboxed_or_untagged_integer _ | Raw_pointer ->
     false
 
 let ccall_involves_split_vectors (desc : L.external_call_description) =
@@ -1115,8 +1182,31 @@ let ccall_involves_split_vectors (desc : L.external_call_description) =
     (fun (_, repr) -> extern_repr_involves_split_vectors repr)
     (desc.prim_native_repr_res :: desc.prim_native_repr_args)
 
+let unbox_split_vector ~loc vec arg =
+  let arg_id = Ident.create_local "arg" in
+  L.Llet
+    ( Strict,
+      L.layout_tupled_vector vec,
+      arg_id,
+      Lambda.debug_uid_none,
+      boxed_vector_to_mixed ~loc vec arg,
+      make_unboxed_vector ~loc vec (boxed_vector_fields ~loc vec (Lvar arg_id))
+    )
+
+let box_split_vector ~loc ~mode vec arg =
+  let arg_id = Ident.create_local "arg" in
+  L.Llet
+    ( Strict,
+      split_vector_layout vec,
+      arg_id,
+      Lambda.debug_uid_none,
+      arg,
+      make_boxed_vector ~loc ~mode vec
+        (unboxed_vector_fields ~loc vec (Lvar arg_id)) )
+
 (* A split vector is passed to and returned from C as the unboxed product of its
-   128-bit components, that is, like a struct of 128-bit vectors. *)
+   128-bit components, that is, like a struct of 128-bit vectors. A mask is
+   passed and returned as a 64-bit integer. *)
 let split_vectors_in_ccall ~loc (desc : L.external_call_description) args =
   let split_arg (mode, (repr : L.extern_repr)) arg =
     match repr with
@@ -1124,12 +1214,13 @@ let split_vectors_in_ccall ~loc (desc : L.external_call_description) args =
       (mode, L.Same_as_ocaml_repr (split_vectors_in_sort sort)), arg
     | Unpacked_product sort ->
       (mode, L.Unpacked_product (split_vectors_in_sort sort)), arg
-    | Unboxed_vector Boxed_vec256 ->
-      ( (mode, L.Same_as_ocaml_repr (split_vectors_in_sort S.vec256)),
-        L.Lprim (Punbox_vector Boxed_vec256, [arg], loc) )
-    | Unboxed_vector (Boxed_vec128 | Boxed_vec512)
-    | Unboxed_mask | Unboxed_float _ | Unboxed_or_untagged_integer _
-    | Raw_pointer ->
+    | Unboxed_vector ((Boxed_vec256 | Boxed_vec512) as vec) ->
+      ( (mode, L.Same_as_ocaml_repr (split_vector_sort vec)),
+        L.Lprim (Punbox_vector vec, [arg], loc) )
+    | Unboxed_mask ->
+      (mode, L.Same_as_ocaml_repr S.bits64), L.Lprim (Punbox_mask, [arg], loc)
+    | Unboxed_vector Boxed_vec128
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Raw_pointer ->
       (mode, repr), arg
   in
   let native_repr_args, args =
@@ -1145,24 +1236,29 @@ let split_vectors_in_ccall ~loc (desc : L.external_call_description) args =
     in
     L.Lprim (Pccall desc, args, loc)
   in
+  let alloc_mode () =
+    Lambda.locality_mode_of_primitive_description desc
+    |> Option.value ~default:L.alloc_heap
+  in
   match desc.prim_native_repr_res with
   | mode, Same_as_ocaml_repr sort ->
     ccall (mode, L.Same_as_ocaml_repr (split_vectors_in_sort sort))
   | mode, Unpacked_product sort ->
     ccall (mode, L.Unpacked_product (split_vectors_in_sort sort))
-  | mode, Unboxed_vector Boxed_vec256 ->
-    let alloc_mode =
-      Lambda.locality_mode_of_primitive_description desc
-      |> Option.value ~default:L.alloc_heap
-    in
+  | mode, Unboxed_vector ((Boxed_vec256 | Boxed_vec512) as vec) ->
     L.Lprim
-      ( Pbox_vector (Boxed_vec256, alloc_mode),
-        [ccall (mode, L.Same_as_ocaml_repr (split_vectors_in_sort S.vec256))],
+      ( Pbox_vector (vec, alloc_mode ()),
+        [ccall (mode, L.Same_as_ocaml_repr (split_vector_sort vec))],
+        loc )
+  | mode, Unboxed_mask ->
+    L.Lprim
+      ( Pbox_mask (alloc_mode ()),
+        [ccall (mode, L.Same_as_ocaml_repr S.bits64)],
         loc )
   | ( _,
-      ( Unboxed_vector (Boxed_vec128 | Boxed_vec512)
-      | Unboxed_mask | Unboxed_float _ | Unboxed_or_untagged_integer _
-      | Raw_pointer ) ) as native_repr_res ->
+      ( Unboxed_vector Boxed_vec128
+      | Unboxed_float _ | Unboxed_or_untagged_integer _ | Raw_pointer ) ) as
+    native_repr_res ->
     ccall native_repr_res
 
 let transform_primitive0 env (prim : L.primitive) args loc =
@@ -1287,112 +1383,99 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     let name = Format.sprintf "caml_sys_const_%s" name in
     let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
     Primitive (L.Pccall desc, [L.lambda_unit], loc)
-  | ( Pstring_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
-      [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
+  | Pstring_load_vec ({ size; mode; index_kind; boxed; _ } as desc), [arr; idx]
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:1
       ~load:(fun ~index_kind _ ->
         L.Pstring_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
-  | ( Pbytes_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
-      [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
+  | Pbytes_load_vec ({ size; mode; index_kind; boxed; _ } as desc), [arr; idx]
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:1
       ~load:(fun ~index_kind _ ->
         L.Pbytes_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
-  | ( Pbigstring_load_vec
-        ({ size = Boxed_vec256; checks; mode; index_kind; boxed; _ } as desc),
+  | ( Pbigstring_load_vec ({ size; checks; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
-      ~load:(fun ~index_kind low ->
-        let checks =
-          Option.map
-            (fun (~len, ~align) ->
-              if low then ~len, ~align else ~len:(len / 2), ~align:(align / 2))
-            checks
-        in
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:1
+      ~load:(fun ~index_kind part ->
+        let checks = split_bigstring_checks ~size ~part checks in
         L.Pbigstring_load_vec
           { desc with size = Boxed_vec128; checks; index_kind; boxed = false })
-  | ( Pfloatarray_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+  | ( Pfloatarray_load_vec ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:8
       ~load:(fun ~index_kind _ ->
         L.Pfloatarray_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
-  | ( Pint_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+  | ( Pint_array_load_vec ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:8
       ~load:(fun ~index_kind _ ->
         L.Pint_array_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
   | ( Punboxed_float_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+        ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:8
       ~load:(fun ~index_kind _ ->
         L.Punboxed_float_array_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
   | ( Punboxed_float32_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+        ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:4
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:4
       ~load:(fun ~index_kind _ ->
         L.Punboxed_float32_array_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
   | ( Puntagged_int8_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+        ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:1
       ~load:(fun ~index_kind _ ->
         L.Puntagged_int8_array_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
   | ( Puntagged_int16_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+        ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:2
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:2
       ~load:(fun ~index_kind _ ->
         L.Puntagged_int16_array_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
   | ( Punboxed_int32_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+        ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:4
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:4
       ~load:(fun ~index_kind _ ->
         L.Punboxed_int32_array_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
   | ( Punboxed_int64_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+        ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:8
       ~load:(fun ~index_kind _ ->
         L.Punboxed_int64_array_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
   | ( Punboxed_nativeint_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+        ({ size; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+    when vector_is_split size ->
+    split_vector_load ~loc ~mode ~index_kind ~boxed ~size ~arr ~idx ~stride:8
       ~load:(fun ~index_kind _ ->
         L.Punboxed_nativeint_array_load_vec
           { desc with size = Boxed_vec128; index_kind; boxed = false })
-  | ( Pbytes_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed },
-      [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+  | Pbytes_set_vec { size; unsafe; index_kind; boxed }, [arr; idx; value]
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:1 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Pbytes_load_vec
@@ -1405,24 +1488,17 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Pbytes_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Pbigstring_set_vec
-        ({ size = Boxed_vec256; checks; index_kind; boxed; _ } as desc),
+  | ( Pbigstring_set_vec ({ size; checks; index_kind; boxed; _ } as desc),
       [arr; idx; value] )
-    when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:1
-      ~check_high:None ~store:(fun ~index_kind low ->
-        let checks =
-          Option.map
-            (fun (~len, ~align) ->
-              if low then ~len, ~align else ~len:(len / 2), ~align:(align / 2))
-            checks
-        in
+    when vector_is_split size ->
+    split_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx ~stride:1
+      ~check_last:None ~store:(fun ~index_kind part ->
+        let checks = split_bigstring_checks ~size ~part checks in
         L.Pbigstring_set_vec
           { desc with size = Boxed_vec128; checks; index_kind; boxed = false })
-  | ( Pfloatarray_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed },
-      [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+  | Pfloatarray_set_vec { size; unsafe; index_kind; boxed }, [arr; idx; value]
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:8 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Pfloatarray_load_vec
@@ -1435,10 +1511,9 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Pfloatarray_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Pint_array_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed },
-      [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+  | Pint_array_set_vec { size; unsafe; index_kind; boxed }, [arr; idx; value]
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:8 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Pint_array_load_vec
@@ -1451,11 +1526,10 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Pint_array_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Punboxed_float_array_set_vec
-        { size = Boxed_vec256; unsafe; index_kind; boxed },
+  | ( Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed },
       [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:8 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Punboxed_float_array_load_vec
@@ -1468,11 +1542,10 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Punboxed_float_array_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Punboxed_float32_array_set_vec
-        { size = Boxed_vec256; unsafe; index_kind; boxed },
+  | ( Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed },
       [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:4 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Punboxed_float32_array_load_vec
@@ -1485,11 +1558,10 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Punboxed_float32_array_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Puntagged_int8_array_set_vec
-        { size = Boxed_vec256; unsafe; index_kind; boxed },
+  | ( Puntagged_int8_array_set_vec { size; unsafe; index_kind; boxed },
       [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:1 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Puntagged_int8_array_load_vec
@@ -1502,11 +1574,10 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Puntagged_int8_array_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Puntagged_int16_array_set_vec
-        { size = Boxed_vec256; unsafe; index_kind; boxed },
+  | ( Puntagged_int16_array_set_vec { size; unsafe; index_kind; boxed },
       [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:2 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Puntagged_int16_array_load_vec
@@ -1519,11 +1590,10 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Puntagged_int16_array_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Punboxed_int32_array_set_vec
-        { size = Boxed_vec256; unsafe; index_kind; boxed },
+  | ( Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed },
       [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:4 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Punboxed_int32_array_load_vec
@@ -1536,11 +1606,10 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Punboxed_int32_array_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Punboxed_int64_array_set_vec
-        { size = Boxed_vec256; unsafe; index_kind; boxed },
+  | ( Punboxed_int64_array_set_vec { size; unsafe; index_kind; boxed },
       [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:8 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Punboxed_int64_array_load_vec
@@ -1553,11 +1622,10 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun ~index_kind ~unsafe ->
         L.Punboxed_int64_array_set_vec
           { size = Boxed_vec128; unsafe; index_kind; boxed = false })
-  | ( Punboxed_nativeint_array_set_vec
-        { size = Boxed_vec256; unsafe; index_kind; boxed },
+  | ( Punboxed_nativeint_array_set_vec { size; unsafe; index_kind; boxed },
       [arr; idx; value] )
-    when L.split_vectors ->
-    split_checked_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx
+    when vector_is_split size ->
+    split_checked_vector_store ~loc ~index_kind ~boxed ~size ~arr ~value ~idx
       ~stride:8 ~unsafe
       ~checked_load:(fun ~index_kind ->
         L.Punboxed_nativeint_array_load_vec
@@ -1614,43 +1682,38 @@ let transform_primitive0 env (prim : L.primitive) args loc =
              arg_duid,
              arg,
              product ))
-  | Punbox_vector Boxed_vec256, [arg] when L.split_vectors ->
-    (* vec256 -> vec256# as #(vec128# * vec128#) *)
-    let arg_id = Ident.create_local "arg" in
-    let arg_duid = Lambda.debug_uid_none in
-    let prim =
-      L.Lprim
-        ( Pmake_unboxed_product
-            [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
-          [ boxed_vec256_field ~loc 0 (Lvar arg_id);
-            boxed_vec256_field ~loc 1 (Lvar arg_id) ],
-          loc )
-    in
-    Transformed
-      (Llet
-         ( Strict,
-           L.layout_tupled_vector Boxed_vec256,
-           arg_id,
-           arg_duid,
-           boxed_vec256_to_mixed ~loc arg,
-           prim ))
-  | Pbox_vector (Boxed_vec256, mode), [arg] when L.split_vectors ->
-    (* vec256# as #(vec128# * vec128#) -> vec256 *)
-    let arg_id = Ident.create_local "arg" in
-    let arg_duid = Lambda.debug_uid_none in
-    let prim =
-      make_boxed_vec256 ~loc ~mode
-        [ unboxed_vec256_field ~loc 0 (Lvar arg_id);
-          unboxed_vec256_field ~loc 1 (Lvar arg_id) ]
-    in
-    Transformed
-      (Llet
-         ( Strict,
-           L.layout_unboxed_tupled_vector Unboxed_vec256,
-           arg_id,
-           arg_duid,
-           arg,
-           prim ))
+  | Punbox_vector vec, [arg] when vector_is_split vec ->
+    Transformed (unbox_split_vector ~loc vec arg)
+  | Pbox_vector (vec, mode), [arg] when vector_is_split vec ->
+    Transformed (box_split_vector ~loc ~mode vec arg)
+  | Punbox_mask, [arg] when L.split_vectors -> Transformed (unbox_mask ~loc arg)
+  | Pbox_mask mode, [arg] when L.split_vectors ->
+    Transformed (make_boxed_mask ~loc ~mode arg)
+  | Pstring_load_mask { unsafe; index_kind; mode; boxed }, _
+    when L.split_vectors ->
+    split_mask_load ~loc ~mode ~boxed
+      (Pstring_load_64 { unsafe; index_kind; mode; boxed = false })
+      args
+  | Pbytes_load_mask { unsafe; index_kind; mode; boxed }, _ when L.split_vectors
+    ->
+    split_mask_load ~loc ~mode ~boxed
+      (Pbytes_load_64 { unsafe; index_kind; mode; boxed = false })
+      args
+  | Pbigstring_load_mask { unsafe; index_kind; mode; boxed }, _
+    when L.split_vectors ->
+    split_mask_load ~loc ~mode ~boxed
+      (Pbigstring_load_64 { unsafe; index_kind; mode; boxed = false })
+      args
+  | Pbytes_set_mask { unsafe; index_kind; boxed }, [arr; idx; value]
+    when L.split_vectors ->
+    split_mask_store ~loc ~boxed
+      (Pbytes_set_64 { unsafe; index_kind; boxed = false })
+      ~arr ~idx ~value
+  | Pbigstring_set_mask { unsafe; index_kind; boxed }, [arr; idx; value]
+    when L.split_vectors ->
+    split_mask_store ~loc ~boxed
+      (Pbigstring_set_64 { unsafe; index_kind; boxed = false })
+      ~arr ~idx ~value
   | Pccall desc, _ when L.split_vectors && ccall_involves_split_vectors desc ->
     Transformed (split_vectors_in_ccall ~loc desc args)
   | _, _ -> Primitive (prim, args, loc)
