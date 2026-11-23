@@ -95,6 +95,29 @@
  (action
   (diff simplify_terminator_counters.output simplify_terminator_counters.output.corrected)))
 
+; The counters through the passes of the SSA pipeline.
+
+(executable
+ (name ssa_counters)
+ (modules ssa_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   ssa_counters.output.corrected
+   (run ./ssa_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps ssa_counters.output ssa_counters.output.corrected)
+ (action
+  (diff ssa_counters.output ssa_counters.output.corrected)))
+
 ; The counters of the blocks that [Cfg_merge_blocks] merges.
 
 (executable
