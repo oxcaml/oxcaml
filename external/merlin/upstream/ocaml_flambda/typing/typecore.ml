@@ -311,6 +311,8 @@ type error =
   | Wrong_expected_record_boxing of
       wrong_kind_context * record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
+  | Unboxed_label_assignment of
+      { lid : Longident.t; mutability : mutability }
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_path_bad_type of block_path_kind * block_path_bad_type_reason
@@ -1284,11 +1286,11 @@ let type_constant: Typedtree.constant -> type_expr = function
   | Const_unboxed_nativeint _ -> instance Predef.type_nativeint_u
 
 type constant_integer_result =
-  | Int8 of int
-  | Int16 of int
+  | Int8 of Numbers.Int8.t
+  | Int16 of Numbers.Int16.t
   | Int32 of int32
   | Int64 of int64
-  | Nativeint of nativeint
+  | Nativeint of Targetint.t
   | Int of int
 
 type constant_integer_error =
@@ -1308,15 +1310,17 @@ let constant_integer i ~suffix :
   | Some 's' ->
     if Language_extension.is_enabled Small_numbers then
     begin
-      try Ok (Int8 (Misc.Int_literal_converter.int8 i))
-      with Failure _ -> Error Int8_literal_overflow
+      match Misc.Int_literal_converter.int8 i with
+      | i -> Ok (Int8 (Numbers.Int8.of_int_exn i))
+      | exception Failure _ -> Error Int8_literal_overflow
     end
     else Error (Int8_literal_not_enabled)
   | Some 'S' ->
     if Language_extension.is_enabled Small_numbers then
     begin
-      try Ok (Int16 (Misc.Int_literal_converter.int16 i))
-      with Failure _ -> Error Int16_literal_overflow
+      match Misc.Int_literal_converter.int16 i with
+      | i -> Ok (Int16 (Numbers.Int16.of_int_exn i))
+      | exception Failure _ -> Error Int16_literal_overflow
     end
     else Error (Int16_literal_not_enabled)
   | Some 'l' ->
@@ -1331,7 +1335,7 @@ let constant_integer i ~suffix :
     end
   | Some 'n' ->
     begin
-      try Ok (Nativeint (Misc.Int_literal_converter.nativeint i))
+      try Ok (Nativeint (Targetint.of_string i))
       with Failure _ -> Error Nativeint_literal_overflow
     end
   | Some 'm' | None ->
@@ -1368,7 +1372,9 @@ let constant_desc
       if Language_extension.is_enabled Small_numbers
       then
         let extra_bits = Sys.int_size - 8 in
-        Ok (Const_untagged_char ((Char.code c lsl extra_bits) asr extra_bits))
+        Ok (Const_untagged_char
+              (Numbers.Int8.of_int_exn
+                 ((Char.code c lsl extra_bits) asr extra_bits)))
       else Error (Untagged_char_literal c)
   | Pconst_string (s,loc,d) -> Ok (Const_string (s,loc,d))
   | Pconst_float (f,None)-> Ok (Const_float f)
@@ -1479,7 +1485,7 @@ let src_pos loc attrs env =
 
 type 'rep record_extraction_result =
   | Record_type of Path.t * Path.t * Types.label_declaration list * 'rep
-  | Record_type_of_other_form
+  | Record_type_of_other_form of Types.label_declaration list
   | Not_a_record_type
   | Maybe_a_record_type
 
@@ -1494,9 +1500,10 @@ let extract_concrete_record (type rep) (record_form : rep record_form) env ty
   | Unboxed_product,
     Typedecl(p0, p, {type_kind=Type_record_unboxed_product (fields, repres, _)}) ->
     Record_type (p0, p, fields, repres)
-  | Legacy, Typedecl(_, _, {type_kind=Type_record_unboxed_product _})
-  | Unboxed_product, Typedecl(_, _, {type_kind=Type_record _}) ->
-    Record_type_of_other_form
+  | Legacy,
+    Typedecl(_, _, {type_kind=Type_record_unboxed_product (fields, _, _)})
+  | Unboxed_product, Typedecl(_, _, {type_kind=Type_record (fields, _, _)}) ->
+    Record_type_of_other_form fields
   | _, Has_no_typedecl | _, Typedecl(_, _, _) -> Not_a_record_type
   | _, May_have_typedecl -> Maybe_a_record_type
 
@@ -1517,7 +1524,7 @@ let extract_concrete_variant env ty =
 let extract_label_names record_form env ty =
   match extract_concrete_record record_form env ty with
   | Record_type (_, _,fields, _) -> List.map (fun l -> l.Types.ld_id) fields
-  | Record_type_of_other_form | Not_a_record_type | Maybe_a_record_type ->
+  | Record_type_of_other_form _ | Not_a_record_type | Maybe_a_record_type ->
     assert false
 
 let has_poly_constraint spat =
@@ -3880,7 +3887,7 @@ and type_pat_aux
         | Record_type(p0, p, _, _) ->
             let ty = generic_instance expected_ty in
             Some (p0, p, is_principal expected_ty), ty
-        | Record_type_of_other_form ->
+        | Record_type_of_other_form _ ->
           let error =
             Wrong_expected_record_boxing(Pattern, P record_form, expected_ty) in
           Error.log_and_raise loc !!penv error
@@ -4115,7 +4122,9 @@ and type_pat_aux
           ~make:(fun loc i -> Const.char ~loc (Char.chr i))
       | Const_untagged_char c1, Const_untagged_char c2 ->
         (* Intervals are specified by character code, as for [char]. *)
-        expand_interval (c1 land 0xff) (c2 land 0xff)
+        expand_interval
+          (Numbers.Int8.to_int c1 land 0xff)
+          (Numbers.Int8.to_int c2 land 0xff)
           ~make:(fun loc i -> Const.untagged_char ~loc (Char.chr i))
       | _ ->
         Error.log_and_raise loc !!penv Invalid_interval
@@ -7387,7 +7396,7 @@ and type_expect_
           match extract_concrete_record record_form env ty with
           | Record_type (p0, p, _, _) ->
               Some (p0, p, is_principal ty)
-          | Record_type_of_other_form ->
+          | Record_type_of_other_form _ ->
               Error.log_and_raise loc env other_form_error
           | Maybe_a_record_type -> None
           | Not_a_record_type ->
@@ -8469,7 +8478,7 @@ and type_expect_
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
       let (record, _, rmode, label, expected_type, ambiguity) =
-        type_label_access Legacy env srecord Env.Mutation lid in
+        type_label_access Legacy loc env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
         then
@@ -10640,9 +10649,9 @@ and type_function
      }
 
 and type_label_access
-  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
+  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ -> _ ->
     _ * _ * _ * 'rep gen_label_description * _ * _
-  = fun record_form env srecord usage lid ->
+  = fun record_form loc env srecord usage lid ->
   let mode = With_regionality.newvar (get_current_level ()) in
   let record_jkind, record_sort =
     Jkind.of_new_sort_var ~why:Record_projection
@@ -10661,9 +10670,22 @@ and type_label_access
     | Record_type(p0, p, _, _) ->
         Some(p0, p, is_principal ty_exp)
     | Maybe_a_record_type -> None
-    | Record_type_of_other_form ->
-        let error = Expr_record_type_has_wrong_boxing (P record_form, ty_exp) in
-        Error.log_and_raise record.exp_loc env error
+    | Record_type_of_other_form fields ->
+        let name = Longident.last lid.txt in
+        let field =
+          List.find_opt (fun ld -> Ident.name ld.Types.ld_id = name) fields
+        in
+        let error_loc, error =
+          match P record_form, usage, field with
+          | P Legacy, Env.Mutation, Some { ld_mutable; _ } ->
+              loc,
+              Unboxed_label_assignment
+                { lid = lid.txt; mutability = ld_mutable }
+          | _ ->
+              record.exp_loc,
+              Expr_record_type_has_wrong_boxing (P record_form, ty_exp)
+        in
+        Error.log_and_raise error_loc env error
     | Not_a_record_type ->
         let error = Expr_not_a_record_type (P record_form, ty_exp) in
         Error.log_and_raise record.exp_loc env error
@@ -10718,7 +10740,7 @@ and solve_Pexp_field
     _ * _ * _ * 'rep gen_label_description * _ * _ * 'rep =
   fun ~label_usage loc env sexp srecord record_form lid ->
   let (record, record_sort, rmode, label, _expected_type, ambiguity) =
-    type_label_access record_form env srecord label_usage lid
+    type_label_access record_form loc env srecord label_usage lid
   in
   let ty_arg, record_repres =
     with_local_level_generalize_structure_if_principal
@@ -14530,6 +14552,18 @@ let report_error ~loc env =
          which is %s record rather than %s one."
         (Style.as_inline_code Printtyp.type_expr) ty
         actual expected
+  | Unboxed_label_assignment { lid; mutability = Mutable _ } ->
+      Location.errorf ~loc
+        "The unboxed record field %a is declared mutable,@ \
+         but fields of unboxed records can't be mutated."
+        quoted_longident lid
+  | Unboxed_label_assignment { lid; mutability = Immutable } ->
+      Location.errorf ~loc
+        ~sub:[ Location.msg
+                 "@{<hint>Hint@}: Only mutable fields of boxed records can be \
+                  mutated." ]
+        "The unboxed record field %a is not mutable"
+        quoted_longident lid
   | Invalid_unboxed_access { prev_el_type; ua } ->
       begin match ua with
       | Uaccess_unboxed_field { txt = lid; _ } ->

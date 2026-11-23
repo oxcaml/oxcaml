@@ -47,6 +47,14 @@ external buf_reset : (int[@untagged]) -> (int[@untagged])
 external buf_eq : (int[@untagged]) -> (int[@untagged]) = "" "test_buf_eq"
 [@@noalloc]
 
+external cpu_has_avx512_bf16 : (int[@untagged]) -> (int[@untagged])
+  = "" "test_has_avx512_bf16"
+[@@noalloc]
+
+(* Tests of extensions beyond those checked by [avx512_available.exe] are
+   skipped on hosts without them. *)
+let has_avx512_bf16 = cpu_has_avx512_bf16 0 <> 0
+
 (* Each test is its own function: a module initializer containing all of them
    is too large for the register allocators. *)
 let[@inline never] test name f = f name

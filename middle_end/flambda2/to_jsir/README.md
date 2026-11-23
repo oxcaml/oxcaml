@@ -8,33 +8,80 @@ the compiler by [jsoo_imports/dune](jsoo_imports/dune)). This translation enable
 The pass is the code generator of `ocamlopt -target js_of_ocaml` and `ocamlopt -target wasm_of_ocaml` (see [`Jscomp`](../../../optcomp/jscomp.mli)), which work like regular `ocamlopt`:
 
 ```
-ocamlopt -target js_of_ocaml -c foo.ml                           # foo.cmi foo.cmjx foo.cmjo
-ocamlopt -target js_of_ocaml -a -o lib.cmjxa foo.cmjx stubs.js   # lib.cmjxa lib.cmja
-ocamlopt -target js_of_ocaml -o prog.js lib.cmjxa main.cmjx      # or a.out.js without -o
+ocamlopt -target js_of_ocaml -c foo.ml                               # foo.cmi foo.cmx-js foo.cmo-js
+ocamlopt -target js_of_ocaml -a -o lib.cmxa-js foo.cmx-js stubs.js   # lib.cmxa-js lib.cma-js
+ocamlopt -target js_of_ocaml -o prog.js lib.cmxa-js main.cmx-js      # or a.out.js without -o
 
-ocamlopt -target wasm_of_ocaml -c foo.ml                          # foo.cmi foo.cmwx foo.cmwo
-ocamlopt -target wasm_of_ocaml -a -o lib.cmwxa foo.cmwx stubs.wat  # lib.cmwxa lib.cmwa
-ocamlopt -target wasm_of_ocaml -o prog.js lib.cmwxa main.cmwx     # prog.js prog.assets/
+ocamlopt -target wasm_of_ocaml -c foo.ml                                    # foo.cmi foo.cmx-wasm foo.cmo-wasm
+ocamlopt -target wasm_of_ocaml -a -o lib.cmxa-wasm foo.cmx-wasm stubs.wat   # lib.cmxa-wasm lib.cma-wasm
+ocamlopt -target wasm_of_ocaml -o prog.js lib.cmxa-wasm main.cmx-wasm       # prog.js prog.assets/
+```
+
+This compiles each unit to JavaScript (WebAssembly) separately, which is the fastest way to build. With `-link-jsir`, the JSIR of the units is linked into one program first, which `js_of_ocaml` optimises as a whole and compiles to a smaller executable (see [JSIR linking](#jsir-linking)):
+
+```
+ocamlopt -target js_of_ocaml -link-jsir -c foo.ml                              # foo.cmi foo.cmx-js foo.cm-jsir-js
+ocamlopt -target js_of_ocaml -link-jsir -a -o lib.cmxa-js foo.cmx-js stubs.js  # lib.cmxa-js lib.cma-jsir-js
+ocamlopt -target js_of_ocaml -link-jsir -o prog.js lib.cmxa-js main.cmx-js     # prog.js
 ```
 
 | Native | js_of_ocaml | wasm_of_ocaml | Contents |
 |--------|-------------|---------------|----------|
-| `.cmx` / `.cmxa` | `.cmjx` / `.cmjxa` | `.cmwx` / `.cmwxa` | Flambda 2 export information |
-| `.o` / `.a` | `.cmjo` / `.cmja` | `.cmwo` / `.cmwa` | JavaScript or WebAssembly, produced by `compile` / `link -a` |
-| `.s` | `.cmj` | `.cmw` | The JSIR of a unit, marshaled (the same format, recording the target); deleted unless `-S` is given |
-| startup file | `<exe>.runtime.js` | `<exe>.runtime.wasma` | The output of `build-runtime`; deleted unless `-dstartup` is given |
-| C stubs | `.js` stubs | `.js`, `.wat`, `.wast` and `.wasm` stubs | Recorded in library files and passed to `build-runtime` when linking |
-| executable | `prog.js` | `prog.js` and `prog.assets/` | The output of `link`; the directory holds the WebAssembly code that `prog.js` loads |
+| `.cmx` / `.cmxa` | `.cmx-js` / `.cmxa-js` | `.cmx-wasm` / `.cmxa-wasm` | Flambda 2 export information |
+| `.o` / `.a` | `.cmo-js` / `.cma-js` | `.cmo-wasm` / `.cma-wasm` | JavaScript or WebAssembly, produced by `compile` / `link -a` |
+| `.s` | `.cm-jsir-js` | `.cm-jsir-wasm` | The JSIR of a unit, marshaled (the same format, recording the target); deleted unless `-S` is given. With `-link-jsir`, this is the object file of a unit instead of `.cmo-js` (`.cmo-wasm`), and `<exe>.cm-jsir-js` (`<exe>.cm-jsir-wasm`) is the JSIR of the linked program, deleted unless `-S` is given |
+| | `.cma-jsir-js` | `.cma-jsir-wasm` | The JSIR of the units of a library (a marshaled list), which `-link-jsir` produces and reads instead of `.cma-js` (`.cma-wasm`) |
+| startup file | `<exe>.runtime.js` | `<exe>.runtime.wasma` | The output of `build-runtime`; deleted unless `-dstartup` is given. Not produced with `-link-jsir` |
+| C stubs | `.js` stubs | `.js`, `.wat`, `.wast` and `.wasm` stubs | Recorded in library files and passed to `build-runtime` when linking (to `compile` with `-link-jsir`) |
+| executable | `prog.js` | `prog.js` and `prog.assets/` | The output of `link` (of `compile` with `-link-jsir`); the directory holds the WebAssembly code that `prog.js` loads |
 
 The compiler runs the `js_of_ocaml` (`wasm_of_ocaml`) executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` (`OXCAML_WASM_OF_OCAML`) environment variable is populated.
 Every `wasm_of_ocaml` command is given `--enable=portable-int`, as we use 63-bit integers.
-We can print JSIR with `-djsir`, `-g` makes `js_of_ocaml` keep debug information, and `-verbose` shows the `js_of_ocaml` commands.
+We can print JSIR with `-djsir`, and `-verbose` shows the `js_of_ocaml` commands.
 C sources and objects and `-ccopt`/`-cclib` are ignored (with a warning under `-verbose`).
 
 `-jsoo-effects` selects the implementation of effect handlers, passed as `--effects` to `compile` and `build-runtime`: `disabled`, `cps` or `double-translation` (the default) for `js_of_ocaml`, and `disabled`, `cps`, `jspi` (the default) or `native` for `wasm_of_ocaml`.
 Only `jspi` (and `disabled`, which uses the same runtime) has a precompiled `wasm_of_ocaml` runtime for 63-bit integers; with `cps` or `native`, `build-runtime` compiles the runtime from its sources every time an executable is linked, which is slow.
 
-Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. They apply to the same `wasm_of_ocaml` commands. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc., and also `target=` and `jsoo-effects=`.
+Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. They apply to the same `wasm_of_ocaml` commands. With `-link-jsir`, the only command is the `compile` of the whole program, so only `-jsoo-opt` and `-jsoo-opt-compile` have an effect. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc., and also `target=` and `jsoo-effects=`.
+
+## Debug information
+With `-g`, the JSIR of a unit carries the debug information that `js_of_ocaml` otherwise reads from bytecode:
+- debug events (source locations), at the start of functions, before calls (and after those that are not tail calls), before raises, and before the registration of closure symbols;
+- the names of the variables and functions of the source, which JSIR files record as `var_names` in [`Code.jsir_file`](../../../external/js_of_ocaml/compiler/lib/code.mli), and which the JSIR linker keeps.
+
+The debug location of code inlined by Flambda 2 is the one it had in the function it comes from.
+With `-jsir-inlined-frames`, we additionally record the call sites that the function was inlined through, as a single string.
+For example, we might record `list.ml<-foo.ml:12:4<-bar.ml:40:2` for code of `list.ml` inlined at line 12, column 4 of `foo.ml`, itself inlined at line 40 of `bar.ml`.
+This is a convention specific to JSIR, and as such normal debuggers will not be able to find such source files.
+
+`-g` does not change the `js_of_ocaml` commands: what `js_of_ocaml` does with this information is chosen with `-jsoo-opt`, for example `--source-map`, `--pretty`, or `--debuginfo` (which puts the locations in comments in the generated JavaScript).
+
+For source maps, pass `-jsoo-opt --source-map-inline`.
+`--source-map` (a separate `.map` file) only works for the link of an executable, as `js_of_ocaml link` ignores source maps that are not inline in the files it is given. To get the source map of an executable in a separate file:
+
+```
+-jsoo-opt-compile --source-map-inline -jsoo-opt-archive --source-map-inline -jsoo-opt-runtime --source-map-inline -jsoo-opt-link --source-map
+```
+
+With `-link-jsir`, pass `-jsoo-opt-compile --source-map` when linking the executable instead.
+
+## JSIR linking
+By default, `js_of_ocaml compile` runs on each unit when it is compiled, and `js_of_ocaml link` links the results: units can be compiled in parallel and are only recompiled when they change, but `js_of_ocaml` cannot optimise across units, and symbols of other units are looked up at runtime.
+
+`-link-jsir` trades link time for faster and smaller code, as `js_of_ocaml` does for bytecode executables: the executable only has the primitives of the runtime and of the stubs that the program uses, instead of all of them. It must be given consistently:
+- when compiling a unit (`-c`), `js_of_ocaml` is not run: the object file is the JSIR of the unit (`.cm-jsir-js`, `.cm-jsir-wasm`);
+- when creating a library (`-a`), the JSIR of its units is put in a `.cma-jsir-js` (`.cma-jsir-wasm`) file;
+- when linking an executable, the JSIR of all its units is linked into the JSIR of one program by [`Jsir_linker`](jsir_linker.mli), which the compiler passes to `js_of_ocaml compile` with the stubs (`-jsoo-opt-compile` and `-jsoo-effects` now apply to this command). The JSIR file records that it is a whole program, which `js_of_ocaml` compiles to the executable as it does a bytecode executable: `build-runtime` and `link` are not run.
+
+The units are linked in initialisation order, as determined by the compiler's linker (`Optlink`) from the `.cmx-js` and `.cmxa-js` files, so each unit comes after the units it imports.
+The JSIR linker renumbers the variables and block addresses of each unit so that they are disjoint, and replaces the `Stop`s of the toplevel code of each unit (reachable from its entry block without entering closures) with a branch to the entry block of the next unit.
+
+The JSIR of a unit refers to the symbols of other units through the runtime's symbol table: a unit binds `caml_get_symbol` (or `caml_get_global`, for a module block) to a fresh variable at the start of its entry block, and registers its own symbols with `caml_register_symbol` (`caml_register_global` for its module block) where they are defined.
+JSIR files record these variables (`symbol_imports` and `symbol_exports` in [`Code.jsir_file`](../../../external/js_of_ocaml/compiler/lib/code.mli)), and the linker substitutes the importing unit's variable with the exporting unit's, deleting the `caml_get_symbol` binding.
+The `caml_register_global` calls are deleted too unless `-linkall` is given (as `js_of_ocaml` does for bytecode executables), so that `js_of_ocaml` can remove the fields of module blocks that are not used.
+
+A unit whose toplevel code never exits normally (it always raises) makes the units after it unreachable, and the linker leaves them out.
 
 ## Number representations
 The JSIR produced for `-target js_of_ocaml` and `-target wasm_of_ocaml` differs in a few places, chosen by [`To_jsir_target`](to_jsir_target.mli).
@@ -78,6 +125,7 @@ as `js_of_ocaml link` fails otherwise.
 The backend can be chosen with `-jsoo-effects {disabled|cps|double-translation}` (`jsoo-effects=` in `OCAMLPARAM`), which the compiler passes to `js_of_ocaml compile` and `js_of_ocaml build-runtime`.
 The default is `double-translation`, which is what the installed standard library is built with. Selecting another effects backend thus requires a standard
 library built with the same backend.
+This does not apply with `-link-jsir`: the JSIR of a unit does not depend on the effects backend, which is only chosen when linking, so the installed standard library can be used with any of them.
 With `-jsoo-effects disabled`, performing an effect or installing a handler fails at runtime with `Failure "Effect handlers are not supported"`.
 
 ## Known limitations

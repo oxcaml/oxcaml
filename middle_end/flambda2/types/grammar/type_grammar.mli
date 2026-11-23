@@ -437,6 +437,8 @@ val create_variant :
   is_unique:bool ->
   immediates:t Or_unknown.t ->
   blocks:row_like_for_blocks Or_unknown.t ->
+  is_int:Variable.t option ->
+  get_tag:Variable.t option ->
   extensions:variant_extensions ->
   t
 
@@ -823,6 +825,8 @@ module Head_of_kind_value : sig
     is_unique:bool ->
     blocks:Row_like_for_blocks.t Or_unknown.t ->
     immediates:flambda_type Or_unknown.t ->
+    is_int:Variable.t option ->
+    get_tag:Variable.t option ->
     extensions:variant_extensions ->
     t
 

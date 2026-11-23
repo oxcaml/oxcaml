@@ -31,28 +31,26 @@ module Uid = Shape.Uid
 type constant =
     Const_int of int
   | Const_char of char
-  | Const_untagged_char of int
-    (* The payload is between -128 and 127, inclusive. [int] is used
-       instead of [char] since untagged chars have layout
-       [bits8], which are expected to be sign-extended, and [char] is
-       zero-extended. *)
+  | Const_untagged_char of Numbers.Int8.t
+    (** [Int8.t] is used instead of [char] since untagged chars have layout
+        [bits8], which are expected to be sign-extended, and [char] is
+        zero-extended. *)
   | Const_string of string * Location.t * string option
   | Const_float of string
   | Const_float32 of string
   | Const_unboxed_float of string
   | Const_unboxed_float32 of string
-  | Const_int8 of int
-  | Const_int16 of int
+  | Const_int8 of Numbers.Int8.t
+  | Const_int16 of Numbers.Int16.t
   | Const_int32 of int32
   | Const_int64 of int64
-  (* CR mshinwell: This should use [Targetint.t] not [nativeint] *)
-  | Const_nativeint of nativeint
+  | Const_nativeint of Targetint.t
   | Const_untagged_int of int
-  | Const_untagged_int8 of int
-  | Const_untagged_int16 of int
+  | Const_untagged_int8 of Numbers.Int8.t
+  | Const_untagged_int16 of Numbers.Int16.t
   | Const_unboxed_int32 of int32
   | Const_unboxed_int64 of int64
-  | Const_unboxed_nativeint of nativeint
+  | Const_unboxed_nativeint of Targetint.t
 
 (* Value expressions for the core language *)
 

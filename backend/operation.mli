@@ -180,6 +180,11 @@ type t =
   | Thread_self_id
   | Poll
   | Pause
+  | Trace_pc_guard_gate
+      (** Load of the coverage gate, see [Cfg_trace_pc_guard]. *)
+  | Trace_pc_guard of int
+      (** Call to the coverage callback for the probe with the given index,
+          preserving all registers. *)
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;

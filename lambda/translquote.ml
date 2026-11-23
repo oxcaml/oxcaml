@@ -464,15 +464,15 @@ module Constant : sig
 
   val float32 : Debuginfo.Scoped_location.t -> string -> t'
 
-  val int8 : Debuginfo.Scoped_location.t -> int -> t'
+  val int8 : Debuginfo.Scoped_location.t -> Numbers.Int8.t -> t'
 
-  val int16 : Debuginfo.Scoped_location.t -> int -> t'
+  val int16 : Debuginfo.Scoped_location.t -> Numbers.Int16.t -> t'
 
   val int32 : Debuginfo.Scoped_location.t -> int32 -> t'
 
   val int64 : Debuginfo.Scoped_location.t -> int64 -> t'
 
-  val nativeint : Debuginfo.Scoped_location.t -> nativeint -> t'
+  val nativeint : Debuginfo.Scoped_location.t -> Targetint.t -> t'
 
   val unboxed_float : Debuginfo.Scoped_location.t -> string -> t'
 
@@ -482,15 +482,15 @@ module Constant : sig
 
   val unboxed_int64 : Debuginfo.Scoped_location.t -> int64 -> t'
 
-  val unboxed_nativeint : Debuginfo.Scoped_location.t -> nativeint -> t'
+  val unboxed_nativeint : Debuginfo.Scoped_location.t -> Targetint.t -> t'
 
-  val untagged_char : Debuginfo.Scoped_location.t -> int -> t'
+  val untagged_char : Debuginfo.Scoped_location.t -> Numbers.Int8.t -> t'
 
   val untagged_int : Debuginfo.Scoped_location.t -> int -> t'
 
-  val untagged_int8 : Debuginfo.Scoped_location.t -> int -> t'
+  val untagged_int8 : Debuginfo.Scoped_location.t -> Numbers.Int8.t -> t'
 
-  val untagged_int16 : Debuginfo.Scoped_location.t -> int -> t'
+  val untagged_int16 : Debuginfo.Scoped_location.t -> Numbers.Int16.t -> t'
 end = struct
   type s = lambda
 
@@ -520,10 +520,12 @@ end = struct
       (Lconst (Const_base (Const_string (x, to_location loc, None))))
 
   let int8 loc x =
-    apply1 "Constant" "int8" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "int8" loc
+      (Lconst (Const_base (Const_int (Numbers.Int8.to_int x))))
 
   let int16 loc x =
-    apply1 "Constant" "int16" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "int16" loc
+      (Lconst (Const_base (Const_int (Numbers.Int16.to_int x))))
 
   let int32 loc x =
     apply1 "Constant" "int32" loc (Lconst (Const_base (Const_int32 x)))
@@ -553,16 +555,19 @@ end = struct
       (Lconst (Const_base (Const_nativeint x)))
 
   let untagged_char loc x =
-    apply1 "Constant" "untagged_char" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "untagged_char" loc
+      (Lconst (Const_base (Const_int (Numbers.Int8.to_int x))))
 
   let untagged_int loc x =
     apply1 "Constant" "untagged_int" loc (Lconst (Const_base (Const_int x)))
 
   let untagged_int8 loc x =
-    apply1 "Constant" "untagged_int8" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "untagged_int8" loc
+      (Lconst (Const_base (Const_int (Numbers.Int8.to_int x))))
 
   let untagged_int16 loc x =
-    apply1 "Constant" "untagged_int16" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "untagged_int16" loc
+      (Lconst (Const_base (Const_int (Numbers.Int16.to_int x))))
 end
 
 module Modes : sig

@@ -45,24 +45,26 @@ type task =
 exception Is_static of Result.t
 
 let combine ~drop_skip tasks =
-  let dropped = ref false in
+  let dropped = ref None in
   match
     tasks |> List.filter_map (function
-      | Static ({ status = (Fail | Predicate false); _ } as r) ->
+      | Static ({ status = Fail; _ } as r) ->
          raise (Is_static r)
       | Static { status = Pass; _ }
       | Static { status = Predicate true; reason = None } ->
          None
       | Static { status = Predicate true; reason = Some txt } ->
          Some [Predicate_pass txt]
-      | Static ({ status = Skip; _ } as r) ->
-         if drop_skip then (dropped := true; None)
-         else raise (Is_static r)
+      | Static ({ status = (Skip | Predicate false); _ } as r) ->
+         if drop_skip then begin
+           if Option.is_none !dropped then dropped := Some r;
+           None
+         end else raise (Is_static r)
       | Task tasks ->
          Some tasks)
   with
   | exception (Is_static r) -> Static r
-  | [] -> Static (if !dropped then Result.skip else Result.pass)
+  | [] -> Static (Option.value !dropped ~default:Result.pass)
   | tasks -> Task (List.concat tasks)
 
 let seq tasks = combine ~drop_skip:false tasks

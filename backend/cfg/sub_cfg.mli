@@ -116,13 +116,56 @@ val join :
 val join_tail : from:t list -> to_:t -> unit
 
 val update_exit_terminator :
-  ?arg:Reg.t array ->
   t ->
   Cfg.terminator ->
+  arg:Reg.t array ->
+  dbg:Debuginfo.t ->
   phantom_available_before:Backend_var.Set.t option ->
   unit
 
 val start_label : t -> Label.t
+
+(* CR-someday mshinwell: the two functions below could mostly be removed if
+   instructions had an accurate debuginfo from earlier on. Those they give a
+   debuginfo to fall into four groups:
+
+   - Constants and variables forming a whole arm ([then "big"], [| None -> y]).
+   [Lconst] and [Lvar] have no location in Lambda, so the [Apply_cont] of the
+   arm has none, and To_cmm falls back to the location of the switch. With a
+   location from Lambda, To_cmm would pass it to the constant, which keeps its
+   debuginfo through selection. The arm would then also be located at its body
+   rather than at the condition.
+
+   - The moves and the jump or return implementing an [Apply_cont]. They have no
+   Cmm term to take a debuginfo from: [Cexit] has no debuginfo, and a return is
+   an expression in tail position. With a debuginfo on [Cexit], and an explicit
+   return, selection could use it directly, and the debuginfos of the arms of
+   [Cifthenelse] and [Cswitch] would not be needed for code from To_cmm.
+
+   - Symbols. To_cmm deliberately gives them no debuginfo: that of their context
+   moved the first located instruction of some functions into an inlined frame,
+   which changes where a breakpoint on the function stops. They need the same
+   treatment as constants, once that problem is solved.
+
+   - The moves joining arms in value position. These only arise for
+   [Cifthenelse] built by [Cmm_helpers], and would still need the debuginfo of
+   the arm, or a debuginfo on the join. *)
+
+(** [set_block_entry_debuginfo block dbg] gives the debuginfo [dbg] to the
+    instructions at the start of [block] (terminator included), stopping at the
+    first one that already has a debuginfo. Instructions after that one are left
+    alone: in the line number table they take the location of what precedes them
+    in the block. Only moves, constants, trap instructions, and terminators
+    transferring control within the function or returning from it are given
+    [dbg]: for other instructions a debuginfo is more than a code location. Does
+    nothing if [dbg] is [Debuginfo.none]. *)
+val set_block_entry_debuginfo : Cfg.basic_block -> Debuginfo.t -> unit
+
+(** Like [set_block_entry_debuginfo], on the first non-empty block of [t]. This
+    is used for the arms of [Cmm.Cifthenelse] and [Cmm.Cswitch], whose debuginfo
+    is the location of the entry to the arm. It must be called before [t] is
+    passed to [join] or [join_tail]. *)
+val set_entry_debuginfo : t -> Debuginfo.t -> unit
 
 val mark_as_trap_handler : t -> unit
 

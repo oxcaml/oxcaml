@@ -1302,6 +1302,9 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Specific op -> specific t i op
   | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
   | Pause -> call_llvm_intrinsic_no_res t "x86.sse2.pause" []
+  | Trace_pc_guard_gate | Trace_pc_guard _ ->
+    Misc.fatal_error
+      "Llvmize: -gated-trace-pc-guard is not supported with -llvm-backend"
   | Dls_get ->
     let dls_state_ptr = load_domainstate_addr t Domain_dls_state in
     let dls_state = emit_ins t (I.load ~ptr:dls_state_ptr ~typ:T.i64) in

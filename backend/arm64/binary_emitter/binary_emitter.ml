@@ -121,11 +121,12 @@ let compute_label_offsets emitter ~all_sections =
         All_section_states.add_direct_assignment all_sections name expr
       (* Directives that don't define labels or symbols *)
       | Align _ | Bytes _ | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _
-      | Cfi_endproc | Cfi_offset _ | Cfi_startproc | Cfi_remember_state
-      | Cfi_restore_state | Cfi_def_cfa_register _ | Comment _ | Const _
-      | File _ | Indirect_symbol _ | Loc _ | New_line | Private_extern _
-      | Section _ | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _
-      | Protected _ | Hidden _ | External _ | Reloc _ | Delta_uleb128 _ ->
+      | Cfi_endproc | Cfi_offset _ | Cfi_rel_offset _ | Cfi_startproc
+      | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _
+      | Comment _ | Const _ | File _ | Indirect_symbol _ | Loc _ | New_line
+      | Private_extern _ | Section _ | Size _ | Sleb128 _ | Space _ | Type _
+      | Uleb128 _ | Protected _ | Hidden _ | External _ | Reloc _
+      | Delta_uleb128 _ ->
         ())
 
 (* Second pass: emit machine code and data *)

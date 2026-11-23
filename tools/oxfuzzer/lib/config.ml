@@ -20,6 +20,8 @@ let max_array_axis_size = 10
 
 let max_array_elements = 256
 
+let max_string_length = 64
+
 let max_record_types = 3
 
 let max_record_fields = 4
@@ -67,6 +69,8 @@ let mutable_field_probability = 5_000
 let array_probability = 2_500
 
 let bool_probability = 2_000
+
+let string_probability = 2_000
 
 let array_literal_probability = 5_000
 

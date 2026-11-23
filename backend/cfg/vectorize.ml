@@ -318,6 +318,8 @@ end = struct
     | Probe_is_enabled _, _
     | Opaque, _
     | Pause, _
+    | Trace_pc_guard_gate, _
+    | Trace_pc_guard _, _
     | Begin_region, _
     | End_region, _
     | Specific _, _
@@ -816,7 +818,8 @@ end = struct
                         | Icomp _ ),
                         _ )
                   | Opaque | Begin_region | End_region | Dls_get | Tls_get
-                  | Domain_index | Thread_self_id | Poll | Pause | Const_int _
+                  | Domain_index | Thread_self_id | Poll | Pause
+                  | Trace_pc_guard_gate | Trace_pc_guard _ | Const_int _
                   | Const_float32 _ | Const_float _ | Const_symbol _
                   | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
                   | Const_mask _ | Stackoffset _ | Load _
@@ -1053,7 +1056,8 @@ end = struct
             (* conservative, don't reorder around region begin/end. *)
             create Arbitrary
           | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
-          | Thread_self_id | Poll | Opaque | Pause | Probe_is_enabled _ ->
+          | Thread_self_id | Poll | Opaque | Pause | Trace_pc_guard_gate
+          | Trace_pc_guard _ | Probe_is_enabled _ ->
             (* conservative, don't reorder around this instruction. *)
             (* CR-someday gyorsh: Poll insertion pass is after the vectorizer.
                Currently, it inserts instruction at the end of a block, so it
@@ -2327,8 +2331,9 @@ end = struct
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
         | Const_mask _ | Stackoffset _ | Intop _ | Int128op _ | Intop_imm _
         | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-        | Pause | Begin_region | End_region | Name_for_debugger _ | Dls_get
-        | Tls_get | Domain_index | Thread_self_id | Poll ->
+        | Pause | Trace_pc_guard_gate | Trace_pc_guard _ | Begin_region
+        | End_region | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+        | Thread_self_id | Poll ->
           None)
 
     let from_block (block : Block.t) deps : t list =

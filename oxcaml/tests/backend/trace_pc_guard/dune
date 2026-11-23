@@ -1,0 +1,37 @@
+(foreign_library
+ (archive_name stubs)
+ (language c)
+ (names stubs)
+ (include_dirs "../../../../runtime"))
+
+(executables
+ (names trace_pc_guard)
+ (modes
+  (native exe))
+ (ocamlopt_flags
+  (:standard -gated-trace-pc-guard -dcfg-invariants -extension simd_beta))
+ (modules trace_pc_guard)
+ (foreign_archives stubs))
+
+;; The guard section relies on ELF linker-defined section bounds.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{system} "linux")))
+ (targets trace_pc_guard.out)
+ (deps trace_pc_guard.exe)
+ (action
+  (with-outputs-to
+   trace_pc_guard.out
+   (run ./trace_pc_guard.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{system} "linux")))
+ (action
+  (diff trace_pc_guard.expected trace_pc_guard.out)))

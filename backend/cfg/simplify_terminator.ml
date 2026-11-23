@@ -307,8 +307,9 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
           | Floatop (Float32, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | End_region | Specific _
-          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
-          | Domain_index | Thread_self_id )
+          | Name_for_debugger _ | Dls_get | Poll | Pause | Trace_pc_guard_gate
+          | Trace_pc_guard _ | Alloc _ | Tls_get | Domain_index | Thread_self_id
+            )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter

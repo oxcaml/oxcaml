@@ -91,7 +91,24 @@ let add_exn_handler t cont ~addr ~exn_param ~extra_args =
       Continuation.Map.add cont { addr; exn_param; extra_args } t.exn_handlers
   }
 
-let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
+(* With [-g], name JSIR variables after the user-visible Flambda variables they
+   stand for. When aliases share a JSIR variable, the first non-generated name
+   wins. *)
+let name_var fvar jvar =
+  if Flambda_features.debug () && Variable.user_visible fvar
+  then
+    let name = Variable.name fvar in
+    let generated =
+      (String.length name > 1 && Char.equal name.[0] '*')
+      || match name with "param" | "switcher" | "tag" -> true | _ -> false
+    in
+    match Jsir.Var.get_name jvar with
+    | Some _ when generated || not (Jsir.Var.generated_name jvar) -> ()
+    | Some _ | None -> Jsir.Var.set_name jvar ~generated name
+
+let add_var t fvar jvar =
+  name_var fvar jvar;
+  { t with vars = Variable.Map.add fvar jvar t.vars }
 
 let add_symbol_without_registering t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
@@ -158,7 +175,7 @@ let get_value_slot_exn t vslot = Value_slot.Map.find vslot t.value_slots
 
 let add_var_alias_of_var_exn t ~var ~alias_of =
   let jvar = get_var_exn t alias_of in
-  { t with vars = Variable.Map.add var jvar t.vars }
+  add_var t var jvar
 
 let add_symbol_alias_of_var_exn t ~res ~symbol ~alias_of =
   let jvar = get_var_exn t alias_of in
@@ -172,7 +189,7 @@ let add_var_alias_of_symbol_exn t ~res ~var ~alias_of =
         alias_of
     | Some (v, res) -> v, res
   in
-  { t with vars = Variable.Map.add var jvar t.vars }, res
+  add_var t var jvar, res
 
 let add_if_not_found map item ~mem ~add =
   if mem item map

@@ -83,6 +83,15 @@ val gdwarf_may_alter_codegen_experimental : bool ref
     implies this variable being set to [true]). *)
 val dwarf_inlined_frames : bool ref
 
+(** Set by [-gno-dwarf-inlined-frames], to tell an explicit request not to emit
+    inlined frame information from the default. *)
+val no_dwarf_inlined_frames : bool ref
+
+(** Whether to emit inlined frame information: either [dwarf_inlined_frames] is
+    set, or [-gated-trace-pc-guard] is given, whose coverage reports rely on it,
+    and [no_dwarf_inlined_frames] is not set. *)
+val emit_dwarf_inlined_frames : unit -> bool
+
 (** Setting this to [true] will print availability sets (both regular and
     phantom) when dumping CFG and Linear representations. *)
 val debug_avail_sets : bool ref
