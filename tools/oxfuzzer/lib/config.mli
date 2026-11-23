@@ -42,6 +42,22 @@ val max_unboxed_tuple_arity : int
 
 val max_unboxed_tuple_depth : int
 
+val max_closure_param_count : int
+
+val max_closure_call_count : int
+
+val max_let_rec_count : int
+
+val max_recursive_functions : int
+
+val max_recursive_param_count : int
+
+val max_recursive_calls : int
+
+val max_recursion_fuel : int
+
+val unused_recursive_functions : bool
+
 val max_probability : int
 
 (* Probabilities out of [max_probability]. *)
@@ -89,6 +105,12 @@ val raise_notrace_probability : int
 
 val callee_raises_probability : int
 
+val closure_probability : int
+
+val curried_lambda_probability : int
+
+val opaque_recursive_call_probability : int
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -121,7 +143,10 @@ module Swarm : sig
       opaque_initializers : bool;
       opaque_leaves : bool;
       opaque_loop_bounds : bool;
-      exceptions : bool
+      exceptions : bool;
+      closures : bool;
+      partial_applications : bool;
+      recursive_functions : bool
     }
 
   val create : Random.State.t -> t
