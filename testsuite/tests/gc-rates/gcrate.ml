@@ -9,65 +9,142 @@
 (* Measure the rates at which the major GC marks and sweeps, the minor GC
    promotes, and the compactor compacts.
 
-   The measurement is taken entirely from OUTSIDE the measured process:
-   a child runs the workload with runtime events enabled, and the parent
-   watches the child's event ring, accumulating phase spans and the
-   per-slice work counters.  `gcrate watch DIR PID SECONDS` attaches the
-   same watcher to any process started with OCAML_RUNTIME_EVENTS_START=1.
-   Rates are whole-run averages over the watched window.
+   The measurement is taken entirely from OUTSIDE the measured process,
+   by watching its runtime-events ring: time comes from the EV_MAJOR_MARK,
+   EV_MAJOR_SWEEP, EV_MINOR and EV_COMPACT spans, and work from the
+   EV_C_MAJOR_SLICE_*_WORK and EV_C_MINOR_* counters.  Rates are
+   whole-run averages over the watched window.
 
-   Build a live heap of mixed structure, then churn it, while consuming my own
-   runtime-events stream, accumulating time spent inside EV_MAJOR_SWEEP and
-   EV_MAJOR_MARK spans, and per-slice sweep and mark work from the
-   EV_C_MAJOR_SLICE_*_WORK counters. Finally measure
-   compaction three times: at steady state (live data, garbage-laden heap),
-   immediately again (live data, compacted heap), and after dropping the data
-   (near-empty), timing the EV_COMPACT span and its sub-phases.
+   `gcrate CMD ARG...` is a wrapper in the style of time(1): it runs CMD
+   with runtime events enabled, passes its exit status through, and
+   reports on stderr.  `gcrate --watch PID` attaches to a process already
+   running with OCAML_RUNTIME_EVENTS_START=1.
 
-   With no arguments (testsuite mode): small heap, a few seconds, terse
-   output checking the rates clear generous de-minimis thresholds.  With
-   arguments (manual mode): gcrate LIVE-GIB SECONDS [SEED] prints a full
-   report.  Steady-state major heap is roughly 2.4x LIVE-GIB at the default
-   space_overhead of 80. *)
+   `gcrate --bench LIVE-GIB` watches a built-in workload, run in a forked
+   child, which builds a live heap of mixed structure, churns it, and
+   then compacts three times: at steady state (live data, garbage-laden
+   heap), immediately again (live data, compacted heap), and after
+   dropping the data (near-empty).  The child also prints its own
+   progress and Gc statistics.
+
+   With no arguments (testsuite mode): the same workload with a small
+   heap for a few seconds, and terse output checking that the rates
+   clear generous de-minimis thresholds. *)
 
 module RE = Runtime_events
 
-let manual = Array.length Sys.argv > 1
-let watch_mode = manual && Sys.argv.(1) = "watch"
-
 let usage =
-  "usage: gcrate [LIVE-GIB [SECONDS [SEED]]]\n\
-   \n\
-   Estimates the rates at which the OCaml major GC marks and sweeps,\n\
-   the minor GC evacuates survivors,\n\
-   and the compactor compacts. Builds LIVE-GIB GiB of live\n\
-   mixed-structure heap, churns it for SECONDS seconds (default 300),\n\
-   and then compacts twice, drops the roots, and compacts one more time.\n\
-   \n\
-   With no arguments: self-test mode, as run from the testsuite - 32 MiB\n\
-   live heap, 3 s churn, terse pass/fail output against de-minimis rate\n\
-   thresholds.\n"
+  {|usage: gcrate [--] CMD [ARG...]
+       gcrate --watch PID [--dir DIR] [--seconds SECONDS]
+       gcrate --bench LIVE-GIB [--seconds SECONDS] [--seed SEED]
+       gcrate
 
-let () =
-  if manual then
-    match Sys.argv.(1) with
-    | "help" | "-help" | "--help" | "-h" ->
+Estimates the rates at which the OCaml major GC marks and sweeps,
+the minor GC evacuates survivors, and the compactor compacts, from
+the runtime events of a watched process.
+
+CMD [ARG...]
+    Run an OCaml program with runtime events enabled, like time(1):
+    the report goes to stderr and the exit status is CMD's.  Options
+    are only recognised before CMD; -- ends them explicitly.
+--watch PID
+    Attach to process PID, which must have been started with
+    OCAML_RUNTIME_EVENTS_START=1, until it exits.
+--bench LIVE-GIB
+    Run the built-in workload: build LIVE-GIB GiB of live
+    mixed-structure heap, churn it, then compact twice, drop the
+    roots, and compact once more.
+--dir DIR
+    With --watch: the directory holding PID's ring file (default
+    $OCAML_RUNTIME_EVENTS_DIR, or the current directory).
+--seconds SECONDS
+    With --watch: stop watching after SECONDS.  With --bench: churn
+    for SECONDS (default 300).
+--seed SEED
+    With --bench: random seed (default 42).
+-h, --help
+    Print this message.
+
+With no arguments: self-test, as run from the testsuite - 32 MiB live
+heap, 3 s churn, terse pass/fail output against de-minimis rate
+thresholds.
+|}
+
+let usage_error msg =
+  Printf.eprintf "gcrate: %s (try --help)\n" msg;
+  exit 2
+
+type mode =
+  | Self_test
+  | Bench
+  | Watch of int
+  | Command of string list
+
+let opt_bench = ref None
+let opt_watch = ref None
+let opt_dir = ref None
+let opt_seconds = ref None
+let opt_seed = ref None
+
+(* Options stop at the first argument which is not one, so that the
+   wrapped command keeps its own. *)
+let mode =
+  let set r conv opt v =
+    match conv v with
+    | Some x -> r := Some x
+    | None -> usage_error (Printf.sprintf "bad argument %S to %s" v opt)
+  in
+  let rec parse = function
+    | [] -> []
+    | [ "--" ] -> usage_error "no command after --"
+    | "--" :: cmd -> cmd
+    | ("-h" | "--help") :: _ ->
       print_string usage;
       exit 0
-    | _ -> ()
+    | ("--bench" as o) :: v :: rest ->
+      set opt_bench float_of_string_opt o v; parse rest
+    | ("--watch" as o) :: v :: rest ->
+      set opt_watch int_of_string_opt o v; parse rest
+    | "--dir" :: v :: rest -> opt_dir := Some v; parse rest
+    | ("--seconds" as o) :: v :: rest ->
+      set opt_seconds float_of_string_opt o v; parse rest
+    | ("--seed" as o) :: v :: rest ->
+      set opt_seed int_of_string_opt o v; parse rest
+    | [ ("--bench" | "--watch" | "--dir" | "--seconds" | "--seed") as o ] ->
+      usage_error (o ^ " needs an argument")
+    | o :: _ when String.starts_with ~prefix:"-" o ->
+      usage_error ("unknown option " ^ o)
+    | cmd -> cmd
+  in
+  let cmd = parse (List.tl (Array.to_list Sys.argv)) in
+  let mode =
+    match cmd, !opt_bench, !opt_watch with
+    | [], None, None -> Self_test
+    | [], Some _, None -> Bench
+    | [], None, Some pid -> Watch pid
+    | _ :: _, None, None -> Command cmd
+    | _ -> usage_error "give only one of CMD, --watch and --bench"
+  in
+  let only opt given ok =
+    if given && not ok then
+      usage_error (opt ^ " does not apply here")
+  in
+  let is_watch = match mode with Watch _ -> true | _ -> false in
+  only "--dir" (!opt_dir <> None) is_watch;
+  only "--seconds" (!opt_seconds <> None) (is_watch || mode = Bench);
+  only "--seed" (!opt_seed <> None) (mode = Bench);
+  mode
 
-let arg conv i default =
-  if (not watch_mode) && Array.length Sys.argv > i then
-    match conv Sys.argv.(i) with
-    | Some v -> v
-    | None ->
-      Printf.eprintf "gcrate: bad argument %S (try --help)\n" Sys.argv.(i);
-      exit 2
-  else default
+let manual = mode <> Self_test
 
-let live_gib = arg float_of_string_opt 1 0.03125 (* test mode: 32 MiB *)
-let duration = arg float_of_string_opt 2 (if manual then 300.0 else 3.0)
-let seed = arg int_of_string_opt 3 42
+(* The report shares stdout with the built-in workload, but must keep out
+   of the way of a wrapped command's output. *)
+let out = match mode with Command _ -> stderr | _ -> stdout
+
+let live_gib = Option.value !opt_bench ~default:0.03125 (* self-test: 32 MiB *)
+let duration =
+  Option.value !opt_seconds ~default:(if manual then 300.0 else 3.0)
+let seed = Option.value !opt_seed ~default:42
 
 let target_words = int_of_float (live_gib *. (1024. *. 1024. *. 1024. /. 8.))
 let slot_words = 2000
@@ -91,7 +168,8 @@ let min_promote_rate = 2e6 *. variant_factor (* promoted words / minor time *)
 let phase_total : (RE.runtime_phase, int ref * int ref) Hashtbl.t =
   Hashtbl.create 64
 
-let phase_open : (RE.runtime_phase, int) Hashtbl.t = Hashtbl.create 64
+(* Spans are tracked per ring (that is, per domain). *)
+let phase_open : (int * RE.runtime_phase, int) Hashtbl.t = Hashtbl.create 64
 
 let counter_total : (RE.runtime_counter, int ref * int ref) Hashtbl.t =
   Hashtbl.create 64
@@ -112,13 +190,14 @@ let tally tbl key v =
   incr count;
   total := !total + v
 
-let runtime_begin _ring ts phase = Hashtbl.replace phase_open phase (ns_of ts)
+let runtime_begin ring ts phase =
+  Hashtbl.replace phase_open (ring, phase) (ns_of ts)
 
-let runtime_end _ring ts phase =
-  match Hashtbl.find_opt phase_open phase with
+let runtime_end ring ts phase =
+  match Hashtbl.find_opt phase_open (ring, phase) with
   | None -> () (* span began before we started consuming *)
   | Some t0 ->
-    Hashtbl.remove phase_open phase;
+    Hashtbl.remove phase_open (ring, phase);
     tally phase_total phase (ns_of ts - t0)
 
 let runtime_counter _ring _ts counter v = tally counter_total counter v
@@ -314,7 +393,8 @@ let report_stat prefix (s : Gc.stat) =
     s.forced_major_collections
 
 let report_rate what words ns =
-  Printf.printf "%-8s %16d words in %9.3f s -> %7.1f Mwords/s (%.2f GiB/s)\n"
+  Printf.fprintf out
+    "%-8s %16d words in %9.3f s -> %7.1f Mwords/s (%.2f GiB/s)\n"
     what words (secs ns)
     (rate words ns /. 1e6)
     (rate words ns *. 8. /. (1024. *. 1024. *. 1024.))
@@ -473,37 +553,53 @@ let run_workload () =
 (* ---------------- watcher ---------------- *)
 
 (* Attach to the ring of [pid] under [dir] and poll it until
-   [still_running] turns false, then drain.
+   [still_running] turns false, then drain.  Returns false if there was
+   no ring to attach to.
 
    The target may still be creating its ring: the file can be missing, or
    present but with its metadata not yet written, which a cursor reports
    as a corrupt stream on the first poll.  Back off and reopen in both
-   cases. *)
+   cases, for as long as the target runs and a little longer. *)
 let watch_target dir pid ~still_running =
-  let rec attach tries =
-    let retry () = Unix.sleepf 0.05; attach (tries - 1) in
+  let try_attach () =
     match RE.create_cursor (Some (dir, pid)) with
-    | exception _ when tries > 0 -> retry ()
+    | exception Failure _ -> None
     | c ->
       cursor := Some c;
       match poll () with
-      | () -> c
-      | exception Failure msg
-        when tries > 0 && msg = "Runtime_events: corrupt stream" ->
+      | () -> Some c
+      | exception Failure msg when msg = "Runtime_events: corrupt stream" ->
         cursor := None;
         RE.free_cursor c;
-        retry ()
+        None
   in
-  let c = attach 100 in
-  let rec loop () =
+  let rec attach tries =
+    match try_attach () with
+    | Some _ as c -> c
+    | None when tries = 0 -> None
+    | None ->
+      Unix.sleepf 0.05;
+      attach (if still_running () then tries else tries - 1)
+  in
+  match attach 3 with
+  | None -> false
+  | Some c ->
+    let rec loop () =
+      poll ();
+      if still_running () then begin Unix.sleepf 0.02; loop () end
+    in
+    loop ();
     poll ();
-    if still_running () then begin Unix.sleepf 0.02; loop () end
-  in
-  loop ();
-  poll ();
-  poll ();
-  RE.free_cursor c;
-  cursor := None
+    poll ();
+    RE.free_cursor c;
+    cursor := None;
+    true
+
+let no_ring dir pid =
+  Printf.eprintf
+    "gcrate: no runtime-events ring for process %d in %s (not an OCaml 5 \
+     program?)\n"
+    pid dir
 
 let report_watch ~test =
   let counter_tally c =
@@ -562,14 +658,15 @@ let report_watch ~test =
       (Printf.sprintf "compact_spans=%d" compact_spans)
   end
   else begin
-    Printf.printf "\nwatched: slices=%d ephe_mark=%d ephe_sweep=%d \
-                   lost_events=%d\n"
+    Printf.fprintf out "\nwatched: slices=%d ephe_mark=%d ephe_sweep=%d \
+                        lost_events=%d\n"
       slices ephe_mark_work ephe_sweep_work !lost_total;
-    Printf.printf "work cross-check: per-phase sum %d vs work_done %d\n"
+    Printf.fprintf out
+      "work cross-check: per-phase sum %d vs work_done %d\n"
       phase_work ev_total;
     report_rate "sweep" sweep_work sweep_ns;
     report_rate "mark" mark_work mark_ns;
-    Printf.printf
+    Printf.fprintf out
       "minor: %d collections in %.3f s (mean pause %.0f us), %d words \
        allocated, %d promoted (%.1f%% survival)\n"
       minor_colls (secs minor_ns)
@@ -579,32 +676,146 @@ let report_watch ~test =
       (if minor_allocated = 0 then 0.
        else 100. *. float_of_int promoted /. float_of_int minor_allocated);
     report_rate "promotion (minor live evacuation)" promoted minor_ns;
-    Printf.printf "compaction: %d runs in %.3f s total\n"
+    Printf.fprintf out "compaction: %d runs in %.3f s total\n"
       compact_spans (secs compact_ns);
     if mark_work > 0 && mark_ns > 0 && sweep_ns > 0 then
-      Printf.printf
+      Printf.fprintf out
         "sweep/mark rate ratio: %.2f (runtime assumes \
          percent_sweep_per_mark=120, i.e. 1.20)\n"
         (rate sweep_work sweep_ns /. rate mark_work mark_ns)
   end
 
+(* ---------------- wrapper ---------------- *)
+
+(* Run [cmd] with runtime events enabled, watch it, report, and exit with
+   its status. *)
+let run_command cmd =
+  let prog = List.hd cmd in
+  (* The ring file goes in a private directory, unless the caller chose
+     one, and is kept past the command's exit so that it can be drained;
+     it is left behind only if the caller asked for that. *)
+  let dir, private_dir =
+    match Sys.getenv_opt "OCAML_RUNTIME_EVENTS_DIR" with
+    | Some dir -> (dir, false)
+    | None -> (Filename.temp_dir "gcrate" "", true)
+  in
+  let preserve = Sys.getenv_opt "OCAML_RUNTIME_EVENTS_PRESERVE" <> None in
+  let ours = String.starts_with ~prefix:"OCAML_RUNTIME_EVENTS_" in
+  let env =
+    Array.of_list
+      ("OCAML_RUNTIME_EVENTS_START=1"
+       :: "OCAML_RUNTIME_EVENTS_PRESERVE=1"
+       :: ("OCAML_RUNTIME_EVENTS_DIR=" ^ dir)
+       :: List.filter (fun v -> not (ours v))
+            (Array.to_list (Unix.environment ())))
+  in
+  let remove file =
+    try Sys.remove (Filename.concat dir file) with Sys_error _ -> ()
+  in
+  (* Rings in [dir] other than the command's own: its OCaml descendants
+     inherit the environment and so leave theirs here too. *)
+  let other_rings pid =
+    if private_dir then
+      List.filter
+        (fun f ->
+          Filename.check_suffix f ".events"
+          && f <> string_of_int pid ^ ".events")
+        (Array.to_list (Sys.readdir dir))
+    else []
+  in
+  let cleanup pid =
+    if not preserve then remove (string_of_int pid ^ ".events");
+    if private_dir then begin
+      List.iter remove (other_rings pid);
+      try Sys.rmdir dir with Sys_error _ -> ()
+    end
+  in
+  let pid =
+    try
+      Unix.create_process_env prog (Array.of_list cmd) env Unix.stdin
+        Unix.stdout Unix.stderr
+    with Unix.Unix_error (e, _, _) ->
+      Printf.eprintf "gcrate: cannot run %s: %s\n" prog (Unix.error_message e);
+      cleanup 0;
+      exit 127
+  in
+  (* Like time(1), leave terminal interrupts to the command, and report on
+     whatever it did before it stopped. *)
+  Sys.Safe.set_signal Sys.sigint Sys.Signal_ignore;
+  Sys.Safe.set_signal Sys.sigquit Sys.Signal_ignore;
+  let load0 = loadavg () in
+  let t0 = Unix.gettimeofday () in
+  let status = ref None in
+  let still_running () =
+    !status = None
+    && (match Unix.waitpid [ Unix.WNOHANG ] pid with
+        | 0, _ -> true
+        | _, st -> status := Some st; false)
+  in
+  let attached = watch_target dir pid ~still_running in
+  let status =
+    match !status with
+    | Some st -> st
+    | None -> snd (Unix.waitpid [] pid)
+  in
+  let elapsed = Unix.gettimeofday () -. t0 in
+  let others = other_rings pid in
+  cleanup pid;
+  if attached then begin
+    report_watch ~test:false;
+    Printf.fprintf out "elapsed: %.3f s\n" elapsed;
+    Printf.fprintf out "META loadavg: %s -> %s\n" load0 (loadavg ())
+  end
+  else no_ring dir pid;
+  if others <> [] then
+    Printf.eprintf
+      "gcrate: ignored %d other process(es) with runtime events, started \
+       by %s\n"
+      (List.length others) prog;
+  flush out;
+  match status with
+  | Unix.WEXITED n -> exit n
+  | Unix.WSIGNALED signal ->
+    (* Die the same way, so that our own caller sees the signal. *)
+    Sys.Safe.set_signal signal Sys.Signal_default;
+    Unix.kill (Unix.getpid ()) signal;
+    exit 255
+  | Unix.WSTOPPED _ -> exit 255
+
 (* ---------------- dispatch ---------------- *)
 
 let () =
-  if watch_mode then begin
-    (* gcrate watch DIR PID SECONDS: attach to any process started with
-       OCAML_RUNTIME_EVENTS_START=1. *)
-    let dir = Sys.argv.(2) in
-    let pid = int_of_string Sys.argv.(3) in
-    let secs = float_of_string Sys.argv.(4) in
-    let deadline = Unix.gettimeofday () +. secs in
+  match mode with
+  | Command cmd -> run_command cmd
+  | Watch pid ->
+    let dir =
+      match !opt_dir, Sys.getenv_opt "OCAML_RUNTIME_EVENTS_DIR" with
+      | Some dir, _ | None, Some dir -> dir
+      | None, None -> "."
+    in
+    let deadline =
+      match !opt_seconds with
+      | Some secs -> Unix.gettimeofday () +. secs
+      | None -> infinity
+    in
+    let alive () =
+      match Unix.kill pid 0 with
+      | () -> true
+      | exception Unix.Unix_error (Unix.EPERM, _, _) -> true
+      | exception Unix.Unix_error _ -> false
+    in
     let load0 = loadavg () in
-    watch_target dir pid
-      ~still_running:(fun () -> Unix.gettimeofday () < deadline);
+    if not
+         (watch_target dir pid
+            ~still_running:(fun () ->
+              Unix.gettimeofday () < deadline && alive ()))
+    then begin
+      no_ring dir pid;
+      exit 1
+    end;
     Printf.printf "META loadavg: %s -> %s\n" load0 (loadavg ());
     report_watch ~test:false
-  end
-  else begin
+  | Self_test | Bench ->
     let load0 = loadavg () in
     match Unix.fork () with
     | 0 ->
@@ -621,11 +832,14 @@ let () =
             | 0, _ -> true
             | _ -> finished := true; false)
       in
-      watch_target "." child ~still_running;
+      let attached = watch_target "." child ~still_running in
       if not !finished then ignore (Unix.waitpid [] child);
       (try Sys.remove (string_of_int child ^ ".events")
        with Sys_error _ -> ());
+      if not attached then begin
+        no_ring "." child;
+        exit 1
+      end;
       if manual then
         Printf.printf "META loadavg: %s -> %s\n" load0 (loadavg ());
       report_watch ~test:(not manual)
-  end
