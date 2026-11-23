@@ -47,7 +47,9 @@ val create_unknown :
   original_term:Flambda.Named.t ->
   t
 
-val create_rewritten : (body:Flambda.Expr.t -> Flambda.Expr.t) -> t
+(** See [Simplified_named.or_rewritten]. *)
+val create_rewritten :
+  temporaries:(Bound_var.t * Flambda.Named.t) list -> Flambda.Named.t -> t
 
 val is_invalid : t -> bool
 

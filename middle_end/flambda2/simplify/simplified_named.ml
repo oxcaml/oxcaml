@@ -89,7 +89,10 @@ let update_cost_metrics cost_metrics t = { t with cost_metrics }
 
 type 'a or_rewritten =
   | Simplified of 'a
-  | Rewritten of (body:Flambda.Expr.t -> Flambda.Expr.t)
+  | Rewritten of
+      { temporaries : (Bound_var.t * Named.t) list;
+        defining_expr : Named.t
+      }
 
 type binding_to_place =
   | Keep_binding of

@@ -53,7 +53,8 @@ let create_unknown dacc ~result_var kind ~original_term =
   let dacc = Downwards_acc.add_variable dacc result_var ty in
   create original_term ~try_reify:false dacc
 
-let create_rewritten f : t = Rewritten f
+let create_rewritten ~temporaries defining_expr : t =
+  Rewritten { temporaries; defining_expr }
 
 let is_invalid (t : t) =
   match t with

@@ -241,6 +241,15 @@ let define_variable t var kind =
 let define_extra_variable t var kind =
   (define_variable0 [@inlined hint]) ~extra:true t var kind
 
+let begin_extra_definitions t =
+  { t with replay_history = Replay_history.first_pass }
+
+let end_extra_definitions t ~before =
+  { t with
+    replay_history = before.replay_history;
+    defined_variables_by_scope = before.defined_variables_by_scope
+  }
+
 let create ~ppf_dump ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation

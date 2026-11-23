@@ -1027,32 +1027,26 @@ let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term dbg
         DA.add_variable dacc result_var (T.these_naked_immediates bools)
       in
       SPR.create original_term ~try_reify:false dacc
-    | Some (bool, imm) ->
+    | Some (bool, imm) -> (
       let untag = Named.create_prim (Unary (Untag_immediate, bool)) dbg in
       let constant_is_true =
         Target_ocaml_int.equal imm (Target_ocaml_int.one machine_width)
       in
-      let let_ bound named ~body =
-        Expr.create_let
-          (Let.create
-             (Bound_pattern.singleton bound)
-             named ~free_names_of_body:Unknown ~body)
-      in
-      SPR.create_rewritten (fun ~body ->
-          match op, constant_is_true with
-          | Eq, true | Neq, false -> let_ result_var untag ~body
-          | Eq, false | Neq, true ->
-            let untagged = Variable.create "untagged" K.naked_immediate in
-            let negation =
-              Named.create_prim
-                (Unary (Boolean_not Naked_bool, Simple.var untagged))
-                dbg
-            in
-            let_
-              (Bound_var.create untagged Flambda_debug_uid.none
-                 (Bound_var.name_mode result_var))
-              untag
-              ~body:(let_ result_var negation ~body)))
+      match op, constant_is_true with
+      | Eq, true | Neq, false -> SPR.create_rewritten ~temporaries:[] untag
+      | Eq, false | Neq, true ->
+        let untagged = Variable.create "untagged" K.naked_immediate in
+        let negation =
+          Named.create_prim
+            (Unary (Boolean_not Naked_bool, Simple.var untagged))
+            dbg
+        in
+        SPR.create_rewritten
+          ~temporaries:
+            [ ( Bound_var.create untagged Flambda_debug_uid.none
+                  (Bound_var.name_mode result_var),
+                untag ) ]
+          negation))
 
 let simplify_array_load (array_kind : P.Array_kind.t)
     (array_load_kind : P.Array_load_kind.t) mutability dacc ~original_term:_ dbg

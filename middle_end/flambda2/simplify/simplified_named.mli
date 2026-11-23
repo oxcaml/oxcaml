@@ -51,9 +51,27 @@ val cost_metrics : t -> Cost_metrics.t
 
 val update_cost_metrics : Cost_metrics.t -> t -> t
 
+(** The result of simplifying the defining expression of a [Let].
+
+    [Rewritten] asks for the binding [let x = e in body] that is being
+    simplified to be replaced by
+    [let t1 = e1 in ... let tn = en in let x = defining_expr in body], where
+    [temporaries] is [(t1, e1); ...; (tn, en)], and for that expression to be
+    simplified instead.
+
+    The temporaries must be fresh variables. They are defined as extra variables
+    (see [Downwards_env.begin_extra_definitions]), like the extra parameters of
+    continuations. Whether a primitive is rewritten, and into what, depends on
+    the types of its arguments, so two downwards passes on the same handler may
+    disagree on the temporaries: they cannot be part of the [Replay_history],
+    nor become parameters of the continuations lifted out of the handler, as a
+    pass that does not bind them would have no argument for them. *)
 type 'a or_rewritten =
   | Simplified of 'a
-  | Rewritten of (body:Flambda.Expr.t -> Flambda.Expr.t)
+  | Rewritten of
+      { temporaries : (Bound_var.t * Named.t) list;
+        defining_expr : Named.t
+      }
 
 type binding_to_place =
   | Keep_binding of
