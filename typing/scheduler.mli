@@ -24,7 +24,9 @@ module Monitor : sig
       job registered under [body] is re-raised from here as an ordinary
       exception.
 
-      Jobs registered under [body] must run before it returns. *)
+      Jobs registered under [body] must run before it returns. Registering a job
+      without a monitor is a fatal error. A [root] is typically installed around
+      typechecker entry points to ensure jobs are registered correctly. *)
   val root : (unit -> 'a) -> 'a
 
   (** [try_ body ~with_] runs [body] with [with_] pushed onto the current
