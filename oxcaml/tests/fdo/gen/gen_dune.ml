@@ -178,6 +178,8 @@ let dropped file = Annotations ["dropped"; file]
 
 let compare_sets a b = Annotations ["compare-sets"; a; b]
 
+let check a b = Annotations ["check"; a; b]
+
 let fexpr_flags pass =
   [ "-fdo-counters";
     "-fexpr-print-fdo-counters";
@@ -409,7 +411,52 @@ let tests =
           compare_sets "linear_cmm/cfg.cmx.dump" "linear_linear/cfg.cmx.dump";
           list "linear_linear/cfg.cmx.dump";
           compare_sets "linear_cmm/to_cmm.cmx.dump"
-            "linear_linear/to_cmm.cmx.dump" ] ) ]
+            "linear_linear/to_cmm.cmx.dump" ] );
+    ( "End to end through the backend, at -O3, with the SSA pipeline and with \
+       the merging of identical blocks: each counter of the Cmm is in the \
+       Linear code or dropped, and the Linear code has no other counter.",
+      let sources =
+        ["linear.ml"; "cfg.ml"; "to_cmm.ml"; "to_cmm_reaper.ml"; "simplify.ml"]
+      in
+      let configs =
+        [ "backend_o3", ["-O3"];
+          "backend_o3_ssa", ["-O3"; "-use-ssa"];
+          "backend_o3_merge_blocks", ["-O3"; "-cfg-merge-blocks"] ]
+      in
+      let module_ source = Filename.chop_extension source in
+      let dump dir source = dir ^ "/" ^ module_ source ^ ".cmx.dump" in
+      dumps "backend_o3" ~sources
+        ~dirs:
+          (List.concat_map
+             (fun (dir, _) -> [dir ^ "_cmm"; dir ^ "_linear"])
+             configs)
+        (List.concat_map
+           (fun (dir, flags) ->
+             List.concat_map
+               (fun source ->
+                 [ compile
+                     ~output:(dir ^ "_cmm/" ^ module_ source ^ ".cmx")
+                     (flags @ ["-fdo-counters"; "-dcmm"; "-dump-into-file"])
+                     source;
+                   compile
+                     ~output:(dir ^ "_linear/" ^ module_ source ^ ".cmx")
+                     (flags
+                     @ [ "-fdo-counters";
+                         "-dlinear";
+                         "-dfdo-dropped-counters";
+                         "-dump-into-file" ])
+                     source ])
+               sources)
+           configs)
+        (List.concat_map
+           (fun (dir, _) ->
+             List.map
+               (fun source ->
+                 check
+                   (dump (dir ^ "_cmm") source)
+                   (dump (dir ^ "_linear") source))
+               sources)
+           configs) ) ]
 
 let () =
   let buf = Buffer.create 65536 in
