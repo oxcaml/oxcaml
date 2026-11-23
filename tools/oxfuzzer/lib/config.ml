@@ -124,7 +124,7 @@ let wide_function_probability = 500
 
 let tail_call_probability = 2_500
 
-let wide_argument_variable_probability = 7_500
+let existing_value_for_wide_argument_probability = 7_500
 
 type assertion_mode =
   | Disabled

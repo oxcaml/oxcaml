@@ -1088,7 +1088,8 @@ and gen_arguments (st : State.t) env params =
       | Some generate
         when wide
              && with_probability st
-                  ~probability:Config.wide_argument_variable_probability ->
+                  ~probability:
+                    Config.existing_value_for_wide_argument_probability ->
         generate ()
       | Some _ | None -> gen_value st env binding.ty)
     params

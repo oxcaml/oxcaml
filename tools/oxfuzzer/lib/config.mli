@@ -119,7 +119,7 @@ val wide_function_probability : int
 
 val tail_call_probability : int
 
-val wide_argument_variable_probability : int
+val existing_value_for_wide_argument_probability : int
 
 type assertion_mode =
   | Disabled
