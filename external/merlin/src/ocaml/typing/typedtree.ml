@@ -23,23 +23,23 @@ open Mode
 type constant =
     Const_int of int
   | Const_char of char
-  | Const_untagged_char of int
+  | Const_untagged_char of Numbers.Int8.t
   | Const_string of string * Location.t * string option
   | Const_float of string
   | Const_float32 of string
   | Const_unboxed_float of string
   | Const_unboxed_float32 of string
-  | Const_int8 of int
-  | Const_int16 of int
+  | Const_int8 of Numbers.Int8.t
+  | Const_int16 of Numbers.Int16.t
   | Const_int32 of int32
   | Const_int64 of int64
-  | Const_nativeint of nativeint
+  | Const_nativeint of Targetint.t
   | Const_untagged_int of int
-  | Const_untagged_int8 of int
-  | Const_untagged_int16 of int
+  | Const_untagged_int8 of Numbers.Int8.t
+  | Const_untagged_int16 of Numbers.Int16.t
   | Const_unboxed_int32 of int32
   | Const_unboxed_int64 of int64
-  | Const_unboxed_nativeint of nativeint
+  | Const_unboxed_nativeint of Targetint.t
 
 module Uid = Shape.Uid
 
@@ -669,10 +669,10 @@ and functor_parameter =
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
-  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.r
+  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.Const.t
   | Tmod_apply of
       module_expr * module_expr * module_coercion * Mode.Yielding.l
-      * Mode.Staticity.r
+      * Mode.Staticity.Const.t
   | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion
@@ -866,11 +866,13 @@ and 'repr include_kind =
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : 'repr
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.Const.t
       }
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : 'repr
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.Const.t
       }
 
 and ('a, 'repr) include_infos =

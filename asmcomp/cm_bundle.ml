@@ -91,7 +91,8 @@ let cmx_bundle ~quoted_cmx =
           uir_section_toc = toc;
           uir_sections_length = total_length;
           uir_external_symbols = Array.of_list info.ui_external_symbols;
-          uir_static_data = info.ui_static_data
+          uir_static_data = info.ui_static_data;
+          uir_lto_info = info.ui_lto_info
         }
       in
       raw_info, serialized_sections)
@@ -127,7 +128,7 @@ let make_bundled_cm_file unix ~ppf_dump ~quoted_cmi ~quoted_cmx ~output_name
         ~sourcefile:sourcefile_for_dwarf;
       Emit.begin_assembly unix;
       let bundle_cm name value cont =
-        let symbol = { Cmm.sym_name = name; sym_global = Global } in
+        let symbol = Cmm.global_symbol ~ty:Cmm.typ_int name in
         let string = Marshal.to_string value [] in
         Cmm_helpers.emit_string_constant symbol string cont
       in

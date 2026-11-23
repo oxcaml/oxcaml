@@ -877,10 +877,12 @@ static void scan_local_allocations(scanning_action f, void* fdata,
     if (Color_hd(hd) == NOT_MARKABLE) {
       /* Local allocation, not marked */
 #ifdef DEBUG
-      /* We don't check the reserved bits here because this is OK even for mixed
-         blocks. */
-      for (i = 0; i < Wosize_hd(hd); i++)
-        Field(Val_hp(hp), i) = Debug_free_local;
+      /* Unscannable blocks may still be referenced by unmanaged pointers.
+         Scannable blocks can be overwritten in full, even if mixed. */
+      if (Scannable_hd(hd)) {
+        for (i = 0; i < Wosize_hd(hd); i++)
+          Field(Val_hp(hp), i) = Debug_free_local;
+      }
 #endif
       sp += Bhsize_hd(hd);
       continue;

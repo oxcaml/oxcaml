@@ -36,6 +36,9 @@ val emit_debug_info_gen :
   (file_num:int -> line:int -> col:int -> ?discriminator:int -> unit -> unit) ->
   unit
 
+(** Whether [emit_debug_info_gen] emits a source line for this debuginfo. *)
+val has_source_line : Debuginfo.t -> bool
+
 type frame_debuginfo =
   | Dbg_alloc of Cmm.alloc_dbginfo
   | Dbg_raise of Debuginfo.t

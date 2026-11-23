@@ -64,12 +64,16 @@ define dune_main_context
     (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
-    (env-vars ("OCAMLPARAM" "$(main_ocamlparam)"))))))
+    ; STDLIB_JSIR_OCAMLOPT_FLAGS: for the JSIR builds of the compiler's
+    ; libraries (see external/ast-dependent-libs/stdlib-jsir/dune).
+    (env-vars
+      ("OCAMLPARAM" "$(main_ocamlparam)")
+      ("STDLIB_JSIR_OCAMLOPT_FLAGS" "$(main_ocamlopt_optimization_flags)"))))))
 endef
 
 
 .DEFAULT_GOAL := compiler
-.PHONY: boot-compiler boot-runtest compiler runtest runtest-llvmize runtest-dwarf
+.PHONY: boot-compiler boot-runtest compiler runtest runtest-llvmize runtest-dwarf runtest-sancov
 
 boot_targets = \
   $(boot_ocamlc) \
@@ -136,6 +140,9 @@ runtest-llvmize: compiler
 
 runtest-dwarf: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-dwarf $(ws_main)
+
+runtest-sancov: compiler
+	$(dune) build @runtest-sancov $(ws_main)
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
@@ -260,6 +267,32 @@ boot_build = _build/default
 # run on an installed tree (led by David Allsopp) is completed.
 .PHONY: runtest-upstream test install_for_test
 install_for_test: install
+ifeq ($(with_jsir),true)
+	@for program in js_of_ocaml wasm_of_ocaml; do \
+	  test -x _install/bin/$$program || { \
+	    echo "error: with_jsir=true but _install/bin/$$program is missing;" \
+	      "make test needs jsoo-install-shipped to install into" \
+	      "$(CURDIR)/_install (OXCAML_INSTALL and AST_DEPENDENT_LIBS_PREFIX)," \
+	      "or use make test-without-jsir" >&2; \
+	    exit 1; }; \
+	done
+	@for package in stdlib-jsir:cmxa-js stdlib-wasm:cmxa-wasm; do \
+	  test -f _install/lib/ocaml/stdlib.$${package#*:} || { \
+	    echo "error: with_jsir=true but _install/lib/ocaml/stdlib.$${package#*:}" \
+	      "is missing (the $${package%:*} package was not installed)" >&2; \
+	    exit 1; }; \
+	done
+	@for program in wasm-opt wasm-merge; do \
+	  command -v $$program > /dev/null || { \
+	    echo "error: with_jsir=true but $$program is not in PATH;" \
+	      "wasm_of_ocaml runs the Binaryen tools" >&2; \
+	    exit 1; }; \
+	done
+	@command -v "$${NODE:-node}" > /dev/null || { \
+	  echo "error: with_jsir=true but $${NODE:-node} is not in PATH;" \
+	    "ocamltest runs JSIR programs with \$$NODE (default: node)" >&2; \
+	  exit 1; }
+endif
 	rm -rf _runtest
 	mkdir _runtest
 	ln -s ../_install _runtest/_install
@@ -368,6 +401,26 @@ install_for_test: install
 	# ocamltest itself
 	mkdir _runtest/ocamltest
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
+ifeq ($(with_jsir),true)
+	cd _runtest/testsuite/lib && \
+	  export OXCAML_JS_OF_OCAML=$(CURDIR)/_install/bin/js_of_ocaml && \
+	  export OXCAML_WASM_OF_OCAML=$(CURDIR)/_install/bin/wasm_of_ocaml && \
+	  for target in js_of_ocaml:js wasm_of_ocaml:wasm; do \
+	    ocamlopt_jsir="../../ocamlopt.opt -target $${target%:*} -nostdlib \
+	      -I ../../stdlib" && \
+	    $$ocamlopt_jsir -S -c lib.ml && \
+	    $$ocamlopt_jsir -S -linkall -a -o testing.cmxa-$${target#*:} testing.ml && \
+	    $$ocamlopt_jsir -link-jsir -linkall -a \
+	      -o testing.cmxa-$${target#*:} testing.cmx-$${target#*:} \
+	      || exit 1; \
+	  done
+	cp _install/lib/ocaml/compiler-libs/*.cmx-js \
+	  _install/lib/ocaml/compiler-libs/*.cmx-wasm _runtest/utils
+	cp $(stdlib_jsir_build)/compiler-libs/*.cmo-js \
+	  $(stdlib_jsir_build)/compiler-libs/*.cmo-wasm \
+	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-js \
+	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-wasm _runtest/utils
+endif
 test: install_for_test
 	if [ "$(middle_end)" = "flambda2" ]; then \
 	  for path in `cd testsuite; ls -1 -d tests/*`; do \

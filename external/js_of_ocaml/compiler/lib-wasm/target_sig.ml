@@ -330,6 +330,20 @@ module type S = sig
       -> indices:expression list
       -> expression
       -> expression
+
+    val get_raw :
+         kind:Optimization_hint.Bigarray.kind
+      -> expression
+      -> offset:expression
+      -> expression
+    (** Access at a flat element offset (an [i32]), without bounds checking. *)
+
+    val set_raw :
+         kind:Optimization_hint.Bigarray.kind
+      -> expression
+      -> offset:expression
+      -> expression
+      -> expression
   end
 
   val internal_primitives :

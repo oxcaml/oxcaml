@@ -1,5 +1,10 @@
 (* TEST
  flags += " -g";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 let f1 ~a ~b ~c ~d ~e = a + b + c + d + e

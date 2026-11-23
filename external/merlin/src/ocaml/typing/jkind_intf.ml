@@ -56,7 +56,9 @@ module type Sort = sig
   (** A sort variable that can be unified during type-checking. *)
   type var
 
-  type level_error = Rigid
+  type level_error =
+    | Rigid
+    | Escape of Path.t
 
   type error =
     | Incompatible
@@ -464,6 +466,8 @@ module History = struct
     | Class_field
     | Boxed_record
     | Boxed_variant
+    | Unboxed_variant
+    | At_at_unboxed_record
     | Boxed
     | Extensible_variant
     | Primitive of Ident.t

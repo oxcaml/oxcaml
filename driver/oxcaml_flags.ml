@@ -41,9 +41,6 @@ let x86_peephole_remove_redundant_test = ref true
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
-let cfg_eliminate_dead_trap_handlers = ref true
-(* -cfg-eliminate-dead-trap-handlers *)
-
 let cfg_eliminate_dead_code_validate = ref false
 (* -cfg-eliminate-dead-code-validate *)
 
@@ -214,6 +211,7 @@ module Flambda2 = struct
     let reaper_unbox = true
     let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
+    let lto_support = false
     let simplify_stubs =
       (* CR pchambart: should be changed to true after proper testing *)
       false
@@ -237,6 +235,7 @@ module Flambda2 = struct
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    lto_support : bool;
     simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
@@ -259,6 +258,7 @@ module Flambda2 = struct
     reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
+    lto_support = Default.lto_support;
     simplify_stubs = Default.simplify_stubs;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
@@ -309,6 +309,7 @@ module Flambda2 = struct
   let reaper_unbox = ref Default
   let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
+  let lto_support = ref Default
   let match_in_match = ref Default
   let simplify_stubs = ref Default
 
@@ -321,9 +322,12 @@ module Flambda2 = struct
     let fexpr_after = ref Last_pass
     let fexpr_annot = ref false
     let fexpr_annot_after = ref []
+    let fexpr_print_branch_annotations = ref false
+    let fexpr_print_fdo_counters = ref false
     let slot_offsets = ref false
     let freshen = ref false
     let flow = ref false
+    let simplified = ref false
     let simplify = ref false
     let reaper = ref false
   end

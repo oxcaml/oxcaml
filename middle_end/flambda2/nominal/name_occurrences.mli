@@ -109,6 +109,25 @@ val union : t -> t -> t
 
 val union_list : t list -> t
 
+val no_free_names : 'a -> t
+
+val free_names_set :
+  fold:(('key -> t -> t) -> 'set -> t -> t) ->
+  add_key:(t -> 'key -> t) ->
+  'set ->
+  t
+
+val free_names_map :
+  fold:(('key -> 'value -> t -> t) -> 'map -> t -> t) ->
+  add_key:(t -> 'key -> t) ->
+  free_names_value:('value -> t) ->
+  'map ->
+  t
+
+val free_names_code_id_set : Code_id.Set.t -> Name_mode.t -> t
+
+val free_names_name_map : ('a -> t) -> 'a Name.Map.t -> Name_mode.t -> t
+
 (** [subset_domain t1 t2] is the usual "set subset" test on the names occurring
     in [t1] and [t2]. The numbers of occurrences and the name_modes of those
     occurrences are ignored. *)

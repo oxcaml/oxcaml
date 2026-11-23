@@ -9,7 +9,7 @@
   (pps js_of_ocaml-ppx)))
 
 (rule
- (targets main_jsir.js main_jsir.cmi main_jsir.cmjx main_jsir.cmjo)
+ (targets main_jsir.js main_jsir.cmi main_jsir.cmx-js main_jsir.cmo-js)
  (deps main_jsir.ml)
  (action
   (run %{ocamlopt} -target js_of_ocaml -o main_jsir.js %{deps})))

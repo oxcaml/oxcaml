@@ -3,10 +3,8 @@
  flags += " -flambda2-inline-small-function-size 0";
  flags += " -flambda2-inline-large-function-size 0";
  flags += " -O3";
- flags += " -cfg-prologue-shrink-wrap";
  flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -regalloc irc";
  flags += " -cfg-merge-blocks";
  only-default-codegen;
  expect.opt with dump-simplify;

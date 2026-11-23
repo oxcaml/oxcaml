@@ -70,7 +70,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~rebuild_expr
   let expr, dacc =
     simplify_expr dacc expr ~down_to_up:(fun dacc expr -> expr, dacc)
   in
-  let _, uacc =
+  let expr, uacc =
     let exn_continuation = Apply.exn_continuation apply in
     let dacc =
       DA.map_flow_acc dacc ~f:(Flow.Acc.exit_continuation dummy_toplevel_cont)
@@ -155,7 +155,9 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~rebuild_expr
             (Lifted_constant.definitions lifted_constant))
     else Cost_metrics.zero
   in
-  Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
+  Cost_metrics.( + )
+    (Rebuilt_expr.cost_metrics expr)
+    cost_metrics_of_lifted_constants
 
 type argument_types_useful =
   | Coarse

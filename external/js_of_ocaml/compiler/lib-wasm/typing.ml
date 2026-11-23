@@ -275,7 +275,8 @@ let update_deps st { blocks; _ } =
                         | "caml_ba_get_1"
                         | "caml_ba_get_2"
                         | "caml_ba_get_3"
-                        | "caml_ba_get_generic" )
+                        | "caml_ba_get_generic"
+                        | "caml_ba_get_raw_unsafe" )
                       , _ )
                   , lst ) ) ->
               (* The return type of these primitives depend on the input type *)
@@ -397,7 +398,7 @@ let prim_type ~st ~approx prim hint args =
                ~kind:(Targetint.to_int_exn kind)
                ~layout:(Targetint.to_int_exn layout))
       | _ -> Top)
-  | "caml_ba_get_1" | "caml_ba_get_2" | "caml_ba_get_3" -> (
+  | "caml_ba_get_1" | "caml_ba_get_2" | "caml_ba_get_3" | "caml_ba_get_raw_unsafe" -> (
       match hint, args with
       | Some (Optimization_hint.Hint_bigarray { kind; _ }), _ ->
           bigarray_element_type kind

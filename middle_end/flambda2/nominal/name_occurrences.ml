@@ -787,6 +787,28 @@ let inter_domain_is_non_empty t1 t2 =
 
 let union_list ts = List.fold_left union empty ts
 
+let no_free_names _ = empty
+
+let free_names_set ~fold ~add_key set =
+  fold (fun key free_names -> add_key free_names key) set empty
+
+let free_names_map ~fold ~add_key ~free_names_value map =
+  fold
+    (fun key value free_names ->
+      union free_names (add_key (free_names_value value) key))
+    map empty
+
+let free_names_code_id_set code_ids name_mode =
+  free_names_set ~fold:Code_id.Set.fold
+    ~add_key:(fun free_names code_id ->
+      add_code_id free_names code_id name_mode)
+    code_ids
+
+let free_names_name_map free_names_value map name_mode =
+  free_names_map ~fold:Name.Map.fold
+    ~add_key:(fun free_names name -> add_name free_names name name_mode)
+    ~free_names_value map
+
 let function_slots_in_normal_projections t =
   For_function_slots.fold_with_mode t.function_slots_in_projections
     ~init:Function_slot.Set.empty ~f:(fun acc function_slot name_mode ->

@@ -413,30 +413,19 @@ let run
             ~link:`All
             output_file
           |> sourcemap_of_info ~base:source_map_base)
-  | `Cmj filename ->
+  | `Jsir_file filename ->
       let t1 = Timer.make () in
       (* Read a file produced by the OxCaml JSIR backend: a magic number
-         followed by a marshaled [Code.cmj_body]. *)
+         followed by a marshaled [Code.jsir_file]. *)
       let unit =
         let ic = open_in_bin filename in
         Fun.protect
           ~finally:(fun () -> close_in ic)
-          (fun () ->
-            let magic =
-              Magic_number.of_string (really_input_string ic Magic_number.size)
-            in
-            (match Magic_number.kind magic with
-            | `Cmj -> ()
-            | `Cmo | `Cma | `Exe | `Other _ ->
-                raise Magic_number.(Bad_magic_number (to_string magic)));
-            if Config.Flag.check_magic ()
-               && not (Magic_number.equal magic (Magic_number.current `Cmj))
-            then raise Magic_number.(Bad_magic_version magic);
-            Parse_bytecode.from_cmj ic)
+          (fun () -> Parse_bytecode.from_jsir_channel ~target:Code.Js ~filename ic)
       in
       if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
       (* CR-soon selee: the OxCaml JSIR backend does not produce any
-         debug-related information yet. This should be updated once the [.cmj]
+         debug-related information yet. This should be updated once the JSIR
          file format changes. *)
       let one : Parse_bytecode.one =
         { code = unit.program
@@ -444,32 +433,52 @@ let run
         ; debug = Parse_bytecode.Debug.default_summary
         }
       in
-      output_gen
-        ~write_shape:false
-        ~standalone:false
-        ~custom_header
-        ~build_info:(Build_info.create `Cmj)
-        ~source_map
-        (fst output_file)
-        (fun ~standalone ~shapes ~source_map ((_, fmt) as output_file) ->
-          let runtime =
-            if include_runtime
-            then [ output_partial_runtime ~standalone ~shapes ~source_map output_file ]
-            else []
-          in
-          Pretty_print.string fmt "\n";
-          Pretty_print.string fmt (Unit_info.to_string unit.info);
-          let sm =
+      if unit.whole_program
+      then
+        output_gen
+          ~write_shape:false
+          ~standalone:true
+          ~custom_header
+          ~build_info:(Build_info.create `Exe)
+          ~source_map
+          (fst output_file)
+          (fun ~standalone ~shapes ~source_map output_file ->
             output
               one
               ~check_sourcemap:false
               ~standalone
               ~shapes
               ~source_map
-              ~link:`Needed
+              ~link:(if linkall then `All else `Needed)
               output_file
-          in
-          sourcemap_of_infos ~base:source_map_base (runtime @ [ sm ]))
+            |> sourcemap_of_info ~base:source_map_base)
+      else
+        output_gen
+          ~write_shape:false
+          ~standalone:false
+          ~custom_header
+          ~build_info:(Build_info.create `Jsir)
+          ~source_map
+          (fst output_file)
+          (fun ~standalone ~shapes ~source_map ((_, fmt) as output_file) ->
+            let runtime =
+              if include_runtime
+              then [ output_partial_runtime ~standalone ~shapes ~source_map output_file ]
+              else []
+            in
+            Pretty_print.string fmt "\n";
+            Pretty_print.string fmt (Unit_info.to_string unit.info);
+            let sm =
+              output
+                one
+                ~check_sourcemap:false
+                ~standalone
+                ~shapes
+                ~source_map
+                ~link:`Needed
+                output_file
+            in
+            sourcemap_of_infos ~base:source_map_base (runtime @ [ sm ]))
   | (`Bytecode_stdin | `Bytecode_file _) as bytecode ->
       let kind, ic, close_ic, include_dirs =
         match bytecode with

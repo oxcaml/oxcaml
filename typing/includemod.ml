@@ -99,6 +99,7 @@ module Error = struct
   and functor_symptom =
     | Params of functor_params_diff
     | Result of module_type_diff
+    | Staticity
 
   and ('arg,'path) functor_param_symptom =
     | Incompatible_params of 'arg * functor_parameter
@@ -262,11 +263,11 @@ module Core_inclusion = struct
       vd2 =
     if Directionality.mark_as_used direction then
       Env.mark_value_used vd1.val_uid;
-    let vd2 = Subst.value_description subst vd2 in
     try
       Ok (Includecore.value_descriptions ~loc env (Ident.name id) ~mmodes
-            ~self_check vd1 vd2)
+            ~self_check vd1 subst vd2)
     with Includecore.Dont_match err ->
+      let vd2 = Subst.value_description subst vd2 in
       Error Error.(Core (Value_descriptions (mdiff vd1 vd2 mmodes err)))
 
   (* Inclusion between type declarations *)
@@ -565,8 +566,9 @@ let pair_components subst sig1_comps sig2 =
               Subst.add_modtype id2 (Path.Pident id1) subst
           | Sig_jkind _ ->
               Subst.add_jkind id2 (Path.Pident id1) subst
-          | Sig_value _ | Sig_typext _
-          | Sig_class _ | Sig_class_type _ ->
+          | Sig_value _ ->
+              Subst.add_value id2 (Path.Pident id1) subst
+          | Sig_typext _ | Sig_class _ | Sig_class_type _ ->
               subst
         in
         pair new_subst
@@ -585,7 +587,7 @@ let pair_components subst sig1_comps sig2 =
 let retrieve_functor_params env mty =
   let rec retrieve_functor_params before env mty =
     match Mtype.scrape_alias env mty with
-    | Mty_functor (p, res, _) ->
+    | Mty_functor (p, res, _, _) ->
         (* the function is only used for functor parameter diff, so the return
            mode is intentionally ignored. *)
         retrieve_functor_params (p :: before) env res
@@ -766,11 +768,17 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
       | Error e -> Error (Error.Signature e)
       end
 
-  | Mty_functor (param1, res1, mres1), Mty_functor (param2, res2, mres2) ->
+  | Mty_functor (param1, res1, mres1, staticity1),
+    Mty_functor (param2, res2, mres2, staticity2) ->
       let* () =
         Includecore.check_modes env ~item:Module
           ~crossing:Ctype.mode_crossing_functor modes
         |> map_error (fun e -> Error.Mode e)
+      in
+      let* staticity =
+        if Mode.Staticity.Const.equal staticity1 staticity2
+        then Ok staticity1
+        else Error (Error.Functor Staticity)
       in
       let cc_arg, env, subst =
         let direction = Directionality.negate direction in
@@ -806,6 +814,10 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
           in
           Ok (Tcoerce_none, final_shape)
       | Ok cc_arg, Ok (cc_res, final_res_shape) ->
+          if not (staticity = Mode.Staticity.Dynamic) then
+            Misc.fatal_errorf
+              "Includemod.try_modtypes: template functor coercion at %a"
+              Location.print_loc_in_lowercase loc;
           let final_shape =
             if final_res_shape == res_shape
             then orig_shape
@@ -1347,7 +1359,9 @@ type application_name =
   | Anonymous_functor
   | Full_application_path of Longident.t
   | Named_leftmost_functor of Longident.t
-exception Apply_error of {
+
+module Apply_error = struct
+  type t = {
     loc : Location.t ;
     env : Env.t ;
     app_name : application_name ;
@@ -1355,6 +1369,18 @@ exception Apply_error of {
     args : (Error.functor_arg_descr * module_type
       * Typedtree.mode_with_locks) list ;
   }
+
+  type exn += In_context of t
+
+  let log_or_raise err = Typing_recovery.log_or_raise (In_context err)
+
+  let log_and_raise err = Typing_recovery.log_and_raise (In_context err)
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
 
 let signatures ~direction ~loc env subst sig1 sig2 mod_shape =
   let sig1 = Subst.Lazy.of_signature sig1 in
@@ -1403,7 +1429,7 @@ let check_functor_application_in_path
         let mty_f = (Env.find_module f0_path env).md_type in
         let args = List.map prepare_arg args in
         let app_name = Full_application_path lid_whole_app in
-        raise (Apply_error {loc; env; app_name; mty_f; args})
+        Apply_error.log_and_raise {loc; env; app_name; mty_f; args}
       else
         raise Not_found
 

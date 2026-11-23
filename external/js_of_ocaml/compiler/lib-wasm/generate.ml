@@ -298,12 +298,20 @@ module Generate (Target : Target_sig.S) = struct
   let load_and_box ctx x = convert ~from:(Typing.var_type ctx.types x) ~into:Top (load x)
 
   let transl_prim_arg ctx ?(typ = Typing.Top) x =
-    convert
-      ~from:(get_type ctx x)
-      ~into:typ
-      (match x with
-      | Pv x -> load x
-      | Pc c -> Constant.translate ~unboxed:false c)
+    match x with
+    | Pv x -> convert ~from:(Typing.var_type ctx.types x) ~into:typ (load x)
+    | Pc c ->
+        let unboxed =
+          match typ with
+          | Number (_, Unboxed) -> true
+          | _ -> false
+        in
+        let from : Typing.typ =
+          match Typing.constant_type c with
+          | Number (n, Unboxed) when not unboxed -> Number (n, Boxed)
+          | from -> from
+        in
+        convert ~from ~into:typ (Constant.translate ~unboxed c)
 
   (* used to limit >32b ints to 32b when dealing with indices *)
   let transl_idx_specialized_arg ctx repr x =
@@ -438,6 +446,15 @@ module Generate (Target : Target_sig.S) = struct
          name
          expected
          (List.length l))
+
+  let jsir_symbol_global_name ~prim compilation_unit symbol =
+    let string_constant (x : Code.prim_arg) =
+      match x with
+      | Pc (String s) | Pc (NativeString (Byte s | Utf (Utf8 s))) -> s
+      | Pc _ | Pv _ ->
+          failwith (Printf.sprintf "Primitive %s expects constant string arguments." prim)
+    in
+    "symbol:" ^ string_constant compilation_unit ^ ":" ^ string_constant symbol
 
   let is_unboxed typ =
     match typ with
@@ -859,6 +876,10 @@ module Generate (Target : Target_sig.S) = struct
           (let* cond = Arith.eqz y in
            instr (W.Br_if (label_index context zero_divide_pc, cond)))
           (Value.int_mod x y));
+    register_un_prim "%direct_obj_tag_nullish" `Pure ~ret_typ:(Int Ref) (fun x ->
+        let* f = register_import ~name:"caml_obj_tag" (Fun (Type.primitive_type 1)) in
+        let* x = x in
+        return (W.Call (f, [ x ])));
     if Config.Flag.portable_int ()
     then
       register_un_prim "%int_neg" `Pure ~typ:int_lu ~ret_typ:int_lu Value64.int_neg
@@ -1259,6 +1280,42 @@ module Generate (Target : Target_sig.S) = struct
     else
     register_un_prim "caml_float32_of_int" `Pure ~typ:int_n ~ret_typ:float32_u (fun n ->
         float32_un_op (Convert (`I32, S)) n);
+    register_un_prim "caml_int32_of_float32" `Pure ~typ:float32_u ~ret_typ:int32_u (fun f ->
+        let* f = f in
+        return (W.UnOp (I32 (TruncSat (`F32, S)), f)));
+    register_un_prim "caml_float32_of_int32" `Pure ~typ:int32_u ~ret_typ:float32_u (fun n ->
+        float32_un_op (Convert (`I32, S)) n);
+    if Config.Flag.portable_int ()
+    then (
+      register_un_prim
+        "caml_nativeint_of_float32"
+        `Pure
+        ~typ:float32_u
+        ~ret_typ:nativeint_u
+        (fun f ->
+          let* f = f in
+          return (W.UnOp (I64 (TruncSat (`F32, S)), f)));
+      register_un_prim
+        "caml_float32_of_nativeint"
+        `Pure
+        ~typ:nativeint_u
+        ~ret_typ:float32_u
+        (fun n -> float32_un_op (Convert (`I64, S)) n))
+    else (
+      register_un_prim
+        "caml_nativeint_of_float32"
+        `Pure
+        ~typ:float32_u
+        ~ret_typ:nativeint_u
+        (fun f ->
+          let* f = f in
+          return (W.UnOp (I32 (TruncSat (`F32, S)), f)));
+      register_un_prim
+        "caml_float32_of_nativeint"
+        `Pure
+        ~typ:nativeint_u
+        ~ret_typ:float32_u
+        (fun n -> float32_un_op (Convert (`I32, S)) n));
     (* Note: [caml_simd_float32_min_bytecode] and [caml_simd_float32_max_bytecode]
        to go through the runtime implementation in float32.wat instead. *)
     register_un_prim
@@ -2564,6 +2621,69 @@ module Generate (Target : Target_sig.S) = struct
                 let* v' = transl_prim_arg ctx v in
                 return (W.Call (f, [ ta'; indices'; v' ])))
         | _ -> invalid_arity "caml_ba_set_generic" l ~expected:3);
+    (* Raw accesses at a flat element offset, which the OxCaml JSIR backend
+       has already computed (and bounds-checked if needed). *)
+    let raw_offset ctx offset =
+      if Config.Flag.portable_int ()
+      then
+        match get_type ctx offset with
+        | Int (Small_normalized | Small_unnormalized) ->
+            transl_prim_arg ctx ~typ:int_sn offset
+        | _ -> Arith64.to_i32 (transl_prim_arg ctx ~typ:int_ln offset)
+      else transl_prim_arg ctx ~typ:int_n offset
+    in
+    let raw_access_kind ~ctx ~hint ta =
+      match hint, get_type ctx ta with
+      | Some (Optimization_hint.Hint_bigarray { kind; _ }), _ | _, Bigarray { kind; _ }
+        -> Some kind
+      | _ -> None
+    in
+    register_prim "caml_ba_get_raw_unsafe" `Mutator (fun ctx _ hint l ->
+        match l with
+        | [ ta; offset ] -> (
+            match raw_access_kind ~ctx ~hint ta with
+            | Some kind ->
+                Bigarray.get_raw
+                  ~kind
+                  (transl_prim_arg ctx ta)
+                  ~offset:(raw_offset ctx offset)
+            | None ->
+                let* f =
+                  register_import
+                    ~name:"caml_ba_get_raw_unsafe"
+                    (Fun (Type.primitive_type 2))
+                in
+                let* ta' = transl_prim_arg ctx ta in
+                let* offset' = transl_prim_arg ctx offset in
+                return (W.Call (f, [ ta'; offset' ])))
+        | _ -> invalid_arity "caml_ba_get_raw_unsafe" l ~expected:2);
+    register_prim "caml_ba_set_raw_unsafe" `Mutator ~unbox:true (fun ctx _ hint l ->
+        match l with
+        | [ ta; offset; v ] -> (
+            match raw_access_kind ~ctx ~hint ta with
+            | Some kind ->
+                let typ =
+                  match Typing.bigarray_element_type kind with
+                  | Int Large_unnormalized when Config.Flag.portable_int () ->
+                      Typing.Int Large_normalized
+                  | typ -> typ
+                in
+                Bigarray.set_raw
+                  ~kind
+                  (transl_prim_arg ctx ta)
+                  ~offset:(raw_offset ctx offset)
+                  (transl_prim_arg ctx ~typ v)
+            | None ->
+                let* f =
+                  register_import
+                    ~name:"caml_ba_set_raw_unsafe"
+                    (Fun (Type.primitive_type 3))
+                in
+                let* ta' = transl_prim_arg ctx ta in
+                let* offset' = transl_prim_arg ctx offset in
+                let* v' = transl_prim_arg ctx v in
+                return (W.Call (f, [ ta'; offset'; v' ])))
+        | _ -> invalid_arity "caml_ba_set_raw_unsafe" l ~expected:3);
     let caml_ba_float32_set_n ~ctx ~context ta indices v =
       match get_type ctx ta with
       | Bigarray { unsafe; layout; _ } ->
@@ -2651,7 +2771,9 @@ module Generate (Target : Target_sig.S) = struct
     let int_n, int_u = int_sn, int_su in
     match e with
     | Apply { f; args; exact; _ } ->
-        let* closure = load f in
+        (* [f] may have a number type when it is not a closure, in code that
+           is never run (e.g. Flambda replaces dead closures by constants). *)
+        let* closure = load_and_box ctx f in
         if exact || List.length args = if Var.Set.mem x ctx.in_cps then 2 else 1
         then
           match
@@ -2829,6 +2951,52 @@ module Generate (Target : Target_sig.S) = struct
            let* name_str = Constant.translate ~unboxed:false (String name) in
            instr (W.Drop (W.Call (f, [ v; name_str ]))))
           Value.unit
+    | Prim (Extern ("caml_register_symbol", _), l) -> (
+        match l with
+        | [ compilation_unit; symbol; v ] ->
+            let exported_name =
+              jsir_symbol_global_name ~prim:"caml_register_symbol" compilation_unit symbol
+            in
+            let v = transl_prim_arg ctx v in
+            let x = Var.fresh_n "symbol" in
+            let* () =
+              register_global
+                x
+                ~exported_name
+                { mut = true; typ = Type.value }
+                (W.RefI31 (Const (I32 0l)))
+            in
+            seq
+              (let* v = v in
+               instr (W.GlobalSet (x, v)))
+              Value.unit
+        | _ -> invalid_arity "caml_register_symbol" l ~expected:3)
+    | Prim (Extern ("caml_get_symbol", _), l) -> (
+        match l with
+        | [ compilation_unit; symbol ] ->
+            let exported_name =
+              jsir_symbol_global_name ~prim:"caml_get_symbol" compilation_unit symbol
+            in
+            let* x =
+              let* context = get_context in
+              match
+                List.find_map
+                  ~f:(fun f ->
+                    match f with
+                    | W.Global { name = name'; exported_name = Some en; _ }
+                      when String.equal en exported_name -> Some name'
+                    | _ -> None)
+                  context.other_fields
+              with
+              | Some x -> return x
+              | _ ->
+                  register_import
+                    ~import_module:"OCaml"
+                    ~name:exported_name
+                    (Global { mut = true; typ = Type.value })
+            in
+            return (W.GlobalGet x)
+        | _ -> invalid_arity "caml_get_symbol" l ~expected:2)
     | Prim (Not, [ x ]) when Config.Flag.portable_int () ->
       Value64.not (transl_prim_arg ctx ~typ:int_lu x)
     | Prim (Not, [ x ]) -> Value.not (transl_prim_arg ctx ~typ:int_u x)

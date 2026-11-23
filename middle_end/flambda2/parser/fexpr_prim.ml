@@ -744,6 +744,9 @@ let enter_inlined_apply =
 let domain_index =
   D.(nullary "%domain_index" ~params:param0 (fun _env () -> P.Domain_index))
 
+let thread_self_id =
+  D.(nullary "%thread_self_id" ~params:param0 (fun _env () -> P.Thread_self_id))
+
 let dls_get = D.(nullary "%dls_get" ~params:param0 (fun _env () -> P.Dls_get))
 
 let tls_get = D.(nullary "%tls_get" ~params:param0 (fun _env () -> P.Tls_get))
@@ -944,7 +947,11 @@ let bytes_length =
   D.(unary "%bytes_length" ~params:param0 (fun _ () -> P.String_length String))
 
 let boolean_not =
-  D.(unary "%boolean_not" ~params:param0 (fun _ () -> P.Boolean_not))
+  D.(
+    unary "%boolean_not"
+      ~params:
+        (default ~def:P.Tagged_bool @@ constructor_flag ["imm", P.Naked_bool])
+      (fun _ repr -> P.Boolean_not repr))
 
 let duplicate_block =
   let open D in
@@ -1360,6 +1367,7 @@ module OfFlambda = struct
     | Enter_inlined_apply { dbg = _; inlined_attribute = _ } ->
       enter_inlined_apply env ()
     | Domain_index -> domain_index env ()
+    | Thread_self_id -> thread_self_id env ()
     | Dls_get -> dls_get env ()
     | Tls_get -> tls_get env ()
     | Poll -> poll env ()
@@ -1371,7 +1379,7 @@ module OfFlambda = struct
     | Block_load { kind; mut; field } -> block_load env (kind, mut, field)
     | Bigarray_length { dimension } -> bigarray_length env dimension
     | Box_number (bk, alloc) -> box_num env (bk, alloc)
-    | Boolean_not -> boolean_not env ()
+    | Boolean_not repr -> boolean_not env repr
     | End_region { ghost = false } -> end_region env ()
     | End_try_region { ghost = false } -> end_try_region env ()
     | End_region { ghost = true } -> end_ghost_region env ()

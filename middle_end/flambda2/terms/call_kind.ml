@@ -357,10 +357,7 @@ let free_names t =
   | Function { function_call = Direct code_id } ->
     Name_occurrences.add_code_id Name_occurrences.empty code_id Name_mode.normal
   | Function { function_call = Indirect_known_arity (Known code_ids) } ->
-    Code_id.Set.fold
-      (fun code_id free_names ->
-        Name_occurrences.add_code_id free_names code_id Name_mode.normal)
-      code_ids Name_occurrences.empty
+    Name_occurrences.free_names_code_id_set code_ids Name_mode.normal
   | Function { function_call = Indirect_unknown_arity }
   | Function { function_call = Indirect_known_arity Unknown } ->
     Name_occurrences.empty
@@ -383,10 +380,8 @@ let apply_renaming t renaming =
     then t
     else Function { function_call = Direct code_id' }
   | Function { function_call = Indirect_known_arity (Known code_ids) } ->
-    let code_ids' =
-      Code_id.Set.map (Renaming.apply_code_id renaming) code_ids
-    in
-    if Code_id.Set.equal code_ids code_ids'
+    let code_ids' = Renaming.apply_code_id_set renaming code_ids in
+    if code_ids == code_ids'
     then t
     else Function { function_call = Indirect_known_arity (Known code_ids') }
   | Function
@@ -413,10 +408,7 @@ let ids_for_export t =
   | Function { function_call = Direct code_id } ->
     Ids_for_export.add_code_id Ids_for_export.empty code_id
   | Function { function_call = Indirect_known_arity (Known code_ids) } ->
-    Code_id.Set.fold
-      (fun code_id ids_for_export ->
-        Ids_for_export.add_code_id ids_for_export code_id)
-      code_ids Ids_for_export.empty
+    Ids_for_export.ids_for_export_code_id_set code_ids
   | Function { function_call = Indirect_unknown_arity }
   | Function { function_call = Indirect_known_arity Unknown } ->
     Ids_for_export.empty

@@ -384,6 +384,7 @@ type nullary_primitive =
   | Dls_get  (** Obtain the domain-local state block. *)
   | Tls_get  (** Obtain the thread-local state block. *)
   | Domain_index  (** Obtain the current domain's index. *)
+  | Thread_self_id  (** Obtain the current systhread's id. *)
   | Poll
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and GC
@@ -417,6 +418,13 @@ module Reinterpret_64_bit_word : sig
     | Unboxed_int64_as_unboxed_float64
     | Unboxed_float64_as_unboxed_int64
 end
+
+(** How a boolean is represented: as a tagged immediate, like values of the
+    OCaml type [bool], or as a naked immediate. Either way it is 0 or 1 once
+    untagged. *)
+type boolean_representation =
+  | Tagged_bool
+  | Naked_bool
 
 (** Primitives taking exactly one argument. *)
 type unary_primitive =
@@ -471,7 +479,7 @@ type unary_primitive =
      needs to introduce a sign-extension, and simplifying it away would remove
      that sign_extension, leading to incorrect overflow behavior *)
   (* CR gbury: add test for this as soon as we can write tests in flambda *)
-  | Boolean_not
+  | Boolean_not of boolean_representation
   (* CR-someday mshinwell: We should maybe change int32.ml and friends to use a
      %-primitive instead of directly calling C stubs for conversions *)
   | Reinterpret_64_bit_word of Reinterpret_64_bit_word.t

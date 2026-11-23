@@ -15,7 +15,62 @@
 
 (* Definition of actions, basic blocks for tests *)
 
-type code = out_channel -> Environments.t -> Result.t * Environments.t
+type task_item =
+  | Predicate_pass of string
+  | Chdir of string
+  | Check_file_exists of { filename: string; reason: string }
+  | Check_file_absent of { filename: string }
+  | Copy_file of { src: string; dst: string }
+  | Setup_build_env of
+      { source_dir: string;
+        build_dir: string;
+        remove: string list;
+        files: string list;
+        subdirs: string list }
+  | Run_cmd of
+      { settings: Run_command.settings;
+        message: string;
+        exits: (int * Result.t) list }
+  | Compare_files of
+      { kind_of_output: string;
+        files: Filecompare.files;
+        tool: Filecompare.tool;
+        reference_exists: bool;
+        promote: bool }
+
+type task =
+  | Static of Result.t
+  | Task of task_item list
+
+exception Is_static of Result.t
+
+let combine ~drop_skip tasks =
+  let dropped = ref None in
+  match
+    tasks |> List.filter_map (function
+      | Static ({ status = Fail; _ } as r) ->
+         raise (Is_static r)
+      | Static { status = Pass; _ }
+      | Static { status = Predicate true; reason = None } ->
+         None
+      | Static { status = Predicate true; reason = Some txt } ->
+         Some [Predicate_pass txt]
+      | Static ({ status = (Skip | Predicate false); _ } as r) ->
+         if drop_skip then begin
+           if Option.is_none !dropped then dropped := Some r;
+           None
+         end else raise (Is_static r)
+      | Task tasks ->
+         Some tasks)
+  with
+  | exception (Is_static r) -> Static r
+  | [] -> Static (Option.value !dropped ~default:Result.pass)
+  | tasks -> Task (List.concat tasks)
+
+let seq tasks = combine ~drop_skip:false tasks
+let par tasks = combine ~drop_skip:true tasks
+
+type code = out_channel -> Environments.t -> task * Environments.t
 
 type t = {
   name : string;

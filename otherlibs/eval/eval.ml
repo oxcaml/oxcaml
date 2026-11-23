@@ -89,6 +89,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
             ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
             ui_static_data = uir.uir_static_data;
+            ui_lto_info = uir.uir_lto_info;
             ui_file_sections = sections
           }
         in
@@ -179,7 +180,8 @@ let eval (expr : 'a expr) =
                 { Persistent_env.Persistent_signature.filename =
                     Compilation_unit.Name.to_string unit_name;
                   cmi;
-                  visibility = Visible { cmx_guaranteed = false }
+                  include_flags =
+                    { visibility = Visible; cmx_guaranteed = false }
                 })
               (Compilation_unit.Name.Map.find_opt unit_name !cmis));
   let env = Compmisc.initial_env () in

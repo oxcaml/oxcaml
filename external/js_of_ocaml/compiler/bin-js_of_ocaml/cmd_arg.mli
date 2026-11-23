@@ -30,7 +30,7 @@ type t =
   ; output_file : [ `Name of string | `Stdout ] * bool
   ; input :
       [ `Bytecode_file of string
-      | `Cmj of string
+      | `Jsir_file of string
       | `Bytecode_stdin
       | `None
       ]

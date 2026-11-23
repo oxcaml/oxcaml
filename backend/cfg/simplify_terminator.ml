@@ -307,8 +307,9 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
           | Floatop (Float32, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | End_region | Specific _
-          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
-          | Domain_index )
+          | Name_for_debugger _ | Dls_get | Poll | Pause | Trace_pc_guard_gate
+          | Trace_pc_guard _ | Alloc _ | Tls_get | Domain_index | Thread_self_id
+            )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
@@ -441,7 +442,8 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     Misc.fatal_error
       "Simplify_terminator.evaluate_terminator: unexpected Never terminator"
   | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+  | Call_no_return _ | External_call_no_return _ | Call _ | Prim _ | Invalid _
+    ->
     None
 
 let block_known_values (cfg : Cfg.t) (block : C.basic_block)
@@ -536,7 +538,8 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
                  };
             true
           | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
-          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+          | Tailcall_func _ | Call_no_return _ | External_call_no_return _
+          | Call _ | Prim _ | Invalid _ ->
             false)
     else false
   | Never ->
@@ -564,7 +567,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       simplify_switch block labels;
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ | Invalid _ ->
+  | External_call_no_return _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let run cfg =

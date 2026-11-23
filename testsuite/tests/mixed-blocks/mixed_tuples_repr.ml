@@ -7,6 +7,11 @@
    reference = "${test_source_directory}/mixed_tuples_repr.native.reference";
    native;
  }{
+   (* Under js_of_ocaml and wasm_of_ocaml, mixed blocks are blocks of values,
+      so none are mixed. *)
+   reference = "${test_source_directory}/mixed_tuples_repr.jsir.reference";
+   jsir;
+ }{
    reference = "${test_source_directory}/mixed_tuples_repr.bytecode.reference";
    bytecode;
  }

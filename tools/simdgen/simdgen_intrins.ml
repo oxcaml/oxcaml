@@ -91,11 +91,16 @@ let parse_intrinsics path =
   Simdgen_xml.children_named (Simdgen_xml.parse_file path) "intrinsic"
   |> List.map intrinsic_of_node
 
+(* Every host that runs the tests supports these. *)
+let baseline_exts = ["AVX512F"; "AVX512DQ"; "AVX512CD"; "AVX512BW"; "AVX512VL"]
+
+(* Tests of these check for host support at runtime, see [test_guard]. *)
+let optional_exts = ["AVX512_BF16"; "VPCLMULQDQ"]
+
 let in_scope i =
   i.cpuid <> []
   && List.for_all
-       (fun c ->
-         List.mem c ["AVX512F"; "AVX512DQ"; "AVX512CD"; "AVX512BW"; "AVX512VL"])
+       (fun c -> List.mem c baseline_exts || List.mem c optional_exts)
        i.cpuid
 
 let caml_name i = "caml" ^ i.name
@@ -732,6 +737,9 @@ let tkind_of p =
   | "__m128" -> vec "float" 32 128
   | "__m128d" -> vec "float" 64 128
   | "__m128i" -> int_vec 128
+  | "__m512bh" -> vec "int" 16 512
+  | "__m256bh" -> vec "int" 16 256
+  | "__m128bh" -> vec "int" 16 128
   | "__mmask8" | "__mmask16" | "__mmask32" | "__mmask64" -> unboxed MaskT "mask"
   | "int" | "unsigned int" | "const int" -> unboxed I32 "int32"
   | "__int64" | "unsigned __int64" | "long long" | "unsigned long long" ->
@@ -881,8 +889,15 @@ let scalar_sqrt_oracle i tuple =
          suffix sqrt_args src)
   | _ -> None
 
+(* [helpers.ml] defines [has_<ext>] for each of [optional_exts]. *)
+let test_guard i =
+  List.filter (fun c -> List.mem c optional_exts) i.cpuid
+  |> List.map (fun c -> sprintf "if has_%s then " (String.lowercase_ascii c))
+  |> String.concat ""
+
 let print_test_ml buf ({ i; kind; reuse_mask; _ } as test) =
   let name = caml_name i in
+  let guard = test_guard i in
   let vals = values i in
   let val_tys = List.map (fun p -> Option.get (tkind_of p)) vals in
   let ret_ty = Option.get (tkind_of i.ret) in
@@ -955,14 +970,15 @@ let print_test_ml buf ({ i; kind; reuse_mask; _ } as test) =
       in
       let label = i.name ^ suffix in
       match masks with
-      | [] -> bprintf buf "let () = test %S (fun name -> %s)\n" label body
+      | [] ->
+        bprintf buf "let () = %stest %S (fun name -> %s)\n" guard label body
       | _ :: _ ->
         let bindings =
           String.concat ""
             (List.map (fun (idx, p) -> mask_binding ~idx p) masks)
         in
-        bprintf buf "let () = test_masks %S (fun name masks -> %s%s)\n" label
-          bindings body)
+        bprintf buf "let () = %stest_masks %S (fun name masks -> %s%s)\n" guard
+          label bindings body)
     (test_tuples test)
 
 let tests_ml ~memory ~bindings intrinsics =

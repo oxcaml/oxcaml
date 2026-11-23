@@ -3023,7 +3023,7 @@ Line 1, characters 10-12:
 Error: This type "t1" should be an instance of type
          "('a : immediate & immediate)"
        The layout of t1 is value & value
-         because it is an unboxed tuple.
+         because of the definition of t1 at line 1, characters 0-57.
        But the layout of t1 must be a sublayout of
            value non_pointer & value non_pointer
          because of the definition of t2 at line 2, characters 0-36.

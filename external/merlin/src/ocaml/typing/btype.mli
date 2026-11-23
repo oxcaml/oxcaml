@@ -746,11 +746,6 @@ module Jkind0 : sig
         ('l * disallowed) jkind
       val immediate_or_null :
         why:Jkind_intf.History.immediate_or_null_creation_reason -> 'd jkind
-      val product :
-        why:Jkind_intf.History.product_creation_reason ->
-        (type_expr * Mode.Modality.Const.t) list ->
-        Jkind_types.Sort.t Jkind_types.Layout.t list ->
-        jkind_l
       val product_of_any :
         why:Jkind_intf.History.product_creation_reason ->
         int ->
@@ -778,6 +773,20 @@ module Jkind0 : sig
       payload_tys:Types.type_expr list ->
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       (Types.type_expr * Types.type_expr) list
+
+    val for_unboxed_variant :
+      decl_params:Types.type_expr list ->
+      type_apply:
+        (Types.type_expr list ->
+        Types.type_expr ->
+        Types.type_expr list ->
+        Types.type_expr) ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
+      get_ty_base:
+        (Types.type_expr ->
+        Jkind_types.Sort.t Jkind_types.Layout.t jkind_base) ->
+      Types.constructor_declaration ->
+      Types.jkind_l
 
     val for_boxed_variant :
       loc:Location.t ->

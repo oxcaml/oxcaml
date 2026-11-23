@@ -2,3 +2,6 @@
 
 (package
  (name stdlib-jsir))
+
+(package
+ (name stdlib-wasm))

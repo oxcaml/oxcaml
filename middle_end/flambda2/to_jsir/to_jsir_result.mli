@@ -37,22 +37,39 @@ open! Jsoo_imports.Import
 
 type t
 
-(** Create a new result structure. It is not initialised with any blocks. *)
-val create : unit -> t
+(** Create a new result structure. It is not initialised with any blocks.
+    [reachable_names] are the names of this unit that other compilation units
+    may refer to. *)
+val create : reachable_names:Name_occurrences.t -> t
 
 (** Add a [Jsir.instr] to the top of the stack of current blocks and return the
     address of the new block. This function raises if there are no blocks being
     worked on. *)
 val add_instr_exn : t -> Jsir.instr -> t
 
-(** Add debugging information as an [Event] if it is not [_none_]. Raises if
-    there are no blocks being worked on. [pos] controls whether we log the start
-    of the region or the end. *)
-val maybe_add_debuginfo_exn : t -> Debuginfo.t -> pos:[`Start | `End] -> t
+(** The [Parse_info.t] for the start or the end of [dbg], or [None] if [dbg] has
+    no location or if [Clflags.debug] is not set. *)
+val parse_info_of_debuginfo :
+  Debuginfo.t -> pos:[`Start | `End] -> Parse_info.t option
 
-(** Wrap any result changes between [`Start] and [`End] debuginfos. Raises if
-    there are no blocks being worked on. *)
-val with_debuginfo_exn : t -> Debuginfo.t -> f:(t -> 'a * t) -> 'a * t
+(** Add an [Event] for the start or the end of [dbg], replacing an [Event]
+    immediately preceding it. Raises if there are no blocks being worked on. *)
+val add_event_exn : t -> Debuginfo.t -> pos:[`Start | `End] -> t
+
+(** Like [add_event_exn], for a location that is already a [Parse_info.t]. *)
+val add_event_at_exn : t -> Parse_info.t -> t
+
+(** Like [add_instr_exn], for an instruction that is a call. If run within
+    [with_debuginfo_exn], the instruction is surrounded by [Event]s for the
+    start and the end of the debuginfo. *)
+val add_call_exn : t -> Jsir.instr -> t
+
+(** Run [f] so that the calls it adds with [add_call_exn] are preceded by an
+    [Event] for the start of [dbg] and, if [event_after], followed by one for
+    its end. [event_after] should be [false] for a call that ends its block with
+    [Return]. *)
+val with_debuginfo_exn :
+  t -> Debuginfo.t -> event_after:bool -> f:(t -> 'a * t) -> 'a * t
 
 (** Push a new block to the stack of current blocks. *)
 val new_block : t -> params:Jsir.Var.t list -> t * Jsir.Addr.t
@@ -73,28 +90,60 @@ val new_block_with_addr_exn :
     argument. This function raises if there are no blocks being worked on. *)
 val end_block_with_last_exn : t -> Jsir.last -> t
 
-(** Returns the address for a special block for invalid switches, creating one
-    if it doesn't exist already. *)
-val invalid_switch_block : t -> t * Jsir.Addr.t
+(** Create a block for the invalid arms of a switch, which raises. As it defines
+    a variable, it must only be used within one function. *)
+val new_invalid_switch_block : t -> t * Jsir.Addr.t
 
-(** Get a public method and return the function. Increments the method cache ID.
-*)
+(** Get a public method and return the function. *)
 val get_public_method :
   t -> obj:Jsir.Var.t -> field:Jsir.Var.t -> t * Jsir.Var.t
 
 (** Register the fact that we import the given compilation unit (either its
-    toplevel module from the JSOO global data table or one of its symbols from
-    the symbol table). This is used to inform Js_of_ocaml that the compilation
-    unit must be linked before this one. *)
+    toplevel module, with [caml_get_global], or one of its symbols from the
+    symbol table). This is used to inform Js_of_ocaml that the compilation unit
+    must be linked before this one. *)
 val import_compilation_unit : t -> Compilation_unit.t -> t
-(* CR selee: Eventually we should do something similar for symbols too, so that
-   we don't put unused symbols in the symbol table. *)
 
-val global_data_var : t -> t * Jsir.Var.t
+(** Register [var] as the value of [symbol] in the global symbol table, so that
+    other compilation units can fetch it, with an [Event] for [loc] before the
+    registration, and record it as an export of the unit. Does nothing for
+    symbols that no other unit can refer to (those not in [reachable_names]).
+    Module symbols are only recorded as exports, as they are fetched with
+    [caml_get_global] instead. *)
+val register_symbol : t -> ?loc:Parse_info.t -> Symbol.t -> Jsir.Var.t -> t
+
+(** The variable holding the value of [symbol], which must be from another
+    compilation unit. On the first call for a given symbol, the expression
+    fetching it is bound to a fresh variable at the start of the entry block.
+    Later calls return the same variable without emitting anything. The
+    compilation unit of the symbol is recorded as an import. *)
+val external_symbol_var : t -> Symbol.t -> t * Jsir.Var.t
+
+(** Record that [bound_var], a variable created ahead of its definition, refers
+    to [defining_var]. All instances of [bound_var] will later be substituted
+    with [defining_var] (or following the chain of aliases if [defining_var] is
+    an alias itself. Raises if [bound_var] was already registered. *)
+val add_var_alias_exn :
+  t -> bound_var:Jsir.Var.t -> defining_var:Jsir.Var.t -> t
+
+type var_binding =
+  { bound_var : Jsir.Var.t;
+    defining_var : Jsir.Var.t
+  }
+
+val add_var_aliases_exn : t -> var_binding list -> t
 
 type program =
   { program : Jsir.program;
-    imported_compilation_units : Compilation_unit.Set.t
+    imported_compilation_units : Compilation_unit.Set.t;
+    symbol_imports : (Jsir.Var.t * Symbol.t) list;
+        (** The variables bound at the start of the entry block to the symbols
+            of other compilation units (excluding predefined exceptions), for
+            the linker to replace with the exporting unit's variables. *)
+    symbol_exports : (Symbol.t * Jsir.Var.t) list
+        (** The symbols of this unit that other compilation units may fetch
+            (including the module symbol), with the variables holding their
+            values. *)
   }
 
 (** Create a [program] with the blocks in the result, including the current

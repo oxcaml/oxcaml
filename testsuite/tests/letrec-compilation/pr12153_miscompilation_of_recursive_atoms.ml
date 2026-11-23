@@ -1,4 +1,9 @@
-(* TEST *)
+(* TEST
+ { bytecode; }
+ { native; }
+ { jsir-js; }
+ (* Disabled on jsir-wasm due to an upstream WASMOO bug *)
+*)
 
 let rec empty_int_array : int array =
   let _ = empty_int_array in [||]

@@ -21,8 +21,9 @@ val empty : t
 
 val from_bindings : (Variables.t * string) list -> t
 val to_bindings : t -> (Variables.t * string) list
-val to_system_env : t -> string array
-val append_to_system_env : string array -> t -> string array
+val to_system_env : full:bool -> t -> string array
+val append_to_system_env :
+  full:bool -> string array -> t -> string array
 
 val expand : t -> string -> string
 (** [expand env s] expands variable references [$var] and [${var}] in [s],

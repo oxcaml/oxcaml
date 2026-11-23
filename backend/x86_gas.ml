@@ -147,7 +147,7 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
       in
       match instr.mnemonic with
       | "vcvtpd2dq" | "vcvttpd2dq" | "vcvtpd2udq" | "vcvttpd2udq" | "vcvtpd2ps"
-      | "vcvtqq2ps" | "vcvtuqq2ps" ->
+      | "vcvtqq2ps" | "vcvtuqq2ps" | "vcvtneps2bf16" ->
         len_letter ~z:false
       | "vfpclassps" | "vfpclasspd" -> len_letter ~z:true
       | "vcvtusi2ss" | "vcvtusi2sd" ->

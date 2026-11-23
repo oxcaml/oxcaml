@@ -24,7 +24,7 @@ type simplify_result =
     unit : Flambda_unit.t
   }
 
-let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
+let run ~ppf_dump ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let return_continuation = FU.return_continuation unit in
   let exn_continuation = FU.exn_continuation unit in
   let toplevel_my_alloc_region = FU.toplevel_my_alloc_region unit in
@@ -32,7 +32,7 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let resolver = Flambda_cmx.load_cmx_file_contents cmx_loader in
   let get_imported_code = Flambda_cmx.get_imported_code cmx_loader in
   let denv =
-    DE.create ~round ~machine_width ~resolver ~get_imported_code
+    DE.create ~ppf_dump ~round ~machine_width ~resolver ~get_imported_code
       ~propagating_float_consts:(Flambda_features.float_const_prop ())
       ~unit_toplevel_return_continuation:return_continuation
       ~unit_toplevel_exn_continuation:exn_continuation ~toplevel_my_alloc_region
@@ -45,8 +45,8 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
       ~return_arity:(Flambda_arity.create_singletons [K.With_subkind.any_value])
       ~exn_continuation
   in
+  let name_occurrences = RE.free_names body in
   let body = Rebuilt_expr.to_expr body (UA.are_rebuilding_terms uacc) in
-  let name_occurrences = UA.name_occurrences uacc in
   NO.fold_names name_occurrences ~init:() ~f:(fun () name ->
       Name.pattern_match name
         ~var:(fun var ->
@@ -78,7 +78,6 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
     Exported_code.merge (UA.all_code uacc)
       (Exported_code.mark_as_imported (get_imported_code ()))
   in
-  let name_occurrences = UA.name_occurrences uacc in
   let slot_offsets =
     match UA.slot_offsets uacc with
     | Unknown ->

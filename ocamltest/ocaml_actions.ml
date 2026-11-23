@@ -21,16 +21,35 @@ open Actions
 (* Extracting information from environment *)
 
 let no_native_compilers _log env =
-  (Result.skip_with_reason "native compilers disabled", env)
+  Actions.Static (Result.skip_with_reason "native compilers disabled"), env
 
 let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
 
-let get_backend_value_from_env env bytecode_var native_var =
-  Ocaml_backends.make_backend_function
-    (Environments.safe_lookup bytecode_var env)
-    (Environments.safe_lookup native_var env)
+let no_jsir_js_reason = "js_of_ocaml not available"
+
+let no_jsir_wasm_reason = "wasm_of_ocaml not available"
+
+let jsir_action ~available ~reason a =
+  if Ocamltest_config.native_compiler && available then a
+  else Actions.update a (fun _log env ->
+    (Actions.Static (Result.skip_with_reason reason), env))
+
+let jsir_js_action =
+  jsir_action ~available:Ocaml_files.jsir_js_available
+    ~reason:no_jsir_js_reason
+
+let jsir_wasm_action =
+  jsir_action ~available:Ocaml_files.jsir_wasm_available
+    ~reason:no_jsir_wasm_reason
+
+(* Jsir_js and Jsir_wasm are compiled by ocamlopt (-target js_of_ocaml and
+   -target wasm_of_ocaml), so they take the ocamlopt variables. *)
+let get_backend_value_from_env env ocamlc_var ocamlopt_var backend =
+  match (backend : Ocaml_backends.t) with
+  | Bytecode -> Environments.safe_lookup ocamlc_var env
+  | Native | Jsir_js | Jsir_wasm -> Environments.safe_lookup ocamlopt_var env
 
 let modules env =
   Actions_helpers.words_of_variable env Ocaml_variables.modules
@@ -86,6 +105,16 @@ let default_ocaml_env = [|
   "OCAML_ERROR_STYLE=contextual"
 |]
 
+let compiler_env backend =
+  match (backend : Ocaml_backends.t) with
+  | Native | Bytecode -> default_ocaml_env
+  | Jsir_js ->
+    Array.append default_ocaml_env
+      [| "OXCAML_JS_OF_OCAML=" ^ Ocaml_files.js_of_ocaml |]
+  | Jsir_wasm ->
+    Array.append default_ocaml_env
+      [| "OXCAML_WASM_OF_OCAML=" ^ Ocaml_files.wasm_of_ocaml |]
+
 type module_generator = {
   description : string;
   command : string;
@@ -131,23 +160,16 @@ let generate_module generator output_variable input log env =
     input_file
   ] in
   let expected_exit_status = 0 in
-  let exit_status =
-    Actions_helpers.run_cmd
-      ~environment:default_ocaml_env
-      ~stdin_variable: Ocaml_variables.compiler_stdin
-      ~stdout_variable:output_variable
-      ~stderr_variable:output_variable
-      ~append:true
-      log env commandline in
-  if exit_status=expected_exit_status
-  then generator.generated_compilation_units basename
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    Printf.fprintf log "%s\n%!" reason;
-    []
-  end
+  Actions_helpers.run_cmd
+    ~environment:default_ocaml_env
+    ~stdin_variable: Ocaml_variables.compiler_stdin
+    ~stdout_variable:output_variable
+    ~stderr_variable:output_variable
+    ~append:true
+    ~exits:[expected_exit_status, Result.pass]
+    ~what
+    log env commandline,
+  generator.generated_compilation_units basename
 
 let generate_lexer = generate_module ocamllex
 
@@ -158,10 +180,11 @@ exception Cannot_compile_file_type of string
 let prepare_module output_variable log env input =
   let input_type = snd input in
   let open Ocaml_filetypes in
+  let nop = Actions.Static Result.pass in
   match input_type with
-    | Implementation | Interface | C | Obj -> [input]
-    | Binary_interface -> [input]
-    | Backend_specific _ -> [input]
+    | Implementation | Interface | C | Obj -> nop, [input]
+    | Binary_interface -> nop, [input]
+    | Backend_specific _ -> nop, [input]
     | Lexer ->
       generate_lexer output_variable input log env
     | Grammar ->
@@ -223,8 +246,12 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
     Actions_helpers.words_of_variable env Ocaml_variables.all_modules in
   let output_variable = Compiler.output_variable in
   let prepare = prepare_module output_variable log env in
-  let modules =
-    List.concat_map prepare (List.map Ocaml_filetypes.filetype all_modules) in
+  let module_tasks, modules =
+    List.split
+      (List.map prepare(List.map Ocaml_filetypes.filetype all_modules))
+  in
+  let modules = List.concat modules in
+  let module_tasks = Actions.seq module_tasks in
   let has_c_file = List.exists is_c_file modules in
   let c_headers_flags =
     if has_c_file then Ocaml_flags.c_includes else "" in
@@ -253,7 +280,7 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
   in
   match cmas_need_dynamic_loading with
     | Some (Error reason) ->
-        (Result.fail_with_reason reason, env)
+        (Actions.Static (Result.fail_with_reason reason), env)
     | Some (Ok _) | None ->
       let bytecode_links_c_code = (cmas_need_dynamic_loading = Some (Ok ())) in
       let commandline =
@@ -262,6 +289,7 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
         Ocaml_flags.runtime_flags env Compiler.target
                                   (has_c_file || bytecode_links_c_code);
         c_headers_flags;
+        Ocaml_flags.target_flags Compiler.target;
         Ocaml_flags.stdlib;
         directory_flags env;
         libraries;
@@ -274,22 +302,18 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
         module_names;
         last_flags env
       ] in
-      let exit_status =
+      Actions.seq [
+        module_tasks; 
         Actions_helpers.run_cmd
-          ~environment:default_ocaml_env
+          ~environment:(compiler_env Compiler.target)
           ~stdin_variable: Ocaml_variables.compiler_stdin
           ~stdout_variable:Compiler.output_variable
           ~stderr_variable:Compiler.output_variable
           ~append:true
-          log env commandline in
-      if exit_status=expected_exit_status
-      then (Result.pass, env)
-      else begin
-        let reason =
-          (Actions_helpers.mkreason
-            what (String.concat " " commandline) exit_status) in
-        (Result.fail_with_reason reason, env)
-      end
+          ~exits:[expected_exit_status, Result.pass]
+          ~what
+          log env commandline],
+      env
 
 let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
   let (module Compiler) = compiler in
@@ -309,6 +333,7 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
   let commandline =
   [
     Compiler.name;
+    Ocaml_flags.target_flags Compiler.target;
     Ocaml_flags.stdlib;
     c_headers_flags;
     directory_flags env;
@@ -319,22 +344,15 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
     compile_only_flag_opt;
     module_;
   ] in
-  let exit_status =
-    Actions_helpers.run_cmd
-      ~environment:default_ocaml_env
-      ~stdin_variable: Ocaml_variables.compiler_stdin
-      ~stdout_variable:Compiler.output_variable
-      ~stderr_variable:Compiler.output_variable
-      ~append:true
-      log env commandline in
-  if exit_status=expected_exit_status
-  then (Result.pass, env)
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+  Actions_helpers.run_cmd
+    ~environment:(compiler_env Compiler.target)
+    ~stdin_variable: Ocaml_variables.compiler_stdin
+    ~stdout_variable:Compiler.output_variable
+    ~stderr_variable:Compiler.output_variable
+    ~append:true
+    ~exits:[expected_exit_status, Result.pass]
+    ~what
+    log env commandline
 
 let module_has_interface directory module_name =
   let interface_name =
@@ -382,6 +400,12 @@ let setup_tool_build_env (tool : Ocaml_tools.tool) log env =
   let tool_reference_file =
     Tool.reference_file env tool_reference_prefix
   in
+  let extra_deps =
+    let reason = "Dependency of " ^ Tool.name in
+    Actions.Task (List.map
+      (fun filename -> Actions.Check_file_exists { filename; reason })
+      Tool.extra_dependencies)
+  in
   let env =
     Environments.add_if_undefined
       tool_reference_variable
@@ -408,17 +432,19 @@ let setup_tool_build_env (tool : Ocaml_tools.tool) log env =
       tool_output_variable
       tool_output_file env
   in
-  Sys.force_remove tool_output_file;
   let env =
     Environments.add Builtin_variables.test_build_directory build_dir env in
-  Actions_helpers.setup_build_env false source_modules log env
+  let task, env =
+    Actions_helpers.setup_build_env
+      false ~remove:[tool_output_file] source_modules log env
+  in
+  Actions.seq [extra_deps; task], env
 
 let setup_compiler_build_env (compiler : Ocaml_compilers.compiler) log env =
   let (module Compiler) = compiler in
-  let (r, env) =
+  let (t, env) =
     setup_tool_build_env (module Compiler : Ocaml_tools.Tool) log env
   in
-  if Result.is_pass r then
   begin
     let prog_var = Compiler.program_variable in
     let prog_output_var = Compiler.program_output_variable in
@@ -431,8 +457,8 @@ let setup_compiler_build_env (compiler : Ocaml_compilers.compiler) log env =
       | Some outputvar ->
         Environments.add_if_undefined outputvar prog_output_file env
     in
-    (r, env)
-  end else (r, env)
+    (t, env)
+  end
 
 let setup_toplevel_build_env (toplevel : Ocaml_toplevels.toplevel) log env =
   let (module Toplevel) = toplevel in
@@ -472,6 +498,18 @@ let setup_ocamlopt_opt_build_env =
       "setup-ocamlopt.opt-build-env"
       Ocaml_compilers.ocamlopt_opt)
 
+let setup_ocamlopt_jsir_js_build_env =
+  jsir_js_action
+    (mk_compiler_env_setup
+      "setup-ocamlopt.jsir-js-build-env"
+      Ocaml_compilers.ocamlopt_jsir_js)
+
+let setup_ocamlopt_jsir_wasm_build_env =
+  jsir_wasm_action
+    (mk_compiler_env_setup
+      "setup-ocamlopt.jsir-wasm-build-env"
+      Ocaml_compilers.ocamlopt_jsir_wasm)
+
 let setup_ocaml_build_env =
   mk_toplevel_env_setup
     "setup-ocaml-build-env"
@@ -490,7 +528,7 @@ let compile (compiler : Ocaml_compilers.compiler) log env =
     begin
       match Environments.lookup_nonempty Ocaml_variables.module_ env with
       | None -> compile_program compiler log env
-      | Some module_ -> compile_module compiler module_ log env
+      | Some module_ -> compile_module compiler module_ log env, env
     end
   | Some cmdline ->
     let expected_exit_status =
@@ -498,23 +536,18 @@ let compile (compiler : Ocaml_compilers.compiler) log env =
         (module Compiler : Ocaml_tools.Tool) in
     let what = Printf.sprintf "Compiling using commandline %s" cmdline in
     Printf.fprintf log "%s\n%!" what;
-    let commandline = [Compiler.name; cmdline] in
-    let exit_status =
-      Actions_helpers.run_cmd
-        ~environment:default_ocaml_env
-        ~stdin_variable: Ocaml_variables.compiler_stdin
-        ~stdout_variable:Compiler.output_variable
-        ~stderr_variable:Compiler.output_variable
-        ~append:true
-        log env commandline in
-    if exit_status=expected_exit_status
-    then (Result.pass, env)
-    else begin
-      let reason =
-        (Actions_helpers.mkreason
-          what (String.concat " " commandline) exit_status) in
-      (Result.fail_with_reason reason, env)
-    end
+    let commandline =
+      [Compiler.name; Ocaml_flags.target_flags Compiler.target; cmdline] in
+    Actions_helpers.run_cmd
+      ~environment:(compiler_env Compiler.target)
+      ~stdin_variable: Ocaml_variables.compiler_stdin
+      ~stdout_variable:Compiler.output_variable
+      ~stderr_variable:Compiler.output_variable
+      ~append:true
+      ~exits:[expected_exit_status, Result.pass]
+      ~what
+      log env commandline,
+    env
 
 (* Compile actions *)
 
@@ -549,6 +582,43 @@ let ocamlopt_opt =
       ~does_something:true
       (compile Ocaml_compilers.ocamlopt_opt))
 
+let ocamlopt_jsir_js =
+  jsir_js_action
+    (Actions.make
+      ~name:"ocamlopt.jsir-js"
+      ~description:
+        "Compile the program to JavaScript using \
+         ocamlopt.opt -target js_of_ocaml"
+      ~does_something:true
+      (compile Ocaml_compilers.ocamlopt_jsir_js))
+
+let ocamlopt_jsir_wasm =
+  jsir_wasm_action
+    (Actions.make
+      ~name:"ocamlopt.jsir-wasm"
+      ~description:
+        "Compile the program to WebAssembly using \
+         ocamlopt.opt -target wasm_of_ocaml"
+      ~does_something:true
+      (compile Ocaml_compilers.ocamlopt_jsir_wasm))
+
+let run_js =
+  jsir_js_action
+    (Actions.make
+      ~name:"run-js"
+      ~description:"Run the JavaScript program with node"
+      ~does_something:true
+      (Actions_helpers.run_program_with ~interpreter:Ocaml_files.node))
+
+let run_wasm =
+  jsir_wasm_action
+    (Actions.make
+      ~name:"run-wasm"
+      ~description:"Run the wasm_of_ocaml program with node"
+      ~does_something:true
+      (Actions_helpers.run_program_with
+        ~interpreter:(Ocaml_files.node ^ " " ^ Ocaml_files.node_wasm_flags)))
+
 let env_with_lib_unix env =
   let libunixdir = Ocaml_directories.libunix in
   let newlibs =
@@ -572,6 +642,7 @@ let objinfo log env =
   let ocamllib = [| (Printf.sprintf "OCAMLLIB=%s" tools_directory) |] in
   let systemenv =
     Environments.append_to_system_env
+      ~full:false
       (Array.concat
        [
          default_ocaml_env;
@@ -580,21 +651,15 @@ let objinfo log env =
       (env_with_lib_unix env)
   in
   let expected_exit_status = 0 in
-  let exit_status =
-    Actions_helpers.run_cmd
-      ~environment:systemenv
-      ~stdout_variable:Builtin_variables.output
-      ~stderr_variable:Builtin_variables.output
-      ~append:true
-      log (env_with_lib_unix env) commandline in
-  if exit_status=expected_exit_status
-  then (Result.pass, env)
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+  Actions_helpers.run_cmd
+    ~environment:systemenv
+    ~stdout_variable:Builtin_variables.output
+    ~stderr_variable:Builtin_variables.output
+    ~append:true
+    ~exits:[expected_exit_status, Result.pass]
+    ~what
+    log (env_with_lib_unix env) commandline,
+  env
 
 let ocamlobjinfo =
   Actions.make ~name:"ocamlobjinfo"
@@ -604,7 +669,8 @@ let ocamlobjinfo =
        if Ocamltest_config.ocamlobjinfo then
          objinfo log env
        else
-         Result.skip_with_reason "ocamlobjinfo not available", env
+         Actions.Static (Result.skip_with_reason "ocamlobjinfo not available"),
+         env
     )
 
 let mklib log env =
@@ -625,21 +691,15 @@ let mklib log env =
     "-o " ^ program
   ] @ modules env in
   let expected_exit_status = 0 in
-  let exit_status =
-    Actions_helpers.run_cmd
-      ~environment:default_ocaml_env
-      ~stdout_variable:Ocaml_variables.compiler_output
-      ~stderr_variable:Ocaml_variables.compiler_output
-      ~append:true
-      log env commandline in
-  if exit_status=expected_exit_status
-  then (Result.pass, env)
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+  Actions_helpers.run_cmd
+    ~environment:default_ocaml_env
+    ~stdout_variable:Ocaml_variables.compiler_output
+    ~stderr_variable:Ocaml_variables.compiler_output
+    ~append:true
+    ~exits:[expected_exit_status, Result.pass]
+    ~what
+    log env commandline,
+  env
 
 let ocamlmklib =
   Actions.make ~name:"ocamlmklib"
@@ -664,21 +724,15 @@ let run_fexpr log env =
     backend_flags env Ocaml_backends.Native;
     testfile
   ] in
-  let exit_status =
-    Actions_helpers.run_cmd
-      ~environment:default_ocaml_env
-      ~stdout_variable:Builtin_variables.output
-      ~stderr_variable:Builtin_variables.output
-      ~append:true
-      log env commandline in
-  if exit_status=0
-  then (Result.pass, env)
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+  Actions_helpers.run_cmd
+    ~environment:default_ocaml_env
+    ~stdout_variable:Builtin_variables.output
+    ~stderr_variable:Builtin_variables.output
+    ~append:true
+    ~exits:[0, Result.pass]
+    ~what
+    log env commandline,
+  env
 
 let fexpr =
   native_action @@
@@ -702,7 +756,7 @@ let run_fexpr_check log env =
     | Some module_ -> module_
     | None -> Actions_helpers.testfile env in
   let test_name = Filename.chop_extension test_name in
-  List.fold_left (fun (res, env) pass_sfx ->
+  List.fold_left (fun (task, env) pass_sfx ->
       let pass_dump_file = Filename.make_filename test_name pass_sfx in
       let pass_ref_file =
         Filename.(make_filename
@@ -715,23 +769,11 @@ let run_fexpr_check log env =
       let ref_file =
         Filename.make_path [test_source_dir; pass_ref_file]
       in
-      let nr =
-        if Sys.file_exists ref_file then
-          if Sys.file_exists dump_file then
-            Actions_helpers.compare_files "fexpr" dump_file ref_file log env
-          else
-            let dump_sfx = Filename.basename dump_file in
-            (Result.fail_with_reason
-              ("Expected a pass output: " ^ dump_sfx)
-            , env)
-        else
-          let ref_sfx = Filename.basename ref_file in
-          (Result.fail_with_reason
-            ("Missing reference file: " ^ ref_sfx)
-          , env)
+      let task', env =
+        Actions_helpers.compare_files "fexpr" dump_file ref_file log env
       in
-      if Result.is_pass res then nr else (res, env))
-    (Result.pass, env)
+      (Actions.seq [task;task'], env))
+    (Actions.Static Result.pass, env)
     passes_sfx
 
 let check_fexpr_dump =
@@ -752,7 +794,7 @@ let finalise_codegen_cc test_basename _log env =
     Ocaml_variables.modules, modules;
     Builtin_variables.program, program;
   ] env in
-  (Result.pass, env)
+  (Actions.Static Result.pass, env)
 
 let finalise_codegen_msvc test_basename log env =
   let obj = Filename.make_filename test_basename Ocamltest_config.objext in
@@ -761,30 +803,24 @@ let finalise_codegen_msvc test_basename log env =
   Printf.fprintf log "%s\n%!" what;
   let commandline = [Ocamltest_config.asm; obj; src] in
   let expected_exit_status = 0 in
-  let exit_status =
+  let task =
     Actions_helpers.run_cmd
       ~environment:default_ocaml_env
       ~stdout_variable:Ocaml_variables.compiler_output
       ~stderr_variable:Ocaml_variables.compiler_output
       ~append:true
+      ~exits:[expected_exit_status, Result.pass]
+      ~what
       log env commandline in
-  if exit_status=expected_exit_status
-  then begin
-    let archmod = Ocaml_files.asmgen_archmod in
-    let modules = obj ^ " " ^ archmod in
-    let program = Filename.make_filename test_basename "out" in
-    let env = Environments.add_bindings
-    [
-      Ocaml_variables.modules, modules;
-      Builtin_variables.program, program;
-    ] env in
-    (Result.pass, env)
-  end else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+  let archmod = Ocaml_files.asmgen_archmod in
+  let modules = obj ^ " " ^ archmod in
+  let program = Filename.make_filename test_basename "out" in
+  let env = Environments.add_bindings
+  [
+    Ocaml_variables.modules, modules;
+    Builtin_variables.program, program;
+  ] env in
+  (task, env)
 
 let run_codegen log env =
   let testfile = Actions_helpers.testfile env in
@@ -815,30 +851,25 @@ let run_codegen log env =
     Actions_helpers.exit_status_of_variable env
       Ocaml_variables.codegen_exit_status
   in
-  let exit_status =
+  let compile =
     Actions_helpers.run_cmd
       ~environment:default_ocaml_env
       ~stdout_variable:Ocaml_variables.compiler_output
       ~stderr_variable:Ocaml_variables.compiler_output
       ~append:true
+      ~exits:[expected_exit_status, Result.pass]
+      ~what
       log env commandline in
-  if exit_status=expected_exit_status
+  if expected_exit_status=0
   then begin
-    if exit_status=0
-    then begin
-      let finalise =
-        if Ocamltest_config.ccomp_type="msvc"
-        then finalise_codegen_msvc
-        else finalise_codegen_cc
-      in
-      finalise testfile_basename log env
-    end else (Result.pass, env)
-  end else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+    let finalise =
+      if Ocamltest_config.ccomp_type="msvc"
+      then finalise_codegen_msvc
+      else finalise_codegen_cc
+    in
+    let final, env = finalise testfile_basename log env in
+    Actions.seq [compile;final], env
+  end else compile, env
 
 let codegen =
   Actions.make ~name:"codegen" ~description:"Run codegen on the test file"
@@ -861,21 +892,15 @@ let run_cc log env =
     Environments.safe_lookup Builtin_variables.arguments env;
   ] @ modules env in
   let expected_exit_status = 0 in
-  let exit_status =
-    Actions_helpers.run_cmd
-      ~environment:default_ocaml_env
-      ~stdout_variable:Ocaml_variables.compiler_output
-      ~stderr_variable:Ocaml_variables.compiler_output
-      ~append:true
-      log env commandline in
-  if exit_status=expected_exit_status
-  then (Result.pass, env)
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+  Actions_helpers.run_cmd
+    ~environment:default_ocaml_env
+    ~stdout_variable:Ocaml_variables.compiler_output
+    ~stderr_variable:Ocaml_variables.compiler_output
+    ~append:true
+    ~exits:[expected_exit_status, Result.pass]
+    ~what
+    log env commandline,
+  env
 
 let cc =
   Actions.make ~name:"cc" ~description:"Run C compiler to build the program"
@@ -889,6 +914,7 @@ let run_expect_once input_file principal log env ~backend =
     match (backend : Ocaml_backends.t) with
     | Bytecode -> Ocaml_commands.expect
     | Native -> Ocaml_commands.expectnat
+    | Jsir_js | Jsir_wasm -> invalid_arg "run_expect_once: no JSIR toplevel"
   in
   let commandline =
   [
@@ -907,41 +933,38 @@ let run_expect_once input_file principal log env ~backend =
     input_file
   ]
   in
-  let exit_status =
-    Actions_helpers.run_cmd ~environment:default_ocaml_env log env commandline
-  in
-  if exit_status=0 then (Result.pass, env, ~needs_principal:false)
-  else if exit_status=3 then (Result.pass, env, ~needs_principal:true)
-  else begin
-    let reason = (Actions_helpers.mkreason
-      "expect" (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env, ~needs_principal:false)
-  end
+  Actions_helpers.run_cmd
+    ~environment:default_ocaml_env
+    ~exits:[0, Result.pass; 3, Result.pass]
+    ~what:"expect"
+    log env commandline,
+  env,
+  ~needs_principal:true
 
 let run_expect_twice input_file log env ~backend =
   let corrected filename = Filename.make_filename filename "corrected" in
-  let (result1, env1, ~needs_principal) =
+  let (task1, env1, ~needs_principal) =
     run_expect_once input_file false log env ~backend
   in
-  if Result.is_pass result1 then begin
+  begin
     let intermediate_file = corrected input_file in
-    let (result2, env2, output_file) =
+    let (tasks, env2, output_file) =
       if needs_principal then
-        let (result2, env2, ..) =
+        let (task2, env2, ..) =
           run_expect_once intermediate_file true log env1 ~backend
         in
-        (result2, env2, corrected intermediate_file)
-      else (result1, env1, intermediate_file)
+        (Actions.seq [task1; task2], env2, corrected intermediate_file)
+      else (task1, env1, intermediate_file)
     in
-    if Result.is_pass result2 then begin
+    begin
       let output_env = Environments.add_bindings
       [
         Builtin_variables.reference, input_file;
         Builtin_variables.output, output_file
       ] env2 in
-      (Result.pass, output_env)
-    end else (result2, env2)
-  end else (result1, env1)
+      (tasks, output_env)
+    end
+  end
 
 let run_expect_with ~backend log env =
   let input_file = Actions_helpers.testfile env in
@@ -994,6 +1017,16 @@ let check_ocamlopt_opt_output =
     (make_check_compiler_output
       "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt)
 
+let check_ocamlopt_jsir_js_output =
+  jsir_js_action
+    (make_check_compiler_output
+      "check-ocamlopt.jsir-js-output" Ocaml_compilers.ocamlopt_jsir_js)
+
+let check_ocamlopt_jsir_wasm_output =
+  jsir_wasm_action
+    (make_check_compiler_output
+      "check-ocamlopt.jsir-wasm-output" Ocaml_compilers.ocamlopt_jsir_wasm)
+
 let really_compare_programs backend comparison_tool log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
   let program2 = Environments.safe_lookup Builtin_variables.program2 env in
@@ -1005,23 +1038,20 @@ let really_compare_programs backend comparison_tool log env =
     Filecompare.reference_filename = program;
     Filecompare.output_filename = program2
   } in
-  match Filecompare.compare_files ~tool:comparison_tool files with
-  | Filecompare.Same -> (Result.pass, env)
-  | Filecompare.Different ->
-    let reason = Printf.sprintf "Files %s and %s are different"
-      program program2 in
-    (Result.fail_with_reason reason, env)
-  | Filecompare.Unexpected_output -> assert false
-  | Filecompare.Error (commandline, exitcode) ->
-    let reason = Actions_helpers.mkreason what commandline exitcode in
-    (Result.fail_with_reason reason, env)
+  Actions.Task [Compare_files {
+    kind_of_output = "program";
+    files;
+    tool = comparison_tool;
+    reference_exists = false;
+    promote = false }],
+  env
 
 let compare_programs backend comparison_tool log env =
   let compare_programs =
     Environments.lookup_as_bool Ocaml_variables.compare_programs env in
   if compare_programs = Some false then begin
     let reason = "program comparison disabled" in
-    (Result.pass_with_reason reason, env)
+    (Actions.Static (Result.pass_with_reason reason), env)
   end else really_compare_programs backend comparison_tool log env
 
 (* See CR in compare_bytecode_programs_code below.
@@ -1033,7 +1063,7 @@ let _make_bytecode_programs_comparison_tool =
 
 let native_programs_comparison_tool = Filecompare.default_comparison_tool
 
-let compare_bytecode_programs_code _log env : Result.t * Environments.t =
+let compare_bytecode_programs_code _log env : Actions.task * Environments.t =
   (* CR xclerc: consider re-enabling the test if it can be made robust enough.
      Currently, ocamlc.byte and ocamlc.opt (flambda2) sometimes generate equivalent
      cmi files whose contents differ because of sharing; the resulting difference
@@ -1043,7 +1073,8 @@ let compare_bytecode_programs_code _log env : Result.t * Environments.t =
   compare_programs
     Ocaml_backends.Bytecode bytecode_programs_comparison_tool log env
   *)
-  Result.pass_with_reason "comparing of bytecode programs is disabled", env
+  Static (Result.pass_with_reason "comparing of bytecode programs is disabled"),
+  env
 
 let compare_bytecode_programs =
   native_action
@@ -1090,20 +1121,16 @@ let compile_module compiler compilername compileroutput log env
     ] in
   let exec commandline =
     Printf.fprintf log "%s\n%!" what;
-    let exit_status =
-      Actions_helpers.run_cmd
-        ~stdin_variable: Ocaml_variables.compiler_stdin
-        ~stdout_variable:compileroutput
-        ~stderr_variable:compileroutput
-        ~append:true log env commandline in
-    if exit_status=expected_exit_status
-    then (Result.pass, env)
-    else begin
-      let reason =
-        (Actions_helpers.mkreason
-          what (String.concat " " commandline) exit_status) in
-      (Result.fail_with_reason reason, env)
-    end in
+    Actions_helpers.run_cmd
+      ~stdin_variable: Ocaml_variables.compiler_stdin
+      ~stdout_variable:compileroutput
+      ~stderr_variable:compileroutput
+      ~append:true
+      ~exits:[expected_exit_status, Result.pass]
+      ~what
+      log env commandline,
+    env
+  in
   match[@ocaml.warning "-fragile-match"] module_filetype with
     | Ocaml_filetypes.Interface ->
       let interface_name =
@@ -1128,7 +1155,7 @@ let compile_module compiler compilername compileroutput log env
     | _ ->
       let reason = Printf.sprintf "File %s of type %s not supported yet"
         filename (Ocaml_filetypes.string_of_filetype module_filetype) in
-      (Result.fail_with_reason reason, env)
+      (Actions.Static (Result.fail_with_reason reason), env)
 
 let compile_modules compiler compilername compileroutput
     modules_with_filetypes log initial_env
@@ -1137,11 +1164,12 @@ let compile_modules compiler compilername compileroutput
     compile_module compiler compilername compileroutput
     log env mod_ in
   let rec compile_mods env = function
-    | [] -> (Result.pass, env)
+    | [] -> ([], env)
     | m::ms ->
-      (let (result, newenv) = compile_mod env m in
-      if Result.is_pass result then (compile_mods newenv ms)
-      else (result, newenv)) in
+      let (m_task, env) = compile_mod env m in
+      let (ms_tasks, env) = compile_mods env ms in
+      m_task :: ms_tasks, env
+  in
   compile_mods initial_env modules_with_filetypes
 
 let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
@@ -1156,9 +1184,9 @@ let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
   in
   match cmas_need_dynamic_loading (directories env) libraries with
     | Some (Error reason) ->
-      (Result.fail_with_reason reason, env)
+      (Actions.Static (Result.fail_with_reason reason), env)
     | Some (Ok ()) when not toplevel_supports_dynamic_loading ->
-      (Result.skip, env)
+      (Actions.Static Result.skip, env)
     | Some (Ok ()) | None ->
       let testfile = Actions_helpers.testfile env in
       let expected_exit_status =
@@ -1169,10 +1197,10 @@ let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
       let compiler_name = Compiler.name in
       let modules_with_filetypes =
         List.map Ocaml_filetypes.filetype (modules env) in
-      let (result, env) = compile_modules
+      let (tasks, env) = compile_modules
         compiler compiler_name compiler_output_variable
         modules_with_filetypes log env in
-      if Result.is_pass result then begin
+      begin
         let what =
           Printf.sprintf "Running %s in %s toplevel \
                           (expected exit status: %d)"
@@ -1203,29 +1231,26 @@ let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
           if ocaml_script_as_argument then testfile else "";
           Environments.safe_lookup Builtin_variables.arguments env
         ] in
-        let exit_status =
+        let task =
           if ocaml_script_as_argument
           then Actions_helpers.run_cmd
             ~environment:default_ocaml_env
             ~stdout_variable:compiler_output_variable
             ~stderr_variable:compiler_output_variable
+            ~exits:[expected_exit_status, Result.pass]
+            ~what
             log env commandline
           else Actions_helpers.run_cmd
             ~environment:default_ocaml_env
             ~stdin_variable:Builtin_variables.test_file
             ~stdout_variable:compiler_output_variable
             ~stderr_variable:compiler_output_variable
+            ~exits:[expected_exit_status, Result.pass]
+            ~what
             log env commandline
         in
-        if exit_status=expected_exit_status
-        then (Result.pass, env)
-        else begin
-          let reason =
-            (Actions_helpers.mkreason
-              what (String.concat " " commandline) exit_status) in
-          (Result.fail_with_reason reason, env)
-        end
-      end else (result, env)
+        Actions.seq (tasks @ [task]), env
+      end
 
 let ocaml = Actions.make
   ~name:"ocaml"
@@ -1254,8 +1279,11 @@ let config_variables _log env =
   [
     Ocaml_variables.arch, Ocamltest_config.arch;
     Ocaml_variables.ocamlrun, Ocaml_files.ocamlrun;
+    Ocaml_variables.ocamlrun_sys, Ocaml_files.ocamlrun_sys;
     Ocaml_variables.ocamlc_byte, Ocaml_files.ocamlc;
     Ocaml_variables.ocamlopt_byte, Ocaml_files.ocamlopt;
+    Ocaml_variables.runtime, Ocaml_directories.runtime;
+    Ocaml_variables.stdlib, Ocaml_directories.stdlib;
     Ocaml_variables.bytecc_libs, Ocamltest_config.bytecc_libs;
     Ocaml_variables.nativecc_libs, Ocamltest_config.nativecc_libs;
     Ocaml_variables.mkdll, Ocamltest_config.mkdll;
@@ -1280,8 +1308,9 @@ let config_variables _log env =
     Ocaml_variables.ocamlopt_default_flags,
       Ocamltest_config.ocamlopt_default_flags;
     Ocaml_variables.ocamlrunparam, Sys.safe_getenv "OCAMLRUNPARAM";
-    Ocaml_variables.ocamlsrcdir, Ocaml_directories.srcdir;
-    Ocaml_variables.os_type, Sys.os_type
+    Ocaml_variables.ocamlsrcdir, Ocaml_directories.srcdir_path [];
+    Ocaml_variables.os_type, Sys.os_type;
+    Ocaml_variables.caml_ld_library_path, ""
   ] env
 
 let flat_float_array = Actions.make
@@ -1356,9 +1385,19 @@ let native_compiler = Actions.make
   ~name:"native-compiler"
   ~description:"Passes if the native compiler is available"
   ~does_something:false
-  (Actions_helpers.predicate Ocamltest_config.native_compiler
-    "native compiler available"
-    "native compiler not available")
+  (fun ppf env ->
+    let pred, env =
+      Actions_helpers.predicate Ocamltest_config.native_compiler
+        "native compiler available"
+        "native compiler not available"
+        ppf env
+    in
+    (* Add an explicit dependency on ocamlopt *)
+    Actions.seq
+      [pred;
+       Task [Check_file_exists {filename=Ocaml_files.ocamlopt;
+                                reason="native compiler available"}]],
+    env)
 
 let native_dynlink = Actions.make
   ~name:"native-dynlink"
@@ -1535,8 +1574,7 @@ let compile_ocamldoc (basename,filetype as module_) log env =
   Printf.fprintf log "%s\n%!" what;
   let filename =
     Ocaml_filetypes.make_filename (basename, filetype) in
-  let (r,env) = compiler_for_ocamldoc [module_] log env in
-  if not (Result.is_pass r) then (r,env) else
+  let (pre_tasks,env) = compiler_for_ocamldoc [module_] log env in
   let commandline =
     (* currently, we are ignoring the global ocamldoc_flags, since we
        don't have per-module flags *)
@@ -1546,39 +1584,32 @@ let compile_ocamldoc (basename,filetype as module_) log env =
     "-dump " ^ compiled_doc_name basename;
      filename;
   ] in
-  let exit_status =
+  let task =
     Actions_helpers.run_cmd
-      ~environment:(Environments.to_system_env env)
+      ~environment:(Environments.to_system_env ~full:false env)
       ~stdin_variable: Ocaml_variables.compiler_stdin
       ~stdout_variable:Ocamldoc.output_variable
       ~stderr_variable:Ocamldoc.output_variable
       ~append:true
-      log env commandline in
-  if exit_status=expected_exit_status
-  then (Result.pass, env)
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+      ~exits:[expected_exit_status, Result.pass]
+      ~what
+      log env commandline
+  in
+  Actions.seq (pre_tasks @ [task]), env
 
 let rec ocamldoc_compile_all log env = function
-  | [] -> (Result.pass, env)
+  | [] -> ([], env)
   | a :: q ->
-      let (r,env) = compile_ocamldoc a log env in
-      if Result.is_pass r then
-        ocamldoc_compile_all log env q
-      else
-        (r,env)
+      let (a,env) = compile_ocamldoc a log env in
+      let (q,env) = ocamldoc_compile_all log env q in
+      (a :: q, env)
 
 let setup_ocamldoc_build_env =
   Actions.make ~name:"setup_ocamldoc_build_env"
     ~description:"Setup ocamldoc build environment"
     ~does_something:false
     @@ fun log env ->
-  let (r,env) = setup_tool_build_env ocamldoc log env in
-  if not (Result.is_pass r) then (r,env) else
+  let (task,env) = setup_tool_build_env ocamldoc log env in
   let source_directory = Actions_helpers.test_source_directory env in
   let root_file = Filename.chop_extension (Actions_helpers.testfile env) in
   let reference_prefix = Filename.make_path [source_directory; root_file] in
@@ -1593,7 +1624,7 @@ let setup_ocamldoc_build_env =
     if backend = "man" then Environments.add_if_undefined
         Builtin_variables.skip_header_lines "1" env
     else env in
-  Result.pass, env
+  task, env
 
 let ocamldoc_plugin name = name ^ ".cmo"
 
@@ -1618,10 +1649,8 @@ let run_ocamldoc =
   let modules =  List.map Ocaml_filetypes.filetype @@ modules env in
   (* plugins are used for custom documentation generators *)
   let plugins = List.map Ocaml_filetypes.filetype @@ plugins env in
-  let (r,env) = compiler_for_ocamldoc plugins log env in
-  if not (Result.is_pass r) then r, env else
-  let (r,env) = ocamldoc_compile_all log env modules in
-  if not (Result.is_pass r) then r, env else
+  let (t1,env) = compiler_for_ocamldoc plugins log env in
+  let (t2,env) = ocamldoc_compile_all log env modules in
   let input_file = Actions_helpers.testfile env in
   Printf.fprintf log "Generating documentation for %s\n%!" input_file;
   let load_all =
@@ -1640,20 +1669,27 @@ let run_ocamldoc =
    [ input_file;
      "-o"; ocamldoc_o_flag env
    ] in
-  let exit_status =
-    Actions_helpers.run_cmd ~environment:(Environments.to_system_env env)
+  let t3 =
+    Actions_helpers.run_cmd
+      ~environment:(Environments.to_system_env ~full:false env)
       ~stdin_variable: Ocaml_variables.compiler_stdin
       ~stdout_variable:Ocamldoc.output_variable
       ~stderr_variable:Ocamldoc.output_variable
       ~append:true
+      ~exits:[0, Result.pass]
+      ~what:"ocamldoc"
       log env commandline in
-  if exit_status=0 then
-    (Result.pass, env)
-  else begin
-    let reason = (Actions_helpers.mkreason
-      "ocamldoc" (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+  Actions.seq (t1 @ t2 @ [t3]), env
+
+let setup_ocamlfilt =
+  Actions.make ~name:"setup-ocamlfilt"
+    ~description:"Ensure ocamlfilt is available"
+    ~does_something:false
+    @@ fun _loc env ->
+  let filename = Ocaml_files.ocamlfilt in
+  let env = Environments.add Ocaml_variables.ocamlfilt filename env in
+  let reason = filename ^ " does not exist" in
+  Actions.Task [Check_file_exists {filename; reason}], env
 
 let init () =
   Environments.register_initializer Environments.Post
@@ -1674,6 +1710,14 @@ let init () =
     setup_ocamlopt_opt_build_env;
     ocamlopt_opt;
     check_ocamlopt_opt_output;
+    setup_ocamlopt_jsir_js_build_env;
+    ocamlopt_jsir_js;
+    check_ocamlopt_jsir_js_output;
+    run_js;
+    setup_ocamlopt_jsir_wasm_build_env;
+    ocamlopt_jsir_wasm;
+    check_ocamlopt_jsir_wasm_output;
+    run_wasm;
     run_expect;
     run_expectnat;
     compare_bytecode_programs;
@@ -1707,6 +1751,7 @@ let init () =
     setup_ocamldoc_build_env;
     run_ocamldoc;
     check_ocamldoc_output;
+    setup_ocamlfilt;
     ocamlmklib;
     fexpr;
     check_fexpr_dump;

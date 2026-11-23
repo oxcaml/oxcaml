@@ -981,8 +981,8 @@ module Binary_float32_comp = Binary_arith_like (Float32_ops_for_binary_comp)
 (* Unlike in the language specification, the compiler defines physical equality
    as referential equality on all values, including immediates and immutable
    blocks. *)
-let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term _dbg
-    ~arg1:_ ~arg1_ty ~arg2:_ ~arg2_ty ~result_var =
+let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term dbg
+    ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~result_var =
   (* This primitive is only used for arguments of kind [Value]. *)
   let typing_env = DA.typing_env dacc in
   (* Note: We don't compare the arguments themselves for equality. Instead, we
@@ -999,12 +999,60 @@ let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term _dbg
     SPR.create
       (Named.create_simple (Simple.untagged_const_bool machine_width result))
       ~try_reify:false dacc
-  | Unknown ->
-    let dacc =
-      DA.add_variable dacc result_var
-        (T.these_naked_immediates (Target_ocaml_int.all_bools machine_width))
+  | Unknown -> (
+    (* For a boolean [b], [b = true] and [b <> false] are the untagging of [b],
+       and [b = false] and [b <> true] are the negation of that. This avoids
+       materialising a boolean that has just been computed by a comparison. *)
+    let bools = Target_ocaml_int.all_bools machine_width in
+    let bool_imms ty =
+      match T.prove_equals_tagged_immediates typing_env ty with
+      | Proved imms when Target_ocaml_int.Set.subset imms bools -> Some imms
+      | Proved _ | Unknown -> None
     in
-    SPR.create original_term ~try_reify:false dacc
+    let bool_and_constant =
+      match bool_imms arg1_ty, bool_imms arg2_ty with
+      | Some imms1, Some imms2 -> (
+        match
+          ( Target_ocaml_int.Set.get_singleton imms1,
+            Target_ocaml_int.Set.get_singleton imms2 )
+        with
+        | _, Some imm -> Some (arg1, imm)
+        | Some imm, None -> Some (arg2, imm)
+        | None, None -> None)
+      | None, _ | _, None -> None
+    in
+    match bool_and_constant with
+    | None ->
+      let dacc =
+        DA.add_variable dacc result_var (T.these_naked_immediates bools)
+      in
+      SPR.create original_term ~try_reify:false dacc
+    | Some (bool, imm) ->
+      let untag = Named.create_prim (Unary (Untag_immediate, bool)) dbg in
+      let constant_is_true =
+        Target_ocaml_int.equal imm (Target_ocaml_int.one machine_width)
+      in
+      let let_ bound named ~body =
+        Expr.create_let
+          (Let.create
+             (Bound_pattern.singleton bound)
+             named ~free_names_of_body:Unknown ~body)
+      in
+      SPR.create_rewritten (fun ~body ->
+          match op, constant_is_true with
+          | Eq, true | Neq, false -> let_ result_var untag ~body
+          | Eq, false | Neq, true ->
+            let untagged = Variable.create "untagged" K.naked_immediate in
+            let negation =
+              Named.create_prim
+                (Unary (Boolean_not Naked_bool, Simple.var untagged))
+                dbg
+            in
+            let_
+              (Bound_var.create untagged Flambda_debug_uid.none
+                 (Bound_var.name_mode result_var))
+              untag
+              ~body:(let_ result_var negation ~body)))
 
 let simplify_array_load (array_kind : P.Array_kind.t)
     (array_load_kind : P.Array_load_kind.t) mutability dacc ~original_term:_ dbg

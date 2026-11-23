@@ -962,6 +962,17 @@ and extension_constructor_kind = Parsetree.extension_constructor_kind =
       pjkind_loc : location
     }
 
+  and law_declaration = Parsetree.law_declaration =
+    {
+      plaw_name : string loc;
+      plaw_params : (string loc * core_type option) list;
+      plaw_assumptions : expression list;
+      plaw_conclusion : expression;
+      plaw_attributes : attributes;
+      plaw_loc : location
+    }
+  (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C] *)
+
 (** {1 Class language} *)
 (** {2 Type expressions for the class language} *)
 
@@ -1198,6 +1209,8 @@ and signature_item_desc = Parsetree.signature_item_desc =
   | Psig_extension of extension * attributes  (** [\[%%id\]] *)
   | Psig_jkind of jkind_declaration
       (** [kind_abbrev_ name = k] *)
+  | Psig_law of law_declaration
+      (** [law_? name x (y : T) : A implies_ C] *)
 
 and module_declaration = Parsetree.module_declaration = {
   pmd_name : string option loc;
@@ -1356,6 +1369,8 @@ and structure_item_desc = Parsetree.structure_item_desc =
   | Pstr_extension of extension * attributes  (** [\[%%id\]] *)
   | Pstr_jkind of jkind_declaration
       (** [kind_abbrev_ name = k] *)
+  | Pstr_law of law_declaration
+      (** [law_? name x (y : T) : A implies_ C] *)
 
 and value_constraint = Parsetree.value_constraint =
   | Pvc_constraint of {
@@ -2210,6 +2225,23 @@ class virtual map =
         let pjkind_attributes = self#attributes pjkind_attributes in
         let pjkind_loc = self#location pjkind_loc in
         { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
+    method law_declaration : law_declaration -> law_declaration=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        let plaw_name = self#loc self#string plaw_name in
+        let plaw_params =
+          self#list
+            (fun (a, b) ->
+               let a = self#loc self#string a in
+               let b = self#option self#core_type b in (a, b))
+            plaw_params in
+        let plaw_assumptions = self#list self#expression plaw_assumptions in
+        let plaw_conclusion = self#expression plaw_conclusion in
+        let plaw_attributes = self#attributes plaw_attributes in
+        let plaw_loc = self#location plaw_loc in
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc }
     method class_type : class_type -> class_type=
       fun { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc pcty_desc in
@@ -2464,6 +2496,7 @@ class virtual map =
             let a = self#extension a in
             let b = self#attributes b in Psig_extension (a, b)
         | Psig_jkind a -> let a = self#jkind_declaration a in Psig_jkind a
+        | Psig_law a -> let a = self#law_declaration a in Psig_law a
     method module_declaration : module_declaration -> module_declaration=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } ->
         let pmd_name = self#loc (self#option self#string) pmd_name in
@@ -2614,6 +2647,7 @@ class virtual map =
             let a = self#extension a in
             let b = self#attributes b in Pstr_extension (a, b)
         | Pstr_jkind a -> let a = self#jkind_declaration a in Pstr_jkind a
+        | Pstr_law a -> let a = self#law_declaration a in Pstr_law a
     method value_constraint : value_constraint -> value_constraint=
       fun x ->
         match x with
@@ -3243,6 +3277,18 @@ class virtual iter =
         self#option self#jkind_annotation pjkind_manifest;
         self#attributes pjkind_attributes;
         self#location pjkind_loc
+    method law_declaration : law_declaration -> unit=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        self#loc self#string plaw_name;
+        self#list
+          (fun (a, b) -> self#loc self#string a; self#option self#core_type b)
+          plaw_params;
+        self#list self#expression plaw_assumptions;
+        self#expression plaw_conclusion;
+        self#attributes plaw_attributes;
+        self#location plaw_loc
     method class_type : class_type -> unit=
       fun { pcty_desc; pcty_loc; pcty_attributes } ->
         self#class_type_desc pcty_desc;
@@ -3427,6 +3473,7 @@ class virtual iter =
         | Psig_attribute a -> self#attribute a
         | Psig_extension (a, b) -> (self#extension a; self#attributes b)
         | Psig_jkind a -> self#jkind_declaration a
+        | Psig_law a -> self#law_declaration a
     method module_declaration : module_declaration -> unit=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } ->
         self#loc (self#option self#string) pmd_name;
@@ -3533,6 +3580,7 @@ class virtual iter =
         | Pstr_attribute a -> self#attribute a
         | Pstr_extension (a, b) -> (self#extension a; self#attributes b)
         | Pstr_jkind a -> self#jkind_declaration a
+        | Pstr_law a -> self#law_declaration a
     method value_constraint : value_constraint -> unit=
       fun x ->
         match x with
@@ -4292,6 +4340,21 @@ class virtual ['acc] fold =
         let acc = self#option self#jkind_annotation pjkind_manifest acc in
         let acc = self#attributes pjkind_attributes acc in
         let acc = self#location pjkind_loc acc in acc
+    method law_declaration : law_declaration -> 'acc -> 'acc=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } acc ->
+        let acc = self#loc self#string plaw_name acc in
+        let acc =
+          self#list
+            (fun (a, b) acc ->
+               let acc = self#loc self#string a acc in
+               let acc = self#option self#core_type b acc in acc)
+            plaw_params acc in
+        let acc = self#list self#expression plaw_assumptions acc in
+        let acc = self#expression plaw_conclusion acc in
+        let acc = self#attributes plaw_attributes acc in
+        let acc = self#location plaw_loc acc in acc
     method class_type : class_type -> 'acc -> 'acc=
       fun { pcty_desc; pcty_loc; pcty_attributes } acc ->
         let acc = self#class_type_desc pcty_desc acc in
@@ -4512,6 +4575,7 @@ class virtual ['acc] fold =
             let acc = self#extension a acc in
             let acc = self#attributes b acc in acc
         | Psig_jkind a -> self#jkind_declaration a acc
+        | Psig_law a -> self#law_declaration a acc
     method module_declaration : module_declaration -> 'acc -> 'acc=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } acc
         ->
@@ -4650,6 +4714,7 @@ class virtual ['acc] fold =
             let acc = self#extension a acc in
             let acc = self#attributes b acc in acc
         | Pstr_jkind a -> self#jkind_declaration a acc
+        | Pstr_law a -> self#law_declaration a acc
     method value_constraint : value_constraint -> 'acc -> 'acc=
       fun x acc ->
         match x with
@@ -5674,6 +5739,26 @@ class virtual ['acc] fold_map =
         let (pjkind_loc, acc) = self#location pjkind_loc acc in
         ({ pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc },
           acc)
+    method law_declaration :
+      law_declaration -> 'acc -> (law_declaration * 'acc)=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } acc ->
+        let (plaw_name, acc) = self#loc self#string plaw_name acc in
+        let (plaw_params, acc) =
+          self#list
+            (fun (a, b) acc ->
+               let (a, acc) = self#loc self#string a acc in
+               let (b, acc) = self#option self#core_type b acc in
+               ((a, b), acc)) plaw_params acc in
+        let (plaw_assumptions, acc) =
+          self#list self#expression plaw_assumptions acc in
+        let (plaw_conclusion, acc) = self#expression plaw_conclusion acc in
+        let (plaw_attributes, acc) = self#attributes plaw_attributes acc in
+        let (plaw_loc, acc) = self#location plaw_loc acc in
+        ({ plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc },
+          acc)
     method class_type : class_type -> 'acc -> (class_type * 'acc)=
       fun { pcty_desc; pcty_loc; pcty_attributes } acc ->
         let (pcty_desc, acc) = self#class_type_desc pcty_desc acc in
@@ -6002,6 +6087,9 @@ class virtual ['acc] fold_map =
         | Psig_jkind a ->
             let (a, acc) = self#jkind_declaration a acc in
             ((Psig_jkind a), acc)
+        | Psig_law a ->
+            let (a, acc) = self#law_declaration a acc in
+            ((Psig_law a), acc)
     method module_declaration :
       module_declaration -> 'acc -> (module_declaration * 'acc)=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } acc
@@ -6208,6 +6296,9 @@ class virtual ['acc] fold_map =
         | Pstr_jkind a ->
             let (a, acc) = self#jkind_declaration a acc in
             ((Pstr_jkind a), acc)
+        | Pstr_law a ->
+            let (a, acc) = self#law_declaration a acc in
+            ((Pstr_law a), acc)
     method value_constraint :
       value_constraint -> 'acc -> (value_constraint * 'acc)=
       fun x acc ->
@@ -7147,6 +7238,24 @@ class virtual ['ctx] map_with_context =
         let pjkind_attributes = self#attributes ctx pjkind_attributes in
         let pjkind_loc = self#location ctx pjkind_loc in
         { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
+    method law_declaration : 'ctx -> law_declaration -> law_declaration=
+      fun ctx
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        let plaw_name = self#loc self#string ctx plaw_name in
+        let plaw_params =
+          self#list
+            (fun ctx (a, b) ->
+               let a = self#loc self#string ctx a in
+               let b = self#option self#core_type ctx b in (a, b)) ctx
+            plaw_params in
+        let plaw_assumptions =
+          self#list self#expression ctx plaw_assumptions in
+        let plaw_conclusion = self#expression ctx plaw_conclusion in
+        let plaw_attributes = self#attributes ctx plaw_attributes in
+        let plaw_loc = self#location ctx plaw_loc in
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc }
     method class_type : 'ctx -> class_type -> class_type=
       fun ctx { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc ctx pcty_desc in
@@ -7417,6 +7526,8 @@ class virtual ['ctx] map_with_context =
             let b = self#attributes ctx b in Psig_extension (a, b)
         | Psig_jkind a ->
             let a = self#jkind_declaration ctx a in Psig_jkind a
+        | Psig_law a ->
+            let a = self#law_declaration ctx a in Psig_law a
     method module_declaration :
       'ctx -> module_declaration -> module_declaration=
       fun ctx { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc }
@@ -7581,6 +7692,8 @@ class virtual ['ctx] map_with_context =
             let b = self#attributes ctx b in Pstr_extension (a, b)
         | Pstr_jkind a ->
             let a = self#jkind_declaration ctx a in Pstr_jkind a
+        | Pstr_law a ->
+            let a = self#law_declaration ctx a in Pstr_law a
     method value_constraint : 'ctx -> value_constraint -> value_constraint=
       fun ctx x ->
         match x with
@@ -8645,6 +8758,28 @@ class virtual ['res] lift =
           ("pjkind_manifest", pjkind_manifest);
           ("pjkind_attributes", pjkind_attributes);
           ("pjkind_loc", pjkind_loc)]
+    method law_declaration : law_declaration -> 'res=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        let plaw_name = self#loc self#string plaw_name in
+        let plaw_params =
+          self#list
+            (fun (a, b) ->
+               let a = self#loc self#string a in
+               let b = self#option self#core_type b in self#tuple [a; b])
+            plaw_params in
+        let plaw_assumptions = self#list self#expression plaw_assumptions in
+        let plaw_conclusion = self#expression plaw_conclusion in
+        let plaw_attributes = self#attributes plaw_attributes in
+        let plaw_loc = self#location plaw_loc in
+        self#record
+          [("plaw_name", plaw_name);
+          ("plaw_params", plaw_params);
+          ("plaw_assumptions", plaw_assumptions);
+          ("plaw_conclusion", plaw_conclusion);
+          ("plaw_attributes", plaw_attributes);
+          ("plaw_loc", plaw_loc)]
     method class_type : class_type -> 'res=
       fun { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc pcty_desc in
@@ -8957,6 +9092,8 @@ class virtual ['res] lift =
             let b = self#attributes b in self#constr "Psig_extension" [a; b]
         | Psig_jkind a ->
             let a = self#jkind_declaration a in self#constr "Psig_jkind" [a]
+        | Psig_law a ->
+            let a = self#law_declaration a in self#constr "Psig_law" [a]
     method module_declaration : module_declaration -> 'res=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } ->
         let pmd_name = self#loc (self#option self#string) pmd_name in
@@ -9155,6 +9292,8 @@ class virtual ['res] lift =
             let b = self#attributes b in self#constr "Pstr_extension" [a; b]
         | Pstr_jkind a ->
             let a = self#jkind_declaration a in self#constr "Pstr_jkind" [a]
+        | Pstr_law a ->
+            let a = self#law_declaration a in self#constr "Pstr_law" [a]
     method value_constraint : value_constraint -> 'res=
       fun x ->
         match x with
@@ -10704,6 +10843,40 @@ class virtual ['ctx,'res] lift_map_with_context =
              ("pjkind_manifest", (Stdlib.snd pjkind_manifest));
              ("pjkind_attributes", (Stdlib.snd pjkind_attributes));
              ("pjkind_loc", (Stdlib.snd pjkind_loc))]))
+    method law_declaration :
+      'ctx -> law_declaration -> (law_declaration * 'res)=
+      fun ctx
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        let plaw_name = self#loc self#string ctx plaw_name in
+        let plaw_params =
+          self#list
+            (fun ctx (a, b) ->
+               let a = self#loc self#string ctx a in
+               let b = self#option self#core_type ctx b in
+               (((Stdlib.fst a), (Stdlib.fst b)),
+                 (self#tuple ctx [Stdlib.snd a; Stdlib.snd b]))) ctx
+            plaw_params in
+        let plaw_assumptions =
+          self#list self#expression ctx plaw_assumptions in
+        let plaw_conclusion = self#expression ctx plaw_conclusion in
+        let plaw_attributes = self#attributes ctx plaw_attributes in
+        let plaw_loc = self#location ctx plaw_loc in
+        ({
+           plaw_name = (Stdlib.fst plaw_name);
+           plaw_params = (Stdlib.fst plaw_params);
+           plaw_assumptions = (Stdlib.fst plaw_assumptions);
+           plaw_conclusion = (Stdlib.fst plaw_conclusion);
+           plaw_attributes = (Stdlib.fst plaw_attributes);
+           plaw_loc = (Stdlib.fst plaw_loc)
+         },
+          (self#record ctx
+             [("plaw_name", (Stdlib.snd plaw_name));
+             ("plaw_params", (Stdlib.snd plaw_params));
+             ("plaw_assumptions", (Stdlib.snd plaw_assumptions));
+             ("plaw_conclusion", (Stdlib.snd plaw_conclusion));
+             ("plaw_attributes", (Stdlib.snd plaw_attributes));
+             ("plaw_loc", (Stdlib.snd plaw_loc))]))
     method class_type : 'ctx -> class_type -> (class_type * 'res)=
       fun ctx { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc ctx pcty_desc in
@@ -11213,6 +11386,10 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#jkind_declaration ctx a in
             ((Psig_jkind (Stdlib.fst a)),
               (self#constr ctx "Psig_jkind" [Stdlib.snd a]))
+        | Psig_law a ->
+            let a = self#law_declaration ctx a in
+            ((Psig_law (Stdlib.fst a)),
+              (self#constr ctx "Psig_law" [Stdlib.snd a]))
     method module_declaration :
       'ctx -> module_declaration -> (module_declaration * 'res)=
       fun ctx { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc }
@@ -11536,6 +11713,10 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#jkind_declaration ctx a in
             ((Pstr_jkind (Stdlib.fst a)),
               (self#constr ctx "Pstr_jkind" [Stdlib.snd a]))
+        | Pstr_law a ->
+            let a = self#law_declaration ctx a in
+            ((Pstr_law (Stdlib.fst a)),
+              (self#constr ctx "Pstr_law" [Stdlib.snd a]))
     method value_constraint :
       'ctx -> value_constraint -> (value_constraint * 'res)=
       fun ctx x ->

@@ -208,7 +208,7 @@ let c1 =
   let module R = U (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
+>> Fatal error: Includemod.try_modtypes: template functor coercion at line 6, characters 68-73
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -275,6 +275,152 @@ let r12 =
   R.i
 [%%expect{|
 val r12 : int = 11
+|}]
+
+(* Template functor [IdF] only available dynamically as an argument of [G]. *)
+module G (H : IdF) = H (struct let poly_ id x = x end)
+[%%expect{|
+Line 1, characters 21-22:
+1 | module G (H : IdF) = H (struct let poly_ id x = x end)
+                         ^
+Error: The functor is "dynamic"
+       but is expected to be "static"
+         because it is a template functor instantiated here.
+|}]
+
+(* [G] is a template functor, so all is fine. *)
+module G (H : IdF @ static) = H (struct let poly_ id x = x end)
+[%%expect{|
+module G : functor (H : IdF @ static) -> Id
+|}]
+
+(* same as before, but with an [include functor] application *)
+module G (H : IdF) = struct let poly_ id x = x include functor H end
+[%%expect{|
+Line 1, characters 47-64:
+1 | module G (H : IdF) = struct let poly_ id x = x include functor H end
+                                                   ^^^^^^^^^^^^^^^^^
+Error: The functor is "dynamic"
+       but is expected to be "static"
+         because it is a template functor instantiated here.
+|}]
+
+(* [include functor] of a static functor: the enclosing structure is the
+   argument, and the application is a template instantiation. *)
+let (r13i, r13f) =
+  let module F (M : Id @ static) = struct
+    let i = M.id 12
+    let f = to_float (M.id #12.0)
+  end in
+  let module R = struct
+    let poly_ id x = x
+    include functor F
+  end in
+  (R.i, R.f)
+[%%expect{|
+val r13i : int = 12
+val r13f : float = 12.
+|}]
+
+(* The same with a generative static functor: instantiate, then apply to unit. *)
+let (r13gi, r13gf) =
+  let module F (M : Id @ static) () = struct
+    let i = M.id 13
+    let f = to_float (M.id #13.0)
+  end in
+  let module R = struct
+    let poly_ id x = x
+    include functor F
+  end in
+  (R.i, R.f)
+[%%expect{|
+val r13gi : int = 13
+val r13gf : float = 13.
+|}]
+
+(* Generative non-template [include functor] should return [@ dynamic] *)
+let _ =
+  let module F (M : sig end) () = struct
+    let poly_ id x = x
+  end in
+  let module M = struct
+    include functor F
+  end in
+  M.id 1
+[%%expect{|
+Line 8, characters 2-6:
+8 |   M.id 1
+      ^^^^
+Error: The value "M.id" is "dynamic"
+         because generative functor applications are always dynamic.
+       However, the value "M.id" highlighted is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
+|}]
+
+(* Generative [include functor] should return [@ dynamic] *)
+let _ =
+  let module F (M : sig end @ static) () = struct
+    let poly_ id x = x
+  end in
+  let module M = struct
+    include functor F
+  end in
+  M.id 1
+[%%expect{|
+Line 8, characters 2-6:
+8 |   M.id 1
+      ^^^^
+Error: The value "M.id" is "dynamic"
+         because generative functor applications are always dynamic.
+       However, the value "M.id" highlighted is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
+|}]
+
+(* Abstraction of a template functor with a consistent functor type. *)
+let _ =
+  let module M : sig
+    module F : functor (_ : Id @ static) -> Id @ static
+  end = struct
+    module F (X : Id @ static) = X
+  end in
+  let module M = M.F (struct let poly_ id x = x end) in
+  M.id 1
+[%%expect{|
+- : int = 1
+|}]
+
+(* Abstraction of a template functor with a weakened functor type
+   returning [@ dynamic]. *)
+let _ =
+  let module M : sig
+    module F : functor (_ : Id @ static) -> Id
+  end = struct
+    module F (X : Id @ static) = X
+  end in
+  let module M = M.F (struct let poly_ id x = x end) in
+  M.id 1
+[%%expect{|
+Line 8, characters 2-6:
+8 |   M.id 1
+      ^^^^
+Error: The value "M.id" is "dynamic"
+       but is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
+|}]
+
+(* template functor coercion *)
+let _ =
+  let module M : sig
+    module F (X : sig end @ static) : sig val j : int end
+  end = struct
+    module F (X : sig end @ static) = struct let i = 1 let j = 2 end
+  end in
+  let module M = M.F (struct end) in
+  M.j
+[%%expect{|
+>> Fatal error: Includemod.try_modtypes: template functor coercion at lines 4-6, characters 8-5
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Captured values of several layouts at once. *)
@@ -469,11 +615,8 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-(* Recursive functor. This is more broken than it initially looks.
-   [Recursive.M12.id]'s first argument ends up with the kind [value_or_null]
-   even though it should be polymorphic. The missing value error is coming from
-   how recursive modules are compiled: this ends up as calls to CamlinternalMod
-   which slambda eval can't see through. *)
+(* Recursive functor. Recursive modules compile to calls to CamlinternalMod,
+   which slambda eval can't see through, so they must be dynamic. *)
 let x12 =
  let module Recursive = struct
     module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
@@ -487,9 +630,33 @@ let x12 =
   end in
   Recursive.M12.id 7
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
+Line 3, characters 15-18:
+3 |     module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
+                   ^^^
+Error: The module is "dynamic" because recursive modules are always dynamic.
+       However, the module highlighted is expected to be "static".
+|}]
 
+(* An unsafe recursive module is evaluated directly, not through
+   CamlinternalMod, but it must be dynamic like every recursive module. [M16] is
+   unsafe because of [k]. *)
+let x16 =
+  let module Recursive = struct
+    module rec M16 : sig
+      val id : layout_ l. ('a : l). 'a -> 'a
+      val k : int
+    end @ static = struct
+      let poly_ id x = x
+      let k = 1
+    end
+  end in
+  Recursive.M16.id 7
+[%%expect{|
+Line 3, characters 15-18:
+3 |     module rec M16 : sig
+                   ^^^
+Error: The module is "dynamic" because recursive modules are always dynamic.
+       However, the module highlighted is expected to be "static".
 |}]
 
 (* Recursive first-class functor *)
@@ -504,11 +671,33 @@ let rec p13 =
   end : F)
 [%%expect{|
 module type F = functor (X : sig end @ static) -> sig val f : unit -> int end
-Lines 7-9, characters 18-5:
-7 | ..................(X : sig end @ static) -> struct
+Lines 7-9, characters 2-10:
+7 | ..(module functor (X : sig end @ static) -> struct
 8 |     let f () = ignore p13; 1
-9 |   end.....
-Error: Recursive static functors are not supported
+9 |   end : F)
+Error: This kind of expression is not allowed as right-hand side of "let rec"
+|}]
+
+(* A static functor in a [let rec] that does not refer to itself *)
+let rec p14 =
+  (module functor (X : sig end @ static) -> struct
+    let f () = 1
+  end : F)
+[%%expect{|
+val p14 : (module F) = <module>
+|}]
+
+(* A constrained static functor (with the trivial coercion) in a [let rec] *)
+let rec p15 =
+  (module (functor (X : sig end @ static) -> struct
+    let f () = ignore p15; 1
+  end : F) : F)
+[%%expect{|
+Lines 2-4, characters 2-15:
+2 | ..(module (functor (X : sig end @ static) -> struct
+3 |     let f () = ignore p15; 1
+4 |   end : F) : F)
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 (* A static functor taking another static functor as its argument *)
@@ -541,4 +730,17 @@ let (h3i, h3f) =
 [%%expect{|
 val h3i : int = 43
 val h3f : float = 43.
+|}]
+
+(* A recursive module containing a layout-polymorphic value. Compiling it must
+   not mutate the shared [Id] signature. Must be the last test: if it does, the
+   later uses of [Id] fail. *)
+module rec D15 : sig module Y : Id end = struct
+  module Y = struct let poly_ id x = x end
+end
+
+module L15 : Id = struct let poly_ id x = x end
+[%%expect{|
+module rec D15 : sig module Y : Id end
+module L15 : Id
 |}]
