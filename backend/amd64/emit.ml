@@ -1671,8 +1671,9 @@ end = struct
       | Store_initialize -> ()
       | Load | Store_modify -> (
         let report =
+          (* The instruction still needs its arguments after the report. *)
           asan_report_function
-            (must_save_simd_regs instr.live)
+            (must_save_simd_regs (Reg.add_set_array instr.live instr.arg))
             (Memory_chunk_size.of_memory_chunk memory_chunk)
             memory_access
         in
