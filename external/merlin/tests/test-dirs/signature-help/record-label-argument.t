@@ -18,18 +18,18 @@ A block index argument: on its opening parenthesis, on its label, and just
 after its closing parenthesis.
 
   $ signature_help 4:10
-  [null,null]
+  ["f : (r, int) idx_imm -> int -> unit",0]
 
   $ signature_help 4:12
-  [null,null]
+  ["f : (r, int) idx_imm -> int -> unit",0]
 
   $ signature_help 5:14
-  [null,null]
+  ["f : (r, int) idx_imm -> int -> unit",0]
 
 A field access argument: on its label, and just after it.
 
   $ signature_help 6:27
-  [null,null]
+  ["g : int -> int -> unit",0]
 
   $ signature_help 6:28
-  [null,null]
+  ["g : int -> int -> unit",0]
