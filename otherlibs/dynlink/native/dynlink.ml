@@ -41,6 +41,8 @@ module Native = struct
   (* mshinwell: We need something better than caml_sys_exit *)
   external ndl_open : string -> bool -> handle * Cmxs_format.dynheader
     = "caml_sys_exit" "caml_natdynlink_open"
+  external ndl_make_global : handle -> string -> unit
+    = "caml_sys_exit" "caml_natdynlink_make_global"
   external ndl_register : handle -> string array -> unit
     = "caml_sys_exit" "caml_natdynlink_register"
   external ndl_run : handle -> string -> unit
@@ -125,9 +127,11 @@ module Native = struct
     Callback.Safe.register "Register_dyn_global_duplicate"
       Register_dyn_global_duplicate
 
-  let load ~filename ~priv =
+  let load ~filename ~priv:_ =
+    (* The symbols of the library are not made available to libraries loaded
+       later until [register], when the library has passed the checks. *)
     let handle, header =
-      try ndl_open filename (not priv)
+      try ndl_open filename false
       with exn -> raise (DT.Error (Cannot_open_dynamic_library exn))
     in
     if header.dynu_magic <> Config.cmxs_magic_number then begin
@@ -140,7 +144,7 @@ module Native = struct
       "caml_shared_startup" ::
       List.concat_map Unit_header.defined_symbols dynu_units
     in
-    try
+    begin try
       ndl_register handle (Array.of_list syms)
     with
     | Register_dyn_global_duplicate ->
@@ -156,6 +160,11 @@ module Native = struct
       Printexc.raise_with_backtrace
         (DT.Error (Library's_module_initializers_failed exn))
         (Printexc.get_raw_backtrace ())
+    end;
+    if not priv then begin
+      try ndl_make_global handle filename
+      with exn -> raise (DT.Error (Cannot_open_dynamic_library exn))
+    end
 
   let unsafe_get_global_value ~bytecode_or_asm_symbol =
     match ndl_loadsym bytecode_or_asm_symbol with

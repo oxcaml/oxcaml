@@ -1,0 +1,4 @@
+rejected/plugin.cmxs: interface mismatch on Api
+plugin.cmxs: loaded
+consumer.cmxs calls the accepted plugin
+consumer.cmxs: loaded

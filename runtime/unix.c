@@ -239,6 +239,14 @@ void * caml_dlopen(char * libname, int global)
   return flexdll_dlopen(libname, flags);
 }
 
+int caml_dlmake_global(char * libname, void * handle)
+{
+  void * again = flexdll_dlopen(libname, FLEXDLL_RTLD_GLOBAL);
+  int same = (again == handle);
+  if (again != NULL) flexdll_dlclose(again);
+  return same;
+}
+
 void caml_dlclose(void * handle)
 {
   flexdll_dlclose(handle);
@@ -268,10 +276,22 @@ char * caml_dlerror(void)
 #ifndef RTLD_LOCAL
 #define RTLD_LOCAL 0
 #endif
+#ifndef RTLD_NOLOAD
+#define RTLD_NOLOAD 0
+#endif
 
 void * caml_dlopen(char * libname, int global)
 {
   return dlopen(libname, RTLD_NOW | (global ? RTLD_GLOBAL : RTLD_LOCAL));
+}
+
+int caml_dlmake_global(char * libname, void * handle)
+{
+  /* Opening a library again with RTLD_GLOBAL makes its symbols global. */
+  void * again = dlopen(libname, RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
+  int same = (again == handle);
+  if (again != NULL) dlclose(again);
+  return same;
 }
 
 void caml_dlclose(void * handle)
@@ -304,6 +324,11 @@ char * caml_dlerror(void)
 void * caml_dlopen(char * libname, int global)
 {
   return NULL;
+}
+
+int caml_dlmake_global(char * libname, void * handle)
+{
+  return 0;
 }
 
 void caml_dlclose(void * handle)

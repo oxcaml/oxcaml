@@ -104,6 +104,23 @@ CAMLprim value caml_natdynlink_open(value filename, value global)
   CAMLreturn(res);
 }
 
+CAMLprim value caml_natdynlink_make_global(value handle_v, value filename)
+{
+  void *handle = Handle_val(handle_v);
+  char_os *p;
+  int ok;
+
+  p = caml_stat_strdup_to_os(String_val(filename));
+  caml_enter_blocking_section_no_pending();
+  ok = caml_dlmake_global(p, handle);
+  caml_leave_blocking_section();
+  caml_stat_free(p);
+
+  if (!ok)
+    caml_failwith("cannot make the symbols of the plugin global");
+  return Val_unit;
+}
+
 CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
   CAMLparam2 (handle_v, symbols);
   int nsymbols = Wosize_val(symbols);
