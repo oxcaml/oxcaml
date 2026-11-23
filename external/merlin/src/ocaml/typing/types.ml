@@ -1739,18 +1739,10 @@ let undo_change = function
   | Cscheduler c -> Scheduler.Change.undo c
   | Civar c -> Ivar.Change.undo c
 
-<<<<<<< Merlin:aobrien/omni-backtracking-snapshots
-type snapshot = changes ref * int
-let last_snapshot = Local_store.s_ref 0
 let linked_variables = s_ref 0
-||||||| Compiler:last-imported
-type snapshot = changes ref * int
-let last_snapshot = Local_store.s_ref 0
-=======
 type snapshot = changes ref * With_backtracking.Stamp.Snapshot.t
 
 let needs_log ty = With_backtracking.Stamp.needs_log ty.id
->>>>>>> Compiler:HEAD
 
 let log_type ty =
   if needs_log ty then log_change (Ctype (ty, ty.desc))
