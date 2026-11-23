@@ -110,6 +110,13 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ ->
         Misc.fatal_error "Unsupported instruction for branch relaxation")
 
+  (* CR-someday yusumez: Keep the counters of the relaxed branches. A relaxed
+     [Lcondbranch] is an inverted branch over a jump to its target: the inverted
+     branch's taken edge has the counters of the fallthrough, and its
+     fallthrough (into the jump) those of the taken edge. An expanded
+     [Lcondbranch3] has a branch per outcome, with its counters, and the last
+     one falls through with those of the fallthrough. The relaxed instructions
+     of the target would need to carry counters. *)
   let drop_fdo_counters annotations =
     Fdo_dropped_counters.register ~reason:Linear_branch_relaxed
       (Fdo_annotation.union annotations)

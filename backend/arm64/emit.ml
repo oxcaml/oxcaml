@@ -2258,8 +2258,6 @@ let relax_branches env body =
       | Far_stackcheck { max_frame_size_bytes } ->
         Lop (Specific (Ifar_stackcheck { max_frame_size_bytes }))
       | Condbranch { test; lbl; arg = _ } ->
-        (* CR-someday yusumez: Keep the FDO counters of a relaxed branch, which
-           [Branch_relaxation] drops. *)
         Lcondbranch
           { test;
             taken = { target = lbl; fdo_annotation = Fdo_annotation.empty };
