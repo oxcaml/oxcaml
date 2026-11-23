@@ -122,8 +122,8 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
       done;
       let i = label_count - 1 in
       fprintf ppf "case %d: goto %a" i Label.format labels.(i))
-  | Call_no_return { func_symbol; _ } ->
-    fprintf ppf "call_no_return %s%a" func_symbol print_args args
+  | External_call_no_return { func_symbol; _ } ->
+    fprintf ppf "external_call_no_return %s%a" func_symbol print_args args
   | Return -> fprintf ppf "return%a" print_args args
   | Raise _ -> fprintf ppf "raise%a" print_args args
   | Tailcall_self { destination } ->

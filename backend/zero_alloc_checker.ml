@@ -2729,11 +2729,11 @@ end = struct
           in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
-        | Call_no_return { alloc = false; _ } ->
+        | External_call_no_return { alloc = false; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns or
              raises. *)
           Value.bot
-        | Call_no_return { alloc = true; func_symbol = func; _ } ->
+        | External_call_no_return { alloc = true; func_symbol = func; _ } ->
           (* Sound to ignore [next] because the call never returns. *)
           (* CR gyorsh: we do not currently generate this, but may later. *)
           let w = create_witnesses t (Extcall { callee = func }) dbg in
@@ -2844,7 +2844,8 @@ let drop_invalid_successors cfg_with_layout =
         | Invalid { label_after = None; _ }
         | Prim _ | Never | Always _ | Parity_test _ | Truth_test _
         | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-        | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _ ->
+        | Tailcall_self _ | Tailcall_func _ | External_call_no_return _ | Call _
+          ->
           ());
     if not !modified
     then cfg_with_layout

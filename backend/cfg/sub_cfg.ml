@@ -208,8 +208,8 @@ let terminator_only_transfers_control (desc : Cfg.terminator) =
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return ->
     true
-  | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _
-  | Prim _ | Invalid _ ->
+  | Raise _ | Tailcall_self _ | Tailcall_func _ | External_call_no_return _
+  | Call _ | Prim _ | Invalid _ ->
     false
 
 (* Returns [false] if an instruction having a debuginfo was found. *)
@@ -260,7 +260,8 @@ let set_entry_debuginfo sub_cfg dbg =
           set_block next
         | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
         | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-        | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+        | Tailcall_func _ | External_call_no_return _ | Call _ | Prim _
+        | Invalid _ ->
           ())
   in
   if not (Debuginfo.is_none dbg) then set_block (DLL.hd_cell sub_cfg.layout)
