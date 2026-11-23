@@ -121,7 +121,7 @@ let rec go_down_right acc ~current_loc (expr : Typedtree.expression) =
     (* [let x = exp1 in][ exp2] *)
     | { exp_desc = Texp_let (_, _, right_expr); _ } -> go right_expr
     (* [exp1 ;][ exp2] *)
-    | { exp_desc = Texp_sequence (_, right_expr); _ } -> go right_expr
+    | { exp_desc = Texp_sequence (_, _, right_expr); _ } -> go right_expr
     (* [let%map x = exp1 in][ exp2] *)
     | { exp_desc =
           Texp_apply
@@ -131,11 +131,17 @@ let rec go_down_right acc ~current_loc (expr : Typedtree.expression) =
                   Arg
                     { exp_desc =
                         Texp_function
-                          ( [ { fp_kind = Tparam_pat pat; _ } ],
-                            Tfunction_body right_expr );
+                          { param = [ { fp_kind = Tparam_pat pat; _ } ];
+                            body = Tfunction_body right_expr;
+                            _
+                          };
                       _
                     } )
-              ] );
+              ],
+              _,
+              _,
+              _,
+              _ );
         _
       }
       when pat.pat_loc << value_binded.exp_loc
@@ -144,6 +150,7 @@ let rec go_down_right acc ~current_loc (expr : Typedtree.expression) =
     | { exp_desc =
           Texp_match
             ( exp,
+              _,
               [ { c_lhs; c_rhs = right_expr; c_guard = None; c_cont = _ } ],
               [],
               _ );
