@@ -540,10 +540,12 @@ let addressing addr typ i n =
   match addr with
   | Ibased (sym_name, sym_global, ofs) ->
     add_used_symbol sym_name;
-    let sym_global : Cmm.is_global =
-      match sym_global with Global -> Global | Local -> Local
+    let sym : Cmm.symbol =
+      match sym_global with
+      | Global -> Cmm.global_symbol ~ty:Cmm.typ_int sym_name
+      | Local -> Cmm.local_symbol ~ty:Cmm.typ_int sym_name
     in
-    mem64_rip typ (emit_cmm_symbol_str { sym_name; sym_global }) ~ofs
+    mem64_rip typ (emit_cmm_symbol_str sym) ~ofs
   | Iindexed d -> mem64 typ d (arg_idx i n)
   | Iindexed2 d -> mem64 typ ~base:(arg64 i n) d (arg_idx i (n + 1))
   | Iscaled (2, d) -> mem64 typ ~base:(arg64 i n) d (arg_idx i n)
@@ -556,7 +558,8 @@ let addressing addr typ i n =
 (* A global symbol that maybe calls the GC, suffixed by the class of simd
    register which should be saved *)
 let global_gc_sym ~simd name =
-  Cmm.global_symbol (name ^ Regs.Save_simd_regs.symbol_suffix simd)
+  Cmm.global_symbol ~ty:Cmm.typ_int
+    (name ^ Regs.Save_simd_regs.symbol_suffix simd)
 
 let must_save_simd_regs live : Regs.Save_simd_regs.t =
   let v128, v256, v512 = ref false, ref false, ref false in
@@ -652,10 +655,8 @@ type gc_call =
 let call_gc_sites = ref ([] : gc_call list)
 
 let call_gc_local_sym ~simd : Cmm.symbol =
-  { sym_name =
-      Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd);
-    sym_global = Local
-  }
+  Cmm.local_symbol ~ty:Cmm.typ_int
+    (Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd))
 
 let emit_call_gc gc =
   D.define_label gc.gc_lbl;
@@ -713,8 +714,10 @@ let emit_call_safety_error kind sc =
   D.define_label sc.sc_lbl;
   emit_debug_info sc.sc_dbg;
   (match kind with
-  | Bound_check -> emit_call (Cmm.global_symbol "caml_ml_array_bound_error")
-  | Align_check -> emit_call (Cmm.global_symbol "caml_ml_array_align_error"));
+  | Bound_check ->
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ml_array_bound_error")
+  | Align_check ->
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ml_array_align_error"));
   D.define_label sc.sc_frame
 
 let clear_safety_checks () =
@@ -729,13 +732,13 @@ let emit_call_safety_errors () =
   | None -> ()
   | Some sc_call ->
     D.define_label sc_call;
-    emit_call (Cmm.global_symbol "caml_ml_array_bound_error"));
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ml_array_bound_error"));
   List.iter (emit_call_safety_error Align_check) align_checks.sc_sites;
   match align_checks.sc_call with
   | None -> ()
   | Some sc_call ->
     D.define_label sc_call;
-    emit_call (Cmm.global_symbol "caml_ml_array_align_error")
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ml_array_align_error")
 
 (* Stack reallocation *)
 type stack_realloc =
@@ -2268,17 +2271,21 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       I.mov rsp r13;
       I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
-      load_symbol_addr (Cmm.global_symbol func) rax;
+      load_symbol_addr (Cmm.global_symbol ~ty:Cmm.typ_int func) rax;
       (match stack_align with
-      | Align_16 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args")
-      | Align_32 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx")
+      | Align_16 ->
+        emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_c_call_stack_args")
+      | Align_32 ->
+        emit_call
+          (Cmm.global_symbol ~ty:Cmm.typ_int "caml_c_call_stack_args_avx")
       | Align_64 ->
-        emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx512"));
+        emit_call
+          (Cmm.global_symbol ~ty:Cmm.typ_int "caml_c_call_stack_args_avx512"));
       record_frame i.live (Dbg_other i.dbg))
     else if alloc
     then (
-      load_symbol_addr (Cmm.global_symbol func) rax;
-      emit_call (Cmm.global_symbol "caml_c_call");
+      load_symbol_addr (Cmm.global_symbol ~ty:Cmm.typ_int func) rax;
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_c_call");
       record_frame i.live (Dbg_other i.dbg))
     else
       let switch_stacks = not Config.no_stack_checks in
@@ -2291,7 +2298,7 @@ let emit_instr ~first ~last ~fallthrough i =
            through this unless we were to tag this calling frame with
            cfi_signal_frame in its definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
-      emit_call (Cmm.global_symbol func);
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_int func);
       if switch_stacks
       then (
         I.mov r13 rsp;
@@ -2803,7 +2810,7 @@ let emit_instr ~first ~last ~fallthrough i =
     stack_offset := !stack_offset - 16
   | Lraise k -> (
     let call_raise sym =
-      emit_call (Cmm.global_symbol sym);
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_int sym);
       record_frame Reg.Set.empty (Dbg_raise i.dbg);
       (* Add a nop if this is the last instruction of this function, so that the
          return address (used in backtraces) lies in the right function. *)
@@ -2920,7 +2927,8 @@ let fundecl fundecl =
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
   if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
-  then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
+  then
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   X86_proc.peephole_optimize_from fun_body_start;
@@ -3236,7 +3244,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   I.mov (reg saved_r15) r15;
   (* Emit call to handler *)
   add_used_symbol handler_code_sym;
-  emit_call (Cmm.global_symbol handler_code_sym);
+  emit_call (Cmm.global_symbol ~ty:Cmm.typ_int handler_code_sym);
   (* Record a frame description for the wrapper *)
   let label = Cmm.new_label () in
   let live_offset =

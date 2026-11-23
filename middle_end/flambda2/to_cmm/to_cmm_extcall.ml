@@ -237,7 +237,7 @@ let callee_symbol_name res apply callee_simple =
       Apply.print apply
   | Some callee_simple -> (
     match Simple.must_be_symbol callee_simple with
-    | Some (sym, _) -> (To_cmm_result.symbol res sym).sym_name
+    | Some (sym, _) -> (To_cmm_result.symbol res ~ty:Cmm.typ_int sym).sym_name
     | None ->
       Misc.fatal_errorf
         "To_cmm_extcall.callee_symbol_name: callee is not a symbol: %a"

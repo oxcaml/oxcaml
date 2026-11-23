@@ -261,7 +261,8 @@ let static_cast : Cmm.static_cast -> string = function
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
-  | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
+  | Capply { result_type = _ty; region = _; callees = _; returns = _ } ->
+    "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)
   | Cload { memory_chunk; mutability; is_atomic } -> (
@@ -366,7 +367,8 @@ let rec expr ppf = function
   | Cconst_float32 (n, _dbg) -> fprintf ppf "%Fs" n
   | Cconst_float (n, _dbg) -> fprintf ppf "%F" n
   | Cconst_symbol (s, _dbg) ->
-    fprintf ppf "%a:\"%s\"" is_global s.sym_global s.sym_name
+    fprintf ppf "%a:\"%s\":%a" is_global s.sym_global s.sym_name machtype
+      s.sym_type
   | Cvar id -> V.print ppf id
   | Clet (id, def, (Clet (_, _, _) as body)) ->
     let print_binding id ppf def =
@@ -417,7 +419,9 @@ let rec expr ppf = function
         fprintf ppf "@[<2>(%s" (operation dbg op);
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
-        | Capply { result_type = mty; _ } -> fprintf ppf "@ %a" machtype mty
+        | Capply { result_type = mty; returns; _ } ->
+          fprintf ppf "@ %a" machtype mty;
+          if not returns then fprintf ppf "@ ->."
         | Cextcall
             { ty;
               ty_args;
@@ -553,9 +557,9 @@ let fundecl ppf f =
         sequence f.fun_body)
 
 let data_item ppf = function
-  | Cdefine_symbol { sym_name; sym_global = Local } ->
+  | Cdefine_symbol { sym_name; sym_global = Local; _ } ->
     fprintf ppf "\"%s\":" sym_name
-  | Cdefine_symbol { sym_name; sym_global = Global } ->
+  | Cdefine_symbol { sym_name; sym_global = Global; _ } ->
     fprintf ppf "global \"%s\":" sym_name
   | Cint8 n -> fprintf ppf "byte %i" n
   | Cint16 n -> fprintf ppf "int16 %i" n

@@ -221,9 +221,10 @@ val equal_is_global : is_global -> is_global -> bool
 
    (Marking symbols in this way speeds up linking, as many references can then
    be resolved early) *)
-type symbol =
+type symbol = private
   { sym_name : string;
-    sym_global : is_global
+    sym_global : is_global;
+    sym_type : machtype
   }
 
 val equal_symbol : symbol -> symbol -> bool
@@ -437,9 +438,10 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : symbol list option;
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
+        returns : bool (* [true] is the conservative default. *)
       }
   | Cextcall of
       { func : string;
@@ -551,7 +553,9 @@ type vec512_bits =
     word7 : int64
   }
 
-val global_symbol : string -> symbol
+val global_symbol : ty:machtype -> string -> symbol
+
+val local_symbol : ty:machtype -> string -> symbol
 
 type ccatch_flag =
   | Normal

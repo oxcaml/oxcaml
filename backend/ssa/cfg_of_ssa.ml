@@ -198,23 +198,24 @@ let emit_op body op dbg rs rd : Cfg.basic Cfg.instruction =
     DLL.add_end body main;
     main
 
-(** For a call op, return the args to actually pass on the stack/regs (which
-    skips the function-pointer arg for [Indirect]), the matching hard-reg
-    locations, and the stack offset. *)
-let call_arg_locations (call_op : Cfg_intf.S.func_call_operation) virt_args =
-  let rarg =
-    match call_op with
-    | Indirect _ -> Array.sub virt_args 1 (Array.length virt_args - 1)
-    | Direct _ -> virt_args
+(** Move [virt_args] into the OCaml calling-convention locations for [call_op],
+    extending the stack as needed for both the arguments and the results of type
+    [result_type]. Returns the terminator's arguments, the result locations, and
+    the stack offset. *)
+let move_to_call_arg_locs body call_op virt_args result_type =
+  let rarg, loc_arg, stack_ofs_args =
+    Select_utils.call_arg_locations call_op virt_args
   in
-  let loc_arg, stack_ofs = Proc.loc_arguments (Reg.typv rarg) in
-  rarg, loc_arg, stack_ofs
-
-let call_arg_for_terminator (call_op : Cfg_intf.S.func_call_operation) virt_args
-    loc_arg =
-  match call_op with
-  | Indirect _ -> Array.append [| virt_args.(0) |] loc_arg
-  | Direct _ -> loc_arg
+  let loc_res, stack_ofs_res = Proc.loc_results_call result_type in
+  let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
+  if stack_ofs <> 0
+  then
+    DLL.add_end body
+      (make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||] Debuginfo.none);
+  emit_moves body ~src:rarg ~dst:loc_arg;
+  ( Select_utils.call_arg_for_terminator call_op virt_args loc_arg,
+    loc_res,
+    stack_ofs )
 
 (** Move [virt_args] into the locations dictated by
     [Proc.loc_external_arguments ty_args], extending the stack as needed and
@@ -468,55 +469,54 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
             "Cfg_of_ssa: external functions cannot be tail called"
       in
       let virt_args = Array.map (get_reg env) args in
-      let rarg, loc_arg, stack_ofs = call_arg_locations call_op virt_args in
+      let rarg, loc_arg, stack_ofs =
+        Select_utils.call_arg_locations call_op virt_args
+      in
       (* [Ssa_tail_call] only creates tail calls whose arguments fit in
          registers ([stack_offsets_zero]); a tail call with stack arguments
          would write below the stack pointer. *)
       assert (stack_ofs = 0);
       emit_moves body ~src:rarg ~dst:loc_arg;
       make_instr (Cfg.Tailcall_func call_op)
-        (call_arg_for_terminator call_op virt_args loc_arg)
+        (Select_utils.call_arg_for_terminator call_op virt_args loc_arg)
         [||] dbg
     | Call { continuation = Raise _; _ } ->
       Misc.fatal_error "Cfg_of_ssa: a call continuation cannot be Raise"
     | Call { op; args; continuation = Unreachable; _ } -> (
       let virt_args = Array.map (get_reg env) args in
+      let ocaml_call (call_op : Cfg_intf.S.func_call_operation) =
+        let loc_arg, loc_res, _stack_ofs =
+          move_to_call_arg_locs body call_op virt_args Cmm.typ_void
+        in
+        make_instr (Cfg.Call_no_return call_op) loc_arg loc_res dbg
+      in
       match op with
+      | Direct sym -> ocaml_call (Direct sym)
+      | Indirect candidates -> ocaml_call (Indirect candidates)
       | External ({ ty_args; ty_res; _ } as ext) ->
         let loc_arg, stack_ofs, stack_align =
           move_to_extcall_arg_locs body ty_args virt_args dbg
         in
         make_instr
-          (Cfg.Call_no_return { ext with stack_ofs; stack_align })
+          (Cfg.External_call_no_return { ext with stack_ofs; stack_align })
           loc_arg
           (Proc.loc_external_results ty_res)
           dbg
-      | Direct _ | Indirect _ | Probe _ ->
+      | Probe _ ->
         Misc.fatal_error
-          "Cfg_of_ssa: only an external call can have continuation Unreachable")
+          "Cfg_of_ssa: a probe cannot have continuation Unreachable")
     | Call { op; args; continuation = Goto continuation; _ } -> (
       let virt_args = Array.map (get_reg env) args in
       let virt_res = get_block_params_regs env continuation in
       let ocaml_call (call_op : Cfg_intf.S.func_call_operation) =
-        let rarg, loc_arg, stack_ofs_args =
-          call_arg_locations call_op virt_args
+        let loc_arg, loc_res, stack_ofs =
+          move_to_call_arg_locs body call_op virt_args (Reg.typv virt_res)
         in
-        let loc_res, stack_ofs_res =
-          Proc.loc_results_call (Reg.typv virt_res)
-        in
-        let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
-        if stack_ofs <> 0
-        then
-          DLL.add_end body
-            (make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
-               Debuginfo.none);
-        emit_moves body ~src:rarg ~dst:loc_arg;
         Block.Tbl.replace env.call_result_locs continuation loc_res;
         Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
         make_instr
           (Cfg.Call { op = call_op; label_after = label_of env continuation })
-          (call_arg_for_terminator call_op virt_args loc_arg)
-          loc_res dbg
+          loc_arg loc_res dbg
       in
       match op with
       | Direct sym -> ocaml_call (Direct sym)

@@ -30,14 +30,15 @@ type t
 val create : module_symbol:Symbol.t -> reachable_names:Name_occurrences.t -> t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)
-val symbol : t -> Symbol.t -> Cmm.symbol
+val symbol : t -> ty:Cmm.machtype -> Symbol.t -> Cmm.symbol
 
 (** Produce the Cmm function symbol for a piece of code. *)
 val symbol_of_code_id :
   t -> Code_id.t -> currently_in_inlined_body:bool -> Cmm.symbol
 
 (** Create a Cmm symbol, not arising from a [Symbol.t]. *)
-val raw_symbol : t -> global:Cmm.is_global -> string -> t * Cmm.symbol
+val raw_symbol :
+  t -> global:Cmm.is_global -> ty:Cmm.machtype -> string -> t * Cmm.symbol
 
 (** Archive the current data into the list of already-translated data. *)
 val archive_data : t -> t

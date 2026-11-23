@@ -242,6 +242,7 @@ module Flambda2 : sig
     val slot_offsets : bool ref
     val freshen : bool ref
     val flow : bool ref
+    val simplified : bool ref
     val simplify : bool ref
     val reaper : bool ref
   end

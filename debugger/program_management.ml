@@ -131,7 +131,7 @@ let initialize_loading () =
   let visible =
     visible
     @ List.map
-        (fun path : Clflags.visible_include -> { path; cmx_guaranteed = false })
+        (fun path : Clflags.include_dir -> { path; cmx_guaranteed = false })
         !Symbols.program_source_dirs
   in
   Load_path.init ~auto_include:Compmisc.auto_include ~visible ~hidden;

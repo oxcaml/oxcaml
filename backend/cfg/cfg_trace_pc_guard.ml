@@ -51,7 +51,7 @@ let is_unreachable (block : Cfg.basic_block) =
   | Invalid { label_after = None; _ } -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _
+  | Call_no_return _ | External_call_no_return _
   | Invalid { label_after = Some _; _ }
   | Call _ | Prim _ ->
     false
@@ -241,7 +241,7 @@ let effective_entry (cfg : Cfg.t) =
     else cfg.entry_label
   | Never | Parity_test _ | Truth_test _ | Float_test _ | Int_test _ | Switch _
   | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Invalid _ | Call _ | Prim _ ->
+  | External_call_no_return _ | Invalid _ | Call _ | Prim _ ->
     cfg.entry_label
 
 (* The debuginfo of the probe of [block]. The callback records its return

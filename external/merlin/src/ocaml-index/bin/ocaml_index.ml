@@ -104,10 +104,22 @@ let speclist =
        cmx files for modules in <dir> are always available)" );
     ( "-H",
       Arg.String
-        (fun arg ->
+        (fun path ->
           build_path_rev :=
-            { !build_path_rev with hidden = arg :: !build_path_rev.hidden }),
+            { !build_path_rev with
+              hidden =
+                { path; cmx_guaranteed = false } :: !build_path_rev.hidden
+            }),
       "An extra hidden directory to add to the load path" );
+    ( "-Hx",
+      Arg.String
+        (fun path ->
+          build_path_rev :=
+            { !build_path_rev with
+              hidden = { path; cmx_guaranteed = true } :: !build_path_rev.hidden
+            }),
+      "An extra hidden directory to add to the load path (Like -H, but \
+       indicates that cmx files for modules in <dir> are always available)" );
     ( "--no-cmt-load-path",
       Arg.Set do_not_use_cmt_loadpath,
       "Do not initialize the load path with the paths found in the first input \

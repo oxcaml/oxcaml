@@ -41,7 +41,7 @@ end)
 
 type open_arg =
   | Open of string
-  | Open_cmi of string
+  | Open_cmi of { path : string; cmx_guaranteed : bool }
 
 let objfiles = ref ([] : string list)   (* .cmo and .cma files *)
 and ccobjs = ref ([] : string list)     (* .o, .a, .so and -cclib -lxxx *)
@@ -70,7 +70,7 @@ type gdwarf_fidelity =
   | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
   | Fidelity_unlimited
 
-type visible_include =
+type include_dir =
   { path : string;
     cmx_guaranteed : bool;
   }
@@ -89,8 +89,8 @@ let parse_hidden_include_file ~cmx_guaranteed entry =
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
-and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
-and hidden_include_dirs = ref ([] : string list) (* -H *)
+and include_dirs = ref ([] : include_dir list)  (* -I, -Ix *)
+and hidden_include_dirs = ref ([] : include_dir list) (* -H, -Hx *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
 and hidden_include_files = (* -H-file, -Hx-file *)
@@ -172,7 +172,7 @@ and noprompt = ref false                (* -noprompt *)
 and nopromptcont = ref false            (* -nopromptcont *)
 and init_file = ref (None : string option)   (* -init *)
 and noinit = ref false                  (* -noinit *)
-and open_args = ref ([] : open_arg list) (* -open / -open-cmi *)
+and open_args = ref ([] : open_arg list) (* -open / -open-cmi(-x) *)
 and use_prims = ref ""                  (* -use-prims ... *)
 and use_runtime = ref ""                (* -use-runtime ... *)
 and plugin = ref false                  (* -plugin ... *)

@@ -33,11 +33,11 @@ let verbose = ref false
 
 let output_file = ref None
 
-let include_dirs : Clflags.visible_include list ref = ref []
+let include_dirs : Clflags.include_dir list ref = ref []
 
 let include_manifests = ref []
 
-let hidden_include_dirs = ref []
+let hidden_include_dirs : Clflags.include_dir list ref = ref []
 
 let hidden_include_manifests = ref []
 
@@ -80,8 +80,20 @@ let spec_list =
       Arg.String
         (fun s ->
           hidden_include_dirs
-            := List.rev_append (String.split_on_char ',' s) !hidden_include_dirs),
+            := Misc.rev_map_end
+                 (fun path -> { Clflags.path; cmx_guaranteed = false })
+                 (String.split_on_char ',' s)
+                 !hidden_include_dirs),
       "Hidden includes" );
+    ( "-Hx",
+      Arg.String
+        (fun s ->
+          hidden_include_dirs
+            := Misc.rev_map_end
+                 (fun path -> { Clflags.path; cmx_guaranteed = true })
+                 (String.split_on_char ',' s)
+                 !hidden_include_dirs),
+      "Same as -H (the cmx_guaranteed distinction is not used by this tool)" );
     ( "-I-manifest",
       Arg.String (fun file -> include_manifests := file :: !include_manifests),
       "A manifest file specifying which .cmi files are available." );

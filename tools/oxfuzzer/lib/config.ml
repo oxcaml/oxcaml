@@ -44,6 +44,24 @@ let max_unboxed_tuple_arity = 4
 
 let max_unboxed_tuple_depth = 2
 
+let max_closure_param_count = 3
+
+let max_closure_call_count = 8
+
+let max_let_rec_count = 4
+
+let max_recursive_functions = 3
+
+let max_recursive_param_count = 2
+
+let max_recursive_calls = 2
+
+let max_recursion_fuel = 3
+
+(* Off by default to avoid generating tests that tend to trigger a known
+   compiler bug (https://github.com/oxcaml/oxcaml/issues/8139) *)
+let unused_recursive_functions = false
+
 let max_probability = 10_000
 
 (* Probabilities out of [max_probability], conditional on reaching each
@@ -92,6 +110,12 @@ let raise_notrace_probability = 5_000
 
 let callee_raises_probability = 5_000
 
+let closure_probability = 1_500
+
+let curried_lambda_probability = 2_500
+
+let opaque_recursive_call_probability = 2_500
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -124,7 +148,10 @@ module Swarm = struct
       opaque_initializers : bool;
       opaque_leaves : bool;
       opaque_loop_bounds : bool;
-      exceptions : bool
+      exceptions : bool;
+      closures : bool;
+      partial_applications : bool;
+      recursive_functions : bool
     }
 
   let create random_state =
@@ -157,7 +184,10 @@ module Swarm = struct
       opaque_initializers = Random.State.bool random_state;
       opaque_leaves = Random.State.bool random_state;
       opaque_loop_bounds = Random.State.bool random_state;
-      exceptions = Random.State.bool random_state
+      exceptions = Random.State.bool random_state;
+      closures = Random.State.bool random_state;
+      partial_applications = Random.State.bool random_state;
+      recursive_functions = Random.State.bool random_state
     }
 
   let to_string t =
@@ -185,7 +215,10 @@ module Swarm = struct
       "opaque_initializers", t.opaque_initializers;
       "opaque_leaves", t.opaque_leaves;
       "opaque_loop_bounds", t.opaque_loop_bounds;
-      "exceptions", t.exceptions ]
+      "exceptions", t.exceptions;
+      "closures", t.closures;
+      "partial_applications", t.partial_applications;
+      "recursive_functions", t.recursive_functions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> List.cons
          (Format.sprintf "  assertions = %s"
