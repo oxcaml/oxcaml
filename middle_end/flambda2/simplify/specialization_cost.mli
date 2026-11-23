@@ -80,16 +80,7 @@ val add_prim : Bound_var.t -> Flambda_primitive.t -> t -> t
     which must only be simplified once. *)
 val add_template_definition : t -> t
 
-(** [define_templates] says whether the handlers, which haven't been simplified
-    yet, will be copied with the handler being specialised and contain the
-    definition of a template. It is only forced if that handler could be
-    specialised. *)
-val add_continuations :
-  can_be_lifted:bool ->
-  define_templates:bool Lazy.t ->
-  Original_handlers.t ->
-  t ->
-  t
+val add_continuations : can_be_lifted:bool -> Original_handlers.t -> t -> t
 
 (** Add a set of closure containing [~num] closures to the cost of
     specialization. *)

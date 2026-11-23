@@ -34,7 +34,3 @@
     definition of a template. The code of those functions is looked up in the
     environment. *)
 val in_code : Downwards_env.t -> Code.t -> bool
-
-(** Whether any of the handlers, or the code of any function they define,
-    contains the definition of a template. *)
-val in_handlers : Downwards_env.t -> Original_handlers.t -> bool
