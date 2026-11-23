@@ -83,10 +83,10 @@ generates some kind of unique identifier which can then be used in filenames.
   compressed marshalling).
 - Bit 18 (**ansi**): Set if the compiler distribution was configured with the
   legacy support `WINDOWS_UNICODE=ansi`.
-- Bit 19 (**mutable-string**): Set if the compiler distribution was configured
-  with `--disable-force-safe-string`. This option was removed in OCaml 5.0, and
-  the bit is available for re-use. When this bit is unset, strings are
-  guaranteed to be immutable.
+- Bit 19 (**OxCaml**): For OCaml 5.4 onwards, set if the compiler distribution
+  is OxCaml. Prior to OCaml 5.4, set if the compiler distribution was configured
+  with `--disable-force-safe-string` (this option was removed in OCaml 5.0,
+  meaning this bit is always unset for OCaml 5.0-5.3).
 
 The bit descriptions are designed such that the default configuration of the
 latest version of the compiler has unset bits. The ordering of the bits is
@@ -116,8 +116,8 @@ in three different contexts where certain bits are masked out:
 3. _Zinc Mask_: masks out bits which are not related to bytecode portability.
    Where the _Bytecode_ and _Native_ masks relate to _runtimes_, the _Zinc_ mask
    relates to _bytecode images_. The Zinc ID therefore includes:
-   - **release** and **dev** (a given bytecode image targets a specific version
-     of OCaml)
+   - **release**, **dev**, and **OxCaml** (a given bytecode image targets a
+     specific version of OCaml or OxCaml)
    - **no-flat-float-array** (code compiled assuming that float arrays are boxed
      will segfault on runtimes which unbox them)
    - **int31**, **static**, and **no-compression** (a bytecode image using
@@ -131,5 +131,5 @@ the value representation, and therefore both runtimes. It does not directly
 affect bytecode (although a bytecode program may use unsafe features to observe
 it). **reserved** is therefore part of both the _Bytecode_ and _Native Masks_,
 but not part of the _Zinc Mask_. Similarly, although **no-flat-float-array**
-affects code generation for bytecode, **mutable-string** never did, and so would
-not be included in the _Zinc Mask_.
+affects code generation for bytecode, mutable strings never did, and so bit 19
+was not included in the _Zinc Mask_ prior to OCaml 5.4.

@@ -440,7 +440,8 @@ let p_list title print = function
       List.iter print l
 
 let p_runtime_id ({Misc.RuntimeID.dev; release; no_flat_float_array; fp; tsan;
-                   int31; static; no_compression; ansi; reserved} as t) =
+                   int31; static; no_compression; ansi; reserved;
+                   oxcaml} as t) =
   let version =
     if release > Config.release_number then
       ""
@@ -450,7 +451,8 @@ let p_runtime_id ({Misc.RuntimeID.dev; release; no_flat_float_array; fp; tsan;
       else if release < 16 then
         Printf.sprintf " (OCaml 4.%02d)" (release - 1)
       else
-        Printf.sprintf " (OCaml 5.%d)" (release - 16)
+        Printf.sprintf " (%s 5.%d)"
+          (if oxcaml then "OxCaml" else "OCaml") (release - 16)
   in
   printf "\t%s = Release %d%s%s\n"
     (Misc.RuntimeID.to_string t)

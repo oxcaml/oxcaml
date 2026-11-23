@@ -2199,6 +2199,7 @@ module RuntimeID = struct
     static: bool;
     no_compression: bool;
     ansi: bool;
+    oxcaml: bool;
   }
 
   let make fn ?(dev = not Config.is_official_release)
@@ -2210,12 +2211,13 @@ module RuntimeID = struct
               ?(int31 = (Sys.int_size = 31))
               ?(static = not Config.supports_shared_libraries)
               ?(no_compression = (Config.compression_c_libraries = ""))
-              ?(ansi = Config.target_win32 && not Config.windows_unicode) () =
+              ?(ansi = Config.target_win32 && not Config.windows_unicode)
+              ?(oxcaml = true) () =
     if release < 0 || release > 63 || reserved < 0 || reserved > 31 then
       invalid_arg fn
     else
       {dev; release; reserved; no_flat_float_array; fp; tsan; int31; static;
-       no_compression; ansi}
+       no_compression; ansi; oxcaml}
 
   let make_zinc =
     make "Misc.RuntimeID.make_zinc"
@@ -2228,14 +2230,16 @@ module RuntimeID = struct
 
   let is_zinc = function
   | {dev = _; release = _; reserved = 0; no_flat_float_array = _; fp = false;
-     tsan = false; int31 = _; static = _; no_compression = _; ansi = false} ->
+     tsan = false; int31 = _; static = _; no_compression = _; ansi = false;
+     oxcaml = _} ->
       true
   | _ ->
       false
 
   let is_bytecode = function
   | {dev = _; release = _; reserved = _; no_flat_float_array = _; fp = false;
-     tsan = false; int31 = _; static = _; no_compression = _; ansi = _} -> true
+     tsan = false; int31 = _; static = _; no_compression = _; ansi = _;
+     oxcaml = _} -> true
   | _ -> false
 
   let is_native _ = true
@@ -2261,8 +2265,8 @@ module RuntimeID = struct
       bit 0 t.int31 lor
       bit 1 t.static lor
       bit 2 t.no_compression lor
-      bit 3 t.ansi
-      (* bit 4 is unused *)
+      bit 3 t.ansi lor
+      bit 4 t.oxcaml
     in
     Printf.sprintf "%c%c%c%c" alpha.[q0] alpha.[q1] alpha.[q2] alpha.[q3]
 
@@ -2286,7 +2290,7 @@ module RuntimeID = struct
               reserved = ((q2 land 0b11) lsl 2) lor (q1 lsr 2);
               no_flat_float_array = set 2 q2; fp = set 3 q2; tsan = set 4 q2;
               int31 = set 0 q3; static = set 1 q3; no_compression = set 2 q3;
-              ansi = set 3 q3; (* bit 4 of q3 is unused *)}
+              ansi = set 3 q3; oxcaml = set 4 q3}
       else
         None
 

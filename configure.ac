@@ -3964,9 +3964,8 @@ AS_CASE([$target],
 m4_define([ALPHABET], [0123456789abcdefghijklmnopqrstuv])
 AC_DEFUN([BASE32], ["$(echo 'ALPHABET' | cut -c $(expr \( $1 \) + 1))"])
 
-m4_cond(OCAML__DEVELOPMENT_VERSION, [true],
-  [m4_define([ID_VERSION], m4_eval((OCAML__RELEASE_NUMBER << 1) + 1))],
-  [m4_define([ID_VERSION], m4_eval((OCAML__RELEASE_NUMBER << 1)))])
+# Bit 0 (dev) is always set, as OxCaml is never an official release
+m4_define([ID_VERSION], m4_eval((OCAML__RELEASE_NUMBER << 1) + 1))
 
 # Bits 0-4 (dev + low 4 bits of release)
 m4_define([QUINTET0],
@@ -4015,7 +4014,9 @@ AS_CASE([$target,$windows_unicode],
   [*-*-mingw32,0|*-pc-windows,0],
     [quintet3="8 + $quintet3_zinc"],
   [quintet3="$quintet3_zinc"])
-# Bit 19 (mutable-string) cannot be set since OCaml 5.0
+# Bit 19 (OxCaml)
+quintet3_zinc="16 + $quintet3_zinc"
+quintet3="16 + $quintet3"
 
 quintet3_zinc=BASE32([$quintet3_zinc])
 quintet3=BASE32([$quintet3])
@@ -4027,8 +4028,7 @@ native_runtime_id="QUINTET0${quintet1}${quintet2_native}${quintet3}"
 # Update the values for is_official_release and release_number in
 # utils/config.common.ml.in (this is done when tools/autogen is run, not each
 # time configure is run!)
-m4_syscmd([sed -e '/^let is_official_release =/s/=.*/= ]'\
-'m4_if(OCAML__DEVELOPMENT_VERSION,true,false,true)[/' \
+m4_syscmd([sed -e '/^let is_official_release =/s/=.*/= false/' \
     -e '/^let release_number =/s/=.*/= ]OCAML__RELEASE_NUMBER[/' \
     utils/config.common.ml.in > utils/config.common.ml.in.new
 mv -f utils/config.common.ml.in.new utils/config.common.ml.in])

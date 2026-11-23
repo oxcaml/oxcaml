@@ -1301,11 +1301,14 @@ module RuntimeID : sig
       (** [true] if compressed marshalling is not supported *)
     ansi: bool;
       (** [true] if Unicode support on Windows is disabled *)
+    oxcaml: bool;
+      (** [true] if this is OxCaml *)
   }
 
   val make_zinc: ?dev:bool -> ?release:int
     -> ?no_flat_float_array:bool
     -> ?int31:bool -> ?static:bool -> ?no_compression:bool
+    -> ?oxcaml:bool
     -> unit -> t
   (** Returns the Zinc Runtime ID for the given parameters (using default values
       from {!Config} and {!Sys} as necessary) *)
@@ -1314,6 +1317,7 @@ module RuntimeID : sig
     -> ?reserved:int -> ?no_flat_float_array:bool
     -> ?int31:bool -> ?static:bool -> ?no_compression:bool
     -> ?ansi:bool
+    -> ?oxcaml:bool
     -> unit -> t
   (** Returns the Bytecode Runtime ID for the given parameters (using default
       values from {!Config} and {!Sys} as necessary) *)
@@ -1322,6 +1326,7 @@ module RuntimeID : sig
     -> ?reserved:int -> ?no_flat_float_array:bool -> ?fp:bool -> ?tsan:bool
     -> ?int31:bool -> ?static:bool -> ?no_compression:bool
     -> ?ansi:bool
+    -> ?oxcaml:bool
     -> unit -> t
   (** Returns the Native Runtime ID for the given parameters (using default
       values from {!Config} and {!Sys} as necessary) *)
