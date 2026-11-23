@@ -1916,6 +1916,20 @@ let find_constructor_address path env =
       get_constrs_address (NameMap.find s c.comp_constrs)
   | Papply _ | Pextra_ty _ -> raise Not_found
 
+let error_if_unrepresentable find ~loc path env =
+  match find path env with
+  | address -> address
+  | exception Unrepresentable_type (unrep_loc, id, ty, unrep_env, violation) ->
+    lookup_error loc env
+      (Module_projection_unrepresentable
+         {
+           unrep_loc;
+           unrep_id = id;
+           unrep_ty = ty;
+           unrep_env;
+           violation
+         })
+
 let find_hash_type path env =
   match path with
   | Pident id ->
@@ -2103,7 +2117,7 @@ let normalize_module_path oloc env path =
 let find_module_address_head loc path env =
   let path = normalize_module_path (Some loc) env path in
   let root = Path.Pident (Path.head path) in
-  let address = find_module_address root env in
+  let address = error_if_unrepresentable find_module_address ~loc root env in
   address_head address
 
 let add_required_global_for_quote loc path env =
@@ -3798,28 +3812,6 @@ let may_lookup_error report_errors loc env err =
   if report_errors then lookup_error loc env err
   else raise Not_found
 
-let check_representable ~errors ~loc ~env address =
-  match address () with
-  | exception Unrepresentable_type (unrep_loc, id, ty, unrep_env, violation) ->
-    may_lookup_error errors loc env
-      (Module_projection_unrepresentable
-         {
-           unrep_loc;
-           unrep_id = id;
-           unrep_ty = ty;
-           unrep_env;
-           violation
-       })
-  | (_ : address) -> ()
-
-let check_address_representable ~errors ~loc ~env a =
-  check_representable ~errors ~loc ~env (fun () -> get_address a)
-
-(* Only extension constructors have an address. *)
-let check_constructor_address_representable ~errors ~loc ~env cda =
-  Option.iter (check_address_representable ~errors ~loc ~env)
-    cda.cda_address
-
 let path_is_persistent_in_quotations env path =
   Path.scope path <= env.persistent_scope
 
@@ -3928,14 +3920,13 @@ let use_modtype ~use ~loc path desc =
       (Path.name path)
   end
 
-let use_class ~errors ~use ~loc ~env path clda =
+let use_class ~use ~loc path clda =
   if use then begin
     let desc = clda.clda_declaration in
     mark_class_used desc.cty_uid;
     Builtin_attributes.check_alerts loc desc.cty_attributes
       (Path.name path)
-  end;
-  check_address_representable ~errors ~loc ~env clda.clda_address
+  end
 
 let use_cltype ~use ~loc path desc =
   if use then begin
@@ -3966,9 +3957,8 @@ let use_constructor_desc ~use ~loc usage env cstr =
     Builtin_attributes.check_alerts loc cstr.cstr_attributes cstr.cstr_name
   end
 
-let use_constructor ~errors ~use ~loc usage env cda =
-  use_constructor_desc ~use ~loc usage env cda.cda_description;
-  check_constructor_address_representable ~errors ~loc ~env cda
+let use_constructor ~use ~loc usage env cda =
+  use_constructor_desc ~use ~loc usage env cda.cda_description
 
 type _ load =
   | Load : module_data load
@@ -4245,7 +4235,7 @@ let lookup_ident_class ~errors ~use ~loc s env =
       let stage_locks, locks = partition_locks locks in
       check_cross_quotation ~errors ~loc_def:loc
         ~loc_use:clda.clda_declaration.cty_loc env path (Lident s) stage_locks;
-      use_class ~errors ~use ~loc ~env path clda;
+      use_class ~use ~loc path clda;
       path, locks, clda.clda_declaration
   | Error _ ->
       may_lookup_error errors loc env (Unbound_class (Lident s))
@@ -4330,7 +4320,7 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
       List.map
         (fun (_path, cda, (locks, use_fn)) ->
            let use_fn () =
-             use_constructor ~errors ~use ~loc usage env cda;
+             use_constructor ~use ~loc usage env cda;
              use_fn ()
            in
            ((cda.cda_description, locks), use_fn))
@@ -4516,7 +4506,7 @@ let lookup_dot_class ~errors ~use ~loc l s env =
   match NameMap.find s.txt comps.comp_classes with
   | clda ->
       let path = Pdot(p, s.txt) in
-      use_class ~errors ~use ~loc ~env path clda;
+      use_class ~use ~loc path clda;
       (path, locks, clda.clda_declaration)
   | exception Not_found ->
       may_lookup_error errors loc env (Unbound_class (Ldot(l, s)))
@@ -4572,7 +4562,7 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
           List.map
             (fun cda ->
                let use_fun () =
-                 use_constructor ~errors ~use ~loc usage env cda;
+                 use_constructor ~use ~loc usage env cda;
                in
                ((cda.cda_description, locks), use_fun))
             cstrs
@@ -4854,10 +4844,6 @@ let lookup_value_lazy ~errors ~use ~loc lid env =
     | Lapply _ -> assert false
   in
   let vd, mode = Normalize_mode.vda Normalize vda in
-  (match vd.val_kind with
-   | Val_reg _ -> check_address_representable ~errors ~loc ~env vda.vda_address
-   | Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _ | Val_anc _ -> ()
-  );
   path, vd, (mode, locks)
 
 let lookup_value ~errors ~use ~loc lid env =
@@ -5107,23 +5093,11 @@ let lookup_modtype ?(use=true) ~loc lid env =
 let lookup_modtype_path ?(use=true) ~loc lid env =
   fst (lookup_modtype_lazy ~errors:true ~use ~loc lid env)
 
-let check_module_path_representable ~loc path env =
-  check_representable ~errors:true ~loc ~env
-    (fun () -> find_module_address path env)
-
-let fatal_if_unrepresentable find path env =
-  match find path env with
-  | address -> address
-  | exception Unrepresentable_type (_, _, _, _, _) ->
-    (* the type checker should have already checked that the address's
-       enclosing modules are representable *)
-    Misc.fatal_error "expected representable type"
-
-let find_value_address = fatal_if_unrepresentable find_value_address
-let find_module_address = fatal_if_unrepresentable find_module_address
-let find_class_address = fatal_if_unrepresentable find_class_address
+let find_value_address = error_if_unrepresentable find_value_address
+let find_module_address = error_if_unrepresentable find_module_address
+let find_class_address = error_if_unrepresentable find_class_address
 let find_constructor_address =
-  fatal_if_unrepresentable find_constructor_address
+  error_if_unrepresentable find_constructor_address
 
 let lookup_class ?(use=true) ~loc lid env =
   let path, desc, vmode = lookup_class ~errors:true ~use ~loc lid env in
