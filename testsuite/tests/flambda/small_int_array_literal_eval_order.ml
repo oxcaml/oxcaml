@@ -1,7 +1,8 @@
 (* TEST *)
 
-(* The elements of an array literal are evaluated from right to left, also
-   when they are packed several to a word. *)
+(* [y] is bound before [x], so it must be evaluated first, also when both
+   calls are substituted into an array literal whose elements are packed
+   several to a word. *)
 
 external int8_of_string : string -> int8#
   = "caml_int8_of_string" "caml_int8_of_string_untagged"
