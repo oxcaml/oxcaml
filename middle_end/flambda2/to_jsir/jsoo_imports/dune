@@ -34,6 +34,6 @@
 
 (install
  (files
-  (dlljsoo_imports_stubs%{stub_dll_suffix}.so as stublibs/dlljsoo_imports_stubs%{stub_dll_suffix}.so))
+  (dlljsoo_imports_stubs.so as stublibs/dlljsoo_imports_stubs.so))
  (section lib)
  (package ocaml))

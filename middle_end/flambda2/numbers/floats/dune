@@ -20,6 +20,6 @@
 
 (install
  (files
-  (dllflambda2_floats_stubs%{stub_dll_suffix}.so as stublibs/dllflambda2_floats_stubs%{stub_dll_suffix}.so))
+  (dllflambda2_floats_stubs.so as stublibs/dllflambda2_floats_stubs.so))
  (section lib)
  (package ocaml))

@@ -199,6 +199,47 @@ let merge_cmxa ~target ~archives =
 
 let has_extension archive ~ext = Filename.check_suffix archive ("." ^ ext)
 
+(* [file] can be a hard link into the build tree, so a copy replaces it. *)
+let patch file perm f =
+  let tmp = file ^ ".tmp" in
+  let flags = [Open_wronly; Open_creat; Open_trunc; Open_binary] in
+  In_channel.with_open_bin file (fun ic ->
+      Out_channel.with_open_gen flags perm tmp (fun oc ->
+          Misc.copy_file ic oc;
+          f ic oc));
+  Sys.rename tmp file
+
+(* Dune cannot yet record a library's DLLs with [-dllib-suffixed], so the
+   installed bytecode libraries and executables are changed to say so. *)
+let suffix file =
+  if has_extension file ~ext:"cma"
+  then
+    patch file 0o666 (fun ic oc ->
+        seek_in ic (String.length Config.cma_magic_number);
+        let toc_pos = input_binary_int ic in
+        seek_in ic toc_pos;
+        let (toc : Cmo_format.library) = input_value ic in
+        let lib_dllibs =
+          List.map
+            (fun (~suffixed:_, dll) -> ~suffixed:true, dll)
+            toc.lib_dllibs
+        in
+        seek_out oc toc_pos;
+        output_value oc { toc with lib_dllibs })
+  else
+    (* An executable has ":dllfoo" for a DLL, or "-dllfoo" if it is suffixed *)
+    patch file 0o777 (fun ic oc ->
+        List.iter
+          (function
+            | { Bytesections.name = DLLS; pos; len } ->
+              seek_in ic pos;
+              seek_out oc pos;
+              really_input_string ic len
+              |> String.map (function ':' -> '-' | c -> c)
+              |> output_string oc
+            | _ -> ())
+          (Bytesections.all (Bytesections.read_toc ic)))
+
 let syntax () =
   Printf.eprintf
     "syntax: %s OCAMLOPT-BINARY TARGET-CMA-OR-CMXA-FILE CMA-OR-CMXA-FILES\n"
@@ -206,7 +247,7 @@ let syntax () =
   Printf.eprintf "Please provide only .cma files or only .cmxa files.";
   exit 1
 
-let () =
+let merge () =
   if Array.length Sys.argv < 3 then syntax ();
   let target = Sys.argv.(1) in
   let archives =
@@ -222,3 +263,8 @@ let () =
   | true, false -> merge_cma ~target ~archives
   | false, true -> merge_cmxa ~target ~archives
   | true, true | false, false -> syntax ()
+
+let () =
+  match Array.to_list Sys.argv with
+  | _ :: "-suffixed" :: files -> List.iter suffix files
+  | _ -> merge ()

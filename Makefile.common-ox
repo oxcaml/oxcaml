@@ -291,6 +291,15 @@ endif
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
+# Dune cannot yet build the C stub libraries suffixed (cf. MKLIB -suffixed in
+# otherlibs/Makefile.otherlibs.common), so the installed ones are renamed and
+# the bytecode libraries and executables changed to match.
+	_build/main/$(ocamldir)/tools/merge_archives.exe -suffixed \
+	  `find _install -name '*.cma' -o -name '*.byte'` \
+	  _install/bin/ocaml _install/bin/ocamldebug _install/lib/ocaml/expunge
+	cd _install/lib/ocaml/stublibs && for f in *.so; do \
+	  mv $$f $${f%.so}-$(TARGET)-$(BYTECODE_RUNTIME_ID).so; \
+	done
 
 
 # Copy _install to the final install directory (no-op if they are the same)
@@ -417,9 +426,9 @@ endif
 	# Suppress linker errors about -I directories not existing.
 	for dir in asmcomp bytecomp driver file_formats lambda middle_end \
 	  parsing typing; do ln -s utils _runtest/$$dir; done
-	# stublibs
+	# stublibs (only suffixed in _install)
 	mkdir -p _runtest/lib/ocaml/stublibs/
-	cp $(main_prefix)/lib/ocaml/stublibs/*.so _runtest/lib/ocaml/stublibs
+	cp _install/lib/ocaml/stublibs/*.so _runtest/lib/ocaml/stublibs
 	# ocamldebug
 	mkdir _runtest/debugger
 	ln -s ../ocamldebug _runtest/debugger
