@@ -110,6 +110,17 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ ->
         Misc.fatal_error "Unsupported instruction for branch relaxation")
 
+  (* The sequences that replace a relaxed conditional branch have no counters,
+     so those of the branch are dropped. *)
+  let drop_fdo_counters annotations =
+    Fdo_dropped_counters.register ~reason:Linear_branch_relaxed
+      (Fdo_annotation.union annotations)
+
+  let fdo_annotation_of_optbranch (lbl : Linear.successor option) =
+    match lbl with
+    | None -> Fdo_annotation.empty
+    | Some { target = _; fdo_annotation } -> fdo_annotation
+
   let fixup_branches ~code_size ~max_out_of_line_code_offset map code sizes =
     let expand_optbranch lbl n arg next =
       match lbl with
@@ -157,7 +168,12 @@ module Make (T : Branch_relaxation_intf.S) = struct
               (T.relax_allocation ~num_bytes ~dbginfo ~res:instr.res.(0) ~mode)
           | Lstackcheck { max_frame_size_bytes } ->
             relax_instr (T.relax_stackcheck ~max_frame_size_bytes)
-          | Lcondbranch { test; taken = { target = lbl; _ }; _ } ->
+          | Lcondbranch
+              { test;
+                taken = { target = lbl; fdo_annotation };
+                fallthrough_annotation
+              } ->
+            drop_fdo_counters [fdo_annotation; fallthrough_annotation];
             let lbl2 = Cmm.new_label () in
             let llabel = Llabel_for_jump_target lbl2 in
             let ri_branch = T.relax_branch lbl in
@@ -189,7 +205,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
               instr.next
               (branch_size :: label_size :: rest)
           | Lcondbranch3
-              { lt = lbl0; eq = lbl1; gt = lbl2; fallthrough_annotation = _ } ->
+              { lt = lbl0; eq = lbl1; gt = lbl2; fallthrough_annotation } ->
+            drop_fdo_counters
+              (fallthrough_annotation
+              :: List.map fdo_annotation_of_optbranch [lbl0; lbl1; lbl2]);
             let original_next = instr.next in
             let cont =
               expand_optbranch lbl0 0 instr.arg

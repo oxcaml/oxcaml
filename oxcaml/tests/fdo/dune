@@ -141,6 +141,29 @@
  (action
   (diff cfg_to_linear_counters.output cfg_to_linear_counters.output.corrected)))
 
+; ; The counters of the conditional branches that [Branch_relaxation] relaxes.
+
+(executable
+ (name branch_relaxation_counters)
+ (modules branch_relaxation_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   branch_relaxation_counters.output.corrected
+   (run ./branch_relaxation_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps branch_relaxation_counters.output branch_relaxation_counters.output.corrected)
+ (action
+  (diff branch_relaxation_counters.output branch_relaxation_counters.output.corrected)))
+
 ; The counters of the blocks that [Cfg_merge_blocks] merges.
 
 (executable
