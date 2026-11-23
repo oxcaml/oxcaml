@@ -777,6 +777,39 @@ Error: Signature mismatch in included functor's parameter:
        but the second is "static".
 |}]
 
+(* a class in the argument to [include functor] *)
+module M = struct
+  module type F =
+    functor (_ : sig class c : object end end @ static) -> sig val y : int end
+  module type T = sig
+    module Y : sig class c : object end include functor F end
+  end
+end
+[%%expect{|
+Line 5, characters 56-57:
+5 |     module Y : sig class c : object end include functor F end
+                                                            ^
+Error: Signature mismatch in included functor's parameter:
+       Class declarations c do not match:
+       First is "dynamic"
+       but second is "static".
+|}]
+
+(* likewise in a structure *)
+module M = struct
+  module F (X : sig class c : object end end @ static) = struct let y = 1 end
+  module Y = struct class c = object end include functor F end
+end
+[%%expect{|
+module M :
+  sig
+    module F :
+      functor (X : sig class c : object  end end @ static) ->
+        sig val y : int end
+    module Y : sig class c : object  end val y : int @@ dynamic end
+  end
+|}]
+
 module type Id = sig val poly_ id : 'a -> 'a end
 [%%expect{|
 module type Id = sig val poly_ id : 'a -> 'a end
