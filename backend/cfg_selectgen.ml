@@ -1539,7 +1539,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Direct { sym = func; callsite_counter }
         when String.equal func.sym_name !SU.current_function_name
              && SU.trap_stack_is_empty env ->
-        (* The call becomes a jump. *)
         Fdo_dropped_counters.register ~reason:Cfg_self_tail_call_to_jump
           (Fdo_annotation.of_list (Option.to_list callsite_counter));
         let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in

@@ -39,8 +39,7 @@ let counters_of_edges_to label successors =
   |> Fdo_annotation.union
 
 (* The unconditional jump to [label] replacing the terminator of [block], whose
-   control flow was [from]'s. The edges of [from] to [label] are now the jump:
-   their counters are dropped. *)
+   control flow was [from]'s. *)
 let always (block : C.basic_block) ~(from : C.terminator) label :
     C.terminator C.instruction =
   Fdo_dropped_counters.register ~reason:Cfg_branch_to_jump

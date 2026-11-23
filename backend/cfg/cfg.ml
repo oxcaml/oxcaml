@@ -263,7 +263,6 @@ let replace_successor_labels t ~normal ~exn block ~f =
   if exn then block.exn <- Option.map f block.exn;
   if normal
   then
-    (* The edge counters stay with the edge. *)
     let fs successor = { successor with target = f successor.target } in
     let desc =
       match block.terminator.desc with

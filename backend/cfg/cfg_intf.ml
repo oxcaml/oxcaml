@@ -35,6 +35,8 @@ module S = struct
   type successor =
     { target : Label.t;
       fdo_annotation : Fdo_annotation.t
+          (* CR yusumez: Potentially have [Branch_annotations.t] here
+             instead? *)
     }
 
   type func_call_operation =
