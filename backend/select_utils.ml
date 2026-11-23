@@ -227,13 +227,18 @@ let oper_result_type = function
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
     | Word_val -> typ_val
+    | Word_static_block -> typ_static_block
+    | Word_code_pointer -> typ_code_pointer
+    | Word_out_of_heap_data_pointer -> typ_out_of_heap_data_pointer
     | Word_mask -> typ_mask
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
     | Twofiftysix_aligned | Twofiftysix_unaligned -> typ_vec256
     | Fivetwelve_aligned | Fivetwelve_unaligned -> typ_vec512
-    | _ -> typ_int)
+    | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int ->
+      typ_int)
   | Calloc _ -> typ_val
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
@@ -320,7 +325,8 @@ let oper_result_type = function
 (* [size_component] is placed here and not in [Cmm] to avoid cyclic
    dependencies, because it uses [Arch]. *)
 let size_component : machtype_component -> int = function
-  | Val | Addr -> Arch.size_addr
+  | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer ->
+    Arch.size_addr
   | Int ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
@@ -562,7 +568,11 @@ let chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk =
   | Vec256 -> Twofiftysix_unaligned
   | Vec512 -> Fivetwelve_unaligned
   | Mask -> Word_mask
-  | Val | Addr | Int -> Word_val
+  | Val | Addr -> Word_val
+  | Int -> Word_int
+  | Static_block -> Word_static_block
+  | Code_pointer -> Word_code_pointer
+  | Out_of_heap_data_pointer -> Word_out_of_heap_data_pointer
   | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
 let float_test_of_float_comparison :
