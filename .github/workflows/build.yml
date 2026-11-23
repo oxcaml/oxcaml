@@ -186,6 +186,8 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,flambda2-expert-cmm-safe-subst=1,flambda2-expert-cmm-pin-reads=1'
             ocamlparam: '_,flambda2-expert-cmm-safe-subst=1,flambda2-expert-cmm-pin-reads=1'
+            # These tests compare Cmm output, which differs with pinned reads.
+            disable_testcases: 'testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/invalid.ml'
             sysdeps: gdb
 
           - name: address-sanitizer (x86_64-linux)
