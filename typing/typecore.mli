@@ -63,7 +63,11 @@ type type_expected = private {
 type pattern_variable_kind =
   | Std_var
   | As_var
+  | Deref_var
   | Continuation_var
+
+(** The warning for an unused pattern variable of the given kind *)
+val unused_variable_warning : pattern_variable_kind -> string -> Warnings.t
 
 type pattern_variable =
   {
