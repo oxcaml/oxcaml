@@ -105,7 +105,7 @@ bar.cmi -> $PWD/manifests/01/bar (visible)
 baz.cmi -> $PWD/manifests/04-baz (hidden)
 |}]
 
-(* Test file_x entries in manifests: qux.cmi is cmx_guaranteed,
+(* Test 'x' entries in manifests: qux.cmi is cmx_guaranteed,
    quux.cmi is not *)
 let () =
   run_test ~include_manifests:[
@@ -117,15 +117,37 @@ qux.cmi -> $PWD/manifests/04/qux (visible, cmx_guaranteed)
 quux.cmi -> $PWD/manifests/04/quux (visible)
 |}]
 
-(* You can write `file_x` in a hidden includes manifest *)
+(* You can also write 'x' entries in hidden includes manifests. *)
 let () =
   run_test ~hidden_include_manifests:[
     "04/04-manifest.txt";
-  ] ~files_to_check:["qux.cmi"; "quux.cmi"] ()
+  ] ~files_to_check:["qux.cmi"; "qux.cmx"; "quux.cmi"] ()
 
 [%%expect{|
 qux.cmi -> $PWD/manifests/04/qux (hidden, cmx_guaranteed)
+qux.cmx -> $PWD/manifests/04/qux_cmx (hidden)
 quux.cmi -> $PWD/manifests/04/quux (hidden)
+|}]
+
+(* Only .cmi files may be marked cmx_guaranteed. *)
+let () =
+  run_test ~include_manifests:[
+    "05/05-manifest.txt";
+  ] ~files_to_check:[] ()
+
+[%%expect{|
+Exception:
+Load_path.Parse_error "Only cmi files may be marked cmx_guaranteed".
+|}]
+
+let () =
+  run_test ~include_manifests:[
+    "06/06-manifest.txt";
+  ] ~files_to_check:[] ()
+
+[%%expect{|
+Exception:
+Load_path.Parse_error "Only cmi files may be marked cmx_guaranteed".
 |}]
 
 (* Parsing of -H-file arguments *)

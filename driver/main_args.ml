@@ -213,14 +213,16 @@ let mk_I_manifest f =
   \    to the -I flag, but specifies available files directly instead of\n\
   \    adding whole directories to the search path. Each line of the\n\
   \    manifest file should be in the format\n\
-  \    'file|manifest <basename> <actual_path>', where 'file' means\n\
+  \    'file|manifest <basename> <actual_path> [x]', where 'file' means\n\
   \    that the line describes a file that the compiler can reference,\n\
   \    'manifest' means that the compiler should read the specified\n\
   \    manifest file recursively, <basename> is the name under which the\n\
   \    compiler looks the file up (used as-is, so it must not contain a\n\
   \    directory component), <actual_path> is where this file is in the\n\
-  \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
-  \    passed to the [-I-manifest] flag should itself be relative to\n\
+  \    filesystem (relative to [$MANIFEST_FILES_ROOT]), and 'x' is an\n\
+  \    optional flag that indicates a cmi file's corresponding cmx file\n\
+  \    is guaranteed to be present. The manifest file passed to the\n\
+  \    [-I-manifest] flag should itself be relative to\n\
   \    [$MANIFEST_FILES_ROOT]. When linking, files given on the command\n\
   \    line by their bare names (e.g. 'foo.cmx' or 'lib.cmxa') are also\n\
   \    resolved through manifest entries; if the entry's <actual_path> does\n\
