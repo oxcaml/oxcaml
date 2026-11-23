@@ -114,8 +114,24 @@ abbrev expectedValue : Value :=
                   { tag := 247,
                     contents := BlockContents.closure (Expr.var 0) })] })
 
-theorem implementationReducesToValue {Step} [S : StepRelation Step]
-    : Reduce Step Oxbow.Extracted.Even.implementation expectedValue := by
+theorem implementationReducesToValue
+    {refinedSignatures : List (ModuleType SemanticTypeConstructor)}
+    (signaturesRefineDependencies
+      : refinedSignatures.forAllPairs
+          ModuleType.validWrtExtraction
+          Oxbow.Extracted.Even.dependencies)
+    {dependencies : List Value}
+    (dependenciesInhabitTheirSignatures
+      : refinedSignatures.map
+          (fun sig Step S => @ModuleType.structuralRelation! Step S sorry sig)
+        |>.forAllPairs Value.wellTyped dependencies)
+    {Step} [S : StepRelation Step]
+    : let implementation :=
+        Oxbow.Extracted.Even.implementation.substituteCompilationUnits!
+          dependencies
+      Reduce Step implementation expectedValue := by
+  obtain ⟨⟩ := signaturesRefineDependencies
+  obtain ⟨⟩ := dependenciesInhabitTheirSignatures
   simp
   apply Reduce.step; apply S.letBinding; apply S.function
   apply Reduce.step; apply S.letBindingValue; simp

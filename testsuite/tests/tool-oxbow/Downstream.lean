@@ -63,8 +63,53 @@ example {Step} [S : StepRelation Step]
 abbrev expectedValue : Value :=
   sorry
 
-theorem implementationReducesToValue {Step} [S : StepRelation Step]
-    : Reduce Step Oxbow.Extracted.Downstream.implementation expectedValue := by
+theorem implementationReducesToValue
+    {refinedSignatures : List (ModuleType SemanticTypeConstructor)}
+    (signaturesRefineDependencies
+      : refinedSignatures.forAllPairs
+          ModuleType.validWrtExtraction
+          Oxbow.Extracted.Downstream.dependencies)
+    {dependencies : List Value}
+    (dependenciesInhabitTheirSignatures
+      : refinedSignatures.map
+          (fun sig Step S => @ModuleType.structuralRelation! Step S sorry sig)
+        |>.forAllPairs Value.wellTyped dependencies)
+    {Step} [S : StepRelation Step]
+    : let implementation :=
+        Oxbow.Extracted.Downstream.implementation.substituteCompilationUnits!
+          dependencies
+      Reduce Step implementation expectedValue := by
+  cases signaturesRefineDependencies with | @cons evenSig _ evenValid tailSig tailParametric signaturesRefineDependencies =>
+  obtain ⟨⟩ := signaturesRefineDependencies
+  cases dependenciesInhabitTheirSignatures with | @cons evenRelation even evenWellTyped tailRelations tailValues dependenciesInhabitTheirSignatures =>
+  obtain ⟨⟩ := dependenciesInhabitTheirSignatures
+  obtain ⟨evenAbsent, evenPresent⟩ := evenSig; simp at evenValid
+  obtain ⟨evenAbsentValid, evenPresentValid⟩ := evenValid
+  cases evenAbsent with simp at evenAbsentValid | cons evenT evenAbsent =>
+  cases evenAbsent with simp at evenAbsentValid | nil =>
+  obtain ⟨evenTArity, evenT⟩ := evenT
+  cases evenTArity with simp at evenAbsentValid | zero =>
+  cases evenT with simp at evenAbsentValid | abstract evenT =>
+  obtain ⟨⟩ := evenAbsentValid
+  cases evenPresent with simp at evenPresentValid | cons evenCreate evenPresent =>
+  cases evenPresent with simp at evenPresentValid | cons evenGet evenPresent =>
+  cases evenPresent with simp at evenPresentValid | nil =>
+  obtain ⟨evenCreateValid, evenGetValid⟩ := evenPresentValid
+  cases evenCreate with simp at evenCreateValid | val evenCreate =>
+  cases evenCreate with simp at evenCreateValid | arrow evenCreateDomain evenCreateCodomain =>
+  cases evenCreateDomain with simp at evenCreateValid | constr evenCreateDomain evenCreateDomainArgs =>
+  cases evenCreateDomain with simp at evenCreateValid | predef evenCreateDomain =>
+  cases evenCreateDomain with simp at evenCreateValid | int =>
+  cases evenCreateDomainArgs with simp at evenCreateValid | nil =>
+  cases evenCreateCodomain with simp at evenCreateValid | constr evenCreateCodomain evenCreateCodomainArgs =>
+  cases evenCreateCodomain with simp at evenCreateValid | predef evenCreateCodomain =>
+  cases evenCreateCodomain with simp at evenCreateValid | option =>
+  cases evenCreateCodomainArgs with simp at evenCreateValid | cons evenCreateCodomainArg evenCreateCodomainArgs =>
+  cases evenCreateCodomainArgs with simp at evenCreateValid | nil =>
+  cases evenCreateCodomainArg with simp at evenCreateValid | constr evenCreateCodomainArg evenCreateCodomainArgArgs =>
+  cases evenCreateCodomainArgArgs with simp at evenCreateValid | nil =>
+  cases evenCreateCodomainArg with simp at evenCreateValid | field within index =>
+  obtain ⟨⟨⟩, ⟨⟩⟩ := evenCreateValid
   simp
   apply Reduce.step; apply S.letBinding; apply S.applyFunc; fail
 

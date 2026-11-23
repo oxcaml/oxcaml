@@ -325,6 +325,7 @@ end Oxbow.SemanticTypes
 
 open Oxbow.SemanticTypes
 
+@[simp]
 def SemanticTypeConstructor : (arity : Nat) → Type 0
   | .zero => PER Value
   | .succ pred => PER Value → SemanticTypeConstructor pred
