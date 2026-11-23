@@ -158,13 +158,7 @@ val llvm_path : string option ref
 val llvm_flags : string ref
 
 val fdo_counters : bool ref
-
-(** Also record in the FDO metadata section the names of the counters it refers
-    to by hash, for readable decoder output. *)
 val fdo_names : bool ref
-
-(** Also record in the FDO metadata section the counters the compiler dropped,
-    with the reason, to assess what dropping them loses. *)
 val fdo_dropped_counters : bool ref
 
 val dump_fdo_dropped_counters : bool ref
