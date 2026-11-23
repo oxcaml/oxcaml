@@ -443,6 +443,8 @@ We try several places in the identifier to check the result stability
               Nolabel
               Param_pat
                 pattern (under.ml[2,13+6]..under.ml[2,13+9])
+                  attribute \"merlin.loc_stack\"
+                    []
                   Tpat_var \"x\"
                   sort '_representable_layout_1
                   value_mode local_to_regional_full(modevar#e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#12<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
