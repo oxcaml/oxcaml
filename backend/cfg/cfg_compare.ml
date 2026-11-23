@@ -314,16 +314,11 @@ let compare_body ~ppf_m ~map_label ~old_label ~new_label old_body new_body =
 
 (* The FDO counters take part in the comparison: both pipelines must carry the
    same counters on the same edges and calls. *)
-let callsite_counter (op : Cfg.func_call_operation) =
-  match op with
-  | Direct { sym = _; callsite_counter }
-  | Indirect { callees = _; callsite_counter } ->
-    callsite_counter
-
 let equal_func_call_operation old_op new_op =
   Cfg.equal_func_call_operation old_op new_op
-  && Option.equal Fdo_counter.equal (callsite_counter old_op)
-       (callsite_counter new_op)
+  && Option.equal Fdo_counter.equal
+       (Cfg.callsite_counter old_op)
+       (Cfg.callsite_counter new_op)
 
 let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     (new_term : Cfg.terminator) =
