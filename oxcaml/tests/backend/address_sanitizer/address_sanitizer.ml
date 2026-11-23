@@ -1418,6 +1418,138 @@ module Test_out_of_bounds_accesses = struct
   ;;
 end
 
+(* The check of an access must preserve the live values that are in registers.
+   Each function below makes one valid access while eleven integers are live
+   across it: with the address, that is as many values as there are registers
+   that can hold an integer. *)
+module Test_live_registers = struct
+  type void : void
+
+  external malloc : nativeint_u -> nativeint_u = "" "malloc"
+  external box_nativeint : nativeint_u -> nativeint = "%box_nativeint"
+  external unbox_nativeint : nativeint -> nativeint_u = "%unbox_nativeint"
+
+  let offset ptr n = unbox_nativeint (Nativeint.add (box_nativeint ptr) n)
+
+  external vec128_load_low64 : nativeint_u -> int64x2# = "" "caml_sse2_vec128_load_low64"
+  [@@noalloc] [@@builtin]
+  external vec128_load_low32 : nativeint_u -> int64x2# = "" "caml_sse2_vec128_load_low32"
+  [@@noalloc] [@@builtin]
+  external vec128_load_unaligned : nativeint_u -> int64x2# = "" "caml_sse_vec128_load_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec256_load_unaligned : nativeint_u -> int64x4# = "" "caml_avx_vec256_load_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec128_store_low64 : nativeint_u -> int64x2# -> void = "" "caml_sse2_vec128_store_low64"
+  [@@noalloc] [@@builtin]
+  external vec128_store_low32 : nativeint_u -> int64x2# -> void = "" "caml_sse2_vec128_store_low32"
+  [@@noalloc] [@@builtin]
+  external vec128_store_unaligned : nativeint_u -> int64x2# -> void = "" "caml_sse_vec128_store_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec256_store_unaligned : nativeint_u -> int64x4# -> void = "" "caml_avx_vec256_store_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec128_store_mask8 : int64x2# -> int64x2# -> nativeint_u -> void = "" "caml_sse2_vec128_store_mask8"
+  [@@noalloc] [@@builtin]
+
+  let[@inline always] sum a b c d e f g h i j k = a + b + c + d + e + f + g + h + i + j + k
+
+  let[@inline never] load_low64 ptr a b c d e f g h i j k =
+    let _ = Sys.opaque_identity (vec128_load_low64 ptr) in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] load_low32 ptr a b c d e f g h i j k =
+    let _ = Sys.opaque_identity (vec128_load_low32 ptr) in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] load_vec128 ptr a b c d e f g h i j k =
+    let _ = Sys.opaque_identity (vec128_load_unaligned ptr) in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] load_vec256 ptr a b c d e f g h i j k =
+    let _ = Sys.opaque_identity (vec256_load_unaligned ptr) in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] store_low64 ptr x a b c d e f g h i j k =
+    let _ = vec128_store_low64 ptr x in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] store_low32 ptr x a b c d e f g h i j k =
+    let _ = vec128_store_low32 ptr x in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] store_vec128 ptr x a b c d e f g h i j k =
+    let _ = vec128_store_unaligned ptr x in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] store_vec256 ptr x a b c d e f g h i j k =
+    let _ = vec256_store_unaligned ptr x in
+    sum a b c d e f g h i j k
+  ;;
+
+  (* The memory operand of this store is implicit. *)
+  let[@inline never] store_mask8 ptr x a b c d e f g h i j k =
+    let _ = vec128_store_mask8 x x ptr in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] bigstring_get_vec128 t a b c d e f g h i j k =
+    let _ = Sys.opaque_identity (Vec128_bigarray.unsafe_unaligned_get t ~byte:20) in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] bigstring_set_vec128 t x a b c d e f g h i j k =
+    Vec128_bigarray.unsafe_unaligned_set t ~byte:20 x;
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] bigstring_get_vec256 t a b c d e f g h i j k =
+    let _ = Sys.opaque_identity (Vec256_bigarray.unsafe_unaligned_get t ~byte:4) in
+    sum a b c d e f g h i j k
+  ;;
+
+  let[@inline never] bigstring_set_vec256 t x a b c d e f g h i j k =
+    Vec256_bigarray.unsafe_unaligned_set t ~byte:4 x;
+    sum a b c d e f g h i j k
+  ;;
+
+  let live_registers_are_preserved () =
+    let test () =
+      (* Only four bytes of the last 8-byte granule of each block are
+         addressable. The accesses smaller than a word and the vector accesses
+         below end there, which makes their checks take the slow path. *)
+      let ptr = malloc #36n in
+      let bigstring = Bigstring.create 36 in
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let y = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let check name sum =
+        if sum <> 11066 then Printf.printf "%s: the sum is %d\n" name sum
+      in
+      check "load_low64" (load_low64 ptr 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "load_low32" (load_low32 (offset ptr 32n) 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "load_vec128" (load_vec128 (offset ptr 20n) 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "load_vec256" (load_vec256 (offset ptr 4n) 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "store_low64" (store_low64 ptr x 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "store_low32" (store_low32 (offset ptr 32n) x 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "store_vec128" (store_vec128 (offset ptr 20n) x 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "store_vec256" (store_vec256 (offset ptr 4n) y 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "store_mask8" (store_mask8 (offset ptr 20n) x 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "bigstring_get_vec128" (bigstring_get_vec128 bigstring 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "bigstring_set_vec128" (bigstring_set_vec128 bigstring x 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "bigstring_get_vec256" (bigstring_get_vec256 bigstring 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      check "bigstring_set_vec256" (bigstring_set_vec256 bigstring y 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011);
+      print_endline "done"
+    in
+    run_test __FUNCTION__ ~test ~validate:(fun test_output ->
+      if test_output <> "done\n" then failwith ("Failed: " ^ test_output))
+  ;;
+end
+
 (* Main entry point *)
 let () =
   (* We print *something* out regardless of whether or not this test is enabled
@@ -1435,6 +1567,7 @@ let () =
       (* Ensure that we aren't producing false-positives *)
       valid_accesses_are_unaffected ();
       valid_vector_accesses_are_unaffected ();
+      Test_live_registers.live_registers_are_preserved ();
       (* Record use-after-free tests *)
       field_get_immediate ();
       field_set_immediate ();
