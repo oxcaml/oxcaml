@@ -5105,6 +5105,8 @@ let rec check_counter_example_pat
       end
   | Tpat_alias { pattern = p; _ } | Tpat_deref { pattern = Some p; _ } ->
       check_rec ~info p expected_ty k
+  | Tpat_deref { pattern = None; _ } ->
+      check_rec ~info { tp with pat_desc = Tpat_any } expected_ty k
   | Tpat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       k @@
@@ -5222,16 +5224,6 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_deref { pattern = None; _ } ->
-      (* CR address-patterns: deref patterns aren't always refuted. E.g. this
-         case is rejected:
-         {[
-           type _ refute_gadt = Refute_int : int refute_gadt
-           let refute_deref (x : string refute_gadt * unit) =
-             match x with
-             | (deref_ y, ()) -> .
-         ]} *)
-      mkp k tp.pat_desc
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting

@@ -958,6 +958,29 @@ val ok_consume_addr_then_replace_all : mut_and_imm @ unique -> unit = <fun>
 (*************************************)
 (* Exhaustiveness and other warnings *)
 
+(* A dereference pattern at a position whose type has no values *)
+type _ refute_gadt = Refute_int : int refute_gadt
+let refute_deref_gadt (x : string refute_gadt * unit) =
+  match x with (deref_ _y, ()) -> .
+[%%expect{|
+type _ refute_gadt = Refute_int : int refute_gadt
+val refute_deref_gadt : string refute_gadt * unit -> 'a = <fun>
+|}]
+
+let unreachable_deref_gadt (x : string refute_gadt * bool) =
+  match x with
+  | (_, true) -> 0
+  | (deref_ _y, false) -> 1
+[%%expect{|
+Line 4, characters 4-22:
+4 |   | (deref_ _y, false) -> 1
+        ^^^^^^^^^^^^^^^^^^
+Warning 56 [unreachable-case]: this match case is unreachable.
+  Consider replacing it with a refutation case "<pat> -> ."
+
+val unreachable_deref_gadt : string refute_gadt * bool -> int = <fun>
+|}]
+
 let refute_deref_below_addr : int addr_imm -> int =
   function addr_imm_ (deref_ _a) -> .
 [%%expect{|
@@ -965,8 +988,7 @@ Line 2, characters 11-32:
 2 |   function addr_imm_ (deref_ _a) -> .
                ^^^^^^^^^^^^^^^^^^^^^
 Error: This match case could not be refuted.
-       Here is an example of a value that would reach it:
-       "addr_imm_ (deref_ _a)"
+       Here is an example of a value that would reach it: "addr_imm_ _"
 |}]
 
 type refute_r = { refute_b : bool }
@@ -978,8 +1000,7 @@ Line 3, characters 11-35:
 3 |   function { refute_b = deref_ _a } -> .
                ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This match case could not be refuted.
-       Here is an example of a value that would reach it:
-       "{refute_b=deref_ _a}"
+       Here is an example of a value that would reach it: "{ _ }"
 |}]
 
 let exh_tuple x = match x with (deref_ _a, 0) -> 1 | (0, 1) -> 2
@@ -1475,6 +1496,15 @@ Line 3, characters 4-27:
 Warning 11 [redundant-case]: this match case is unused.
 
 val unused_alias : 'a option * 'b -> 'a option addr_imm = <fun>
+|}]
+
+(* So does refutation *)
+let refute_alias_gadt (x : string refute_gadt option * unit) =
+  match x with
+  | ((Some _ as deref_ _y), ()) -> .
+  | (None, ()) -> ()
+[%%expect{|
+val refute_alias_gadt : string refute_gadt option * unit -> unit = <fun>
 |}]
 
 (* Unused variables of alias dereference patterns are reported, too *)
