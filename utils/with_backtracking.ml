@@ -10,17 +10,17 @@ module Stamp = struct
     !last
 
   let needs_log t = t <= !latest_snapshot
-end
 
-module Snapshot = struct
-  type t = int
+  module Snapshot = struct
+    type t = int
 
-  let take () =
-    let old = !Stamp.latest_snapshot in
-    Stamp.latest_snapshot := !Stamp.last;
-    old
+    let take () =
+      let old = !latest_snapshot in
+      latest_snapshot := !last;
+      old
 
-  let restore old = Stamp.latest_snapshot := old
+    let restore old = latest_snapshot := old
+  end
 end
 
 module Make (C : Change.S) = struct

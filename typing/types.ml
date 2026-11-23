@@ -1733,7 +1733,7 @@ let undo_change = function
   | Cscheduler c -> Scheduler.Change.undo c
   | Civar c -> Ivar.Change.undo c
 
-type snapshot = changes ref * With_backtracking.Snapshot.t
+type snapshot = changes ref * With_backtracking.Stamp.Snapshot.t
 
 let needs_log ty = With_backtracking.Stamp.needs_log ty.id
 
@@ -1844,7 +1844,7 @@ let rec link_commu ~(inside : commutable) (c : commutable) =
 
 let set_commu_ok c = link_commu ~inside:c Cok
 
-let snapshot () = (!trail, With_backtracking.Snapshot.take ())
+let snapshot () = (!trail, With_backtracking.Stamp.Snapshot.take ())
 
 let rec rev_log accu = function
     Unchanged -> accu
@@ -1856,14 +1856,14 @@ let rec rev_log accu = function
 
 let backtrack ~cleanup_abbrev (changes, old) =
   match !changes with
-    Unchanged -> With_backtracking.Snapshot.restore old
+    Unchanged -> With_backtracking.Stamp.Snapshot.restore old
   | Invalid -> failwith "Types.backtrack"
   | Change _ as change ->
       cleanup_abbrev ();
       let backlog = rev_log [] change in
       List.iter undo_change backlog;
       changes := Unchanged;
-      With_backtracking.Snapshot.restore old;
+      With_backtracking.Stamp.Snapshot.restore old;
       trail := changes
 
 let undo_first_change_after (changes, _) =
