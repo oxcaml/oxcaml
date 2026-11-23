@@ -205,6 +205,8 @@ val successor : ?fdo_annotation:Fdo_annotation.t -> Label.t -> successor
 (** The FDO counters of the edges and of the call of a terminator. *)
 val fdo_counters_of_terminator : terminator -> Fdo_annotation.t
 
+val callsite_counter : func_call_operation -> Fdo_counter.t option
+
 val replace_successor_labels :
   t -> normal:bool -> exn:bool -> basic_block -> f:(Label.t -> Label.t) -> unit
 

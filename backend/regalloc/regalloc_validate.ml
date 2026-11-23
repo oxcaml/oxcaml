@@ -576,8 +576,25 @@ end = struct
           Label.format l1 InstructionId.format s1 Label.format l2
           InstructionId.format s2
     in
+    let compare_fdo_counters ~print c1 c2 ~equal =
+      if not (equal c1 c2)
+      then
+        Regalloc_utils.fatal
+          "The FDO counters of terminator with id %a changed, before: %a, \
+           after: %a."
+          InstructionId.format id print c1 print c2
+    in
     let compare_successor (s1 : Cfg.successor) (s2 : Cfg.successor) =
-      compare_label s1.target s2.target
+      compare_label s1.target s2.target;
+      compare_fdo_counters ~print:Fdo_annotation.print
+        ~equal:Fdo_annotation.equal s1.fdo_annotation s2.fdo_annotation
+    in
+    let compare_callsite_counter call1 call2 =
+      compare_fdo_counters
+        ~print:(Format.pp_print_option Fdo_counter.print)
+        ~equal:(Option.equal Fdo_counter.equal)
+        (Cfg.callsite_counter call1)
+        (Cfg.callsite_counter call2)
     in
     match old_instr, instr with
     | Never, Never -> ()
@@ -614,13 +631,14 @@ end = struct
     | Tailcall_func call1, Tailcall_func call2
     | Call_no_return call1, Call_no_return call2
       when Cfg.equal_func_call_operation call1 call2 ->
-      ()
+      compare_callsite_counter call1 call2
     | External_call_no_return call1, External_call_no_return call2
       when Cfg.equal_external_call_operation call1 call2 ->
       ()
     | ( Call { op = call1; label_after = l1 },
         Call { op = call2; label_after = l2 } )
       when Cfg.equal_func_call_operation call1 call2 ->
+      compare_callsite_counter call1 call2;
       compare_label l1 l2
     | ( Prim { op = prim1; label_after = l1 },
         Prim { op = prim2; label_after = l2 } )
