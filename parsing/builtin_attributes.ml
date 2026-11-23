@@ -159,6 +159,7 @@ let builtin_attrs =
   ; "represent_as_float_array"
   ; "immediate_all_void_constructor"
   ; "rec"
+  ; "static"
   ]
 
 let builtin_attrs =
@@ -484,6 +485,9 @@ let attribute_location nm attrs =
        then (mark_used a.attr_name; Some a.attr_name.loc)
        else None)
     attrs
+
+let static_attribute_of_str str =
+  attribute_location "static" (attrs_of_str str)
 
 type attr_action = Mark_used_only | Return
 let select_attributes actions attrs =

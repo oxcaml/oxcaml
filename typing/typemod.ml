@@ -4918,6 +4918,9 @@ let type_implementation target modulename initial_env ast =
         let cu_name = Compilation_unit.name modulename in
         let basename = cu_name |> Compilation_unit.Name.to_string in
         let source_intf = Unit_info.mli_from_source target in
+        let static_attribute =
+          Builtin_attributes.static_attribute_of_str ast
+        in
         if !Clflags.cmi_file <> None
         || Sys.file_exists source_intf then begin
           let for_pack_prefix = Compilation_unit.for_pack_prefix modulename in
@@ -4948,6 +4951,17 @@ let type_implementation target modulename initial_env ast =
           let dclsig, staticity =
             Env.read_signature global_name compiled_intf_file
           in
+          (* If the unit has [[@@@static]] but the interface is dynamic, then we
+             issue a misplaced attribute warning.
+
+             Even though the attribute is intended for [.mli]-less [.ml] files,
+             an [.ml] may still be compiled against the [.cmi] for its own
+             inferred signature, so we don't warn if the staticity agrees. *)
+          (match static_attribute, staticity with
+           | None, _ | Some _, Staticity.Static -> ()
+           | Some loc, Staticity.Dynamic ->
+             Location.prerr_warning loc
+               (Warnings.Misplaced_attribute "static"));
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi =
@@ -5002,7 +5016,16 @@ let type_implementation target modulename initial_env ast =
           Location.prerr_warning
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
-          let staticity = Staticity.Dynamic in
+          (* [.mli]-less [.ml]s are [static] iff they start with
+             [[@@@static]] *)
+          let staticity =
+            match static_attribute with
+            | None -> Staticity.Dynamic
+            | Some loc ->
+              Language_extension.assert_enabled ~loc Layout_poly
+                Language_extension.Alpha;
+              Staticity.Static
+          in
           let coercion, shape =
             let modes =
               Includecore.Specific

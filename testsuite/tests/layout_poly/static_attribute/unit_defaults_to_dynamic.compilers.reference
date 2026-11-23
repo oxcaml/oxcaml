@@ -1,0 +1,6 @@
+File "unit_defaults_to_dynamic.ml", line 13, characters 8-21:
+13 | let _ = Plain_unit.id 1
+             ^^^^^^^^^^^^^
+Error: The value Plain_unit.id is dynamic
+       but is expected to be static
+         because it is layout-polymorphic and being instantiated here.
