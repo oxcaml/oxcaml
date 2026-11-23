@@ -173,9 +173,6 @@ let bind_list name args fn =
   in
   aux [] (List.rev args)
 
-let bind_load name arg fn =
-  match arg with Cop (Cload _, [Cvar _], _) -> fn arg | _ -> bind name arg fn
-
 let caml_black = Nativeint.shift_left (Nativeint.of_int 3) 8
 
 let caml_local = Nativeint.shift_left (Nativeint.of_int 3) 8
@@ -2821,7 +2818,7 @@ let make_alloc_generic ~strict_init ~block_kind ~mode ~alloc_block_kind dbg tag
     let rec bind_args_then_alloc simple_args = function
       | [] -> do_alloc simple_args
       | arg :: args_rev ->
-        bind_load "alloc_arg" arg (fun arg ->
+        bind "alloc_arg" arg (fun arg ->
             bind_args_then_alloc (arg :: simple_args) args_rev)
     in
     if strict_init
