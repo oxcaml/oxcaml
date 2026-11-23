@@ -143,7 +143,7 @@ let rec print (instr : Linear.instruction) =
     Format.printf "  (padding)@.";
     print (skip instr)
   | _ ->
-    Format.printf "  %a@." Printlinear.instr instr;
+    Format.printf "  @[<v 0>%a@]@." Printlinear.instr instr;
     print instr.next
 
 let print_counters title counters =

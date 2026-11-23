@@ -127,7 +127,7 @@ let print_entry_block (fundecl : Linear.fundecl) =
     match[@warning "-fragile-match"] instr.desc with
     | Lend | Lreturn | Llabel_for_jump_target _ -> ()
     | _ ->
-      Format.printf "    %a@." Printlinear.instr instr;
+      Format.printf "    @[<v 0>%a@]@." Printlinear.instr instr;
       print instr.next
   in
   print fundecl.fun_body
@@ -163,7 +163,7 @@ let test name (terminator : Cfg.terminator) ~next =
   Format.printf "@."
 
 let test_layouts name terminator =
-  List.iter (fun next -> test name terminator ~next) [a; b; c]
+  List.iter (fun next -> test name terminator ~next) [a; b; c; d]
 
 let int_test ?(is_signed = Scalar.Signedness.Signed) ?(imm = Some 0) lt eq gt :
     Cfg.terminator =

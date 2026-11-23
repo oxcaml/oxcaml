@@ -131,7 +131,7 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   | Lswitch successors ->
     fprintf ppf "switch %a" reg i.arg.(0);
     Array.iteri
-      (fun i lbl -> fprintf ppf "case %i: goto %a" i successor lbl)
+      (fun i lbl -> fprintf ppf "@,case %i: goto %a" i successor lbl)
       successors;
     fprintf ppf "@,endswitch"
   | Lentertrap -> fprintf ppf "enter trap"

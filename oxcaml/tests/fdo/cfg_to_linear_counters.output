@@ -16,6 +16,12 @@ truth test, followed by C:
   dropped:
   lost:
 
+truth test, followed by D:
+    if anon:I/0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
+    goto L101
+  dropped:
+  lost:
+
 parity test, followed by A:
     if anon:I/0 & 1 == 1 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(2)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))
   dropped:
@@ -27,6 +33,12 @@ parity test, followed by B:
   lost:
 
 parity test, followed by C:
+    if anon:I/0 & 1 == 0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
+    goto L101
+  dropped:
+  lost:
+
+parity test, followed by D:
     if anon:I/0 & 1 == 0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
     goto L101
   dropped:
@@ -46,6 +58,11 @@ truth test to a single target, followed by C:
   dropped: "Test.f":0:00000001:0:branch(1) "Test.f":0:00000001:0:branch(2)
   lost:
 
+truth test to a single target, followed by D:
+    goto L100
+  dropped: "Test.f":0:00000001:0:branch(1) "Test.f":0:00000001:0:branch(2)
+  lost:
+
 int test with two targets, followed by A:
     if anon:I/0 == 0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2))
   dropped:
@@ -57,6 +74,12 @@ int test with two targets, followed by B:
   lost:
 
 int test with two targets, followed by C:
+    if anon:I/0 == 0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2))
+    goto L100
+  dropped:
+  lost:
+
+int test with two targets, followed by D:
     if anon:I/0 == 0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2))
     goto L100
   dropped:
@@ -80,24 +103,43 @@ int test with three targets, followed by C:
   dropped:
   lost:
 
+int test with three targets, followed by D:
+    if anon:I/0 >s 0 goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+    if anon:I/0 == 0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0))
+    goto L100
+  dropped:
+  lost:
+
 int test with three targets, against 1 unsigned, followed by A:
-    switch3 anon:I/0 fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0))case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
-case 2: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
-endswitch
+    switch3 anon:I/0 fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0))
+    case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    case 2: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+    endswitch
   dropped:
   lost:
 
 int test with three targets, against 1 unsigned, followed by B:
-    switch3 anon:I/0 fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))
-case 2: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
-endswitch
+    switch3 anon:I/0 fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(1))
+    case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))
+    case 2: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+    endswitch
   dropped:
   lost:
 
 int test with three targets, against 1 unsigned, followed by C:
-    switch3 anon:I/0 fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))
-case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
-endswitch
+    switch3 anon:I/0 fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(2))
+    case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))
+    case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    endswitch
+  dropped:
+  lost:
+
+int test with three targets, against 1 unsigned, followed by D:
+    switch3 anon:I/0
+    case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))
+    case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    case 2: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+    endswitch
   dropped:
   lost:
 
@@ -113,6 +155,13 @@ float test with two targets, followed by B:
   lost:
 
 float test with two targets, followed by C:
+    if anon:I/0 == anon:I/0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2)
+                                                                                                                 "Test.f":0:00000001:0:branch(3))
+    goto L100
+  dropped:
+  lost:
+
+float test with two targets, followed by D:
     if anon:I/0 == anon:I/0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(2)
                                                                                                                  "Test.f":0:00000001:0:branch(3))
     goto L100
@@ -137,16 +186,26 @@ float test with three targets, followed by C:
   dropped:
   lost:
 
+float test with three targets, followed by D:
+    if anon:I/0 !<= anon:I/0 goto L102 fdo_annotation("Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3))
+    if anon:I/0 == anon:I/0 goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(0))
+    goto L100
+  dropped:
+  lost:
+
 switch, followed by A:
-    switch anon:I/0case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))case 2: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(2))case 3: goto L102 fdo_annotation
-("Test.f":0:00000001:0:branch(3))
-endswitch
+    switch anon:I/0
+    case 0: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(0))
+    case 1: goto L101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    case 2: goto L100 fdo_annotation("Test.f":0:00000001:0:branch(2))
+    case 3: goto L102 fdo_annotation("Test.f":0:00000001:0:branch(3))
+    endswitch
   dropped:
   lost:
 
 call, followed by A:
     {}
-call "g" anon:I/0 anon:I/0 callsite_counter("Test.f":0:00000001:1:call)
+    call "g" anon:I/0 anon:I/0 callsite_counter("Test.f":0:00000001:1:call)
   dropped:
   lost:
 

@@ -141,7 +141,7 @@
  (action
   (diff cfg_to_linear_counters.output cfg_to_linear_counters.output.corrected)))
 
-; ; The counters of the conditional branches that [Branch_relaxation] relaxes.
+; The counters of the conditional branches that [Branch_relaxation] relaxes.
 
 (executable
  (name branch_relaxation_counters)
