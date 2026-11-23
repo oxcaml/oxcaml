@@ -92,7 +92,12 @@ let main filename =
          in
          objects := obj :: !objects
        ) genfns_partitions;
-       ignore (Ccomp.create_archive file_prefix !objects : int))
+       Ccomp.create_archive file_prefix !objects)
+  |> function
+  | 0 -> ()
+  | status ->
+    Printf.eprintf "Error while creating the archive %s\n" file_prefix;
+    exit status
 
 let arg_usage =
   Printf.sprintf "%s FILE : Generate an obj file containing cached generatic functions named FILE" Sys.argv.(0)
