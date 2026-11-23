@@ -66,33 +66,9 @@ let basic_desc ppf (basic : Cfg.basic) =
   | Stack_check { max_frame_size_bytes } ->
     fprintf ppf "stack_check size=%d" max_frame_size_bytes
 
-(* The FDO counters are printed as in Cmm dumps, when there are any, but without
-   boxes: the rest of the dump is laid out by hand. *)
-let fdo_annotation ppf annotation =
-  if not (Fdo_annotation.is_empty annotation)
-  then
-    Format.fprintf ppf " fdo_annotation(%s)"
-      (Fdo_annotation.to_list annotation
-      |> List.map ~f:Fdo_counter.to_string
-      |> String.concat " ")
-
-let fdo_entry_annotation ppf entry_annotation =
-  let module Entry = Fdo_annotation.With_body_hash in
-  if not (Entry.is_empty entry_annotation)
-  then
-    let body_hash =
-      Entry.body_hash entry_annotation
-      |> Option.map (fun body_hash ->
-          "body_hash:" ^ Fdo_counter.Body_hash.to_string body_hash)
-      |> Option.to_list
-    in
-    Format.fprintf ppf "  fdo_entry_annotation(%s)\n"
-      ( Fdo_annotation.to_list (Entry.annotation entry_annotation)
-      |> List.map ~f:Fdo_counter.to_string
-      |> fun counters -> String.concat " " (counters @ body_hash) )
-
-let successor ppf ({ target; fdo_annotation = annotation } : Cfg.successor) =
-  Format.fprintf ppf "%a%a" Label.format target fdo_annotation annotation
+let successor ppf ({ target; fdo_annotation } : Cfg.successor) =
+  Format.fprintf ppf "%a%a" Label.format target Fdo_annotation.print_edge
+    fdo_annotation
 
 (* Shared implementation between [terminator_desc] (no args, desc-only) and
    [print_terminator_body] (args drawn from the instruction). *)
@@ -346,9 +322,9 @@ let format :
     Cfg_liveness.domain InstructionId.Tbl.t option ->
     unit =
  fun fmt cfg labels liveness ->
-  Format.fprintf fmt "cfg for %t%s%t\n" Cfg_colours.function_name cfg.fun_name
-    Cfg_colours.pop;
-  fdo_entry_annotation fmt cfg.fun_fdo_entry_annotation;
+  Format.fprintf fmt "cfg for %t%s%t%a\n" Cfg_colours.function_name cfg.fun_name
+    Cfg_colours.pop Fdo_annotation.With_body_hash.print_entry
+    cfg.fun_fdo_entry_annotation;
   Format.fprintf fmt "  args: %a\n" Printreg.regs cfg.fun_args;
   Format.fprintf fmt "  ret_type: %a\n" Printcmm.machtype cfg.fun_ret_type;
   Format.fprintf fmt "  entry_label: %a\n" Label.format cfg.entry_label;

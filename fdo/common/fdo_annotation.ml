@@ -55,11 +55,26 @@ let equal t1 t2 =
     (List.sort Fdo_counter.compare t1)
     (List.sort Fdo_counter.compare t2)
 
-let print_raw =
-  Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf counter ->
-      Format.pp_print_string ppf (Fdo_counter.to_string counter))
+let print_raw ppf t =
+  Format.pp_print_string ppf
+    (String.concat " " (List.map Fdo_counter.to_string (to_list t)))
 
-let print ppf t = Format.fprintf ppf "@[<hov 1>(%a)@]" print_raw t
+let print ppf t = Format.fprintf ppf "(%a)" print_raw t
+
+let print_tagged ~keyword ppf t =
+  if not (is_empty t) then Format.fprintf ppf " %s%a" keyword print t
+
+let edge_keyword = "fdo_annotation"
+
+let print_edge = print_tagged ~keyword:edge_keyword
+
+let print_edge_before ppf t =
+  if not (is_empty t) then Format.fprintf ppf "%s%a@ " edge_keyword print t
+
+let print_callsite_counter ppf = function
+  | None -> ()
+  | Some counter ->
+    Format.fprintf ppf " callsite_counter(%s)" (Fdo_counter.to_string counter)
 
 module With_body_hash = struct
   type annotation = t
@@ -89,11 +104,15 @@ module With_body_hash = struct
     && Option.equal Fdo_counter.Body_hash.equal t1.body_hash t2.body_hash
 
   let print ppf { annotation; body_hash } =
-    Format.fprintf ppf "@[<hov 1>(%a%a)@]" print_raw annotation
+    Format.fprintf ppf "(%a%a)" print_raw annotation
       (Format.pp_print_option
          ~none:(fun _ () -> ())
          (fun ppf body_hash ->
            Format.fprintf ppf " body_hash:%a" Fdo_counter.Body_hash.print
              body_hash))
       body_hash
+
+  let print_entry ppf t =
+    if not (is_empty t)
+    then Format.fprintf ppf " fdo_entry_annotation%a" print t
 end

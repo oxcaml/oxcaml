@@ -624,15 +624,6 @@ module Terminator = struct
   let successor ?(fdo_annotation = Fdo_annotation.empty) target =
     { target; fdo_annotation }
 
-  let print_fdo_annotation ppf annotation =
-    if not (Fdo_annotation.is_empty annotation)
-    then Format.fprintf ppf " fdo_annotation%a" Fdo_annotation.print annotation
-
-  let print_callsite_counter ppf = function
-    | None -> ()
-    | Some counter ->
-      Format.fprintf ppf " callsite_counter(%s)" (Fdo_counter.to_string counter)
-
   let print_args ppf arr =
     Format.pp_print_array
       ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
@@ -664,7 +655,7 @@ module Terminator = struct
       Array.iteri
         (fun i { target; fdo_annotation } ->
           Format.fprintf ppf " | %i -> %a%a" i Block.print_id target
-            print_fdo_annotation fdo_annotation)
+            Fdo_annotation.print_edge fdo_annotation)
         targets
     | Call { op; args; continuation; may_raise; nontail } -> (
       let kind =
@@ -675,10 +666,10 @@ module Terminator = struct
       (match op with
       | Direct { sym; callsite_counter } ->
         Format.fprintf ppf "%s %s(%a)%a" kind sym.sym_name print_args args
-          print_callsite_counter callsite_counter
+          Fdo_annotation.print_callsite_counter callsite_counter
       | Indirect { callees = _; callsite_counter } ->
         Format.fprintf ppf "%s_indirect(%a)%a" kind print_args args
-          print_callsite_counter callsite_counter
+          Fdo_annotation.print_callsite_counter callsite_counter
       | External { func_symbol; _ } ->
         Format.fprintf ppf "%s_prim %s(%a)" kind func_symbol print_args args
       | Probe { name; _ } ->
