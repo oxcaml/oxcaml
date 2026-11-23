@@ -212,6 +212,10 @@ let () =
   test "truth test" ~args:["x"] (function
     | [x] -> if_ x ~ifso:(int 3) ~ifnot:(int 5)
     | _ -> assert false);
+  (* The low bit of the argument, as a condition: an odd test. *)
+  test "odd test" ~args:["x"] (function
+    | [x] -> if_ (Cop (Cand, [x; int 1], dbg)) ~ifso:(int 3) ~ifnot:(int 5)
+    | _ -> assert false);
   (* A parity test is a comparison that cannot be negated: [Ssa_simplify] swaps
      the targets instead, with their counters. *)
   test "parity test" ~args:["x"] (function
