@@ -2343,7 +2343,7 @@ let file_emitter ~file_num ~file_name =
 (* Beginning / end of an assembly file *)
 
 let begin_assembly _unix =
-  reset_debug_info ();
+  Emitaux.reset ();
   Probe_emission.reset ();
   sancov := Emit_sancov.create ();
   A.set_emit_string ~emit_string:Emitaux.emit_string;
