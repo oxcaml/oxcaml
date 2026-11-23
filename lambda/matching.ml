@@ -237,13 +237,16 @@ let transl_deref_address deref_address =
         loc
   | In_address { addr; rev_unboxed_path = []; _ } -> addr
   | In_address { addr; contents_layout; rev_unboxed_path; loc } ->
-      let part i =
-        Lprim (Punboxed_product_field (i, address_layouts), [ addr ], loc)
+      let base =
+        Lprim (Punboxed_product_field (0, address_layouts), [ addr ], loc)
+      in
+      let idx =
+        Lprim (Punboxed_product_field (1, address_layouts), [ addr ], loc)
       in
       let contents = mixed_block_element_of_layout contents_layout in
       let path = List.rev rev_unboxed_path in
-      make_address (part 0)
-        (Lprim (Pidx_deepen (contents, path), [ part 1 ], loc))
+      make_address base
+        (Lprim (Pidx_deepen (contents, path), [ idx ], loc))
         loc
 
 let bind_address (id, duid) deref_address action =
@@ -4813,38 +4816,36 @@ let root_arg arg binding_kind sort layout =
   { arg; binding_kind; mut = Immutable; sort; layout; deref_address = None }
 
 (* Syntactic tuples ([match (a, b) with ...], [let ... = (a, b)] and the
-   arguments of tupled functions) are usually matched directly without
-   allocating the tuple. Dereference patterns on their elements need the tuple
-   in memory though, so if there are any, the tuple is allocated and matched
-   like any other value. *)
+   arguments of tupled functions) are usually "flattened", that is, matched
+   directly without allocating the tuple. Dereference patterns on their elements
+   need the tuple in memory though, so if there are any, the tuple is allocated
+   and matched like any other value. *)
 
-(* Whether this pattern, matching a tuple element, has a dereference pattern at
-   a position inside that element, rather than inside another block *)
-let rec derefs_tuple_element (p : pattern) =
+let rec tuple_has_direct_derefs (p : pattern) =
+  (* Whether matching a value against this pattern needs the block containing
+     the value. *)
+  let rec has_direct_derefs (p : pattern) =
+    match p.pat_desc with
+    | Tpat_deref _ -> true
+    | Tpat_alias { pattern = p; _ } -> has_direct_derefs p
+    | Tpat_or (p1, p2, _) -> has_direct_derefs p1 || has_direct_derefs p2
+    | Tpat_unboxed_tuple ps ->
+        List.exists (fun (_, p, _) -> has_direct_derefs p) ps
+    | Tpat_record_unboxed_product (lps, _, _) ->
+        List.exists (fun (_, _, p) -> has_direct_derefs p) lps
+    | Tpat_record (lps, Record_unboxed, _) ->
+        List.exists (fun (_, _, p) -> has_direct_derefs p) lps
+    | Tpat_any | Tpat_var _ | Tpat_fun_layout _ | Tpat_constant _
+    | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
+    | Tpat_construct _ | Tpat_variant _ | Tpat_record _ | Tpat_array _
+    | Tpat_addr _ | Tpat_lazy _ ->
+        false
+  in
   match p.pat_desc with
-  | Tpat_deref _ -> true
-  | Tpat_alias { pattern = p; _ } -> derefs_tuple_element p
-  | Tpat_or (p1, p2, _) -> derefs_tuple_element p1 || derefs_tuple_element p2
-  | Tpat_unboxed_tuple ps ->
-      List.exists (fun (_, p, _) -> derefs_tuple_element p) ps
-  | Tpat_record_unboxed_product (lps, _, _) ->
-      List.exists (fun (_, _, p) -> derefs_tuple_element p) lps
-  | Tpat_record (lps, Record_unboxed, _) ->
-      List.exists (fun (_, _, p) -> derefs_tuple_element p) lps
-  | Tpat_any | Tpat_var _ | Tpat_fun_layout _ | Tpat_constant _
-  | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_construct _
-  | Tpat_variant _ | Tpat_record _ | Tpat_array _ | Tpat_addr _ | Tpat_lazy _
-    ->
-      false
-
-(* Whether this pattern has a top-level tuple pattern with a dereference pattern
-   inside *)
-let rec has_tuple_element_deref (p : pattern) =
-  match p.pat_desc with
-  | Tpat_tuple ps -> List.exists (fun (_, p, _) -> derefs_tuple_element p) ps
-  | Tpat_alias { pattern; _ } -> has_tuple_element_deref pattern
+  | Tpat_tuple ps -> List.exists (fun (_, p, _) -> has_direct_derefs p) ps
+  | Tpat_alias { pattern; _ } -> tuple_has_direct_derefs pattern
   | Tpat_or (p1, p2, _) ->
-      has_tuple_element_deref p1 || has_tuple_element_deref p2
+      tuple_has_direct_derefs p1 || tuple_has_direct_derefs p2
   | _ -> false
 
 let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer
@@ -4999,7 +5000,7 @@ let rec map_return f = function
 let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
   let rec collect pat_sort acc pat lam =
     match (pat.pat_desc, lam) with
-    | Tpat_tuple _, _ when has_tuple_element_deref pat ->
+    | Tpat_tuple _, _ when tuple_has_direct_derefs pat ->
         collect_whole pat_sort acc pat lam
     | Tpat_tuple patl, Lprim (Pmakeblock _, lams, _) ->
         opt := true;
@@ -5133,9 +5134,8 @@ let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial 
 
 let flatten_pattern size p =
   match p.pat_desc with
-  | Tpat_tuple _ when has_tuple_element_deref p ->
-      raise Cannot_flatten
-  | Tpat_tuple args -> List.map (fun (_, p, _) -> p) args
+  | Tpat_tuple args when not (tuple_has_direct_derefs p) ->
+      List.map (fun (_, p, _) -> p) args
   | Tpat_any -> Patterns.omegas size
   | _ -> raise Cannot_flatten
 
@@ -5229,41 +5229,37 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
       Typeopt.assert_mixed_product_support_for_lambda_shape loc Tuple shape;
     Lprim (Pmakeblock (0, Immutable, Shape shape, mode), param_lambda, sloc)
   in
-  if List.exists (fun (p, _) -> has_tuple_element_deref p) pat_act_list then
-    for_function ~scopes ~arg_sort:Jkind.Sort.Const.for_tuple
-      ~arg_layout:layout_block ~return_layout loc repr arg pat_act_list partial
-  else
-    let input_args =
-      { first = root_arg (Tuple arg) Strict
-          Jkind.Sort.Const.for_tuple layout_block;
-        rest = [] }
+  let input_args =
+    { first = root_arg (Tuple arg) Strict
+        Jkind.Sort.Const.for_tuple layout_block;
+      rest = [] }
+  in
+  let handler =
+    let rows = map_on_rows (fun p -> (p, [])) pat_act_list in
+    toplevel_handler ~scopes ~return_layout loc ~failer:Raise_match_failure
+      partial input_args rows in
+  handler (fun partial pm1 ->
+    let pm1_half =
+      { pm1 with
+        cases =
+          List.map (half_simplify_nonempty ~arg ~deref_address:None)
+            pm1.cases }
     in
-    let handler =
-      let rows = map_on_rows (fun p -> (p, [])) pat_act_list in
-      toplevel_handler ~scopes ~return_layout loc ~failer:Raise_match_failure
-        partial input_args rows in
-    handler (fun partial pm1 ->
-      let pm1_half =
-        { pm1 with
-          cases =
-            List.map (half_simplify_nonempty ~arg ~deref_address:None)
-              pm1.cases }
-      in
-      let next, nexts = split_and_precompile_half_simplified pm1_half in
-      let size = List.length idl in
-      let args =
-        List.map
-          (fun (id, sort, layout) -> root_arg (Lvar id) Alias sort layout)
-          idl
-      in
-      let flat_next = flatten_precompiled size args next
-      and flat_nexts =
-        List.map (fun (e, pm) -> (e, flatten_precompiled size args pm)) nexts
-      in
-      comp_match_handlers return_layout
-        (compile_flattened ~scopes return_layout repr) partial
-        (Context.start size) flat_next flat_nexts
-    )
+    let next, nexts = split_and_precompile_half_simplified pm1_half in
+    let size = List.length idl in
+    let args =
+      List.map
+        (fun (id, sort, layout) -> root_arg (Lvar id) Alias sort layout)
+        idl
+    in
+    let flat_next = flatten_precompiled size args next
+    and flat_nexts =
+      List.map (fun (e, pm) -> (e, flatten_precompiled size args pm)) nexts
+    in
+    comp_match_handlers return_layout
+      (compile_flattened ~scopes return_layout repr) partial
+      (Context.start size) flat_next flat_nexts
+  )
 
 (* PR#4828: Believe it or not, the 'paraml' argument below
    may not be side effect free. *)

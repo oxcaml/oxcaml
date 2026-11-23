@@ -3035,9 +3035,14 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
        handler,
       Same_region, return_layout)
   in
+  let flattenable () =
+    not
+      (List.exists (fun (p, _) -> Matching.tuple_has_direct_derefs p)
+         val_cases)
+  in
   let classic =
     match arg, exn_cases with
-    | {exp_desc = Texp_tuple (argl, locality_mode)}, [] ->
+    | {exp_desc = Texp_tuple (argl, locality_mode)}, [] when flattenable () ->
       (* CR layouts v7.1: This case and the one below it give special treatment
          to matching on literal tuples. This optimization is irrelevant for
          unboxed tuples in native code, but not doing it for unboxed tuples in
@@ -3051,7 +3056,8 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
       in
       Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
         (transl_list_with_layout ~scopes argl) mode val_cases partial
-    | {exp_desc = Texp_tuple (argl, locality_mode)}, _ :: _ ->
+    | {exp_desc = Texp_tuple (argl, locality_mode)}, _ :: _
+      when flattenable () ->
         let argl =
           List.map (fun (_, a, s) ->
             (a, Jkind.Sort.default_for_transl_and_get s)) argl

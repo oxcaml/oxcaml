@@ -1,6 +1,6 @@
 (* TEST
  flags = "-dlambda -dno-unique-ids";
- expect;
+ expect.opt;
 *)
 
 (* Dereference patterns on elements of syntactic tuples need the tuple in
@@ -12,10 +12,12 @@ let single x y = match x, y with deref_ a, _ -> a
 (let
   (single =
      (function {nlocal = 0} x? y? : #(?, int64)
-       (let (*match* = (makeblock 0 x y))
+       (let
+         (*match* =[value<(consts ()) (non_consts ([0: ?, ?]))>]
+            (makeblock 0 x y))
          (make_unboxed_product #(?, int64) *match*
            (idx_mixed_field  (?,?) 0 )))))
-  (apply (field_imm 1 (global Toploop!)) "single" single))
+  (makeblock 0 single))
 val single : 'a -> 'b -> 'a addr_imm = <fun>
 |}]
 
@@ -28,7 +30,9 @@ let shared x y =
 (let
   (shared =
      (function {nlocal = 0} x? y[value<int>] : #(#(?, int64), ?)
-       (let (t = (makeblock 0 (?,value<int>) x y))
+       (let
+         (t =[value<(consts ()) (non_consts ([0: ?, value<int>]))>]
+            (makeblock 0 (?,value<int>) x y))
          (if (%int_notequal (mixedfield 1  (?,?) t) 0)
            (make_unboxed_product #(#(?, int64), value<
                                                  (consts ())
@@ -42,7 +46,7 @@ let shared x y =
                                                                 value<int>]))>)
              (make_unboxed_product #(?, int64) t (idx_mixed_field  (?,?) 0 ))
              t)))))
-  (apply (field_imm 1 (global Toploop!)) "shared" shared))
+  (makeblock 0 shared))
 val shared : 'a -> int -> #('a addr_imm * ('a * int)) = <fun>
 |}]
 
@@ -57,7 +61,7 @@ let let_tuple x y = let (deref_ a, _) = (x, y) in a
             (makeblock 0 x y))
          (make_unboxed_product #(?, int64) *match*
            (idx_mixed_field  (?,?) 0 )))))
-  (apply (field_imm 1 (global Toploop!)) "let_tuple" let_tuple))
+  (makeblock 0 let_tuple))
 val let_tuple : 'a -> 'b -> 'a addr_imm = <fun>
 |}]
 
@@ -69,11 +73,13 @@ let stack_match (x : int) y =
   (stack_match =
      (function {nlocal = 0} x[value<int>] y? : int
        (region
-         (let (*match* = (makelocalblock 0 (value<int>,?) x y))
+         (let
+           (*match* =[value<(consts ()) (non_consts ([0: value<int>, ?]))>]
+              (makelocalblock 0 (value<int>,?) x y))
            ((get_ptr_imm ?)
              (make_unboxed_product #(?, int64) *match*
                (idx_mixed_field  (?,?) 0 )))))))
-  (apply (field_imm 1 (global Toploop!)) "stack_match" stack_match))
+  (makeblock 0 stack_match))
 val stack_match : int -> 'a -> int = <fun>
 |}]
 
@@ -90,7 +96,7 @@ let stack_let (x : int) y =
            ((get_ptr_imm ?)
              (make_unboxed_product #(?, int64) *match*
                (idx_mixed_field  (?,?) 0 )))))))
-  (apply (field_imm 1 (global Toploop!)) "stack_let" stack_let))
+  (makeblock 0 stack_let))
 val stack_let : int -> 'a -> int = <fun>
 |}]
 
@@ -99,13 +105,13 @@ val stack_let : int -> 'a -> int = <fun>
 type r = { mutable f : float#; g : string }
 let in_element r y = match r, y with ({ f = deref_ a; _ }, _) -> a
 [%%expect{|
-0
+(makeblock 0)
 type r = { mutable f : float#; g : string; }
 (let
   (in_element =
      (function {nlocal = 0} r y? : #(?, int64)
        (make_unboxed_product #(?, int64) r (idx_mixed_field  (float64,?) 0 ))))
-  (apply (field_imm 1 (global Toploop!)) "in_element" in_element))
+  (makeblock 0 in_element))
 val in_element : r -> 'a -> float# addr = <fun>
 |}]
 
@@ -117,7 +123,7 @@ let tupled (deref_ a, _) = a
      (function {nlocal = 0}
        param[value<(consts ()) (non_consts ([0: ?, ?]))>] : #(?, int64)
        (make_unboxed_product #(?, int64) param (idx_mixed_field  (?,?) 0 ))))
-  (apply (field_imm 1 (global Toploop!)) "tupled" tupled))
+  (makeblock 0 tupled))
 val tupled : 'a * 'b -> 'a addr_imm = <fun>
 |}]
 
@@ -127,16 +133,16 @@ type m = { mutable mp : p }
 let mixed { mp = #{ y = deref_ a; _ } } = a
 let deepen (addr_ #{ y = deref_ a; _ } : p addr) = a
 [%%expect{|
-0
+(makeblock 0)
 type p = #{ x : string; y : float#; }
-0
+(makeblock 0)
 type m = { mutable mp : p; }
 (let
   (mixed =
      (function {nlocal = 0} param : #(?, int64)
        (make_unboxed_product #(?, int64) param
          (idx_mixed_field  (product  (?,float64)) 0 1))))
-  (apply (field_imm 1 (global Toploop!)) "mixed" mixed))
+  (makeblock 0 mixed))
 val mixed : m -> float# addr = <fun>
 (let
   (deepen =
@@ -145,6 +151,6 @@ val mixed : m -> float# addr = <fun>
          (unboxed_product_field 0 #(?, int64) param)
          (idx_deepen product  (?,float64) 1
            (unboxed_product_field 1 #(?, int64) param)))))
-  (apply (field_imm 1 (global Toploop!)) "deepen" deepen))
+  (makeblock 0 deepen))
 val deepen : p addr -> float# addr = <fun>
 |}]

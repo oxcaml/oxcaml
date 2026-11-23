@@ -382,6 +382,11 @@ let () =
    | (deref_ a, deref_ b) ->
      print_int_ln (Addr_imm.get a);
      print_int_ln (Addr_imm.get b));
+  let mixed = (#6.0, "six") in
+  (match mixed with
+   | (deref_ a, deref_ b) ->
+     print_float_ln (get_float_imm a);
+     print_endline (Addr_imm.get b));
   print_newline ()
 
 (* Positions: below address patterns *)
@@ -537,11 +542,16 @@ let syntactic_tuples : (string * (string -> string -> string)) list =
     ("tupled function", fun x y -> tupled (x, y))
   ]
 
+let mixed_syntactic_tuple (x : float#) y =
+  match x, y with deref_ a, deref_ b -> #(get_float_imm a, Addr_imm.get b)
+
 let () =
   print_endline "deref syntactic tuples";
   List.iter
     (fun (name, f) -> Printf.printf "%s: %s\n" name (f "x" "y"))
     syntactic_tuples;
+  let #(x, y) = mixed_syntactic_tuple #1.5 "z" in
+  Printf.printf "mixed: %.1f %s\n" (Float_u.to_float x) y;
   print_newline ()
 
 (* Choosing between positions *)
@@ -579,8 +589,6 @@ let () =
   print_int_ln (default (2, (0, 2)));
   print_int_ln (default (3, (0, 0)));
   print_newline ()
-
-(* Allocating syntactic tuples does not change evaluation order *)
 
 let say s = print_string s
 
