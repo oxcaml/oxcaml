@@ -357,7 +357,9 @@ let instrument_block cfg_with_layout { label; dbg } ~index =
   block.terminator
     <- make_instruction
          (Truth_test
-            { ifso = Cfg.successor call_label; ifnot = Cfg.successor rest_label }
+            { ifso = Cfg.successor call_label;
+              ifnot = Cfg.successor rest_label
+            }
            : Cfg.terminator)
          ~arg:[| gate |] ~res:[||];
   block.exn <- None;
