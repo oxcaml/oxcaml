@@ -63,7 +63,8 @@ let named_startup_file () =
 
 let force_linking_of_startup ~ppf_dump =
   Asmgen.compile_phrase ~ppf_dump
-    (Cmm.Cdata [Cmm.Csymbol_address (Cmm.global_symbol "caml_startup")])
+    (Cmm.Cdata
+       [Cmm.Csymbol_address (Cmm.global_symbol ~ty:Cmm.typ_int "caml_startup")])
 
 let sourcefile_for_dwarf ~named_startup_file filename =
   (* Ensure the name emitted into the DWARF is stable, for build reproducibility
@@ -74,7 +75,7 @@ let emit_ocamlrunparam ~ppf_dump =
   Asmgen.compile_phrase ~ppf_dump
     (Cmm.Cdata
        [ Cmm.Cdefine_symbol
-           { sym_name = "caml_ocamlrunparam"; sym_global = Global };
+           (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ocamlrunparam");
          Cmm.Cstring (!Clflags.ocamlrunparam ^ "\000") ])
 
 (* With [-gated-trace-pc-guard-define-gate], the startup file defines the gate

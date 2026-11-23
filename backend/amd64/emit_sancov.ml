@@ -79,7 +79,7 @@ let emit_call t ~live ~move ~emit_call ~index =
   if frame_size > 0 then I.sub (int frame_size) rsp;
   List.iter (fun (r, slot) -> move r slot) saved;
   I.lea (mem64_rip NONE (L.encode guard)) rdi;
-  emit_call (Cmm.global_symbol Cfg_trace_pc_guard.callback);
+  emit_call (Cmm.global_symbol ~ty:Cmm.typ_int Cfg_trace_pc_guard.callback);
   List.iter (fun (r, slot) -> move slot r) saved;
   I.mov r13 rsp;
   D.cfi_restore_state ();
@@ -92,7 +92,7 @@ let emit_constructor_body ~emit_call ~start ~stop ~init:_ =
   D.cfi_adjust_cfa_offset ~bytes:8;
   I.lea (mem64_rip NONE (S.encode start)) rdi;
   I.lea (mem64_rip NONE (S.encode stop)) (Reg64 RSI);
-  emit_call (Cmm.global_symbol Cfg_trace_pc_guard.init);
+  emit_call (Cmm.global_symbol ~ty:Cmm.typ_int Cfg_trace_pc_guard.init);
   I.pop rax;
   D.cfi_adjust_cfa_offset ~bytes:(-8);
   I.ret ()

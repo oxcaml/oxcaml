@@ -537,7 +537,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
   in
   let func =
     match op with
-    | Direct { sym_name; sym_global = _ } ->
+    | Direct { sym_name; sym_global = _; sym_type = _ } ->
       add_referenced_symbol t sym_name;
       LL.Ident.global sym_name
     | Indirect _ -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
@@ -1239,7 +1239,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     in
     store_into_reg t i.res.(0) opaque_temp
   | Const_int n -> store_into_reg t i.res.(0) (V.of_nativeint n)
-  | Const_symbol { sym_name; sym_global = _ } ->
+  | Const_symbol { sym_name; sym_global = _; sym_type = _ } ->
     add_referenced_symbol t sym_name;
     store_into_reg t i.res.(0) (V.of_symbol sym_name)
   | Const_float32 bits -> store_into_reg t i.res.(0) (V.of_float32_bits bits)
@@ -1692,7 +1692,8 @@ let llvm_value_of_data_item (d : Cmm.data_item) =
   | Cint8 n -> V.of_int ~typ:T.i8 n
   | Cint16 n -> V.of_int ~typ:T.i16 n
   | Cint32 n -> V.of_nativeint ~typ:T.i32 n
-  | Csymbol_address { sym_name; sym_global = _ } -> V.of_symbol sym_name
+  | Csymbol_address { sym_name; sym_global = _; sym_type = _ } ->
+    V.of_symbol sym_name
   | Cstring s -> V.of_string_constant s
   | Cskip size ->
     V.zeroinitializer (T.Array { num_of_elems = size; elem_type = T.i8 })
@@ -1718,7 +1719,7 @@ let define_symbol t ~private_ ~header ~symbol (contents : Cmm.data_item list) =
   List.iter
     (fun (d : Cmm.data_item) ->
       match[@warning "-fragile-match"] d with
-      | Csymbol_address { sym_name; sym_global = _ } ->
+      | Csymbol_address { sym_name; sym_global = _; sym_type = _ } ->
         add_referenced_symbol t sym_name
       | _ -> ())
     contents
@@ -1732,7 +1733,8 @@ let data (ds : Cmm.data_item list) =
   in
   let peek_int = function[@warning "-4"] Cmm.Cint n -> Some n | _ -> None in
   let peek_define_symbol = function[@warning "-4"]
-    | Cmm.Cdefine_symbol { sym_name; sym_global = _ } -> Some sym_name
+    | Cmm.Cdefine_symbol { sym_name; sym_global = _; sym_type = _ } ->
+      Some sym_name
     | _ -> None
   in
   let eat_if peek = function

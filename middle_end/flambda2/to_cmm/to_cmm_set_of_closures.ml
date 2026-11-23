@@ -244,7 +244,9 @@ end = struct
           let function_symbol =
             Function_slot.Map.find function_slot closure_symbols
           in
-          List.rev_append (P.define_symbol (R.symbol res function_symbol)) acc
+          List.rev_append
+            (P.define_symbol (R.symbol res ~ty:Cmm.typ_int function_symbol))
+            acc
       in
       match code_id with
       | Code_id { code_id; only_full_applications } -> (
@@ -684,7 +686,8 @@ let let_static_set_of_closures0 env res closure_symbols
     with
     | Some (function_slot_offset, function_slot) -> (
       match Function_slot.Map.find function_slot closure_symbols with
-      | closure_symbol -> function_slot_offset, R.symbol res closure_symbol
+      | closure_symbol ->
+        function_slot_offset, R.symbol res ~ty:Cmm.typ_int closure_symbol
       | exception Not_found ->
         Misc.fatal_errorf "No closure symbol for function slot %a"
           Function_slot.print function_slot)
@@ -776,7 +779,8 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
       (fun (env, res) cid v ->
         let sym =
           C.symbol ~dbg
-            (R.symbol res (Function_slot.Map.find cid closure_symbols))
+            (R.symbol res ~ty:Cmm.typ_int
+               (Function_slot.Map.find cid closure_symbols))
         in
         Env.bind_variable env res v ~defining_expr:sym
           ~free_vars_of_defining_expr:Backend_var.Set.empty
