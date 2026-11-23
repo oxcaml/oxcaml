@@ -1,0 +1,8 @@
+The files other/bad_user.cmo and dep.cmo disagree over interface Dep
+Dep.v = 1
+Line 1, characters 8-11:
+1 | ignore (Dep.v : string);;
+            ^^^
+Error: The files dep.cmo and other/dep.cmi make inconsistent assumptions
+       over interface Dep
+

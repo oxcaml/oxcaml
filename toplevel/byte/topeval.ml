@@ -210,6 +210,24 @@ open Cmo_format
 
 (* Loading files *)
 
+(* The interfaces imported by the toplevel itself and by the units that are
+   loaded, each with the file that imports it. The environment knows them
+   too, until it is reset: see [init_path]. *)
+let loaded_crcs = ref Compilation_unit.Name.Map.empty
+
+(* An interface keeps the file that imported it first, as in the environment,
+   unless the unit that defines it is loaded later. The two can only disagree
+   if the environment was reset by other means than [init_path]. *)
+let record_loaded_crcs ~defines source imports =
+  let record crcs import =
+    let name = Import_info.name import in
+    if Option.is_none (Import_info.crc import)
+    || (Compilation_unit.Name.Map.mem name crcs && not (defines name))
+    then crcs
+    else Compilation_unit.Name.Map.add name (source, import) crcs
+  in
+  loaded_crcs := Array.fold_left record !loaded_crcs imports
+
 exception Load_failed
 
 let check_consistency ppf filename cu =
@@ -235,6 +253,7 @@ let load_compunit ic filename ppf compunit =
     | None -> raise End_of_file
     | Some () -> ();
   let initial_symtable = Symtable.current_state() in
+  let initial_crcs = !loaded_crcs in
   Symtable.patch_object code compunit.cu_reloc;
   Symtable.update_global_table();
   let events =
@@ -243,6 +262,9 @@ let load_compunit ic filename ppf compunit =
       seek_in ic compunit.cu_debug;
       [| input_value ic |]
     end in
+  record_loaded_crcs
+    ~defines:(Compilation_unit.equal_to_name compunit.cu_name)
+    filename compunit.cu_imports;
   begin try
     may_trace := true;
     let _bytecode, closure = Meta.reify_bytecode code events None in
@@ -252,6 +274,7 @@ let load_compunit ic filename ppf compunit =
     record_backtrace ();
     may_trace := false;
     Symtable.restore_state initial_symtable;
+    loaded_crcs := initial_crcs;
     print_exception_outcome ppf exn;
     raise Load_failed
   end
@@ -324,4 +347,14 @@ let init () =
   let crc_intfs = Symtable.init_toplevel () in
   Compmisc.init_path ();
   Env.import_crcs ~source:Sys.executable_name crc_intfs;
-  ()
+  loaded_crcs := Compilation_unit.Name.Map.empty;
+  record_loaded_crcs ~defines:(fun _ -> false) Sys.executable_name crc_intfs
+
+(* [Compmisc.init_path] makes the environment forget the CRCs of all
+   interfaces. Those in [loaded_crcs] must stay, for what is loaded or typed
+   later to be checked against them. *)
+let init_path ?dir () =
+  Compmisc.init_path ?dir ();
+  Compilation_unit.Name.Map.iter
+    (fun _ (source, import) -> Env.import_crcs ~source [| import |])
+    !loaded_crcs

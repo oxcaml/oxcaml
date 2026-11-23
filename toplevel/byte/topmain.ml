@@ -199,7 +199,7 @@ let main () =
   Compenv.readenv ppf Before_link;
   Location.read_clflags_from_env ();
   if not (Toploop.prepare ppf ()) then raise (Compenv.Exit_with_status 2);
-  Compmisc.init_path ();
+  Topeval.init_path ();
   Toploop.loop Format.std_formatter
 
 let main () =
