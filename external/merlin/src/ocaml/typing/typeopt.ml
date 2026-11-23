@@ -282,8 +282,16 @@ let rec classify ~classify_product env ty layout : _ classification =
                     [ Punboxedvector_ignorable Unboxed_vec128;
                       Punboxedvector_ignorable Unboxed_vec128 ])
     else Unboxed_vector Unboxed_vec256
-  | Base (Vec512, _) -> Unboxed_vector Unboxed_vec512
-  | Base (Mask, _) -> Unboxed_mask
+  | Base (Vec512, _) ->
+    if split_vectors
+    then Product (Pgcignorableproductarray
+                    [ Punboxedvector_ignorable Unboxed_vec128;
+                      Punboxedvector_ignorable Unboxed_vec128;
+                      Punboxedvector_ignorable Unboxed_vec128;
+                      Punboxedvector_ignorable Unboxed_vec128 ])
+    else Unboxed_vector Unboxed_vec512
+  | Base (Mask, _) ->
+    if split_vectors then Unboxed_int Unboxed_int64 else Unboxed_mask
   | Base (Word, _) -> Unboxed_int Unboxed_nativeint
   | Base (Untagged_immediate, _) -> Unboxed_int Untagged_int
   | Base (Void, _) -> Void
