@@ -447,3 +447,44 @@
  (deps to_cmm_reaper.output to_cmm_reaper.output.corrected)
  (action
   (diff to_cmm_reaper.output to_cmm_reaper.output.corrected)))
+
+; The counter of the call of a probe handler, which To_cmm replaces by the
+; probe: it is dropped. Probes are only supported on Linux.
+
+(rule
+ (targets to_cmm_probe.output.corrected)
+ (deps to_cmm_probe.ml fdo_annotations.exe)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{system} "linux")))
+ (action
+  (progn
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcmm
+     -dfdo-dropped-counters
+     -dump-into-file
+     -color
+     never
+     to_cmm_probe.ml))
+   (with-stdout-to
+    to_cmm_probe.output.corrected
+    (progn
+     (run ./fdo_annotations.exe list to_cmm_probe.cmx.dump)
+     (run ./fdo_annotations.exe dropped to_cmm_probe.cmx.dump))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{system} "linux")))
+ (deps to_cmm_probe.output to_cmm_probe.output.corrected)
+ (action
+  (diff to_cmm_probe.output to_cmm_probe.output.corrected)))

@@ -96,6 +96,13 @@ let () =
     ~index:
       (Array.init 20 (fun v -> if v < 10 then 0 else if v < 19 then 1 else 2))
     (Array.sub exits 0 3);
+  (* A case for the values on both sides of another is shared: each of the tests
+     that lead to it has its counter. *)
+  test "shared case on both sides"
+    ~index:
+      (Array.init 30 (fun v ->
+           if v < 10 || (v >= 20 && v < 29) then 0 else if v < 20 then 1 else 2))
+    (Array.sub exits 0 3);
   (* Constants: a table lookup, whose counters are all dropped. *)
   test "lookup" ~index:[| 0; 1; 2; 3 |]
     [| constant 1; constant 5; constant 2; constant 8 |];
