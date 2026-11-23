@@ -543,8 +543,16 @@ let destroyed_at_c_call =
      is marked as destroyed. *)
   if win64 then destroyed_at_c_call_win64 else destroyed_at_c_call_unix
 
-let destroyed_at_alloc_or_poll =
+let destroyed_at_alloc =
   if X86_proc.use_plt then destroyed_by_plt_stub else [| r11 |]
+
+let destroyed_at_poll =
+  (* Under faulting polls a poll overwrites %rcx (see the
+     [Lop Poll] case in emit.ml); the register must have a REX-free 32-bit
+     load so that the faulting instruction is 2/3 bytes long. *)
+  if Config.faulting_polls
+  then [| rcx |]
+  else destroyed_at_alloc
 
 let destroyed_at_pushtrap = [| r11 |]
 
@@ -697,9 +705,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_rax
   | Op (Specific (Irdtsc | Irdpmc)) ->
     destroyed_rax_rdx
-  | Op Poll -> destroyed_at_alloc_or_poll
+  | Op Poll -> destroyed_at_poll
   | Op (Alloc _) ->
-    destroyed_at_alloc_or_poll
+    destroyed_at_alloc
   | Op (Specific Ipackf32) -> [||]
   | Op (Trace_pc_guard_gate | Trace_pc_guard _) ->
     (* The call to the coverage callback preserves all registers. *)
