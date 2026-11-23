@@ -58,6 +58,15 @@ val typecheck_phrase :
 
 val record_backtrace : unit -> unit
 
+val catch_async_exns : bool ref
+(* Set by the interactive loop, where an interrupt or a stack overflow must
+   not end the session: these are asynchronous exceptions, which only
+   [Sys.with_async_exns] catches. *)
+
+val with_async_exns : (unit -> 'a) -> 'a
+(* If [catch_async_exns] is set, [Sys.with_async_exns], keeping the backtrace
+   of an exception raised by the function; otherwise, a call of it. *)
+
 
 (* Printing of values *)
 

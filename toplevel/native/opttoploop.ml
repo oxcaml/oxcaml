@@ -90,8 +90,17 @@ let global_symbol comp_unit =
 let need_symbol sym =
   not (Dynlink.does_symbol_exist ~bytecode_or_asm_symbol:sym)
 
+(* Set by the interactive loop, where an interrupt or a stack overflow must not
+   end the session: these are asynchronous exceptions, which only
+   [Sys.with_async_exns] catches. *)
+let catch_async_exns = ref false
+
+let with_async_exns f =
+  if !catch_async_exns then Sys.with_async_exns f else f ()
+
 let dll_run dll entry =
-  match (try Result (Obj.magic (ndl_run_toplevel dll entry))
+  let run () = with_async_exns (fun () -> ndl_run_toplevel dll entry) in
+  match (try Result (Obj.magic (run ()))
          with exn -> Exception exn)
   with
     | Exception _ as r -> r
@@ -749,7 +758,9 @@ let refill_lexbuf buffer len =
       else "  "
     in
     first_line := false;
-    let (len, eof) = !read_interactive_input prompt buffer len in
+    let (len, eof) =
+      with_async_exns (fun () -> !read_interactive_input prompt buffer len)
+    in
     if eof then begin
       Location.echo_eof ();
       if len > 0 then got_eof := true;
@@ -852,6 +863,7 @@ let loop ppf =
   Location.input_name := "//toplevel//";
   Location.input_lexbuf := Some lb;
   Sys.catch_break true;
+  catch_async_exns := true;
   run_hooks After_setup;
   load_ocamlinit ppf;
   while true do

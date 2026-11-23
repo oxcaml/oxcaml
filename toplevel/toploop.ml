@@ -397,6 +397,7 @@ let loop ppf =
   Location.input_lexbuf := Some lb;
   Location.input_phrase_buffer := Some phrase_buffer;
   Sys.catch_break true;
+  catch_async_exns := true;
   run_hooks After_setup;
   load_ocamlinit ppf;
   Lexer.reset_syntax_mode();

@@ -11,5 +11,7 @@ Exception: E.
 Raised at f in file "//toplevel//", line 4, characters 11-18
 Called from g in file "//toplevel//", line 1, characters 11-15
 Called from <unknown> in file "//toplevel//", line 1, characters 0-4
-Called from Topeval.load_lambda in file "toplevel/byte/topeval.ml", line 101, characters 4-14
+Called from Topcommon.with_async_exns.(fun) in file "toplevel/topcommon.ml", line 247, characters 14-18
+Re-raised at Topcommon.with_async_exns in file "toplevel/topcommon.ml", line 252, characters 23-57
+Called from Topeval.load_lambda in file "toplevel/byte/topeval.ml", line 101, characters 4-27
 
