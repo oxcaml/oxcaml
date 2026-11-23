@@ -1145,6 +1145,10 @@ CAMLexport wchar_t* caml_stat_wcsconcat(int n, ...)
 
    Users can still customize the behavior of AddressSanitizer via the
    [ASAN_OPTIONS] environment variable at runtime.
+
+   This definition has no effect when it is in a shared library: a
+   program whose runtime is in one does not get these settings (see
+   "AddressSanitizer" in HACKING.adoc).
    */
 const char *
 #ifdef __clang___
