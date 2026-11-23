@@ -161,7 +161,8 @@ The budget in 'work' that a domain has to do during the major slice.
 *)
 | EV_C_MAJOR_SLICE_WORK_DONE
 (**
-Total work done by this domain in a slice.
+Total work done by this domain in a major slice or within an opportunistic
+span.
 @since 5.4 *)
 | EV_C_STACK_CREATED
 (**
@@ -183,23 +184,23 @@ resumption (value: bytes copied).
 @since 5.4 *)
 | EV_C_MAJOR_SLICE_SWEEP_WORK
 (**
-Words of sweeping work performed in the major slice that just ended,
-excluding ephemeron sweeping. Only emitted if non-zero.
+Words of sweeping work performed in a major slice or opportunistic span that
+just ended, excluding ephemeron sweeping. Only emitted if non-zero.
 @since 5.5 *)
 | EV_C_MAJOR_SLICE_MARK_WORK
 (**
-Words of marking work performed in the major slice that just ended,
-excluding ephemeron marking. Only emitted if non-zero.
+Words of marking work performed in a major slice or opportunistic span that
+just ended, excluding ephemeron marking. Only emitted if non-zero.
 @since 5.5 *)
 | EV_C_MAJOR_SLICE_EPHE_MARK_WORK
 (**
-Words of ephemeron marking work performed in the major slice that just
-ended. Only emitted if non-zero.
+Words of ephemeron marking work performed in a major slice that just ended.
+Only emitted if non-zero.
 @since 5.5 *)
 | EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK
 (**
-Words of ephemeron sweeping work performed in the major slice that just
-ended. Only emitted if non-zero.
+Words of ephemeron sweeping work performed in a major slice that just ended.
+Only emitted if non-zero.
 @since 5.5 *)
 
 (** The type for span events emitted by the runtime. *)
@@ -344,7 +345,9 @@ Event spanning the stop-the-world phase done at the end of a major GC cycle.
 *)
 | EV_MAJOR_MARK_OPPORTUNISTIC
 (**
-Event spanning the work done during opportunistic marking in a major GC.
+Event spanning the opportunistic major GC work, both sweeping and marking,
+done by a domain while it waits for others. Its work counters are emitted
+within the span.
 @since 5.0
 *)
 | EV_MAJOR_SLICE

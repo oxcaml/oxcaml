@@ -12,7 +12,9 @@
    - opportunistic slices emit no per-slice events; each spin phase of
      opportunistic slices is instead aggregated into a single
      EV_MAJOR_MARK_OPPORTUNISTIC span containing exactly one
-     EV_C_MAJOR_SLICE_WORK_DONE counter, which is positive.
+     EV_C_MAJOR_SLICE_WORK_DONE counter, which is positive and is the sum
+     of the span's EV_C_MAJOR_SLICE_SWEEP_WORK and
+     EV_C_MAJOR_SLICE_MARK_WORK counters.
 
    The workload runs a domain making large allocations with plenty of live
    data (steady major GC work) alongside a domain churning short-lived
@@ -24,6 +26,8 @@ open Runtime_events
 let max_domains = 256
 let in_opp = Array.make max_domains false
 let opp_work_counters = Array.make max_domains 0
+let opp_work_done = Array.make max_domains 0
+let opp_phase_work = Array.make max_domains 0
 let in_slice = Array.make max_domains false
 let slice_subspans = Array.make max_domains 0
 let events_lost = ref false
@@ -36,7 +40,9 @@ let runtime_begin dom _ts phase =
   | EV_MAJOR_MARK_OPPORTUNISTIC ->
     if in_opp.(dom) then violation "domain %d: nested opportunistic span" dom;
     in_opp.(dom) <- true;
-    opp_work_counters.(dom) <- 0
+    opp_work_counters.(dom) <- 0;
+    opp_work_done.(dom) <- 0;
+    opp_phase_work.(dom) <- 0
   | EV_MAJOR_SLICE ->
     if in_opp.(dom) then violation "domain %d: slice span in opp span" dom;
     if in_slice.(dom) then violation "domain %d: nested slice span" dom;
@@ -54,7 +60,9 @@ let runtime_end dom _ts phase =
       violation "domain %d: unmatched opportunistic span end" dom
     else if opp_work_counters.(dom) <> 1 then
       violation "domain %d: %d work counters in opp span"
-        dom opp_work_counters.(dom);
+        dom opp_work_counters.(dom)
+    else if opp_phase_work.(dom) <> opp_work_done.(dom) then
+      violation "domain %d: opp span phase work differs from work done" dom;
     in_opp.(dom) <- false
   | EV_MAJOR_SLICE ->
     if not in_slice.(dom) then
@@ -69,8 +77,13 @@ let runtime_counter dom _ts counter v =
   | EV_C_MAJOR_SLICE_WORK_DONE ->
     if in_opp.(dom) then begin
       opp_work_counters.(dom) <- opp_work_counters.(dom) + 1;
+      opp_work_done.(dom) <- v;
       if v = 0 then violation "domain %d: zero-work opp span" dom
     end
+  | EV_C_MAJOR_SLICE_SWEEP_WORK | EV_C_MAJOR_SLICE_MARK_WORK ->
+    if in_opp.(dom) then opp_phase_work.(dom) <- opp_phase_work.(dom) + v
+  | EV_C_MAJOR_SLICE_EPHE_MARK_WORK | EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK ->
+    if in_opp.(dom) then violation "domain %d: ephe counter in opp span" dom
   | EV_C_MAJOR_SLICE_ALLOC_WORDS | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
   | EV_C_MAJOR_SLICE_NEW_WORK | EV_C_MAJOR_SLICE_TOTAL_WORK
   | EV_C_MAJOR_SLICE_BUDGET ->

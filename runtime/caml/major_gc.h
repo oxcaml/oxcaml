@@ -40,18 +40,18 @@ extern atomic_uintnat caml_gc_mark_phase_requested;
 
 intnat caml_opportunistic_major_work_available (caml_domain_state*);
 
-/* Run an opportunistic slice; returns the amount of work done. */
-uintnat caml_opportunistic_major_collection_slice (intnat);
-
 /* Aggregated work for opportunistic slices of one spin phase,
    used to log events at the end of the span. */
 struct caml_opportunistic_events {
   bool span_open;
-  uintnat work_done;
+  uintnat sweep_work;
+  uintnat mark_work;
 };
 
-void caml_opportunistic_events_add(struct caml_opportunistic_events *,
-                                   uintnat work_done);
+/* Run an opportunistic slice, recording its work in [evs]. */
+void caml_opportunistic_major_collection_slice(
+  intnat, struct caml_opportunistic_events *evs);
+
 void caml_opportunistic_events_end(struct caml_opportunistic_events *);
 
 /* Runs one bounded opportunistic slice if any work is available, recording

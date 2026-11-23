@@ -933,7 +933,7 @@ static void nonatomic_increment_counter(atomic_uintnat* counter) {
 static void minor_gc_leave_barrier
   (caml_domain_state* domain, int participating_count)
 {
-  struct caml_opportunistic_events evs = { false, 0 };
+  struct caml_opportunistic_events evs = { false, 0, 0 };
 
   /* Spin while we have major work available */
   SPIN_WAIT_BOUNDED {

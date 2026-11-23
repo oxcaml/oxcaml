@@ -174,6 +174,11 @@ let phase_open : (int * RE.runtime_phase, int) Hashtbl.t = Hashtbl.create 64
 let counter_total : (RE.runtime_counter, int ref * int ref) Hashtbl.t =
   Hashtbl.create 64
 
+(* Counters emitted within an EV_MAJOR_MARK_OPPORTUNISTIC span, which
+   describe the opportunistic slices of that span and not a major slice. *)
+let opportunistic_total : (RE.runtime_counter, int ref * int ref) Hashtbl.t =
+  Hashtbl.create 8
+
 let lost_total = ref 0
 
 let ns_of ts = Int64.to_int (RE.Timestamp.to_int64 ts)
@@ -200,7 +205,13 @@ let runtime_end ring ts phase =
     Hashtbl.remove phase_open (ring, phase);
     tally phase_total phase (ns_of ts - t0)
 
-let runtime_counter _ring _ts counter v = tally counter_total counter v
+let runtime_counter ring _ts counter v =
+  let tbl =
+    if Hashtbl.mem phase_open (ring, RE.EV_MAJOR_MARK_OPPORTUNISTIC)
+    then opportunistic_total
+    else counter_total
+  in
+  tally tbl counter v
 
 let lost_events _ring n = lost_total := !lost_total + n
 
@@ -602,8 +613,8 @@ let no_ring dir pid =
     pid dir
 
 let report_watch ~test =
-  let counter_tally c =
-    match Hashtbl.find_opt counter_total c with
+  let counter_tally ?(tbl = counter_total) c =
+    match Hashtbl.find_opt tbl c with
     | Some (n, t) -> (!n, !t)
     | None -> (0, 0)
   in
@@ -664,6 +675,15 @@ let report_watch ~test =
     Printf.fprintf out
       "work cross-check: per-phase sum %d vs work_done %d\n"
       phase_work ev_total;
+    (* Opportunistic work is in neither rate below: its span is not
+       divided between sweeping and marking. *)
+    let opp counter = snd (counter_tally ~tbl:opportunistic_total counter) in
+    let opp_spans, opp_ns = span RE.EV_MAJOR_MARK_OPPORTUNISTIC in
+    Printf.fprintf out
+      "opportunistic: %d sweep + %d mark words (work_done %d) in %d spans, \
+       %.3f s\n"
+      (opp RE.EV_C_MAJOR_SLICE_SWEEP_WORK) (opp RE.EV_C_MAJOR_SLICE_MARK_WORK)
+      (opp RE.EV_C_MAJOR_SLICE_WORK_DONE) opp_spans (secs opp_ns);
     report_rate "sweep" sweep_work sweep_ns;
     report_rate "mark" mark_work mark_ns;
     Printf.fprintf out
