@@ -472,7 +472,7 @@ val find_cltype_index:  Ident.t -> t -> int option
 (** Finds the label of the current loop, or
     raises an error if none is found.
 *)
-val find_loop_label_exn: Location.t -> t -> Ident.t
+val find_loop_label_exn: Location.t -> t -> Ident.t * type_expr * Location.t
 
 (* Check if a name is bound *)
 
@@ -509,7 +509,11 @@ val add_value:
     Types.value_description ->
     t ->
     t
-val add_loop_label: t -> Ident.t * bool ref * t
+val add_loop_label:
+    t ->
+    loop_type:type_expr ->
+    loop_loc:Location.t ->
+    Ident.t * t
 val add_type:
   check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_extension:

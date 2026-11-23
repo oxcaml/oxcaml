@@ -3448,23 +3448,22 @@ let add_signature_lazy sg env =
 
 let loop_str = "*loop*"
 
-let add_loop_label env =
+let add_loop_label env ~loop_type ~loop_loc=
   let id = Ident.create_local loop_str in
-  let uid = Uid.mk ~current_unit:(get_current_unit ()) in
-  let has_break = ref false in
-  Types.Uid.Tbl.add !value_declarations uid (fun () -> has_break := true);
   let desc =
-    { val_type = Predef.type_unit;
+    { val_type = loop_type;
       val_kind = Val_reg Jkind_types.Sort.scannable;
       val_lpoly = Lpoly.determined [];
       val_attributes = [];
       val_zero_alloc = Zero_alloc.default;
       val_modalities = Mode.Modality.undefined;
-      val_loc = Location.none;
-      val_uid = uid
+      (* Storing the location of the loop so that it can be returned in
+         [find_loop_label_exn] to construct error messages as needed.  *)
+      val_loc = loop_loc;
+      val_uid = Uid.internal_not_actually_unique
     }
   in
-  (id, has_break, add_value ~mode:Mode.With_regionality.legacy id desc env)
+  (id, add_value ~mode:Mode.With_regionality.legacy id desc env)
 
 (* Add "unbound" bindings *)
 
@@ -4943,9 +4942,13 @@ let find_loop_label_exn loc env =
   | Ok (path, locks, Val_bound vda) ->
     let _, locks = partition_locks locks in
     walk_locks_for_break ~loc ~env locks;
-    use_value ~use:true ~loc path vda;
     (match path with
-    | Path.Pident id -> id
+    | Path.Pident id ->
+      let stored_type =
+        Subst.Lazy.force_type_expr vda.vda_description.val_type
+      in
+      let stored_loc = vda.vda_description.val_loc in
+      (id, stored_type, stored_loc)
     | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ ->
       fatal_error "find_loop_label_exn: impossible Path")
   | Ok (_, _, Val_unbound _) ->

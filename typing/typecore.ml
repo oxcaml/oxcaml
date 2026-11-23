@@ -8732,17 +8732,18 @@ and type_expect_
           (mk_expected ~explanation:While_loop_conditional Predef.type_bool)
       in
       let body_env = Env.add_region_lock env in
-      let (wh_label, has_break, body_env) = Env.add_loop_label body_env in
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
+      let exp_type =
+        match wh_cond.exp_desc with
+        | Texp_construct(_, {cstr_name="true"}, _, _, _) -> instance ty_expected
+        | _ -> instance Predef.type_unit
+      in
+      let (wh_label, body_env) =
+        Env.add_loop_label body_env ~loop_type:exp_type ~loop_loc:loc
+      in
       let wh_body, wh_body_sort =
         type_statement ~explanation:While_loop_body
           ~position body_env sbody
-      in
-      let exp_type =
-        match wh_cond.exp_desc with
-        | Texp_construct(_, {cstr_name="true"}, _, _, _) when not !has_break ->
-            instance ty_expected
-        | _ -> instance Predef.type_unit
       in
       rue {
         exp_desc =
@@ -8768,7 +8769,10 @@ and type_expect_
         type_for_loop_index ~loc ~env ~param
       in
       let new_env = Env.add_region_lock new_env in
-      let (for_label, _, new_env) = Env.add_loop_label new_env in
+      let exp_type = instance Predef.type_unit in
+      let (for_label, new_env) =
+        Env.add_loop_label new_env ~loop_type:exp_type ~loop_loc:loc
+      in
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
       let for_body, for_body_sort =
         type_statement ~explanation:For_loop_body ~position new_env sbody
@@ -8778,7 +8782,7 @@ and type_expect_
                              for_from; for_to; for_dir = dir;
                              for_body; for_body_sort; for_label };
         exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unit;
+        exp_type;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_constraint (sarg, None, modes) ->
@@ -9723,7 +9727,8 @@ and type_expect_
       | _ -> Error.log_and_raise loc env Unexpected_hole;
       end
   | Pexp_break ->
-      let id = Env.find_loop_label_exn loc env in
+      let (id, loop_type, loop_loc) = Env.find_loop_label_exn loc env in
+      unify_exp_types loop_loc env (instance Predef.type_unit) loop_type;
       rue {
         exp_desc = Texp_break id;
         exp_loc = loc;
