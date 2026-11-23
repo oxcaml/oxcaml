@@ -83,27 +83,16 @@ let normalize_spaces s =
   |> List.filter (fun s -> not (String.equal s ""))
   |> String.concat " "
 
-let rec skip_spaces dump i =
-  if
-    i < String.length dump
-    && (Char.equal dump.[i] ' ' || Char.equal dump.[i] '\n')
-  then skip_spaces dump (i + 1)
-  else i
-
-(* The annotation starting at [i], if any, with the index just after it. A line
-   break can separate the keyword from the parenthesis. *)
+(* The annotation starting at [i], if any, with the index just after it. *)
 let annotation_at dump i =
   List.find_map
     (fun kind ->
-      let keyword = Kind.keyword kind in
-      let after_keyword = i + String.length keyword in
-      let paren = skip_spaces dump after_keyword in
+      let prefix = Kind.keyword kind ^ "(" in
+      let start = i + String.length prefix in
       if
-        paren < String.length dump
-        && String.equal (String.sub dump i (String.length keyword)) keyword
-        && Char.equal dump.[paren] '('
+        start <= String.length dump
+        && String.equal (String.sub dump i (String.length prefix)) prefix
       then
-        let start = paren + 1 in
         let close = closing_paren dump start in
         let contents =
           normalize_spaces (String.sub dump start (close - start))

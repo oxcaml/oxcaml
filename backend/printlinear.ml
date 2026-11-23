@@ -23,23 +23,13 @@ open Linear
 
 let label ppf l = Format.fprintf ppf "L%a" Label.format l
 
-(* The FDO counters are printed as in Cmm dumps, when there are any. *)
-let callsite_counter ppf = function
-  | None -> ()
-  | Some counter ->
-    fprintf ppf " callsite_counter(%s)" (Fdo_counter.to_string counter)
+let callsite_counter = Fdo_annotation.print_callsite_counter
 
-let fdo_annotation ~keyword ppf annotation =
-  if not (Fdo_annotation.is_empty annotation)
-  then fprintf ppf " %s%a" keyword Fdo_annotation.print annotation
-
-let successor ppf { target; fdo_annotation = annotation } =
-  fprintf ppf "%a%a" label target
-    (fdo_annotation ~keyword:"fdo_annotation")
-    annotation
+let successor ppf { target; fdo_annotation } =
+  fprintf ppf "%a%a" label target Fdo_annotation.print_edge fdo_annotation
 
 let fallthrough_annotation =
-  fdo_annotation ~keyword:"fallthrough_fdo_annotation"
+  Fdo_annotation.print_tagged ~keyword:"fallthrough_fdo_annotation"
 
 let call_operation ?(print_reg = Printreg.reg) ppf op arg =
   let regs = Printreg.regs' ~print_reg in
@@ -158,11 +148,6 @@ let fundecl ppf f =
     then ""
     else " " ^ Debuginfo.to_string f.fun_dbg
   in
-  let entry_annotation ppf entry_annotation =
-    if not (Fdo_annotation.With_body_hash.is_empty entry_annotation)
-    then
-      fprintf ppf " fdo_entry_annotation%a" Fdo_annotation.With_body_hash.print
-        entry_annotation
-  in
-  fprintf ppf "@[<v 2>%s:%s%a@,%a@]" f.fun_name dbg entry_annotation
-    f.fun_fdo_entry_annotation all_instr f.fun_body
+  fprintf ppf "@[<v 2>%s:%s%a@,%a@]" f.fun_name dbg
+    Fdo_annotation.With_body_hash.print_entry f.fun_fdo_entry_annotation
+    all_instr f.fun_body
