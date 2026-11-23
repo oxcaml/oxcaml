@@ -95,6 +95,9 @@ let label_of env (blk : block) =
     Misc.fatal_errorf "Cfg_of_ssa.label_of: block %a not in block_labels"
       Block.print_id blk
 
+let cfg_successor env ({ target; fdo_annotation } : _ Terminator.successor) =
+  Cfg.successor (label_of env target) ~fdo_annotation
+
 let get_reg env (value : value) : Reg.t =
   match value with
   | Res ({ id; _ }, output_index) ->
@@ -157,39 +160,22 @@ let emit_parallel_moves body ~src ~dst =
 
 (** A Branch condition that can be folded into the CFG test terminator,
     consuming the comparison's args directly. *)
-let fuse_comparison (cond : value) ~true_label ~false_label :
-    (Cfg.terminator * value array) option =
+let fuse_comparison (cond : value) ~(ifso : Cfg.successor)
+    ~(ifnot : Cfg.successor) : (Cfg.terminator * value array) option =
   match[@warning "-fragile-match"] cond with
   | Res ({ op = Intop_imm (Icomp Cne, 0); args; _ }, 0) ->
-    Some
-      ( Cfg.Truth_test
-          { ifso = Cfg.successor true_label; ifnot = Cfg.successor false_label },
-        args )
+    Some (Cfg.Truth_test { ifso; ifnot }, args)
   | Res ({ op = Intop (Icomp cmp); args; _ }, 0) ->
-    Some
-      ( Select_utils.terminator_of_test (Iinttest cmp)
-          ~ifso:(Cfg.successor true_label)
-          ~ifnot:(Cfg.successor false_label),
-        args )
+    Some (Select_utils.terminator_of_test (Iinttest cmp) ~ifso ~ifnot, args)
   | Res ({ op = Intop_imm (Icomp cmp, n); args; _ }, 0) ->
     Some
-      ( Select_utils.terminator_of_test
-          (Iinttest_imm (cmp, n))
-          ~ifso:(Cfg.successor true_label)
-          ~ifnot:(Cfg.successor false_label),
+      ( Select_utils.terminator_of_test (Iinttest_imm (cmp, n)) ~ifso ~ifnot,
         args )
   | Res ({ op = Floatop (w, Icompf cmp); args; _ }, 0) ->
     Some
-      ( Select_utils.terminator_of_test
-          (Ifloattest (w, cmp))
-          ~ifso:(Cfg.successor true_label)
-          ~ifnot:(Cfg.successor false_label),
-        args )
+      (Select_utils.terminator_of_test (Ifloattest (w, cmp)) ~ifso ~ifnot, args)
   | Res ({ op = Intop_imm (Iand, 1); args; _ }, 0) ->
-    Some
-      ( Cfg.Parity_test
-          { ifso = Cfg.successor false_label; ifnot = Cfg.successor true_label },
-        args )
+    Some (Cfg.Parity_test { ifso = ifnot; ifnot = ifso }, args)
   | _ -> None
 
 let truncate arr n = if Array.length arr > n then Array.sub arr 0 n else arr
@@ -453,32 +439,28 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
            possible. *)
         Array.length targets = 2
       then
-        let false_label = label_of env targets.(0) in
-        let true_label = label_of env targets.(1) in
-        match fuse_comparison index ~true_label ~false_label with
+        let ifnot = cfg_successor env targets.(0) in
+        let ifso = cfg_successor env targets.(1) in
+        match fuse_comparison index ~ifso ~ifnot with
         | Some (term, args) ->
           make_instr term (Array.map (get_reg env) args) [||] dbg
         | None ->
           make_instr
-            (Cfg.Truth_test
-               { ifso = Cfg.successor true_label;
-                 ifnot = Cfg.successor false_label
-               })
+            (Cfg.Truth_test { ifso; ifnot })
             [| get_reg env index |]
             [||] dbg
       else
         let index_reg = get_reg env index in
-        let labels =
-          Array.map (fun target -> Cfg.successor (label_of env target)) targets
-        in
-        make_instr (Cfg.Switch labels) [| index_reg |] [||] dbg
+        make_instr
+          (Cfg.Switch (Array.map (cfg_successor env) targets))
+          [| index_reg |] [||] dbg
     | Call { op; args; continuation = Return; nontail; may_raise = _ } ->
       assert (not nontail);
       let call_op : Cfg.func_call_operation =
         match op with
-        | Direct sym -> Direct { sym; callsite_counter = None }
-        | Indirect candidates ->
-          Indirect { callees = candidates; callsite_counter = None }
+        | Direct { sym; callsite_counter } -> Direct { sym; callsite_counter }
+        | Indirect { callees; callsite_counter } ->
+          Indirect { callees; callsite_counter }
         | External _ | Probe _ ->
           Misc.fatal_error
             "Cfg_of_ssa: external functions cannot be tail called"
@@ -506,9 +488,10 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         make_instr (Cfg.Call_no_return call_op) loc_arg loc_res dbg
       in
       match op with
-      | Direct sym -> ocaml_call (Direct { sym; callsite_counter = None })
-      | Indirect candidates ->
-        ocaml_call (Indirect { callees = candidates; callsite_counter = None })
+      | Direct { sym; callsite_counter } ->
+        ocaml_call (Direct { sym; callsite_counter })
+      | Indirect { callees; callsite_counter } ->
+        ocaml_call (Indirect { callees; callsite_counter })
       | External ({ ty_args; ty_res; _ } as ext) ->
         let loc_arg, stack_ofs, stack_align =
           move_to_extcall_arg_locs body ty_args virt_args dbg
@@ -535,9 +518,10 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
           loc_arg loc_res dbg
       in
       match op with
-      | Direct sym -> ocaml_call (Direct { sym; callsite_counter = None })
-      | Indirect candidates ->
-        ocaml_call (Indirect { callees = candidates; callsite_counter = None })
+      | Direct { sym; callsite_counter } ->
+        ocaml_call (Direct { sym; callsite_counter })
+      | Indirect { callees; callsite_counter } ->
+        ocaml_call (Indirect { callees; callsite_counter })
       | External ({ ty_args; _ } as ext) ->
         let loc_arg, stack_ofs, stack_align =
           move_to_extcall_arg_locs body ty_args virt_args dbg
@@ -609,8 +593,8 @@ let collect_fused_comparisons env =
       | Switch { index; targets } when Array.length targets = 2 -> (
         if
           Option.is_some
-            (fuse_comparison index ~true_label:Label.none
-               ~false_label:Label.none)
+            (fuse_comparison index ~ifso:(Cfg.successor Label.none)
+               ~ifnot:(Cfg.successor Label.none))
         then
           match index with
           | Res ({ id; _ }, _) ->
@@ -753,9 +737,7 @@ let convert ~future_funcnames (ssa_graph : finished Ssa.graph) :
       ~fun_codegen_options:
         (Cfg.of_cmm_codegen_option function_info.codegen_options)
       ~fun_dbg:function_info.dbg
-        (* CR-soon yusumez: [Ssa_of_cmm] drops the FDO counters, including the
-           entry annotation. *)
-      ~fun_fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
+      ~fun_fdo_entry_annotation:function_info.fdo_entry_annotation
       ~fun_contains_calls:true ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
       ~fun_poll:function_info.poll ~next_instruction_id:Sub_cfg.instr_id
       ~fun_ret_type:function_info.ret_type

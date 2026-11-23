@@ -657,3 +657,142 @@
  (deps cfg.output cfg.output.corrected)
  (action
   (diff cfg.output cfg.output.corrected)))
+
+; The counters through SSA: those of the Cmm are in the SSA and in the Cfg
+; converted from it, except that of a self tail call, which becomes a jump.
+; [-use-ssa] also checks, by [-ssa-validate], that the Cfg converted from SSA
+; has the counters of the one selected from Cmm, on the same edges and calls.
+; The SSA dumps hold the SSA before and after [Ssa_simplify].
+
+(rule
+ (targets ssa.output.corrected)
+ (deps cfg.ml to_cmm.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run mkdir -p ssa_cmm ssa_ssa ssa_cfg)
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -use-ssa
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     ssa_cmm/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -use-ssa
+     -fdo-counters
+     -dssa
+     -dfdo-dropped-counters
+     -dump-into-file
+     -color
+     never
+     -o
+     ssa_ssa/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -use-ssa
+     -fdo-counters
+     -dcfg
+     -dump-into-file
+     -color
+     never
+     -o
+     ssa_cfg/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -use-ssa
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     ssa_cmm/to_cmm.cmx
+     to_cmm.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -use-ssa
+     -fdo-counters
+     -dssa
+     -dump-into-file
+     -color
+     never
+     -o
+     ssa_ssa/to_cmm.cmx
+     to_cmm.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -use-ssa
+     -fdo-counters
+     -dcfg
+     -dump-into-file
+     -color
+     never
+     -o
+     ssa_cfg/to_cmm.cmx
+     to_cmm.ml))
+   (with-stdout-to
+    ssa.output.corrected
+    (progn
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      ssa_cmm/cfg.cmx.dump
+      ssa_ssa/cfg.cmx.dump)
+     (run ./fdo_annotations.exe list ssa_ssa/cfg.cmx.dump)
+     (run ./fdo_annotations.exe dropped ssa_ssa/cfg.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      ssa_cmm/cfg.cmx.dump
+      ssa_cfg/cfg.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      ssa_cmm/to_cmm.cmx.dump
+      ssa_ssa/to_cmm.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      ssa_cmm/to_cmm.cmx.dump
+      ssa_cfg/to_cmm.cmx.dump))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps ssa.output ssa.output.corrected)
+ (action
+  (diff ssa.output ssa.output.corrected)))

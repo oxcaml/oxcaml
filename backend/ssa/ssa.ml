@@ -95,8 +95,14 @@ let visible_usage_count (c : usage_count) : int =
 type op = Operation.t
 
 type call_op =
-  | Direct of Cmm.symbol
-  | Indirect of Cmm.symbol list option
+  | Direct of
+      { sym : Cmm.symbol;
+        callsite_counter : Fdo_counter.t option
+      }
+  | Indirect of
+      { callees : Cmm.symbol list option;
+        callsite_counter : Fdo_counter.t option
+      }
   | External of Cfg_intf.S.external_call_operation
   | Probe of
       { name : string;
@@ -111,7 +117,8 @@ module Function_info = struct
       codegen_options : Cmm.codegen_option list;
       dbg : Debuginfo.t;
       poll : Lambda.poll_attribute;
-      ret_type : Cmm.machtype
+      ret_type : Cmm.machtype;
+      fdo_entry_annotation : Fdo_annotation.With_body_hash.t
     }
 
   let flattened_parameters function_info =
@@ -186,7 +193,7 @@ and 'g terminator =
       }
   | Switch of
       { index : 'g value;
-        targets : 'g block array
+        targets : 'g successor array
       }
   | Call of
       { op : call_op;
@@ -200,6 +207,11 @@ and 'g terminator =
         args : 'g value array;
         continuation : 'g block option
       }
+
+and 'g successor =
+  { target : 'g block;
+    fdo_annotation : Fdo_annotation.t
+  }
 
 type 'g graph =
   { function_info : Function_info.t;
@@ -335,7 +347,9 @@ module Block = struct
     match t with
     | Continue { continuation; _ } | Call { continuation; _ } ->
       non_exn_successors_of_continuation continuation
-    | Switch { targets; _ } -> Array.to_list targets
+    | Switch { targets; _ } ->
+      Array.to_list targets
+      |> List.map (fun { target; fdo_annotation = _ } -> target)
     | Invalid { continuation; _ } -> (
       match continuation with Some l -> [l] | None -> [])
 
@@ -587,7 +601,7 @@ module Terminator = struct
         }
     | Switch of
         { index : 'g value;
-          targets : 'g block array
+          targets : 'g successor array
         }
     | Call of
         { op : call_op;
@@ -601,6 +615,23 @@ module Terminator = struct
           args : 'g value array;
           continuation : 'g block option
         }
+
+  type nonrec 'g successor = 'g successor =
+    { target : 'g block;
+      fdo_annotation : Fdo_annotation.t
+    }
+
+  let successor ?(fdo_annotation = Fdo_annotation.empty) target =
+    { target; fdo_annotation }
+
+  let print_fdo_annotation ppf annotation =
+    if not (Fdo_annotation.is_empty annotation)
+    then Format.fprintf ppf " fdo_annotation%a" Fdo_annotation.print annotation
+
+  let print_callsite_counter ppf = function
+    | None -> ()
+    | Some counter ->
+      Format.fprintf ppf " callsite_counter(%s)" (Fdo_counter.to_string counter)
 
   let print_args ppf arr =
     Format.pp_print_array
@@ -631,7 +662,9 @@ module Terminator = struct
     | Switch { index; targets } ->
       Format.fprintf ppf "switch(%a)" Value.print index;
       Array.iteri
-        (fun i block -> Format.fprintf ppf " | %i -> %a" i Block.print_id block)
+        (fun i { target; fdo_annotation } ->
+          Format.fprintf ppf " | %i -> %a%a" i Block.print_id target
+            print_fdo_annotation fdo_annotation)
         targets
     | Call { op; args; continuation; may_raise; nontail } -> (
       let kind =
@@ -640,9 +673,12 @@ module Terminator = struct
         | Goto _ | Raise _ | Unreachable -> "call"
       in
       (match op with
-      | Direct sym ->
-        Format.fprintf ppf "%s %s(%a)" kind sym.sym_name print_args args
-      | Indirect _ -> Format.fprintf ppf "%s_indirect(%a)" kind print_args args
+      | Direct { sym; callsite_counter } ->
+        Format.fprintf ppf "%s %s(%a)%a" kind sym.sym_name print_args args
+          print_callsite_counter callsite_counter
+      | Indirect { callees = _; callsite_counter } ->
+        Format.fprintf ppf "%s_indirect(%a)%a" kind print_args args
+          print_callsite_counter callsite_counter
       | External { func_symbol; _ } ->
         Format.fprintf ppf "%s_prim %s(%a)" kind func_symbol print_args args
       | Probe { name; _ } ->
@@ -682,7 +718,10 @@ let check_terminator (term : under_construction terminator) : unit =
     Misc.fatal_error
       "Ssa.check_terminator: a Continue continuation cannot be Unreachable"
   | Switch { targets; _ } ->
-    Array.iter (check_target_has_no_params ~term_name:"Switch") targets
+    Array.iter
+      (fun { target; fdo_annotation = _ } ->
+        check_target_has_no_params ~term_name:"Switch" target)
+      targets
   | Call { continuation = Return; nontail; _ } ->
     if nontail
     then

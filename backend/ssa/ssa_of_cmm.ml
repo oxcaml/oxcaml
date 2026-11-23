@@ -46,8 +46,10 @@ open Ssa.Export
 
 type block = under_construction Block.t
 
-(* CR-soon yusumez: SSA doesn't carry the FDO counters of the function entry,
-   edges and calls. *)
+(* The successor [target], for a branch with annotations [annots]. *)
+let branch_successor target annots =
+  Terminator.successor target
+    ~fdo_annotation:(Branch_annotations.fdo_annotation annots)
 
 type value = under_construction Ssa.Value.t
 
@@ -122,40 +124,31 @@ let bind_let env c v args =
   emit_name_for_debugger env c v args;
   env
 
-let emit_branch env c (test : Operation.test) rarg ~dbg ~true_block ~false_block
-    =
+let emit_branch env c (test : Operation.test) rarg ~dbg ~ifso ~ifnot =
   let make_cond op args = (emit_op env c op dbg Cmm.typ_int args).(0) in
-  (* A boolean branch is a two-target switch: [targets.(0)] is the false edge,
-     [targets.(1)] the true edge. The condition is always a 0/1 comparison. *)
-  let branch index ~true_block ~false_block : under_construction Terminator.t =
-    Switch { index; targets = [| false_block; true_block |] }
+  (* A boolean branch is a two-target switch: [targets.(0)] is the false edge
+     ([ifnot]), [targets.(1)] the true edge ([ifso]). The condition is always a
+     0/1 comparison. *)
+  let branch index ~ifso ~ifnot : under_construction Terminator.t =
+    Switch { index; targets = [| ifnot; ifso |] }
   in
   let term : under_construction Terminator.t =
     match test with
     | Itruetest ->
-      branch
-        (make_cond (Intop_imm (Icomp Cne, 0)) [| rarg.(0) |])
-        ~true_block ~false_block
+      branch (make_cond (Intop_imm (Icomp Cne, 0)) [| rarg.(0) |]) ~ifso ~ifnot
     | Ifalsetest ->
-      branch
-        (make_cond (Intop_imm (Icomp Ceq, 0)) [| rarg.(0) |])
-        ~true_block ~false_block
-    | Iinttest cmp ->
-      branch (make_cond (Intop (Icomp cmp)) rarg) ~true_block ~false_block
+      branch (make_cond (Intop_imm (Icomp Ceq, 0)) [| rarg.(0) |]) ~ifso ~ifnot
+    | Iinttest cmp -> branch (make_cond (Intop (Icomp cmp)) rarg) ~ifso ~ifnot
     | Iinttest_imm (cmp, n) ->
-      branch
-        (make_cond (Intop_imm (Icomp cmp, n)) [| rarg.(0) |])
-        ~true_block ~false_block
+      branch (make_cond (Intop_imm (Icomp cmp, n)) [| rarg.(0) |]) ~ifso ~ifnot
     | Ifloattest (w, cmp) ->
-      branch (make_cond (Floatop (w, Icompf cmp)) rarg) ~true_block ~false_block
+      branch (make_cond (Floatop (w, Icompf cmp)) rarg) ~ifso ~ifnot
     | Ioddtest ->
-      branch
-        (make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |])
-        ~true_block ~false_block
+      branch (make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |]) ~ifso ~ifnot
     | Ieventest ->
       branch
         (make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |])
-        ~true_block:false_block ~false_block:true_block
+        ~ifso:ifnot ~ifnot:ifso
   in
   finish_block env c ~dbg term
 
@@ -389,18 +382,18 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Never_returns
   in
   match new_op with
-  | Call { op = Direct { sym; callsite_counter = _ }; _ } ->
-    call_returning_to (Direct sym) ty
-  | Call { op = Indirect { callees = candidates; callsite_counter = _ }; _ } ->
-    call_returning_to (Indirect candidates) ty
+  | Call { op = Direct { sym; callsite_counter }; _ } ->
+    call_returning_to (Direct { sym; callsite_counter }) ty
+  | Call { op = Indirect { callees; callsite_counter }; _ } ->
+    call_returning_to (Indirect { callees; callsite_counter }) ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
     call_returning_to (External ext_call) ty_res
   | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
     call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
-  | Call_no_return (Direct { sym; callsite_counter = _ }) ->
-    call_no_return (Direct sym)
-  | Call_no_return (Indirect { callees = candidates; callsite_counter = _ }) ->
-    call_no_return (Indirect candidates)
+  | Call_no_return (Direct { sym; callsite_counter }) ->
+    call_no_return (Direct { sym; callsite_counter })
+  | Call_no_return (Indirect { callees; callsite_counter }) ->
+    call_no_return (Indirect { callees; callsite_counter })
   | External_call_no_return ext_call -> call_no_return (External ext_call)
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
@@ -488,8 +481,9 @@ and emit_ifthenelse env c ~tail econd ~ifso_dbg ifa eif ~ifnot_dbg elsea eelse
   in
   let then_block = new_block then_env ~params:[||] ~entry_dbg:ifso_dbg in
   let else_block = new_block else_env ~params:[||] ~entry_dbg:ifnot_dbg in
-  emit_branch env c cond rarg ~dbg ~true_block:then_block
-    ~false_block:else_block;
+  emit_branch env c cond rarg ~dbg
+    ~ifso:(branch_successor then_block ifa)
+    ~ifnot:(branch_successor else_block elsea);
   let then_c = Cursor.start then_block in
   let r_then = emit then_env then_c eif ~tail in
   let else_c = Cursor.start else_block in
@@ -507,7 +501,13 @@ and emit_switch env c ~tail esel index ecases ~dbg : result =
         new_block env ~params:[||] ~entry_dbg:case_dbg)
       ecases
   in
-  let targets = Array.map (fun idx -> case_blocks.(idx)) index in
+  let targets =
+    Array.map
+      (fun idx ->
+        let _, _, annots = ecases.(idx) in
+        branch_successor case_blocks.(idx) annots)
+      index
+  in
   let index =
     assert (Array.length rsel = 1);
     rsel.(0)
@@ -661,7 +661,8 @@ let convert ~ppf_dump (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph
         codegen_options = cmm.fun_codegen_options;
         dbg = cmm.fun_dbg;
         poll = cmm.fun_poll;
-        ret_type = cmm.fun_ret_type
+        ret_type = cmm.fun_ret_type;
+        fdo_entry_annotation = cmm.fun_fdo_entry_annotation
       }
     in
     let g = Ssa.create_graph function_info ~keep_unused_ops in

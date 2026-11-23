@@ -73,8 +73,14 @@ open! Int_replace_polymorphic_compare
     functions; [External] / [Probe] are primitive calls, which cannot be tail
     called. *)
 type call_op =
-  | Direct of Cmm.symbol
-  | Indirect of Cmm.symbol list option
+  | Direct of
+      { sym : Cmm.symbol;
+        callsite_counter : Fdo_counter.t option
+      }
+  | Indirect of
+      { callees : Cmm.symbol list option;
+        callsite_counter : Fdo_counter.t option
+      }
   | External of Cfg_intf.S.external_call_operation
   | Probe of
       { name : string;
@@ -89,7 +95,8 @@ module Function_info : sig
       codegen_options : Cmm.codegen_option list;
       dbg : Debuginfo.t;
       poll : Lambda.poll_attribute;
-      ret_type : Cmm.machtype
+      ret_type : Cmm.machtype;
+      fdo_entry_annotation : Fdo_annotation.With_body_hash.t
     }
 
   val flattened_parameters : t -> Cmm.machtype
@@ -239,6 +246,15 @@ module Terminator : sig
     | Arg of 'g Value.t
     | Omitted_since_unused
 
+  (** A target of a [Switch], with the FDO counters of the edge to it. *)
+  type 'g successor =
+    { target : 'g block;
+      fdo_annotation : Fdo_annotation.t
+    }
+
+  (** A successor with the given FDO counters (none by default). *)
+  val successor : ?fdo_annotation:Fdo_annotation.t -> 'g block -> 'g successor
+
   type 'g t =
     | Continue of
         { continuation : 'g continuation;
@@ -249,7 +265,7 @@ module Terminator : sig
         }
     | Switch of
         { index : 'g Value.t;
-          targets : 'g block array
+          targets : 'g successor array
               (** Control goes to [targets.(index)]. [index] being out of range
                   is undefined behavior. A two-target switch is the boolean
                   branch: [targets.(0)] is the false edge, [targets.(1)] the
