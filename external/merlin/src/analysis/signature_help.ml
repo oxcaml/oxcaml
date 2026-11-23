@@ -185,7 +185,11 @@ let is_arrow t =
   | Tarrow _ -> true
   | _ -> false
 
-let application_signature ~prefix ~cursor = function
+let rec application_signature ~prefix ~cursor = function
+  | (_, Browse_raw.Record_field _) :: parents ->
+    (* A record label is not an expression: continue from the expression
+       around it. *)
+    application_signature ~prefix ~cursor parents
   | (_, Browse_raw.Expression arg)
     :: ( _,
          Expression
