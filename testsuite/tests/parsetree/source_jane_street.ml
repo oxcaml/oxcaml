@@ -1969,3 +1969,8 @@ let f (deref_ a, deref_ b) = #(a, b)
 [%%expect{|
 val f : 'a * 'b -> #('a addr_imm * 'b addr_imm) = <fun>
 |}]
+
+let f ({ contents = (x as deref_ a) as y }) = #(x, a, y)
+[%%expect{|
+val f : 'a ref -> #('a * 'a addr * 'a) = <fun>
+|}]

@@ -2362,7 +2362,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
     ty, mode
   in
   match p.pat_desc with
-    Tpat_alias { pattern = p1; _ } ->
+    Tpat_alias { pattern = p1; _ } | Tpat_deref { pattern = Some p1; _ } ->
      build_as_type_and_mode env p1 ~mode
   | Tpat_tuple pl ->
       let labeled_tyl =
@@ -2439,7 +2439,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_addr _ | Tpat_deref _ | Tpat_lazy _ ->
+  | Tpat_deref { pattern = None; _ }
+  | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -3716,6 +3717,7 @@ let rec has_literal_pattern p =
   | Ppat_alias (p, _)
   | Ppat_addr (_, p)
   | Ppat_deref p
+  | Ppat_alias_deref (p, _)
   | Ppat_lazy p
   | Ppat_open (_, p) ->
      has_literal_pattern p
@@ -4047,6 +4049,52 @@ and type_pat_aux
       let lbl_a_list = List.map (type_label_pat rep) lbl_a_list in
       rvp @@ solve_expected (make_record_pat rep lbl_a_list ambiguity)
   in
+  (* CR address-patterns: [deref_] should be allowed while deepening an
+     [addr_] at [write] and [immutable], too. Currently, this is only
+     accepted if the ['a addr] is at least read. Similarly, [deref_] on
+     a mutable field should be allowed in records at [write], [immutable]
+     or [contended]. *)
+  let type_deref ~attrs sp1 name =
+    let q =
+      Option.map
+        (fun sp1 -> type_pat tps Value ?deref_position sp1 expected_ty sort)
+        sp1
+    in
+    let { position_mutability; container_mode; container_loc; base;
+          rev_unboxed } =
+      match deref_position with
+      | Some pos -> pos
+      | None -> Error.log_and_raise loc !!penv Deref_pattern_bad_position
+    in
+    let unboxed = List.rev rev_unboxed in
+    check_block_path ~loc ~env:!!penv Deref_pattern
+      ~mutability:position_mutability base unboxed;
+    let ty_addr, addr_sort =
+      solve_Ppat_deref !!penv position_mutability expected_ty
+    in
+    let is_contained_by : Mode.Hint.is_contained_by =
+      { containing = Derived_address; container = (container_loc, Pattern) }
+    in
+    let mode = apply_left_is_contained_by is_contained_by container_mode in
+    let type_expr = instance ty_addr in
+    let mode = cross_left !!penv ty_addr mode in
+    let id, uid =
+      enter_variable ~pv_kind:Deref_var tps name.loc name mode
+        ~kind:(Val_reg addr_sort) type_expr attrs addr_sort
+    in
+    let pat_type =
+      match q with
+      | None -> instance expected_ty
+      | Some q -> q.pat_type
+    in
+    rvp { pat_desc = Tpat_deref { pattern = q; id; name; uid;
+                                  sort = addr_sort; mode; type_expr };
+          pat_loc = loc; pat_extra=[];
+          pat_type;
+          pat_attributes = sp.ppat_attributes;
+          pat_env = !!penv;
+          pat_unique_barrier = Unique_barrier.not_computed () }
+  in
   match sp.ppat_desc with
     Ppat_any ->
       rvp {
@@ -4300,7 +4348,7 @@ and type_pat_aux
         | Ppat_or (p1, p2) ->
             check_non_escaping p1;
             check_non_escaping p2
-        | Ppat_alias (p, _) ->
+        | Ppat_alias (p, _) | Ppat_alias_deref (p, _) ->
             check_non_escaping p
         | Ppat_constraint _ ->
             Error.log_or_raise p.ppat_loc !!penv Inlined_record_escape
@@ -4631,50 +4679,15 @@ and type_pat_aux
   | Ppat_effect _ ->
       Error.log_and_raise loc !!penv Effect_pattern_below_toplevel
   | Ppat_deref sp1 ->
-      (* CR address-patterns: [deref_] should be allowed while deepening an
-         [addr_] at [write] and [immutable], too. Currently, this is only
-         accepted if the ['a addr] is at least read. Similarly, [deref_] on
-         a mutable field should be allowed in records at [write], [immutable]
-         or [contended]. *)
-      (* CR address-patterns: support [as deref_ x], which lifts the
-         restriction below; then, print a more informative error when
-         the argument is a pattern that [as deref_ x] would accept. *)
-      let name =
-        match sp1.ppat_desc with
-        | Ppat_var name -> name
-        | _ ->
+      (* CR address-patterns: print a more informative error when the argument
+         is a pattern that [as deref_ x] would accept. *)
+      begin match sp1.ppat_desc with
+      | Ppat_var name -> type_deref ~attrs:sp1.ppat_attributes None name
+      | _ ->
           Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument
-      in
-      let { position_mutability; container_mode; container_loc; base;
-            rev_unboxed } =
-        match deref_position with
-        | Some pos -> pos
-        | None -> Error.log_and_raise loc !!penv Deref_pattern_bad_position
-      in
-      let unboxed = List.rev rev_unboxed in
-      check_block_path ~loc ~env:!!penv Deref_pattern
-        ~mutability:position_mutability base unboxed;
-      let ty_addr, addr_sort =
-        solve_Ppat_deref !!penv position_mutability expected_ty
-      in
-      let is_contained_by : Mode.Hint.is_contained_by =
-        { containing = Derived_address; container = (container_loc, Pattern) }
-      in
-      let mode = apply_left_is_contained_by is_contained_by container_mode in
-      let type_expr = instance ty_addr in
-      let mode = cross_left !!penv ty_addr mode in
-      let id, uid =
-        enter_variable ~pv_kind:Deref_var tps name.loc name mode
-          ~kind:(Val_reg addr_sort) type_expr sp1.ppat_attributes addr_sort
-      in
-      rvp {
-        pat_desc =
-          Tpat_deref { id; name; uid; sort = addr_sort; mode; type_expr };
-        pat_loc = loc; pat_extra=[];
-        pat_type = instance expected_ty;
-        pat_attributes = sp.ppat_attributes;
-        pat_env = !!penv;
-        pat_unique_barrier = Unique_barrier.not_computed () }
+      end
+  | Ppat_alias_deref (sp1, name) ->
+      type_deref ~attrs:sp.ppat_attributes (Some sp1) name
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -4837,7 +4850,8 @@ let rec pat_tuple_arity spat =
       Not_local_tuple
   | Ppat_or(sp1, sp2) ->
       combine_pat_tuple_arity (pat_tuple_arity sp1) (pat_tuple_arity sp2)
-  | Ppat_constraint(p, _, _) | Ppat_open(_, p) | Ppat_alias(p, _) -> pat_tuple_arity p
+  | Ppat_constraint(p, _, _) | Ppat_open(_, p) | Ppat_alias(p, _)
+  | Ppat_alias_deref (p, _) -> pat_tuple_arity p
 
 let rec cases_tuple_arity cases =
   match cases with
@@ -5089,7 +5103,10 @@ let rec check_counter_example_pat
           in
           check_rec ~info:(decrease 5) tp expected_ty k
       end
-  | Tpat_alias { pattern = p; _ } -> check_rec ~info p expected_ty k
+  | Tpat_alias { pattern = p; _ } | Tpat_deref { pattern = Some p; _ } ->
+      check_rec ~info p expected_ty k
+  | Tpat_deref { pattern = None; _ } ->
+      check_rec ~info { tp with pat_desc = Tpat_any } expected_ty k
   | Tpat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       k @@
@@ -5207,16 +5224,6 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_deref _ ->
-      (* CR address-patterns: deref patterns aren't always refuted. E.g. this
-         case is rejected:
-         {[
-           type _ refute_gadt = Refute_int : int refute_gadt
-           let refute_deref (x : string refute_gadt * unit) =
-             match x with
-             | (deref_ y, ()) -> .
-         ]} *)
-      mkp k tp.pat_desc
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
@@ -6697,7 +6704,8 @@ let shallow_iter_ppat f p =
   | Ppat_exception p | Ppat_alias (p,_)
   | Ppat_open (_,p)
   | Ppat_constraint (p,_,_)
-  | Ppat_addr (_, p) | Ppat_deref p | Ppat_lazy p -> f p
+  | Ppat_addr (_, p) | Ppat_deref p | Ppat_alias_deref (p, _) | Ppat_lazy p ->
+    f p
   | Ppat_record (args, _flag) | Ppat_record_unboxed_product (args, _flag) ->
     List.iter (fun (_,p) -> f p) args
 

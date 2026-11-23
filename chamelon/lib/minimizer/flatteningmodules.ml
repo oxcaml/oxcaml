@@ -136,6 +136,7 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
       | O (Tpat_deref d) ->
         Tpat_deref
           { d with
+            pattern = Option.map (replace_in_pat mod_name) d.pattern;
             id = create_local (mod_name ^ "_" ^ Ident.name d.id);
             name = { d.name with txt = mod_name ^ "_" ^ d.name.txt }
           }
