@@ -110,8 +110,6 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ ->
         Misc.fatal_error "Unsupported instruction for branch relaxation")
 
-  (* The sequences that replace a relaxed conditional branch have no counters,
-     so those of the branch are dropped. *)
   let drop_fdo_counters annotations =
     Fdo_dropped_counters.register ~reason:Linear_branch_relaxed
       (Fdo_annotation.union annotations)

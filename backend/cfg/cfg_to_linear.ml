@@ -139,15 +139,6 @@ let mk_float_cond ~lt ~eq ~gt ~uo =
   | false, false, false, true -> Must_be_last
   | true, false, false, true -> Must_be_last
 
-(* A conditional branch to [target]. [attach_fdo_annotations] fills in its FDO
-   counters. *)
-let condbranch test target : L.instruction_desc =
-  L.Lcondbranch
-    { test;
-      taken = { target; fdo_annotation = Fdo_annotation.empty };
-      fallthrough_annotation = Fdo_annotation.empty
-    }
-
 let linear_successor ({ target; fdo_annotation } : Cfg.successor) : L.successor
     =
   { target; fdo_annotation }
@@ -161,61 +152,20 @@ let annotation_of_edges_to (successors : Cfg.successor list) target =
     successors
   |> Fdo_annotation.union
 
-(* Where control goes after an instruction of the linearization of a terminator,
-   unless it jumps. *)
-module Control_after = struct
-  type t =
-    | Falls_through
-    | Jumps_to of Label.t
-    | Branches
-end
-
-(* A successor of [terminator] can become several machine edges. The taken edge
-   of a conditional branch has the FDO counters of the successors it jumps to,
-   and its fallthrough edge those of the successors it continues to, unless it
-   continues to another conditional branch, which it only passes through. *)
-let attach_fdo_annotations (terminator : Cfg.terminator) ~next_label
-    (desc_list : L.instruction_desc list) =
-  let annotation_of =
-    annotation_of_edges_to (Cfg.branch_successors terminator)
-  in
-  let fallthrough_annotation : Control_after.t -> Fdo_annotation.t = function
-    | Falls_through -> annotation_of next_label
-    | Jumps_to label -> annotation_of label
-    | Branches -> Fdo_annotation.empty
-  in
-  List.fold_right
-    (fun (desc : L.instruction_desc) (descs, (control_after : Control_after.t))
-       ->
-      match[@ocaml.warning "-4"] desc with
-      | Lcondbranch { test; taken = { target; _ }; _ } ->
-        let desc : L.instruction_desc =
-          Lcondbranch
-            { test;
-              taken = { target; fdo_annotation = annotation_of target };
-              fallthrough_annotation = fallthrough_annotation control_after
-            }
-        in
-        desc :: descs, Control_after.Branches
-      | Lcondbranch3 _ -> desc :: descs, Control_after.Branches
-      | Lbranch label -> desc :: descs, Control_after.Jumps_to label
-      | _ -> desc :: descs, control_after)
-    desc_list
-    ([], Control_after.Falls_through)
-  |> fst
-
-(* The FDO counters on the edges of an instruction of the linearization of a
-   terminator. *)
 let fdo_annotations_of_desc (desc : L.instruction_desc) =
   let of_successor (successor : L.successor) = successor.fdo_annotation in
-  match[@ocaml.warning "-4"] desc with
+  match desc with
   | Lcondbranch { taken; fallthrough_annotation; test = _ } ->
     [of_successor taken; fallthrough_annotation]
   | Lcondbranch3 { lt; eq; gt; fallthrough_annotation } ->
     fallthrough_annotation
     :: List.filter_map (Option.map of_successor) [lt; eq; gt]
   | Lswitch successors -> List.map of_successor (Array.to_list successors)
-  | _ -> []
+  | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lop _ | Lcall_op _
+  | Lreloadretaddr | Lreturn | Llabel_for_jump_target _ | Llabel_for_dwarf _
+  | Lbranch _ | Lentertrap | Ladjust_stack_offset _ | Lpushtrap _ | Lpoptrap _
+  | Lraise _ | Lstackcheck _ ->
+    []
 
 (* The counters of the edges of [terminator] that no instruction of its
    linearization has are dropped: it became an unconditional jump or a
@@ -252,16 +202,37 @@ let linearize_terminator (func : string)
     if not (Label.equal next.label lbl) then d @ [L.Lbranch lbl] else d
   in
   let single d = [d], None in
+  let annotation_of =
+    annotation_of_edges_to (Cfg.branch_successors terminator.desc)
+  in
+  (* Conditional branches to the targets of [tests] in turn, then a jump or a
+     fallthrough to [last]. Also attaches FDO counters. *)
+  let cascade tests ~last =
+    let num_tests = List.length tests in
+    List.mapi
+      (fun i (test, target) : L.instruction_desc ->
+        Lcondbranch
+          { test;
+            taken = { target; fdo_annotation = annotation_of target };
+            fallthrough_annotation =
+              (if i = num_tests - 1
+               then annotation_of last
+               else
+                 Fdo_annotation.empty
+                 (* Counters are carried by the branches further down the
+                    line *))
+          })
+      tests
+    @ branch_or_fallthrough [] last
+  in
   let emit_bool (c1, l1) (c2, l2) =
     (* c1 must be the inverse of c2 *)
     match Label.equal l1 next.label, Label.equal l2 next.label with
     | true, true -> []
-    | false, true -> [condbranch c1 l1]
-    | true, false -> [condbranch c2 l2]
+    | false, true -> cascade [c1, l1] ~last:l2
+    | true, false -> cascade [c2, l2] ~last:l1
     | false, false ->
-      if Label.equal l1 l2
-      then [L.Lbranch l1]
-      else [condbranch c1 l1; L.Lbranch l2]
+      if Label.equal l1 l2 then [L.Lbranch l1] else cascade [c1, l1] ~last:l2
   in
   let desc_list, tailrec_label =
     match terminator.desc with
@@ -405,15 +376,15 @@ let linearize_terminator (func : string)
             Misc.fatal_error
               "Illegal branch: more than one successor label that must be last"
         in
-        let branches =
+        let tests =
           List.filter_map
             (fun (c, lbl) ->
               if Label.equal lbl last
               then None
-              else Some (condbranch (Ifloattest (width, c)) lbl))
+              else Some (Operation.Ifloattest (width, c), lbl))
             any
         in
-        branches @ branch_or_fallthrough [] last, None
+        cascade tests ~last, None
       | _ -> assert false)
     | Int_test
         { lt = lt_successor;
@@ -452,7 +423,6 @@ let linearize_terminator (func : string)
         if Label.Set.cardinal cond_successor_labels = 2 && can_emit_Lcondbranch3
         then
           (* generates one cmp instruction for all conditional jumps here *)
-          let successors = [lt_successor; eq_successor; gt_successor] in
           let find (successor : Cfg.successor) =
             if Label.equal next.label successor.target
             then None
@@ -462,13 +432,12 @@ let linearize_terminator (func : string)
                 { lt = find lt_successor;
                   eq = find eq_successor;
                   gt = find gt_successor;
-                  fallthrough_annotation =
-                    annotation_of_edges_to successors next.label
+                  fallthrough_annotation = annotation_of next.label
                 } ],
             None )
         else
-          let init = branch_or_fallthrough [] last in
-          ( Label.Set.fold
+          let tests =
+            Label.Set.fold
               (fun lbl acc ->
                 match
                   Scalar.Integer_comparison.create is_signed
@@ -486,13 +455,11 @@ let linearize_terminator (func : string)
                     | None -> Operation.Iinttest comp
                     | Some n -> Operation.Iinttest_imm (comp, n)
                   in
-                  condbranch test lbl :: acc)
-              cond_successor_labels init,
-            None )
+                  (test, lbl) :: acc)
+              cond_successor_labels []
+          in
+          cascade tests ~last, None
       | _ -> assert false)
-  in
-  let desc_list =
-    attach_fdo_annotations terminator.desc ~next_label:next.label desc_list
   in
   drop_fdo_counters_without_edge terminator.desc desc_list;
   let desc_list =
