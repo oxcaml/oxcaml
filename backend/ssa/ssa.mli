@@ -246,13 +246,12 @@ module Terminator : sig
     | Arg of 'g Value.t
     | Omitted_since_unused
 
-  (** A target of a [Switch], with the FDO counters of the edge to it. *)
   type 'g successor =
     { target : 'g block;
       fdo_annotation : Fdo_annotation.t
+          (* CR yusumez: Can we have [Branch_annotations] here instead? *)
     }
 
-  (** A successor with the given FDO counters (none by default). *)
   val successor : ?fdo_annotation:Fdo_annotation.t -> 'g block -> 'g successor
 
   type 'g t =
