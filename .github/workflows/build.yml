@@ -172,10 +172,16 @@ jobs:
             check_arch: true
             sysdeps: gdb
 
+          # No w=-46 here, so that a key after "_" that the compiler does not
+          # know fails the build instead of being discarded silently.
+          # Under the bundle, -cfg-merge-blocks merges blocks that differ only
+          # in debug info, so in the native backtraces of the tests below the
+          # entry of a raise names another raise or is missing.
           - name: experimental-optimizations (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
-            ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            build_ocamlparam: "_,experimental-optimizations=1"
+            ocamlparam: "_,experimental-optimizations=1"
+            disable_testcases: 'testsuite/tests/backtrace/backtrace3.ml testsuite/tests/backtrace/backtrace_or_exception.ml testsuite/tests/backtrace/raw_backtrace.ml'
             check_arch: true
             sysdeps: gdb
 
