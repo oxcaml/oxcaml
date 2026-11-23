@@ -32,7 +32,10 @@
   unix)
  (modules genprintval_native opttoploop opttopdirs topmain))
 
-(copy_files ../topmain.mli)
+; The interface must compile to the same topmain.cmi as in the bytecode
+; toplevel library, whose copy is the one installed. [copy_files#] makes both
+; record the same source path.
+(copy_files# ../topmain.mli)
 
 (rule
  (targets genprintval_native.ml)

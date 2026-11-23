@@ -176,7 +176,8 @@ let check_native_smoke_programs t =
     run "./smoke.exe" []
   in
   smoke "compiler-libs.native-toplevel"
-    "let () = Opttoploop.initialize_toplevel_env ()\n";
+    "let () = Opttoploop.initialize_toplevel_env ()\n\
+     let _ : unit -> int = Topmain.main\n";
   smoke "ocaml-jit" "let () = Jit.init_top ()\n";
   (* -uses-metaprogramming would mask a missing eval-to-JIT dependency. *)
   checking "eval's ocaml-jit dependency";
