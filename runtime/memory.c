@@ -1147,7 +1147,7 @@ CAMLexport wchar_t* caml_stat_wcsconcat(int n, ...)
    [ASAN_OPTIONS] environment variable at runtime.
    */
 const char *
-#ifdef __clang___
+#if defined(__clang__) && __has_attribute(retain)
 __attribute__((used, retain))
 #else
 __attribute__((used))
