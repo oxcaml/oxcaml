@@ -89,14 +89,7 @@ module General : sig
         * Mode.With_regionality.l
         * Types.type_expr
     | `Deref of
-        Ident.t
-        * string loc
-        * Uid.t
-        * Jkind.Sort.t
-        * Mode.With_regionality.l
-        * Types.type_expr
-    | `Alias_deref of
-        pattern
+        pattern option
         * Ident.t
         * string loc
         * Uid.t
