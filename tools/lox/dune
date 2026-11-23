@@ -1,4 +1,4 @@
 (executable
- (name oxiclean)
+ (name lox)
  (modes byte native)
  (libraries ocamlfrontend))

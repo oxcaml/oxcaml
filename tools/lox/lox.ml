@@ -93,7 +93,7 @@ let lean_file_contents ~(imports : string list) : string =
   let import (name : string) : string =
     "import extracted_oxcaml_" ^ String.uncapitalize_ascii name ^ "\n"
   in
-  "import Oxiclean.BuildSystem\n"
+  "import Lox.BuildSystem\n"
   ^ String.concat "" (List.map import imports)
   ^ "\n_do_not_use_this_outside_automatically_generated_files%\n"
 

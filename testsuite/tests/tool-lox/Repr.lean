@@ -1,5 +1,5 @@
 import extracted_oxcaml_repr
-open Oxiclean.Model
+open Lox.Model
 
 abbrev interface : ModuleType :=
   let int : ExprType := .constr (.predef .int) []
@@ -28,5 +28,5 @@ abbrev implementation : Expr :=
 
   .letBinding get (.letBinding create (.block 0 [.var 0, .var 1]))
 
-example : Oxiclean.Extracted.Repr.interface = interface := by rfl
-example : Oxiclean.Extracted.Repr.implementation = implementation := by rfl
+example : Lox.Extracted.Repr.interface = interface := by rfl
+example : Lox.Extracted.Repr.implementation = implementation := by rfl

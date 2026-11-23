@@ -1,7 +1,7 @@
-import Oxiclean.Model
-open Oxiclean.Model
+import Lox.Model
+open Lox.Model
 
-namespace Oxiclean.Reduction
+namespace Lox.Reduction
 
 inductive Reduce (Step : Expr → Expr → Prop) : Expr → Value → Prop where
   | alreadyReduced {v} : Reduce Step (.val v) v
@@ -246,4 +246,4 @@ instance referenceStepRelationIsValid : StepRelation Step' where
   switchScrutinee := .switchScrutinee
   switchImmediate := .switchImmediate
 
-end Oxiclean.Reduction
+end Lox.Reduction

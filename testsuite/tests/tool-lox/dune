@@ -1,4 +1,7 @@
-(env (_ (env-vars (LEAN_PATH ../../../tools/oxiclean/lean:.))))
+(env
+ (_
+  (env-vars
+   (LEAN_PATH ../../../tools/lox/lean:.))))
 
 (rule
  (target repr.ml)
@@ -28,13 +31,14 @@
 
 (rule
  (targets repr.intf.json repr.impl.json extracted_oxcaml_repr.lean)
- (deps (glob_files ../../../stdlib/build/*.cmi))
- (mode (promote (until-clean) (only *.json)))
+ (deps
+  (glob_files ../../../stdlib/build/*.cmi))
+ (mode
+  (promote
+   (until-clean)
+   (only *.json)))
  (action
-  (run
-   %{exe:../../../tools/oxiclean/oxiclean.exe}
-   %{dep:repr.cmti}
-   %{dep:repr.cmt})))
+  (run %{exe:../../../tools/lox/lox.exe} %{dep:repr.cmti} %{dep:repr.cmt})))
 
 (rule
  (targets extracted_oxcaml_repr.olean)
@@ -42,9 +46,14 @@
   (sandbox preserve_file_kind)
   repr.intf.json
   repr.impl.json
-  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+  (glob_files ../../../tools/lox/lean/Lox/*.olean))
  (action
-  (run lean -DautoImplicit=false -o %{targets} %{dep:extracted_oxcaml_repr.lean})))
+  (run
+   lean
+   -DautoImplicit=false
+   -o
+   %{targets}
+   %{dep:extracted_oxcaml_repr.lean})))
 
 (rule
  (alias repr)
@@ -53,7 +62,7 @@
   repr.impl.json
   extracted_oxcaml_repr.olean
   Repr.lean
-  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+  (glob_files ../../../tools/lox/lean/Lox/*.olean))
  (action
   (progn
    (diff repr.impl.json.expected repr.impl.json)
@@ -78,13 +87,14 @@
 
 (rule
  (targets even.intf.json even.impl.json extracted_oxcaml_even.lean)
- (deps (glob_files ../../../stdlib/build/*.cmi))
- (mode (promote (until-clean) (only *.json)))
+ (deps
+  (glob_files ../../../stdlib/build/*.cmi))
+ (mode
+  (promote
+   (until-clean)
+   (only *.json)))
  (action
-  (run
-   %{exe:../../../tools/oxiclean/oxiclean.exe}
-   %{dep:even.cmti}
-   %{dep:even.cmt})))
+  (run %{exe:../../../tools/lox/lox.exe} %{dep:even.cmti} %{dep:even.cmt})))
 
 (rule
  (targets extracted_oxcaml_even.olean)
@@ -92,9 +102,14 @@
   (sandbox preserve_file_kind)
   even.intf.json
   even.impl.json
-  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+  (glob_files ../../../tools/lox/lean/Lox/*.olean))
  (action
-  (run lean -DautoImplicit=false -o %{targets} %{dep:extracted_oxcaml_even.lean})))
+  (run
+   lean
+   -DautoImplicit=false
+   -o
+   %{targets}
+   %{dep:extracted_oxcaml_even.lean})))
 
 (rule
  (alias even)
@@ -103,7 +118,7 @@
   even.impl.json
   extracted_oxcaml_even.olean
   Even.lean
-  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+  (glob_files ../../../tools/lox/lean/Lox/*.olean))
  (action
   (progn
    (diff even.impl.json.expected even.impl.json)
@@ -137,10 +152,13 @@
  (deps
   even.cmi
   (glob_files ../../../stdlib/build/*.cmi))
- (mode (promote (until-clean) (only *.json)))
+ (mode
+  (promote
+   (until-clean)
+   (only *.json)))
  (action
   (run
-   %{exe:../../../tools/oxiclean/oxiclean.exe}
+   %{exe:../../../tools/lox/lox.exe}
    %{dep:downstream.cmti}
    %{dep:downstream.cmt})))
 
@@ -151,9 +169,14 @@
   downstream.intf.json
   downstream.impl.json
   extracted_oxcaml_even.olean
-  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+  (glob_files ../../../tools/lox/lean/Lox/*.olean))
  (action
-  (run lean -DautoImplicit=false -o %{targets} %{dep:extracted_oxcaml_downstream.lean})))
+  (run
+   lean
+   -DautoImplicit=false
+   -o
+   %{targets}
+   %{dep:extracted_oxcaml_downstream.lean})))
 
 (rule
  (alias downstream)
@@ -163,7 +186,7 @@
   extracted_oxcaml_even.olean
   extracted_oxcaml_downstream.olean
   Downstream.lean
-  (glob_files ../../../tools/oxiclean/lean/Oxiclean/*.olean))
+  (glob_files ../../../tools/lox/lean/Lox/*.olean))
  (action
   (progn
    (diff downstream.impl.json.expected downstream.impl.json)

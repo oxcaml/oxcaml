@@ -1,8 +1,8 @@
 import extracted_oxcaml_even
-import Oxiclean.SemanticTypes
-open Oxiclean.SemanticTypes
-open Oxiclean.Model
-open Oxiclean.Reduction
+import Lox.SemanticTypes
+open Lox.SemanticTypes
+open Lox.Model
+open Lox.Reduction
 
 abbrev expectedInterface : ModuleType Parametric :=
   let int : ValType Parametric := .constr (.predef .int) []
@@ -36,9 +36,9 @@ abbrev expectedImplementation : Expr :=
 
 abbrev expectedDependencies : List (ModuleType Parametric) := []
 
-example : Oxiclean.Extracted.Even.dependencies = expectedDependencies := by rfl
-example : Oxiclean.Extracted.Even.interface = expectedInterface := by rfl
-example : Oxiclean.Extracted.Even.implementation = expectedImplementation := by rfl
+example : Lox.Extracted.Even.dependencies = expectedDependencies := by rfl
+example : Lox.Extracted.Even.interface = expectedInterface := by rfl
+example : Lox.Extracted.Even.implementation = expectedImplementation := by rfl
 
 def evenImmediates : PER Value :=
   PER.refinedImmediate (fun bits : BitVec 63 => bits[0] = false)
@@ -56,14 +56,14 @@ abbrev refinedInterface : ModuleType SemanticTypeConstructor :=
 
 example
     : refinedInterface.validWrtExtraction
-        Oxiclean.Extracted.Even.interface := by simp
+        Lox.Extracted.Even.interface := by simp
 
 @[simp]
 abbrev expectedRelation {Step} [S : StepRelation Step] : PER Value :=
   PER.forAllWhere
     (List.forAllPairs
       SemanticModuleInContext.refines
-      Oxiclean.Extracted.Even.dependencies)
+      Lox.Extracted.Even.dependencies)
     fun _ =>
       PER.moduleRuntimeBlock
         (PER.cons
@@ -73,7 +73,7 @@ abbrev expectedRelation {Step} [S : StepRelation Step] : PER Value :=
             PER.emptyList))
 
 abbrev actualRelation {Step} [S : StepRelation Step] : PER Value :=
-  @refinedInterface.structuralRelation! Step S Oxiclean.Extracted.Even.dependencies
+  @refinedInterface.structuralRelation! Step S Lox.Extracted.Even.dependencies
 
 example {Step} [S : StepRelation Step]
     : @actualRelation Step S = @expectedRelation Step S := by simp; rfl
@@ -115,7 +115,7 @@ abbrev expectedValue : Value :=
                     contents := BlockContents.closure (Expr.var 0) })] })
 
 theorem implementationReducesToValue {Step} [S : StepRelation Step]
-    : Reduce Step Oxiclean.Extracted.Even.implementation expectedValue := by
+    : Reduce Step Lox.Extracted.Even.implementation expectedValue := by
   simp
   apply Reduce.step; apply S.letBinding; apply S.function
   apply Reduce.step; apply S.letBindingValue; simp
@@ -154,7 +154,7 @@ theorem ifInputRelationIsEqualityThenDiagonalSufficesForExtensionality {Step}
   exact .extensionality atLeastAsDefined atLeastAsDefined
 
 example
-    : Oxiclean.Extracted.Even.implementation.wellTyped @expectedRelation := by
+    : Lox.Extracted.Even.implementation.wellTyped @expectedRelation := by
   intro Step S v reduction
   obtain ⟨⟩ := @S.deterministic _ _ reduction _ implementationReducesToValue
   intro dependencies allDependenciesAreValid

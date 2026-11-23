@@ -1,4 +1,4 @@
-namespace Oxiclean.Model
+namespace Lox.Model
 
 inductive PredefinedType : Type where
   | bool
@@ -229,4 +229,4 @@ attribute [pp_nodot]
   Expr.val Expr.var
   -- Please keep this up to date when adding new constructors!
 
-end Oxiclean.Model
+end Lox.Model
