@@ -184,6 +184,10 @@ let add_ccobjs t origin (l : Cmx_format.library_infos) =
     in
     t.lib_ccopts <- List.map replace_origin l.lib_ccopts @ t.lib_ccopts)
 
+let clear_ccobjs t =
+  t.lib_ccobjs <- [];
+  t.lib_ccopts <- []
+
 let is_required t name =
   try
     ignore (Hashtbl.find t.missing_globals name);

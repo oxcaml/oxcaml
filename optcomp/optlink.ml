@@ -342,6 +342,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let link_shared ~ppf_dump linkenv objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
+        (* [linkenv] may have been used for another link, as in the native
+           toplevel. The C objects and options recorded then were added to
+           [Clflags] then, unless their file was refused: they must not be added
+           below. *)
+        Linkenv.clear_ccobjs linkenv;
         let genfns = Generic_fns.Tbl.make () in
         let _full_paths, ml_objfiles, units_tolink, _ =
           List.fold_right
