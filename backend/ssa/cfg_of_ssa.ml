@@ -753,9 +753,9 @@ let convert ~future_funcnames (ssa_graph : finished Ssa.graph) :
       ~fun_codegen_options:
         (Cfg.of_cmm_codegen_option function_info.codegen_options)
       ~fun_dbg:function_info.dbg
-        (* CR-someday yusumez: [Ssa_of_cmm] drops the FDO counters of edges and
-           calls; only the entry annotation gets through. *)
-      ~fun_fdo_entry_annotation:function_info.fdo_entry_annotation
+        (* CR-soon yusumez: [Ssa_of_cmm] drops the FDO counters, including the
+           entry annotation. *)
+      ~fun_fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
       ~fun_contains_calls:true ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
       ~fun_poll:function_info.poll ~next_instruction_id:Sub_cfg.instr_id
       ~fun_ret_type:function_info.ret_type

@@ -64,9 +64,6 @@ module Reason : sig
             miss the executions of that predecessor. *)
     | Cfg_blocks_merged
         (** The counters of a block that is merged into an identical one. *)
-    | Not_carried_through_ssa
-        (** The counters of the edges and calls of a function compiled through
-            SSA, which does not carry them. *)
 
   val to_string : t -> string
 end

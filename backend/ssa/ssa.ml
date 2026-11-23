@@ -111,8 +111,7 @@ module Function_info = struct
       codegen_options : Cmm.codegen_option list;
       dbg : Debuginfo.t;
       poll : Lambda.poll_attribute;
-      ret_type : Cmm.machtype;
-      fdo_entry_annotation : Fdo_annotation.With_body_hash.t
+      ret_type : Cmm.machtype
     }
 
   let flattened_parameters function_info =
