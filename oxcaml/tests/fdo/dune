@@ -95,6 +95,29 @@
  (action
   (diff simplify_terminator_counters.output simplify_terminator_counters.output.corrected)))
 
+; The counters of the blocks that [Cfg_merge_blocks] merges.
+
+(executable
+ (name merge_blocks_counters)
+ (modules merge_blocks_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   merge_blocks_counters.output.corrected
+   (run ./merge_blocks_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps merge_blocks_counters.output merge_blocks_counters.output.corrected)
+ (action
+  (diff merge_blocks_counters.output merge_blocks_counters.output.corrected)))
+
 ; Extracting the FDO annotations from fexpr dumps.
 
 (executable
