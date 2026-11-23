@@ -2210,7 +2210,7 @@ let add_module_variables env module_variables =
     end
   ) env module_variables_as_list
 
-let enter_variable ?(is_module=false) ?(pv_kind=Std_var) tps loc name mode
+let enter_variable ?(is_module=false) ~pv_kind tps loc name mode
     ?(lpoly=Lpoly.determined [])
     ~kind ty attrs sort =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
@@ -4081,8 +4081,8 @@ and type_pat_aux
         | Some env_locality_mode ->
           let lpoly = Lpoly.pending ~loc in
           let id, uid =
-            enter_variable ~lpoly tps loc name var_mode ~kind ty
-              sp.ppat_attributes sort
+            enter_variable ~pv_kind:Std_var ~lpoly tps loc name var_mode
+              ~kind ty sp.ppat_attributes sort
           in
           Tpat_fun_layout
             { id; name; uid; sort;
@@ -4092,8 +4092,8 @@ and type_pat_aux
         | None ->
           let lpoly = Lpoly.determined [] in
           let id, uid =
-            enter_variable ~lpoly tps loc name var_mode ~kind ty
-              sp.ppat_attributes sort
+            enter_variable ~pv_kind:Std_var ~lpoly tps loc name var_mode
+              ~kind ty sp.ppat_attributes sort
           in
           Tpat_var { id; name; uid; sort; mode }
       in
@@ -4132,8 +4132,8 @@ and type_pat_aux
              the comment on [may_contain_modules]. *)
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
-            enter_variable tps loc v pat_mode.mode t ~is_module:true
-              ~kind:(Val_reg sort) sp.ppat_attributes sort
+            enter_variable ~pv_kind:Std_var tps loc v pat_mode.mode t
+              ~is_module:true ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var { id; name = v; uid; sort;
