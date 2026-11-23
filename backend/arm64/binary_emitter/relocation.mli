@@ -42,7 +42,12 @@ module Kind : sig
     | R_AARCH64_ADR_GOT_PAGE of target_with_addend
     | R_AARCH64_LD64_GOT_LO12_NC of target_with_addend
     | R_AARCH64_ADD_ABS_LO12_NC of target_with_addend
+    (* Low 12 bits of the address in the immediate of a load or store of 16, 32,
+       64 or 128 bits, which the instruction scales by the size of the access *)
+    | R_AARCH64_LDST16_ABS_LO12_NC of target_with_addend
+    | R_AARCH64_LDST32_ABS_LO12_NC of target_with_addend
     | R_AARCH64_LDST64_ABS_LO12_NC of target_with_addend
+    | R_AARCH64_LDST128_ABS_LO12_NC of target_with_addend
     | R_AARCH64_CALL26 of target_with_addend
     | R_AARCH64_JUMP26 of target_with_addend
     | R_AARCH64_ABS64 of target_with_addend

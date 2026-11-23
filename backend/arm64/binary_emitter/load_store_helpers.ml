@@ -154,6 +154,20 @@ let encode_load_store_pair_signed_offset ~opc ~v ~l ~imm7 ~rt2 ~rn ~rt =
   let result = logor result (of_int rt) in
   result
 
+(* The relocation for the low 12 bits of an address in the immediate of a load
+   or store of [scale] bytes. The instruction scales its immediate by the size
+   of the access, so the relocation depends on that size. A byte access is not
+   scaled: its immediate is relocated like that of ADD. *)
+let ldst_abs_lo12_reloc ~scale (r : Relocation.Kind.target_with_addend) :
+    Relocation.Kind.t =
+  match scale with
+  | 1 -> R_AARCH64_ADD_ABS_LO12_NC r
+  | 2 -> R_AARCH64_LDST16_ABS_LO12_NC r
+  | 4 -> R_AARCH64_LDST32_ABS_LO12_NC r
+  | 8 -> R_AARCH64_LDST64_ABS_LO12_NC r
+  | 16 -> R_AARCH64_LDST128_ABS_LO12_NC r
+  | _ -> Misc.fatal_errorf "No relocation for a load or store of %d bytes" scale
+
 (* Generalized load/store encoding for byte/halfword/word/doubleword operations.
    size: 00=byte, 01=halfword, 10=word, 11=doubleword opc encodes the operation
    (load/store and signed extension) *)
@@ -247,12 +261,7 @@ let encode_load_store_gp_sized : type a.
         let r = { Relocation.Kind.target = sym.target; addend = sym.offset } in
         match reloc with
         | GOT_PAGE_OFF | GOT_LOWER_TWELVE -> R_AARCH64_LD64_GOT_LO12_NC r
-        | PAGE_OFF | LOWER_TWELVE ->
-          (* Use LDST64 relocation for 64-bit load/store instructions. The
-             immediate encoding differs from ADD: it's scaled by 8. *)
-          if size = 0b11 (* XXX should this ever be an "ADD" one? *)
-          then R_AARCH64_LDST64_ABS_LO12_NC r
-          else R_AARCH64_ADD_ABS_LO12_NC r
+        | PAGE_OFF | LOWER_TWELVE -> ldst_abs_lo12_reloc ~scale:(1 lsl size) r
       in
       Section_state.add_relocation_at_current_offset state ~reloc_kind;
       let rn = Reg.gp_encoding rn in
@@ -541,12 +550,7 @@ let encode_load_store_simd_fp : type s.
         let r = { Relocation.Kind.target = sym.target; addend = sym.offset } in
         match reloc with
         | GOT_PAGE_OFF | GOT_LOWER_TWELVE -> R_AARCH64_LD64_GOT_LO12_NC r
-        | PAGE_OFF | LOWER_TWELVE ->
-          (* Use LDST64 relocation for 64-bit load/store instructions. The
-             immediate encoding differs from ADD: it's scaled by 8. *)
-          if size = 0b11
-          then R_AARCH64_LDST64_ABS_LO12_NC r
-          else R_AARCH64_ADD_ABS_LO12_NC r
+        | PAGE_OFF | LOWER_TWELVE -> ldst_abs_lo12_reloc ~scale r
       in
       Section_state.add_relocation_at_current_offset state ~reloc_kind;
       let rn = Reg.gp_encoding rn in
