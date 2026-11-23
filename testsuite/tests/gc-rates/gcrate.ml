@@ -473,15 +473,28 @@ let run_workload () =
 (* ---------------- watcher ---------------- *)
 
 (* Attach to the ring of [pid] under [dir] and poll it until
-   [still_running] turns false, then drain. *)
+   [still_running] turns false, then drain.
+
+   The target may still be creating its ring: the file can be missing, or
+   present but with its metadata not yet written, which a cursor reports
+   as a corrupt stream on the first poll.  Back off and reopen in both
+   cases. *)
 let watch_target dir pid ~still_running =
   let rec attach tries =
+    let retry () = Unix.sleepf 0.05; attach (tries - 1) in
     match RE.create_cursor (Some (dir, pid)) with
-    | c -> c
-    | exception _ when tries > 0 -> Unix.sleepf 0.05; attach (tries - 1)
+    | exception _ when tries > 0 -> retry ()
+    | c ->
+      cursor := Some c;
+      match poll () with
+      | () -> c
+      | exception Failure msg
+        when tries > 0 && msg = "Runtime_events: corrupt stream" ->
+        cursor := None;
+        RE.free_cursor c;
+        retry ()
   in
   let c = attach 100 in
-  cursor := Some c;
   let rec loop () =
     poll ();
     if still_running () then begin Unix.sleepf 0.02; loop () end
