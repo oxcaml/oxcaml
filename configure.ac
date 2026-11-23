@@ -3568,6 +3568,83 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_VPCLMULQDQ]) has_vpclmulqdq=yes, [])
 
+AC_SUBST([has_avx512vbmi])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512vbmi")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512VBMI]) has_avx512vbmi=yes, [])
+
+AC_SUBST([has_avx512vbmi2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512vbmi2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512VBMI2]) has_avx512vbmi2=yes, [])
+
+AC_SUBST([has_vaes])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
+int main(void) {
+  unsigned int eax, ebx, ecx, edx;
+  __builtin_cpu_init ();
+  // Old versions of gcc don't accept "vaes" in __builtin_cpu_supports
+  if (__builtin_cpu_supports("avx")
+      && __get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx)
+      && (ecx & (1u << 9))) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_VAES]) has_vaes=yes, [])
+
+AC_SUBST([has_avx512bitalg])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512bitalg")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512BITALG]) has_avx512bitalg=yes, [])
+
+AC_SUBST([has_avx512vpopcntdq])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512vpopcntdq")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512VPOPCNTDQ]) has_avx512vpopcntdq=yes, [])
+
+AC_SUBST([has_avx512ifma])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512ifma")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512IFMA]) has_avx512ifma=yes, [])
+
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
 

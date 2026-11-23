@@ -158,6 +158,18 @@ let has_avx512bf16 = "@has_avx512bf16@" = "yes"
 
 let has_vpclmulqdq = "@has_vpclmulqdq@" = "yes"
 
+let has_avx512vbmi = "@has_avx512vbmi@" = "yes"
+
+let has_avx512vbmi2 = "@has_avx512vbmi2@" = "yes"
+
+let has_vaes = "@has_vaes@" = "yes"
+
+let has_avx512bitalg = "@has_avx512bitalg@" = "yes"
+
+let has_avx512vpopcntdq = "@has_avx512vpopcntdq@" = "yes"
+
+let has_avx512ifma = "@has_avx512ifma@" = "yes"
+
 let as_compress_debug_sections_flag = {@QS@|@as_compress_debug_sections_flag@|@QS@}
 let cc_compress_debug_sections_flag = {@QS@|@cc_compress_debug_sections_flag@|@QS@}
 let objcopy_compress_debug_sections_flag = {@QS@|@objcopy_compress_debug_sections_flag@|@QS@}
