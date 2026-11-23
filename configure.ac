@@ -3539,6 +3539,23 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_AVX512VL]) has_avx512vl=yes, [])
 
+AC_SUBST([has_avx512bf16])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
+int main(void) {
+  unsigned int eax, ebx, ecx, edx;
+  __builtin_cpu_init ();
+  // Old versions of gcc don't accept "avx512bf16" in __builtin_cpu_supports
+  if (__builtin_cpu_supports("avx512f")
+      && __get_cpuid_count(7, 1, &eax, &ebx, &ecx, &edx)
+      && (eax & (1u << 5))) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512BF16]) has_avx512bf16=yes, [])
+
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
 

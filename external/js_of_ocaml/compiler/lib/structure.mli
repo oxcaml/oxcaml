@@ -13,7 +13,18 @@ val is_forward : t -> Addr.t -> Addr.t -> bool
 
 val build_graph : block Addr.Map.t -> Addr.t -> t
 
+val control_flow_graph : block Addr.Map.t -> Addr.t -> t
+(** The control flow graph of a function, without the edges [build_graph] adds to
+    limit the scope of loops and exception handlers *)
+
 val dominator_tree : t -> graph
+
+val immediate_dominators : t -> Addr.t Addr.Hashtbl.t
+(** The immediate dominator of each block, except the entry block *)
+
+val dominance_frontier : t -> Addr.t Addr.Hashtbl.t -> graph
+(** [dominance_frontier g idom] computes the dominance frontier of each block, given
+    the immediate dominators [idom] of graph [g] *)
 
 val is_merge_node : t -> Addr.t -> bool
 

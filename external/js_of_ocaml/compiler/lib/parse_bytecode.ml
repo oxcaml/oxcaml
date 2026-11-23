@@ -455,6 +455,26 @@ module Hints = struct
     | Some (Hint_ccall h) -> Some h
     | _ -> None
 
+  let find_immediate t pc =
+    List.exists
+      ~f:(fun (h : Optimization_hint.t) ->
+        match h with
+        | Hint_immediate -> true
+        | _ -> false)
+      (Int.Hashtbl.find_all t.hints pc)
+
+  let find_variant t pc =
+    List.exists
+      ~f:(fun (h : Optimization_hint.t) ->
+        match h with
+        | Hint_variant -> true
+        | _ -> false)
+      (Int.Hashtbl.find_all t.hints pc)
+
+  (* The kind of the value read by the instruction at [pc] *)
+  let field_type t pc : Code.field_type =
+    if find_immediate t pc then Immediate else Non_float
+
   let find_closures_opt t pc =
     match Int.Hashtbl.find_opt t.hints pc with
     | Some (Hint_closures l) -> Some l
@@ -1652,7 +1672,11 @@ and compile infos pc state (instrs : instr list) =
         let y, state = State.fresh_var state in
         if debug_parser () then Format.printf "%a = %a[%d]@." Var.print y Var.print x j;
         Shape.State.propagate x j y;
-        compile infos (pc + 3) state (Let (y, Field (x, j, Non_float)) :: instrs)
+        compile
+          infos
+          (pc + 3)
+          state
+          (Let (y, Field (x, j, Hints.field_type infos.hints pc)) :: instrs)
     | PUSHGETGLOBALFIELD ->
         let state = State.push state in
 
@@ -1662,7 +1686,11 @@ and compile infos pc state (instrs : instr list) =
         let y, state = State.fresh_var state in
         if debug_parser () then Format.printf "%a = %a[%d]@." Var.print y Var.print x j;
         Shape.State.propagate x j y;
-        compile infos (pc + 3) state (Let (y, Field (x, j, Non_float)) :: instrs)
+        compile
+          infos
+          (pc + 3)
+          state
+          (Let (y, Field (x, j, Hints.field_type infos.hints pc)) :: instrs)
     | SETGLOBAL ->
         let i = getu code (pc + 1) in
         State.size_globals state (i + 1);
@@ -1802,28 +1830,44 @@ and compile infos pc state (instrs : instr list) =
 
         if debug_parser () then Format.printf "%a = %a[0]@." Var.print x Var.print y;
         Shape.State.propagate y 0 x;
-        compile infos (pc + 1) state (Let (x, Field (y, 0, Non_float)) :: instrs)
+        compile
+          infos
+          (pc + 1)
+          state
+          (Let (x, Field (y, 0, Hints.field_type infos.hints pc)) :: instrs)
     | GETFIELD1 ->
         let y = State.accu state in
         let x, state = State.fresh_var state in
 
         if debug_parser () then Format.printf "%a = %a[1]@." Var.print x Var.print y;
         Shape.State.propagate y 1 x;
-        compile infos (pc + 1) state (Let (x, Field (y, 1, Non_float)) :: instrs)
+        compile
+          infos
+          (pc + 1)
+          state
+          (Let (x, Field (y, 1, Hints.field_type infos.hints pc)) :: instrs)
     | GETFIELD2 ->
         let y = State.accu state in
         let x, state = State.fresh_var state in
 
         if debug_parser () then Format.printf "%a = %a[2]@." Var.print x Var.print y;
         Shape.State.propagate y 2 x;
-        compile infos (pc + 1) state (Let (x, Field (y, 2, Non_float)) :: instrs)
+        compile
+          infos
+          (pc + 1)
+          state
+          (Let (x, Field (y, 2, Hints.field_type infos.hints pc)) :: instrs)
     | GETFIELD3 ->
         let y = State.accu state in
         let x, state = State.fresh_var state in
 
         if debug_parser () then Format.printf "%a = %a[3]@." Var.print x Var.print y;
         Shape.State.propagate y 3 x;
-        compile infos (pc + 1) state (Let (x, Field (y, 3, Non_float)) :: instrs)
+        compile
+          infos
+          (pc + 1)
+          state
+          (Let (x, Field (y, 3, Hints.field_type infos.hints pc)) :: instrs)
     | GETFIELD ->
         let y = State.accu state in
         let n = getu code (pc + 1) in
@@ -1831,7 +1875,11 @@ and compile infos pc state (instrs : instr list) =
 
         if debug_parser () then Format.printf "%a = %a[%d]@." Var.print x Var.print y n;
         Shape.State.propagate y n x;
-        compile infos (pc + 2) state (Let (x, Field (y, n, Non_float)) :: instrs)
+        compile
+          infos
+          (pc + 2)
+          state
+          (Let (x, Field (y, n, Hints.field_type infos.hints pc)) :: instrs)
     | GETFLOATFIELD ->
         let y = State.accu state in
         let n = getu code (pc + 1) in
@@ -1937,7 +1985,8 @@ and compile infos pc state (instrs : instr list) =
           infos
           (pc + 1)
           (State.pop 1 state)
-          (Let (x, Prim (Array_get, [ Pv y; Pv z ])) :: instrs)
+          (Let (x, Prim (Array_get (Hints.field_type infos.hints pc), [ Pv y; Pv z ]))
+          :: instrs)
     | SETVECTITEM ->
         if debug_parser ()
         then
@@ -2072,7 +2121,11 @@ and compile infos pc state (instrs : instr list) =
                   !compiled_blocks
             in
             let isint_var = Var.fresh () in
-            let instrs = Let (isint_var, Prim (IsInt, [ Pv x ])) :: instrs in
+            (* A switch on both constant and non-constant constructors
+               is a match on a value of a variant type *)
+            let instrs =
+              Let (isint_var, Prim (IsInt { variant_only = true }, [ Pv x ])) :: instrs
+            in
             instrs, Cond (isint_var, (isint_branch, []), (isblock_branch, [])), state)
     | BOOLNOT ->
         let y = State.accu state in
@@ -2651,7 +2704,12 @@ and compile infos pc state (instrs : instr list) =
         let x, state = State.fresh_var state in
 
         if debug_parser () then Format.printf "%a = !%a@." Var.print x Var.print y;
-        compile infos (pc + 1) state (Let (x, Prim (IsInt, [ Pv y ])) :: instrs)
+        let variant_only = Hints.find_variant infos.hints pc in
+        compile
+          infos
+          (pc + 1)
+          state
+          (Let (x, Prim (IsInt { variant_only }, [ Pv y ])) :: instrs)
     | BEQ ->
         let n = gets32 code (pc + 1) in
         let offset = gets code (pc + 2) in
@@ -2816,7 +2874,7 @@ and compile infos pc state (instrs : instr list) =
           infos
           (pc + 1)
           state
-          (Let (m, Prim (Array_get, [ Pv meths; Pv lab ]))
+          (Let (m, Prim (Array_get Non_float, [ Pv meths; Pv lab ]))
           :: Let (meths, Field (obj, 0, Non_float))
           :: instrs)
     | STOP -> instrs, Stop, state
@@ -3651,12 +3709,68 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
   Code.invariant p.code;
   p
 
+let register_predefined_exceptions () =
+  let open Code in
+  List.map predefined_exceptions ~f:(fun (index, name) ->
+      assert (String.is_valid_utf_8 name);
+      let exn = Var.fresh () in
+      let v_name = Var.fresh () in
+      let v_index = Var.fresh () in
+      let by_index =
+        match Config.target () with
+        | `Wasm -> Some index
+        | `JavaScript -> None
+      in
+      [ Let (v_name, Constant (String name))
+      ; Let
+          ( v_index
+          , Constant
+              (Int
+                 ((* Predefined exceptions are registered in
+                     Symtable.init with [-index - 1] *)
+                  Targetint.of_int_exn
+                    (-index - 1))) )
+      ; Let (exn, Block (248, [| v_name; v_index |], NotArray, Immutable))
+      ]
+      @ register_global_instrs exn ~name:(Glob_predef (Predef name)) ?by_index [])
+  |> List.concat
+
 type jsir_unit =
   { name : string
   ; target : Code.jsir_target
   ; program : Code.program
   ; info : Unit_info.t
+  ; whole_program : bool
   }
+
+(* The OxCaml JSIR backend records source files as the compiler does in debug
+   information, rewritten with [BUILD_PATH_PREFIX_MAP]. *)
+let restore_source_paths (program : Code.program) =
+  match Build_path_prefix_map.get_build_path_prefix_map () with
+  | None -> program
+  | Some map ->
+      let map = Build_path_prefix_map.flip map in
+      let restore (pi : Parse_info.t) =
+        match pi.src with
+        | Some src when not (Filename.is_relative src) ->
+            { pi with src = Some (Build_path_prefix_map.rewrite map src) }
+        | Some _ | None -> pi
+      in
+      let blocks =
+        Addr.Map.map
+          (fun block ->
+            let body =
+              List.map block.body ~f:(function
+                | Event pi -> Event (restore pi)
+                | Let (x, Closure (params, cont, (hint, Some pi))) ->
+                    Let (x, Closure (params, cont, (hint, Some (restore pi))))
+                | (Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _) as instr
+                  -> instr)
+            in
+            { block with body })
+          program.blocks
+      in
+      { program with blocks }
 
 let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic =
   let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
@@ -3670,9 +3784,13 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
   let { Code.target
       ; program
       ; last_var
+      ; var_names
       ; imported_compilation_units
       ; exported_compilation_unit
       ; force_link
+      ; whole_program
+      ; symbol_imports = _
+      ; symbol_exports = _
       } =
     (Marshal.from_channel ic : Code.jsir_file)
   in
@@ -3680,15 +3798,23 @@ let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic 
      This means that it is enough for fresh variables to be larger than any
      variable of any unit. *)
   Code.Var.set_last last_var;
+  List.iter var_names ~f:(fun (var, name) -> Code.Variable_name.set var name);
+  let program = restore_source_paths (Code.Marshalable_program.to_program program) in
+  let program =
+    if whole_program
+    then Code.prepend program (register_predefined_exceptions ())
+    else program
+  in
   let unit =
     { name = exported_compilation_unit
     ; target
-    ; program = Code.Marshalable_program.to_program program
+    ; program
     ; info =
         Unit_info.of_compilation_units
           ~exported:exported_compilation_unit
           ~imported:imported_compilation_units
           ~force_link
+    ; whole_program
     }
   in
   let program_name : Code.jsir_target -> string = function
@@ -3757,32 +3883,7 @@ let from_channel ic =
 
 let predefined_exceptions () =
   (* Register predefined exceptions in case of separate compilation *)
-  let body =
-    let open Code in
-    List.map predefined_exceptions ~f:(fun (index, name) ->
-        assert (String.is_valid_utf_8 name);
-        let exn = Var.fresh () in
-        let v_name = Var.fresh () in
-        let v_index = Var.fresh () in
-        let by_index =
-          match Config.target () with
-          | `Wasm -> Some index
-          | `JavaScript -> None
-        in
-        [ Let (v_name, Constant (String name))
-        ; Let
-            ( v_index
-            , Constant
-                (Int
-                   ((* Predefined exceptions are registered in
-                       Symtable.init with [-index - 1] *)
-                    Targetint.of_int_exn
-                      (-index - 1))) )
-        ; Let (exn, Block (248, [| v_name; v_index |], NotArray, Immutable))
-        ]
-        @ register_global_instrs exn ~name:(Glob_predef (Predef name)) ?by_index [])
-    |> List.concat
-  in
+  let body = register_predefined_exceptions () in
   let block = { params = []; body; branch = Stop } in
   let unit_info =
     { Unit_info.provides = Global_name.Compunit_set.empty

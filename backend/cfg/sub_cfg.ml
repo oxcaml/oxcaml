@@ -158,14 +158,112 @@ let join_tail ~from ~to_ =
   List.iter (fun from -> transfer ~from ~to_) from;
   add_never_block to_ ~label:(Cmm.new_label ())
 
-let update_exit_terminator ?arg sub_cfg desc ~phantom_available_before =
+let update_exit_terminator sub_cfg desc ~arg ~dbg ~phantom_available_before =
   sub_cfg.exit.terminator
     <- { sub_cfg.exit.terminator with
          desc;
          id = next_instr_id ();
-         arg = Option.value arg ~default:sub_cfg.exit.terminator.arg;
+         arg;
+         dbg;
          phantom_available_before
        }
+
+(* The debuginfo of the instructions accepted by the two functions below is only
+   used to describe code locations. That of other instructions can also end up
+   in frametables (and thus in backtraces), or in the messages of checks such as
+   [@zero_alloc] and [@poll error]: [set_block_entry_debuginfo] must not give
+   them one.
+
+   The first group is also restricted to what selection emits without a Cmm term
+   to take a debuginfo from, together with constants, which stand for a whole
+   arm such as [then 0]. Moves join the results of arms; trap instructions are
+   grouped with them because they open and close the scope of a handler without
+   computing anything, and do not appear in frametables. [Csel], by contrast,
+   computes a value for a Cmm operation: selection gives it the debuginfo of
+   that operation, as for arithmetic, so one without debuginfo is left that way.
+
+   Among terminators, [Tailcall_self] is implemented as a jump, but is an
+   application in the source: like the other calls it has the debuginfo of its
+   Cmm term and must not receive that of an arm. *)
+
+let basic_only_moves_values (desc : Cfg.basic) =
+  match desc with
+  | Op
+      ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Const_mask _ )
+  | Pushtrap _ | Poptrap _ ->
+    true
+  | Op
+      ( Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+      | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+      | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Thread_self_id
+      | Poll | Pause | Alloc _ | Trace_pc_guard_gate | Trace_pc_guard _ )
+  | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
+    false
+
+let terminator_only_transfers_control (desc : Cfg.terminator) =
+  match desc with
+  | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
+  | Switch _ | Return ->
+    true
+  | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _
+  | Prim _ | Invalid _ ->
+    false
+
+(* Returns [false] if an instruction having a debuginfo was found. *)
+let set_leading_debuginfo (block : Cfg.basic_block) dbg =
+  let has_dbg (instr : _ Cfg.instruction) = not (Debuginfo.is_none instr.dbg) in
+  let rec set_body cell =
+    match cell with
+    | None -> true
+    | Some cell ->
+      let instr : Cfg.basic Cfg.instruction = DLL.value cell in
+      if has_dbg instr
+      then false
+      else (
+        if basic_only_moves_values instr.desc then instr.dbg <- dbg;
+        set_body (DLL.next cell))
+  in
+  if set_body (DLL.hd_cell block.body) && not (has_dbg block.terminator)
+  then (
+    if terminator_only_transfers_control block.terminator.desc
+    then block.terminator.dbg <- dbg;
+    true)
+  else false
+
+let set_block_entry_debuginfo block dbg =
+  if not (Debuginfo.is_none dbg)
+  then ignore (set_leading_debuginfo block dbg : bool)
+
+let set_entry_debuginfo sub_cfg dbg =
+  let rec set_block cell =
+    match cell with
+    | None -> ()
+    | Some cell -> (
+      let block : Cfg.basic_block = DLL.value cell in
+      let is_empty = DLL.is_empty block.body in
+      if set_leading_debuginfo block dbg
+      then
+        (* The entry block is empty when the code starts in the next one. *)
+        let next = DLL.next cell in
+        let falls_through_to_next label =
+          match next with
+          | None -> false
+          | Some next ->
+            let next : Cfg.basic_block = DLL.value next in
+            Label.equal label next.start
+        in
+        match block.terminator.desc with
+        | Always label when is_empty && falls_through_to_next label ->
+          set_block next
+        | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+        | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+        | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+          ())
+  in
+  if not (Debuginfo.is_none dbg) then set_block (DLL.hd_cell sub_cfg.layout)
 
 let mark_as_trap_handler sub_cfg = sub_cfg.entry.is_trap_handler <- true
 

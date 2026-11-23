@@ -311,6 +311,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Opaque as op ->
       Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"
         Operation.dump op
+    | Trace_pc_guard_gate | Trace_pc_guard _ -> Op_other
     | Pause ->
       (* Pause is used to spin on memory locations, so equations over mutable
          loads must not survive it. *)
@@ -350,8 +351,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Const_int _ -> true
     | Move | Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Opaque
-    | Stackoffset _ | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _
-    | Int128op _
+    | Stackoffset _ | Load _ | Store _ | Alloc _ | Poll | Pause
+    | Trace_pc_guard_gate | Trace_pc_guard _ | Intop _ | Int128op _
     | Intop_imm (_, _)
     | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
     | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
@@ -400,7 +401,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Intop_atomic _
          | Floatop (_, _)
          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-         | Specific _ | Name_for_debugger _ | Pause ) as op) -> (
+         | Specific _ | Name_for_debugger _ | Pause | Trace_pc_guard_gate
+         | Trace_pc_guard _ ) as op) -> (
       match class_of_operation op with
       | (Op_pure | Op_load _) as op_class -> (
         let n1, varg = valnum_regs n i.arg in

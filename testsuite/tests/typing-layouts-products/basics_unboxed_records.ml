@@ -192,6 +192,25 @@ type accepted = #{ mutable i : int }
 type accepted = #{ mutable i : int; }
 |}]
 
+let cannot_set (x : accepted) = x.i <- 1
+[%%expect{|
+Line 1, characters 32-40:
+1 | let cannot_set (x : accepted) = x.i <- 1
+                                    ^^^^^^^^
+Error: The unboxed record field "i" is declared mutable,
+       but fields of unboxed records can't be mutated.
+|}]
+
+let cannot_set_inferred x = x.i <- 1
+[%%expect{|
+Line 1, characters 30-31:
+1 | let cannot_set_inferred x = x.i <- 1
+                                  ^
+Error: Unbound record field "i"
+Hint: There is an unboxed record field with this name.
+Only mutable fields of boxed records can be mutated.
+|}]
+
 type atomic_bad = #{ mutable a : int [@atomic] }
 [%%expect{|
 Line 1, characters 21-46:
@@ -593,20 +612,28 @@ and ('a : float64, 'b : immediate, 'ptr) t = #{
 (* We don't yet have syntax for setting an unboxed record field.
    However, the below, using a boxed set field, will never work. *)
 
-type r = #{ i : int }
-let f = #{ i = 1 }
+type immutable_unboxed = #{ i : int }
 [%%expect{|
-type r = #{ i : int; }
-val f : r = #{i = 1}
+type immutable_unboxed = #{ i : int; }
 |}]
 
-let () = f.i <- 2
+let cannot_set (x : immutable_unboxed) = x.i <- 2
 [%%expect{|
-Line 1, characters 9-10:
-1 | let () = f.i <- 2
-             ^
-Error: This expression has type "r",
-       which is an unboxed record rather than a boxed one.
+Line 1, characters 41-49:
+1 | let cannot_set (x : immutable_unboxed) = x.i <- 2
+                                             ^^^^^^^^
+Error: The unboxed record field "i" is not mutable
+Hint: Only mutable fields of boxed records can be mutated.
+|}]
+
+let cannot_set_inferred x = x.i <- 2
+[%%expect{|
+Line 1, characters 30-31:
+1 | let cannot_set_inferred x = x.i <- 2
+                                  ^
+Error: Unbound record field "i"
+Hint: There is an unboxed record field with this name.
+Only mutable fields of boxed records can be mutated.
 |}]
 
 (********************************)

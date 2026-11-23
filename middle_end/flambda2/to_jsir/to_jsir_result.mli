@@ -106,9 +106,10 @@ val import_compilation_unit : t -> Compilation_unit.t -> t
 
 (** Register [var] as the value of [symbol] in the global symbol table, so that
     other compilation units can fetch it, with an [Event] for [loc] before the
-    registration. Does nothing for symbols that no other unit can refer to
-    (those not in [reachable_names]), nor for module symbols, which are fetched
-    with [caml_get_global] instead. *)
+    registration, and record it as an export of the unit. Does nothing for
+    symbols that no other unit can refer to (those not in [reachable_names]).
+    Module symbols are only recorded as exports, as they are fetched with
+    [caml_get_global] instead. *)
 val register_symbol : t -> ?loc:Parse_info.t -> Symbol.t -> Jsir.Var.t -> t
 
 (** The variable holding the value of [symbol], which must be from another
@@ -134,7 +135,15 @@ val add_var_aliases_exn : t -> var_binding list -> t
 
 type program =
   { program : Jsir.program;
-    imported_compilation_units : Compilation_unit.Set.t
+    imported_compilation_units : Compilation_unit.Set.t;
+    symbol_imports : (Jsir.Var.t * Symbol.t) list;
+        (** The variables bound at the start of the entry block to the symbols
+            of other compilation units (excluding predefined exceptions), for
+            the linker to replace with the exporting unit's variables. *)
+    symbol_exports : (Symbol.t * Jsir.Var.t) list
+        (** The symbols of this unit that other compilation units may fetch
+            (including the module symbol), with the variables holding their
+            values. *)
   }
 
 (** Create a [program] with the blocks in the result, including the current

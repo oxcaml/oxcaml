@@ -488,8 +488,8 @@ let enough_arms ~num_arms = function
 let bound_tagged_scrutinee scrutinee dbg =
   bound_prim "tagged_scrutinee" K.value (P.Unary (Tag_immediate, scrutinee)) dbg
 
-let rebuild_mergeable_argument ~machine_width ~scrutinee mergeable_argument k =
-  let dbg = Debuginfo.none in
+let rebuild_mergeable_argument ~machine_width ~scrutinee ~dbg mergeable_argument
+    k =
   match mergeable_argument with
   | Invariant_argument simple -> k simple
   | Affine_argument { kind; offset; slope } -> (
@@ -535,7 +535,7 @@ let rebuild_mergeable_argument ~machine_width ~scrutinee mergeable_argument k =
     let$ tagged_scrutinee = bound_tagged_scrutinee scrutinee dbg in
     let$ not_scrutinee =
       bound_prim "not_scrutinee" K.value
-        (P.Unary (Boolean_not, tagged_scrutinee))
+        (P.Unary (Boolean_not Tagged_bool, tagged_scrutinee))
         dbg
     in
     k not_scrutinee
@@ -544,8 +544,12 @@ let rebuild_mergeable_argument ~machine_width ~scrutinee mergeable_argument k =
     let module ALK = P.Array_load_kind in
     let element_kind = ALK.kind_of_loaded_value array_load_kind in
     let loaded_kind = KS.kind element_kind in
+    (* The table is data, not code: its fields have no debuginfo, so that
+       identical tables built for different switches remain equal as static
+       constants and can be shared. *)
     let$ switch_block =
-      bound_lookup_table "switch_block" ~element_kind ~array_kind simples dbg
+      bound_lookup_table "switch_block" ~element_kind ~array_kind simples
+        Debuginfo.none
     in
     let$ tagged_scrutinee =
       bound_prim "tagged_scrutinee" K.value
@@ -786,7 +790,7 @@ let rebuild_switch
           (RE.create_invalid Zero_switch_arms),
         uacc )
     else
-      let dbg = Debuginfo.none in
+      let dbg = condition_dbg in
       let[@inline] normal_case uacc =
         (* In that case, even though some branches were removed by simplify we
            should not count them in the number of removed operations: these
@@ -823,8 +827,9 @@ let rebuild_switch
               (RE.create_apply_cont ~is_cold apply_cont
               |> RE.notify_removed ~operation:Removed_operations.branch)
           | special_arg :: special_args ->
-            rebuild_mergeable_argument ~machine_width ~scrutinee special_arg
-              (fun arg -> rebuild_merged_switch special_args (arg :: args_rev))
+            rebuild_mergeable_argument ~machine_width ~scrutinee ~dbg
+              special_arg (fun arg ->
+                rebuild_merged_switch special_args (arg :: args_rev))
         in
         run uacc ~shareable_constants ~typing_env_before_switch
           ~cse_before_switch

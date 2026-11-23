@@ -720,6 +720,8 @@ let ocaml_ignored_flags =
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
     "-afl-instrument";
+    "-gated-trace-pc-guard";
+    "-gated-trace-pc-guard-define-gate";
     "-probes";
     "-no-probes";
     "-probes-optimized";
@@ -769,6 +771,8 @@ let ocaml_ignored_flags =
     "-no-manual-module-init";
     "-dfexpr-annot";
     "-dfexpr-annot-after";
+    "-fexpr-print-branch-annotations";
+    "-fexpr-print-fdo-counters";
     "-linscan";
     "-clambda-checks";
     "-dasm-comments";
@@ -795,6 +799,8 @@ let ocaml_ignored_flags =
     "-fno-avx512cd";
     "-favx512dq";
     "-fno-avx512dq";
+    "-favx512bf16";
+    "-fno-avx512bf16";
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
@@ -821,7 +827,9 @@ let ocaml_ignored_flags =
     "-flambda2-simplify-stubs";
     "-stubs-forward-inlining";
     "-no-stubs-forward-inlining";
-    "-djsir"
+    "-djsir";
+    "-link-jsir";
+    "-jsir-inlined-frames"
   ]
 
 let ocaml_ignored_parametrized_flags =

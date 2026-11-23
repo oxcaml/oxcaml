@@ -1222,7 +1222,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Num_conv { src; dst } ->
     let extra, expr = arithmetic_conversion dbg src dst arg in
     extra, res, expr
-  | Boolean_not -> None, res, C.mk_not dbg arg
+  | Boolean_not Tagged_bool -> None, res, C.mk_not dbg arg
+  | Boolean_not Naked_bool -> None, res, C.mk_not_untagged dbg arg
   | Reinterpret_64_bit_word reinterpret ->
     let cmm =
       match reinterpret with

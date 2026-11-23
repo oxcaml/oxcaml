@@ -192,8 +192,11 @@ val mod_int :
 (** unsigned remainder of two register-width integers *)
 val unsigned_mod_int : expression -> expression -> Debuginfo.t -> expression
 
-(** Boolean negation *)
+(** Boolean negation of a tagged boolean *)
 val mk_not : Debuginfo.t -> expression -> expression
+
+(** Boolean negation of an untagged boolean (0 or 1) *)
+val mk_not_untagged : Debuginfo.t -> expression -> expression
 
 (** Conditional selection: [ifso] when [cond] is non-zero, [ifnot] otherwise.
     Both arms are always evaluated. Simplifies away the conditional move when
@@ -724,7 +727,7 @@ val transl_switch_clambda :
   Debuginfo.t ->
   expression ->
   int array ->
-  (expression * Branch_annotations.t) array ->
+  (expression * Debuginfo.t * Branch_annotations.t) array ->
   expression
 
 (** Method call : [send kind met obj args dbg]

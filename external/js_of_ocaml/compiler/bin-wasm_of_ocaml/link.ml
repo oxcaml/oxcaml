@@ -111,9 +111,9 @@ let f
     ; enable_source_maps
     ; mklib
     } =
-  Js_of_ocaml_compiler.Config.set_target `Wasm;
   Jsoo_cmdline.Arg.eval common;
   Js_of_ocaml_compiler.Dune_manifests_reader.set manifests;
+  Js_of_ocaml_compiler.Config.set_target `Wasm;
   Link.link ~output_file ~linkall ~mklib ~enable_source_maps ~embedded_files:[] ~files
 
 let info =

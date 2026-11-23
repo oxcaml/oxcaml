@@ -567,16 +567,20 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         loc_arg loc_res dbg
   in
   let can_raise = Cfg.can_raise_terminator cfg_terminator.desc in
-  { Cfg.start = label_of env block;
-    body;
-    terminator = cfg_terminator;
-    predecessors = Label.Set.empty;
-    stack_offset = Cfg.invalid_stack_offset;
-    exn = None;
-    can_raise;
-    is_trap_handler;
-    cold = Block.cold block
-  }
+  let cfg_block : Cfg.basic_block =
+    { start = label_of env block;
+      body;
+      terminator = cfg_terminator;
+      predecessors = Label.Set.empty;
+      stack_offset = Cfg.invalid_stack_offset;
+      exn = None;
+      can_raise;
+      is_trap_handler;
+      cold = Block.cold block
+    }
+  in
+  Sub_cfg.set_block_entry_debuginfo cfg_block (Block.entry_dbg block);
+  cfg_block
 
 (** Remember comparisons that will be folded into branch terminators. The branch
     terminator consumes the comparison's args directly, so the comparison itself

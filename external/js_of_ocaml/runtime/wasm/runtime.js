@@ -276,7 +276,7 @@
     return caml_alloc_stat(
       large,
       s.dev,
-      s.ino | 0,
+      s.ino,
       kind,
       s.mode & 0o7777,
       s.nlink,
@@ -321,6 +321,13 @@
       // ZZZ not supported in Safari yet
       new WebAssembly.Tag({ parameters: ["externref"], results: [] }),
     identity: (x) => x,
+    number_as_int: (x) =>
+      typeof x === "number" &&
+      Number.isInteger(x) &&
+      x >= -(2 ** 62) &&
+      x < 2 ** 62
+        ? x
+        : Number.NaN,
     from_bool: (x) => !!x,
     get: (x, y) => x[y],
     set: (x, y, z) => (x[y] = z),
@@ -766,6 +773,18 @@
       const vp = virtual_path(p);
       if (virtual_files.has(vp) || virtual_dirs.has(vp)) return 1;
       return fs ? +fs.existsSync(p) : 0;
+    },
+    filepath_exists: (p) => {
+      const vp = virtual_path(p);
+      if (virtual_files.has(vp) || virtual_dirs.has(vp)) return 1;
+      if (!fs) return 0;
+      try {
+        fs.statSync(p);
+        return 1;
+      } catch (e) {
+        if (e.code === "ENOENT" || e.code === "ENOTDIR") return 0;
+        throw e;
+      }
     },
     is_directory: (p) => {
       const vp = virtual_path(p);

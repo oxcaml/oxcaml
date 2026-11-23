@@ -43,6 +43,8 @@ let operation : Operation.t -> int =
   | Alloc _ -> 32
   | Const_mask _ -> 33
   | Thread_self_id -> 34
+  | Trace_pc_guard_gate -> 35
+  | Trace_pc_guard _ -> 36
 
 let basic : Cfg.basic -> int = function
   | Op op -> operation op

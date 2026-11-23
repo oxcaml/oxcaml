@@ -121,12 +121,19 @@ end
 
 type cont = Addr.t * Var.t list
 
+type field_type =
+  | Non_float
+  | Immediate  (** A field known to contain an immediate value *)
+  | Float
+
 type prim =
   | Vectlength of Optimization_hint.array_kind
-  | Array_get
+  | Array_get of field_type  (** [Non_float] or [Immediate], never [Float] *)
   | Extern of string * Optimization_hint.ccall option
   | Not
-  | IsInt
+  | IsInt of { variant_only : bool }
+      (** [variant_only]: the argument is a value of a variant type, whose
+          immediates are constant constructors *)
   | Eq
   | Neq
   | Lt
@@ -189,10 +196,6 @@ type special = Alias_prim of string
 type mutability =
   | Immutable
   | Maybe_mutable
-
-type field_type =
-  | Non_float
-  | Float
 
 type yielding_kind =
   | Unyielding
@@ -262,10 +265,30 @@ module Marshalable_program : sig
   val to_program : t -> program
 end
 
-(** The target a JSIR file (.cmj or .cmw) was produced for. *)
+(** The target a JSIR file (.cm-jsir-js or .cm-jsir-wasm) was produced for. *)
 type jsir_target =
   | Js
   | Wasm
+
+(** The linkage name of a symbol of the OxCaml JSIR backend, which identifies
+    it across compilation units. *)
+module Linkage_name : sig
+  type t
+
+  val of_string : string -> t
+
+  val to_string : t -> string
+
+  module Hashtbl : Hashtbl.S with type key = t
+end
+
+module Variable_name : sig
+  type t
+
+  val of_var : Var.t -> t option
+
+  val set : Var.t -> t -> unit
+end
 
 type jsir_file =
   { target : jsir_target
@@ -274,6 +297,10 @@ type jsir_file =
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so the OxCaml JSIR backend must communicate it to
             [js_of_ocaml] to keep the two in sync. *)
+  ; var_names : (Var.t * Variable_name.t) list
+        (** The names of the variables of [program]. [Var] keeps these in
+            mutable state too, so the OxCaml JSIR backend must communicate them
+            to [js_of_ocaml]. *)
   ; imported_compilation_units : string list
         (** Full paths of the compilation units that must be linked, and
             initialised, before [program]: those whose symbols it fetches from
@@ -285,8 +312,20 @@ type jsir_file =
   ; force_link : bool
         (** Whether the unit was compiled with [-linkall], so must be linked
             even if nothing requires it. Needed to fill in [Unit_info.t]. *)
+  ; whole_program : bool
+        (** Whether [program] is a whole program, which the OxCaml JSIR linker
+            makes from the units of an executable, rather than a compilation
+            unit. *)
+  ; symbol_imports : (Var.t * Linkage_name.t) list
+        (** The variables bound at the start of the entry block of [program]
+            to the symbols of other compilation units. Used by the OxCaml JSIR
+            linker, which replaces them with the exporting unit's variables. *)
+  ; symbol_exports : (Linkage_name.t * Var.t) list
+        (** The symbols of this unit that other compilation units may fetch,
+            with the variables holding their values. Used by the OxCaml JSIR
+            linker. *)
   }
-(** Contents of a JSIR file (.cmj or .cmw) produced by the OxCaml JSIR backend
+(** Contents of a JSIR file (.cm-jsir-js or .cm-jsir-wasm) produced by the OxCaml JSIR backend
     (after the magic number), marshaled. *)
 
 module Print : sig

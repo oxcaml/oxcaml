@@ -68,3 +68,17 @@ val sum_list : t list -> t
 val is_uniform : t list -> bool
 (** [is_uniform l] is [true] iff all elements in the list that are not [cold]
 have the same relative likelihood. *)
+
+(** The scale at which a set of likelihoods (e.g. those of the arms of a
+    switch) is printed. *)
+type printing_scale
+
+val printing_scale : t list -> printing_scale
+
+(** Whether printing [t] at the scale says anything: it is cold, or the
+    likelihoods of the scale are not uniform. *)
+val worth_printing : printing_scale -> t -> bool
+
+(** Prints [cold], or the weight of [t] relative to the likelihoods of the
+    scale. *)
+val print : printing_scale -> Format.formatter -> t -> unit

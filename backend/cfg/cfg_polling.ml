@@ -201,10 +201,10 @@ module Polls_before_prtc_transfer = struct
       Ok dom
     | Op
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Domain_index | Thread_self_id | Pause | Const_int _
-        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
-        | Load _
+        | Tls_get | Domain_index | Thread_self_id | Pause | Trace_pc_guard_gate
+        | Trace_pc_guard _ | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Const_mask _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -340,12 +340,16 @@ let instr_cfg_with_layout :
              from block %a to block %a: %s"
             Label.format src Label.format dst reason
         in
+        (* The poll is not given the debuginfo of the terminator: whether the
+           terminator has one depends on the optimisation mode, and the message
+           for [@poll error] would vary accordingly. *)
         let poll =
           { after.terminator with
             Cfg.id = next_instruction_id ();
             Cfg.desc = Cfg.Op Poll;
             Cfg.arg = [||];
-            Cfg.res = [||]
+            Cfg.res = [||];
+            Cfg.dbg = Debuginfo.none
           }
         in
         (* The arguments of a call are moved into their calling-convention
@@ -408,7 +412,7 @@ let add_poll_or_alloc_basic :
     | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
     | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
     | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
-    | Thread_self_id | Pause ->
+    | Thread_self_id | Pause | Trace_pc_guard_gate | Trace_pc_guard _ ->
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
