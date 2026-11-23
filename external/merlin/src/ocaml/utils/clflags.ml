@@ -1,6 +1,6 @@
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type shape_format = Old_merlin | Debugging_shapes
-type visible_include =
+type include_dir =
   { path : string;
     cmx_guaranteed : bool;
   }
@@ -27,7 +27,7 @@ let syntax_quotations   = ref Config.syntax_quotations
 
 type open_arg =
   | Open of string
-  | Open_cmi of string
+  | Open_cmi of { path : string; cmx_guaranteed : bool }
 
 let open_args           = ref ([] : open_arg list)
 let parameters          = ref ([] : string list)
